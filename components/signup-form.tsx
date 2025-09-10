@@ -29,7 +29,6 @@ interface Employee {
   id: number;
   firstName: string;
   lastName: string;
-  employeeCode: string;
   position: string;
 }
 
@@ -53,7 +52,6 @@ export function SignupForm({
     email: "",
     phone: "",
     position: "",
-    employeeCode: "",
     department: "",
     password: "",
     confirmPassword: ""
@@ -98,7 +96,6 @@ export function SignupForm({
           email: formData.email,
           phone: formData.phone,
           position: formData.position,
-          employeeCode: formData.employeeCode,
           department: formData.department,
           password: formData.password,
         }),
@@ -115,7 +112,6 @@ export function SignupForm({
           email: "",
           phone: "",
           position: "",
-          employeeCode: "",
           department: "",
           password: "",
           confirmPassword: ""
@@ -191,27 +187,15 @@ export function SignupForm({
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div className="grid gap-3">
-                  <Label htmlFor="phone">เบอร์โทรศัพท์</Label>
-                  <Input
-                    id="phone"
-                    type="tel"
-                    placeholder="081-234-5678"
-                    value={formData.phone}
-                    onChange={(e) => setFormData({...formData, phone: e.target.value})}
-                  />
-                </div>
-                <div className="grid gap-3">
-                  <Label htmlFor="employeeCode">รหัสพนักงาน (ถ้าไม่ระบุ)</Label>
-                  <Input
-                    id="employeeCode"
-                    type="text"
-                    placeholder="EMP001"
-                    value={formData.employeeCode}
-                    onChange={(e) => setFormData({...formData, employeeCode: e.target.value})}
-                  />
-                </div>
+              <div className="grid gap-3">
+                <Label htmlFor="phone">เบอร์โทรศัพท์</Label>
+                <Input
+                  id="phone"
+                  type="tel"
+                  placeholder="081-234-5678"
+                  value={formData.phone}
+                  onChange={(e) => setFormData({...formData, phone: e.target.value})}
+                />
               </div>
 
               <div className="grid gap-3">
