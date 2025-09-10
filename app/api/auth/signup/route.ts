@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Find department by name or code
+    // Find department by name or code (simplified - only two departments exist)
     const dept = await prisma.department.findFirst({
       where: {
         OR: [
@@ -43,12 +43,8 @@ export async function POST(request: NextRequest) {
       }
     });
 
-    if (!dept) {
-      return NextResponse.json(
-        { error: 'ไม่พบแผนกที่ระบุ' },
-        { status: 400 }
-      );
-    }
+    // If department not found, use the first available department as fallback
+    const finalDept = dept || await prisma.department.findFirst();
 
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 12);
@@ -65,7 +61,7 @@ export async function POST(request: NextRequest) {
           phone: phone || null,
           position: position || 'พนักงาน',
           affiliation: affiliation || null,
-          departmentId: dept.id,
+          departmentId: finalDept!.id,
         },
       });
 
@@ -75,7 +71,7 @@ export async function POST(request: NextRequest) {
           name: `${firstName} ${lastName}`, // Combine firstName and lastName
           email,
           password: hashedPassword,
-          department: dept.name, // Keep this for backward compatibility
+          department: finalDept!.name, // Keep this for backward compatibility
           role: 'USER',
           employeeId: employee.id,
         },

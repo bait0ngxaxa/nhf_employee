@@ -49,6 +49,7 @@ export function SignupForm({
   const [formData, setFormData] = useState({
     firstName: "",
     lastName: "",
+    nickname: "",
     email: "",
     phone: "",
     position: "",
@@ -93,6 +94,7 @@ export function SignupForm({
         body: JSON.stringify({
           firstName: formData.firstName,
           lastName: formData.lastName,
+          nickname: formData.nickname,
           email: formData.email,
           phone: formData.phone,
           position: formData.position,
@@ -109,6 +111,7 @@ export function SignupForm({
         setFormData({
           firstName: "",
           lastName: "",
+          nickname: "",
           email: "",
           phone: "",
           position: "",
@@ -173,6 +176,17 @@ export function SignupForm({
                     required
                   />
                 </div>
+              </div>
+
+              <div className="grid gap-3">
+                <Label htmlFor="nickname">ชื่อเล่น (ไม่บังคับ)</Label>
+                <Input
+                  id="nickname"
+                  type="text"
+                  placeholder="ชื่อเล่นที่ใช้ในชีวิตประจำวัน"
+                  value={formData.nickname}
+                  onChange={(e) => setFormData({...formData, nickname: e.target.value})}
+                />
               </div>
 
               <div className="grid gap-3">
