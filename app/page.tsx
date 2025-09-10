@@ -1,103 +1,243 @@
-import Image from "next/image";
+'use client';
+
+import { AuthStatus } from "../components/AuthStatus";
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Users, UserPlus, BarChart3, Shield, Clock, Database } from "lucide-react";
+import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
+import { useEffect } from "react";
+
+import { Session } from 'next-auth';
 
 export default function Home() {
-  return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+  const { data: session, status } = useSession();
+  const router = useRouter();
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+  // Redirect authenticated users to dashboard
+  useEffect(() => {
+    if (status === 'authenticated' && session) {
+      router.push('/dashboard');
+    }
+  }, [status, session, router]);
+
+  // Loading state
+  if (status === 'loading') {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin h-8 w-8 border-4 border-blue-600 border-t-transparent rounded-full mx-auto mb-4"></div>
+          <p className="text-gray-600">กำลังโหลดระบบ...</p>
         </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
+      {/* Header */}
+      <header className="bg-white shadow-sm border-b">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center py-4">
+            <div className="flex items-center space-x-3">
+              <div className="bg-blue-600 p-2 rounded-lg">
+                <Users className="h-6 w-6 text-white" />
+              </div>
+              <div>
+                <h1 className="text-xl font-bold text-gray-900">ระบบบันทึกข้อมูลพนักงาน</h1>
+                <p className="text-sm text-gray-500">Employee Management System</p>
+              </div>
+            </div>
+            <AuthStatus />
+          </div>
+        </div>
+      </header>
+
+      {/* Main Content */}
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {session ? (
+          <AuthenticatedContent session={session} />
+        ) : (
+          <UnauthenticatedContent />
+        )}
       </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
     </div>
+  );
+}
+
+// Component for authenticated users
+function AuthenticatedContent({ session }: { session: Session }) {
+  return (
+    <>
+      <div className="mb-8">
+        <h2 className="text-3xl font-bold text-gray-900 mb-2">ยินดีต้อนรับคุณ {session.user?.name}</h2>
+        <p className="text-lg text-gray-600">จัดการข้อมูลพนักงานในองค์กรของคุณอย่างมีประสิทธิภาพ</p>
+      </div>
+
+      {/* Quick Actions */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+        <Card className="hover:shadow-lg transition-shadow cursor-pointer">
+          <CardHeader className="flex flex-row items-center space-y-0 pb-2">
+            <UserPlus className="h-8 w-8 text-blue-600" />
+            <div className="ml-4">
+              <CardTitle className="text-lg">เพิ่มพนักงานใหม่</CardTitle>
+              <CardDescription>บันทึกข้อมูลพนักงานใหม่เข้าระบบ</CardDescription>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <Link href="/employees/add">
+              <Button className="w-full">เพิ่มพนักงาน</Button>
+            </Link>
+          </CardContent>
+        </Card>
+
+        <Card className="hover:shadow-lg transition-shadow cursor-pointer">
+          <CardHeader className="flex flex-row items-center space-y-0 pb-2">
+            <Users className="h-8 w-8 text-green-600" />
+            <div className="ml-4">
+              <CardTitle className="text-lg">จัดการพนักงาน</CardTitle>
+              <CardDescription>ดูและแก้ไขข้อมูลพนักงาน</CardDescription>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <Link href="/employees">
+              <Button variant="outline" className="w-full">ดูรายการพนักงาน</Button>
+            </Link>
+          </CardContent>
+        </Card>
+
+        <Card className="hover:shadow-lg transition-shadow cursor-pointer">
+          <CardHeader className="flex flex-row items-center space-y-0 pb-2">
+            <BarChart3 className="h-8 w-8 text-purple-600" />
+            <div className="ml-4">
+              <CardTitle className="text-lg">รายงาน</CardTitle>
+              <CardDescription>ดูสถิติและรายงานพนักงาน</CardDescription>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <Link href="/reports">
+              <Button variant="outline" className="w-full">ดูรายงาน</Button>
+            </Link>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Statistics Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-gray-600">พนักงานทั้งหมด</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-blue-600">156</div>
+            <p className="text-xs text-gray-500">+12% จากเดือนที่แล้ว</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-gray-600">แผนกบริหาร</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-green-600">89</div>
+            <p className="text-xs text-gray-500">57%</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-gray-600">แผนกวิชาการ</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-purple-600">67</div>
+            <p className="text-xs text-gray-500">43%</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-gray-600">เข้าร่วมใหม่</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-orange-600">12</div>
+            <p className="text-xs text-gray-500">เดือนนี้</p>
+          </CardContent>
+        </Card>
+      </div>
+    </>
+  );
+}
+
+// Component for unauthenticated users
+function UnauthenticatedContent() {
+  return (
+    <>
+      <div className="mb-12 text-center">
+        <h2 className="text-4xl font-bold text-gray-900 mb-4">ยินดีต้อนรับสู่ระบบจัดการพนักงาน</h2>
+        <p className="text-xl text-gray-600 max-w-3xl mx-auto">
+          ระบบที่ช่วยให้คุณจัดการข้อมูลพนักงานในองค์กรของคุณอย่างมีประสิทธิภาพและปลอดภัย
+        </p>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
+        <Card className="text-center">
+          <CardHeader>
+            <div className="mx-auto bg-blue-100 p-3 rounded-full w-16 h-16 flex items-center justify-center mb-4">
+              <Shield className="h-8 w-8 text-blue-600" />
+            </div>
+            <CardTitle className="text-xl">ปลอดภัยสูง</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <CardDescription className="text-base">
+              ระบบรักษาความปลอดภัยข้อมูลด้วยเทคโนโลยีการเข้ารหัสและการยืนยันตัวตนที่ทันสมัย
+            </CardDescription>
+          </CardContent>
+        </Card>
+
+        <Card className="text-center">
+          <CardHeader>
+            <div className="mx-auto bg-green-100 p-3 rounded-full w-16 h-16 flex items-center justify-center mb-4">
+              <Database className="h-8 w-8 text-green-600" />
+            </div>
+            <CardTitle className="text-xl">จัดการข้อมูล</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <CardDescription className="text-base">
+              บันทึกและจัดการข้อมูลพนักงานอย่างเป็นระบบ ค้นหา แก้ไข และลบข้อมูลได้ง่าย
+            </CardDescription>
+          </CardContent>
+        </Card>
+
+        <Card className="text-center">
+          <CardHeader>
+            <div className="mx-auto bg-purple-100 p-3 rounded-full w-16 h-16 flex items-center justify-center mb-4">
+              <Clock className="h-8 w-8 text-purple-600" />
+            </div>
+            <CardTitle className="text-xl">รายงานแบบเรียลไทม์</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <CardDescription className="text-base">
+              สร้างและดูรายงานสถิติพนักงานแบบเรียลไทม์ ช่วยในการตัดสินใจและวางแผน
+            </CardDescription>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="text-center bg-white rounded-lg shadow-lg p-8">
+        <h3 className="text-2xl font-bold text-gray-900 mb-4">พร้อมเริ่มต้นใช้งานระบบแล้วหรือยัง?</h3>
+        <p className="text-lg text-gray-600 mb-6">
+          เข้าสู่ระบบหรือสมัครสมาชิกเพื่อเริ่มใช้งานระบบจัดการพนักงาน
+        </p>
+        <div className="flex justify-center space-x-4">
+          <Link href="/login">
+            <Button size="lg" className="px-8">เข้าสู่ระบบ</Button>
+          </Link>
+          <Link href="/signup">
+            <Button variant="outline" size="lg" className="px-8">สมัครสมาชิก</Button>
+          </Link>
+        </div>
+      </div>
+    </>
   );
 }

@@ -1,0 +1,75 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id         Int       @id @default(autoincrement())
+  email      String    @unique
+  name       String?
+  password   String
+  department String?
+  role       String    @default("USER")
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  
+  // Relationship with Employee
+  employee   Employee? @relation(fields: [employeeId], references: [id])
+  employeeId Int?      @unique
+
+  @@map("users")
+}
+
+model Employee {
+  id          Int       @id @default(autoincrement())
+  firstName   String    // ชื่อ
+  lastName    String    // นามสกุล
+  nickname    String?   // ชื่อเล่น
+  phone       String?   // โทร
+  email       String    @unique // อีเมล
+  position    String    // ตำแหน่ง
+  affiliation String?   // สังกัด
+  hireDate    DateTime  @default(now()) // วันที่เข้าทำงาน
+  status      EmployeeStatus @default(ACTIVE) // สถานะพนักงาน
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  // Relationship with User (for login access)
+  user        User?
+  
+  // Relationship with Department
+  dept        Department @relation(fields: [departmentId], references: [id])
+  departmentId Int
+
+  @@map("employees")
+}
+
+model Department {
+  id          Int        @id @default(autoincrement())
+  name        String     @unique // ชื่อแผนก
+  code        String     @unique // รหัสแผนก
+  description String?    // คำอธิบาย
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  
+  // Relationships
+  employees   Employee[]
+
+  @@map("departments")
+}
+
+enum EmployeeStatus {
+  ACTIVE      // ปฏิบัติงาน
+  INACTIVE    // ลาออก
+  SUSPENDED   // ถูกระงับ
+}
