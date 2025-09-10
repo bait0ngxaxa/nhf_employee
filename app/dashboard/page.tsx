@@ -24,6 +24,7 @@ import { signOut } from 'next-auth/react';
 import { AddEmployeeForm } from '@/components/AddEmployeeForm';
 import { EmployeeList } from '@/components/EmployeeList';
 import { CSVLink } from 'react-csv';
+import { useTitle } from '@/hook/useTitle';
 
 // Type definitions
 interface MenuItem {
@@ -105,6 +106,7 @@ export default function DashboardPage() {
 
   const user = session?.user;
   const isAdmin = user?.role === 'ADMIN';
+  useTitle('Dashboard');
 
   // Fetch employee statistics
   const fetchEmployeeStats = useCallback(async () => {

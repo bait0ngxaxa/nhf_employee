@@ -6,7 +6,7 @@ import { authOptions } from '@/lib/auth';
 // PATCH - อัปเดตข้อมูลพนักงาน (สถานะ)
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -15,7 +15,8 @@ export async function PATCH(
       return NextResponse.json({ error: 'ไม่มีสิทธิ์เข้าถึง' }, { status: 403 });
     }
 
-    const employeeId = parseInt(params.id);
+    const { id } = await params;
+    const employeeId = parseInt(id);
     const { status } = await request.json();
 
     // Validation
@@ -73,7 +74,7 @@ export async function PATCH(
 // DELETE - ลบพนักงาน (ถ้าต้องการ)
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -82,7 +83,8 @@ export async function DELETE(
       return NextResponse.json({ error: 'ไม่มีสิทธิ์เข้าถึง' }, { status: 403 });
     }
 
-    const employeeId = parseInt(params.id);
+    const resolvedParams = await params;
+    const employeeId = parseInt(resolvedParams.id);
 
     // Check if employee exists
     const existingEmployee = await prisma.employee.findUnique({

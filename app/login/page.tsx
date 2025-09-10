@@ -2,6 +2,9 @@
 
 import { LoginForm } from "@/components/login-form"
 import { Suspense } from "react"
+import { useTitle } from "@/hook/useTitle";
+
+
 
 function LoginPageContent() {
   return (
@@ -13,7 +16,9 @@ function LoginPageContent() {
   )
 }
 
+
 export default function Page() {
+  useTitle('เข้าสู่ระบบ');
   return (
     <Suspense fallback={
       <div className="flex min-h-svh w-full items-center justify-center p-6 md:p-10">
