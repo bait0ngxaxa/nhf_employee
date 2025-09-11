@@ -131,7 +131,11 @@ export function EditEmployeeForm({ employee, isOpen, onClose, onSuccess }: EditE
       const data = await response.json();
 
       if (response.ok) {
+        // Close the main dialog immediately
+        onClose();
+        // Show success modal
         setShowSuccessModal(true);
+        // Call success callback to refresh data
         if (onSuccess) {
           onSuccess();
         }
@@ -147,7 +151,7 @@ export function EditEmployeeForm({ employee, isOpen, onClose, onSuccess }: EditE
 
   const handleSuccessModalClose = () => {
     setShowSuccessModal(false);
-    onClose();
+    // Don't call onClose here since we already closed the main dialog
   };
 
   const resetForm = () => {

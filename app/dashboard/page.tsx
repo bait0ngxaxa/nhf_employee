@@ -100,6 +100,7 @@ export default function DashboardPage() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [employeeStats, setEmployeeStats] = useState({
     total: 0,
+    active: 0,
     admin: 0,
     academic: 0
   });
@@ -125,6 +126,7 @@ export default function DashboardPage() {
           
           const stats = {
             total: employees.length,
+            active: employees.filter((emp: Employee) => emp.status === 'ACTIVE').length,
             admin: employees.filter((emp: Employee) => emp.dept.code === 'ADMIN').length,
             academic: employees.filter((emp: Employee) => emp.dept.code === 'ACADEMIC').length
           };
@@ -331,7 +333,7 @@ export default function DashboardPage() {
               </div>
             </div>
             
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
               <Card>
                 <CardHeader>
                   <CardTitle>พนักงานทั้งหมด</CardTitle>
@@ -343,10 +345,19 @@ export default function DashboardPage() {
               </Card>
               <Card>
                 <CardHeader>
+                  <CardTitle>พนักงานปัจจุบัน</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-3xl font-bold text-green-600">{employeeStats.active}</p>
+                  <p className="text-sm text-gray-600">คน (ทำงานอยู่)</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader>
                   <CardTitle>แผนกบริหาร</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-3xl font-bold text-green-600">{employeeStats.admin}</p>
+                  <p className="text-3xl font-bold text-orange-600">{employeeStats.admin}</p>
                   <p className="text-sm text-gray-600">คน</p>
                 </CardContent>
               </Card>
