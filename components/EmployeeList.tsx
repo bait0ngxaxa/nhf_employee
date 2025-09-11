@@ -4,9 +4,10 @@ import { useState, useEffect } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Search, ChevronLeft, ChevronRight, Download, Edit } from 'lucide-react';
+import { Search, ChevronLeft, ChevronRight, Download, Edit, Settings } from 'lucide-react';
 import { CSVLink } from 'react-csv';
 import { EditStatusModal } from '@/components/EditStatusModal';
+import { EditEmployeeForm } from '@/components/EditEmployeeForm';
 
 interface Department {
   id: number;
@@ -72,6 +73,8 @@ export function EmployeeList({ refreshTrigger, userRole }: EmployeeListProps) {
   const [isExporting, setIsExporting] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isEditFormOpen, setIsEditFormOpen] = useState(false);
+  const [employeeToEdit, setEmployeeToEdit] = useState<Employee | null>(null);
 
   // Pagination calculations
   const totalPages = Math.ceil(filteredEmployees.length / itemsPerPage);
@@ -165,7 +168,7 @@ export function EmployeeList({ refreshTrigger, userRole }: EmployeeListProps) {
       'ตำแหน่ง': employee.position,
       'สังกัด': employee.affiliation || '-',
       'แผนก': employee.dept.name,
-      'อีเมล': employee.email,
+      'อีเมล': employee.email.includes('@temp.local') ? '-' : employee.email,
       'เบอร์โทร': employee.phone || '-',
       'วันที่เข้าทำงาน': new Date(employee.hireDate).toLocaleDateString('th-TH'),
       'สถานะ': employee.status === 'ACTIVE' ? 'ทำงานอยู่' : employee.status === 'INACTIVE' ? 'ไม่ทำงาน' : 'ถูกระงับ',
@@ -213,6 +216,22 @@ export function EmployeeList({ refreshTrigger, userRole }: EmployeeListProps) {
         ? { ...emp, status: newStatus as 'ACTIVE' | 'INACTIVE' | 'SUSPENDED' }
         : emp
     ));
+  };
+
+  // Handle edit employee
+  const handleEditEmployee = (employee: Employee) => {
+    setEmployeeToEdit(employee);
+    setIsEditFormOpen(true);
+  };
+
+  const handleCloseEditForm = () => {
+    setIsEditFormOpen(false);
+    setEmployeeToEdit(null);
+  };
+
+  const handleEmployeeUpdate = () => {
+    // Refresh the employee list after successful update
+    fetchEmployees();
   };
 
   if (isLoading) {
@@ -352,7 +371,9 @@ export function EmployeeList({ refreshTrigger, userRole }: EmployeeListProps) {
                     <Badge variant="outline">{employee.dept.name}</Badge>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900">{employee.email}</div>
+                    <div className="text-sm text-gray-900">
+                      {employee.email.includes('@temp.local') ? '-' : employee.email}
+                    </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm text-gray-900">{employee.phone || '-'}</div>
@@ -364,15 +385,26 @@ export function EmployeeList({ refreshTrigger, userRole }: EmployeeListProps) {
                  
                   {userRole === 'ADMIN' && (
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleEditStatus(employee)}
-                        className="flex items-center space-x-1 text-blue-600 hover:text-blue-700"
-                      >
-                        <Edit className="h-3 w-3" />
-                        <span>แก้ไขสถานะ</span>
-                      </Button>
+                      <div className="flex items-center space-x-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleEditEmployee(employee)}
+                          className="flex items-center space-x-1 text-green-600 hover:text-green-700"
+                        >
+                          <Edit className="h-3 w-3" />
+                          <span>แก้ไข</span>
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleEditStatus(employee)}
+                          className="flex items-center space-x-1 text-blue-600 hover:text-blue-700"
+                        >
+                          <Settings className="h-3 w-3" />
+                          <span>สถานะ</span>
+                        </Button>
+                      </div>
                     </td>
                   )}
                 </tr>
@@ -454,6 +486,14 @@ export function EmployeeList({ refreshTrigger, userRole }: EmployeeListProps) {
         isOpen={isEditModalOpen}
         onClose={handleCloseEditModal}
         onStatusUpdate={handleStatusUpdate}
+      />
+
+      {/* Edit Employee Form */}
+      <EditEmployeeForm
+        employee={employeeToEdit}
+        isOpen={isEditFormOpen}
+        onClose={handleCloseEditForm}
+        onSuccess={handleEmployeeUpdate}
       />
     </div>
   );

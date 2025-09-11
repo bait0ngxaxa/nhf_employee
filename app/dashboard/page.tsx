@@ -18,11 +18,13 @@ import {
   LogOut,
   Plus,
   UserPlus,
-  Download
+  Download,
+  Upload
 } from 'lucide-react';
 import { signOut } from 'next-auth/react';
 import { AddEmployeeForm } from '@/components/AddEmployeeForm';
 import { EmployeeList } from '@/components/EmployeeList';
+import { ImportEmployeeCSV } from '@/components/ImportEmployeeCSV';
 import { CSVLink } from 'react-csv';
 import { useTitle } from '@/hook/useTitle';
 import ITIssuesPage from '@/app/it-issues/page';
@@ -184,6 +186,13 @@ export default function DashboardPage() {
       icon: UserPlus,
       description: 'เพิ่มข้อมูลพนักงานใหม่',
       requiredRole: 'ADMIN'
+    },
+    {
+      id: 'import-employee',
+      label: 'นำเข้าจาก CSV',
+      icon: Upload,
+      description: 'นำเข้าข้อมูลพนักงานจากไฟล์ CSV',
+      requiredRole: 'ADMIN'
     }
   ];
 
@@ -311,6 +320,10 @@ export default function DashboardPage() {
                     </Button>
                   </CSVLink>
                 )}
+                <Button onClick={() => handleMenuClick('import-employee')} variant="outline" className="flex items-center space-x-2">
+                  <Upload className="h-4 w-4" />
+                  <span>นำเข้า CSV</span>
+                </Button>
                 <Button onClick={() => handleMenuClick('add-employee')} className="flex items-center space-x-2">
                   <Plus className="h-4 w-4" />
                   <span>เพิ่มพนักงาน</span>
@@ -379,6 +392,14 @@ export default function DashboardPage() {
             </div>
             <AddEmployeeForm onSuccess={handleEmployeeAdded} />
           </div>
+        );
+      
+      case 'import-employee':
+        return (
+          <ImportEmployeeCSV 
+            onSuccess={handleEmployeeAdded}
+            onBack={() => handleMenuClick('employee-management')}
+          />
         );
       
       default:
