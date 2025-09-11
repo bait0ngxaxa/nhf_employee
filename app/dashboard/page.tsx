@@ -25,6 +25,7 @@ import { AddEmployeeForm } from '@/components/AddEmployeeForm';
 import { EmployeeList } from '@/components/EmployeeList';
 import { CSVLink } from 'react-csv';
 import { useTitle } from '@/hook/useTitle';
+import ITIssuesPage from '@/app/it-issues/page';
 
 // Type definitions
 interface MenuItem {
@@ -160,15 +161,15 @@ export default function DashboardPage() {
   const menuItems: MenuItem[] = [
     {
       id: 'it-equipment',
-      label: 'ครุภัณฑ์ไอที',
+      label: 'IT-Equipments',
       icon: Computer,
       description: 'จัดการครุภัณฑ์ไอทีขององค์กร'
     },
     {
       id: 'it-support',
-      label: 'แจ้งปัญหาไอที',
+      label: 'IT Support',
       icon: AlertTriangle,
-      description: 'แจ้งปัญหาและขอรับการซ่อมแซม'
+      description: 'แจ้งปัญหาไอทีและติดตามสถานะ'
     },
     {
       id: 'employee-management',
@@ -192,6 +193,14 @@ export default function DashboardPage() {
   );
 
   const handleMenuClick = (menuId: string) => {
+    // Check if user has permission for this menu item
+    const menuItem = menuItems.find(item => item.id === menuId);
+    if (menuItem?.requiredRole === 'ADMIN' && !isAdmin) {
+      // If user tries to access admin-only content, redirect to access denied
+      window.location.href = '/access-denied';
+      return;
+    }
+    
     setSelectedMenu(menuId);
     // On mobile, close sidebar after selection
     if (window.innerWidth < 768) {
@@ -272,15 +281,7 @@ export default function DashboardPage() {
               <h2 className="text-2xl font-bold text-gray-900">แจ้งปัญหาไอที</h2>
               <p className="text-gray-600">แจ้งปัญหาและขอรับการซ่อมแซม</p>
             </div>
-            <Card>
-              <CardHeader>
-                <CardTitle>สร้างทิกเก็ตใหม่</CardTitle>
-                <CardDescription>แจ้งปัญหาใหม่ให้ทีมไอที</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <p className="text-gray-700">ฟีเจอร์สำหรับแจ้งปัญหาและขอความช่วยเหลือจะพัฒนาในอนาคต</p>
-              </CardContent>
-            </Card>
+            <ITIssuesPage />
           </div>
         );
       

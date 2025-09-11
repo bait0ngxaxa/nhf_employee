@@ -45,7 +45,7 @@ export default function Home() {
                 <Users className="h-6 w-6 text-white" />
               </div>
               <div>
-                <h1 className="text-xl font-bold text-gray-900">ระบบบันทึกข้อมูลพนักงาน</h1>
+                <h1 className="text-xl font-bold text-gray-900">ระบบบันทึกข้อมูล แจ้งปัญหาไอทีและติดตามสถานะ</h1>
                 <p className="text-sm text-gray-500">Employee Management System</p>
               </div>
             </div>
@@ -174,9 +174,9 @@ function UnauthenticatedContent() {
   return (
     <>
       <div className="mb-12 text-center">
-        <h2 className="text-4xl font-bold text-gray-900 mb-4">ยินดีต้อนรับสู่ระบบจัดการพนักงาน</h2>
+        <h2 className="text-4xl font-bold text-gray-900 mb-4">NHF IT Management</h2>
         <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-          ระบบที่ช่วยให้คุณจัดการข้อมูลพนักงานในองค์กรของคุณอย่างมีประสิทธิภาพและปลอดภัย
+          National Health Foundation (NHF) is a non-profit organization that provides free medical services to people in need.
         </p>
       </div>
 
@@ -186,11 +186,11 @@ function UnauthenticatedContent() {
             <div className="mx-auto bg-blue-100 p-3 rounded-full w-16 h-16 flex items-center justify-center mb-4">
               <Shield className="h-8 w-8 text-blue-600" />
             </div>
-            <CardTitle className="text-xl">ปลอดภัยสูง</CardTitle>
+            <CardTitle className="text-xl">IT Support Ticket</CardTitle>
           </CardHeader>
           <CardContent>
             <CardDescription className="text-base">
-              ระบบรักษาความปลอดภัยข้อมูลด้วยเทคโนโลยีการเข้ารหัสและการยืนยันตัวตนที่ทันสมัย
+              ระบบรายงานปัญหาเกี่ยวกับสารสนเทศ
             </CardDescription>
           </CardContent>
         </Card>
@@ -200,7 +200,7 @@ function UnauthenticatedContent() {
             <div className="mx-auto bg-green-100 p-3 rounded-full w-16 h-16 flex items-center justify-center mb-4">
               <Database className="h-8 w-8 text-green-600" />
             </div>
-            <CardTitle className="text-xl">จัดการข้อมูล</CardTitle>
+            <CardTitle className="text-xl">Employees Manage</CardTitle>
           </CardHeader>
           <CardContent>
             <CardDescription className="text-base">
@@ -214,11 +214,11 @@ function UnauthenticatedContent() {
             <div className="mx-auto bg-purple-100 p-3 rounded-full w-16 h-16 flex items-center justify-center mb-4">
               <Clock className="h-8 w-8 text-purple-600" />
             </div>
-            <CardTitle className="text-xl">รายงานแบบเรียลไทม์</CardTitle>
+            <CardTitle className="text-xl">IT Equipments</CardTitle>
           </CardHeader>
           <CardContent>
             <CardDescription className="text-base">
-              สร้างและดูรายงานสถิติพนักงานแบบเรียลไทม์ ช่วยในการตัดสินใจและวางแผน
+              Coming Soon | In Progress
             </CardDescription>
           </CardContent>
         </Card>

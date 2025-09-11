@@ -11,7 +11,6 @@ import {
 } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { SuccessModal } from "@/components/SuccessModal"
 import { useState } from "react"
 import { useRouter } from "next/navigation"
@@ -21,21 +20,12 @@ interface User {
   id: number;
   name: string;
   email: string;
-  department: string;
   role: string;
-}
-
-interface Employee {
-  id: number;
-  firstName: string;
-  lastName: string;
-  position: string;
 }
 
 interface SignupSuccessResponse {
   message: string;
   user: User;
-  employee: Employee;
 }
 
 interface SignupErrorResponse {
@@ -47,13 +37,8 @@ export function SignupForm({
   ...props
 }: React.ComponentProps<"div">) {
   const [formData, setFormData] = useState({
-    firstName: "",
-    lastName: "",
-    nickname: "",
+    name: "",
     email: "",
-    phone: "",
-    position: "",
-    department: "",
     password: "",
     confirmPassword: ""
   });
@@ -63,10 +48,7 @@ export function SignupForm({
   const [successData, setSuccessData] = useState<SignupSuccessResponse | null>(null);
   const router = useRouter();
 
-  const departments = [
-    "บริหาร",
-    "วิชาการ"
-  ];
+
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -92,14 +74,10 @@ export function SignupForm({
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          firstName: formData.firstName,
-          lastName: formData.lastName,
-          nickname: formData.nickname,
+          name: formData.name,
           email: formData.email,
-          phone: formData.phone,
-          position: formData.position,
-          department: formData.department,
           password: formData.password,
+          confirmPassword: formData.confirmPassword,
         }),
       });
 
@@ -109,13 +87,8 @@ export function SignupForm({
         setShowSuccessModal(true);
         // Reset form
         setFormData({
-          firstName: "",
-          lastName: "",
-          nickname: "",
+          name: "",
           email: "",
-          phone: "",
-          position: "",
-          department: "",
           password: "",
           confirmPassword: ""
         });
@@ -141,7 +114,7 @@ export function SignupForm({
         <CardHeader>
           <CardTitle>สร้างบัญชีใหม่</CardTitle>
           <CardDescription>
-            กรุณากรอกข้อมูลด้านล่างเพื่อสร้างบัญชีของคุณ
+            กรุณากรอกข้อมูลพื้นฐานเพื่อสร้างบัญชีผู้ใช้ของคุณ
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -153,39 +126,15 @@ export function SignupForm({
                 </div>
               )}
               
-              <div className="grid grid-cols-2 gap-3">
-                <div className="grid gap-3">
-                  <Label htmlFor="firstName">ชื่อ</Label>
-                  <Input
-                    id="firstName"
-                    type="text"
-                    placeholder="ชื่อจริง"
-                    value={formData.firstName}
-                    onChange={(e) => setFormData({...formData, firstName: e.target.value})}
-                    required
-                  />
-                </div>
-                <div className="grid gap-3">
-                  <Label htmlFor="lastName">นามสกุล</Label>
-                  <Input
-                    id="lastName"
-                    type="text"
-                    placeholder="นามสกุลจริง"
-                    value={formData.lastName}
-                    onChange={(e) => setFormData({...formData, lastName: e.target.value})}
-                    required
-                  />
-                </div>
-              </div>
-
               <div className="grid gap-3">
-                <Label htmlFor="nickname">ชื่อเล่น (ไม่บังคับ)</Label>
+                <Label htmlFor="name">ชื่อ-นามสกุล</Label>
                 <Input
-                  id="nickname"
+                  id="name"
                   type="text"
-                  placeholder="ชื่อเล่นที่ใช้ในชีวิตประจำวัน"
-                  value={formData.nickname}
-                  onChange={(e) => setFormData({...formData, nickname: e.target.value})}
+                  placeholder="กรอกชื่อ-นามสกุล"
+                  value={formData.name}
+                  onChange={(e) => setFormData({...formData, name: e.target.value})}
+                  required
                 />
               </div>
 
@@ -201,47 +150,7 @@ export function SignupForm({
                 />
               </div>
 
-              <div className="grid gap-3">
-                <Label htmlFor="phone">เบอร์โทรศัพท์</Label>
-                <Input
-                  id="phone"
-                  type="tel"
-                  placeholder="081-234-5678"
-                  value={formData.phone}
-                  onChange={(e) => setFormData({...formData, phone: e.target.value})}
-                />
-              </div>
 
-              <div className="grid gap-3">
-                <Label htmlFor="position">ตำแหน่ง</Label>
-                <Input
-                  id="position"
-                  type="text"
-                  placeholder="เช่น ผู้จัดการ, อาจารย์, นักวิชาการ"
-                  value={formData.position}
-                  onChange={(e) => setFormData({...formData, position: e.target.value})}
-                />
-              </div>
-
-              <div className="grid gap-3">
-                <Label htmlFor="department">แผนก</Label>
-                <Select 
-                  value={formData.department} 
-                  onValueChange={(value) => setFormData({...formData, department: value})}
-                  required
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="เลือกแผนก" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {departments.map((dept) => (
-                      <SelectItem key={dept} value={dept}>
-                        {dept}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
 
               <div className="grid gap-3">
                 <Label htmlFor="password">รหัสผ่าน</Label>
@@ -286,7 +195,7 @@ export function SignupForm({
         isOpen={showSuccessModal}
         onClose={handleModalClose}
         title="สมัครสมาชิกสำเร็จ!"
-        description={`ยินดีต้อนรับ! บัญชีของคุณถูกสร้างเรียบร้อยแล้ว${successData?.user?.name ? ` สำหรับ ${successData.user.name}` : ''} คุณสามารถเข้าสู่ระบบได้ทันที`}
+        description={`ยินดีต้อนรับ! บัญชีผู้ใช้ของคุณถูกสร้างเรียบร้อยแล้ว${successData?.user?.name ? ` สำหรับ ${successData.user.name}` : ''} คุณสามารถเข้าสู่ระบบได้ทันที`}
         buttonText="ไปหน้าเข้าสู่ระบบ"
         onButtonClick={handleModalClose}
       />

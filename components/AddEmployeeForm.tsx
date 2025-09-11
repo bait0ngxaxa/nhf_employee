@@ -96,7 +96,7 @@ export function AddEmployeeForm({ onSuccess }: AddEmployeeFormProps) {
         const data = await response.json();
         setError(data.error || 'เกิดข้อผิดพลาดในการเพิ่มพนักงาน');
       }
-    } catch (err) {
+    } catch {
       setError('เกิดข้อผิดพลาดในการเชื่อมต่อ');
     } finally {
       setIsLoading(false);

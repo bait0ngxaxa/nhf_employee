@@ -16,16 +16,22 @@ datasource db {
 model User {
   id         Int       @id @default(autoincrement())
   email      String    @unique
-  name       String?
+  name       String    // Full name for display
   password   String
-  department String?
   role       String    @default("USER")
+  isActive   Boolean   @default(true) // Account status
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @updatedAt
   
-  // Relationship with Employee
+  // Optional relationship with Employee (for staff who have employee records)
   employee   Employee? @relation(fields: [employeeId], references: [id])
   employeeId Int?      @unique
+  
+  // Relationships with Tickets
+  reportedTickets Ticket[] @relation("ReportedTickets") // tickets ที่แจ้งโดย user นี้
+  assignedTickets Ticket[] @relation("AssignedTickets") // tickets ที่ได้รับมอบหมาย (สำหรับ admin)
+  comments TicketComment[] // comments ที่เขียนโดย user นี้
+  ticketViews TicketView[] // tickets ที่ user นี้เคยดูแล้ว
 
   @@map("users")
 }
@@ -68,8 +74,94 @@ model Department {
   @@map("departments")
 }
 
+model Ticket {
+  id          Int        @id @default(autoincrement())
+  title       String     // หัวข้อปัญหา
+  description String     @db.Text // รายละเอียดปัญหา
+  category    TicketCategory // หมวดหมู่ปัญหา
+  priority    TicketPriority @default(MEDIUM) // ระดับความสำคัญ
+  status      TicketStatus   @default(OPEN) // สถานะ ticket
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  resolvedAt  DateTime?  // วันที่แก้ไขเสร็จ
+  
+  // ความสัมพันธ์กับผู้แจ้ง (User)
+  reportedBy  User       @relation("ReportedTickets", fields: [reportedById], references: [id])
+  reportedById Int
+  
+  // ความสัมพันธ์กับผู้รับผิดชอบ (Admin)
+  assignedTo  User?      @relation("AssignedTickets", fields: [assignedToId], references: [id])
+  assignedToId Int?
+  
+  // ความสัมพันธ์กับ comments
+  comments    TicketComment[]
+  
+  // ความสัมพันธ์กับ views
+  views       TicketView[]
+
+  @@map("tickets")
+}
+
+model TicketComment {
+  id        Int      @id @default(autoincrement())
+  content   String   @db.Text // ความคิดเห็น
+  createdAt DateTime @default(now())
+  
+  // ความสัมพันธ์กับ ticket
+  ticket    Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  ticketId  Int
+  
+  // ความสัมพันธ์กับผู้เขียนความคิดเห็น
+  author    User     @relation(fields: [authorId], references: [id])
+  authorId  Int
+
+  @@map("ticket_comments")
+}
+
+model TicketView {
+  id       Int      @id @default(autoincrement())
+  viewedAt DateTime @default(now())
+  
+  // ความสัมพันธ์กับ ticket
+  ticket   Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  ticketId Int
+  
+  // ความสัมพันธ์กับผู้ดู
+  user     User     @relation(fields: [userId], references: [id])
+  userId   Int
+  
+  // Unique constraint to prevent duplicate views
+  @@unique([ticketId, userId])
+  @@map("ticket_views")
+}
+
 enum EmployeeStatus {
   ACTIVE      // ปฏิบัติงาน
   INACTIVE    // ลาออก
   SUSPENDED   // ถูกระงับ
+}
+
+enum TicketCategory {
+  HARDWARE    // ฮาร์ดแวร์
+  SOFTWARE    // ซอฟต์แวร์
+  NETWORK     // เครือข่าย
+  ACCOUNT     // บัญชีผู้ใช้
+  EMAIL       // อีเมล
+  PRINTER     // เครื่องพิมพ์
+  OTHER       // อื่นๆ
+}
+
+enum TicketPriority {
+  LOW         // ต่ำ
+  MEDIUM      // ปานกลาง
+  HIGH        // สูง
+  URGENT      // เร่งด่วน
+}
+
+enum TicketStatus {
+  OPEN        // เปิด
+  IN_PROGRESS // กำลังดำเนินการ
+  RESOLVED    // แก้ไขแล้ว
+  CLOSED      // ปิด
+  CANCELLED   // ยกเลิก
 }

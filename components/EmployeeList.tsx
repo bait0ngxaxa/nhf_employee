@@ -149,9 +149,10 @@ export function EmployeeList({ refreshTrigger, userRole }: EmployeeListProps) {
 
 
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('th-TH');
-  };
+  // Utility function for date formatting (currently used in CSV export)
+  // const formatDate = (dateString: string) => {
+  //   return new Date(dateString).toLocaleDateString('th-TH');
+  // };
 
   // Prepare CSV data for filtered employees
   const prepareCsvData = (): EmployeeCSVData[] => {

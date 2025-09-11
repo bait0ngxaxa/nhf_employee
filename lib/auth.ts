@@ -26,6 +26,13 @@ export const authOptions: NextAuthOptions = {
         // Find the user by email in the database
         const user = await prisma.user.findUnique({
           where: { email: credentials.email },
+          include: {
+            employee: {
+              include: {
+                dept: true
+              }
+            }
+          }
         });
 
         // Check if the user exists and the password is correct
@@ -38,7 +45,7 @@ export const authOptions: NextAuthOptions = {
             name: user.name,
             email: user.email,
             role: user.role,
-            department: user.department || undefined,
+            department: user.employee?.dept?.name || undefined,
           };
           return authorizedUser;
         } else {

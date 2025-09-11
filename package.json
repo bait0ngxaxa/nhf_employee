@@ -7,7 +7,8 @@
     "build": "next build --turbopack",
     "start": "next start",
     "lint": "eslint",
-    "db:seed": "npx prisma db seed"
+    "db:seed": "npx prisma db seed",
+    "test:email": "node test-email.js"
   },
   "dependencies": {
     "@prisma/client": "^6.15.0",
@@ -16,6 +17,7 @@
     "@radix-ui/react-select": "^2.2.6",
     "@radix-ui/react-separator": "^1.1.7",
     "@radix-ui/react-slot": "^1.2.3",
+    "@radix-ui/react-tabs": "^1.1.13",
     "@radix-ui/react-tooltip": "^1.2.8",
     "bcryptjs": "^3.0.2",
     "class-variance-authority": "^0.7.1",
@@ -23,6 +25,7 @@
     "lucide-react": "^0.543.0",
     "next": "15.5.2",
     "next-auth": "^4.24.11",
+    "nodemailer": "^6.10.1",
     "react": "19.1.0",
     "react-csv": "^2.2.2",
     "react-dom": "19.1.0",
@@ -33,6 +36,7 @@
     "@tailwindcss/postcss": "^4",
     "@types/bcryptjs": "^2.4.6",
     "@types/node": "^20",
+    "@types/nodemailer": "^7.0.1",
     "@types/react": "^19",
     "@types/react-csv": "^1.1.10",
     "@types/react-dom": "^19",
