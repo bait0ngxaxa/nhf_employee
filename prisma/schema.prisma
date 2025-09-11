@@ -1,9 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -14,154 +8,133 @@ datasource db {
 }
 
 model User {
-  id         Int       @id @default(autoincrement())
-  email      String    @unique
-  name       String    // Full name for display
-  password   String
-  role       String    @default("USER")
-  isActive   Boolean   @default(true) // Account status
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
-  
-  // Optional relationship with Employee (for staff who have employee records)
-  employee   Employee? @relation(fields: [employeeId], references: [id])
-  employeeId Int?      @unique
-  
-  // Relationships with Tickets
-  reportedTickets Ticket[] @relation("ReportedTickets") // tickets ที่แจ้งโดย user นี้
-  assignedTickets Ticket[] @relation("AssignedTickets") // tickets ที่ได้รับมอบหมาย (สำหรับ admin)
-  comments TicketComment[] // comments ที่เขียนโดย user นี้
-  ticketViews TicketView[] // tickets ที่ user นี้เคยดูแล้ว
+  id              Int             @id @default(autoincrement())
+  email           String          @unique
+  name            String
+  password        String
+  role            String          @default("USER")
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  employeeId      Int?            @unique
+  isActive        Boolean         @default(true)
+  comments        TicketComment[]
+  ticketViews     TicketView[]
+  assignedTickets Ticket[]        @relation("AssignedTickets")
+  reportedTickets Ticket[]        @relation("ReportedTickets")
+  employee        Employee?       @relation(fields: [employeeId], references: [id])
 
   @@map("users")
 }
 
 model Employee {
-  id          Int       @id @default(autoincrement())
-  firstName   String    // ชื่อ
-  lastName    String    // นามสกุล
-  nickname    String?   // ชื่อเล่น
-  phone       String?   // โทร
-  email       String    @unique // อีเมล
-  position    String    // ตำแหน่ง
-  affiliation String?   // สังกัด
-  hireDate    DateTime  @default(now()) // วันที่เข้าทำงาน
-  status      EmployeeStatus @default(ACTIVE) // สถานะพนักงาน
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  
-  // Relationship with User (for login access)
-  user        User?
-  
-  // Relationship with Department
-  dept        Department @relation(fields: [departmentId], references: [id])
+  id           Int            @id @default(autoincrement())
+  firstName    String
+  lastName     String
+  phone        String?
+  email        String         @unique
+  position     String
+  hireDate     DateTime       @default(now())
+  status       EmployeeStatus @default(ACTIVE)
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
   departmentId Int
+  affiliation  String?
+  nickname     String?
+  dept         Department     @relation(fields: [departmentId], references: [id])
+  user         User?
 
+  @@index([departmentId], map: "employees_departmentId_fkey")
   @@map("employees")
 }
 
 model Department {
   id          Int        @id @default(autoincrement())
-  name        String     @unique // ชื่อแผนก
-  code        String     @unique // รหัสแผนก
-  description String?    // คำอธิบาย
+  name        String     @unique
+  code        String     @unique
+  description String?
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
-  
-  // Relationships
   employees   Employee[]
 
   @@map("departments")
 }
 
 model Ticket {
-  id          Int        @id @default(autoincrement())
-  title       String     // หัวข้อปัญหา
-  description String     @db.Text // รายละเอียดปัญหา
-  category    TicketCategory // หมวดหมู่ปัญหา
-  priority    TicketPriority @default(MEDIUM) // ระดับความสำคัญ
-  status      TicketStatus   @default(OPEN) // สถานะ ticket
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
-  resolvedAt  DateTime?  // วันที่แก้ไขเสร็จ
-  
-  // ความสัมพันธ์กับผู้แจ้ง (User)
-  reportedBy  User       @relation("ReportedTickets", fields: [reportedById], references: [id])
+  id           Int             @id @default(autoincrement())
+  title        String
+  description  String          @db.Text
+  category     TicketCategory
+  priority     TicketPriority  @default(MEDIUM)
+  status       TicketStatus    @default(OPEN)
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+  resolvedAt   DateTime?
   reportedById Int
-  
-  // ความสัมพันธ์กับผู้รับผิดชอบ (Admin)
-  assignedTo  User?      @relation("AssignedTickets", fields: [assignedToId], references: [id])
   assignedToId Int?
-  
-  // ความสัมพันธ์กับ comments
-  comments    TicketComment[]
-  
-  // ความสัมพันธ์กับ views
-  views       TicketView[]
+  comments     TicketComment[]
+  views        TicketView[]
+  assignedTo   User?           @relation("AssignedTickets", fields: [assignedToId], references: [id])
+  reportedBy   User            @relation("ReportedTickets", fields: [reportedById], references: [id])
 
+  @@index([assignedToId], map: "tickets_assignedToId_fkey")
+  @@index([reportedById], map: "tickets_reportedById_fkey")
   @@map("tickets")
 }
 
 model TicketComment {
   id        Int      @id @default(autoincrement())
-  content   String   @db.Text // ความคิดเห็น
+  content   String   @db.Text
   createdAt DateTime @default(now())
-  
-  // ความสัมพันธ์กับ ticket
-  ticket    Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
   ticketId  Int
-  
-  // ความสัมพันธ์กับผู้เขียนความคิดเห็น
-  author    User     @relation(fields: [authorId], references: [id])
   authorId  Int
+  author    User     @relation(fields: [authorId], references: [id])
+  ticket    Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
 
+  @@index([authorId], map: "ticket_comments_authorId_fkey")
+  @@index([ticketId], map: "ticket_comments_ticketId_fkey")
   @@map("ticket_comments")
 }
 
 model TicketView {
   id       Int      @id @default(autoincrement())
   viewedAt DateTime @default(now())
-  
-  // ความสัมพันธ์กับ ticket
-  ticket   Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
   ticketId Int
-  
-  // ความสัมพันธ์กับผู้ดู
-  user     User     @relation(fields: [userId], references: [id])
   userId   Int
-  
-  // Unique constraint to prevent duplicate views
+  ticket   Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  user     User     @relation(fields: [userId], references: [id])
+
   @@unique([ticketId, userId])
+  @@index([userId], map: "ticket_views_userId_fkey")
   @@map("ticket_views")
 }
 
 enum EmployeeStatus {
-  ACTIVE      // ปฏิบัติงาน
-  INACTIVE    // ลาออก
-  SUSPENDED   // ถูกระงับ
+  ACTIVE
+  INACTIVE
+  SUSPENDED
 }
 
 enum TicketCategory {
-  HARDWARE    // ฮาร์ดแวร์
-  SOFTWARE    // ซอฟต์แวร์
-  NETWORK     // เครือข่าย
-  ACCOUNT     // บัญชีผู้ใช้
-  EMAIL       // อีเมล
-  PRINTER     // เครื่องพิมพ์
-  OTHER       // อื่นๆ
+  HARDWARE
+  SOFTWARE
+  NETWORK
+  ACCOUNT
+  EMAIL
+  PRINTER
+  OTHER
 }
 
 enum TicketPriority {
-  LOW         // ต่ำ
-  MEDIUM      // ปานกลาง
-  HIGH        // สูง
-  URGENT      // เร่งด่วน
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
 }
 
 enum TicketStatus {
-  OPEN        // เปิด
-  IN_PROGRESS // กำลังดำเนินการ
-  RESOLVED    // แก้ไขแล้ว
-  CLOSED      // ปิด
-  CANCELLED   // ยกเลิก
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+  CANCELLED
 }
