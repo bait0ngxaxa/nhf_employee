@@ -233,7 +233,7 @@ export default function EmailRequestPage() {
               {/* Department */}
               <div>
                 <label htmlFor="department" className="block text-sm font-medium text-gray-700 mb-2">
-                  สังกัด/แผนก <span className="text-red-500">*</span>
+                  สังกัด <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
@@ -243,7 +243,7 @@ export default function EmailRequestPage() {
                   onChange={handleInputChange}
                   required
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="เช่น แผนกบัญชีการเงิน"
+                  placeholder="เช่น มสช. สพบ."
                 />
               </div>
 
@@ -260,7 +260,7 @@ export default function EmailRequestPage() {
                   onChange={handleInputChange}
                   required
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="เช่น hr@company.com หรืออีเมลผู้จัดการที่รับผิดชอบ"
+                  placeholder="อีเมลที่ต้องการให้แจ้งกลับเมื่อสำเร็จ"
                 />
               </div>
             </div>

@@ -197,7 +197,7 @@ export function AddEmployeeForm({ onSuccess }: AddEmployeeFormProps) {
                 <Input
                   id="affiliation"
                   type="text"
-                  placeholder="เช่น โรงเรียน, สถาบันเอกชน, หน่วยราชการ"
+                  placeholder="เช่น มสช. สพบ."
                   value={formData.affiliation}
                   onChange={(e) => setFormData({...formData, affiliation: e.target.value})}
                 />
