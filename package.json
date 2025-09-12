@@ -8,7 +8,13 @@
     "start": "next start",
     "lint": "eslint",
     "db:seed": "npx prisma db seed",
-    "test:email": "node test-email.js"
+    "test:email": "node test-email.js",
+    "test:email-service": "node test-email-service.mjs",
+    "test:line": "node test-line-notification.js",
+    "test:notifications": "node test-full-notification.mjs",
+    "debug:line": "node debug-line.js",
+    "test:line-quick": "node test-line-quick.js",
+    "email:diagnostic": "node email-diagnostic.js"
   },
   "dependencies": {
     "@prisma/client": "^6.15.0",

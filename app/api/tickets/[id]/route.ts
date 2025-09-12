@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { emailService, TicketEmailData } from '@/lib/email';
+import { lineNotificationService } from '@/lib/line';
 
 // GET - Get single ticket with comments
 export async function GET(
@@ -217,7 +218,7 @@ export async function PATCH(
       }
     });
 
-    // Send email notification if status was changed
+    // Send email and LINE notification if status was changed
     if (status && status !== existingTicket.status) {
       try {
         const emailData: TicketEmailData = {
@@ -245,10 +246,15 @@ export async function PATCH(
         };
 
         // Send status update notification to the user who reported the ticket
+        console.log('📧 Sending status update email...');
         await emailService.sendStatusUpdateNotification(emailData, existingTicket.status);
-      } catch (emailError) {
-        console.error('Failed to send status update email:', emailError);
-        // Don't fail the update if email fails
+        
+        console.log('📱 Sending status update LINE notification...');
+        await lineNotificationService.sendStatusUpdateNotification(emailData, existingTicket.status);
+        
+      } catch (notificationError) {
+        console.error('Failed to send status update notifications:', notificationError);
+        // Don't fail the update if notifications fail
       }
     }
 

@@ -28,9 +28,14 @@ export interface TicketEmailData {
 }
 
 class EmailService {
-  private transporter: nodemailer.Transporter;
+  private transporter!: nodemailer.Transporter;
+  private isTransporterReady: boolean = false;
 
   constructor() {
+    this.initializeTransporter();
+  }
+
+  private initializeTransporter() {
     this.transporter = nodemailer.createTransport({
       host: process.env.SMTP_HOST || 'smtp.gmail.com',
       port: parseInt(process.env.SMTP_PORT || '587'),
@@ -42,7 +47,39 @@ class EmailService {
       tls: {
         rejectUnauthorized: false,
       },
+      pool: true, // Enable connection pooling
+      maxConnections: 5, // Max concurrent connections
+      maxMessages: 100, // Max messages per connection
+      rateDelta: 1000, // Rate limiting: 1 second
+      rateLimit: 5, // Max 5 messages per rateDelta
     });
+  }
+
+  private async verifyConnection(): Promise<boolean> {
+    try {
+      await this.transporter.verify();
+      this.isTransporterReady = true;
+      console.log('✅ SMTP connection verified successfully');
+      return true;
+    } catch (error) {
+      console.error('❌ SMTP connection verification failed:', error);
+      this.isTransporterReady = false;
+      
+      // Try to reinitialize the transporter
+      console.log('🔄 Reinitializing SMTP transporter...');
+      this.initializeTransporter();
+      
+      // Retry verification once
+      try {
+        await this.transporter.verify();
+        this.isTransporterReady = true;
+        console.log('✅ SMTP connection verified after reinitialize');
+        return true;
+      } catch (retryError) {
+        console.error('❌ SMTP connection failed after retry:', retryError);
+        return false;
+      }
+    }
   }
 
   private getCategoryLabel(category: string): string {
@@ -474,18 +511,66 @@ class EmailService {
         return false;
       }
 
-      const info = await this.transporter.sendMail({
-        from: `"NHF IT Support" <${process.env.SMTP_USER}>`,
-        to: emailData.to,
-        subject: emailData.subject,
-        html: emailData.html,
-        text: emailData.text,
-      });
+      // Verify connection before sending
+      if (!this.isTransporterReady) {
+        console.log('🔄 Verifying SMTP connection before sending...');
+        const connectionOk = await this.verifyConnection();
+        if (!connectionOk) {
+          console.error('❌ Cannot establish SMTP connection. Email not sent.');
+          return false;
+        }
+      }
 
-      console.log('✅ Email sent successfully:', info.messageId);
-      return true;
+      // Add timeout and retry logic
+      const maxRetries = 3;
+      let attempt = 0;
+      
+      while (attempt < maxRetries) {
+        try {
+          attempt++;
+          console.log(`📧 Attempting to send email (attempt ${attempt}/${maxRetries})...`);
+          
+          const info = await this.transporter.sendMail({
+            from: `"NHF IT Support" <${process.env.SMTP_USER}>`,
+            to: emailData.to,
+            subject: emailData.subject,
+            html: emailData.html,
+            text: emailData.text,
+          });
+
+          console.log('✅ Email sent successfully:', info.messageId);
+          console.log('  - Response:', info.response);
+          return true;
+          
+        } catch (sendError: unknown) {
+          const errorMessage = sendError instanceof Error ? sendError.message : 'Unknown error';
+          const errorCode = sendError instanceof Error && 'code' in sendError ? (sendError as Error & { code: string }).code : undefined;
+          console.error(`❌ Email send attempt ${attempt} failed:`, errorMessage);
+          
+          // If it's a connection error, try to reconnect
+          if (errorCode === 'ECONNRESET' || errorCode === 'ETIMEDOUT' || errorCode === 'ENOTFOUND') {
+            console.log('🔄 Connection error detected, reinitializing transporter...');
+            this.isTransporterReady = false;
+            const reconnected = await this.verifyConnection();
+            if (!reconnected && attempt === maxRetries) {
+              console.error('❌ Failed to reconnect after all attempts');
+              return false;
+            }
+          } else if (attempt === maxRetries) {
+            console.error('❌ Failed to send email after all attempts:', sendError);
+            return false;
+          }
+          
+          // Wait before retry (exponential backoff)
+          const waitTime = Math.pow(2, attempt) * 1000; // 2s, 4s, 8s
+          console.log(`⏳ Waiting ${waitTime}ms before retry...`);
+          await new Promise(resolve => setTimeout(resolve, waitTime));
+        }
+      }
+      
+      return false;
     } catch (error) {
-      console.error('❌ Failed to send email:', error);
+      console.error('❌ Unexpected error in sendEmail:', error);
       return false;
     }
   }

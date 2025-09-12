@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { emailService, TicketEmailData } from '@/lib/email';
+import { lineNotificationService } from '@/lib/line';
 
 // GET - Retrieve tickets (filtered by role)
 export async function GET(request: NextRequest) {
@@ -159,9 +160,9 @@ export async function POST(request: NextRequest) {
       }
     });
 
-    // Send email notifications
+    // Send email and LINE notifications
     try {
-      console.log('🎟️ Sending email notifications for ticket #' + ticket.id);
+      console.log('🎟️ Sending notifications for ticket #' + ticket.id);
       const emailData: TicketEmailData = {
         ticketId: ticket.id,
         title: ticket.title,
@@ -184,15 +185,23 @@ export async function POST(request: NextRequest) {
       const emailSent = await emailService.sendNewTicketNotification(emailData);
       console.log('📧 Email result:', emailSent ? 'SUCCESS' : 'FAILED');
 
+      console.log('📱 Attempting to send LINE notification...');
+      // Send LINE notification to the user
+      const lineSent = await lineNotificationService.sendNewTicketNotification(emailData);
+      console.log('📱 LINE result:', lineSent ? 'SUCCESS' : 'FAILED');
+
       // Send notification to IT team for high/urgent priority tickets
       if (ticket.priority === 'HIGH' || ticket.priority === 'URGENT') {
-        console.log('⚡ Sending IT team notification for ' + ticket.priority + ' priority ticket');
+        console.log('⚡ Sending IT team notifications for ' + ticket.priority + ' priority ticket');
         const itEmailSent = await emailService.sendITTeamNotification(emailData);
         console.log('📧 IT team email result:', itEmailSent ? 'SUCCESS' : 'FAILED');
+        
+        const itLineSent = await lineNotificationService.sendITTeamNotification(emailData);
+        console.log('📱 IT team LINE result:', itLineSent ? 'SUCCESS' : 'FAILED');
       }
-    } catch (emailError) {
-      console.error('❌ Failed to send email notification:', emailError);
-      // Don't fail the ticket creation if email fails
+    } catch (notificationError) {
+      console.error('❌ Failed to send notifications:', notificationError);
+      // Don't fail the ticket creation if notifications fail
     }
 
     return NextResponse.json({ ticket }, { status: 201 });

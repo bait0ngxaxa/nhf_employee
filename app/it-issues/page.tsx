@@ -10,6 +10,7 @@ import { Plus, Ticket, List, Settings, BarChart3, Sparkles } from 'lucide-react'
 import CreateTicketForm from '@/components/CreateTicketForm';
 import TicketList from '@/components/TicketList';
 import TicketDetail from '@/components/TicketDetail';
+import { useTitle } from '@/hook/useTitle';
 
 interface TicketStats {
   total: number;
@@ -72,6 +73,7 @@ export default function ITIssuesPage() {
     newTickets: 0
   });
   const [statsLoading, setStatsLoading] = useState(true);
+  useTitle('IT Support System');
 
   const isAdmin = session?.user?.role === 'ADMIN';
 
