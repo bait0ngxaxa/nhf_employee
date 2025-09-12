@@ -4,7 +4,8 @@ import { useState, useEffect } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Search, ChevronLeft, ChevronRight, Download, Edit, Settings } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Search, ChevronLeft, ChevronRight, Download, Edit, Settings, Filter } from 'lucide-react';
 import { CSVLink } from 'react-csv';
 import { EditStatusModal } from '@/components/EditStatusModal';
 import { EditEmployeeForm } from '@/components/EditEmployeeForm';
@@ -66,6 +67,7 @@ export function EmployeeList({ refreshTrigger, userRole }: EmployeeListProps) {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [filteredEmployees, setFilteredEmployees] = useState<Employee[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
@@ -111,7 +113,7 @@ export function EmployeeList({ refreshTrigger, userRole }: EmployeeListProps) {
   useEffect(() => {
     const filtered = employees.filter(employee => {
       const searchLower = searchTerm.toLowerCase();
-      return (
+      const matchesSearch = (
         employee.firstName.toLowerCase().includes(searchLower) ||
         employee.lastName.toLowerCase().includes(searchLower) ||
         (employee.nickname && employee.nickname.toLowerCase().includes(searchLower)) ||
@@ -120,10 +122,14 @@ export function EmployeeList({ refreshTrigger, userRole }: EmployeeListProps) {
         employee.dept.name.toLowerCase().includes(searchLower) ||
         (employee.affiliation && employee.affiliation.toLowerCase().includes(searchLower))
       );
+      
+      const matchesStatus = statusFilter === 'all' || employee.status === statusFilter;
+      
+      return matchesSearch && matchesStatus;
     });
     setFilteredEmployees(filtered);
-    setCurrentPage(1); // Reset to first page when search changes
-  }, [searchTerm, employees]);
+    setCurrentPage(1); // Reset to first page when search or filter changes
+  }, [searchTerm, statusFilter, employees]);
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
@@ -177,13 +183,24 @@ export function EmployeeList({ refreshTrigger, userRole }: EmployeeListProps) {
     }));
   };
 
-  // Generate filename with current date and search term
+  // Generate filename with current date, search term, and status filter
   const generateFileName = () => {
     const now = new Date();
     const dateStr = now.toLocaleDateString('th-TH').replace(/\//g, '-');
     const timeStr = now.toLocaleTimeString('th-TH', { hour12: false }).replace(/:/g, '-');
-    const searchSuffix = searchTerm ? `_กรอง-${searchTerm}` : '';
-    return `รายชื่อพนักงาน${searchSuffix}_${dateStr}_${timeStr}.csv`;
+    const searchSuffix = searchTerm ? `_ค้นหา-${searchTerm}` : '';
+    const statusSuffix = statusFilter !== 'all' ? `_สถานะ-${getStatusLabel(statusFilter)}` : '';
+    return `รายชื่อพนักงาน${searchSuffix}${statusSuffix}_${dateStr}_${timeStr}.csv`;
+  };
+
+  // Get status label in Thai
+  const getStatusLabel = (status: string) => {
+    switch (status) {
+      case 'ACTIVE': return 'ทำงานอยู่';
+      case 'INACTIVE': return 'ไม่ทำงาน';
+      case 'SUSPENDED': return 'ถูกระงับ';
+      default: return status;
+    }
   };
 
   // Handle CSV export
@@ -255,17 +272,38 @@ export function EmployeeList({ refreshTrigger, userRole }: EmployeeListProps) {
 
   return (
     <div className="space-y-6">
-      {/* Search Bar and Export */}
+      {/* Search Bar, Status Filter and Export */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-3 sm:space-y-0 sm:space-x-3">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-          <Input
-            type="text"
-            placeholder="ค้นหาพนักงาน (ชื่อ, ชื่อเล่น, อีเมล, ตำแหน่ง, แผนก, สังกัด)"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10"
-          />
+        <div className="flex flex-col sm:flex-row space-y-3 sm:space-y-0 sm:space-x-3 flex-1">
+          {/* Search Input */}
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+            <Input
+              type="text"
+              placeholder="ค้นหาพนักงาน (ชื่อ, ชื่อเล่น, อีเมล, ตำแหน่ง, แผนก, สังกัด)"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+          
+          {/* Status Filter */}
+          <div className="w-full sm:w-48">
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-full">
+                <div className="flex items-center space-x-2">
+                  <Filter className="h-4 w-4 text-gray-400" />
+                  <SelectValue placeholder="กรองตามสถานะ" />
+                </div>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">สถานะทั้งหมด</SelectItem>
+                <SelectItem value="ACTIVE">ทำงานอยู่</SelectItem>
+                <SelectItem value="INACTIVE">ไม่ทำงาน</SelectItem>
+                <SelectItem value="SUSPENDED">ถูกระงับ</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
         
         {filteredEmployees.length > 0 && (
@@ -288,9 +326,16 @@ export function EmployeeList({ refreshTrigger, userRole }: EmployeeListProps) {
       </div>
 
       {/* Results Summary and Pagination Info */}
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center space-y-2 sm:space-y-0">
         <div className="text-sm text-gray-600">
-          แสดงผล {startIndex + 1}-{Math.min(endIndex, filteredEmployees.length)} จาก {filteredEmployees.length} คน (ทั้งหมด {employees.length} คน)
+          แสดงผล {startIndex + 1}-{Math.min(endIndex, filteredEmployees.length)} จาก {filteredEmployees.length} คน 
+          {statusFilter !== 'all' && (
+            <span className="text-blue-600">(กรองตามสถานะ: {getStatusLabel(statusFilter)})</span>
+          )}
+          {searchTerm && (
+            <span className="text-green-600">(ค้นหา: &quot;{searchTerm}&quot;)</span>
+          )}
+          <span className="text-gray-500">(ทั้งหมด {employees.length} คน)</span>
         </div>
         {totalPages > 1 && (
           <div className="text-sm text-gray-600">
@@ -302,7 +347,10 @@ export function EmployeeList({ refreshTrigger, userRole }: EmployeeListProps) {
       {/* Employee Table */}
       {filteredEmployees.length === 0 ? (
         <div className="text-center p-8 text-gray-500">
-          {searchTerm ? 'ไม่พบพนักงานที่ตรงกับการค้นหา' : 'ยังไม่มีข้อมูลพนักงาน'}
+          {searchTerm || statusFilter !== 'all' 
+            ? 'ไม่พบพนักงานที่ตรงกับเงื่อนไขการค้นหาหรือการกรอง' 
+            : 'ยังไม่มีข้อมูลพนักงาน'
+          }
         </div>
       ) : (
         <div className="overflow-x-auto">

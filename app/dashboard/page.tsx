@@ -19,7 +19,8 @@ import {
   Plus,
   UserPlus,
   Download,
-  Upload
+  Upload,
+  Mail
 } from 'lucide-react';
 import { signOut } from 'next-auth/react';
 import { AddEmployeeForm } from '@/components/AddEmployeeForm';
@@ -176,6 +177,13 @@ export default function DashboardPage() {
       description: 'แจ้งปัญหาไอทีและติดตามสถานะ'
     },
     {
+      id: 'email-request',
+      label: 'ขออีเมลพนักงานใหม่',
+      icon: Mail,
+      description: 'ขออีเมลสำหรับพนักงานใหม่จากทีมไอที',
+      requiredRole: 'ADMIN'
+    },
+    {
       id: 'employee-management',
       label: 'จัดการพนักงาน',
       icon: Users,
@@ -209,6 +217,13 @@ export default function DashboardPage() {
     if (menuItem?.requiredRole === 'ADMIN' && !isAdmin) {
       // If user tries to access admin-only content, redirect to access denied
       window.location.href = '/access-denied';
+      return;
+    }
+    
+    // Handle special cases for routing
+    if (menuId === 'email-request') {
+      // Navigate to the email request page directly
+      window.location.href = '/dashboard/email-request';
       return;
     }
     
@@ -293,6 +308,21 @@ export default function DashboardPage() {
               <p className="text-gray-600">แจ้งปัญหาและขอรับการซ่อมแซม</p>
             </div>
             <ITIssuesPage />
+          </div>
+        );
+      
+      case 'email-request':
+        return (
+          <div className="space-y-6">
+            <div>
+              <h2 className="text-2xl font-bold text-gray-900">ขออีเมลพนักงานใหม่</h2>
+              <p className="text-gray-600">ส่งคำขออีเมลสำหรับพนักงานใหม่ให้ทีมไอที</p>
+            </div>
+            <iframe 
+              src="/dashboard/email-request" 
+              className="w-full h-screen border-0 rounded-lg"
+              title="ขออีเมลพนักงานใหม่"
+            />
           </div>
         );
       

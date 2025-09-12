@@ -14,7 +14,8 @@
     "test:notifications": "node test-full-notification.mjs",
     "debug:line": "node debug-line.js",
     "test:line-quick": "node test-line-quick.js",
-    "email:diagnostic": "node email-diagnostic.js"
+    "email:diagnostic": "node email-diagnostic.js",
+    "test:email-request": "node test-email-request.js"
   },
   "dependencies": {
     "@prisma/client": "^6.15.0",

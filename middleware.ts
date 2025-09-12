@@ -15,7 +15,8 @@ export default withAuth(
     // Admin-only routes
     const adminOnlyRoutes = [
       '/dashboard/employee-management',
-      '/dashboard/add-employee'
+      '/dashboard/add-employee',
+      '/dashboard/email-request'
     ];
     
     // Check if current path is admin-only

@@ -20,6 +20,17 @@ export interface LineNotificationData {
   updatedAt?: string;
 }
 
+export interface EmailRequestData {
+  thaiName: string;
+  englishName: string;
+  phone: string;
+  nickname: string;
+  position: string;
+  department: string;
+  replyEmail: string;
+  requestedAt: string;
+}
+
 // LINE Flex Message type definitions
 interface LineFlexText {
   type: 'text';
@@ -79,8 +90,9 @@ interface LineFlexMessage {
 }
 
 interface LineWebhookData {
-  type: 'new_ticket' | 'status_update' | 'it_team_urgent';
-  ticket: LineNotificationData;
+  type: 'new_ticket' | 'status_update' | 'it_team_urgent' | 'email_request';
+  ticket?: LineNotificationData;
+  emailRequest?: EmailRequestData;
   oldStatus?: string;
   flexMessage: LineFlexMessage;
 }
@@ -591,6 +603,257 @@ class LineNotificationService {
     const webhookResult = await this.sendLineWebhook(webhookData);
 
     return messageResult || webhookResult;
+  }
+
+  private generateEmailRequestFlexMessage(data: EmailRequestData): LineFlexMessage {
+    return {
+      type: 'flex',
+      altText: `ขออีเมลพนักงานใหม่ - ${data.thaiName}`,
+      contents: {
+        type: 'bubble',
+        header: {
+          type: 'box',
+          layout: 'vertical',
+          contents: [
+            {
+              type: 'text',
+              text: '📧 ขออีเมลพนักงานใหม่',
+              weight: 'bold',
+              color: '#FFFFFF',
+              size: 'lg'
+            },
+            {
+              type: 'text',
+              text: 'คำขออีเมลพนักงานใหม่จากระบบ',
+              color: '#FFFFFF',
+              size: 'sm'
+            }
+          ],
+          backgroundColor: '#7C3AED',
+          paddingAll: '20px'
+        },
+        body: {
+          type: 'box',
+          layout: 'vertical',
+          contents: [
+            {
+              type: 'text',
+              text: `${data.thaiName} (${data.englishName})`,
+              weight: 'bold',
+              size: 'lg',
+              wrap: true
+            },
+            {
+              type: 'separator',
+              margin: 'md'
+            },
+            {
+              type: 'box',
+              layout: 'vertical',
+              margin: 'md',
+              spacing: 'sm',
+              contents: [
+                {
+                  type: 'box',
+                  layout: 'baseline',
+                  spacing: 'sm',
+                  contents: [
+                    {
+                      type: 'text',
+                      text: 'ชื่อเล่น:',
+                      color: '#666666',
+                      size: 'sm',
+                      flex: 2
+                    },
+                    {
+                      type: 'text',
+                      text: data.nickname,
+                      wrap: true,
+                      color: '#333333',
+                      size: 'sm',
+                      flex: 3
+                    }
+                  ]
+                },
+                {
+                  type: 'box',
+                  layout: 'baseline',
+                  spacing: 'sm',
+                  contents: [
+                    {
+                      type: 'text',
+                      text: 'เบอร์โทร:',
+                      color: '#666666',
+                      size: 'sm',
+                      flex: 2
+                    },
+                    {
+                      type: 'text',
+                      text: data.phone,
+                      wrap: true,
+                      color: '#333333',
+                      size: 'sm',
+                      flex: 3
+                    }
+                  ]
+                },
+                {
+                  type: 'box',
+                  layout: 'baseline',
+                  spacing: 'sm',
+                  contents: [
+                    {
+                      type: 'text',
+                      text: 'ตำแหน่ง:',
+                      color: '#666666',
+                      size: 'sm',
+                      flex: 2
+                    },
+                    {
+                      type: 'text',
+                      text: data.position,
+                      wrap: true,
+                      color: '#333333',
+                      size: 'sm',
+                      flex: 3
+                    }
+                  ]
+                },
+                {
+                  type: 'box',
+                  layout: 'baseline',
+                  spacing: 'sm',
+                  contents: [
+                    {
+                      type: 'text',
+                      text: 'สังกัด:',
+                      color: '#666666',
+                      size: 'sm',
+                      flex: 2
+                    },
+                    {
+                      type: 'text',
+                      text: data.department,
+                      wrap: true,
+                      color: '#333333',
+                      size: 'sm',
+                      flex: 3
+                    }
+                  ]
+                },
+                {
+                  type: 'box',
+                  layout: 'baseline',
+                  spacing: 'sm',
+                  contents: [
+                    {
+                      type: 'text',
+                      text: 'อีเมลตอบกลับ:',
+                      color: '#666666',
+                      size: 'sm',
+                      flex: 2
+                    },
+                    {
+                      type: 'text',
+                      text: data.replyEmail,
+                      wrap: true,
+                      color: '#333333',
+                      size: 'sm',
+                      flex: 3
+                    }
+                  ]
+                },
+                {
+                  type: 'box',
+                  layout: 'baseline',
+                  spacing: 'sm',
+                  contents: [
+                    {
+                      type: 'text',
+                      text: 'วันที่ขอ:',
+                      color: '#666666',
+                      size: 'sm',
+                      flex: 2
+                    },
+                    {
+                      type: 'text',
+                      text: this.formatDate(data.requestedAt),
+                      wrap: true,
+                      color: '#333333',
+                      size: 'sm',
+                      flex: 3
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        footer: {
+          type: 'box',
+          layout: 'vertical',
+          spacing: 'sm',
+          contents: [
+            {
+              type: 'button',
+              style: 'primary',
+              height: 'sm',
+              action: {
+                type: 'uri',
+                label: 'ดูในระบบ',
+                uri: `${this.baseUrl}/dashboard/email-request`
+              },
+              color: '#7C3AED'
+            },
+            {
+              type: 'spacer',
+              size: 'sm'
+            }
+          ]
+        }
+      }
+    };
+  }
+
+  async sendEmailRequestNotification(emailRequestData: EmailRequestData): Promise<boolean> {
+    console.log('🔍 [LINE] Starting sendEmailRequestNotification...');
+    console.log('🔍 [LINE] Channel Access Token:', this.channelAccessToken ? 'SET' : 'NOT SET');
+    
+    console.log('🔍 [LINE] Generating Email Request Flex Message...');
+    const flexMessage = this.generateEmailRequestFlexMessage(emailRequestData);
+    console.log('🔍 [LINE] Email Request Flex Message generated successfully');
+    
+    // Get IT team user ID from environment or use broadcast
+    const itTeamUserId = process.env.LINE_IT_TEAM_USER_ID;
+    console.log('🔍 [LINE] IT Team User ID:', itTeamUserId ? 'SET' : 'NOT SET');
+    
+    let messageResult = false;
+    
+    if (itTeamUserId) {
+      // Send to specific IT team user
+      console.log('📱 [LINE] Sending email request to specific user:', itTeamUserId);
+      messageResult = await this.sendLineMessage(itTeamUserId, flexMessage);
+    } else {
+      // Send as broadcast to all followers
+      console.log('📱 [LINE] Sending email request as broadcast to all followers');
+      messageResult = await this.sendLineBroadcast(flexMessage);
+    }
+    
+    console.log('📱 [LINE] Email request message result:', messageResult ? 'SUCCESS' : 'FAILED');
+    
+    // Also send to webhook if configured
+    const webhookData: LineWebhookData = {
+      type: 'email_request' as const,
+      emailRequest: emailRequestData,
+      flexMessage: flexMessage
+    };
+    console.log('🔍 [LINE] Webhook URL:', this.lineWebhookUrl ? 'SET' : 'NOT SET');
+    const webhookResult = await this.sendLineWebhook(webhookData);
+    console.log('🔍 [LINE] Email request webhook result:', webhookResult ? 'SUCCESS' : 'FAILED');
+
+    const finalResult = messageResult || webhookResult;
+    console.log('🔍 [LINE] Email request final result:', finalResult ? 'SUCCESS' : 'FAILED');
+    return finalResult;
   }
 }
 
