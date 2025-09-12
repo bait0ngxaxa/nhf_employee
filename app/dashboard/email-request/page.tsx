@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
+import { useTitle } from '@/hook/useTitle';
 
 interface EmailRequestForm {
   thaiName: string;
@@ -19,6 +20,7 @@ export default function EmailRequestPage() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
+    useTitle('ขออีเมลพนักงานใหม่ | NHF IT System');
 
   const [formData, setFormData] = useState<EmailRequestForm>({
     thaiName: '',
@@ -29,6 +31,7 @@ export default function EmailRequestPage() {
     department: '',
     replyEmail: ''
   });
+  
 
   // Check if user is authenticated and has admin role
   if (status === 'loading') {

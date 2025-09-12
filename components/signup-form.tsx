@@ -14,6 +14,7 @@ import { Label } from "@/components/ui/label"
 import { SuccessModal } from "@/components/SuccessModal"
 import { useState } from "react"
 import { useRouter } from "next/navigation"
+import { useTitle } from "@/hook/useTitle";
 
 // Type definitions for API response
 interface User {
@@ -47,7 +48,7 @@ export function SignupForm({
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [successData, setSuccessData] = useState<SignupSuccessResponse | null>(null);
   const router = useRouter();
-
+  useTitle("สมัครสมาชิก | NHF IT System");
 
 
   const handleSubmit = async (e: React.FormEvent) => {

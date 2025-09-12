@@ -73,7 +73,7 @@ export default function ITIssuesPage() {
     newTickets: 0
   });
   const [statsLoading, setStatsLoading] = useState(true);
-  useTitle('IT Support System');
+  useTitle('IT Support | NHF IT System');
 
   const isAdmin = session?.user?.role === 'ADMIN';
 

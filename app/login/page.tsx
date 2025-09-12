@@ -18,7 +18,7 @@ function LoginPageContent() {
 
 
 export default function Page() {
-  useTitle('เข้าสู่ระบบ');
+  useTitle('เข้าสู่ระบบ | NHF IT System');
   return (
     <Suspense fallback={
       <div className="flex min-h-svh w-full items-center justify-center p-6 md:p-10">

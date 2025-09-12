@@ -111,7 +111,7 @@ export default function DashboardPage() {
 
   const user = session?.user;
   const isAdmin = user?.role === 'ADMIN';
-  useTitle('Dashboard');
+  useTitle('Dashboard | NHF IT System');
 
   // Fetch employee statistics
   const fetchEmployeeStats = useCallback(async () => {
