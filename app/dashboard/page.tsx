@@ -1,7 +1,7 @@
 'use client';
 
 import { useSession } from 'next-auth/react';
-import { redirect } from 'next/navigation';
+import { redirect , useRouter} from 'next/navigation';
 import { useState, useEffect, useCallback } from 'react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -29,6 +29,7 @@ import { ImportEmployeeCSV } from '@/components/ImportEmployeeCSV';
 import { CSVLink } from 'react-csv';
 import { useTitle } from '@/hook/useTitle';
 import ITIssuesPage from '@/app/it-issues/page';
+
 
 // Type definitions
 interface MenuItem {
@@ -108,7 +109,7 @@ export default function DashboardPage() {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [allEmployees, setAllEmployees] = useState<Employee[]>([]);
   const [isExporting, setIsExporting] = useState(false);
-
+  const router = useRouter();
   const user = session?.user;
   const isAdmin = user?.role === 'ADMIN';
   useTitle('Dashboard | NHF IT System');
@@ -223,7 +224,7 @@ export default function DashboardPage() {
     // Handle special cases for routing
     if (menuId === 'email-request') {
       // Navigate to the email request page directly
-      window.location.href = '/dashboard/email-request';
+      router.push('/dashboard/email-request');
       return;
     }
     
