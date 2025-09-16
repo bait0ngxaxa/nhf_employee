@@ -18,7 +18,7 @@ interface TicketStats {
   inProgress: number;
   resolved: number;
   userTickets: number;
-  newTickets: number; // New tickets in last 24 hours
+  newTickets: number; 
 }
 interface Ticket {
   id: number;
@@ -64,6 +64,7 @@ export default function ITIssuesPage() {
   const [activeTab, setActiveTab] = useState('tickets');
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [showCreateModal, setShowCreateModal] = useState(false);
   const [ticketStats, setTicketStats] = useState<TicketStats>({
     total: 0,
     open: 0,
@@ -127,6 +128,7 @@ export default function ITIssuesPage() {
 
   const handleTicketCreated = () => {
     setRefreshTrigger(prev => prev + 1);
+    setShowCreateModal(false);
     // Switch to tickets tab to see the newly created ticket
     setActiveTab('tickets');
   };
@@ -265,14 +267,10 @@ export default function ITIssuesPage() {
 
       {/* Main Content */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="tickets" className="flex items-center gap-2">
             <List className="h-4 w-4" />
             รายการ Tickets
-          </TabsTrigger>
-          <TabsTrigger value="create" className="flex items-center gap-2">
-            <Plus className="h-4 w-4" />
-            แจ้งปัญหาใหม่
           </TabsTrigger>
           {selectedTicket && (
             <TabsTrigger value="detail" className="flex items-center gap-2">
@@ -296,7 +294,7 @@ export default function ITIssuesPage() {
                   </CardDescription>
                 </div>
                 <Button 
-                  onClick={() => setActiveTab('create')}
+                  onClick={() => setShowCreateModal(true)}
                   className="flex items-center gap-2"
                 >
                   <Plus className="h-4 w-4" />
@@ -313,10 +311,6 @@ export default function ITIssuesPage() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="create" className="space-y-4">
-          <CreateTicketForm onTicketCreated={handleTicketCreated} />
-        </TabsContent>
-
         {selectedTicket && (
           <TabsContent value="detail" className="space-y-4">
             <TicketDetail 
@@ -327,6 +321,13 @@ export default function ITIssuesPage() {
           </TabsContent>
         )}
       </Tabs>
+
+      {/* Create Ticket Modal */}
+      <CreateTicketForm 
+        isOpen={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        onTicketCreated={handleTicketCreated}
+      />
     </div>
   );
 }

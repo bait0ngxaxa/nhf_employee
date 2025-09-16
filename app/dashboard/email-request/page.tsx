@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { useTitle } from '@/hook/useTitle';
+import { SuccessModal } from '@/components/SuccessModal';
 
 interface EmailRequestForm {
   thaiName: string;
@@ -19,8 +20,9 @@ export default function EmailRequestPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
-  const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
-    useTitle('ขออีเมลพนักงานใหม่ | NHF IT System');
+  const [message, setMessage] = useState<{ type: 'error', text: string } | null>(null);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  useTitle('ขออีเมลพนักงานใหม่ | NHF IT System');
 
   const [formData, setFormData] = useState<EmailRequestForm>({
     thaiName: '',
@@ -81,7 +83,6 @@ export default function EmailRequestPage() {
       const result = await response.json();
 
       if (result.success) {
-        setMessage({ type: 'success', text: result.message });
         // Reset form after successful submission
         setFormData({
           thaiName: '',
@@ -92,9 +93,7 @@ export default function EmailRequestPage() {
           department: '',
           replyEmail: ''
         });
-        setTimeout(() => {
-          router.push('/dashboard');
-        }, 3000);
+        setShowSuccessModal(true);
       } else {
         setMessage({ type: 'error', text: result.error || 'เกิดข้อผิดพลาด' });
       }
@@ -119,24 +118,14 @@ export default function EmailRequestPage() {
             <p className="text-gray-600 mt-2">กรอกข้อมูลพนักงานใหม่เพื่อขออีเมลจากทีมไอที</p>
           </div>
 
-          {/* Alert Messages */}
+          {/* Error Messages */}
           {message && (
-            <div className={`mx-6 mt-4 p-4 rounded-md ${
-              message.type === 'success' 
-                ? 'bg-green-50 border border-green-200 text-green-800' 
-                : 'bg-red-50 border border-red-200 text-red-800'
-            }`}>
+            <div className="mx-6 mt-4 p-4 rounded-md bg-red-50 border border-red-200 text-red-800">
               <div className="flex">
                 <div className="flex-shrink-0">
-                  {message.type === 'success' ? (
-                    <svg className="h-5 w-5 text-green-400" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                    </svg>
-                  ) : (
-                    <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                    </svg>
-                  )}
+                  <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                  </svg>
                 </div>
                 <div className="ml-3">
                   <p className="text-sm font-medium">{message.text}</p>
@@ -246,7 +235,7 @@ export default function EmailRequestPage() {
                   onChange={handleInputChange}
                   required
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="เช่น มสช. สพบ."
+                  placeholder="เช่น มสช. สพบ. หรืออื่นๆ"
                 />
               </div>
 
@@ -317,6 +306,19 @@ export default function EmailRequestPage() {
           </div>
         </div>
       </div>
+
+      {/* Success Modal */}
+      <SuccessModal
+        isOpen={showSuccessModal}
+        onClose={() => setShowSuccessModal(false)}
+        title="ส่งคำขอสำเร็จ!"
+        description="คำขออีเมลพนักงานใหม่ถูกส่งให้ทีมไอทีเรียบร้อยแล้ว ทีมไอทีจะดำเนินการสร้างอีเมลและแจ้งกลับให้ท่านทราบ"
+        buttonText="กลับหน้าหลัก"
+        onButtonClick={() => {
+          setShowSuccessModal(false);
+          router.push('/dashboard');
+        }}
+      />
     </div>
   );
 }

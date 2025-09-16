@@ -5,16 +5,18 @@ import { useSession } from 'next-auth/react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { SuccessModal } from '@/components/SuccessModal';
 
 interface CreateTicketFormProps {
+  isOpen: boolean;
+  onClose: () => void;
   onTicketCreated?: () => void;
 }
 
-export default function CreateTicketForm({ onTicketCreated }: CreateTicketFormProps) {
+export default function CreateTicketForm({ isOpen, onClose, onTicketCreated }: CreateTicketFormProps) {
   const { data: session } = useSession();
   const [formData, setFormData] = useState({
     title: '',
@@ -90,6 +92,9 @@ export default function CreateTicketForm({ onTicketCreated }: CreateTicketFormPr
         priority: 'MEDIUM'
       });
 
+      // Close the dialog immediately
+      onClose();
+      
       // Call callback if provided
       if (onTicketCreated) {
         onTicketCreated();
@@ -110,25 +115,28 @@ export default function CreateTicketForm({ onTicketCreated }: CreateTicketFormPr
 
   if (!session) {
     return (
-      <Card>
-        <CardContent className="p-6">
-          <p className="text-center text-gray-500">กรุณาเข้าสู่ระบบเพื่อแจ้งปัญหา</p>
-        </CardContent>
-      </Card>
+      <Dialog open={isOpen} onOpenChange={onClose}>
+        <DialogContent className="sm:max-w-md">
+          <div className="text-center p-6">
+            <p className="text-gray-500">กรุณาเข้าสู่ระบบเพื่อแจ้งปัญหา</p>
+          </div>
+        </DialogContent>
+      </Dialog>
     );
   }
 
   return (
     <>
-      <Card>
-        <CardHeader>
-          <CardTitle>แจ้งปัญหาไอที</CardTitle>
-          <CardDescription>
-            กรอกรายละเอียดปัญหาที่พบเพื่อให้ทีม IT สามารถช่วยเหลือคุณได้
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
+      <Dialog open={isOpen} onOpenChange={onClose}>
+        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-semibold">แจ้งปัญหาไอที</DialogTitle>
+            <DialogDescription>
+              กรอกรายละเอียดปัญหาที่พบเพื่อให้ทีม IT สามารถช่วยเหลือคุณได้
+            </DialogDescription>
+          </DialogHeader>
+          
+          <form onSubmit={handleSubmit} className="space-y-4 mt-4">
             {error && (
               <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
                 {error}
@@ -197,13 +205,19 @@ export default function CreateTicketForm({ onTicketCreated }: CreateTicketFormPr
               />
             </div>
 
-            <Button type="submit" disabled={isLoading} className="w-full">
-              {isLoading ? 'กำลังส่ง...' : 'ส่งคำร้องแจ้งปัญหา'}
-            </Button>
+            <div className="flex justify-end space-x-3 pt-4 border-t">
+              <Button type="button" variant="outline" onClick={onClose}>
+                ยกเลิก
+              </Button>
+              <Button type="submit" disabled={isLoading}>
+                {isLoading ? 'กำลังส่ง...' : 'ส่งคำร้องแจ้งปัญหา'}
+              </Button>
+            </div>
           </form>
-        </CardContent>
-      </Card>
+        </DialogContent>
+      </Dialog>
 
+      
       <SuccessModal
         isOpen={showSuccessModal}
         onClose={handleSuccessModalClose}
