@@ -233,9 +233,7 @@ function UnauthenticatedContent() {
           <Link href="/login">
             <Button size="lg" className="px-8">เข้าสู่ระบบ</Button>
           </Link>
-          <Link href="/signup">
-            <Button variant="outline" size="lg" className="px-8">สมัครสมาชิก</Button>
-          </Link>
+          
         </div>
       </div>
     </>
