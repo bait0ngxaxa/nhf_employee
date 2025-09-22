@@ -218,7 +218,7 @@ export default function EmailRequestPage() {
                   onChange={handleInputChange}
                   required
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="เช่น เจ้าหน้าที่บัญชี"
+                  placeholder="เช่น เจ้าหน้าที่บัญชี, นักวิชาการ"
                 />
               </div>
 
@@ -252,7 +252,7 @@ export default function EmailRequestPage() {
                   onChange={handleInputChange}
                   required
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="อีเมลที่ต้องการให้แจ้งกลับเมื่อสำเร็จ"
+                  placeholder="ระบุอีเมลที่ต้องการให้แจ้งกลับเมื่อสำเร็จ"
                 />
               </div>
             </div>

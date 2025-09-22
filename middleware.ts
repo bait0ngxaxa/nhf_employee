@@ -8,6 +8,7 @@ export default withAuth(
     const token = req.nextauth.token;
     
     // If user has session and tries to access login/signup, redirect to dashboard
+    // Root path (/) is accessible for everyone regardless of session status
     if (token && (pathname === '/login' || pathname === '/signup')) {
       return NextResponse.redirect(new URL('/dashboard', req.url));
     }
@@ -38,12 +39,12 @@ export default withAuth(
         // Public routes that don't require authentication
         const publicRoutes = ['/', '/login', '/signup', '/access-denied'];
         
-        // Allow access to public routes
+        // Always allow access to public routes (including root path)
         if (publicRoutes.includes(pathname)) {
           return true;
         }
         
-        // All other routes require authentication
+        // For protected routes, require authentication
         return !!token;
       },
     },

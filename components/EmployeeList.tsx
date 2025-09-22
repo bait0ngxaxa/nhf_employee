@@ -52,9 +52,7 @@ interface EmployeeCSVData {
   'แผนก': string;
   'อีเมล': string;
   'เบอร์โทร': string;
-  'วันที่เข้าทำงาน': string;
   'สถานะ': string;
-  'บัญชีผู้ใช้': string;
   'วันที่สร้างข้อมูล': string;
 }
 
@@ -176,9 +174,7 @@ export function EmployeeList({ refreshTrigger, userRole }: EmployeeListProps) {
       'แผนก': employee.dept.name,
       'อีเมล': employee.email.includes('@temp.local') ? '-' : employee.email,
       'เบอร์โทร': employee.phone || '-',
-      'วันที่เข้าทำงาน': new Date(employee.hireDate).toLocaleDateString('th-TH'),
       'สถานะ': employee.status === 'ACTIVE' ? 'ทำงานอยู่' : employee.status === 'INACTIVE' ? 'ไม่ทำงาน' : 'ถูกระงับ',
-      'บัญชีผู้ใช้': employee.user ? (employee.user.role === 'ADMIN' ? 'ผู้ดูแลระบบ' : 'ผู้ใช้งาน') : '-',
       'วันที่สร้างข้อมูล': new Date(employee.createdAt).toLocaleDateString('th-TH')
     }));
   };
@@ -235,7 +231,7 @@ export function EmployeeList({ refreshTrigger, userRole }: EmployeeListProps) {
     ));
   };
 
-  // Handle edit employee
+  
   const handleEditEmployee = (employee: Employee) => {
     setEmployeeToEdit(employee);
     setIsEditFormOpen(true);
@@ -353,8 +349,8 @@ export function EmployeeList({ refreshTrigger, userRole }: EmployeeListProps) {
           }
         </div>
       ) : (
-        <div className="overflow-x-auto">
-          <table className="min-w-full bg-white border border-gray-200 rounded-lg">
+        <div className="overflow-x-auto border border-gray-200 rounded-lg">
+          <table className="min-w-full bg-white">
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">

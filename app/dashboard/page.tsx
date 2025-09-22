@@ -31,7 +31,7 @@ import { useTitle } from '@/hook/useTitle';
 import ITIssuesPage from '@/app/it-issues/page';
 
 
-// Type definitions
+
 interface MenuItem {
   id: string;
   label: string;
@@ -150,7 +150,7 @@ export default function DashboardPage() {
     setRefreshTrigger(prev => prev + 1);
   };
 
-  // Redirect if not authenticated
+  
   if (status === 'loading') {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -213,23 +213,23 @@ export default function DashboardPage() {
   );
 
   const handleMenuClick = (menuId: string) => {
-    // Check if user has permission for this menu item
+    
     const menuItem = menuItems.find(item => item.id === menuId);
     if (menuItem?.requiredRole === 'ADMIN' && !isAdmin) {
-      // If user tries to access admin-only content, redirect to access denied
+      
       window.location.href = '/access-denied';
       return;
     }
     
-    // Handle special cases for routing
+    
     if (menuId === 'email-request') {
-      // Navigate to the email request page directly
+      
       router.push('/dashboard/email-request');
       return;
     }
     
     setSelectedMenu(menuId);
-    // On mobile, close sidebar after selection
+    
     if (window.innerWidth < 768) {
       setSidebarOpen(false);
     }
@@ -267,11 +267,11 @@ export default function DashboardPage() {
     return `รายชื่อพนักงาน_${dateStr}_${timeStr}.csv`;
   };
 
-  // Handle CSV export
+  
   const handleExportCSV = async () => {
     setIsExporting(true);
     try {
-      // Refresh data before export
+      
       await fetchEmployeeStats();
     } catch (error) {
       console.error('Error preparing export:', error);
