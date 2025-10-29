@@ -90,10 +90,7 @@ interface EmployeeCSVData {
   'แผนก': string;
   'อีเมล': string;
   'เบอร์โทร': string;
-  'วันที่เข้าทำงาน': string;
-  'สถานะ': string;
-  'บัญชีผู้ใช้': string;
-  'วันที่สร้างข้อมูล': string;
+  
 }
 
 export default function DashboardPage() {
@@ -186,7 +183,7 @@ export default function DashboardPage() {
     },
     {
       id: 'employee-management',
-      label: 'จัดการพนักงาน',
+      label: 'ข้อมูลพนักงาน',
       icon: Users,
       description: 'จัดการข้อมูลพนักงานและสิทธิ์',
       requiredRole: 'ADMIN'
@@ -252,10 +249,7 @@ export default function DashboardPage() {
       'แผนก': employee.dept.name,
       'อีเมล': employee.email,
       'เบอร์โทร': employee.phone || '-',
-      'วันที่เข้าทำงาน': new Date(employee.hireDate).toLocaleDateString('th-TH'),
-      'สถานะ': employee.status === 'ACTIVE' ? 'ทำงานอยู่' : employee.status === 'INACTIVE' ? 'ไม่ทำงาน' : 'ถูกระงับ',
-      'บัญชีผู้ใช้': employee.user ? (employee.user.role === 'ADMIN' ? 'ผู้ดูแลระบบ' : 'ผู้ใช้งาน') : '-',
-      'วันที่สร้างข้อมูล': new Date(employee.createdAt).toLocaleDateString('th-TH')
+      
     }));
   };
 

@@ -46,14 +46,12 @@ interface EmployeeCSVData {
   'ชื่อ': string;
   'นามสกุล': string;
   'ชื่อเล่น': string;
-  'ชื่อ-นามสกุล': string;
   'ตำแหน่ง': string;
   'สังกัด': string;
   'แผนก': string;
   'อีเมล': string;
   'เบอร์โทร': string;
   'สถานะ': string;
-  'วันที่สร้างข้อมูล': string;
 }
 
 interface EmployeeListProps {
@@ -168,14 +166,12 @@ export function EmployeeList({ refreshTrigger, userRole }: EmployeeListProps) {
       'ชื่อ': employee.firstName,
       'นามสกุล': employee.lastName,
       'ชื่อเล่น': employee.nickname || '-',
-      'ชื่อ-นามสกุล': `${employee.firstName} ${employee.lastName}`,
       'ตำแหน่ง': employee.position,
       'สังกัด': employee.affiliation || '-',
       'แผนก': employee.dept.name,
       'อีเมล': employee.email.includes('@temp.local') ? '-' : employee.email,
       'เบอร์โทร': employee.phone || '-',
-      'สถานะ': employee.status === 'ACTIVE' ? 'ทำงานอยู่' : employee.status === 'INACTIVE' ? 'ไม่ทำงาน' : 'ถูกระงับ',
-      'วันที่สร้างข้อมูล': new Date(employee.createdAt).toLocaleDateString('th-TH')
+      'สถานะ': employee.status === 'ACTIVE' ? 'ทำงานอยู่' : employee.status === 'INACTIVE' ? 'ไม่ทำงาน' : 'ถูกระงับ'
     }));
   };
 
@@ -296,7 +292,7 @@ export function EmployeeList({ refreshTrigger, userRole }: EmployeeListProps) {
                 <SelectItem value="all">สถานะทั้งหมด</SelectItem>
                 <SelectItem value="ACTIVE">ทำงานอยู่</SelectItem>
                 <SelectItem value="INACTIVE">ไม่ทำงาน</SelectItem>
-                <SelectItem value="SUSPENDED">ถูกระงับ</SelectItem>
+                
               </SelectContent>
             </Select>
           </div>

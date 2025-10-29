@@ -138,7 +138,7 @@ export function AddEmployeeForm({ onSuccess }: AddEmployeeFormProps) {
                   <Input
                     id="lastName"
                     type="text"
-                    placeholder="นามสกุลจริง"
+                    placeholder="นามสกุล"
                     value={formData.lastName}
                     onChange={(e) => setFormData({...formData, lastName: e.target.value})}
                     required

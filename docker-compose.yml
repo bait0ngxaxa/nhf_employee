@@ -1,0 +1,51 @@
+# docker-compose.yml  (Compose V2 ไม่ต้องใส่ version แล้ว)
+services:
+    mysql:
+        image: mysql:8.0
+        container_name: db-mysql
+        restart: always
+        environment:
+            MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+            MYSQL_DATABASE: ${MYSQL_DATABASE}
+            MYSQL_USER: ${MYSQL_USER}
+            MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+            TZ: Asia/Bangkok
+        ports:
+            - "3306:3306"
+        volumes:
+            - mysql-data:/var/lib/mysql
+        networks:
+            - grant-online-network
+        healthcheck:
+            test:
+                [
+                    "CMD-SHELL",
+                    "mysqladmin ping -h 127.0.0.1 -uroot -p$${MYSQL_ROOT_PASSWORD} || exit 1",
+                ]
+            interval: 10s
+            timeout: 5s
+            retries: 5
+
+    phpmyadmin:
+        image: phpmyadmin/phpmyadmin
+        container_name: db-phpmyadmin
+        restart: always
+        environment:
+            PMA_HOST: mysql
+            PMA_PORT: 3306
+            MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+            TZ: Asia/Bangkok
+        ports:
+            - "8080:80"
+        depends_on:
+            mysql:
+                condition: service_healthy
+        networks:
+            - grant-online-network
+
+networks:
+    grant-online-network:
+        driver: bridge
+
+volumes:
+    mysql-data:
