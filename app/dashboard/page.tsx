@@ -84,12 +84,13 @@ interface EmployeeCSVData {
   'ชื่อ': string;
   'นามสกุล': string;
   'ชื่อเล่น': string;
-  'ชื่อ-นามสกุล': string;
+  
   'ตำแหน่ง': string;
   'สังกัด': string;
   'แผนก': string;
   'อีเมล': string;
   'เบอร์โทร': string;
+  'สถานะ': string;
   
 }
 
@@ -243,13 +244,13 @@ export default function DashboardPage() {
       'ชื่อ': employee.firstName,
       'นามสกุล': employee.lastName,
       'ชื่อเล่น': employee.nickname || '-',
-      'ชื่อ-นามสกุล': `${employee.firstName} ${employee.lastName}`,
+      
       'ตำแหน่ง': employee.position,
       'สังกัด': employee.affiliation || '-',
       'แผนก': employee.dept.name,
       'อีเมล': employee.email,
       'เบอร์โทร': employee.phone || '-',
-      
+      'สถานะ': employee.status === 'ACTIVE' ? 'ทำงานอยู่' : employee.status === 'INACTIVE' ? 'ไม่ทำงาน' : 'ถูกระงับ',
     }));
   };
 
