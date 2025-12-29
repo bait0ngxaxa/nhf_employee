@@ -1,51 +1,52 @@
-# docker-compose.yml  (Compose V2 ไม่ต้องใส่ version แล้ว)
 services:
     mysql:
         image: mysql:8.0
-        container_name: db-mysql
-        restart: always
+        container_name: db-mysql-nhf_employee
+        restart: unless-stopped
         environment:
             MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
             MYSQL_DATABASE: ${MYSQL_DATABASE}
             MYSQL_USER: ${MYSQL_USER}
             MYSQL_PASSWORD: ${MYSQL_PASSWORD}
             TZ: Asia/Bangkok
+        command: >
+            --character-set-server=utf8mb4
+            --collation-server=utf8mb4_unicode_ci
+            --default-authentication-plugin=caching_sha2_password
+            --max-connections=150
+            --innodb-buffer-pool-size=512M
         ports:
-            - "3306:3306"
+            - "127.0.0.1:3308:3306"
         volumes:
-            - mysql-data:/var/lib/mysql
+            - nhfemployee-data:/var/lib/mysql
         networks:
-            - grant-online-network
+            - nhfemployee-network
         healthcheck:
-            test:
-                [
-                    "CMD-SHELL",
-                    "mysqladmin ping -h 127.0.0.1 -uroot -p$${MYSQL_ROOT_PASSWORD} || exit 1",
-                ]
+            test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "--silent"]
             interval: 10s
             timeout: 5s
             retries: 5
-
-    phpmyadmin:
-        image: phpmyadmin/phpmyadmin
-        container_name: db-phpmyadmin
-        restart: always
-        environment:
-            PMA_HOST: mysql
-            PMA_PORT: 3306
-            MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
-            TZ: Asia/Bangkok
-        ports:
-            - "8080:80"
-        depends_on:
-            mysql:
-                condition: service_healthy
-        networks:
-            - grant-online-network
-
-networks:
-    grant-online-network:
-        driver: bridge
+            start_period: 40s
+        deploy:
+            resources:
+                limits:
+                    cpus: "2"
+                    memory: 2G
+                reservations:
+                    cpus: "0.25"
+                    memory: 512M
+        security_opt:
+            - no-new-privileges:true
+        logging:
+            driver: "json-file"
+            options:
+                max-size: "10m"
+                max-file: "3"
 
 volumes:
-    mysql-data:
+    nhfemployee-data:
+        driver: local
+
+networks:
+    nhfemployee-network:
+        driver: bridge

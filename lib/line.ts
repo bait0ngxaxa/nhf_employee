@@ -1,95 +1,7 @@
-import { TicketEmailData } from './email';
+import { LineNotificationData, EmailRequestData, TicketEmailData, LineFlexMessage } from '@/types/api';
+import { getTicketCategoryLabel } from '@/lib/helpers/ticket-helpers';
 
-export interface LineNotificationData {
-  ticketId: number;
-  title: string;
-  description: string;
-  category: string;
-  priority: string;
-  status: string;
-  reportedBy: {
-    name: string;
-    email: string;
-    department?: string;
-  };
-  assignedTo?: {
-    name: string;
-    email: string;
-  };
-  createdAt: string;
-  updatedAt?: string;
-}
-
-export interface EmailRequestData {
-  thaiName: string;
-  englishName: string;
-  phone: string;
-  nickname: string;
-  position: string;
-  department: string;
-  replyEmail: string;
-  requestedAt: string;
-}
-
-// LINE Flex Message type definitions
-interface LineFlexText {
-  type: 'text';
-  text: string;
-  weight?: 'regular' | 'bold';
-  color?: string;
-  size?: 'xxs' | 'xs' | 'sm' | 'md' | 'lg' | 'xl' | 'xxl' | '3xl' | '4xl' | '5xl';
-  wrap?: boolean;
-  flex?: number;
-  margin?: 'none' | 'xs' | 'sm' | 'md' | 'lg' | 'xl' | 'xxl';
-}
-
-interface LineFlexSeparator {
-  type: 'separator';
-  margin?: 'none' | 'xs' | 'sm' | 'md' | 'lg' | 'xl' | 'xxl';
-}
-
-interface LineFlexSpacer {
-  type: 'spacer';
-  size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl' | 'xxl';
-}
-
-interface LineFlexButton {
-  type: 'button';
-  style?: 'link' | 'primary' | 'secondary';
-  height?: 'sm' | 'md';
-  action: {
-    type: 'uri';
-    label: string;
-    uri: string;
-  };
-  color?: string;
-}
-
-interface LineFlexBox {
-  type: 'box';
-  layout: 'vertical' | 'horizontal' | 'baseline';
-  contents: LineFlexComponent[];
-  spacing?: 'none' | 'xs' | 'sm' | 'md' | 'lg' | 'xl' | 'xxl';
-  margin?: 'none' | 'xs' | 'sm' | 'md' | 'lg' | 'xl' | 'xxl';
-  backgroundColor?: string;
-  paddingAll?: string;
-  flex?: number;
-}
-
-type LineFlexComponent = LineFlexText | LineFlexSeparator | LineFlexSpacer | LineFlexButton | LineFlexBox;
-
-interface LineFlexMessage {
-  type: 'flex';
-  altText: string;
-  contents: {
-    type: 'bubble';
-    header?: LineFlexBox;
-    body?: LineFlexBox;
-    footer?: LineFlexBox;
-  };
-}
-
-interface LineWebhookData {
+export interface LineWebhookData {
   type: 'new_ticket' | 'status_update' | 'it_team_urgent' | 'email_request';
   ticket?: LineNotificationData;
   emailRequest?: EmailRequestData;
@@ -245,7 +157,7 @@ class LineNotificationService {
                     },
                     {
                       type: 'text',
-                      text: this.getCategoryLabel(data.category),
+                      text: getTicketCategoryLabel(data.category),
                       wrap: true,
                       color: '#333333',
                       size: 'sm',
@@ -398,13 +310,10 @@ class LineNotificationService {
 
   async sendLineMessage(userId: string, message: LineFlexMessage): Promise<boolean> {
     if (!this.channelAccessToken) {
-      console.warn('⚠️ LINE Channel Access Token ไม่ได้ตั้งค่า');
       return false;
     }
 
     try {
-      console.log('📱 ส่ง LINE Message...');
-      
       const response = await fetch('https://api.line.me/v2/bot/message/push', {
         method: 'POST',
         headers: {
@@ -418,7 +327,6 @@ class LineNotificationService {
       });
 
       if (response.ok) {
-        console.log('✅ LINE Message ส่งสำเร็จ');
         return true;
       } else {
         const errorText = await response.text();
@@ -433,13 +341,10 @@ class LineNotificationService {
 
   async sendLineBroadcast(message: LineFlexMessage): Promise<boolean> {
     if (!this.channelAccessToken) {
-      console.warn('⚠️ LINE Channel Access Token ไม่ได้ตั้งค่า');
       return false;
     }
 
     try {
-      console.log('📱 ส่ง LINE Broadcast...');
-      
       const response = await fetch('https://api.line.me/v2/bot/message/broadcast', {
         method: 'POST',
         headers: {
@@ -452,7 +357,6 @@ class LineNotificationService {
       });
 
       if (response.ok) {
-        console.log('✅ LINE Broadcast ส่งสำเร็จ');
         return true;
       } else {
         const errorText = await response.text();
@@ -467,13 +371,10 @@ class LineNotificationService {
 
   async sendLineWebhook(data: LineWebhookData): Promise<boolean> {
     if (!this.lineWebhookUrl) {
-      console.warn('⚠️ LINE Webhook URL ไม่ได้ตั้งค่า');
       return false;
     }
 
     try {
-      console.log('📱 ส่ง LINE Webhook...');
-      
       const response = await fetch(this.lineWebhookUrl, {
         method: 'POST',
         headers: {
@@ -483,7 +384,6 @@ class LineNotificationService {
       });
 
       if (response.ok) {
-        console.log('✅ LINE Webhook ส่งสำเร็จ');
         return true;
       } else {
         const errorText = await response.text();
@@ -497,48 +397,30 @@ class LineNotificationService {
   }
 
   async sendNewTicketNotification(ticketData: TicketEmailData): Promise<boolean> {
-    console.log('🔍 [LINE] Starting sendNewTicketNotification...');
-    console.log('🔍 [LINE] Channel Access Token:', this.channelAccessToken ? 'SET' : 'NOT SET');
-    console.log('🔍 [LINE] Token length:', this.channelAccessToken.length);
-    
     const lineData: LineNotificationData = {
       ...ticketData
     };
 
-    console.log('🔍 [LINE] Generating Flex Message...');
     const flexMessage = this.generateFlexMessage(lineData, 'new_ticket');
-    console.log('🔍 [LINE] Flex Message generated successfully');
-    
-    // Get IT team user ID from environment or use broadcast
+
     const itTeamUserId = process.env.LINE_IT_TEAM_USER_ID;
-    console.log('🔍 [LINE] IT Team User ID:', itTeamUserId ? 'SET' : 'NOT SET');
-    
+
     let messageResult = false;
-    
+
     if (itTeamUserId) {
-      // Send to specific IT team user
-      console.log('📱 [LINE] Sending to specific user:', itTeamUserId);
       messageResult = await this.sendLineMessage(itTeamUserId, flexMessage);
     } else {
-      // Send as broadcast to all followers
-      console.log('📱 [LINE] Sending as broadcast to all followers');
       messageResult = await this.sendLineBroadcast(flexMessage);
     }
-    
-    console.log('📱 [LINE] Message result:', messageResult ? 'SUCCESS' : 'FAILED');
-    
-    // Also send to webhook if configured
+
     const webhookData: LineWebhookData = {
       type: 'new_ticket' as const,
       ticket: lineData,
       flexMessage: flexMessage
     };
-    console.log('🔍 [LINE] Webhook URL:', this.lineWebhookUrl ? 'SET' : 'NOT SET');
     const webhookResult = await this.sendLineWebhook(webhookData);
-    console.log('🔍 [LINE] Webhook result:', webhookResult ? 'SUCCESS' : 'FAILED');
 
     const finalResult = messageResult || webhookResult;
-    console.log('🔍 [LINE] Final result:', finalResult ? 'SUCCESS' : 'FAILED');
     return finalResult;
   }
 
@@ -816,43 +698,26 @@ class LineNotificationService {
   }
 
   async sendEmailRequestNotification(emailRequestData: EmailRequestData): Promise<boolean> {
-    console.log('🔍 [LINE] Starting sendEmailRequestNotification...');
-    console.log('🔍 [LINE] Channel Access Token:', this.channelAccessToken ? 'SET' : 'NOT SET');
-    
-    console.log('🔍 [LINE] Generating Email Request Flex Message...');
     const flexMessage = this.generateEmailRequestFlexMessage(emailRequestData);
-    console.log('🔍 [LINE] Email Request Flex Message generated successfully');
-    
-    // Get IT team user ID from environment or use broadcast
+
     const itTeamUserId = process.env.LINE_IT_TEAM_USER_ID;
-    console.log('🔍 [LINE] IT Team User ID:', itTeamUserId ? 'SET' : 'NOT SET');
-    
+
     let messageResult = false;
-    
+
     if (itTeamUserId) {
-      // Send to specific IT team user
-      console.log('📱 [LINE] Sending email request to specific user:', itTeamUserId);
       messageResult = await this.sendLineMessage(itTeamUserId, flexMessage);
     } else {
-      // Send as broadcast to all followers
-      console.log('📱 [LINE] Sending email request as broadcast to all followers');
       messageResult = await this.sendLineBroadcast(flexMessage);
     }
-    
-    console.log('📱 [LINE] Email request message result:', messageResult ? 'SUCCESS' : 'FAILED');
-    
-    // Also send to webhook if configured
+
     const webhookData: LineWebhookData = {
       type: 'email_request' as const,
       emailRequest: emailRequestData,
       flexMessage: flexMessage
     };
-    console.log('🔍 [LINE] Webhook URL:', this.lineWebhookUrl ? 'SET' : 'NOT SET');
     const webhookResult = await this.sendLineWebhook(webhookData);
-    console.log('🔍 [LINE] Email request webhook result:', webhookResult ? 'SUCCESS' : 'FAILED');
 
     const finalResult = messageResult || webhookResult;
-    console.log('🔍 [LINE] Email request final result:', finalResult ? 'SUCCESS' : 'FAILED');
     return finalResult;
   }
 }

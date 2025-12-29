@@ -48,7 +48,6 @@ interface ImportEmployeeCSVProps {
 
 export function ImportEmployeeCSV({ onSuccess, onBack }: ImportEmployeeCSVProps) {
   const [step, setStep] = useState<'upload' | 'preview' | 'result'>('upload');
-  const [csvFile, setCsvFile] = useState<File | null>(null);
   const [parsedData, setParsedData] = useState<CSVEmployee[]>([]);
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -202,7 +201,6 @@ export function ImportEmployeeCSV({ onSuccess, onBack }: ImportEmployeeCSVProps)
       return;
     }
 
-    setCsvFile(file);
     setPreviewError('');
     setError('');
 
@@ -243,7 +241,7 @@ export function ImportEmployeeCSV({ onSuccess, onBack }: ImportEmployeeCSVProps)
       } else {
         setError(data.error || 'เกิดข้อผิดพลาดในการนำเข้าข้อมูล');
       }
-    } catch (err) {
+    } catch {
       setError('เกิดข้อผิดพลาดในการเชื่อมต่อ');
     } finally {
       setIsLoading(false);
@@ -253,7 +251,6 @@ export function ImportEmployeeCSV({ onSuccess, onBack }: ImportEmployeeCSVProps)
   // Reset to upload step
   const resetUpload = () => {
     setStep('upload');
-    setCsvFile(null);
     setParsedData([]);
     setImportResult(null);
     setError('');

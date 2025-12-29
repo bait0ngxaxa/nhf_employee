@@ -9,53 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Alert } from '@/components/ui/alert';
 import { SuccessModal } from '@/components/SuccessModal';
 import { AlertTriangle, CheckCircle} from 'lucide-react';
-
-interface Department {
-  id: number;
-  name: string;
-  code: string;
-  description?: string;
-}
-
-interface Employee {
-  id: number;
-  firstName: string;
-  lastName: string;
-  nickname?: string;
-  phone?: string;
-  email: string;
-  position: string;
-  affiliation?: string;
-  hireDate: string;
-  status: 'ACTIVE' | 'INACTIVE' | 'SUSPENDED';
-  dept: Department;
-  user?: {
-    id: number;
-    email: string;
-    role: string;
-  };
-  createdAt: string;
-  updatedAt: string;
-}
-
-interface EmployeeFormData {
-  firstName: string;
-  lastName: string;
-  nickname: string;
-  email: string;
-  phone: string;
-  position: string;
-  affiliation: string;
-  departmentId: string;
-  status: string;
-}
-
-interface EditEmployeeFormProps {
-  employee: Employee | null;
-  isOpen: boolean;
-  onClose: () => void;
-  onSuccess?: () => void;
-}
+import { EditEmployeeFormProps, EmployeeFormData, Department, EmployeeStatusValue } from '@/types/employees';
 
 export function EditEmployeeForm({ employee, isOpen, onClose, onSuccess }: EditEmployeeFormProps) {
   const [formData, setFormData] = useState<EmployeeFormData>({
@@ -67,7 +21,8 @@ export function EditEmployeeForm({ employee, isOpen, onClose, onSuccess }: EditE
     position: '',
     affiliation: '',
     departmentId: '',
-    status: 'ACTIVE'
+    status: 'ACTIVE',
+    hireDate: ''
   });
 
   const [departments, setDepartments] = useState<Department[]>([]);
@@ -141,7 +96,7 @@ export function EditEmployeeForm({ employee, isOpen, onClose, onSuccess }: EditE
       } else {
         setError(data.error || 'เกิดข้อผิดพลาดในการแก้ไขข้อมูล');
       }
-    } catch (error) {
+    } catch {
       setError('เกิดข้อผิดพลาดในการเชื่อมต่อ');
     } finally {
       setIsLoading(false);
@@ -272,8 +227,8 @@ export function EditEmployeeForm({ employee, isOpen, onClose, onSuccess }: EditE
 
             <div>
               <Label htmlFor="department">แผนก *</Label>
-              <Select 
-                value={formData.departmentId} 
+              <Select
+                value={String(formData.departmentId)}
                 onValueChange={(value) => setFormData({ ...formData, departmentId: value })}
                 required
               >
@@ -292,9 +247,9 @@ export function EditEmployeeForm({ employee, isOpen, onClose, onSuccess }: EditE
 
             <div>
               <Label htmlFor="status">สถานะ *</Label>
-              <Select 
-                value={formData.status} 
-                onValueChange={(value) => setFormData({ ...formData, status: value })}
+              <Select
+                value={formData.status}
+                onValueChange={(value) => setFormData({ ...formData, status: value as EmployeeStatusValue })}
                 required
               >
                 <SelectTrigger>

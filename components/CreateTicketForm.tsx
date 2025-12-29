@@ -9,16 +9,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { SuccessModal } from '@/components/SuccessModal';
-
-interface CreateTicketFormProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onTicketCreated?: () => void;
-}
+import { CreateTicketFormProps, TicketFormData } from '@/types/tickets';
+import { TICKET_CATEGORIES, TICKET_PRIORITIES } from '@/constants/tickets';
 
 export default function CreateTicketForm({ isOpen, onClose, onTicketCreated }: CreateTicketFormProps) {
   const { data: session } = useSession();
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<TicketFormData>({
     title: '',
     description: '',
     category: '',
@@ -28,23 +24,6 @@ export default function CreateTicketForm({ isOpen, onClose, onTicketCreated }: C
   const [error, setError] = useState('');
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [createdTicket, setCreatedTicket] = useState<{id: number, title: string} | null>(null);
-
-  const categories = [
-    { value: 'HARDWARE', label: 'ฮาร์ดแวร์' },
-    { value: 'SOFTWARE', label: 'ซอฟต์แวร์' },
-    { value: 'NETWORK', label: 'เครือข่าย' },
-    { value: 'ACCOUNT', label: 'บัญชีผู้ใช้' },
-    { value: 'EMAIL', label: 'อีเมล' },
-    { value: 'PRINTER', label: 'เครื่องพิมพ์' },
-    { value: 'OTHER', label: 'อื่นๆ' }
-  ];
-
-  const priorities = [
-    { value: 'LOW', label: 'ต่ำ' },
-    { value: 'MEDIUM', label: 'ปานกลาง' },
-    { value: 'HIGH', label: 'สูง' },
-    { value: 'URGENT', label: 'เร่งด่วน' }
-  ];
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({
@@ -165,7 +144,7 @@ export default function CreateTicketForm({ isOpen, onClose, onTicketCreated }: C
                   <SelectValue placeholder="เลือกหมวดหมู่ปัญหา" />
                 </SelectTrigger>
                 <SelectContent>
-                  {categories.map((category) => (
+                  {TICKET_CATEGORIES.map((category) => (
                     <SelectItem key={category.value} value={category.value}>
                       {category.label}
                     </SelectItem>
@@ -184,7 +163,7 @@ export default function CreateTicketForm({ isOpen, onClose, onTicketCreated }: C
                   <SelectValue placeholder="เลือกระดับความสำคัญ" />
                 </SelectTrigger>
                 <SelectContent>
-                  {priorities.map((priority) => (
+                  {TICKET_PRIORITIES.map((priority) => (
                     <SelectItem key={priority.value} value={priority.value}>
                       {priority.label}
                     </SelectItem>

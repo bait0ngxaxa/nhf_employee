@@ -9,55 +9,10 @@ import { Search, ChevronLeft, ChevronRight, Download, Edit, Settings, Filter } f
 import { CSVLink } from 'react-csv';
 import { EditStatusModal } from '@/components/EditStatusModal';
 import { EditEmployeeForm } from '@/components/EditEmployeeForm';
-
-interface Department {
-  id: number;
-  name: string;
-  code: string;
-  description?: string;
-}
-
-interface User {
-  id: number;
-  email: string;
-  role: string;
-}
-
-interface Employee {
-  id: number;
-  firstName: string;
-  lastName: string;
-  nickname?: string;
-  phone?: string;
-  email: string;
-  position: string;
-  affiliation?: string;
-  hireDate: string;
-  status: 'ACTIVE' | 'INACTIVE' | 'SUSPENDED';
-  dept: Department;
-  user?: User;
-  createdAt: string;
-  updatedAt: string;
-}
-
-// Interface for CSV export data
-interface EmployeeCSVData {
-  'ลำดับ': number;
-  'ชื่อ': string;
-  'นามสกุล': string;
-  'ชื่อเล่น': string;
-  'ตำแหน่ง': string;
-  'สังกัด': string;
-  'แผนก': string;
-  'อีเมล': string;
-  'เบอร์โทร': string;
-  'สถานะ': string;
-}
-
-interface EmployeeListProps {
-  refreshTrigger?: number;
-  userRole?: string;
-}
+import { EmployeeListProps, Employee, EmployeeCSVData } from '@/types/employees';
+import { PAGINATION_DEFAULTS, STATUS_FILTER_OPTIONS } from '@/constants/ui';
+import { getEmployeeStatusLabel, getEmployeeStatusBadge, getEmployeeEmailStatus } from '@/lib/helpers/employee-helpers';
+import { generateFilename } from '@/lib/helpers/date-helpers';
 
 export function EmployeeList({ refreshTrigger, userRole }: EmployeeListProps) {
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -67,7 +22,7 @@ export function EmployeeList({ refreshTrigger, userRole }: EmployeeListProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage] = useState(10);
+  const [itemsPerPage] = useState(PAGINATION_DEFAULTS.ITEMS_PER_PAGE);
   const [isExporting, setIsExporting] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -139,26 +94,6 @@ export function EmployeeList({ refreshTrigger, userRole }: EmployeeListProps) {
     setCurrentPage(prev => Math.min(prev + 1, totalPages));
   };
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'ACTIVE':
-        return <Badge className="bg-green-100 text-green-800">ทำงานอยู่</Badge>;
-      case 'INACTIVE':
-        return <Badge variant="secondary">ไม่ทำงาน</Badge>;
-      case 'SUSPENDED':
-        return <Badge variant="destructive">ถูกระงับ</Badge>;
-      default:
-        return <Badge variant="outline">{status}</Badge>;
-    }
-  };
-
-
-
-  // Utility function for date formatting (currently used in CSV export)
-  // const formatDate = (dateString: string) => {
-  //   return new Date(dateString).toLocaleDateString('th-TH');
-  // };
-
   // Prepare CSV data for filtered employees
   const prepareCsvData = (): EmployeeCSVData[] => {
     return filteredEmployees.map((employee, index) => ({
@@ -169,30 +104,18 @@ export function EmployeeList({ refreshTrigger, userRole }: EmployeeListProps) {
       'ตำแหน่ง': employee.position,
       'สังกัด': employee.affiliation || '-',
       'แผนก': employee.dept.name,
-      'อีเมล': employee.email.includes('@temp.local') ? '-' : employee.email,
+      'อีเมล': getEmployeeEmailStatus(employee.email) === 'temp' ? '-' : employee.email,
       'เบอร์โทร': employee.phone || '-',
-      'สถานะ': employee.status === 'ACTIVE' ? 'ทำงานอยู่' : employee.status === 'INACTIVE' ? 'ไม่ทำงาน' : 'ถูกระงับ'
+      'สถานะ': getEmployeeStatusLabel(employee.status)
     }));
   };
 
   // Generate filename with current date, search term, and status filter
-  const generateFileName = () => {
-    const now = new Date();
-    const dateStr = now.toLocaleDateString('th-TH').replace(/\//g, '-');
-    const timeStr = now.toLocaleTimeString('th-TH', { hour12: false }).replace(/:/g, '-');
+  const getExportFileName = () => {
     const searchSuffix = searchTerm ? `_ค้นหา-${searchTerm}` : '';
-    const statusSuffix = statusFilter !== 'all' ? `_สถานะ-${getStatusLabel(statusFilter)}` : '';
-    return `รายชื่อพนักงาน${searchSuffix}${statusSuffix}_${dateStr}_${timeStr}.csv`;
-  };
-
-  // Get status label in Thai
-  const getStatusLabel = (status: string) => {
-    switch (status) {
-      case 'ACTIVE': return 'ทำงานอยู่';
-      case 'INACTIVE': return 'ไม่ทำงาน';
-      case 'SUSPENDED': return 'ถูกระงับ';
-      default: return status;
-    }
+    const statusSuffix = statusFilter !== 'all' ? `_สถานะ-${getEmployeeStatusLabel(statusFilter)}` : '';
+    const prefix = `รายชื่อพนักงาน${searchSuffix}${statusSuffix}`;
+    return generateFilename(prefix, 'csv');
   };
 
   // Handle CSV export
@@ -289,10 +212,11 @@ export function EmployeeList({ refreshTrigger, userRole }: EmployeeListProps) {
                 </div>
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">สถานะทั้งหมด</SelectItem>
-                <SelectItem value="ACTIVE">ทำงานอยู่</SelectItem>
-                <SelectItem value="INACTIVE">ไม่ทำงาน</SelectItem>
-                
+                {STATUS_FILTER_OPTIONS.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
@@ -301,7 +225,7 @@ export function EmployeeList({ refreshTrigger, userRole }: EmployeeListProps) {
         {filteredEmployees.length > 0 && (
           <CSVLink
             data={prepareCsvData()}
-            filename={generateFileName()}
+            filename={getExportFileName()}
             className="inline-flex"
             onClick={handleExportCSV}
           >
@@ -320,9 +244,9 @@ export function EmployeeList({ refreshTrigger, userRole }: EmployeeListProps) {
       {/* Results Summary and Pagination Info */}
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center space-y-2 sm:space-y-0">
         <div className="text-sm text-gray-600">
-          แสดงผล {startIndex + 1}-{Math.min(endIndex, filteredEmployees.length)} จาก {filteredEmployees.length} คน 
+          แสดงผล {startIndex + 1}-{Math.min(endIndex, filteredEmployees.length)} จาก {filteredEmployees.length} คน
           {statusFilter !== 'all' && (
-            <span className="text-blue-600">(กรองตามสถานะ: {getStatusLabel(statusFilter)})</span>
+            <span className="text-blue-600">(กรองตามสถานะ: {getEmployeeStatusLabel(statusFilter)})</span>
           )}
           {searchTerm && (
             <span className="text-green-600">(ค้นหา: &quot;{searchTerm}&quot;)</span>
@@ -419,8 +343,10 @@ export function EmployeeList({ refreshTrigger, userRole }: EmployeeListProps) {
                     <div className="text-sm text-gray-900">{employee.phone || '-'}</div>
                   </td>
                   
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    {getStatusBadge(employee.status)}
+                   <td className="px-6 py-4 whitespace-nowrap">
+                    <Badge className={getEmployeeStatusBadge(employee.status)}>
+                      {getEmployeeStatusLabel(employee.status)}
+                    </Badge>
                   </td>
                  
                   {userRole === 'ADMIN' && (

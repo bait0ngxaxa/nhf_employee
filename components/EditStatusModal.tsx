@@ -2,15 +2,15 @@
 
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogDescription, 
-  DialogFooter, 
-  DialogHeader, 
-  DialogTitle 
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle
 } from '@/components/ui/dialog';
-import { 
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -19,29 +19,18 @@ import {
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { AlertCircle, CheckCircle2 } from 'lucide-react';
+import { EditStatusModalProps } from '@/types/employees';
+import { EmployeeStatusValue } from '@/types/employees';
+import { EMPLOYEE_STATUSES } from '@/constants/employees';
+import { getEmployeeStatusInfo } from '@/lib/helpers/employee-helpers';
 
-interface Employee {
-  id: number;
-  firstName: string;
-  lastName: string;
-  nickname?: string;
-  status: 'ACTIVE' | 'INACTIVE' | 'SUSPENDED';
-}
-
-interface EditStatusModalProps {
-  employee: Employee | null;
-  isOpen: boolean;
-  onClose: () => void;
-  onStatusUpdate: (employeeId: number, newStatus: string) => void;
-}
-
-export function EditStatusModal({ 
-  employee, 
-  isOpen, 
-  onClose, 
-  onStatusUpdate 
+export function EditStatusModal({
+  employee,
+  isOpen,
+  onClose,
+  onStatusUpdate
 }: EditStatusModalProps) {
-  const [selectedStatus, setSelectedStatus] = useState<string>('');
+  const [selectedStatus, setSelectedStatus] = useState<EmployeeStatusValue>('ACTIVE' as EmployeeStatusValue);
   const [isUpdating, setIsUpdating] = useState(false);
 
   // Reset selected status when modal opens
@@ -52,7 +41,7 @@ export function EditStatusModal({
   }, [employee, isOpen]);
 
   const handleStatusChange = (value: string) => {
-    setSelectedStatus(value);
+    setSelectedStatus(value as EmployeeStatusValue);
   };
 
   const handleUpdate = async () => {
@@ -83,43 +72,10 @@ export function EditStatusModal({
     }
   };
 
-  const getStatusInfo = (status: string) => {
-    switch (status) {
-      case 'ACTIVE':
-        return {
-          label: 'ทำงานอยู่',
-          color: 'bg-green-100 text-green-800',
-          icon: <CheckCircle2 className="h-4 w-4" />,
-          description: 'พนักงานปฏิบัติงานปกติ'
-        };
-      case 'INACTIVE':
-        return {
-          label: 'ไม่ทำงาน',
-          color: 'bg-gray-100 text-gray-800',
-          icon: <AlertCircle className="h-4 w-4" />,
-          description: 'พนักงานออกจากงานแล้ว'
-        };
-      case 'SUSPENDED':
-        return {
-          label: 'ถูกระงับ',
-          color: 'bg-red-100 text-red-800',
-          icon: <AlertCircle className="h-4 w-4" />,
-          description: 'พนักงานถูกระงับการทำงานชั่วคราว'
-        };
-      default:
-        return {
-          label: status,
-          color: 'bg-gray-100 text-gray-800',
-          icon: <AlertCircle className="h-4 w-4" />,
-          description: ''
-        };
-    }
-  };
-
   if (!employee) return null;
 
-  const currentStatusInfo = getStatusInfo(employee.status);
-  const selectedStatusInfo = getStatusInfo(selectedStatus);
+  const currentStatusInfo = getEmployeeStatusInfo(employee.status);
+  const selectedStatusInfo = getEmployeeStatusInfo(selectedStatus);
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -156,19 +112,18 @@ export function EditStatusModal({
                 <SelectValue placeholder="เลือกสถานะใหม่" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="ACTIVE">
-                  <div className="flex items-center space-x-2">
-                    <CheckCircle2 className="h-4 w-4 text-green-600" />
-                    <span>ทำงานอยู่</span>
-                  </div>
-                </SelectItem>
-                <SelectItem value="INACTIVE">
-                  <div className="flex items-center space-x-2">
-                    <AlertCircle className="h-4 w-4 text-gray-600" />
-                    <span>ไม่ทำงาน</span>
-                  </div>
-                </SelectItem>
-                
+                {EMPLOYEE_STATUSES.map((status) => (
+                  <SelectItem key={status.value} value={status.value}>
+                    <div className="flex items-center space-x-2">
+                      {status.icon === '✓' ? (
+                        <CheckCircle2 className="h-4 w-4 text-green-600" />
+                      ) : (
+                        <AlertCircle className="h-4 w-4 text-gray-600" />
+                      )}
+                      <span>{status.label}</span>
+                    </div>
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>

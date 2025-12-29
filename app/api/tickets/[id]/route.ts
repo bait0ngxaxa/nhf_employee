@@ -2,8 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { emailService, TicketEmailData } from '@/lib/email';
+import { emailService } from '@/lib/email';
 import { lineNotificationService } from '@/lib/line';
+import { TicketEmailData } from '@/types/api';
 
 // GET - Get single ticket with comments
 export async function GET(
@@ -229,7 +230,7 @@ export async function PATCH(
           priority: updatedTicket.priority,
           status: updatedTicket.status,
           reportedBy: {
-            name: updatedTicket.reportedBy.employee?.firstName && updatedTicket.reportedBy.employee?.lastName 
+            name: updatedTicket.reportedBy.employee?.firstName && updatedTicket.reportedBy.employee?.lastName
               ? `${updatedTicket.reportedBy.employee.firstName} ${updatedTicket.reportedBy.employee.lastName}`
               : updatedTicket.reportedBy.name,
             email: updatedTicket.reportedBy.email,
@@ -245,16 +246,12 @@ export async function PATCH(
           updatedAt: updatedTicket.updatedAt.toISOString()
         };
 
-        // Send status update notification to the user who reported the ticket
-        console.log('📧 Sending status update email...');
         await emailService.sendStatusUpdateNotification(emailData, existingTicket.status);
-        
-        console.log('📱 Sending status update LINE notification...');
         await lineNotificationService.sendStatusUpdateNotification(emailData, existingTicket.status);
-        
+
       } catch (notificationError) {
         console.error('Failed to send status update notifications:', notificationError);
-        // Don't fail the update if notifications fail
+        // Don't fail update if notifications fail
       }
     }
 

@@ -7,28 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { SuccessModal } from '@/components/SuccessModal';
-
-interface Department {
-  id: number;
-  name: string;
-  code: string;
-  description?: string;
-}
-
-interface EmployeeFormData {
-  firstName: string;
-  lastName: string;
-  nickname: string;
-  email: string;
-  phone: string;
-  position: string;
-  affiliation: string;
-  departmentId: string;
-}
-
-interface AddEmployeeFormProps {
-  onSuccess?: () => void;
-}
+import { AddEmployeeFormProps, EmployeeFormData, Department } from '@/types/employees';
 
 export function AddEmployeeForm({ onSuccess }: AddEmployeeFormProps) {
   const [formData, setFormData] = useState<EmployeeFormData>({
@@ -205,8 +184,8 @@ export function AddEmployeeForm({ onSuccess }: AddEmployeeFormProps) {
 
               <div className="grid gap-3">
                 <Label htmlFor="department">แผนก</Label>
-                <Select 
-                  value={formData.departmentId} 
+                <Select
+                  value={String(formData.departmentId)}
                   onValueChange={(value) => setFormData({...formData, departmentId: value})}
                   required
                 >

@@ -1,30 +1,13 @@
 import nodemailer from 'nodemailer';
+import { TicketEmailData } from '@/types/api';
+import { getTicketCategoryLabel, getTicketPriorityLabel, getTicketStatusLabel, getPriorityHexColor, getStatusHexColor } from '@/lib/helpers/ticket-helpers';
+import { formatDateTime } from '@/lib/helpers/date-helpers';
 
 export interface EmailData {
   to: string;
   subject: string;
   html: string;
   text?: string;
-}
-
-export interface TicketEmailData {
-  ticketId: number;
-  title: string;
-  description: string;
-  category: string;
-  priority: string;
-  status: string;
-  reportedBy: {
-    name: string;
-    email: string;
-    department?: string;
-  };
-  assignedTo?: {
-    name: string;
-    email: string;
-  };
-  createdAt: string;
-  updatedAt?: string;
 }
 
 class EmailService {
@@ -59,92 +42,22 @@ class EmailService {
     try {
       await this.transporter.verify();
       this.isTransporterReady = true;
-      console.log('✅ SMTP connection verified successfully');
       return true;
     } catch (error) {
       console.error('❌ SMTP connection verification failed:', error);
       this.isTransporterReady = false;
-      
-      // Try to reinitialize the transporter
-      console.log('🔄 Reinitializing SMTP transporter...');
+
       this.initializeTransporter();
-      
-      // Retry verification once
+
       try {
         await this.transporter.verify();
         this.isTransporterReady = true;
-        console.log('✅ SMTP connection verified after reinitialize');
         return true;
       } catch (retryError) {
         console.error('❌ SMTP connection failed after retry:', retryError);
         return false;
       }
     }
-  }
-
-  private getCategoryLabel(category: string): string {
-    const categories: Record<string, string> = {
-      'HARDWARE': 'ฮาร์ดแวร์',
-      'SOFTWARE': 'ซอฟต์แวร์',
-      'NETWORK': 'เครือข่าย',
-      'ACCOUNT': 'บัญชีผู้ใช้',
-      'EMAIL': 'อีเมล',
-      'PRINTER': 'เครื่องพิมพ์',
-      'OTHER': 'อื่นๆ'
-    };
-    return categories[category] || category;
-  }
-
-  private getPriorityLabel(priority: string): string {
-    const priorities: Record<string, string> = {
-      'LOW': 'ต่ำ',
-      'MEDIUM': 'ปานกลาง',
-      'HIGH': 'สูง',
-      'URGENT': 'เร่งด่วน'
-    };
-    return priorities[priority] || priority;
-  }
-
-  private getStatusLabel(status: string): string {
-    const statuses: Record<string, string> = {
-      'OPEN': 'เปิด',
-      'IN_PROGRESS': 'กำลังดำเนินการ',
-      'RESOLVED': 'แก้ไขแล้ว',
-      'CLOSED': 'ปิด',
-      'CANCELLED': 'ยกเลิก'
-    };
-    return statuses[status] || status;
-  }
-
-  private getPriorityColor(priority: string): string {
-    const colors: Record<string, string> = {
-      'LOW': '#6B7280',
-      'MEDIUM': '#3B82F6',
-      'HIGH': '#F59E0B',
-      'URGENT': '#EF4444'
-    };
-    return colors[priority] || '#6B7280';
-  }
-
-  private getStatusColor(status: string): string {
-    const colors: Record<string, string> = {
-      'OPEN': '#3B82F6',
-      'IN_PROGRESS': '#F59E0B',
-      'RESOLVED': '#10B981',
-      'CLOSED': '#6B7280',
-      'CANCELLED': '#EF4444'
-    };
-    return colors[status] || '#6B7280';
-  }
-
-  private formatDate(dateString: string): string {
-    return new Date(dateString).toLocaleDateString('th-TH', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
   }
 
   generateNewTicketEmailHTML(data: TicketEmailData): string {
@@ -264,21 +177,21 @@ class EmailService {
                     </div>
                     <div class="info-row">
                         <span class="label">หมวดหมู่:</span>
-                        <span class="value">${this.getCategoryLabel(data.category)}</span>
+                        <span class="value">${getTicketCategoryLabel(data.category)}</span>
                     </div>
                     <div class="info-row">
                         <span class="label">ความสำคัญ:</span>
                         <span class="value">
-                            <span class="badge" style="background-color: ${this.getPriorityColor(data.priority)}">
-                                ${this.getPriorityLabel(data.priority)}
+                            <span class="badge" style="background-color: ${getPriorityHexColor(data.priority)}">
+                                ${getTicketPriorityLabel(data.priority)}
                             </span>
                         </span>
                     </div>
                     <div class="info-row">
                         <span class="label">สถานะ:</span>
                         <span class="value">
-                            <span class="badge" style="background-color: ${this.getStatusColor(data.status)}">
-                                ${this.getStatusLabel(data.status)}
+                            <span class="badge" style="background-color: ${getStatusHexColor(data.status)}">
+                                ${getTicketStatusLabel(data.status)}
                             </span>
                         </span>
                     </div>
@@ -288,7 +201,7 @@ class EmailService {
                     </div>
                     <div class="info-row">
                         <span class="label">วันที่สร้าง:</span>
-                        <span class="value">${this.formatDate(data.createdAt)}</span>
+                        <span class="value">${formatDateTime(data.createdAt)}</span>
                     </div>
                 </div>
 
@@ -436,12 +349,12 @@ class EmailService {
                 <div class="status-update">
                     <h3 style="margin-top: 0; color: #065F46;">สถานะได้รับการอัพเดท</h3>
                     <div class="status-change">
-                        <span class="status-badge" style="background-color: ${this.getStatusColor(oldStatus)}">
-                            ${this.getStatusLabel(oldStatus)}
+                        <span class="status-badge" style="background-color: ${getStatusHexColor(oldStatus)}">
+                            ${getTicketStatusLabel(oldStatus)}
                         </span>
                         <span class="arrow">→</span>
-                        <span class="status-badge" style="background-color: ${this.getStatusColor(data.status)}">
-                            ${this.getStatusLabel(data.status)}
+                        <span class="status-badge" style="background-color: ${getStatusHexColor(data.status)}">
+                            ${getTicketStatusLabel(data.status)}
                         </span>
                     </div>
                 </div>
@@ -453,13 +366,13 @@ class EmailService {
                     </div>
                     <div class="info-row">
                         <span class="label">หมวดหมู่:</span>
-                        <span class="value">${this.getCategoryLabel(data.category)}</span>
+                        <span class="value">${getTicketCategoryLabel(data.category)}</span>
                     </div>
                     <div class="info-row">
                         <span class="label">ความสำคัญ:</span>
                         <span class="value">
-                            <span class="status-badge" style="background-color: ${this.getPriorityColor(data.priority)}; padding: 4px 12px; font-size: 12px;">
-                                ${this.getPriorityLabel(data.priority)}
+                            <span class="status-badge" style="background-color: ${getPriorityHexColor(data.priority)}; padding: 4px 12px; font-size: 12px;">
+                                ${getTicketPriorityLabel(data.priority)}
                             </span>
                         </span>
                     </div>
@@ -475,7 +388,7 @@ class EmailService {
                     ` : ''}
                     <div class="info-row">
                         <span class="label">อัพเดทล่าสุด:</span>
-                        <span class="value">${this.formatDate(data.updatedAt || data.createdAt)}</span>
+                        <span class="value">${formatDateTime(data.updatedAt || data.createdAt)}</span>
                     </div>
                 </div>
 
@@ -498,22 +411,11 @@ class EmailService {
 
   async sendEmail(emailData: EmailData): Promise<boolean> {
     try {
-      console.log('🔍 Email Service Debug:');
-      console.log('  - SMTP_HOST:', process.env.SMTP_HOST || 'NOT SET');
-      console.log('  - SMTP_PORT:', process.env.SMTP_PORT || 'NOT SET');
-      console.log('  - SMTP_USER:', process.env.SMTP_USER ? 'CONFIGURED' : 'NOT SET');
-      console.log('  - SMTP_PASS:', process.env.SMTP_PASS ? 'CONFIGURED' : 'NOT SET');
-      console.log('  - IT_TEAM_EMAIL:', process.env.IT_TEAM_EMAIL || 'NOT SET');
-      console.log('  - Target email:', emailData.to);
-      
       if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
-        console.warn('❌ SMTP credentials not configured. Email not sent.');
         return false;
       }
 
-      // Verify connection before sending
       if (!this.isTransporterReady) {
-        console.log('🔄 Verifying SMTP connection before sending...');
         const connectionOk = await this.verifyConnection();
         if (!connectionOk) {
           console.error('❌ Cannot establish SMTP connection. Email not sent.');
@@ -521,16 +423,14 @@ class EmailService {
         }
       }
 
-      // Add timeout and retry logic
       const maxRetries = 3;
       let attempt = 0;
-      
+
       while (attempt < maxRetries) {
         try {
           attempt++;
-          console.log(`📧 Attempting to send email (attempt ${attempt}/${maxRetries})...`);
-          
-          const info = await this.transporter.sendMail({
+
+          await this.transporter.sendMail({
             from: `"NHF IT Support" <${process.env.SMTP_USER}>`,
             to: emailData.to,
             subject: emailData.subject,
@@ -538,18 +438,14 @@ class EmailService {
             text: emailData.text,
           });
 
-          console.log('✅ Email sent successfully:', info.messageId);
-          console.log('  - Response:', info.response);
           return true;
-          
+
         } catch (sendError: unknown) {
           const errorMessage = sendError instanceof Error ? sendError.message : 'Unknown error';
           const errorCode = sendError instanceof Error && 'code' in sendError ? (sendError as Error & { code: string }).code : undefined;
           console.error(`❌ Email send attempt ${attempt} failed:`, errorMessage);
-          
-          // If it's a connection error, try to reconnect
+
           if (errorCode === 'ECONNRESET' || errorCode === 'ETIMEDOUT' || errorCode === 'ENOTFOUND') {
-            console.log('🔄 Connection error detected, reinitializing transporter...');
             this.isTransporterReady = false;
             const reconnected = await this.verifyConnection();
             if (!reconnected && attempt === maxRetries) {
@@ -560,14 +456,12 @@ class EmailService {
             console.error('❌ Failed to send email after all attempts:', sendError);
             return false;
           }
-          
-          // Wait before retry (exponential backoff)
-          const waitTime = Math.pow(2, attempt) * 1000; // 2s, 4s, 8s
-          console.log(`⏳ Waiting ${waitTime}ms before retry...`);
+
+          const waitTime = Math.pow(2, attempt) * 1000;
           await new Promise(resolve => setTimeout(resolve, waitTime));
         }
       }
-      
+
       return false;
     } catch (error) {
       console.error('❌ Unexpected error in sendEmail:', error);
@@ -580,7 +474,7 @@ class EmailService {
       to: ticketData.reportedBy.email,
       subject: `[NHF IT] Ticket #${ticketData.ticketId} ถูกสร้างแล้ว - ${ticketData.title}`,
       html: this.generateNewTicketEmailHTML(ticketData),
-      text: `Ticket #${ticketData.ticketId} ถูกสร้างแล้ว\n\nหัวข้อ: ${ticketData.title}\nคำอธิบาย: ${ticketData.description}\nสถานะ: ${this.getStatusLabel(ticketData.status)}\nความสำคัญ: ${this.getPriorityLabel(ticketData.priority)}\n\nดู Ticket ได้ที่: ${process.env.NEXTAUTH_URL}/dashboard/it-issues`
+      text: `Ticket #${ticketData.ticketId} ถูกสร้างแล้ว\n\nหัวข้อ: ${ticketData.title}\nคำอธิบาย: ${ticketData.description}\nสถานะ: ${getTicketStatusLabel(ticketData.status)}\nความสำคัญ: ${getTicketPriorityLabel(ticketData.priority)}\n\nดู Ticket ได้ที่: ${process.env.NEXTAUTH_URL}/dashboard/it-issues`
     };
 
     return await this.sendEmail(emailData);
@@ -589,9 +483,9 @@ class EmailService {
   async sendStatusUpdateNotification(ticketData: TicketEmailData, oldStatus: string): Promise<boolean> {
     const emailData: EmailData = {
       to: ticketData.reportedBy.email,
-      subject: `[NHF IT] อัพเดทสถานะ Ticket #${ticketData.ticketId} - ${this.getStatusLabel(ticketData.status)}`,
+      subject: `[NHF IT] อัพเดทสถานะ Ticket #${ticketData.ticketId} - ${getTicketStatusLabel(ticketData.status)}`,
       html: this.generateStatusUpdateEmailHTML(ticketData, oldStatus),
-      text: `สถานะ Ticket #${ticketData.ticketId} ได้รับการอัพเดท\n\nหัวข้อ: ${ticketData.title}\nสถานะเดิม: ${this.getStatusLabel(oldStatus)}\nสถานะใหม่: ${this.getStatusLabel(ticketData.status)}\n\nดู Ticket ได้ที่: ${process.env.NEXTAUTH_URL}/dashboard/it-issues`
+      text: `สถานะ Ticket #${ticketData.ticketId} ได้รับการอัพเดท\n\nหัวข้อ: ${ticketData.title}\nสถานะเดิม: ${getTicketStatusLabel(oldStatus)}\nสถานะใหม่: ${getTicketStatusLabel(ticketData.status)}\n\nดู Ticket ได้ที่: ${process.env.NEXTAUTH_URL}/dashboard/it-issues`
     };
 
     return await this.sendEmail(emailData);
@@ -601,7 +495,6 @@ class EmailService {
   async sendITTeamNotification(ticketData: TicketEmailData): Promise<boolean> {
     const itTeamEmail = process.env.IT_TEAM_EMAIL;
     if (!itTeamEmail) {
-      console.warn('IT team email not configured');
       return false;
     }
 
@@ -609,7 +502,7 @@ class EmailService {
       to: itTeamEmail,
       subject: `[NHF IT] Ticket ${ticketData.priority === 'URGENT' ? 'เร่งด่วน' : 'ความสำคัญสูง'} #${ticketData.ticketId} - ${ticketData.title}`,
       html: this.generateNewTicketEmailHTML(ticketData),
-      text: `Ticket ใหม่ที่ต้องให้ความสำคัญ\n\nTicket #${ticketData.ticketId}\nหัวข้อ: ${ticketData.title}\nผู้แจ้ง: ${ticketData.reportedBy.name}\nความสำคัญ: ${this.getPriorityLabel(ticketData.priority)}\n\nดู Ticket ได้ที่: ${process.env.NEXTAUTH_URL}/dashboard/it-issues`
+      text: `Ticket ใหม่ที่ต้องให้ความสำคัญ\n\nTicket #${ticketData.ticketId}\nหัวข้อ: ${ticketData.title}\nผู้แจ้ง: ${ticketData.reportedBy.name}\nความสำคัญ: ${getTicketPriorityLabel(ticketData.priority)}\n\nดู Ticket ได้ที่: ${process.env.NEXTAUTH_URL}/dashboard/it-issues`
     };
 
     return await this.sendEmail(emailData);

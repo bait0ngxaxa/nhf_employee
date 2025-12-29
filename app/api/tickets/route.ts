@@ -2,8 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { emailService, TicketEmailData } from '@/lib/email';
+import { emailService } from '@/lib/email';
 import { lineNotificationService } from '@/lib/line';
+import { TicketEmailData } from '@/types/api';
 
 // GET - Retrieve tickets (filtered by role)
 export async function GET(request: NextRequest) {
@@ -162,7 +163,6 @@ export async function POST(request: NextRequest) {
 
     // Send email and LINE notifications
     try {
-      console.log('🎟️ Sending notifications for ticket #' + ticket.id);
       const emailData: TicketEmailData = {
         ticketId: ticket.id,
         title: ticket.title,
@@ -171,7 +171,7 @@ export async function POST(request: NextRequest) {
         priority: ticket.priority,
         status: ticket.status,
         reportedBy: {
-          name: ticket.reportedBy.employee?.firstName && ticket.reportedBy.employee?.lastName 
+          name: ticket.reportedBy.employee?.firstName && ticket.reportedBy.employee?.lastName
             ? `${ticket.reportedBy.employee.firstName} ${ticket.reportedBy.employee.lastName}`
             : ticket.reportedBy.name,
           email: ticket.reportedBy.email,
@@ -180,28 +180,17 @@ export async function POST(request: NextRequest) {
         createdAt: ticket.createdAt.toISOString()
       };
 
-      console.log('📧 Attempting to send confirmation email to:', emailData.reportedBy.email);
-      // Send confirmation email to the user
-      const emailSent = await emailService.sendNewTicketNotification(emailData);
-      console.log('📧 Email result:', emailSent ? 'SUCCESS' : 'FAILED');
-
-      console.log('📱 Attempting to send LINE notification...');
-      // Send LINE notification to the user
-      const lineSent = await lineNotificationService.sendNewTicketNotification(emailData);
-      console.log('📱 LINE result:', lineSent ? 'SUCCESS' : 'FAILED');
+      await emailService.sendNewTicketNotification(emailData);
+      await lineNotificationService.sendNewTicketNotification(emailData);
 
       // Send notification to IT team for high/urgent priority tickets
       if (ticket.priority === 'HIGH' || ticket.priority === 'URGENT') {
-        console.log('⚡ Sending IT team notifications for ' + ticket.priority + ' priority ticket');
-        const itEmailSent = await emailService.sendITTeamNotification(emailData);
-        console.log('📧 IT team email result:', itEmailSent ? 'SUCCESS' : 'FAILED');
-        
-        const itLineSent = await lineNotificationService.sendITTeamNotification(emailData);
-        console.log('📱 IT team LINE result:', itLineSent ? 'SUCCESS' : 'FAILED');
+        await emailService.sendITTeamNotification(emailData);
+        await lineNotificationService.sendITTeamNotification(emailData);
       }
     } catch (notificationError) {
       console.error('❌ Failed to send notifications:', notificationError);
-      // Don't fail the ticket creation if notifications fail
+      // Don't fail ticket creation if notifications fail
     }
 
     return NextResponse.json({ ticket }, { status: 201 });
