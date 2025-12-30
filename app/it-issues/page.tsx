@@ -6,58 +6,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Ticket, List, Settings, BarChart3, Sparkles } from 'lucide-react';
+import { Plus as PlusIcon, Ticket as TicketIcon, List, Settings, BarChart3, Sparkles } from 'lucide-react';
 import CreateTicketForm from '@/components/CreateTicketForm';
 import TicketList from '@/components/TicketList';
 import TicketDetail from '@/components/TicketDetail';
 import { useTitle } from '@/hook/useTitle';
-
-interface TicketStats {
-  total: number;
-  open: number;
-  inProgress: number;
-  resolved: number;
-  userTickets: number;
-  newTickets: number; 
-}
-interface Ticket {
-  id: number;
-  title: string;
-  description: string;
-  category: string;
-  priority: string;
-  status: string;
-  createdAt: string;
-  updatedAt: string;
-  resolvedAt?: string;
-  reportedBy: {
-    id: number;
-    name: string;
-    email: string;
-    employee?: {
-      firstName: string;
-      lastName: string;
-      dept?: {
-        name: string;
-      };
-    };
-  };
-  assignedTo?: {
-    id: number;
-    name: string;
-    email: string;
-    employee?: {
-      firstName: string;
-      lastName: string;
-    };
-  };
-  _count: {
-    comments: number;
-  };
-  views: {
-    viewedAt: string;
-  }[];
-}
+import { TicketStats, Ticket } from '@/types/tickets';
 
 export default function ITIssuesPage() {
   const { data: session } = useSession();
@@ -70,6 +24,10 @@ export default function ITIssuesPage() {
     open: 0,
     inProgress: 0,
     resolved: 0,
+    closed: 0,
+    cancelled: 0,
+    highPriority: 0,
+    urgentPriority: 0,
     userTickets: 0,
     newTickets: 0
   });
@@ -106,8 +64,12 @@ export default function ITIssuesPage() {
           open: tickets.filter((t: Ticket) => t.status === 'OPEN').length,
           inProgress: tickets.filter((t: Ticket) => t.status === 'IN_PROGRESS').length,
           resolved: tickets.filter((t: Ticket) => t.status === 'RESOLVED').length,
-          newTickets: tickets.filter((t: Ticket) => isNewTicket(t.createdAt, t.views)).length,
-          userTickets: isAdmin 
+          closed: tickets.filter((t: Ticket) => t.status === 'CLOSED').length,
+          cancelled: tickets.filter((t: Ticket) => t.status === 'CANCELLED').length,
+          highPriority: tickets.filter((t: Ticket) => t.priority === 'HIGH').length,
+          urgentPriority: tickets.filter((t: Ticket) => t.priority === 'URGENT').length,
+          newTickets: tickets.filter((t: Ticket) => isNewTicket(t.createdAt, t.views ?? [])).length,
+          userTickets: isAdmin
             ? tickets.filter((t: Ticket) => t.assignedTo?.id === parseInt(session.user.id)).length
             : tickets.filter((t: Ticket) => t.reportedBy.id === parseInt(session.user.id)).length
         };
@@ -184,7 +146,7 @@ export default function ITIssuesPage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Tickets ทั้งหมด</CardTitle>
-            <Ticket className="h-4 w-4 text-muted-foreground" />
+            <TicketIcon className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
@@ -196,14 +158,14 @@ export default function ITIssuesPage() {
           </CardContent>
         </Card>
         
-        <Card className={ticketStats.newTickets > 0 ? 'ring-2 ring-blue-200 bg-blue-50/30' : ''}>
+        <Card className={(ticketStats.newTickets ?? 0) > 0 ? 'ring-2 ring-blue-200 bg-blue-50/30' : ''}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium flex items-center gap-1">
               <Sparkles className="h-4 w-4 text-blue-500" />
               Tickets ใหม่
             </CardTitle>
             <div className="text-blue-500">
-              {ticketStats.newTickets > 0 && <Sparkles className="h-4 w-4 animate-pulse" />}
+              {(ticketStats.newTickets ?? 0) > 0 && <Sparkles className="h-4 w-4 animate-pulse" />}
             </div>
           </CardHeader>
           <CardContent>
@@ -274,7 +236,7 @@ export default function ITIssuesPage() {
           </TabsTrigger>
           {selectedTicket && (
             <TabsTrigger value="detail" className="flex items-center gap-2">
-              <Ticket className="h-4 w-4" />
+              <TicketIcon className="h-4 w-4" />
               รายละเอียด
             </TabsTrigger>
           )}
@@ -297,7 +259,7 @@ export default function ITIssuesPage() {
                   onClick={() => setShowCreateModal(true)}
                   className="flex items-center gap-2"
                 >
-                  <Plus className="h-4 w-4" />
+                  <PlusIcon className="h-4 w-4" />
                   แจ้งปัญหาใหม่
                 </Button>
               </div>

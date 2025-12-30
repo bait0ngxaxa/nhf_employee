@@ -8,50 +8,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Clock, MessageSquare, User, Calendar, Filter, Search, ChevronLeft, ChevronRight, Sparkles } from 'lucide-react';
-
-interface Ticket {
-  id: number;
-  title: string;
-  description: string;
-  category: string;
-  priority: string;
-  status: string;
-  createdAt: string;
-  updatedAt: string;
-  resolvedAt?: string;
-  reportedBy: {
-    id: number;
-    name: string;
-    email: string;
-    employee?: {
-      firstName: string;
-      lastName: string;
-      dept?: {
-        name: string;
-      };
-    };
-  };
-  assignedTo?: {
-    id: number;
-    name: string;
-    email: string;
-    employee?: {
-      firstName: string;
-      lastName: string;
-    };
-  };
-  _count: {
-    comments: number;
-  };
-  views: {
-    viewedAt: string;
-  }[];
-}
-
-interface TicketListProps {
-  onTicketSelect?: (ticket: Ticket) => void;
-  refreshTrigger?: number;
-}
+import { TicketListProps, Ticket } from '@/types/tickets';
+import { TICKET_CATEGORIES, TICKET_PRIORITIES, TICKET_STATUSES } from '@/constants/tickets';
+import { PAGINATION_DEFAULTS } from '@/constants/ui';
+import { formatThaiDate } from '@/lib/helpers/date-helpers';
+import { getTicketCategoryLabel, getTicketPriorityLabel, getTicketStatusLabel, getPriorityBadgeColor, getStatusBadgeColor } from '@/lib/helpers/ticket-helpers';
 
 export default function TicketList({ onTicketSelect, refreshTrigger }: TicketListProps) {
   const { data: session } = useSession();
@@ -66,35 +27,10 @@ export default function TicketList({ onTicketSelect, refreshTrigger }: TicketLis
   });
   const [pagination, setPagination] = useState({
     page: 1,
-    limit: 10,
+    limit: PAGINATION_DEFAULTS.ITEMS_PER_PAGE,
     total: 0,
     pages: 0
   });
-
-  const categories = [
-    { value: 'HARDWARE', label: 'ฮาร์ดแวร์' },
-    { value: 'SOFTWARE', label: 'ซอฟต์แวร์' },
-    { value: 'NETWORK', label: 'เครือข่าย' },
-    { value: 'ACCOUNT', label: 'บัญชีผู้ใช้' },
-    { value: 'EMAIL', label: 'อีเมล' },
-    { value: 'PRINTER', label: 'เครื่องพิมพ์' },
-    { value: 'OTHER', label: 'อื่นๆ' }
-  ];
-
-  const priorities = [
-    { value: 'LOW', label: 'ต่ำ' },
-    { value: 'MEDIUM', label: 'ปานกลาง' },
-    { value: 'HIGH', label: 'สูง' },
-    { value: 'URGENT', label: 'เร่งด่วน' }
-  ];
-
-  const statuses = [
-    { value: 'OPEN', label: 'เปิด' },
-    { value: 'IN_PROGRESS', label: 'กำลังดำเนินการ' },
-    { value: 'RESOLVED', label: 'แก้ไขแล้ว' },
-    { value: 'CLOSED', label: 'ปิด' },
-    { value: 'CANCELLED', label: 'ยกเลิก' }
-  ];
 
   const fetchTickets = useCallback(async () => {
     try {
@@ -153,56 +89,13 @@ export default function TicketList({ onTicketSelect, refreshTrigger }: TicketLis
     }
   }, [filters.search, fetchTickets, pagination.page]);
 
-  const getBadgeColor = (status: string) => {
-    switch (status) {
-      case 'OPEN': return 'bg-blue-500 text-white border border-blue-600';
-      case 'IN_PROGRESS': return 'bg-amber-500 text-white border border-amber-600';
-      case 'RESOLVED': return 'bg-green-500 text-white border border-green-600';
-      case 'CLOSED': return 'bg-slate-500 text-white border border-slate-600';
-      case 'CANCELLED': return 'bg-red-500 text-white border border-red-600';
-      default: return 'bg-gray-500 text-white border border-gray-600';
-    }
-  };
-
-  const getPriorityColor = (priority: string) => {
-    switch (priority) {
-      case 'LOW': return 'bg-gray-600 text-white border border-gray-700';
-      case 'MEDIUM': return 'bg-blue-600 text-white border border-blue-700';
-      case 'HIGH': return 'bg-orange-600 text-white border border-orange-700';
-      case 'URGENT': return 'bg-red-600 text-white border border-red-700';
-      default: return 'bg-gray-600 text-white border border-gray-700';
-    }
-  };
-
-  const getStatusLabel = (status: string) => {
-    return statuses.find(s => s.value === status)?.label || status;
-  };
-
-  const getCategoryLabel = (category: string) => {
-    return categories.find(c => c.value === category)?.label || category;
-  };
-
-  const getPriorityLabel = (priority: string) => {
-    return priorities.find(p => p.value === priority)?.label || priority;
-  };
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('th-TH', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  };
-
   // Check if ticket is new (created within last 24 hours) AND not viewed by current user
-  const isNewTicket = (createdAt: string, views: { viewedAt: string }[]) => {
+  const isNewTicket = (createdAt: string, views?: { viewedAt: string }[]) => {
     const now = new Date();
     const ticketDate = new Date(createdAt);
     const hoursDiff = (now.getTime() - ticketDate.getTime()) / (1000 * 60 * 60);
     const isRecent = hoursDiff <= 24;
-    const hasBeenViewed = views.length > 0;
+    const hasBeenViewed = views && views.length > 0;
     return isRecent && !hasBeenViewed;
   };
 
@@ -253,7 +146,7 @@ export default function TicketList({ onTicketSelect, refreshTrigger }: TicketLis
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">ทุกสถานะ</SelectItem>
-                  {statuses.map((status) => (
+                  {TICKET_STATUSES.map((status) => (
                     <SelectItem key={status.value} value={status.value}>
                       {status.label}
                     </SelectItem>
@@ -270,12 +163,29 @@ export default function TicketList({ onTicketSelect, refreshTrigger }: TicketLis
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">ทุกหมวดหมู่</SelectItem>
-                  {categories.map((category) => (
+                  {TICKET_CATEGORIES.map((category) => (
                     <SelectItem key={category.value} value={category.value}>
                       {category.label}
                     </SelectItem>
                   ))}
                 </SelectContent>
+              </Select>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium">ความสำคัญ</label>
+                <Select value={filters.priority || undefined} onValueChange={(value) => setFilters(prev => ({ ...prev, priority: value === 'all' ? '' : value }))}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="ทุกระดับ" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">ทุกระดับ</SelectItem>
+                    {TICKET_PRIORITIES.map((priority) => (
+                      <SelectItem key={priority.value} value={priority.value}>
+                        {priority.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
               </Select>
             </div>
 
@@ -285,14 +195,14 @@ export default function TicketList({ onTicketSelect, refreshTrigger }: TicketLis
                 <SelectTrigger>
                   <SelectValue placeholder="ทุกระดับ" />
                 </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">ทุกระดับ</SelectItem>
-                  {priorities.map((priority) => (
-                    <SelectItem key={priority.value} value={priority.value}>
-                      {priority.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
+                  <SelectContent>
+                    <SelectItem value="all">ทุกระดับ</SelectItem>
+                    {TICKET_PRIORITIES.map((priority) => (
+                      <SelectItem key={priority.value} value={priority.value}>
+                        {priority.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
               </Select>
             </div>
 
@@ -371,11 +281,11 @@ export default function TicketList({ onTicketSelect, refreshTrigger }: TicketLis
                         }`}>{ticket.title}</h3>
                       </div>
                       <div className="flex gap-3">
-                        <Badge className={`font-semibold px-3 py-1 text-sm ${getPriorityColor(ticket.priority)}`}>
-                          {getPriorityLabel(ticket.priority)}
+                        <Badge className={`font-semibold px-3 py-1 text-sm ${getPriorityBadgeColor(ticket.priority)}`}>
+                          {getTicketPriorityLabel(ticket.priority)}
                         </Badge>
-                        <Badge className={`font-semibold px-3 py-1 text-sm ${getBadgeColor(ticket.status)}`}>
-                          {getStatusLabel(ticket.status)}
+                        <Badge className={`font-semibold px-3 py-1 text-sm ${getStatusBadgeColor(ticket.status)}`}>
+                          {getTicketStatusLabel(ticket.status)}
                         </Badge>
                       </div>
                     </div>
@@ -403,22 +313,22 @@ export default function TicketList({ onTicketSelect, refreshTrigger }: TicketLis
                         isNew ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-700'
                       }`}>
                         <Calendar className="h-4 w-4 flex-shrink-0" />
-                        <span className="truncate">{formatDate(ticket.createdAt)}</span>
+                        <span className="truncate">{formatThaiDate(ticket.createdAt)}</span>
                       </div>
 
                       <div className={`flex items-center gap-2 p-2 rounded-lg ${
                         isNew ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-700'
                       }`}>
                         <Clock className="h-4 w-4 flex-shrink-0" />
-                        <span className="truncate">{getCategoryLabel(ticket.category)}</span>
+                        <span className="truncate">{getTicketCategoryLabel(ticket.category)}</span>
                       </div>
 
-                      {ticket._count.comments > 0 && (
+                      {(ticket._count?.comments ?? 0) > 0 && (
                         <div className={`flex items-center gap-2 p-2 rounded-lg ${
                           isNew ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-700'
                         }`}>
                           <MessageSquare className="h-4 w-4 flex-shrink-0" />
-                          <span className="truncate">{ticket._count.comments} ความคิดเห็น</span>
+                          <span className="truncate">{ticket._count?.comments ?? 0} ความคิดเห็น</span>
                         </div>
                       )}
 

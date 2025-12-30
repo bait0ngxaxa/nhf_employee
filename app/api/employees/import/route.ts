@@ -3,7 +3,8 @@ import { prisma } from '@/lib/prisma';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 
-interface CSVEmployee {
+
+interface CSVImportEmployee {
   firstName: string;
   lastName: string;
   email?: string;
@@ -16,12 +17,12 @@ interface CSVEmployee {
 
 interface ImportError {
   row: number;
-  data: Partial<CSVEmployee>;
+  data: Partial<CSVImportEmployee>;
   error: string;
 }
 
 interface ImportResult {
-  success: CSVEmployee[];
+  success: CSVImportEmployee[];
   errors: ImportError[];
 }
 
