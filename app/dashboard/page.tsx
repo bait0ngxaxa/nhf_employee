@@ -37,6 +37,7 @@ import {
     getAvailableMenuItems,
 } from "@/constants/dashboard";
 import { useEmployeeExport } from "@/hooks/useEmployeeExport";
+import { EmailRequestForm } from "@/components/EmailRequestForm";
 
 export default function DashboardPage() {
     const { data: session, status } = useSession();
@@ -129,11 +130,6 @@ export default function DashboardPage() {
             return;
         }
 
-        if (menuId === "email-request") {
-            router.push("/dashboard/email-request");
-            return;
-        }
-
         setSelectedMenu(menuId);
 
         if (window.innerWidth < 768) {
@@ -211,11 +207,12 @@ export default function DashboardPage() {
                                 ส่งคำขออีเมลสำหรับพนักงานใหม่ให้ทีมไอที
                             </p>
                         </div>
-                        <iframe
-                            src="/dashboard/email-request"
-                            className="w-full h-screen border-0 rounded-lg"
-                            title="ขออีเมลพนักงานใหม่"
-                        />
+                        <div className="space-y-6">
+                            <EmailRequestForm
+                                onCancel={() => setSelectedMenu("dashboard")}
+                                onSuccess={() => setSelectedMenu("dashboard")}
+                            />
+                        </div>
                     </div>
                 );
 
@@ -276,50 +273,72 @@ export default function DashboardPage() {
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle>พนักงานทั้งหมด</CardTitle>
+                            <Card className="bg-white/60 backdrop-blur-md border-gray-100 shadow-lg hover:shadow-xl transition-all duration-300 rounded-2xl">
+                                <CardHeader className="pb-2">
+                                    <CardTitle className="text-sm font-medium text-gray-500 uppercase tracking-wider">
+                                        พนักงานทั้งหมด
+                                    </CardTitle>
                                 </CardHeader>
                                 <CardContent>
-                                    <p className="text-3xl font-bold text-blue-600">
-                                        {employeeStats.total}
-                                    </p>
-                                    <p className="text-sm text-gray-600">คน</p>
+                                    <div className="flex items-baseline space-x-2">
+                                        <p className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent">
+                                            {employeeStats.total}
+                                        </p>
+                                        <p className="text-sm text-gray-500">
+                                            คน
+                                        </p>
+                                    </div>
                                 </CardContent>
                             </Card>
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle>พนักงานปัจจุบัน</CardTitle>
+                            <Card className="bg-white/60 backdrop-blur-md border-gray-100 shadow-lg hover:shadow-xl transition-all duration-300 rounded-2xl">
+                                <CardHeader className="pb-2">
+                                    <CardTitle className="text-sm font-medium text-gray-500 uppercase tracking-wider">
+                                        พนักงานปัจจุบัน
+                                    </CardTitle>
                                 </CardHeader>
                                 <CardContent>
-                                    <p className="text-3xl font-bold text-green-600">
-                                        {employeeStats.active}
-                                    </p>
-                                    <p className="text-sm text-gray-600">
-                                        คน (ทำงานอยู่)
-                                    </p>
+                                    <div className="flex items-baseline space-x-2">
+                                        <p className="text-4xl font-bold bg-gradient-to-r from-green-500 to-emerald-600 bg-clip-text text-transparent">
+                                            {employeeStats.active}
+                                        </p>
+                                        <p className="text-sm text-gray-500">
+                                            คน (Active)
+                                        </p>
+                                    </div>
                                 </CardContent>
                             </Card>
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle>แผนกบริหาร</CardTitle>
+                            <Card className="bg-white/60 backdrop-blur-md border-gray-100 shadow-lg hover:shadow-xl transition-all duration-300 rounded-2xl">
+                                <CardHeader className="pb-2">
+                                    <CardTitle className="text-sm font-medium text-gray-500 uppercase tracking-wider">
+                                        แผนกบริหาร
+                                    </CardTitle>
                                 </CardHeader>
                                 <CardContent>
-                                    <p className="text-3xl font-bold text-orange-600">
-                                        {employeeStats.admin}
-                                    </p>
-                                    <p className="text-sm text-gray-600">คน</p>
+                                    <div className="flex items-baseline space-x-2">
+                                        <p className="text-4xl font-bold bg-gradient-to-r from-orange-500 to-amber-600 bg-clip-text text-transparent">
+                                            {employeeStats.admin}
+                                        </p>
+                                        <p className="text-sm text-gray-500">
+                                            คน
+                                        </p>
+                                    </div>
                                 </CardContent>
                             </Card>
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle>แผนกวิชาการ</CardTitle>
+                            <Card className="bg-white/60 backdrop-blur-md border-gray-100 shadow-lg hover:shadow-xl transition-all duration-300 rounded-2xl">
+                                <CardHeader className="pb-2">
+                                    <CardTitle className="text-sm font-medium text-gray-500 uppercase tracking-wider">
+                                        แผนกวิชาการ
+                                    </CardTitle>
                                 </CardHeader>
                                 <CardContent>
-                                    <p className="text-3xl font-bold text-purple-600">
-                                        {employeeStats.academic}
-                                    </p>
-                                    <p className="text-sm text-gray-600">คน</p>
+                                    <div className="flex items-baseline space-x-2">
+                                        <p className="text-4xl font-bold bg-gradient-to-r from-purple-500 to-violet-600 bg-clip-text text-transparent">
+                                            {employeeStats.academic}
+                                        </p>
+                                        <p className="text-sm text-gray-500">
+                                            คน
+                                        </p>
+                                    </div>
                                 </CardContent>
                             </Card>
                         </div>
@@ -391,19 +410,21 @@ export default function DashboardPage() {
                                 return (
                                     <Card
                                         key={item.id}
-                                        className="cursor-pointer hover:shadow-lg transition-shadow duration-200"
+                                        className="cursor-pointer bg-white/60 backdrop-blur-md border-gray-100 shadow-lg hover:shadow-2xl hover:scale-[1.02] transition-all duration-300 rounded-2xl group"
                                         onClick={() => handleMenuClick(item.id)}
                                     >
                                         <CardHeader>
-                                            <div className="flex items-center space-x-3">
-                                                <IconComponent className="h-8 w-8 text-blue-600" />
-                                                <CardTitle className="text-lg">
+                                            <div className="flex items-center space-x-4">
+                                                <div className="p-3 bg-blue-50 rounded-xl group-hover:bg-blue-100 transition-colors duration-300">
+                                                    <IconComponent className="h-8 w-8 text-blue-600" />
+                                                </div>
+                                                <CardTitle className="text-xl group-hover:text-blue-700 transition-colors">
                                                     {item.label}
                                                 </CardTitle>
                                             </div>
                                         </CardHeader>
                                         <CardContent>
-                                            <CardDescription>
+                                            <CardDescription className="text-base">
                                                 {item.description}
                                             </CardDescription>
                                         </CardContent>
@@ -417,16 +438,16 @@ export default function DashboardPage() {
     };
 
     return (
-        <div className="flex h-screen bg-gray-50">
+        <div className="flex h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
             {/* Sidebar */}
             <div
                 className={cn(
-                    "bg-white shadow-lg border-r border-gray-200 transition-all duration-300 flex flex-col",
+                    "bg-white/80 backdrop-blur-xl shadow-lg border-r border-gray-200/50 transition-all duration-300 flex flex-col z-20",
                     sidebarOpen ? "w-64" : "w-16"
                 )}
             >
                 {/* Header */}
-                <div className="p-4 border-b border-gray-200">
+                <div className="p-4 border-b border-gray-100">
                     <div className="flex items-center justify-between">
                         {sidebarOpen && (
                             <h1 className="text-xl font-bold text-gray-800">
@@ -455,6 +476,9 @@ export default function DashboardPage() {
                         }
                         className={cn(
                             "w-full justify-start",
+                            selectedMenu === "dashboard"
+                                ? "bg-gradient-to-r from-blue-50 to-cyan-50 text-blue-700 hover:from-blue-100 hover:to-cyan-100 border-r-4 border-blue-600 shadow-sm"
+                                : "hover:bg-gray-50 text-gray-600 hover:text-gray-900",
                             !sidebarOpen && "justify-center px-2"
                         )}
                         onClick={() => handleMenuClick("dashboard")}
@@ -477,6 +501,9 @@ export default function DashboardPage() {
                                 }
                                 className={cn(
                                     "w-full justify-start",
+                                    selectedMenu === item.id
+                                        ? "bg-gradient-to-r from-blue-50 to-cyan-50 text-blue-700 hover:from-blue-100 hover:to-cyan-100 border-r-4 border-blue-600 shadow-sm"
+                                        : "hover:bg-gray-50 text-gray-600 hover:text-gray-900",
                                     !sidebarOpen && "justify-center px-2"
                                 )}
                                 onClick={() => handleMenuClick(item.id)}
@@ -491,7 +518,7 @@ export default function DashboardPage() {
                 </nav>
 
                 {/* User Info & Logout */}
-                <div className="p-4 border-t border-gray-200">
+                <div className="p-4 border-t border-gray-100">
                     {sidebarOpen && (
                         <div className="mb-3 p-3 bg-gray-50 rounded-lg">
                             <div className="flex items-center space-x-2">
@@ -533,9 +560,15 @@ export default function DashboardPage() {
             </div>
 
             {/* Main Content */}
-            <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+            <div className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
+                {/* Background Effects */}
+                <div className="absolute inset-0 overflow-hidden pointer-events-none">
+                    <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-blue-200/30 rounded-full blur-3xl"></div>
+                    <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-purple-200/30 rounded-full blur-3xl"></div>
+                </div>
+
                 {/* Mobile Menu Button */}
-                <div className="md:hidden p-4 border-b border-gray-200 bg-white">
+                <div className="md:hidden p-4 border-b border-gray-200/50 bg-white/60 backdrop-blur-md">
                     <Button
                         variant="ghost"
                         size="sm"
@@ -547,7 +580,7 @@ export default function DashboardPage() {
                 </div>
 
                 {/* Page Content */}
-                <main className="flex-1 overflow-y-auto p-4 md:p-6">
+                <main className="flex-1 overflow-y-auto p-4 md:p-8 relative z-10">
                     {renderContent()}
                 </main>
             </div>

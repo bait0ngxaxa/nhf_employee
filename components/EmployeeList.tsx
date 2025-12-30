@@ -265,7 +265,7 @@ export function EmployeeList({ refreshTrigger, userRole }: EmployeeListProps) {
                             placeholder="ค้นหาพนักงาน (ชื่อ, ชื่อเล่น, อีเมล, ตำแหน่ง, แผนก, สังกัด)"
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
-                            className="pl-10"
+                            className="pl-10 rounded-xl border-gray-200 focus:border-blue-500 focus:ring-blue-500/20 bg-white/50"
                         />
                     </div>
 
@@ -354,38 +354,38 @@ export function EmployeeList({ refreshTrigger, userRole }: EmployeeListProps) {
                         : "ยังไม่มีข้อมูลพนักงาน"}
                 </div>
             ) : (
-                <div className="overflow-x-auto border border-gray-200 rounded-lg">
+                <div className="overflow-x-auto border border-gray-200/60 rounded-2xl shadow-sm bg-white/60 backdrop-blur-md">
                     <table className="min-w-full bg-white">
-                        <thead className="bg-gray-50">
+                        <thead className="bg-gray-50/50 border-b border-gray-200/60">
                             <tr>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">
+                                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
                                     ชื่อ-นามสกุล
                                 </th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">
+                                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
                                     ชื่อเล่น
                                 </th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">
+                                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
                                     ตำแหน่ง
                                 </th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">
+                                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
                                     สังกัด
                                 </th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">
+                                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
                                     แผนก
                                 </th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">
+                                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
                                     อีเมล
                                 </th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">
+                                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
                                     เบอร์โทร
                                 </th>
 
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">
+                                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
                                     สถานะ
                                 </th>
 
                                 {userRole === "ADMIN" && (
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">
+                                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
                                         การจัดการ
                                     </th>
                                 )}
@@ -395,7 +395,7 @@ export function EmployeeList({ refreshTrigger, userRole }: EmployeeListProps) {
                             {currentEmployees.map((employee) => (
                                 <tr
                                     key={employee.id}
-                                    className="hover:bg-gray-50"
+                                    className="hover:bg-blue-50/30 transition-colors border-b border-gray-100 last:border-0"
                                 >
                                     <td className="px-6 py-4 whitespace-nowrap">
                                         <div className="text-sm font-medium text-gray-900">
