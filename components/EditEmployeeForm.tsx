@@ -107,10 +107,8 @@ export function EditEmployeeForm({
             const data = await response.json();
 
             if (response.ok) {
-                // Just call onSuccess - parent will handle closing form and showing success modal
-                if (onSuccess) {
-                    onSuccess();
-                }
+                // Let parent handle closing form and showing success modal
+                onSuccess?.();
             } else {
                 setError(data.error || "เกิดข้อผิดพลาดในการแก้ไขข้อมูล");
             }

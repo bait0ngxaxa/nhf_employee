@@ -156,21 +156,11 @@ export async function sendNewTicketNotification(
         baseUrl
     );
 
-    const messageResult = await sendToITTeamOrBroadcast(flexMessage);
-
-    const webhookData: LineWebhookData = {
-        type: "new_ticket",
-        ticket: lineData,
-        flexMessage: flexMessage,
-    };
-    const webhookResult = await sendLineWebhook(webhookData);
-
-    return messageResult || webhookResult;
+    return await sendToITTeamOrBroadcast(flexMessage);
 }
 
 export async function sendStatusUpdateNotification(
-    ticketData: TicketEmailData,
-    oldStatus: string
+    ticketData: TicketEmailData
 ): Promise<boolean> {
     const { baseUrl } = getConfig();
     const lineData: LineNotificationData = { ...ticketData };
@@ -180,17 +170,7 @@ export async function sendStatusUpdateNotification(
         baseUrl
     );
 
-    const messageResult = await sendToITTeamOrBroadcast(flexMessage);
-
-    const webhookData: LineWebhookData = {
-        type: "status_update",
-        ticket: lineData,
-        oldStatus: oldStatus,
-        flexMessage: flexMessage,
-    };
-    const webhookResult = await sendLineWebhook(webhookData);
-
-    return messageResult || webhookResult;
+    return await sendToITTeamOrBroadcast(flexMessage);
 }
 
 export async function sendITTeamNotification(
@@ -200,16 +180,7 @@ export async function sendITTeamNotification(
     const lineData: LineNotificationData = { ...ticketData };
     const flexMessage = generateTicketFlexMessage(lineData, "it_team", baseUrl);
 
-    const messageResult = await sendToITTeamOrBroadcast(flexMessage);
-
-    const webhookData: LineWebhookData = {
-        type: "it_team_urgent",
-        ticket: lineData,
-        flexMessage: flexMessage,
-    };
-    const webhookResult = await sendLineWebhook(webhookData);
-
-    return messageResult || webhookResult;
+    return await sendToITTeamOrBroadcast(flexMessage);
 }
 
 export async function sendEmailRequestNotification(
@@ -221,16 +192,7 @@ export async function sendEmailRequestNotification(
         baseUrl
     );
 
-    const messageResult = await sendToITTeamOrBroadcast(flexMessage);
-
-    const webhookData: LineWebhookData = {
-        type: "email_request",
-        emailRequest: emailRequestData,
-        flexMessage: flexMessage,
-    };
-    const webhookResult = await sendLineWebhook(webhookData);
-
-    return messageResult || webhookResult;
+    return await sendToITTeamOrBroadcast(flexMessage);
 }
 
 // Export as object for backward compatibility

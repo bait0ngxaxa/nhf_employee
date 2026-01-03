@@ -190,13 +190,19 @@ export async function POST(request: NextRequest) {
                 createdAt: ticket.createdAt.toISOString(),
             };
 
-            await emailService.sendNewTicketNotification(emailData);
-            await lineNotificationService.sendNewTicketNotification(emailData);
+            // Send LINE notification (single notification - use IT team style for high priority)
+            if (ticket.priority === "HIGH" || ticket.priority === "URGENT") {
+                await lineNotificationService.sendITTeamNotification(emailData);
+            } else {
+                await lineNotificationService.sendNewTicketNotification(
+                    emailData
+                );
+            }
 
-            // Send notification to IT team for high/urgent priority tickets
+            // Send email notifications
+            await emailService.sendNewTicketNotification(emailData);
             if (ticket.priority === "HIGH" || ticket.priority === "URGENT") {
                 await emailService.sendITTeamNotification(emailData);
-                await lineNotificationService.sendITTeamNotification(emailData);
             }
         } catch (notificationError) {
             console.error(

@@ -17,11 +17,9 @@ import {
     ChevronRight,
     Download,
     Edit,
-    Settings,
     Filter,
 } from "lucide-react";
 import { CSVLink } from "react-csv";
-import { EditStatusModal } from "@/components/EditStatusModal";
 import { EditEmployeeForm } from "@/components/EditEmployeeForm";
 import { SuccessModal } from "@/components/SuccessModal";
 import {
@@ -47,10 +45,6 @@ export function EmployeeList({ refreshTrigger, userRole }: EmployeeListProps) {
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage] = useState(PAGINATION_DEFAULTS.ITEMS_PER_PAGE);
     const [isExporting, setIsExporting] = useState(false);
-    const [editingEmployee, setEditingEmployee] = useState<Employee | null>(
-        null
-    );
-    const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [isEditFormOpen, setIsEditFormOpen] = useState(false);
     const [employeeToEdit, setEmployeeToEdit] = useState<Employee | null>(null);
     const [showEditSuccessModal, setShowEditSuccessModal] = useState(false);
@@ -163,47 +157,6 @@ export function EmployeeList({ refreshTrigger, userRole }: EmployeeListProps) {
         setTimeout(() => setIsExporting(false), 1000);
     };
 
-    // Handle edit status
-    const handleEditStatus = (employee: Employee) => {
-        setEditingEmployee(employee);
-        setIsEditModalOpen(true);
-    };
-
-    const handleCloseEditModal = () => {
-        setIsEditModalOpen(false);
-        setEditingEmployee(null);
-    };
-
-    const handleStatusUpdate = (employeeId: number, newStatus: string) => {
-        // Update the employee in the local state
-        setEmployees((prev) =>
-            prev.map((emp) =>
-                emp.id === employeeId
-                    ? {
-                          ...emp,
-                          status: newStatus as
-                              | "ACTIVE"
-                              | "INACTIVE"
-                              | "SUSPENDED",
-                      }
-                    : emp
-            )
-        );
-        setFilteredEmployees((prev) =>
-            prev.map((emp) =>
-                emp.id === employeeId
-                    ? {
-                          ...emp,
-                          status: newStatus as
-                              | "ACTIVE"
-                              | "INACTIVE"
-                              | "SUSPENDED",
-                      }
-                    : emp
-            )
-        );
-    };
-
     const handleEditEmployee = (employee: Employee) => {
         setEmployeeToEdit(employee);
         setIsEditFormOpen(true);
@@ -216,17 +169,25 @@ export function EmployeeList({ refreshTrigger, userRole }: EmployeeListProps) {
 
     const handleEmployeeUpdate = () => {
         // Save the employee name before closing
-        if (employeeToEdit) {
-            setLastEditedEmployee({
-                firstName: employeeToEdit.firstName,
-                lastName: employeeToEdit.lastName,
-            });
-        }
+        const employeeName = employeeToEdit
+            ? {
+                  firstName: employeeToEdit.firstName,
+                  lastName: employeeToEdit.lastName,
+              }
+            : null;
+
         // Close the edit form
         setIsEditFormOpen(false);
         setEmployeeToEdit(null);
-        // Show success modal
-        setShowEditSuccessModal(true);
+
+        // Show success modal after a small delay to ensure Dialog closes first
+        setTimeout(() => {
+            if (employeeName) {
+                setLastEditedEmployee(employeeName);
+            }
+            setShowEditSuccessModal(true);
+        }, 100);
+
         // Refresh the employee list
         fetchEmployees();
     };
@@ -474,19 +435,6 @@ export function EmployeeList({ refreshTrigger, userRole }: EmployeeListProps) {
                                                     <Edit className="h-3 w-3" />
                                                     <span>แก้ไข</span>
                                                 </Button>
-                                                <Button
-                                                    variant="outline"
-                                                    size="sm"
-                                                    onClick={() =>
-                                                        handleEditStatus(
-                                                            employee
-                                                        )
-                                                    }
-                                                    className="flex items-center space-x-1 text-blue-600 hover:text-blue-700"
-                                                >
-                                                    <Settings className="h-3 w-3" />
-                                                    <span>สถานะ</span>
-                                                </Button>
                                             </div>
                                         </td>
                                     )}
@@ -575,15 +523,6 @@ export function EmployeeList({ refreshTrigger, userRole }: EmployeeListProps) {
                     </div>
                 </div>
             )}
-
-            {/* Edit Status Modal */}
-            <EditStatusModal
-                employee={editingEmployee}
-                isOpen={isEditModalOpen}
-                onClose={handleCloseEditModal}
-                onStatusUpdate={handleStatusUpdate}
-            />
-
             {/* Edit Employee Form */}
             <EditEmployeeForm
                 employee={employeeToEdit}

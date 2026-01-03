@@ -291,8 +291,7 @@ export async function PATCH(
                     existingTicket.status
                 );
                 await lineNotificationService.sendStatusUpdateNotification(
-                    emailData,
-                    existingTicket.status
+                    emailData
                 );
             } catch (notificationError) {
                 console.error(
