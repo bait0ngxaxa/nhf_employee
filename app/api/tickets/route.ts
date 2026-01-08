@@ -6,6 +6,7 @@ import { emailService } from "@/lib/email";
 import { lineNotificationService } from "@/lib/line";
 import { TicketEmailData } from "@/types/api";
 import { createTicketSchema } from "@/lib/validations/ticket";
+import { logTicketEvent } from "@/lib/audit";
 
 // GET - Retrieve tickets (filtered by role)
 export async function GET(request: NextRequest) {
@@ -220,6 +221,22 @@ export async function POST(request: NextRequest) {
             );
             // Don't fail ticket creation if notifications fail
         }
+
+        // Log audit event
+        await logTicketEvent(
+            "TICKET_CREATE",
+            ticket.id,
+            parseInt(session.user.id),
+            session.user.email || "",
+            {
+                after: {
+                    title: ticket.title,
+                    category: ticket.category,
+                    priority: ticket.priority,
+                    status: ticket.status,
+                },
+            }
+        );
 
         return NextResponse.json({ ticket }, { status: 201 });
     } catch (error) {

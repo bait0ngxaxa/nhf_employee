@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { createEmployeeSchema } from "@/lib/validations/employee";
+import { logEmployeeEvent } from "@/lib/audit";
 
 // GET - ดึงข้อมูลพนักงานทั้งหมด
 export async function GET() {
@@ -100,6 +101,23 @@ export async function POST(request: NextRequest) {
                 dept: true,
             },
         });
+
+        // Log audit event
+        await logEmployeeEvent(
+            "EMPLOYEE_CREATE",
+            employee.id,
+            parseInt(session.user.id),
+            session.user.email || "",
+            {
+                after: {
+                    firstName: employee.firstName,
+                    lastName: employee.lastName,
+                    email: employee.email,
+                    position: employee.position,
+                    departmentId: employee.departmentId,
+                },
+            }
+        );
 
         return NextResponse.json(
             {

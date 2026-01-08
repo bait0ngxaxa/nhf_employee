@@ -18,6 +18,7 @@ import ITIssuesPage from "@/app/it-issues/page";
 import { DashboardSidebar } from "@/components/DashboardSidebar";
 import { EmployeeStatsCards } from "@/components/EmployeeStatsCards";
 import { EmailRequestForm } from "@/components/EmailRequestForm";
+import { AuditLogViewer } from "@/components/AuditLogViewer";
 import { useDashboard } from "@/hooks/useDashboard";
 
 export default function DashboardPage() {
@@ -228,6 +229,21 @@ export default function DashboardPage() {
                         onSuccess={handleEmployeeAdded}
                         onBack={() => handleMenuClick("employee-management")}
                     />
+                );
+
+            case "audit-logs":
+                return (
+                    <div className="space-y-6">
+                        <div>
+                            <h2 className="text-2xl font-bold text-gray-900">
+                                บันทึกการใช้งาน
+                            </h2>
+                            <p className="text-gray-600">
+                                ประวัติการดำเนินการในระบบ
+                            </p>
+                        </div>
+                        <AuditLogViewer />
+                    </div>
                 );
 
             default:
