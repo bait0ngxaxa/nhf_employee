@@ -5,6 +5,7 @@ import {
     Users,
     UserPlus,
     Upload,
+    FileText,
 } from "lucide-react";
 import { MenuItem } from "@/types/dashboard";
 
@@ -47,6 +48,13 @@ export const DASHBOARD_MENU_ITEMS: MenuItem[] = [
         label: "นำเข้าจาก CSV",
         icon: Upload,
         description: "นำเข้าข้อมูลพนักงานจากไฟล์ CSV",
+        requiredRole: "ADMIN",
+    },
+    {
+        id: "audit-logs",
+        label: "บันทึกการใช้งาน",
+        icon: FileText,
+        description: "ดูประวัติการใช้งานระบบ",
         requiredRole: "ADMIN",
     },
 ];

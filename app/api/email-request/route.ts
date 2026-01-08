@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { lineNotificationService } from "@/lib/line";
 import { EmailRequestData } from "@/types/api";
+import { createAuditLog } from "@/lib/audit";
 
 interface EmailRequestBody {
     thaiName: string;
@@ -102,6 +103,22 @@ export async function POST(req: NextRequest) {
             );
 
         if (lineResult) {
+            // Log audit event
+            await createAuditLog({
+                action: "EMAIL_REQUEST",
+                entityType: "EmailRequest",
+                userId: parseInt(session.user.id),
+                userEmail: session.user.email || "",
+                details: {
+                    after: {
+                        thaiName: body.thaiName,
+                        englishName: body.englishName,
+                        position: body.position,
+                        department: body.department,
+                    },
+                },
+            });
+
             return NextResponse.json({
                 success: true,
                 message: "ส่งคำขออีเมลพนักงานใหม่เรียบร้อยแล้ว",

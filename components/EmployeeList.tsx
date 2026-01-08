@@ -1,7 +1,5 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
@@ -11,186 +9,49 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
-import {
-    Search,
-    ChevronLeft,
-    ChevronRight,
-    Download,
-    Edit,
-    Filter,
-} from "lucide-react";
+import { Search, Download, Filter } from "lucide-react";
 import { CSVLink } from "react-csv";
 import { EditEmployeeForm } from "@/components/EditEmployeeForm";
 import { SuccessModal } from "@/components/SuccessModal";
-import {
-    EmployeeListProps,
-    Employee,
-    EmployeeCSVData,
-} from "@/types/employees";
-import { PAGINATION_DEFAULTS, STATUS_FILTER_OPTIONS } from "@/constants/ui";
-import {
-    getEmployeeStatusLabel,
-    getEmployeeStatusBadge,
-    getEmployeeEmailStatus,
-} from "@/lib/helpers/employee-helpers";
-import { generateFilename } from "@/lib/helpers/date-helpers";
+import { EmployeeTable } from "@/components/EmployeeTable";
+import { Pagination } from "@/components/Pagination";
+import { EmployeeListProps } from "@/types/employees";
+import { STATUS_FILTER_OPTIONS } from "@/constants/ui";
+import { getEmployeeStatusLabel } from "@/lib/helpers/employee-helpers";
+import { useEmployeeList } from "@/hooks/useEmployeeList";
 
 export function EmployeeList({ refreshTrigger, userRole }: EmployeeListProps) {
-    const [employees, setEmployees] = useState<Employee[]>([]);
-    const [filteredEmployees, setFilteredEmployees] = useState<Employee[]>([]);
-    const [searchTerm, setSearchTerm] = useState("");
-    const [statusFilter, setStatusFilter] = useState<string>("all");
-    const [isLoading, setIsLoading] = useState(true);
-    const [error, setError] = useState("");
-    const [currentPage, setCurrentPage] = useState(1);
-    const [itemsPerPage] = useState(PAGINATION_DEFAULTS.ITEMS_PER_PAGE);
-    const [isExporting, setIsExporting] = useState(false);
-    const [isEditFormOpen, setIsEditFormOpen] = useState(false);
-    const [employeeToEdit, setEmployeeToEdit] = useState<Employee | null>(null);
-    const [showEditSuccessModal, setShowEditSuccessModal] = useState(false);
-    const [lastEditedEmployee, setLastEditedEmployee] = useState<{
-        firstName: string;
-        lastName: string;
-    } | null>(null);
-
-    // Pagination calculations
-    const totalPages = Math.ceil(filteredEmployees.length / itemsPerPage);
-    const startIndex = (currentPage - 1) * itemsPerPage;
-    const endIndex = startIndex + itemsPerPage;
-    const currentEmployees = filteredEmployees.slice(startIndex, endIndex);
-
-    const fetchEmployees = async () => {
-        try {
-            setIsLoading(true);
-            const response = await fetch("/api/employees");
-
-            if (response.ok) {
-                const data = await response.json();
-                setEmployees(data.employees);
-                setFilteredEmployees(data.employees);
-                setError("");
-            } else {
-                const errorData = await response.json();
-                setError(errorData.error || "เกิดข้อผิดพลาดในการดึงข้อมูล");
-            }
-        } catch (error) {
-            setError("เกิดข้อผิดพลาดในการเชื่อมต่อ");
-            console.error("Error fetching employees:", error);
-        } finally {
-            setIsLoading(false);
-        }
-    };
-
-    useEffect(() => {
-        fetchEmployees();
-    }, [refreshTrigger]);
-
-    useEffect(() => {
-        const filtered = employees.filter((employee) => {
-            const searchLower = searchTerm.toLowerCase();
-            const matchesSearch =
-                employee.firstName.toLowerCase().includes(searchLower) ||
-                employee.lastName.toLowerCase().includes(searchLower) ||
-                (employee.nickname &&
-                    employee.nickname.toLowerCase().includes(searchLower)) ||
-                employee.email.toLowerCase().includes(searchLower) ||
-                employee.position.toLowerCase().includes(searchLower) ||
-                employee.dept.name.toLowerCase().includes(searchLower) ||
-                (employee.affiliation &&
-                    employee.affiliation.toLowerCase().includes(searchLower));
-
-            const matchesStatus =
-                statusFilter === "all" || employee.status === statusFilter;
-
-            return matchesSearch && matchesStatus;
-        });
-        setFilteredEmployees(filtered);
-        setCurrentPage(1); // Reset to first page when search or filter changes
-    }, [searchTerm, statusFilter, employees]);
-
-    const handlePageChange = (page: number) => {
-        setCurrentPage(page);
-    };
-
-    const handlePreviousPage = () => {
-        setCurrentPage((prev) => Math.max(prev - 1, 1));
-    };
-
-    const handleNextPage = () => {
-        setCurrentPage((prev) => Math.min(prev + 1, totalPages));
-    };
-
-    // Prepare CSV data for filtered employees
-    const prepareCsvData = (): EmployeeCSVData[] => {
-        return filteredEmployees.map((employee, index) => ({
-            ลำดับ: index + 1,
-            ชื่อ: employee.firstName,
-            นามสกุล: employee.lastName,
-            ชื่อเล่น: employee.nickname || "-",
-            ตำแหน่ง: employee.position,
-            สังกัด: employee.affiliation || "-",
-            แผนก: employee.dept.name,
-            อีเมล:
-                getEmployeeEmailStatus(employee.email) === "temp"
-                    ? "-"
-                    : employee.email,
-            เบอร์โทร: employee.phone || "-",
-            สถานะ: getEmployeeStatusLabel(employee.status),
-        }));
-    };
-
-    // Generate filename with current date, search term, and status filter
-    const getExportFileName = () => {
-        const searchSuffix = searchTerm ? `_ค้นหา-${searchTerm}` : "";
-        const statusSuffix =
-            statusFilter !== "all"
-                ? `_สถานะ-${getEmployeeStatusLabel(statusFilter)}`
-                : "";
-        const prefix = `รายชื่อพนักงาน${searchSuffix}${statusSuffix}`;
-        return generateFilename(prefix, "csv");
-    };
-
-    // Handle CSV export
-    const handleExportCSV = () => {
-        setIsExporting(true);
-        // Reset export state after a short delay
-        setTimeout(() => setIsExporting(false), 1000);
-    };
-
-    const handleEditEmployee = (employee: Employee) => {
-        setEmployeeToEdit(employee);
-        setIsEditFormOpen(true);
-    };
-
-    const handleCloseEditForm = () => {
-        setIsEditFormOpen(false);
-        setEmployeeToEdit(null);
-    };
-
-    const handleEmployeeUpdate = () => {
-        // Save the employee name before closing
-        const employeeName = employeeToEdit
-            ? {
-                  firstName: employeeToEdit.firstName,
-                  lastName: employeeToEdit.lastName,
-              }
-            : null;
-
-        // Close the edit form
-        setIsEditFormOpen(false);
-        setEmployeeToEdit(null);
-
-        // Show success modal after a small delay to ensure Dialog closes first
-        setTimeout(() => {
-            if (employeeName) {
-                setLastEditedEmployee(employeeName);
-            }
-            setShowEditSuccessModal(true);
-        }, 100);
-
-        // Refresh the employee list
-        fetchEmployees();
-    };
+    const {
+        employees,
+        filteredEmployees,
+        currentEmployees,
+        searchTerm,
+        setSearchTerm,
+        statusFilter,
+        setStatusFilter,
+        currentPage,
+        totalPages,
+        itemsPerPage,
+        startIndex,
+        endIndex,
+        handlePageChange,
+        handlePreviousPage,
+        handleNextPage,
+        isLoading,
+        error,
+        isExporting,
+        prepareCsvData,
+        getExportFileName,
+        handleExportCSV,
+        isEditFormOpen,
+        employeeToEdit,
+        showEditSuccessModal,
+        lastEditedEmployee,
+        handleEditEmployee,
+        handleCloseEditForm,
+        handleEmployeeUpdate,
+        setShowEditSuccessModal,
+    } = useEmployeeList(refreshTrigger);
 
     if (isLoading) {
         return (
@@ -279,7 +140,7 @@ export function EmployeeList({ refreshTrigger, userRole }: EmployeeListProps) {
                 )}
             </div>
 
-            {/* Results Summary and Pagination Info */}
+            {/* Results Summary */}
             <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center space-y-2 sm:space-y-0">
                 <div className="text-sm text-gray-600">
                     แสดงผล {startIndex + 1}-
@@ -315,214 +176,23 @@ export function EmployeeList({ refreshTrigger, userRole }: EmployeeListProps) {
                         : "ยังไม่มีข้อมูลพนักงาน"}
                 </div>
             ) : (
-                <div className="overflow-x-auto border border-gray-200/60 rounded-2xl shadow-sm bg-white/60 backdrop-blur-md">
-                    <table className="min-w-full bg-white">
-                        <thead className="bg-gray-50/50 border-b border-gray-200/60">
-                            <tr>
-                                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                                    ชื่อ-นามสกุล
-                                </th>
-                                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                                    ชื่อเล่น
-                                </th>
-                                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                                    ตำแหน่ง
-                                </th>
-                                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                                    สังกัด
-                                </th>
-                                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                                    แผนก
-                                </th>
-                                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                                    อีเมล
-                                </th>
-                                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                                    เบอร์โทร
-                                </th>
-
-                                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                                    สถานะ
-                                </th>
-
-                                {userRole === "ADMIN" && (
-                                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                                        การจัดการ
-                                    </th>
-                                )}
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-200">
-                            {currentEmployees.map((employee) => (
-                                <tr
-                                    key={employee.id}
-                                    className="hover:bg-blue-50/30 transition-colors border-b border-gray-100 last:border-0"
-                                >
-                                    <td className="px-6 py-4 whitespace-nowrap">
-                                        <div className="text-sm font-medium text-gray-900">
-                                            {employee.firstName}{" "}
-                                            {employee.lastName}
-                                        </div>
-                                    </td>
-                                    <td className="px-6 py-4 whitespace-nowrap">
-                                        <div className="text-sm text-gray-900">
-                                            {employee.nickname ? (
-                                                <span className="bg-blue-50 text-blue-700 px-2 py-1 rounded-md text-xs">
-                                                    {employee.nickname}
-                                                </span>
-                                            ) : (
-                                                <span className="text-gray-400">
-                                                    -
-                                                </span>
-                                            )}
-                                        </div>
-                                    </td>
-                                    <td className="px-6 py-4 whitespace-nowrap">
-                                        <div className="text-sm text-gray-900">
-                                            {employee.position}
-                                        </div>
-                                    </td>
-                                    <td className="px-6 py-4 whitespace-nowrap">
-                                        <div className="text-sm text-gray-900">
-                                            {employee.affiliation || "-"}
-                                        </div>
-                                    </td>
-                                    <td className="px-6 py-4 whitespace-nowrap">
-                                        <Badge variant="outline">
-                                            {employee.dept.name}
-                                        </Badge>
-                                    </td>
-                                    <td className="px-6 py-4 whitespace-nowrap">
-                                        <div className="text-sm text-gray-900">
-                                            {employee.email.includes(
-                                                "@temp.local"
-                                            )
-                                                ? "-"
-                                                : employee.email}
-                                        </div>
-                                    </td>
-                                    <td className="px-6 py-4 whitespace-nowrap">
-                                        <div className="text-sm text-gray-900">
-                                            {employee.phone || "-"}
-                                        </div>
-                                    </td>
-
-                                    <td className="px-6 py-4 whitespace-nowrap">
-                                        <Badge
-                                            className={getEmployeeStatusBadge(
-                                                employee.status
-                                            )}
-                                        >
-                                            {getEmployeeStatusLabel(
-                                                employee.status
-                                            )}
-                                        </Badge>
-                                    </td>
-
-                                    {userRole === "ADMIN" && (
-                                        <td className="px-6 py-4 whitespace-nowrap">
-                                            <div className="flex items-center space-x-2">
-                                                <Button
-                                                    variant="outline"
-                                                    size="sm"
-                                                    onClick={() =>
-                                                        handleEditEmployee(
-                                                            employee
-                                                        )
-                                                    }
-                                                    className="flex items-center space-x-1 text-green-600 hover:text-green-700"
-                                                >
-                                                    <Edit className="h-3 w-3" />
-                                                    <span>แก้ไข</span>
-                                                </Button>
-                                            </div>
-                                        </td>
-                                    )}
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
+                <EmployeeTable
+                    employees={currentEmployees}
+                    userRole={userRole}
+                    onEditEmployee={handleEditEmployee}
+                />
             )}
 
             {/* Pagination Controls */}
-            {totalPages > 1 && (
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={handlePreviousPage}
-                            disabled={currentPage === 1}
-                            className="flex items-center space-x-1"
-                        >
-                            <ChevronLeft className="h-4 w-4" />
-                            <span>ก่อนหน้า</span>
-                        </Button>
+            <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                itemsPerPage={itemsPerPage}
+                onPageChange={handlePageChange}
+                onPreviousPage={handlePreviousPage}
+                onNextPage={handleNextPage}
+            />
 
-                        <div className="flex items-center space-x-1">
-                            {Array.from(
-                                { length: totalPages },
-                                (_, i) => i + 1
-                            ).map((page) => {
-                                // Show first page, last page, current page, and pages around current page
-                                if (
-                                    page === 1 ||
-                                    page === totalPages ||
-                                    (page >= currentPage - 2 &&
-                                        page <= currentPage + 2)
-                                ) {
-                                    return (
-                                        <Button
-                                            key={page}
-                                            variant={
-                                                currentPage === page
-                                                    ? "default"
-                                                    : "outline"
-                                            }
-                                            size="sm"
-                                            onClick={() =>
-                                                handlePageChange(page)
-                                            }
-                                            className="min-w-[40px]"
-                                        >
-                                            {page}
-                                        </Button>
-                                    );
-                                } else if (
-                                    page === currentPage - 3 ||
-                                    page === currentPage + 3
-                                ) {
-                                    return (
-                                        <span
-                                            key={page}
-                                            className="px-2 text-gray-400"
-                                        >
-                                            ...
-                                        </span>
-                                    );
-                                }
-                                return null;
-                            })}
-                        </div>
-
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={handleNextPage}
-                            disabled={currentPage === totalPages}
-                            className="flex items-center space-x-1"
-                        >
-                            <span>ถัดไป</span>
-                            <ChevronRight className="h-4 w-4" />
-                        </Button>
-                    </div>
-
-                    <div className="text-sm text-gray-600">
-                        แสดงผล {itemsPerPage} รายการต่อหน้า
-                    </div>
-                </div>
-            )}
             {/* Edit Employee Form */}
             <EditEmployeeForm
                 employee={employeeToEdit}

@@ -1,9 +1,5 @@
 "use client";
 
-import { useSession } from "next-auth/react";
-import { useRouter } from "next/navigation";
-import { useState, useEffect, useCallback } from "react";
-import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
     Card,
@@ -12,98 +8,41 @@ import {
     CardHeader,
     CardTitle,
 } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
-import {
-    Menu,
-    X,
-    User,
-    Users,
-    Settings,
-    LogOut,
-    Plus,
-    Download,
-    Upload,
-} from "lucide-react";
-import { signOut } from "next-auth/react";
+import { Menu, Plus, Download, Upload, Users } from "lucide-react";
 import { AddEmployeeForm } from "@/components/AddEmployeeForm";
 import { EmployeeList } from "@/components/EmployeeList";
 import { ImportEmployeeCSV } from "@/components/ImportEmployeeCSV";
 import { CSVLink } from "react-csv";
 import { useTitle } from "@/hook/useTitle";
 import ITIssuesPage from "@/app/it-issues/page";
-import { Employee } from "@/types/employees";
-import {
-    DASHBOARD_MENU_ITEMS,
-    getAvailableMenuItems,
-} from "@/constants/dashboard";
-import { useEmployeeExport } from "@/hooks/useEmployeeExport";
+import { DashboardSidebar } from "@/components/DashboardSidebar";
+import { EmployeeStatsCards } from "@/components/EmployeeStatsCards";
 import { EmailRequestForm } from "@/components/EmailRequestForm";
+import { AuditLogViewer } from "@/components/AuditLogViewer";
+import { useDashboard } from "@/hooks/useDashboard";
 
 export default function DashboardPage() {
-    const { data: session, status } = useSession();
-    const [selectedMenu, setSelectedMenu] = useState<string>("dashboard");
-    const [sidebarOpen, setSidebarOpen] = useState(true);
-    const [employeeStats, setEmployeeStats] = useState({
-        total: 0,
-        active: 0,
-        admin: 0,
-        academic: 0,
-    });
-    const [refreshTrigger, setRefreshTrigger] = useState(0);
-    const {
-        allEmployees,
-        setAllEmployees,
-        isExporting,
-        setIsExporting,
-        prepareCsvData,
-        generateFileName,
-    } = useEmployeeExport();
-    const router = useRouter();
-    const user = session?.user;
-    const isAdmin = user?.role === "ADMIN";
     useTitle("Dashboard | NHF IT System");
 
-    // Fetch employee statistics
-    const fetchEmployeeStats = useCallback(async () => {
-        if (isAdmin) {
-            try {
-                const response = await fetch("/api/employees");
-                if (response.ok) {
-                    const data = await response.json();
-                    const employees: Employee[] = data.employees;
-
-                    // Store all employees for CSV export
-                    setAllEmployees(employees);
-
-                    const stats = {
-                        total: employees.length,
-                        active: employees.filter(
-                            (emp: Employee) => emp.status === "ACTIVE"
-                        ).length,
-                        admin: employees.filter(
-                            (emp: Employee) => emp.dept.code === "ADMIN"
-                        ).length,
-                        academic: employees.filter(
-                            (emp: Employee) => emp.dept.code === "ACADEMIC"
-                        ).length,
-                    };
-
-                    setEmployeeStats(stats);
-                }
-            } catch (error) {
-                console.error("Error fetching employee stats:", error);
-            }
-        }
-    }, [isAdmin, setAllEmployees]);
-
-    // Fetch stats on component mount and when refreshTrigger changes
-    useEffect(() => {
-        fetchEmployeeStats();
-    }, [fetchEmployeeStats, refreshTrigger]);
-
-    const handleEmployeeAdded = () => {
-        setRefreshTrigger((prev) => prev + 1);
-    };
+    const {
+        status,
+        user,
+        selectedMenu,
+        sidebarOpen,
+        setSidebarOpen,
+        availableMenuItems,
+        handleMenuClick,
+        handleSignOut,
+        employeeStats,
+        refreshTrigger,
+        handleEmployeeAdded,
+        allEmployees,
+        isExporting,
+        prepareCsvData,
+        generateFileName,
+        handleExportCSV,
+        router,
+    } = useDashboard();
 
     if (status === "loading") {
         return (
@@ -113,44 +52,10 @@ export default function DashboardPage() {
         );
     }
 
-    if (status === "unauthenticated" || !session) {
+    if (status === "unauthenticated") {
         router.push("/login");
         return null;
     }
-
-    // Get available menu items based on user role
-    const availableMenuItems = getAvailableMenuItems(isAdmin);
-
-    const handleMenuClick = (menuId: string) => {
-        const menuItem = DASHBOARD_MENU_ITEMS.find(
-            (item) => item.id === menuId
-        );
-        if (menuItem?.requiredRole === "ADMIN" && !isAdmin) {
-            window.location.href = "/access-denied";
-            return;
-        }
-
-        setSelectedMenu(menuId);
-
-        if (window.innerWidth < 768) {
-            setSidebarOpen(false);
-        }
-    };
-
-    const handleSignOut = () => {
-        signOut({ callbackUrl: "/login" });
-    };
-
-    const handleExportCSV = async () => {
-        setIsExporting(true);
-        try {
-            await fetchEmployeeStats();
-        } catch (error) {
-            console.error("Error preparing export:", error);
-        } finally {
-            setIsExporting(false);
-        }
-    };
 
     const renderContent = () => {
         switch (selectedMenu) {
@@ -209,8 +114,8 @@ export default function DashboardPage() {
                         </div>
                         <div className="space-y-6">
                             <EmailRequestForm
-                                onCancel={() => setSelectedMenu("dashboard")}
-                                onSuccess={() => setSelectedMenu("dashboard")}
+                                onCancel={() => handleMenuClick("dashboard")}
+                                onSuccess={() => handleMenuClick("dashboard")}
                             />
                         </div>
                     </div>
@@ -272,76 +177,7 @@ export default function DashboardPage() {
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
-                            <Card className="bg-white/60 backdrop-blur-md border-gray-100 shadow-lg hover:shadow-xl transition-all duration-300 rounded-2xl">
-                                <CardHeader className="pb-2">
-                                    <CardTitle className="text-sm font-medium text-gray-500 uppercase tracking-wider">
-                                        พนักงานทั้งหมด
-                                    </CardTitle>
-                                </CardHeader>
-                                <CardContent>
-                                    <div className="flex items-baseline space-x-2">
-                                        <p className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent">
-                                            {employeeStats.total}
-                                        </p>
-                                        <p className="text-sm text-gray-500">
-                                            คน
-                                        </p>
-                                    </div>
-                                </CardContent>
-                            </Card>
-                            <Card className="bg-white/60 backdrop-blur-md border-gray-100 shadow-lg hover:shadow-xl transition-all duration-300 rounded-2xl">
-                                <CardHeader className="pb-2">
-                                    <CardTitle className="text-sm font-medium text-gray-500 uppercase tracking-wider">
-                                        พนักงานปัจจุบัน
-                                    </CardTitle>
-                                </CardHeader>
-                                <CardContent>
-                                    <div className="flex items-baseline space-x-2">
-                                        <p className="text-4xl font-bold bg-gradient-to-r from-green-500 to-emerald-600 bg-clip-text text-transparent">
-                                            {employeeStats.active}
-                                        </p>
-                                        <p className="text-sm text-gray-500">
-                                            คน (Active)
-                                        </p>
-                                    </div>
-                                </CardContent>
-                            </Card>
-                            <Card className="bg-white/60 backdrop-blur-md border-gray-100 shadow-lg hover:shadow-xl transition-all duration-300 rounded-2xl">
-                                <CardHeader className="pb-2">
-                                    <CardTitle className="text-sm font-medium text-gray-500 uppercase tracking-wider">
-                                        แผนกบริหาร
-                                    </CardTitle>
-                                </CardHeader>
-                                <CardContent>
-                                    <div className="flex items-baseline space-x-2">
-                                        <p className="text-4xl font-bold bg-gradient-to-r from-orange-500 to-amber-600 bg-clip-text text-transparent">
-                                            {employeeStats.admin}
-                                        </p>
-                                        <p className="text-sm text-gray-500">
-                                            คน
-                                        </p>
-                                    </div>
-                                </CardContent>
-                            </Card>
-                            <Card className="bg-white/60 backdrop-blur-md border-gray-100 shadow-lg hover:shadow-xl transition-all duration-300 rounded-2xl">
-                                <CardHeader className="pb-2">
-                                    <CardTitle className="text-sm font-medium text-gray-500 uppercase tracking-wider">
-                                        แผนกวิชาการ
-                                    </CardTitle>
-                                </CardHeader>
-                                <CardContent>
-                                    <div className="flex items-baseline space-x-2">
-                                        <p className="text-4xl font-bold bg-gradient-to-r from-purple-500 to-violet-600 bg-clip-text text-transparent">
-                                            {employeeStats.academic}
-                                        </p>
-                                        <p className="text-sm text-gray-500">
-                                            คน
-                                        </p>
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        </div>
+                        <EmployeeStatsCards stats={employeeStats} />
 
                         <Card>
                             <CardHeader>
@@ -395,6 +231,21 @@ export default function DashboardPage() {
                     />
                 );
 
+            case "audit-logs":
+                return (
+                    <div className="space-y-6">
+                        <div>
+                            <h2 className="text-2xl font-bold text-gray-900">
+                                บันทึกการใช้งาน
+                            </h2>
+                            <p className="text-gray-600">
+                                ประวัติการดำเนินการในระบบ
+                            </p>
+                        </div>
+                        <AuditLogViewer />
+                    </div>
+                );
+
             default:
                 return (
                     <div className="space-y-6">
@@ -440,124 +291,15 @@ export default function DashboardPage() {
     return (
         <div className="flex h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
             {/* Sidebar */}
-            <div
-                className={cn(
-                    "bg-white/80 backdrop-blur-xl shadow-lg border-r border-gray-200/50 transition-all duration-300 flex flex-col z-20",
-                    sidebarOpen ? "w-64" : "w-16"
-                )}
-            >
-                {/* Header */}
-                <div className="p-4 border-b border-gray-100">
-                    <div className="flex items-center justify-between">
-                        {sidebarOpen && (
-                            <h1 className="text-xl font-bold text-gray-800">
-                                ระบบจัดการ
-                            </h1>
-                        )}
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setSidebarOpen(!sidebarOpen)}
-                        >
-                            {sidebarOpen ? (
-                                <X className="h-4 w-4" />
-                            ) : (
-                                <Menu className="h-4 w-4" />
-                            )}
-                        </Button>
-                    </div>
-                </div>
-
-                {/* Navigation */}
-                <nav className="flex-1 p-4 space-y-2">
-                    <Button
-                        variant={
-                            selectedMenu === "dashboard" ? "default" : "ghost"
-                        }
-                        className={cn(
-                            "w-full justify-start",
-                            selectedMenu === "dashboard"
-                                ? "bg-gradient-to-r from-blue-50 to-cyan-50 text-blue-700 hover:from-blue-100 hover:to-cyan-100 border-r-4 border-blue-600 shadow-sm"
-                                : "hover:bg-gray-50 text-gray-600 hover:text-gray-900",
-                            !sidebarOpen && "justify-center px-2"
-                        )}
-                        onClick={() => handleMenuClick("dashboard")}
-                    >
-                        <Settings className="h-4 w-4" />
-                        {sidebarOpen && <span className="ml-2">แดชบอร์ด</span>}
-                    </Button>
-
-                    <Separator className="my-2" />
-
-                    {availableMenuItems.map((item) => {
-                        const IconComponent = item.icon;
-                        return (
-                            <Button
-                                key={item.id}
-                                variant={
-                                    selectedMenu === item.id
-                                        ? "default"
-                                        : "ghost"
-                                }
-                                className={cn(
-                                    "w-full justify-start",
-                                    selectedMenu === item.id
-                                        ? "bg-gradient-to-r from-blue-50 to-cyan-50 text-blue-700 hover:from-blue-100 hover:to-cyan-100 border-r-4 border-blue-600 shadow-sm"
-                                        : "hover:bg-gray-50 text-gray-600 hover:text-gray-900",
-                                    !sidebarOpen && "justify-center px-2"
-                                )}
-                                onClick={() => handleMenuClick(item.id)}
-                            >
-                                <IconComponent className="h-4 w-4" />
-                                {sidebarOpen && (
-                                    <span className="ml-2">{item.label}</span>
-                                )}
-                            </Button>
-                        );
-                    })}
-                </nav>
-
-                {/* User Info & Logout */}
-                <div className="p-4 border-t border-gray-100">
-                    {sidebarOpen && (
-                        <div className="mb-3 p-3 bg-gray-50 rounded-lg">
-                            <div className="flex items-center space-x-2">
-                                <User className="h-4 w-4 text-gray-600" />
-                                <div className="flex-1 min-w-0">
-                                    <p className="text-sm font-medium text-gray-900 truncate">
-                                        {user?.name}
-                                    </p>
-                                    <p className="text-xs text-gray-500 truncate">
-                                        {user?.email}
-                                    </p>
-                                    <p className="text-xs text-blue-600">
-                                        {user?.role === "ADMIN"
-                                            ? "ผู้ดูแลระบบ"
-                                            : "ผู้ใช้งาน"}{" "}
-                                        | {user?.department}
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
-                    <Button
-                        variant="ghost"
-                        className={cn(
-                            "w-full text-red-600 hover:text-red-700 hover:bg-red-50",
-                            sidebarOpen
-                                ? "justify-start"
-                                : "justify-center px-2"
-                        )}
-                        onClick={handleSignOut}
-                    >
-                        <LogOut className="h-4 w-4" />
-                        {sidebarOpen && (
-                            <span className="ml-2">ออกจากระบบ</span>
-                        )}
-                    </Button>
-                </div>
-            </div>
+            <DashboardSidebar
+                isOpen={sidebarOpen}
+                onToggle={() => setSidebarOpen(!sidebarOpen)}
+                selectedMenu={selectedMenu}
+                onMenuClick={handleMenuClick}
+                menuItems={availableMenuItems}
+                user={user}
+                onSignOut={handleSignOut}
+            />
 
             {/* Main Content */}
             <div className="flex-1 flex flex-col min-w-0 overflow-hidden relative">

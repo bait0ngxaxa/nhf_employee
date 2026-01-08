@@ -22,6 +22,7 @@ model User {
   assignedTickets Ticket[]        @relation("AssignedTickets")
   reportedTickets Ticket[]        @relation("ReportedTickets")
   employee        Employee?       @relation(fields: [employeeId], references: [id])
+  auditLogs       AuditLog[]
 
   @@map("users")
 }
@@ -138,3 +139,59 @@ enum TicketStatus {
   CLOSED
   CANCELLED
 }
+
+// Audit Log for tracking critical actions per agent.md security standards
+model AuditLog {
+  id          Int         @id @default(autoincrement())
+  action      AuditAction
+  entityType  String      // e.g., "User", "Employee", "Ticket"
+  entityId    Int?        // ID of the affected entity
+  userId      Int?        // User who performed the action
+  userEmail   String?     // Email for reference even if user deleted
+  ipAddress   String?     // Client IP address
+  userAgent   String?     @db.Text // Browser/client info
+  details     String?     @db.Text // JSON string with additional details
+  createdAt   DateTime    @default(now())
+  user        User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([action])
+  @@index([entityType, entityId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+enum AuditAction {
+  // Authentication
+  LOGIN_SUCCESS
+  LOGIN_FAILED
+  LOGOUT
+  PASSWORD_CHANGE
+  PASSWORD_RESET
+  
+  // Employee management
+  EMPLOYEE_CREATE
+  EMPLOYEE_UPDATE
+  EMPLOYEE_DELETE
+  EMPLOYEE_STATUS_CHANGE
+  EMPLOYEE_IMPORT
+  
+  // Ticket management
+  TICKET_CREATE
+  TICKET_UPDATE
+  TICKET_STATUS_CHANGE
+  TICKET_ASSIGN
+  TICKET_COMMENT
+  
+  // Admin actions
+  USER_CREATE
+  USER_UPDATE
+  USER_DELETE
+  USER_ROLE_CHANGE
+  
+  // System
+  SETTINGS_UPDATE
+  DATA_EXPORT
+  EMAIL_REQUEST
+}
+
