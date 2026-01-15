@@ -7,11 +7,7 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-generator erd {
-  provider = "prisma-erd-generator"
-  output   = "./docs/ERD.svg"
-  theme    = "forest"
-}
+
 
 model User {
   id              Int             @id @default(autoincrement())
