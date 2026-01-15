@@ -1,102 +1,31 @@
 "use client";
 
-import { useState } from "react";
-
 import { SuccessModal } from "@/components/SuccessModal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { Loader2, Mail, Send } from "lucide-react";
+import { useEmailRequestForm } from "@/hooks/useEmailRequestForm";
 
 interface EmailRequestFormProps {
     onCancel?: () => void;
     onSuccess?: () => void;
 }
 
-interface EmailRequestData {
-    thaiName: string;
-    englishName: string;
-    phone: string;
-    nickname: string;
-    position: string;
-    department: string;
-    replyEmail: string;
-}
-
 export function EmailRequestForm({
     onCancel,
     onSuccess,
 }: EmailRequestFormProps) {
-    const [isLoading, setIsLoading] = useState(false);
-    const [message, setMessage] = useState<{
-        type: "error";
-        text: string;
-    } | null>(null);
-    const [showSuccessModal, setShowSuccessModal] = useState(false);
-
-    const [formData, setFormData] = useState<EmailRequestData>({
-        thaiName: "",
-        englishName: "",
-        phone: "",
-        nickname: "",
-        position: "",
-        department: "",
-        replyEmail: "",
-    });
-
-    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const { name, value } = e.target;
-        setFormData((prev) => ({
-            ...prev,
-            [name]: value,
-        }));
-    };
-
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        setIsLoading(true);
-        setMessage(null);
-
-        try {
-            const response = await fetch("/api/email-request", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify(formData),
-            });
-
-            const result = await response.json();
-
-            if (result.success) {
-                // Reset form
-                setFormData({
-                    thaiName: "",
-                    englishName: "",
-                    phone: "",
-                    nickname: "",
-                    position: "",
-                    department: "",
-                    replyEmail: "",
-                });
-                setShowSuccessModal(true);
-            } else {
-                setMessage({
-                    type: "error",
-                    text: result.error || "เกิดข้อผิดพลาด",
-                });
-            }
-        } catch (error) {
-            console.error("Error submitting email request:", error);
-            setMessage({
-                type: "error",
-                text: "เกิดข้อผิดพลาดในการเชื่อมต่อ กรุณาลองใหม่อีกครั้ง",
-            });
-        } finally {
-            setIsLoading(false);
-        }
-    };
+    const {
+        formData,
+        isLoading,
+        error,
+        showSuccessModal,
+        handleInputChange,
+        handleSubmit,
+        closeSuccessModal,
+    } = useEmailRequestForm();
 
     return (
         <div className="space-y-6">
@@ -116,10 +45,10 @@ export function EmailRequestForm({
 
             <Card className="bg-white/80 backdrop-blur-xl border-gray-200/50 shadow-xl rounded-3xl">
                 <CardContent className="p-6 md:p-8">
-                    {message && (
+                    {error && (
                         <div className="mb-6 p-4 rounded-xl bg-red-50 border border-red-200 text-red-800 flex items-center">
                             <span className="mr-2">⚠️</span>
-                            {message.text}
+                            {error}
                         </div>
                     )}
 
@@ -290,12 +219,12 @@ export function EmailRequestForm({
 
             <SuccessModal
                 isOpen={showSuccessModal}
-                onClose={() => setShowSuccessModal(false)}
+                onClose={closeSuccessModal}
                 title="ส่งคำขอสำเร็จ!"
                 description="คำขออีเมลพนักงานใหม่ถูกส่งให้ทีมไอทีเรียบร้อยแล้ว"
                 buttonText="กลับหน้าหลัก"
                 onButtonClick={() => {
-                    setShowSuccessModal(false);
+                    closeSuccessModal();
                     onSuccess?.();
                 }}
             />

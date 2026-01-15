@@ -1,6 +1,6 @@
 "use client";
 
-import { AuthStatus } from "../components/AuthStatus";
+import { AuthStatus } from "@/components/auth";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Users, Shield, Database, Zap, ArrowRight } from "lucide-react";

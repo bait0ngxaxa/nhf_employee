@@ -7,6 +7,12 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+generator erd {
+  provider = "prisma-erd-generator"
+  output   = "./docs/ERD.svg"
+  theme    = "forest"
+}
+
 model User {
   id              Int             @id @default(autoincrement())
   email           String          @unique
@@ -23,6 +29,7 @@ model User {
   reportedTickets Ticket[]        @relation("ReportedTickets")
   employee        Employee?       @relation(fields: [employeeId], references: [id])
   auditLogs       AuditLog[]
+  emailRequests   EmailRequest[]
 
   @@map("users")
 }
@@ -194,4 +201,25 @@ enum AuditAction {
   DATA_EXPORT
   EMAIL_REQUEST
 }
+
+// Email Request History for tracking new employee email requests
+model EmailRequest {
+  id           Int      @id @default(autoincrement())
+  thaiName     String
+  englishName  String
+  phone        String
+  nickname     String
+  position     String
+  department   String
+  replyEmail   String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  requestedBy  Int
+  user         User     @relation(fields: [requestedBy], references: [id])
+
+  @@index([requestedBy])
+  @@index([createdAt])
+  @@map("email_requests")
+}
+
 

@@ -14,7 +14,7 @@ import { Label } from "@/components/ui/label";
 import { SuccessModal } from "@/components/SuccessModal";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { useTitle } from "@/hook/useTitle";
+import { useTitle } from "@/hooks/useTitle";
 
 // Type definitions for API response
 interface User {

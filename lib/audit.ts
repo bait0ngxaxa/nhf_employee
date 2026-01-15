@@ -182,3 +182,20 @@ export async function logTicketEvent(
         details,
     });
 }
+
+/**
+ * Create audit log for data export events
+ */
+export async function logDataExport(
+    userId: number,
+    userEmail: string,
+    details?: AuditLogDetails
+): Promise<void> {
+    await createAuditLog({
+        action: "DATA_EXPORT",
+        entityType: "Employee",
+        userId,
+        userEmail,
+        details,
+    });
+}

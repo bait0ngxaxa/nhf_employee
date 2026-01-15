@@ -1,6 +1,5 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,135 +19,47 @@ import {
 } from "@/components/ui/card";
 import { Search, RefreshCw } from "lucide-react";
 import { Pagination } from "@/components/Pagination";
-
-interface AuditLog {
-    id: number;
-    action: string;
-    entityType: string;
-    entityId: number | null;
-    userId: number | null;
-    userEmail: string | null;
-    ipAddress: string | null;
-    userAgent: string | null;
-    details: Record<string, unknown> | null;
-    createdAt: string;
-    user: {
-        id: number;
-        name: string;
-        email: string;
-    } | null;
-}
+import { useAuditLogs } from "@/hooks/useAuditLogs";
+import {
+    AUDIT_ACTION_LABELS,
+    AUDIT_ACTION_FILTER_OPTIONS,
+    AUDIT_ENTITY_TYPE_OPTIONS,
+    getAuditActionBadgeColor,
+} from "@/constants/audit";
 
 interface AuditLogViewerProps {
     className?: string;
 }
 
-const ACTION_LABELS: Record<string, string> = {
-    LOGIN_SUCCESS: "เข้าสู่ระบบสำเร็จ",
-    LOGIN_FAILED: "เข้าสู่ระบบล้มเหลว",
-    LOGOUT: "ออกจากระบบ",
-    PASSWORD_CHANGE: "เปลี่ยนรหัสผ่าน",
-    PASSWORD_RESET: "รีเซ็ตรหัสผ่าน",
-    EMPLOYEE_CREATE: "สร้างพนักงาน",
-    EMPLOYEE_UPDATE: "แก้ไขพนักงาน",
-    EMPLOYEE_DELETE: "ลบพนักงาน",
-    EMPLOYEE_STATUS_CHANGE: "เปลี่ยนสถานะพนักงาน",
-    EMPLOYEE_IMPORT: "นำเข้าพนักงาน",
-    TICKET_CREATE: "สร้าง Ticket",
-    TICKET_UPDATE: "แก้ไข Ticket",
-    TICKET_STATUS_CHANGE: "เปลี่ยนสถานะ Ticket",
-    TICKET_ASSIGN: "มอบหมาย Ticket",
-    TICKET_COMMENT: "คอมเมนต์ Ticket",
-    USER_CREATE: "สร้างผู้ใช้",
-    USER_UPDATE: "แก้ไขผู้ใช้",
-    USER_DELETE: "ลบผู้ใช้",
-    USER_ROLE_CHANGE: "เปลี่ยนสิทธิ์ผู้ใช้",
-    SETTINGS_UPDATE: "อัปเดตการตั้งค่า",
-    DATA_EXPORT: "ส่งออกข้อมูล",
-    EMAIL_REQUEST: "ขออีเมลพนักงานใหม่",
-};
-
-const getActionBadgeColor = (action: string): string => {
-    if (action.includes("DELETE")) return "bg-red-100 text-red-700";
-    if (action.includes("CREATE")) return "bg-green-100 text-green-700";
-    if (action.includes("UPDATE") || action.includes("CHANGE"))
-        return "bg-blue-100 text-blue-700";
-    if (action.includes("LOGIN_SUCCESS"))
-        return "bg-emerald-100 text-emerald-700";
-    if (action.includes("LOGIN_FAILED")) return "bg-orange-100 text-orange-700";
-    return "bg-gray-100 text-gray-700";
+const formatDate = (dateString: string): string => {
+    const date = new Date(dateString);
+    return date.toLocaleString("th-TH", {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+    });
 };
 
 export function AuditLogViewer({ className }: AuditLogViewerProps) {
-    const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
-    const [error, setError] = useState("");
-    const [currentPage, setCurrentPage] = useState(1);
-    const [totalPages, setTotalPages] = useState(1);
-    const [actionFilter, setActionFilter] = useState<string>("all");
-    const [entityTypeFilter, setEntityTypeFilter] = useState<string>("all");
-    const [searchTerm, setSearchTerm] = useState("");
-
-    const fetchAuditLogs = useCallback(async () => {
-        try {
-            setIsLoading(true);
-            const params = new URLSearchParams();
-            params.set("page", currentPage.toString());
-            params.set("limit", "15");
-
-            if (actionFilter !== "all") {
-                params.set("action", actionFilter);
-            }
-            if (entityTypeFilter !== "all") {
-                params.set("entityType", entityTypeFilter);
-            }
-
-            const response = await fetch(
-                `/api/audit-logs?${params.toString()}`
-            );
-
-            if (response.ok) {
-                const data = await response.json();
-                setAuditLogs(data.auditLogs);
-                setTotalPages(data.pagination.pages);
-                setError("");
-            } else {
-                const errorData = await response.json();
-                setError(errorData.error || "เกิดข้อผิดพลาด");
-            }
-        } catch (err) {
-            setError("เกิดข้อผิดพลาดในการเชื่อมต่อ");
-            console.error("Error fetching audit logs:", err);
-        } finally {
-            setIsLoading(false);
-        }
-    }, [currentPage, actionFilter, entityTypeFilter]);
-
-    useEffect(() => {
-        fetchAuditLogs();
-    }, [fetchAuditLogs]);
-
-    const filteredLogs = auditLogs.filter((log) => {
-        if (!searchTerm) return true;
-        const searchLower = searchTerm.toLowerCase();
-        return (
-            log.userEmail?.toLowerCase().includes(searchLower) ||
-            log.user?.name.toLowerCase().includes(searchLower) ||
-            log.action.toLowerCase().includes(searchLower) ||
-            log.entityType.toLowerCase().includes(searchLower)
-        );
-    });
-
-    const formatDate = (dateString: string): string => {
-        const date = new Date(dateString);
-        return date.toLocaleString("th-TH", {
-            year: "numeric",
-            month: "short",
-            day: "numeric",
-            hour: "2-digit",
-            minute: "2-digit",
-        });
-    };
+    const {
+        filteredLogs,
+        isLoading,
+        error,
+        currentPage,
+        setCurrentPage,
+        totalPages,
+        actionFilter,
+        setActionFilter,
+        entityTypeFilter,
+        setEntityTypeFilter,
+        searchTerm,
+        setSearchTerm,
+        refresh,
+        handlePreviousPage,
+        handleNextPage,
+    } = useAuditLogs();
 
     if (isLoading) {
         return (
@@ -182,7 +93,7 @@ export function AuditLogViewer({ className }: AuditLogViewerProps) {
                     <Button
                         variant="outline"
                         size="sm"
-                        onClick={fetchAuditLogs}
+                        onClick={refresh}
                         className="flex items-center gap-2"
                     >
                         <RefreshCw className="h-4 w-4" />
@@ -211,28 +122,14 @@ export function AuditLogViewer({ className }: AuditLogViewerProps) {
                             <SelectValue placeholder="ประเภทการดำเนินการ" />
                         </SelectTrigger>
                         <SelectContent>
-                            <SelectItem value="all">ทั้งหมด</SelectItem>
-                            <SelectItem value="LOGIN_SUCCESS">
-                                เข้าสู่ระบบสำเร็จ
-                            </SelectItem>
-                            <SelectItem value="LOGIN_FAILED">
-                                เข้าสู่ระบบล้มเหลว
-                            </SelectItem>
-                            <SelectItem value="EMPLOYEE_CREATE">
-                                สร้างพนักงาน
-                            </SelectItem>
-                            <SelectItem value="EMPLOYEE_UPDATE">
-                                แก้ไขพนักงาน
-                            </SelectItem>
-                            <SelectItem value="EMPLOYEE_DELETE">
-                                ลบพนักงาน
-                            </SelectItem>
-                            <SelectItem value="TICKET_CREATE">
-                                สร้าง Ticket
-                            </SelectItem>
-                            <SelectItem value="USER_CREATE">
-                                สร้างผู้ใช้
-                            </SelectItem>
+                            {AUDIT_ACTION_FILTER_OPTIONS.map((option) => (
+                                <SelectItem
+                                    key={option.value}
+                                    value={option.value}
+                                >
+                                    {option.label}
+                                </SelectItem>
+                            ))}
                         </SelectContent>
                     </Select>
                     <Select
@@ -243,10 +140,14 @@ export function AuditLogViewer({ className }: AuditLogViewerProps) {
                             <SelectValue placeholder="ประเภทข้อมูล" />
                         </SelectTrigger>
                         <SelectContent>
-                            <SelectItem value="all">ทั้งหมด</SelectItem>
-                            <SelectItem value="User">User</SelectItem>
-                            <SelectItem value="Employee">Employee</SelectItem>
-                            <SelectItem value="Ticket">Ticket</SelectItem>
+                            {AUDIT_ENTITY_TYPE_OPTIONS.map((option) => (
+                                <SelectItem
+                                    key={option.value}
+                                    value={option.value}
+                                >
+                                    {option.label}
+                                </SelectItem>
+                            ))}
                         </SelectContent>
                     </Select>
                 </div>
@@ -294,12 +195,13 @@ export function AuditLogViewer({ className }: AuditLogViewerProps) {
                                         </td>
                                         <td className="px-4 py-3">
                                             <Badge
-                                                className={getActionBadgeColor(
+                                                className={getAuditActionBadgeColor(
                                                     log.action
                                                 )}
                                             >
-                                                {ACTION_LABELS[log.action] ||
-                                                    log.action}
+                                                {AUDIT_ACTION_LABELS[
+                                                    log.action
+                                                ] || log.action}
                                             </Badge>
                                         </td>
                                         <td className="px-4 py-3 text-sm">
@@ -337,12 +239,8 @@ export function AuditLogViewer({ className }: AuditLogViewerProps) {
                         totalPages={totalPages}
                         itemsPerPage={15}
                         onPageChange={setCurrentPage}
-                        onPreviousPage={() =>
-                            setCurrentPage((p) => Math.max(p - 1, 1))
-                        }
-                        onNextPage={() =>
-                            setCurrentPage((p) => Math.min(p + 1, totalPages))
-                        }
+                        onPreviousPage={handlePreviousPage}
+                        onNextPage={handleNextPage}
                     />
                 )}
             </CardContent>

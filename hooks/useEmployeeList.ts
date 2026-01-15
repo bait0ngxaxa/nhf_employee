@@ -6,11 +6,18 @@ import {
     getEmployeeEmailStatus,
 } from "@/lib/helpers/employee-helpers";
 import { generateFilename } from "@/lib/helpers/date-helpers";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
+
+interface Pagination {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+}
 
 interface UseEmployeeListReturn {
     // Data
     employees: Employee[];
-    filteredEmployees: Employee[];
     currentEmployees: Employee[];
 
     // Search & Filter
@@ -22,9 +29,8 @@ interface UseEmployeeListReturn {
     // Pagination
     currentPage: number;
     totalPages: number;
+    totalEmployees: number;
     itemsPerPage: number;
-    startIndex: number;
-    endIndex: number;
     handlePageChange: (page: number) => void;
     handlePreviousPage: () => void;
     handleNextPage: () => void;
@@ -35,9 +41,9 @@ interface UseEmployeeListReturn {
 
     // Export
     isExporting: boolean;
-    prepareCsvData: () => EmployeeCSVData[];
+    getExportData: () => EmployeeCSVData[];
     getExportFileName: () => string;
-    handleExportCSV: () => void;
+    handleExportCSV: () => Promise<EmployeeCSVData[]>;
 
     // Edit
     isEditFormOpen: boolean;
@@ -54,20 +60,24 @@ interface UseEmployeeListReturn {
 }
 
 /**
- * Custom hook for managing employee list state and actions
- * Extracts business logic from EmployeeList component
+ * Custom hook for managing employee list state with server-side pagination
  */
 export function useEmployeeList(
     refreshTrigger?: number
 ): UseEmployeeListReturn {
     const [employees, setEmployees] = useState<Employee[]>([]);
-    const [filteredEmployees, setFilteredEmployees] = useState<Employee[]>([]);
     const [searchTerm, setSearchTerm] = useState("");
     const [statusFilter, setStatusFilter] = useState<string>("all");
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState("");
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage] = useState(PAGINATION_DEFAULTS.ITEMS_PER_PAGE);
+    const [pagination, setPagination] = useState<Pagination>({
+        page: 1,
+        limit: PAGINATION_DEFAULTS.ITEMS_PER_PAGE,
+        total: 0,
+        totalPages: 0,
+    });
     const [isExporting, setIsExporting] = useState(false);
     const [isEditFormOpen, setIsEditFormOpen] = useState(false);
     const [employeeToEdit, setEmployeeToEdit] = useState<Employee | null>(null);
@@ -77,22 +87,34 @@ export function useEmployeeList(
         lastName: string;
     } | null>(null);
 
-    // Pagination calculations
-    const totalPages = Math.ceil(filteredEmployees.length / itemsPerPage);
-    const startIndex = (currentPage - 1) * itemsPerPage;
-    const endIndex = startIndex + itemsPerPage;
-    const currentEmployees = filteredEmployees.slice(startIndex, endIndex);
+    // Debounce search to avoid too many API calls
+    const debouncedSearchTerm = useDebouncedValue(searchTerm, 300);
 
     const fetchEmployees = useCallback(async () => {
         try {
             setIsLoading(true);
-            const response = await fetch("/api/employees");
+            setError("");
+
+            // Build query params
+            const params = new URLSearchParams({
+                page: currentPage.toString(),
+                limit: itemsPerPage.toString(),
+            });
+
+            if (debouncedSearchTerm) {
+                params.append("search", debouncedSearchTerm);
+            }
+
+            if (statusFilter && statusFilter !== "all") {
+                params.append("status", statusFilter);
+            }
+
+            const response = await fetch(`/api/employees?${params}`);
 
             if (response.ok) {
                 const data = await response.json();
                 setEmployees(data.employees);
-                setFilteredEmployees(data.employees);
-                setError("");
+                setPagination(data.pagination);
             } else {
                 const errorData = await response.json();
                 setError(errorData.error || "เกิดข้อผิดพลาดในการดึงข้อมูล");
@@ -103,34 +125,17 @@ export function useEmployeeList(
         } finally {
             setIsLoading(false);
         }
-    }, []);
+    }, [currentPage, itemsPerPage, debouncedSearchTerm, statusFilter]);
 
+    // Fetch when dependencies change
     useEffect(() => {
         fetchEmployees();
     }, [fetchEmployees, refreshTrigger]);
 
+    // Reset to page 1 when filters change
     useEffect(() => {
-        const filtered = employees.filter((employee) => {
-            const searchLower = searchTerm.toLowerCase();
-            const matchesSearch =
-                employee.firstName.toLowerCase().includes(searchLower) ||
-                employee.lastName.toLowerCase().includes(searchLower) ||
-                (employee.nickname &&
-                    employee.nickname.toLowerCase().includes(searchLower)) ||
-                employee.email.toLowerCase().includes(searchLower) ||
-                employee.position.toLowerCase().includes(searchLower) ||
-                employee.dept.name.toLowerCase().includes(searchLower) ||
-                (employee.affiliation &&
-                    employee.affiliation.toLowerCase().includes(searchLower));
-
-            const matchesStatus =
-                statusFilter === "all" || employee.status === statusFilter;
-
-            return matchesSearch && matchesStatus;
-        });
-        setFilteredEmployees(filtered);
         setCurrentPage(1);
-    }, [searchTerm, statusFilter, employees]);
+    }, [debouncedSearchTerm, statusFilter]);
 
     const handlePageChange = (page: number) => {
         setCurrentPage(page);
@@ -141,11 +146,34 @@ export function useEmployeeList(
     };
 
     const handleNextPage = () => {
-        setCurrentPage((prev) => Math.min(prev + 1, totalPages));
+        setCurrentPage((prev) => Math.min(prev + 1, pagination.totalPages));
     };
+    // Export: need to fetch all matching employees, not just current page
+    const [exportData, setExportData] = useState<EmployeeCSVData[]>([]);
 
-    const prepareCsvData = (): EmployeeCSVData[] => {
-        return filteredEmployees.map((employee, index) => ({
+    const fetchAllForExport = useCallback(async (): Promise<Employee[]> => {
+        const params = new URLSearchParams({
+            page: "1",
+            limit: "10000", // Get all
+        });
+
+        if (debouncedSearchTerm) {
+            params.append("search", debouncedSearchTerm);
+        }
+        if (statusFilter && statusFilter !== "all") {
+            params.append("status", statusFilter);
+        }
+
+        const response = await fetch(`/api/employees?${params}`);
+        if (response.ok) {
+            const data = await response.json();
+            return data.employees;
+        }
+        return [];
+    }, [debouncedSearchTerm, statusFilter]);
+
+    const prepareCsvData = (allEmployees: Employee[]): EmployeeCSVData[] => {
+        return allEmployees.map((employee, index) => ({
             ลำดับ: index + 1,
             ชื่อ: employee.firstName,
             นามสกุล: employee.lastName,
@@ -172,10 +200,37 @@ export function useEmployeeList(
         return generateFilename(prefix, "csv");
     };
 
-    const handleExportCSV = () => {
+    const handleExportCSV = async (): Promise<EmployeeCSVData[]> => {
         setIsExporting(true);
-        setTimeout(() => setIsExporting(false), 1000);
+        try {
+            const allEmployees = await fetchAllForExport();
+            const csvData = prepareCsvData(allEmployees);
+            setExportData(csvData);
+
+            // Log audit event for data export
+            await fetch("/api/audit-logs/export", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    entityType: "Employee",
+                    recordCount: allEmployees.length,
+                    filters: {
+                        search: debouncedSearchTerm || null,
+                        status: statusFilter !== "all" ? statusFilter : null,
+                    },
+                }),
+            });
+
+            return csvData;
+        } catch (err) {
+            console.error("Error fetching for export:", err);
+            return [];
+        } finally {
+            setTimeout(() => setIsExporting(false), 500);
+        }
     };
+
+    const getExportData = () => exportData;
 
     const handleEditEmployee = (employee: Employee) => {
         setEmployeeToEdit(employee);
@@ -210,24 +265,22 @@ export function useEmployeeList(
 
     return {
         employees,
-        filteredEmployees,
-        currentEmployees,
+        currentEmployees: employees, // Server already returns paginated data
         searchTerm,
         setSearchTerm,
         statusFilter,
         setStatusFilter,
         currentPage,
-        totalPages,
+        totalPages: pagination.totalPages,
+        totalEmployees: pagination.total,
         itemsPerPage,
-        startIndex,
-        endIndex,
         handlePageChange,
         handlePreviousPage,
         handleNextPage,
         isLoading,
         error,
         isExporting,
-        prepareCsvData,
+        getExportData,
         getExportFileName,
         handleExportCSV,
         isEditFormOpen,

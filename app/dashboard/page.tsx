@@ -1,25 +1,22 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import {
-    Card,
-    CardContent,
-    CardDescription,
-    CardHeader,
-    CardTitle,
-} from "@/components/ui/card";
-import { Menu, Plus, Download, Upload, Users } from "lucide-react";
-import { AddEmployeeForm } from "@/components/AddEmployeeForm";
-import { EmployeeList } from "@/components/EmployeeList";
-import { ImportEmployeeCSV } from "@/components/ImportEmployeeCSV";
-import { CSVLink } from "react-csv";
-import { useTitle } from "@/hook/useTitle";
-import ITIssuesPage from "@/app/it-issues/page";
-import { DashboardSidebar } from "@/components/DashboardSidebar";
-import { EmployeeStatsCards } from "@/components/EmployeeStatsCards";
-import { EmailRequestForm } from "@/components/EmailRequestForm";
-import { AuditLogViewer } from "@/components/AuditLogViewer";
+import { ImportEmployeeCSV } from "@/components/employee";
+import { useTitle } from "@/hooks/useTitle";
+import { DashboardSidebar } from "@/components/dashboard/DashboardSidebar";
 import { useDashboard } from "@/hooks/useDashboard";
+import { Menu } from "lucide-react";
+
+// Dashboard Sections
+import {
+    ITEquipmentSection,
+    ITSupportSection,
+    EmailRequestSection,
+    EmployeeManagementSection,
+    AddEmployeeSection,
+    AuditLogsSection,
+    DashboardHomeSection,
+} from "@/components/dashboard";
 
 export default function DashboardPage() {
     useTitle("Dashboard | NHF IT System");
@@ -60,167 +57,40 @@ export default function DashboardPage() {
     const renderContent = () => {
         switch (selectedMenu) {
             case "it-equipment":
-                return (
-                    <div className="space-y-6">
-                        <div>
-                            <h2 className="text-2xl font-bold text-gray-900">
-                                ครุภัณฑ์ไอที
-                            </h2>
-                            <p className="text-gray-600">
-                                จัดการและติดตามครุภัณฑ์ไอที
-                            </p>
-                        </div>
-                        <Card>
-                            <CardHeader>
-                                <CardTitle>ครุภัณฑ์ไอทีของฉัน</CardTitle>
-                                <CardDescription>
-                                    รายการครุภัณฑ์ที่ได้รับมอบหมาย
-                                </CardDescription>
-                            </CardHeader>
-                            <CardContent>
-                                <p className="text-gray-700">
-                                    กำลังอยู่ในช่วงพัฒนา
-                                </p>
-                            </CardContent>
-                        </Card>
-                    </div>
-                );
+                return <ITEquipmentSection />;
 
             case "it-support":
-                return (
-                    <div className="space-y-6">
-                        <div>
-                            <h2 className="text-2xl font-bold text-gray-900">
-                                แจ้งปัญหาไอที
-                            </h2>
-                            <p className="text-gray-600">
-                                แจ้งปัญหาและขอรับการซ่อมแซม
-                            </p>
-                        </div>
-                        <ITIssuesPage />
-                    </div>
-                );
+                return <ITSupportSection />;
 
             case "email-request":
                 return (
-                    <div className="space-y-6">
-                        <div>
-                            <h2 className="text-2xl font-bold text-gray-900">
-                                ขออีเมลพนักงานใหม่
-                            </h2>
-                            <p className="text-gray-600">
-                                ส่งคำขออีเมลสำหรับพนักงานใหม่ให้ทีมไอที
-                            </p>
-                        </div>
-                        <div className="space-y-6">
-                            <EmailRequestForm
-                                onCancel={() => handleMenuClick("dashboard")}
-                                onSuccess={() => handleMenuClick("dashboard")}
-                            />
-                        </div>
-                    </div>
+                    <EmailRequestSection
+                        onCancel={() => handleMenuClick("dashboard")}
+                        onSuccess={() => handleMenuClick("dashboard")}
+                    />
                 );
 
             case "employee-management":
                 return (
-                    <div className="space-y-6">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <h2 className="text-2xl font-bold text-gray-900">
-                                    จัดการพนักงาน
-                                </h2>
-                                <p className="text-gray-600">
-                                    จัดการข้อมูลพนักงานและสิทธิ์การเข้าถึง
-                                </p>
-                            </div>
-                            <div className="flex items-center space-x-3">
-                                {allEmployees.length > 0 && (
-                                    <CSVLink
-                                        data={prepareCsvData()}
-                                        filename={generateFileName()}
-                                        className="inline-flex"
-                                        onClick={handleExportCSV}
-                                    >
-                                        <Button
-                                            variant="outline"
-                                            className="flex items-center space-x-2"
-                                            disabled={isExporting}
-                                        >
-                                            <Download className="h-4 w-4" />
-                                            <span>
-                                                {isExporting
-                                                    ? "กำลังเตรียมข้อมูล..."
-                                                    : "Export CSV"}
-                                            </span>
-                                        </Button>
-                                    </CSVLink>
-                                )}
-                                <Button
-                                    onClick={() =>
-                                        handleMenuClick("import-employee")
-                                    }
-                                    variant="outline"
-                                    className="flex items-center space-x-2"
-                                >
-                                    <Upload className="h-4 w-4" />
-                                    <span>นำเข้า CSV</span>
-                                </Button>
-                                <Button
-                                    onClick={() =>
-                                        handleMenuClick("add-employee")
-                                    }
-                                    className="flex items-center space-x-2"
-                                >
-                                    <Plus className="h-4 w-4" />
-                                    <span>เพิ่มพนักงาน</span>
-                                </Button>
-                            </div>
-                        </div>
-
-                        <EmployeeStatsCards stats={employeeStats} />
-
-                        <Card>
-                            <CardHeader>
-                                <CardTitle>รายชื่อพนักงาน</CardTitle>
-                                <CardDescription>
-                                    รายชื่อพนักงานทั้งหมดในระบบ
-                                </CardDescription>
-                            </CardHeader>
-                            <CardContent>
-                                <EmployeeList
-                                    refreshTrigger={refreshTrigger}
-                                    userRole={user?.role}
-                                />
-                            </CardContent>
-                        </Card>
-                    </div>
+                    <EmployeeManagementSection
+                        allEmployees={allEmployees}
+                        prepareCsvData={prepareCsvData}
+                        generateFileName={generateFileName}
+                        handleExportCSV={handleExportCSV}
+                        isExporting={isExporting}
+                        handleMenuClick={handleMenuClick}
+                        employeeStats={employeeStats}
+                        refreshTrigger={refreshTrigger}
+                        user={user}
+                    />
                 );
 
             case "add-employee":
                 return (
-                    <div className="space-y-6">
-                        <div className="flex items-center space-x-3">
-                            <Button
-                                variant="outline"
-                                onClick={() =>
-                                    handleMenuClick("employee-management")
-                                }
-                                className="flex items-center space-x-2"
-                            >
-                                <Users className="h-4 w-4" />
-                                <span>กลับไปรายชื่อ</span>
-                            </Button>
-                            <div>
-                                <h2 className="text-2xl font-bold text-gray-900">
-                                    เพิ่มพนักงานใหม่
-                                </h2>
-                                <p className="text-gray-600">
-                                    เพิ่มข้อมูลพนักงานใหม่เข้าระบบ
-                                </p>
-                            </div>
-                        </div>
-                        <AddEmployeeForm onSuccess={handleEmployeeAdded} />
-                    </div>
+                    <AddEmployeeSection
+                        handleMenuClick={handleMenuClick}
+                        onSuccess={handleEmployeeAdded}
+                    />
                 );
 
             case "import-employee":
@@ -232,58 +102,15 @@ export default function DashboardPage() {
                 );
 
             case "audit-logs":
-                return (
-                    <div className="space-y-6">
-                        <div>
-                            <h2 className="text-2xl font-bold text-gray-900">
-                                บันทึกการใช้งาน
-                            </h2>
-                            <p className="text-gray-600">
-                                ประวัติการดำเนินการในระบบ
-                            </p>
-                        </div>
-                        <AuditLogViewer />
-                    </div>
-                );
+                return <AuditLogsSection />;
 
             default:
                 return (
-                    <div className="space-y-6">
-                        <div>
-                            <h2 className="text-2xl font-bold text-gray-900">
-                                ยินดีต้อนรับ, {user?.name}
-                            </h2>
-                            <p className="text-gray-600">ระบบจัดการพนักงาน</p>
-                        </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                            {availableMenuItems.map((item) => {
-                                const IconComponent = item.icon;
-                                return (
-                                    <Card
-                                        key={item.id}
-                                        className="cursor-pointer bg-white/60 backdrop-blur-md border-gray-100 shadow-lg hover:shadow-2xl hover:scale-[1.02] transition-all duration-300 rounded-2xl group"
-                                        onClick={() => handleMenuClick(item.id)}
-                                    >
-                                        <CardHeader>
-                                            <div className="flex items-center space-x-4">
-                                                <div className="p-3 bg-blue-50 rounded-xl group-hover:bg-blue-100 transition-colors duration-300">
-                                                    <IconComponent className="h-8 w-8 text-blue-600" />
-                                                </div>
-                                                <CardTitle className="text-xl group-hover:text-blue-700 transition-colors">
-                                                    {item.label}
-                                                </CardTitle>
-                                            </div>
-                                        </CardHeader>
-                                        <CardContent>
-                                            <CardDescription className="text-base">
-                                                {item.description}
-                                            </CardDescription>
-                                        </CardContent>
-                                    </Card>
-                                );
-                            })}
-                        </div>
-                    </div>
+                    <DashboardHomeSection
+                        user={user}
+                        availableMenuItems={availableMenuItems}
+                        handleMenuClick={handleMenuClick}
+                    />
                 );
         }
     };

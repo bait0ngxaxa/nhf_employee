@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
-import { SessionProvider } from "../components/SessionProvider";
+import { SessionProvider } from "../components/auth/SessionProvider";
 
 const googleSans = localFont({
     src: "../public/fonts/GoogleSans-VariableFont.ttf",

@@ -1,8 +1,8 @@
 "use client";
 
-import { LoginForm } from "@/components/login-form";
+import { LoginForm } from "@/components/auth";
 import { Suspense } from "react";
-import { useTitle } from "@/hook/useTitle";
+import { useTitle } from "@/hooks/useTitle";
 
 function LoginPageContent() {
     return (

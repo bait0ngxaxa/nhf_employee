@@ -4,16 +4,8 @@ import { authOptions } from "@/lib/auth";
 import { lineNotificationService } from "@/lib/line";
 import { EmailRequestData } from "@/types/api";
 import { createAuditLog } from "@/lib/audit";
-
-interface EmailRequestBody {
-    thaiName: string;
-    englishName: string;
-    phone: string;
-    nickname: string;
-    position: string;
-    department: string;
-    replyEmail: string;
-}
+import { prisma } from "@/lib/prisma";
+import { emailRequestSchema } from "@/lib/validations/email-request";
 
 export async function POST(req: NextRequest) {
     try {
@@ -25,8 +17,7 @@ export async function POST(req: NextRequest) {
             );
         }
 
-        // Admin check - Update this check according to your authentication system
-        // Common role values: 'ADMIN', 'USER', 'IT_ADMIN', etc.
+        // Admin check
         const adminRoles = ["ADMIN"];
         if (!adminRoles.includes(session.user.role)) {
             return NextResponse.json(
@@ -38,108 +29,85 @@ export async function POST(req: NextRequest) {
             );
         }
 
-        // Parse request body
-        const body: EmailRequestBody = await req.json();
+        // Parse and validate request body
+        const body = await req.json();
+        const validation = emailRequestSchema.safeParse(body);
 
-        // Validate required fields
-        const requiredFields = [
-            "thaiName",
-            "englishName",
-            "phone",
-            "nickname",
-            "position",
-            "department",
-            "replyEmail",
-        ];
-        const missingFields = requiredFields.filter(
-            (field) => !body[field as keyof EmailRequestBody]
-        );
-
-        if (missingFields.length > 0) {
+        if (!validation.success) {
+            const errorMessages = validation.error.issues
+                .map((issue) => issue.message)
+                .join(", ");
             return NextResponse.json(
-                {
-                    success: false,
-                    error: `กรุณากรอกข้อมูลให้ครบถ้วน: ${missingFields.join(
-                        ", "
-                    )}`,
-                },
+                { success: false, error: errorMessages },
                 { status: 400 }
             );
         }
 
-        // Validate email format
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!emailRegex.test(body.replyEmail)) {
-            return NextResponse.json(
-                { success: false, error: "รูปแบบอีเมลไม่ถูกต้อง" },
-                { status: 400 }
-            );
-        }
+        const validatedData = validation.data;
 
-        // Validate phone number (basic validation for Thai phone numbers)
-        const phoneRegex = /^[0-9\-\s\+\(\)]{10,15}$/;
-        if (!phoneRegex.test(body.phone)) {
-            return NextResponse.json(
-                { success: false, error: "รูปแบบเบอร์โทรศัพท์ไม่ถูกต้อง" },
-                { status: 400 }
-            );
-        }
+        // Save to database
+        const emailRequest = await prisma.emailRequest.create({
+            data: {
+                thaiName: validatedData.thaiName,
+                englishName: validatedData.englishName,
+                phone: validatedData.phone,
+                nickname: validatedData.nickname,
+                position: validatedData.position,
+                department: validatedData.department,
+                replyEmail: validatedData.replyEmail,
+                requestedBy: parseInt(session.user.id),
+            },
+        });
 
         // Prepare data for LINE notification
         const emailRequestData: EmailRequestData = {
-            thaiName: body.thaiName,
-            englishName: body.englishName,
-            phone: body.phone,
-            nickname: body.nickname,
-            position: body.position,
-            department: body.department,
-            replyEmail: body.replyEmail,
+            thaiName: validatedData.thaiName,
+            englishName: validatedData.englishName,
+            phone: validatedData.phone,
+            nickname: validatedData.nickname,
+            position: validatedData.position,
+            department: validatedData.department,
+            replyEmail: validatedData.replyEmail,
             requestedAt: new Date().toISOString(),
         };
 
-        const lineResult =
-            await lineNotificationService.sendEmailRequestNotification(
-                emailRequestData
-            );
-
-        if (lineResult) {
-            // Log audit event
-            await createAuditLog({
-                action: "EMAIL_REQUEST",
-                entityType: "EmailRequest",
-                userId: parseInt(session.user.id),
-                userEmail: session.user.email || "",
-                details: {
-                    after: {
-                        thaiName: body.thaiName,
-                        englishName: body.englishName,
-                        position: body.position,
-                        department: body.department,
-                    },
-                },
+        // Send LINE notification (non-blocking)
+        lineNotificationService
+            .sendEmailRequestNotification(emailRequestData)
+            .catch((error) => {
+                console.error("LINE notification failed:", error);
             });
 
-            return NextResponse.json({
-                success: true,
-                message: "ส่งคำขออีเมลพนักงานใหม่เรียบร้อยแล้ว",
-                data: {
-                    thaiName: body.thaiName,
-                    englishName: body.englishName,
-                    nickname: body.nickname,
-                    position: body.position,
-                    department: body.department,
-                    requestedAt: emailRequestData.requestedAt,
+        // Log audit event
+        await createAuditLog({
+            action: "EMAIL_REQUEST",
+            entityType: "EmailRequest",
+            entityId: emailRequest.id,
+            userId: parseInt(session.user.id),
+            userEmail: session.user.email || "",
+            details: {
+                after: {
+                    thaiName: validatedData.thaiName,
+                    englishName: validatedData.englishName,
+                    position: validatedData.position,
+                    department: validatedData.department,
                 },
-            });
-        } else {
-            return NextResponse.json(
-                {
-                    success: false,
-                    error: "ไม่สามารถส่งแจ้งเตือนได้ กรุณาลองใหม่อีกครั้ง",
-                },
-                { status: 500 }
-            );
-        }
+            },
+        });
+
+        return NextResponse.json({
+            success: true,
+            message: "ส่งคำขออีเมลพนักงานใหม่เรียบร้อยแล้ว",
+            data: {
+                id: emailRequest.id,
+                thaiName: validatedData.thaiName,
+                englishName: validatedData.englishName,
+                nickname: validatedData.nickname,
+                position: validatedData.position,
+                department: validatedData.department,
+                requestedAt: emailRequest.createdAt.toISOString(),
+            },
+        });
     } catch (error) {
         console.error("❌ Error processing email request:", error);
         return NextResponse.json(
@@ -152,9 +120,65 @@ export async function POST(req: NextRequest) {
     }
 }
 
-export async function GET() {
-    return NextResponse.json({
-        message: "Email Request API is working",
-        timestamp: new Date().toISOString(),
-    });
+export async function GET(req: NextRequest) {
+    try {
+        const session = await getServerSession(authOptions);
+        if (!session?.user) {
+            return NextResponse.json(
+                { success: false, error: "กรุณาเข้าสู่ระบบ" },
+                { status: 401 }
+            );
+        }
+
+        const { searchParams } = new URL(req.url);
+        const page = parseInt(searchParams.get("page") || "1");
+        const limit = parseInt(searchParams.get("limit") || "10");
+
+        const isAdmin = session.user.role === "ADMIN";
+
+        // Build where clause - non-admin users can only see their own requests
+        const where = isAdmin ? {} : { requestedBy: parseInt(session.user.id) };
+
+        // Get total count
+        const total = await prisma.emailRequest.count({ where });
+
+        // Get email requests with pagination
+        const emailRequests = await prisma.emailRequest.findMany({
+            where,
+            include: {
+                user: {
+                    select: {
+                        id: true,
+                        name: true,
+                        email: true,
+                    },
+                },
+            },
+            orderBy: {
+                createdAt: "desc",
+            },
+            skip: (page - 1) * limit,
+            take: limit,
+        });
+
+        return NextResponse.json({
+            success: true,
+            emailRequests,
+            pagination: {
+                page,
+                limit,
+                total,
+                totalPages: Math.ceil(total / limit),
+            },
+        });
+    } catch (error) {
+        console.error("❌ Error fetching email requests:", error);
+        return NextResponse.json(
+            {
+                success: false,
+                error: "เกิดข้อผิดพลาดในการโหลดข้อมูล",
+            },
+            { status: 500 }
+        );
+    }
 }

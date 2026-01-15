@@ -1,5 +1,6 @@
 "use client";
 
+import { useRef } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
@@ -11,9 +12,8 @@ import {
 } from "@/components/ui/select";
 import { Search, Download, Filter } from "lucide-react";
 import { CSVLink } from "react-csv";
-import { EditEmployeeForm } from "@/components/EditEmployeeForm";
+import { EditEmployeeForm, EmployeeTable } from "@/components/employee";
 import { SuccessModal } from "@/components/SuccessModal";
-import { EmployeeTable } from "@/components/EmployeeTable";
 import { Pagination } from "@/components/Pagination";
 import { EmployeeListProps } from "@/types/employees";
 import { STATUS_FILTER_OPTIONS } from "@/constants/ui";
@@ -21,9 +21,12 @@ import { getEmployeeStatusLabel } from "@/lib/helpers/employee-helpers";
 import { useEmployeeList } from "@/hooks/useEmployeeList";
 
 export function EmployeeList({ refreshTrigger, userRole }: EmployeeListProps) {
+    const csvLinkRef = useRef<
+        CSVLink & HTMLAnchorElement & { link: HTMLAnchorElement }
+    >(null);
+
     const {
         employees,
-        filteredEmployees,
         currentEmployees,
         searchTerm,
         setSearchTerm,
@@ -31,16 +34,15 @@ export function EmployeeList({ refreshTrigger, userRole }: EmployeeListProps) {
         setStatusFilter,
         currentPage,
         totalPages,
+        totalEmployees,
         itemsPerPage,
-        startIndex,
-        endIndex,
         handlePageChange,
         handlePreviousPage,
         handleNextPage,
         isLoading,
         error,
         isExporting,
-        prepareCsvData,
+        getExportData,
         getExportFileName,
         handleExportCSV,
         isEditFormOpen,
@@ -53,7 +55,19 @@ export function EmployeeList({ refreshTrigger, userRole }: EmployeeListProps) {
         setShowEditSuccessModal,
     } = useEmployeeList(refreshTrigger);
 
-    if (isLoading) {
+    // Don't show loading screen for subsequent loads to prevent focus loss
+    const isInitialLoading = isLoading && employees.length === 0;
+
+    // Handle export button click - fetch data then trigger CSV download
+    const onExportClick = async () => {
+        await handleExportCSV();
+        // Wait a bit for state to update, then trigger download
+        setTimeout(() => {
+            csvLinkRef.current?.link.click();
+        }, 100);
+    };
+
+    if (isInitialLoading) {
         return (
             <div className="flex justify-center items-center p-8">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
@@ -64,7 +78,7 @@ export function EmployeeList({ refreshTrigger, userRole }: EmployeeListProps) {
         );
     }
 
-    if (error) {
+    if (error && employees.length === 0) {
         return (
             <div className="text-center p-8">
                 <div className="text-red-600 bg-red-50 p-4 rounded-md">
@@ -74,8 +88,20 @@ export function EmployeeList({ refreshTrigger, userRole }: EmployeeListProps) {
         );
     }
 
+    // Calculate display range
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = Math.min(startIndex + employees.length, totalEmployees);
+
     return (
         <div className="space-y-6">
+            {/* Hidden CSVLink for async download trigger */}
+            <CSVLink
+                ref={csvLinkRef}
+                data={getExportData()}
+                filename={getExportFileName()}
+                className="hidden"
+            />
+
             {/* Search Bar, Status Filter and Export */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-3 sm:space-y-0 sm:space-x-3">
                 <div className="flex flex-col sm:flex-row space-y-3 sm:space-y-0 sm:space-x-3 flex-1">
@@ -117,35 +143,27 @@ export function EmployeeList({ refreshTrigger, userRole }: EmployeeListProps) {
                     </div>
                 </div>
 
-                {filteredEmployees.length > 0 && (
-                    <CSVLink
-                        data={prepareCsvData()}
-                        filename={getExportFileName()}
-                        className="inline-flex"
-                        onClick={handleExportCSV}
+                {employees.length > 0 && (
+                    <Button
+                        variant="outline"
+                        className="flex items-center space-x-2 whitespace-nowrap"
+                        disabled={isExporting}
+                        onClick={onExportClick}
                     >
-                        <Button
-                            variant="outline"
-                            className="flex items-center space-x-2 whitespace-nowrap"
-                            disabled={isExporting}
-                        >
-                            <Download className="h-4 w-4" />
-                            <span>
-                                {isExporting
-                                    ? "กำลังเตรียม..."
-                                    : `Export CSV (${filteredEmployees.length} คน)`}
-                            </span>
-                        </Button>
-                    </CSVLink>
+                        <Download className="h-4 w-4" />
+                        <span>
+                            {isExporting
+                                ? "กำลังเตรียม..."
+                                : `Export CSV (${totalEmployees} คน)`}
+                        </span>
+                    </Button>
                 )}
             </div>
 
             {/* Results Summary */}
             <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center space-y-2 sm:space-y-0">
                 <div className="text-sm text-gray-600">
-                    แสดงผล {startIndex + 1}-
-                    {Math.min(endIndex, filteredEmployees.length)} จาก{" "}
-                    {filteredEmployees.length} คน
+                    แสดงผล {startIndex + 1}-{endIndex} จาก {totalEmployees} คน
                     {statusFilter !== "all" && (
                         <span className="text-blue-600">
                             (กรองตามสถานะ:{" "}
@@ -157,9 +175,6 @@ export function EmployeeList({ refreshTrigger, userRole }: EmployeeListProps) {
                             (ค้นหา: &quot;{searchTerm}&quot;)
                         </span>
                     )}
-                    <span className="text-gray-500">
-                        (ทั้งหมด {employees.length} คน)
-                    </span>
                 </div>
                 {totalPages > 1 && (
                     <div className="text-sm text-gray-600">
@@ -169,7 +184,7 @@ export function EmployeeList({ refreshTrigger, userRole }: EmployeeListProps) {
             </div>
 
             {/* Employee Table */}
-            {filteredEmployees.length === 0 ? (
+            {employees.length === 0 ? (
                 <div className="text-center p-8 text-gray-500">
                     {searchTerm || statusFilter !== "all"
                         ? "ไม่พบพนักงานที่ตรงกับเงื่อนไขการค้นหาหรือการกรอง"
