@@ -88,33 +88,17 @@ export function useDashboard(): UseDashboardReturn {
     const fetchEmployeeStats = useCallback(async () => {
         if (isAdmin) {
             try {
-                const response = await fetch("/api/employees");
+                // Use dedicated stats API instead of paginated employees API
+                const response = await fetch("/api/employees/stats");
                 if (response.ok) {
                     const data = await response.json();
-                    const employees: Employee[] = data.employees;
-
-                    setAllEmployees(employees);
-
-                    const stats = {
-                        total: employees.length,
-                        active: employees.filter(
-                            (emp: Employee) => emp.status === "ACTIVE"
-                        ).length,
-                        admin: employees.filter(
-                            (emp: Employee) => emp.dept.code === "ADMIN"
-                        ).length,
-                        academic: employees.filter(
-                            (emp: Employee) => emp.dept.code === "ACADEMIC"
-                        ).length,
-                    };
-
-                    setEmployeeStats(stats);
+                    setEmployeeStats(data.stats);
                 }
             } catch (error) {
                 console.error("Error fetching employee stats:", error);
             }
         }
-    }, [isAdmin, setAllEmployees]);
+    }, [isAdmin]);
 
     useEffect(() => {
         fetchEmployeeStats();
