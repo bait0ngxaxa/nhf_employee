@@ -15,7 +15,7 @@ import { CSVLink } from "react-csv";
 import { EditEmployeeForm, EmployeeTable } from "@/components/employee";
 import { SuccessModal } from "@/components/SuccessModal";
 import { Pagination } from "@/components/Pagination";
-import { EmployeeListProps } from "@/types/employees";
+import { type EmployeeListProps } from "@/types/employees";
 import { STATUS_FILTER_OPTIONS } from "@/constants/ui";
 import { getEmployeeStatusLabel } from "@/lib/helpers/employee-helpers";
 import { useEmployeeList } from "@/hooks/useEmployeeList";
@@ -70,7 +70,7 @@ export function EmployeeList({ refreshTrigger, userRole }: EmployeeListProps) {
     if (isInitialLoading) {
         return (
             <div className="flex justify-center items-center p-8">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
                 <span className="ml-2 text-gray-600">
                     กำลังโหลดข้อมูลพนักงาน...
                 </span>

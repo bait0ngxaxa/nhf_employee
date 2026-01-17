@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { useSession } from "next-auth/react";
-import { TicketStats, Ticket } from "@/types/tickets";
+import { type TicketStats, type Ticket } from "@/types/tickets";
 
 export function useITIssues() {
     const { data: session } = useSession();

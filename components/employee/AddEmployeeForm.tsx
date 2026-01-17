@@ -20,9 +20,9 @@ import {
 } from "@/components/ui/select";
 import { SuccessModal } from "@/components/SuccessModal";
 import {
-    AddEmployeeFormProps,
-    EmployeeFormData,
-    Department,
+    type AddEmployeeFormProps,
+    type EmployeeFormData,
+    type Department,
 } from "@/types/employees";
 
 export function AddEmployeeForm({ onSuccess }: AddEmployeeFormProps) {

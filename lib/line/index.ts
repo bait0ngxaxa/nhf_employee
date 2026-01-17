@@ -1,10 +1,10 @@
 import {
-    LineNotificationData,
-    EmailRequestData,
-    TicketEmailData,
-    LineFlexMessage,
+    type LineNotificationData,
+    type EmailRequestData,
+    type TicketEmailData,
+    type LineFlexMessage,
 } from "@/types/api";
-import { LineWebhookData } from "./types";
+import { type LineWebhookData } from "./types";
 import { generateTicketFlexMessage } from "./flex-messages/ticket";
 import { generateEmailRequestFlexMessage } from "./flex-messages/email-request";
 

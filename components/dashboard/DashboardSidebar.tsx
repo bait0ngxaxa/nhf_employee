@@ -2,7 +2,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Menu, X, User, Settings, LogOut } from "lucide-react";
-import { MenuItem } from "@/types/dashboard";
+import { type MenuItem } from "@/types/dashboard";
 
 interface UserInfo {
     name?: string | null;

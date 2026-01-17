@@ -44,7 +44,7 @@ export default function DashboardPage() {
     if (status === "loading") {
         return (
             <div className="flex items-center justify-center min-h-screen">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600" />
             </div>
         );
     }
@@ -132,8 +132,8 @@ export default function DashboardPage() {
             <div className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
                 {/* Background Effects */}
                 <div className="absolute inset-0 overflow-hidden pointer-events-none">
-                    <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-blue-200/30 rounded-full blur-3xl"></div>
-                    <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-purple-200/30 rounded-full blur-3xl"></div>
+                    <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-blue-200/30 rounded-full blur-3xl" />
+                    <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-purple-200/30 rounded-full blur-3xl" />
                 </div>
 
                 {/* Mobile Menu Button */}

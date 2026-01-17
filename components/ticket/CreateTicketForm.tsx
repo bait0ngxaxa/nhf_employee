@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { SuccessModal } from '@/components/SuccessModal';
-import { CreateTicketFormProps, TicketFormData } from '@/types/tickets';
+import { type CreateTicketFormProps, type TicketFormData } from '@/types/tickets';
 import { TICKET_CATEGORIES, TICKET_PRIORITIES } from '@/constants/tickets';
 
 export default function CreateTicketForm({ isOpen, onClose, onTicketCreated }: CreateTicketFormProps) {

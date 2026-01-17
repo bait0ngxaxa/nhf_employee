@@ -1,7 +1,7 @@
 import {
-    LineNotificationData,
-    EmailRequestData,
-    LineFlexMessage,
+    type LineNotificationData,
+    type EmailRequestData,
+    type LineFlexMessage,
 } from "@/types/api";
 
 export interface LineWebhookData {

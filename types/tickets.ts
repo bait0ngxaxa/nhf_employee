@@ -1,4 +1,4 @@
-import { TicketCategoryValue, TicketPriorityValue, TicketStatusValue } from '@/constants/tickets';
+import { type TicketCategoryValue, type TicketPriorityValue, type TicketStatusValue } from '@/constants/tickets';
 
 export type { TicketCategoryValue, TicketPriorityValue, TicketStatusValue };
 

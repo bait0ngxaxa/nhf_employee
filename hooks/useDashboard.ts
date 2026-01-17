@@ -2,8 +2,8 @@ import { useState, useEffect, useCallback } from "react";
 import { useSession } from "next-auth/react";
 import { signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { Employee, EmployeeCSVData } from "@/types/employees";
-import { MenuItem } from "@/types/dashboard";
+import { type Employee, type EmployeeCSVData } from "@/types/employees";
+import { type MenuItem } from "@/types/dashboard";
 import { useEmployeeExport } from "@/hooks/useEmployeeExport";
 import {
     DASHBOARD_MENU_ITEMS,
@@ -76,12 +76,13 @@ export function useDashboard(): UseDashboardReturn {
 
     const {
         allEmployees,
-        setAllEmployees,
+        setAllEmployees: _setAllEmployees,
         isExporting,
         setIsExporting,
         prepareCsvData,
         generateFileName,
     } = useEmployeeExport();
+    void _setAllEmployees;
 
     const availableMenuItems = getAvailableMenuItems(isAdmin);
 
@@ -110,7 +111,7 @@ export function useDashboard(): UseDashboardReturn {
 
     const handleMenuClick = (menuId: string) => {
         const menuItem = DASHBOARD_MENU_ITEMS.find(
-            (item) => item.id === menuId
+            (item) => item.id === menuId,
         );
         if (menuItem?.requiredRole === "ADMIN" && !isAdmin) {
             window.location.href = "/access-denied";

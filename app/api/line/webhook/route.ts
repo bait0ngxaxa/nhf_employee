@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { type NextRequest, NextResponse } from 'next/server';
 
 // LINE Webhook handler for receiving events and getting User IDs
 export async function POST(request: NextRequest) {

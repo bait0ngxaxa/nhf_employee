@@ -3,6 +3,7 @@ import { PrismaClient } from "@prisma/client";
 const prisma = new PrismaClient();
 
 async function main() {
+    // eslint-disable-next-line no-console
     console.log("🌱 เริ่มต้น seed ข้อมูลพื้นฐาน...");
 
     // สร้างแผนกพื้นฐาน (ใช้ upsert เพื่อไม่สร้างซ้ำ)
@@ -27,10 +28,12 @@ async function main() {
         }),
     ]);
 
+    // eslint-disable-next-line no-console
     console.log(
         "✅ สร้างแผนกสำเร็จ:",
-        departments.map((d) => d.name).join(", ")
+        departments.map((d) => d.name).join(", "),
     );
+    // eslint-disable-next-line no-console
     console.log("🎉 Seed เสร็จสิ้น!");
 }
 

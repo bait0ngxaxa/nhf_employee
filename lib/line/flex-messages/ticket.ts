@@ -1,4 +1,4 @@
-import { LineNotificationData, LineFlexMessage } from "@/types/api";
+import { type LineNotificationData, type LineFlexMessage } from "@/types/api";
 import {
     getTicketCategoryLabel,
     getTicketPriorityLabel,

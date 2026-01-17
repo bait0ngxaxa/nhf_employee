@@ -9,7 +9,7 @@ import {
 import { Download, Upload, Plus } from "lucide-react";
 import { CSVLink } from "react-csv";
 import { EmployeeStatsCards, EmployeeList } from "@/components/employee";
-import { Employee, EmployeeCSVData } from "@/types/employees";
+import { type Employee, type EmployeeCSVData } from "@/types/employees";
 
 interface EmployeeStats {
     total: number;

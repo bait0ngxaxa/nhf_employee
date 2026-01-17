@@ -1,8 +1,8 @@
-import { NextRequest, NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { lineNotificationService } from "@/lib/line";
-import { EmailRequestData } from "@/types/api";
+import { type EmailRequestData } from "@/types/api";
 import { createAuditLog } from "@/lib/audit";
 import { prisma } from "@/lib/prisma";
 import { emailRequestSchema } from "@/lib/validations/email-request";

@@ -5,7 +5,7 @@ import {
     CardHeader,
     CardTitle,
 } from "@/components/ui/card";
-import { MenuItem } from "@/types/dashboard";
+import { type MenuItem } from "@/types/dashboard";
 
 interface User {
     id?: string;

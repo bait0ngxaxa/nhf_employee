@@ -1,4 +1,4 @@
-import { EmailRequestData, LineFlexMessage } from "@/types/api";
+import { type EmailRequestData, type LineFlexMessage } from "@/types/api";
 import { formatDate } from "../helpers";
 
 export function generateEmailRequestFlexMessage(

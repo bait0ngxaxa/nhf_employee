@@ -1,7 +1,7 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Edit } from "lucide-react";
-import { Employee } from "@/types/employees";
+import { type Employee } from "@/types/employees";
 import {
     getEmployeeStatusLabel,
     getEmployeeStatusBadge,

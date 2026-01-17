@@ -7,24 +7,24 @@ export default function DashboardLoading() {
         <div className="flex h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
             {/* Sidebar Skeleton */}
             <div className="w-64 bg-white/80 backdrop-blur-xl shadow-lg border-r border-gray-200/50 p-4 hidden md:flex flex-col">
-                <div className="h-8 bg-gray-200/50 rounded-lg animate-pulse mb-6"></div>
+                <div className="h-8 bg-gray-200/50 rounded-lg animate-pulse mb-6" />
                 <div className="space-y-3 flex-1">
                     {[1, 2, 3, 4, 5].map((i) => (
                         <div
                             key={i}
                             className="h-10 bg-gray-100/50 rounded-xl animate-pulse"
-                        ></div>
+                         />
                     ))}
                 </div>
-                <div className="h-20 bg-gray-100/50 rounded-xl animate-pulse mt-4"></div>
+                <div className="h-20 bg-gray-100/50 rounded-xl animate-pulse mt-4" />
             </div>
 
             {/* Main Content Loading */}
             <div className="flex-1 flex items-center justify-center relative">
                 {/* Background Effects */}
                 <div className="absolute inset-0 overflow-hidden pointer-events-none">
-                    <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-blue-200/30 rounded-full blur-3xl"></div>
-                    <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-purple-200/30 rounded-full blur-3xl"></div>
+                    <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-blue-200/30 rounded-full blur-3xl" />
+                    <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-purple-200/30 rounded-full blur-3xl" />
                 </div>
 
                 {/* Loading Card */}

@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { TicketListProps } from "@/types/tickets";
+import { type TicketListProps } from "@/types/tickets";
 import { useTicketList } from "@/hooks/useTicketList";
 import { TicketCard } from "./TicketCard";
 import { TicketFiltersCard } from "./TicketFiltersCard";

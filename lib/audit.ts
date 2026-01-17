@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { AuditAction } from "@prisma/client";
+import { type AuditAction } from "@prisma/client";
 import { headers } from "next/headers";
 
 /**

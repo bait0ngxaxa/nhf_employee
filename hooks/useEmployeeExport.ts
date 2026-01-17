@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react";
-import { Employee, EmployeeCSVData } from "@/types/employees";
+import { type Employee, type EmployeeCSVData } from "@/types/employees";
 
 interface UseEmployeeExportReturn {
     allEmployees: Employee[];

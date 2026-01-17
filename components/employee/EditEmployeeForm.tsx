@@ -21,10 +21,10 @@ import {
 import { Alert } from "@/components/ui/alert";
 import { AlertTriangle, CheckCircle } from "lucide-react";
 import {
-    EditEmployeeFormProps,
-    EmployeeFormData,
-    Department,
-    EmployeeStatusValue,
+    type EditEmployeeFormProps,
+    type EmployeeFormData,
+    type Department,
+    type EmployeeStatusValue,
 } from "@/types/employees";
 
 export function EditEmployeeForm({
@@ -352,7 +352,7 @@ export function EditEmployeeForm({
                             >
                                 {isLoading ? (
                                     <>
-                                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
                                         <span>กำลังบันทึก...</span>
                                     </>
                                 ) : (

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { useSession } from "next-auth/react";
-import { Ticket } from "@/types/tickets";
+import { type Ticket } from "@/types/tickets";
 import { PAGINATION_DEFAULTS } from "@/constants/ui";
 
 interface TicketFilters {

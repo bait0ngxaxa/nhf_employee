@@ -1,10 +1,10 @@
-import { NextRequest, NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { emailService } from "@/lib/email";
 import { lineNotificationService } from "@/lib/line";
-import { TicketEmailData } from "@/types/api";
+import { type TicketEmailData } from "@/types/api";
 import { createTicketSchema } from "@/lib/validations/ticket";
 import { logTicketEvent } from "@/lib/audit";
 

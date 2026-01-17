@@ -19,8 +19,8 @@ import {
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { AlertCircle, CheckCircle2 } from 'lucide-react';
-import { EditStatusModalProps } from '@/types/employees';
-import { EmployeeStatusValue } from '@/types/employees';
+import { type EditStatusModalProps } from '@/types/employees';
+import { type EmployeeStatusValue } from '@/types/employees';
 import { EMPLOYEE_STATUSES } from '@/constants/employees';
 import { getEmployeeStatusInfo } from '@/lib/helpers/employee-helpers';
 

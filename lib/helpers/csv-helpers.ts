@@ -1,4 +1,4 @@
-import { CSVEmployee } from "@/types/employees";
+import { type CSVEmployee } from "@/types/employees";
 
 // CSV header mapping (support both Thai and English headers)
 export const CSV_HEADER_MAPPINGS: Record<string, keyof CSVEmployee> = {

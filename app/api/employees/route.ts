@@ -1,10 +1,10 @@
-import { NextRequest, NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { createEmployeeSchema } from "@/lib/validations/employee";
 import { logEmployeeEvent } from "@/lib/audit";
-import { EmployeeStatus, Prisma } from "@prisma/client";
+import { type EmployeeStatus, type Prisma } from "@prisma/client";
 
 // GET - ดึงข้อมูลพนักงาน (with pagination and filters)
 export async function GET(request: NextRequest) {

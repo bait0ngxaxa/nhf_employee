@@ -9,7 +9,7 @@ import {
     Sparkles,
     Tag,
 } from "lucide-react";
-import { Ticket } from "@/types/tickets";
+import { type Ticket } from "@/types/tickets";
 import { formatThaiDate } from "@/lib/helpers/date-helpers";
 import {
     getTicketCategoryLabel,

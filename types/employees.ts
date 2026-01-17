@@ -1,4 +1,4 @@
-import { EmployeeStatusValue } from "@/constants/employees";
+import { type EmployeeStatusValue } from "@/constants/employees";
 
 export type { EmployeeStatusValue } from "@/constants/employees";
 

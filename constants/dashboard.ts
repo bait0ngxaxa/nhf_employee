@@ -7,7 +7,7 @@ import {
     Upload,
     FileText,
 } from "lucide-react";
-import { MenuItem } from "@/types/dashboard";
+import { type MenuItem } from "@/types/dashboard";
 
 export const DASHBOARD_MENU_ITEMS: MenuItem[] = [
     {

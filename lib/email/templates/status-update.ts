@@ -1,4 +1,4 @@
-import { TicketEmailData } from "@/types/api";
+import { type TicketEmailData } from "@/types/api";
 import {
     getTicketCategoryLabel,
     getTicketPriorityLabel,

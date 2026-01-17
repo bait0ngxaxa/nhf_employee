@@ -1,6 +1,6 @@
-import { TicketCategoryValue, TicketPriorityValue, TicketStatusValue } from '@/constants/tickets';
-import { Ticket, } from '@/types/tickets';
-import { Employee, } from '@/types/employees';
+import { type TicketCategoryValue, type TicketPriorityValue, type TicketStatusValue } from '@/constants/tickets';
+import { type Ticket, } from '@/types/tickets';
+import { type Employee, } from '@/types/employees';
 
 export interface EmailRequestBody {
   email: string;

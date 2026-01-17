@@ -1,5 +1,5 @@
 import { EMPLOYEE_STATUSES, EMPLOYEE_STATUS_LABELS, EMPLOYEE_STATUS_BADGE_CLASSES } from '@/constants/employees';
-import { EmployeeStatusValue } from '@/constants/employees';
+import { type EmployeeStatusValue } from '@/constants/employees';
 
 export function getEmployeeStatusLabel(status: string): string {
   return EMPLOYEE_STATUS_LABELS[status as EmployeeStatusValue] || status;

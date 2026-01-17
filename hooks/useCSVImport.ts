@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback } from "react";
-import { CSVEmployee, ImportResult } from "@/types/employees";
+import { type CSVEmployee, type ImportResult } from "@/types/employees";
 import { parseCSV, downloadSampleCSV } from "@/lib/helpers/csv-helpers";
 
 type ImportStep = "upload" | "preview" | "result";

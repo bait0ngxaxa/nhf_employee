@@ -11,7 +11,7 @@ export function AuthStatus() {
     if (status === "loading") {
         return (
             <div className="flex items-center space-x-2">
-                <div className="animate-spin h-4 w-4 border-2 border-blue-600 border-t-transparent rounded-full"></div>
+                <div className="animate-spin h-4 w-4 border-2 border-blue-600 border-t-transparent rounded-full" />
                 <span className="text-sm text-gray-600">กำลังโหลด...</span>
             </div>
         );

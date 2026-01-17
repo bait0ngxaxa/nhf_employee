@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { Employee, EmployeeCSVData } from "@/types/employees";
+import { type Employee, type EmployeeCSVData } from "@/types/employees";
 import { PAGINATION_DEFAULTS } from "@/constants/ui";
 import {
     getEmployeeStatusLabel,

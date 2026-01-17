@@ -1,10 +1,10 @@
 import nodemailer from "nodemailer";
-import { TicketEmailData } from "@/types/api";
+import { type TicketEmailData } from "@/types/api";
 import {
     getTicketStatusLabel,
     getTicketPriorityLabel,
 } from "@/lib/helpers/ticket-helpers";
-import { EmailData } from "./types";
+import { type EmailData } from "./types";
 import { generateNewTicketEmailHTML } from "./templates/new-ticket";
 import { generateStatusUpdateEmailHTML } from "./templates/status-update";
 
