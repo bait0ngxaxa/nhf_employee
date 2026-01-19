@@ -1,133 +1,60 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { emailService } from "@/lib/email";
-import { lineNotificationService } from "@/lib/line";
-import { type TicketEmailData } from "@/types/api";
 import { createTicketSchema } from "@/lib/validations/ticket";
 import { logTicketEvent } from "@/lib/audit";
+import { ticketService, type TicketFilters } from "@/lib/services/ticket";
+import { buildUserContext } from "@/lib/context";
+
+/**
+ * Parse query parameters into TicketFilters
+ */
+function parseQueryParams(url: string): TicketFilters {
+    const { searchParams } = new URL(url);
+    return {
+        status: searchParams.get("status") || undefined,
+        category: searchParams.get("category") || undefined,
+        priority: searchParams.get("priority") || undefined,
+        page: parseInt(searchParams.get("page") || "1"),
+        limit: parseInt(searchParams.get("limit") || "10"),
+    };
+}
 
 // GET - Retrieve tickets (filtered by role)
-export async function GET(request: NextRequest) {
+export async function GET(request: NextRequest): Promise<NextResponse> {
     try {
         const session = await getServerSession(authOptions);
 
         if (!session) {
             return NextResponse.json(
                 { error: "Unauthorized" },
-                { status: 401 }
+                { status: 401 },
             );
         }
 
-        const { searchParams } = new URL(request.url);
-        const status = searchParams.get("status");
-        const category = searchParams.get("category");
-        const priority = searchParams.get("priority");
-        const page = parseInt(searchParams.get("page") || "1");
-        const limit = parseInt(searchParams.get("limit") || "10");
+        const filters = parseQueryParams(request.url);
+        const user = buildUserContext(session);
+        const result = await ticketService.getTickets(filters, user);
 
-        const where: Record<string, unknown> = {};
-
-        // Role-based filtering
-        if (session.user?.role !== "ADMIN") {
-            // Regular users can only see their own tickets
-            where.reportedById = parseInt(session.user.id);
-        }
-
-        // Add filters
-        if (status) where.status = status;
-        if (category) where.category = category;
-        if (priority) where.priority = priority;
-
-        const skip = (page - 1) * limit;
-
-        const [tickets, totalCount] = await Promise.all([
-            prisma.ticket.findMany({
-                where,
-                include: {
-                    reportedBy: {
-                        select: {
-                            id: true,
-                            name: true,
-                            email: true,
-                            employee: {
-                                select: {
-                                    firstName: true,
-                                    lastName: true,
-                                    dept: {
-                                        select: {
-                                            name: true,
-                                        },
-                                    },
-                                },
-                            },
-                        },
-                    },
-                    assignedTo: {
-                        select: {
-                            id: true,
-                            name: true,
-                            email: true,
-                            employee: {
-                                select: {
-                                    firstName: true,
-                                    lastName: true,
-                                },
-                            },
-                        },
-                    },
-                    _count: {
-                        select: {
-                            comments: true,
-                        },
-                    },
-                    views: {
-                        where: {
-                            userId: parseInt(session.user.id),
-                        },
-                        select: {
-                            viewedAt: true,
-                        },
-                    },
-                },
-                orderBy: [{ priority: "desc" }, { createdAt: "desc" }],
-                skip,
-                take: limit,
-            }),
-            prisma.ticket.count({ where }),
-        ]);
-
-        return NextResponse.json(
-            {
-                tickets,
-                pagination: {
-                    page,
-                    limit,
-                    total: totalCount,
-                    pages: Math.ceil(totalCount / limit),
-                },
-            },
-            { status: 200 }
-        );
+        return NextResponse.json(result, { status: 200 });
     } catch (error) {
         console.error("Error fetching tickets:", error);
         return NextResponse.json(
             { error: "Failed to fetch tickets" },
-            { status: 500 }
+            { status: 500 },
         );
     }
 }
 
 // POST - Create new ticket
-export async function POST(request: NextRequest) {
+export async function POST(request: NextRequest): Promise<NextResponse> {
     try {
         const session = await getServerSession(authOptions);
 
         if (!session) {
             return NextResponse.json(
                 { error: "Unauthorized" },
-                { status: 401 }
+                { status: 401 },
             );
         }
 
@@ -135,115 +62,36 @@ export async function POST(request: NextRequest) {
 
         // Validate input with Zod
         const result = createTicketSchema.safeParse(body);
-
         if (!result.success) {
             const errors = result.error.flatten();
             return NextResponse.json(
-                {
-                    error: "ข้อมูลไม่ถูกต้อง",
-                    details: errors.fieldErrors,
-                },
-                { status: 400 }
+                { error: "ข้อมูลไม่ถูกต้อง", details: errors.fieldErrors },
+                { status: 400 },
             );
         }
 
-        const validatedData = result.data;
+        const user = buildUserContext(session);
+        const ticket = await ticketService.createTicket(result.data, user.id);
 
-        const ticket = await prisma.ticket.create({
-            data: {
-                title: validatedData.title,
-                description: validatedData.description,
-                category: validatedData.category,
-                priority: validatedData.priority,
-                reportedById: parseInt(session.user.id),
-            },
-            include: {
-                reportedBy: {
-                    select: {
-                        id: true,
-                        name: true,
-                        email: true,
-                        employee: {
-                            select: {
-                                firstName: true,
-                                lastName: true,
-                                dept: {
-                                    select: {
-                                        name: true,
-                                    },
-                                },
-                            },
-                        },
-                    },
-                },
-            },
-        });
+        // Send notifications (non-blocking)
+        ticketService.sendTicketCreatedNotifications(ticket);
 
-        // Send email and LINE notifications
-        try {
-            const emailData: TicketEmailData = {
-                ticketId: ticket.id,
+        // Log audit event
+        await logTicketEvent("TICKET_CREATE", ticket.id, user.id, user.email, {
+            after: {
                 title: ticket.title,
-                description: ticket.description,
                 category: ticket.category,
                 priority: ticket.priority,
                 status: ticket.status,
-                reportedBy: {
-                    name:
-                        ticket.reportedBy.employee?.firstName &&
-                        ticket.reportedBy.employee?.lastName
-                            ? `${ticket.reportedBy.employee.firstName} ${ticket.reportedBy.employee.lastName}`
-                            : ticket.reportedBy.name,
-                    email: ticket.reportedBy.email,
-                    department: ticket.reportedBy.employee?.dept?.name,
-                },
-                createdAt: ticket.createdAt.toISOString(),
-            };
-
-            // Send LINE notification (single notification - use IT team style for high priority)
-            if (ticket.priority === "HIGH" || ticket.priority === "URGENT") {
-                await lineNotificationService.sendITTeamNotification(emailData);
-            } else {
-                await lineNotificationService.sendNewTicketNotification(
-                    emailData
-                );
-            }
-
-            // Send email notifications
-            await emailService.sendNewTicketNotification(emailData);
-            if (ticket.priority === "HIGH" || ticket.priority === "URGENT") {
-                await emailService.sendITTeamNotification(emailData);
-            }
-        } catch (notificationError) {
-            console.error(
-                "❌ Failed to send notifications:",
-                notificationError
-            );
-            // Don't fail ticket creation if notifications fail
-        }
-
-        // Log audit event
-        await logTicketEvent(
-            "TICKET_CREATE",
-            ticket.id,
-            parseInt(session.user.id),
-            session.user.email || "",
-            {
-                after: {
-                    title: ticket.title,
-                    category: ticket.category,
-                    priority: ticket.priority,
-                    status: ticket.status,
-                },
-            }
-        );
+            },
+        });
 
         return NextResponse.json({ ticket }, { status: 201 });
     } catch (error) {
         console.error("Error creating ticket:", error);
         return NextResponse.json(
             { error: "Failed to create ticket" },
-            { status: 500 }
+            { status: 500 },
         );
     }
 }

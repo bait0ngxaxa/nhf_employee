@@ -52,7 +52,7 @@ export function EmployeeManagementSection({
 }: EmployeeManagementSectionProps) {
     return (
         <div className="space-y-6">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
                     <h2 className="text-2xl font-bold text-gray-900">
                         จัดการพนักงาน
@@ -61,7 +61,7 @@ export function EmployeeManagementSection({
                         จัดการข้อมูลพนักงานและสิทธิ์การเข้าถึง
                     </p>
                 </div>
-                <div className="flex items-center space-x-3">
+                <div className="flex flex-wrap items-center gap-3">
                     {allEmployees.length > 0 && (
                         <CSVLink
                             data={prepareCsvData()}

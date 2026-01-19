@@ -15,7 +15,10 @@
     "debug:line": "node debug-line.js",
     "test:line-quick": "node test-line-quick.js",
     "email:diagnostic": "node email-diagnostic.js",
-    "test:email-request": "node test-email-request.js"
+    "test:email-request": "node test-email-request.js",
+    "test": "vitest",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
     "@prisma/client": "^6.15.0",
@@ -43,19 +46,27 @@
     "@eslint/eslintrc": "^3.3.3",
     "@mermaid-js/mermaid-cli": "^11.12.0",
     "@tailwindcss/postcss": "^4",
+    "@testing-library/dom": "^10.4.1",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.1",
     "@types/bcryptjs": "^2.4.6",
     "@types/node": "^20",
     "@types/nodemailer": "^7.0.1",
     "@types/react": "^19",
     "@types/react-csv": "^1.1.10",
     "@types/react-dom": "^19",
+    "@vitejs/plugin-react": "^5.1.2",
+    "@vitest/coverage-v8": "^4.0.17",
     "eslint": "^9.39.2",
     "eslint-config-next": "^15.5.2",
+    "jsdom": "^27.4.0",
     "prisma": "^6.15.0",
     "tailwindcss": "^4",
     "tsx": "^4.20.5",
     "tw-animate-css": "^1.3.8",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^4.0.17",
+    "vitest-mock-extended": "^3.1.0"
   },
   "prisma": {
     "seed": "npx tsx prisma/seed.ts"
