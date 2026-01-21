@@ -18,12 +18,16 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
+import { Alert } from "@/components/ui/alert";
+import { AlertTriangle } from "lucide-react";
 import { SuccessModal } from "@/components/SuccessModal";
 import {
     type AddEmployeeFormProps,
     type EmployeeFormData,
     type Department,
 } from "@/types/employees";
+
+import { createEmployeeSchema } from "@/lib/validations/employee";
 
 export function AddEmployeeForm({ onSuccess }: AddEmployeeFormProps) {
     const [formData, setFormData] = useState<EmployeeFormData>({
@@ -40,6 +44,7 @@ export function AddEmployeeForm({ onSuccess }: AddEmployeeFormProps) {
     const [departments, setDepartments] = useState<Department[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState("");
+    const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
     const [showSuccessModal, setShowSuccessModal] = useState(false);
 
     useEffect(() => {
@@ -61,6 +66,38 @@ export function AddEmployeeForm({ onSuccess }: AddEmployeeFormProps) {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setError("");
+        setFieldErrors({});
+
+        // Client-side validation
+        const result = createEmployeeSchema.safeParse(formData);
+
+        if (!result.success) {
+            const errors: Record<string, string> = {};
+            let firstErrorField = "";
+
+            result.error.issues.forEach((issue) => {
+                const fieldName = issue.path[0] as string;
+                if (!errors[fieldName]) {
+                    errors[fieldName] = issue.message;
+                    if (!firstErrorField) firstErrorField = fieldName;
+                }
+            });
+
+            setFieldErrors(errors);
+
+            if (firstErrorField) {
+                const element = document.getElementById(firstErrorField);
+                if (element) {
+                    element.scrollIntoView({
+                        behavior: "smooth",
+                        block: "center",
+                    });
+                    element.focus();
+                }
+            }
+            return;
+        }
+
         setIsLoading(true);
 
         try {
@@ -97,6 +134,7 @@ export function AddEmployeeForm({ onSuccess }: AddEmployeeFormProps) {
             affiliation: "",
             departmentId: "",
         });
+        setFieldErrors({});
         onSuccess?.();
     };
 
@@ -110,17 +148,20 @@ export function AddEmployeeForm({ onSuccess }: AddEmployeeFormProps) {
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
-                    <form onSubmit={handleSubmit}>
+                    <form onSubmit={handleSubmit} noValidate>
                         <div className="flex flex-col gap-6">
-                            {error && (
-                                <div className="text-sm text-red-600 bg-red-50 p-3 rounded-md">
-                                    {error}
-                                </div>
-                            )}
-
                             <div className="grid grid-cols-2 gap-3">
                                 <div className="grid gap-3">
-                                    <Label htmlFor="firstName">ชื่อ</Label>
+                                    <Label
+                                        htmlFor="firstName"
+                                        className={
+                                            fieldErrors.firstName
+                                                ? "text-red-500"
+                                                : ""
+                                        }
+                                    >
+                                        ชื่อ
+                                    </Label>
                                     <Input
                                         id="firstName"
                                         type="text"
@@ -132,11 +173,29 @@ export function AddEmployeeForm({ onSuccess }: AddEmployeeFormProps) {
                                                 firstName: e.target.value,
                                             })
                                         }
-                                        required
+                                        className={
+                                            fieldErrors.firstName
+                                                ? "border-red-500 focus-visible:ring-red-500"
+                                                : ""
+                                        }
                                     />
+                                    {fieldErrors.firstName && (
+                                        <p className="text-xs text-red-500">
+                                            {fieldErrors.firstName}
+                                        </p>
+                                    )}
                                 </div>
                                 <div className="grid gap-3">
-                                    <Label htmlFor="lastName">นามสกุล</Label>
+                                    <Label
+                                        htmlFor="lastName"
+                                        className={
+                                            fieldErrors.lastName
+                                                ? "text-red-500"
+                                                : ""
+                                        }
+                                    >
+                                        นามสกุล
+                                    </Label>
                                     <Input
                                         id="lastName"
                                         type="text"
@@ -148,13 +207,29 @@ export function AddEmployeeForm({ onSuccess }: AddEmployeeFormProps) {
                                                 lastName: e.target.value,
                                             })
                                         }
-                                        required
+                                        className={
+                                            fieldErrors.lastName
+                                                ? "border-red-500 focus-visible:ring-red-500"
+                                                : ""
+                                        }
                                     />
+                                    {fieldErrors.lastName && (
+                                        <p className="text-xs text-red-500">
+                                            {fieldErrors.lastName}
+                                        </p>
+                                    )}
                                 </div>
                             </div>
 
                             <div className="grid gap-3">
-                                <Label htmlFor="nickname">
+                                <Label
+                                    htmlFor="nickname"
+                                    className={
+                                        fieldErrors.nickname
+                                            ? "text-red-500"
+                                            : ""
+                                    }
+                                >
                                     ชื่อเล่น (ไม่บังคับ)
                                 </Label>
                                 <Input
@@ -168,11 +243,28 @@ export function AddEmployeeForm({ onSuccess }: AddEmployeeFormProps) {
                                             nickname: e.target.value,
                                         })
                                     }
+                                    className={
+                                        fieldErrors.nickname
+                                            ? "border-red-500 focus-visible:ring-red-500"
+                                            : ""
+                                    }
                                 />
+                                {fieldErrors.nickname && (
+                                    <p className="text-xs text-red-500">
+                                        {fieldErrors.nickname}
+                                    </p>
+                                )}
                             </div>
 
                             <div className="grid gap-3">
-                                <Label htmlFor="email">อีเมล</Label>
+                                <Label
+                                    htmlFor="email"
+                                    className={
+                                        fieldErrors.email ? "text-red-500" : ""
+                                    }
+                                >
+                                    อีเมล
+                                </Label>
                                 <Input
                                     id="email"
                                     type="email"
@@ -184,12 +276,28 @@ export function AddEmployeeForm({ onSuccess }: AddEmployeeFormProps) {
                                             email: e.target.value,
                                         })
                                     }
-                                    required
+                                    className={
+                                        fieldErrors.email
+                                            ? "border-red-500 focus-visible:ring-red-500"
+                                            : ""
+                                    }
                                 />
+                                {fieldErrors.email && (
+                                    <p className="text-xs text-red-500">
+                                        {fieldErrors.email}
+                                    </p>
+                                )}
                             </div>
 
                             <div className="grid gap-3">
-                                <Label htmlFor="phone">เบอร์โทรศัพท์</Label>
+                                <Label
+                                    htmlFor="phone"
+                                    className={
+                                        fieldErrors.phone ? "text-red-500" : ""
+                                    }
+                                >
+                                    เบอร์โทรศัพท์
+                                </Label>
                                 <Input
                                     id="phone"
                                     type="tel"
@@ -201,11 +309,30 @@ export function AddEmployeeForm({ onSuccess }: AddEmployeeFormProps) {
                                             phone: e.target.value,
                                         })
                                     }
+                                    className={
+                                        fieldErrors.phone
+                                            ? "border-red-500 focus-visible:ring-red-500"
+                                            : ""
+                                    }
                                 />
+                                {fieldErrors.phone && (
+                                    <p className="text-xs text-red-500">
+                                        {fieldErrors.phone}
+                                    </p>
+                                )}
                             </div>
 
                             <div className="grid gap-3">
-                                <Label htmlFor="position">ตำแหน่ง</Label>
+                                <Label
+                                    htmlFor="position"
+                                    className={
+                                        fieldErrors.position
+                                            ? "text-red-500"
+                                            : ""
+                                    }
+                                >
+                                    ตำแหน่ง
+                                </Label>
                                 <Input
                                     id="position"
                                     type="text"
@@ -217,12 +344,30 @@ export function AddEmployeeForm({ onSuccess }: AddEmployeeFormProps) {
                                             position: e.target.value,
                                         })
                                     }
-                                    required
+                                    className={
+                                        fieldErrors.position
+                                            ? "border-red-500 focus-visible:ring-red-500"
+                                            : ""
+                                    }
                                 />
+                                {fieldErrors.position && (
+                                    <p className="text-xs text-red-500">
+                                        {fieldErrors.position}
+                                    </p>
+                                )}
                             </div>
 
                             <div className="grid gap-3">
-                                <Label htmlFor="affiliation">สังกัด</Label>
+                                <Label
+                                    htmlFor="affiliation"
+                                    className={
+                                        fieldErrors.affiliation
+                                            ? "text-red-500"
+                                            : ""
+                                    }
+                                >
+                                    สังกัด
+                                </Label>
                                 <Input
                                     id="affiliation"
                                     type="text"
@@ -234,11 +379,30 @@ export function AddEmployeeForm({ onSuccess }: AddEmployeeFormProps) {
                                             affiliation: e.target.value,
                                         })
                                     }
+                                    className={
+                                        fieldErrors.affiliation
+                                            ? "border-red-500 focus-visible:ring-red-500"
+                                            : ""
+                                    }
                                 />
+                                {fieldErrors.affiliation && (
+                                    <p className="text-xs text-red-500">
+                                        {fieldErrors.affiliation}
+                                    </p>
+                                )}
                             </div>
 
                             <div className="grid gap-3">
-                                <Label htmlFor="department">แผนก</Label>
+                                <Label
+                                    htmlFor="departmentId"
+                                    className={
+                                        fieldErrors.departmentId
+                                            ? "text-red-500"
+                                            : ""
+                                    }
+                                >
+                                    แผนก
+                                </Label>
                                 <Select
                                     value={String(formData.departmentId)}
                                     onValueChange={(value) =>
@@ -247,9 +411,15 @@ export function AddEmployeeForm({ onSuccess }: AddEmployeeFormProps) {
                                             departmentId: value,
                                         })
                                     }
-                                    required
                                 >
-                                    <SelectTrigger>
+                                    <SelectTrigger
+                                        id="departmentId"
+                                        className={
+                                            fieldErrors.departmentId
+                                                ? "border-red-500 focus:ring-red-500"
+                                                : ""
+                                        }
+                                    >
                                         <SelectValue placeholder="เลือกแผนก" />
                                     </SelectTrigger>
                                     <SelectContent>
@@ -263,7 +433,19 @@ export function AddEmployeeForm({ onSuccess }: AddEmployeeFormProps) {
                                         ))}
                                     </SelectContent>
                                 </Select>
+                                {fieldErrors.departmentId && (
+                                    <p className="text-xs text-red-500">
+                                        {fieldErrors.departmentId}
+                                    </p>
+                                )}
                             </div>
+
+                            {error && (
+                                <Alert className="border-red-200 bg-red-50">
+                                    <AlertTriangle className="h-4 w-4 text-red-600" />
+                                    <div className="text-red-700">{error}</div>
+                                </Alert>
+                            )}
 
                             <Button
                                 type="submit"

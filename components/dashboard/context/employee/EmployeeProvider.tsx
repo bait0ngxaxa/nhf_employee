@@ -1,4 +1,7 @@
-import { useState, useEffect, useCallback } from "react";
+"use client";
+
+import { useState, useCallback, useEffect, type ReactNode } from "react";
+import useSWR from "swr";
 import { type Employee, type EmployeeCSVData } from "@/types/employees";
 import { PAGINATION_DEFAULTS } from "@/constants/ui";
 import {
@@ -7,6 +10,8 @@ import {
 } from "@/lib/helpers/employee-helpers";
 import { generateFilename } from "@/lib/helpers/date-helpers";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
+import { EmployeeContext } from "./EmployeeContext";
+import { type EmployeeContextValue } from "./types";
 
 interface Pagination {
     page: number;
@@ -15,69 +20,24 @@ interface Pagination {
     totalPages: number;
 }
 
-interface UseEmployeeListReturn {
-    // Data
-    employees: Employee[];
-    currentEmployees: Employee[];
-
-    // Search & Filter
-    searchTerm: string;
-    setSearchTerm: (term: string) => void;
-    statusFilter: string;
-    setStatusFilter: (filter: string) => void;
-
-    // Pagination
-    currentPage: number;
-    totalPages: number;
-    totalEmployees: number;
-    itemsPerPage: number;
-    handlePageChange: (page: number) => void;
-    handlePreviousPage: () => void;
-    handleNextPage: () => void;
-
-    // Loading & Error
-    isLoading: boolean;
-    error: string;
-
-    // Export
-    isExporting: boolean;
-    getExportData: () => EmployeeCSVData[];
-    getExportFileName: () => string;
-    handleExportCSV: () => Promise<EmployeeCSVData[]>;
-
-    // Edit
-    isEditFormOpen: boolean;
-    employeeToEdit: Employee | null;
-    showEditSuccessModal: boolean;
-    lastEditedEmployee: { firstName: string; lastName: string } | null;
-    handleEditEmployee: (employee: Employee) => void;
-    handleCloseEditForm: () => void;
-    handleEmployeeUpdate: () => void;
-    setShowEditSuccessModal: (show: boolean) => void;
-
-    // Actions
-    fetchEmployees: () => Promise<void>;
+interface EmployeeProviderProps {
+    children: ReactNode;
 }
 
-/**
- * Custom hook for managing employee list state with server-side pagination
- */
-export function useEmployeeList(
-    refreshTrigger?: number
-): UseEmployeeListReturn {
-    const [employees, setEmployees] = useState<Employee[]>([]);
+const defaultPagination: Pagination = {
+    page: 1,
+    limit: PAGINATION_DEFAULTS.ITEMS_PER_PAGE,
+    total: 0,
+    totalPages: 0,
+};
+
+export function EmployeeProvider({ children }: EmployeeProviderProps) {
     const [searchTerm, setSearchTerm] = useState("");
     const [statusFilter, setStatusFilter] = useState<string>("all");
-    const [isLoading, setIsLoading] = useState(true);
-    const [error, setError] = useState("");
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage] = useState(PAGINATION_DEFAULTS.ITEMS_PER_PAGE);
-    const [pagination, setPagination] = useState<Pagination>({
-        page: 1,
-        limit: PAGINATION_DEFAULTS.ITEMS_PER_PAGE,
-        total: 0,
-        totalPages: 0,
-    });
+
+    // UI states
     const [isExporting, setIsExporting] = useState(false);
     const [isEditFormOpen, setIsEditFormOpen] = useState(false);
     const [employeeToEdit, setEmployeeToEdit] = useState<Employee | null>(null);
@@ -86,75 +46,63 @@ export function useEmployeeList(
         firstName: string;
         lastName: string;
     } | null>(null);
+    const [refreshTrigger, setRefreshTrigger] = useState(0);
+    const [exportData, setExportData] = useState<EmployeeCSVData[]>([]);
 
-    // Debounce search to avoid too many API calls
     const debouncedSearchTerm = useDebouncedValue(searchTerm, 300);
 
-    const fetchEmployees = useCallback(async () => {
-        try {
-            setIsLoading(true);
-            setError("");
+    // Prepare SWR key
+    const params = new URLSearchParams({
+        page: currentPage.toString(),
+        limit: itemsPerPage.toString(),
+    });
 
-            // Build query params
-            const params = new URLSearchParams({
-                page: currentPage.toString(),
-                limit: itemsPerPage.toString(),
-            });
+    if (debouncedSearchTerm) {
+        params.append("search", debouncedSearchTerm);
+    }
+    if (statusFilter && statusFilter !== "all") {
+        params.append("status", statusFilter);
+    }
+    const swrKey = `/api/employees?${params.toString()}`;
 
-            if (debouncedSearchTerm) {
-                params.append("search", debouncedSearchTerm);
-            }
+    // SWR Hook
+    const { data, mutate, isLoading, error: swrError } = useSWR(swrKey);
 
-            if (statusFilter && statusFilter !== "all") {
-                params.append("status", statusFilter);
-            }
+    const employees = data?.employees || [];
+    const pagination = data?.pagination || defaultPagination;
+    const error = swrError
+        ? swrError.message || "เกิดข้อผิดพลาดในการโหลดข้อมูล"
+        : "";
 
-            const response = await fetch(`/api/employees?${params}`);
-
-            if (response.ok) {
-                const data = await response.json();
-                setEmployees(data.employees);
-                setPagination(data.pagination);
-            } else {
-                const errorData = await response.json();
-                setError(errorData.error || "เกิดข้อผิดพลาดในการดึงข้อมูล");
-            }
-        } catch (err) {
-            setError("เกิดข้อผิดพลาดในการเชื่อมต่อ");
-            console.error("Error fetching employees:", err);
-        } finally {
-            setIsLoading(false);
-        }
-    }, [currentPage, itemsPerPage, debouncedSearchTerm, statusFilter]);
-
-    // Fetch when dependencies change
-    useEffect(() => {
-        fetchEmployees();
-    }, [fetchEmployees, refreshTrigger]);
-
-    // Reset to page 1 when filters change
+    // Reset page on search/filter change
     useEffect(() => {
         setCurrentPage(1);
     }, [debouncedSearchTerm, statusFilter]);
 
-    const handlePageChange = (page: number) => {
+    // Force refresh when refreshTrigger changes
+    useEffect(() => {
+        if (refreshTrigger > 0) {
+            mutate();
+        }
+    }, [refreshTrigger, mutate]);
+
+    const handlePageChange = useCallback((page: number) => {
         setCurrentPage(page);
-    };
+    }, []);
 
-    const handlePreviousPage = () => {
+    const handlePreviousPage = useCallback(() => {
         setCurrentPage((prev) => Math.max(prev - 1, 1));
-    };
+    }, []);
 
-    const handleNextPage = () => {
+    const handleNextPage = useCallback(() => {
         setCurrentPage((prev) => Math.min(prev + 1, pagination.totalPages));
-    };
-    // Export: need to fetch all matching employees, not just current page
-    const [exportData, setExportData] = useState<EmployeeCSVData[]>([]);
+    }, [pagination.totalPages]);
 
+    // Export Logic (remains mostly same, uses fetch directly as it's separate query)
     const fetchAllForExport = useCallback(async (): Promise<Employee[]> => {
         const params = new URLSearchParams({
             page: "1",
-            limit: "10000", // Get all
+            limit: "10000",
         });
 
         if (debouncedSearchTerm) {
@@ -190,7 +138,7 @@ export function useEmployeeList(
         }));
     };
 
-    const getExportFileName = () => {
+    const getExportFileName = useCallback(() => {
         const searchSuffix = searchTerm ? `_ค้นหา-${searchTerm}` : "";
         const statusSuffix =
             statusFilter !== "all"
@@ -198,16 +146,17 @@ export function useEmployeeList(
                 : "";
         const prefix = `รายชื่อพนักงาน${searchSuffix}${statusSuffix}`;
         return generateFilename(prefix, "csv");
-    };
+    }, [searchTerm, statusFilter]);
 
-    const handleExportCSV = async (): Promise<EmployeeCSVData[]> => {
+    const handleExportCSV = useCallback(async (): Promise<
+        EmployeeCSVData[]
+    > => {
         setIsExporting(true);
         try {
             const allEmployees = await fetchAllForExport();
             const csvData = prepareCsvData(allEmployees);
             setExportData(csvData);
 
-            // Log audit event for data export
             await fetch("/api/audit-logs/export", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -228,21 +177,21 @@ export function useEmployeeList(
         } finally {
             setTimeout(() => setIsExporting(false), 500);
         }
-    };
+    }, [fetchAllForExport, debouncedSearchTerm, statusFilter]);
 
-    const getExportData = () => exportData;
+    const getExportData = useCallback(() => exportData, [exportData]);
 
-    const handleEditEmployee = (employee: Employee) => {
+    const handleEditEmployee = useCallback((employee: Employee) => {
         setEmployeeToEdit(employee);
         setIsEditFormOpen(true);
-    };
+    }, []);
 
-    const handleCloseEditForm = () => {
+    const handleCloseEditForm = useCallback(() => {
         setIsEditFormOpen(false);
         setEmployeeToEdit(null);
-    };
+    }, []);
 
-    const handleEmployeeUpdate = () => {
+    const handleEmployeeUpdate = useCallback(() => {
         const employeeName = employeeToEdit
             ? {
                   firstName: employeeToEdit.firstName,
@@ -260,12 +209,17 @@ export function useEmployeeList(
             setShowEditSuccessModal(true);
         }, 100);
 
-        fetchEmployees();
-    };
+        mutate(); // Revalidate SWR
+    }, [employeeToEdit, mutate]);
 
-    return {
+    const triggerRefresh = useCallback(async () => {
+        await mutate();
+        setRefreshTrigger((prev) => prev + 1);
+    }, [mutate]);
+
+    const value: EmployeeContextValue = {
         employees,
-        currentEmployees: employees, // Server already returns paginated data
+        currentEmployees: employees,
         searchTerm,
         setSearchTerm,
         statusFilter,
@@ -291,6 +245,14 @@ export function useEmployeeList(
         handleCloseEditForm,
         handleEmployeeUpdate,
         setShowEditSuccessModal,
-        fetchEmployees,
+        fetchEmployees: triggerRefresh,
+        refreshTrigger,
+        triggerRefresh,
     };
+
+    return (
+        <EmployeeContext.Provider value={value}>
+            {children}
+        </EmployeeContext.Provider>
+    );
 }

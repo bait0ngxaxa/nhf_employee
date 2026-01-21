@@ -18,9 +18,9 @@ import { Pagination } from "@/components/Pagination";
 import { type EmployeeListProps } from "@/types/employees";
 import { STATUS_FILTER_OPTIONS } from "@/constants/ui";
 import { getEmployeeStatusLabel } from "@/lib/helpers/employee-helpers";
-import { useEmployeeList } from "@/hooks/useEmployeeList";
+import { useEmployeeContext } from "@/components/dashboard/context/employee/EmployeeContext";
 
-export function EmployeeList({ refreshTrigger, userRole }: EmployeeListProps) {
+export function EmployeeList({ userRole }: EmployeeListProps) {
     const csvLinkRef = useRef<
         CSVLink & HTMLAnchorElement & { link: HTMLAnchorElement }
     >(null);
@@ -53,7 +53,7 @@ export function EmployeeList({ refreshTrigger, userRole }: EmployeeListProps) {
         handleCloseEditForm,
         handleEmployeeUpdate,
         setShowEditSuccessModal,
-    } = useEmployeeList(refreshTrigger);
+    } = useEmployeeContext();
 
     // Don't show loading screen for subsequent loads to prevent focus loss
     const isInitialLoading = isLoading && employees.length === 0;

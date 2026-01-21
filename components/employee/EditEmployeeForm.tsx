@@ -27,6 +27,8 @@ import {
     type EmployeeStatusValue,
 } from "@/types/employees";
 
+import { updateEmployeeSchema } from "@/lib/validations/employee";
+
 export function EditEmployeeForm({
     employee,
     isOpen,
@@ -49,6 +51,7 @@ export function EditEmployeeForm({
     const [departments, setDepartments] = useState<Department[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState("");
+    const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
     // Load employee data when modal opens
     useEffect(() => {
@@ -67,6 +70,7 @@ export function EditEmployeeForm({
                 status: employee.status,
             });
             setError("");
+            setFieldErrors({});
         }
     }, [employee, isOpen]);
 
@@ -94,8 +98,43 @@ export function EditEmployeeForm({
 
         if (!employee) return;
 
-        setIsLoading(true);
         setError("");
+        setFieldErrors({});
+
+        // Client-side validation
+        const result = updateEmployeeSchema.safeParse(formData);
+
+        if (!result.success) {
+            const errors: Record<string, string> = {};
+            let firstErrorField = "";
+
+            result.error.issues.forEach((issue) => {
+                const fieldName = issue.path[0] as string;
+                if (!errors[fieldName]) {
+                    errors[fieldName] = issue.message;
+                    if (!firstErrorField) firstErrorField = fieldName;
+                }
+            });
+
+            setFieldErrors(errors);
+
+            if (firstErrorField) {
+                // Since this is a Dialog, focus/scroll might happen within the dialog content.
+                // scrollIntoView works fine if the container is scrollable or body is scrollable.
+                // Shadcn DialogContent usually fits screen or is scrollable.
+                const element = document.getElementById(firstErrorField);
+                if (element) {
+                    element.scrollIntoView({
+                        behavior: "smooth",
+                        block: "center",
+                    });
+                    element.focus();
+                }
+            }
+            return;
+        }
+
+        setIsLoading(true);
 
         try {
             const response = await fetch(`/api/employees/${employee.id}`, {
@@ -132,6 +171,7 @@ export function EditEmployeeForm({
             status: "ACTIVE",
         });
         setError("");
+        setFieldErrors({});
     };
 
     const handleClose = () => {
@@ -144,7 +184,7 @@ export function EditEmployeeForm({
     return (
         <>
             <Dialog open={isOpen} onOpenChange={handleClose}>
-                <DialogContent className="max-w-md mx-auto">
+                <DialogContent className="max-w-md mx-auto h-[90vh] overflow-y-auto">
                     <DialogHeader>
                         <DialogTitle className="flex items-center space-x-2">
                             <span>แก้ไขข้อมูลพนักงาน</span>
@@ -155,14 +195,26 @@ export function EditEmployeeForm({
                         </DialogDescription>
                     </DialogHeader>
 
-                    <form onSubmit={handleSubmit} className="space-y-4">
+                    <form
+                        onSubmit={handleSubmit}
+                        className="space-y-4"
+                        noValidate
+                    >
                         <div className="grid grid-cols-2 gap-4">
                             <div>
-                                <Label htmlFor="firstName">ชื่อ *</Label>
+                                <Label
+                                    htmlFor="firstName"
+                                    className={
+                                        fieldErrors.firstName
+                                            ? "text-red-500"
+                                            : ""
+                                    }
+                                >
+                                    ชื่อ *
+                                </Label>
                                 <Input
                                     id="firstName"
                                     type="text"
-                                    required
                                     value={formData.firstName}
                                     onChange={(e) =>
                                         setFormData({
@@ -171,14 +223,32 @@ export function EditEmployeeForm({
                                         })
                                     }
                                     placeholder="ชื่อ"
+                                    className={
+                                        fieldErrors.firstName
+                                            ? "border-red-500 focus-visible:ring-red-500"
+                                            : ""
+                                    }
                                 />
+                                {fieldErrors.firstName && (
+                                    <p className="text-xs text-red-500">
+                                        {fieldErrors.firstName}
+                                    </p>
+                                )}
                             </div>
                             <div>
-                                <Label htmlFor="lastName">นามสกุล *</Label>
+                                <Label
+                                    htmlFor="lastName"
+                                    className={
+                                        fieldErrors.lastName
+                                            ? "text-red-500"
+                                            : ""
+                                    }
+                                >
+                                    นามสกุล *
+                                </Label>
                                 <Input
                                     id="lastName"
                                     type="text"
-                                    required
                                     value={formData.lastName}
                                     onChange={(e) =>
                                         setFormData({
@@ -187,12 +257,29 @@ export function EditEmployeeForm({
                                         })
                                     }
                                     placeholder="นามสกุล"
+                                    className={
+                                        fieldErrors.lastName
+                                            ? "border-red-500 focus-visible:ring-red-500"
+                                            : ""
+                                    }
                                 />
+                                {fieldErrors.lastName && (
+                                    <p className="text-xs text-red-500">
+                                        {fieldErrors.lastName}
+                                    </p>
+                                )}
                             </div>
                         </div>
 
                         <div>
-                            <Label htmlFor="nickname">ชื่อเล่น</Label>
+                            <Label
+                                htmlFor="nickname"
+                                className={
+                                    fieldErrors.nickname ? "text-red-500" : ""
+                                }
+                            >
+                                ชื่อเล่น
+                            </Label>
                             <Input
                                 id="nickname"
                                 type="text"
@@ -204,11 +291,28 @@ export function EditEmployeeForm({
                                     })
                                 }
                                 placeholder="ชื่อเล่น"
+                                className={
+                                    fieldErrors.nickname
+                                        ? "border-red-500 focus-visible:ring-red-500"
+                                        : ""
+                                }
                             />
+                            {fieldErrors.nickname && (
+                                <p className="text-xs text-red-500">
+                                    {fieldErrors.nickname}
+                                </p>
+                            )}
                         </div>
 
                         <div>
-                            <Label htmlFor="email">อีเมล</Label>
+                            <Label
+                                htmlFor="email"
+                                className={
+                                    fieldErrors.email ? "text-red-500" : ""
+                                }
+                            >
+                                อีเมล
+                            </Label>
                             <Input
                                 id="email"
                                 type="email"
@@ -220,11 +324,28 @@ export function EditEmployeeForm({
                                     })
                                 }
                                 placeholder="อีเมล (เว้นว่างได้)"
+                                className={
+                                    fieldErrors.email
+                                        ? "border-red-500 focus-visible:ring-red-500"
+                                        : ""
+                                }
                             />
+                            {fieldErrors.email && (
+                                <p className="text-xs text-red-500">
+                                    {fieldErrors.email}
+                                </p>
+                            )}
                         </div>
 
                         <div>
-                            <Label htmlFor="phone">เบอร์โทรศัพท์</Label>
+                            <Label
+                                htmlFor="phone"
+                                className={
+                                    fieldErrors.phone ? "text-red-500" : ""
+                                }
+                            >
+                                เบอร์โทรศัพท์
+                            </Label>
                             <Input
                                 id="phone"
                                 type="tel"
@@ -236,15 +357,31 @@ export function EditEmployeeForm({
                                     })
                                 }
                                 placeholder="เบอร์โทรศัพท์"
+                                className={
+                                    fieldErrors.phone
+                                        ? "border-red-500 focus-visible:ring-red-500"
+                                        : ""
+                                }
                             />
+                            {fieldErrors.phone && (
+                                <p className="text-xs text-red-500">
+                                    {fieldErrors.phone}
+                                </p>
+                            )}
                         </div>
 
                         <div>
-                            <Label htmlFor="position">ตำแหน่ง *</Label>
+                            <Label
+                                htmlFor="position"
+                                className={
+                                    fieldErrors.position ? "text-red-500" : ""
+                                }
+                            >
+                                ตำแหน่ง *
+                            </Label>
                             <Input
                                 id="position"
                                 type="text"
-                                required
                                 value={formData.position}
                                 onChange={(e) =>
                                     setFormData({
@@ -253,11 +390,30 @@ export function EditEmployeeForm({
                                     })
                                 }
                                 placeholder="ตำแหน่งงาน"
+                                className={
+                                    fieldErrors.position
+                                        ? "border-red-500 focus-visible:ring-red-500"
+                                        : ""
+                                }
                             />
+                            {fieldErrors.position && (
+                                <p className="text-xs text-red-500">
+                                    {fieldErrors.position}
+                                </p>
+                            )}
                         </div>
 
                         <div>
-                            <Label htmlFor="affiliation">สังกัด</Label>
+                            <Label
+                                htmlFor="affiliation"
+                                className={
+                                    fieldErrors.affiliation
+                                        ? "text-red-500"
+                                        : ""
+                                }
+                            >
+                                สังกัด
+                            </Label>
                             <Input
                                 id="affiliation"
                                 type="text"
@@ -269,11 +425,30 @@ export function EditEmployeeForm({
                                     })
                                 }
                                 placeholder="หน่วยงาน/องค์กรที่สังกัด"
+                                className={
+                                    fieldErrors.affiliation
+                                        ? "border-red-500 focus-visible:ring-red-500"
+                                        : ""
+                                }
                             />
+                            {fieldErrors.affiliation && (
+                                <p className="text-xs text-red-500">
+                                    {fieldErrors.affiliation}
+                                </p>
+                            )}
                         </div>
 
                         <div>
-                            <Label htmlFor="department">แผนก *</Label>
+                            <Label
+                                htmlFor="departmentId"
+                                className={
+                                    fieldErrors.departmentId
+                                        ? "text-red-500"
+                                        : ""
+                                }
+                            >
+                                แผนก *
+                            </Label>
                             <Select
                                 value={String(formData.departmentId)}
                                 onValueChange={(value) =>
@@ -282,9 +457,15 @@ export function EditEmployeeForm({
                                         departmentId: value,
                                     })
                                 }
-                                required
                             >
-                                <SelectTrigger>
+                                <SelectTrigger
+                                    id="departmentId"
+                                    className={
+                                        fieldErrors.departmentId
+                                            ? "border-red-500 focus:ring-red-500"
+                                            : ""
+                                    }
+                                >
                                     <SelectValue placeholder="เลือกแผนก" />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -298,10 +479,22 @@ export function EditEmployeeForm({
                                     ))}
                                 </SelectContent>
                             </Select>
+                            {fieldErrors.departmentId && (
+                                <p className="text-xs text-red-500">
+                                    {fieldErrors.departmentId}
+                                </p>
+                            )}
                         </div>
 
                         <div>
-                            <Label htmlFor="status">สถานะ *</Label>
+                            <Label
+                                htmlFor="status"
+                                className={
+                                    fieldErrors.status ? "text-red-500" : ""
+                                }
+                            >
+                                สถานะ *
+                            </Label>
                             <Select
                                 value={formData.status}
                                 onValueChange={(value) =>
@@ -310,9 +503,15 @@ export function EditEmployeeForm({
                                         status: value as EmployeeStatusValue,
                                     })
                                 }
-                                required
                             >
-                                <SelectTrigger>
+                                <SelectTrigger
+                                    id="status"
+                                    className={
+                                        fieldErrors.status
+                                            ? "border-red-500 focus:ring-red-500"
+                                            : ""
+                                    }
+                                >
                                     <SelectValue placeholder="เลือกสถานะ" />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -327,6 +526,11 @@ export function EditEmployeeForm({
                                     </SelectItem>
                                 </SelectContent>
                             </Select>
+                            {fieldErrors.status && (
+                                <p className="text-xs text-red-500">
+                                    {fieldErrors.status}
+                                </p>
+                            )}
                         </div>
 
                         {error && (

@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/card";
 import { Search, RefreshCw } from "lucide-react";
 import { Pagination } from "@/components/Pagination";
-import { useAuditLogs } from "@/hooks/useAuditLogs";
+import { useAuditLogsContext } from "@/components/dashboard/context/audit-logs/AuditLogsContext";
 import {
     AUDIT_ACTION_LABELS,
     AUDIT_ACTION_FILTER_OPTIONS,
@@ -59,7 +59,7 @@ export function AuditLogViewer({ className }: AuditLogViewerProps) {
         refresh,
         handlePreviousPage,
         handleNextPage,
-    } = useAuditLogs();
+    } = useAuditLogsContext();
 
     if (isLoading) {
         return (
@@ -196,7 +196,7 @@ export function AuditLogViewer({ className }: AuditLogViewerProps) {
                                         <td className="px-4 py-3">
                                             <Badge
                                                 className={getAuditActionBadgeColor(
-                                                    log.action
+                                                    log.action,
                                                 )}
                                             >
                                                 {AUDIT_ACTION_LABELS[

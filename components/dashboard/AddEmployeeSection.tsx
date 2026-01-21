@@ -1,16 +1,13 @@
+"use client";
+
 import { Button } from "@/components/ui/button";
 import { Users } from "lucide-react";
 import { AddEmployeeForm } from "@/components/employee";
+import { useDashboardContext } from "./context";
 
-interface AddEmployeeSectionProps {
-    handleMenuClick: (menuId: string) => void;
-    onSuccess: () => void;
-}
+export function AddEmployeeSection() {
+    const { handleMenuClick, handleEmployeeAdded } = useDashboardContext();
 
-export function AddEmployeeSection({
-    handleMenuClick,
-    onSuccess,
-}: AddEmployeeSectionProps) {
     return (
         <div className="space-y-6">
             <div className="flex items-center space-x-3">
@@ -31,7 +28,7 @@ export function AddEmployeeSection({
                     </p>
                 </div>
             </div>
-            <AddEmployeeForm onSuccess={onSuccess} />
+            <AddEmployeeForm onSuccess={handleEmployeeAdded} />
         </div>
     );
 }

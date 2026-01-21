@@ -1,14 +1,11 @@
+"use client";
+
 import { EmailRequestForm, EmailRequestHistory } from "@/components/email";
+import { useDashboardContext, EmailRequestProvider } from "./context";
 
-interface EmailRequestSectionProps {
-    onCancel: () => void;
-    onSuccess: () => void;
-}
+function EmailRequestContent() {
+    const { handleMenuClick } = useDashboardContext();
 
-export function EmailRequestSection({
-    onCancel,
-    onSuccess,
-}: EmailRequestSectionProps) {
     return (
         <div className="space-y-6">
             <div>
@@ -20,11 +17,22 @@ export function EmailRequestSection({
                 </p>
             </div>
             <div className="space-y-6">
-                <EmailRequestForm onCancel={onCancel} onSuccess={onSuccess} />
+                <EmailRequestForm
+                    onCancel={() => handleMenuClick("dashboard")}
+                    onSuccess={() => handleMenuClick("dashboard")}
+                />
             </div>
 
             {/* Email Request History */}
             <EmailRequestHistory />
         </div>
+    );
+}
+
+export function EmailRequestSection() {
+    return (
+        <EmailRequestProvider>
+            <EmailRequestContent />
+        </EmailRequestProvider>
     );
 }

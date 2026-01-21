@@ -1,5 +1,8 @@
-import { useState, useEffect, useCallback } from "react";
+"use client";
+
+import { useState, useCallback, useMemo, useEffect } from "react";
 import { useSession } from "next-auth/react";
+import useSWR from "swr";
 import { type Ticket } from "@/types/tickets";
 import { PAGINATION_DEFAULTS } from "@/constants/ui";
 
@@ -36,97 +39,83 @@ const initialFilters: TicketFilters = {
     search: "",
 };
 
+const defaultPagination: Pagination = {
+    page: 1,
+    limit: PAGINATION_DEFAULTS.ITEMS_PER_PAGE,
+    total: 0,
+    pages: 0,
+};
+
 export function useTicketList(refreshTrigger?: number): UseTicketListReturn {
     const { data: session } = useSession();
-    const [tickets, setTickets] = useState<Ticket[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState("");
     const [filters, setFilters] = useState<TicketFilters>(initialFilters);
-    const [pagination, setPagination] = useState<Pagination>({
-        page: 1,
-        limit: PAGINATION_DEFAULTS.ITEMS_PER_PAGE,
-        total: 0,
-        pages: 0,
+    const [page, setPage] = useState(1);
+
+    const searchParams = new URLSearchParams({
+        page: page.toString(),
+        limit: PAGINATION_DEFAULTS.ITEMS_PER_PAGE.toString(),
     });
 
-    const fetchTickets = useCallback(async () => {
-        try {
-            setLoading(true);
-            setError("");
+    if (filters.status) searchParams.append("status", filters.status);
+    if (filters.category) searchParams.append("category", filters.category);
+    if (filters.priority) searchParams.append("priority", filters.priority);
 
-            const searchParams = new URLSearchParams({
-                page: pagination.page.toString(),
-                limit: pagination.limit.toString(),
+    const swrKey = session ? `/api/tickets?${searchParams.toString()}` : null;
+
+    const { data, isLoading, error: swrError, mutate } = useSWR(swrKey);
+
+    useEffect(() => {
+        if (refreshTrigger) {
+            mutate();
+        }
+    }, [refreshTrigger, mutate]);
+
+    // Client-side search filtering
+    const tickets = useMemo(() => {
+        if (!data?.tickets) return [];
+        let filtered = data.tickets;
+        if (filters.search) {
+            const searchLower = filters.search.toLowerCase();
+            filtered = filtered.filter(
+                (ticket: Ticket) =>
+                    ticket.title.toLowerCase().includes(searchLower) ||
+                    ticket.description.toLowerCase().includes(searchLower),
+            );
+        }
+        return filtered;
+    }, [data, filters.search]);
+
+    const pagination = data?.pagination || defaultPagination;
+    const error = swrError ? swrError.message || "เกิดข้อผิดพลาด" : "";
+
+    // Better approach for page reset:
+    const setFiltersWrapper = useCallback(
+        (value: React.SetStateAction<TicketFilters>) => {
+            setFilters((prev) => {
+                const newVal =
+                    typeof value === "function" ? value(prev) : value;
+                if (
+                    newVal.status !== prev.status ||
+                    newVal.category !== prev.category ||
+                    newVal.priority !== prev.priority
+                ) {
+                    setPage(1);
+                }
+                return newVal;
             });
-
-            if (filters.status) searchParams.append("status", filters.status);
-            if (filters.category)
-                searchParams.append("category", filters.category);
-            if (filters.priority)
-                searchParams.append("priority", filters.priority);
-
-            const response = await fetch(`/api/tickets?${searchParams}`);
-            const data = await response.json();
-
-            if (!response.ok) {
-                throw new Error(data.error || "เกิดข้อผิดพลาด");
-            }
-
-            // Filter by search text on client side
-            let filteredTickets = data.tickets;
-            if (filters.search) {
-                const searchLower = filters.search.toLowerCase();
-                filteredTickets = data.tickets.filter(
-                    (ticket: Ticket) =>
-                        ticket.title.toLowerCase().includes(searchLower) ||
-                        ticket.description.toLowerCase().includes(searchLower)
-                );
-            }
-
-            setTickets(filteredTickets);
-            setPagination(data.pagination);
-        } catch (err: unknown) {
-            const errorMessage =
-                err instanceof Error
-                    ? err.message
-                    : "เกิดข้อผิดพลาดในการโหลดข้อมูล";
-            setError(errorMessage);
-        } finally {
-            setLoading(false);
-        }
-    }, [
-        filters.status,
-        filters.category,
-        filters.priority,
-        filters.search,
-        pagination.page,
-        pagination.limit,
-    ]);
-
-    useEffect(() => {
-        if (session) {
-            fetchTickets();
-        }
-    }, [session, refreshTrigger, fetchTickets]);
-
-    useEffect(() => {
-        // Reset to first page when filters change
-        if (pagination.page !== 1) {
-            setPagination((prev) => ({ ...prev, page: 1 }));
-        } else {
-            fetchTickets();
-        }
-    }, [filters.search, fetchTickets, pagination.page]);
+        },
+        [],
+    );
 
     const handlePageChange = useCallback((newPage: number) => {
-        setPagination((prev) => ({ ...prev, page: newPage }));
+        setPage(newPage);
     }, []);
 
     const resetFilters = useCallback(() => {
         setFilters(initialFilters);
+        setPage(1);
     }, []);
 
-    // Check if ticket is new (created within last 24 hours) AND not viewed
     const isNewTicket = useCallback(
         (createdAt: string, views?: { viewedAt: string }[]) => {
             const now = new Date();
@@ -137,15 +126,15 @@ export function useTicketList(refreshTrigger?: number): UseTicketListReturn {
             const hasBeenViewed = views && views.length > 0;
             return isRecent && !hasBeenViewed;
         },
-        []
+        [],
     );
 
     return {
         tickets,
-        loading,
+        loading: isLoading,
         error,
         filters,
-        setFilters,
+        setFilters: setFiltersWrapper,
         pagination,
         handlePageChange,
         resetFilters,

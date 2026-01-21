@@ -1,5 +1,8 @@
-import { useState, useEffect, useCallback } from "react";
+"use client";
+
+import { useState, useCallback } from "react";
 import { useSession } from "next-auth/react";
+import useSWR from "swr";
 
 interface Comment {
     id: number;
@@ -70,41 +73,19 @@ interface UseTicketDetailReturn {
 
 export function useTicketDetail(
     ticketId: number,
-    onTicketUpdated?: () => void
+    onTicketUpdated?: () => void,
 ): UseTicketDetailReturn {
     const { data: session } = useSession();
-    const [ticket, setTicket] = useState<TicketDetailData | null>(null);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState("");
     const [newComment, setNewComment] = useState("");
     const [commentLoading, setCommentLoading] = useState(false);
     const [updateLoading, setUpdateLoading] = useState(false);
     const [statusUpdate, setStatusUpdate] = useState("");
 
-    const fetchTicket = useCallback(async () => {
-        try {
-            setLoading(true);
-            setError("");
+    const swrKey = ticketId ? `/api/tickets/${ticketId}` : null;
+    const { data, error: swrError, mutate, isLoading } = useSWR(swrKey);
 
-            const response = await fetch(`/api/tickets/${ticketId}`);
-            const data = await response.json();
-
-            if (!response.ok) {
-                throw new Error(data.error || "เกิดข้อผิดพลาด");
-            }
-
-            setTicket(data.ticket);
-            setStatusUpdate(data.ticket.status);
-        } catch (err: unknown) {
-            const errorMessage =
-                err instanceof Error
-                    ? err.message
-                    : "เกิดข้อผิดพลาดในการโหลดข้อมูล";
-            setError(errorMessage);
-        } finally {
-            setLoading(false);
-        }
-    }, [ticketId]);
+    const ticket = data?.ticket || null;
+    const error = swrError ? swrError.message || "เกิดข้อผิดพลาด" : "";
 
     const handleAddComment = useCallback(async () => {
         if (!newComment.trim()) return;
@@ -126,16 +107,8 @@ export function useTicketDetail(
                 throw new Error(data.error || "เกิดข้อผิดพลาด");
             }
 
-            setTicket((prev) =>
-                prev
-                    ? {
-                          ...prev,
-                          comments: [...prev.comments, data.comment],
-                      }
-                    : null
-            );
-
             setNewComment("");
+            mutate(); // Refresh data
         } catch (err: unknown) {
             const errorMessage =
                 err instanceof Error
@@ -145,7 +118,7 @@ export function useTicketDetail(
         } finally {
             setCommentLoading(false);
         }
-    }, [ticketId, newComment]);
+    }, [ticketId, newComment, mutate]);
 
     const handleStatusUpdate = useCallback(async () => {
         if (!statusUpdate || statusUpdate === ticket?.status) return;
@@ -167,7 +140,7 @@ export function useTicketDetail(
                 throw new Error(data.error || "เกิดข้อผิดพลาด");
             }
 
-            setTicket((prev) => (prev ? { ...prev, ...data.ticket } : null));
+            await mutate(); // Refresh data
 
             if (onTicketUpdated) {
                 onTicketUpdated();
@@ -181,13 +154,7 @@ export function useTicketDetail(
         } finally {
             setUpdateLoading(false);
         }
-    }, [ticketId, statusUpdate, ticket?.status, onTicketUpdated]);
-
-    useEffect(() => {
-        if (ticketId) {
-            fetchTicket();
-        }
-    }, [ticketId, fetchTicket]);
+    }, [ticketId, statusUpdate, ticket?.status, onTicketUpdated, mutate]);
 
     const isAdmin = session?.user?.role === "ADMIN";
     const isOwner =
@@ -199,7 +166,7 @@ export function useTicketDetail(
 
     return {
         ticket,
-        loading,
+        loading: isLoading,
         error,
         newComment,
         setNewComment,

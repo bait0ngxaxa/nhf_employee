@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { Loader2, Mail, Send } from "lucide-react";
-import { useEmailRequestForm } from "@/hooks/useEmailRequestForm";
+import { useEmailRequestContext } from "@/components/dashboard/context/email-request/EmailRequestContext";
 
 interface EmailRequestFormProps {
     onCancel?: () => void;
@@ -19,13 +19,13 @@ export function EmailRequestForm({
 }: EmailRequestFormProps) {
     const {
         formData,
-        isLoading,
-        error,
+        isFormLoading: isLoading,
+        formError: error,
         showSuccessModal,
         handleInputChange,
         handleSubmit,
         closeSuccessModal,
-    } = useEmailRequestForm();
+    } = useEmailRequestContext();
 
     return (
         <div className="space-y-6">

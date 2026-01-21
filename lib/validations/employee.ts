@@ -25,7 +25,7 @@ export const createEmployeeSchema = z.object({
         .trim(),
     phone: z
         .string()
-        .max(20, "เบอร์โทรต้องไม่เกิน 20 ตัวอักษร")
+        .max(10, "เบอร์โทรต้องไม่เกิน 10 ตัวอักษร")
         .trim()
         .nullish()
         .transform((val) => val || null),

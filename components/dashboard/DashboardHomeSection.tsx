@@ -1,3 +1,5 @@
+"use client";
+
 import {
     Card,
     CardContent,
@@ -5,28 +7,11 @@ import {
     CardHeader,
     CardTitle,
 } from "@/components/ui/card";
-import { type MenuItem } from "@/types/dashboard";
+import { useDashboardContext } from "./context";
 
-interface User {
-    id?: string;
-    name?: string | null;
-    email?: string | null;
-    role?: string;
-    department?: string;
-    image?: string | null;
-}
+export function DashboardHomeSection() {
+    const { user, availableMenuItems, handleMenuClick } = useDashboardContext();
 
-interface DashboardHomeSectionProps {
-    user: User | undefined;
-    availableMenuItems: MenuItem[];
-    handleMenuClick: (menuId: string) => void;
-}
-
-export function DashboardHomeSection({
-    user,
-    availableMenuItems,
-    handleMenuClick,
-}: DashboardHomeSectionProps) {
     return (
         <div className="space-y-6">
             <div>

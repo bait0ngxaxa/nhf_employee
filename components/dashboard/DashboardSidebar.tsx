@@ -33,8 +33,8 @@ export function DashboardSidebar({
     return (
         <div
             className={cn(
-                "bg-white/80 backdrop-blur-xl shadow-lg border-r border-gray-200/50 transition-all duration-300 flex flex-col z-20",
-                isOpen ? "w-64" : "w-16"
+                "h-full bg-white/80 backdrop-blur-xl shadow-lg border-r border-gray-200/50 transition-all duration-300 flex flex-col z-20",
+                isOpen ? "w-64" : "w-16",
             )}
         >
             {/* Header */}
@@ -64,7 +64,7 @@ export function DashboardSidebar({
                         selectedMenu === "dashboard"
                             ? "bg-gradient-to-r from-blue-50 to-cyan-50 text-blue-700 hover:from-blue-100 hover:to-cyan-100 border-r-4 border-blue-600 shadow-sm"
                             : "hover:bg-gray-50 text-gray-600 hover:text-gray-900",
-                        !isOpen && "justify-center px-2"
+                        !isOpen && "justify-center px-2",
                     )}
                     onClick={() => onMenuClick("dashboard")}
                 >
@@ -87,7 +87,7 @@ export function DashboardSidebar({
                                 selectedMenu === item.id
                                     ? "bg-gradient-to-r from-blue-50 to-cyan-50 text-blue-700 hover:from-blue-100 hover:to-cyan-100 border-r-4 border-blue-600 shadow-sm"
                                     : "hover:bg-gray-50 text-gray-600 hover:text-gray-900",
-                                !isOpen && "justify-center px-2"
+                                !isOpen && "justify-center px-2",
                             )}
                             onClick={() => onMenuClick(item.id)}
                         >
@@ -128,7 +128,7 @@ export function DashboardSidebar({
                     variant="ghost"
                     className={cn(
                         "w-full text-red-600 hover:text-red-700 hover:bg-red-50",
-                        isOpen ? "justify-start" : "justify-center px-2"
+                        isOpen ? "justify-start" : "justify-center px-2",
                     )}
                     onClick={onSignOut}
                 >

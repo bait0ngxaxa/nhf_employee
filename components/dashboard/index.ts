@@ -5,3 +5,6 @@ export * from "./EmployeeManagementSection";
 export * from "./AddEmployeeSection";
 export * from "./AuditLogsSection";
 export * from "./DashboardHomeSection";
+export * from "./context";
+export * from "./DashboardNavbar";
+export * from "./DashboardSidebar";

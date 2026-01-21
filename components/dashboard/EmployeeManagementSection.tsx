@@ -1,3 +1,5 @@
+"use client";
+
 import { Button } from "@/components/ui/button";
 import {
     Card,
@@ -9,47 +11,23 @@ import {
 import { Download, Upload, Plus } from "lucide-react";
 import { CSVLink } from "react-csv";
 import { EmployeeStatsCards, EmployeeList } from "@/components/employee";
-import { type Employee, type EmployeeCSVData } from "@/types/employees";
+import {
+    useDashboardContext,
+    useEmployeeContext,
+    EmployeeProvider,
+} from "./context";
 
-interface EmployeeStats {
-    total: number;
-    active: number;
-    admin: number;
-    academic: number;
-}
+function EmployeeManagementContent() {
+    const { handleMenuClick, employeeStats, user } = useDashboardContext();
+    const {
+        employees,
+        refreshTrigger,
+        isExporting,
+        getExportData,
+        getExportFileName,
+        handleExportCSV,
+    } = useEmployeeContext();
 
-interface User {
-    id?: string;
-    name?: string | null;
-    email?: string | null;
-    role?: string;
-    department?: string;
-    image?: string | null;
-}
-
-interface EmployeeManagementSectionProps {
-    allEmployees: Employee[];
-    prepareCsvData: () => EmployeeCSVData[];
-    generateFileName: () => string;
-    handleExportCSV: () => Promise<void>;
-    isExporting: boolean;
-    handleMenuClick: (menuId: string) => void;
-    employeeStats: EmployeeStats;
-    refreshTrigger: number;
-    user: User | undefined;
-}
-
-export function EmployeeManagementSection({
-    allEmployees,
-    prepareCsvData,
-    generateFileName,
-    handleExportCSV,
-    isExporting,
-    handleMenuClick,
-    employeeStats,
-    refreshTrigger,
-    user,
-}: EmployeeManagementSectionProps) {
     return (
         <div className="space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -62,10 +40,10 @@ export function EmployeeManagementSection({
                     </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-3">
-                    {allEmployees.length > 0 && (
+                    {employees.length > 0 && (
                         <CSVLink
-                            data={prepareCsvData()}
-                            filename={generateFileName()}
+                            data={getExportData()}
+                            filename={getExportFileName()}
                             className="inline-flex"
                             onClick={handleExportCSV}
                         >
@@ -118,5 +96,13 @@ export function EmployeeManagementSection({
                 </CardContent>
             </Card>
         </div>
+    );
+}
+
+export function EmployeeManagementSection() {
+    return (
+        <EmployeeProvider>
+            <EmployeeManagementContent />
+        </EmployeeProvider>
     );
 }
