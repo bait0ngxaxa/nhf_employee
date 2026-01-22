@@ -52,7 +52,7 @@ export function AuthStatus() {
                     <span>เข้าสู่ระบบ</span>
                 </Button>
             </Link>
-            <Link href="/signup">
+            {/* <Link href="/signup">
                 <Button
                     variant="outline"
                     className="flex items-center space-x-2"
@@ -60,7 +60,7 @@ export function AuthStatus() {
                     <User className="h-4 w-4" />
                     <span>สมัครสมาชิก</span>
                 </Button>
-            </Link>
+            </Link> */}
         </div>
     );
 }

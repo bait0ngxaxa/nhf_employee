@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, type ReactNode } from "react";
+import { useState, useCallback, useMemo, type ReactNode } from "react";
 import { useSession, signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import useSWR from "swr";
@@ -8,8 +8,12 @@ import {
     DASHBOARD_MENU_ITEMS,
     getAvailableMenuItems,
 } from "@/constants/dashboard";
-import { DashboardContext } from "./DashboardContext";
-import { type EmployeeStats, type DashboardContextValue } from "./types";
+import { DashboardDataContext, DashboardUIContext } from "./DashboardContext";
+import {
+    type EmployeeStats,
+    type DashboardDataContextValue,
+    type DashboardUIContextValue,
+} from "./types";
 
 interface DashboardProviderProps {
     children: ReactNode;
@@ -68,26 +72,53 @@ export function DashboardProvider({ children }: DashboardProviderProps) {
         signOut({ callbackUrl: "/login" });
     }, []);
 
-    const value: DashboardContextValue = {
-        status,
-        user,
-        isAdmin,
-        selectedMenu,
-        setSelectedMenu,
-        sidebarOpen,
-        setSidebarOpen,
-        availableMenuItems,
-        handleMenuClick,
-        handleSignOut,
-        employeeStats,
-        refreshTrigger,
-        handleEmployeeAdded,
-        router,
-    };
+    const dataValue = useMemo<DashboardDataContextValue>(
+        () => ({
+            status,
+            user,
+            isAdmin,
+            employeeStats,
+            refreshTrigger,
+            handleEmployeeAdded,
+            availableMenuItems,
+        }),
+        [
+            status,
+            user,
+            isAdmin,
+            employeeStats,
+            refreshTrigger,
+            handleEmployeeAdded,
+            availableMenuItems,
+        ],
+    );
+
+    const uiValue = useMemo<DashboardUIContextValue>(
+        () => ({
+            selectedMenu,
+            setSelectedMenu,
+            sidebarOpen,
+            setSidebarOpen,
+            handleMenuClick,
+            handleSignOut,
+            router,
+        }),
+        [
+            selectedMenu,
+            setSelectedMenu,
+            sidebarOpen,
+            setSidebarOpen,
+            handleMenuClick,
+            handleSignOut,
+            router,
+        ],
+    );
 
     return (
-        <DashboardContext.Provider value={value}>
-            {children}
-        </DashboardContext.Provider>
+        <DashboardDataContext.Provider value={dataValue}>
+            <DashboardUIContext.Provider value={uiValue}>
+                {children}
+            </DashboardUIContext.Provider>
+        </DashboardDataContext.Provider>
     );
 }

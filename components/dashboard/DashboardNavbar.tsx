@@ -10,7 +10,10 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useDashboardContext } from "./context";
+import {
+    useDashboardUIContext,
+    useDashboardDataContext,
+} from "@/components/dashboard/context/dashboard/DashboardContext";
 
 const MENU_LABELS: Record<string, string> = {
     dashboard: "แดชบอร์ด",
@@ -24,8 +27,9 @@ const MENU_LABELS: Record<string, string> = {
 };
 
 export function DashboardNavbar() {
-    const { user, selectedMenu, sidebarOpen, setSidebarOpen, handleSignOut } =
-        useDashboardContext();
+    const { selectedMenu, sidebarOpen, setSidebarOpen, handleSignOut } =
+        useDashboardUIContext();
+    const { user } = useDashboardDataContext();
 
     const currentPageLabel = MENU_LABELS[selectedMenu] || "แดชบอร์ด";
 

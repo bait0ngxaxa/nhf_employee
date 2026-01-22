@@ -7,25 +7,31 @@ export async function POST(request: NextRequest) {
     try {
         const { name, email, password, confirmPassword } = await request.json();
 
-        // Validation
         if (!name || !email || !password || !confirmPassword) {
             return NextResponse.json(
                 { error: "กรุณากรอกข้อมูลให้ครบถ้วน" },
-                { status: 400 }
+                { status: 400 },
             );
         }
 
         if (password !== confirmPassword) {
             return NextResponse.json(
                 { error: "รหัสผ่านไม่ตรงกัน" },
-                { status: 400 }
+                { status: 400 },
             );
         }
 
         if (password.length < 6) {
             return NextResponse.json(
                 { error: "รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร" },
-                { status: 400 }
+                { status: 400 },
+            );
+        }
+
+        if (!email.endsWith("@thainhf.org")) {
+            return NextResponse.json(
+                { error: "กรุณาใช้อีเมลองค์กร (@thainhf.org) เท่านั้น" },
+                { status: 400 },
             );
         }
 
@@ -37,14 +43,12 @@ export async function POST(request: NextRequest) {
         if (existingUser) {
             return NextResponse.json(
                 { error: "อีเมลนี้ถูกใช้งานแล้ว" },
-                { status: 400 }
+                { status: 400 },
             );
         }
 
-        // Hash password
         const hashedPassword = await bcrypt.hash(password, 12);
 
-        // Create user account only
         const user = await prisma.user.create({
             data: {
                 name: name.trim(),
@@ -71,7 +75,6 @@ export async function POST(request: NextRequest) {
             },
         });
 
-        // Return success response (don't include password)
         return NextResponse.json(
             {
                 message: "สมัครสมาชิกสำเร็จ",
@@ -82,13 +85,13 @@ export async function POST(request: NextRequest) {
                     role: user.role,
                 },
             },
-            { status: 201 }
+            { status: 201 },
         );
     } catch (error) {
         console.error("Signup error:", error);
         return NextResponse.json(
             { error: "เกิดข้อผิดพลาดในการสมัครสมาชิก" },
-            { status: 500 }
+            { status: 500 },
         );
     }
 }

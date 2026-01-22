@@ -56,6 +56,11 @@ export function SignupForm({
         setError("");
 
         // Validation
+        if (!formData.email.endsWith("@thainhf.org")) {
+            setError("กรุณาใช้อีเมลองค์กร (@thainhf.org) เท่านั้น");
+            return;
+        }
+
         if (formData.password !== formData.confirmPassword) {
             setError("รหัสผ่านไม่ตรงกัน");
             return;
@@ -159,7 +164,7 @@ export function SignupForm({
                                 <Input
                                     id="email"
                                     type="email"
-                                    placeholder="example@company.com"
+                                    placeholder="example@thainhf.org"
                                     value={formData.email}
                                     onChange={(e) =>
                                         setFormData({

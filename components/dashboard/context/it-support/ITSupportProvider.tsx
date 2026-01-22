@@ -4,8 +4,11 @@ import { useState, useCallback, useMemo, type ReactNode } from "react";
 import { useSession } from "next-auth/react";
 import useSWR from "swr";
 import { type TicketStats, type Ticket } from "@/types/tickets";
-import { ITSupportContext } from "./ITSupportContext";
-import { type ITSupportContextValue } from "./types";
+import { ITSupportDataContext, ITSupportUIContext } from "./ITSupportContext";
+import {
+    type ITSupportDataContextValue,
+    type ITSupportUIContextValue,
+} from "./types";
 
 interface ITSupportProviderProps {
     children: ReactNode;
@@ -106,26 +109,53 @@ export function ITSupportProvider({ children }: ITSupportProviderProps) {
         setActiveTab("tickets");
     }, []);
 
-    const value: ITSupportContextValue = {
-        session,
-        isAdmin,
-        activeTab,
-        setActiveTab,
-        selectedTicket,
-        refreshTrigger,
-        showCreateModal,
-        setShowCreateModal,
-        ticketStats,
-        statsLoading: isLoading,
-        handleTicketCreated,
-        handleTicketSelect,
-        handleTicketUpdated,
-        handleBackToList,
-    };
+    const dataValue = useMemo<ITSupportDataContextValue>(
+        () => ({
+            session,
+            isAdmin,
+            ticketStats,
+            statsLoading: isLoading,
+            refreshTrigger,
+            handleTicketCreated,
+            handleTicketUpdated,
+        }),
+        [
+            session,
+            isAdmin,
+            ticketStats,
+            isLoading,
+            refreshTrigger,
+            handleTicketCreated,
+            handleTicketUpdated,
+        ],
+    );
+
+    const uiValue = useMemo<ITSupportUIContextValue>(
+        () => ({
+            activeTab,
+            setActiveTab,
+            selectedTicket,
+            showCreateModal,
+            setShowCreateModal,
+            handleTicketSelect,
+            handleBackToList,
+        }),
+        [
+            activeTab,
+            setActiveTab,
+            selectedTicket,
+            showCreateModal,
+            setShowCreateModal,
+            handleTicketSelect,
+            handleBackToList,
+        ],
+    );
 
     return (
-        <ITSupportContext.Provider value={value}>
-            {children}
-        </ITSupportContext.Provider>
+        <ITSupportDataContext.Provider value={dataValue}>
+            <ITSupportUIContext.Provider value={uiValue}>
+                {children}
+            </ITSupportUIContext.Provider>
+        </ITSupportDataContext.Provider>
     );
 }

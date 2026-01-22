@@ -75,24 +75,44 @@ export function AuditLogsProvider({ children }: AuditLogsProviderProps) {
         mutate();
     }, [mutate]);
 
-    const value: AuditLogsContextValue = {
-        auditLogs,
-        filteredLogs,
-        isLoading,
-        error,
-        currentPage,
-        setCurrentPage,
-        totalPages,
-        actionFilter,
-        setActionFilter,
-        entityTypeFilter,
-        setEntityTypeFilter,
-        searchTerm,
-        setSearchTerm,
-        refresh,
-        handlePreviousPage,
-        handleNextPage,
-    };
+    const value = useMemo<AuditLogsContextValue>(
+        () => ({
+            auditLogs,
+            filteredLogs,
+            isLoading,
+            error,
+            currentPage,
+            setCurrentPage,
+            totalPages,
+            actionFilter,
+            setActionFilter,
+            entityTypeFilter,
+            setEntityTypeFilter,
+            searchTerm,
+            setSearchTerm,
+            refresh,
+            handlePreviousPage,
+            handleNextPage,
+        }),
+        [
+            auditLogs,
+            filteredLogs,
+            isLoading,
+            error,
+            currentPage,
+            setCurrentPage,
+            totalPages,
+            actionFilter,
+            setActionFilter,
+            entityTypeFilter,
+            setEntityTypeFilter,
+            searchTerm,
+            setSearchTerm,
+            refresh,
+            handlePreviousPage,
+            handleNextPage,
+        ],
+    );
 
     return (
         <AuditLogsContext.Provider value={value}>

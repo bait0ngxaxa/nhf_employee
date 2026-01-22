@@ -7,10 +7,14 @@ import {
     CardHeader,
     CardTitle,
 } from "@/components/ui/card";
-import { useDashboardContext } from "./context";
+import {
+    useDashboardUIContext,
+    useDashboardDataContext,
+} from "@/components/dashboard/context/dashboard/DashboardContext";
 
 export function DashboardHomeSection() {
-    const { user, availableMenuItems, handleMenuClick } = useDashboardContext();
+    const { user, availableMenuItems } = useDashboardDataContext();
+    const { handleMenuClick } = useDashboardUIContext();
 
     return (
         <div className="space-y-6">

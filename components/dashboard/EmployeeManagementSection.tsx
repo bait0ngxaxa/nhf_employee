@@ -12,21 +12,21 @@ import { Download, Upload, Plus } from "lucide-react";
 import { CSVLink } from "react-csv";
 import { EmployeeStatsCards, EmployeeList } from "@/components/employee";
 import {
-    useDashboardContext,
-    useEmployeeContext,
+    useDashboardUIContext,
+    useDashboardDataContext,
+} from "@/components/dashboard/context/dashboard/DashboardContext";
+import {
+    useEmployeeDataContext,
+    useEmployeeUIContext,
     EmployeeProvider,
 } from "./context";
 
 function EmployeeManagementContent() {
-    const { handleMenuClick, employeeStats, user } = useDashboardContext();
-    const {
-        employees,
-        refreshTrigger,
-        isExporting,
-        getExportData,
-        getExportFileName,
-        handleExportCSV,
-    } = useEmployeeContext();
+    const { handleMenuClick } = useDashboardUIContext();
+    const { employeeStats, user } = useDashboardDataContext();
+    const { employees, refreshTrigger } = useEmployeeDataContext();
+    const { isExporting, getExportData, getExportFileName, handleExportCSV } =
+        useEmployeeUIContext();
 
     return (
         <div className="space-y-6">

@@ -2,7 +2,10 @@
 
 import { ImportEmployeeCSV } from "@/components/employee";
 import { useTitle } from "@/hooks/useTitle";
-import { useDashboardContext } from "@/components/dashboard/context";
+import {
+    useDashboardUIContext,
+    useDashboardDataContext,
+} from "@/components/dashboard/context/dashboard/DashboardContext";
 
 // Dashboard Sections
 import {
@@ -18,8 +21,8 @@ import {
 export default function DashboardPage() {
     useTitle("Dashboard | NHF IT System");
 
-    const { selectedMenu, handleMenuClick, handleEmployeeAdded } =
-        useDashboardContext();
+    const { selectedMenu, handleMenuClick } = useDashboardUIContext();
+    const { handleEmployeeAdded } = useDashboardDataContext();
 
     const renderContent = () => {
         switch (selectedMenu) {

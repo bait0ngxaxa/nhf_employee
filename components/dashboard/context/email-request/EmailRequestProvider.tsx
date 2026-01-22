@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, type ReactNode } from "react";
+import { useState, useCallback, useMemo, type ReactNode } from "react";
 import useSWR from "swr";
 import { EmailRequestContext } from "./EmailRequestContext";
 import {
@@ -55,10 +55,14 @@ export function EmailRequestProvider({ children }: EmailRequestProviderProps) {
         error?: string;
     }>(`/api/email-request?page=${currentPage}&limit=10`);
 
-    const emailRequests = data?.success ? data.emailRequests : [];
-    const pagination = data?.success ? data.pagination : defaultPagination;
-    const listError =
-        swrError || (data?.success === false ? data?.error : null);
+    const { emailRequests, pagination, listError } = useMemo(() => {
+        return {
+            emailRequests: data?.success ? data.emailRequests : [],
+            pagination: data?.success ? data.pagination : defaultPagination,
+            listError:
+                swrError || (data?.success === false ? data?.error : null),
+        };
+    }, [data, swrError]);
 
     const refreshList = useCallback(() => {
         mutate();
@@ -116,22 +120,40 @@ export function EmailRequestProvider({ children }: EmailRequestProviderProps) {
         setShowSuccessModal(false);
     }, []);
 
-    const value: EmailRequestContextValue = {
-        emailRequests,
-        pagination,
-        isListLoading: isLoading,
-        listError: listError as string | null, // Cast error to string if object, though usually useSWR error is generic
-        currentPage,
-        setCurrentPage,
-        refreshList,
-        formData,
-        isFormLoading,
-        formError,
-        showSuccessModal,
-        handleInputChange,
-        handleSubmit,
-        closeSuccessModal,
-    };
+    const value = useMemo<EmailRequestContextValue>(
+        () => ({
+            emailRequests,
+            pagination,
+            isListLoading: isLoading,
+            listError: listError as string | null,
+            currentPage,
+            setCurrentPage,
+            refreshList,
+            formData,
+            isFormLoading,
+            formError,
+            showSuccessModal,
+            handleInputChange,
+            handleSubmit,
+            closeSuccessModal,
+        }),
+        [
+            emailRequests,
+            pagination,
+            isLoading,
+            listError,
+            currentPage,
+            setCurrentPage,
+            refreshList,
+            formData,
+            isFormLoading,
+            formError,
+            showSuccessModal,
+            handleInputChange,
+            handleSubmit,
+            closeSuccessModal,
+        ],
+    );
 
     return (
         <EmailRequestContext.Provider value={value}>

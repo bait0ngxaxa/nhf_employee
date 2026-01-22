@@ -31,7 +31,7 @@ describe("Employee Mutations", () => {
         const mockData = {
             firstName: "John",
             lastName: "Doe",
-            email: "john@test.com",
+            email: "john@thainhf.org",
             position: "Dev",
             departmentId: 1,
         };
@@ -43,6 +43,18 @@ describe("Employee Mutations", () => {
 
             expect(result.success).toBe(false);
             expect(result.error).toContain("อีเมลนี้ถูกใช้งานแล้ว");
+        });
+
+        it("should fail if email domain is not @thainhf.org", async () => {
+            const invalidData = { ...mockData, email: "john@gmail.com" };
+
+            const result = await createEmployee(invalidData);
+
+            expect(result.success).toBe(false);
+            expect(result.status).toBe(400);
+            expect(result.error).toContain(
+                "กรุณาใช้อีเมลองค์กร (@thainhf.org) เท่านั้น",
+            );
         });
 
         it("should create employee if valid", async () => {
@@ -91,7 +103,21 @@ describe("Employee Mutations", () => {
             );
         });
 
-        // Add more cases for email updates if needed
+        it("should fail if email domain is not @thainhf.org", async () => {
+            prismaMock.employee.findUnique.mockResolvedValue({
+                id: 1,
+                firstName: "Old",
+                email: "old@thainhf.org",
+            } as any);
+
+            const result = await updateEmployee(1, { email: "new@gmail.com" });
+
+            expect(result.success).toBe(false);
+            expect(result.status).toBe(400);
+            expect(result.error).toContain(
+                "กรุณาใช้อีเมลองค์กร (@thainhf.org) เท่านั้น",
+            );
+        });
     });
 
     describe("deleteEmployee", () => {

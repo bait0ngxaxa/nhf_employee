@@ -1,6 +1,12 @@
 "use client";
 
-import { useState, useCallback, useEffect, type ReactNode } from "react";
+import {
+    useState,
+    useCallback,
+    useEffect,
+    useMemo,
+    type ReactNode,
+} from "react";
 import useSWR from "swr";
 import { type Employee, type EmployeeCSVData } from "@/types/employees";
 import { PAGINATION_DEFAULTS } from "@/constants/ui";
@@ -10,8 +16,11 @@ import {
 } from "@/lib/helpers/employee-helpers";
 import { generateFilename } from "@/lib/helpers/date-helpers";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
-import { EmployeeContext } from "./EmployeeContext";
-import { type EmployeeContextValue } from "./types";
+import { EmployeeDataContext, EmployeeUIContext } from "./EmployeeContext";
+import {
+    type EmployeeDataContextValue,
+    type EmployeeUIContextValue,
+} from "./types";
 
 interface Pagination {
     page: number;
@@ -68,11 +77,16 @@ export function EmployeeProvider({ children }: EmployeeProviderProps) {
     // SWR Hook
     const { data, mutate, isLoading, error: swrError } = useSWR(swrKey);
 
-    const employees = data?.employees || [];
-    const pagination = data?.pagination || defaultPagination;
-    const error = swrError
-        ? swrError.message || "เกิดข้อผิดพลาดในการโหลดข้อมูล"
-        : "";
+    // Derived data - wrapped in useMemo to prevent exhaustive-deps warning in dataValue
+    const { employees, pagination, error } = useMemo(() => {
+        return {
+            employees: data?.employees || [],
+            pagination: data?.pagination || defaultPagination,
+            error: swrError
+                ? swrError.message || "เกิดข้อผิดพลาดในการโหลดข้อมูล"
+                : "",
+        };
+    }, [data, swrError]);
 
     // Reset page on search/filter change
     useEffect(() => {
@@ -217,42 +231,82 @@ export function EmployeeProvider({ children }: EmployeeProviderProps) {
         setRefreshTrigger((prev) => prev + 1);
     }, [mutate]);
 
-    const value: EmployeeContextValue = {
-        employees,
-        currentEmployees: employees,
-        searchTerm,
-        setSearchTerm,
-        statusFilter,
-        setStatusFilter,
-        currentPage,
-        totalPages: pagination.totalPages,
-        totalEmployees: pagination.total,
-        itemsPerPage,
-        handlePageChange,
-        handlePreviousPage,
-        handleNextPage,
-        isLoading,
-        error,
-        isExporting,
-        getExportData,
-        getExportFileName,
-        handleExportCSV,
-        isEditFormOpen,
-        employeeToEdit,
-        showEditSuccessModal,
-        lastEditedEmployee,
-        handleEditEmployee,
-        handleCloseEditForm,
-        handleEmployeeUpdate,
-        setShowEditSuccessModal,
-        fetchEmployees: triggerRefresh,
-        refreshTrigger,
-        triggerRefresh,
-    };
+    const dataValue = useMemo<EmployeeDataContextValue>(
+        () => ({
+            employees,
+            currentEmployees: employees,
+            totalEmployees: pagination.total,
+            totalPages: pagination.totalPages,
+            isLoading,
+            error,
+            fetchEmployees: triggerRefresh,
+            refreshTrigger,
+            triggerRefresh,
+        }),
+        [
+            employees,
+            pagination,
+            isLoading,
+            error,
+            triggerRefresh,
+            refreshTrigger,
+        ],
+    );
+
+    const uiValue = useMemo<EmployeeUIContextValue>(
+        () => ({
+            searchTerm,
+            setSearchTerm,
+            statusFilter,
+            setStatusFilter,
+            currentPage,
+            itemsPerPage,
+            handlePageChange,
+            handlePreviousPage,
+            handleNextPage,
+            isExporting,
+            getExportData,
+            getExportFileName,
+            handleExportCSV,
+            isEditFormOpen,
+            employeeToEdit,
+            showEditSuccessModal,
+            lastEditedEmployee,
+            handleEditEmployee,
+            handleCloseEditForm,
+            handleEmployeeUpdate,
+            setShowEditSuccessModal,
+        }),
+        [
+            searchTerm,
+            setSearchTerm,
+            statusFilter,
+            setStatusFilter,
+            currentPage,
+            itemsPerPage,
+            handlePageChange,
+            handlePreviousPage,
+            handleNextPage,
+            isExporting,
+            getExportData,
+            getExportFileName,
+            handleExportCSV,
+            isEditFormOpen,
+            employeeToEdit,
+            showEditSuccessModal,
+            lastEditedEmployee,
+            handleEditEmployee,
+            handleCloseEditForm,
+            handleEmployeeUpdate,
+            setShowEditSuccessModal,
+        ],
+    );
 
     return (
-        <EmployeeContext.Provider value={value}>
-            {children}
-        </EmployeeContext.Provider>
+        <EmployeeDataContext.Provider value={dataValue}>
+            <EmployeeUIContext.Provider value={uiValue}>
+                {children}
+            </EmployeeUIContext.Provider>
+        </EmployeeDataContext.Provider>
     );
 }

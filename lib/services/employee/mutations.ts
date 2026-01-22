@@ -58,6 +58,15 @@ export async function createEmployee(
         };
     }
 
+    // Validate email domain
+    if (data.email && !data.email.endsWith("@thainhf.org")) {
+        return {
+            success: false,
+            error: "กรุณาใช้อีเมลองค์กร (@thainhf.org) เท่านั้น",
+            status: 400,
+        };
+    }
+
     const employee = await prisma.employee.create({
         data: {
             firstName: data.firstName,
@@ -138,6 +147,15 @@ export async function updateEmployee(
 
             // Check for duplicate email if real email provided
             if (!emailResult.email.includes("@temp.local")) {
+                // Validate email domain
+                if (!emailResult.email.endsWith("@thainhf.org")) {
+                    return {
+                        success: false,
+                        error: "กรุณาใช้อีเมลองค์กร (@thainhf.org) เท่านั้น",
+                        status: 400,
+                    };
+                }
+
                 if (await emailExists(emailResult.email, employeeId)) {
                     return {
                         success: false,

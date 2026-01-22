@@ -119,9 +119,6 @@ export function EditEmployeeForm({
             setFieldErrors(errors);
 
             if (firstErrorField) {
-                // Since this is a Dialog, focus/scroll might happen within the dialog content.
-                // scrollIntoView works fine if the container is scrollable or body is scrollable.
-                // Shadcn DialogContent usually fits screen or is scrollable.
                 const element = document.getElementById(firstErrorField);
                 if (element) {
                     element.scrollIntoView({

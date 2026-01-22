@@ -77,7 +77,10 @@ export const updateEmployeeSchema = z.object({
         .or(z.literal("-")),
     phone: z
         .string()
-        .max(20, "เบอร์โทรต้องไม่เกิน 20 ตัวอักษร")
+        .max(
+            11,
+            "กรุณาระบุเบอร์โทรศัพท์ให้ถูกต้อง(example 0889999999 หรือ 088-9999999)",
+        )
         .trim()
         .nullish()
         .transform((val) => val || null),

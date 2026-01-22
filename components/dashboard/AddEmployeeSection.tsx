@@ -3,10 +3,14 @@
 import { Button } from "@/components/ui/button";
 import { Users } from "lucide-react";
 import { AddEmployeeForm } from "@/components/employee";
-import { useDashboardContext } from "./context";
+import {
+    useDashboardUIContext,
+    useDashboardDataContext,
+} from "@/components/dashboard/context/dashboard/DashboardContext";
 
 export function AddEmployeeSection() {
-    const { handleMenuClick, handleEmployeeAdded } = useDashboardContext();
+    const { handleMenuClick } = useDashboardUIContext();
+    const { handleEmployeeAdded } = useDashboardDataContext();
 
     return (
         <div className="space-y-6">

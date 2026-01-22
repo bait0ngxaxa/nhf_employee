@@ -1,10 +1,11 @@
 "use client";
 
 import { EmailRequestForm, EmailRequestHistory } from "@/components/email";
-import { useDashboardContext, EmailRequestProvider } from "./context";
+import { EmailRequestProvider } from "./context";
+import { useDashboardUIContext } from "@/components/dashboard/context/dashboard/DashboardContext";
 
 function EmailRequestContent() {
-    const { handleMenuClick } = useDashboardContext();
+    const { handleMenuClick } = useDashboardUIContext();
 
     return (
         <div className="space-y-6">

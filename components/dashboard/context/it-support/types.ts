@@ -1,26 +1,35 @@
 import { type Ticket, type TicketStats } from "@/types/tickets";
 import { type Session } from "next-auth";
 
-export interface ITSupportContextValue {
-    // Session
+export interface ITSupportDataContextValue {
+    // Session Data
     session: Session | null;
     isAdmin: boolean;
 
-    // Tabs & Navigation
+    // Ticket Data
+    ticketStats: TicketStats;
+    statsLoading: boolean;
+    refreshTrigger: number;
+
+    // Data Actions
+    handleTicketCreated: () => void;
+    handleTicketUpdated: () => void;
+}
+
+export interface ITSupportUIContextValue {
+    // Tabs & Navigation State
     activeTab: string;
     setActiveTab: (tab: string) => void;
     selectedTicket: Ticket | null;
 
-    // State
-    refreshTrigger: number;
+    // Modal State
     showCreateModal: boolean;
     setShowCreateModal: (show: boolean) => void;
-    ticketStats: TicketStats;
-    statsLoading: boolean;
 
-    // Actions
-    handleTicketCreated: () => void;
+    // UI Actions
     handleTicketSelect: (ticket: Ticket) => void;
-    handleTicketUpdated: () => void;
     handleBackToList: () => void;
 }
+
+export interface ITSupportContextValue
+    extends ITSupportDataContextValue, ITSupportUIContextValue {}

@@ -16,26 +16,35 @@ export interface DashboardUser {
     department?: string;
 }
 
-export interface DashboardContextValue {
-    // Session
+export interface DashboardDataContextValue {
+    // Session & User Data
     status: "loading" | "authenticated" | "unauthenticated";
     user?: DashboardUser;
     isAdmin: boolean;
 
-    // Navigation
-    selectedMenu: string;
-    setSelectedMenu: (menu: string) => void;
-    sidebarOpen: boolean;
-    setSidebarOpen: (open: boolean) => void;
-    availableMenuItems: MenuItem[];
-    handleMenuClick: (menuId: string) => void;
-    handleSignOut: () => void;
-
-    // Employee Stats
+    // Employee Stats & Data
     employeeStats: EmployeeStats;
     refreshTrigger: number;
     handleEmployeeAdded: () => void;
 
+    // Navigation Data
+    availableMenuItems: MenuItem[];
+}
+
+export interface DashboardUIContextValue {
+    // Navigation State
+    selectedMenu: string;
+    setSelectedMenu: (menu: string) => void;
+    sidebarOpen: boolean;
+    setSidebarOpen: (open: boolean) => void;
+    handleMenuClick: (menuId: string) => void;
+
+    // Actions
+    handleSignOut: () => void;
+
     // Router
     router: ReturnType<typeof useRouter>;
 }
+
+export interface DashboardContextValue
+    extends DashboardDataContextValue, DashboardUIContextValue {}
