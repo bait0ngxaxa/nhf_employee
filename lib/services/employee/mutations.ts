@@ -95,8 +95,8 @@ export async function updateEmployee(
     data: UpdateEmployeeData,
 ): Promise<EmployeeMutationResult & { beforeData?: Record<string, unknown> }> {
     // Check if employee exists
-    const existingEmployee = await prisma.employee.findUnique({
-        where: { id: employeeId },
+    const existingEmployee = await prisma.employee.findFirst({
+        where: { id: employeeId, deletedAt: null },
     });
 
     if (!existingEmployee) {
@@ -193,8 +193,8 @@ export async function deleteEmployee(employeeId: number): Promise<{
     status?: number;
 }> {
     // Check if employee exists
-    const existingEmployee = await prisma.employee.findUnique({
-        where: { id: employeeId },
+    const existingEmployee = await prisma.employee.findFirst({
+        where: { id: employeeId, deletedAt: null },
     });
 
     if (!existingEmployee) {
@@ -212,9 +212,10 @@ export async function deleteEmployee(employeeId: number): Promise<{
         email: existingEmployee.email,
     };
 
-    // Delete employee
-    await prisma.employee.delete({
+    // Perform Soft Delete
+    await prisma.employee.update({
         where: { id: employeeId },
+        data: { deletedAt: new Date() },
     });
 
     return { success: true, beforeData };

@@ -88,22 +88,22 @@ describe("Employee Queries", () => {
     describe("getEmployeeById", () => {
         it("should return employee if found", async () => {
             const mockEmployee = { id: 1, firstName: "John" };
-            prismaMock.employee.findUnique.mockResolvedValue(
+            prismaMock.employee.findFirst.mockResolvedValue(
                 mockEmployee as any,
             );
 
             const result = await getEmployeeById(1);
 
             expect(result).toEqual(mockEmployee);
-            expect(prismaMock.employee.findUnique).toHaveBeenCalledWith(
+            expect(prismaMock.employee.findFirst).toHaveBeenCalledWith(
                 expect.objectContaining({
-                    where: { id: 1 },
+                    where: { id: 1, deletedAt: null },
                 }),
             );
         });
 
         it("should return null if not found", async () => {
-            prismaMock.employee.findUnique.mockResolvedValue(null);
+            prismaMock.employee.findFirst.mockResolvedValue(null);
 
             const result = await getEmployeeById(999);
 
@@ -113,7 +113,7 @@ describe("Employee Queries", () => {
 
     describe("emailExists", () => {
         it("should return true if email exists", async () => {
-            prismaMock.employee.findUnique.mockResolvedValue({
+            prismaMock.employee.findFirst.mockResolvedValue({
                 id: 1,
                 email: "test@test.com",
             } as any);
@@ -124,7 +124,7 @@ describe("Employee Queries", () => {
         });
 
         it("should return false if email does not exist", async () => {
-            prismaMock.employee.findUnique.mockResolvedValue(null);
+            prismaMock.employee.findFirst.mockResolvedValue(null);
 
             const result = await emailExists("new@test.com");
 
@@ -132,7 +132,7 @@ describe("Employee Queries", () => {
         });
 
         it("should return false if email exists but belongs to excludeEmployeeId", async () => {
-            prismaMock.employee.findUnique.mockResolvedValue({
+            prismaMock.employee.findFirst.mockResolvedValue({
                 id: 1,
                 email: "test@test.com",
             } as any);

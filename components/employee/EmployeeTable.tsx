@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Edit } from "lucide-react";
@@ -13,7 +14,7 @@ interface EmployeeTableProps {
     onEditEmployee?: (employee: Employee) => void;
 }
 
-export function EmployeeTable({
+export const EmployeeTable = memo(function EmployeeTable({
     employees,
     userRole,
     onEditEmployee,
@@ -110,7 +111,7 @@ export function EmployeeTable({
                             <td className="px-6 py-4 whitespace-nowrap">
                                 <Badge
                                     className={getEmployeeStatusBadge(
-                                        employee.status
+                                        employee.status,
                                     )}
                                 >
                                     {getEmployeeStatusLabel(employee.status)}
@@ -139,4 +140,4 @@ export function EmployeeTable({
             </table>
         </div>
     );
-}
+});

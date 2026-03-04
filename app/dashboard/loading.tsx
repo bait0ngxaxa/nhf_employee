@@ -1,5 +1,3 @@
-"use client";
-
 import { Loader2 } from "lucide-react";
 
 export default function DashboardLoading() {
@@ -13,7 +11,7 @@ export default function DashboardLoading() {
                         <div
                             key={i}
                             className="h-10 bg-gray-100/50 rounded-xl animate-pulse"
-                         />
+                        />
                     ))}
                 </div>
                 <div className="h-20 bg-gray-100/50 rounded-xl animate-pulse mt-4" />

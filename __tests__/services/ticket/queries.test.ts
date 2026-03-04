@@ -23,7 +23,7 @@ describe("Ticket Queries", () => {
             prismaMock.ticket.findMany.mockResolvedValue([{ id: 1 }] as any);
             prismaMock.ticket.count.mockResolvedValue(1);
 
-            const result = await getTickets({ page: 1 }, user);
+            const result = await getTickets({ page: 1, limit: 10 }, user);
 
             expect(prismaMock.ticket.findMany).toHaveBeenCalledWith(
                 expect.objectContaining({
@@ -38,7 +38,7 @@ describe("Ticket Queries", () => {
             prismaMock.ticket.findMany.mockResolvedValue([{ id: 2 }] as any);
             prismaMock.ticket.count.mockResolvedValue(1);
 
-            await getTickets({ page: 1 }, user);
+            await getTickets({ page: 1, limit: 10 }, user);
 
             expect(prismaMock.ticket.findMany).toHaveBeenCalledWith(
                 expect.objectContaining({
@@ -53,7 +53,7 @@ describe("Ticket Queries", () => {
             prismaMock.ticket.count.mockResolvedValue(0);
 
             await getTickets(
-                { page: 1, status: "OPEN", priority: "HIGH" },
+                { page: 1, limit: 10, status: "OPEN", priority: "HIGH" },
                 user,
             );
 

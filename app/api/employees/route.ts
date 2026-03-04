@@ -1,4 +1,4 @@
-import { type NextRequest, NextResponse } from "next/server";
+import { after, type NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { createEmployeeSchema } from "@/lib/validations/employee";
@@ -86,21 +86,25 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
             throw new Error("Created employee data is missing");
         }
 
-        await logEmployeeEvent(
-            "EMPLOYEE_CREATE",
-            createResult.employee.id,
-            user.id,
-            user.email,
-            {
-                after: {
-                    firstName: createResult.employee.firstName,
-                    lastName: createResult.employee.lastName,
-                    email: createResult.employee.email,
-                    position: createResult.employee.position,
-                    departmentId: createResult.employee.departmentId,
+        const employee = createResult.employee;
+
+        after(async () => {
+            await logEmployeeEvent(
+                "EMPLOYEE_CREATE",
+                employee.id,
+                user.id,
+                user.email,
+                {
+                    after: {
+                        firstName: employee.firstName,
+                        lastName: employee.lastName,
+                        email: employee.email,
+                        position: employee.position,
+                        departmentId: employee.departmentId,
+                    },
                 },
-            },
-        );
+            );
+        });
 
         return NextResponse.json(
             {

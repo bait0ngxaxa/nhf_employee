@@ -88,10 +88,22 @@ export async function importEmployeesFromCSV(
 
     // Get existing emails to check for duplicates
     const existingEmployees = await prisma.employee.findMany({
-        select: { email: true },
+        where: { deletedAt: null },
+        select: { email: true, firstName: true, lastName: true },
     });
+
     const existingEmails = new Set(
-        existingEmployees.map((emp) => emp.email.toLowerCase()),
+        existingEmployees
+            .filter((emp) => emp.email && !emp.email.includes("@temp.local"))
+            .map((emp) => emp.email.toLowerCase()),
+    );
+
+    // Create a Set of normalized "FirstName LastName" for duplicate name checking
+    const existingNames = new Set(
+        existingEmployees.map(
+            (emp) =>
+                `${emp.firstName.trim().toLowerCase()} ${emp.lastName.trim().toLowerCase()}`,
+        ),
     );
 
     // Process each employee
@@ -119,6 +131,14 @@ export async function importEmployeesFromCSV(
                 throw new Error("อีเมลนี้ถูกใช้งานแล้ว");
             }
 
+            // Check for duplicate First Name + Last Name
+            const normalizedFullName = `${employeeData.firstName.trim().toLowerCase()} ${employeeData.lastName.trim().toLowerCase()}`;
+            if (existingNames.has(normalizedFullName)) {
+                throw new Error(
+                    `พนักงานชื่อ "${employeeData.firstName.trim()} ${employeeData.lastName.trim()}" มีอยู่ในระบบแล้ว`,
+                );
+            }
+
             // Validate department code
             const departmentId = getDepartmentId(
                 employeeData.department,
@@ -126,7 +146,7 @@ export async function importEmployeesFromCSV(
             );
             if (departmentId === null) {
                 throw new Error(
-                    "รหัสแผนกไม่ถูกต้อง ใช้ได้เฉพาะ ADMIN หรือ ACADEMIC",
+                    "รหัสแผนกไม่ถูกต้อง ใช้ได้เฉพาะ ADMIN (บริหาร) หรือ ACADEMIC (วิชาการ)",
                 );
             }
 
@@ -155,10 +175,11 @@ export async function importEmployeesFromCSV(
                 },
             });
 
-            // Add to existing emails set
+            // Add to existing tracking sets to detect duplicates within the same CSV file
             if (!email.includes("@temp.local")) {
                 existingEmails.add(email.toLowerCase());
             }
+            existingNames.add(normalizedFullName);
 
             result.success.push({
                 firstName: newEmployee.firstName,

@@ -1,4 +1,4 @@
-import { type NextRequest, NextResponse } from "next/server";
+import { after, type NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { updateEmployeeSchema } from "@/lib/validations/employee";
@@ -85,9 +85,11 @@ export async function PATCH(
                 : ("EMPLOYEE_UPDATE" as const);
 
         // Log audit event
-        await logEmployeeEvent(actionType, employeeId, user.id, user.email, {
-            before: result.beforeData,
-            after: validationResult.data as Record<string, unknown>,
+        after(async () => {
+            await logEmployeeEvent(actionType, employeeId, user.id, user.email, {
+                before: result.beforeData,
+                after: validationResult.data as Record<string, unknown>,
+            });
         });
 
         return NextResponse.json(
@@ -141,15 +143,17 @@ export async function DELETE(
         }
 
         // Log audit event
-        await logEmployeeEvent(
-            "EMPLOYEE_DELETE",
-            employeeId,
-            user.id,
-            user.email,
-            {
-                before: result.beforeData,
-            },
-        );
+        after(async () => {
+            await logEmployeeEvent(
+                "EMPLOYEE_DELETE",
+                employeeId,
+                user.id,
+                user.email,
+                {
+                    before: result.beforeData,
+                },
+            );
+        });
 
         return NextResponse.json(
             { message: "ลบพนักงานสำเร็จ" },

@@ -1,4 +1,4 @@
-import { type NextRequest, NextResponse } from "next/server";
+import { after, type NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { createTicketSchema } from "@/lib/validations/ticket";
@@ -73,17 +73,19 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         const user = buildUserContext(session);
         const ticket = await ticketService.createTicket(result.data, user.id);
 
-        // Send notifications (non-blocking)
-        ticketService.sendTicketCreatedNotifications(ticket);
+        after(async () => {
+            // Send notifications (non-blocking)
+            ticketService.sendTicketCreatedNotifications(ticket);
 
-        // Log audit event
-        await logTicketEvent("TICKET_CREATE", ticket.id, user.id, user.email, {
-            after: {
-                title: ticket.title,
-                category: ticket.category,
-                priority: ticket.priority,
-                status: ticket.status,
-            },
+            // Log audit event
+            await logTicketEvent("TICKET_CREATE", ticket.id, user.id, user.email, {
+                after: {
+                    title: ticket.title,
+                    category: ticket.category,
+                    priority: ticket.priority,
+                    status: ticket.status,
+                },
+            });
         });
 
         return NextResponse.json({ ticket }, { status: 201 });

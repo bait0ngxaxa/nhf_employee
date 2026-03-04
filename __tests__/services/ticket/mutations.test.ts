@@ -26,8 +26,8 @@ describe("Ticket Mutations", () => {
             const data = {
                 title: "T",
                 description: "D",
-                category: "C",
-                priority: "LOW",
+                category: "HARDWARE" as const,
+                priority: "LOW" as const,
             };
             prismaMock.ticket.create.mockResolvedValue({
                 id: 1,

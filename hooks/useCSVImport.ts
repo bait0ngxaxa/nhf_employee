@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback } from "react";
 import { type CSVEmployee, type ImportResult } from "@/types/employees";
 import { parseCSV, downloadSampleCSV } from "@/lib/helpers/csv-helpers";
+import { validateCSVFile } from "@/lib/helpers/file-validation";
 
 type ImportStep = "upload" | "preview" | "result";
 
@@ -23,7 +24,7 @@ interface UseCSVImportReturn {
 
     // Actions
     handleFileSelect: (
-        event: React.ChangeEvent<HTMLInputElement>
+        event: React.ChangeEvent<HTMLInputElement>,
     ) => Promise<void>;
     handleImport: (onSuccess?: () => void) => Promise<void>;
     resetUpload: () => void;
@@ -44,8 +45,11 @@ export function useCSVImport(): UseCSVImportReturn {
             const file = event.target.files?.[0];
             if (!file) return;
 
-            if (!file.name.endsWith(".csv")) {
-                setPreviewError("กรุณาเลือกไฟล์ CSV เท่านั้น");
+            const validation = await validateCSVFile(file);
+            if (!validation.isValid) {
+                setPreviewError(
+                    validation.error || "ไฟล์ตรวจสอบไม่ผ่านตามหลักความปลอดภัย",
+                );
                 return;
             }
 
@@ -66,11 +70,11 @@ export function useCSVImport(): UseCSVImportReturn {
                 setPreviewError(
                     err instanceof Error
                         ? err.message
-                        : "เกิดข้อผิดพลาดในการอ่านไฟล์"
+                        : "เกิดข้อผิดพลาดในการอ่านไฟล์",
                 );
             }
         },
-        []
+        [],
     );
 
     const handleImport = useCallback(
@@ -106,7 +110,7 @@ export function useCSVImport(): UseCSVImportReturn {
                 setIsLoading(false);
             }
         },
-        [parsedData]
+        [parsedData],
     );
 
     const resetUpload = useCallback(() => {

@@ -1,34 +1,17 @@
-"use client";
-
 import { AuthStatus } from "@/components/auth";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Users, Shield, Database, Zap, ArrowRight } from "lucide-react";
-import { useSession } from "next-auth/react";
-import { useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
+import { redirect } from "next/navigation";
 
-export default function Home() {
-    const { data: session, status } = useSession();
-    const router = useRouter();
+export default async function Home() {
+    const session = await getServerSession(authOptions);
 
-    // Redirect authenticated users to dashboard
-    useEffect(() => {
-        if (status === "authenticated" && session) {
-            router.push("/dashboard");
-        }
-    }, [status, session, router]);
-
-    // Loading state
-    if (status === "loading") {
-        return (
-            <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 flex items-center justify-center">
-                <div className="text-center">
-                    <div className="animate-spin h-10 w-10 border-4 border-blue-600 border-t-transparent rounded-full mx-auto mb-4" />
-                    <p className="text-gray-600">กำลังโหลดระบบ...</p>
-                </div>
-            </div>
-        );
+    // Redirect authenticated users to dashboard on the server
+    if (session) {
+        redirect("/dashboard");
     }
 
     return (

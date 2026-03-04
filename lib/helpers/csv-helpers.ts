@@ -76,7 +76,7 @@ export function parseCSV(csvText: string): CSVEmployee[] {
 
     // Parse headers
     const headers = parseCSVLine(lines[0]).map((header) =>
-        header.toLowerCase().trim()
+        header.toLowerCase().trim(),
     );
 
     // Map headers to our expected fields
@@ -91,18 +91,18 @@ export function parseCSV(csvText: string): CSVEmployee[] {
     // Check if required fields are present
     const mappedFields = Object.values(fieldMapping);
     const missingFields = CSV_REQUIRED_FIELDS.filter(
-        (field) => !mappedFields.includes(field)
+        (field) => !mappedFields.includes(field),
     );
 
     if (missingFields.length > 0) {
         throw new Error(
             `ไม่พบคอลัมน์ที่จำเป็น: ${missingFields.join(
-                ", "
+                ", ",
             )}\n\nพบคอลัมน์: ${headers.join(
-                ", "
+                ", ",
             )}\n\nคอลัมน์ที่รองรับ: ${Object.keys(CSV_HEADER_MAPPINGS).join(
-                ", "
-            )}`
+                ", ",
+            )}`,
         );
     }
 
@@ -139,10 +139,10 @@ export function parseCSV(csvText: string): CSVEmployee[] {
  * Generate sample CSV content for download
  */
 export function generateSampleCSV(): string {
-    const sampleData = `ชื่อ,นามสกุล,อีเมล,เบอร์โทรศัพท์,ตำแหน่ง,แผนก,สังกัด,ชื่อเล่น
-สมชาย,ใจดี,somchai@company.com,081-234-5678,ผู้จัดการ,ADMIN,สำนักงานใหญ่,ชาย
-สมหญิง,รักงาน,,082-345-6789,อาจารย์,ACADEMIC,คณะวิทยาศาสตร์,หญิง
-เจษฎา,รักเรียน,,081-111-2222,ครู,ADMIN,โรงเรียนประถม,เจ`;
+    const sampleData = `ลำดับ,ชื่อ,นามสกุล,ชื่อเล่น,ตำแหน่ง,สังกัด,แผนก,อีเมล,เบอร์โทร,สถานะ
+1,สมชาย,ใจดี,ชาย,ผู้จัดการ,สำนักงานใหญ่,บริหาร,somchai@company.com,081-234-5678,ปกติ
+2,สมหญิง,รักงาน,หญิง,อาจารย์,คณะวิทยาศาสตร์,วิชาการ,,082-345-6789,ปกติ
+3,เจษฎา,รักเรียน,เจ,ครู,โรงเรียนประถม,ADMIN,,081-111-2222,ปกติ`;
 
     // Add UTF-8 BOM for proper Thai character display
     return "\uFEFF" + sampleData;
@@ -152,7 +152,7 @@ export function generateSampleCSV(): string {
  * Download sample CSV file
  */
 export function downloadSampleCSV(
-    filename: string = "ตัวอย่างข้อมูลพนักงาน.csv"
+    filename: string = "ตัวอย่างข้อมูลพนักงาน.csv",
 ): void {
     const csvContent = generateSampleCSV();
 

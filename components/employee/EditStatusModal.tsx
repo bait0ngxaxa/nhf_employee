@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -30,15 +30,10 @@ export function EditStatusModal({
   onClose,
   onStatusUpdate
 }: EditStatusModalProps) {
-  const [selectedStatus, setSelectedStatus] = useState<EmployeeStatusValue>('ACTIVE' as EmployeeStatusValue);
+  const [selectedStatus, setSelectedStatus] = useState<EmployeeStatusValue>(
+    () => employee?.status || 'ACTIVE' as EmployeeStatusValue
+  );
   const [isUpdating, setIsUpdating] = useState(false);
-
-  // Reset selected status when modal opens
-  useEffect(() => {
-    if (employee && isOpen) {
-      setSelectedStatus(employee.status);
-    }
-  }, [employee, isOpen]);
 
   const handleStatusChange = (value: string) => {
     setSelectedStatus(value as EmployeeStatusValue);

@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { prisma } from "@/lib/prisma";
 import type { Prisma, EmployeeStatus } from "@prisma/client";
 import {
@@ -14,7 +15,9 @@ import type {
  * Build Prisma where clause based on filters
  */
 function buildWhereClause(filters: EmployeeFilters): Prisma.EmployeeWhereInput {
-    const where: Prisma.EmployeeWhereInput = {};
+    const where: Prisma.EmployeeWhereInput = {
+        deletedAt: null,
+    };
 
     // Status filter
     if (filters.status && filters.status !== "all") {
@@ -79,16 +82,16 @@ export async function getEmployees(
 /**
  * Get single employee by ID
  */
-export async function getEmployeeById(
-    employeeId: number,
-): Promise<EmployeeWithRelations | null> {
-    const employee = await prisma.employee.findUnique({
-        where: { id: employeeId },
-        include: EMPLOYEE_WITH_RELATIONS_INCLUDE,
-    });
+export const getEmployeeById = cache(
+    async (employeeId: number): Promise<EmployeeWithRelations | null> => {
+        const employee = await prisma.employee.findFirst({
+            where: { id: employeeId, deletedAt: null },
+            include: EMPLOYEE_WITH_RELATIONS_INCLUDE,
+        });
 
-    return employee as EmployeeWithRelations | null;
-}
+        return employee as EmployeeWithRelations | null;
+    },
+);
 
 /**
  * Check if email already exists (optionally excluding a specific employee)
@@ -97,8 +100,8 @@ export async function emailExists(
     email: string,
     excludeEmployeeId?: number,
 ): Promise<boolean> {
-    const existing = await prisma.employee.findUnique({
-        where: { email: email.toLowerCase() },
+    const existing = await prisma.employee.findFirst({
+        where: { email: email.toLowerCase(), deletedAt: null },
     });
 
     if (!existing) return false;

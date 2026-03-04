@@ -19,6 +19,7 @@ export function EmployeeModals() {
         <>
             {/* Edit Employee Form */}
             <EditEmployeeForm
+                key={employeeToEdit?.id || "new"}
                 employee={employeeToEdit}
                 isOpen={isEditFormOpen}
                 onClose={handleCloseEditForm}

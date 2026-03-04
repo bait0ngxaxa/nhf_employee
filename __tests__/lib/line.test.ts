@@ -33,7 +33,7 @@ describe("LINE Notification Service", () => {
             const result = await sendLineMessage("user1", {
                 type: "text",
                 text: "Hello",
-            });
+            } as any);
             expect(result).toBe(true);
             expect(fetchMock).toHaveBeenCalledWith(
                 "https://api.line.me/v2/bot/message/push",
@@ -52,7 +52,7 @@ describe("LINE Notification Service", () => {
             const result = await sendLineMessage("user1", {
                 type: "text",
                 text: "Hello",
-            });
+            } as any);
             expect(result).toBe(false);
             expect(fetchMock).not.toHaveBeenCalled();
         });
@@ -66,7 +66,7 @@ describe("LINE Notification Service", () => {
             const result = await sendLineMessage("user1", {
                 type: "text",
                 text: "Hello",
-            });
+            } as any);
             expect(result).toBe(false);
         });
     });
@@ -76,7 +76,7 @@ describe("LINE Notification Service", () => {
             const result = await sendLineBroadcast({
                 type: "text",
                 text: "Hello",
-            });
+            } as any);
             expect(result).toBe(true);
             expect(fetchMock).toHaveBeenCalledWith(
                 "https://api.line.me/v2/bot/message/broadcast",

@@ -22,9 +22,13 @@ describe("Employee Import", () => {
         const mockDepts = [{ id: 1, code: "ADMIN", name: "Administration" }];
         prismaMock.department.findMany.mockResolvedValue(mockDepts as any);
         prismaMock.employee.findMany.mockResolvedValue([]); // No existing emails
-        prismaMock.employee.create.mockImplementation((args) =>
-            Promise.resolve({ ...args.data, dept: { name: "ADMIN" } } as any),
-        );
+        prismaMock.employee.create.mockImplementation(((args: any) =>
+            Promise.resolve({
+                ...args.data,
+                departmentId: 1,
+                dept: { name: "ADMIN" },
+                user: null,
+            })) as any);
 
         const csvData = [
             {
@@ -64,7 +68,7 @@ describe("Employee Import", () => {
             { id: 1, code: "ADMIN" },
         ] as any);
         prismaMock.employee.findMany.mockResolvedValue([
-            { email: "taken@test.com" },
+            { email: "taken@test.com", firstName: "A", lastName: "B" },
         ] as any);
 
         const csvData = [
@@ -87,7 +91,9 @@ describe("Employee Import", () => {
         // Mock create only for successful one
         prismaMock.employee.create.mockResolvedValue({
             firstName: "C",
+            departmentId: 1,
             dept: { name: "ADMIN" },
+            user: null,
         } as any);
 
         const result = await importEmployeesFromCSV(csvData);
@@ -95,5 +101,34 @@ describe("Employee Import", () => {
         expect(result.errors).toHaveLength(1); // duplicate
         expect(result.success).toHaveLength(1); // unique
         expect(result.errors[0].error).toContain("อีเมลนี้ถูกใช้งานแล้ว");
+    });
+
+    it("should handle duplicate names inside DB", async () => {
+        prismaMock.department.findMany.mockResolvedValue([
+            { id: 1, code: "ADMIN" },
+        ] as any);
+        prismaMock.employee.findMany.mockResolvedValue([
+            {
+                email: "some@test.com",
+                firstName: "Duplicate",
+                lastName: "Name",
+            },
+        ] as any);
+
+        const csvData = [
+            {
+                firstName: "Duplicate ",
+                lastName: " Name",
+                position: "P",
+                department: "ADMIN",
+                email: "", // Empty email triggering temp email, but name matches
+            },
+        ];
+
+        const result = await importEmployeesFromCSV(csvData as any);
+
+        expect(result.errors).toHaveLength(1); // duplicate name
+        expect(result.success).toHaveLength(0);
+        expect(result.errors[0].error).toContain("มีอยู่ในระบบแล้ว");
     });
 });

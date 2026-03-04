@@ -5,6 +5,7 @@ import {
     useCallback,
     useEffect,
     useMemo,
+    startTransition,
     type ReactNode,
 } from "react";
 import useSWR from "swr";
@@ -45,6 +46,16 @@ export function EmployeeProvider({ children }: EmployeeProviderProps) {
     const [statusFilter, setStatusFilter] = useState<string>("all");
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage] = useState(PAGINATION_DEFAULTS.ITEMS_PER_PAGE);
+
+    const handleSearchTermChange = useCallback((value: string) => {
+        setSearchTerm(value);
+        setCurrentPage(1);
+    }, []);
+
+    const handleStatusFilterChange = useCallback((value: string) => {
+        setStatusFilter(value);
+        setCurrentPage(1);
+    }, []);
 
     // UI states
     const [isExporting, setIsExporting] = useState(false);
@@ -87,11 +98,6 @@ export function EmployeeProvider({ children }: EmployeeProviderProps) {
                 : "",
         };
     }, [data, swrError]);
-
-    // Reset page on search/filter change
-    useEffect(() => {
-        setCurrentPage(1);
-    }, [debouncedSearchTerm, statusFilter]);
 
     // Force refresh when refreshTrigger changes
     useEffect(() => {
@@ -169,7 +175,10 @@ export function EmployeeProvider({ children }: EmployeeProviderProps) {
         try {
             const allEmployees = await fetchAllForExport();
             const csvData = prepareCsvData(allEmployees);
-            setExportData(csvData);
+
+            startTransition(() => {
+                setExportData(csvData);
+            });
 
             await fetch("/api/audit-logs/export", {
                 method: "POST",
@@ -217,10 +226,12 @@ export function EmployeeProvider({ children }: EmployeeProviderProps) {
         setEmployeeToEdit(null);
 
         setTimeout(() => {
-            if (employeeName) {
-                setLastEditedEmployee(employeeName);
-            }
-            setShowEditSuccessModal(true);
+            startTransition(() => {
+                if (employeeName) {
+                    setLastEditedEmployee(employeeName);
+                }
+                setShowEditSuccessModal(true);
+            });
         }, 100);
 
         mutate(); // Revalidate SWR
@@ -256,9 +267,9 @@ export function EmployeeProvider({ children }: EmployeeProviderProps) {
     const uiValue = useMemo<EmployeeUIContextValue>(
         () => ({
             searchTerm,
-            setSearchTerm,
+            setSearchTerm: handleSearchTermChange,
             statusFilter,
-            setStatusFilter,
+            setStatusFilter: handleStatusFilterChange,
             currentPage,
             itemsPerPage,
             handlePageChange,
@@ -279,9 +290,9 @@ export function EmployeeProvider({ children }: EmployeeProviderProps) {
         }),
         [
             searchTerm,
-            setSearchTerm,
+            handleSearchTermChange,
             statusFilter,
-            setStatusFilter,
+            handleStatusFilterChange,
             currentPage,
             itemsPerPage,
             handlePageChange,

@@ -1,8 +1,10 @@
-"use client";
-
 import { LoginForm } from "@/components/auth";
 import { Suspense } from "react";
-import { useTitle } from "@/hooks/useTitle";
+import { type Metadata } from "next";
+
+export const metadata: Metadata = {
+    title: "เข้าสู่ระบบ | NHF IT System",
+};
 
 function LoginPageContent() {
     return (
@@ -22,7 +24,6 @@ function LoginPageContent() {
 }
 
 export default function Page() {
-    useTitle("เข้าสู่ระบบ | NHF IT System");
     return (
         <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
             <Suspense

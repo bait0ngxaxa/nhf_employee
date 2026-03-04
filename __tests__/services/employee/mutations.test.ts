@@ -74,7 +74,7 @@ describe("Employee Mutations", () => {
 
     describe("updateEmployee", () => {
         it("should fail if employee not found", async () => {
-            prismaMock.employee.findUnique.mockResolvedValue(null);
+            prismaMock.employee.findFirst.mockResolvedValue(null);
 
             const result = await updateEmployee(999, { firstName: "New" });
 
@@ -83,7 +83,7 @@ describe("Employee Mutations", () => {
         });
 
         it("should update basic fields", async () => {
-            prismaMock.employee.findUnique.mockResolvedValue({
+            prismaMock.employee.findFirst.mockResolvedValue({
                 id: 1,
                 firstName: "Old",
             } as any);
@@ -104,7 +104,7 @@ describe("Employee Mutations", () => {
         });
 
         it("should fail if email domain is not @thainhf.org", async () => {
-            prismaMock.employee.findUnique.mockResolvedValue({
+            prismaMock.employee.findFirst.mockResolvedValue({
                 id: 1,
                 firstName: "Old",
                 email: "old@thainhf.org",
@@ -122,7 +122,7 @@ describe("Employee Mutations", () => {
 
     describe("deleteEmployee", () => {
         it("should fail if not found", async () => {
-            prismaMock.employee.findUnique.mockResolvedValue(null);
+            prismaMock.employee.findFirst.mockResolvedValue(null);
 
             const result = await deleteEmployee(999);
 
@@ -131,7 +131,7 @@ describe("Employee Mutations", () => {
         });
 
         it("should delete if found", async () => {
-            prismaMock.employee.findUnique.mockResolvedValue({
+            prismaMock.employee.findFirst.mockResolvedValue({
                 id: 1,
                 firstName: "DeleteMe",
             } as any);
@@ -139,8 +139,9 @@ describe("Employee Mutations", () => {
             const result = await deleteEmployee(1);
 
             expect(result.success).toBe(true);
-            expect(prismaMock.employee.delete).toHaveBeenCalledWith({
+            expect(prismaMock.employee.update).toHaveBeenCalledWith({
                 where: { id: 1 },
+                data: { deletedAt: expect.any(Date) },
             });
         });
     });

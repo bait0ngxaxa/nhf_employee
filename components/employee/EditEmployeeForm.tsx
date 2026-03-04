@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
+import useSWR from "swr";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -35,63 +36,25 @@ export function EditEmployeeForm({
     onClose,
     onSuccess,
 }: EditEmployeeFormProps) {
-    const [formData, setFormData] = useState<EmployeeFormData>({
-        firstName: "",
-        lastName: "",
-        nickname: "",
-        email: "",
-        phone: "",
-        position: "",
-        affiliation: "",
-        departmentId: "",
-        status: "ACTIVE",
+    const [formData, setFormData] = useState<EmployeeFormData>(() => ({
+        firstName: employee?.firstName || "",
+        lastName: employee?.lastName || "",
+        nickname: employee?.nickname || "",
+        email: employee?.email?.includes("@temp.local") ? "" : employee?.email || "",
+        phone: employee?.phone || "",
+        position: employee?.position || "",
+        affiliation: employee?.affiliation || "",
+        departmentId: employee?.dept?.id?.toString() || "",
+        status: employee?.status || "ACTIVE",
         hireDate: "",
-    });
+    }));
 
-    const [departments, setDepartments] = useState<Department[]>([]);
+    const { data: departmentData } = useSWR<{ departments: Department[] }>(isOpen ? "/api/departments" : null);
+    const departments = departmentData?.departments || [];
+
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState("");
     const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
-
-    // Load employee data when modal opens
-    useEffect(() => {
-        if (employee && isOpen) {
-            setFormData({
-                firstName: employee.firstName,
-                lastName: employee.lastName,
-                nickname: employee.nickname || "",
-                email: employee.email.includes("@temp.local")
-                    ? ""
-                    : employee.email,
-                phone: employee.phone || "",
-                position: employee.position,
-                affiliation: employee.affiliation || "",
-                departmentId: employee.dept.id.toString(),
-                status: employee.status,
-            });
-            setError("");
-            setFieldErrors({});
-        }
-    }, [employee, isOpen]);
-
-    // Fetch departments
-    useEffect(() => {
-        const fetchDepartments = async () => {
-            try {
-                const response = await fetch("/api/departments");
-                if (response.ok) {
-                    const data = await response.json();
-                    setDepartments(data.departments);
-                }
-            } catch (error) {
-                console.error("Error fetching departments:", error);
-            }
-        };
-
-        if (isOpen) {
-            fetchDepartments();
-        }
-    }, [isOpen]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
