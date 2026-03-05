@@ -3,6 +3,7 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
     Select,
     SelectContent,
@@ -63,10 +64,46 @@ export function AuditLogViewer({ className }: AuditLogViewerProps) {
 
     if (isLoading) {
         return (
-            <div className="flex justify-center items-center p-8">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
-                <span className="ml-2 text-gray-600">กำลังโหลด...</span>
-            </div>
+            <Card>
+                <CardHeader>
+                    <div className="flex items-center justify-between">
+                        <div className="space-y-2">
+                            <Skeleton className="h-6 w-48" />
+                            <Skeleton className="h-4 w-32" />
+                        </div>
+                        <Skeleton className="h-10 w-24" />
+                    </div>
+                </CardHeader>
+                <CardContent className="space-y-4 animate-pulse">
+                    {/* Filters Skeleton */}
+                    <div className="flex flex-wrap gap-3">
+                        <Skeleton className="h-10 flex-1 min-w-[200px]" />
+                        <Skeleton className="h-10 w-44" />
+                        <Skeleton className="h-10 w-36" />
+                    </div>
+                    
+                    {/* Table Skeleton */}
+                    <div className="overflow-x-auto border rounded-lg p-4">
+                        <div className="flex gap-4 pb-4 border-b border-gray-100">
+                            {Array.from({ length: 5 }).map((_, i) => (
+                                <Skeleton key={i} className="h-4 flex-1" />
+                            ))}
+                        </div>
+                        <div className="space-y-4 pt-4">
+                            {Array.from({ length: 6 }).map((_, rowIndex) => (
+                                <div key={rowIndex} className="flex gap-4 items-center">
+                                    {Array.from({ length: 5 }).map((_, colIndex) => (
+                                        <Skeleton 
+                                            key={colIndex} 
+                                            className="h-8 flex-1"
+                                        />
+                                    ))}
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </CardContent>
+            </Card>
         );
     }
 

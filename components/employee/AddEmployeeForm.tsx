@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/select";
 import { Alert } from "@/components/ui/alert";
 import { AlertTriangle } from "lucide-react";
-import { SuccessModal } from "@/components/SuccessModal";
+import { toast } from "sonner";
 import {
     type AddEmployeeFormProps,
     type EmployeeFormData,
@@ -45,7 +45,6 @@ export function AddEmployeeForm({ onSuccess }: AddEmployeeFormProps) {
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState("");
     const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
-    const [showSuccessModal, setShowSuccessModal] = useState(false);
 
     useEffect(() => {
         const fetchDepartments = async () => {
@@ -110,7 +109,22 @@ export function AddEmployeeForm({ onSuccess }: AddEmployeeFormProps) {
             });
 
             if (response.ok) {
-                setShowSuccessModal(true);
+                toast.success("เพิ่มพนักงานสำเร็จ!", {
+                    description: "ข้อมูลพนักงานใหม่ถูกเพิ่มเข้าระบบเรียบร้อยแล้ว",
+                });
+                // Reset form
+                setFormData({
+                    firstName: "",
+                    lastName: "",
+                    nickname: "",
+                    email: "",
+                    phone: "",
+                    position: "",
+                    affiliation: "",
+                    departmentId: "",
+                });
+                setFieldErrors({});
+                onSuccess?.();
             } else {
                 const data = await response.json();
                 setError(data.error || "เกิดข้อผิดพลาดในการเพิ่มพนักงาน");
@@ -122,21 +136,7 @@ export function AddEmployeeForm({ onSuccess }: AddEmployeeFormProps) {
         }
     };
 
-    const handleModalClose = () => {
-        setShowSuccessModal(false);
-        setFormData({
-            firstName: "",
-            lastName: "",
-            nickname: "",
-            email: "",
-            phone: "",
-            position: "",
-            affiliation: "",
-            departmentId: "",
-        });
-        setFieldErrors({});
-        onSuccess?.();
-    };
+
 
     return (
         <>
@@ -461,13 +461,6 @@ export function AddEmployeeForm({ onSuccess }: AddEmployeeFormProps) {
                 </CardContent>
             </Card>
 
-            <SuccessModal
-                isOpen={showSuccessModal}
-                onClose={handleModalClose}
-                title="เพิ่มพนักงานสำเร็จ!"
-                description="ข้อมูลพนักงานใหม่ถูกเพิ่มเข้าระบบเรียบร้อยแล้ว"
-                buttonText="ตกลง"
-            />
         </>
     );
 }

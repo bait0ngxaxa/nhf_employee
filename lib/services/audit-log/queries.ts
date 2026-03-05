@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { prisma } from "@/lib/prisma";
 import type {
     AuditLogFilters,
@@ -52,46 +53,47 @@ function parseAuditLogDetails(
 
 /**
  * Get paginated list of audit logs (Admin only)
+ * Cached per request for deduplication
  */
-export async function getAuditLogs(
-    filters: AuditLogFilters,
-): Promise<PaginatedAuditLogsResult> {
-    const page = Math.max(1, filters.page);
-    const limit = Math.min(Math.max(1, filters.limit), 100);
-    const skip = (page - 1) * limit;
+export const getAuditLogs = cache(
+    async (filters: AuditLogFilters): Promise<PaginatedAuditLogsResult> => {
+        const page = Math.max(1, filters.page);
+        const limit = Math.min(Math.max(1, filters.limit), 100);
+        const skip = (page - 1) * limit;
 
-    const where = buildWhereClause(filters);
+        const where = buildWhereClause(filters);
 
-    const [auditLogs, totalCount] = await Promise.all([
-        prisma.auditLog.findMany({
-            where,
-            include: {
-                user: {
-                    select: AUDIT_LOG_USER_SELECT,
+        const [auditLogs, totalCount] = await Promise.all([
+            prisma.auditLog.findMany({
+                where,
+                include: {
+                    user: {
+                        select: AUDIT_LOG_USER_SELECT,
+                    },
                 },
-            },
-            orderBy: {
-                createdAt: "desc",
-            },
-            skip,
-            take: limit,
-        }),
-        prisma.auditLog.count({ where }),
-    ]);
+                orderBy: {
+                    createdAt: "desc",
+                },
+                skip,
+                take: limit,
+            }),
+            prisma.auditLog.count({ where }),
+        ]);
 
-    // Parse details JSON for each log
-    const logsWithParsedDetails: AuditLogWithUser[] = auditLogs.map((log) => ({
-        ...log,
-        details: parseAuditLogDetails(log.details),
-    }));
+        // Parse details JSON for each log
+        const logsWithParsedDetails: AuditLogWithUser[] = auditLogs.map((log) => ({
+            ...log,
+            details: parseAuditLogDetails(log.details),
+        }));
 
-    return {
-        auditLogs: logsWithParsedDetails,
-        pagination: {
-            page,
-            limit,
-            total: totalCount,
-            pages: Math.ceil(totalCount / limit),
-        },
-    };
-}
+        return {
+            auditLogs: logsWithParsedDetails,
+            pagination: {
+                page,
+                limit,
+                total: totalCount,
+                pages: Math.ceil(totalCount / limit),
+            },
+        };
+    },
+);

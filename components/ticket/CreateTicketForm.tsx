@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { SuccessModal } from '@/components/SuccessModal';
+import { toast } from "sonner";
 import { type CreateTicketFormProps, type TicketFormData } from '@/types/tickets';
 import { TICKET_CATEGORIES, TICKET_PRIORITIES } from '@/constants/tickets';
 
@@ -22,8 +22,6 @@ export default function CreateTicketForm({ isOpen, onClose, onTicketCreated }: C
   });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
-  const [showSuccessModal, setShowSuccessModal] = useState(false);
-  const [createdTicket, setCreatedTicket] = useState<{id: number, title: string} | null>(null);
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({
@@ -59,9 +57,10 @@ export default function CreateTicketForm({ isOpen, onClose, onTicketCreated }: C
         throw new Error(data.error || 'เกิดข้อผิดพลาด');
       }
 
-      // Store ticket info for success modal
-      setCreatedTicket({ id: data.ticket.id, title: formData.title });
-      setShowSuccessModal(true);
+      // Show toast notification
+      toast.success("ส่งคำร้องสำเร็จ!", {
+        description: `คำร้องแจ้งปัญหา "${formData.title}" ได้รับการบันทึกเรียบร้อยแล้ว หมายเลขที่ติดตาม: #${data.ticket.id}`,
+      });
       
       // Reset form
       setFormData({
@@ -87,10 +86,7 @@ export default function CreateTicketForm({ isOpen, onClose, onTicketCreated }: C
     }
   };
 
-  const handleSuccessModalClose = () => {
-    setShowSuccessModal(false);
-    setCreatedTicket(null);
-  };
+
 
   if (!session) {
     return (
@@ -196,14 +192,6 @@ export default function CreateTicketForm({ isOpen, onClose, onTicketCreated }: C
         </DialogContent>
       </Dialog>
 
-      
-      <SuccessModal
-        isOpen={showSuccessModal}
-        onClose={handleSuccessModalClose}
-        title="ส่งคำร้องสำเร็จ!"
-        description={createdTicket ? `คำร้องแจ้งปัญหา "${createdTicket.title}" ได้รับการบันทึกเรียบร้อยแล้ว หมายเลขที่ติดตาม: #${createdTicket.id}` : 'คำร้องแจ้งปัญหาได้รับการบันทึกเรียบร้อยแล้ว'}
-        buttonText="ตกลง"
-      />
     </>
   );
 }

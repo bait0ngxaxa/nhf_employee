@@ -40,12 +40,9 @@ export interface EmployeeUIContextValue {
     // Edit Modal State & Actions
     isEditFormOpen: boolean;
     employeeToEdit: Employee | null;
-    showEditSuccessModal: boolean;
-    lastEditedEmployee: { firstName: string; lastName: string } | null;
     handleEditEmployee: (employee: Employee) => void;
     handleCloseEditForm: () => void;
     handleEmployeeUpdate: () => void;
-    setShowEditSuccessModal: (show: boolean) => void;
 }
 
 export interface EmployeeContextValue

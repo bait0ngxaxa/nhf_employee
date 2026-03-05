@@ -2,6 +2,7 @@
 
 import { useSession, signOut } from "next-auth/react";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { User, LogOut } from "lucide-react";
 import Link from "next/link";
 
@@ -9,12 +10,7 @@ export function AuthStatus() {
     const { data: session, status } = useSession();
 
     if (status === "loading") {
-        return (
-            <div className="flex items-center space-x-2">
-                <div className="animate-spin h-4 w-4 border-2 border-blue-600 border-t-transparent rounded-full" />
-                <span className="text-sm text-gray-600">กำลังโหลด...</span>
-            </div>
-        );
+        return <Skeleton className="h-9 w-28 rounded-md" />;
     }
 
     if (session) {

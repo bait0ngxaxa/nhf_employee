@@ -1,8 +1,10 @@
 "use client";
 
+import { Suspense } from "react";
 import dynamic from "next/dynamic";
 import { ImportEmployeeCSV } from "@/components/employee";
 import { useTitle } from "@/hooks/useTitle";
+import { SectionSkeleton } from "@/components/dashboard/SectionSkeleton";
 import {
     useDashboardUIContext,
     useDashboardDataContext,
@@ -13,26 +15,20 @@ const ITEquipmentSection = dynamic(
     () =>
         import("@/components/dashboard").then((mod) => mod.ITEquipmentSection),
     {
-        loading: () => (
-            <div className="p-8 text-center text-gray-500">กำลังโหลด...</div>
-        ),
+        loading: () => <SectionSkeleton />,
     },
 );
 const ITSupportSection = dynamic(
     () => import("@/components/dashboard").then((mod) => mod.ITSupportSection),
     {
-        loading: () => (
-            <div className="p-8 text-center text-gray-500">กำลังโหลด...</div>
-        ),
+        loading: () => <SectionSkeleton />,
     },
 );
 const EmailRequestSection = dynamic(
     () =>
         import("@/components/dashboard").then((mod) => mod.EmailRequestSection),
     {
-        loading: () => (
-            <div className="p-8 text-center text-gray-500">กำลังโหลด...</div>
-        ),
+        loading: () => <SectionSkeleton />,
     },
 );
 const EmployeeManagementSection = dynamic(
@@ -41,26 +37,20 @@ const EmployeeManagementSection = dynamic(
             (mod) => mod.EmployeeManagementSection,
         ),
     {
-        loading: () => (
-            <div className="p-8 text-center text-gray-500">กำลังโหลด...</div>
-        ),
+        loading: () => <SectionSkeleton />,
     },
 );
 const AddEmployeeSection = dynamic(
     () =>
         import("@/components/dashboard").then((mod) => mod.AddEmployeeSection),
     {
-        loading: () => (
-            <div className="p-8 text-center text-gray-500">กำลังโหลด...</div>
-        ),
+        loading: () => <SectionSkeleton />,
     },
 );
 const AuditLogsSection = dynamic(
     () => import("@/components/dashboard").then((mod) => mod.AuditLogsSection),
     {
-        loading: () => (
-            <div className="p-8 text-center text-gray-500">กำลังโหลด...</div>
-        ),
+        loading: () => <SectionSkeleton />,
     },
 );
 const DashboardHomeSection = dynamic(
@@ -69,9 +59,7 @@ const DashboardHomeSection = dynamic(
             (mod) => mod.DashboardHomeSection,
         ),
     {
-        loading: () => (
-            <div className="p-8 text-center text-gray-500">กำลังโหลด...</div>
-        ),
+        loading: () => <SectionSkeleton />,
     },
 );
 
@@ -84,33 +72,63 @@ export function DashboardContent() {
     const renderContent = () => {
         switch (selectedMenu) {
             case "it-equipment":
-                return <ITEquipmentSection />;
+                return (
+                    <Suspense fallback={<SectionSkeleton />}>
+                        <ITEquipmentSection />
+                    </Suspense>
+                );
 
             case "it-support":
-                return <ITSupportSection />;
+                return (
+                    <Suspense fallback={<SectionSkeleton />}>
+                        <ITSupportSection />
+                    </Suspense>
+                );
 
             case "email-request":
-                return <EmailRequestSection />;
+                return (
+                    <Suspense fallback={<SectionSkeleton />}>
+                        <EmailRequestSection />
+                    </Suspense>
+                );
 
             case "employee-management":
-                return <EmployeeManagementSection />;
+                return (
+                    <Suspense fallback={<SectionSkeleton />}>
+                        <EmployeeManagementSection />
+                    </Suspense>
+                );
 
             case "add-employee":
-                return <AddEmployeeSection />;
+                return (
+                    <Suspense fallback={<SectionSkeleton />}>
+                        <AddEmployeeSection />
+                    </Suspense>
+                );
 
             case "import-employee":
                 return (
-                    <ImportEmployeeCSV
-                        onSuccess={handleEmployeeAdded}
-                        onBack={() => handleMenuClick("employee-management")}
-                    />
+                    <Suspense fallback={<SectionSkeleton />}>
+                        <ImportEmployeeCSV
+                            onSuccess={handleEmployeeAdded}
+                            onBack={() => handleMenuClick("employee-management")}
+                        />
+                    </Suspense>
                 );
 
             case "audit-logs":
-                return <AuditLogsSection />;
+                return (
+                    <Suspense fallback={<SectionSkeleton />}>
+                        <AuditLogsSection />
+                    </Suspense>
+                );
 
             default:
-                return <DashboardHomeSection />;
+                return (
+                    <Suspense fallback={<SectionSkeleton />}>
+                        <DashboardHomeSection />
+                    </Suspense>
+                );
         }
     };
 

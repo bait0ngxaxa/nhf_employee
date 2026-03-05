@@ -13,6 +13,7 @@ import type {
 
 /**
  * Build Prisma where clause based on filters
+ * Note: Not cached as it's a pure function with no async operations
  */
 function buildWhereClause(filters: EmployeeFilters): Prisma.EmployeeWhereInput {
     const where: Prisma.EmployeeWhereInput = {
@@ -42,42 +43,43 @@ function buildWhereClause(filters: EmployeeFilters): Prisma.EmployeeWhereInput {
 
 /**
  * Get paginated list of employees
+ * Cached per request for deduplication
  */
-export async function getEmployees(
-    filters: EmployeeFilters,
-): Promise<PaginatedEmployeesResult> {
-    const page = Math.max(1, filters.page || PAGINATION_DEFAULTS.page);
-    const limit = Math.min(
-        Math.max(1, filters.limit || PAGINATION_DEFAULTS.limit),
-        PAGINATION_DEFAULTS.maxLimit,
-    );
-    const skip = (page - 1) * limit;
+export const getEmployees = cache(
+    async (filters: EmployeeFilters): Promise<PaginatedEmployeesResult> => {
+        const page = Math.max(1, filters.page || PAGINATION_DEFAULTS.page);
+        const limit = Math.min(
+            Math.max(1, filters.limit || PAGINATION_DEFAULTS.limit),
+            PAGINATION_DEFAULTS.maxLimit,
+        );
+        const skip = (page - 1) * limit;
 
-    const where = buildWhereClause(filters);
+        const where = buildWhereClause(filters);
 
-    const [total, employees] = await Promise.all([
-        prisma.employee.count({ where }),
-        prisma.employee.findMany({
-            where,
-            include: EMPLOYEE_WITH_RELATIONS_INCLUDE,
-            orderBy: {
-                createdAt: "desc",
+        const [total, employees] = await Promise.all([
+            prisma.employee.count({ where }),
+            prisma.employee.findMany({
+                where,
+                include: EMPLOYEE_WITH_RELATIONS_INCLUDE,
+                orderBy: {
+                    createdAt: "desc",
+                },
+                skip,
+                take: limit,
+            }),
+        ]);
+
+        return {
+            employees: employees as EmployeeWithRelations[],
+            pagination: {
+                page,
+                limit,
+                total,
+                totalPages: Math.ceil(total / limit),
             },
-            skip,
-            take: limit,
-        }),
-    ]);
-
-    return {
-        employees: employees as EmployeeWithRelations[],
-        pagination: {
-            page,
-            limit,
-            total,
-            totalPages: Math.ceil(total / limit),
-        },
-    };
-}
+        };
+    },
+);
 
 /**
  * Get single employee by ID

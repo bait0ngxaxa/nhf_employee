@@ -7,6 +7,7 @@ import {
     CardHeader,
     CardTitle,
 } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -89,11 +90,61 @@ export default function TicketDetail({
 
     if (loading) {
         return (
-            <Card>
-                <CardContent className="p-6">
-                    <div className="text-center">กำลังโหลด...</div>
-                </CardContent>
-            </Card>
+            <div className="space-y-6 animate-pulse">
+                {/* Header Skeleton */}
+                <div className="flex items-center justify-between">
+                    <Skeleton className="h-10 w-24" />
+                    <Skeleton className="h-6 w-32" />
+                </div>
+
+                {/* Ticket Details Card Skeleton */}
+                <Card>
+                    <CardHeader>
+                        <div className="flex justify-between items-start">
+                            <div className="space-y-2">
+                                <Skeleton className="h-6 w-64" />
+                                <Skeleton className="h-4 w-48" />
+                            </div>
+                            <div className="flex gap-2">
+                                <Skeleton className="h-6 w-16" />
+                                <Skeleton className="h-6 w-16" />
+                            </div>
+                        </div>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        <div className="space-y-2">
+                            <Skeleton className="h-4 w-24" />
+                            <Skeleton className="h-20 w-full" />
+                        </div>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                            {Array.from({ length: 4 }).map((_, i) => (
+                                <div key={i} className="space-y-1">
+                                    <Skeleton className="h-3 w-16" />
+                                    <Skeleton className="h-4 w-24" />
+                                </div>
+                            ))}
+                        </div>
+                    </CardContent>
+                </Card>
+
+                {/* Comments Card Skeleton */}
+                <Card>
+                    <CardHeader>
+                        <Skeleton className="h-6 w-32" />
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        {Array.from({ length: 2 }).map((_, i) => (
+                            <div key={i} className="space-y-2">
+                                <div className="flex justify-between">
+                                    <Skeleton className="h-4 w-24" />
+                                    <Skeleton className="h-3 w-16" />
+                                </div>
+                                <Skeleton className="h-12 w-full" />
+                            </div>
+                        ))}
+                    </CardContent>
+                </Card>
+            </div>
         );
     }
 

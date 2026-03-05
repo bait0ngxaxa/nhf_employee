@@ -2,6 +2,7 @@
 
 import { useRef } from "react";
 import { CSVLink } from "react-csv";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
     EmployeeTable,
     EmployeeSearchControls,
@@ -62,11 +63,41 @@ export function EmployeeList({ userRole }: EmployeeListProps) {
 
     if (isInitialLoading) {
         return (
-            <div className="flex justify-center items-center p-8">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
-                <span className="ml-2 text-gray-600">
-                    กำลังโหลดข้อมูลพนักงาน...
-                </span>
+            <div className="space-y-6 animate-pulse">
+                {/* Search Controls Skeleton */}
+                <div className="flex flex-wrap gap-3">
+                    <Skeleton className="h-10 flex-1 min-w-[200px]" />
+                    <Skeleton className="h-10 w-40" />
+                    <Skeleton className="h-10 w-32" />
+                    <Skeleton className="h-10 w-32" />
+                </div>
+                
+                {/* Results Summary Skeleton */}
+                <div className="flex justify-between">
+                    <Skeleton className="h-4 w-48" />
+                    <Skeleton className="h-4 w-24" />
+                </div>
+                
+                {/* Table Skeleton */}
+                <div className="w-full">
+                    <div className="flex gap-4 pb-4 border-b border-gray-100">
+                        {Array.from({ length: 6 }).map((_, i) => (
+                            <Skeleton key={i} className="h-4 flex-1" />
+                        ))}
+                    </div>
+                    <div className="space-y-4 pt-4">
+                        {Array.from({ length: 5 }).map((_, rowIndex) => (
+                            <div key={rowIndex} className="flex gap-4 items-center">
+                                {Array.from({ length: 6 }).map((_, colIndex) => (
+                                    <Skeleton 
+                                        key={colIndex} 
+                                        className="h-12 flex-1"
+                                    />
+                                ))}
+                            </div>
+                        ))}
+                    </div>
+                </div>
             </div>
         );
     }

@@ -48,8 +48,6 @@ export interface EmailRequestContextValue {
     formData: EmailRequestFormData;
     isFormLoading: boolean;
     formError: string | null;
-    showSuccessModal: boolean;
     handleInputChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
     handleSubmit: (e: React.FormEvent) => Promise<void>;
-    closeSuccessModal: () => void;
 }

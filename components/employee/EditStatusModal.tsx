@@ -19,6 +19,7 @@ import {
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { AlertCircle, CheckCircle2 } from 'lucide-react';
+import { toast } from "sonner";
 import { type EditStatusModalProps } from '@/types/employees';
 import { type EmployeeStatusValue } from '@/types/employees';
 import { EMPLOYEE_STATUSES } from '@/constants/employees';
@@ -54,14 +55,21 @@ export function EditStatusModal({
 
       if (response.ok) {
         onStatusUpdate(employee.id, selectedStatus);
+        toast.success("อัปเดตสถานะสำเร็จ", {
+          description: `สถานะของ ${employee.firstName} ${employee.lastName} ถูกเปลี่ยนเป็น "${selectedStatusInfo.label}" เรียบร้อยแล้ว`,
+        });
         onClose();
       } else {
         const errorData = await response.json();
-        alert(errorData.error || 'เกิดข้อผิดพลาดในการอัปเดต');
+        toast.error("เกิดข้อผิดพลาด", {
+          description: errorData.error || 'เกิดข้อผิดพลาดในการอัปเดตสถานะ',
+        });
       }
     } catch (error) {
       console.error('Error updating status:', error);
-      alert('เกิดข้อผิดพลาดในการเชื่อมต่อ');
+      toast.error("เกิดข้อผิดพลาด", {
+        description: 'ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้',
+      });
     } finally {
       setIsUpdating(false);
     }

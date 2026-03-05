@@ -1,6 +1,5 @@
 "use client";
 
-import { SuccessModal } from "@/components/SuccessModal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,18 +12,13 @@ interface EmailRequestFormProps {
     onSuccess?: () => void;
 }
 
-export function EmailRequestForm({
-    onCancel,
-    onSuccess,
-}: EmailRequestFormProps) {
+export function EmailRequestForm({ onCancel }: EmailRequestFormProps) {
     const {
         formData,
         isFormLoading: isLoading,
         formError: error,
-        showSuccessModal,
         handleInputChange,
         handleSubmit,
-        closeSuccessModal,
     } = useEmailRequestContext();
 
     return (
@@ -216,18 +210,6 @@ export function EmailRequestForm({
                     </div>
                 </CardContent>
             </Card>
-
-            <SuccessModal
-                isOpen={showSuccessModal}
-                onClose={closeSuccessModal}
-                title="ส่งคำขอสำเร็จ!"
-                description="คำขออีเมลพนักงานใหม่ถูกส่งให้ทีมไอทีเรียบร้อยแล้ว"
-                buttonText="กลับหน้าหลัก"
-                onButtonClick={() => {
-                    closeSuccessModal();
-                    onSuccess?.();
-                }}
-            />
         </div>
     );
 }

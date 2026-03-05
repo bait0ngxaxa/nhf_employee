@@ -1,6 +1,7 @@
 "use client";
 
 import { useSession } from "next-auth/react";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -16,7 +17,6 @@ import {
     ChevronLeft,
     ChevronRight,
     CheckCircle,
-    Loader2,
     History,
 } from "lucide-react";
 import { useEmailRequestHistory } from "@/hooks/useEmailRequestHistory";
@@ -66,9 +66,26 @@ export function EmailRequestHistory() {
 
             <CardContent>
                 {isLoading ? (
-                    <div className="flex justify-center items-center py-12">
-                        <Loader2 className="h-8 w-8 animate-spin text-purple-600" />
-                        <span className="ml-2 text-gray-600">กำลังโหลด...</span>
+                    <div className="space-y-4 py-6 animate-pulse">
+                        {/* Table Header Skeleton */}
+                        <div className="flex gap-4 pb-4 border-b border-gray-100">
+                            {Array.from({ length: 5 }).map((_, i) => (
+                                <Skeleton key={i} className="h-4 flex-1" />
+                            ))}
+                        </div>
+                        {/* Table Rows Skeleton */}
+                        <div className="space-y-4">
+                            {Array.from({ length: 4 }).map((_, rowIndex) => (
+                                <div key={rowIndex} className="flex gap-4 items-center">
+                                    {Array.from({ length: 5 }).map((_, colIndex) => (
+                                        <Skeleton 
+                                            key={colIndex} 
+                                            className="h-12 flex-1"
+                                        />
+                                    ))}
+                                </div>
+                            ))}
+                        </div>
                     </div>
                 ) : error ? (
                     <div className="text-center py-12 text-red-600">

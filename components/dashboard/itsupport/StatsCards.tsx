@@ -12,7 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useITSupportDataContext } from "../context";
 
 export const StatsCards = memo(function StatsCards() {
-    const { ticketStats, statsLoading, isAdmin } = useITSupportDataContext();
+    const { ticketStats, isAdmin } = useITSupportDataContext();
 
     return (
         <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
@@ -25,10 +25,10 @@ export const StatsCards = memo(function StatsCards() {
                 </CardHeader>
                 <CardContent>
                     <div className="text-2xl font-bold">
-                        {statsLoading ? "-" : ticketStats.total}
+                        {ticketStats.total}
                     </div>
                     <p className="text-xs text-muted-foreground">
-                        {statsLoading ? "กำลังโหลดข้อมูล" : "tickets ในระบบ"}
+                        tickets ในระบบ
                     </p>
                 </CardContent>
             </Card>
@@ -53,12 +53,10 @@ export const StatsCards = memo(function StatsCards() {
                 </CardHeader>
                 <CardContent>
                     <div className="text-2xl font-bold text-blue-600">
-                        {statsLoading ? "-" : ticketStats.newTickets}
+                        {ticketStats.newTickets}
                     </div>
                     <p className="text-xs text-blue-600">
-                        {statsLoading
-                            ? "กำลังโหลดข้อมูล"
-                            : "24 ชั่วโมงที่ผ่านมา"}
+                        24 ชั่วโมงที่ผ่านมา
                     </p>
                 </CardContent>
             </Card>
@@ -72,14 +70,10 @@ export const StatsCards = memo(function StatsCards() {
                 </CardHeader>
                 <CardContent>
                     <div className="text-2xl font-bold">
-                        {statsLoading
-                            ? "-"
-                            : ticketStats.open + ticketStats.inProgress}
+                        {ticketStats.open + ticketStats.inProgress}
                     </div>
                     <p className="text-xs text-muted-foreground">
-                        {statsLoading
-                            ? "รอการแก้ไข"
-                            : `เปิด: ${ticketStats.open}, ดำเนินการ: ${ticketStats.inProgress}`}
+                        เปิด: {ticketStats.open}, ดำเนินการ: {ticketStats.inProgress}
                     </p>
                 </CardContent>
             </Card>
@@ -93,12 +87,10 @@ export const StatsCards = memo(function StatsCards() {
                 </CardHeader>
                 <CardContent>
                     <div className="text-2xl font-bold">
-                        {statsLoading ? "-" : ticketStats.resolved}
+                        {ticketStats.resolved}
                     </div>
                     <p className="text-xs text-muted-foreground">
-                        {statsLoading
-                            ? "เสร็จสิ้นแล้ว"
-                            : "tickets ที่แก้ไขแล้ว"}
+                        tickets ที่แก้ไขแล้ว
                     </p>
                 </CardContent>
             </Card>
@@ -112,7 +104,7 @@ export const StatsCards = memo(function StatsCards() {
                 </CardHeader>
                 <CardContent>
                     <div className="text-2xl font-bold">
-                        {statsLoading ? "-" : ticketStats.userTickets}
+                        {ticketStats.userTickets}
                     </div>
                     <p className="text-xs text-muted-foreground">
                         {isAdmin ? "มอบหมายให้ฉัน" : "ที่ฉันแจ้ง"}

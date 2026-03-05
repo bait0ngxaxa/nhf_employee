@@ -26,16 +26,22 @@ export function DashboardSidebar() {
     return (
         <div
             className={cn(
-                "h-full bg-white/80 backdrop-blur-xl shadow-lg border-r border-gray-200/50 transition-all duration-300 flex flex-col z-20 overflow-hidden",
+                "h-full bg-white shadow-lg border-r border-gray-200/50 flex flex-col z-20 overflow-hidden will-change-transform",
                 sidebarOpen ? "w-64" : "w-16",
             )}
+            style={{
+                transition: "width 300ms cubic-bezier(0.4, 0, 0.2, 1)",
+            }}
         >
             {/* Header */}
             <div
                 className={cn(
-                    "border-b border-gray-100 transition-all duration-300",
+                    "border-b border-gray-100",
                     sidebarOpen ? "p-4" : "p-2",
                 )}
+                style={{
+                    transition: "padding 300ms cubic-bezier(0.4, 0, 0.2, 1)",
+                }}
             >
                 <div
                     className={cn(
@@ -69,31 +75,40 @@ export function DashboardSidebar() {
                     "flex-1 space-y-2 overflow-y-auto overflow-x-hidden custom-scrollbar",
                     sidebarOpen ? "p-4" : "p-2",
                 )}
+                style={{
+                    transition: "padding 300ms cubic-bezier(0.4, 0, 0.2, 1)",
+                }}
             >
                 <div className="relative group">
                     {/* Decorative Glow for Active State */}
-                    {selectedMenu === "dashboard" && (
+                    {selectedMenu === "dashboard" && sidebarOpen && (
                         <div
                             className={cn(
-                                `absolute inset-0 bg-gradient-to-r ${dashboardTheme.glow} opacity-20 blur-lg transition-all duration-500 rounded-xl`,
-                                !sidebarOpen && "opacity-0",
+                                `absolute inset-0 bg-gradient-to-r ${dashboardTheme.glow} opacity-20 rounded-xl`,
                             )}
+                            style={{ filter: "blur(16px)" }}
                         />
                     )}
                     <Button
                         variant="ghost"
                         className={cn(
-                            "relative w-full justify-start transition-all duration-300 overflow-hidden group/btn",
+                            "relative w-full justify-start overflow-hidden group/btn",
                             selectedMenu === "dashboard"
                                 ? `${dashboardTheme.activeBg} ${dashboardTheme.text} shadow-sm border-r-4 ${dashboardTheme.border}`
                                 : `${dashboardTheme.hover} text-gray-600 hover:text-gray-900`,
                             !sidebarOpen && "justify-center px-0 border-r-0",
                         )}
+                        style={{
+                            transition: "all 200ms ease-out",
+                        }}
                         onClick={() => handleMenuClick("dashboard")}
                     >
                         {/* Decorative Blob for Active State */}
                         {selectedMenu === "dashboard" && sidebarOpen && (
-                            <div className="absolute -right-2 -top-2 w-12 h-12 bg-blue-200/50 rounded-full blur-xl animate-pulse pointer-events-none" />
+                            <div 
+                                className="absolute -right-2 -top-2 w-12 h-12 bg-blue-200/50 rounded-full pointer-events-none" 
+                                style={{ filter: "blur(12px)" }}
+                            />
                         )}
 
                         <div
@@ -104,20 +119,29 @@ export function DashboardSidebar() {
                         >
                             <div
                                 className={cn(
-                                    "p-2 rounded-lg transition-all duration-300",
+                                    "p-2 rounded-lg",
                                     selectedMenu === "dashboard"
-                                        ? "bg-white/80 shadow-sm"
+                                        ? "bg-white shadow-sm"
                                         : `${dashboardTheme.lightBg} group-hover/btn:scale-110`,
                                 )}
+                                style={{
+                                    transition: "transform 200ms ease-out, background-color 200ms ease-out",
+                                }}
                             >
-                                <Settings
-                                    className={cn(
-                                        "h-4 w-4 transition-colors duration-300",
-                                        selectedMenu === "dashboard"
-                                            ? dashboardTheme.text
-                                            : "text-gray-500 group-hover/btn:text-gray-900",
-                                    )}
-                                />
+                                <span
+                                    style={{
+                                        transition: "color 200ms ease-out",
+                                    }}
+                                >
+                                    <Settings
+                                        className={cn(
+                                            "h-4 w-4",
+                                            selectedMenu === "dashboard"
+                                                ? dashboardTheme.text
+                                                : "text-gray-500 group-hover/btn:text-gray-900",
+                                        )}
+                                    />
+                                </span>
                             </div>
                             {sidebarOpen && (
                                 <span className="ml-3 font-medium whitespace-nowrap">
@@ -138,33 +162,37 @@ export function DashboardSidebar() {
                     return (
                         <div key={item.id} className="relative group">
                             {/* Decorative Glow for Active State */}
-                            {isActive && (
+                            {isActive && sidebarOpen && (
                                 <div
                                     className={cn(
-                                        `absolute inset-0 bg-gradient-to-r ${theme.glow} opacity-20 blur-lg transition-all duration-500 rounded-xl`,
-                                        !sidebarOpen && "opacity-0",
+                                        `absolute inset-0 bg-gradient-to-r ${theme.glow} opacity-20 rounded-xl`,
                                     )}
+                                    style={{ filter: "blur(16px)" }}
                                 />
                             )}
                             <Button
                                 variant="ghost"
                                 className={cn(
-                                    "relative w-full justify-start transition-all duration-300 overflow-hidden group/btn",
+                                    "relative w-full justify-start overflow-hidden group/btn",
                                     isActive
                                         ? `${theme.activeBg} ${theme.text} shadow-sm border-r-4 ${theme.border}`
                                         : `${theme.hover} text-gray-600 hover:text-gray-900`,
                                     !sidebarOpen &&
                                         "justify-center px-0 border-r-0",
                                 )}
+                                style={{
+                                    transition: "all 200ms ease-out",
+                                }}
                                 onClick={() => handleMenuClick(item.id)}
                             >
                                 {/* Decorative Blob for Active State - visible only when open to prevent overflow */}
                                 {isActive && sidebarOpen && (
                                     <div
                                         className={cn(
-                                            "absolute -right-2 -top-2 w-12 h-12 rounded-full blur-xl animate-pulse pointer-events-none",
+                                            "absolute -right-2 -top-2 w-12 h-12 rounded-full pointer-events-none",
                                             theme.activeBg,
                                         )}
+                                        style={{ filter: "blur(12px)" }}
                                     />
                                 )}
 
@@ -176,20 +204,29 @@ export function DashboardSidebar() {
                                 >
                                     <div
                                         className={cn(
-                                            "p-2 rounded-lg transition-all duration-300",
+                                            "p-2 rounded-lg",
                                             isActive
-                                                ? "bg-white/80 shadow-sm"
+                                                ? "bg-white shadow-sm"
                                                 : `${theme.lightBg} group-hover/btn:scale-110`,
                                         )}
+                                        style={{
+                                            transition: "transform 200ms ease-out, background-color 200ms ease-out",
+                                        }}
                                     >
-                                        <IconComponent
-                                            className={cn(
-                                                "h-4 w-4 transition-colors duration-300",
-                                                isActive
-                                                    ? theme.text
-                                                    : "text-gray-500 group-hover/btn:text-gray-900",
-                                            )}
-                                        />
+                                        <span
+                                            style={{
+                                                transition: "color 200ms ease-out",
+                                            }}
+                                        >
+                                            <IconComponent
+                                                className={cn(
+                                                    "h-4 w-4",
+                                                    isActive
+                                                        ? theme.text
+                                                        : "text-gray-500 group-hover/btn:text-gray-900",
+                                                )}
+                                            />
+                                        </span>
                                     </div>
                                     {sidebarOpen && (
                                         <span className="ml-3 font-medium whitespace-nowrap">
@@ -209,6 +246,9 @@ export function DashboardSidebar() {
                     "border-t border-gray-100",
                     sidebarOpen ? "p-4" : "p-2",
                 )}
+                style={{
+                    transition: "padding 300ms cubic-bezier(0.4, 0, 0.2, 1)",
+                }}
             >
                 {sidebarOpen && user && (
                     <div className="mb-3 p-3 bg-gradient-to-br from-gray-50 to-blue-50/50 rounded-xl border border-blue-100/50 overflow-hidden">

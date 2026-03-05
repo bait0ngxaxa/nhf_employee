@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { SuccessModal } from "@/components/SuccessModal";
+import { toast } from "sonner";
 import { useState, useEffect } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -32,9 +32,6 @@ export function LoginForm({
     });
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState("");
-    const [showSuccessModal, setShowSuccessModal] = useState(false);
-    const [loginSuccess, setLoginSuccess] = useState(false);
-    const [successMessage, setSuccessMessage] = useState("");
     const router = useRouter();
     const searchParams = useSearchParams();
 
@@ -42,8 +39,9 @@ export function LoginForm({
     useEffect(() => {
         const message = searchParams.get("message");
         if (message) {
-            setSuccessMessage(message);
-            setShowSuccessModal(true);
+            toast.success("สมัครสมาชิกสำเร็จ!", {
+                description: message,
+            });
             // Clean URL
             router.replace("/login");
         }
@@ -64,10 +62,15 @@ export function LoginForm({
             if (result?.error) {
                 setError("อีเมลหรือรหัสผ่านไม่ถูกต้อง");
             } else if (result?.ok) {
-                setLoginSuccess(true);
-                setShowSuccessModal(true);
+                toast.success("เข้าสู่ระบบสำเร็จ!", {
+                    description: "ยินดีต้อนรับ! กำลังนำคุณไปยังหน้าแดชบอร์ด",
+                });
                 // Reset form
                 setFormData({ email: "", password: "" });
+                // Redirect to dashboard after a short delay
+                setTimeout(() => {
+                    router.push("/dashboard");
+                }, 1500);
             }
         } catch {
             setError("เกิดข้อผิดพลาดในการเข้าสู่ระบบ");
@@ -76,13 +79,6 @@ export function LoginForm({
         }
     };
 
-    const handleModalClose = () => {
-        setShowSuccessModal(false);
-        setSuccessMessage("");
-        if (loginSuccess) {
-            router.push("/dashboard");
-        }
-    };
     return (
         <div className={cn("flex flex-col gap-6", className)} {...props}>
             <Card className="border-gray-200/50 shadow-xl shadow-gray-200/50 bg-white/80 backdrop-blur-xl rounded-3xl">
@@ -167,21 +163,6 @@ export function LoginForm({
                 </CardContent>
             </Card>
 
-            <SuccessModal
-                isOpen={showSuccessModal}
-                onClose={handleModalClose}
-                title={
-                    loginSuccess ? "เข้าสู่ระบบสำเร็จ!" : "สมัครสมาชิกสำเร็จ!"
-                }
-                description={
-                    loginSuccess
-                        ? "ยินดีต้อนรับ! คุณจะถูกนำไปยังหน้าแดชบอร์ด"
-                        : successMessage ||
-                          "บัญชีของคุณถูกสร้างเรียบร้อยแล้ว คุณสามารถเข้าสู่ระบบได้แล้ว"
-                }
-                buttonText={loginSuccess ? "ไปยังแดชบอร์ด" : "เข้าสู่ระบบ"}
-                onButtonClick={handleModalClose}
-            />
         </div>
     );
 }

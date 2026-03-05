@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useMemo, type ReactNode } from "react";
 import useSWR from "swr";
+import { toast } from "sonner";
 import { EmailRequestContext } from "./EmailRequestContext";
 import {
     type EmailRequest,
@@ -40,7 +41,6 @@ export function EmailRequestProvider({ children }: EmailRequestProviderProps) {
         useState<EmailRequestFormData>(initialFormData);
     const [isFormLoading, setIsFormLoading] = useState(false);
     const [formError, setFormError] = useState<string | null>(null);
-    const [showSuccessModal, setShowSuccessModal] = useState(false);
 
     // SWR for List
     const {
@@ -99,7 +99,9 @@ export function EmailRequestProvider({ children }: EmailRequestProviderProps) {
 
                 if (result.success) {
                     setFormData(initialFormData);
-                    setShowSuccessModal(true);
+                    toast.success("ส่งคำขออีเมลสำเร็จ", {
+                        description: "คำขออีเมลของคุณถูกส่งไปยังทีมไอทีแล้ว",
+                    });
                     mutate(); // Refresh the list
                 } else {
                     setFormError(result.error || "เกิดข้อผิดพลาด");
@@ -116,10 +118,6 @@ export function EmailRequestProvider({ children }: EmailRequestProviderProps) {
         [formData, mutate],
     );
 
-    const closeSuccessModal = useCallback(() => {
-        setShowSuccessModal(false);
-    }, []);
-
     const value = useMemo<EmailRequestContextValue>(
         () => ({
             emailRequests,
@@ -132,10 +130,8 @@ export function EmailRequestProvider({ children }: EmailRequestProviderProps) {
             formData,
             isFormLoading,
             formError,
-            showSuccessModal,
             handleInputChange,
             handleSubmit,
-            closeSuccessModal,
         }),
         [
             emailRequests,
@@ -148,10 +144,8 @@ export function EmailRequestProvider({ children }: EmailRequestProviderProps) {
             formData,
             isFormLoading,
             formError,
-            showSuccessModal,
             handleInputChange,
             handleSubmit,
-            closeSuccessModal,
         ],
     );
 

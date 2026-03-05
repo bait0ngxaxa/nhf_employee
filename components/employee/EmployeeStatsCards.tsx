@@ -1,3 +1,4 @@
+import React from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import {
     Users,
@@ -28,45 +29,54 @@ interface EmployeeStatsCardsProps {
     stats: EmployeeStats;
 }
 
-export function EmployeeStatsCards({ stats }: EmployeeStatsCardsProps) {
-    const statItems: StatItem[] = [
-        {
-            label: "พนักงานทั้งหมด",
-            value: stats.total,
-            unit: "คน",
-            gradient: "from-blue-600 to-cyan-600",
-            icon: Users,
-            bgClass: "bg-blue-50/50",
-            iconClass: "text-blue-600",
-        },
-        {
-            label: "พนักงานปัจจุบัน",
-            value: stats.active,
-            unit: "คน (Active)",
-            gradient: "from-green-500 to-emerald-600",
-            icon: UserCheck,
-            bgClass: "bg-green-50/50",
-            iconClass: "text-green-600",
-        },
-        {
-            label: "แผนกบริหาร",
-            value: stats.admin,
-            unit: "คน",
-            gradient: "from-orange-500 to-amber-600",
-            icon: Building2,
-            bgClass: "bg-orange-50/50",
-            iconClass: "text-orange-600",
-        },
-        {
-            label: "แผนกวิชาการ",
-            value: stats.academic,
-            unit: "คน",
-            gradient: "from-purple-500 to-violet-600",
-            icon: GraduationCap,
-            bgClass: "bg-purple-50/50",
-            iconClass: "text-purple-600",
-        },
+// Static configuration - defined outside component to prevent recreation
+const STAT_CONFIG: Omit<StatItem, 'value'>[] = [
+    {
+        label: "พนักงานทั้งหมด",
+        unit: "คน",
+        gradient: "from-blue-600 to-cyan-600",
+        icon: Users,
+        bgClass: "bg-blue-50/50",
+        iconClass: "text-blue-600",
+    },
+    {
+        label: "พนักงานปัจจุบัน",
+        unit: "คน (Active)",
+        gradient: "from-green-500 to-emerald-600",
+        icon: UserCheck,
+        bgClass: "bg-green-50/50",
+        iconClass: "text-green-600",
+    },
+    {
+        label: "แผนกบริหาร",
+        unit: "คน",
+        gradient: "from-orange-500 to-amber-600",
+        icon: Building2,
+        bgClass: "bg-orange-50/50",
+        iconClass: "text-orange-600",
+    },
+    {
+        label: "แผนกวิชาการ",
+        unit: "คน",
+        gradient: "from-purple-500 to-violet-600",
+        icon: GraduationCap,
+        bgClass: "bg-purple-50/50",
+        iconClass: "text-purple-600",
+    },
+];
+
+// Build stat items from config + stats data
+function buildStatItems(stats: EmployeeStats): StatItem[] {
+    return [
+        { ...STAT_CONFIG[0], value: stats.total },
+        { ...STAT_CONFIG[1], value: stats.active },
+        { ...STAT_CONFIG[2], value: stats.admin },
+        { ...STAT_CONFIG[3], value: stats.academic },
     ];
+}
+
+export const EmployeeStatsCards = React.memo(function EmployeeStatsCards({ stats }: EmployeeStatsCardsProps) {
+    const statItems = buildStatItems(stats);
 
     return (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
@@ -114,4 +124,4 @@ export function EmployeeStatsCards({ stats }: EmployeeStatsCardsProps) {
             })}
         </div>
     );
-}
+});

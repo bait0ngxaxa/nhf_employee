@@ -16,8 +16,29 @@ export function DashboardLayoutClient({
 
     if (status === "loading") {
         return (
-            <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600" />
+            <div className="flex h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+                {/* Sidebar Skeleton */}
+                <div className="w-64 bg-white shadow-lg border-r border-gray-200/50 p-4 hidden md:flex flex-col h-full">
+                    <div className="h-8 bg-gray-200 rounded-lg animate-pulse mb-6" />
+                    <div className="space-y-3 flex-1">
+                        {Array.from({ length: 6 }).map((_, i) => (
+                            <div
+                                key={i}
+                                className="h-10 bg-gray-100 rounded-xl animate-pulse"
+                            />
+                        ))}
+                    </div>
+                    <div className="h-20 bg-gray-100 rounded-xl animate-pulse mt-4" />
+                </div>
+
+                {/* Main Content Skeleton */}
+                <div className="flex-1 flex items-center justify-center">
+                    <div className="animate-pulse space-y-4">
+                        <div className="h-8 bg-gray-200 rounded w-48 mx-auto" />
+                        <div className="h-4 bg-gray-200 rounded w-64 mx-auto" />
+                        <div className="h-32 bg-gray-200 rounded w-96 mx-auto mt-8" />
+                    </div>
+                </div>
             </div>
         );
     }
@@ -45,10 +66,19 @@ export function DashboardLayoutClient({
 
             {/* Main Content Area */}
             <div className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
-                {/* Background Effects */}
-                <div className="absolute inset-0 overflow-hidden pointer-events-none">
-                    <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-blue-200/30 rounded-full blur-3xl" />
-                    <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-purple-200/30 rounded-full blur-3xl" />
+            {/* Background Effects - Optimized with contain */}
+                <div 
+                    className="absolute inset-0 overflow-hidden pointer-events-none contain-paint"
+                    style={{ willChange: 'transform' }}
+                >
+                    <div 
+                        className="absolute top-0 right-0 w-[400px] h-[400px] bg-blue-200/20 rounded-full" 
+                        style={{ filter: 'blur(80px)' }}
+                    />
+                    <div 
+                        className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-purple-200/20 rounded-full" 
+                        style={{ filter: 'blur(80px)' }}
+                    />
                 </div>
 
                 {/* Navbar */}

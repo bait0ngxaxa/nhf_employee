@@ -3,9 +3,18 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { EmailRequestProvider } from "@/components/dashboard/context/email-request/EmailRequestProvider";
 import { useEmailRequestContext } from "@/components/dashboard/context/email-request/EmailRequestContext";
 import useSWR from "swr";
+import { toast } from "sonner";
 
 // Mock useSWR
 vi.mock("swr");
+
+// Mock sonner toast
+vi.mock("sonner", () => ({
+    toast: {
+        success: vi.fn(),
+        error: vi.fn(),
+    },
+}));
 
 // Mock fetch
 global.fetch = vi.fn();
@@ -18,8 +27,6 @@ const TestComponent = () => {
         emailRequests,
         isFormLoading,
         formError,
-        showSuccessModal,
-        closeSuccessModal,
     } = useEmailRequestContext();
 
     return (
@@ -28,9 +35,6 @@ const TestComponent = () => {
                 {isFormLoading ? "Loading" : "Idle"}
             </div>
             <div data-testid="error-state">{formError}</div>
-            <div data-testid="success-modal">
-                {showSuccessModal ? "Modal Open" : "Modal Closed"}
-            </div>
             <input
                 data-testid="input-thaiName"
                 name="thaiName"
@@ -39,9 +43,6 @@ const TestComponent = () => {
             />
             <button data-testid="submit-btn" onClick={handleSubmit}>
                 Submit
-            </button>
-            <button data-testid="close-modal-btn" onClick={closeSuccessModal}>
-                Close Modal
             </button>
             <ul data-testid="request-list">
                 {emailRequests.map((req) => (
@@ -93,7 +94,7 @@ describe("EmailRequestProvider", () => {
         expect(input).toHaveValue("New Name");
     });
 
-    it("should handle successful submission", async () => {
+    it("should handle successful submission and show toast", async () => {
         (global.fetch as any).mockResolvedValueOnce({
             json: async () => ({ success: true }),
         });
@@ -117,9 +118,13 @@ describe("EmailRequestProvider", () => {
             );
         });
 
+        // Check that toast.success was called
         await waitFor(() => {
-            expect(screen.getByTestId("success-modal").textContent).toBe(
-                "Modal Open",
+            expect(toast.success).toHaveBeenCalledWith(
+                "ส่งคำขออีเมลสำเร็จ",
+                expect.objectContaining({
+                    description: "คำขออีเมลของคุณถูกส่งไปยังทีมไอทีแล้ว",
+                }),
             );
         });
 

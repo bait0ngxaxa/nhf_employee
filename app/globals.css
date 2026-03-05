@@ -121,3 +121,16 @@
             sans-serif;
     }
 }
+
+/* Hide default loading indicators */
+[data-loading-indicator],
+.loading-indicator,
+.nprogress {
+    display: none !important;
+}
+
+/* Prevent loading spinner flash */
+html {
+    visibility: visible;
+    opacity: 1;
+}

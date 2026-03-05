@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { SuccessModal } from "@/components/SuccessModal";
+import { toast } from "sonner";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTitle } from "@/hooks/useTitle";
@@ -45,9 +45,6 @@ export function SignupForm({
     });
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState("");
-    const [showSuccessModal, setShowSuccessModal] = useState(false);
-    const [successData, setSuccessData] =
-        useState<SignupSuccessResponse | null>(null);
     const router = useRouter();
     useTitle("สมัครสมาชิก | NHF IT System");
 
@@ -89,8 +86,9 @@ export function SignupForm({
 
             if (response.ok) {
                 const data: SignupSuccessResponse = await response.json();
-                setSuccessData(data);
-                setShowSuccessModal(true);
+                toast.success("สมัครสมาชิกสำเร็จ!", {
+                    description: `ยินดีต้อนรับ${data.user?.name ? ` ${data.user.name}` : ""}! บัญชีของคุณถูกสร้างเรียบร้อยแล้ว`,
+                });
                 // Reset form
                 setFormData({
                     name: "",
@@ -98,6 +96,10 @@ export function SignupForm({
                     password: "",
                     confirmPassword: "",
                 });
+                // Redirect to login
+                setTimeout(() => {
+                    router.push("/login");
+                }, 2000);
             } else {
                 const data: SignupErrorResponse = await response.json();
                 setError(data.error || "เกิดข้อผิดพลาดในการสมัครสมาชิก");
@@ -109,10 +111,7 @@ export function SignupForm({
         }
     };
 
-    const handleModalClose = () => {
-        setShowSuccessModal(false);
-        router.push("/login");
-    };
+
 
     return (
         <div className={cn("flex flex-col gap-6", className)} {...props}>
@@ -247,18 +246,6 @@ export function SignupForm({
                 </CardContent>
             </Card>
 
-            <SuccessModal
-                isOpen={showSuccessModal}
-                onClose={handleModalClose}
-                title="สมัครสมาชิกสำเร็จ!"
-                description={`ยินดีต้อนรับ! บัญชีผู้ใช้ของคุณถูกสร้างเรียบร้อยแล้ว${
-                    successData?.user?.name
-                        ? ` สำหรับ ${successData.user.name}`
-                        : ""
-                } คุณสามารถเข้าสู่ระบบได้ทันที`}
-                buttonText="ไปหน้าเข้าสู่ระบบ"
-                onButtonClick={handleModalClose}
-            />
         </div>
     );
 }

@@ -5,10 +5,12 @@ import {
     useCallback,
     useEffect,
     useMemo,
+    useRef,
     startTransition,
     type ReactNode,
 } from "react";
 import useSWR from "swr";
+import { toast } from "sonner";
 import { type Employee, type EmployeeCSVData } from "@/types/employees";
 import { PAGINATION_DEFAULTS } from "@/constants/ui";
 import {
@@ -61,11 +63,6 @@ export function EmployeeProvider({ children }: EmployeeProviderProps) {
     const [isExporting, setIsExporting] = useState(false);
     const [isEditFormOpen, setIsEditFormOpen] = useState(false);
     const [employeeToEdit, setEmployeeToEdit] = useState<Employee | null>(null);
-    const [showEditSuccessModal, setShowEditSuccessModal] = useState(false);
-    const [lastEditedEmployee, setLastEditedEmployee] = useState<{
-        firstName: string;
-        lastName: string;
-    } | null>(null);
     const [refreshTrigger, setRefreshTrigger] = useState(0);
     const [exportData, setExportData] = useState<EmployeeCSVData[]>([]);
 
@@ -88,6 +85,12 @@ export function EmployeeProvider({ children }: EmployeeProviderProps) {
     // SWR Hook
     const { data, mutate, isLoading, error: swrError } = useSWR(swrKey);
 
+    // Keep mutate stable using ref to prevent unnecessary re-renders
+    const mutateRef = useRef(mutate);
+    useEffect(() => {
+        mutateRef.current = mutate;
+    }, [mutate]);
+
     // Derived data - wrapped in useMemo to prevent exhaustive-deps warning in dataValue
     const { employees, pagination, error } = useMemo(() => {
         return {
@@ -102,9 +105,9 @@ export function EmployeeProvider({ children }: EmployeeProviderProps) {
     // Force refresh when refreshTrigger changes
     useEffect(() => {
         if (refreshTrigger > 0) {
-            mutate();
+            mutateRef.current();
         }
-    }, [refreshTrigger, mutate]);
+    }, [refreshTrigger]);
 
     const handlePageChange = useCallback((page: number) => {
         setCurrentPage(page);
@@ -216,32 +219,28 @@ export function EmployeeProvider({ children }: EmployeeProviderProps) {
 
     const handleEmployeeUpdate = useCallback(() => {
         const employeeName = employeeToEdit
-            ? {
-                  firstName: employeeToEdit.firstName,
-                  lastName: employeeToEdit.lastName,
-              }
-            : null;
+            ? `${employeeToEdit.firstName} ${employeeToEdit.lastName}`
+            : "พนักงาน";
 
         setIsEditFormOpen(false);
         setEmployeeToEdit(null);
 
-        setTimeout(() => {
-            startTransition(() => {
-                if (employeeName) {
-                    setLastEditedEmployee(employeeName);
-                }
-                setShowEditSuccessModal(true);
-            });
-        }, 100);
+        // Show toast notification instead of modal
+        toast.success("อัปเดตข้อมูลสำเร็จ", {
+            description: `ข้อมูลของ ${employeeName} ได้รับการอัปเดตเรียบร้อยแล้ว`,
+        });
 
-        mutate(); // Revalidate SWR
-    }, [employeeToEdit, mutate]);
+        mutateRef.current(); // Revalidate SWR
+    }, [employeeToEdit]);
 
+    // Stable triggerRefresh that doesn't depend on mutate identity
     const triggerRefresh = useCallback(async () => {
-        await mutate();
+        await mutateRef.current();
         setRefreshTrigger((prev) => prev + 1);
-    }, [mutate]);
+    }, []);
 
+    // Split data into stable references to reduce context updates
+    // triggerRefresh is intentionally excluded - it's kept stable via ref pattern
     const dataValue = useMemo<EmployeeDataContextValue>(
         () => ({
             employees,
@@ -254,63 +253,60 @@ export function EmployeeProvider({ children }: EmployeeProviderProps) {
             refreshTrigger,
             triggerRefresh,
         }),
-        [
-            employees,
-            pagination,
-            isLoading,
-            error,
-            triggerRefresh,
-            refreshTrigger,
-        ],
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        [employees, pagination.total, pagination.totalPages, isLoading, error, refreshTrigger],
     );
+
+    // Split UI handlers into a separate memoized object to reduce dependencies
+    const uiHandlers = useMemo(() => ({
+        handleSearchTermChange,
+        handleStatusFilterChange,
+        handlePageChange,
+        handlePreviousPage,
+        handleNextPage,
+        getExportData,
+        getExportFileName,
+        handleExportCSV,
+        handleEditEmployee,
+        handleCloseEditForm,
+        handleEmployeeUpdate,
+    }), [
+        handleSearchTermChange,
+        handleStatusFilterChange,
+        handlePageChange,
+        handlePreviousPage,
+        handleNextPage,
+        getExportData,
+        getExportFileName,
+        handleExportCSV,
+        handleEditEmployee,
+        handleCloseEditForm,
+        handleEmployeeUpdate,
+    ]);
 
     const uiValue = useMemo<EmployeeUIContextValue>(
         () => ({
             searchTerm,
-            setSearchTerm: handleSearchTermChange,
+            setSearchTerm: uiHandlers.handleSearchTermChange,
             statusFilter,
-            setStatusFilter: handleStatusFilterChange,
+            setStatusFilter: uiHandlers.handleStatusFilterChange,
             currentPage,
             itemsPerPage,
-            handlePageChange,
-            handlePreviousPage,
-            handleNextPage,
+            handlePageChange: uiHandlers.handlePageChange,
+            handlePreviousPage: uiHandlers.handlePreviousPage,
+            handleNextPage: uiHandlers.handleNextPage,
             isExporting,
-            getExportData,
-            getExportFileName,
-            handleExportCSV,
+            getExportData: uiHandlers.getExportData,
+            getExportFileName: uiHandlers.getExportFileName,
+            handleExportCSV: uiHandlers.handleExportCSV,
             isEditFormOpen,
             employeeToEdit,
-            showEditSuccessModal,
-            lastEditedEmployee,
-            handleEditEmployee,
-            handleCloseEditForm,
-            handleEmployeeUpdate,
-            setShowEditSuccessModal,
+            handleEditEmployee: uiHandlers.handleEditEmployee,
+            handleCloseEditForm: uiHandlers.handleCloseEditForm,
+            handleEmployeeUpdate: uiHandlers.handleEmployeeUpdate,
         }),
-        [
-            searchTerm,
-            handleSearchTermChange,
-            statusFilter,
-            handleStatusFilterChange,
-            currentPage,
-            itemsPerPage,
-            handlePageChange,
-            handlePreviousPage,
-            handleNextPage,
-            isExporting,
-            getExportData,
-            getExportFileName,
-            handleExportCSV,
-            isEditFormOpen,
-            employeeToEdit,
-            showEditSuccessModal,
-            lastEditedEmployee,
-            handleEditEmployee,
-            handleCloseEditForm,
-            handleEmployeeUpdate,
-            setShowEditSuccessModal,
-        ],
+        // Reduce dependencies - only state values that change
+        [searchTerm, statusFilter, currentPage, itemsPerPage, isExporting, isEditFormOpen, employeeToEdit, uiHandlers],
     );
 
     return (
