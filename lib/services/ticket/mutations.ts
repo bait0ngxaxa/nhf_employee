@@ -1,3 +1,4 @@
+﻿import { OUTBOX_NOTIFICATION_TYPES } from "@/lib/services/outbox/types";
 import { prisma } from "@/lib/prisma";
 import { TICKET_WITH_USERS_INCLUDE } from "./constants";
 import type {
@@ -44,11 +45,7 @@ function buildUpdateFields(
         // Handle resolvedAt timestamp
         if (data.status === "RESOLVED") {
             updateFields.resolvedAt = new Date();
-        } else if (
-            data.status &&
-            data.status !== "RESOLVED" &&
-            existingTicket.resolvedAt
-        ) {
+        } else if (data.status && existingTicket.resolvedAt) {
             updateFields.resolvedAt = null;
         }
     }
@@ -72,15 +69,27 @@ export async function createTicket(
     data: CreateTicketData,
     userId: number,
 ): Promise<TicketWithRelations> {
-    const ticket = await prisma.ticket.create({
-        data: {
-            title: data.title,
-            description: data.description,
-            category: data.category,
-            priority: data.priority,
-            reportedById: userId,
-        },
-        include: TICKET_WITH_USERS_INCLUDE,
+    const ticket = await prisma.$transaction(async (tx) => {
+        const newTicket = await tx.ticket.create({
+            data: {
+                title: data.title,
+                description: data.description,
+                category: data.category,
+                priority: data.priority,
+                reportedById: userId,
+            },
+            include: TICKET_WITH_USERS_INCLUDE,
+        });
+
+        // Add to outbox for LINE/Email notifications
+        await tx.notificationOutbox.create({
+            data: {
+                type: OUTBOX_NOTIFICATION_TYPES[0],
+                payload: JSON.stringify({ ticketId: newTicket.id }),
+            },
+        });
+
+        return newTicket;
     });
 
     return ticket as TicketWithRelations;
@@ -118,17 +127,37 @@ export async function updateTicket(
         return { ticket: null, error: "Access denied", status: 403 };
     }
 
-    // Build and apply updates
+    // Build and apply updates within transaction
     const updateFields = buildUpdateFields(data, existingTicket, permissions);
 
-    const updatedTicket = await prisma.ticket.update({
-        where: { id: ticketId },
-        data: updateFields,
-        include: TICKET_WITH_USERS_INCLUDE,
+    const result = await prisma.$transaction(async (tx) => {
+        const updatedTicket = await tx.ticket.update({
+            where: { id: ticketId },
+            data: updateFields,
+            include: TICKET_WITH_USERS_INCLUDE,
+        });
+
+        // Add to outbox only if status was changed
+        if (
+            updateFields.status &&
+            updateFields.status !== existingTicket.status
+        ) {
+            await tx.notificationOutbox.create({
+                data: {
+                    type: OUTBOX_NOTIFICATION_TYPES[1],
+                    payload: JSON.stringify({
+                        ticketId: updatedTicket.id,
+                        oldStatus: existingTicket.status,
+                    }),
+                },
+            });
+        }
+
+        return updatedTicket;
     });
 
     return {
-        ticket: updatedTicket as TicketWithRelations,
+        ticket: result as TicketWithRelations,
         oldStatus: existingTicket.status,
     };
 }

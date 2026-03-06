@@ -1,9 +1,11 @@
-import { type NextRequest, NextResponse } from "next/server";
+﻿import { type NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { updateTicketSchema } from "@/lib/validations/ticket";
 import { ticketService, type UpdateTicketData } from "@/lib/services/ticket";
 import { buildUserContext } from "@/lib/context";
+import { processOutbox } from "@/lib/services/outbox/processor";
+import { after } from "next/server";
 
 /**
  * Parse and validate ticket ID from params
@@ -96,7 +98,7 @@ export async function PATCH(
         if (!validationResult.success) {
             const errors = validationResult.error.flatten();
             return NextResponse.json(
-                { error: "ข้อมูลไม่ถูกต้อง", details: errors.fieldErrors },
+                { error: "เธเนเธญเธกเธนเธฅเนเธกเนเธ–เธนเธเธ•เนเธญเธ", details: errors.fieldErrors },
                 { status: 400 },
             );
         }
@@ -135,18 +137,12 @@ export async function PATCH(
             );
         }
 
-        // Send notifications if status changed (non-blocking)
-        if (
-            updateData.status &&
-            result.oldStatus &&
-            result.ticket &&
-            updateData.status !== result.oldStatus
-        ) {
-            ticketService.sendTicketUpdatedNotifications(
-                result.ticket,
-                result.oldStatus,
+        // (Notifications are now triggered transactionally via outbox)
+        after(async () => {
+            processOutbox().catch((err) =>
+                console.error("Outbox processor failed:", err),
             );
-        }
+        });
 
         return NextResponse.json({ ticket: result.ticket }, { status: 200 });
     } catch (error) {
@@ -204,3 +200,4 @@ export async function DELETE(
         );
     }
 }
+

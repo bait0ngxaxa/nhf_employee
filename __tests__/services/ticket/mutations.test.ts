@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+﻿import { describe, it, expect, vi, beforeEach } from "vitest";
 import { mockDeep, mockReset } from "vitest-mock-extended";
 import { prisma } from "@/lib/prisma";
 import {
@@ -16,23 +16,38 @@ const prismaMock = prisma as unknown as ReturnType<
     typeof mockDeep<PrismaClient>
 >;
 
+function asNever<T>(value: T): never {
+    return value as unknown as never;
+}
+
 describe("Ticket Mutations", () => {
     beforeEach(() => {
         mockReset(prismaMock);
+        prismaMock.$transaction.mockImplementation(async (arg) => {
+            if (Array.isArray(arg)) {
+                return Promise.all(arg);
+            }
+
+            const callback = arg as (client: PrismaClient) => unknown;
+            return callback(prismaMock as unknown as PrismaClient);
+        });
     });
 
     describe("createTicket", () => {
-        it("should create ticket", async () => {
+        it("should create ticket and enqueue outbox", async () => {
             const data = {
                 title: "T",
                 description: "D",
                 category: "HARDWARE" as const,
                 priority: "LOW" as const,
             };
-            prismaMock.ticket.create.mockResolvedValue({
-                id: 1,
-                ...data,
-            } as any);
+
+            prismaMock.ticket.create.mockResolvedValue(
+                asNever({
+                    id: 1,
+                    ...data,
+                }),
+            );
 
             await createTicket(data, 1);
 
@@ -42,6 +57,14 @@ describe("Ticket Mutations", () => {
                         title: "T",
                         reportedById: 1,
                     }),
+                }),
+            );
+            expect(prismaMock.notificationOutbox.create).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    data: {
+                        type: "TICKET_CREATED",
+                        payload: JSON.stringify({ ticketId: 1 }),
+                    },
                 }),
             );
         });
@@ -57,12 +80,14 @@ describe("Ticket Mutations", () => {
 
         it("should allow owner to update title if OPEN", async () => {
             prismaMock.ticket.findUnique.mockResolvedValue(
-                existingTicket as any,
+                asNever(existingTicket),
             );
-            prismaMock.ticket.update.mockResolvedValue({
-                ...existingTicket,
-                title: "New",
-            } as any);
+            prismaMock.ticket.update.mockResolvedValue(
+                asNever({
+                    ...existingTicket,
+                    title: "New",
+                }),
+            );
 
             const user = { id: 10, role: "USER", email: "" };
             const result = await updateTicket(1, { title: "New" }, user);
@@ -77,14 +102,13 @@ describe("Ticket Mutations", () => {
 
         it("should NOT allow owner to update status", async () => {
             prismaMock.ticket.findUnique.mockResolvedValue(
-                existingTicket as any,
+                asNever(existingTicket),
             );
-            prismaMock.ticket.update.mockResolvedValue(existingTicket as any);
+            prismaMock.ticket.update.mockResolvedValue(asNever(existingTicket));
 
             const user = { id: 10, role: "USER", email: "" };
             await updateTicket(1, { status: "RESOLVED" }, user);
 
-            // updateFields should NOT contain status
             expect(prismaMock.ticket.update).toHaveBeenCalledWith(
                 expect.objectContaining({
                     data: expect.not.objectContaining({ status: "RESOLVED" }),
@@ -92,14 +116,16 @@ describe("Ticket Mutations", () => {
             );
         });
 
-        it("should allow admin to update status", async () => {
+        it("should allow admin to update status and enqueue outbox", async () => {
             prismaMock.ticket.findUnique.mockResolvedValue(
-                existingTicket as any,
+                asNever(existingTicket),
             );
-            prismaMock.ticket.update.mockResolvedValue({
-                ...existingTicket,
-                status: "RESOLVED",
-            } as any);
+            prismaMock.ticket.update.mockResolvedValue(
+                asNever({
+                    ...existingTicket,
+                    status: "RESOLVED",
+                }),
+            );
 
             const user = { id: 99, role: "ADMIN", email: "" };
             await updateTicket(1, { status: "RESOLVED" }, user);
@@ -107,6 +133,17 @@ describe("Ticket Mutations", () => {
             expect(prismaMock.ticket.update).toHaveBeenCalledWith(
                 expect.objectContaining({
                     data: expect.objectContaining({ status: "RESOLVED" }),
+                }),
+            );
+            expect(prismaMock.notificationOutbox.create).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    data: {
+                        type: "TICKET_UPDATED",
+                        payload: JSON.stringify({
+                            ticketId: 1,
+                            oldStatus: "OPEN",
+                        }),
+                    },
                 }),
             );
         });
@@ -121,7 +158,7 @@ describe("Ticket Mutations", () => {
         });
 
         it("should allow admin", async () => {
-            prismaMock.ticket.findUnique.mockResolvedValue({ id: 1 } as any);
+            prismaMock.ticket.findUnique.mockResolvedValue(asNever({ id: 1 }));
             const user = { id: 99, role: "ADMIN", email: "" };
             const result = await deleteTicket(1, user);
             expect(result.success).toBe(true);
@@ -129,3 +166,4 @@ describe("Ticket Mutations", () => {
         });
     });
 });
+

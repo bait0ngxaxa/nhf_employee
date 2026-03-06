@@ -7,8 +7,6 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-
-
 model User {
   id              Int             @id @default(autoincrement())
   email           String          @unique
@@ -145,19 +143,32 @@ enum TicketStatus {
   CANCELLED
 }
 
+enum NotificationOutboxType {
+  TICKET_CREATED
+  TICKET_UPDATED
+  EMAIL_REQUEST
+}
+
+enum NotificationOutboxStatus {
+  PENDING
+  PROCESSING
+  SENT
+  FAILED
+}
+
 // Audit Log for tracking critical actions per agent.md security standards
 model AuditLog {
-  id          Int         @id @default(autoincrement())
-  action      AuditAction
-  entityType  String      // e.g., "User", "Employee", "Ticket"
-  entityId    Int?        // ID of the affected entity
-  userId      Int?        // User who performed the action
-  userEmail   String?     // Email for reference even if user deleted
-  ipAddress   String?     // Client IP address
-  userAgent   String?     @db.Text // Browser/client info
-  details     String?     @db.Text // JSON string with additional details
-  createdAt   DateTime    @default(now())
-  user        User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
+  id         Int         @id @default(autoincrement())
+  action     AuditAction
+  entityType String // e.g., "User", "Employee", "Ticket"
+  entityId   Int? // ID of the affected entity
+  userId     Int? // User who performed the action
+  userEmail  String? // Email for reference even if user deleted
+  ipAddress  String? // Client IP address
+  userAgent  String?     @db.Text // Browser/client info
+  details    String?     @db.Text // JSON string with additional details
+  createdAt  DateTime    @default(now())
+  user       User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   @@index([userId])
   @@index([action])
@@ -173,27 +184,27 @@ enum AuditAction {
   LOGOUT
   PASSWORD_CHANGE
   PASSWORD_RESET
-  
+
   // Employee management
   EMPLOYEE_CREATE
   EMPLOYEE_UPDATE
   EMPLOYEE_DELETE
   EMPLOYEE_STATUS_CHANGE
   EMPLOYEE_IMPORT
-  
+
   // Ticket management
   TICKET_CREATE
   TICKET_UPDATE
   TICKET_STATUS_CHANGE
   TICKET_ASSIGN
   TICKET_COMMENT
-  
+
   // Admin actions
   USER_CREATE
   USER_UPDATE
   USER_DELETE
   USER_ROLE_CHANGE
-  
+
   // System
   SETTINGS_UPDATE
   DATA_EXPORT
@@ -202,18 +213,18 @@ enum AuditAction {
 
 // Email Request History for tracking new employee email requests
 model EmailRequest {
-  id           Int      @id @default(autoincrement())
-  thaiName     String
-  englishName  String
-  phone        String
-  nickname     String
-  position     String
-  department   String
-  replyEmail   String
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  requestedBy  Int
-  user         User     @relation(fields: [requestedBy], references: [id])
+  id          Int      @id @default(autoincrement())
+  thaiName    String
+  englishName String
+  phone       String
+  nickname    String
+  position    String
+  department  String
+  replyEmail  String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  requestedBy Int
+  user        User     @relation(fields: [requestedBy], references: [id])
 
   @@index([requestedBy])
   @@index([createdAt])
@@ -233,3 +244,23 @@ model PasswordResetToken {
   @@index([expiresAt])
   @@map("password_reset_tokens")
 }
+
+// Transactional Outbox for reliable notifications (Email & LINE)
+model NotificationOutbox {
+  id        Int                      @id @default(autoincrement())
+  type      NotificationOutboxType
+  payload   String                   @db.Text // JSON string containing notification details
+  status    NotificationOutboxStatus @default(PENDING)
+  attempts  Int                      @default(0)
+  error     String?                  @db.Text
+  createdAt DateTime                 @default(now())
+  updatedAt DateTime                 @updatedAt
+
+  @@index([status])
+  @@index([createdAt])
+  @@map("notification_outbox")
+}
+
+
+
+

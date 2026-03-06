@@ -1,4 +1,4 @@
-import { type NextRequest, NextResponse } from "next/server";
+﻿import { type NextRequest, NextResponse, after } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { createAuditLog } from "@/lib/audit";
@@ -8,6 +8,7 @@ import {
     type EmailRequestFilters,
 } from "@/lib/services/email-request";
 import { buildUserContext } from "@/lib/context";
+import { processOutbox } from "@/lib/services/outbox/processor";
 
 // POST - Create new email request
 export async function POST(req: NextRequest): Promise<NextResponse> {
@@ -15,7 +16,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         const session = await getServerSession(authOptions);
         if (!session?.user) {
             return NextResponse.json(
-                { success: false, error: "กรุณาเข้าสู่ระบบ" },
+                { success: false, error: "เธเธฃเธธเธ“เธฒเน€เธเนเธฒเธชเธนเนเธฃเธฐเธเธ" },
                 { status: 401 },
             );
         }
@@ -24,7 +25,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
             return NextResponse.json(
                 {
                     success: false,
-                    error: `ไม่มีสิทธิ์เข้าถึง (Role: ${session.user.role})`,
+                    error: `เนเธกเนเธกเธตเธชเธดเธ—เธเธดเนเน€เธเนเธฒเธ–เธถเธ (Role: ${session.user.role})`,
                 },
                 { status: 403 },
             );
@@ -77,9 +78,15 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
             },
         });
 
+        after(async () => {
+            processOutbox().catch((err) =>
+                console.error("Outbox processor failed:", err),
+            );
+        });
+
         return NextResponse.json({
             success: true,
-            message: "ส่งคำขออีเมลพนักงานใหม่เรียบร้อยแล้ว",
+            message: "เธชเนเธเธเธณเธเธญเธญเธตเน€เธกเธฅเธเธเธฑเธเธเธฒเธเนเธซเธกเนเน€เธฃเธตเธขเธเธฃเนเธญเธขเนเธฅเนเธง",
             data: {
                 id: result.emailRequest.id,
                 thaiName: validation.data.thaiName,
@@ -91,11 +98,11 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
             },
         });
     } catch (error) {
-        console.error("❌ Error processing email request:", error);
+        console.error("โ Error processing email request:", error);
         return NextResponse.json(
             {
                 success: false,
-                error: "เกิดข้อผิดพลาดในระบบ กรุณาลองใหม่อีกครั้ง",
+                error: "เน€เธเธดเธ”เธเนเธญเธเธดเธ”เธเธฅเธฒเธ”เนเธเธฃเธฐเธเธ เธเธฃเธธเธ“เธฒเธฅเธญเธเนเธซเธกเนเธญเธตเธเธเธฃเธฑเนเธ",
             },
             { status: 500 },
         );
@@ -108,7 +115,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
         const session = await getServerSession(authOptions);
         if (!session?.user) {
             return NextResponse.json(
-                { success: false, error: "กรุณาเข้าสู่ระบบ" },
+                { success: false, error: "เธเธฃเธธเธ“เธฒเน€เธเนเธฒเธชเธนเนเธฃเธฐเธเธ" },
                 { status: 401 },
             );
         }
@@ -130,10 +137,11 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
             ...result,
         });
     } catch (error) {
-        console.error("❌ Error fetching email requests:", error);
+        console.error("โ Error fetching email requests:", error);
         return NextResponse.json(
-            { success: false, error: "เกิดข้อผิดพลาดในการโหลดข้อมูล" },
+            { success: false, error: "เน€เธเธดเธ”เธเนเธญเธเธดเธ”เธเธฅเธฒเธ”เนเธเธเธฒเธฃเนเธซเธฅเธ”เธเนเธญเธกเธนเธฅ" },
             { status: 500 },
         );
     }
 }
+

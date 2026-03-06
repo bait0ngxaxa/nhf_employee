@@ -1,4 +1,4 @@
-import { emailService } from "@/lib/email";
+﻿import { emailService } from "@/lib/email";
 import { lineNotificationService } from "@/lib/line";
 import type { TicketEmailData } from "@/types/api";
 import type { TicketWithRelations } from "./types";
@@ -40,47 +40,37 @@ function buildEmailData(ticket: TicketWithRelations): TicketEmailData {
 }
 
 /**
- * Send notifications when a new ticket is created
- * Sends LINE notification (IT team for high priority) and email notifications
+ * Send notifications when a new ticket is created.
+ * Throws on error so caller can mark outbox as FAILED.
  */
 export async function sendTicketCreatedNotifications(
     ticket: TicketWithRelations,
 ): Promise<void> {
-    try {
-        const emailData = buildEmailData(ticket);
+    const emailData = buildEmailData(ticket);
 
-        // Send LINE notification (single notification - use IT team style for high priority)
-        if (ticket.priority === "HIGH" || ticket.priority === "URGENT") {
-            await lineNotificationService.sendITTeamNotification(emailData);
-        } else {
-            await lineNotificationService.sendNewTicketNotification(emailData);
-        }
+    if (ticket.priority === "HIGH" || ticket.priority === "URGENT") {
+        await lineNotificationService.sendITTeamNotification(emailData);
+    } else {
+        await lineNotificationService.sendNewTicketNotification(emailData);
+    }
 
-        // Send email notifications
-        await emailService.sendNewTicketNotification(emailData);
-        if (ticket.priority === "HIGH" || ticket.priority === "URGENT") {
-            await emailService.sendITTeamNotification(emailData);
-        }
-    } catch (error) {
-        console.error("❌ Failed to send ticket created notifications:", error);
-        // Don't throw - notifications should not block ticket creation
+    await emailService.sendNewTicketNotification(emailData);
+    if (ticket.priority === "HIGH" || ticket.priority === "URGENT") {
+        await emailService.sendITTeamNotification(emailData);
     }
 }
 
 /**
- * Send notifications when a ticket status is updated
+ * Send notifications when a ticket status is updated.
+ * Throws on error so caller can mark outbox as FAILED.
  */
 export async function sendTicketUpdatedNotifications(
     ticket: TicketWithRelations,
     oldStatus: string,
 ): Promise<void> {
-    try {
-        const emailData = buildEmailData(ticket);
+    const emailData = buildEmailData(ticket);
 
-        await emailService.sendStatusUpdateNotification(emailData, oldStatus);
-        await lineNotificationService.sendStatusUpdateNotification(emailData);
-    } catch (error) {
-        console.error("❌ Failed to send ticket update notifications:", error);
-        // Don't throw - notifications should not block ticket update
-    }
+    await emailService.sendStatusUpdateNotification(emailData, oldStatus);
+    await lineNotificationService.sendStatusUpdateNotification(emailData);
 }
+

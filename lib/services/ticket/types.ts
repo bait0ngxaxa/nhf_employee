@@ -1,18 +1,19 @@
-import type {
+﻿import type {
     Ticket,
     TicketComment,
     TicketView,
     TicketCategory,
     TicketPriority,
+    TicketStatus,
 } from "@prisma/client";
 
 // ==================== Input Types ====================
 
 /** Filters for querying tickets list */
 export interface TicketFilters {
-    status?: string;
-    category?: string;
-    priority?: string;
+    status?: TicketStatus;
+    category?: TicketCategory;
+    priority?: TicketPriority;
     page: number;
     limit: number;
 }
@@ -36,9 +37,9 @@ export interface CreateTicketData {
 export interface UpdateTicketData {
     title?: string;
     description?: string;
-    category?: string;
-    priority?: string;
-    status?: string;
+    category?: TicketCategory;
+    priority?: TicketPriority;
+    status?: TicketStatus;
     assignedToId?: number | null;
     resolution?: string | null;
 }
@@ -135,3 +136,4 @@ export interface PermissionCheck {
     isAdmin: boolean;
     hasAccess: boolean;
 }
+

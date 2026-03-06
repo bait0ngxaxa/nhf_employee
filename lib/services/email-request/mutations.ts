@@ -1,5 +1,5 @@
-import { prisma } from "@/lib/prisma";
-import { lineNotificationService } from "@/lib/line";
+﻿import { prisma } from "@/lib/prisma";
+import { OUTBOX_NOTIFICATION_TYPES } from "@/lib/services/outbox/types";
 import { type EmailRequestData } from "@/types/api";
 import type {
     CreateEmailRequestData,
@@ -14,21 +14,6 @@ export async function createEmailRequest(
     data: CreateEmailRequestData,
     user: UserContext,
 ): Promise<CreateEmailRequestResult> {
-    // Save to database
-    const emailRequest = await prisma.emailRequest.create({
-        data: {
-            thaiName: data.thaiName,
-            englishName: data.englishName,
-            phone: data.phone,
-            nickname: data.nickname ?? "",
-            position: data.position,
-            department: data.department,
-            replyEmail: data.replyEmail,
-            requestedBy: user.id,
-        },
-    });
-
-    // Send LINE notification (non-blocking)
     const notificationData: EmailRequestData = {
         thaiName: data.thaiName,
         englishName: data.englishName,
@@ -40,14 +25,34 @@ export async function createEmailRequest(
         requestedAt: new Date().toISOString(),
     };
 
-    lineNotificationService
-        .sendEmailRequestNotification(notificationData)
-        .catch((error) => {
-            console.error("LINE notification failed:", error);
+    // Use transaction to ensure outbox entry and email request are created together
+    const emailRequest = await prisma.$transaction(async (tx) => {
+        const newRecord = await tx.emailRequest.create({
+            data: {
+                thaiName: data.thaiName,
+                englishName: data.englishName,
+                phone: data.phone,
+                nickname: data.nickname ?? "",
+                position: data.position,
+                department: data.department,
+                replyEmail: data.replyEmail,
+                requestedBy: user.id,
+            },
         });
+
+        await tx.notificationOutbox.create({
+            data: {
+                type: OUTBOX_NOTIFICATION_TYPES[2],
+                payload: JSON.stringify(notificationData),
+            },
+        });
+
+        return newRecord;
+    });
 
     return {
         success: true,
         emailRequest,
     };
 }
+

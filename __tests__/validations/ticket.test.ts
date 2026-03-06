@@ -1,8 +1,8 @@
-import { describe, it, expect } from "vitest";
+﻿import { describe, it, expect } from "vitest";
 import {
     createTicketSchema,
     updateTicketSchema,
-    TICKET_CATEGORIES,
+    ticketFiltersSchema,
 } from "@/lib/validations/ticket";
 
 describe("Ticket Validation", () => {
@@ -44,4 +44,33 @@ describe("Ticket Validation", () => {
             }
         });
     });
+
+    describe("ticketFiltersSchema", () => {
+        it("should coerce and validate valid query filters", () => {
+            const result = ticketFiltersSchema.safeParse({
+                status: "OPEN",
+                category: "ACCOUNT",
+                priority: "LOW",
+                page: "2",
+                limit: "20",
+            });
+
+            expect(result.success).toBe(true);
+            if (result.success) {
+                expect(result.data.page).toBe(2);
+                expect(result.data.limit).toBe(20);
+            }
+        });
+
+        it("should fail on invalid status filter", () => {
+            const result = ticketFiltersSchema.safeParse({
+                status: "PENDING",
+                page: "1",
+                limit: "10",
+            });
+
+            expect(result.success).toBe(false);
+        });
+    });
 });
+
