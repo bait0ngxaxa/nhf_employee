@@ -15,6 +15,7 @@ import { toast } from "sonner";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTitle } from "@/hooks/useTitle";
+import Link from "next/link";
 
 // Type definitions for API response
 interface User {
@@ -110,8 +111,6 @@ export function SignupForm({
             setIsLoading(false);
         }
     };
-
-
 
     return (
         <div className={cn("flex flex-col gap-6", className)} {...props}>
@@ -235,17 +234,16 @@ export function SignupForm({
 
                         <div className="mt-4 text-center text-sm">
                             มีบัญชีอยู่แล้ว?{" "}
-                            <a
+                            <Link
                                 href="/login"
-                                className="underline underline-offset-4"
+                                className="text-blue-600 hover:text-blue-700 font-medium"
                             >
                                 เข้าสู่ระบบ
-                            </a>
+                            </Link>
                         </div>
                     </form>
                 </CardContent>
             </Card>
-
         </div>
     );
 }

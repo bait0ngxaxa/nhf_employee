@@ -15,6 +15,7 @@ import { toast } from "sonner";
 import { useState, useEffect } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
 
 // Type definitions for login
 interface LoginFormData {
@@ -122,13 +123,19 @@ export function LoginForm({
                                 />
                             </div>
                             <div className="grid gap-3">
-                                <div className="flex items-center">
+                                <div className="flex items-center justify-between">
                                     <Label
                                         htmlFor="password"
                                         className="text-gray-700"
                                     >
                                         Password
                                     </Label>
+                                    <Link
+                                        href="/forgot-password"
+                                        className="text-xs text-blue-600 hover:text-blue-700 hover:underline"
+                                    >
+                                        ลืมรหัสผ่าน?
+                                    </Link>
                                 </div>
                                 <Input
                                     id="password"
@@ -157,12 +164,17 @@ export function LoginForm({
                             </div>
                         </div>
                         <div className="mt-4 text-center text-sm">
-                            ยังไม่มีบัญชี? ติดต่อแอดมิน
+                            ยังไม่มีบัญชี?{" "}
+                            <Link
+                                href="/signup"
+                                className="text-blue-600 hover:text-blue-700 font-medium"
+                            >
+                                สมัครสมาชิก
+                            </Link>
                         </div>
                     </form>
                 </CardContent>
             </Card>
-
         </div>
     );
 }

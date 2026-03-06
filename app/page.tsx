@@ -1,7 +1,7 @@
 import { AuthStatus } from "@/components/auth";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Users, Shield, Database, Zap, ArrowRight } from "lucide-react";
+import { Shield, Database, Zap, ArrowRight } from "lucide-react";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { redirect } from "next/navigation";
@@ -27,17 +27,17 @@ export default async function Home() {
             <header className="relative z-10 border-b border-gray-200/50 backdrop-blur-sm bg-white/70">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                     <div className="flex justify-between items-center py-4">
-                        <div className="flex items-center space-x-3">
-                            <div className="bg-gradient-to-br from-blue-600 to-cyan-500 p-2 rounded-xl shadow-lg shadow-blue-500/20">
-                                <Users className="h-6 w-6 text-white" />
+                        <div className="flex items-center space-x-3 group cursor-pointer">
+                            <div className="bg-gradient-to-br from-blue-600 to-cyan-500 p-2.5 rounded-xl shadow-md shadow-blue-500/20 group-hover:shadow-blue-500/40 transition-all duration-300 group-hover:scale-105">
+                                <Zap className="h-5 w-5 text-white" />
                             </div>
-                            <div>
-                                <h1 className="text-xl font-bold text-gray-900">
-                                    NHF IT System
-                                </h1>
-                                <p className="text-sm text-gray-500">
-                                    IT Management Platform
-                                </p>
+                            <div className="flex flex-col justify-center">
+                                <span className="text-xl font-black tracking-tight text-gray-900 leading-none">
+                                    NHF
+                                </span>
+                                <span className="text-[10px] font-bold tracking-widest text-blue-600 uppercase mt-1">
+                                    Workspace
+                                </span>
                             </div>
                         </div>
                         <AuthStatus />
@@ -47,24 +47,28 @@ export default async function Home() {
 
             {/* Hero Section */}
             <main className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 md:py-24">
-                <div className="text-center mb-12">
-                    <div className="inline-flex items-center px-4 py-2 rounded-full bg-blue-100 border border-blue-200 mb-6">
-                        <Zap className="h-4 w-4 text-blue-600 mr-2" />
-                        <span className="text-sm text-blue-700 font-medium">
-                            National Health Foundation
+                <div className="text-center mb-16 mt-8">
+                    <div className="inline-flex items-center px-4 py-2 rounded-full bg-white/60 backdrop-blur-md border border-gray-200/60 shadow-sm mb-8">
+                        <span className="flex h-2 w-2 rounded-full bg-blue-600 mr-3 animate-pulse" />
+                        <span className="text-sm text-gray-600 font-medium tracking-wide">
+                            ระบบสารสนเทศภายในองค์กร
                         </span>
                     </div>
-                    <h2 className="text-4xl md:text-6xl font-bold text-gray-900 mb-6 leading-tight">
-                        IT Management
+                    <h2 className="text-5xl md:text-7xl font-extrabold tracking-tight text-gray-900 mb-6 leading-[1.15]">
+                        National Health Foundation
                         <br />
-                        <span className="bg-gradient-to-r from-blue-600 via-cyan-600 to-teal-600 bg-clip-text text-transparent">
-                            Platform
+                        <span className="relative inline-block mt-2">
+                            <span className="relative z-10 bg-gradient-to-r from-blue-600 via-cyan-600 to-teal-500 bg-clip-text text-transparent">
+                                Platform
+                            </span>
+                            <span className="absolute -bottom-2 left-0 w-full h-4 bg-blue-100/50 -z-10 rounded-full blur-sm" />
                         </span>
                     </h2>
-                    <p className="text-lg md:text-xl text-gray-600 max-w-2xl mx-auto mb-8">
-                        ระบบบันทึกข้อมูลพนักงาน แจ้งปัญหาไอที
-                        และติดตามสถานะการแก้ไขปัญหา <br />
-                        สำหรับมูลนิธิสาธารณสุขแห่งชาติ
+                    <p className="text-lg md:text-xl text-gray-500 max-w-2xl mx-auto mb-10 leading-relaxed font-light">
+                        แพลตฟอร์มส่วนกลางสำหรับ{" "}
+                        <strong>มูลนิธิสาธารณสุขแห่งชาติ</strong>{" "}
+                        ในการบริหารข้อมูลพนักงาน แจ้งซ่อมอุปกรณ์
+                        และติดตามสถานะช่วยเหลือแบบครบวงจร
                     </p>
                     <div className="flex flex-col sm:flex-row justify-center gap-4">
                         <Link href="/login">

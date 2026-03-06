@@ -1,3 +1,3 @@
-export * from "./types";
-export * from "./AuditLogsContext";
-export * from "./AuditLogsProvider";
+export type { AuditLog, AuditLogsContextValue } from "./types";
+export { AuditLogsContext, useAuditLogsContext } from "./AuditLogsContext";
+export { AuditLogsProvider } from "./AuditLogsProvider";

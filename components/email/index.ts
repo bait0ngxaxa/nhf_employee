@@ -1,2 +1,2 @@
-export * from "./EmailRequestForm";
-export * from "./EmailRequestHistory";
+export { EmailRequestForm } from "./EmailRequestForm";
+export { EmailRequestHistory } from "./EmailRequestHistory";

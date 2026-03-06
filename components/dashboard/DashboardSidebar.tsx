@@ -49,11 +49,11 @@ export function DashboardSidebar() {
                         sidebarOpen ? "justify-between" : "justify-center",
                     )}
                 >
-                    {sidebarOpen && (
+                    {sidebarOpen ? (
                         <h1 className="text-xl font-bold bg-gradient-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent whitespace-nowrap overflow-hidden">
                             ระบบจัดการ
                         </h1>
-                    )}
+                    ) : null}
                     <Button
                         variant="ghost"
                         size="sm"
@@ -81,14 +81,14 @@ export function DashboardSidebar() {
             >
                 <div className="relative group">
                     {/* Decorative Glow for Active State */}
-                    {selectedMenu === "dashboard" && sidebarOpen && (
+                    {selectedMenu === "dashboard" && sidebarOpen ? (
                         <div
                             className={cn(
                                 `absolute inset-0 bg-gradient-to-r ${dashboardTheme.glow} opacity-20 rounded-xl`,
                             )}
                             style={{ filter: "blur(16px)" }}
                         />
-                    )}
+                    ) : null}
                     <Button
                         variant="ghost"
                         className={cn(
@@ -104,12 +104,12 @@ export function DashboardSidebar() {
                         onClick={() => handleMenuClick("dashboard")}
                     >
                         {/* Decorative Blob for Active State */}
-                        {selectedMenu === "dashboard" && sidebarOpen && (
-                            <div 
-                                className="absolute -right-2 -top-2 w-12 h-12 bg-blue-200/50 rounded-full pointer-events-none" 
+                        {selectedMenu === "dashboard" && sidebarOpen ? (
+                            <div
+                                className="absolute -right-2 -top-2 w-12 h-12 bg-blue-200/50 rounded-full pointer-events-none"
                                 style={{ filter: "blur(12px)" }}
                             />
-                        )}
+                        ) : null}
 
                         <div
                             className={cn(
@@ -125,7 +125,8 @@ export function DashboardSidebar() {
                                         : `${dashboardTheme.lightBg} group-hover/btn:scale-110`,
                                 )}
                                 style={{
-                                    transition: "transform 200ms ease-out, background-color 200ms ease-out",
+                                    transition:
+                                        "transform 200ms ease-out, background-color 200ms ease-out",
                                 }}
                             >
                                 <span
@@ -143,11 +144,11 @@ export function DashboardSidebar() {
                                     />
                                 </span>
                             </div>
-                            {sidebarOpen && (
+                            {sidebarOpen ? (
                                 <span className="ml-3 font-medium whitespace-nowrap">
                                     แดชบอร์ด
                                 </span>
-                            )}
+                            ) : null}
                         </div>
                     </Button>
                 </div>
@@ -162,14 +163,14 @@ export function DashboardSidebar() {
                     return (
                         <div key={item.id} className="relative group">
                             {/* Decorative Glow for Active State */}
-                            {isActive && sidebarOpen && (
+                            {isActive && sidebarOpen ? (
                                 <div
                                     className={cn(
                                         `absolute inset-0 bg-gradient-to-r ${theme.glow} opacity-20 rounded-xl`,
                                     )}
                                     style={{ filter: "blur(16px)" }}
                                 />
-                            )}
+                            ) : null}
                             <Button
                                 variant="ghost"
                                 className={cn(
@@ -210,12 +211,14 @@ export function DashboardSidebar() {
                                                 : `${theme.lightBg} group-hover/btn:scale-110`,
                                         )}
                                         style={{
-                                            transition: "transform 200ms ease-out, background-color 200ms ease-out",
+                                            transition:
+                                                "transform 200ms ease-out, background-color 200ms ease-out",
                                         }}
                                     >
                                         <span
                                             style={{
-                                                transition: "color 200ms ease-out",
+                                                transition:
+                                                    "color 200ms ease-out",
                                             }}
                                         >
                                             <IconComponent

@@ -6,21 +6,23 @@ import { employeeService } from "@/lib/services/employee";
 // POST - Import employees from CSV
 export async function POST(request: NextRequest): Promise<NextResponse> {
     try {
+        const { employees } = await request.json();
+
+        // 1. Input Validation
+        if (!employees || !Array.isArray(employees)) {
+            return NextResponse.json(
+                { error: "ข้อมูลไม่ถูกต้อง" },
+                { status: 400 },
+            );
+        }
+
+        // 2. Auth Check & Access Control
         const session = await getServerSession(authOptions);
 
         if (!session || session.user?.role !== "ADMIN") {
             return NextResponse.json(
                 { error: "ไม่มีสิทธิ์เข้าถึง" },
                 { status: 403 },
-            );
-        }
-
-        const { employees } = await request.json();
-
-        if (!employees || !Array.isArray(employees)) {
-            return NextResponse.json(
-                { error: "ข้อมูลไม่ถูกต้อง" },
-                { status: 400 },
             );
         }
 

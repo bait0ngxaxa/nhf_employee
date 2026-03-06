@@ -71,13 +71,13 @@ export function EmployeeList({ userRole }: EmployeeListProps) {
                     <Skeleton className="h-10 w-32" />
                     <Skeleton className="h-10 w-32" />
                 </div>
-                
+
                 {/* Results Summary Skeleton */}
                 <div className="flex justify-between">
                     <Skeleton className="h-4 w-48" />
                     <Skeleton className="h-4 w-24" />
                 </div>
-                
+
                 {/* Table Skeleton */}
                 <div className="w-full">
                     <div className="flex gap-4 pb-4 border-b border-gray-100">
@@ -87,13 +87,18 @@ export function EmployeeList({ userRole }: EmployeeListProps) {
                     </div>
                     <div className="space-y-4 pt-4">
                         {Array.from({ length: 5 }).map((_, rowIndex) => (
-                            <div key={rowIndex} className="flex gap-4 items-center">
-                                {Array.from({ length: 6 }).map((_, colIndex) => (
-                                    <Skeleton 
-                                        key={colIndex} 
-                                        className="h-12 flex-1"
-                                    />
-                                ))}
+                            <div
+                                key={rowIndex}
+                                className="flex gap-4 items-center"
+                            >
+                                {Array.from({ length: 6 }).map(
+                                    (_, colIndex) => (
+                                        <Skeleton
+                                            key={colIndex}
+                                            className="h-12 flex-1"
+                                        />
+                                    ),
+                                )}
                             </div>
                         ))}
                     </div>
@@ -133,23 +138,23 @@ export function EmployeeList({ userRole }: EmployeeListProps) {
             <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center space-y-2 sm:space-y-0">
                 <div className="text-sm text-gray-600">
                     แสดงผล {startIndex + 1}-{endIndex} จาก {totalEmployees} คน
-                    {statusFilter !== "all" && (
+                    {statusFilter !== "all" ? (
                         <span className="text-blue-600">
                             (กรองตามสถานะ:{" "}
                             {getEmployeeStatusLabel(statusFilter)})
                         </span>
-                    )}
-                    {searchTerm && (
+                    ) : null}
+                    {searchTerm ? (
                         <span className="text-green-600">
                             (ค้นหา: &quot;{searchTerm}&quot;)
                         </span>
-                    )}
+                    ) : null}
                 </div>
-                {totalPages > 1 && (
+                {totalPages > 1 ? (
                     <div className="text-sm text-gray-600">
                         หน้า {currentPage} จาก {totalPages}
                     </div>
-                )}
+                ) : null}
             </div>
 
             {/* Employee Table */}

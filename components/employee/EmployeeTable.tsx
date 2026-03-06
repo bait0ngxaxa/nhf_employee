@@ -24,9 +24,15 @@ export const EmployeeTable = memo(function EmployeeTable({
     }
 
     return (
-        <div className="overflow-x-auto border border-gray-200/60 rounded-2xl shadow-sm bg-white/60 backdrop-blur-md">
+        <div
+            className="overflow-auto max-h-[70vh] border border-gray-200/60 rounded-2xl shadow-sm bg-white/60 backdrop-blur-md"
+            style={{
+                contentVisibility: "auto",
+                containIntrinsicSize: "0 500px",
+            }}
+        >
             <table className="min-w-full bg-white">
-                <thead className="bg-gray-50/50 border-b border-gray-200/60">
+                <thead className="bg-gray-50/80 border-b border-gray-200/60 sticky top-0 z-10 backdrop-blur-sm">
                     <tr>
                         <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
                             ชื่อ-นามสกุล
@@ -52,11 +58,11 @@ export const EmployeeTable = memo(function EmployeeTable({
                         <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
                             สถานะ
                         </th>
-                        {userRole === "ADMIN" && (
-                            <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                        {userRole === "ADMIN" ? (
+                            <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider sticky right-0 bg-gray-50 backdrop-blur-sm">
                                 การจัดการ
                             </th>
-                        )}
+                        ) : null}
                     </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
@@ -118,7 +124,7 @@ export const EmployeeTable = memo(function EmployeeTable({
                                 </Badge>
                             </td>
                             {userRole === "ADMIN" && onEditEmployee && (
-                                <td className="px-6 py-4 whitespace-nowrap">
+                                <td className="px-6 py-4 whitespace-nowrap sticky right-0 bg-white">
                                     <div className="flex items-center space-x-2">
                                         <Button
                                             variant="outline"

@@ -80,15 +80,6 @@ export async function PATCH(
     { params }: { params: Promise<{ id: string }> },
 ): Promise<NextResponse> {
     try {
-        const session = await getServerSession(authOptions);
-
-        if (!session) {
-            return NextResponse.json(
-                { error: "Unauthorized" },
-                { status: 401 },
-            );
-        }
-
         const { ticketId, error } = await parseTicketId(params);
         if (error) return error;
         if (!ticketId) {
@@ -100,13 +91,23 @@ export async function PATCH(
 
         const body = await request.json();
 
-        // Validate input with Zod (partial validation for updates)
+        // 1. Input Validation with Zod (partial validation for updates)
         const validationResult = updateTicketSchema.safeParse(body);
         if (!validationResult.success) {
             const errors = validationResult.error.flatten();
             return NextResponse.json(
                 { error: "ข้อมูลไม่ถูกต้อง", details: errors.fieldErrors },
                 { status: 400 },
+            );
+        }
+
+        // 2. Auth Check
+        const session = await getServerSession(authOptions);
+
+        if (!session) {
+            return NextResponse.json(
+                { error: "Unauthorized" },
+                { status: 401 },
             );
         }
 

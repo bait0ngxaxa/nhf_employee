@@ -1,3 +1,3 @@
-export * from "./Header";
-export * from "./StatsCards";
-export * from "./TicketTabs";
+export { Header } from "./Header";
+export { StatsCards } from "./StatsCards";
+export { TicketTabs } from "./TicketTabs";

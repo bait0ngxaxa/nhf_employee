@@ -1,14 +1,45 @@
 // Dashboard Context
-export * from "./dashboard";
+export { DashboardProvider } from "./dashboard";
+export {
+    useDashboardDataContext,
+    useDashboardUIContext,
+    useDashboardContext,
+} from "./dashboard";
+export type {
+    DashboardDataContextValue,
+    DashboardUIContextValue,
+} from "./dashboard";
 
 // IT Support Context
-export * from "./it-support";
+export { ITSupportProvider } from "./it-support";
+export {
+    useITSupportDataContext,
+    useITSupportUIContext,
+    useITSupportContext,
+} from "./it-support";
+export type {
+    ITSupportDataContextValue,
+    ITSupportUIContextValue,
+} from "./it-support";
 
 // Employee Context
-export * from "./employee";
+export { EmployeeProvider } from "./employee";
+export {
+    useEmployeeDataContext,
+    useEmployeeUIContext,
+    useEmployeeContext,
+} from "./employee";
+export type {
+    EmployeeDataContextValue,
+    EmployeeUIContextValue,
+} from "./employee";
 
 // Audit Logs Context
-export * from "./audit-logs";
+export { AuditLogsProvider } from "./audit-logs";
+export { useAuditLogsContext } from "./audit-logs";
+export type { AuditLog, AuditLogsContextValue } from "./audit-logs";
 
 // Email Request Context
-export * from "./email-request";
+export { EmailRequestProvider } from "./email-request";
+export { useEmailRequestContext } from "./email-request";
+export type { EmailRequest, EmailRequestContextValue } from "./email-request";

@@ -24,10 +24,10 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     try {
         const session = await getServerSession(authOptions);
 
-        if (!session || session.user?.role !== "ADMIN") {
+        if (!session) {
             return NextResponse.json(
                 { error: "ไม่มีสิทธิ์เข้าถึง" },
-                { status: 403 },
+                { status: 401 },
             );
         }
 
@@ -50,24 +50,25 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 // POST - เพิ่มพนักงานใหม่
 export async function POST(request: NextRequest): Promise<NextResponse> {
     try {
-        const session = await getServerSession(authOptions);
-
-        if (!session || session.user?.role !== "ADMIN") {
-            return NextResponse.json(
-                { error: "ไม่มีสิทธิ์เข้าถึง" },
-                { status: 403 },
-            );
-        }
-
         const body = await request.json();
 
-        // Validate input with Zod
+        // 1. Input Validation
         const result = createEmployeeSchema.safeParse(body);
         if (!result.success) {
             const errors = result.error.flatten();
             return NextResponse.json(
                 { error: "ข้อมูลไม่ถูกต้อง", details: errors.fieldErrors },
                 { status: 400 },
+            );
+        }
+
+        // 2. Auth Check & Access Control
+        const session = await getServerSession(authOptions);
+
+        if (!session || session.user?.role !== "ADMIN") {
+            return NextResponse.json(
+                { error: "ไม่มีสิทธิ์เข้าถึง" },
+                { status: 403 },
             );
         }
 

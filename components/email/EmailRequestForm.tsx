@@ -23,20 +23,6 @@ export function EmailRequestForm({ onCancel }: EmailRequestFormProps) {
 
     return (
         <div className="space-y-6">
-            <div className="flex items-center space-x-3">
-                <div className="p-3 bg-gradient-to-br from-purple-100 to-indigo-100 rounded-xl border border-purple-200/50">
-                    <Mail className="h-6 w-6 text-purple-600" />
-                </div>
-                <div>
-                    <h2 className="text-2xl font-bold text-gray-900">
-                        ขออีเมลพนักงานใหม่
-                    </h2>
-                    <p className="text-gray-600">
-                        กรอกข้อมูลพนักงานใหม่เพื่อขออีเมลจากทีมไอที
-                    </p>
-                </div>
-            </div>
-
             <Card className="bg-white/80 backdrop-blur-xl border-gray-200/50 shadow-xl rounded-3xl">
                 <CardContent className="p-6 md:p-8">
                     {error && (

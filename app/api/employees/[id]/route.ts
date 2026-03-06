@@ -34,15 +34,6 @@ export async function PATCH(
     { params }: { params: Promise<{ id: string }> },
 ): Promise<NextResponse> {
     try {
-        const session = await getServerSession(authOptions);
-
-        if (!session || session.user?.role !== "ADMIN") {
-            return NextResponse.json(
-                { error: "ไม่มีสิทธิ์เข้าถึง" },
-                { status: 403 },
-            );
-        }
-
         const { employeeId, error } = await parseEmployeeId(params);
         if (error) return error;
         if (!employeeId) {
@@ -54,13 +45,23 @@ export async function PATCH(
 
         const body = await request.json();
 
-        // Validate with Zod
+        // 1. Input Validation
         const validationResult = updateEmployeeSchema.safeParse(body);
         if (!validationResult.success) {
             const errors = validationResult.error.flatten();
             return NextResponse.json(
                 { error: "ข้อมูลไม่ถูกต้อง", details: errors.fieldErrors },
                 { status: 400 },
+            );
+        }
+
+        // 2. Auth Check & Access Control
+        const session = await getServerSession(authOptions);
+
+        if (!session || session.user?.role !== "ADMIN") {
+            return NextResponse.json(
+                { error: "ไม่มีสิทธิ์เข้าถึง" },
+                { status: 403 },
             );
         }
 
@@ -86,10 +87,16 @@ export async function PATCH(
 
         // Log audit event
         after(async () => {
-            await logEmployeeEvent(actionType, employeeId, user.id, user.email, {
-                before: result.beforeData,
-                after: validationResult.data as Record<string, unknown>,
-            });
+            await logEmployeeEvent(
+                actionType,
+                employeeId,
+                user.id,
+                user.email,
+                {
+                    before: result.beforeData,
+                    after: validationResult.data as Record<string, unknown>,
+                },
+            );
         });
 
         return NextResponse.json(

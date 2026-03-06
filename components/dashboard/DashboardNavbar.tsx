@@ -15,23 +15,10 @@ import {
     useDashboardDataContext,
 } from "@/components/dashboard/context/dashboard/DashboardContext";
 
-const MENU_LABELS: Record<string, string> = {
-    dashboard: "แดชบอร์ด",
-    "it-equipment": "อุปกรณ์ IT",
-    "it-support": "IT Support",
-    "email-request": "ขอ Email",
-    "employee-management": "จัดการพนักงาน",
-    "add-employee": "เพิ่มพนักงาน",
-    "import-employee": "นำเข้า CSV",
-    "audit-logs": "ประวัติการใช้งาน",
-};
-
 export function DashboardNavbar() {
-    const { selectedMenu, sidebarOpen, setSidebarOpen, handleSignOut } =
+    const { sidebarOpen, setSidebarOpen, handleSignOut } =
         useDashboardUIContext();
     const { user } = useDashboardDataContext();
-
-    const currentPageLabel = MENU_LABELS[selectedMenu] || "แดชบอร์ด";
 
     return (
         <header className="sticky top-0 z-30 bg-white/80 backdrop-blur-xl border-b border-gray-200/50 shadow-sm">
@@ -46,11 +33,7 @@ export function DashboardNavbar() {
                     >
                         <Menu className="h-5 w-5" />
                     </Button>
-                    <div className="hidden md:block">
-                        <h1 className="text-lg font-semibold text-gray-800">
-                            {currentPageLabel}
-                        </h1>
-                    </div>
+                    {/* Page title removed from navbar to avoid redundancy with page headers */}
                 </div>
 
                 {/* Right: User menu */}
@@ -128,12 +111,7 @@ export function DashboardNavbar() {
                 </div>
             </div>
 
-            {/* Mobile: Page title */}
-            <div className="md:hidden px-4 pb-2">
-                <h1 className="text-base font-semibold text-gray-800">
-                    {currentPageLabel}
-                </h1>
-            </div>
+            {/* Mobile page title row removed to avoid redundancy */}
         </header>
     );
 }

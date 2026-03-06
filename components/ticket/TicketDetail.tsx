@@ -155,14 +155,14 @@ export default function TicketDetail({
                     <div className="text-center text-red-600">
                         {error || "ไม่พบข้อมูล ticket"}
                     </div>
-                    {onBack && (
+                    {onBack ? (
                         <div className="text-center mt-4">
                             <Button variant="outline" onClick={onBack}>
                                 <ArrowLeft className="h-4 w-4 mr-2" />
                                 กลับ
                             </Button>
                         </div>
-                    )}
+                    ) : null}
                 </CardContent>
             </Card>
         );
@@ -172,12 +172,12 @@ export default function TicketDetail({
         <div className="space-y-6">
             {/* Header */}
             <div className="flex items-center justify-between">
-                {onBack && (
+                {onBack ? (
                     <Button variant="outline" onClick={onBack}>
                         <ArrowLeft className="h-4 w-4 mr-2" />
                         กลับ
                     </Button>
-                )}
+                ) : null}
                 <div className="flex items-center gap-2">
                     {getStatusIcon(ticket.status)}
                     <span className="text-sm font-medium">
@@ -205,7 +205,7 @@ export default function TicketDetail({
                         <div className="flex gap-2">
                             <Badge
                                 className={getPriorityBadgeColor(
-                                    ticket.priority
+                                    ticket.priority,
                                 )}
                             >
                                 {getTicketPriorityLabel(ticket.priority)}
@@ -239,17 +239,17 @@ export default function TicketDetail({
                             <span className="font-medium">อัปเดตล่าสุด:</span>
                             <p>{formatDate(ticket.updatedAt)}</p>
                         </div>
-                        {ticket.resolvedAt && (
+                        {ticket.resolvedAt ? (
                             <div>
                                 <span className="font-medium">
                                     วันที่แก้ไข:
                                 </span>
                                 <p>{formatDate(ticket.resolvedAt)}</p>
                             </div>
-                        )}
+                        ) : null}
                     </div>
 
-                    {ticket.assignedTo && (
+                    {ticket.assignedTo ? (
                         <div>
                             <span className="font-medium">มอบหมายให้:</span>
                             <p>
@@ -259,10 +259,10 @@ export default function TicketDetail({
                                     : ticket.assignedTo.name}
                             </p>
                         </div>
-                    )}
+                    ) : null}
 
                     {/* Admin Controls */}
-                    {isAdmin && (
+                    {isAdmin ? (
                         <div className="border-t pt-4">
                             <h3 className="font-medium mb-3">จัดการ Ticket</h3>
                             <div className="flex gap-4 items-end">
@@ -302,7 +302,7 @@ export default function TicketDetail({
                                 </Button>
                             </div>
                         </div>
-                    )}
+                    ) : null}
                 </CardContent>
             </Card>
 
@@ -334,7 +334,7 @@ export default function TicketDetail({
                     )}
 
                     {/* Add Comment */}
-                    {canComment && (
+                    {canComment ? (
                         <div className="border-t pt-4">
                             <h3 className="font-medium mb-3">
                                 เพิ่มความคิดเห็น
@@ -362,7 +362,7 @@ export default function TicketDetail({
                                 </Button>
                             </div>
                         </div>
-                    )}
+                    ) : null}
                 </CardContent>
             </Card>
         </div>

@@ -1,6 +1,12 @@
 "use client";
 
-import { useState, useCallback, useMemo, type ReactNode } from "react";
+import {
+    useState,
+    useCallback,
+    useMemo,
+    startTransition,
+    type ReactNode,
+} from "react";
 import { useSession, signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import useSWR from "swr";
@@ -40,7 +46,7 @@ export function DashboardProvider({ children }: DashboardProviderProps) {
 
     const { data: statsData, mutate: mutateStats } = useSWR<{
         stats: EmployeeStats;
-    }>(isAdmin ? "/api/employees/stats" : null);
+    }>("/api/employees/stats");
 
     const employeeStats = statsData?.stats || defaultStats;
 
@@ -59,7 +65,9 @@ export function DashboardProvider({ children }: DashboardProviderProps) {
                 return;
             }
 
-            setSelectedMenu(menuId);
+            startTransition(() => {
+                setSelectedMenu(menuId);
+            });
 
             if (window.innerWidth < 768) {
                 setSidebarOpen(false);

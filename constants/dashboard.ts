@@ -33,8 +33,7 @@ export const DASHBOARD_MENU_ITEMS: MenuItem[] = [
         id: "employee-management",
         label: "ข้อมูลพนักงาน",
         icon: Users,
-        description: "จัดการข้อมูลพนักงานและสิทธิ์",
-        requiredRole: "ADMIN",
+        description: "ดูข้อมูลพนักงานในองค์กร",
     },
     {
         id: "add-employee",

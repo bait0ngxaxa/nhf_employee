@@ -8,10 +8,10 @@ export async function GET() {
     try {
         const session = await getServerSession(authOptions);
 
-        if (!session || session.user?.role !== "ADMIN") {
+        if (!session) {
             return NextResponse.json(
                 { error: "ไม่มีสิทธิ์เข้าถึง" },
-                { status: 403 }
+                { status: 401 },
             );
         }
 
@@ -49,7 +49,7 @@ export async function GET() {
         console.error("Error fetching employee stats:", error);
         return NextResponse.json(
             { error: "เกิดข้อผิดพลาดในการดึงข้อมูล" },
-            { status: 500 }
+            { status: 500 },
         );
     }
 }

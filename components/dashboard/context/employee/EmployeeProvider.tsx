@@ -50,13 +50,17 @@ export function EmployeeProvider({ children }: EmployeeProviderProps) {
     const [itemsPerPage] = useState(PAGINATION_DEFAULTS.ITEMS_PER_PAGE);
 
     const handleSearchTermChange = useCallback((value: string) => {
-        setSearchTerm(value);
-        setCurrentPage(1);
+        startTransition(() => {
+            setSearchTerm(value);
+            setCurrentPage(1);
+        });
     }, []);
 
     const handleStatusFilterChange = useCallback((value: string) => {
-        setStatusFilter(value);
-        setCurrentPage(1);
+        startTransition(() => {
+            setStatusFilter(value);
+            setCurrentPage(1);
+        });
     }, []);
 
     // UI states
@@ -110,15 +114,21 @@ export function EmployeeProvider({ children }: EmployeeProviderProps) {
     }, [refreshTrigger]);
 
     const handlePageChange = useCallback((page: number) => {
-        setCurrentPage(page);
+        startTransition(() => {
+            setCurrentPage(page);
+        });
     }, []);
 
     const handlePreviousPage = useCallback(() => {
-        setCurrentPage((prev) => Math.max(prev - 1, 1));
+        startTransition(() => {
+            setCurrentPage((prev) => Math.max(prev - 1, 1));
+        });
     }, []);
 
     const handleNextPage = useCallback(() => {
-        setCurrentPage((prev) => Math.min(prev + 1, pagination.totalPages));
+        startTransition(() => {
+            setCurrentPage((prev) => Math.min(prev + 1, pagination.totalPages));
+        });
     }, [pagination.totalPages]);
 
     // Export Logic (remains mostly same, uses fetch directly as it's separate query)
@@ -254,35 +264,45 @@ export function EmployeeProvider({ children }: EmployeeProviderProps) {
             triggerRefresh,
         }),
         // eslint-disable-next-line react-hooks/exhaustive-deps
-        [employees, pagination.total, pagination.totalPages, isLoading, error, refreshTrigger],
+        [
+            employees,
+            pagination.total,
+            pagination.totalPages,
+            isLoading,
+            error,
+            refreshTrigger,
+        ],
     );
 
     // Split UI handlers into a separate memoized object to reduce dependencies
-    const uiHandlers = useMemo(() => ({
-        handleSearchTermChange,
-        handleStatusFilterChange,
-        handlePageChange,
-        handlePreviousPage,
-        handleNextPage,
-        getExportData,
-        getExportFileName,
-        handleExportCSV,
-        handleEditEmployee,
-        handleCloseEditForm,
-        handleEmployeeUpdate,
-    }), [
-        handleSearchTermChange,
-        handleStatusFilterChange,
-        handlePageChange,
-        handlePreviousPage,
-        handleNextPage,
-        getExportData,
-        getExportFileName,
-        handleExportCSV,
-        handleEditEmployee,
-        handleCloseEditForm,
-        handleEmployeeUpdate,
-    ]);
+    const uiHandlers = useMemo(
+        () => ({
+            handleSearchTermChange,
+            handleStatusFilterChange,
+            handlePageChange,
+            handlePreviousPage,
+            handleNextPage,
+            getExportData,
+            getExportFileName,
+            handleExportCSV,
+            handleEditEmployee,
+            handleCloseEditForm,
+            handleEmployeeUpdate,
+        }),
+        [
+            handleSearchTermChange,
+            handleStatusFilterChange,
+            handlePageChange,
+            handlePreviousPage,
+            handleNextPage,
+            getExportData,
+            getExportFileName,
+            handleExportCSV,
+            handleEditEmployee,
+            handleCloseEditForm,
+            handleEmployeeUpdate,
+        ],
+    );
 
     const uiValue = useMemo<EmployeeUIContextValue>(
         () => ({
@@ -306,7 +326,16 @@ export function EmployeeProvider({ children }: EmployeeProviderProps) {
             handleEmployeeUpdate: uiHandlers.handleEmployeeUpdate,
         }),
         // Reduce dependencies - only state values that change
-        [searchTerm, statusFilter, currentPage, itemsPerPage, isExporting, isEditFormOpen, employeeToEdit, uiHandlers],
+        [
+            searchTerm,
+            statusFilter,
+            currentPage,
+            itemsPerPage,
+            isExporting,
+            isEditFormOpen,
+            employeeToEdit,
+            uiHandlers,
+        ],
     );
 
     return (

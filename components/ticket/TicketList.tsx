@@ -72,10 +72,13 @@ export default function TicketList({
                                 <Skeleton className="h-10 w-40" />
                                 <Skeleton className="h-10 w-40" />
                             </div>
-                            
+
                             {/* Ticket Cards Skeleton */}
                             {Array.from({ length: 4 }).map((_, i) => (
-                                <div key={i} className="p-4 border rounded-lg space-y-3">
+                                <div
+                                    key={i}
+                                    className="p-4 border rounded-lg space-y-3"
+                                >
                                     <div className="flex justify-between">
                                         <Skeleton className="h-5 w-48" />
                                         <Skeleton className="h-5 w-20" />
@@ -97,14 +100,20 @@ export default function TicketList({
                             <p>ไม่พบ tickets</p>
                         </div>
                     ) : (
-                        <div className="space-y-4">
+                        <div
+                            className="space-y-4"
+                            style={{
+                                contentVisibility: "auto",
+                                containIntrinsicSize: "0 500px",
+                            }}
+                        >
                             {tickets.map((ticket) => (
                                 <TicketCard
                                     key={ticket.id}
                                     ticket={ticket}
                                     isNew={isNewTicket(
                                         ticket.createdAt,
-                                        ticket.views
+                                        ticket.views,
                                     )}
                                     onClick={() => onTicketSelect?.(ticket)}
                                 />
@@ -113,7 +122,7 @@ export default function TicketList({
                     )}
 
                     {/* Pagination */}
-                    {pagination.pages > 1 && (
+                    {pagination.pages > 1 ? (
                         <div className="flex items-center justify-between mt-6">
                             <div className="text-sm text-gray-500">
                                 หน้า {pagination.page} จาก {pagination.pages}
@@ -145,7 +154,7 @@ export default function TicketList({
                                 </Button>
                             </div>
                         </div>
-                    )}
+                    ) : null}
                 </CardContent>
             </Card>
         </div>

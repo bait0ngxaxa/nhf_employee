@@ -49,24 +49,25 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 // POST - Create new ticket
 export async function POST(request: NextRequest): Promise<NextResponse> {
     try {
-        const session = await getServerSession(authOptions);
-
-        if (!session) {
-            return NextResponse.json(
-                { error: "Unauthorized" },
-                { status: 401 },
-            );
-        }
-
         const body = await request.json();
 
-        // Validate input with Zod
+        // 1. Input Validation with Zod
         const result = createTicketSchema.safeParse(body);
         if (!result.success) {
             const errors = result.error.flatten();
             return NextResponse.json(
                 { error: "ข้อมูลไม่ถูกต้อง", details: errors.fieldErrors },
                 { status: 400 },
+            );
+        }
+
+        // 2. Auth Check
+        const session = await getServerSession(authOptions);
+
+        if (!session) {
+            return NextResponse.json(
+                { error: "Unauthorized" },
+                { status: 401 },
             );
         }
 
@@ -78,14 +79,20 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
             ticketService.sendTicketCreatedNotifications(ticket);
 
             // Log audit event
-            await logTicketEvent("TICKET_CREATE", ticket.id, user.id, user.email, {
-                after: {
-                    title: ticket.title,
-                    category: ticket.category,
-                    priority: ticket.priority,
-                    status: ticket.status,
+            await logTicketEvent(
+                "TICKET_CREATE",
+                ticket.id,
+                user.id,
+                user.email,
+                {
+                    after: {
+                        title: ticket.title,
+                        category: ticket.category,
+                        priority: ticket.priority,
+                        status: ticket.status,
+                    },
                 },
-            });
+            );
         });
 
         return NextResponse.json({ ticket }, { status: 201 });

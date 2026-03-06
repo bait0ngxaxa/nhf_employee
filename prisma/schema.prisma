@@ -220,4 +220,16 @@ model EmailRequest {
   @@map("email_requests")
 }
 
+// Password Reset Token for forgot password flow
+model PasswordResetToken {
+  id        Int      @id @default(autoincrement())
+  token     String   @unique @db.VarChar(255) // SHA-256 hashed token
+  email     String
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
 
+  @@index([email])
+  @@index([expiresAt])
+  @@map("password_reset_tokens")
+}
