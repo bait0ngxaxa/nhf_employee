@@ -33,13 +33,15 @@ export function TicketCard({
     return (
         <div
             className={`
-                group relative overflow-hidden rounded-2xl p-6 cursor-pointer
-                transition-all duration-300 ease-out
-                hover:scale-[1.01] hover:-translate-y-1
+                group relative overflow-hidden rounded-xl p-5 cursor-pointer
+                transition-all duration-200 ease-out
+                hover:shadow-xl hover:-translate-y-0.5
+                bg-white border-2 border-gray-200 shadow-md
+                hover:border-gray-300
                 ${
                     isNew
-                        ? "bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 border-2 border-blue-300 shadow-lg shadow-blue-200/40"
-                        : "bg-white border border-gray-200 shadow-md hover:shadow-xl hover:border-gray-300"
+                        ? "ring-2 ring-blue-200 border-blue-300 shadow-lg shadow-blue-100"
+                        : ""
                 }
             `}
             onClick={onClick}

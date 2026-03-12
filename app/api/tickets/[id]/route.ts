@@ -1,6 +1,7 @@
-﻿import { type NextRequest, NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
 import { updateTicketSchema } from "@/lib/validations/ticket";
 import { ticketService, type UpdateTicketData } from "@/lib/services/ticket";
 import { buildUserContext } from "@/lib/context";
@@ -98,7 +99,7 @@ export async function PATCH(
         if (!validationResult.success) {
             const errors = validationResult.error.flatten();
             return NextResponse.json(
-                { error: "เธเนเธญเธกเธนเธฅเนเธกเนเธ–เธนเธเธ•เนเธญเธ", details: errors.fieldErrors },
+                { error: "ข้อมูลไม่ถูกต้อง", details: errors.fieldErrors },
                 { status: 400 },
             );
         }
@@ -142,6 +143,21 @@ export async function PATCH(
             processOutbox().catch((err) =>
                 console.error("Outbox processor failed:", err),
             );
+            
+            // In-app Notification for status update
+            const currentUserId = Number(user.id);
+            if (result.ticket && result.ticket.reportedById !== currentUserId && updateData.status) {
+                await prisma.notification.create({
+                    data: {
+                        userId: result.ticket.reportedById,
+                        type: "TICKET_UPDATED",
+                        title: "อัปเดตสถานะปัญหา",
+                        message: `ปัญหา '${result.ticket.title}' เปลี่ยนสถานะเป็น: ${updateData.status}`,
+                        actionUrl: `/dashboard?tab=it-support&ticketId=${ticketId}`,
+                        referenceId: ticketId.toString()
+                    }
+                });
+            }
         });
 
         return NextResponse.json({ ticket: result.ticket }, { status: 200 });

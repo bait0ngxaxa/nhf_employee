@@ -1,116 +1,151 @@
 "use client";
 
-import { memo } from "react";
+import React from "react";
+import { Card, CardContent } from "@/components/ui/card";
 import {
     Ticket as TicketIcon,
     Settings,
     BarChart3,
     Sparkles,
     List,
+    type LucideIcon,
 } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 import { useITSupportDataContext } from "../context";
 
-export const StatsCards = memo(function StatsCards() {
+interface StatItem {
+    label: string;
+    value: number;
+    unit: string;
+    gradient: string;
+    icon: LucideIcon;
+    bgClass: string;
+    iconClass: string;
+}
+
+// Static configuration
+const STAT_CONFIG: Omit<StatItem, 'value'>[] = [
+    {
+        label: "Tickets ทั้งหมด",
+        unit: "tickets",
+        gradient: "from-gray-600 to-slate-600",
+        icon: TicketIcon,
+        bgClass: "bg-gray-100",
+        iconClass: "text-gray-600",
+    },
+    {
+        label: "Tickets ใหม่",
+        unit: "24 ชม.",
+        gradient: "from-blue-600 to-indigo-600",
+        icon: Sparkles,
+        bgClass: "bg-blue-100",
+        iconClass: "text-blue-600",
+    },
+    {
+        label: "กำลังดำเนินการ",
+        unit: "tickets",
+        gradient: "from-amber-500 to-orange-600",
+        icon: Settings,
+        bgClass: "bg-amber-100",
+        iconClass: "text-amber-600",
+    },
+    {
+        label: "แก้ไขแล้ว",
+        unit: "tickets",
+        gradient: "from-emerald-500 to-teal-600",
+        icon: BarChart3,
+        bgClass: "bg-emerald-100",
+        iconClass: "text-emerald-600",
+    },
+    {
+        label: "ของฉัน",
+        unit: "tickets",
+        gradient: "from-purple-500 to-pink-600",
+        icon: List,
+        bgClass: "bg-purple-100",
+        iconClass: "text-purple-600",
+    },
+];
+
+export const StatsCards = React.memo(function StatsCards() {
     const { ticketStats, isAdmin } = useITSupportDataContext();
 
+    const statItems: StatItem[] = [
+        { ...STAT_CONFIG[0], value: ticketStats.total },
+        { ...STAT_CONFIG[1], value: ticketStats.newTickets ?? 0 },
+        { ...STAT_CONFIG[2], value: ticketStats.open + ticketStats.inProgress },
+        { ...STAT_CONFIG[3], value: ticketStats.resolved },
+        { ...STAT_CONFIG[4], value: ticketStats.userTickets ?? 0 },
+    ];
+
+    // Update unit for "Mine" based on role
+    statItems[4] = {
+        ...statItems[4],
+        unit: isAdmin ? "มอบหมาย" : "ที่ฉันแจ้ง",
+    };
+
     return (
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-            <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">
-                        Tickets ทั้งหมด
-                    </CardTitle>
-                    <TicketIcon className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                    <div className="text-2xl font-bold">
-                        {ticketStats.total}
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                        tickets ในระบบ
-                    </p>
-                </CardContent>
-            </Card>
+        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4 lg:gap-5">
+            {statItems.map((item, index) => {
+                const Icon = item.icon;
+                const isNewCard = index === 1 && item.value > 0;
 
-            <Card
-                className={
-                    (ticketStats.newTickets ?? 0) > 0
-                        ? "ring-2 ring-blue-200 bg-blue-50/30"
-                        : ""
-                }
-            >
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium flex items-center gap-1">
-                        <Sparkles className="h-4 w-4 text-blue-500" />
-                        Tickets ใหม่
-                    </CardTitle>
-                    <div className="text-blue-500">
-                        {(ticketStats.newTickets ?? 0) > 0 && (
-                            <Sparkles className="h-4 w-4 animate-pulse" />
+                return (
+                    <Card
+                        key={item.label}
+                        className={cn(
+                            "relative overflow-hidden bg-white border-gray-200 shadow-lg hover:shadow-xl transition-[box-shadow,transform] duration-300 rounded-2xl group",
+                            isNewCard && "ring-2 ring-blue-200"
                         )}
-                    </div>
-                </CardHeader>
-                <CardContent>
-                    <div className="text-2xl font-bold text-blue-600">
-                        {ticketStats.newTickets}
-                    </div>
-                    <p className="text-xs text-blue-600">
-                        24 ชั่วโมงที่ผ่านมา
-                    </p>
-                </CardContent>
-            </Card>
+                    >
+                        {/* Decorative Background Blob */}
+                        <div
+                            className={cn(
+                                "absolute -right-6 -top-6 w-32 h-32 rounded-full opacity-10 blur-2xl bg-gradient-to-br",
+                                item.gradient,
+                                "group-hover:opacity-20 transition-opacity duration-500"
+                            )}
+                        />
 
-            <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">
-                        กำลังดำเนินการ
-                    </CardTitle>
-                    <Settings className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                    <div className="text-2xl font-bold">
-                        {ticketStats.open + ticketStats.inProgress}
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                        เปิด: {ticketStats.open}, ดำเนินการ: {ticketStats.inProgress}
-                    </p>
-                </CardContent>
-            </Card>
-
-            <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">
-                        แก้ไขแล้ว
-                    </CardTitle>
-                    <BarChart3 className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                    <div className="text-2xl font-bold">
-                        {ticketStats.resolved}
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                        tickets ที่แก้ไขแล้ว
-                    </p>
-                </CardContent>
-            </Card>
-
-            <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">
-                        ของฉัน
-                    </CardTitle>
-                    <List className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                    <div className="text-2xl font-bold">
-                        {ticketStats.userTickets}
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                        {isAdmin ? "มอบหมายให้ฉัน" : "ที่ฉันแจ้ง"}
-                    </p>
-                </CardContent>
-            </Card>
+                        <CardContent className="p-5">
+                            <div className="flex justify-between items-start">
+                                <div>
+                                    <p className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">
+                                        {item.label}
+                                    </p>
+                                    <div className="flex items-baseline space-x-1.5">
+                                        <p
+                                            className={cn(
+                                                "text-2xl font-bold bg-gradient-to-r bg-clip-text text-transparent",
+                                                item.gradient
+                                            )}
+                                        >
+                                            {item.value}
+                                        </p>
+                                        <p className="text-xs text-gray-500">
+                                            {item.unit}
+                                        </p>
+                                    </div>
+                                </div>
+                                <div
+                                    className={cn(
+                                        "p-2.5 rounded-xl group-hover:scale-110 transition-transform duration-300",
+                                        item.bgClass
+                                    )}
+                                >
+                                    <Icon
+                                        className={cn(
+                                            "h-5 w-5",
+                                            item.iconClass,
+                                            isNewCard && "animate-pulse"
+                                        )}
+                                    />
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+                );
+            })}
         </div>
     );
 });

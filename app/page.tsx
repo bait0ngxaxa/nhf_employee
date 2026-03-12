@@ -27,8 +27,11 @@ export default async function Home() {
             <header className="relative z-10 border-b border-gray-200/50 backdrop-blur-sm bg-white/70">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                     <div className="flex justify-between items-center py-4">
-                        <div className="flex items-center space-x-3 group cursor-pointer">
-                            <div className="bg-gradient-to-br from-blue-600 to-cyan-500 p-2.5 rounded-xl shadow-md shadow-blue-500/20 group-hover:shadow-blue-500/40 transition-all duration-300 group-hover:scale-105">
+                        <Link
+                            href="/"
+                            className="flex items-center space-x-3 group rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-4"
+                        >
+                            <div className="bg-gradient-to-br from-blue-600 to-cyan-500 p-2.5 rounded-xl shadow-md shadow-blue-500/20 group-hover:shadow-blue-500/40 transition duration-300 motion-safe:group-hover:scale-105">
                                 <Zap className="h-5 w-5 text-white" />
                             </div>
                             <div className="flex flex-col justify-center">
@@ -39,7 +42,7 @@ export default async function Home() {
                                     Workspace
                                 </span>
                             </div>
-                        </div>
+                        </Link>
                         <AuthStatus />
                     </div>
                 </div>
@@ -49,7 +52,7 @@ export default async function Home() {
             <main className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 md:py-24">
                 <div className="text-center mb-16 mt-8">
                     <div className="inline-flex items-center px-4 py-2 rounded-full bg-white/60 backdrop-blur-md border border-gray-200/60 shadow-sm mb-8">
-                        <span className="flex h-2 w-2 rounded-full bg-blue-600 mr-3 animate-pulse" />
+                        <span className="flex h-2 w-2 rounded-full bg-blue-600 mr-3 motion-safe:animate-pulse" />
                         <span className="text-sm text-gray-600 font-medium tracking-wide">
                             ระบบสารสนเทศภายในองค์กร
                         </span>
@@ -68,18 +71,19 @@ export default async function Home() {
                         แพลตฟอร์มส่วนกลางสำหรับ{" "}
                         <strong>มูลนิธิสาธารณสุขแห่งชาติ</strong>{" "}
                         ในการบริหารข้อมูลพนักงาน แจ้งซ่อมอุปกรณ์
-                        และติดตามสถานะช่วยเหลือแบบครบวงจร
+                        และติดตามสถานะช่วยเหลือ
                     </p>
                     <div className="flex flex-col sm:flex-row justify-center gap-4">
-                        <Link href="/login">
-                            <Button
-                                size="lg"
-                                className="bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white px-8 py-6 text-lg rounded-xl shadow-lg shadow-blue-500/25 transition-all duration-300 hover:scale-105 hover:shadow-xl"
-                            >
+                        <Button
+                            asChild
+                            size="lg"
+                            className="bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white px-8 py-6 text-lg rounded-xl shadow-lg shadow-blue-500/25 transition duration-300 motion-safe:hover:scale-105 hover:shadow-xl focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+                        >
+                            <Link href="/login">
                                 เข้าสู่ระบบ
                                 <ArrowRight className="ml-2 h-5 w-5" />
-                            </Button>
-                        </Link>
+                            </Link>
+                        </Button>
                     </div>
                 </div>
 
@@ -114,7 +118,8 @@ export default async function Home() {
                                     Employee Management
                                 </h3>
                                 <p className="text-sm text-gray-600">
-                                    บันทึกและจัดการข้อมูลพนักงานอย่างเป็นระบบ
+                                    บันทึกและจัดการข้อมูลพนักงานอย่างเป็นระบบเพื่อเป็น
+                                    Single Source of Truth
                                 </p>
                             </div>
 
@@ -139,8 +144,8 @@ export default async function Home() {
             <footer className="relative z-10 border-t border-gray-200/50 py-6">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                     <p className="text-center text-sm text-gray-500">
-                        © {new Date().getFullYear()} National Health Foundation.
-                        All rights reserved.
+                        &copy; {new Date().getFullYear()} National Health
+                        Foundation. All rights reserved.
                     </p>
                 </div>
             </footer>

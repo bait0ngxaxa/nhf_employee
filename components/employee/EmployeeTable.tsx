@@ -25,14 +25,14 @@ export const EmployeeTable = memo(function EmployeeTable({
 
     return (
         <div
-            className="overflow-auto max-h-[70vh] border border-gray-200/60 rounded-2xl shadow-sm bg-white/60 backdrop-blur-md"
+            className="overflow-auto max-h-[70vh] border border-gray-200/60 rounded-2xl shadow-sm bg-white"
             style={{
                 contentVisibility: "auto",
                 containIntrinsicSize: "0 500px",
             }}
         >
-            <table className="min-w-full bg-white">
-                <thead className="bg-gray-50/80 border-b border-gray-200/60 sticky top-0 z-10 backdrop-blur-sm">
+            <table className="w-full text-sm text-left">
+                <thead className="bg-gray-50 border-b border-gray-200/60 sticky top-0 z-10">
                     <tr>
                         <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
                             ชื่อ-นามสกุล
@@ -59,7 +59,7 @@ export const EmployeeTable = memo(function EmployeeTable({
                             สถานะ
                         </th>
                         {userRole === "ADMIN" ? (
-                            <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider sticky right-0 bg-gray-50 backdrop-blur-sm">
+                            <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider sticky right-0 bg-gray-50">
                                 การจัดการ
                             </th>
                         ) : null}

@@ -1,6 +1,7 @@
-﻿import { after, type NextRequest, NextResponse } from "next/server";
+import { after, type NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
 import { createTicketSchema, ticketFiltersSchema } from "@/lib/validations/ticket";
 import { logTicketEvent } from "@/lib/audit";
 import { ticketService, type TicketFilters } from "@/lib/services/ticket";
@@ -79,7 +80,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         if (!result.success) {
             const errors = result.error.flatten();
             return NextResponse.json(
-                { error: "เธเนเธญเธกเธนเธฅเนเธกเนเธ–เธนเธเธ•เนเธญเธ", details: errors.fieldErrors },
+                { error: "ข้อมูลไม่ถูกต้อง", details: errors.fieldErrors },
                 { status: 400 },
             );
         }
@@ -118,6 +119,21 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
                     },
                 },
             );
+
+            // Trigger In-App Notification using Prisma
+            const admins = await prisma.user.findMany({ where: { role: "ADMIN" } });
+            if (admins.length > 0) {
+                await prisma.notification.createMany({
+                    data: admins.map((admin) => ({
+                        userId: admin.id,
+                        type: "TICKET_CREATED",
+                        title: "ผู้ใช้งานแจ้งปัญหาใหม่",
+                        message: `หัวข้อ: ${ticket.title}`,
+                        actionUrl: `/dashboard?tab=it-support&ticketId=${ticket.id}`,
+                        referenceId: ticket.id.toString(),
+                    })),
+                });
+            }
         });
 
         return NextResponse.json({ ticket }, { status: 201 });

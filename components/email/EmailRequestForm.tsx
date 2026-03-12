@@ -23,7 +23,7 @@ export function EmailRequestForm({ onCancel }: EmailRequestFormProps) {
 
     return (
         <div className="space-y-6">
-            <Card className="bg-white/80 backdrop-blur-xl border-gray-200/50 shadow-xl rounded-3xl">
+            <Card className="bg-white/95 border-gray-200/50 shadow-xl rounded-3xl">
                 <CardContent className="p-6 md:p-8">
                     {error && (
                         <div className="mb-6 p-4 rounded-xl bg-red-50 border border-red-200 text-red-800 flex items-center">

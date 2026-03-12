@@ -1,7 +1,69 @@
-import { type NextRequest, NextResponse } from "next/server";
+import { after, type NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+
+/**
+ * Build in-app notification data based on who commented.
+ * Runs inside after() so it doesn't block the response.
+ */
+async function notifyCommentParticipants(
+    ticket: { id: number; title: string; reportedById: number; assignedToId: number | null },
+    commentAuthorId: number,
+    isAdmin: boolean,
+    isAssigned: boolean,
+    isOwner: boolean,
+): Promise<void> {
+    const actionUrl = `/dashboard?tab=it-support&ticketId=${ticket.id}`;
+    const referenceId = ticket.id.toString();
+
+    if ((isAdmin || isAssigned) && ticket.reportedById !== commentAuthorId) {
+        await prisma.notification.create({
+            data: {
+                userId: ticket.reportedById,
+                type: "NEW_COMMENT",
+                title: "คุณมีข้อความใหม่",
+                message: `แอดมินหรือเจ้าหน้าที่ได้ตอบกลับปัญหา: ${ticket.title}`,
+                actionUrl,
+                referenceId,
+            },
+        });
+        return;
+    }
+
+    if (!isOwner) return;
+
+    if (ticket.assignedToId) {
+        await prisma.notification.create({
+            data: {
+                userId: ticket.assignedToId,
+                type: "NEW_COMMENT",
+                title: "ผู้แจ้งมีการตอบกลับ",
+                message: `มีข้อความใหม่ในปัญหา: ${ticket.title}`,
+                actionUrl,
+                referenceId,
+            },
+        });
+    } else {
+        const admins = await prisma.user.findMany({
+            where: { role: "ADMIN" },
+            select: { id: true },
+        });
+
+        if (admins.length > 0) {
+            await prisma.notification.createMany({
+                data: admins.map((admin) => ({
+                    userId: admin.id,
+                    type: "NEW_COMMENT" as const,
+                    title: "มีผู้แจ้งโต้ตอบกลับ",
+                    message: `มีข้อความใหม่ในปัญหา: ${ticket.title}`,
+                    actionUrl,
+                    referenceId,
+                })),
+            });
+        }
+    }
+}
 
 // POST - Add comment to ticket
 export async function POST(
@@ -39,6 +101,14 @@ export async function POST(
             );
         }
 
+        const currentUserId = parseInt(session.user.id);
+        if (isNaN(currentUserId)) {
+            return NextResponse.json(
+                { error: "Invalid user session" },
+                { status: 400 },
+            );
+        }
+
         // Check if ticket exists
         const ticket = await prisma.ticket.findUnique({
             where: { id: ticketId },
@@ -51,10 +121,10 @@ export async function POST(
             );
         }
 
-        // Check permissions - user can comment on their own tickets or admin can comment on any
-        const isOwner = ticket.reportedById === parseInt(session.user.id);
+        // Check permissions
+        const isOwner = ticket.reportedById === currentUserId;
         const isAdmin = session.user?.role === "ADMIN";
-        const isAssigned = ticket.assignedToId === parseInt(session.user.id);
+        const isAssigned = ticket.assignedToId === currentUserId;
 
         if (!isOwner && !isAdmin && !isAssigned) {
             return NextResponse.json(
@@ -68,7 +138,7 @@ export async function POST(
             data: {
                 content: content.trim(),
                 ticketId,
-                authorId: parseInt(session.user.id),
+                authorId: currentUserId,
             },
             include: {
                 author: {
@@ -86,6 +156,12 @@ export async function POST(
                     },
                 },
             },
+        });
+
+        // Dispatch in-app notifications after response (non-blocking)
+        after(() => {
+            notifyCommentParticipants(ticket, currentUserId, isAdmin, isAssigned, isOwner)
+                .catch((err) => console.error("Comment notification failed:", err));
         });
 
         return NextResponse.json({ comment }, { status: 201 });

@@ -49,7 +49,7 @@ export function ITSupportProvider({ children }: ITSupportProviderProps) {
     const isAdmin = session?.user?.role === "ADMIN";
 
     const { data, mutate, isLoading } = useSWR<{ tickets: Ticket[] }>(
-        session ? "/api/tickets?limit=1000" : null,
+        session ? "/api/tickets?limit=100" : null,
     );
 
     const ticketStats = useMemo<TicketStats>(() => {

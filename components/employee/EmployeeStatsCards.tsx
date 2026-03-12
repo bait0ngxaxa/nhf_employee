@@ -85,7 +85,7 @@ export const EmployeeStatsCards = React.memo(function EmployeeStatsCards({ stats
                 return (
                     <Card
                         key={item.label}
-                        className="relative overflow-hidden bg-white/60 backdrop-blur-md border-gray-100 shadow-lg hover:shadow-xl transition-all duration-300 rounded-2xl group border-l-4"
+                        className="relative overflow-hidden bg-white border-gray-100 shadow-lg hover:shadow-xl transition-[box-shadow,transform] duration-300 rounded-2xl group border-l-4 will-change-transform"
                         style={{ borderLeftColor: "transparent" }}
                     >
                         {/* Decorative Background Blob */}

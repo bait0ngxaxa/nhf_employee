@@ -3,12 +3,13 @@
 import {
     useState,
     useCallback,
+    useEffect,
     useMemo,
     startTransition,
     type ReactNode,
 } from "react";
 import { useSession, signOut } from "next-auth/react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import useSWR from "swr";
 import {
     DASHBOARD_MENU_ITEMS,
@@ -35,12 +36,26 @@ const defaultStats: EmployeeStats = {
 export function DashboardProvider({ children }: DashboardProviderProps) {
     const { data: session, status } = useSession();
     const router = useRouter();
+    const searchParams = useSearchParams();
+    const pathname = usePathname();
     const user = session?.user;
     const isAdmin = user?.role === "ADMIN";
 
-    const [selectedMenu, setSelectedMenu] = useState<string>("dashboard");
+    // Initialize selectedMenu from URL ?tab= param, fallback to "dashboard"
+    const initialTab = searchParams.get("tab") ?? "dashboard";
+    const [selectedMenu, setSelectedMenu] = useState<string>(initialTab);
     const [sidebarOpen, setSidebarOpen] = useState(true);
     const [refreshTrigger, setRefreshTrigger] = useState(0);
+
+    // Sync selectedMenu when URL ?tab= changes (e.g. notification click)
+    useEffect(() => {
+        const tabFromUrl = searchParams.get("tab");
+        if (tabFromUrl) {
+            startTransition(() => {
+                setSelectedMenu(tabFromUrl);
+            });
+        }
+    }, [searchParams]);
 
     const availableMenuItems = getAvailableMenuItems(isAdmin);
 
@@ -69,11 +84,17 @@ export function DashboardProvider({ children }: DashboardProviderProps) {
                 setSelectedMenu(menuId);
             });
 
+            // Navigate back to /dashboard if on a sub-route (e.g. /dashboard/notifications)
+            // or if URL has ?tab= param that needs clearing
+            if (pathname !== "/dashboard" || searchParams.has("tab")) {
+                router.replace("/dashboard", { scroll: false });
+            }
+
             if (window.innerWidth < 768) {
                 setSidebarOpen(false);
             }
         },
-        [isAdmin, router],
+        [isAdmin, router, searchParams, pathname],
     );
 
     const handleSignOut = useCallback(() => {

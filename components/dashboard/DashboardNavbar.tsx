@@ -2,7 +2,7 @@
 
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Menu, Bell, User, LogOut, ChevronDown } from "lucide-react";
+import { Menu, User, LogOut, ChevronDown } from "lucide-react";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -14,6 +14,7 @@ import {
     useDashboardUIContext,
     useDashboardDataContext,
 } from "@/components/dashboard/context/dashboard/DashboardContext";
+import { NotificationDropdown } from "./NotificationDropdown";
 
 export function DashboardNavbar() {
     const { sidebarOpen, setSidebarOpen, handleSignOut } =
@@ -21,7 +22,7 @@ export function DashboardNavbar() {
     const { user } = useDashboardDataContext();
 
     return (
-        <header className="sticky top-0 z-30 bg-white/80 backdrop-blur-xl border-b border-gray-200/50 shadow-sm">
+        <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-sm border-b border-gray-200/50 shadow-sm">
             <div className="flex items-center justify-between h-14 px-4 md:px-6">
                 {/* Left: Mobile menu + Page title */}
                 <div className="flex items-center gap-3">
@@ -39,13 +40,7 @@ export function DashboardNavbar() {
                 {/* Right: User menu */}
                 <div className="flex items-center gap-2">
                     {/* Notifications */}
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-9 w-9 text-gray-600 hover:text-gray-900"
-                    >
-                        <Bell className="h-5 w-5" />
-                    </Button>
+                    <NotificationDropdown />
 
                     {/* User Dropdown */}
                     <DropdownMenu>

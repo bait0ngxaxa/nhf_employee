@@ -47,7 +47,7 @@ export function EmailRequestHistory() {
     }
 
     return (
-        <Card className="bg-white/80 backdrop-blur-xl border-gray-200/50 shadow-xl rounded-3xl">
+        <Card className="bg-white/95 border-gray-200/50 shadow-xl rounded-3xl">
             <CardHeader>
                 <div className="flex items-center gap-3">
                     <div className="p-2 bg-gradient-to-br from-purple-100 to-indigo-100 rounded-xl">

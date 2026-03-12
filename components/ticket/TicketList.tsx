@@ -55,15 +55,15 @@ export default function TicketList({
             />
 
             {/* Tickets List */}
-            <Card>
-                <CardHeader>
+            <Card className="border-gray-300 shadow-lg bg-slate-50/80">
+                <CardHeader className="border-b border-gray-200 bg-white">
                     <CardTitle>รายการ Tickets</CardTitle>
                     <CardDescription>
                         แสดง {tickets.length} รายการจากทั้งหมด{" "}
                         {pagination.total} รายการ
                     </CardDescription>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="p-5 space-y-4 bg-slate-50/50">
                     {loading ? (
                         <div className="space-y-4 py-4 animate-pulse">
                             {/* Filter Bar Skeleton */}
@@ -101,7 +101,7 @@ export default function TicketList({
                         </div>
                     ) : (
                         <div
-                            className="space-y-4"
+                            className="space-y-4 p-1"
                             style={{
                                 contentVisibility: "auto",
                                 containIntrinsicSize: "0 500px",

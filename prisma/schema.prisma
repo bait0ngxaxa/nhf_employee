@@ -25,6 +25,7 @@ model User {
   employee        Employee?       @relation(fields: [employeeId], references: [id])
   auditLogs       AuditLog[]
   emailRequests   EmailRequest[]
+  notifications   Notification[]
 
   @@map("users")
 }
@@ -261,6 +262,27 @@ model NotificationOutbox {
   @@map("notification_outbox")
 }
 
+// In-App Notifications for the Navigation Bar
+model Notification {
+  id          String           @id @default(cuid())
+  userId      Int
+  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type        NotificationType
+  title       String
+  message     String           @db.Text
+  isRead      Boolean          @default(false)
+  actionUrl   String?
+  referenceId String?          // ID of Ticket, Comment, etc.
+  createdAt   DateTime         @default(now())
 
+  @@index([userId, isRead])
+  @@index([createdAt])
+  @@map("notifications")
+}
 
-
+enum NotificationType {
+  TICKET_CREATED
+  NEW_COMMENT
+  TICKET_UPDATED
+  SYSTEM_ALERT
+}

@@ -85,6 +85,16 @@ const ImportEmployeeCSV = dynamic(
     },
 );
 
+const NotificationsSection = dynamic(
+    () =>
+        import("@/components/dashboard/NotificationsPageContent").then(
+            (mod) => mod.NotificationsSection,
+        ),
+    {
+        loading: () => <SectionSkeleton />,
+    },
+);
+
 export function DashboardContent() {
     useTitle("Dashboard | NHF IT System");
 
@@ -144,6 +154,13 @@ export function DashboardContent() {
                 return (
                     <Suspense fallback={<SectionSkeleton />}>
                         <AuditLogsSection />
+                    </Suspense>
+                );
+
+            case "notifications":
+                return (
+                    <Suspense fallback={<SectionSkeleton />}>
+                        <NotificationsSection />
                     </Suspense>
                 );
 
