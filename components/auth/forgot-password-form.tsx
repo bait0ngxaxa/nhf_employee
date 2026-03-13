@@ -14,6 +14,7 @@ import { Label } from "@/components/ui/label";
 import { useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, Mail, CheckCircle2 } from "lucide-react";
+import { apiPost } from "@/lib/api-client";
 
 export function ForgotPasswordForm({
     className,
@@ -30,15 +31,10 @@ export function ForgotPasswordForm({
         setIsLoading(true);
 
         try {
-            const response = await fetch("/api/auth/forgot-password", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ email }),
-            });
+            const result = await apiPost("/api/auth/forgot-password", { email });
 
-            if (!response.ok) {
-                const data = await response.json();
-                setError(data.error || "เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง");
+            if (!result.success) {
+                setError(result.error);
                 return;
             }
 

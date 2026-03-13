@@ -16,6 +16,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { KeyRound, Eye, EyeOff, CheckCircle2, XCircle } from "lucide-react";
 import Link from "next/link";
+import { apiPost } from "@/lib/api-client";
 
 interface PasswordRequirement {
     label: string;
@@ -61,16 +62,14 @@ export function ResetPasswordForm({
         setIsLoading(true);
 
         try {
-            const response = await fetch("/api/auth/reset-password", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ token, password, confirmPassword }),
+            const result = await apiPost("/api/auth/reset-password", {
+                token,
+                password,
+                confirmPassword,
             });
 
-            const data = await response.json();
-
-            if (!response.ok) {
-                setError(data.error || "เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง");
+            if (!result.success) {
+                setError(result.error);
                 return;
             }
 

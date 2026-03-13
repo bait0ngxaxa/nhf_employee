@@ -27,21 +27,13 @@ import {
     AUDIT_ENTITY_TYPE_OPTIONS,
     getAuditActionBadgeColor,
 } from "@/constants/audit";
+import { formatThaiDateTime } from "@/lib/helpers/date-helpers";
 
 interface AuditLogViewerProps {
     className?: string;
 }
 
-const formatDate = (dateString: string): string => {
-    const date = new Date(dateString);
-    return date.toLocaleString("th-TH", {
-        year: "numeric",
-        month: "short",
-        day: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-    });
-};
+
 
 export function AuditLogViewer({ className }: AuditLogViewerProps) {
     const {
@@ -228,7 +220,7 @@ export function AuditLogViewer({ className }: AuditLogViewerProps) {
                                         className="hover:bg-gray-50"
                                     >
                                         <td className="px-4 py-3 text-sm text-gray-600 whitespace-nowrap">
-                                            {formatDate(log.createdAt)}
+                                            {formatThaiDateTime(log.createdAt)}
                                         </td>
                                         <td className="px-4 py-3">
                                             <Badge

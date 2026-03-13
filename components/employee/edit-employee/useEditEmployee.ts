@@ -9,6 +9,7 @@ import {
     type EmployeeStatusValue,
 } from "@/types/employees";
 import { updateEmployeeSchema } from "@/lib/validations/employee";
+import { apiPatch } from "@/lib/api-client";
 
 function buildInitialFormData(employee: Employee | null): EmployeeFormData {
     return {
@@ -134,25 +135,18 @@ export function useEditEmployee({
 
         setIsLoading(true);
 
-        try {
-            const response = await fetch(`/api/employees/${employee.id}`, {
-                method: "PATCH",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(formData),
-            });
+        const apiResult = await apiPatch(
+            `/api/employees/${employee.id}`,
+            formData,
+        );
 
-            const data = await response.json();
-
-            if (response.ok) {
-                onSuccess?.();
-            } else {
-                setError(data.error || "เกิดข้อผิดพลาดในการแก้ไขข้อมูล");
-            }
-        } catch {
-            setError("เกิดข้อผิดพลาดในการเชื่อมต่อ");
-        } finally {
-            setIsLoading(false);
+        if (apiResult.success) {
+            onSuccess?.();
+        } else {
+            setError(apiResult.error);
         }
+
+        setIsLoading(false);
     };
 
     return {

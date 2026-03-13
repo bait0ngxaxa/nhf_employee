@@ -21,8 +21,8 @@ export function ITEquipmentSection() {
                 <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 animate-in fade-in slide-in-from-bottom-2 duration-700 ease-out">
                     <div className="flex items-center space-x-5">
                         <div className="relative group cursor-default">
-                            <div className="absolute -inset-2 rounded-2xl bg-gradient-to-r from-teal-500/40 to-emerald-500/40 blur-xl opacity-70 group-hover:opacity-100 group-hover:scale-110 transition-[opacity,transform] duration-500 will-change-transform" />
-                            <div className="relative flex items-center justify-center w-14 h-14 bg-gradient-to-br from-teal-600 to-emerald-600 rounded-2xl shadow-lg shadow-teal-500/25 ring-1 ring-white/20">
+                            <div className="absolute -inset-2 rounded-2xl bg-gradient-to-r from-orange-500/40 to-red-500/40 blur-xl opacity-70 group-hover:opacity-100 group-hover:scale-110 transition-[opacity,transform] duration-500 will-change-transform" />
+                            <div className="relative flex items-center justify-center w-14 h-14 bg-gradient-to-br from-orange-500 to-red-600 rounded-2xl shadow-lg shadow-orange-500/25 ring-1 ring-white/20">
                                 <MonitorSmartphone className="h-7 w-7 text-white" />
                             </div>
                         </div>

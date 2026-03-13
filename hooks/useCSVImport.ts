@@ -2,6 +2,7 @@ import { useState, useRef, useCallback } from "react";
 import { type CSVEmployee, type ImportResult } from "@/types/employees";
 import { parseCSV, downloadSampleCSV } from "@/lib/helpers/csv-helpers";
 import { validateCSVFile } from "@/lib/helpers/file-validation";
+import { apiPost } from "@/lib/api-client";
 
 type ImportStep = "upload" | "preview" | "result";
 
@@ -85,27 +86,19 @@ export function useCSVImport(): UseCSVImportReturn {
             setError("");
 
             try {
-                const response = await fetch("/api/employees/import", {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                    },
-                    body: JSON.stringify({ employees: parsedData }),
+                const result = await apiPost<{ result: ImportResult }>("/api/employees/import", {
+                    employees: parsedData,
                 });
 
-                const data = await response.json();
-
-                if (response.ok) {
-                    setImportResult(data.result);
+                if (result.success) {
+                    setImportResult(result.data.result);
                     setStep("result");
                     if (onSuccess) {
                         onSuccess();
                     }
                 } else {
-                    setError(data.error || "เกิดข้อผิดพลาดในการนำเข้าข้อมูล");
+                    setError(result.error);
                 }
-            } catch {
-                setError("เกิดข้อผิดพลาดในการเชื่อมต่อ");
             } finally {
                 setIsLoading(false);
             }

@@ -87,7 +87,7 @@ export function EmployeeProvider({ children }: EmployeeProviderProps) {
     const swrKey = `/api/employees?${params.toString()}`;
 
     // SWR Hook
-    const { data, mutate, isLoading, error: swrError } = useSWR(swrKey);
+    const { data, mutate, isLoading, error: swrError } = useSWR(swrKey, { keepPreviousData: true });
 
     // Keep mutate stable using ref to prevent unnecessary re-renders
     const mutateRef = useRef(mutate);
@@ -172,14 +172,14 @@ export function EmployeeProvider({ children }: EmployeeProviderProps) {
     };
 
     const getExportFileName = useCallback(() => {
-        const searchSuffix = searchTerm ? `_ค้นหา-${searchTerm}` : "";
+        const searchSuffix = debouncedSearchTerm ? `_ค้นหา-${debouncedSearchTerm}` : "";
         const statusSuffix =
             statusFilter !== "all"
                 ? `_สถานะ-${getEmployeeStatusLabel(statusFilter)}`
                 : "";
         const prefix = `รายชื่อพนักงาน${searchSuffix}${statusSuffix}`;
         return generateFilename(prefix, "csv");
-    }, [searchTerm, statusFilter]);
+    }, [debouncedSearchTerm, statusFilter]);
 
     const handleExportCSV = useCallback(async (): Promise<
         EmployeeCSVData[]
@@ -206,9 +206,15 @@ export function EmployeeProvider({ children }: EmployeeProviderProps) {
                 }),
             });
 
+            toast.success("ดาวน์โหลดสำเร็จ", {
+                description: `เตรียมข้อมูลพนักงานทั้งหมด ${allEmployees.length} รายการเรียบร้อยแล้ว`,
+            });
             return csvData;
         } catch (err) {
             console.error("Error fetching for export:", err);
+            toast.error("เกิดข้อผิดพลาดในการดาวน์โหลด", {
+                description: "ไม่สามารถเตรียมข้อมูลสำหรับ Export ได้ กรุณาลองใหม่อีกครั้ง",
+            });
             return [];
         } finally {
             setTimeout(() => setIsExporting(false), 500);
@@ -306,7 +312,7 @@ export function EmployeeProvider({ children }: EmployeeProviderProps) {
 
     const uiValue = useMemo<EmployeeUIContextValue>(
         () => ({
-            searchTerm,
+            debouncedSearchTerm,
             setSearchTerm: uiHandlers.handleSearchTermChange,
             statusFilter,
             setStatusFilter: uiHandlers.handleStatusFilterChange,
@@ -325,9 +331,8 @@ export function EmployeeProvider({ children }: EmployeeProviderProps) {
             handleCloseEditForm: uiHandlers.handleCloseEditForm,
             handleEmployeeUpdate: uiHandlers.handleEmployeeUpdate,
         }),
-        // Reduce dependencies - only state values that change
         [
-            searchTerm,
+            debouncedSearchTerm,
             statusFilter,
             currentPage,
             itemsPerPage,

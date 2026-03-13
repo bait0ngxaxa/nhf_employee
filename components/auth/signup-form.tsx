@@ -16,6 +16,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTitle } from "@/hooks/useTitle";
 import Link from "next/link";
+import { apiPost } from "@/lib/api-client";
 
 // Type definitions for API response
 interface User {
@@ -28,10 +29,6 @@ interface User {
 interface SignupSuccessResponse {
     message: string;
     user: User;
-}
-
-interface SignupErrorResponse {
-    error: string;
 }
 
 export function SignupForm({
@@ -72,21 +69,18 @@ export function SignupForm({
         setIsLoading(true);
 
         try {
-            const response = await fetch("/api/auth/signup", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
+            const result = await apiPost<SignupSuccessResponse>(
+                "/api/auth/signup",
+                {
                     name: formData.name,
                     email: formData.email,
                     password: formData.password,
                     confirmPassword: formData.confirmPassword,
-                }),
-            });
+                },
+            );
 
-            if (response.ok) {
-                const data: SignupSuccessResponse = await response.json();
+            if (result.success) {
+                const data = result.data;
                 toast.success("สมัครสมาชิกสำเร็จ!", {
                     description: `ยินดีต้อนรับ${data.user?.name ? ` ${data.user.name}` : ""}! บัญชีของคุณถูกสร้างเรียบร้อยแล้ว`,
                 });
@@ -102,8 +96,7 @@ export function SignupForm({
                     router.push("/login");
                 }, 2000);
             } else {
-                const data: SignupErrorResponse = await response.json();
-                setError(data.error || "เกิดข้อผิดพลาดในการสมัครสมาชิก");
+                setError(result.error);
             }
         } catch {
             setError("เกิดข้อผิดพลาดในการเชื่อมต่อ");
@@ -120,7 +113,7 @@ export function SignupForm({
                         สร้างบัญชีใหม่
                     </CardTitle>
                     <CardDescription className="text-gray-500">
-                        กรุณากรอกข้อมูลเพื่อสมัครสมาชิก
+                        กรุณากรอกข้อมูลเพื่อลงทะเบียนเข้าใช้งาน
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -226,9 +219,7 @@ export function SignupForm({
                                 className="w-full rounded-xl bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white shadow-lg shadow-blue-500/25 transition-all duration-300 hover:scale-[1.02]"
                                 disabled={isLoading}
                             >
-                                {isLoading
-                                    ? "กำลังสมัครสมาชิก..."
-                                    : "สมัครสมาชิก"}
+                                {isLoading ? "กำลังลงทะเบียน..." : "ลงทะเบียน"}
                             </Button>
                         </div>
 

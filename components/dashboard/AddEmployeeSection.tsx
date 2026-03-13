@@ -25,8 +25,8 @@ export function AddEmployeeSection() {
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 animate-in fade-in slide-in-from-bottom-2 duration-700 ease-out">
                     <div className="flex items-center space-x-5">
                         <div className="relative group cursor-default">
-                            <div className="absolute -inset-2 rounded-2xl bg-gradient-to-r from-indigo-500/40 to-purple-500/40 blur-xl opacity-70 group-hover:opacity-100 group-hover:scale-110 transition-[opacity,transform] duration-500 will-change-transform" />
-                            <div className="relative flex items-center justify-center w-14 h-14 bg-gradient-to-br from-indigo-600 to-purple-600 rounded-2xl shadow-lg shadow-indigo-500/25 ring-1 ring-white/20">
+                            <div className="absolute -inset-2 rounded-2xl bg-gradient-to-r from-pink-500/40 to-rose-500/40 blur-xl opacity-70 group-hover:opacity-100 group-hover:scale-110 transition-[opacity,transform] duration-500 will-change-transform" />
+                            <div className="relative flex items-center justify-center w-14 h-14 bg-gradient-to-br from-pink-500 to-rose-600 rounded-2xl shadow-lg shadow-pink-500/25 ring-1 ring-white/20">
                                 <UserPlus className="h-7 w-7 text-white" />
                             </div>
                         </div>

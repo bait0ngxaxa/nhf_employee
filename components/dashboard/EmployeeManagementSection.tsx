@@ -41,8 +41,8 @@ function EmployeeManagementContent() {
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 animate-in fade-in slide-in-from-bottom-2 duration-700 ease-out">
                     <div className="flex items-center space-x-5">
                         <div className="relative group cursor-default">
-                            <div className="absolute -inset-2 rounded-2xl bg-gradient-to-r from-blue-500/40 to-cyan-500/40 blur-xl opacity-70 group-hover:opacity-100 group-hover:scale-110 transition-[opacity,transform] duration-500 will-change-transform" />
-                            <div className="relative flex items-center justify-center w-14 h-14 bg-gradient-to-br from-blue-600 to-cyan-600 rounded-2xl shadow-lg shadow-blue-500/25 ring-1 ring-white/20">
+                            <div className="absolute -inset-2 rounded-2xl bg-gradient-to-r from-sky-500/40 to-blue-500/40 blur-xl opacity-70 group-hover:opacity-100 group-hover:scale-110 transition-[opacity,transform] duration-500 will-change-transform" />
+                            <div className="relative flex items-center justify-center w-14 h-14 bg-gradient-to-br from-sky-600 to-blue-700 rounded-2xl shadow-lg shadow-sky-500/25 ring-1 ring-white/20">
                                 <Users className="h-7 w-7 text-white" />
                             </div>
                         </div>

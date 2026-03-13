@@ -19,8 +19,8 @@ export function AuditLogsSection() {
                     <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 animate-in fade-in slide-in-from-bottom-2 duration-700 ease-out">
                         <div className="flex items-center space-x-5">
                             <div className="relative group cursor-default">
-                                <div className="absolute -inset-2 rounded-2xl bg-gradient-to-r from-rose-500/40 to-orange-500/40 blur-xl opacity-70 group-hover:opacity-100 group-hover:scale-110 transition-[opacity,transform] duration-500 will-change-transform" />
-                                <div className="relative flex items-center justify-center w-14 h-14 bg-gradient-to-br from-rose-600 to-orange-600 rounded-2xl shadow-lg shadow-rose-500/25 ring-1 ring-white/20">
+                                <div className="absolute -inset-2 rounded-2xl bg-gradient-to-r from-yellow-500/40 to-amber-500/40 blur-xl opacity-70 group-hover:opacity-100 group-hover:scale-110 transition-[opacity,transform] duration-500 will-change-transform" />
+                                <div className="relative flex items-center justify-center w-14 h-14 bg-gradient-to-br from-yellow-500 to-amber-600 rounded-2xl shadow-lg shadow-yellow-500/25 ring-1 ring-white/20">
                                     <History className="h-7 w-7 text-white" />
                                 </div>
                             </div>

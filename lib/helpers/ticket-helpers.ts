@@ -1,4 +1,5 @@
 import { TICKET_CATEGORIES, TICKET_PRIORITIES, TICKET_STATUSES, PRIORITY_BADGE_COLORS, STATUS_BADGE_COLORS, PRIORITY_HEX_COLORS, STATUS_HEX_COLORS } from '@/constants/tickets';
+import { AlertCircle, Clock, CheckCircle, XCircle, type LucideIcon } from 'lucide-react';
 
 export function getTicketCategoryLabel(category: string): string {
   const categoryOption = TICKET_CATEGORIES.find(c => c.value === category);
@@ -13,6 +14,19 @@ export function getTicketPriorityLabel(priority: string): string {
 export function getTicketStatusLabel(status: string): string {
   const statusOption = TICKET_STATUSES.find(s => s.value === status);
   return statusOption?.label || status;
+}
+
+export function getTicketStatusIcon(status: string): LucideIcon {
+  switch (status) {
+    case "OPEN":
+      return AlertCircle;
+    case "IN_PROGRESS":
+      return Clock;
+    case "RESOLVED":
+      return CheckCircle;
+    default:
+      return XCircle;
+  }
 }
 
 export function getPriorityBadgeColor(priority: string): string {

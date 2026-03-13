@@ -5,6 +5,7 @@ import useSWR from "swr";
 import { toast } from "sonner";
 import { type EmployeeFormData, type Department } from "@/types/employees";
 import { createEmployeeSchema } from "@/lib/validations/employee";
+import { apiPost } from "@/lib/api-client";
 
 const INITIAL_FORM_DATA: EmployeeFormData = {
     firstName: "",
@@ -95,30 +96,23 @@ export function useAddEmployee({
 
         setIsLoading(true);
 
-        try {
-            const response = await fetch("/api/employees", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(formData),
-            });
+        setIsLoading(true);
 
-            if (response.ok) {
-                toast.success("เพิ่มพนักงานสำเร็จ!", {
-                    description:
-                        "ข้อมูลพนักงานใหม่ถูกเพิ่มเข้าระบบเรียบร้อยแล้ว",
-                });
-                setFormData(INITIAL_FORM_DATA);
-                setFieldErrors({});
-                onSuccess?.();
-            } else {
-                const data = await response.json();
-                setError(data.error || "เกิดข้อผิดพลาดในการเพิ่มพนักงาน");
-            }
-        } catch {
-            setError("เกิดข้อผิดพลาดในการเชื่อมต่อ");
-        } finally {
-            setIsLoading(false);
+        const apiResult = await apiPost("/api/employees", formData);
+
+        if (apiResult.success) {
+            toast.success("เพิ่มพนักงานสำเร็จ!", {
+                description:
+                    "ข้อมูลพนักงานใหม่ถูกเพิ่มเข้าระบบเรียบร้อยแล้ว",
+            });
+            setFormData(INITIAL_FORM_DATA);
+            setFieldErrors({});
+            onSuccess?.();
+        } else {
+            setError(apiResult.error);
         }
+
+        setIsLoading(false);
     };
 
     return {

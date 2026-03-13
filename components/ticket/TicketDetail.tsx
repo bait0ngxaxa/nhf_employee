@@ -18,15 +18,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
-import {
-    Clock,
-    MessageSquare,
-    Send,
-    ArrowLeft,
-    CheckCircle,
-    AlertCircle,
-    XCircle,
-} from "lucide-react";
+import { MessageSquare, Send, ArrowLeft } from "lucide-react";
 import { useTicketDetail } from "@/hooks/useTicketDetail";
 import { TICKET_STATUSES } from "@/constants/tickets";
 import {
@@ -35,7 +27,9 @@ import {
     getTicketStatusLabel,
     getPriorityBadgeColor,
     getStatusBadgeColor,
+    getTicketStatusIcon,
 } from "@/lib/helpers/ticket-helpers";
+import { formatThaiDateTime } from "@/lib/helpers/date-helpers";
 import { CommentItem } from "./CommentItem";
 
 interface TicketDetailProps {
@@ -64,29 +58,6 @@ export default function TicketDetail({
         isAdmin,
         canComment,
     } = useTicketDetail(ticketId, onTicketUpdated);
-
-    const getStatusIcon = (status: string) => {
-        switch (status) {
-            case "OPEN":
-                return <AlertCircle className="h-4 w-4" />;
-            case "IN_PROGRESS":
-                return <Clock className="h-4 w-4" />;
-            case "RESOLVED":
-                return <CheckCircle className="h-4 w-4" />;
-            default:
-                return <XCircle className="h-4 w-4" />;
-        }
-    };
-
-    const formatDate = (dateString: string) => {
-        return new Date(dateString).toLocaleDateString("th-TH", {
-            year: "numeric",
-            month: "long",
-            day: "numeric",
-            hour: "2-digit",
-            minute: "2-digit",
-        });
-    };
 
     if (loading) {
         return (
@@ -179,7 +150,10 @@ export default function TicketDetail({
                     </Button>
                 ) : null}
                 <div className="flex items-center gap-2">
-                    {getStatusIcon(ticket.status)}
+                    {(() => {
+                        const Icon = getTicketStatusIcon(ticket.status);
+                        return <Icon className="h-4 w-4" />;
+                    })()}
                     <span className="text-sm font-medium">
                         Ticket #{ticket.id}
                     </span>
@@ -233,18 +207,18 @@ export default function TicketDetail({
                         </div>
                         <div>
                             <span className="font-medium">วันที่แจ้ง:</span>
-                            <p>{formatDate(ticket.createdAt)}</p>
+                            <p>{formatThaiDateTime(ticket.createdAt)}</p>
                         </div>
                         <div>
                             <span className="font-medium">อัปเดตล่าสุด:</span>
-                            <p>{formatDate(ticket.updatedAt)}</p>
+                            <p>{formatThaiDateTime(ticket.updatedAt)}</p>
                         </div>
                         {ticket.resolvedAt ? (
                             <div>
                                 <span className="font-medium">
                                     วันที่แก้ไข:
                                 </span>
-                                <p>{formatDate(ticket.resolvedAt)}</p>
+                                <p>{formatThaiDateTime(ticket.resolvedAt)}</p>
                             </div>
                         ) : null}
                     </div>

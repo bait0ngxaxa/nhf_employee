@@ -3,6 +3,7 @@
 import { useState, useCallback } from "react";
 import { useSession } from "next-auth/react";
 import useSWR from "swr";
+import { apiPost, apiPatch } from "@/lib/api-client";
 
 interface Comment {
     id: number;
@@ -93,18 +94,12 @@ export function useTicketDetail(
         try {
             setCommentLoading(true);
 
-            const response = await fetch(`/api/tickets/${ticketId}/comments`, {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify({ content: newComment }),
+            const result = await apiPost(`/api/tickets/${ticketId}/comments`, {
+                content: newComment,
             });
 
-            const data = await response.json();
-
-            if (!response.ok) {
-                throw new Error(data.error || "เกิดข้อผิดพลาด");
+            if (!result.success) {
+                throw new Error(result.error);
             }
 
             setNewComment("");
@@ -126,18 +121,12 @@ export function useTicketDetail(
         try {
             setUpdateLoading(true);
 
-            const response = await fetch(`/api/tickets/${ticketId}`, {
-                method: "PATCH",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify({ status: statusUpdate }),
+            const result = await apiPatch(`/api/tickets/${ticketId}`, {
+                status: statusUpdate,
             });
 
-            const data = await response.json();
-
-            if (!response.ok) {
-                throw new Error(data.error || "เกิดข้อผิดพลาด");
+            if (!result.success) {
+                throw new Error(result.error);
             }
 
             await mutate(); // Refresh data

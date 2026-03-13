@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { apiGet } from "@/lib/api-client";
 
 interface EmailRequest {
     id: number;
@@ -59,14 +60,17 @@ export function useEmailRequestHistory(): UseEmailRequestHistoryReturn {
                 limit: "10",
             });
 
-            const response = await fetch(`/api/email-request?${params}`);
-            const data = await response.json();
+            const result = await apiGet<{
+                success: boolean;
+                emailRequests: EmailRequest[];
+                pagination: Pagination;
+            }>(`/api/email-request?${params}`);
 
-            if (data.success) {
-                setEmailRequests(data.emailRequests);
-                setPagination(data.pagination);
+            if (result.success) {
+                setEmailRequests(result.data.emailRequests);
+                setPagination(result.data.pagination);
             } else {
-                setError(data.error || "เกิดข้อผิดพลาดในการโหลดข้อมูล");
+                setError(result.error);
             }
         } catch (err) {
             console.error("Error fetching email requests:", err);

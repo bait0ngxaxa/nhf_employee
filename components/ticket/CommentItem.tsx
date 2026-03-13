@@ -3,6 +3,7 @@
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { User } from "lucide-react";
+import { formatThaiDateTime } from "@/lib/helpers/date-helpers";
 
 interface CommentAuthor {
     id: number;
@@ -29,16 +30,6 @@ export function CommentItem({
     author,
     showSeparator = false,
 }: CommentItemProps) {
-    const formatDate = (dateString: string) => {
-        return new Date(dateString).toLocaleDateString("th-TH", {
-            year: "numeric",
-            month: "long",
-            day: "numeric",
-            hour: "2-digit",
-            minute: "2-digit",
-        });
-    };
-
     const authorName =
         author.employee?.firstName && author.employee?.lastName
             ? `${author.employee.firstName} ${author.employee.lastName}`
@@ -57,7 +48,7 @@ export function CommentItem({
                     )}
                 </div>
                 <span className="text-sm text-gray-500">
-                    {formatDate(createdAt)}
+                    {formatThaiDateTime(createdAt)}
                 </span>
             </div>
             <p className="text-gray-700 whitespace-pre-wrap ml-6">{content}</p>

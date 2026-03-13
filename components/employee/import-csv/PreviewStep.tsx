@@ -77,7 +77,7 @@ export function PreviewStep({
                                         {employee.position}
                                     </td>
                                     <td className="px-4 py-4 text-sm">
-                                        <Badge variant="outline">
+                                        <Badge variant="outline" className="bg-slate-50 text-slate-700 border-slate-200/80 font-medium shadow-sm hover:bg-slate-100 px-2.5">
                                             {employee.department === "ADMIN" ||
                                             employee.department === "บริหาร"
                                                 ? "บริหาร"
@@ -88,7 +88,13 @@ export function PreviewStep({
                                         {employee.phone || "-"}
                                     </td>
                                     <td className="px-4 py-4 text-sm text-gray-600">
-                                        {employee.nickname || "-"}
+                                        {employee.nickname ? (
+                                            <Badge variant="secondary" className="bg-violet-50 text-violet-700 hover:bg-violet-100 border border-violet-200/60 font-medium shadow-sm px-2.5">
+                                                {employee.nickname}
+                                            </Badge>
+                                        ) : (
+                                            "-"
+                                        )}
                                     </td>
                                 </tr>
                             ))}

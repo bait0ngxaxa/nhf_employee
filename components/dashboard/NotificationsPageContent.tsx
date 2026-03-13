@@ -12,6 +12,9 @@ import {
     MessageSquare,
     Filter,
 } from "lucide-react";
+import { toast } from "sonner";
+import { apiGet, apiPost, apiPatch } from "@/lib/api-client";
+import { getRelativeTime } from "@/lib/helpers/date-helpers";
 
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -36,27 +39,13 @@ interface NotificationsResponse {
 
 type FilterType = "all" | "unread";
 
-const fetcher = async (url: string) => {
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`Fetch failed: ${res.status}`);
-    return res.json();
+const fetcher = async <T,>(url: string): Promise<T> => {
+    const result = await apiGet<T>(url);
+    if (!result.success) throw new Error(result.error);
+    return result.data;
 };
 
-function getRelativeTime(dateString: string): string {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffInSeconds = Math.floor((date.getTime() - now.getTime()) / 1000);
-    const rtf = new Intl.RelativeTimeFormat("th", { numeric: "auto" });
 
-    if (Math.abs(diffInSeconds) < 60) {
-        return rtf.format(diffInSeconds, "second");
-    } else if (Math.abs(diffInSeconds) < 3600) {
-        return rtf.format(Math.floor(diffInSeconds / 60), "minute");
-    } else if (Math.abs(diffInSeconds) < 86400) {
-        return rtf.format(Math.floor(diffInSeconds / 3600), "hour");
-    }
-    return rtf.format(Math.floor(diffInSeconds / 86400), "day");
-}
 
 function getNotificationIcon(type: string) {
     switch (type) {
@@ -98,17 +87,18 @@ export function NotificationsSection() {
         setIsLoadingMore(true);
 
         try {
-            const res = await fetch(
+            const result = await apiGet<NotificationsResponse>(
                 `${apiUrl}&cursor=${encodeURIComponent(cursor)}`,
             );
-            if (!res.ok) throw new Error("Failed to load more");
-            const moreData: NotificationsResponse = await res.json();
+            if (!result.success) throw new Error(result.error);
+            const moreData = result.data;
 
             setAllNotifications((prev) => [...prev, ...moreData.notifications]);
             setCursor(moreData.nextCursor);
             setHasMore(moreData.hasMore);
         } catch (err) {
             console.error("Failed to load more notifications:", err);
+            toast.error("เกิดข้อผิดพลาด", { description: "ไม่สามารถโหลดข้อมูลเพิ่มเติมได้" });
         } finally {
             setIsLoadingMore(false);
         }
@@ -119,7 +109,7 @@ export function NotificationsSection() {
         actionUrl: string | null,
     ) => {
         try {
-            await fetch(`/api/notifications/${id}/read`, { method: "PATCH" });
+            await apiPatch(`/api/notifications/${id}/read`);
             setAllNotifications((prev) =>
                 prev.map((n) => (n.id === id ? { ...n, isRead: true } : n)),
             );
@@ -127,18 +117,20 @@ export function NotificationsSection() {
             if (actionUrl) router.push(actionUrl);
         } catch (err) {
             console.error("Failed to mark as read:", err);
+            toast.error("เกิดข้อผิดพลาด", { description: "ไม่สามารถอัปเดตสถานะการอ่านได้" });
         }
     };
 
     const handleMarkAllAsRead = async () => {
         try {
-            await fetch("/api/notifications/mark-all-read", { method: "POST" });
+            await apiPost("/api/notifications/mark-all-read");
             setAllNotifications((prev) =>
                 prev.map((n) => ({ ...n, isRead: true })),
             );
             mutate();
         } catch (err) {
             console.error("Failed to mark all as read:", err);
+            toast.error("เกิดข้อผิดพลาด", { description: "ไม่สามารถอัปเดตสถานะการอ่านได้" });
         }
     };
 

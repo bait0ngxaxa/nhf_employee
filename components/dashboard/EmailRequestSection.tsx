@@ -21,8 +21,8 @@ function EmailRequestContent() {
                 <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 animate-in fade-in slide-in-from-bottom-2 duration-700 ease-out">
                     <div className="flex items-center space-x-5">
                         <div className="relative group cursor-default">
-                            <div className="absolute -inset-2 rounded-2xl bg-gradient-to-r from-violet-500/40 to-fuchsia-500/40 blur-xl opacity-70 group-hover:opacity-100 group-hover:scale-110 transition-all duration-500 will-change-transform" />
-                            <div className="relative flex items-center justify-center w-14 h-14 bg-gradient-to-br from-violet-600 to-fuchsia-600 rounded-2xl shadow-lg shadow-violet-500/25 ring-1 ring-white/20">
+                            <div className="absolute -inset-2 rounded-2xl bg-gradient-to-r from-indigo-500/40 to-violet-500/40 blur-xl opacity-70 group-hover:opacity-100 group-hover:scale-110 transition-[opacity,transform] duration-500 will-change-transform" />
+                            <div className="relative flex items-center justify-center w-14 h-14 bg-gradient-to-br from-indigo-600 to-violet-700 rounded-2xl shadow-lg shadow-indigo-500/25 ring-1 ring-white/20">
                                 <Mail className="h-7 w-7 text-white" />
                             </div>
                         </div>

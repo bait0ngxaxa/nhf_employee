@@ -20,6 +20,7 @@ import {
     History,
 } from "lucide-react";
 import { useEmailRequestHistory } from "@/hooks/useEmailRequestHistory";
+import { formatThaiDateTime } from "@/lib/helpers/date-helpers";
 
 export function EmailRequestHistory() {
     const { data: session } = useSession();
@@ -32,15 +33,7 @@ export function EmailRequestHistory() {
         setCurrentPage,
     } = useEmailRequestHistory();
 
-    const formatDate = (dateString: string) => {
-        return new Date(dateString).toLocaleDateString("th-TH", {
-            year: "numeric",
-            month: "short",
-            day: "numeric",
-            hour: "2-digit",
-            minute: "2-digit",
-        });
-    };
+
 
     if (!session) {
         return null;
@@ -141,7 +134,7 @@ export function EmailRequestHistory() {
                                                 {request.department}
                                             </TableCell>
                                             <TableCell className="text-sm">
-                                                {formatDate(request.createdAt)}
+                                                {formatThaiDateTime(request.createdAt)}
                                             </TableCell>
                                             <TableCell>
                                                 <Badge className="bg-green-100 text-green-800 flex items-center gap-1 w-fit">

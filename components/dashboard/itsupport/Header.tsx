@@ -14,8 +14,8 @@ export const Header = memo(function Header() {
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 animate-in fade-in slide-in-from-bottom-2 duration-700 ease-out">
             <div className="flex items-center space-x-5">
                 <div className="relative group cursor-default">
-                    <div className="absolute -inset-2 rounded-2xl bg-gradient-to-r from-indigo-500/40 to-purple-500/40 blur-xl opacity-70 group-hover:opacity-100 group-hover:scale-110 transition-all duration-500 will-change-transform" />
-                    <div className="relative flex items-center justify-center w-14 h-14 bg-gradient-to-br from-indigo-600 to-purple-600 rounded-2xl shadow-lg shadow-indigo-500/25 ring-1 ring-white/20">
+                    <div className="absolute -inset-2 rounded-2xl bg-gradient-to-r from-emerald-500/40 to-teal-500/40 blur-xl opacity-70 group-hover:opacity-100 group-hover:scale-110 transition-[opacity,transform] duration-500 will-change-transform" />
+                    <div className="relative flex items-center justify-center w-14 h-14 bg-gradient-to-br from-emerald-500 to-teal-700 rounded-2xl shadow-lg shadow-emerald-500/25 ring-1 ring-white/20">
                         <Settings className="h-7 w-7 text-white" />
                     </div>
                 </div>

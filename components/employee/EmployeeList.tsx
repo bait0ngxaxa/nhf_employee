@@ -32,7 +32,7 @@ export function EmployeeList({ userRole }: EmployeeListProps) {
     } = useEmployeeDataContext();
 
     const {
-        searchTerm,
+        debouncedSearchTerm,
 
         statusFilter,
 
@@ -144,9 +144,9 @@ export function EmployeeList({ userRole }: EmployeeListProps) {
                             {getEmployeeStatusLabel(statusFilter)})
                         </span>
                     ) : null}
-                    {searchTerm ? (
+                    {debouncedSearchTerm ? (
                         <span className="text-green-600">
-                            (ค้นหา: &quot;{searchTerm}&quot;)
+                            (ค้นหา: &quot;{debouncedSearchTerm}&quot;)
                         </span>
                     ) : null}
                 </div>
@@ -160,7 +160,7 @@ export function EmployeeList({ userRole }: EmployeeListProps) {
             {/* Employee Table */}
             {employees.length === 0 ? (
                 <div className="text-center p-8 text-gray-500">
-                    {searchTerm || statusFilter !== "all"
+                    {debouncedSearchTerm || statusFilter !== "all"
                         ? "ไม่พบพนักงานที่ตรงกับเงื่อนไขการค้นหาหรือการกรอง"
                         : "ยังไม่มีข้อมูลพนักงาน"}
                 </div>

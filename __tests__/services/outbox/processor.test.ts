@@ -1,5 +1,5 @@
-﻿import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { NotificationOutbox, PrismaClient } from "@prisma/client";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { NotificationOutbox, PrismaClient, NotificationOutboxType } from "@prisma/client";
 import { mockDeep, mockReset } from "vitest-mock-extended";
 import { lineNotificationService } from "@/lib/line";
 import { prisma } from "@/lib/prisma";
@@ -30,7 +30,7 @@ const prismaMock = prisma as unknown as ReturnType<
 
 function buildNotification(
     id: number,
-    type: string,
+    type: NotificationOutboxType,
     payload: string,
 ): NotificationOutbox {
     return {

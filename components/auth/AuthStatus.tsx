@@ -54,7 +54,7 @@ export function AuthStatus() {
                     className="flex items-center space-x-2"
                 >
                     <User className="h-4 w-4" />
-                    <span>สมัครสมาชิก</span>
+                    <span>ลงทะเบียน</span>
                 </Button>
             </Link>
         </div>

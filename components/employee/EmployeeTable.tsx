@@ -79,9 +79,9 @@ export const EmployeeTable = memo(function EmployeeTable({
                             <td className="px-6 py-4 whitespace-nowrap">
                                 <div className="text-sm text-gray-900">
                                     {employee.nickname ? (
-                                        <span className="bg-blue-50 text-blue-700 px-2 py-1 rounded-md text-xs">
+                                        <Badge variant="secondary" className="bg-violet-50 text-violet-700 hover:bg-violet-100 border border-violet-200/60 font-medium shadow-sm px-2.5">
                                             {employee.nickname}
-                                        </span>
+                                        </Badge>
                                     ) : (
                                         <span className="text-gray-400">-</span>
                                     )}
@@ -98,7 +98,7 @@ export const EmployeeTable = memo(function EmployeeTable({
                                 </div>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap">
-                                <Badge variant="outline">
+                                <Badge variant="outline" className="bg-slate-50 text-slate-700 border-slate-200/80 font-medium shadow-sm hover:bg-slate-100 px-2.5">
                                     {employee.dept.name}
                                 </Badge>
                             </td>
@@ -127,15 +127,18 @@ export const EmployeeTable = memo(function EmployeeTable({
                                 <td className="px-6 py-4 whitespace-nowrap sticky right-0 bg-white">
                                     <div className="flex items-center space-x-2">
                                         <Button
-                                            variant="outline"
+                                            variant="ghost"
                                             size="sm"
                                             onClick={() =>
                                                 onEditEmployee(employee)
                                             }
-                                            className="flex items-center space-x-1 text-green-600 hover:text-green-700"
+                                            className="h-8 group relative overflow-hidden bg-emerald-50 text-emerald-600 hover:bg-emerald-100 hover:text-emerald-700 border-0 shadow-sm transition-all duration-300 rounded-lg px-3"
                                         >
-                                            <Edit className="h-3 w-3" />
-                                            <span>แก้ไข</span>
+                                            <div className="absolute inset-0 bg-gradient-to-r from-emerald-100/50 to-teal-100/50 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                            <span className="relative flex items-center gap-1.5 font-medium">
+                                                <Edit className="h-3.5 w-3.5" />
+                                                <span>แก้ไข</span>
+                                            </span>
                                         </Button>
                                     </div>
                                 </td>

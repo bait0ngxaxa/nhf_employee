@@ -4,6 +4,9 @@ import { useState } from "react";
 import useSWR from "swr";
 import { Bell, Check, Loader2, AlertCircle, Info, MessageSquare, ExternalLink } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
+import { apiGet, apiPost, apiPatch } from "@/lib/api-client";
+import { getRelativeTime } from "@/lib/helpers/date-helpers";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -31,30 +34,13 @@ interface NotificationsData {
     unreadCount: number;
 }
 
-const fetcher = async (url: string) => {
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`Fetch failed: ${res.status}`);
-    return res.json();
+const fetcher = async <T,>(url: string): Promise<T> => {
+    const result = await apiGet<T>(url);
+    if (!result.success) throw new Error(result.error);
+    return result.data;
 };
 
-// Helper function to format relative time natively
-function getRelativeTime(dateString: string) {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffInSeconds = Math.floor((date.getTime() - now.getTime()) / 1000);
 
-    const rtf = new Intl.RelativeTimeFormat('th', { numeric: 'auto' });
-
-    if (Math.abs(diffInSeconds) < 60) {
-        return rtf.format(diffInSeconds, 'second');
-    } else if (Math.abs(diffInSeconds) < 3600) {
-        return rtf.format(Math.floor(diffInSeconds / 60), 'minute');
-    } else if (Math.abs(diffInSeconds) < 86400) {
-        return rtf.format(Math.floor(diffInSeconds / 3600), 'hour');
-    } else {
-        return rtf.format(Math.floor(diffInSeconds / 86400), 'day');
-    }
-}
 
 export function NotificationDropdown() {
     const router = useRouter();
@@ -67,7 +53,7 @@ export function NotificationDropdown() {
 
     const handleMarkAsRead = async (id: string, actionUrl: string | null) => {
         try {
-            await fetch(`/api/notifications/${id}/read`, { method: "PATCH" });
+            await apiPatch(`/api/notifications/${id}/read`);
             mutate(); // Optimistic update or refetch
             
             if (actionUrl) {
@@ -76,15 +62,17 @@ export function NotificationDropdown() {
             }
         } catch (error) {
             console.error("Failed to mark notification as read", error);
+            toast.error("เกิดข้อผิดพลาด", { description: "ไม่สามารถอัปเดตสถานะการอ่านได้" });
         }
     };
 
     const handleMarkAllAsRead = async () => {
         try {
-            await fetch("/api/notifications/mark-all-read", { method: "POST" });
+            await apiPost("/api/notifications/mark-all-read");
             mutate();
         } catch (error) {
             console.error("Failed to mark all as read", error);
+            toast.error("เกิดข้อผิดพลาด", { description: "ไม่สามารถอัปเดตสถานะการอ่านได้" });
         }
     };
 
