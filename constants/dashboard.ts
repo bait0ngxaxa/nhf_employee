@@ -5,11 +5,18 @@ import {
     Users,
     UserPlus,
     Upload,
+    CalendarRange,
     FileText,
 } from "lucide-react";
 import { type MenuItem } from "@/types/dashboard";
 
 export const DASHBOARD_MENU_ITEMS: MenuItem[] = [
+    {
+        id: "leave-management",
+        label: "ระบบลางาน",
+        icon: CalendarRange,
+        description: "ยื่นใบลาและตรวจสอบโควต้าวันลา",
+    },
     {
         id: "it-equipment",
         label: "IT-Equipments",
@@ -116,6 +123,16 @@ export const getMenuTheme = (menuId: string) => {
                 hover: "hover:bg-pink-50",
                 activeBg: "bg-pink-50/80",
                 glow: "from-pink-400 via-rose-400 to-red-400",
+            };
+        case "leave-management":
+            return {
+                gradient: "from-indigo-500 to-sky-500",
+                lightBg: "bg-indigo-50",
+                text: "text-indigo-600",
+                border: "border-indigo-600",
+                hover: "hover:bg-indigo-50",
+                activeBg: "bg-indigo-50/80",
+                glow: "from-indigo-400 via-sky-400 to-cyan-400",
             };
         default:
             return {

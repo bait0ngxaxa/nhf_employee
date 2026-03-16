@@ -8,7 +8,10 @@ import {
 } from "@/components/dashboard/context/dashboard/DashboardContext";
 
 // Static color config for menu items - keys must match DASHBOARD_MENU_ITEMS[].id
+const DEFAULT_MENU_CONFIG = { gradient: "from-gray-500 to-slate-600", bgClass: "bg-gray-100", iconClass: "text-gray-600" };
+
 const MENU_ITEM_CONFIG: Record<string, { gradient: string; bgClass: string; iconClass: string }> = {
+    "leave-management": { gradient: "from-indigo-500 to-sky-600", bgClass: "bg-indigo-100", iconClass: "text-indigo-600" },
     "it-equipment": { gradient: "from-orange-500 to-red-600", bgClass: "bg-orange-100", iconClass: "text-orange-600" },
     "it-support": { gradient: "from-emerald-500 to-teal-700", bgClass: "bg-emerald-100", iconClass: "text-emerald-700" },
     "email-request": { gradient: "from-indigo-600 to-violet-700", bgClass: "bg-indigo-100", iconClass: "text-indigo-700" },
@@ -45,7 +48,7 @@ export function DashboardHomeSection() {
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 animate-in fade-in slide-in-from-bottom-6 duration-700 ease-out delay-150">
                     {availableMenuItems.map((item) => {
                         const IconComponent = item.icon;
-                        const config = MENU_ITEM_CONFIG[item.id] || MENU_ITEM_CONFIG.employees;
+                        const config = MENU_ITEM_CONFIG[item.id] ?? DEFAULT_MENU_CONFIG;
                         
                         return (
                             <Card

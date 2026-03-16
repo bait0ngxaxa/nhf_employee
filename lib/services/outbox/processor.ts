@@ -1,4 +1,4 @@
-﻿import type { NotificationOutbox } from "@prisma/client";
+import type { NotificationOutbox } from "@prisma/client";
 import { lineNotificationService } from "@/lib/line";
 import { prisma } from "@/lib/prisma";
 import { TICKET_WITH_USERS_INCLUDE } from "@/lib/services/ticket/constants";
@@ -7,6 +7,7 @@ import {
     sendTicketUpdatedNotifications,
 } from "@/lib/services/ticket/notifications";
 import type { TicketWithRelations } from "@/lib/services/ticket/types";
+import type { LeaveActionPayload, LeaveResultPayload } from "@/lib/email/types";
 import {
     MAX_OUTBOX_ATTEMPTS,
     OUTBOX_STATUSES,
@@ -105,6 +106,53 @@ function parseEmailRequestPayload(payload: unknown): EmailRequestPayload {
     };
 }
 
+function parseLeaveActionPayload(payload: unknown): LeaveActionPayload {
+    if (
+        !isRecord(payload) ||
+        typeof payload.leaveId !== "string" ||
+        typeof payload.employeeName !== "string" ||
+        typeof payload.managerId !== "number" ||
+        typeof payload.leaveType !== "string" ||
+        typeof payload.startDate !== "string" ||
+        typeof payload.endDate !== "string" ||
+        typeof payload.durationDays !== "number" ||
+        typeof payload.reason !== "string"
+    ) {
+        throw new Error("Invalid LEAVE_ACTION payload");
+    }
+
+    return {
+        leaveId: payload.leaveId,
+        employeeName: payload.employeeName,
+        managerId: payload.managerId,
+        leaveType: payload.leaveType as LeaveActionPayload["leaveType"],
+        startDate: payload.startDate,
+        endDate: payload.endDate,
+        durationDays: payload.durationDays,
+        reason: payload.reason,
+    };
+}
+
+function parseLeaveResultPayload(payload: unknown): LeaveResultPayload {
+    if (
+        !isRecord(payload) ||
+        typeof payload.leaveId !== "string" ||
+        typeof payload.employeeId !== "number" ||
+        typeof payload.employeeEmail !== "string" ||
+        typeof payload.status !== "string"
+    ) {
+        throw new Error("Invalid LEAVE_RESULT payload");
+    }
+
+    return {
+        leaveId: payload.leaveId,
+        employeeId: payload.employeeId,
+        employeeEmail: payload.employeeEmail,
+        status: payload.status,
+        reason: typeof payload.reason === "string" ? payload.reason : null,
+    };
+}
+
 async function markStaleProcessingRows(): Promise<void> {
     const staleBefore = new Date(
         Date.now() - STALE_OUTBOX_PROCESSING_MINUTES * 60_000,
@@ -174,6 +222,18 @@ async function dispatchNotification(notification: NotificationOutbox): Promise<v
         case "EMAIL_REQUEST": {
             const parsedPayload = parseEmailRequestPayload(payload);
             await lineNotificationService.sendEmailRequestNotification(parsedPayload);
+            return;
+        }
+        case "LEAVE_ACTION": {
+            const parsedLeaveAction = parseLeaveActionPayload(payload);
+            const { sendLeaveActionNotifications } = await import("./leave/notifications");
+            await sendLeaveActionNotifications(parsedLeaveAction);
+            return;
+        }
+        case "LEAVE_RESULT": {
+            const parsedLeaveResult = parseLeaveResultPayload(payload);
+            const { sendLeaveResultNotifications } = await import("./leave/notifications");
+            await sendLeaveResultNotifications(parsedLeaveResult);
             return;
         }
     }

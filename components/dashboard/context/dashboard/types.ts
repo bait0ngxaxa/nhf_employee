@@ -14,6 +14,7 @@ export interface DashboardUser {
     email?: string | null;
     role?: string;
     department?: string;
+    isManager?: boolean;
 }
 
 export interface DashboardDataContextValue {

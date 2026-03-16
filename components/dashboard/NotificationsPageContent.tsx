@@ -74,6 +74,8 @@ export function NotificationsSection() {
         apiUrl,
         fetcher,
         {
+            revalidateOnFocus: false,
+            shouldRetryOnError: false,
             onSuccess: (responseData) => {
                 setAllNotifications(responseData.notifications);
                 setCursor(responseData.nextCursor);

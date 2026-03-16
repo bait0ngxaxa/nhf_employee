@@ -18,6 +18,9 @@ import type {
 function buildWhereClause(filters: EmployeeFilters): Prisma.EmployeeWhereInput {
     const where: Prisma.EmployeeWhereInput = {
         deletedAt: null,
+        NOT: {
+            email: "admin@thainhf.org"
+        }
     };
 
     // Status filter
@@ -45,7 +48,7 @@ function buildWhereClause(filters: EmployeeFilters): Prisma.EmployeeWhereInput {
  * Get paginated list of employees
  * Cached per request for deduplication
  */
-export const getEmployees = cache(
+export const getEmployees = 
     async (filters: EmployeeFilters): Promise<PaginatedEmployeesResult> => {
         const page = Math.max(1, filters.page || PAGINATION_DEFAULTS.page);
         const limit = Math.min(
@@ -62,7 +65,7 @@ export const getEmployees = cache(
                 where,
                 include: EMPLOYEE_WITH_RELATIONS_INCLUDE,
                 orderBy: {
-                    createdAt: "desc",
+                    createdAt: "asc",
                 },
                 skip,
                 take: limit,
@@ -78,8 +81,7 @@ export const getEmployees = cache(
                 totalPages: Math.ceil(total / limit),
             },
         };
-    },
-);
+    };
 
 /**
  * Get single employee by ID

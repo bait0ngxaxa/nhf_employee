@@ -75,6 +75,16 @@ const DashboardHomeSection = dynamic(
     },
 );
 
+const LeaveManagementSection = dynamic(
+    () =>
+        import("@/components/dashboard/LeaveManagementSection").then(
+            (mod) => mod.LeaveManagementSection,
+        ),
+    {
+        loading: () => <SectionSkeleton />,
+    },
+);
+
 const ImportEmployeeCSV = dynamic(
     () =>
         import("@/components/employee/import-csv/ImportEmployeeCSV").then(
@@ -103,6 +113,13 @@ export function DashboardContent() {
 
     const renderContent = () => {
         switch (selectedMenu) {
+            case "leave-management":
+                return (
+                    <Suspense fallback={<SectionSkeleton />}>
+                        <LeaveManagementSection />
+                    </Suspense>
+                );
+
             case "it-equipment":
                 return (
                     <Suspense fallback={<SectionSkeleton />}>

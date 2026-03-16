@@ -7,12 +7,14 @@ declare module "next-auth" {
       id: string
       role: string
       department?: string
+      isManager?: boolean
     } & DefaultSession["user"]
   }
 
   interface User extends DefaultUser {
     role: string
     department?: string
+    isManager?: boolean
   }
 }
 
@@ -21,5 +23,6 @@ declare module "next-auth/jwt" {
     id: string
     role: string
     department?: string
+    isManager?: boolean
   }
 }

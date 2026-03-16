@@ -45,8 +45,14 @@ model Employee {
   departmentId Int
   affiliation  String?
   nickname     String?
+  managerId    Int?
   dept         Department     @relation(fields: [departmentId], references: [id])
+  manager      Employee?      @relation("ManagerToSubordinate", fields: [managerId], references: [id])
+  subordinates Employee[]     @relation("ManagerToSubordinate")
   user         User?
+  leaveQuotas   LeaveQuota[]
+  leaveRequests LeaveRequest[] @relation("LeaveRequester")
+  approvals     LeaveRequest[] @relation("LeaveApprover")
 
   @@index([departmentId], map: "employees_departmentId_fkey")
   @@map("employees")
@@ -148,6 +154,8 @@ enum NotificationOutboxType {
   TICKET_CREATED
   TICKET_UPDATED
   EMAIL_REQUEST
+  LEAVE_ACTION
+  LEAVE_RESULT
 }
 
 enum NotificationOutboxStatus {
@@ -285,4 +293,74 @@ enum NotificationType {
   NEW_COMMENT
   TICKET_UPDATED
   SYSTEM_ALERT
+  LEAVE_REQUESTED
+  LEAVE_APPROVED
+  LEAVE_REJECTED
+}
+
+// ==========================================
+// Leave Management System (HR)
+// ==========================================
+
+model LeaveQuota {
+  id          String    @id @default(cuid())
+  employeeId  Int
+  year        Int       // ปี ค.ศ. (เช่น 2026)
+  leaveType   LeaveType 
+  totalDays   Float     // โควต้าทั้งหมด (ป่วย=30, กิจ=10, พักร้อน=6)
+  usedDays    Float     @default(0) // วันที่ใช้ไปแล้ว (ทศนิยมได้ เช่น 0.5)
+
+  employee    Employee  @relation(fields: [employeeId], references: [id])
+  @@unique([employeeId, year, leaveType]) // 1 คนมีโควต้า 1 ประเภทต่อ 1 ปี
+  @@map("leave_quotas")
+}
+
+model LeaveRequest {
+  id            String       @id @default(cuid())
+  employeeId    Int
+  leaveType     LeaveType
+  startDate     DateTime     
+  endDate       DateTime     
+  period        LeavePeriod  @default(FULL_DAY) 
+  durationDays  Float        // จำนวนวันลาสุทธิ (เช่น 1.5 วัน)
+  reason        String       @db.Text
+  
+  status        LeaveStatus  @default(PENDING)
+  
+  // ผู้อนุมัติ
+  approverId    Int?         // หัวหน้าที่ต้องอนุมัติตอนนั้น (ดึงจาก managerId ของพนักงาน)
+  approvedAt    DateTime?    // เวลาที่กดอนุมัติ/ปฏิเสธ
+  rejectReason  String?      @db.Text // เหตุผลที่ปฏิเสธ (ถ้ามี)
+
+  attachmentUrl String?      @db.Text // เผื่อต้องแนบใบรับรองแพทย์
+
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  employee      Employee     @relation("LeaveRequester", fields: [employeeId], references: [id])
+  approver      Employee?    @relation("LeaveApprover", fields: [approverId], references: [id])
+
+  @@index([employeeId])
+  @@index([approverId])
+  @@index([status])
+  @@map("leave_requests")
+}
+
+enum LeaveType {
+  SICK       // ลาป่วย
+  PERSONAL   // ลากิจ
+  VACATION   // ลาพักร้อน
+}
+
+enum LeavePeriod {
+  FULL_DAY   // เต็มวัน (1.0)
+  MORNING    // ครึ่งวันเช้า (0.5)
+  AFTERNOON  // ครึ่งวันบ่าย (0.5)
+}
+
+enum LeaveStatus {
+  PENDING    // รออนุมัติ
+  APPROVED   // อนุมัติแล้ว
+  REJECTED   // ปฏิเสธ
+  CANCELLED  // ยกเลิกโดยตัวพนักงานเอง
 }

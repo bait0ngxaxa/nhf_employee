@@ -104,6 +104,7 @@ export const updateEmployeeSchema = z.object({
         })
         .optional(),
     status: z.enum(["ACTIVE", "INACTIVE", "SUSPENDED"]).optional(),
+    managerId: z.number().int().positive().nullable().optional(),
 });
 
 // Inferred types for use in API routes

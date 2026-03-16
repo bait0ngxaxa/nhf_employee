@@ -33,6 +33,26 @@ async function main() {
         "✅ สร้างแผนกสำเร็จ:",
         departments.map((d) => d.name).join(", "),
     );
+
+    // สร้างพนักงานผู้ดูแลระบบ (Admin) เพื่อให้ User คนแรก สมัครแล้วได้สิทธิ์ Admin ทันที
+    const adminDept = departments.find((d) => d.code === "ADMIN");
+    if (adminDept) {
+        const adminEmployee = await prisma.employee.upsert({
+            where: { email: "admin@thainhf.org" },
+            update: {},
+            create: {
+                firstName: "System",
+                lastName: "Administrator",
+                email: "admin@thainhf.org",
+                position: "IT Manager",
+                departmentId: adminDept.id,
+                status: "ACTIVE",
+            },
+        });
+        // eslint-disable-next-line no-console
+        console.log(`✅ สร้างพนักงานตั้งต้นสำเร็จ: ${adminEmployee.email} (กรุณาใช้ email นี้สมัครสมาชิก หรือเปลี่ยนในฐานข้อมูลก่อนสมัคร)`);
+    }
+
     // eslint-disable-next-line no-console
     console.log("🎉 Seed เสร็จสิ้น!");
 }

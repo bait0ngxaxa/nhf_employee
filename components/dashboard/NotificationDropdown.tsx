@@ -48,7 +48,10 @@ export function NotificationDropdown() {
 
     // Poll every 10 seconds
     const { data, error, isLoading, mutate } = useSWR<NotificationsData>("/api/notifications", fetcher, {
-        refreshInterval: 10000,
+        refreshInterval: 60_000,
+        revalidateOnFocus: false,
+        shouldRetryOnError: false,
+        dedupingInterval: 30_000,
     });
 
     const handleMarkAsRead = async (id: string, actionUrl: string | null) => {

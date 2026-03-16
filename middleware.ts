@@ -28,6 +28,7 @@ export default withAuth(
                     "/access-denied",
                     "/forgot-password",
                     "/reset-password",
+                    "/leave/action",
                 ];
 
                 // Always allow access to public routes (including root path)

@@ -1,12 +1,14 @@
 import nodemailer from "nodemailer";
-import { type TicketEmailData } from "@/types/api";
+import type { TicketEmailData } from "@/types/api";
 import {
     getTicketStatusLabel,
     getTicketPriorityLabel,
 } from "@/lib/helpers/ticket-helpers";
-import { type EmailData } from "./types";
+import { type EmailData, type LeaveActionPayload, type LeaveResultPayload } from "./types";
 import { generateNewTicketEmailHTML } from "./templates/new-ticket";
 import { generateStatusUpdateEmailHTML } from "./templates/status-update";
+import { generateLeaveActionEmailHTML } from "./templates/leave-action";
+import { generateLeaveResultEmailHTML } from "./templates/leave-result";
 
 // Create transporter (singleton pattern using closure)
 let transporter: nodemailer.Transporter | null = null;
@@ -213,12 +215,44 @@ export async function sendITTeamNotification(
     return await sendEmail(emailData);
 }
 
+export async function sendLeaveActionNotification(
+    managerEmail: string,
+    data: LeaveActionPayload,
+    approveLink: string,
+    rejectLink: string
+): Promise<boolean> {
+    const emailData: EmailData = {
+        to: managerEmail,
+        subject: `[NHF Leave] คำขออนุมัติลางานใหม่จาก ${data.employeeName}`,
+        html: generateLeaveActionEmailHTML(data, approveLink, rejectLink),
+        text: `มีคำขออนุมัติลางานใหม่\nพนักงาน ${data.employeeName} ขอลา ${data.durationDays} วัน\n(กรุณาใช้ลิงก์ในอีเมลแบบ HTML เพื่อดำเนินการ)`,
+    };
+
+    return await sendEmail(emailData);
+}
+
+export async function sendLeaveResultNotification(
+    employeeEmail: string,
+    data: LeaveResultPayload
+): Promise<boolean> {
+    const emailData: EmailData = {
+        to: employeeEmail,
+        subject: `[NHF Leave] ผลการอนุมัติลางานของคุณ: ${data.status === "APPROVED" ? "อนุมัติ" : "ไม่อนุมัติ"}`,
+        html: generateLeaveResultEmailHTML(data),
+        text: `ผลการพิจารณาลางาน: ${data.status}\nเหตุผล: ${data.reason || "-"}`,
+    };
+
+    return await sendEmail(emailData);
+}
+
 // Export as object for backward compatibility
 export const emailService = {
     sendEmail,
     sendNewTicketNotification,
     sendStatusUpdateNotification,
     sendITTeamNotification,
+    sendLeaveActionNotification,
+    sendLeaveResultNotification,
 };
 
 export type { EmailData };

@@ -49,6 +49,17 @@ export async function POST(request: NextRequest) {
 
         const hashedPassword = await bcrypt.hash(password, 12);
 
+        // Auto-link: find Employee with matching email to connect the accounts
+        const matchedEmployee = await prisma.employee.findUnique({
+            where: { email: email.toLowerCase() },
+            select: { id: true, user: { select: { id: true } } },
+        });
+
+        // Only link if the Employee exists AND is not already claimed by another User
+        const employeeId = matchedEmployee && !matchedEmployee.user
+            ? matchedEmployee.id
+            : null;
+
         const user = await prisma.user.create({
             data: {
                 name: name.trim(),
@@ -56,6 +67,7 @@ export async function POST(request: NextRequest) {
                 password: hashedPassword,
                 role: "USER",
                 isActive: true,
+                employeeId,
             },
         });
 

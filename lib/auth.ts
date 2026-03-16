@@ -39,6 +39,7 @@ export const authOptions: NextAuthOptions = {
                         employee: {
                             include: {
                                 dept: true,
+                                subordinates: { select: { id: true }, take: 1 },
                             },
                         },
                     },
@@ -57,12 +58,12 @@ export const authOptions: NextAuthOptions = {
                     // IMPORTANT: Do NOT return the password field.
                     // The returned object must match the NextAuth 'User' type, which expects 'id' to be a string.
                     const authorizedUser: User = {
-                        // FIX: Explicitly cast the user ID to a string to match NextAuth's User type.
                         id: String(user.id),
                         name: user.name,
                         email: user.email,
                         role: user.role,
                         department: user.employee?.dept?.name || undefined,
+                        isManager: (user.employee?.subordinates?.length ?? 0) > 0,
                     };
                     return authorizedUser;
                 } else {
@@ -92,20 +93,20 @@ export const authOptions: NextAuthOptions = {
     // Callbacks to manage the JWT token and session
     callbacks: {
         jwt: async ({ token, user }) => {
-            // Add the user's ID to the JWT token
             if (user) {
                 token.id = user.id;
                 token.role = user.role;
                 token.department = user.department;
+                token.isManager = user.isManager;
             }
             return token;
         },
         session: async ({ session, token }) => {
-            // Add the user's ID from the token to the session object
             if (session.user) {
                 session.user.id = token.id as string;
                 session.user.role = token.role as string;
                 session.user.department = token.department as string;
+                session.user.isManager = token.isManager as boolean;
             }
             return session;
         },
