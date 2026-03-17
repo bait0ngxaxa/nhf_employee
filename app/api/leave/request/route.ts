@@ -6,6 +6,8 @@ import { leaveRequestSchema } from "@/lib/validations/leave";
 import { DEFAULT_LEAVE_QUOTAS } from "@/constants/leave";
 import { getEmployeeIdFromUserId } from "@/lib/services/leave/get-employee-id";
 import { processOutbox } from "@/lib/services/outbox/processor";
+import { logLeaveEvent } from "@/lib/audit";
+import { getWorkingDays } from "@/lib/services/leave/utils";
 
 export async function POST(req: Request) {
     try {
@@ -54,13 +56,31 @@ export async function POST(req: Request) {
             );
         }
 
-        // Calculate duration days
+        // Calculate duration days excluding weekends
         const start = new Date(startDate);
         const end = new Date(endDate);
-        const diffTime = Math.abs(end.getTime() - start.getTime());
-        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+        
+        let diffDays = getWorkingDays(start, end);
 
-        const durationDays = period === "FULL_DAY" ? diffDays : 0.5;
+        // If it's a half day, duration is 0.5, but we must ensure it is a working day
+        if (period !== "FULL_DAY") {
+            if (diffDays === 0) {
+                 return NextResponse.json(
+                    { error: "ไม่สามารถขอลาในวันหยุดสุดสัปดาห์ได้" },
+                    { status: 400 },
+                );
+            }
+            diffDays = 0.5;
+        } else {
+             if (diffDays === 0) {
+                return NextResponse.json(
+                    { error: "ช่วงเวลาที่เลือกเป็นวันหยุดสุดสัปดาห์ทั้งหมด" },
+                    { status: 400 },
+                );
+            }
+        }
+
+        const durationDays = diffDays;
 
         // Use a transaction to check quota and create request safely
         const result = await prisma.$transaction(async (tx) => {
@@ -81,7 +101,23 @@ export async function POST(req: Request) {
                 );
             }
 
-            // 3. Fetch or Create Quota
+            // 3. Check for overlapping requests
+            const overlappingRequests = await tx.leaveRequest.findFirst({
+                where: {
+                    employeeId,
+                    status: { in: ["PENDING", "APPROVED"] },
+                    AND: [
+                        { startDate: { lte: new Date(endDate) } },
+                        { endDate: { gte: new Date(startDate) } },
+                    ],
+                },
+            });
+
+            if (overlappingRequests) {
+                throw new Error("คุณมีคำขอลาในช่วงเวลานี้ที่กำลังรออนุมัติหรืออนุมัติแล้ว");
+            }
+
+            // 4. Fetch or Create Quota
             let quota = await tx.leaveQuota.findFirst({
                 where: { employeeId, year: currentYear, leaveType },
             });
@@ -100,15 +136,15 @@ export async function POST(req: Request) {
                 });
             }
 
-            // 4. Check Quota limit
+            // 5. Check Quota limit and atomically reserve quota
             const availableQuota = quota.totalDays - quota.usedDays;
             if (durationDays > availableQuota) {
                 throw new Error(
-                    `Insufficient leave quota. You have ${availableQuota} days remaining.`,
+                    `คุณมีโควตาวันลาคงเหลือเพียง ${availableQuota} วัน`,
                 );
             }
 
-            // 5. Create Request
+            // 6. Create Request
             const leaveRequest = await tx.leaveRequest.create({
                 data: {
                     employeeId,
@@ -123,7 +159,7 @@ export async function POST(req: Request) {
                 },
             });
 
-            // 6. Trigger Notification to Approver (always inside transaction)
+            // 7. Trigger Notification to Approver (always inside transaction)
             await tx.notificationOutbox.create({
                 data: {
                     type: "LEAVE_ACTION",
@@ -145,13 +181,28 @@ export async function POST(req: Request) {
 
         // Fire-and-forget: process pending outbox notifications (sends email to manager)
         processOutbox().catch((err) =>
-            console.error("Outbox processing error:", err),
+            console.error("Failed to process outbox in background:", err),
         );
 
-        return NextResponse.json(
-            { success: true, data: result },
-            { status: 201 },
-        );
+        // Audit Logging
+        await logLeaveEvent(
+            "LEAVE_REQUEST_CREATE",
+            result.id,
+            userId,
+            session.user.email || "",
+            {
+                metadata: {
+                    leaveType: parsed.data.leaveType,
+                    period: parsed.data.period,
+                    durationDays,
+                    startDate: parsed.data.startDate,
+                    endDate: parsed.data.endDate,
+                    reason: parsed.data.reason
+                }
+            }
+        ).catch((err) => console.error("Failed to log audit event:", err));
+
+        return NextResponse.json({ success: true, data: result }, { status: 201 });
     } catch (error) {
         console.error("Leave request error:", error);
         return NextResponse.json(

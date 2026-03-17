@@ -25,61 +25,71 @@ export function LeaveManagementSection() {
                         <CalendarRange className="h-8 w-8" />
                     </div>
                     <div>
-                        <h1 className="text-3xl font-extrabold bg-gradient-to-r from-indigo-600 to-sky-600 bg-clip-text text-transparent pb-1 tracking-tight">
+                        <h1 className="text-3xl text-slate-900 font-extrabold pb-1 tracking-tight">
                             ระบบลางาน
                         </h1>
                         <p className="text-gray-500 font-medium mt-1">
-                            จัดการวันลาพักผ่อน ลากิจ ลาป่วย และตรวจสอบโควต้าของคุณ
+                            จัดการวันลาพักผ่อน ลากิจ ลาป่วย
+                            และตรวจสอบโควต้าของคุณ
                         </p>
                     </div>
                 </div>
 
-            {(showApprovalTab || isAdmin) ? (
-                <Tabs defaultValue="my-leave" className="w-full">
-                    <TabsList className="bg-indigo-50 p-1 mb-6 rounded-xl flex max-w-fit">
-                        <TabsTrigger 
-                            value="my-leave"
-                            className="rounded-lg data-[state=active]:bg-white data-[state=active]:text-indigo-700 data-[state=active]:shadow-sm px-4"
-                        >
-                            วันลาของฉัน
-                        </TabsTrigger>
-                        {showApprovalTab && (
-                            <TabsTrigger 
-                                value="approvals"
+                {showApprovalTab || isAdmin ? (
+                    <Tabs defaultValue="my-leave" className="w-full">
+                        <TabsList className="bg-indigo-50 p-1 mb-6 rounded-xl flex max-w-fit">
+                            <TabsTrigger
+                                value="my-leave"
                                 className="rounded-lg data-[state=active]:bg-white data-[state=active]:text-indigo-700 data-[state=active]:shadow-sm px-4"
                             >
-                                อนุมัติการลา
+                                วันลาของฉัน
                             </TabsTrigger>
-                        )}
-                        {isAdmin && (
-                            <TabsTrigger 
-                                value="approver-settings"
-                                className="rounded-lg data-[state=active]:bg-white data-[state=active]:text-indigo-700 data-[state=active]:shadow-sm px-4"
-                            >
-                                จัดการผู้อนุมัติ
-                            </TabsTrigger>
-                        )}
-                    </TabsList>
-                    
-                    <TabsContent value="my-leave" className="mt-0 outline-none">
-                        <EmployeeLeaveDashboard />
-                    </TabsContent>
-                    
-                    {showApprovalTab && (
-                        <TabsContent value="approvals" className="mt-0 outline-none">
-                            <ManagerApprovalDashboard />
-                        </TabsContent>
-                    )}
+                            {showApprovalTab && (
+                                <TabsTrigger
+                                    value="approvals"
+                                    className="rounded-lg data-[state=active]:bg-white data-[state=active]:text-indigo-700 data-[state=active]:shadow-sm px-4"
+                                >
+                                    อนุมัติการลา
+                                </TabsTrigger>
+                            )}
+                            {isAdmin && (
+                                <TabsTrigger
+                                    value="approver-settings"
+                                    className="rounded-lg data-[state=active]:bg-white data-[state=active]:text-indigo-700 data-[state=active]:shadow-sm px-4"
+                                >
+                                    จัดการผู้อนุมัติ
+                                </TabsTrigger>
+                            )}
+                        </TabsList>
 
-                    {isAdmin && (
-                        <TabsContent value="approver-settings" className="mt-0 outline-none">
-                            <ApproverManagement />
+                        <TabsContent
+                            value="my-leave"
+                            className="mt-0 outline-none"
+                        >
+                            <EmployeeLeaveDashboard />
                         </TabsContent>
-                    )}
-                </Tabs>
-            ) : (
-                <EmployeeLeaveDashboard />
-            )}
+
+                        {showApprovalTab && (
+                            <TabsContent
+                                value="approvals"
+                                className="mt-0 outline-none"
+                            >
+                                <ManagerApprovalDashboard />
+                            </TabsContent>
+                        )}
+
+                        {isAdmin && (
+                            <TabsContent
+                                value="approver-settings"
+                                className="mt-0 outline-none"
+                            >
+                                <ApproverManagement />
+                            </TabsContent>
+                        )}
+                    </Tabs>
+                ) : (
+                    <EmployeeLeaveDashboard />
+                )}
             </div>
         </div>
     );

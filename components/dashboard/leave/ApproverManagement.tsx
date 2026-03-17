@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from "react";
 import useSWR from "swr";
+import { apiGet, apiPut } from "@/lib/api-client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
     Select,
@@ -29,10 +30,11 @@ interface EmployeeItem {
 
 const NO_APPROVER_VALUE = "";
 
-const fetcher = (url: string) => fetch(url).then(r => {
-    if (!r.ok) throw new Error("Failed to fetch");
-    return r.json();
-});
+const fetcher = async (url: string) => {
+    const res = await apiGet<{ employees: EmployeeItem[] }>(url);
+    if (!res.success) throw new Error(res.error);
+    return res.data;
+};
 
 const formatName = (e: { firstName: string; lastName: string; nickname: string | null }): string =>
     `${e.firstName} ${e.lastName}${e.nickname ? ` (${e.nickname})` : ""}`;
@@ -80,15 +82,10 @@ export function ApproverManagement() {
                 managerId,
             }));
 
-            const res = await fetch("/api/leave/approvers", {
-                method: "PUT",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ assignments: payload }),
-            });
-            const result = await res.json();
-            if (!res.ok) throw new Error(result.error || "Save failed");
+            const res = await apiPut<{ message: string }>("/api/leave/approvers", { assignments: payload });
+            if (!res.success) throw new Error(res.error || "Save failed");
 
-            setSaveMsg({ type: "ok", text: result.message });
+            setSaveMsg({ type: "ok", text: res.data.message });
             setAssignments(new Map());
             await mutate();
         } catch (err) {

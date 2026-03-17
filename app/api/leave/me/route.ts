@@ -5,7 +5,7 @@ import { authOptions } from "@/lib/auth";
 import { ALL_LEAVE_TYPES, DEFAULT_LEAVE_QUOTAS } from "@/constants/leave";
 import { getEmployeeIdFromUserId } from "@/lib/services/leave/get-employee-id";
 
-export async function GET() {
+export async function GET(req: Request) {
     try {
         const session = await getServerSession(authOptions);
         if (!session?.user?.id) {
@@ -64,23 +64,46 @@ export async function GET() {
                   })
                 : existingQuotas;
 
-        // Fetch Leave History ordered by newest first
-        const history = await prisma.leaveRequest.findMany({
-            where: { employeeId },
-            take: 50,
-            orderBy: { createdAt: "desc" },
-            include: {
-                approver: {
-                    select: {
-                        firstName: true,
-                        lastName: true,
-                        nickname: true,
+        // Pagination setup
+        const url = new URL(req.url);
+        const page = parseInt(url.searchParams.get("page") || "1");
+        const limit = parseInt(url.searchParams.get("limit") || "10");
+        const skip = (page - 1) * limit;
+
+        // Fetch Leave History with pagination
+        const [history, totalCount] = await Promise.all([
+             prisma.leaveRequest.findMany({
+                where: { employeeId },
+                skip,
+                take: limit,
+                orderBy: { createdAt: "desc" },
+                include: {
+                    approver: {
+                        select: {
+                            firstName: true,
+                            lastName: true,
+                            nickname: true,
+                        },
                     },
                 },
-            },
-        });
+            }),
+            prisma.leaveRequest.count({
+                 where: { employeeId }
+            })
+        ]);
 
-        return NextResponse.json({ quotas, history });
+        const totalPages = Math.ceil(totalCount / limit);
+
+        return NextResponse.json({ 
+            quotas, 
+            history, 
+            metadata: {
+                 currentPage: page,
+                 totalPages,
+                 totalItems: totalCount,
+                 itemsPerPage: limit
+            }
+        });
     } catch (error) {
         console.error("Error fetching leave data:", error);
         return NextResponse.json(

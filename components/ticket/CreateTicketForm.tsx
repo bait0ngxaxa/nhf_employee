@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { toast } from "sonner";
 import { type CreateTicketFormProps, type TicketFormData } from '@/types/tickets';
 import { TICKET_CATEGORIES, TICKET_PRIORITIES } from '@/constants/tickets';
+import { apiPost } from "@/lib/api-client";
 
 export default function CreateTicketForm({ isOpen, onClose, onTicketCreated }: CreateTicketFormProps) {
   const { data: session } = useSession();
@@ -43,23 +44,15 @@ export default function CreateTicketForm({ isOpen, onClose, onTicketCreated }: C
     setError('');
 
     try {
-      const response = await fetch('/api/tickets', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(formData),
-      });
+      const response = await apiPost<{ ticket: { id: string } }>('/api/tickets', formData);
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'เกิดข้อผิดพลาด');
+      if (!response.success) {
+        throw new Error(response.error || 'เกิดข้อผิดพลาด');
       }
 
       // Show toast notification
       toast.success("ส่งคำร้องสำเร็จ!", {
-        description: `คำร้องแจ้งปัญหา "${formData.title}" ได้รับการบันทึกเรียบร้อยแล้ว หมายเลขที่ติดตาม: #${data.ticket.id}`,
+        description: `คำร้องแจ้งปัญหา "${formData.title}" ได้รับการบันทึกเรียบร้อยแล้ว หมายเลขที่ติดตาม: #${response.data.ticket.id}`,
       });
       
       // Reset form

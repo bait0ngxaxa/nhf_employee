@@ -70,7 +70,7 @@ export default async function Home() {
                     <p className="text-lg md:text-xl text-gray-500 max-w-2xl mx-auto mb-10 leading-relaxed font-light">
                         แพลตฟอร์มส่วนกลางสำหรับ{" "}
                         <strong>มูลนิธิสาธารณสุขแห่งชาติ</strong>{" "}
-                        ในการบริหารข้อมูลพนักงาน แจ้งซ่อมอุปกรณ์
+                        ในการจัดเก็บข้อมูลพนักงาน แจ้งปัญหา/ซ่อมอุปกรณ์
                         และติดตามสถานะช่วยเหลือ
                     </p>
                     <div className="flex flex-col sm:flex-row justify-center gap-4">

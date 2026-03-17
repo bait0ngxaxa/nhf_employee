@@ -10,7 +10,9 @@ import {
     type ReactNode,
 } from "react";
 import useSWR from "swr";
+
 import { toast } from "sonner";
+import { apiGet, apiPost } from "@/lib/api-client";
 import { type Employee, type EmployeeCSVData } from "@/types/employees";
 import { PAGINATION_DEFAULTS } from "@/constants/ui";
 import {
@@ -87,7 +89,12 @@ export function EmployeeProvider({ children }: EmployeeProviderProps) {
     const swrKey = `/api/employees?${params.toString()}`;
 
     // SWR Hook
-    const { data, mutate, isLoading, error: swrError } = useSWR(swrKey, { keepPreviousData: true });
+    const {
+        data,
+        mutate,
+        isLoading,
+        error: swrError,
+    } = useSWR(swrKey, { keepPreviousData: true });
 
     // Keep mutate stable using ref to prevent unnecessary re-renders
     const mutateRef = useRef(mutate);
@@ -145,10 +152,11 @@ export function EmployeeProvider({ children }: EmployeeProviderProps) {
             params.append("status", statusFilter);
         }
 
-        const response = await fetch(`/api/employees?${params}`);
-        if (response.ok) {
-            const data = await response.json();
-            return data.employees;
+        const response = await apiGet<{ employees: Employee[] }>(
+            `/api/employees?${params}`,
+        );
+        if (response.success) {
+            return response.data.employees;
         }
         return [];
     }, [debouncedSearchTerm, statusFilter]);
@@ -172,7 +180,9 @@ export function EmployeeProvider({ children }: EmployeeProviderProps) {
     };
 
     const getExportFileName = useCallback(() => {
-        const searchSuffix = debouncedSearchTerm ? `_ค้นหา-${debouncedSearchTerm}` : "";
+        const searchSuffix = debouncedSearchTerm
+            ? `_ค้นหา-${debouncedSearchTerm}`
+            : "";
         const statusSuffix =
             statusFilter !== "all"
                 ? `_สถานะ-${getEmployeeStatusLabel(statusFilter)}`
@@ -193,17 +203,13 @@ export function EmployeeProvider({ children }: EmployeeProviderProps) {
                 setExportData(csvData);
             });
 
-            await fetch("/api/audit-logs/export", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    entityType: "Employee",
-                    recordCount: allEmployees.length,
-                    filters: {
-                        search: debouncedSearchTerm || null,
-                        status: statusFilter !== "all" ? statusFilter : null,
-                    },
-                }),
+            await apiPost("/api/audit-logs/export", {
+                entityType: "Employee",
+                recordCount: allEmployees.length,
+                filters: {
+                    search: debouncedSearchTerm || null,
+                    status: statusFilter !== "all" ? statusFilter : null,
+                },
             });
 
             toast.success("ดาวน์โหลดสำเร็จ", {
@@ -213,7 +219,8 @@ export function EmployeeProvider({ children }: EmployeeProviderProps) {
         } catch (err) {
             console.error("Error fetching for export:", err);
             toast.error("เกิดข้อผิดพลาดในการดาวน์โหลด", {
-                description: "ไม่สามารถเตรียมข้อมูลสำหรับ Export ได้ กรุณาลองใหม่อีกครั้ง",
+                description:
+                    "ไม่สามารถเตรียมข้อมูลสำหรับ Export ได้ กรุณาลองใหม่อีกครั้ง",
             });
             return [];
         } finally {

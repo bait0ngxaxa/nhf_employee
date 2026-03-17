@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/select";
 import { apiPost } from "@/lib/api-client";
 import { Loader2 } from "lucide-react";
+import { toast } from "sonner";
 
 import {
     leaveRequestSchema,
@@ -78,11 +79,14 @@ export function LeaveRequestForm({ onSuccess, onCancel }: Props) {
             const res = await apiPost("/api/leave/request", data);
 
             if (res.success) {
+                toast.success("ส่งคำขอลาสำเร็จ");
                 onSuccess();
             } else {
+                toast.error(res.error || "เกิดข้อผิดพลาดในการส่งใบลา");
                 setErrorMsg(res.error || "เกิดข้อผิดพลาดในการส่งใบลา");
             }
         } catch (_error) {
+            toast.error("เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์");
             setErrorMsg("เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์");
         } finally {
             setIsSubmitting(false);

@@ -5,6 +5,7 @@ import { type CSVEmployee, type ImportResult } from "@/types/employees";
 import { parseCSV, downloadSampleCSV } from "@/lib/helpers/csv-helpers";
 import { type UseImportCSVReturn, type ImportStep } from "./types";
 import { toast } from "sonner";
+import { apiPost } from "@/lib/api-client";
 
 interface UseImportCSVOptions {
     onSuccess?: () => void;
@@ -61,23 +62,17 @@ export function useImportCSV({
         setError("");
 
         try {
-            const response = await fetch("/api/employees/import", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ employees: parsedData }),
-            });
+            const response = await apiPost<{ result: ImportResult }>("/api/employees/import", { employees: parsedData });
 
-            const data = await response.json();
-
-            if (response.ok) {
-                setImportResult(data.result);
+            if (response.success) {
+                setImportResult(response.data.result);
                 setStep("result");
                 toast.success("นำเข้าข้อมูลเสร็จสิ้น", {
-                    description: `พบข้อมูลทั้งหมด ${data.result.imported + (data.result.failed || 0)} รายการ`,
+                    description: `พบข้อมูลทั้งหมด ${(response.data.result.imported || 0) + (response.data.result.failed || 0)} รายการ`,
                 });
                 onSuccess?.();
             } else {
-                const errorMsg = data.error || "เกิดข้อผิดพลาดในการนำเข้าข้อมูล";
+                const errorMsg = response.error || "เกิดข้อผิดพลาดในการนำเข้าข้อมูล";
                 setError(errorMsg);
                 toast.error("เกิดข้อผิดพลาด", { description: errorMsg });
             }

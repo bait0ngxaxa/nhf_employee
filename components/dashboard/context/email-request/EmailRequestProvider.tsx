@@ -3,6 +3,7 @@
 import { useState, useCallback, useMemo, type ReactNode } from "react";
 import useSWR from "swr";
 import { toast } from "sonner";
+import { apiPost } from "@/lib/api-client";
 import { EmailRequestContext } from "./EmailRequestContext";
 import {
     type EmailRequest,
@@ -87,24 +88,16 @@ export function EmailRequestProvider({ children }: EmailRequestProviderProps) {
             setFormError(null);
 
             try {
-                const response = await fetch("/api/email-request", {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                    },
-                    body: JSON.stringify(formData),
-                });
+                const response = await apiPost<{ success: boolean; error?: string }>("/api/email-request", formData);
 
-                const result = await response.json();
-
-                if (result.success) {
+                if (response.success) {
                     setFormData(initialFormData);
                     toast.success("ส่งคำขออีเมลสำเร็จ", {
                         description: "คำขออีเมลของคุณถูกส่งไปยังทีมไอทีแล้ว",
                     });
                     mutate(); // Refresh the list
                 } else {
-                    setFormError(result.error || "เกิดข้อผิดพลาด");
+                    setFormError(response.error || "เกิดข้อผิดพลาด");
                 }
             } catch (err) {
                 console.error("Error submitting email request:", err);

@@ -5,8 +5,16 @@ import { useEmailRequestContext } from "@/components/dashboard/context/email-req
 import useSWR from "swr";
 import { toast } from "sonner";
 
+import { apiPost } from "@/lib/api-client";
+
 // Mock useSWR
 vi.mock("swr");
+
+// Mock api-client
+vi.mock("@/lib/api-client", () => ({
+    apiGet: vi.fn(),
+    apiPost: vi.fn(),
+}));
 
 // Mock sonner toast
 vi.mock("sonner", () => ({
@@ -15,9 +23,6 @@ vi.mock("sonner", () => ({
         error: vi.fn(),
     },
 }));
-
-// Mock fetch
-global.fetch = vi.fn();
 
 const TestComponent = () => {
     const {
@@ -95,8 +100,10 @@ describe("EmailRequestProvider", () => {
     });
 
     it("should handle successful submission and show toast", async () => {
-        (global.fetch as any).mockResolvedValueOnce({
-            json: async () => ({ success: true }),
+        vi.mocked(apiPost).mockResolvedValueOnce({
+            success: true,
+            data: { success: true },
+            status: 200,
         });
 
         render(
@@ -109,11 +116,11 @@ describe("EmailRequestProvider", () => {
         fireEvent.click(submitBtn);
 
         await waitFor(() => {
-            expect(global.fetch).toHaveBeenCalledWith(
+            expect(apiPost).toHaveBeenCalledWith(
                 "/api/email-request",
                 expect.objectContaining({
-                    method: "POST",
-                    body: expect.stringContaining(""),
+                    thaiName: "",
+                    // The rest of the form data
                 }),
             );
         });
@@ -132,8 +139,10 @@ describe("EmailRequestProvider", () => {
     });
 
     it("should handle submission failure", async () => {
-        (global.fetch as any).mockResolvedValueOnce({
-            json: async () => ({ success: false, error: "API Error" }),
+        vi.mocked(apiPost).mockResolvedValueOnce({
+            success: false,
+            error: "API Error",
+            status: 400,
         });
 
         render(

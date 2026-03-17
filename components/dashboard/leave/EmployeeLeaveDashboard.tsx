@@ -3,13 +3,26 @@
 import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus, Loader2, Thermometer, Briefcase, Palmtree } from "lucide-react";
+import {
+    Plus,
+    Loader2,
+    Thermometer,
+    Briefcase,
+    Palmtree,
+    X,
+} from "lucide-react";
+import { toast } from "sonner";
 import { useLeaveProfile } from "@/hooks/useLeaveProfile";
 import { LeaveRequestForm } from "./LeaveRequestForm";
 
+import { Pagination } from "@/components/Pagination";
+
 export function EmployeeLeaveDashboard() {
     const [isRequestFormOpen, setIsRequestFormOpen] = useState(false);
-    const { quotas, history, isLoading, mutate } = useLeaveProfile();
+    const [page, setPage] = useState(1);
+    const { quotas, history, metadata, isLoading, mutate, cancelLeave } =
+        useLeaveProfile(page);
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
     const getQuota = (type: "SICK" | "PERSONAL" | "VACATION") => {
         return (
@@ -164,16 +177,16 @@ export function EmployeeLeaveDashboard() {
                     ประวัติการลางาน (Recent Requests)
                 </h2>
                 {history.length > 0 ? (
-                    <div className="space-y-4">
+                    <div className="space-y-2">
                         {history.map((request) => (
                             <Card
                                 key={request.id}
                                 className="shadow-sm border-white/60 bg-white/60 backdrop-blur-sm overflow-hidden hover:shadow-md transition-shadow"
                             >
-                                <div className="p-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 hover:bg-white/40 transition-colors">
+                                <div className="p-3 flex flex-col md:flex-row justify-between items-start md:items-center gap-3 hover:bg-white/40 transition-colors">
                                     <div>
                                         <div className="flex items-center space-x-2">
-                                            <span className="font-semibold text-gray-800">
+                                            <span className="font-semibold text-gray-800 text-sm">
                                                 {request.leaveType === "SICK"
                                                     ? "ลาป่วย"
                                                     : request.leaveType ===
@@ -181,7 +194,7 @@ export function EmployeeLeaveDashboard() {
                                                       ? "ลากิจ"
                                                       : "ลาพักร้อน"}
                                             </span>
-                                            <span className="text-sm px-2.5 py-0.5 rounded-full bg-white border border-gray-200 text-gray-600 shadow-sm">
+                                            <span className="text-xs px-2 py-0.5 rounded-full bg-white border border-gray-200 text-gray-600 shadow-sm">
                                                 {request.period === "FULL_DAY"
                                                     ? "เต็มวัน"
                                                     : request.period ===
@@ -191,7 +204,7 @@ export function EmployeeLeaveDashboard() {
                                                 ({request.durationDays} วัน)
                                             </span>
                                         </div>
-                                        <p className="text-sm text-gray-500 mt-2 font-medium">
+                                        <p className="text-xs text-gray-500 mt-1 font-medium">
                                             วันที่:{" "}
                                             <span className="text-gray-700">
                                                 {new Date(
@@ -211,14 +224,14 @@ export function EmployeeLeaveDashboard() {
                                                 </span>
                                             )}
                                         </p>
-                                        <p className="text-sm text-gray-500 mt-2 italic border-l-2 border-indigo-200 pl-2 leading-relaxed">
+                                        <p className="text-xs text-gray-500 mt-1 italic border-l-2 border-indigo-200 pl-2 leading-relaxed">
                                             &quot;{request.reason}&quot;
                                         </p>
                                     </div>
-                                    <div className="flex items-center self-start md:self-center">
+                                    <div className="flex items-center self-start md:self-center mt-2 md:mt-0">
                                         {/* Status Badge */}
                                         <span
-                                            className={`px-3 py-1.5 rounded-full text-xs font-semibold shadow-sm ${
+                                            className={`px-2.5 py-1 rounded-full text-[10px] uppercase font-bold tracking-wider shadow-sm ${
                                                 request.status === "APPROVED"
                                                     ? "bg-emerald-100 text-emerald-700 border border-emerald-200"
                                                     : request.status ===
@@ -239,15 +252,74 @@ export function EmployeeLeaveDashboard() {
                                                     ? "ยกเลิก"
                                                     : "รออนุมัติ"}
                                         </span>
+                                        {request.status === "PENDING" && (
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                className="h-6 w-6 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                                                title="ยกเลิกคำขอลา"
+                                                disabled={isSubmitting}
+                                                onClick={async () => {
+                                                    if (
+                                                        window.confirm(
+                                                            "คุณต้องการยกเลิกคำขอลานี้ใช่หรือไม่?",
+                                                        )
+                                                    ) {
+                                                        try {
+                                                            setIsSubmitting(
+                                                                true,
+                                                            );
+                                                            await cancelLeave(
+                                                                request.id,
+                                                            );
+                                                            toast.success("ยกเลิกคำขอลาเรียบร้อยแล้ว");
+                                                        } catch (_err) {
+                                                            toast.error(
+                                                                "เกิดข้อผิดพลาดในการยกเลิกคำขอลา",
+                                                            );
+                                                        } finally {
+                                                            setIsSubmitting(
+                                                                false,
+                                                            );
+                                                        }
+                                                    }
+                                                }}
+                                            >
+                                                <X className="h-4 w-4" />
+                                            </Button>
+                                        )}
                                     </div>
                                 </div>
                             </Card>
                         ))}
+
+                        {/* Pagination Controls */}
+                        {metadata && metadata.totalPages > 1 && (
+                            <div className="pt-6 pb-2">
+                                <Pagination
+                                    currentPage={metadata.currentPage}
+                                    totalPages={metadata.totalPages}
+                                    itemsPerPage={metadata.itemsPerPage}
+                                    onPageChange={(p) => setPage(p)}
+                                    onPreviousPage={() =>
+                                        setPage((p) => Math.max(1, p - 1))
+                                    }
+                                    onNextPage={() =>
+                                        setPage((p) =>
+                                            Math.min(
+                                                metadata.totalPages,
+                                                p + 1,
+                                            ),
+                                        )
+                                    }
+                                />
+                            </div>
+                        )}
                     </div>
                 ) : (
                     <Card className="shadow-sm border-gray-100">
                         <div className="p-8 text-center text-gray-500">
-                            ยังไม่มีประวัติการยื่นใบลาในปีนี้
+                            ยังไม่มีประวัติการยื่นใบลา
                         </div>
                     </Card>
                 )}

@@ -31,9 +31,11 @@ vi.mock("@/lib/prisma", () => ({
         leaveQuota: {
             findFirst: vi.fn(),
             create: vi.fn(),
+            update: vi.fn(),
         },
         leaveRequest: {
             create: vi.fn(),
+            findFirst: vi.fn(),
         },
         notificationOutbox: {
             create: vi.fn(),
@@ -117,8 +119,8 @@ describe("POST /api/leave/request", () => {
 
         const payload = {
             leaveType: "SICK",
-            startDate: "2024-01-01T00:00:00.000Z",
-            endDate: "2024-01-02T00:00:00.000Z",
+            startDate: "2030-01-01T00:00:00.000Z",
+            endDate: "2030-01-02T00:00:00.000Z",
             period: "MORNING", // half-day spanning two days
             reason: "Sick leave",
         };
@@ -137,8 +139,8 @@ describe("POST /api/leave/request", () => {
     describe("Transaction Logic", () => {
         const validPayload = {
             leaveType: "PERSONAL",
-            startDate: "2024-05-10T00:00:00.000Z",
-            endDate: "2024-05-10T00:00:00.000Z",
+            startDate: "2030-05-10T00:00:00.000Z",
+            endDate: "2030-05-10T00:00:00.000Z",
             period: "FULL_DAY",
             reason: "Personal errand",
         };
@@ -196,10 +198,22 @@ describe("POST /api/leave/request", () => {
                 lastName: "B",
                 managerId: 200,
             });
-            // Quota exists but exhausted (e.g. 6 used out of 6 total for PERSONAL)
+            // 3. Mock overlap check to pass (no overlaps)
+            (prisma.leaveRequest.findFirst as any).mockResolvedValue(null);
+
+            // 4. Mock quota check
             (prisma.leaveQuota.findFirst as any).mockResolvedValue({
+                id: 1,
                 totalDays: 6,
                 usedDays: 6,
+            });
+
+            // 5. Mock quota.update shouldn't be called if availableQuota check fails first
+            // But we'll set it just in case
+            (prisma.leaveQuota.update as any).mockResolvedValue({
+                 id: 1,
+                 totalDays: 6,
+                 usedDays: 7, // Exceeds
             });
 
             const req = new NextRequest("http://localhost/api/leave/request", {
@@ -212,9 +226,34 @@ describe("POST /api/leave/request", () => {
             const data = await res.json();
             // 0 days remaining
             expect(data.error).toBe(
-                "Insufficient leave quota. You have 0 days remaining.",
+                "คุณมีโควตาวันลาคงเหลือเพียง 0 วัน",
             );
         });
+
+        it("should throw error if requests overlap", async () => {
+             (prisma.employee.findUnique as any).mockResolvedValue({
+                id: mockEmployeeId,
+                managerId: 200,
+            });
+
+            // Mock an existing overlap request
+            (prisma.leaveRequest.findFirst as any).mockResolvedValue({
+                id: 50,
+                status: "APPROVED"
+            });
+
+            const req = new NextRequest("http://localhost/api/leave/request", {
+                method: "POST",
+                body: JSON.stringify(validPayload),
+            });
+
+            const res = await submitLeaveRequest(req);
+            expect(res.status).toBe(500);
+            const data = await res.json();
+            
+            expect(data.error).toBe("คุณมีคำขอลาในช่วงเวลานี้ที่กำลังรออนุมัติหรืออนุมัติแล้ว");
+        });
+
 
         it("should complete successfully, creating default quota if none exists", async () => {
             (prisma.employee.findUnique as any).mockResolvedValue({
@@ -223,13 +262,15 @@ describe("POST /api/leave/request", () => {
                 lastName: "B",
                 managerId: 200,
             });
+            // No overlap
+            (prisma.leaveRequest.findFirst as any).mockResolvedValue(null);
+
             // No existing quota
             (prisma.leaveQuota.findFirst as any).mockResolvedValue(null);
 
             // Mock created quota
-            const newQuota = { totalDays: 10, usedDays: 0 };
+            const newQuota = { id: 1, totalDays: 10, usedDays: 0 };
             (prisma.leaveQuota.create as any).mockResolvedValue(newQuota);
-
             const mockCreatedRequest = { id: 999 };
             (prisma.leaveRequest.create as any).mockResolvedValue(
                 mockCreatedRequest,
@@ -250,13 +291,12 @@ describe("POST /api/leave/request", () => {
             expect(prisma.leaveQuota.create).toHaveBeenCalledWith({
                 data: {
                     employeeId: mockEmployeeId,
-                    year: 2024,
+                    year: 2030,
                     leaveType: "PERSONAL",
                     totalDays: 10, // DEFAULT_LEAVE_QUOTAS.PERSONAL
                     usedDays: 0,
                 },
             });
-
             expect(prisma.leaveRequest.create).toHaveBeenCalledWith({
                 data: expect.objectContaining({
                     employeeId: mockEmployeeId,

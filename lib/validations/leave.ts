@@ -17,6 +17,15 @@ export const leaveRequestSchema = z.object({
 }, {
     message: "วันที่สิ้นสุดต้องไม่ก่อนวันที่เริ่มต้น",
     path: ["endDate"]
+}).refine((data) => {
+    const start = new Date(data.startDate);
+    start.setHours(0, 0, 0, 0);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return start >= today;
+}, {
+    message: "วันที่เริ่มต้นต้องไม่น้อยกว่าวันปัจจุบัน (ไม่อนุญาตให้ลาย้อนหลัง)",
+    path: ["startDate"]
 });
 
 export type LeaveRequestValues = z.infer<typeof leaveRequestSchema>;

@@ -167,6 +167,69 @@ export function downloadSampleCSV(
     link.style.visibility = "hidden";
     document.body.appendChild(link);
     link.click();
-    document.body.removeChild(link);
     URL.revokeObjectURL(url);
+}
+
+// ============================================================
+// Leave CSV Helpers
+// ============================================================
+
+export interface LeaveRequestRow {
+    employee: {
+        firstName: string;
+        lastName: string;
+        nickname?: string;
+        position: string;
+        dept?: { name: string };
+    };
+    leaveType: string;
+    startDate: string;
+    endDate: string;
+    period: string;
+    durationDays: number;
+    reason: string;
+    status: string;
+    createdAt: string;
+}
+
+export const LEAVE_TYPE_TH: Record<string, string> = {
+    SICK: "ลาป่วย",
+    PERSONAL: "ลากิจ",
+    VACATION: "ลาพักร้อน",
+};
+
+export const LEAVE_PERIOD_TH: Record<string, string> = {
+    FULL_DAY: "เต็มวัน",
+    MORNING: "ครึ่งวันเช้า",
+    AFTERNOON: "ครึ่งวันบ่าย",
+};
+
+export const LEAVE_STATUS_TH: Record<string, string> = {
+    PENDING: "รออนุมัติ",
+    APPROVED: "อนุมัติแล้ว",
+    REJECTED: "ไม่อนุมัติ",
+    CANCELLED: "ยกเลิก",
+};
+
+/**
+ * Map a raw LeaveRequest API row to a Thai-labelled CSV row object.
+ */
+export function mapLeaveRowToCSV(
+    r: LeaveRequestRow,
+    index: number
+): Record<string, string | number> {
+    return {
+        "ลำดับ": index + 1,
+        "ชื่อ-นามสกุล": `${r.employee.firstName} ${r.employee.lastName}${r.employee.nickname ? ` (${r.employee.nickname})` : ""}`,
+        "แผนก": r.employee.dept?.name ?? "-",
+        "ตำแหน่ง": r.employee.position,
+        "ประเภทการลา": LEAVE_TYPE_TH[r.leaveType] ?? r.leaveType,
+        "วันที่เริ่ม": new Date(r.startDate).toLocaleDateString("th-TH"),
+        "วันที่สิ้นสุด": new Date(r.endDate).toLocaleDateString("th-TH"),
+        "ช่วงเวลา": LEAVE_PERIOD_TH[r.period] ?? r.period,
+        "จำนวนวัน": r.durationDays,
+        "เหตุผล": r.reason,
+        "สถานะ": LEAVE_STATUS_TH[r.status] ?? r.status,
+        "วันที่ยื่น": new Date(r.createdAt).toLocaleDateString("th-TH"),
+    };
 }

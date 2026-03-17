@@ -1,4 +1,5 @@
 import useSWR from "swr";
+import { apiPost } from "@/lib/api-client";
 import { apiGet } from "@/lib/api-client";
 
 const fetcher = async <T,>(url: string): Promise<T> => {
@@ -44,11 +45,17 @@ export interface LeaveRequest {
 export interface LeaveProfileResponse {
     quotas: LeaveQuota[];
     history: LeaveRequest[];
+    metadata: {
+        currentPage: number;
+        totalPages: number;
+        totalItems: number;
+        itemsPerPage: number;
+    };
 }
 
-export function useLeaveProfile() {
+export function useLeaveProfile(page: number = 1) {
     const { data, error, isLoading, mutate } = useSWR<LeaveProfileResponse>(
-        "/api/leave/me",
+        `/api/leave/me?page=${page}&limit=10`,
         fetcher,
         {
             revalidateOnFocus: false,
@@ -58,11 +65,30 @@ export function useLeaveProfile() {
         }
     );
 
+    const cancelLeave = async (leaveId: string) => {
+        try {
+            const response = await apiPost("/api/leave/cancel", { leaveId });
+
+            if (!response.success) {
+                throw new Error(response.error || "Failed to cancel leave");
+            }
+
+            // Immediately re-fetch the data to reflect the CANCELLED status & restored quota
+            await mutate();
+            return true;
+        } catch (error) {
+            console.error("Cancel leave error:", error);
+            throw error;
+        }
+    };
+
     return {
         quotas: data?.quotas || [],
         history: data?.history || [],
+        metadata: data?.metadata,
         isLoading,
-        isError: error,
+        error,
         mutate,
+        cancelLeave,
     };
 }

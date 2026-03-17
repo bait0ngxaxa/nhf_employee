@@ -1,6 +1,62 @@
-import { NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 import { verifyLeaveToken } from "@/lib/auth/jwt";
 import { prisma } from "@/lib/prisma";
+import { logLeaveEvent } from "@/lib/audit";
+
+/**
+ * GET — Read-only token validation (no mutation)
+ * Used by the frontend to pre-check token status on page load
+ */
+export async function GET(request: NextRequest) {
+    try {
+        const token = request.nextUrl.searchParams.get("token");
+
+        if (!token) {
+            return NextResponse.json(
+                { valid: false, error: "Missing token" },
+                { status: 400 },
+            );
+        }
+
+        const payload = await verifyLeaveToken(token);
+        if (!payload) {
+            return NextResponse.json(
+                { valid: false, error: "ลิงก์อนุมัติไม่ถูกต้อง หรือหมดอายุแล้ว" },
+                { status: 401 },
+            );
+        }
+
+        const leaveRequest = await prisma.leaveRequest.findUnique({
+            where: { id: payload.leaveId },
+            select: { status: true },
+        });
+
+        if (!leaveRequest) {
+            return NextResponse.json(
+                { valid: false, error: "ไม่พบข้อมูลใบลาในระบบ" },
+                { status: 404 },
+            );
+        }
+
+        if (leaveRequest.status !== "PENDING") {
+            return NextResponse.json(
+                { valid: false, error: `คำขอนี้ถูกดำเนินการไปแล้ว (สถานะปัจจุบัน: ${leaveRequest.status})` },
+                { status: 400 },
+            );
+        }
+
+        return NextResponse.json({
+            valid: true,
+            action: payload.action,
+        });
+    } catch (error) {
+        console.error("❌ [Leave Action Validate] Error:", error);
+        return NextResponse.json(
+            { valid: false, error: "ระบบขัดข้อง กรุณาลองใหม่อีกครั้ง" },
+            { status: 500 },
+        );
+    }
+}
 
 export async function POST(request: Request) {
     try {
@@ -28,7 +84,7 @@ export async function POST(request: Request) {
         // 2. Fetch Leave Request with employee data for notification
         const leaveRequest = await prisma.leaveRequest.findUnique({
             where: { id: leaveId },
-            include: { employee: { select: { email: true } } }
+            include: { employee: { select: { id: true, email: true, firstName: true, lastName: true } } } // Added id, firstName, lastName for audit log
         });
 
         if (!leaveRequest) {
@@ -107,6 +163,32 @@ export async function POST(request: Request) {
             });
         });
 
+        // Audit Logging
+        const auditAction =
+            newStatus === "APPROVED"
+                ? "LEAVE_REQUEST_APPROVE"
+                : "LEAVE_REQUEST_REJECT";
+
+        // Fetch the genuine User account for this approver (Employee)
+        const approverUser = await prisma.user.findFirst({
+            where: { employeeId: approverId }
+        });
+
+        await logLeaveEvent(
+            auditAction,
+            leaveId,
+            approverUser?.id ?? null, // userId performing the action
+            approverUser?.email ?? `System (Approver ID ${approverId})`, // Fallback email
+            {
+                after: {
+                    status: newStatus,
+                    employeeId: leaveRequest.employee.id,
+                    employeeName: `${leaveRequest.employee.firstName} ${leaveRequest.employee.lastName}`,
+                },
+            }
+        ).catch((err) => console.error("Failed to log audit event:", err));
+
+
         return NextResponse.json({
             success: true,
             message: `ทำรายการ${action === "approve" ? "อนุมัติ" : "ปฏิเสธ"}ใบลาเรียบร้อยแล้ว`
@@ -120,4 +202,3 @@ export async function POST(request: Request) {
         );
     }
 }
-

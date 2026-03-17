@@ -23,6 +23,7 @@ import { toast } from "sonner";
 import { type EditStatusModalProps } from '@/types/employees';
 import { type EmployeeStatusValue } from '@/types/employees';
 import { EMPLOYEE_STATUSES } from '@/constants/employees';
+import { apiPatch } from '@/lib/api-client';
 import { getEmployeeStatusInfo } from '@/lib/helpers/employee-helpers';
 
 export function EditStatusModal({
@@ -45,24 +46,17 @@ export function EditStatusModal({
 
     setIsUpdating(true);
     try {
-      const response = await fetch(`/api/employees/${employee.id}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ status: selectedStatus }),
-      });
+      const response = await apiPatch(`/api/employees/${employee.id}`, { status: selectedStatus });
 
-      if (response.ok) {
+      if (response.success) {
         onStatusUpdate(employee.id, selectedStatus);
         toast.success("อัปเดตสถานะสำเร็จ", {
           description: `สถานะของ ${employee.firstName} ${employee.lastName} ถูกเปลี่ยนเป็น "${selectedStatusInfo.label}" เรียบร้อยแล้ว`,
         });
         onClose();
       } else {
-        const errorData = await response.json();
         toast.error("เกิดข้อผิดพลาด", {
-          description: errorData.error || 'เกิดข้อผิดพลาดในการอัปเดตสถานะ',
+          description: response.error || 'เกิดข้อผิดพลาดในการอัปเดตสถานะ',
         });
       }
     } catch (error) {

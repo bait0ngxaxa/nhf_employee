@@ -1,13 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { format } from "date-fns";
 import { th } from "date-fns/locale";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useLeaveApprovals, type PendingLeave } from "@/hooks/useLeaveApprovals";
-import { apiPost } from "@/lib/api-client";
-import { CheckCircle, XCircle, Clock, Loader2, CalendarRange, UserCircle2 } from "lucide-react";
+import { apiGet, apiPost } from "@/lib/api-client";
+import { CheckCircle, XCircle, Clock, Loader2, CalendarRange, UserCircle2, Download } from "lucide-react";
+import { toast } from "sonner";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
@@ -17,6 +18,17 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { CSVLink } from "react-csv";
+import { mapLeaveRowToCSV, type LeaveRequestRow } from "@/lib/helpers/csv-helpers";
+import { generateFilename } from "@/lib/helpers/date-helpers";
+
 
 export function ManagerApprovalDashboard() {
     const { pending, history, isLoading, mutate } = useLeaveApprovals();
@@ -25,6 +37,25 @@ export function ManagerApprovalDashboard() {
     const [rejectReason, setRejectReason] = useState("");
     const [isProcessing, setIsProcessing] = useState(false);
 
+    // Export state
+    const currentYear = new Date().getFullYear();
+    const [exportYear, setExportYear] = useState(currentYear);
+    const [isExporting, setIsExporting] = useState(false);
+    const [exportData, setExportData] = useState<Record<string, string | number>[]>([]);
+    const csvLinkRef = useRef<CSVLink & HTMLAnchorElement & { link: HTMLAnchorElement }>(null);
+    const [availableYears, setAvailableYears] = useState<number[]>([currentYear]);
+
+    // Fetch years that have actual leave data for this manager's team
+    useEffect(() => {
+        void apiGet<{ years: number[] }>("/api/leave/export?yearsOnly=1")
+            .then((res) => {
+                if (res.success && res.data.years.length > 0) {
+                    setAvailableYears(res.data.years);
+                    setExportYear(res.data.years[0]);
+                }
+            });
+    }, []);
+
     if (isLoading) {
         return (
             <div className="flex justify-center items-center py-12">
@@ -32,6 +63,39 @@ export function ManagerApprovalDashboard() {
             </div>
         );
     }
+
+    const handleExportCSV = async () => {
+        setIsExporting(true);
+        try {
+            const res = await apiGet<{ data: LeaveRequestRow[] }>(`/api/leave/export?year=${exportYear}`);
+            if (!res.success) throw new Error(res.error);
+
+            const rows = res.data.data.map(mapLeaveRowToCSV);
+
+            setExportData(rows);
+
+            // Trigger download on next render tick
+            setTimeout(() => {
+                csvLinkRef.current?.link.click();
+            }, 100);
+
+            // Audit: log the export action
+            await apiPost("/api/audit-logs/export", {
+                entityType: "LeaveRequest",
+                recordCount: rows.length,
+                filters: { year: exportYear },
+            });
+
+            toast.success("ดาวน์โหลดสำเร็จ", {
+                description: `เตรียมข้อมูลการลา ${rows.length} รายการ (ปี ${exportYear}) เรียบร้อยแล้ว`,
+            });
+        } catch (err) {
+            console.error("Export error:", err);
+            toast.error("เกิดข้อผิดพลาดในการดาวน์โหลด");
+        } finally {
+            setTimeout(() => setIsExporting(false), 500);
+        }
+    };
 
     const handleAction = async (action: "APPROVE" | "REJECT", leaveId: string, reason?: string) => {
         setIsProcessing(true);
@@ -43,16 +107,17 @@ export function ManagerApprovalDashboard() {
             });
 
             if (res.success) {
+                toast.success(action === "APPROVE" ? "อนุมัติใบลาเรียบร้อยแล้ว" : "ปฏิเสธใบลาเรียบร้อยแล้ว");
                 await mutate();
                 setIsRejectDialogOpen(false);
                 setRejectReason("");
                 setSelectedLeave(null);
             } else {
-                alert(`Error: ${res.error}`);
+                toast.error(res.error || "เกิดข้อผิดพลาดในการดำเนินการ");
             }
         } catch (error) {
             console.error("Action failed:", error);
-            alert("เกิดข้อผิดพลาดในการดำเนินการ");
+            toast.error("เกิดข้อผิดพลาดในการดำเนินการ");
         } finally {
             setIsProcessing(false);
         }
@@ -73,10 +138,47 @@ export function ManagerApprovalDashboard() {
 
     return (
         <div className="space-y-6">
-            <div className="flex justify-between items-center">
+            <div className="flex justify-between items-center flex-wrap gap-3">
                 <div>
                     <h2 className="text-xl font-semibold text-gray-800">รายการรอพิจารณา (Pending Approvals)</h2>
                     <p className="text-sm text-gray-500">ใบลาคงค้างของพนักงานในทีมที่รอรับการอนุมัติ</p>
+                </div>
+                <div className="flex items-center gap-2">
+                    <Select
+                        value={String(exportYear)}
+                        onValueChange={(v) => setExportYear(Number(v))}
+                    >
+                        <SelectTrigger className="w-[110px] h-9 text-sm">
+                            <SelectValue placeholder="เลือกปี" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {availableYears.map((y) => (
+                                <SelectItem key={y} value={String(y)}>
+                                    {y}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                    <Button
+                        onClick={handleExportCSV}
+                        disabled={isExporting}
+                        variant="outline"
+                        className="h-9 text-sm"
+                    >
+                        {isExporting ? (
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        ) : (
+                            <Download className="w-4 h-4 mr-2" />
+                        )}
+                        Export CSV
+                    </Button>
+                    {/* Hidden CSVLink */}
+                    <CSVLink
+                        ref={csvLinkRef}
+                        data={exportData}
+                        filename={generateFilename(`รายงานการลา_ปี-${exportYear}`, "csv")}
+                        className="hidden"
+                    />
                 </div>
             </div>
 

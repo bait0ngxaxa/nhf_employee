@@ -24,6 +24,10 @@ export const AUDIT_ACTION_LABELS: Record<string, string> = {
     SETTINGS_UPDATE: "อัปเดตการตั้งค่า",
     DATA_EXPORT: "ส่งออกข้อมูล",
     EMAIL_REQUEST: "ขออีเมลพนักงานใหม่",
+    LEAVE_REQUEST_CREATE: "ยื่นคำขอลา",
+    LEAVE_REQUEST_APPROVE: "อนุมัติคำขอลา",
+    LEAVE_REQUEST_REJECT: "ไม่อนุมัติคำขอลา",
+    LEAVE_REQUEST_CANCEL: "ยกเลิกคำขอลา",
 };
 
 /**
@@ -40,6 +44,10 @@ export const AUDIT_ACTION_FILTER_OPTIONS = [
     { value: "USER_CREATE", label: "สร้างผู้ใช้" },
     { value: "DATA_EXPORT", label: "ส่งออกข้อมูล" },
     { value: "EMAIL_REQUEST", label: "ขออีเมลพนักงานใหม่" },
+    { value: "LEAVE_REQUEST_CREATE", label: "ยื่นคำขอลา" },
+    { value: "LEAVE_REQUEST_APPROVE", label: "อนุมัติคำขอลา" },
+    { value: "LEAVE_REQUEST_REJECT", label: "ไม่อนุมัติคำขอลา" },
+    { value: "LEAVE_REQUEST_CANCEL", label: "ยกเลิกคำขอลา" },
 ];
 
 /**

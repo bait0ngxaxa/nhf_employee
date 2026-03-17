@@ -4,6 +4,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { NotificationOutboxType } from "@prisma/client";
 import { getEmployeeIdFromUserId } from "@/lib/services/leave/get-employee-id";
+import { logLeaveEvent } from "@/lib/audit";
 
 export async function POST(req: Request) {
     try {
@@ -95,6 +96,30 @@ export async function POST(req: Request) {
 
             return updatedRequest;
         });
+
+        // Audit Logging outside transaction
+        const auditAction =
+            action === "APPROVE"
+                ? "LEAVE_REQUEST_APPROVE"
+                : "LEAVE_REQUEST_REJECT";
+
+        // Fetch user email for audit log if possible, otherwise use a fallback
+        const userEmail = session.user.email || `User ${userId}`;
+
+        // Get employee name if possible (result.employee is not returned from transaction
+        // because we updated the request. Let's just log the action with what we have)
+        await logLeaveEvent(
+            auditAction,
+            leaveId,
+            userId, // Manager who performed action
+            userEmail,
+            {
+                after: {
+                    status: action === "APPROVE" ? "APPROVED" : "REJECTED",
+                    reason: action === "REJECT" ? reason : null,
+                },
+            }
+        ).catch((err) => console.error("Failed to log audit event:", err));
 
         return NextResponse.json({ success: true, data: result });
     } catch (error) {

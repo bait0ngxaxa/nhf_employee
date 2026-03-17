@@ -76,7 +76,7 @@ async function getUserAgent(): Promise<string | null> {
  * ```
  */
 export async function createAuditLog(
-    params: CreateAuditLogParams
+    params: CreateAuditLogParams,
 ): Promise<void> {
     const { action, entityType, entityId, userId, userEmail, details } = params;
 
@@ -121,7 +121,7 @@ export async function logAuthEvent(
         | "PASSWORD_RESET",
     userId?: number,
     userEmail?: string,
-    details?: AuditLogDetails
+    details?: AuditLogDetails,
 ): Promise<void> {
     await createAuditLog({
         action,
@@ -146,7 +146,7 @@ export async function logEmployeeEvent(
     entityId: number,
     userId: number,
     userEmail: string,
-    details?: AuditLogDetails
+    details?: AuditLogDetails,
 ): Promise<void> {
     await createAuditLog({
         action,
@@ -171,7 +171,7 @@ export async function logTicketEvent(
     entityId: number,
     userId: number,
     userEmail: string,
-    details?: AuditLogDetails
+    details?: AuditLogDetails,
 ): Promise<void> {
     await createAuditLog({
         action,
@@ -197,5 +197,38 @@ export async function logDataExport(
         userId,
         userEmail,
         details,
+    });
+}
+
+/**
+ * Create audit log for leave management events
+ */
+export async function logLeaveEvent(
+    action:
+        | "LEAVE_REQUEST_CREATE"
+        | "LEAVE_REQUEST_APPROVE"
+        | "LEAVE_REQUEST_REJECT"
+        | "LEAVE_REQUEST_CANCEL",
+    entityId: string, // Leave request ID is a CUID (string)
+    userId: number | null,
+    userEmail: string,
+    details?: AuditLogDetails,
+): Promise<void> {
+    await createAuditLog({
+        action,
+        entityType: "LeaveRequest",
+        // Since AuditLog.entityId is Int, but LeaveRequest.id is String (cuid),
+        // we store the CUID in the details.metadata for exact match,
+        // and leave entityId null as it only accepts Int
+        entityId: undefined, // Explicitly undefined since Prisma complains about null for Int? in some cases or Int
+        userId: userId ?? undefined, // Only pass if we have a valid user ID
+        userEmail,
+        details: {
+            ...details,
+            metadata: {
+                ...details?.metadata,
+                leaveRequestId: entityId,
+            },
+        },
     });
 }
