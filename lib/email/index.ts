@@ -216,15 +216,14 @@ export async function sendITTeamNotification(
 }
 
 export async function sendLeaveActionNotification(
-    managerEmail: string,
+    to: string,
     data: LeaveActionPayload,
-    approveLink: string,
-    rejectLink: string
+    dashboardLink: string
 ): Promise<boolean> {
     const emailData: EmailData = {
-        to: managerEmail,
+        to: to,
         subject: `[NHF Leave] คำขออนุมัติลางานใหม่จาก ${data.employeeName}`,
-        html: generateLeaveActionEmailHTML(data, approveLink, rejectLink),
+        html: generateLeaveActionEmailHTML(data, dashboardLink),
         text: `มีคำขออนุมัติลางานใหม่\nพนักงาน ${data.employeeName} ขอลา ${data.durationDays} วัน\n(กรุณาใช้ลิงก์ในอีเมลแบบ HTML เพื่อดำเนินการ)`,
     };
 

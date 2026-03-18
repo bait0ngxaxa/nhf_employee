@@ -1,7 +1,15 @@
 import { type LeaveActionPayload } from "../types";
 
-export function generateLeaveActionEmailHTML(data: LeaveActionPayload, approveLink: string, rejectLink: string): string {
-    const typeLabel = data.leaveType === "SICK" ? "ลาป่วย" : data.leaveType === "PERSONAL" ? "ลากิจ" : "ลาพักร้อน";
+export function generateLeaveActionEmailHTML(
+    data: LeaveActionPayload,
+    dashboardLink: string
+): string {
+    const typeLabel =
+        data.leaveType === "SICK"
+            ? "ลาป่วย"
+            : data.leaveType === "PERSONAL"
+              ? "ลากิจ"
+              : "ลาพักร้อน";
 
     return `
 <!DOCTYPE html>
@@ -16,7 +24,7 @@ export function generateLeaveActionEmailHTML(data: LeaveActionPayload, approveLi
             มีคำขออนุมัติลางานใหม่
         </h2>
         
-        <p>เรียน ผู้จัดการ,</p>
+        <p>เรียน ผู้อนุมัติ,</p>
         <p>พนักงาน <strong>${data.employeeName}</strong> ได้ส่งคำขออนุมัติ${typeLabel} โดยมีรายละเอียดดังนี้:</p>
         
         <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
@@ -39,8 +47,9 @@ export function generateLeaveActionEmailHTML(data: LeaveActionPayload, approveLi
         </table>
 
         <p style="margin-top: 30px; text-align: center;">
-            <a href="${approveLink}" style="display: inline-block; padding: 12px 24px; background-color: #10b981; color: white; text-decoration: none; border-radius: 6px; font-weight: bold; margin-right: 10px;">อนุมัติลางาน</a>
-            <a href="${rejectLink}" style="display: inline-block; padding: 12px 24px; background-color: #ef4444; color: white; text-decoration: none; border-radius: 6px; font-weight: bold;">ไม่อนุมัติ</a>
+            <a href="${dashboardLink}" style="display: inline-block; padding: 12px 24px; background-color: #3b82f6; color: white; text-decoration: none; border-radius: 6px; font-weight: bold;">
+                ดูรายละเอียดและพิจารณาใบลา
+            </a>
         </p>
 
         <p style="font-size: 12px; color: #6c757d; margin-top: 40px; border-top: 1px solid #e9ecef; padding-top: 20px;">

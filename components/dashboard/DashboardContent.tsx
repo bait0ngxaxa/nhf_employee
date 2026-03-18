@@ -114,9 +114,16 @@ export function DashboardContent() {
     const renderContent = () => {
         switch (selectedMenu) {
             case "leave-management":
+            case "manager-approval":
+            case "leave-history":
+                // Determine the correct sub-tab to show within LeaveManagementSection
+                const defaultLeaveTab = 
+                    selectedMenu === "manager-approval" ? "approvals" : 
+                    selectedMenu === "leave-history" ? "my-leave" : undefined;
+                
                 return (
                     <Suspense fallback={<SectionSkeleton />}>
-                        <LeaveManagementSection />
+                        <LeaveManagementSection defaultTab={defaultLeaveTab} />
                     </Suspense>
                 );
 

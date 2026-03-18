@@ -1,15 +1,29 @@
 import { CalendarRange } from "lucide-react";
+import { useState, useEffect } from "react";
 import { useDashboardDataContext } from "./context/dashboard/DashboardContext";
 import { EmployeeLeaveDashboard } from "./leave/EmployeeLeaveDashboard";
 import { ManagerApprovalDashboard } from "./leave/ManagerApprovalDashboard";
 import { ApproverManagement } from "./leave/ApproverManagement";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
-export function LeaveManagementSection() {
+interface LeaveManagementSectionProps {
+    defaultTab?: string;
+}
+
+export function LeaveManagementSection({ defaultTab = "my-leave" }: LeaveManagementSectionProps) {
     const { user } = useDashboardDataContext();
     const isManager = user?.isManager === true;
     const isAdmin = user?.role === "ADMIN";
     const showApprovalTab = isManager;
+
+    const [activeTab, setActiveTab] = useState(defaultTab);
+
+    // Ensure the tab changes if the user clicks a deep link while already on this page
+    useEffect(() => {
+        if (defaultTab) {
+            setActiveTab(defaultTab);
+        }
+    }, [defaultTab]);
 
     return (
         <div className="relative min-h-[calc(100vh-6rem)] bg-slate-50/50 rounded-3xl overflow-hidden border border-white/60 shadow-inner p-4 md:p-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -36,7 +50,7 @@ export function LeaveManagementSection() {
                 </div>
 
                 {showApprovalTab || isAdmin ? (
-                    <Tabs defaultValue="my-leave" className="w-full">
+                    <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
                         <TabsList className="bg-indigo-50 p-1 mb-6 rounded-xl flex max-w-fit">
                             <TabsTrigger
                                 value="my-leave"

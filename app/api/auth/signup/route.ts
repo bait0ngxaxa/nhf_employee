@@ -52,7 +52,11 @@ export async function POST(request: NextRequest) {
         // Auto-link: find Employee with matching email to connect the accounts
         const matchedEmployee = await prisma.employee.findUnique({
             where: { email: email.toLowerCase() },
-            select: { id: true, user: { select: { id: true } } },
+            select: { 
+                id: true, 
+                user: { select: { id: true } },
+                dept: { select: { code: true } }
+            },
         });
 
         // Only link if the Employee exists AND is not already claimed by another User
@@ -60,12 +64,20 @@ export async function POST(request: NextRequest) {
             ? matchedEmployee.id
             : null;
 
+        // Determine user role
+        let assignedRole = "USER";
+        if (email.toLowerCase() === "admin@thainhf.org") {
+            assignedRole = "ADMIN";
+        } else if (matchedEmployee?.dept?.code === "ADMIN") {
+            assignedRole = "ADMIN";
+        }
+
         const user = await prisma.user.create({
             data: {
                 name: name.trim(),
                 email: email.toLowerCase(),
                 password: hashedPassword,
-                role: "USER",
+                role: assignedRole,
                 isActive: true,
                 employeeId,
             },
