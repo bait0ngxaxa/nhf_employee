@@ -36,7 +36,6 @@ export function SignupForm({
     ...props
 }: React.ComponentProps<"div">) {
     const [formData, setFormData] = useState({
-        name: "",
         email: "",
         password: "",
         confirmPassword: "",
@@ -72,7 +71,6 @@ export function SignupForm({
             const result = await apiPost<SignupSuccessResponse>(
                 "/api/auth/signup",
                 {
-                    name: formData.name,
                     email: formData.email,
                     password: formData.password,
                     confirmPassword: formData.confirmPassword,
@@ -86,7 +84,6 @@ export function SignupForm({
                 });
                 // Reset form
                 setFormData({
-                    name: "",
                     email: "",
                     password: "",
                     confirmPassword: "",
@@ -113,7 +110,7 @@ export function SignupForm({
                         สร้างบัญชีใหม่
                     </CardTitle>
                     <CardDescription className="text-gray-500">
-                        กรุณากรอกข้อมูลเพื่อลงทะเบียนเข้าใช้งาน
+                        ใช้อีเมลองค์กรของคุณเพื่อลงทะเบียน ระบบจะดึงชื่อจากข้อมูลพนักงานให้อัตโนมัติ
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -124,26 +121,6 @@ export function SignupForm({
                                     {error}
                                 </div>
                             )}
-
-                            <div className="grid gap-3">
-                                <Label htmlFor="name" className="text-gray-700">
-                                    ชื่อ-นามสกุล
-                                </Label>
-                                <Input
-                                    id="name"
-                                    type="text"
-                                    placeholder="กรอกชื่อ-นามสกุล"
-                                    value={formData.name}
-                                    onChange={(e) =>
-                                        setFormData({
-                                            ...formData,
-                                            name: e.target.value,
-                                        })
-                                    }
-                                    required
-                                    className="rounded-xl border-gray-200 focus:border-blue-500 focus:ring-blue-500/20 bg-white/50"
-                                />
-                            </div>
 
                             <div className="grid gap-3">
                                 <Label

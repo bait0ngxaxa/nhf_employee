@@ -94,6 +94,28 @@ export async function POST(req: Request) {
                 }
             });
 
+            // 5. Create In-App Notification for the Employee
+            const employeeUser = await tx.user.findUnique({
+                where: { employeeId: leaveRequest.employeeId },
+                select: { id: true }
+            });
+
+            if (employeeUser) {
+                const actionTextTh = action === "APPROVE" ? "อนุมัติ" : "ไม่อนุมัติ";
+                await tx.notification.create({
+                    data: {
+                        userId: employeeUser.id,
+                        type: action === "APPROVE" ? "LEAVE_APPROVED" : "LEAVE_REJECTED",
+                        title: `ผลการพิจารณาคำร้องขอลา`,
+                        message: `คำร้องขอลาของคุณได้รับการพิจารณาแล้ว: **${actionTextTh}**${
+                            action === "REJECT" && reason ? ` (เหตุผล: ${reason})` : ""
+                        }`,
+                        actionUrl: "/dashboard?tab=leave-management",
+                        referenceId: leaveId,
+                    }
+                });
+            }
+
             return updatedRequest;
         });
 

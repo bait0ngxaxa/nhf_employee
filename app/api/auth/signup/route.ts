@@ -5,9 +5,9 @@ import { createAuditLog } from "@/lib/audit";
 
 export async function POST(request: NextRequest) {
     try {
-        const { name, email, password, confirmPassword } = await request.json();
+        const { email, password, confirmPassword } = await request.json();
 
-        if (!name || !email || !password || !confirmPassword) {
+        if (!email || !password || !confirmPassword) {
             return NextResponse.json(
                 { error: "กรุณากรอกข้อมูลให้ครบถ้วน" },
                 { status: 400 },
@@ -50,36 +50,51 @@ export async function POST(request: NextRequest) {
         const hashedPassword = await bcrypt.hash(password, 12);
 
         // Auto-link: find Employee with matching email to connect the accounts
+        // Name is derived from Employee record — users cannot set their own name at signup
         const matchedEmployee = await prisma.employee.findUnique({
             where: { email: email.toLowerCase() },
-            select: { 
-                id: true, 
+            select: {
+                id: true,
+                firstName: true,
+                lastName: true,
                 user: { select: { id: true } },
-                dept: { select: { code: true } }
+                dept: { select: { code: true } },
             },
         });
 
-        // Only link if the Employee exists AND is not already claimed by another User
-        const employeeId = matchedEmployee && !matchedEmployee.user
-            ? matchedEmployee.id
-            : null;
-
-        // Determine user role
-        let assignedRole = "USER";
-        if (email.toLowerCase() === "admin@thainhf.org") {
-            assignedRole = "ADMIN";
-        } else if (matchedEmployee?.dept?.code === "ADMIN") {
-            assignedRole = "ADMIN";
+        // Reject signup if no Employee record is found for this email
+        if (!matchedEmployee) {
+            return NextResponse.json(
+                {
+                    error: "ไม่พบข้อมูลพนักงานที่ตรงกับอีเมลนี้ กรุณาติดต่อผู้ดูแล",
+                },
+                { status: 400 },
+            );
         }
+
+        // Reject if the Employee record is already claimed by another account
+        if (matchedEmployee.user) {
+            return NextResponse.json(
+                { error: "อีเมลนี้ถูกใช้งานแล้ว" },
+                { status: 400 },
+            );
+        }
+
+        const employeeName = `${matchedEmployee.firstName} ${matchedEmployee.lastName}`;
+
+        // Only the seeded admin account gets ADMIN role at signup.
+        // All others start as USER; an admin must assign elevated roles manually.
+        const assignedRole =
+            email.toLowerCase() === "admin@thainhf.org" ? "ADMIN" : "USER";
 
         const user = await prisma.user.create({
             data: {
-                name: name.trim(),
+                name: employeeName,
                 email: email.toLowerCase(),
                 password: hashedPassword,
                 role: assignedRole,
                 isActive: true,
-                employeeId,
+                employeeId: matchedEmployee.id,
             },
         });
 

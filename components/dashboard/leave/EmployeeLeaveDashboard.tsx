@@ -227,6 +227,14 @@ export function EmployeeLeaveDashboard() {
                                         <p className="text-xs text-gray-500 mt-1 italic border-l-2 border-indigo-200 pl-2 leading-relaxed">
                                             &quot;{request.reason}&quot;
                                         </p>
+                                        {/* Show reject reason if status is REJECTED */}
+                                        {request.status === "REJECTED" &&
+                                            request.rejectReason && (
+                                                <p className="text-xs text-red-600 mt-2 p-2 bg-red-50 rounded-md border border-red-100 font-medium">
+                                                    เหตุผล:{" "}
+                                                    {request.rejectReason}
+                                                </p>
+                                            )}
                                     </div>
                                     <div className="flex items-center self-start md:self-center mt-2 md:mt-0">
                                         {/* Status Badge */}
@@ -272,7 +280,9 @@ export function EmployeeLeaveDashboard() {
                                                             await cancelLeave(
                                                                 request.id,
                                                             );
-                                                            toast.success("ยกเลิกคำขอลาเรียบร้อยแล้ว");
+                                                            toast.success(
+                                                                "ยกเลิกคำขอลาเรียบร้อยแล้ว",
+                                                            );
                                                         } catch (_err) {
                                                             toast.error(
                                                                 "เกิดข้อผิดพลาดในการยกเลิกคำขอลา",

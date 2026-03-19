@@ -8,17 +8,56 @@ import {
 } from "@/components/dashboard/context/dashboard/DashboardContext";
 
 // Static color config for menu items - keys must match DASHBOARD_MENU_ITEMS[].id
-const DEFAULT_MENU_CONFIG = { gradient: "from-gray-500 to-slate-600", bgClass: "bg-gray-100", iconClass: "text-gray-600" };
+const DEFAULT_MENU_CONFIG = {
+    gradient: "from-gray-500 to-slate-600",
+    bgClass: "bg-gray-100",
+    iconClass: "text-gray-600",
+};
 
-const MENU_ITEM_CONFIG: Record<string, { gradient: string; bgClass: string; iconClass: string }> = {
-    "leave-management": { gradient: "from-indigo-500 to-sky-600", bgClass: "bg-indigo-100", iconClass: "text-indigo-600" },
-    "it-equipment": { gradient: "from-orange-500 to-red-600", bgClass: "bg-orange-100", iconClass: "text-orange-600" },
-    "it-support": { gradient: "from-emerald-500 to-teal-700", bgClass: "bg-emerald-100", iconClass: "text-emerald-700" },
-    "email-request": { gradient: "from-indigo-600 to-violet-700", bgClass: "bg-indigo-100", iconClass: "text-indigo-700" },
-    "employee-management": { gradient: "from-sky-600 to-blue-700", bgClass: "bg-sky-100", iconClass: "text-sky-700" },
-    "add-employee": { gradient: "from-pink-500 to-rose-600", bgClass: "bg-pink-100", iconClass: "text-pink-600" },
-    "import-employee": { gradient: "from-teal-500 to-cyan-600", bgClass: "bg-teal-100", iconClass: "text-teal-600" },
-    "audit-logs": { gradient: "from-yellow-500 to-amber-600", bgClass: "bg-yellow-100", iconClass: "text-amber-600" },
+const MENU_ITEM_CONFIG: Record<
+    string,
+    { gradient: string; bgClass: string; iconClass: string }
+> = {
+    "leave-management": {
+        gradient: "from-indigo-500 to-sky-600",
+        bgClass: "bg-indigo-100",
+        iconClass: "text-indigo-600",
+    },
+    "it-equipment": {
+        gradient: "from-orange-500 to-red-600",
+        bgClass: "bg-orange-100",
+        iconClass: "text-orange-600",
+    },
+    "it-support": {
+        gradient: "from-emerald-500 to-teal-700",
+        bgClass: "bg-emerald-100",
+        iconClass: "text-emerald-700",
+    },
+    "email-request": {
+        gradient: "from-indigo-600 to-violet-700",
+        bgClass: "bg-indigo-100",
+        iconClass: "text-indigo-700",
+    },
+    "employee-management": {
+        gradient: "from-sky-600 to-blue-700",
+        bgClass: "bg-sky-100",
+        iconClass: "text-sky-700",
+    },
+    "add-employee": {
+        gradient: "from-pink-500 to-rose-600",
+        bgClass: "bg-pink-100",
+        iconClass: "text-pink-600",
+    },
+    "import-employee": {
+        gradient: "from-teal-500 to-cyan-600",
+        bgClass: "bg-teal-100",
+        iconClass: "text-teal-600",
+    },
+    "audit-logs": {
+        gradient: "from-yellow-500 to-amber-600",
+        bgClass: "bg-yellow-100",
+        iconClass: "text-amber-600",
+    },
 };
 
 export function DashboardHomeSection() {
@@ -36,27 +75,29 @@ export function DashboardHomeSection() {
             <div className="relative z-10 p-4 md:p-8 space-y-8">
                 {/* Header */}
                 <div className="animate-in fade-in slide-in-from-bottom-2 duration-700 ease-out">
-                    <h2 className={cn(
-                        "text-3xl font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-br pb-1",
-                        "from-gray-900 via-gray-800 to-gray-600"
-                    )}>
+                    <h2
+                        className={cn(
+                            "text-3xl font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-br pb-1",
+                            "from-gray-900 via-gray-800 to-gray-600",
+                        )}
+                    >
                         ยินดีต้อนรับ, {user?.name}
                     </h2>
-                    <p className="text-gray-500 font-medium">ระบบจัดการพนักงาน</p>
                 </div>
-                
+
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 animate-in fade-in slide-in-from-bottom-6 duration-700 ease-out delay-150">
                     {availableMenuItems.map((item) => {
                         const IconComponent = item.icon;
-                        const config = MENU_ITEM_CONFIG[item.id] ?? DEFAULT_MENU_CONFIG;
-                        
+                        const config =
+                            MENU_ITEM_CONFIG[item.id] ?? DEFAULT_MENU_CONFIG;
+
                         return (
                             <Card
                                 key={item.id}
                                 className={cn(
                                     "relative overflow-hidden cursor-pointer bg-white border-gray-200",
                                     "shadow-lg hover:shadow-xl transition-[box-shadow,transform] duration-300",
-                                    "rounded-2xl group"
+                                    "rounded-2xl group",
                                 )}
                                 onClick={() => handleMenuClick(item.id)}
                             >
@@ -65,23 +106,32 @@ export function DashboardHomeSection() {
                                     className={cn(
                                         "absolute -right-8 -top-8 w-40 h-40 rounded-full opacity-10 blur-2xl bg-gradient-to-br",
                                         config.gradient,
-                                        "group-hover:opacity-20 transition-opacity duration-500"
+                                        "group-hover:opacity-20 transition-opacity duration-500",
                                     )}
                                 />
 
                                 <CardHeader className="pb-2">
                                     <div className="flex items-center space-x-4">
-                                        <div className={cn(
-                                            "p-3 rounded-xl group-hover:scale-110 transition-transform duration-300",
-                                            config.bgClass
-                                        )}>
-                                            <IconComponent className={cn("h-7 w-7", config.iconClass)} />
+                                        <div
+                                            className={cn(
+                                                "p-3 rounded-xl group-hover:scale-110 transition-transform duration-300",
+                                                config.bgClass,
+                                            )}
+                                        >
+                                            <IconComponent
+                                                className={cn(
+                                                    "h-7 w-7",
+                                                    config.iconClass,
+                                                )}
+                                            />
                                         </div>
-                                        <CardTitle className={cn(
-                                            "text-lg font-bold bg-clip-text text-transparent bg-gradient-to-r",
-                                            config.gradient,
-                                            "group-hover:opacity-80 transition-opacity"
-                                        )}>
+                                        <CardTitle
+                                            className={cn(
+                                                "text-lg font-bold bg-clip-text text-transparent bg-gradient-to-r",
+                                                config.gradient,
+                                                "group-hover:opacity-80 transition-opacity",
+                                            )}
+                                        >
                                             {item.label}
                                         </CardTitle>
                                     </div>

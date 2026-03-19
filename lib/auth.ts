@@ -87,7 +87,7 @@ export const authOptions: NextAuthOptions = {
     // Use JWT strategy for session management
     session: {
         strategy: "jwt",
-        maxAge: 60 * 60, // กำหนดอายุของ session เป็น 1 ชั่วโมง
+        maxAge: 7 * 24 * 60 * 60, // กำหนดอายุของ session เป็น 1 สัปดาห์
     },
 
     // Callbacks to manage the JWT token and session
@@ -110,6 +110,12 @@ export const authOptions: NextAuthOptions = {
             }
             return session;
         },
+    },
+
+    // Custom pages for authentication
+    pages: {
+        signIn: "/login",
+        // error: "/login", // We can set this if needed to catch auth errors on the login page
     },
 };
 

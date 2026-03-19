@@ -1,4 +1,5 @@
 import { type CSVEmployee } from "@/types/employees";
+import { EmployeeStatus } from "@prisma/client";
 
 // CSV header mapping (support both Thai and English headers)
 export const CSV_HEADER_MAPPINGS: Record<string, keyof CSVEmployee> = {
@@ -25,6 +26,8 @@ export const CSV_HEADER_MAPPINGS: Record<string, keyof CSVEmployee> = {
     ชื่อเล่น: "nickname",
     nickname: "nickname",
     nick: "nickname",
+    สถานะ: "status",
+    status: "status",
 };
 
 export const CSV_REQUIRED_FIELDS: (keyof CSVEmployee)[] = [
@@ -33,6 +36,29 @@ export const CSV_REQUIRED_FIELDS: (keyof CSVEmployee)[] = [
     "position",
     "department",
 ];
+
+// Maps human-readable status strings (Thai/English) to the Prisma enum value
+const STATUS_INPUT_MAP: Record<string, EmployeeStatus> = {
+    active: EmployeeStatus.ACTIVE,
+    "ทำงานอยู่": EmployeeStatus.ACTIVE,
+    "ปกติ": EmployeeStatus.ACTIVE,
+    inactive: EmployeeStatus.INACTIVE,
+    "ไม่ทำงาน": EmployeeStatus.INACTIVE,
+    "ลาออก": EmployeeStatus.INACTIVE,
+    suspended: EmployeeStatus.SUSPENDED,
+    "ถูกระงับ": EmployeeStatus.SUSPENDED,
+};
+
+/**
+ * Parse a status string from CSV into the EmployeeStatus enum.
+ * Falls back to ACTIVE when the value is absent or unrecognised.
+ */
+export function parseEmployeeStatus(raw: string | undefined): EmployeeStatus {
+    if (!raw || raw.trim() === "-" || raw.trim() === "") {
+        return EmployeeStatus.ACTIVE;
+    }
+    return STATUS_INPUT_MAP[raw.trim().toLowerCase()] ?? EmployeeStatus.ACTIVE;
+}
 
 /**
  * Parse a single CSV line, handling quoted fields properly

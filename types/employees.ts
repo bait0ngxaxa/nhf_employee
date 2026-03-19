@@ -55,6 +55,7 @@ export interface CSVEmployee {
     affiliation?: string;
     nickname?: string;
     hireDate?: string;
+    status?: string;
 }
 
 export interface ImportError {

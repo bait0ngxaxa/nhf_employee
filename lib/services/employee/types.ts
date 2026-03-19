@@ -54,6 +54,7 @@ export interface CSVImportEmployee {
     department: string;
     affiliation?: string;
     nickname?: string;
+    status?: string;
 }
 
 /** Import error details */

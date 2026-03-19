@@ -22,8 +22,13 @@ const securityHeaders = [
         value: "camera=(), microphone=(), geolocation=()",
     },
     {
+        // Force HTTPS for 1 year; Cloudflare already enforces this at edge but belt-and-braces
+        key: "Strict-Transport-Security",
+        value: "max-age=31536000; includeSubDomains",
+    },
+    {
         key: "Content-Security-Policy",
-        value: "default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; font-src 'self'; connect-src 'self';",
+        value: "default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline' https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; font-src 'self'; connect-src 'self' https://cloudflareinsights.com;",
     },
 ];
 

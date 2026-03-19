@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { DEPARTMENT_CODE_MAP } from "./constants";
 import type { CSVImportEmployee, ImportResult } from "./types";
+import { parseEmployeeStatus } from "@/lib/helpers/csv-helpers";
 
 /**
  * Validate required fields for import
@@ -169,6 +170,7 @@ export async function importEmployeesFromCSV(
                     position: employeeData.position.trim(),
                     affiliation: employeeData.affiliation?.trim() || null,
                     departmentId,
+                    status: parseEmployeeStatus(employeeData.status),
                 },
                 include: {
                     dept: true,
