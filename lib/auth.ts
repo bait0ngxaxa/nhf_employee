@@ -87,7 +87,7 @@ export const authOptions: NextAuthOptions = {
     // Use JWT strategy for session management
     session: {
         strategy: "jwt",
-        maxAge: 7 * 24 * 60 * 60, // กำหนดอายุของ session เป็น 1 สัปดาห์
+        maxAge: 30 * 24 * 60 * 60, // กำหนดอายุของ session เป็น 30 วัน (1 เดือนตาม Zero Trust)
     },
 
     // Callbacks to manage the JWT token and session

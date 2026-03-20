@@ -1,7 +1,7 @@
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { Menu, X, User, Settings, LogOut } from "lucide-react";
+import { Menu, X, User, Settings } from "lucide-react";
 
 import { getMenuTheme } from "@/constants/dashboard";
 import {
@@ -10,13 +10,8 @@ import {
 } from "@/components/dashboard/context/dashboard/DashboardContext";
 
 export function DashboardSidebar() {
-    const {
-        selectedMenu,
-        sidebarOpen,
-        handleMenuClick,
-        setSidebarOpen,
-        handleSignOut,
-    } = useDashboardUIContext();
+    const { selectedMenu, sidebarOpen, handleMenuClick, setSidebarOpen } =
+        useDashboardUIContext();
     const { user, availableMenuItems: menuItems } = useDashboardDataContext();
 
     const dashboardTheme = getMenuTheme("dashboard");
@@ -58,7 +53,9 @@ export function DashboardSidebar() {
                         variant="ghost"
                         size="sm"
                         onClick={onToggle}
-                        aria-label={sidebarOpen ? "ปิด Sidebar" : "เปิด Sidebar"}
+                        aria-label={
+                            sidebarOpen ? "ปิด Sidebar" : "เปิด Sidebar"
+                        }
                         className={cn(!sidebarOpen && "h-10 w-10 p-0")}
                     >
                         {sidebarOpen ? (
@@ -100,7 +97,8 @@ export function DashboardSidebar() {
                             !sidebarOpen && "justify-center px-0 border-r-0",
                         )}
                         style={{
-                            transition: "transform 200ms ease-out, background-color 200ms ease-out",
+                            transition:
+                                "transform 200ms ease-out, background-color 200ms ease-out",
                         }}
                         onClick={() => handleMenuClick("dashboard")}
                     >
@@ -244,18 +242,10 @@ export function DashboardSidebar() {
                 })}
             </nav>
 
-            {/* User Info & Logout */}
-            <div
-                className={cn(
-                    "border-t border-gray-100",
-                    sidebarOpen ? "p-4" : "p-2",
-                )}
-                style={{
-                    transition: "padding 300ms cubic-bezier(0.4, 0, 0.2, 1)",
-                }}
-            >
-                {sidebarOpen && user && (
-                    <div className="mb-3 p-3 bg-gradient-to-br from-gray-50 to-blue-50/50 rounded-xl border border-blue-100/50 overflow-hidden">
+            {/* User Info */}
+            {sidebarOpen && user && (
+                <div className="border-t border-gray-100 p-4">
+                    <div className="p-3 bg-gradient-to-br from-gray-50 to-blue-50/50 rounded-xl border border-blue-100/50 overflow-hidden">
                         <div className="flex items-center space-x-3">
                             <div className="p-2 bg-white rounded-lg shadow-sm shrink-0">
                                 <User className="h-4 w-4 text-blue-600" />
@@ -272,27 +262,8 @@ export function DashboardSidebar() {
                             </div>
                         </div>
                     </div>
-                )}
-
-                <Button
-                    variant="ghost"
-                    className={cn(
-                        "w-full text-red-600 hover:text-red-700 hover:bg-red-50 group",
-                        sidebarOpen ? "justify-start" : "justify-center px-0",
-                    )}
-                    onClick={handleSignOut}
-                    title={!sidebarOpen ? "ออกจากระบบ" : undefined}
-                >
-                    <div className="p-2 bg-red-50 rounded-lg group-hover:bg-red-100 transition-colors shrink-0">
-                        <LogOut className="h-4 w-4" />
-                    </div>
-                    {sidebarOpen && (
-                        <span className="ml-3 font-medium whitespace-nowrap">
-                            ออกจากระบบ
-                        </span>
-                    )}
-                </Button>
-            </div>
+                </div>
+            )}
         </div>
     );
 }
