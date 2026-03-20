@@ -4,6 +4,13 @@ import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog";
+import {
     Plus,
     Loader2,
     Thermometer,
@@ -23,6 +30,7 @@ export function EmployeeLeaveDashboard() {
     const { quotas, history, metadata, isLoading, mutate, cancelLeave } =
         useLeaveProfile(page);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [cancelConfirmId, setCancelConfirmId] = useState<string | null>(null);
 
     const getQuota = (type: "SICK" | "PERSONAL" | "VACATION") => {
         return (
@@ -82,7 +90,7 @@ export function EmployeeLeaveDashboard() {
                                     ลาป่วย (Sick Leave)
                                 </p>
                                 <div className="flex items-baseline space-x-2">
-                                    <p className="text-3xl font-extrabold bg-gradient-to-r from-emerald-500 to-teal-600 bg-clip-text text-transparent tracking-tight">
+                                    <p className="tabular-nums text-3xl font-extrabold bg-gradient-to-r from-emerald-500 to-teal-600 bg-clip-text text-transparent tracking-tight">
                                         {Math.max(
                                             0,
                                             sickQuota.totalDays -
@@ -115,7 +123,7 @@ export function EmployeeLeaveDashboard() {
                                     ลากิจ (Personal Leave)
                                 </p>
                                 <div className="flex items-baseline space-x-2">
-                                    <p className="text-3xl font-extrabold bg-gradient-to-r from-blue-500 to-indigo-600 bg-clip-text text-transparent tracking-tight">
+                                    <p className="tabular-nums text-3xl font-extrabold bg-gradient-to-r from-blue-500 to-indigo-600 bg-clip-text text-transparent tracking-tight">
                                         {Math.max(
                                             0,
                                             personalQuota.totalDays -
@@ -148,7 +156,7 @@ export function EmployeeLeaveDashboard() {
                                     ลาพักร้อน (Vacation)
                                 </p>
                                 <div className="flex items-baseline space-x-2">
-                                    <p className="text-3xl font-extrabold bg-gradient-to-r from-amber-500 to-orange-600 bg-clip-text text-transparent tracking-tight">
+                                    <p className="tabular-nums text-3xl font-extrabold bg-gradient-to-r from-amber-500 to-orange-600 bg-clip-text text-transparent tracking-tight">
                                         {Math.max(
                                             0,
                                             vacationQuota.totalDays -
@@ -264,36 +272,11 @@ export function EmployeeLeaveDashboard() {
                                             <Button
                                                 variant="ghost"
                                                 size="sm"
+                                                aria-label="ยกเลิกคำขอลา"
                                                 className="h-6 w-6 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
                                                 title="ยกเลิกคำขอลา"
                                                 disabled={isSubmitting}
-                                                onClick={async () => {
-                                                    if (
-                                                        window.confirm(
-                                                            "คุณต้องการยกเลิกคำขอลานี้ใช่หรือไม่?",
-                                                        )
-                                                    ) {
-                                                        try {
-                                                            setIsSubmitting(
-                                                                true,
-                                                            );
-                                                            await cancelLeave(
-                                                                request.id,
-                                                            );
-                                                            toast.success(
-                                                                "ยกเลิกคำขอลาเรียบร้อยแล้ว",
-                                                            );
-                                                        } catch (_err) {
-                                                            toast.error(
-                                                                "เกิดข้อผิดพลาดในการยกเลิกคำขอลา",
-                                                            );
-                                                        } finally {
-                                                            setIsSubmitting(
-                                                                false,
-                                                            );
-                                                        }
-                                                    }
-                                                }}
+                                                onClick={() => setCancelConfirmId(request.id)}
                                             >
                                                 <X className="h-4 w-4" />
                                             </Button>
@@ -334,6 +317,52 @@ export function EmployeeLeaveDashboard() {
                     </Card>
                 )}
             </div>
+
+            {/* Leave Cancel Confirmation Dialog */}
+            <Dialog
+                open={cancelConfirmId !== null}
+                onOpenChange={(open) => { if (!open) setCancelConfirmId(null); }}
+            >
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>ยืนยันการยกเลิกคำขอลา</DialogTitle>
+                        <DialogDescription>
+                            คุณต้องการยกเลิกคำขอลานี้ใช่หรือไม่?
+                            การดำเนินการนี้ไม่สามารถย้อนกลับได้
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="flex justify-end gap-2 pt-2">
+                        <Button
+                            variant="outline"
+                            disabled={isSubmitting}
+                            onClick={() => setCancelConfirmId(null)}
+                        >
+                            ยกเลิก
+                        </Button>
+                        <Button
+                            disabled={isSubmitting}
+                            className="bg-red-600 hover:bg-red-700 focus:ring-red-500"
+                            onClick={async () => {
+                                const id = cancelConfirmId;
+                                if (id === null) return;
+                                try {
+                                    setIsSubmitting(true);
+                                    await cancelLeave(id);
+                                    toast.success("ยกเลิกคำขอลาเรียบร้อยแล้ว");
+                                } catch {
+                                    toast.error("เกิดข้อผิดพลาดในการยกเลิกคำขอลา");
+                                } finally {
+                                    setIsSubmitting(false);
+                                    setCancelConfirmId(null);
+                                }
+                            }}
+                        >
+                            {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                            ยืนยันการยกเลิก
+                        </Button>
+                    </div>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

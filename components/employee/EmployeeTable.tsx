@@ -132,7 +132,7 @@ export const EmployeeTable = memo(function EmployeeTable({
                                             onClick={() =>
                                                 onEditEmployee(employee)
                                             }
-                                            className="h-8 group relative overflow-hidden bg-emerald-50 text-emerald-600 hover:bg-emerald-100 hover:text-emerald-700 border-0 shadow-sm transition-all duration-300 rounded-lg px-3"
+                                            className="h-8 group relative overflow-hidden bg-emerald-50 text-emerald-600 hover:bg-emerald-100 hover:text-emerald-700 border-0 shadow-sm transition-[box-shadow,background-color] duration-300 rounded-lg px-3"
                                         >
                                             <div className="absolute inset-0 bg-gradient-to-r from-emerald-100/50 to-teal-100/50 opacity-0 group-hover:opacity-100 transition-opacity" />
                                             <span className="relative flex items-center gap-1.5 font-medium">

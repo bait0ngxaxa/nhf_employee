@@ -7,6 +7,16 @@ import { processOutbox } from "@/lib/services/outbox/processor";
 import { NextRequest } from "next/server";
 
 // Mock dependencies
+vi.mock("next/server", async (importOriginal) => {
+    const actual = await importOriginal<typeof import("next/server")>();
+    return {
+        ...actual,
+        after: vi.fn((callback) => {
+            callback();
+        }),
+    };
+});
+
 vi.mock("next-auth", () => ({
     getServerSession: vi.fn(),
 }));

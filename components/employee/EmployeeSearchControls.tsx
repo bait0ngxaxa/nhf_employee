@@ -41,7 +41,9 @@ const SearchInput = React.memo(function SearchInput({
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
             <Input
                 ref={inputRef}
+                id="employee-search"
                 type="text"
+                aria-label="ค้นหาพนักงาน"
                 placeholder="ค้นหาพนักงาน (ชื่อ, ชื่อเล่น, อีเมล, ตำแหน่ง, แผนก, สังกัด)"
                 value={localValue}
                 onChange={handleChange}
@@ -108,7 +110,7 @@ export function EmployeeSearchControls({
                     <Download className="h-4 w-4" />
                     <span>
                         {isExporting
-                            ? "กำลังเตรียม..."
+                            ? "กำลังเตรียม\u2026"
                             : `Export CSV (${totalEmployees} คน)`}
                     </span>
                 </Button>

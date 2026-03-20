@@ -117,7 +117,7 @@ export function SignupForm({
                     <form onSubmit={handleSubmit}>
                         <div className="flex flex-col gap-6">
                             {error && (
-                                <div className="text-sm text-red-600 bg-red-50 p-3 rounded-md">
+                                <div className="text-sm text-red-600 bg-red-50 p-3 rounded-md" role="alert" aria-live="polite">
                                     {error}
                                 </div>
                             )}
@@ -133,6 +133,8 @@ export function SignupForm({
                                     id="email"
                                     type="email"
                                     placeholder="example@thainhf.org"
+                                    autoComplete="email"
+                                    spellCheck={false}
                                     value={formData.email}
                                     onChange={(e) =>
                                         setFormData({
@@ -156,6 +158,7 @@ export function SignupForm({
                                     id="password"
                                     type="password"
                                     placeholder="กรอกรหัสผ่าน"
+                                    autoComplete="new-password"
                                     value={formData.password}
                                     onChange={(e) =>
                                         setFormData({
@@ -179,6 +182,7 @@ export function SignupForm({
                                     id="confirmPassword"
                                     type="password"
                                     placeholder="กรอกรหัสผ่านอีกครั้ง"
+                                    autoComplete="new-password"
                                     value={formData.confirmPassword}
                                     onChange={(e) =>
                                         setFormData({
@@ -193,10 +197,10 @@ export function SignupForm({
 
                             <Button
                                 type="submit"
-                                className="w-full rounded-xl bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white shadow-lg shadow-blue-500/25 transition-all duration-300 hover:scale-[1.02]"
+                                className="w-full rounded-xl bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white shadow-lg shadow-blue-500/25 transition-[transform,background-color,box-shadow] duration-300 motion-safe:hover:scale-[1.02]"
                                 disabled={isLoading}
                             >
-                                {isLoading ? "กำลังลงทะเบียน..." : "ลงทะเบียน"}
+                                {isLoading ? "กำลังลงทะเบียน…" : "ลงทะเบียน"}
                             </Button>
                         </div>
 

@@ -47,14 +47,12 @@ export function DashboardProvider({ children }: DashboardProviderProps) {
     const [sidebarOpen, setSidebarOpen] = useState(true);
     const [refreshTrigger, setRefreshTrigger] = useState(0);
 
-    // Sync selectedMenu when URL ?tab= changes (e.g. notification click)
+    // Sync selectedMenu when URL ?tab= changes (e.g. notification click or browser back/forward)
     useEffect(() => {
         const tabFromUrl = searchParams.get("tab");
-        if (tabFromUrl) {
-            startTransition(() => {
-                setSelectedMenu(tabFromUrl);
-            });
-        }
+        startTransition(() => {
+            setSelectedMenu(tabFromUrl || "dashboard");
+        });
     }, [searchParams]);
 
     const availableMenuItems = getAvailableMenuItems(isAdmin);
@@ -80,14 +78,9 @@ export function DashboardProvider({ children }: DashboardProviderProps) {
                 return;
             }
 
-            startTransition(() => {
-                setSelectedMenu(menuId);
-            });
-
-            // Navigate back to /dashboard if on a sub-route (e.g. /dashboard/notifications)
-            // or if URL has ?tab= param that needs clearing
-            if (pathname !== "/dashboard" || searchParams.has("tab")) {
-                router.replace("/dashboard", { scroll: false });
+            // Sync with URL to support browser history and bookmarks
+            if (pathname !== "/dashboard" || searchParams.get("tab") !== menuId) {
+                router.push(`/dashboard?tab=${menuId}`, { scroll: false });
             }
 
             if (window.innerWidth < 768) {

@@ -134,3 +134,22 @@ html {
     visibility: visible;
     opacity: 1;
 }
+
+/* Eliminate 300ms tap delay on mobile for buttons and links */
+button,
+a,
+[role="button"] {
+    touch-action: manipulation;
+}
+
+/* Respect user preference to reduce motion */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    ::before,
+    ::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
+}

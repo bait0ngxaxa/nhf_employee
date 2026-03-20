@@ -96,7 +96,7 @@ export default function CreateTicketForm({ isOpen, onClose, onTicketCreated }: C
   return (
     <>
       <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto overscroll-contain">
           <DialogHeader>
             <DialogTitle className="text-xl font-semibold">แจ้งปัญหาไอที</DialogTitle>
             <DialogDescription>
@@ -106,7 +106,7 @@ export default function CreateTicketForm({ isOpen, onClose, onTicketCreated }: C
           
           <form onSubmit={handleSubmit} className="space-y-4 mt-4">
             {error && (
-              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
+              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded" role="alert" aria-live="polite">
                 {error}
               </div>
             )}

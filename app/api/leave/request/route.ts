@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
@@ -179,10 +179,12 @@ export async function POST(req: Request) {
             return leaveRequest;
         });
 
-        // Fire-and-forget: process pending outbox notifications (sends email to manager)
-        processOutbox().catch((err) =>
-            console.error("Failed to process outbox in background:", err),
-        );
+        // Non-blocking operation: process pending outbox notifications (sends email to manager)
+        after(() => {
+            processOutbox().catch((err) =>
+                console.error("Failed to process outbox in background:", err),
+            );
+        });
 
         // Audit Logging
         await logLeaveEvent(

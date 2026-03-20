@@ -1,7 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { format } from "date-fns";
+
 
 import { Button } from "@/components/ui/button";
 import {
@@ -40,7 +40,8 @@ export function LeaveRequestForm({ onSuccess, onCancel }: Props) {
     const [errorMsg, setErrorMsg] = useState<string | null>(null);
     const [isMultiDay, setIsMultiDay] = useState(false);
 
-    const today = format(new Date(), "yyyy-MM-dd");
+    const now = new Date();
+    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 
     const form = useForm<LeaveRequestValues>({
         resolver: zodResolver(leaveRequestSchema),
@@ -54,22 +55,6 @@ export function LeaveRequestForm({ onSuccess, onCancel }: Props) {
     });
 
     const startDateValue = form.watch("startDate");
-
-    // Sync endDate = startDate when in single-day mode
-    useEffect(() => {
-        if (!isMultiDay) {
-            form.setValue("endDate", startDateValue);
-        }
-    }, [isMultiDay, startDateValue, form]);
-
-    // When switching to multi-day, force period to FULL_DAY
-    useEffect(() => {
-        if (isMultiDay) {
-            form.setValue("period", "FULL_DAY");
-        }
-    }, [isMultiDay, form]);
-
-
 
     async function onSubmit(data: LeaveRequestValues): Promise<void> {
         setIsSubmitting(true);
@@ -96,7 +81,7 @@ export function LeaveRequestForm({ onSuccess, onCancel }: Props) {
     return (
         <div className="bg-white/80 backdrop-blur-xl p-6 md:p-8 rounded-3xl border border-white/60 shadow-xl relative overflow-hidden">
             <div className="absolute -left-10 -bottom-10 w-40 h-40 rounded-full opacity-20 bg-indigo-400 blur-3xl pointer-events-none" />
-            
+
             <div className="relative z-10 mb-8 border-b border-gray-100 pb-4">
                 <h3 className="text-xl font-bold bg-gradient-to-r from-gray-900 to-gray-600 bg-clip-text text-transparent">
                     แบบฟอร์มยื่นใบลา
@@ -133,9 +118,15 @@ export function LeaveRequestForm({ onSuccess, onCancel }: Props) {
                                         </SelectTrigger>
                                     </FormControl>
                                     <SelectContent>
-                                        <SelectItem value="SICK">ลาป่วย</SelectItem>
-                                        <SelectItem value="PERSONAL">ลากิจ</SelectItem>
-                                        <SelectItem value="VACATION">ลาพักร้อน</SelectItem>
+                                        <SelectItem value="SICK">
+                                            ลาป่วย
+                                        </SelectItem>
+                                        <SelectItem value="PERSONAL">
+                                            ลากิจ
+                                        </SelectItem>
+                                        <SelectItem value="VACATION">
+                                            ลาพักร้อน
+                                        </SelectItem>
                                     </SelectContent>
                                 </Select>
                                 <FormMessage />
@@ -145,16 +136,25 @@ export function LeaveRequestForm({ onSuccess, onCancel }: Props) {
 
                     {/* Toggle วันเดียว / หลายวัน */}
                     <div className="space-y-1.5">
-                        <FormLabel className="text-sm font-medium">จำนวนวันลา</FormLabel>
+                        <FormLabel className="text-sm font-medium">
+                            จำนวนวันลา
+                        </FormLabel>
                         <div className="grid grid-cols-2 gap-2 p-1 bg-gray-100 rounded-lg">
                             <button
                                 type="button"
-                                onClick={() => setIsMultiDay(false)}
+                                onClick={() => {
+                                    setIsMultiDay(false);
+                                    form.setValue(
+                                        "endDate",
+                                        form.getValues("startDate"),
+                                    );
+                                }}
                                 className={`
-                                    py-2 text-sm font-medium rounded-md transition-all duration-200
-                                    ${!isMultiDay
-                                        ? "bg-white text-indigo-700 shadow-sm"
-                                        : "text-gray-500 hover:text-gray-700"
+                                    py-2 text-sm font-medium rounded-md transition-colors duration-200
+                                    ${
+                                        !isMultiDay
+                                            ? "bg-white text-indigo-700 shadow-sm"
+                                            : "text-gray-500 hover:text-gray-700"
                                     }
                                 `}
                             >
@@ -162,12 +162,16 @@ export function LeaveRequestForm({ onSuccess, onCancel }: Props) {
                             </button>
                             <button
                                 type="button"
-                                onClick={() => setIsMultiDay(true)}
+                                onClick={() => {
+                                    setIsMultiDay(true);
+                                    form.setValue("period", "FULL_DAY");
+                                }}
                                 className={`
-                                    py-2 text-sm font-medium rounded-md transition-all duration-200
-                                    ${isMultiDay
-                                        ? "bg-white text-indigo-700 shadow-sm"
-                                        : "text-gray-500 hover:text-gray-700"
+                                    py-2 text-sm font-medium rounded-md transition-colors duration-200
+                                    ${
+                                        isMultiDay
+                                            ? "bg-white text-indigo-700 shadow-sm"
+                                            : "text-gray-500 hover:text-gray-700"
                                     }
                                 `}
                             >
@@ -177,15 +181,33 @@ export function LeaveRequestForm({ onSuccess, onCancel }: Props) {
                     </div>
 
                     {/* Date Fields */}
-                    <div className={`grid gap-4 ${isMultiDay ? "grid-cols-2" : "grid-cols-1"}`}>
+                    <div
+                        className={`grid gap-4 ${isMultiDay ? "grid-cols-2" : "grid-cols-1"}`}
+                    >
                         <FormField
                             control={form.control}
                             name="startDate"
                             render={({ field }) => (
                                 <FormItem>
-                                    <FormLabel>{isMultiDay ? "วันที่เริ่มต้น" : "วันที่ลา"}</FormLabel>
+                                    <FormLabel>
+                                        {isMultiDay
+                                            ? "วันที่เริ่มต้น"
+                                            : "วันที่ลา"}
+                                    </FormLabel>
                                     <FormControl>
-                                        <Input type="date" {...field} />
+                                        <Input
+                                            type="date"
+                                            {...field}
+                                            onChange={(e) => {
+                                                field.onChange(e);
+                                                if (!isMultiDay) {
+                                                    form.setValue(
+                                                        "endDate",
+                                                        e.target.value,
+                                                    );
+                                                }
+                                            }}
+                                        />
                                     </FormControl>
                                     <FormMessage />
                                 </FormItem>
@@ -231,9 +253,15 @@ export function LeaveRequestForm({ onSuccess, onCancel }: Props) {
                                             </SelectTrigger>
                                         </FormControl>
                                         <SelectContent>
-                                            <SelectItem value="FULL_DAY">เต็มวัน</SelectItem>
-                                            <SelectItem value="MORNING">ครึ่งวันเช้า</SelectItem>
-                                            <SelectItem value="AFTERNOON">ครึ่งวันบ่าย</SelectItem>
+                                            <SelectItem value="FULL_DAY">
+                                                เต็มวัน
+                                            </SelectItem>
+                                            <SelectItem value="MORNING">
+                                                ครึ่งวันเช้า
+                                            </SelectItem>
+                                            <SelectItem value="AFTERNOON">
+                                                ครึ่งวันบ่าย
+                                            </SelectItem>
                                         </SelectContent>
                                     </Select>
                                     <FormMessage />
@@ -250,7 +278,7 @@ export function LeaveRequestForm({ onSuccess, onCancel }: Props) {
                                 <FormLabel>เหตุผลการลา</FormLabel>
                                 <FormControl>
                                     <Textarea
-                                        placeholder="ระบุเหตุผลการลาของคุณ..."
+                                        placeholder="ระบุเหตุผลการลาของคุณ…"
                                         className="resize-none"
                                         rows={3}
                                         {...field}
@@ -276,8 +304,8 @@ export function LeaveRequestForm({ onSuccess, onCancel }: Props) {
                         >
                             {isSubmitting ? (
                                 <>
-                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                    กำลังบันทึก...
+                                    <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                                    กำลังบันทึก…
                                 </>
                             ) : (
                                 "ส่งใบลา"

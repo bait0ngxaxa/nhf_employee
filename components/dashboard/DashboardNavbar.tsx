@@ -11,6 +11,15 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogDescription,
+    DialogFooter,
+} from "@/components/ui/dialog";
+import { useState } from "react";
+import {
     useDashboardUIContext,
     useDashboardDataContext,
 } from "@/components/dashboard/context/dashboard/DashboardContext";
@@ -20,6 +29,12 @@ export function DashboardNavbar() {
     const { sidebarOpen, setSidebarOpen, handleSignOut } =
         useDashboardUIContext();
     const { user } = useDashboardDataContext();
+    const [showLogoutDialog, setShowLogoutDialog] = useState(false);
+
+    const confirmLogout = () => {
+        setShowLogoutDialog(false);
+        handleSignOut();
+    };
 
     return (
         <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-sm border-b border-gray-200/50 shadow-sm">
@@ -30,6 +45,7 @@ export function DashboardNavbar() {
                         variant="ghost"
                         size="icon"
                         className="md:hidden h-9 w-9"
+                        aria-label="เปิดเมนู"
                         onClick={() => setSidebarOpen(!sidebarOpen)}
                     >
                         <Menu className="h-5 w-5" />
@@ -85,7 +101,7 @@ export function DashboardNavbar() {
                             </div>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem
-                                onClick={handleSignOut}
+                                onClick={() => setShowLogoutDialog(true)}
                                 className="text-red-600 focus:text-red-600 focus:bg-red-50"
                             >
                                 <LogOut className="h-4 w-4 mr-2" />
@@ -99,14 +115,40 @@ export function DashboardNavbar() {
                         variant="ghost"
                         size="icon"
                         className="sm:hidden h-9 w-9"
-                        onClick={handleSignOut}
+                        aria-label="ออกจากระบบ"
+                        onClick={() => setShowLogoutDialog(true)}
                     >
                         <LogOut className="h-5 w-5 text-red-500" />
                     </Button>
                 </div>
             </div>
 
-            {/* Mobile page title row removed to avoid redundancy */}
+            {/* Logout Confirmation Dialog */}
+            <Dialog open={showLogoutDialog} onOpenChange={setShowLogoutDialog}>
+                <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>ยืนยันการออกจากระบบ</DialogTitle>
+                        <DialogDescription>
+                            คุณแน่ใจหรือไม่ว่าต้องการออกจากระบบบัญชีของคุณ?
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter className="flex gap-2 sm:justify-end">
+                        <Button
+                            variant="outline"
+                            onClick={() => setShowLogoutDialog(false)}
+                        >
+                            ยกเลิก
+                        </Button>
+                        <Button
+                            variant="destructive"
+                            onClick={confirmLogout}
+                            className="bg-red-600 hover:bg-red-700 text-white shadow-md shadow-red-500/20"
+                        >
+                            ออกจากระบบ
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </header>
     );
 }

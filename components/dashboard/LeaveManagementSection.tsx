@@ -78,7 +78,7 @@ export function LeaveManagementSection({ defaultTab = "my-leave" }: LeaveManagem
 
                         <TabsContent
                             value="my-leave"
-                            className="mt-0 outline-none"
+                            className="mt-0 focus-visible:outline-none"
                         >
                             <EmployeeLeaveDashboard />
                         </TabsContent>
@@ -86,7 +86,7 @@ export function LeaveManagementSection({ defaultTab = "my-leave" }: LeaveManagem
                         {showApprovalTab && (
                             <TabsContent
                                 value="approvals"
-                                className="mt-0 outline-none"
+                                className="mt-0 focus-visible:outline-none"
                             >
                                 <ManagerApprovalDashboard />
                             </TabsContent>
@@ -95,7 +95,7 @@ export function LeaveManagementSection({ defaultTab = "my-leave" }: LeaveManagem
                         {isAdmin && (
                             <TabsContent
                                 value="approver-settings"
-                                className="mt-0 outline-none"
+                                className="mt-0 focus-visible:outline-none"
                             >
                                 <ApproverManagement />
                             </TabsContent>

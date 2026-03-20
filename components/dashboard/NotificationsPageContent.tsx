@@ -232,7 +232,7 @@ export function NotificationsSection() {
                                 <Card
                                     key={notification.id}
                                     className={cn(
-                                        "rounded-2xl cursor-pointer transition-all duration-200 hover:shadow-md",
+                                        "rounded-2xl cursor-pointer transition-[box-shadow,border-color,opacity] duration-200 hover:shadow-md",
                                         notification.isRead
                                             ? "bg-white/70 border-gray-100 opacity-75"
                                             : "bg-white border-blue-100 shadow-sm",

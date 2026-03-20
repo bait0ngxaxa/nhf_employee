@@ -41,7 +41,7 @@ export const TicketTabs = memo(function TicketTabs() {
                 <TabsList className="flex h-auto max-w-full overflow-x-auto flex-nowrap md:grid md:w-full md:max-w-md md:grid-cols-2 bg-gray-100 p-1.5 rounded-[2rem] shadow-inner gap-1 hide-scrollbar">
                     <TabsTrigger
                         value="tickets"
-                        className="flex-1 flex items-center justify-center gap-2 rounded-full px-6 py-2.5 data-[state=active]:bg-white data-[state=active]:text-indigo-600 data-[state=active]:shadow-sm transition-all text-gray-600 hover:text-gray-900 font-medium whitespace-nowrap"
+                        className="flex-1 flex items-center justify-center gap-2 rounded-full px-6 py-2.5 data-[state=active]:bg-white data-[state=active]:text-indigo-600 data-[state=active]:shadow-sm transition-[color,background-color,box-shadow] text-gray-600 hover:text-gray-900 font-medium whitespace-nowrap"
                     >
                         <List className="h-4 w-4 shrink-0" />
                         <span>รายการ Tickets</span>
@@ -49,7 +49,7 @@ export const TicketTabs = memo(function TicketTabs() {
                     {selectedTicket && (
                         <TabsTrigger
                             value="detail"
-                            className="flex-1 flex items-center justify-center gap-2 rounded-full px-6 py-2.5 data-[state=active]:bg-white data-[state=active]:text-indigo-600 data-[state=active]:shadow-sm transition-all text-gray-600 hover:text-gray-900 font-medium whitespace-nowrap"
+                            className="flex-1 flex items-center justify-center gap-2 rounded-full px-6 py-2.5 data-[state=active]:bg-white data-[state=active]:text-indigo-600 data-[state=active]:shadow-sm transition-[color,background-color,box-shadow] text-gray-600 hover:text-gray-900 font-medium whitespace-nowrap"
                         >
                             <TicketIcon className="h-4 w-4 shrink-0" />
                             <span>รายละเอียด</span>
@@ -58,7 +58,7 @@ export const TicketTabs = memo(function TicketTabs() {
                 </TabsList>
             </div>
 
-            <TabsContent value="tickets" className="mt-0 outline-none">
+            <TabsContent value="tickets" className="mt-0 focus-visible:outline-none">
                 <Card className="border-0 shadow-lg shadow-gray-200/50 overflow-hidden bg-white/95 rounded-2xl ring-1 ring-gray-200">
                     <CardHeader className="border-b border-gray-100 bg-gray-50/50 px-6 py-5">
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -72,7 +72,7 @@ export const TicketTabs = memo(function TicketTabs() {
                             </div>
                             <Button
                                 onClick={() => setShowCreateModal(true)}
-                                className="flex items-center gap-2 focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white shadow-md shadow-indigo-500/25 transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5"
+                                className="flex items-center gap-2 focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white shadow-md shadow-indigo-500/25 transition-[transform,background-color,box-shadow] duration-300 hover:shadow-lg motion-safe:hover:-translate-y-0.5"
                             >
                                 <PlusIcon className="h-4 w-4" />
                                 แจ้งปัญหาใหม่
@@ -89,7 +89,7 @@ export const TicketTabs = memo(function TicketTabs() {
             </TabsContent>
 
             {selectedTicket && (
-                <TabsContent value="detail" className="mt-0 outline-none">
+                <TabsContent value="detail" className="mt-0 focus-visible:outline-none">
                     <div className="bg-white/95 rounded-2xl shadow-lg ring-1 ring-gray-200 p-1">
                         <TicketDetail
                             ticketId={selectedTicket?.id ?? 0}

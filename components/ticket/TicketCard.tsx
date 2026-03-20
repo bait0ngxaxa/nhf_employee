@@ -34,8 +34,8 @@ export function TicketCard({
         <div
             className={`
                 group relative overflow-hidden rounded-xl p-5 cursor-pointer
-                transition-all duration-200 ease-out
-                hover:shadow-xl hover:-translate-y-0.5
+                transition-[box-shadow,transform,border-color] duration-200 ease-out
+                hover:shadow-xl motion-safe:hover:-translate-y-0.5
                 bg-white border-2 border-gray-200 shadow-md
                 hover:border-gray-300
                 ${

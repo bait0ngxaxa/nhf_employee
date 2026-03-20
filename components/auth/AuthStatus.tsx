@@ -43,7 +43,7 @@ export function AuthStatus() {
     return (
         <div className="flex items-center space-x-4">
             <Link href="/login">
-                <Button className="flex items-center space-x-2 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white shadow-lg shadow-blue-500/25 transition-all duration-300 hover:scale-[1.02]">
+                <Button className="flex items-center space-x-2 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white shadow-lg shadow-blue-500/25 transition-[transform,background-color,box-shadow] duration-300 motion-safe:hover:scale-[1.02]">
                     <User className="h-4 w-4" />
                     <span>เข้าสู่ระบบ</span>
                 </Button>

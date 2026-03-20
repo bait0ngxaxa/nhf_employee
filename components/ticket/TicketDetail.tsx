@@ -241,14 +241,14 @@ export default function TicketDetail({
                             <h3 className="font-medium mb-3">จัดการ Ticket</h3>
                             <div className="flex gap-4 items-end">
                                 <div className="flex-1">
-                                    <label className="text-sm font-medium">
+                                    <label htmlFor="ticket-status-select" className="text-sm font-medium">
                                         สถานะ
                                     </label>
                                     <Select
                                         value={statusUpdate}
                                         onValueChange={setStatusUpdate}
                                     >
-                                        <SelectTrigger>
+                                        <SelectTrigger id="ticket-status-select">
                                             <SelectValue />
                                         </SelectTrigger>
                                         <SelectContent>
@@ -271,7 +271,7 @@ export default function TicketDetail({
                                     }
                                 >
                                     {updateLoading
-                                        ? "กำลังอัปเดต..."
+                                        ? "กำลังอัปเดต…"
                                         : "อัปเดตสถานะ"}
                                 </Button>
                             </div>
@@ -315,8 +315,7 @@ export default function TicketDetail({
                             </h3>
                             <div className="space-y-3">
                                 <Textarea
-                                    placeholder="แสดงความคิดเห็นหรือให้ข้อมูลเพิ่มเติม..."
-                                    value={newComment}
+                                    placeholder="แสดงความคิดเห็นหรือให้ข้อมูลเพิ่มเติม…"
                                     onChange={(e) =>
                                         setNewComment(e.target.value)
                                     }
@@ -331,7 +330,7 @@ export default function TicketDetail({
                                 >
                                     <Send className="h-4 w-4" />
                                     {commentLoading
-                                        ? "กำลังส่ง..."
+                                        ? "กำลังส่ง…"
                                         : "ส่งความคิดเห็น"}
                                 </Button>
                             </div>

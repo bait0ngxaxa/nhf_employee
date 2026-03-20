@@ -90,7 +90,7 @@ function EmployeeManagementContent() {
                             </Button>
                             <Button
                                 onClick={() => handleMenuClick("add-employee")}
-                                className="flex items-center space-x-2 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white shadow-md shadow-indigo-500/25 transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 rounded-xl"
+                                className="flex items-center space-x-2 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white shadow-md shadow-indigo-500/25 transition-[transform,background-color,box-shadow] duration-300 hover:shadow-lg motion-safe:hover:-translate-y-0.5 rounded-xl"
                             >
                                 <Plus className="h-4 w-4" />
                                 <span>เพิ่มพนักงาน</span>

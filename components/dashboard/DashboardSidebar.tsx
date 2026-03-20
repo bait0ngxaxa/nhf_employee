@@ -58,6 +58,7 @@ export function DashboardSidebar() {
                         variant="ghost"
                         size="sm"
                         onClick={onToggle}
+                        aria-label={sidebarOpen ? "ปิด Sidebar" : "เปิด Sidebar"}
                         className={cn(!sidebarOpen && "h-10 w-10 p-0")}
                     >
                         {sidebarOpen ? (
@@ -99,7 +100,7 @@ export function DashboardSidebar() {
                             !sidebarOpen && "justify-center px-0 border-r-0",
                         )}
                         style={{
-                            transition: "all 200ms ease-out",
+                            transition: "transform 200ms ease-out, background-color 200ms ease-out",
                         }}
                         onClick={() => handleMenuClick("dashboard")}
                     >

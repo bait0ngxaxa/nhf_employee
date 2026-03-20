@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
 import { Toaster } from "sonner";
@@ -18,14 +18,25 @@ export const metadata: Metadata = {
         "ระบบบริหารจัดการทรัพยากรบุคคลและไอที NHF (NHF IT Management System)",
 };
 
+export const viewport: Viewport = {
+    themeColor: "#ffffff",
+};
+
 export default function RootLayout({
     children,
 }: Readonly<{
     children: React.ReactNode;
 }>) {
     return (
-        <html lang="en" suppressHydrationWarning>
+        <html lang="th" suppressHydrationWarning>
             <body className={`${googleSans.variable} antialiased`}>
+                {/* Skip-to-content for keyboard/screen reader users */}
+                <a
+                    href="#main"
+                    className="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-[9999] focus:rounded-lg focus:bg-white focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-indigo-600 focus:shadow-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                >
+                    ข้ามไปเนื้อหาหลัก
+                </a>
                 <SessionProvider>
                     <SWRProvider>
                         {children}

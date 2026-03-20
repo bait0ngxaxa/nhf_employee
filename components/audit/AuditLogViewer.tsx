@@ -136,8 +136,10 @@ export function AuditLogViewer({ className }: AuditLogViewerProps) {
                     <div className="relative flex-1 min-w-[200px]">
                         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
                         <Input
+                            id="audit-search"
                             type="text"
-                            placeholder="ค้นหาผู้ใช้, อีเมล..."
+                            aria-label="ค้นหาในบันทึกการใช้งาน"
+                            placeholder="ค้นหาผู้ใช้, อีเมล…"
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                             className="pl-10"

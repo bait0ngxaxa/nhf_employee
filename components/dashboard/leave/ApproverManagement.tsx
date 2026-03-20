@@ -193,7 +193,7 @@ export function ApproverManagement() {
                         <div className="relative flex-1">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                             <Input
-                                placeholder="ค้นหาชื่อ อีเมล หรือแผนก..."
+                                placeholder="ค้นหาชื่อ อีเมล หรือแผนก…"
                                 value={search}
                                 onChange={(e) => setSearch(e.target.value)}
                                 className="pl-9"
@@ -306,7 +306,8 @@ function EmployeeRow({ emp, managerId, hasChange, allEmployees, onAssign }: {
             <select
                 value={managerId ? String(managerId) : NO_APPROVER_VALUE}
                 onChange={(e) => onAssign(emp.id, e.target.value)}
-                className="w-full sm:w-[240px] h-9 rounded-md border border-gray-200 bg-white px-3 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                className="w-full sm:w-[240px] h-9 rounded-md border border-gray-200 bg-white px-3 text-sm text-gray-700 focus-visible:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                aria-label={`เลือกผู้อนุมัติสำหรับ ${formatName(emp)}`}
             >
                 <option value={NO_APPROVER_VALUE}>— ไม่ระบุ —</option>
                 {allEmployees

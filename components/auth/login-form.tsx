@@ -95,7 +95,7 @@ export function LoginForm({
                     <form onSubmit={handleSubmit}>
                         <div className="flex flex-col gap-6">
                             {error && (
-                                <div className="text-sm text-red-600 bg-red-50 p-3 rounded-md">
+                                <div className="text-sm text-red-600 bg-red-50 p-3 rounded-md" role="alert" aria-live="polite">
                                     {error}
                                 </div>
                             )}
@@ -111,6 +111,8 @@ export function LoginForm({
                                     id="email"
                                     type="email"
                                     placeholder="m@example.com"
+                                    autoComplete="email"
+                                    spellCheck={false}
                                     value={formData.email}
                                     onChange={(e) =>
                                         setFormData({
@@ -140,6 +142,7 @@ export function LoginForm({
                                 <Input
                                     id="password"
                                     type="password"
+                                    autoComplete="current-password"
                                     value={formData.password}
                                     onChange={(e) =>
                                         setFormData({
@@ -154,11 +157,11 @@ export function LoginForm({
                             <div className="flex flex-col gap-3">
                                 <Button
                                     type="submit"
-                                    className="w-full rounded-xl bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white shadow-lg shadow-blue-500/25 transition-all duration-300 hover:scale-[1.02]"
+                                    className="w-full rounded-xl bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white shadow-lg shadow-blue-500/25 transition-[transform,background-color,box-shadow] duration-300 motion-safe:hover:scale-[1.02]"
                                     disabled={isLoading}
                                 >
                                     {isLoading
-                                        ? "กำลังเข้าสู่ระบบ..."
+                                        ? "กำลังเข้าสู่ระบบ…"
                                         : "เข้าสู่ระบบ"}
                                 </Button>
                             </div>

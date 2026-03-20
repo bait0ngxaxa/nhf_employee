@@ -47,11 +47,13 @@ export function TicketFiltersCard({
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
                     {/* Search */}
                     <div className="space-y-2">
-                        <label className="text-sm font-medium">ค้นหา</label>
+                        <label htmlFor="ticket-search" className="text-sm font-medium">ค้นหา</label>
                         <div className="relative">
                             <Search className="absolute left-2 top-2.5 h-4 w-4 text-gray-500" />
                             <Input
-                                placeholder="ค้นหาหัวข้อหรือรายละเอียด"
+                                id="ticket-search"
+                                aria-label="ค้นหา ticket"
+                                placeholder="ค้นหาหัวข้อหรือรายละเอียด…"
                                 value={filters.search}
                                 onChange={(e) =>
                                     onFiltersChange((prev) => ({
