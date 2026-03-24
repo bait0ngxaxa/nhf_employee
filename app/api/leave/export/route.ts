@@ -1,12 +1,11 @@
-import { NextResponse, type NextRequest } from "next/server";
+﻿import { NextResponse, type NextRequest } from "next/server";
+import { getApiAuthSession } from "@/lib/server-auth";
 import { prisma } from "@/lib/prisma";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
 import { getEmployeeIdFromUserId } from "@/lib/services/leave/get-employee-id";
 
 export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions);
+        const session = await getApiAuthSession();
         if (!session?.user?.id) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
@@ -19,12 +18,12 @@ export async function GET(req: NextRequest) {
         const managerId = await getEmployeeIdFromUserId(userId);
         if (!managerId) {
             return NextResponse.json(
-                { error: "ไม่พบข้อมูลพนักงานที่เชื่อมกับบัญชีนี้" },
+                { error: "Operation failed" },
                 { status: 404 }
             );
         }
 
-        // Parse year filter from query — default to current year
+// NOTE: normalized to remove mojibake
         const url = new URL(req.url);
         const yearParam = url.searchParams.get("year");
         const yearsOnly = url.searchParams.get("yearsOnly") === "1";
@@ -45,7 +44,7 @@ export async function GET(req: NextRequest) {
         }
 
         if (isNaN(year) || year < 2000 || year > 2100) {
-            return NextResponse.json({ error: "ปีไม่ถูกต้อง" }, { status: 400 });
+            return NextResponse.json({ error: "Operation failed" }, { status: 400 });
         }
 
         // Date range for the selected year (in UTC-friendly way)
@@ -82,8 +81,9 @@ export async function GET(req: NextRequest) {
     } catch (error) {
         console.error("Leave export error:", error);
         return NextResponse.json(
-            { error: "เกิดข้อผิดพลาดในการดึงข้อมูล" },
+            { error: "Operation failed" },
             { status: 500 }
         );
     }
 }
+

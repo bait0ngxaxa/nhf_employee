@@ -2,13 +2,13 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { GET as getNotifications } from "@/app/api/notifications/route";
 import { PATCH as markAsRead } from "@/app/api/notifications/[id]/read/route";
 import { POST as markAllAsRead } from "@/app/api/notifications/mark-all-read/route";
-import { getServerSession } from "next-auth";
+import { getApiAuthSession } from "@/lib/server-auth";
 import { prisma } from "@/lib/prisma";
 import { NextRequest } from "next/server";
 
-// Mock next-auth
-vi.mock("next-auth", () => ({
-    getServerSession: vi.fn(),
+// Mock auth resolver
+vi.mock("@/lib/server-auth", () => ({
+    getApiAuthSession: vi.fn(),
 }));
 
 // Mock prisma
@@ -32,7 +32,7 @@ describe("Notification API Routes", () => {
 
     describe("GET /api/notifications", () => {
         it("should return unauthorized if no session exists", async () => {
-            (getServerSession as any).mockResolvedValue(null);
+            (getApiAuthSession as any).mockResolvedValue(null);
             const req = new NextRequest("http://localhost/api/notifications");
             const res = await getNotifications(req);
             
@@ -42,7 +42,7 @@ describe("Notification API Routes", () => {
         });
 
         it("should return notifications and unread count for authenticated user", async () => {
-            (getServerSession as any).mockResolvedValue({ user: mockUser });
+            (getApiAuthSession as any).mockResolvedValue({ user: mockUser });
             
             const mockNotifications = [
                 { id: "1", title: "Test 1", message: "Msg 1", isRead: false, createdAt: new Date() },
@@ -70,7 +70,7 @@ describe("Notification API Routes", () => {
 
     describe("PATCH /api/notifications/[id]/read", () => {
         it("should mark a single notification as read", async () => {
-            (getServerSession as any).mockResolvedValue({ user: mockUser });
+            (getApiAuthSession as any).mockResolvedValue({ user: mockUser });
             
             const mockNotificationId = "notif-123";
             const params = Promise.resolve({ id: mockNotificationId });
@@ -94,7 +94,7 @@ describe("Notification API Routes", () => {
         });
 
         it("should return unauthorized for patch without session", async () => {
-            (getServerSession as any).mockResolvedValue(null);
+            (getApiAuthSession as any).mockResolvedValue(null);
             const params = Promise.resolve({ id: "123" });
             const req = new NextRequest("http://localhost/api/notifications/123/read", { method: "PATCH" });
             
@@ -105,7 +105,7 @@ describe("Notification API Routes", () => {
 
     describe("POST /api/notifications/mark-all-read", () => {
         it("should mark all user's notifications as read", async () => {
-            (getServerSession as any).mockResolvedValue({ user: mockUser });
+            (getApiAuthSession as any).mockResolvedValue({ user: mockUser });
             (prisma.notification.updateMany as any).mockResolvedValue({ count: 5 });
 
             const req = new NextRequest("http://localhost/api/notifications/mark-all-read", {

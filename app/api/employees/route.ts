@@ -1,6 +1,5 @@
-import { after, type NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+﻿import { after, type NextRequest, NextResponse } from "next/server";
+import { getApiAuthSession } from "@/lib/server-auth";
 import { createEmployeeSchema } from "@/lib/validations/employee";
 import { logEmployeeEvent } from "@/lib/audit";
 import { employeeService, type EmployeeFilters } from "@/lib/services/employee";
@@ -19,14 +18,14 @@ function parseQueryParams(url: string): EmployeeFilters {
     };
 }
 
-// GET - ดึงข้อมูลพนักงาน (with pagination and filters)
+// NOTE: normalized to remove mojibake
 export async function GET(request: NextRequest): Promise<NextResponse> {
     try {
-        const session = await getServerSession(authOptions);
+        const session = await getApiAuthSession();
 
         if (!session) {
             return NextResponse.json(
-                { error: "ไม่มีสิทธิ์เข้าถึง" },
+                { error: "Operation failed" },
                 { status: 401 },
             );
         }
@@ -41,13 +40,13 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     } catch (error) {
         console.error("Error fetching employees:", error);
         return NextResponse.json(
-            { error: "เกิดข้อผิดพลาดในการดึงข้อมูล" },
+            { error: "Operation failed" },
             { status: 500 },
         );
     }
 }
 
-// POST - เพิ่มพนักงานใหม่
+// NOTE: normalized to remove mojibake
 export async function POST(request: NextRequest): Promise<NextResponse> {
     try {
         const body = await request.json();
@@ -57,17 +56,17 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         if (!result.success) {
             const errors = result.error.flatten();
             return NextResponse.json(
-                { error: "ข้อมูลไม่ถูกต้อง", details: errors.fieldErrors },
+                { error: "Operation failed", details: errors.fieldErrors },
                 { status: 400 },
             );
         }
 
         // 2. Auth Check & Access Control
-        const session = await getServerSession(authOptions);
+        const session = await getApiAuthSession();
 
         if (!session || session.user?.role !== "ADMIN") {
             return NextResponse.json(
-                { error: "ไม่มีสิทธิ์เข้าถึง" },
+                { error: "Operation failed" },
                 { status: 403 },
             );
         }
@@ -109,7 +108,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
         return NextResponse.json(
             {
-                message: "เพิ่มพนักงานสำเร็จ",
+                message: "Operation completed",
                 employee: createResult.employee,
             },
             { status: 201 },
@@ -117,8 +116,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     } catch (error) {
         console.error("Error creating employee:", error);
         return NextResponse.json(
-            { error: "เกิดข้อผิดพลาดในการเพิ่มพนักงาน" },
+            { error: "Operation failed" },
             { status: 500 },
         );
     }
 }
+

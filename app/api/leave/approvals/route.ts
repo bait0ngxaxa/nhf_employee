@@ -1,12 +1,11 @@
-import { NextResponse } from "next/server";
+﻿import { NextResponse } from "next/server";
+import { getApiAuthSession } from "@/lib/server-auth";
 import { prisma } from "@/lib/prisma";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
 import { getEmployeeIdFromUserId } from "@/lib/services/leave/get-employee-id";
 
 export async function GET() {
     try {
-        const session = await getServerSession(authOptions);
+        const session = await getApiAuthSession();
         if (!session?.user?.id) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
@@ -18,7 +17,7 @@ export async function GET() {
 
         const managerId = await getEmployeeIdFromUserId(userId);
         if (!managerId) {
-            return NextResponse.json({ error: "ไม่พบข้อมูลพนักงานที่เชื่อมกับบัญชีนี้" }, { status: 404 });
+            return NextResponse.json({ error: "Operation failed" }, { status: 404 });
         }
         // Find leaves where the employee's direct manager is this user, OR this user is specifically the assigned approver
         // Since we save approverId directly in LeaveRequest, we just look for that.
@@ -85,3 +84,4 @@ export async function GET() {
         );
     }
 }
+

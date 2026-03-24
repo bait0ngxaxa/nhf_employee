@@ -21,6 +21,7 @@ import {
     type DashboardDataContextValue,
     type DashboardUIContextValue,
 } from "./types";
+import { logoutHybridSession } from "@/lib/client-auth";
 
 interface DashboardProviderProps {
     children: ReactNode;
@@ -46,6 +47,7 @@ export function DashboardProvider({ children }: DashboardProviderProps) {
     const [selectedMenu, setSelectedMenu] = useState<string>(initialTab);
     const [sidebarOpen, setSidebarOpen] = useState(true);
     const [refreshTrigger, setRefreshTrigger] = useState(0);
+    const [hybridBootstrapped, setHybridBootstrapped] = useState(false);
 
     // Sync selectedMenu when URL ?tab= changes (e.g. notification click or browser back/forward)
     useEffect(() => {
@@ -54,6 +56,23 @@ export function DashboardProvider({ children }: DashboardProviderProps) {
             setSelectedMenu(tabFromUrl || "dashboard");
         });
     }, [searchParams]);
+
+    useEffect(() => {
+        if (status !== "authenticated" || hybridBootstrapped) {
+            return;
+        }
+
+        void (async () => {
+            try {
+                await fetch("/api/auth/bootstrap", {
+                    method: "POST",
+                    credentials: "include",
+                });
+            } finally {
+                setHybridBootstrapped(true);
+            }
+        })();
+    }, [status, hybridBootstrapped]);
 
     const availableMenuItems = getAvailableMenuItems(isAdmin);
 
@@ -91,7 +110,10 @@ export function DashboardProvider({ children }: DashboardProviderProps) {
     );
 
     const handleSignOut = useCallback(() => {
-        signOut({ callbackUrl: "/login" });
+        void (async () => {
+            await logoutHybridSession();
+            await signOut({ callbackUrl: "/login" });
+        })();
     }, []);
 
     const dataValue = useMemo<DashboardDataContextValue>(

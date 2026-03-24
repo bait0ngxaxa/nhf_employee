@@ -1,13 +1,12 @@
-import { NextResponse } from "next/server";
+﻿import { NextResponse } from "next/server";
+import { getApiAuthSession } from "@/lib/server-auth";
 import { prisma } from "@/lib/prisma";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
 import { ALL_LEAVE_TYPES, DEFAULT_LEAVE_QUOTAS } from "@/constants/leave";
 import { getEmployeeIdFromUserId } from "@/lib/services/leave/get-employee-id";
 
 export async function GET(req: Request) {
     try {
-        const session = await getServerSession(authOptions);
+        const session = await getApiAuthSession();
         if (!session?.user?.id) {
             return NextResponse.json(
                 { error: "Unauthorized" },
@@ -26,7 +25,7 @@ export async function GET(req: Request) {
         const employeeId = await getEmployeeIdFromUserId(userId);
         if (!employeeId) {
             return NextResponse.json(
-                { error: "ไม่พบข้อมูลพนักงานที่เชื่อมกับบัญชีนี้" },
+                { error: "Operation failed" },
                 { status: 404 },
             );
         }
@@ -112,3 +111,4 @@ export async function GET(req: Request) {
         );
     }
 }
+

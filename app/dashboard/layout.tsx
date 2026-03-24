@@ -1,16 +1,15 @@
 import { Suspense } from "react";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { DashboardProvider } from "@/components/dashboard/context";
 import { DashboardLayoutClient } from "@/components/dashboard/DashboardLayoutClient";
+import { getApiAuthSession } from "@/lib/server-auth";
 
 export default async function DashboardLayout({
     children,
 }: {
     children: React.ReactNode;
 }) {
-    const session = await getServerSession(authOptions);
+    const session = await getApiAuthSession();
 
     if (!session) {
         redirect("/login");

@@ -1,7 +1,6 @@
-import { NextResponse } from "next/server";
+﻿import { NextResponse } from "next/server";
+import { getApiAuthSession } from "@/lib/server-auth";
 import { prisma } from "@/lib/prisma";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
 import { z } from "zod";
 
 const bulkAssignSchema = z.object({
@@ -14,16 +13,16 @@ const bulkAssignSchema = z.object({
 });
 
 /**
- * GET — Fetch all active employees for admin approver management
+ * GET โ€” Fetch all active employees for admin approver management
  */
 export async function GET() {
     try {
-        const session = await getServerSession(authOptions);
+        const session = await getApiAuthSession();
         if (!session || session.user?.role !== "ADMIN") {
             return NextResponse.json({ error: "Forbidden" }, { status: 403 });
         }
 
-        // Single query — frontend derives candidates from the same list
+// NOTE: normalized to remove mojibake
         const employees = await prisma.employee.findMany({
             where: { status: "ACTIVE" },
             select: {
@@ -50,11 +49,11 @@ export async function GET() {
 }
 
 /**
- * PUT — Bulk-assign managerId for multiple employees
+ * PUT โ€” Bulk-assign managerId for multiple employees
  */
 export async function PUT(req: Request) {
     try {
-        const session = await getServerSession(authOptions);
+        const session = await getApiAuthSession();
         if (!session || session.user?.role !== "ADMIN") {
             return NextResponse.json({ error: "Forbidden" }, { status: 403 });
         }
@@ -75,7 +74,7 @@ export async function PUT(req: Request) {
         const selfAssign = assignments.find(a => a.employeeId === a.managerId);
         if (selfAssign) {
             return NextResponse.json(
-                { error: `ไม่สามารถกำหนดตัวเองเป็นผู้อนุมัติได้ (Employee ID: ${selfAssign.employeeId})` },
+                { error: "Operation failed" },
                 { status: 400 }
             );
         }
@@ -92,7 +91,7 @@ export async function PUT(req: Request) {
 
         return NextResponse.json({
             success: true,
-            message: `อัปเดตผู้อนุมัติสำเร็จ ${assignments.length} รายการ`,
+            message: "Operation completed",
         });
     } catch (error) {
         console.error("Error updating approvers:", error);
@@ -102,3 +101,4 @@ export async function PUT(req: Request) {
         );
     }
 }
+

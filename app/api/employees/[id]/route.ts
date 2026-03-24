@@ -1,6 +1,5 @@
 import { after, type NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { getApiAuthSession } from "@/lib/server-auth";
 import { updateEmployeeSchema } from "@/lib/validations/employee";
 import { logEmployeeEvent } from "@/lib/audit";
 import { employeeService } from "@/lib/services/employee";
@@ -56,7 +55,7 @@ export async function PATCH(
         }
 
         // 2. Auth Check & Access Control
-        const session = await getServerSession(authOptions);
+        const session = await getApiAuthSession();
 
         if (!session || session.user?.role !== "ADMIN") {
             return NextResponse.json(
@@ -121,7 +120,7 @@ export async function DELETE(
     { params }: { params: Promise<{ id: string }> },
 ): Promise<NextResponse> {
     try {
-        const session = await getServerSession(authOptions);
+        const session = await getApiAuthSession();
 
         if (!session || session.user?.role !== "ADMIN") {
             return NextResponse.json(

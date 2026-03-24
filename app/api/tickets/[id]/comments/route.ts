@@ -1,7 +1,6 @@
 import { after, type NextRequest, NextResponse } from "next/server";
+import { getApiAuthSession } from "@/lib/server-auth";
 import { prisma } from "@/lib/prisma";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
 
 /**
  * Build in-app notification data based on who commented.
@@ -82,7 +81,7 @@ export async function POST(
         }
 
         // 2. Auth Check
-        const session = await getServerSession(authOptions);
+        const session = await getApiAuthSession();
 
         if (!session) {
             return NextResponse.json(

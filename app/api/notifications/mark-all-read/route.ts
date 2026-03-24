@@ -1,11 +1,10 @@
-import { type NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+﻿import { type NextRequest, NextResponse } from "next/server";
+import { getApiAuthSession } from "@/lib/server-auth";
 import { prisma } from "@/lib/prisma";
 
 export async function POST(_req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions);
+        const session = await getApiAuthSession();
         if (!session?.user?.id) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
@@ -32,3 +31,4 @@ export async function POST(_req: NextRequest) {
         return NextResponse.json({ error: "Failed to mark all notifications as read" }, { status: 500 });
     }
 }
+

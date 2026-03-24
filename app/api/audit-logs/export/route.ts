@@ -1,15 +1,14 @@
-import { after, type NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+﻿import { after, type NextRequest, NextResponse } from "next/server";
+import { getApiAuthSession } from "@/lib/server-auth";
 import { logDataExport } from "@/lib/audit";
 
 export async function POST(request: NextRequest) {
     try {
-        const session = await getServerSession(authOptions);
+        const session = await getApiAuthSession();
 
         if (!session) {
             return NextResponse.json(
-                { error: "ไม่มีสิทธิ์เข้าถึง" },
+                { error: "Operation failed" },
                 { status: 403 }
             );
         }
@@ -36,8 +35,9 @@ export async function POST(request: NextRequest) {
     } catch (error) {
         console.error("Error logging data export:", error);
         return NextResponse.json(
-            { error: "เกิดข้อผิดพลาดในการบันทึก" },
+            { error: "Operation failed" },
             { status: 500 }
         );
     }
 }
+

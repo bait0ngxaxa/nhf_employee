@@ -1,14 +1,13 @@
-import { NextResponse } from 'next/server';
+﻿import { NextResponse } from 'next/server';
+import { getApiAuthSession } from "@/lib/server-auth";
 import { prisma } from '@/lib/prisma';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
 
 export async function GET() {
   try {
-    const session = await getServerSession(authOptions);
+    const session = await getApiAuthSession();
     
     if (!session) {
-      return NextResponse.json({ error: 'ไม่มีสิทธิ์เข้าถึง' }, { status: 403 });
+      return NextResponse.json({ error: "Operation failed" }, { status: 403 });
     }
 
     const departments = await prisma.department.findMany({
@@ -20,6 +19,6 @@ export async function GET() {
     return NextResponse.json({ departments }, { status: 200 });
   } catch (error) {
     console.error('Error fetching departments:', error);
-    return NextResponse.json({ error: 'เกิดข้อผิดพลาดในการดึงข้อมูล' }, { status: 500 });
+    return NextResponse.json({ error: "Operation failed" }, { status: 500 });
   }
 }

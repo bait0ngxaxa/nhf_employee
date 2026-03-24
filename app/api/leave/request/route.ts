@@ -1,7 +1,6 @@
-import { NextResponse, after } from "next/server";
+﻿import { NextResponse, after } from "next/server";
+import { getApiAuthSession } from "@/lib/server-auth";
 import { prisma } from "@/lib/prisma";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
 import { leaveRequestSchema } from "@/lib/validations/leave";
 import { DEFAULT_LEAVE_QUOTAS } from "@/constants/leave";
 import { getEmployeeIdFromUserId } from "@/lib/services/leave/get-employee-id";
@@ -11,7 +10,7 @@ import { getWorkingDays } from "@/lib/services/leave/utils";
 
 export async function POST(req: Request) {
     try {
-        const session = await getServerSession(authOptions);
+        const session = await getApiAuthSession();
         if (!session?.user?.id) {
             return NextResponse.json(
                 { error: "Unauthorized" },
@@ -30,7 +29,7 @@ export async function POST(req: Request) {
         const employeeId = await getEmployeeIdFromUserId(userId);
         if (!employeeId) {
             return NextResponse.json(
-                { error: "ไม่พบข้อมูลพนักงานที่เชื่อมกับบัญชีนี้" },
+                { error: "Operation failed" },
                 { status: 404 },
             );
         }
@@ -51,7 +50,7 @@ export async function POST(req: Request) {
         // Server-side enforcement: half-day period must be the same day
         if (period !== "FULL_DAY" && startDate !== endDate) {
             return NextResponse.json(
-                { error: "ครึ่งวันสามารถลาได้เฉพาะวันเดียวเท่านั้น" },
+                { error: "Operation failed" },
                 { status: 400 },
             );
         }
@@ -66,7 +65,7 @@ export async function POST(req: Request) {
         if (period !== "FULL_DAY") {
             if (diffDays === 0) {
                  return NextResponse.json(
-                    { error: "ไม่สามารถขอลาในวันหยุดสุดสัปดาห์ได้" },
+                    { error: "Operation failed" },
                     { status: 400 },
                 );
             }
@@ -74,7 +73,7 @@ export async function POST(req: Request) {
         } else {
              if (diffDays === 0) {
                 return NextResponse.json(
-                    { error: "ช่วงเวลาที่เลือกเป็นวันหยุดสุดสัปดาห์ทั้งหมด" },
+                    { error: "Operation failed" },
                     { status: 400 },
                 );
             }
@@ -96,9 +95,7 @@ export async function POST(req: Request) {
 
             // 2. Validate that employee has a manager to approve
             if (!employee.managerId) {
-                throw new Error(
-                    "ไม่พบหัวหน้างานในระบบ กรุณาติดต่อแอดมินเพื่อตั้งค่าผู้อนุมัติ",
-                );
+                throw new Error("No manager is configured for this employee");
             }
 
             // 3. Check for overlapping requests
@@ -114,7 +111,7 @@ export async function POST(req: Request) {
             });
 
             if (overlappingRequests) {
-                throw new Error("คุณมีคำขอลาในช่วงเวลานี้ที่กำลังรออนุมัติหรืออนุมัติแล้ว");
+                throw new Error("Operation failed");
             }
 
             // 4. Fetch or Create Quota
@@ -140,7 +137,7 @@ export async function POST(req: Request) {
             const availableQuota = quota.totalDays - quota.usedDays;
             if (durationDays > availableQuota) {
                 throw new Error(
-                    `คุณมีโควตาวันลาคงเหลือเพียง ${availableQuota} วัน`,
+                    `Operation status`,
                 );
             }
 

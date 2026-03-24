@@ -63,6 +63,10 @@ export function LoginForm({
             if (result?.error) {
                 setError("อีเมลหรือรหัสผ่านไม่ถูกต้อง");
             } else if (result?.ok) {
+                await fetch("/api/auth/bootstrap", {
+                    method: "POST",
+                    credentials: "include",
+                });
                 toast.success("เข้าสู่ระบบสำเร็จ!", {
                     description: "ยินดีต้อนรับ! กำลังนำคุณไปยังหน้าแดชบอร์ด",
                 });

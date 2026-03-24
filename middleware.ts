@@ -1,51 +1,80 @@
-import { withAuth } from "next-auth/middleware";
-import { NextResponse } from "next/server";
+import { jwtVerify, type JWTPayload } from "jose";
+import { NextResponse, type NextRequest } from "next/server";
 
-export default withAuth(
-    function middleware(req) {
-        const { pathname } = req.nextUrl;
-        const token = req.nextauth.token;
+const HYBRID_ACCESS_COOKIE_NAME = "nhf_at";
+const PUBLIC_ROUTES = new Set([
+    "/",
+    "/login",
+    "/signup",
+    "/access-denied",
+    "/forgot-password",
+    "/reset-password",
+    "/leave/action",
+]);
 
-        // If user has session and tries to access login/signup, redirect to dashboard
-        // Root path (/) is accessible for everyone regardless of session status
-        if (token && (pathname === "/login" || pathname === "/signup")) {
-            return NextResponse.redirect(new URL("/dashboard", req.url));
-        }
+function getHybridSecretKey(): Uint8Array | null {
+    const secret =
+        process.env.AUTH_ACCESS_TOKEN_SECRET?.trim() ||
+        process.env.NEXTAUTH_SECRET?.trim();
+    if (!secret) {
+        return null;
+    }
+    return new TextEncoder().encode(secret);
+}
 
-        // Allow access for authenticated users (handled by 'authorized' callback below)
-        return NextResponse.next();
-    },
-    {
-        callbacks: {
-            authorized: ({ token, req }) => {
-                const { pathname } = req.nextUrl;
+function hasRequiredClaims(payload: JWTPayload): boolean {
+    if (typeof payload.sub !== "string" || payload.sub.length === 0) {
+        return false;
+    }
+    if (typeof payload.role !== "string" || payload.role.length === 0) {
+        return false;
+    }
+    if (typeof payload.sid !== "string" || payload.sid.length === 0) {
+        return false;
+    }
+    if (typeof payload.ver !== "number" || !Number.isInteger(payload.ver)) {
+        return false;
+    }
+    return true;
+}
 
-                // Public routes that don't require authentication
-                const publicRoutes = [
-                    "/",
-                    "/login",
-                    "/signup",
-                    "/access-denied",
-                    "/forgot-password",
-                    "/reset-password",
-                    "/leave/action",
-                ];
+async function hasValidHybridAccessToken(request: NextRequest): Promise<boolean> {
+    const token = request.cookies.get(HYBRID_ACCESS_COOKIE_NAME)?.value;
+    const secretKey = getHybridSecretKey();
+    if (!token || !secretKey) {
+        return false;
+    }
 
-                // Always allow access to public routes (including root path)
-                if (publicRoutes.includes(pathname)) {
-                    return true;
-                }
+    try {
+        const { payload } = await jwtVerify(token, secretKey, {
+            algorithms: ["HS256"],
+        });
+        return hasRequiredClaims(payload);
+    } catch {
+        return false;
+    }
+}
 
-                // For protected routes, require authentication
-                return !!token;
-            },
-        },
-    },
-);
+export default async function middleware(request: NextRequest): Promise<NextResponse> {
+    const { pathname } = request.nextUrl;
+    const isPublicRoute = PUBLIC_ROUTES.has(pathname);
+
+    const hasHybridSession = await hasValidHybridAccessToken(request);
+    const isAuthenticated = hasHybridSession;
+
+    if (isAuthenticated && (pathname === "/login" || pathname === "/signup")) {
+        return NextResponse.redirect(new URL("/dashboard", request.url));
+    }
+
+    if (!isPublicRoute && !isAuthenticated) {
+        return NextResponse.redirect(new URL("/login", request.url));
+    }
+
+    return NextResponse.next();
+}
 
 export const config = {
     matcher: [
-        // Match all routes except static files and API routes
         "/((?!api|_next/static|_next/image|favicon.ico).*)",
     ],
 };

@@ -1,16 +1,15 @@
-import { NextResponse } from "next/server";
+﻿import { NextResponse } from "next/server";
+import { getApiAuthSession } from "@/lib/server-auth";
 import { prisma } from "@/lib/prisma";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
 
-// GET - ดึงสถิติพนักงานทั้งหมด (ไม่มี pagination)
+// NOTE: normalized to remove mojibake
 export async function GET() {
     try {
-        const session = await getServerSession(authOptions);
+        const session = await getApiAuthSession();
 
         if (!session) {
             return NextResponse.json(
-                { error: "ไม่มีสิทธิ์เข้าถึง" },
+                { error: "Operation failed" },
                 { status: 401 },
             );
         }
@@ -48,8 +47,9 @@ export async function GET() {
     } catch (error) {
         console.error("Error fetching employee stats:", error);
         return NextResponse.json(
-            { error: "เกิดข้อผิดพลาดในการดึงข้อมูล" },
+            { error: "Operation failed" },
             { status: 500 },
         );
     }
 }
+

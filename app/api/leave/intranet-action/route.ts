@@ -1,14 +1,13 @@
-import { NextResponse } from "next/server";
+﻿import { NextResponse } from "next/server";
+import { getApiAuthSession } from "@/lib/server-auth";
 import { prisma } from "@/lib/prisma";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
 import { NotificationOutboxType } from "@prisma/client";
 import { getEmployeeIdFromUserId } from "@/lib/services/leave/get-employee-id";
 import { logLeaveEvent } from "@/lib/audit";
 
 export async function POST(req: Request) {
     try {
-        const session = await getServerSession(authOptions);
+        const session = await getApiAuthSession();
         if (!session?.user?.id) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
@@ -20,7 +19,7 @@ export async function POST(req: Request) {
 
         const managerId = await getEmployeeIdFromUserId(userId);
         if (!managerId) {
-            return NextResponse.json({ error: "ไม่พบข้อมูลพนักงานที่เชื่อมกับบัญชีนี้" }, { status: 404 });
+            return NextResponse.json({ error: "Operation failed" }, { status: 404 });
         }
 
         const { leaveId, action, reason } = await req.json();
@@ -71,7 +70,7 @@ export async function POST(req: Request) {
                 // Re-validate quota to prevent race condition
                 const remaining = quota.totalDays - quota.usedDays;
                 if (leaveRequest.durationDays > remaining) {
-                    throw new Error(`โควต้าวันลาไม่เพียงพอ (คงเหลือ ${remaining} วัน)`);
+                    throw new Error("Operation failed");
                 }
 
                 await tx.leaveQuota.update({
@@ -101,14 +100,14 @@ export async function POST(req: Request) {
             });
 
             if (employeeUser) {
-                const actionTextTh = action === "APPROVE" ? "อนุมัติ" : "ไม่อนุมัติ";
+                const actionTextTh = action === "APPROVE" ? "Approved" : "Rejected";
                 await tx.notification.create({
                     data: {
                         userId: employeeUser.id,
                         type: action === "APPROVE" ? "LEAVE_APPROVED" : "LEAVE_REJECTED",
-                        title: `ผลการพิจารณาคำร้องขอลา`,
-                        message: `คำร้องขอลาของคุณได้รับการพิจารณาแล้ว: **${actionTextTh}**${
-                            action === "REJECT" && reason ? ` (เหตุผล: ${reason})` : ""
+                        title: "Notification",
+                        message: `Your leave request was reviewed: **${actionTextTh}**${
+                            action === "REJECT" && reason ? ` (Reason: ${reason})` : ""
                         }`,
                         actionUrl: "/dashboard?tab=leave-management",
                         referenceId: leaveId,

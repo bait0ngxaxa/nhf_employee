@@ -1,7 +1,17 @@
 import type { SWRConfiguration } from "swr";
+import {
+    refreshHybridSession,
+    shouldAttemptHybridRefresh,
+} from "@/lib/client-auth";
 
 export const fetcher = async <T>(url: string): Promise<T> => {
-    const response = await fetch(url);
+    let response = await fetch(url, { credentials: "include" });
+    if (response.status === 401 && shouldAttemptHybridRefresh(url)) {
+        const refreshed = await refreshHybridSession();
+        if (refreshed) {
+            response = await fetch(url, { credentials: "include" });
+        }
+    }
 
     if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));

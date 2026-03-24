@@ -1,6 +1,5 @@
-import { type NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+﻿import { type NextRequest, NextResponse } from "next/server";
+import { getApiAuthSession } from "@/lib/server-auth";
 import { employeeService } from "@/lib/services/employee";
 
 // POST - Import employees from CSV
@@ -11,17 +10,17 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         // 1. Input Validation
         if (!employees || !Array.isArray(employees)) {
             return NextResponse.json(
-                { error: "ข้อมูลไม่ถูกต้อง" },
+                { error: "Operation failed" },
                 { status: 400 },
             );
         }
 
         // 2. Auth Check & Access Control
-        const session = await getServerSession(authOptions);
+        const session = await getApiAuthSession();
 
         if (!session || session.user?.role !== "ADMIN") {
             return NextResponse.json(
-                { error: "ไม่มีสิทธิ์เข้าถึง" },
+                { error: "Operation failed" },
                 { status: 403 },
             );
         }
@@ -30,9 +29,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
         return NextResponse.json(
             {
-                message: `นำเข้าข้อมูลสำเร็จ ${result.success.length} คน${
+                message: `Imported ${result.success.length} records successfully${
                     result.errors.length > 0
-                        ? `, มีข้อผิดพลาด ${result.errors.length} รายการ`
+                        ? `, with ${result.errors.length} failed records`
                         : ""
                 }`,
                 result,
@@ -42,7 +41,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     } catch (error) {
         console.error("Error importing employees:", error);
         return NextResponse.json(
-            { error: "เกิดข้อผิดพลาดในการนำเข้าข้อมูล" },
+            { error: "Operation failed" },
             { status: 500 },
         );
     }

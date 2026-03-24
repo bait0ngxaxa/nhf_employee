@@ -5,9 +5,14 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { User, LogOut } from "lucide-react";
 import Link from "next/link";
+import { logoutHybridSession } from "@/lib/client-auth";
 
 export function AuthStatus() {
     const { data: session, status } = useSession();
+    const handleSignOut = async (): Promise<void> => {
+        await logoutHybridSession();
+        await signOut();
+    };
 
     if (status === "loading") {
         return <Skeleton className="h-9 w-28 rounded-md" />;
@@ -28,7 +33,7 @@ export function AuthStatus() {
                     </div>
                 </div>
                 <Button
-                    onClick={() => signOut()}
+                    onClick={() => void handleSignOut()}
                     variant="outline"
                     size="sm"
                     className="flex items-center space-x-2"

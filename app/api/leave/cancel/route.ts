@@ -1,13 +1,12 @@
-import { NextResponse } from "next/server";
+﻿import { NextResponse } from "next/server";
+import { getApiAuthSession } from "@/lib/server-auth";
 import { prisma } from "@/lib/prisma";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
 import { getEmployeeIdFromUserId } from "@/lib/services/leave/get-employee-id";
 import { logLeaveEvent } from "@/lib/audit";
 
 export async function POST(req: Request) {
     try {
-        const session = await getServerSession(authOptions);
+        const session = await getApiAuthSession();
         if (!session?.user?.id) {
             return NextResponse.json(
                 { error: "Unauthorized" },
@@ -41,15 +40,15 @@ export async function POST(req: Request) {
             });
 
             if (!leaveRequest) {
-                throw new Error("ไม่พบข้อมูลการลา");
+                throw new Error("Operation failed");
             }
 
             if (leaveRequest.employeeId !== employeeId) {
-                throw new Error("ไม่มีสิทธิ์ยกเลิกการลานี้");
+                throw new Error("Operation failed");
             }
 
             if (leaveRequest.status !== "PENDING") {
-                throw new Error("สามารถยกเลิกได้เฉพาะรายการที่กำลังรออนุมัติเท่านั้น");
+                throw new Error("Operation failed");
             }
 
             // 2. Mark the leave as CANCELLED
@@ -83,3 +82,4 @@ export async function POST(req: Request) {
         );
     }
 }
+

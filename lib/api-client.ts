@@ -5,6 +5,11 @@
  * eliminating the need for boilerplate try/catch blocks in UI components.
  */
 
+import {
+    refreshHybridSession,
+    shouldAttemptHybridRefresh,
+} from "@/lib/client-auth";
+
 export type ApiResponse<T> =
     | { success: true; data: T; status: number }
     | { success: false; error: string; status?: number; details?: unknown };
@@ -47,6 +52,7 @@ export async function apiRequest<T>(
 
     const configWithData: RequestInit = {
         ...customConfig,
+        credentials: customConfig.credentials ?? "include",
         headers: reqHeaders,
     };
 
@@ -55,7 +61,13 @@ export async function apiRequest<T>(
     }
 
     try {
-        const response = await fetch(endpoint, configWithData);
+        let response = await fetch(endpoint, configWithData);
+        if (response.status === 401 && shouldAttemptHybridRefresh(endpoint)) {
+            const refreshed = await refreshHybridSession();
+            if (refreshed) {
+                response = await fetch(endpoint, configWithData);
+            }
+        }
         const responseData = await parseResponse(response);
 
         if (!response.ok) {

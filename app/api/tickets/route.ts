@@ -1,6 +1,5 @@
-import { after, type NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+﻿import { after, type NextRequest, NextResponse } from "next/server";
+import { getApiAuthSession } from "@/lib/server-auth";
 import { prisma } from "@/lib/prisma";
 import { createTicketSchema, ticketFiltersSchema } from "@/lib/validations/ticket";
 import { logTicketEvent } from "@/lib/audit";
@@ -29,7 +28,7 @@ function parseQueryParams(url: string):
             success: false,
             response: NextResponse.json(
                 {
-                    error: "ข้อมูลตัวกรองไม่ถูกต้อง",
+                    error: "Operation failed",
                     details: validation.error.flatten().fieldErrors,
                 },
                 { status: 400 },
@@ -43,7 +42,7 @@ function parseQueryParams(url: string):
 // GET - Retrieve tickets (filtered by role)
 export async function GET(request: NextRequest): Promise<NextResponse> {
     try {
-        const session = await getServerSession(authOptions);
+        const session = await getApiAuthSession();
 
         if (!session) {
             return NextResponse.json(
@@ -80,13 +79,13 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         if (!result.success) {
             const errors = result.error.flatten();
             return NextResponse.json(
-                { error: "ข้อมูลไม่ถูกต้อง", details: errors.fieldErrors },
+                { error: "Operation failed", details: errors.fieldErrors },
                 { status: 400 },
             );
         }
 
         // 2. Auth Check
-        const session = await getServerSession(authOptions);
+        const session = await getApiAuthSession();
 
         if (!session) {
             return NextResponse.json(
@@ -127,8 +126,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
                     data: admins.map((admin) => ({
                         userId: admin.id,
                         type: "TICKET_CREATED",
-                        title: "ผู้ใช้งานแจ้งปัญหาใหม่",
-                        message: `หัวข้อ: ${ticket.title}`,
+                        title: "Notification",
+                        message: "Operation completed",
                         actionUrl: `/dashboard?tab=it-support&ticketId=${ticket.id}`,
                         referenceId: ticket.id.toString(),
                     })),
@@ -145,4 +144,5 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         );
     }
 }
+
 

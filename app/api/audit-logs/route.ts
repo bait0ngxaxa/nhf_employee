@@ -1,6 +1,5 @@
-import { type NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+﻿import { type NextRequest, NextResponse } from "next/server";
+import { getApiAuthSession } from "@/lib/server-auth";
 import {
     auditLogService,
     type AuditLogFilters,
@@ -32,11 +31,11 @@ function parseQueryParams(url: string): AuditLogFilters {
 // GET - Retrieve audit logs (Admin only)
 export async function GET(request: NextRequest): Promise<NextResponse> {
     try {
-        const session = await getServerSession(authOptions);
+        const session = await getApiAuthSession();
 
         if (!session || session.user?.role !== "ADMIN") {
             return NextResponse.json(
-                { error: "ไม่มีสิทธิ์เข้าถึง" },
+                { error: "Operation failed" },
                 { status: 403 },
             );
         }
@@ -48,8 +47,9 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     } catch (error) {
         console.error("Error fetching audit logs:", error);
         return NextResponse.json(
-            { error: "เกิดข้อผิดพลาดในการดึงข้อมูล" },
+            { error: "Operation failed" },
             { status: 500 },
         );
     }
 }
+

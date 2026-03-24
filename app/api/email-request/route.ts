@@ -1,6 +1,5 @@
-import { type NextRequest, NextResponse, after } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+﻿import { type NextRequest, NextResponse, after } from "next/server";
+import { getApiAuthSession } from "@/lib/server-auth";
 import { createAuditLog } from "@/lib/audit";
 import { emailRequestSchema } from "@/lib/validations/email-request";
 import {
@@ -13,10 +12,10 @@ import { processOutbox } from "@/lib/services/outbox/processor";
 // POST - Create new email request
 export async function POST(req: NextRequest): Promise<NextResponse> {
     try {
-        const session = await getServerSession(authOptions);
+        const session = await getApiAuthSession();
         if (!session?.user) {
             return NextResponse.json(
-                { success: false, error: "กรุณาเข้าสู่ระบบ" },
+                { success: false, error: "Operation failed" },
                 { status: 401 },
             );
         }
@@ -25,7 +24,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
             return NextResponse.json(
                 {
                     success: false,
-                    error: `ไม่มีสิทธิ์เข้าถึง (Role: ${session.user.role})`,
+                    error: "Operation failed",
                 },
                 { status: 403 },
             );
@@ -86,7 +85,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
         return NextResponse.json({
             success: true,
-            message: "ส่งคำขออีเมลพนักงานใหม่เรียบร้อยแล้ว",
+            message: "Operation completed",
             data: {
                 id: result.emailRequest.id,
                 thaiName: validation.data.thaiName,
@@ -98,11 +97,11 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
             },
         });
     } catch (error) {
-        console.error("❌ Error processing email request:", error);
+        console.error("โ Error processing email request:", error);
         return NextResponse.json(
             {
                 success: false,
-                error: "เกิดข้อผิดพลาดในระบบ กรุณาลองใหม่ทีกครั้ง",
+                error: "Operation failed",
             },
             { status: 500 },
         );
@@ -112,10 +111,10 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 // GET - List email requests
 export async function GET(req: NextRequest): Promise<NextResponse> {
     try {
-        const session = await getServerSession(authOptions);
+        const session = await getApiAuthSession();
         if (!session?.user) {
             return NextResponse.json(
-                { success: false, error: "กรุณาเข้าสู่ระบบ" },
+                { success: false, error: "Operation failed" },
                 { status: 401 },
             );
         }
@@ -137,10 +136,11 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
             ...result,
         });
     } catch (error) {
-        console.error("❌ Error fetching email requests:", error);
+        console.error("โ Error fetching email requests:", error);
         return NextResponse.json(
-            { success: false, error: "เกิดข้อผิดพลาดในการโหลดข้อมูล" },
+            { success: false, error: "Operation failed" },
             { status: 500 },
         );
     }
 }
+
