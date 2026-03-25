@@ -16,6 +16,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Loader2, Save, Search, Users, AlertTriangle } from "lucide-react";
+import { API_ROUTES } from "@/lib/ssot/routes";
 
 interface EmployeeItem {
     id: number;
@@ -41,7 +42,7 @@ const formatName = (e: { firstName: string; lastName: string; nickname: string |
 
 export function ApproverManagement() {
     const { data, error: fetchError, isLoading, mutate } = useSWR<{ employees: EmployeeItem[] }>(
-        "/api/leave/approvers",
+        API_ROUTES.leave.approvers,
         fetcher,
         { revalidateOnFocus: false }
     );
@@ -82,7 +83,7 @@ export function ApproverManagement() {
                 managerId,
             }));
 
-            const res = await apiPut<{ message: string }>("/api/leave/approvers", { assignments: payload });
+            const res = await apiPut<{ message: string }>(API_ROUTES.leave.approvers, { assignments: payload });
             if (!res.success) throw new Error(res.error || "Save failed");
 
             setSaveMsg({ type: "ok", text: res.data.message });

@@ -1,46 +1,36 @@
 ﻿import { NextResponse } from "next/server";
-import { getApiAuthSession } from "@/lib/server-auth";
-import { prisma } from "@/lib/prisma";
+
 import { ALL_LEAVE_TYPES, DEFAULT_LEAVE_QUOTAS } from "@/constants/leave";
+import { prisma } from "@/lib/prisma";
 import { getEmployeeIdFromUserId } from "@/lib/services/leave/get-employee-id";
+import { getApiAuthSession } from "@/lib/server-auth";
+import { jsonError, unauthorized } from "@/lib/ssot/http";
+import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
 
 export async function GET(req: Request) {
     try {
         const session = await getApiAuthSession();
         if (!session?.user?.id) {
-            return NextResponse.json(
-                { error: "Unauthorized" },
-                { status: 401 },
-            );
+            return unauthorized();
         }
 
         const userId = Number(session.user.id);
-        if (isNaN(userId)) {
-            return NextResponse.json(
-                { error: "Invalid user ID" },
-                { status: 400 },
-            );
+        if (Number.isNaN(userId)) {
+            return jsonError(COMMON_API_MESSAGES.invalidUserId, 400);
         }
 
         const employeeId = await getEmployeeIdFromUserId(userId);
         if (!employeeId) {
-            return NextResponse.json(
-                { error: "Operation failed" },
-                { status: 404 },
-            );
+            return jsonError(COMMON_API_MESSAGES.operationFailed, 404);
         }
 
         const currentYear = new Date().getFullYear();
-
-        // Auto-create missing quotas for the current year
         const existingQuotas = await prisma.leaveQuota.findMany({
             where: { employeeId, year: currentYear },
         });
 
         const existingTypes = new Set(existingQuotas.map((q) => q.leaveType));
-        const missingTypes = ALL_LEAVE_TYPES.filter(
-            (t) => !existingTypes.has(t),
-        );
+        const missingTypes = ALL_LEAVE_TYPES.filter((type) => !existingTypes.has(type));
 
         if (missingTypes.length > 0) {
             await prisma.leaveQuota.createMany({
@@ -55,23 +45,18 @@ export async function GET(req: Request) {
             });
         }
 
-        // Re-fetch to get complete set (existing + newly created)
         const quotas =
             missingTypes.length > 0
-                ? await prisma.leaveQuota.findMany({
-                      where: { employeeId, year: currentYear },
-                  })
+                ? await prisma.leaveQuota.findMany({ where: { employeeId, year: currentYear } })
                 : existingQuotas;
 
-        // Pagination setup
         const url = new URL(req.url);
-        const page = parseInt(url.searchParams.get("page") || "1");
-        const limit = parseInt(url.searchParams.get("limit") || "10");
+        const page = parseInt(url.searchParams.get("page") || "1", 10);
+        const limit = parseInt(url.searchParams.get("limit") || "10", 10);
         const skip = (page - 1) * limit;
 
-        // Fetch Leave History with pagination
         const [history, totalCount] = await Promise.all([
-             prisma.leaveRequest.findMany({
+            prisma.leaveRequest.findMany({
                 where: { employeeId },
                 skip,
                 take: limit,
@@ -86,29 +71,21 @@ export async function GET(req: Request) {
                     },
                 },
             }),
-            prisma.leaveRequest.count({
-                 where: { employeeId }
-            })
+            prisma.leaveRequest.count({ where: { employeeId } }),
         ]);
 
-        const totalPages = Math.ceil(totalCount / limit);
-
-        return NextResponse.json({ 
-            quotas, 
-            history, 
+        return NextResponse.json({
+            quotas,
+            history,
             metadata: {
-                 currentPage: page,
-                 totalPages,
-                 totalItems: totalCount,
-                 itemsPerPage: limit
-            }
+                currentPage: page,
+                totalPages: Math.ceil(totalCount / limit),
+                totalItems: totalCount,
+                itemsPerPage: limit,
+            },
         });
     } catch (error) {
         console.error("Error fetching leave data:", error);
-        return NextResponse.json(
-            { error: "Failed to fetch leave data" },
-            { status: 500 },
-        );
+        return jsonError(COMMON_API_MESSAGES.failedToFetchLeaveData, 500);
     }
 }
-

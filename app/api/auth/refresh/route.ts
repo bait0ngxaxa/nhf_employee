@@ -1,5 +1,7 @@
-﻿import { type NextRequest, NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 
+import { AUTH_ERROR_MESSAGES, authRefreshUserSelect } from "@/lib/auth-ssot";
+import { withTrustedMutation } from "@/lib/auth-csrf";
 import { logAuthEvent } from "@/lib/audit";
 import {
     buildRefreshTokenRecord,
@@ -15,7 +17,7 @@ import {
 import { prisma } from "@/lib/prisma";
 
 function unauthorizedResponse(): NextResponse {
-    const response = NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const response = NextResponse.json({ error: AUTH_ERROR_MESSAGES.unauthorized }, { status: 401 });
     clearHybridAuthCookies(response);
     return response;
 }
@@ -46,7 +48,7 @@ async function logRefreshSecurityEvent(input: {
     });
 }
 
-export async function POST(request: NextRequest): Promise<NextResponse> {
+export const POST = withTrustedMutation(async (request: NextRequest): Promise<NextResponse> => {
     try {
         const metadata = getClientMetadata(request);
         const refreshToken = request.cookies.get(HYBRID_REFRESH_COOKIE_NAME)?.value;
@@ -59,7 +61,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
             where: { tokenHash },
             include: {
                 user: {
-                    select: { id: true, email: true, role: true, isActive: true },
+                    select: authRefreshUserSelect,
                 },
             },
         });
@@ -106,7 +108,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
             userId: existingToken.userId,
             role: existingToken.user.role,
             sessionId: existingToken.familyId,
-            tokenVersion: 1,
+            tokenVersion: existingToken.user.tokenVersion ?? 1,
         });
 
         await prisma.$transaction([
@@ -131,6 +133,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         setHybridAuthCookies(response, accessToken, nextToken.rawToken);
         return response;
     } catch {
-        return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+        return NextResponse.json({ error: AUTH_ERROR_MESSAGES.internalServerError }, { status: 500 });
     }
-}
+});

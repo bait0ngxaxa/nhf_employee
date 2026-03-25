@@ -4,6 +4,7 @@ import { useState, useCallback, useMemo, type ReactNode } from "react";
 import useSWR from "swr";
 import { toast } from "sonner";
 import { apiPost } from "@/lib/api-client";
+import { API_ROUTES } from "@/lib/ssot/routes";
 import { EmailRequestContext } from "./EmailRequestContext";
 import {
     type EmailRequest,
@@ -54,7 +55,7 @@ export function EmailRequestProvider({ children }: EmailRequestProviderProps) {
         emailRequests: EmailRequest[];
         pagination: Pagination;
         error?: string;
-    }>(`/api/email-request?page=${currentPage}&limit=10`);
+    }>(`${API_ROUTES.emailRequest.list}?page=${currentPage}&limit=10`);
 
     const { emailRequests, pagination, listError } = useMemo(() => {
         return {
@@ -88,7 +89,10 @@ export function EmailRequestProvider({ children }: EmailRequestProviderProps) {
             setFormError(null);
 
             try {
-                const response = await apiPost<{ success: boolean; error?: string }>("/api/email-request", formData);
+                const response = await apiPost<{ success: boolean; error?: string }>(
+                    API_ROUTES.emailRequest.list,
+                    formData,
+                );
 
                 if (response.success) {
                     setFormData(initialFormData);

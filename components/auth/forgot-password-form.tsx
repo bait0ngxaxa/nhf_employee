@@ -15,6 +15,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, Mail, CheckCircle2 } from "lucide-react";
 import { apiPost } from "@/lib/api-client";
+import { API_ROUTES, APP_ROUTES } from "@/lib/ssot/routes";
 
 export function ForgotPasswordForm({
     className,
@@ -31,7 +32,7 @@ export function ForgotPasswordForm({
         setIsLoading(true);
 
         try {
-            const result = await apiPost("/api/auth/forgot-password", { email });
+            const result = await apiPost(API_ROUTES.auth.forgotPassword, { email });
 
             if (!result.success) {
                 setError(result.error);
@@ -64,7 +65,7 @@ export function ForgotPasswordForm({
                                 ลิงก์จะหมดอายุภายใน 1 ชั่วโมง
                             </p>
                             <Link
-                                href="/login"
+                                href={APP_ROUTES.login}
                                 className="inline-flex items-center gap-2 text-sm text-blue-600 hover:text-blue-700 font-medium mt-2"
                             >
                                 <ArrowLeft className="h-4 w-4" />
@@ -133,7 +134,7 @@ export function ForgotPasswordForm({
 
                         <div className="mt-4 text-center">
                             <Link
-                                href="/login"
+                                href={APP_ROUTES.login}
                                 className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-blue-600 transition-colors"
                             >
                                 <ArrowLeft className="h-3 w-3" />

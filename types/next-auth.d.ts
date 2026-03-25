@@ -15,14 +15,16 @@ declare module "next-auth" {
     role: string
     department?: string
     isManager?: boolean
+    tokenVersion?: number
   }
 }
 
 declare module "next-auth/jwt" {
   interface JWT extends DefaultJWT {
-    id: string
-    role: string
+    id?: string
+    role?: string
     department?: string
     isManager?: boolean
+    tokenVersion?: number
   }
 }

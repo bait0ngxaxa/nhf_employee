@@ -1,0 +1,64 @@
+export const APP_ROUTES = {
+    home: "/",
+    login: "/login",
+    signup: "/signup",
+    dashboard: "/dashboard",
+    accessDenied: "/access-denied",
+    forgotPassword: "/forgot-password",
+    resetPassword: "/reset-password",
+} as const;
+
+export const APP_DASHBOARD_TABS = {
+    dashboard: "dashboard",
+    notifications: "notifications",
+    leaveManagement: "leave-management",
+    leaveHistory: "leave-history",
+    managerApproval: "manager-approval",
+    itSupport: "it-support",
+} as const;
+
+export function toDashboardTabPath(tab: string): string {
+    return `${APP_ROUTES.dashboard}?tab=${tab}`;
+}
+
+export const API_ROUTES = {
+    auth: {
+        bootstrap: "/api/auth/bootstrap",
+        forgotPassword: "/api/auth/forgot-password",
+        resetPassword: "/api/auth/reset-password",
+        signup: "/api/auth/signup",
+        refresh: "/api/auth/refresh",
+        logout: "/api/auth/logout",
+        logoutAll: "/api/auth/logout-all",
+        cleanup: "/api/auth/cleanup",
+    },
+    employees: {
+        list: "/api/employees",
+        stats: "/api/employees/stats",
+        import: "/api/employees/import",
+        departments: "/api/departments",
+        byId: (id: number | string): string => `/api/employees/${id}`,
+    },
+    tickets: {
+        list: "/api/tickets",
+        byId: (id: number | string): string => `/api/tickets/${id}`,
+    },
+    notifications: {
+        list: "/api/notifications",
+        all: "/api/notifications/all",
+        markAllRead: "/api/notifications/mark-all-read",
+        read: (id: string): string => `/api/notifications/${id}/read`,
+    },
+    leave: {
+        request: "/api/leave/request",
+        approvers: "/api/leave/approvers",
+        intranetAction: "/api/leave/intranet-action",
+        export: "/api/leave/export",
+    },
+    auditLogs: {
+        export: "/api/audit-logs/export",
+    },
+    emailRequest: {
+        list: "/api/email-request",
+    },
+} as const;

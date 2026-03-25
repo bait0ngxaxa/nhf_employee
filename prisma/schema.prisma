@@ -13,6 +13,7 @@ model User {
   name            String
   password        String
   role            String          @default("USER")
+  tokenVersion    Int             @default(1)
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @updatedAt
   employeeId      Int?            @unique

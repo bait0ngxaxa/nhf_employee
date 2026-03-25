@@ -1,5 +1,7 @@
 ﻿import { type NextRequest, NextResponse } from "next/server";
 import { getApiAuthSession } from "@/lib/server-auth";
+import { operationFailed } from "@/lib/ssot/http";
+import { isAdminRole } from "@/lib/ssot/permissions";
 import {
     auditLogService,
     type AuditLogFilters,
@@ -33,11 +35,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     try {
         const session = await getApiAuthSession();
 
-        if (!session || session.user?.role !== "ADMIN") {
-            return NextResponse.json(
-                { error: "Operation failed" },
-                { status: 403 },
-            );
+        if (!session || !isAdminRole(session.user?.role)) {
+            return operationFailed(403);
         }
 
         const filters = parseQueryParams(request.url);
@@ -46,10 +45,6 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         return NextResponse.json(result, { status: 200 });
     } catch (error) {
         console.error("Error fetching audit logs:", error);
-        return NextResponse.json(
-            { error: "Operation failed" },
-            { status: 500 },
-        );
+        return operationFailed(500);
     }
 }
-

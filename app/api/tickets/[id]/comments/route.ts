@@ -1,11 +1,12 @@
-import { after, type NextRequest, NextResponse } from "next/server";
-import { getApiAuthSession } from "@/lib/server-auth";
-import { prisma } from "@/lib/prisma";
+﻿import { after, type NextRequest, NextResponse } from "next/server";
 
-/**
- * Build in-app notification data based on who commented.
- * Runs inside after() so it doesn't block the response.
- */
+import { prisma } from "@/lib/prisma";
+import { getApiAuthSession } from "@/lib/server-auth";
+import { jsonError, unauthorized } from "@/lib/ssot/http";
+import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
+import { isAdminRole } from "@/lib/ssot/permissions";
+import { APP_ROUTES } from "@/lib/ssot/routes";
+
 async function notifyCommentParticipants(
     ticket: { id: number; title: string; reportedById: number; assignedToId: number | null },
     commentAuthorId: number,
@@ -13,7 +14,7 @@ async function notifyCommentParticipants(
     isAssigned: boolean,
     isOwner: boolean,
 ): Promise<void> {
-    const actionUrl = `/dashboard?tab=it-support&ticketId=${ticket.id}`;
+    const actionUrl = `${APP_ROUTES.dashboard}?tab=it-support&ticketId=${ticket.id}`;
     const referenceId = ticket.id.toString();
 
     if ((isAdmin || isAssigned) && ticket.reportedById !== commentAuthorId) {
@@ -21,8 +22,8 @@ async function notifyCommentParticipants(
             data: {
                 userId: ticket.reportedById,
                 type: "NEW_COMMENT",
-                title: "คุณมีข้อความใหม่",
-                message: `แอดมินหรือเจ้าหน้าที่ได้ตอบกลับปัญหา: ${ticket.title}`,
+                title: "New comment",
+                message: `A staff member replied on ticket: ${ticket.title}`,
                 actionUrl,
                 referenceId,
             },
@@ -37,102 +38,74 @@ async function notifyCommentParticipants(
             data: {
                 userId: ticket.assignedToId,
                 type: "NEW_COMMENT",
-                title: "ผู้แจ้งมีการตอบกลับ",
-                message: `มีข้อความใหม่ในปัญหา: ${ticket.title}`,
+                title: "Reporter replied",
+                message: `New comment on ticket: ${ticket.title}`,
                 actionUrl,
                 referenceId,
             },
         });
-    } else {
-        const admins = await prisma.user.findMany({
-            where: { role: "ADMIN" },
-            select: { id: true },
-        });
+        return;
+    }
 
-        if (admins.length > 0) {
-            await prisma.notification.createMany({
-                data: admins.map((admin) => ({
-                    userId: admin.id,
-                    type: "NEW_COMMENT" as const,
-                    title: "มีผู้แจ้งโต้ตอบกลับ",
-                    message: `มีข้อความใหม่ในปัญหา: ${ticket.title}`,
-                    actionUrl,
-                    referenceId,
-                })),
-            });
-        }
+    const admins = await prisma.user.findMany({
+        where: { role: "ADMIN" },
+        select: { id: true },
+    });
+
+    if (admins.length > 0) {
+        await prisma.notification.createMany({
+            data: admins.map((admin) => ({
+                userId: admin.id,
+                type: "NEW_COMMENT" as const,
+                title: "Reporter replied",
+                message: `New comment on ticket: ${ticket.title}`,
+                actionUrl,
+                referenceId,
+            })),
+        });
     }
 }
 
-// POST - Add comment to ticket
 export async function POST(
     request: NextRequest,
     { params }: { params: Promise<{ id: string }> },
-) {
+): Promise<NextResponse> {
     try {
         const { content } = await request.json();
 
-        // 1. Input Validation
         if (!content || content.trim() === "") {
-            return NextResponse.json(
-                { error: "Comment content is required" },
-                { status: 400 },
-            );
+            return jsonError(COMMON_API_MESSAGES.commentContentRequired, 400);
         }
 
-        // 2. Auth Check
         const session = await getApiAuthSession();
-
         if (!session) {
-            return NextResponse.json(
-                { error: "Unauthorized" },
-                { status: 401 },
-            );
+            return unauthorized();
         }
 
         const resolvedParams = await params;
-        const ticketId = parseInt(resolvedParams.id);
-
-        if (isNaN(ticketId)) {
-            return NextResponse.json(
-                { error: "Invalid ticket ID" },
-                { status: 400 },
-            );
+        const ticketId = parseInt(resolvedParams.id, 10);
+        if (Number.isNaN(ticketId)) {
+            return jsonError(COMMON_API_MESSAGES.invalidTicketId, 400);
         }
 
-        const currentUserId = parseInt(session.user.id);
-        if (isNaN(currentUserId)) {
-            return NextResponse.json(
-                { error: "Invalid user session" },
-                { status: 400 },
-            );
+        const currentUserId = parseInt(session.user.id, 10);
+        if (Number.isNaN(currentUserId)) {
+            return jsonError(COMMON_API_MESSAGES.invalidUserSession, 400);
         }
 
-        // Check if ticket exists
-        const ticket = await prisma.ticket.findUnique({
-            where: { id: ticketId },
-        });
-
+        const ticket = await prisma.ticket.findUnique({ where: { id: ticketId } });
         if (!ticket) {
-            return NextResponse.json(
-                { error: "Ticket not found" },
-                { status: 404 },
-            );
+            return jsonError(COMMON_API_MESSAGES.ticketNotFound, 404);
         }
 
-        // Check permissions
         const isOwner = ticket.reportedById === currentUserId;
-        const isAdmin = session.user?.role === "ADMIN";
+        const isAdmin = isAdminRole(session.user?.role);
         const isAssigned = ticket.assignedToId === currentUserId;
 
         if (!isOwner && !isAdmin && !isAssigned) {
-            return NextResponse.json(
-                { error: "Access denied" },
-                { status: 403 },
-            );
+            return jsonError(COMMON_API_MESSAGES.accessDenied, 403);
         }
 
-        // Create comment
         const comment = await prisma.ticketComment.create({
             data: {
                 content: content.trim(),
@@ -157,18 +130,15 @@ export async function POST(
             },
         });
 
-        // Dispatch in-app notifications after response (non-blocking)
         after(() => {
-            notifyCommentParticipants(ticket, currentUserId, isAdmin, isAssigned, isOwner)
-                .catch((err) => console.error("Comment notification failed:", err));
+            notifyCommentParticipants(ticket, currentUserId, isAdmin, isAssigned, isOwner).catch((err) =>
+                console.error("Comment notification failed:", err),
+            );
         });
 
         return NextResponse.json({ comment }, { status: 201 });
     } catch (error) {
         console.error("Error creating comment:", error);
-        return NextResponse.json(
-            { error: "Failed to create comment" },
-            { status: 500 },
-        );
+        return jsonError(COMMON_API_MESSAGES.failedToCreateComment, 500);
     }
 }

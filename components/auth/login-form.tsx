@@ -16,6 +16,8 @@ import { useState, useEffect } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
+import { AUTH_MUTATION_HEADERS } from "@/lib/auth-csrf";
+import { API_ROUTES, APP_ROUTES } from "@/lib/ssot/routes";
 
 // Type definitions for login
 interface LoginFormData {
@@ -44,7 +46,7 @@ export function LoginForm({
                 description: message,
             });
             // Clean URL
-            router.replace("/login");
+            router.replace(APP_ROUTES.login);
         }
     }, [searchParams, router]);
 
@@ -63,9 +65,10 @@ export function LoginForm({
             if (result?.error) {
                 setError("อีเมลหรือรหัสผ่านไม่ถูกต้อง");
             } else if (result?.ok) {
-                await fetch("/api/auth/bootstrap", {
+                await fetch(API_ROUTES.auth.bootstrap, {
                     method: "POST",
                     credentials: "include",
+                    headers: AUTH_MUTATION_HEADERS,
                 });
                 toast.success("เข้าสู่ระบบสำเร็จ!", {
                     description: "ยินดีต้อนรับ! กำลังนำคุณไปยังหน้าแดชบอร์ด",
@@ -74,7 +77,7 @@ export function LoginForm({
                 setFormData({ email: "", password: "" });
                 // Redirect to dashboard after a short delay
                 setTimeout(() => {
-                    router.push("/dashboard");
+                    router.push(APP_ROUTES.dashboard);
                 }, 1500);
             }
         } catch {
@@ -137,7 +140,7 @@ export function LoginForm({
                                         Password
                                     </Label>
                                     <Link
-                                        href="/forgot-password"
+                                        href={APP_ROUTES.forgotPassword}
                                         className="text-xs text-blue-600 hover:text-blue-700 hover:underline"
                                     >
                                         ลืมรหัสผ่าน?
@@ -173,7 +176,7 @@ export function LoginForm({
                         <div className="mt-4 text-center text-sm">
                             ยังไม่มีบัญชี?{" "}
                             <Link
-                                href="/signup"
+                                href={APP_ROUTES.signup}
                                 className="text-blue-600 hover:text-blue-700 font-medium"
                             >
                                 ลงทะเบียน

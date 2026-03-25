@@ -1,12 +1,26 @@
-"use client";
+﻿"use client";
 
 import { useState } from "react";
 import useSWR from "swr";
-import { Bell, Check, Loader2, AlertCircle, Info, MessageSquare, ExternalLink } from "lucide-react";
+import {
+    AlertCircle,
+    Bell,
+    Check,
+    ExternalLink,
+    Info,
+    Loader2,
+    MessageSquare,
+} from "lucide-react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { apiGet, apiPost, apiPatch } from "@/lib/api-client";
+
+import { apiGet, apiPatch, apiPost } from "@/lib/api-client";
 import { getRelativeTime } from "@/lib/helpers/date-helpers";
+import {
+    API_ROUTES,
+    APP_DASHBOARD_TABS,
+    toDashboardTabPath,
+} from "@/lib/ssot/routes";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -36,46 +50,53 @@ interface NotificationsData {
 
 const fetcher = async <T,>(url: string): Promise<T> => {
     const result = await apiGet<T>(url);
-    if (!result.success) throw new Error(result.error);
+    if (!result.success) {
+        throw new Error(result.error);
+    }
     return result.data;
 };
-
-
 
 export function NotificationDropdown() {
     const router = useRouter();
     const [open, setOpen] = useState(false);
 
-    // Poll every 10 seconds
-    const { data, error, isLoading, mutate } = useSWR<NotificationsData>("/api/notifications", fetcher, {
-        refreshInterval: 60_000,
-        revalidateOnFocus: false,
-        shouldRetryOnError: false,
-        dedupingInterval: 30_000,
-    });
+    const { data, error, isLoading, mutate } = useSWR<NotificationsData>(
+        API_ROUTES.notifications.list,
+        fetcher,
+        {
+            refreshInterval: 60_000,
+            revalidateOnFocus: false,
+            shouldRetryOnError: false,
+            dedupingInterval: 30_000,
+        },
+    );
 
-    const handleMarkAsRead = async (id: string, actionUrl: string | null) => {
+    const handleMarkAsRead = async (id: string, actionUrl: string | null): Promise<void> => {
         try {
-            await apiPatch(`/api/notifications/${id}/read`);
-            mutate(); // Optimistic update or refetch
-            
+            await apiPatch(API_ROUTES.notifications.read(id));
+            mutate();
+
             if (actionUrl) {
                 setOpen(false);
                 router.push(actionUrl);
             }
-        } catch (error) {
-            console.error("Failed to mark notification as read", error);
-            toast.error("เกิดข้อผิดพลาด", { description: "ไม่สามารถอัปเดตสถานะการอ่านได้" });
+        } catch (requestError) {
+            console.error("Failed to mark notification as read", requestError);
+            toast.error("เกิดข้อผิดพลาด", {
+                description: "ไม่สามารถอัปเดตสถานะการอ่านได้",
+            });
         }
     };
 
-    const handleMarkAllAsRead = async () => {
+    const handleMarkAllAsRead = async (): Promise<void> => {
         try {
-            await apiPost("/api/notifications/mark-all-read");
+            await apiPost(API_ROUTES.notifications.markAllRead);
             mutate();
-        } catch (error) {
-            console.error("Failed to mark all as read", error);
-            toast.error("เกิดข้อผิดพลาด", { description: "ไม่สามารถอัปเดตสถานะการอ่านได้" });
+        } catch (requestError) {
+            console.error("Failed to mark all as read", requestError);
+            toast.error("เกิดข้อผิดพลาด", {
+                description: "ไม่สามารถอัปเดตสถานะการอ่านได้",
+            });
         }
     };
 
@@ -108,14 +129,19 @@ export function NotificationDropdown() {
                     )}
                 </Button>
             </DropdownMenuTrigger>
-            
-            <DropdownMenuContent align="end" className="w-80 p-0 overflow-hidden shadow-2xl rounded-2xl border-gray-100">
+
+            <DropdownMenuContent
+                align="end"
+                className="w-80 p-0 overflow-hidden shadow-2xl rounded-2xl border-gray-100"
+            >
                 <div className="flex items-center justify-between px-4 py-3 bg-gray-50/80 border-b border-gray-100">
-                    <DropdownMenuLabel className="p-0 font-bold text-gray-900">แจ้งเตือน</DropdownMenuLabel>
+                    <DropdownMenuLabel className="p-0 font-bold text-gray-900">
+                        แจ้งเตือน
+                    </DropdownMenuLabel>
                     {data && data.unreadCount > 0 && (
-                        <Button 
-                            variant="ghost" 
-                            size="sm" 
+                        <Button
+                            variant="ghost"
+                            size="sm"
                             onClick={handleMarkAllAsRead}
                             className="h-8 text-xs text-blue-600 hover:text-blue-700 hover:bg-blue-50"
                         >
@@ -124,16 +150,14 @@ export function NotificationDropdown() {
                         </Button>
                     )}
                 </div>
-                
+
                 <div className="max-h-[350px] overflow-y-auto">
                     {isLoading ? (
                         <div className="flex justify-center items-center py-8 text-gray-400">
                             <Loader2 className="h-6 w-6 animate-spin" />
                         </div>
                     ) : error ? (
-                        <div className="py-8 text-center text-sm text-red-500">
-                            โหลดข้อมูลล้มเหลว
-                        </div>
+                        <div className="py-8 text-center text-sm text-red-500">โหลดข้อมูลล้มเหลว</div>
                     ) : data?.notifications.length === 0 ? (
                         <div className="py-8 text-center text-sm text-gray-500 flex flex-col items-center">
                             <Bell className="h-8 w-8 text-gray-300 mb-2" />
@@ -145,16 +169,26 @@ export function NotificationDropdown() {
                                 <DropdownMenuItem
                                     key={notification.id}
                                     className={`flex items-start gap-3 p-3 cursor-pointer rounded-xl transition-colors ${
-                                        notification.isRead ? "bg-transparent opacity-70" : "bg-blue-50/50"
+                                        notification.isRead
+                                            ? "bg-transparent opacity-70"
+                                            : "bg-blue-50/50"
                                     }`}
-                                    onClick={() => handleMarkAsRead(notification.id, notification.actionUrl)}
+                                    onClick={() =>
+                                        handleMarkAsRead(notification.id, notification.actionUrl)
+                                    }
                                 >
                                     <div className="mt-1 shrink-0 bg-white p-1.5 rounded-full shadow-sm border border-gray-100">
                                         {getIconPrefix(notification.type)}
                                     </div>
                                     <div className="flex flex-col gap-1 overflow-hidden w-full">
                                         <div className="flex justify-between items-start w-full">
-                                            <span className={`text-sm font-semibold truncate pr-2 ${notification.isRead ? "text-gray-700" : "text-gray-900"}`}>
+                                            <span
+                                                className={`text-sm font-semibold truncate pr-2 ${
+                                                    notification.isRead
+                                                        ? "text-gray-700"
+                                                        : "text-gray-900"
+                                                }`}
+                                            >
                                                 {notification.title}
                                             </span>
                                             {!notification.isRead && (
@@ -173,7 +207,7 @@ export function NotificationDropdown() {
                         </DropdownMenuGroup>
                     )}
                 </div>
-                
+
                 <DropdownMenuSeparator className="m-0 border-gray-100" />
                 <div className="p-2 bg-gray-50/50">
                     <Button
@@ -181,7 +215,7 @@ export function NotificationDropdown() {
                         className="w-full text-xs text-gray-500 justify-center h-8 hover:bg-gray-100 rounded-lg gap-1"
                         onClick={() => {
                             setOpen(false);
-                            router.push("/dashboard?tab=notifications");
+                            router.push(toDashboardTabPath(APP_DASHBOARD_TABS.notifications));
                         }}
                     >
                         <ExternalLink className="h-3 w-3" />

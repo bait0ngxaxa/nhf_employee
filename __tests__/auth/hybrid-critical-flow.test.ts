@@ -42,6 +42,11 @@ function extractCookieValue(setCookieHeader: string | null, name: string): strin
 }
 
 describe("Hybrid critical flow", () => {
+    const csrfHeaders = {
+        origin: "http://localhost",
+        "x-requested-with": "XMLHttpRequest",
+    };
+
     beforeEach(() => {
         vi.clearAllMocks();
         process.env.AUTH_ACCESS_TOKEN_SECRET = "critical-flow-test-secret";
@@ -64,6 +69,7 @@ describe("Hybrid critical flow", () => {
     it("bootstrap success then can access /dashboard", async () => {
         const bootstrapRequest = new NextRequest("http://localhost/api/auth/bootstrap", {
             method: "POST",
+            headers: csrfHeaders,
         });
 
         const bootstrapResponse = await bootstrapRoute(bootstrapRequest);
@@ -91,7 +97,7 @@ describe("Hybrid critical flow", () => {
 
         const logoutAllRequest = new NextRequest("http://localhost/api/auth/logout-all", {
             method: "POST",
-            headers: { cookie: `nhf_at=${accessToken}` },
+            headers: { ...csrfHeaders, cookie: `nhf_at=${accessToken}` },
         });
 
         const logoutAllResponse = await logoutAllRoute(logoutAllRequest);

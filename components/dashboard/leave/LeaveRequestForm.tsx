@@ -24,6 +24,7 @@ import {
 import { apiPost } from "@/lib/api-client";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { API_ROUTES } from "@/lib/ssot/routes";
 
 import {
     leaveRequestSchema,
@@ -61,7 +62,7 @@ export function LeaveRequestForm({ onSuccess, onCancel }: Props) {
         setErrorMsg(null);
 
         try {
-            const res = await apiPost("/api/leave/request", data);
+            const res = await apiPost(API_ROUTES.leave.request, data);
 
             if (res.success) {
                 toast.success("ส่งคำขอลาสำเร็จ");

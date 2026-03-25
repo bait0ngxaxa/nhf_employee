@@ -1,6 +1,10 @@
-import { emailService } from "@/lib/email";
+﻿import { emailService } from "@/lib/email";
 import { type LeaveActionPayload, type LeaveResultPayload } from "@/lib/email/types";
 import { prisma } from "@/lib/prisma";
+import {
+    APP_DASHBOARD_TABS,
+    toDashboardTabPath,
+} from "@/lib/ssot/routes";
 
 const LEAVE_TYPE_LABELS: Record<string, string> = {
     SICK: "ลาป่วย",
@@ -13,7 +17,7 @@ const LEAVE_TYPE_LABELS: Record<string, string> = {
  * Creates both an email and an in-app notification.
  */
 export async function sendLeaveActionNotifications(
-    leaveRequestPayload: LeaveActionPayload
+    leaveRequestPayload: LeaveActionPayload,
 ): Promise<void> {
     const manager = await prisma.employee.findUnique({
         where: { id: leaveRequestPayload.managerId },
@@ -27,15 +31,10 @@ export async function sendLeaveActionNotifications(
     // PUBLIC_APPROVE_URL = Cloudflare Tunnel domain (accessible outside LAN)
     // Falls back to NEXTAUTH_URL for dev / non-tunnel setups
     const publicBase = process.env.PUBLIC_APPROVE_URL || process.env.NEXTAUTH_URL;
-    const dashboardLink = `${publicBase}/dashboard?tab=manager-approval`;
+    const dashboardLink = `${publicBase}${toDashboardTabPath(APP_DASHBOARD_TABS.managerApproval)}`;
 
-    await emailService.sendLeaveActionNotification(
-        manager.email,
-        leaveRequestPayload,
-        dashboardLink
-    );
+    await emailService.sendLeaveActionNotification(manager.email, leaveRequestPayload, dashboardLink);
 
-    // Create in-app notification for the manager if they have a user account
     if (manager.user?.id) {
         const typeLabel = LEAVE_TYPE_LABELS[leaveRequestPayload.leaveType] ?? "ลา";
         await prisma.notification.create({
@@ -44,7 +43,7 @@ export async function sendLeaveActionNotifications(
                 type: "LEAVE_REQUESTED",
                 title: "คำขออนุมัติลางานใหม่",
                 message: `${leaveRequestPayload.employeeName} ขออนุมัติ${typeLabel} ${leaveRequestPayload.durationDays} วัน (${leaveRequestPayload.startDate} - ${leaveRequestPayload.endDate})`,
-                actionUrl: "/dashboard?tab=manager-approval",
+                actionUrl: toDashboardTabPath(APP_DASHBOARD_TABS.managerApproval),
                 referenceId: leaveRequestPayload.leaveId,
             },
         });
@@ -56,7 +55,7 @@ export async function sendLeaveActionNotifications(
  * Creates both an email and an in-app notification.
  */
 export async function sendLeaveResultNotifications(
-    leaveResultPayload: LeaveResultPayload
+    leaveResultPayload: LeaveResultPayload,
 ): Promise<void> {
     if (!leaveResultPayload.employeeEmail) {
         throw new Error("Employee email not found in payload");
@@ -64,10 +63,9 @@ export async function sendLeaveResultNotifications(
 
     await emailService.sendLeaveResultNotification(
         leaveResultPayload.employeeEmail,
-        leaveResultPayload
+        leaveResultPayload,
     );
 
-    // Create in-app notification for the employee if they have a user account
     const employeeUser = await prisma.user.findFirst({
         where: { employeeId: leaveResultPayload.employeeId },
         select: { id: true },
@@ -83,7 +81,7 @@ export async function sendLeaveResultNotifications(
                 message: isApproved
                     ? "ผู้อนุมัติได้อนุมัติคำขอลางานของคุณแล้ว"
                     : `ผู้อนุมัติไม่อนุมัติคำขอลางานของคุณ${leaveResultPayload.reason ? `: ${leaveResultPayload.reason}` : ""}`,
-                actionUrl: "/dashboard?tab=leave-history",
+                actionUrl: toDashboardTabPath(APP_DASHBOARD_TABS.leaveHistory),
                 referenceId: leaveResultPayload.leaveId,
             },
         });

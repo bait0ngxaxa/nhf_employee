@@ -6,6 +6,7 @@ import { parseCSV, downloadSampleCSV } from "@/lib/helpers/csv-helpers";
 import { type UseImportCSVReturn, type ImportStep } from "./types";
 import { toast } from "sonner";
 import { apiPost } from "@/lib/api-client";
+import { API_ROUTES } from "@/lib/ssot/routes";
 
 interface UseImportCSVOptions {
     onSuccess?: () => void;
@@ -62,7 +63,9 @@ export function useImportCSV({
         setError("");
 
         try {
-            const response = await apiPost<{ result: ImportResult }>("/api/employees/import", { employees: parsedData });
+            const response = await apiPost<{ result: ImportResult }>(API_ROUTES.employees.import, {
+                employees: parsedData,
+            });
 
             if (response.success) {
                 setImportResult(response.data.result);

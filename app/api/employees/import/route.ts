@@ -1,28 +1,21 @@
-﻿import { type NextRequest, NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
+
 import { getApiAuthSession } from "@/lib/server-auth";
 import { employeeService } from "@/lib/services/employee";
+import { operationFailed } from "@/lib/ssot/http";
+import { isAdminRole } from "@/lib/ssot/permissions";
 
-// POST - Import employees from CSV
 export async function POST(request: NextRequest): Promise<NextResponse> {
     try {
         const { employees } = await request.json();
 
-        // 1. Input Validation
         if (!employees || !Array.isArray(employees)) {
-            return NextResponse.json(
-                { error: "Operation failed" },
-                { status: 400 },
-            );
+            return operationFailed(400);
         }
 
-        // 2. Auth Check & Access Control
         const session = await getApiAuthSession();
-
-        if (!session || session.user?.role !== "ADMIN") {
-            return NextResponse.json(
-                { error: "Operation failed" },
-                { status: 403 },
-            );
+        if (!session || !isAdminRole(session.user?.role)) {
+            return operationFailed(403);
         }
 
         const result = await employeeService.importEmployeesFromCSV(employees);
@@ -40,9 +33,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         );
     } catch (error) {
         console.error("Error importing employees:", error);
-        return NextResponse.json(
-            { error: "Operation failed" },
-            { status: 500 },
-        );
+        return operationFailed(500);
     }
 }

@@ -4,9 +4,12 @@ import {
     getAccessTokenTtlSeconds,
     getRefreshTokenTtlSeconds,
 } from "@/lib/hybrid-auth-tokens";
+import {
+    HYBRID_ACCESS_COOKIE_NAME,
+    HYBRID_REFRESH_COOKIE_NAME,
+} from "@/lib/hybrid-auth-constants";
 
-export const HYBRID_ACCESS_COOKIE_NAME = "nhf_at";
-export const HYBRID_REFRESH_COOKIE_NAME = "nhf_rt";
+export { HYBRID_ACCESS_COOKIE_NAME, HYBRID_REFRESH_COOKIE_NAME } from "@/lib/hybrid-auth-constants";
 
 function isProduction(): boolean {
     return process.env.NODE_ENV === "production";

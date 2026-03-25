@@ -17,6 +17,7 @@ import { toast } from "sonner";
 import { KeyRound, Eye, EyeOff, CheckCircle2, XCircle } from "lucide-react";
 import Link from "next/link";
 import { apiPost } from "@/lib/api-client";
+import { API_ROUTES, APP_ROUTES } from "@/lib/ssot/routes";
 
 interface PasswordRequirement {
     label: string;
@@ -62,7 +63,7 @@ export function ResetPasswordForm({
         setIsLoading(true);
 
         try {
-            const result = await apiPost("/api/auth/reset-password", {
+            const result = await apiPost(API_ROUTES.auth.resetPassword, {
                 token,
                 password,
                 confirmPassword,
@@ -79,7 +80,7 @@ export function ResetPasswordForm({
 
             setTimeout(() => {
                 router.push(
-                    "/login?message=รีเซ็ตรหัสผ่านสำเร็จ กรุณาเข้าสู่ระบบด้วยรหัสผ่านใหม่",
+                    `${APP_ROUTES.login}?message=รีเซ็ตรหัสผ่านสำเร็จ กรุณาเข้าสู่ระบบด้วยรหัสผ่านใหม่`,
                 );
             }, 1500);
         } catch {
@@ -105,7 +106,7 @@ export function ResetPasswordForm({
                                 ลิงก์รีเซ็ตรหัสผ่านไม่ถูกต้องหรือหมดอายุแล้ว
                             </p>
                             <Link
-                                href="/forgot-password"
+                                href={APP_ROUTES.forgotPassword}
                                 className="text-sm text-blue-600 hover:text-blue-700 font-medium"
                             >
                                 ขอลิงก์รีเซ็ตรหัสผ่านใหม่
@@ -268,7 +269,7 @@ export function ResetPasswordForm({
                         <div className="mt-4 text-center text-sm text-gray-500">
                             จำรหัสผ่านได้แล้ว?{" "}
                             <Link
-                                href="/login"
+                                href={APP_ROUTES.login}
                                 className="text-blue-600 hover:text-blue-700 font-medium"
                             >
                                 เข้าสู่ระบบ

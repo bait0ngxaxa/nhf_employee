@@ -1,34 +1,36 @@
-﻿import { NextResponse } from "next/server";
-import { getApiAuthSession } from "@/lib/server-auth";
-import { prisma } from "@/lib/prisma";
-import { getEmployeeIdFromUserId } from "@/lib/services/leave/get-employee-id";
+import { NextResponse } from "next/server";
 
-export async function GET() {
+import { prisma } from "@/lib/prisma";
+import { getApiAuthSession } from "@/lib/server-auth";
+import { getEmployeeIdFromUserId } from "@/lib/services/leave/get-employee-id";
+import { operationFailed, unauthorized } from "@/lib/ssot/http";
+import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
+
+export async function GET(): Promise<NextResponse> {
     try {
         const session = await getApiAuthSession();
         if (!session?.user?.id) {
-            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+            return unauthorized();
         }
 
         const userId = Number(session.user.id);
         if (isNaN(userId)) {
-            return NextResponse.json({ error: "Invalid user ID" }, { status: 400 });
+            return NextResponse.json({ error: COMMON_API_MESSAGES.invalidUserId }, { status: 400 });
         }
 
         const managerId = await getEmployeeIdFromUserId(userId);
         if (!managerId) {
-            return NextResponse.json({ error: "Operation failed" }, { status: 404 });
+            return operationFailed(404);
         }
-        // Find leaves where the employee's direct manager is this user, OR this user is specifically the assigned approver
-        // Since we save approverId directly in LeaveRequest, we just look for that.
+
         const pendingApprovals = await prisma.leaveRequest.findMany({
             where: {
                 approverId: managerId,
-                status: "PENDING"
+                status: "PENDING",
             },
             take: 50,
             orderBy: {
-                createdAt: 'asc' // Oldest pending first
+                createdAt: "asc",
             },
             include: {
                 employee: {
@@ -40,48 +42,46 @@ export async function GET() {
                         departmentId: true,
                         dept: {
                             select: {
-                                name: true
-                            }
-                        }
-                    }
-                }
-            }
+                                name: true,
+                            },
+                        },
+                    },
+                },
+            },
         });
 
-        // Also fetch history of leaves this manager previously approved/rejected
         const approvalHistory = await prisma.leaveRequest.findMany({
             where: {
                 approverId: managerId,
                 status: {
-                    in: ["APPROVED", "REJECTED"]
-                }
+                    in: ["APPROVED", "REJECTED"],
+                },
             },
             orderBy: {
-                updatedAt: 'desc'
+                updatedAt: "desc",
             },
-            take: 20, // Limit history to last 20
+            take: 20,
             include: {
                 employee: {
                     select: {
                         firstName: true,
                         lastName: true,
                         nickname: true,
-                        position: true
-                    }
-                }
-            }
+                        position: true,
+                    },
+                },
+            },
         });
 
         return NextResponse.json({
             pending: pendingApprovals,
-            history: approvalHistory
+            history: approvalHistory,
         });
     } catch (error) {
         console.error("Error fetching leave approvals:", error);
         return NextResponse.json(
-            { error: "Failed to fetch approvals" },
-            { status: 500 }
+            { error: COMMON_API_MESSAGES.failedToFetchApprovals },
+            { status: 500 },
         );
     }
 }
-

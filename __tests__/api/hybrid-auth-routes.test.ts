@@ -71,7 +71,7 @@ describe("Hybrid auth routes", () => {
 
         const request = new NextRequest("http://localhost/api/auth/refresh", {
             method: "POST",
-            headers: { cookie: "nhf_rt=old-refresh-token" },
+            headers: { ...csrfHeaders, cookie: "nhf_rt=old-refresh-token" },
         });
         const response = await refreshRoute(request);
 
@@ -92,7 +92,7 @@ describe("Hybrid auth routes", () => {
 
         const request = new NextRequest("http://localhost/api/auth/refresh", {
             method: "POST",
-            headers: { cookie: "nhf_rt=old-refresh-token" },
+            headers: { ...csrfHeaders, cookie: "nhf_rt=old-refresh-token" },
         });
         const response = await refreshRoute(request);
 
@@ -112,7 +112,7 @@ describe("Hybrid auth routes", () => {
 
         const request = new NextRequest("http://localhost/api/auth/logout", {
             method: "POST",
-            headers: { cookie: "nhf_rt=old-refresh-token" },
+            headers: { ...csrfHeaders, cookie: "nhf_rt=old-refresh-token" },
         });
         const response = await logoutRoute(request);
 
@@ -127,7 +127,7 @@ describe("Hybrid auth routes", () => {
 
         const request = new NextRequest("http://localhost/api/auth/logout-all", {
             method: "POST",
-            headers: { cookie: "nhf_at=access-token" },
+            headers: { ...csrfHeaders, cookie: "nhf_at=access-token" },
         });
         const response = await logoutAllRoute(request);
 
@@ -138,3 +138,7 @@ describe("Hybrid auth routes", () => {
         });
     });
 });
+    const csrfHeaders = {
+        origin: "http://localhost",
+        "x-requested-with": "XMLHttpRequest",
+    };

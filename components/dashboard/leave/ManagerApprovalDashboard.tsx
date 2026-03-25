@@ -45,6 +45,7 @@ import {
     type LeaveRequestRow,
 } from "@/lib/helpers/csv-helpers";
 import { generateFilename } from "@/lib/helpers/date-helpers";
+import { API_ROUTES } from "@/lib/ssot/routes";
 
 const fetcher = async <T,>(url: string): Promise<T> => {
     const res = await apiGet<T>(url);
@@ -104,7 +105,7 @@ export function ManagerApprovalDashboard() {
         CSVLink & HTMLAnchorElement & { link: HTMLAnchorElement }
     >(null);
     const { data: yearsData } = useSWR<{ years: number[] }>(
-        "/api/leave/export?yearsOnly=1",
+        `${API_ROUTES.leave.export}?yearsOnly=1`,
         fetcher,
         {
             revalidateOnFocus: false,
@@ -131,7 +132,7 @@ export function ManagerApprovalDashboard() {
         setIsExporting(true);
         try {
             const res = await apiGet<{ data: LeaveRequestRow[] }>(
-                `/api/leave/export?year=${exportYear}`,
+                `${API_ROUTES.leave.export}?year=${exportYear}`,
             );
             if (!res.success) throw new Error(res.error);
 
@@ -145,7 +146,7 @@ export function ManagerApprovalDashboard() {
             }, 100);
 
             // Audit: log the export action
-            await apiPost("/api/audit-logs/export", {
+            await apiPost(API_ROUTES.auditLogs.export, {
                 entityType: "LeaveRequest",
                 recordCount: rows.length,
                 filters: { year: exportYear },
@@ -169,7 +170,7 @@ export function ManagerApprovalDashboard() {
     ) => {
         setIsProcessing(true);
         try {
-            const res = await apiPost("/api/leave/intranet-action", {
+            const res = await apiPost(API_ROUTES.leave.intranetAction, {
                 leaveId,
                 action,
                 reason,

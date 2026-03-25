@@ -1,23 +1,25 @@
-﻿import { type NextRequest, NextResponse } from "next/server";
-import { getApiAuthSession } from "@/lib/server-auth";
-import { prisma } from "@/lib/prisma";
+import { type NextRequest, NextResponse } from "next/server";
 
-export async function POST(_req: NextRequest) {
+import { prisma } from "@/lib/prisma";
+import { getApiAuthSession } from "@/lib/server-auth";
+import { unauthorized } from "@/lib/ssot/http";
+import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
+
+export async function POST(_req: NextRequest): Promise<NextResponse> {
     try {
         const session = await getApiAuthSession();
         if (!session?.user?.id) {
-            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+            return unauthorized();
         }
 
-        const userId = parseInt(session.user.id);
+        const userId = parseInt(session.user.id, 10);
         if (isNaN(userId)) {
-            return NextResponse.json({ error: "Invalid user session" }, { status: 400 });
+            return NextResponse.json({ error: COMMON_API_MESSAGES.invalidUserSession }, { status: 400 });
         }
 
-        // Update all unread notifications for this user
         const result = await prisma.notification.updateMany({
             where: {
-                userId: userId,
+                userId,
                 isRead: false,
             },
             data: {
@@ -28,7 +30,9 @@ export async function POST(_req: NextRequest) {
         return NextResponse.json({ success: true, updatedCount: result.count });
     } catch (error) {
         console.error("Error marking all notifications as read:", error);
-        return NextResponse.json({ error: "Failed to mark all notifications as read" }, { status: 500 });
+        return NextResponse.json(
+            { error: COMMON_API_MESSAGES.failedToMarkAllNotificationsAsRead },
+            { status: 500 },
+        );
     }
 }
-

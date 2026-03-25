@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { User } from "lucide-react";
 import { formatThaiDateTime } from "@/lib/helpers/date-helpers";
+import { isAdminRole } from "@/lib/ssot/permissions";
 
 interface CommentAuthor {
     id: number;
@@ -41,7 +42,7 @@ export function CommentItem({
                 <div className="flex items-center gap-2">
                     <User className="h-4 w-4" />
                     <span className="font-medium">{authorName}</span>
-                    {author.role === "ADMIN" && (
+                    {isAdminRole(author.role) && (
                         <Badge variant="secondary" className="text-xs">
                             Admin
                         </Badge>

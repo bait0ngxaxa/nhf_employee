@@ -4,6 +4,9 @@ import { createEmployeeSchema } from "@/lib/validations/employee";
 import { logEmployeeEvent } from "@/lib/audit";
 import { employeeService, type EmployeeFilters } from "@/lib/services/employee";
 import { buildUserContext } from "@/lib/context";
+import { operationFailed } from "@/lib/ssot/http";
+import { isAdminRole } from "@/lib/ssot/permissions";
+import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
 
 /**
  * Parse query parameters into EmployeeFilters
@@ -24,10 +27,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         const session = await getApiAuthSession();
 
         if (!session) {
-            return NextResponse.json(
-                { error: "Operation failed" },
-                { status: 401 },
-            );
+            return operationFailed(401);
         }
 
         const filters = parseQueryParams(request.url);
@@ -39,10 +39,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         });
     } catch (error) {
         console.error("Error fetching employees:", error);
-        return NextResponse.json(
-            { error: "Operation failed" },
-            { status: 500 },
-        );
+        return operationFailed(500);
     }
 }
 
@@ -55,20 +52,14 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         const result = createEmployeeSchema.safeParse(body);
         if (!result.success) {
             const errors = result.error.flatten();
-            return NextResponse.json(
-                { error: "Operation failed", details: errors.fieldErrors },
-                { status: 400 },
-            );
+            return operationFailed(400, { details: errors.fieldErrors });
         }
 
         // 2. Auth Check & Access Control
         const session = await getApiAuthSession();
 
-        if (!session || session.user?.role !== "ADMIN") {
-            return NextResponse.json(
-                { error: "Operation failed" },
-                { status: 403 },
-            );
+        if (!session || !isAdminRole(session.user?.role)) {
+            return operationFailed(403);
         }
 
         const user = buildUserContext(session);
@@ -108,17 +99,13 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
         return NextResponse.json(
             {
-                message: "Operation completed",
+                message: COMMON_API_MESSAGES.operationCompleted,
                 employee: createResult.employee,
             },
             { status: 201 },
         );
     } catch (error) {
         console.error("Error creating employee:", error);
-        return NextResponse.json(
-            { error: "Operation failed" },
-            { status: 500 },
-        );
+        return operationFailed(500);
     }
 }
-

@@ -24,6 +24,7 @@ import {
     useDashboardDataContext,
 } from "@/components/dashboard/context/dashboard/DashboardContext";
 import { NotificationDropdown } from "./NotificationDropdown";
+import { getRoleLabelThai } from "@/lib/ssot/permissions";
 
 export function DashboardNavbar() {
     const { sidebarOpen, setSidebarOpen, handleSignOut } =
@@ -76,9 +77,7 @@ export function DashboardNavbar() {
                                         {user?.name || "ผู้ใช้งาน"}
                                     </span>
                                     <span className="text-xs text-gray-500">
-                                        {user?.role === "ADMIN"
-                                            ? "ผู้ดูแลระบบ"
-                                            : "ผู้ใช้งาน"}
+                                        {getRoleLabelThai(user?.role)}
                                     </span>
                                 </div>
                                 <ChevronDown className="h-4 w-4 text-gray-400" />
@@ -93,9 +92,7 @@ export function DashboardNavbar() {
                                     {user?.email}
                                 </p>
                                 <p className="text-xs text-blue-600 mt-1">
-                                    {user?.role === "ADMIN"
-                                        ? "ผู้ดูแลระบบ"
-                                        : "ผู้ใช้งาน"}{" "}
+                                    {getRoleLabelThai(user?.role)}{" "}
                                     | {user?.department}
                                 </p>
                             </div>
@@ -152,3 +149,4 @@ export function DashboardNavbar() {
         </header>
     );
 }
+

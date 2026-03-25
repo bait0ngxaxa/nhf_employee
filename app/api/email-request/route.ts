@@ -1,42 +1,34 @@
 ﻿import { type NextRequest, NextResponse, after } from "next/server";
-import { getApiAuthSession } from "@/lib/server-auth";
+
 import { createAuditLog } from "@/lib/audit";
-import { emailRequestSchema } from "@/lib/validations/email-request";
+import { buildUserContext } from "@/lib/context";
+import { processOutbox } from "@/lib/services/outbox/processor";
 import {
     emailRequestService,
     type EmailRequestFilters,
 } from "@/lib/services/email-request";
-import { buildUserContext } from "@/lib/context";
-import { processOutbox } from "@/lib/services/outbox/processor";
+import { getApiAuthSession } from "@/lib/server-auth";
+import { forbidden, operationFailed, unauthorized } from "@/lib/ssot/http";
+import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
+import { isAdminRole } from "@/lib/ssot/permissions";
+import { emailRequestSchema } from "@/lib/validations/email-request";
 
-// POST - Create new email request
 export async function POST(req: NextRequest): Promise<NextResponse> {
     try {
         const session = await getApiAuthSession();
         if (!session?.user) {
-            return NextResponse.json(
-                { success: false, error: "Operation failed" },
-                { status: 401 },
-            );
+            return unauthorized({ success: false });
         }
 
-        if (session.user.role !== "ADMIN") {
-            return NextResponse.json(
-                {
-                    success: false,
-                    error: "Operation failed",
-                },
-                { status: 403 },
-            );
+        if (!isAdminRole(session.user.role)) {
+            return forbidden({ success: false });
         }
 
         const body = await req.json();
         const validation = emailRequestSchema.safeParse(body);
 
         if (!validation.success) {
-            const errorMessages = validation.error.issues
-                .map((issue) => issue.message)
-                .join(", ");
+            const errorMessages = validation.error.issues.map((issue) => issue.message).join(", ");
             return NextResponse.json(
                 { success: false, error: errorMessages },
                 { status: 400 },
@@ -44,10 +36,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         }
 
         const user = buildUserContext(session);
-        const result = await emailRequestService.createEmailRequest(
-            validation.data,
-            user,
-        );
+        const result = await emailRequestService.createEmailRequest(validation.data, user);
 
         if (!result.success) {
             return NextResponse.json(
@@ -60,7 +49,6 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
             throw new Error("Created email request data is missing");
         }
 
-        // Log audit event
         await createAuditLog({
             action: "EMAIL_REQUEST",
             entityType: "EmailRequest",
@@ -85,7 +73,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
         return NextResponse.json({
             success: true,
-            message: "Operation completed",
+            message: COMMON_API_MESSAGES.operationCompleted,
             data: {
                 id: result.emailRequest.id,
                 thaiName: validation.data.thaiName,
@@ -97,50 +85,33 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
             },
         });
     } catch (error) {
-        console.error("โ Error processing email request:", error);
-        return NextResponse.json(
-            {
-                success: false,
-                error: "Operation failed",
-            },
-            { status: 500 },
-        );
+        console.error("Error processing email request:", error);
+        return operationFailed(500, { success: false });
     }
 }
 
-// GET - List email requests
 export async function GET(req: NextRequest): Promise<NextResponse> {
     try {
         const session = await getApiAuthSession();
         if (!session?.user) {
-            return NextResponse.json(
-                { success: false, error: "Operation failed" },
-                { status: 401 },
-            );
+            return unauthorized({ success: false });
         }
 
         const { searchParams } = new URL(req.url);
         const filters: EmailRequestFilters = {
-            page: parseInt(searchParams.get("page") || "1"),
-            limit: parseInt(searchParams.get("limit") || "10"),
+            page: parseInt(searchParams.get("page") || "1", 10),
+            limit: parseInt(searchParams.get("limit") || "10", 10),
         };
 
         const user = buildUserContext(session);
-        const result = await emailRequestService.getEmailRequests(
-            filters,
-            user,
-        );
+        const result = await emailRequestService.getEmailRequests(filters, user);
 
         return NextResponse.json({
             success: true,
             ...result,
         });
     } catch (error) {
-        console.error("โ Error fetching email requests:", error);
-        return NextResponse.json(
-            { success: false, error: "Operation failed" },
-            { status: 500 },
-        );
+        console.error("Error fetching email requests:", error);
+        return operationFailed(500, { success: false });
     }
 }
-

@@ -1,9 +1,11 @@
-﻿import { cookies } from "next/headers";
+import { cookies } from "next/headers";
 import { getServerSession } from "next-auth";
 import type { Session } from "next-auth";
 
+import { isValidSessionUser } from "@/lib/auth-ssot";
 import { authOptions } from "@/lib/auth";
-import { HYBRID_ACCESS_COOKIE_NAME, parseUserId } from "@/lib/hybrid-auth-session";
+import { HYBRID_ACCESS_COOKIE_NAME } from "@/lib/hybrid-auth-constants";
+import { parseUserId } from "@/lib/hybrid-auth-session";
 import { verifyAccessToken } from "@/lib/hybrid-auth-tokens";
 import { prisma } from "@/lib/prisma";
 
@@ -21,7 +23,7 @@ export interface ApiAuthSession {
 }
 
 function toApiAuthSession(session: Session): ApiAuthSession | null {
-    if (!session.user?.id || !session.user.role) {
+    if (!isValidSessionUser(session.user)) {
         return null;
     }
 
@@ -64,7 +66,7 @@ async function getHybridFallbackSession(): Promise<ApiAuthSession | null> {
             },
         });
 
-        if (!user) {
+        if (!user || claims.tokenVersion !== user.tokenVersion) {
             return null;
         }
 

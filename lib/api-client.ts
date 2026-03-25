@@ -5,10 +5,8 @@
  * eliminating the need for boilerplate try/catch blocks in UI components.
  */
 
-import {
-    refreshHybridSession,
-    shouldAttemptHybridRefresh,
-} from "@/lib/client-auth";
+import { fetchWithRefresh } from "@/lib/client-auth";
+import { AUTH_MUTATION_HEADERS } from "@/lib/auth-csrf";
 
 export type ApiResponse<T> =
     | { success: true; data: T; status: number }
@@ -21,10 +19,16 @@ interface RequestConfig extends RequestInit {
 /**
  * Helper: Ensure appropriate headers are set
  */
-const createHeaders = (headers?: HeadersInit, hasData?: boolean): Headers => {
+const createHeaders = (headers?: HeadersInit, method?: string, hasData?: boolean): Headers => {
     const reqHeaders = new Headers(headers);
     if (!reqHeaders.has("Content-Type") && hasData) {
         reqHeaders.set("Content-Type", "application/json");
+    }
+    const upperMethod = method?.toUpperCase();
+    if (upperMethod && upperMethod !== "GET" && upperMethod !== "HEAD") {
+        if (!reqHeaders.has("X-Requested-With")) {
+            reqHeaders.set("X-Requested-With", AUTH_MUTATION_HEADERS["X-Requested-With"]);
+        }
     }
     return reqHeaders;
 };
@@ -48,7 +52,7 @@ export async function apiRequest<T>(
     config: RequestConfig = {},
 ): Promise<ApiResponse<T>> {
     const { data, headers, ...customConfig } = config;
-    const reqHeaders = createHeaders(headers, !!data);
+    const reqHeaders = createHeaders(headers, customConfig.method, !!data);
 
     const configWithData: RequestInit = {
         ...customConfig,
@@ -61,13 +65,7 @@ export async function apiRequest<T>(
     }
 
     try {
-        let response = await fetch(endpoint, configWithData);
-        if (response.status === 401 && shouldAttemptHybridRefresh(endpoint)) {
-            const refreshed = await refreshHybridSession();
-            if (refreshed) {
-                response = await fetch(endpoint, configWithData);
-            }
-        }
+        const response = await fetchWithRefresh(endpoint, configWithData);
         const responseData = await parseResponse(response);
 
         if (!response.ok) {

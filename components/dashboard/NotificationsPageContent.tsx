@@ -15,6 +15,7 @@ import {
 import { toast } from "sonner";
 import { apiGet, apiPost, apiPatch } from "@/lib/api-client";
 import { getRelativeTime } from "@/lib/helpers/date-helpers";
+import { API_ROUTES } from "@/lib/ssot/routes";
 
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -68,7 +69,7 @@ export function NotificationsSection() {
     const [hasMore, setHasMore] = useState(false);
     const [isLoadingMore, setIsLoadingMore] = useState(false);
 
-    const apiUrl = `/api/notifications/all?filter=${filter}`;
+    const apiUrl = `${API_ROUTES.notifications.all}?filter=${filter}`;
 
     const { data, error, isLoading, mutate } = useSWR<NotificationsResponse>(
         apiUrl,
@@ -111,7 +112,7 @@ export function NotificationsSection() {
         actionUrl: string | null,
     ) => {
         try {
-            await apiPatch(`/api/notifications/${id}/read`);
+            await apiPatch(API_ROUTES.notifications.read(id));
             setAllNotifications((prev) =>
                 prev.map((n) => (n.id === id ? { ...n, isRead: true } : n)),
             );
@@ -125,7 +126,7 @@ export function NotificationsSection() {
 
     const handleMarkAllAsRead = async () => {
         try {
-            await apiPost("/api/notifications/mark-all-read");
+            await apiPost(API_ROUTES.notifications.markAllRead);
             setAllNotifications((prev) =>
                 prev.map((n) => ({ ...n, isRead: true })),
             );

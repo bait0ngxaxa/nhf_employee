@@ -4,14 +4,17 @@ import { Button } from "@/components/ui/button";
 import { Shield, Database, Zap, ArrowRight } from "lucide-react";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { isValidSessionUser } from "@/lib/auth-ssot";
+import { APP_ROUTES } from "@/lib/ssot/routes";
 import { redirect } from "next/navigation";
 
 export default async function Home() {
     const session = await getServerSession(authOptions);
+    const hasValidSession = isValidSessionUser(session?.user);
 
     // Redirect authenticated users to dashboard on the server
-    if (session) {
-        redirect("/dashboard");
+    if (hasValidSession) {
+        redirect(APP_ROUTES.dashboard);
     }
 
     return (
@@ -79,7 +82,7 @@ export default async function Home() {
                             size="lg"
                             className="bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white px-8 py-6 text-lg rounded-xl shadow-lg shadow-blue-500/25 transition duration-300 motion-safe:hover:scale-105 hover:shadow-xl focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
                         >
-                            <Link href="/login">
+                            <Link href={APP_ROUTES.login}>
                                 เข้าสู่ระบบ
                                 <ArrowRight className="ml-2 h-5 w-5" />
                             </Link>

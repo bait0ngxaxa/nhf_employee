@@ -1,23 +1,19 @@
-import { type NextRequest, NextResponse } from "next/server";
+﻿import { type NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
-import { prisma } from "@/lib/prisma";
-import { forgotPasswordSchema } from "@/lib/validations/auth";
+
 import { sendEmail } from "@/lib/email";
 import { generatePasswordResetEmailHTML } from "@/lib/email/templates/password-reset";
+import { prisma } from "@/lib/prisma";
+import { forgotPasswordSchema } from "@/lib/validations/auth";
+import { AUTH_FORGOT_PASSWORD_MESSAGES } from "@/lib/auth-ssot";
 
 const MAX_REQUESTS_PER_HOUR = 3;
 const TOKEN_EXPIRY_HOURS = 1;
 
-/**
- * Hash token with SHA-256 for secure storage
- */
 function hashToken(token: string): string {
     return crypto.createHash("sha256").update(token).digest("hex");
 }
 
-/**
- * Check rate limit: max 3 requests per email per hour
- */
 async function isRateLimited(email: string): Promise<boolean> {
     const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
 
@@ -31,51 +27,38 @@ async function isRateLimited(email: string): Promise<boolean> {
     return recentRequests >= MAX_REQUESTS_PER_HOUR;
 }
 
-// POST - Request password reset
+function acceptedResponse(): NextResponse {
+    return NextResponse.json({
+        success: true,
+        message: AUTH_FORGOT_PASSWORD_MESSAGES.requestAcceptedThai,
+    });
+}
+
 export async function POST(request: NextRequest): Promise<NextResponse> {
     try {
         const body = await request.json();
 
-        // Validate input
         const result = forgotPasswordSchema.safeParse(body);
         if (!result.success) {
-            // Always return success to prevent email enumeration
-            return NextResponse.json({
-                success: true,
-                message:
-                    "หากอีเมลนี้มีอยู่ในระบบ คุณจะได้รับลิงก์รีเซ็ตรหัสผ่านทางอีเมล",
-            });
+            return acceptedResponse();
         }
 
         const { email } = result.data;
         const normalizedEmail = email.toLowerCase().trim();
 
-        // Rate limit check
         if (await isRateLimited(normalizedEmail)) {
-            // Still return success to prevent enumeration
-            return NextResponse.json({
-                success: true,
-                message:
-                    "หากอีเมลนี้มีอยู่ในระบบ คุณจะได้รับลิงก์รีเซ็ตรหัสผ่านทางอีเมล",
-            });
+            return acceptedResponse();
         }
 
-        // Check if user exists
         const user = await prisma.user.findUnique({
             where: { email: normalizedEmail },
             select: { id: true, name: true, email: true, isActive: true },
         });
 
         if (!user || !user.isActive) {
-            // Return success even if user doesn't exist (prevent enumeration)
-            return NextResponse.json({
-                success: true,
-                message:
-                    "หากอีเมลนี้มีอยู่ในระบบ คุณจะได้รับลิงก์รีเซ็ตรหัสผ่านทางอีเมล",
-            });
+            return acceptedResponse();
         }
 
-        // Delete existing unused tokens for this email
         await prisma.passwordResetToken.deleteMany({
             where: {
                 email: normalizedEmail,
@@ -83,14 +66,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
             },
         });
 
-        // Generate secure token
         const rawToken = crypto.randomBytes(32).toString("hex");
         const hashedToken = hashToken(rawToken);
-        const expiresAt = new Date(
-            Date.now() + TOKEN_EXPIRY_HOURS * 60 * 60 * 1000,
-        );
+        const expiresAt = new Date(Date.now() + TOKEN_EXPIRY_HOURS * 60 * 60 * 1000);
 
-        // Save hashed token to DB
         await prisma.passwordResetToken.create({
             data: {
                 token: hashedToken,
@@ -99,27 +78,21 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
             },
         });
 
-        // Build reset URL
         const baseUrl = process.env.NEXTAUTH_URL || "http://localhost:3000";
         const resetUrl = `${baseUrl}/reset-password?token=${rawToken}`;
 
-        // Send email
         await sendEmail({
             to: user.email,
-            subject: "[NHF IT] รีเซ็ตรหัสผ่าน",
+            subject: AUTH_FORGOT_PASSWORD_MESSAGES.resetSubjectThai,
             html: generatePasswordResetEmailHTML(resetUrl, user.name),
-            text: `สวัสดีคุณ ${user.name},\n\nกรุณาคลิกลิงก์ด้านล่างเพื่อรีเซ็ตรหัสผ่าน:\n${resetUrl}\n\nลิงก์จะหมดอายุภายใน 1 ชั่วโมง\n\nหากคุณไม่ได้ขอรีเซ็ตรหัสผ่าน กรุณาเพิกเฉยอีเมลนี้`,
+            text: AUTH_FORGOT_PASSWORD_MESSAGES.resetMailTextThai(user.name, resetUrl),
         });
 
-        return NextResponse.json({
-            success: true,
-            message:
-                "หากอีเมลนี้มีอยู่ในระบบ คุณจะได้รับลิงก์รีเซ็ตรหัสผ่านทางอีเมล",
-        });
+        return acceptedResponse();
     } catch (error) {
         console.error("Error in forgot-password:", error);
         return NextResponse.json(
-            { error: "เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง" },
+            { error: AUTH_FORGOT_PASSWORD_MESSAGES.requestFailedThai },
             { status: 500 },
         );
     }

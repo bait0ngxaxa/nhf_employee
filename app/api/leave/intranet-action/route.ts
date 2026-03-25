@@ -1,85 +1,82 @@
-﻿import { NextResponse } from "next/server";
-import { getApiAuthSession } from "@/lib/server-auth";
-import { prisma } from "@/lib/prisma";
 import { NotificationOutboxType } from "@prisma/client";
-import { getEmployeeIdFromUserId } from "@/lib/services/leave/get-employee-id";
-import { logLeaveEvent } from "@/lib/audit";
+import { NextResponse } from "next/server";
 
-export async function POST(req: Request) {
+import { logLeaveEvent } from "@/lib/audit";
+import { prisma } from "@/lib/prisma";
+import { getApiAuthSession } from "@/lib/server-auth";
+import { getEmployeeIdFromUserId } from "@/lib/services/leave/get-employee-id";
+import { operationFailed, unauthorized } from "@/lib/ssot/http";
+import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
+import { APP_DASHBOARD_TABS, toDashboardTabPath } from "@/lib/ssot/routes";
+
+export async function POST(req: Request): Promise<NextResponse> {
     try {
         const session = await getApiAuthSession();
         if (!session?.user?.id) {
-            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+            return unauthorized();
         }
 
         const userId = Number(session.user.id);
         if (isNaN(userId)) {
-            return NextResponse.json({ error: "Invalid user ID" }, { status: 400 });
+            return NextResponse.json({ error: COMMON_API_MESSAGES.invalidUserId }, { status: 400 });
         }
 
         const managerId = await getEmployeeIdFromUserId(userId);
         if (!managerId) {
-            return NextResponse.json({ error: "Operation failed" }, { status: 404 });
+            return operationFailed(404);
         }
 
         const { leaveId, action, reason } = await req.json();
 
         if (!leaveId || !action || !["APPROVE", "REJECT"].includes(action)) {
-            return NextResponse.json({ error: "Invalid action parameters" }, { status: 400 });
+            return NextResponse.json({ error: COMMON_API_MESSAGES.invalidActionParameters }, { status: 400 });
         }
 
         const result = await prisma.$transaction(async (tx) => {
-            // 1. Fetch Request & verify authorization
             const leaveRequest = await tx.leaveRequest.findUnique({
                 where: { id: leaveId },
-                include: { employee: true }
+                include: { employee: true },
             });
 
             if (!leaveRequest) throw new Error("Leave request not found");
             if (leaveRequest.status !== "PENDING") throw new Error("This request is already processed");
-            
-            // Managers can only approve their own subordinates' requests, OR HR/Admin can be allowed here in the future
             if (leaveRequest.approverId !== managerId) {
                 throw new Error("You are not authorized to approve this request");
             }
 
             const newStatus = action === "APPROVE" ? "APPROVED" : "REJECTED";
 
-            // 2. Update LeaveRequest Status
             const updatedRequest = await tx.leaveRequest.update({
                 where: { id: leaveId },
                 data: {
                     status: newStatus,
                     approvedAt: new Date(),
-                    rejectReason: action === "REJECT" ? reason : null
-                }
+                    rejectReason: action === "REJECT" ? reason : null,
+                },
             });
 
-            // 3. Update LeaveQuota if actually Approved
             if (action === "APPROVE") {
                 const quota = await tx.leaveQuota.findFirst({
                     where: {
                         employeeId: leaveRequest.employeeId,
                         leaveType: leaveRequest.leaveType,
-                        year: new Date(leaveRequest.startDate).getFullYear()
-                    }
+                        year: new Date(leaveRequest.startDate).getFullYear(),
+                    },
                 });
 
                 if (!quota) throw new Error("Leave quota not found");
 
-                // Re-validate quota to prevent race condition
                 const remaining = quota.totalDays - quota.usedDays;
                 if (leaveRequest.durationDays > remaining) {
-                    throw new Error("Operation failed");
+                    throw new Error(COMMON_API_MESSAGES.operationFailed);
                 }
 
                 await tx.leaveQuota.update({
                     where: { id: quota.id },
-                    data: { usedDays: quota.usedDays + leaveRequest.durationDays }
+                    data: { usedDays: quota.usedDays + leaveRequest.durationDays },
                 });
             }
 
-            // 4. Send Notification back to Employee
             await tx.notificationOutbox.create({
                 data: {
                     type: NotificationOutboxType.LEAVE_RESULT,
@@ -88,15 +85,14 @@ export async function POST(req: Request) {
                         employeeId: leaveRequest.employeeId,
                         employeeEmail: leaveRequest.employee.email,
                         status: newStatus,
-                        reason: action === "REJECT" ? reason : null
-                    })
-                }
+                        reason: action === "REJECT" ? reason : null,
+                    }),
+                },
             });
 
-            // 5. Create In-App Notification for the Employee
             const employeeUser = await tx.user.findUnique({
                 where: { employeeId: leaveRequest.employeeId },
-                select: { id: true }
+                select: { id: true },
             });
 
             if (employeeUser) {
@@ -109,45 +105,33 @@ export async function POST(req: Request) {
                         message: `Your leave request was reviewed: **${actionTextTh}**${
                             action === "REJECT" && reason ? ` (Reason: ${reason})` : ""
                         }`,
-                        actionUrl: "/dashboard?tab=leave-management",
+                        actionUrl: toDashboardTabPath(APP_DASHBOARD_TABS.leaveManagement),
                         referenceId: leaveId,
-                    }
+                    },
                 });
             }
 
             return updatedRequest;
         });
 
-        // Audit Logging outside transaction
-        const auditAction =
-            action === "APPROVE"
-                ? "LEAVE_REQUEST_APPROVE"
-                : "LEAVE_REQUEST_REJECT";
-
-        // Fetch user email for audit log if possible, otherwise use a fallback
+        const auditAction = action === "APPROVE" ? "LEAVE_REQUEST_APPROVE" : "LEAVE_REQUEST_REJECT";
         const userEmail = session.user.email || `User ${userId}`;
 
-        // Get employee name if possible (result.employee is not returned from transaction
-        // because we updated the request. Let's just log the action with what we have)
-        await logLeaveEvent(
-            auditAction,
-            leaveId,
-            userId, // Manager who performed action
-            userEmail,
-            {
-                after: {
-                    status: action === "APPROVE" ? "APPROVED" : "REJECTED",
-                    reason: action === "REJECT" ? reason : null,
-                },
-            }
-        ).catch((err) => console.error("Failed to log audit event:", err));
+        await logLeaveEvent(auditAction, leaveId, userId, userEmail, {
+            after: {
+                status: action === "APPROVE" ? "APPROVED" : "REJECTED",
+                reason: action === "REJECT" ? reason : null,
+            },
+        }).catch((err) => console.error("Failed to log audit event:", err));
 
         return NextResponse.json({ success: true, data: result });
     } catch (error) {
         console.error("Intranet Leave Approval Error:", error);
         return NextResponse.json(
-            { error: error instanceof Error ? error.message : "Failed to process leave approval" },
-            { status: 500 }
+            {
+                error: error instanceof Error ? error.message : COMMON_API_MESSAGES.failedToProcessLeaveApproval,
+            },
+            { status: 500 },
         );
     }
 }

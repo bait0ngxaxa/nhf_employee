@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { type EmployeeFormData, type Department } from "@/types/employees";
 import { createEmployeeSchema } from "@/lib/validations/employee";
 import { apiPost } from "@/lib/api-client";
+import { API_ROUTES } from "@/lib/ssot/routes";
 
 const INITIAL_FORM_DATA: EmployeeFormData = {
     firstName: "",
@@ -42,7 +43,7 @@ export function useAddEmployee({
         useState<EmployeeFormData>(INITIAL_FORM_DATA);
 
     const { data: departmentData } = useSWR<{ departments: Department[] }>(
-        "/api/departments",
+        API_ROUTES.employees.departments,
     );
     const departments = departmentData?.departments || [];
 
@@ -98,7 +99,7 @@ export function useAddEmployee({
 
         setIsLoading(true);
 
-        const apiResult = await apiPost("/api/employees", formData);
+        const apiResult = await apiPost(API_ROUTES.employees.list, formData);
 
         if (apiResult.success) {
             toast.success("เพิ่มพนักงานสำเร็จ!", {

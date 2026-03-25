@@ -1,7 +1,10 @@
-import { jwtVerify, type JWTPayload } from "jose";
+import { jwtVerify } from "jose";
+import { getToken } from "next-auth/jwt";
 import { NextResponse, type NextRequest } from "next/server";
 
-const HYBRID_ACCESS_COOKIE_NAME = "nhf_at";
+import { hasRequiredAccessClaims } from "@/lib/auth-ssot";
+import { HYBRID_ACCESS_COOKIE_NAME, getHybridSecretKey } from "@/lib/hybrid-auth-constants";
+
 const PUBLIC_ROUTES = new Set([
     "/",
     "/login",
@@ -12,44 +15,29 @@ const PUBLIC_ROUTES = new Set([
     "/leave/action",
 ]);
 
-function getHybridSecretKey(): Uint8Array | null {
-    const secret =
-        process.env.AUTH_ACCESS_TOKEN_SECRET?.trim() ||
-        process.env.NEXTAUTH_SECRET?.trim();
-    if (!secret) {
-        return null;
-    }
-    return new TextEncoder().encode(secret);
-}
-
-function hasRequiredClaims(payload: JWTPayload): boolean {
-    if (typeof payload.sub !== "string" || payload.sub.length === 0) {
-        return false;
-    }
-    if (typeof payload.role !== "string" || payload.role.length === 0) {
-        return false;
-    }
-    if (typeof payload.sid !== "string" || payload.sid.length === 0) {
-        return false;
-    }
-    if (typeof payload.ver !== "number" || !Number.isInteger(payload.ver)) {
-        return false;
-    }
-    return true;
-}
-
 async function hasValidHybridAccessToken(request: NextRequest): Promise<boolean> {
     const token = request.cookies.get(HYBRID_ACCESS_COOKIE_NAME)?.value;
-    const secretKey = getHybridSecretKey();
-    if (!token || !secretKey) {
+    if (!token) {
         return false;
     }
 
     try {
-        const { payload } = await jwtVerify(token, secretKey, {
+        const { payload } = await jwtVerify(token, getHybridSecretKey(), {
             algorithms: ["HS256"],
         });
-        return hasRequiredClaims(payload);
+        return hasRequiredAccessClaims(payload);
+    } catch {
+        return false;
+    }
+}
+
+async function hasValidNextAuthSession(request: NextRequest): Promise<boolean> {
+    try {
+        const token = await getToken({
+            req: request,
+            secret: process.env.NEXTAUTH_SECRET,
+        });
+        return typeof token?.sub === "string" && token.sub.length > 0;
     } catch {
         return false;
     }
@@ -60,7 +48,7 @@ export default async function middleware(request: NextRequest): Promise<NextResp
     const isPublicRoute = PUBLIC_ROUTES.has(pathname);
 
     const hasHybridSession = await hasValidHybridAccessToken(request);
-    const isAuthenticated = hasHybridSession;
+    const isAuthenticated = hasHybridSession || await hasValidNextAuthSession(request);
 
     if (isAuthenticated && (pathname === "/login" || pathname === "/signup")) {
         return NextResponse.redirect(new URL("/dashboard", request.url));

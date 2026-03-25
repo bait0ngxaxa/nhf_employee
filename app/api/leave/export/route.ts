@@ -1,35 +1,33 @@
-﻿import { NextResponse, type NextRequest } from "next/server";
-import { getApiAuthSession } from "@/lib/server-auth";
-import { prisma } from "@/lib/prisma";
-import { getEmployeeIdFromUserId } from "@/lib/services/leave/get-employee-id";
+import { type NextRequest, NextResponse } from "next/server";
 
-export async function GET(req: NextRequest) {
+import { prisma } from "@/lib/prisma";
+import { getApiAuthSession } from "@/lib/server-auth";
+import { getEmployeeIdFromUserId } from "@/lib/services/leave/get-employee-id";
+import { operationFailed, unauthorized } from "@/lib/ssot/http";
+import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
+
+export async function GET(req: NextRequest): Promise<NextResponse> {
     try {
         const session = await getApiAuthSession();
         if (!session?.user?.id) {
-            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+            return unauthorized();
         }
 
         const userId = Number(session.user.id);
         if (isNaN(userId)) {
-            return NextResponse.json({ error: "Invalid user ID" }, { status: 400 });
+            return NextResponse.json({ error: COMMON_API_MESSAGES.invalidUserId }, { status: 400 });
         }
 
         const managerId = await getEmployeeIdFromUserId(userId);
         if (!managerId) {
-            return NextResponse.json(
-                { error: "Operation failed" },
-                { status: 404 }
-            );
+            return operationFailed(404);
         }
 
-// NOTE: normalized to remove mojibake
         const url = new URL(req.url);
         const yearParam = url.searchParams.get("year");
         const yearsOnly = url.searchParams.get("yearsOnly") === "1";
-        const year = yearParam ? parseInt(yearParam) : new Date().getFullYear();
+        const year = yearParam ? parseInt(yearParam, 10) : new Date().getFullYear();
 
-        // Return list of distinct years that have leave data for this manager's team
         if (yearsOnly) {
             const rows = await prisma.leaveRequest.findMany({
                 where: { approverId: managerId },
@@ -37,21 +35,18 @@ export async function GET(req: NextRequest) {
                 distinct: ["startDate"],
             });
             const yearSet = new Set(rows.map((r) => new Date(r.startDate).getFullYear()));
-            // Always include current year even if no data yet
             yearSet.add(new Date().getFullYear());
-            const years = Array.from(yearSet).sort((a, b) => b - a); // Descending
+            const years = Array.from(yearSet).sort((a, b) => b - a);
             return NextResponse.json({ years });
         }
 
         if (isNaN(year) || year < 2000 || year > 2100) {
-            return NextResponse.json({ error: "Operation failed" }, { status: 400 });
+            return operationFailed(400);
         }
 
-        // Date range for the selected year (in UTC-friendly way)
         const startOfYear = new Date(`${year}-01-01T00:00:00.000Z`);
         const endOfYear = new Date(`${year + 1}-01-01T00:00:00.000Z`);
 
-        // Fetch all leave requests for the manager's team for the given year
         const leaveRequests = await prisma.leaveRequest.findMany({
             where: {
                 approverId: managerId,
@@ -80,10 +75,6 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({ data: leaveRequests, year, count: leaveRequests.length });
     } catch (error) {
         console.error("Leave export error:", error);
-        return NextResponse.json(
-            { error: "Operation failed" },
-            { status: 500 }
-        );
+        return operationFailed(500);
     }
 }
-

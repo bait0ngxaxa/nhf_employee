@@ -1,9 +1,8 @@
-﻿// @vitest-environment node
+// @vitest-environment node
 import { beforeEach, describe, expect, it } from "vitest";
 
 import {
     buildRefreshTokenRecord,
-    constantTimeHashCompare,
     hashRefreshToken,
     issueAccessToken,
     verifyAccessToken,
@@ -45,14 +44,15 @@ describe("hybrid auth token utilities", () => {
         expect(result.record.expiresAt.getTime()).toBeGreaterThan(Date.now());
     });
 
-    it("compares hashed refresh tokens in constant time", () => {
+    it("produces consistent SHA-256 hashes for the same input", () => {
         const token = "refresh-token-value";
-        const hash = hashRefreshToken(token);
-        const sameHash = hashRefreshToken(token);
+        const hash1 = hashRefreshToken(token);
+        const hash2 = hashRefreshToken(token);
         const differentHash = hashRefreshToken("different");
 
-        expect(constantTimeHashCompare(hash, sameHash)).toBe(true);
-        expect(constantTimeHashCompare(hash, differentHash)).toBe(false);
+        expect(hash1).toBe(hash2);
+        expect(hash1).not.toBe(differentHash);
+        expect(hash1).toHaveLength(64);
     });
 });
 

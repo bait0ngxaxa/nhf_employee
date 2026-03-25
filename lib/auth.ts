@@ -1,9 +1,21 @@
-// /app/api/auth/[...nextauth]/route.ts
+﻿// /app/api/auth/[...nextauth]/route.ts
 import CredentialsProvider from "next-auth/providers/credentials";
 import { prisma } from "./prisma";
 import bcrypt from "bcryptjs";
 import type { NextAuthOptions, User } from "next-auth";
+import type { JWT } from "next-auth/jwt";
 import { logAuthEvent } from "@/lib/audit";
+
+function invalidateToken(token: JWT): JWT {
+    token.sub = undefined;
+    token.id = undefined;
+    token.role = undefined;
+    token.department = undefined;
+    token.isManager = undefined;
+    token.tokenVersion = undefined;
+    token.exp = Math.floor(Date.now() / 1000) - 60;
+    return token;
+}
 
 // Define the NextAuth.js configuration options
 export const authOptions: NextAuthOptions = {
@@ -36,6 +48,8 @@ export const authOptions: NextAuthOptions = {
                 const user = await prisma.user.findUnique({
                     where: { email: credentials.email },
                     include: {
+                        // Include tokenVersion for stateless session invalidation checks.
+                        // We store it in JWT and compare against DB on subsequent requests.
                         employee: {
                             include: {
                                 dept: true,
@@ -64,6 +78,7 @@ export const authOptions: NextAuthOptions = {
                         role: user.role,
                         department: user.employee?.dept?.name || undefined,
                         isManager: (user.employee?.subordinates?.length ?? 0) > 0,
+                        tokenVersion: user.tokenVersion,
                     };
                     return authorizedUser;
                 } else {
@@ -87,7 +102,7 @@ export const authOptions: NextAuthOptions = {
     // Use JWT strategy for session management
     session: {
         strategy: "jwt",
-        maxAge: 30 * 24 * 60 * 60, // กำหนดอายุของ session เป็น 30 วัน (1 เดือนตาม Zero Trust)
+        maxAge: 30 * 24 * 60 * 60, // 30 days for Zero Trust session policy
     },
 
     // Callbacks to manage the JWT token and session
@@ -98,13 +113,39 @@ export const authOptions: NextAuthOptions = {
                 token.role = user.role;
                 token.department = user.department;
                 token.isManager = user.isManager;
+                token.tokenVersion = user.tokenVersion;
+                return token;
             }
+
+            const userId = Number.parseInt(token.sub ?? "", 10);
+            if (!Number.isInteger(userId) || userId <= 0) {
+                return invalidateToken(token);
+            }
+
+            const dbUser = await prisma.user.findUnique({
+                where: { id: userId },
+                select: { isActive: true, tokenVersion: true },
+            });
+
+            if (!dbUser || !dbUser.isActive || token.tokenVersion !== dbUser.tokenVersion) {
+                return invalidateToken(token);
+            }
+
             return token;
         },
         session: async ({ session, token }) => {
+            if (typeof token.id !== "string" || typeof token.role !== "string") {
+                session.expires = new Date(0).toISOString();
+                if (session.user) {
+                    session.user.id = "";
+                    session.user.role = "";
+                }
+                return session;
+            }
+
             if (session.user) {
-                session.user.id = token.id as string;
-                session.user.role = token.role as string;
+                session.user.id = token.id;
+                session.user.role = token.role;
                 session.user.department = token.department as string;
                 session.user.isManager = token.isManager as boolean;
             }
@@ -120,3 +161,4 @@ export const authOptions: NextAuthOptions = {
 };
 
 // Export only the authOptions configuration
+

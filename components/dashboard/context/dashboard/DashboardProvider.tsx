@@ -21,7 +21,14 @@ import {
     type DashboardDataContextValue,
     type DashboardUIContextValue,
 } from "./types";
-import { logoutHybridSession } from "@/lib/client-auth";
+import { logoutHybridSession, refreshHybridSession } from "@/lib/client-auth";
+import { AUTH_MUTATION_HEADERS } from "@/lib/auth-csrf";
+import {
+    API_ROUTES,
+    APP_ROUTES,
+    toDashboardTabPath,
+} from "@/lib/ssot/routes";
+import { isAdminRole, USER_ROLES } from "@/lib/ssot/permissions";
 
 interface DashboardProviderProps {
     children: ReactNode;
@@ -40,7 +47,7 @@ export function DashboardProvider({ children }: DashboardProviderProps) {
     const searchParams = useSearchParams();
     const pathname = usePathname();
     const user = session?.user;
-    const isAdmin = user?.role === "ADMIN";
+    const isAdmin = isAdminRole(user?.role);
 
     // Initialize selectedMenu from URL ?tab= param, fallback to "dashboard"
     const initialTab = searchParams.get("tab") ?? "dashboard";
@@ -64,9 +71,10 @@ export function DashboardProvider({ children }: DashboardProviderProps) {
 
         void (async () => {
             try {
-                await fetch("/api/auth/bootstrap", {
+                await fetch(API_ROUTES.auth.bootstrap, {
                     method: "POST",
                     credentials: "include",
+                    headers: AUTH_MUTATION_HEADERS,
                 });
             } finally {
                 setHybridBootstrapped(true);
@@ -74,11 +82,36 @@ export function DashboardProvider({ children }: DashboardProviderProps) {
         })();
     }, [status, hybridBootstrapped]);
 
+    useEffect(() => {
+        if (status !== "authenticated") {
+            return;
+        }
+
+        const refreshSession = (): void => {
+            void refreshHybridSession();
+        };
+
+        refreshSession();
+
+        const intervalId = window.setInterval(refreshSession, 5 * 60 * 1000);
+        const onVisibilityChange = (): void => {
+            if (document.visibilityState === "visible") {
+                refreshSession();
+            }
+        };
+
+        document.addEventListener("visibilitychange", onVisibilityChange);
+        return () => {
+            window.clearInterval(intervalId);
+            document.removeEventListener("visibilitychange", onVisibilityChange);
+        };
+    }, [status]);
+
     const availableMenuItems = getAvailableMenuItems(isAdmin);
 
     const { data: statsData, mutate: mutateStats } = useSWR<{
         stats: EmployeeStats;
-    }>("/api/employees/stats");
+    }>(API_ROUTES.employees.stats);
 
     const employeeStats = statsData?.stats || defaultStats;
 
@@ -92,14 +125,14 @@ export function DashboardProvider({ children }: DashboardProviderProps) {
             const menuItem = DASHBOARD_MENU_ITEMS.find(
                 (item) => item.id === menuId,
             );
-            if (menuItem?.requiredRole === "ADMIN" && !isAdmin) {
-                router.push("/access-denied");
+            if (menuItem?.requiredRole === USER_ROLES.ADMIN && !isAdmin) {
+                router.push(APP_ROUTES.accessDenied);
                 return;
             }
 
             // Sync with URL to support browser history and bookmarks
-            if (pathname !== "/dashboard" || searchParams.get("tab") !== menuId) {
-                router.push(`/dashboard?tab=${menuId}`, { scroll: false });
+            if (pathname !== APP_ROUTES.dashboard || searchParams.get("tab") !== menuId) {
+                router.push(toDashboardTabPath(menuId), { scroll: false });
             }
 
             if (window.innerWidth < 768) {

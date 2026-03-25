@@ -1,5 +1,7 @@
-﻿import { type NextRequest, NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 
+import { AUTH_ERROR_MESSAGES } from "@/lib/auth-ssot";
+import { withTrustedMutation } from "@/lib/auth-csrf";
 import { logAuthEvent } from "@/lib/audit";
 import {
     HYBRID_REFRESH_COOKIE_NAME,
@@ -30,7 +32,7 @@ async function revokeCurrentRefreshToken(tokenHash: string): Promise<{ userId: n
     return { userId: tokenRecord.user.id, email: tokenRecord.user.email };
 }
 
-export async function POST(request: NextRequest): Promise<NextResponse> {
+export const POST = withTrustedMutation(async (request: NextRequest): Promise<NextResponse> => {
     try {
         const refreshToken = request.cookies.get(HYBRID_REFRESH_COOKIE_NAME)?.value;
         if (refreshToken) {
@@ -47,10 +49,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         return response;
     } catch {
         const response = NextResponse.json(
-            { error: "Internal server error" },
+            { error: AUTH_ERROR_MESSAGES.internalServerError },
             { status: 500 },
         );
         clearHybridAuthCookies(response);
         return response;
     }
-}
+});

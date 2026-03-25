@@ -6,9 +6,13 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { User, LogOut } from "lucide-react";
 import Link from "next/link";
 import { logoutHybridSession } from "@/lib/client-auth";
+import { isValidSessionUser } from "@/lib/auth-ssot";
+import { APP_ROUTES } from "@/lib/ssot/routes";
 
 export function AuthStatus() {
     const { data: session, status } = useSession();
+    const hasValidSession = isValidSessionUser(session?.user);
+
     const handleSignOut = async (): Promise<void> => {
         await logoutHybridSession();
         await signOut();
@@ -18,7 +22,7 @@ export function AuthStatus() {
         return <Skeleton className="h-9 w-28 rounded-md" />;
     }
 
-    if (session) {
+    if (hasValidSession) {
         return (
             <div className="flex items-center space-x-4">
                 <div className="flex items-center space-x-2 bg-white border rounded-lg px-3 py-2">
@@ -47,13 +51,13 @@ export function AuthStatus() {
 
     return (
         <div className="flex items-center space-x-4">
-            <Link href="/login">
+            <Link href={APP_ROUTES.login}>
                 <Button className="flex items-center space-x-2 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white shadow-lg shadow-blue-500/25 transition-[transform,background-color,box-shadow] duration-300 motion-safe:hover:scale-[1.02]">
                     <User className="h-4 w-4" />
                     <span>เข้าสู่ระบบ</span>
                 </Button>
             </Link>
-            <Link href="/signup">
+            <Link href={APP_ROUTES.signup}>
                 <Button
                     variant="outline"
                     className="flex items-center space-x-2 border-blue-200 text-blue-600 hover:bg-blue-50 hover:text-blue-700 transition-colors duration-300"

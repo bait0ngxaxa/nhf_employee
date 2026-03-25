@@ -5,6 +5,8 @@ import { useSession } from "next-auth/react";
 import useSWR from "swr";
 import { type TicketStats, type Ticket } from "@/types/tickets";
 import { ITSupportDataContext, ITSupportUIContext } from "./ITSupportContext";
+import { isAdminRole } from "@/lib/ssot/permissions";
+import { API_ROUTES } from "@/lib/ssot/routes";
 import {
     type ITSupportDataContextValue,
     type ITSupportUIContextValue,
@@ -46,10 +48,10 @@ export function ITSupportProvider({ children }: ITSupportProviderProps) {
     const [refreshTrigger, setRefreshTrigger] = useState(0);
     const [showCreateModal, setShowCreateModal] = useState(false);
 
-    const isAdmin = session?.user?.role === "ADMIN";
+    const isAdmin = isAdminRole(session?.user?.role);
 
     const { data, mutate, isLoading } = useSWR<{ tickets: Ticket[] }>(
-        session ? "/api/tickets?limit=100" : null,
+        session ? `${API_ROUTES.tickets.list}?limit=100` : null,
     );
 
     const ticketStats = useMemo<TicketStats>(() => {

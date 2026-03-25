@@ -22,6 +22,7 @@ import {
 import { generateFilename } from "@/lib/helpers/date-helpers";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { EmployeeDataContext, EmployeeUIContext } from "./EmployeeContext";
+import { API_ROUTES } from "@/lib/ssot/routes";
 import {
     type EmployeeDataContextValue,
     type EmployeeUIContextValue,
@@ -86,7 +87,7 @@ export function EmployeeProvider({ children }: EmployeeProviderProps) {
     if (statusFilter && statusFilter !== "all") {
         params.append("status", statusFilter);
     }
-    const swrKey = `/api/employees?${params.toString()}`;
+    const swrKey = `${API_ROUTES.employees.list}?${params.toString()}`;
 
     // SWR Hook
     const {
@@ -153,7 +154,7 @@ export function EmployeeProvider({ children }: EmployeeProviderProps) {
         }
 
         const response = await apiGet<{ employees: Employee[] }>(
-            `/api/employees?${params}`,
+            `${API_ROUTES.employees.list}?${params}`,
         );
         if (response.success) {
             return response.data.employees;
@@ -203,7 +204,7 @@ export function EmployeeProvider({ children }: EmployeeProviderProps) {
                 setExportData(csvData);
             });
 
-            await apiPost("/api/audit-logs/export", {
+            await apiPost(API_ROUTES.auditLogs.export, {
                 entityType: "Employee",
                 recordCount: allEmployees.length,
                 filters: {

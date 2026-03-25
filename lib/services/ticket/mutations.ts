@@ -1,5 +1,6 @@
 ﻿import { OUTBOX_NOTIFICATION_TYPES } from "@/lib/services/outbox/types";
 import { prisma } from "@/lib/prisma";
+import { isAdminRole } from "@/lib/ssot/permissions";
 import { TICKET_WITH_USERS_INCLUDE } from "./constants";
 import type {
     CreateTicketData,
@@ -18,7 +19,7 @@ export function checkPermissions(
     user: UserContext,
 ): PermissionCheck {
     const isOwner = ticket.reportedById === user.id;
-    const isAdmin = user.role === "ADMIN";
+    const isAdmin = isAdminRole(user.role);
     const hasAccess = isOwner || isAdmin;
 
     return { isOwner, isAdmin, hasAccess };
@@ -172,7 +173,7 @@ export async function deleteTicket(
     user: UserContext,
 ): Promise<{ success: boolean; error?: string; status?: number }> {
     // Admin only check
-    if (user.role !== "ADMIN") {
+    if (!isAdminRole(user.role)) {
         return { success: false, error: "Unauthorized access", status: 403 };
     }
 
@@ -192,3 +193,4 @@ export async function deleteTicket(
 
     return { success: true };
 }
+

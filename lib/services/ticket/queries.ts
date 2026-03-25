@@ -1,5 +1,6 @@
-import { cache } from "react";
+﻿import { cache } from "react";
 import { prisma } from "@/lib/prisma";
+import { isAdminRole } from "@/lib/ssot/permissions";
 import {
     getTicketListInclude,
     TICKET_DETAIL_INCLUDE,
@@ -23,7 +24,7 @@ function buildWhereClause(
     const where: Record<string, unknown> = {};
 
     // Role-based filtering - non-admins only see their own tickets
-    if (user.role !== "ADMIN") {
+    if (!isAdminRole(user.role)) {
         where.reportedById = user.id;
     }
 
@@ -104,7 +105,7 @@ export const getTicketById = cache(
         }
 
         // Check permissions
-        if (user.role !== "ADMIN" && ticket.reportedById !== user.id) {
+        if (!isAdminRole(user.role) && ticket.reportedById !== user.id) {
             return { ticket: null, error: "Access denied", status: 403 };
         }
 
@@ -145,3 +146,4 @@ export async function ticketExists(ticketId: number): Promise<boolean> {
     });
     return count > 0;
 }
+

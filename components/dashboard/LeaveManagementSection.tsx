@@ -5,6 +5,7 @@ import { EmployeeLeaveDashboard } from "./leave/EmployeeLeaveDashboard";
 import { ManagerApprovalDashboard } from "./leave/ManagerApprovalDashboard";
 import { ApproverManagement } from "./leave/ApproverManagement";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { isAdminRole } from "@/lib/ssot/permissions";
 
 interface LeaveManagementSectionProps {
     defaultTab?: string;
@@ -13,7 +14,7 @@ interface LeaveManagementSectionProps {
 export function LeaveManagementSection({ defaultTab = "my-leave" }: LeaveManagementSectionProps) {
     const { user } = useDashboardDataContext();
     const isManager = user?.isManager === true;
-    const isAdmin = user?.role === "ADMIN";
+    const isAdmin = isAdminRole(user?.role);
     const showApprovalTab = isManager;
 
     const [activeTab, setActiveTab] = useState(defaultTab);

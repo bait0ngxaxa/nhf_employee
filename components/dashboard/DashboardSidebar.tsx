@@ -4,6 +4,7 @@ import { Separator } from "@/components/ui/separator";
 import { Menu, X, User, Settings } from "lucide-react";
 
 import { getMenuTheme } from "@/constants/dashboard";
+import { getRoleLabelThai } from "@/lib/ssot/permissions";
 import {
     useDashboardUIContext,
     useDashboardDataContext,
@@ -255,9 +256,7 @@ export function DashboardSidebar() {
                                     {user.name}
                                 </p>
                                 <p className="text-xs text-blue-600 font-medium truncate">
-                                    {user.role === "ADMIN"
-                                        ? "ผู้ดูแลระบบ"
-                                        : "ผู้ใช้งาน"}
+                                    {getRoleLabelThai(user.role)}
                                 </p>
                             </div>
                         </div>
@@ -267,3 +266,4 @@ export function DashboardSidebar() {
         </div>
     );
 }
+

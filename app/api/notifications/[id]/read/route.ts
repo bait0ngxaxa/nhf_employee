@@ -1,29 +1,32 @@
-import { type NextRequest, NextResponse } from "next/server";
-import { getApiAuthSession } from "@/lib/server-auth";
+﻿import { type NextRequest, NextResponse } from "next/server";
+
 import { prisma } from "@/lib/prisma";
+import { getApiAuthSession } from "@/lib/server-auth";
+import { jsonError, unauthorized } from "@/lib/ssot/http";
+import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
 
 export async function PATCH(
     _req: NextRequest,
-    { params }: { params: Promise<{ id: string }> }
-) {
+    { params }: { params: Promise<{ id: string }> },
+): Promise<NextResponse> {
     try {
         const session = await getApiAuthSession();
         if (!session?.user?.id) {
-            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+            return unauthorized();
         }
 
-        const userId = parseInt(session.user.id);
-        if (isNaN(userId)) {
-            return NextResponse.json({ error: "Invalid user session" }, { status: 400 });
+        const userId = parseInt(session.user.id, 10);
+        if (Number.isNaN(userId)) {
+            return jsonError(COMMON_API_MESSAGES.invalidUserSession, 400);
         }
+
         const resolvedParams = await params;
         const notificationId = resolvedParams.id;
 
-        // Verify ownership and update
         const notification = await prisma.notification.update({
             where: {
                 id: notificationId,
-                userId: userId, // Ensure the notification belongs to the user
+                userId,
             },
             data: {
                 isRead: true,
@@ -33,6 +36,6 @@ export async function PATCH(
         return NextResponse.json({ success: true, notification });
     } catch (error) {
         console.error("Error marking notification as read:", error);
-        return NextResponse.json({ error: "Failed to mark notification as read" }, { status: 500 });
+        return jsonError(COMMON_API_MESSAGES.failedToMarkNotificationAsRead, 500);
     }
 }

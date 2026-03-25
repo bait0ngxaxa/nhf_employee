@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { DashboardProvider } from "@/components/dashboard/context";
 import { DashboardLayoutClient } from "@/components/dashboard/DashboardLayoutClient";
 import { getApiAuthSession } from "@/lib/server-auth";
+import { APP_ROUTES } from "@/lib/ssot/routes";
 
 export default async function DashboardLayout({
     children,
@@ -12,7 +13,7 @@ export default async function DashboardLayout({
     const session = await getApiAuthSession();
 
     if (!session) {
-        redirect("/login");
+        redirect(APP_ROUTES.login);
     }
 
     return (

@@ -1,33 +1,30 @@
-import { after, type NextRequest, NextResponse } from "next/server";
-import { getApiAuthSession } from "@/lib/server-auth";
-import { updateEmployeeSchema } from "@/lib/validations/employee";
+﻿import { after, type NextRequest, NextResponse } from "next/server";
+
+import { buildUserContext } from "@/lib/context";
 import { logEmployeeEvent } from "@/lib/audit";
 import { employeeService } from "@/lib/services/employee";
-import { buildUserContext } from "@/lib/context";
+import { getApiAuthSession } from "@/lib/server-auth";
+import { forbidden, jsonError, unauthorized } from "@/lib/ssot/http";
+import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
+import { isAdminRole } from "@/lib/ssot/permissions";
+import { updateEmployeeSchema } from "@/lib/validations/employee";
 
-/**
- * Parse and validate employee ID from params
- */
 async function parseEmployeeId(
     params: Promise<{ id: string }>,
 ): Promise<{ employeeId: number | null; error?: NextResponse }> {
     const { id } = await params;
-    const employeeId = parseInt(id);
+    const employeeId = parseInt(id, 10);
 
-    if (isNaN(employeeId)) {
+    if (Number.isNaN(employeeId)) {
         return {
             employeeId: null,
-            error: NextResponse.json(
-                { error: "Invalid employee ID" },
-                { status: 400 },
-            ),
+            error: jsonError(COMMON_API_MESSAGES.invalidEmployeeId, 400),
         };
     }
 
     return { employeeId };
 }
 
-// PATCH - อัปเดตข้อมูลพนักงาน
 export async function PATCH(
     request: NextRequest,
     { params }: { params: Promise<{ id: string }> },
@@ -36,140 +33,98 @@ export async function PATCH(
         const { employeeId, error } = await parseEmployeeId(params);
         if (error) return error;
         if (!employeeId) {
-            return NextResponse.json(
-                { error: "Invalid employee ID" },
-                { status: 400 },
-            );
+            return jsonError(COMMON_API_MESSAGES.invalidEmployeeId, 400);
         }
 
         const body = await request.json();
-
-        // 1. Input Validation
         const validationResult = updateEmployeeSchema.safeParse(body);
         if (!validationResult.success) {
             const errors = validationResult.error.flatten();
-            return NextResponse.json(
-                { error: "ข้อมูลไม่ถูกต้อง", details: errors.fieldErrors },
-                { status: 400 },
-            );
+            return jsonError(COMMON_API_MESSAGES.invalidInput, 400, {
+                details: errors.fieldErrors,
+            });
         }
 
-        // 2. Auth Check & Access Control
         const session = await getApiAuthSession();
+        if (!session) {
+            return unauthorized();
+        }
 
-        if (!session || session.user?.role !== "ADMIN") {
-            return NextResponse.json(
-                { error: "ไม่มีสิทธิ์เข้าถึง" },
-                { status: 403 },
-            );
+        if (!isAdminRole(session.user?.role)) {
+            return forbidden();
         }
 
         const user = buildUserContext(session);
-        const result = await employeeService.updateEmployee(
-            employeeId,
-            validationResult.data,
-        );
+        const result = await employeeService.updateEmployee(employeeId, validationResult.data);
 
         if (!result.success) {
-            return NextResponse.json(
-                { error: result.error },
-                { status: result.status || 500 },
-            );
+            return jsonError(result.error || COMMON_API_MESSAGES.operationFailed, result.status || 500);
         }
 
-        // Determine action type based on what changed
         const actionType =
-            validationResult.data.status &&
-            result.beforeData?.status !== validationResult.data.status
+            validationResult.data.status && result.beforeData?.status !== validationResult.data.status
                 ? ("EMPLOYEE_STATUS_CHANGE" as const)
                 : ("EMPLOYEE_UPDATE" as const);
 
-        // Log audit event
         after(async () => {
-            await logEmployeeEvent(
-                actionType,
-                employeeId,
-                user.id,
-                user.email,
-                {
-                    before: result.beforeData,
-                    after: validationResult.data as Record<string, unknown>,
-                },
-            );
+            await logEmployeeEvent(actionType, employeeId, user.id, user.email, {
+                before: result.beforeData,
+                after: validationResult.data as Record<string, unknown>,
+            });
         });
 
         return NextResponse.json(
             {
-                message: "อัปเดตข้อมูลพนักงานสำเร็จ",
+                message: COMMON_API_MESSAGES.employeeUpdatedSuccessfully,
                 employee: result.employee,
             },
             { status: 200 },
         );
     } catch (error) {
         console.error("Error updating employee:", error);
-        return NextResponse.json(
-            { error: "เกิดข้อผิดพลาดในการอัปเดต" },
-            { status: 500 },
-        );
+        return jsonError(COMMON_API_MESSAGES.failedToUpdateEmployee, 500);
     }
 }
 
-// DELETE - ลบพนักงาน
 export async function DELETE(
-    request: NextRequest,
+    _request: NextRequest,
     { params }: { params: Promise<{ id: string }> },
 ): Promise<NextResponse> {
     try {
         const session = await getApiAuthSession();
+        if (!session) {
+            return unauthorized();
+        }
 
-        if (!session || session.user?.role !== "ADMIN") {
-            return NextResponse.json(
-                { error: "ไม่มีสิทธิ์เข้าถึง" },
-                { status: 403 },
-            );
+        if (!isAdminRole(session.user?.role)) {
+            return forbidden();
         }
 
         const { employeeId, error } = await parseEmployeeId(params);
         if (error) return error;
         if (!employeeId) {
-            return NextResponse.json(
-                { error: "Invalid employee ID" },
-                { status: 400 },
-            );
+            return jsonError(COMMON_API_MESSAGES.invalidEmployeeId, 400);
         }
 
         const user = buildUserContext(session);
         const result = await employeeService.deleteEmployee(employeeId);
 
         if (!result.success) {
-            return NextResponse.json(
-                { error: result.error },
-                { status: result.status || 500 },
-            );
+            return jsonError(result.error || COMMON_API_MESSAGES.operationFailed, result.status || 500);
         }
 
-        // Log audit event
         after(async () => {
-            await logEmployeeEvent(
-                "EMPLOYEE_DELETE",
-                employeeId,
-                user.id,
-                user.email,
-                {
-                    before: result.beforeData,
-                },
-            );
+            await logEmployeeEvent("EMPLOYEE_DELETE", employeeId, user.id, user.email, {
+                before: result.beforeData,
+            });
         });
 
         return NextResponse.json(
-            { message: "ลบพนักงานสำเร็จ" },
+            { message: COMMON_API_MESSAGES.employeeDeletedSuccessfully },
             { status: 200 },
         );
     } catch (error) {
         console.error("Error deleting employee:", error);
-        return NextResponse.json(
-            { error: "เกิดข้อผิดพลาดในการลบ" },
-            { status: 500 },
-        );
+        return jsonError(COMMON_API_MESSAGES.failedToDeleteEmployee, 500);
     }
 }

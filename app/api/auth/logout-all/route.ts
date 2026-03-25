@@ -1,6 +1,8 @@
-﻿import { getServerSession } from "next-auth";
+import { getServerSession } from "next-auth";
 import { type NextRequest, NextResponse } from "next/server";
 
+import { AUTH_ERROR_MESSAGES } from "@/lib/auth-ssot";
+import { withTrustedMutation } from "@/lib/auth-csrf";
 import { logAuthEvent } from "@/lib/audit";
 import { authOptions } from "@/lib/auth";
 import {
@@ -26,11 +28,11 @@ async function resolveUserId(request: NextRequest): Promise<number | null> {
     return parseUserId(session?.user?.id);
 }
 
-export async function POST(request: NextRequest): Promise<NextResponse> {
+export const POST = withTrustedMutation(async (request: NextRequest): Promise<NextResponse> => {
     try {
         const userId = await resolveUserId(request);
         if (!userId) {
-            const unauthorized = NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+            const unauthorized = NextResponse.json({ error: AUTH_ERROR_MESSAGES.unauthorized }, { status: 401 });
             clearHybridAuthCookies(unauthorized);
             return unauthorized;
         }
@@ -41,7 +43,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         });
 
         if (!user) {
-            const unauthorized = NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+            const unauthorized = NextResponse.json({ error: AUTH_ERROR_MESSAGES.unauthorized }, { status: 401 });
             clearHybridAuthCookies(unauthorized);
             return unauthorized;
         }
@@ -60,10 +62,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         return response;
     } catch {
         const response = NextResponse.json(
-            { error: "Internal server error" },
+            { error: AUTH_ERROR_MESSAGES.internalServerError },
             { status: 500 },
         );
         clearHybridAuthCookies(response);
         return response;
     }
-}
+});

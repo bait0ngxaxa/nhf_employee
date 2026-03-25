@@ -7,6 +7,7 @@ import {
     getEmployeeStatusLabel,
     getEmployeeStatusBadge,
 } from "@/lib/helpers/employee-helpers";
+import { isAdminRole } from "@/lib/ssot/permissions";
 
 interface EmployeeTableProps {
     employees: Employee[];
@@ -58,7 +59,7 @@ export const EmployeeTable = memo(function EmployeeTable({
                         <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
                             สถานะ
                         </th>
-                        {userRole === "ADMIN" ? (
+                        {isAdminRole(userRole) ? (
                             <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider sticky right-0 bg-gray-50">
                                 การจัดการ
                             </th>
@@ -123,7 +124,7 @@ export const EmployeeTable = memo(function EmployeeTable({
                                     {getEmployeeStatusLabel(employee.status)}
                                 </Badge>
                             </td>
-                            {userRole === "ADMIN" && onEditEmployee && (
+                            {isAdminRole(userRole) && onEditEmployee && (
                                 <td className="px-6 py-4 whitespace-nowrap sticky right-0 bg-white">
                                     <div className="flex items-center space-x-2">
                                         <Button

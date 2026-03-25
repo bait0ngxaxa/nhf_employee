@@ -1,7 +1,9 @@
-﻿import bcrypt from "bcryptjs";
+import bcrypt from "bcryptjs";
 import { type NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
+import { AUTH_ERROR_MESSAGES, authLoginUserSelect } from "@/lib/auth-ssot";
+import { withTrustedMutation } from "@/lib/auth-csrf";
 import { logAuthEvent } from "@/lib/audit";
 import { setHybridAuthCookies, getClientMetadata } from "@/lib/hybrid-auth-session";
 import { buildRefreshTokenRecord, issueAccessToken } from "@/lib/hybrid-auth-tokens";
@@ -12,27 +14,19 @@ const hybridLoginSchema = z.object({
     password: z.string().min(1),
 });
 
-export async function POST(request: NextRequest): Promise<NextResponse> {
+export const POST = withTrustedMutation(async (request: NextRequest): Promise<NextResponse> => {
     try {
         const body = await request.json();
         const parsed = hybridLoginSchema.safeParse(body);
 
         if (!parsed.success) {
-            return NextResponse.json({ error: "Invalid credentials payload" }, { status: 400 });
+            return NextResponse.json({ error: AUTH_ERROR_MESSAGES.invalidCredentialsPayload }, { status: 400 });
         }
 
         const normalizedEmail = parsed.data.email.trim().toLowerCase();
         const user = await prisma.user.findUnique({
             where: { email: normalizedEmail },
-            select: {
-                id: true,
-                email: true,
-                name: true,
-                password: true,
-                role: true,
-                isActive: true,
-                deletedAt: true,
-            },
+            select: authLoginUserSelect,
         });
 
         const isPasswordValid = user
@@ -43,7 +37,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
             await logAuthEvent("LOGIN_FAILED", user?.id, normalizedEmail, {
                 metadata: { method: "hybrid_login", reason: "invalid_credentials_or_inactive" },
             });
-            return NextResponse.json({ error: "Invalid email or password" }, { status: 401 });
+            return NextResponse.json({ error: AUTH_ERROR_MESSAGES.invalidEmailOrPassword }, { status: 401 });
         }
 
         const metadata = getClientMetadata(request);
@@ -57,7 +51,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
             userId: user.id,
             role: user.role,
             sessionId: refreshDraft.record.familyId,
-            tokenVersion: 1,
+            tokenVersion: user.tokenVersion ?? 1,
         });
 
         await prisma.authRefreshToken.create({
@@ -87,6 +81,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         setHybridAuthCookies(response, accessToken, refreshDraft.rawToken);
         return response;
     } catch {
-        return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+        return NextResponse.json({ error: AUTH_ERROR_MESSAGES.internalServerError }, { status: 500 });
     }
-}
+});

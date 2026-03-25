@@ -1,20 +1,20 @@
 ﻿import { after, type NextRequest, NextResponse } from "next/server";
-import { getApiAuthSession } from "@/lib/server-auth";
-import { prisma } from "@/lib/prisma";
-import { createTicketSchema, ticketFiltersSchema } from "@/lib/validations/ticket";
-import { logTicketEvent } from "@/lib/audit";
-import { ticketService, type TicketFilters } from "@/lib/services/ticket";
-import { buildUserContext } from "@/lib/context";
-import { processOutbox } from "@/lib/services/outbox/processor";
 
-/**
- * Parse and validate query parameters into TicketFilters
- */
+import { buildUserContext } from "@/lib/context";
+import { logTicketEvent } from "@/lib/audit";
+import { prisma } from "@/lib/prisma";
+import { APP_ROUTES } from "@/lib/ssot/routes";
+import { processOutbox } from "@/lib/services/outbox/processor";
+import { ticketService, type TicketFilters } from "@/lib/services/ticket";
+import { getApiAuthSession } from "@/lib/server-auth";
+import { jsonError, unauthorized } from "@/lib/ssot/http";
+import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
+import { createTicketSchema, ticketFiltersSchema } from "@/lib/validations/ticket";
+
 function parseQueryParams(url: string):
     | { success: true; data: TicketFilters }
     | { success: false; response: NextResponse } {
     const { searchParams } = new URL(url);
-
     const validation = ticketFiltersSchema.safeParse({
         status: searchParams.get("status"),
         category: searchParams.get("category"),
@@ -26,29 +26,20 @@ function parseQueryParams(url: string):
     if (!validation.success) {
         return {
             success: false,
-            response: NextResponse.json(
-                {
-                    error: "Operation failed",
-                    details: validation.error.flatten().fieldErrors,
-                },
-                { status: 400 },
-            ),
+            response: jsonError(COMMON_API_MESSAGES.operationFailed, 400, {
+                details: validation.error.flatten().fieldErrors,
+            }),
         };
     }
 
     return { success: true, data: validation.data };
 }
 
-// GET - Retrieve tickets (filtered by role)
 export async function GET(request: NextRequest): Promise<NextResponse> {
     try {
         const session = await getApiAuthSession();
-
         if (!session) {
-            return NextResponse.json(
-                { error: "Unauthorized" },
-                { status: 401 },
-            );
+            return unauthorized();
         }
 
         const parsedFilters = parseQueryParams(request.url);
@@ -62,73 +53,55 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         return NextResponse.json(result, { status: 200 });
     } catch (error) {
         console.error("Error fetching tickets:", error);
-        return NextResponse.json(
-            { error: "Failed to fetch tickets" },
-            { status: 500 },
-        );
+        return jsonError(COMMON_API_MESSAGES.failedToFetchTickets, 500);
     }
 }
 
-// POST - Create new ticket
 export async function POST(request: NextRequest): Promise<NextResponse> {
     try {
         const body = await request.json();
-
-        // 1. Input Validation with Zod
         const result = createTicketSchema.safeParse(body);
         if (!result.success) {
             const errors = result.error.flatten();
-            return NextResponse.json(
-                { error: "Operation failed", details: errors.fieldErrors },
-                { status: 400 },
-            );
+            return jsonError(COMMON_API_MESSAGES.operationFailed, 400, {
+                details: errors.fieldErrors,
+            });
         }
 
-        // 2. Auth Check
         const session = await getApiAuthSession();
-
         if (!session) {
-            return NextResponse.json(
-                { error: "Unauthorized" },
-                { status: 401 },
-            );
+            return unauthorized();
         }
 
         const user = buildUserContext(session);
         const ticket = await ticketService.createTicket(result.data, user.id);
 
         after(async () => {
-            // Processing outbox in background
             processOutbox().catch((err) =>
                 console.error("Outbox processor failed:", err),
             );
 
-            // Log audit event
-            await logTicketEvent(
-                "TICKET_CREATE",
-                ticket.id,
-                user.id,
-                user.email,
-                {
-                    after: {
-                        title: ticket.title,
-                        category: ticket.category,
-                        priority: ticket.priority,
-                        status: ticket.status,
-                    },
+            await logTicketEvent("TICKET_CREATE", ticket.id, user.id, user.email, {
+                after: {
+                    title: ticket.title,
+                    category: ticket.category,
+                    priority: ticket.priority,
+                    status: ticket.status,
                 },
-            );
+            });
 
-            // Trigger In-App Notification using Prisma
-            const admins = await prisma.user.findMany({ where: { role: "ADMIN" } });
+            const admins = await prisma.user.findMany({
+                where: { role: "ADMIN" },
+            });
+
             if (admins.length > 0) {
                 await prisma.notification.createMany({
                     data: admins.map((admin) => ({
                         userId: admin.id,
                         type: "TICKET_CREATED",
                         title: "Notification",
-                        message: "Operation completed",
-                        actionUrl: `/dashboard?tab=it-support&ticketId=${ticket.id}`,
+                        message: COMMON_API_MESSAGES.operationCompleted,
+                        actionUrl: `${APP_ROUTES.dashboard}?tab=it-support&ticketId=${ticket.id}`,
                         referenceId: ticket.id.toString(),
                     })),
                 });
@@ -138,11 +111,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         return NextResponse.json({ ticket }, { status: 201 });
     } catch (error) {
         console.error("Error creating ticket:", error);
-        return NextResponse.json(
-            { error: "Failed to create ticket" },
-            { status: 500 },
-        );
+        return jsonError(COMMON_API_MESSAGES.failedToCreateTicket, 500);
     }
 }
-
-

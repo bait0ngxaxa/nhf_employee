@@ -1,7 +1,9 @@
-﻿import { getServerSession } from "next-auth";
+import { getServerSession } from "next-auth";
 import { type NextRequest, NextResponse } from "next/server";
 
+import { AUTH_ERROR_MESSAGES, authSessionUserSelect } from "@/lib/auth-ssot";
 import { authOptions } from "@/lib/auth";
+import { withTrustedMutation } from "@/lib/auth-csrf";
 import {
     HYBRID_REFRESH_COOKIE_NAME,
     getClientMetadata,
@@ -19,6 +21,7 @@ async function issueNewTokenPair(
     request: NextRequest,
     userId: number,
     role: string,
+    tokenVersion: number,
 ): Promise<{ accessToken: string; refreshToken: string }> {
     const metadata = getClientMetadata(request);
     const refreshDraft = buildRefreshTokenRecord({
@@ -31,7 +34,7 @@ async function issueNewTokenPair(
         userId,
         role,
         sessionId: refreshDraft.record.familyId,
-        tokenVersion: 1,
+        tokenVersion,
     });
 
     await prisma.authRefreshToken.create({
@@ -52,6 +55,7 @@ async function resumeExistingRefreshToken(
     refreshToken: string,
     userId: number,
     role: string,
+    tokenVersion: number,
 ): Promise<{ accessToken: string; refreshToken: string } | null> {
     const tokenHash = hashRefreshToken(refreshToken);
     const existing = await prisma.authRefreshToken.findUnique({
@@ -76,41 +80,42 @@ async function resumeExistingRefreshToken(
         userId,
         role,
         sessionId: existing.familyId,
-        tokenVersion: 1,
+        tokenVersion,
     });
 
     return { accessToken, refreshToken };
 }
 
-export async function POST(request: NextRequest): Promise<NextResponse> {
+export const POST = withTrustedMutation(async (request: NextRequest): Promise<NextResponse> => {
     try {
         const session = await getServerSession(authOptions);
         const userId = parseUserId(session?.user?.id);
 
         if (!userId || !session?.user?.role) {
-            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+            return NextResponse.json({ error: AUTH_ERROR_MESSAGES.unauthorized }, { status: 401 });
         }
 
         const user = await prisma.user.findUnique({
             where: { id: userId },
-            select: { id: true, role: true, isActive: true },
+            select: authSessionUserSelect,
         });
 
         if (!user || !user.isActive) {
-            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+            return NextResponse.json({ error: AUTH_ERROR_MESSAGES.unauthorized }, { status: 401 });
         }
 
         const existingRefresh = request.cookies.get(HYBRID_REFRESH_COOKIE_NAME)?.value;
         const tokenPair = existingRefresh
-            ? await resumeExistingRefreshToken(existingRefresh, user.id, user.role)
+            ? await resumeExistingRefreshToken(existingRefresh, user.id, user.role, (user.tokenVersion ?? 1))
             : null;
-        const finalTokenPair = tokenPair ?? (await issueNewTokenPair(request, user.id, user.role));
+        const finalTokenPair = tokenPair ??
+            (await issueNewTokenPair(request, user.id, user.role, (user.tokenVersion ?? 1)));
 
         const response = NextResponse.json({ success: true });
         setHybridAuthCookies(response, finalTokenPair.accessToken, finalTokenPair.refreshToken);
         return response;
     } catch (error) {
         console.error("[HybridAuth][bootstrap] failed:", error);
-        return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+        return NextResponse.json({ error: AUTH_ERROR_MESSAGES.internalServerError }, { status: 500 });
     }
-}
+});

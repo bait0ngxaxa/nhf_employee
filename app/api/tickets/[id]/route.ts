@@ -1,82 +1,63 @@
+﻿import { after } from "next/server";
 import { type NextRequest, NextResponse } from "next/server";
-import { getApiAuthSession } from "@/lib/server-auth";
-import { prisma } from "@/lib/prisma";
-import { updateTicketSchema } from "@/lib/validations/ticket";
-import { ticketService, type UpdateTicketData } from "@/lib/services/ticket";
-import { buildUserContext } from "@/lib/context";
-import { processOutbox } from "@/lib/services/outbox/processor";
-import { after } from "next/server";
 
-/**
- * Parse and validate ticket ID from params
- */
+import { buildUserContext } from "@/lib/context";
+import { prisma } from "@/lib/prisma";
+import { processOutbox } from "@/lib/services/outbox/processor";
+import { ticketService, type UpdateTicketData } from "@/lib/services/ticket";
+import { getApiAuthSession } from "@/lib/server-auth";
+import { jsonError, unauthorized } from "@/lib/ssot/http";
+import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
+import { APP_ROUTES } from "@/lib/ssot/routes";
+import { updateTicketSchema } from "@/lib/validations/ticket";
+
 async function parseTicketId(
     params: Promise<{ id: string }>,
 ): Promise<{ ticketId: number | null; error?: NextResponse }> {
     const resolvedParams = await params;
-    const ticketId = parseInt(resolvedParams.id);
+    const ticketId = parseInt(resolvedParams.id, 10);
 
-    if (isNaN(ticketId)) {
+    if (Number.isNaN(ticketId)) {
         return {
             ticketId: null,
-            error: NextResponse.json(
-                { error: "Invalid ticket ID" },
-                { status: 400 },
-            ),
+            error: jsonError(COMMON_API_MESSAGES.invalidTicketId, 400),
         };
     }
 
     return { ticketId };
 }
 
-// GET - Get single ticket with comments
 export async function GET(
-    request: NextRequest,
+    _request: NextRequest,
     { params }: { params: Promise<{ id: string }> },
 ): Promise<NextResponse> {
     try {
         const session = await getApiAuthSession();
-
         if (!session) {
-            return NextResponse.json(
-                { error: "Unauthorized" },
-                { status: 401 },
-            );
+            return unauthorized();
         }
 
         const { ticketId, error } = await parseTicketId(params);
         if (error) return error;
         if (!ticketId) {
-            return NextResponse.json(
-                { error: "Invalid ticket ID" },
-                { status: 400 },
-            );
+            return jsonError(COMMON_API_MESSAGES.invalidTicketId, 400);
         }
 
         const user = buildUserContext(session);
         const result = await ticketService.getTicketById(ticketId, user);
 
         if (result.error) {
-            return NextResponse.json(
-                { error: result.error },
-                { status: result.status || 500 },
-            );
+            return jsonError(result.error, result.status || 500);
         }
 
-        // Record view
         await ticketService.recordTicketView(ticketId, user.id);
-
         return NextResponse.json({ ticket: result.ticket }, { status: 200 });
     } catch (error) {
         console.error("Error fetching ticket:", error);
-        return NextResponse.json(
-            { error: "Failed to fetch ticket" },
-            { status: 500 },
-        );
+        return jsonError(COMMON_API_MESSAGES.failedToFetchTicket, 500);
     }
 }
 
-// PATCH - Update ticket (status, assignment, etc.)
 export async function PATCH(
     request: NextRequest,
     { params }: { params: Promise<{ id: string }> },
@@ -85,32 +66,21 @@ export async function PATCH(
         const { ticketId, error } = await parseTicketId(params);
         if (error) return error;
         if (!ticketId) {
-            return NextResponse.json(
-                { error: "Invalid ticket ID" },
-                { status: 400 },
-            );
+            return jsonError(COMMON_API_MESSAGES.invalidTicketId, 400);
         }
 
         const body = await request.json();
-
-        // 1. Input Validation with Zod (partial validation for updates)
         const validationResult = updateTicketSchema.safeParse(body);
         if (!validationResult.success) {
             const errors = validationResult.error.flatten();
-            return NextResponse.json(
-                { error: "ข้อมูลไม่ถูกต้อง", details: errors.fieldErrors },
-                { status: 400 },
-            );
+            return jsonError(COMMON_API_MESSAGES.invalidInput, 400, {
+                details: errors.fieldErrors,
+            });
         }
 
-        // 2. Auth Check
         const session = await getApiAuthSession();
-
         if (!session) {
-            return NextResponse.json(
-                { error: "Unauthorized" },
-                { status: 401 },
-            );
+            return unauthorized();
         }
 
         const user = buildUserContext(session);
@@ -124,37 +94,27 @@ export async function PATCH(
             resolution: validationResult.data.resolution,
         };
 
-        const result = await ticketService.updateTicket(
-            ticketId,
-            updateData,
-            user,
-        );
-
+        const result = await ticketService.updateTicket(ticketId, updateData, user);
         if (result.error) {
-            return NextResponse.json(
-                { error: result.error },
-                { status: result.status || 500 },
-            );
+            return jsonError(result.error, result.status || 500);
         }
 
-        // (Notifications are now triggered transactionally via outbox)
         after(async () => {
             processOutbox().catch((err) =>
                 console.error("Outbox processor failed:", err),
             );
-            
-            // In-app Notification for status update
+
             const currentUserId = Number(user.id);
             if (result.ticket && result.ticket.reportedById !== currentUserId && updateData.status) {
                 await prisma.notification.create({
                     data: {
                         userId: result.ticket.reportedById,
                         type: "TICKET_UPDATED",
-                        title: "อัปเดตสถานะปัญหา",
-                        message: `ปัญหา '${result.ticket.title}' เปลี่ยนสถานะเป็น: ${updateData.status}`,
-                        actionUrl: `/dashboard?tab=it-support&ticketId=${ticketId}`,
-                        referenceId: ticketId.toString()
-                    }
+                        title: "Ticket status updated",
+                        message: `Ticket '${result.ticket.title}' updated to: ${updateData.status}`,
+                        actionUrl: `${APP_ROUTES.dashboard}?tab=it-support&ticketId=${ticketId}`,
+                        referenceId: ticketId.toString(),
+                    },
                 });
             }
         });
@@ -162,57 +122,36 @@ export async function PATCH(
         return NextResponse.json({ ticket: result.ticket }, { status: 200 });
     } catch (error) {
         console.error("Error updating ticket:", error);
-        return NextResponse.json(
-            { error: "Failed to update ticket" },
-            { status: 500 },
-        );
+        return jsonError(COMMON_API_MESSAGES.failedToUpdateTicket, 500);
     }
 }
 
-// DELETE - Delete ticket (admin only)
 export async function DELETE(
-    request: NextRequest,
+    _request: NextRequest,
     { params }: { params: Promise<{ id: string }> },
 ): Promise<NextResponse> {
     try {
         const session = await getApiAuthSession();
-
         if (!session) {
-            return NextResponse.json(
-                { error: "Unauthorized" },
-                { status: 401 },
-            );
+            return unauthorized();
         }
 
         const { ticketId, error } = await parseTicketId(params);
         if (error) return error;
         if (!ticketId) {
-            return NextResponse.json(
-                { error: "Invalid ticket ID" },
-                { status: 400 },
-            );
+            return jsonError(COMMON_API_MESSAGES.invalidTicketId, 400);
         }
 
         const user = buildUserContext(session);
         const result = await ticketService.deleteTicket(ticketId, user);
 
         if (!result.success) {
-            return NextResponse.json(
-                { error: result.error },
-                { status: result.status || 500 },
-            );
+            return jsonError(result.error || COMMON_API_MESSAGES.operationFailed, result.status || 500);
         }
 
-        return NextResponse.json(
-            { message: "Ticket deleted successfully" },
-            { status: 200 },
-        );
+        return NextResponse.json({ message: COMMON_API_MESSAGES.ticketDeletedSuccessfully }, { status: 200 });
     } catch (error) {
         console.error("Error deleting ticket:", error);
-        return NextResponse.json(
-            { error: "Failed to delete ticket" },
-            { status: 500 },
-        );
+        return jsonError(COMMON_API_MESSAGES.failedToDeleteTicket, 500);
     }
 }
-

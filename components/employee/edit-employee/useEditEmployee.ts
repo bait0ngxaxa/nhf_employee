@@ -10,6 +10,7 @@ import {
 } from "@/types/employees";
 import { updateEmployeeSchema } from "@/lib/validations/employee";
 import { apiPatch } from "@/lib/api-client";
+import { API_ROUTES } from "@/lib/ssot/routes";
 
 function buildInitialFormData(employee: Employee | null): EmployeeFormData {
     return {
@@ -61,7 +62,7 @@ export function useEditEmployee({
     );
 
     const { data: departmentData } = useSWR<{ departments: Department[] }>(
-        isOpen ? "/api/departments" : null,
+        isOpen ? API_ROUTES.employees.departments : null,
     );
     const departments = departmentData?.departments || [];
 
@@ -135,10 +136,7 @@ export function useEditEmployee({
 
         setIsLoading(true);
 
-        const apiResult = await apiPatch(
-            `/api/employees/${employee.id}`,
-            formData,
-        );
+        const apiResult = await apiPatch(API_ROUTES.employees.byId(employee.id), formData);
 
         if (apiResult.success) {
             onSuccess?.();

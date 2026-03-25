@@ -1,5 +1,6 @@
 import { cache } from "react";
 import { prisma } from "@/lib/prisma";
+import { isAdminRole } from "@/lib/ssot/permissions";
 import type {
     EmailRequestFilters,
     PaginatedEmailRequestsResult,
@@ -28,7 +29,7 @@ export const getEmailRequests = cache(
         const limit = Math.min(Math.max(1, filters.limit), 100);
         const skip = (page - 1) * limit;
 
-        const isAdmin = user.role === "ADMIN";
+        const isAdmin = isAdminRole(user.role);
         const where = isAdmin ? {} : { requestedBy: user.id };
 
         const [total, emailRequests] = await Promise.all([

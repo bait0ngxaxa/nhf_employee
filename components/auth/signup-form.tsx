@@ -17,6 +17,7 @@ import { useRouter } from "next/navigation";
 import { useTitle } from "@/hooks/useTitle";
 import Link from "next/link";
 import { apiPost } from "@/lib/api-client";
+import { API_ROUTES, APP_ROUTES } from "@/lib/ssot/routes";
 
 // Type definitions for API response
 interface User {
@@ -69,7 +70,7 @@ export function SignupForm({
 
         try {
             const result = await apiPost<SignupSuccessResponse>(
-                "/api/auth/signup",
+                API_ROUTES.auth.signup,
                 {
                     email: formData.email,
                     password: formData.password,
@@ -90,7 +91,7 @@ export function SignupForm({
                 });
                 // Redirect to login
                 setTimeout(() => {
-                    router.push("/login");
+                    router.push(APP_ROUTES.login);
                 }, 2000);
             } else {
                 setError(result.error);
@@ -207,7 +208,7 @@ export function SignupForm({
                         <div className="mt-4 text-center text-sm">
                             มีบัญชีอยู่แล้ว?{" "}
                             <Link
-                                href="/login"
+                                href={APP_ROUTES.login}
                                 className="text-blue-600 hover:text-blue-700 font-medium"
                             >
                                 เข้าสู่ระบบ

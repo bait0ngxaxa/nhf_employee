@@ -1,5 +1,8 @@
-﻿import { createHash, randomBytes, timingSafeEqual } from "crypto";
+import { createHash, randomBytes } from "crypto";
 import { SignJWT, jwtVerify, type JWTPayload } from "jose";
+
+import { hasRequiredAccessClaims } from "@/lib/auth-ssot";
+import { getHybridSecretKey } from "@/lib/hybrid-auth-constants";
 
 const DEFAULT_ACCESS_TOKEN_TTL_SECONDS = 15 * 60;
 const DEFAULT_REFRESH_TOKEN_TTL_SECONDS = 30 * 24 * 60 * 60;
@@ -41,8 +44,6 @@ interface VerifiedAccessTokenPayload extends JWTPayload {
     ver: number;
 }
 
-const textEncoder = new TextEncoder();
-
 function getPositiveIntFromEnv(name: string, fallback: number): number {
     const raw = process.env[name]?.trim();
     if (!raw) {
@@ -70,24 +71,6 @@ export function getRefreshTokenTtlSeconds(): number {
     );
 }
 
-function getAccessTokenSecretKey(): Uint8Array {
-    const explicitSecret = process.env.AUTH_ACCESS_TOKEN_SECRET?.trim();
-    const fallbackSecret = process.env.NEXTAUTH_SECRET?.trim();
-    const secret = explicitSecret || fallbackSecret;
-
-    if (!secret) {
-        throw new Error(
-            "Missing required environment variable: AUTH_ACCESS_TOKEN_SECRET or NEXTAUTH_SECRET",
-        );
-    }
-
-    return textEncoder.encode(secret);
-}
-
-function isNonEmptyString(value: unknown): value is string {
-    return typeof value === "string" && value.length > 0;
-}
-
 function toAccessTokenClaims(payload: VerifiedAccessTokenPayload): AccessTokenClaims {
     return {
         sub: payload.sub,
@@ -98,17 +81,8 @@ function toAccessTokenClaims(payload: VerifiedAccessTokenPayload): AccessTokenCl
 }
 
 function assertAccessPayload(payload: JWTPayload): asserts payload is VerifiedAccessTokenPayload {
-    if (!isNonEmptyString(payload.sub)) {
-        throw new Error("Invalid access token payload: sub");
-    }
-    if (!isNonEmptyString(payload.role)) {
-        throw new Error("Invalid access token payload: role");
-    }
-    if (!isNonEmptyString(payload.sid)) {
-        throw new Error("Invalid access token payload: sid");
-    }
-    if (typeof payload.ver !== "number" || !Number.isInteger(payload.ver) || payload.ver < 0) {
-        throw new Error("Invalid access token payload: ver");
+    if (!hasRequiredAccessClaims(payload)) {
+        throw new Error("Invalid access token payload");
     }
 }
 
@@ -121,11 +95,11 @@ export async function issueAccessToken(input: IssueAccessTokenInput): Promise<st
         .setSubject(String(input.userId))
         .setIssuedAt(nowInSeconds)
         .setExpirationTime(nowInSeconds + ttlSeconds)
-        .sign(getAccessTokenSecretKey());
+        .sign(getHybridSecretKey());
 }
 
 export async function verifyAccessToken(token: string): Promise<AccessTokenClaims> {
-    const { payload } = await jwtVerify(token, getAccessTokenSecretKey(), {
+    const { payload } = await jwtVerify(token, getHybridSecretKey(), {
         algorithms: ["HS256"],
     });
     assertAccessPayload(payload);
@@ -138,16 +112,6 @@ export function generateOpaqueRefreshToken(): string {
 
 export function hashRefreshToken(token: string): string {
     return createHash("sha256").update(token).digest("hex");
-}
-
-export function constantTimeHashCompare(leftHash: string, rightHash: string): boolean {
-    const left = Buffer.from(leftHash, "hex");
-    const right = Buffer.from(rightHash, "hex");
-
-    if (left.length !== right.length) {
-        return false;
-    }
-    return timingSafeEqual(left, right);
 }
 
 export function buildRefreshTokenRecord(input: RefreshTokenRecordInput): {
