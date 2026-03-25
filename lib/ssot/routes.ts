@@ -50,6 +50,9 @@ export const API_ROUTES = {
         read: (id: string): string => `/api/notifications/${id}/read`,
     },
     leave: {
+        me: "/api/leave/me",
+        approvals: "/api/leave/approvals",
+        cancel: "/api/leave/cancel",
         request: "/api/leave/request",
         approvers: "/api/leave/approvers",
         intranetAction: "/api/leave/intranet-action",

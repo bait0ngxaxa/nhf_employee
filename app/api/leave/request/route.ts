@@ -11,6 +11,30 @@ import { jsonError, unauthorized } from "@/lib/ssot/http";
 import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
 import { leaveRequestSchema } from "@/lib/validations/leave";
 
+const LEAVE_REQUEST_MESSAGES = {
+    holidayConflict: "วันที่ลาตรงกับวันหยุด",
+    approverNotConfigured: "ยังไม่ได้ตั้งค่าผู้อนุมัติ",
+    overlapConflict: "มีคำขอลาในช่วงวันที่นี้อยู่แล้ว",
+    employeeNotFound: "ไม่พบข้อมูลพนักงาน",
+    halfDayMultiDate: "การลาครึ่งวันต้องเลือกวันลาเพียงวันเดียว",
+    quotaExceeded: "สิทธิ์ลาคงเหลือไม่เพียงพอ",
+} as const;
+
+class LeaveRequestError extends Error {
+    readonly statusCode: number;
+
+    constructor(message: string, statusCode: number) {
+        super(message);
+        this.name = "LeaveRequestError";
+        this.statusCode = statusCode;
+    }
+}
+
+const isWorkingDay = (date: Date): boolean => {
+    const day = date.getDay();
+    return day !== 0 && day !== 6;
+};
+
 export async function POST(req: Request) {
     try {
         const session = await getApiAuthSession();
@@ -40,7 +64,7 @@ export async function POST(req: Request) {
         const currentYear = new Date(startDate).getFullYear();
 
         if (period !== "FULL_DAY" && startDate !== endDate) {
-            return jsonError(COMMON_API_MESSAGES.operationFailed, 400);
+            return jsonError(LEAVE_REQUEST_MESSAGES.halfDayMultiDate, 400);
         }
 
         const start = new Date(startDate);
@@ -49,11 +73,13 @@ export async function POST(req: Request) {
 
         if (period !== "FULL_DAY") {
             if (diffDays === 0) {
-                return jsonError(COMMON_API_MESSAGES.operationFailed, 400);
+                return jsonError(LEAVE_REQUEST_MESSAGES.holidayConflict, 400);
             }
             diffDays = 0.5;
         } else if (diffDays === 0) {
-            return jsonError(COMMON_API_MESSAGES.operationFailed, 400);
+            return jsonError(LEAVE_REQUEST_MESSAGES.holidayConflict, 400);
+        } else if (!isWorkingDay(start) || !isWorkingDay(end)) {
+            return jsonError(LEAVE_REQUEST_MESSAGES.holidayConflict, 400);
         }
 
         const durationDays = diffDays;
@@ -65,11 +91,11 @@ export async function POST(req: Request) {
             });
 
             if (!employee) {
-                throw new Error("Employee not found");
+                throw new LeaveRequestError(LEAVE_REQUEST_MESSAGES.employeeNotFound, 404);
             }
 
             if (!employee.managerId) {
-                throw new Error("No manager is configured for this employee");
+                throw new LeaveRequestError(LEAVE_REQUEST_MESSAGES.approverNotConfigured, 400);
             }
 
             const overlappingRequests = await tx.leaveRequest.findFirst({
@@ -84,7 +110,7 @@ export async function POST(req: Request) {
             });
 
             if (overlappingRequests) {
-                throw new Error(COMMON_API_MESSAGES.operationFailed);
+                throw new LeaveRequestError(LEAVE_REQUEST_MESSAGES.overlapConflict, 409);
             }
 
             let quota = await tx.leaveQuota.findFirst({
@@ -105,7 +131,7 @@ export async function POST(req: Request) {
 
             const availableQuota = quota.totalDays - quota.usedDays;
             if (durationDays > availableQuota) {
-                throw new Error(COMMON_API_MESSAGES.operationFailed);
+                throw new LeaveRequestError(LEAVE_REQUEST_MESSAGES.quotaExceeded, 400);
             }
 
             const leaveRequest = await tx.leaveRequest.create({
@@ -161,6 +187,9 @@ export async function POST(req: Request) {
         return NextResponse.json({ success: true, data: result }, { status: 201 });
     } catch (error) {
         console.error("Leave request error:", error);
+        if (error instanceof LeaveRequestError) {
+            return jsonError(error.message, error.statusCode);
+        }
         return jsonError(
             error instanceof Error ? error.message : COMMON_API_MESSAGES.failedToSubmitLeaveRequest,
             500,

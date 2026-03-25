@@ -1,9 +1,4 @@
-import { useState } from "react";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-
-
-import { Button } from "@/components/ui/button";
+import { Loader2 } from "lucide-react";
 import {
     Form,
     FormControl,
@@ -14,6 +9,7 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Button } from "@/components/ui/button";
 import {
     Select,
     SelectContent,
@@ -21,63 +17,15 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
-import { apiPost } from "@/lib/api-client";
-import { Loader2 } from "lucide-react";
-import { toast } from "sonner";
-import { API_ROUTES } from "@/lib/ssot/routes";
-
-import {
-    leaveRequestSchema,
-    type LeaveRequestValues,
-} from "@/lib/validations/leave";
+import { useLeaveRequestFormModel } from "@/hooks/leave/useLeaveRequestFormModel";
 
 interface Props {
-    onSuccess: () => void;
+    onSuccess: () => void | Promise<void>;
     onCancel: () => void;
 }
 
 export function LeaveRequestForm({ onSuccess, onCancel }: Props) {
-    const [isSubmitting, setIsSubmitting] = useState(false);
-    const [errorMsg, setErrorMsg] = useState<string | null>(null);
-    const [isMultiDay, setIsMultiDay] = useState(false);
-
-    const now = new Date();
-    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-
-    const form = useForm<LeaveRequestValues>({
-        resolver: zodResolver(leaveRequestSchema),
-        defaultValues: {
-            leaveType: "SICK",
-            startDate: today,
-            endDate: today,
-            period: "FULL_DAY",
-            reason: "",
-        },
-    });
-
-    const startDateValue = form.watch("startDate");
-
-    async function onSubmit(data: LeaveRequestValues): Promise<void> {
-        setIsSubmitting(true);
-        setErrorMsg(null);
-
-        try {
-            const res = await apiPost(API_ROUTES.leave.request, data);
-
-            if (res.success) {
-                toast.success("ส่งคำขอลาสำเร็จ");
-                onSuccess();
-            } else {
-                toast.error(res.error || "เกิดข้อผิดพลาดในการส่งใบลา");
-                setErrorMsg(res.error || "เกิดข้อผิดพลาดในการส่งใบลา");
-            }
-        } catch (_error) {
-            toast.error("เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์");
-            setErrorMsg("เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์");
-        } finally {
-            setIsSubmitting(false);
-        }
-    }
+    const model = useLeaveRequestFormModel({ onSuccess });
 
     return (
         <div className="bg-white/80 backdrop-blur-xl p-6 md:p-8 rounded-3xl border border-white/60 shadow-xl relative overflow-hidden">
@@ -92,42 +40,33 @@ export function LeaveRequestForm({ onSuccess, onCancel }: Props) {
                 </p>
             </div>
 
-            {errorMsg && (
+            {model.errorMsg ? (
                 <div className="relative z-10 mb-6 p-4 bg-red-50/80 backdrop-blur-sm border border-red-100 text-red-600 rounded-xl text-sm font-medium shadow-sm">
-                    {errorMsg}
+                    {model.errorMsg}
                 </div>
-            )}
+            ) : null}
 
-            <Form {...form}>
+            <Form {...model.form}>
                 <form
-                    onSubmit={form.handleSubmit(onSubmit)}
+                    onSubmit={model.form.handleSubmit(model.submit)}
                     className="space-y-6 relative z-10"
                 >
                     <FormField
-                        control={form.control}
+                        control={model.form.control}
                         name="leaveType"
                         render={({ field }) => (
                             <FormItem>
                                 <FormLabel>ประเภทการลา</FormLabel>
-                                <Select
-                                    onValueChange={field.onChange}
-                                    defaultValue={field.value}
-                                >
+                                <Select onValueChange={field.onChange} defaultValue={field.value}>
                                     <FormControl>
                                         <SelectTrigger>
                                             <SelectValue placeholder="เลือกประเภทการลา" />
                                         </SelectTrigger>
                                     </FormControl>
                                     <SelectContent>
-                                        <SelectItem value="SICK">
-                                            ลาป่วย
-                                        </SelectItem>
-                                        <SelectItem value="PERSONAL">
-                                            ลากิจ
-                                        </SelectItem>
-                                        <SelectItem value="VACATION">
-                                            ลาพักร้อน
-                                        </SelectItem>
+                                        <SelectItem value="SICK">ลาป่วย</SelectItem>
+                                        <SelectItem value="PERSONAL">ลากิจ</SelectItem>
+                                        <SelectItem value="VACATION">ลาพักร้อน</SelectItem>
                                     </SelectContent>
                                 </Select>
                                 <FormMessage />
@@ -135,79 +74,48 @@ export function LeaveRequestForm({ onSuccess, onCancel }: Props) {
                         )}
                     />
 
-                    {/* Toggle วันเดียว / หลายวัน */}
                     <div className="space-y-1.5">
-                        <FormLabel className="text-sm font-medium">
-                            จำนวนวันลา
-                        </FormLabel>
+                        <FormLabel className="text-sm font-medium">จำนวนวันลา</FormLabel>
                         <div className="grid grid-cols-2 gap-2 p-1 bg-gray-100 rounded-lg">
                             <button
                                 type="button"
-                                onClick={() => {
-                                    setIsMultiDay(false);
-                                    form.setValue(
-                                        "endDate",
-                                        form.getValues("startDate"),
-                                    );
-                                }}
-                                className={`
-                                    py-2 text-sm font-medium rounded-md transition-colors duration-200
-                                    ${
-                                        !isMultiDay
-                                            ? "bg-white text-indigo-700 shadow-sm"
-                                            : "text-gray-500 hover:text-gray-700"
-                                    }
-                                `}
+                                onClick={model.switchToSingleDay}
+                                className={`py-2 text-sm font-medium rounded-md transition-colors duration-200 ${
+                                    !model.isMultiDay
+                                        ? "bg-white text-indigo-700 shadow-sm"
+                                        : "text-gray-500 hover:text-gray-700"
+                                }`}
                             >
                                 วันเดียว
                             </button>
                             <button
                                 type="button"
-                                onClick={() => {
-                                    setIsMultiDay(true);
-                                    form.setValue("period", "FULL_DAY");
-                                }}
-                                className={`
-                                    py-2 text-sm font-medium rounded-md transition-colors duration-200
-                                    ${
-                                        isMultiDay
-                                            ? "bg-white text-indigo-700 shadow-sm"
-                                            : "text-gray-500 hover:text-gray-700"
-                                    }
-                                `}
+                                onClick={model.switchToMultiDay}
+                                className={`py-2 text-sm font-medium rounded-md transition-colors duration-200 ${
+                                    model.isMultiDay
+                                        ? "bg-white text-indigo-700 shadow-sm"
+                                        : "text-gray-500 hover:text-gray-700"
+                                }`}
                             >
                                 หลายวัน
                             </button>
                         </div>
                     </div>
 
-                    {/* Date Fields */}
-                    <div
-                        className={`grid gap-4 ${isMultiDay ? "grid-cols-2" : "grid-cols-1"}`}
-                    >
+                    <div className={`grid gap-4 ${model.isMultiDay ? "grid-cols-2" : "grid-cols-1"}`}>
                         <FormField
-                            control={form.control}
+                            control={model.form.control}
                             name="startDate"
                             render={({ field }) => (
                                 <FormItem>
-                                    <FormLabel>
-                                        {isMultiDay
-                                            ? "วันที่เริ่มต้น"
-                                            : "วันที่ลา"}
-                                    </FormLabel>
+                                    <FormLabel>{model.isMultiDay ? "วันที่เริ่มต้น" : "วันที่ลา"}</FormLabel>
                                     <FormControl>
                                         <Input
                                             type="date"
                                             {...field}
-                                            onChange={(e) => {
-                                                field.onChange(e);
-                                                if (!isMultiDay) {
-                                                    form.setValue(
-                                                        "endDate",
-                                                        e.target.value,
-                                                    );
-                                                }
-                                            }}
+                                            onChange={(event) =>
+                                                model.handleStartDateChange(event.target.value, field.onChange)
+                                            }
                                         />
                                     </FormControl>
                                     <FormMessage />
@@ -215,71 +123,57 @@ export function LeaveRequestForm({ onSuccess, onCancel }: Props) {
                             )}
                         />
 
-                        {isMultiDay && (
+                        {model.isMultiDay ? (
                             <FormField
-                                control={form.control}
+                                control={model.form.control}
                                 name="endDate"
                                 render={({ field }) => (
                                     <FormItem>
                                         <FormLabel>วันที่สิ้นสุด</FormLabel>
                                         <FormControl>
-                                            <Input
-                                                type="date"
-                                                {...field}
-                                                min={startDateValue}
-                                            />
+                                            <Input type="date" {...field} min={model.startDateValue} />
                                         </FormControl>
                                         <FormMessage />
                                     </FormItem>
                                 )}
                             />
-                        )}
+                        ) : null}
                     </div>
 
-                    {/* Period — only show for single-day */}
-                    {!isMultiDay && (
+                    {!model.isMultiDay ? (
                         <FormField
-                            control={form.control}
+                            control={model.form.control}
                             name="period"
                             render={({ field }) => (
                                 <FormItem>
                                     <FormLabel>ช่วงเวลา</FormLabel>
-                                    <Select
-                                        onValueChange={field.onChange}
-                                        value={field.value}
-                                    >
+                                    <Select onValueChange={field.onChange} value={field.value}>
                                         <FormControl>
                                             <SelectTrigger>
                                                 <SelectValue placeholder="เลือกช่วงเวลา" />
                                             </SelectTrigger>
                                         </FormControl>
                                         <SelectContent>
-                                            <SelectItem value="FULL_DAY">
-                                                เต็มวัน
-                                            </SelectItem>
-                                            <SelectItem value="MORNING">
-                                                ครึ่งวันเช้า
-                                            </SelectItem>
-                                            <SelectItem value="AFTERNOON">
-                                                ครึ่งวันบ่าย
-                                            </SelectItem>
+                                            <SelectItem value="FULL_DAY">เต็มวัน</SelectItem>
+                                            <SelectItem value="MORNING">ครึ่งวันเช้า</SelectItem>
+                                            <SelectItem value="AFTERNOON">ครึ่งวันบ่าย</SelectItem>
                                         </SelectContent>
                                     </Select>
                                     <FormMessage />
                                 </FormItem>
                             )}
                         />
-                    )}
+                    ) : null}
 
                     <FormField
-                        control={form.control}
+                        control={model.form.control}
                         name="reason"
                         render={({ field }) => (
                             <FormItem>
                                 <FormLabel>เหตุผลการลา</FormLabel>
                                 <FormControl>
                                     <Textarea
-                                        placeholder="ระบุเหตุผลการลาของคุณ…"
+                                        placeholder="ระบุเหตุผลการลาของคุณ..."
                                         className="resize-none"
                                         rows={3}
                                         {...field}
@@ -291,22 +185,18 @@ export function LeaveRequestForm({ onSuccess, onCancel }: Props) {
                     />
 
                     <div className="flex justify-end space-x-4 pt-4 border-t">
-                        <Button
-                            type="button"
-                            variant="outline"
-                            onClick={onCancel}
-                        >
+                        <Button type="button" variant="outline" onClick={onCancel}>
                             ยกเลิก
                         </Button>
                         <Button
                             type="submit"
-                            disabled={isSubmitting}
+                            disabled={model.isSubmitting}
                             className="bg-indigo-600 hover:bg-indigo-700"
                         >
-                            {isSubmitting ? (
+                            {model.isSubmitting ? (
                                 <>
                                     <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                                    กำลังบันทึก…
+                                    กำลังบันทึก...
                                 </>
                             ) : (
                                 "ส่งใบลา"

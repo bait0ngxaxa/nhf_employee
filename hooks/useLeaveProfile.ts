@@ -1,6 +1,7 @@
 import useSWR from "swr";
 import { apiPost } from "@/lib/api-client";
 import { apiGet } from "@/lib/api-client";
+import { API_ROUTES } from "@/lib/ssot/routes";
 
 const fetcher = async <T,>(url: string): Promise<T> => {
     const res = await apiGet<T>(url);
@@ -55,7 +56,7 @@ export interface LeaveProfileResponse {
 
 export function useLeaveProfile(page: number = 1) {
     const { data, error, isLoading, mutate } = useSWR<LeaveProfileResponse>(
-        `/api/leave/me?page=${page}&limit=10`,
+        `${API_ROUTES.leave.me}?page=${page}&limit=10`,
         fetcher,
         {
             revalidateOnFocus: false,
@@ -67,10 +68,10 @@ export function useLeaveProfile(page: number = 1) {
 
     const cancelLeave = async (leaveId: string) => {
         try {
-            const response = await apiPost("/api/leave/cancel", { leaveId });
+            const response = await apiPost(API_ROUTES.leave.cancel, { leaveId });
 
             if (!response.success) {
-                throw new Error(response.error || "Failed to cancel leave");
+                throw new Error(response.error || "ไม่สามารถยกเลิกคำขอลาได้");
             }
 
             // Immediately re-fetch the data to reflect the CANCELLED status & restored quota

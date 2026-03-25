@@ -1,5 +1,6 @@
 import useSWR from "swr";
 import { apiGet } from "@/lib/api-client";
+import { API_ROUTES } from "@/lib/ssot/routes";
 
 const fetcher = async <T,>(url: string): Promise<T> => {
     const res = await apiGet<T>(url);
@@ -37,7 +38,7 @@ export interface LeaveApprovalsResponse {
 
 export function useLeaveApprovals() {
     const { data, error, isLoading, mutate } = useSWR<LeaveApprovalsResponse>(
-        "/api/leave/approvals",
+        API_ROUTES.leave.approvals,
         fetcher,
         {
             revalidateOnFocus: false,

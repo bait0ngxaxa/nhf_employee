@@ -141,8 +141,79 @@ describe("POST /api/leave/request", () => {
         const res = await submitLeaveRequest(req);
         expect(res.status).toBe(400);
         const data = await res.json();
-        expect(typeof data.error).toBe("string");
-        expect(data.error.length).toBeGreaterThan(0);
+        expect(data.error).toBe("การลาครึ่งวันต้องเลือกวันลาเพียงวันเดียว");
+    });
+
+    it("should return 400 if full-day leave range includes weekend", async () => {
+        (getApiAuthSession as unknown as { mockResolvedValue: (v: { user: { id: string; name: string } }) => void }).mockResolvedValue({ user: mockUser });
+        (getEmployeeIdFromUserId as unknown as { mockResolvedValue: (v: number) => void }).mockResolvedValue(mockEmployeeId);
+
+        const payload = {
+            leaveType: "SICK",
+            startDate: "2030-05-10T00:00:00.000Z", // Friday
+            endDate: "2030-05-11T00:00:00.000Z",   // Saturday
+            period: "FULL_DAY",
+            reason: "Weekend overlap",
+        };
+
+        const req = new NextRequest("http://localhost/api/leave/request", {
+            method: "POST",
+            body: JSON.stringify(payload),
+        });
+
+        const res = await submitLeaveRequest(req);
+        expect(res.status).toBe(400);
+        const data = await res.json();
+        expect(data.error).toBe("วันที่ลาตรงกับวันหยุด");
+    });
+
+    it("should allow full-day leave that crosses weekend in the middle", async () => {
+        (getApiAuthSession as unknown as { mockResolvedValue: (v: { user: { id: string; name: string } }) => void }).mockResolvedValue({ user: mockUser });
+        (getEmployeeIdFromUserId as unknown as { mockResolvedValue: (v: number) => void }).mockResolvedValue(mockEmployeeId);
+        (
+            prisma.$transaction as unknown as { mockImplementation: (fn: (arg: unknown) => Promise<unknown>) => void }
+        ).mockImplementation(async (arg: unknown) => {
+            if (typeof arg === "function") {
+                const callback = arg as (tx: typeof prisma) => Promise<unknown>;
+                return callback(prisma);
+            }
+            return Promise.resolve(arg);
+        });
+
+        (prisma.employee.findUnique as unknown as { mockResolvedValue: (v: { id: number; firstName: string; lastName: string; managerId: number }) => void }).mockResolvedValue({
+            id: mockEmployeeId,
+            firstName: "A",
+            lastName: "B",
+            managerId: 200,
+        });
+        (prisma.leaveRequest.findFirst as unknown as { mockResolvedValue: (v: null) => void }).mockResolvedValue(null);
+        (prisma.leaveQuota.findFirst as unknown as { mockResolvedValue: (v: { id: number; totalDays: number; usedDays: number }) => void }).mockResolvedValue({
+            id: 1,
+            totalDays: 10,
+            usedDays: 0,
+        });
+        (prisma.leaveRequest.create as unknown as { mockResolvedValue: (v: { id: number }) => void }).mockResolvedValue({ id: 123 });
+
+        const payload = {
+            leaveType: "SICK",
+            startDate: "2030-05-10T00:00:00.000Z", // Friday
+            endDate: "2030-05-13T00:00:00.000Z",   // Monday
+            period: "FULL_DAY",
+            reason: "Cross weekend",
+        };
+
+        const req = new NextRequest("http://localhost/api/leave/request", {
+            method: "POST",
+            body: JSON.stringify(payload),
+        });
+
+        const res = await submitLeaveRequest(req);
+        expect(res.status).toBe(201);
+        expect(prisma.leaveRequest.create).toHaveBeenCalledWith({
+            data: expect.objectContaining({
+                durationDays: 2,
+            }),
+        });
     });
 
     describe("Transaction Logic", () => {
@@ -157,9 +228,15 @@ describe("POST /api/leave/request", () => {
         beforeEach(() => {
             (getApiAuthSession as unknown as { mockResolvedValue: (v: { user: { id: string; name: string } }) => void }).mockResolvedValue({ user: mockUser });
             (getEmployeeIdFromUserId as unknown as { mockResolvedValue: (v: number) => void }).mockResolvedValue(mockEmployeeId);
-            (prisma.$transaction as unknown as { mockImplementation: (fn: (tx: typeof prisma) => Promise<unknown>) => void }).mockImplementation(
-                async (callback: (tx: typeof prisma) => Promise<unknown>) => callback(prisma),
-            );
+            (
+                prisma.$transaction as unknown as { mockImplementation: (fn: (arg: unknown) => Promise<unknown>) => void }
+            ).mockImplementation(async (arg: unknown) => {
+                if (typeof arg === "function") {
+                    const callback = arg as (tx: typeof prisma) => Promise<unknown>;
+                    return callback(prisma);
+                }
+                return Promise.resolve(arg);
+            });
         });
 
         it("should throw error if employee record not found in transaction", async () => {
@@ -171,9 +248,9 @@ describe("POST /api/leave/request", () => {
             });
 
             const res = await submitLeaveRequest(req);
-            expect(res.status).toBe(500);
+            expect(res.status).toBe(404);
             const data = await res.json();
-            expect(data.error).toBe("Employee not found");
+            expect(data.error).toBe("ไม่พบข้อมูลพนักงาน");
         });
 
         it("should throw error if employee has no managerId", async () => {
@@ -188,10 +265,9 @@ describe("POST /api/leave/request", () => {
             });
 
             const res = await submitLeaveRequest(req);
-            expect(res.status).toBe(500);
+            expect(res.status).toBe(400);
             const data = await res.json();
-            expect(typeof data.error).toBe("string");
-            expect(data.error.length).toBeGreaterThan(0);
+            expect(data.error).toBe("ยังไม่ได้ตั้งค่าผู้อนุมัติ");
         });
 
         it("should throw error if insufficient quota", async () => {
@@ -214,10 +290,9 @@ describe("POST /api/leave/request", () => {
             });
 
             const res = await submitLeaveRequest(req);
-            expect(res.status).toBe(500);
+            expect(res.status).toBe(400);
             const data = await res.json();
-            expect(typeof data.error).toBe("string");
-            expect(data.error.length).toBeGreaterThan(0);
+            expect(data.error).toBe("สิทธิ์ลาคงเหลือไม่เพียงพอ");
         });
 
         it("should throw error if requests overlap", async () => {
@@ -236,10 +311,9 @@ describe("POST /api/leave/request", () => {
             });
 
             const res = await submitLeaveRequest(req);
-            expect(res.status).toBe(500);
+            expect(res.status).toBe(409);
             const data = await res.json();
-            expect(typeof data.error).toBe("string");
-            expect(data.error.length).toBeGreaterThan(0);
+            expect(data.error).toBe("มีคำขอลาในช่วงวันที่นี้อยู่แล้ว");
         });
 
         it("should complete successfully, creating default quota if none exists", async () => {
