@@ -4,13 +4,23 @@ import { AUTH_ERROR_MESSAGES } from "@/lib/auth-ssot";
 const AJAX_HEADER_NAME = "x-requested-with";
 const AJAX_HEADER_VALUE = "XMLHttpRequest";
 
+function buildTrustedOrigins(internalOrigin: string): ReadonlySet<string> {
+    const origins = new Set<string>([internalOrigin]);
+    const nextAuthUrl = process.env.NEXTAUTH_URL;
+    if (nextAuthUrl) {
+        origins.add(new URL(nextAuthUrl).origin);
+    }
+    return origins;
+}
+
 function hasTrustedOrigin(request: NextRequest): boolean {
     const origin = request.headers.get("origin");
     if (!origin) {
         return false;
     }
 
-    return origin === request.nextUrl.origin;
+    const trusted = buildTrustedOrigins(request.nextUrl.origin);
+    return trusted.has(origin);
 }
 
 function hasAjaxHeader(request: NextRequest): boolean {
