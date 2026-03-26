@@ -11,6 +11,7 @@ import {
 import { useSession, signOut } from "next-auth/react";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import useSWR from "swr";
+import { Smartphone } from "lucide-react";
 import {
     DASHBOARD_MENU_ITEMS,
     getAvailableMenuItems,
@@ -33,6 +34,13 @@ import { isAdminRole, USER_ROLES } from "@/lib/ssot/permissions";
 interface DashboardProviderProps {
     children: ReactNode;
 }
+
+const SESSION_MENU_ITEM = {
+    id: "sessions",
+    label: "จัดการเซสชัน",
+    icon: Smartphone,
+    description: "จัดการอุปกรณ์ที่ล็อกอินอยู่และยกเลิกเซสชันได้",
+} as const;
 
 const defaultStats: EmployeeStats = {
     total: 0,
@@ -107,7 +115,10 @@ export function DashboardProvider({ children }: DashboardProviderProps) {
         };
     }, [status]);
 
-    const availableMenuItems = getAvailableMenuItems(isAdmin);
+    const availableMenuItems = useMemo(
+        () => [...getAvailableMenuItems(isAdmin), SESSION_MENU_ITEM],
+        [isAdmin],
+    );
 
     const { data: statsData, mutate: mutateStats } = useSWR<{
         stats: EmployeeStats;

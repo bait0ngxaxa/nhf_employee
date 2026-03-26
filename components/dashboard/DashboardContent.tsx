@@ -105,6 +105,16 @@ const NotificationsSection = dynamic(
     },
 );
 
+const SessionManagementSection = dynamic(
+    () =>
+        import("@/components/dashboard/SessionManagementSection").then(
+            (mod) => mod.SessionManagementSection,
+        ),
+    {
+        loading: () => <SectionSkeleton />,
+    },
+);
+
 export function DashboardContent() {
     useTitle("Dashboard | NHF IT System");
 
@@ -185,6 +195,12 @@ export function DashboardContent() {
                 return (
                     <Suspense fallback={<SectionSkeleton />}>
                         <NotificationsSection />
+                    </Suspense>
+                );
+            case "sessions":
+                return (
+                    <Suspense fallback={<SectionSkeleton />}>
+                        <SessionManagementSection />
                     </Suspense>
                 );
 

@@ -11,6 +11,7 @@ export const APP_ROUTES = {
 export const APP_DASHBOARD_TABS = {
     dashboard: "dashboard",
     notifications: "notifications",
+    sessions: "sessions",
     leaveManagement: "leave-management",
     leaveHistory: "leave-history",
     managerApproval: "manager-approval",
@@ -30,6 +31,8 @@ export const API_ROUTES = {
         refresh: "/api/auth/refresh",
         logout: "/api/auth/logout",
         logoutAll: "/api/auth/logout-all",
+        sessions: "/api/auth/sessions",
+        revokeSession: "/api/auth/sessions/revoke",
         cleanup: "/api/auth/cleanup",
     },
     employees: {
