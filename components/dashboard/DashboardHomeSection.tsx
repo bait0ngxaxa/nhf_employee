@@ -61,8 +61,15 @@ const MENU_ITEM_CONFIG: Record<
 };
 
 export function DashboardHomeSection() {
-    const { user, availableMenuItems } = useDashboardDataContext();
+    const { user, availableMenuGroups, sessionMenuItem } =
+        useDashboardDataContext();
     const { handleMenuClick } = useDashboardUIContext();
+
+    // Flatten groups into a single list for the card grid
+    const allMenuItems = [
+        ...availableMenuGroups.flatMap((group) => group.items),
+        sessionMenuItem,
+    ];
 
     return (
         <div className="relative min-h-[calc(100vh-6rem)] bg-slate-50/50 rounded-3xl overflow-hidden border border-white/60 shadow-inner">
@@ -86,7 +93,7 @@ export function DashboardHomeSection() {
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 animate-in fade-in slide-in-from-bottom-6 duration-700 ease-out delay-150">
-                    {availableMenuItems.map((item) => {
+                    {allMenuItems.map((item) => {
                         const IconComponent = item.icon;
                         const config =
                             MENU_ITEM_CONFIG[item.id] ?? DEFAULT_MENU_CONFIG;

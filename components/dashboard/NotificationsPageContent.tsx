@@ -53,6 +53,12 @@ function getNotificationIcon(type: string) {
         case "TICKET_CREATED":
         case "TICKET_UPDATED":
             return <AlertCircle className="h-5 w-5 text-orange-500" />;
+        case "STOCK_REQUEST_NEW":
+            return <Bell className="h-5 w-5 text-amber-500" />;
+        case "STOCK_APPROVED":
+            return <Check className="h-5 w-5 text-emerald-500" />;
+        case "STOCK_REJECTED":
+            return <AlertCircle className="h-5 w-5 text-rose-500" />;
         case "NEW_COMMENT":
             return <MessageSquare className="h-5 w-5 text-blue-500" />;
         case "SYSTEM_ALERT":

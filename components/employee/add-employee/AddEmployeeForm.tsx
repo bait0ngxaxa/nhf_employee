@@ -52,7 +52,7 @@ export function AddEmployeeForm({ onSuccess }: AddEmployeeFormProps) {
 
                         <Button
                             type="submit"
-                            className="w-full"
+                            className="w-full h-11 font-bold bg-blue-600 hover:bg-blue-700 text-white shadow-sm transition-all text-base"
                             disabled={isLoading}
                         >
                             {isLoading

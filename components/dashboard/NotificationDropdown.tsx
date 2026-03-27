@@ -105,6 +105,12 @@ export function NotificationDropdown() {
             case "TICKET_CREATED":
             case "TICKET_UPDATED":
                 return <AlertCircle className="h-4 w-4 text-orange-500" />;
+            case "STOCK_REQUEST_NEW":
+                return <Bell className="h-4 w-4 text-amber-500" />;
+            case "STOCK_APPROVED":
+                return <Check className="h-4 w-4 text-emerald-500" />;
+            case "STOCK_REJECTED":
+                return <AlertCircle className="h-4 w-4 text-rose-500" />;
             case "NEW_COMMENT":
                 return <MessageSquare className="h-4 w-4 text-blue-500" />;
             case "SYSTEM_ALERT":

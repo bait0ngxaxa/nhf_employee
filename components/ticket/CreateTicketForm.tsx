@@ -173,11 +173,11 @@ export default function CreateTicketForm({ isOpen, onClose, onTicketCreated }: C
               />
             </div>
 
-            <div className="flex justify-end space-x-3 pt-4 border-t">
-              <Button type="button" variant="outline" onClick={onClose}>
+            <div className="flex justify-end gap-3 pt-5 border-t mt-4">
+              <Button type="button" variant="ghost" onClick={onClose} disabled={isLoading} className="h-10 px-5 font-medium hover:bg-slate-100 text-slate-600">
                 ยกเลิก
               </Button>
-              <Button type="submit" disabled={isLoading}>
+              <Button type="submit" disabled={isLoading} className="h-10 px-7 font-bold bg-blue-600 hover:bg-blue-700 text-white shadow-sm transition-all">
                 {isLoading ? 'กำลังส่ง...' : 'ส่งคำร้องแจ้งปัญหา'}
               </Button>
             </div>

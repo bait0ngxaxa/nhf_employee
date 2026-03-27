@@ -8,6 +8,13 @@ export interface MenuItem {
     requiredRole?: "ADMIN";
 }
 
+export interface MenuGroup {
+    id: string;
+    label: string;
+    icon: ComponentType<{ className?: string }>;
+    items: MenuItem[];
+}
+
 export interface DashboardStats {
     total: number;
     active: number;

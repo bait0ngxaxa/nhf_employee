@@ -26,8 +26,11 @@ model User {
   employee        Employee?       @relation(fields: [employeeId], references: [id])
   auditLogs       AuditLog[]
   emailRequests   EmailRequest[]
-  notifications   Notification[]
-  refreshTokens   AuthRefreshToken[]
+  notifications      Notification[]
+  refreshTokens      AuthRefreshToken[]
+  stockTransactions  StockTransaction[]
+  stockRequests      StockRequest[]      @relation("StockRequester")
+  stockReviews       StockRequest[]      @relation("StockReviewer")
 
   @@map("users")
 }
@@ -244,6 +247,17 @@ enum AuditAction {
   USER_DELETE
   USER_ROLE_CHANGE
 
+  // Stock management
+  STOCK_ITEM_CREATE
+  STOCK_ITEM_UPDATE
+  STOCK_ITEM_DELETE
+  STOCK_ADJUST
+  STOCK_REQUEST_CREATE
+  STOCK_REQUEST_APPROVE
+  STOCK_REQUEST_REJECT
+  STOCK_CATEGORY_CREATE
+  STOCK_CATEGORY_DELETE
+
   // System
   SETTINGS_UPDATE
   DATA_EXPORT
@@ -326,6 +340,9 @@ enum NotificationType {
   LEAVE_REQUESTED
   LEAVE_APPROVED
   LEAVE_REJECTED
+  STOCK_REQUEST_NEW
+  STOCK_APPROVED
+  STOCK_REJECTED
 }
 
 // ==========================================
@@ -393,4 +410,99 @@ enum LeaveStatus {
   APPROVED   // อนุมัติแล้ว
   REJECTED   // ปฏิเสธ
   CANCELLED  // ยกเลิกโดยตัวพนักงานเอง
+}
+
+// ==========================================
+// Stock & Requisition System
+// ==========================================
+
+model StockCategory {
+  id          Int         @id @default(autoincrement())
+  name        String      @unique
+  description String?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  items       StockItem[]
+
+  @@map("stock_categories")
+}
+
+model StockItem {
+  id           Int                @id @default(autoincrement())
+  name         String
+  sku          String             @unique
+  unit         String             // รีม, ตลับ, ชิ้น
+  quantity     Int                @default(0)
+  minStock     Int                @default(0)
+  categoryId   Int
+  isActive     Boolean            @default(true)
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+  category     StockCategory      @relation(fields: [categoryId], references: [id])
+  transactions StockTransaction[]
+  requestItems StockRequestItem[]
+
+  @@index([categoryId])
+  @@map("stock_items")
+}
+
+model StockTransaction {
+  id          Int         @id @default(autoincrement())
+  itemId      Int
+  type        StockTxType
+  quantity    Int         // บวก=เพิ่ม, ลบ=ลด
+  note        String?     @db.Text
+  performedBy Int
+  createdAt   DateTime    @default(now())
+  item        StockItem   @relation(fields: [itemId], references: [id])
+  user        User        @relation(fields: [performedBy], references: [id])
+
+  @@index([itemId])
+  @@index([performedBy])
+  @@map("stock_transactions")
+}
+
+model StockRequest {
+  id           Int                @id @default(autoincrement())
+  requestedBy  Int
+  status       StockRequestStatus @default(PENDING)
+  note         String?            @db.Text
+  reviewedBy   Int?
+  reviewedAt   DateTime?
+  rejectReason String?            @db.Text
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+  requester    User               @relation("StockRequester", fields: [requestedBy], references: [id])
+  reviewer     User?              @relation("StockReviewer", fields: [reviewedBy], references: [id])
+  items        StockRequestItem[]
+
+  @@index([requestedBy])
+  @@index([status])
+  @@map("stock_requests")
+}
+
+model StockRequestItem {
+  id        Int          @id @default(autoincrement())
+  requestId Int
+  itemId    Int
+  quantity  Int
+  request   StockRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  item      StockItem    @relation(fields: [itemId], references: [id])
+
+  @@index([requestId])
+  @@index([itemId])
+  @@map("stock_request_items")
+}
+
+enum StockTxType {
+  IN     // รับเข้าสต็อค
+  OUT    // เบิกออก (เมื่ออนุมัติ)
+  ADJUST // ปรับยอดคงเหลือ
+}
+
+enum StockRequestStatus {
+  PENDING   // รออนุมัติ
+  APPROVED  // อนุมัติแล้ว
+  REJECTED  // ปฏิเสธ
+  CANCELLED // ยกเลิกโดยผู้เบิก
 }

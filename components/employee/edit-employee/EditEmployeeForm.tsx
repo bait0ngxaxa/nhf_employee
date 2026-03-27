@@ -110,19 +110,20 @@ export function EditEmployeeForm({
                         </Alert>
                     )}
 
-                    <div className="flex items-center justify-end space-x-3 pt-4">
+                    <div className="flex items-center justify-end gap-3 pt-5 border-t mt-4">
                         <Button
                             type="button"
-                            variant="outline"
+                            variant="ghost"
                             onClick={handleClose}
                             disabled={isLoading}
+                            className="h-10 px-5 font-medium hover:bg-slate-100 text-slate-600"
                         >
                             ยกเลิก
                         </Button>
                         <Button
                             type="submit"
                             disabled={isLoading}
-                            className="flex items-center space-x-2"
+                            className="h-10 px-7 font-bold bg-blue-600 hover:bg-blue-700 text-white shadow-sm transition-all flex items-center space-x-2"
                         >
                             {isLoading ? (
                                 <>
@@ -131,7 +132,7 @@ export function EditEmployeeForm({
                                 </>
                             ) : (
                                 <>
-                                    <CheckCircle className="h-4 w-4" />
+                                    <CheckCircle className="h-4.5 w-4.5" />
                                     <span>บันทึกการแก้ไข</span>
                                 </>
                             )}

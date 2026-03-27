@@ -1,21 +1,225 @@
+import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { Menu, X, User, Settings } from "lucide-react";
+import { Menu, X, User, Home, ChevronDown } from "lucide-react";
 
 import { getMenuTheme } from "@/constants/dashboard";
 import { getRoleLabelThai } from "@/lib/ssot/permissions";
+import { type MenuGroup } from "@/types/dashboard";
+import { type MenuItem } from "@/types/dashboard";
 import {
     useDashboardUIContext,
     useDashboardDataContext,
 } from "@/components/dashboard/context/dashboard/DashboardContext";
 
+const TRANSITION_EASE = "cubic-bezier(0.4, 0, 0.2, 1)";
+
+function SidebarMenuItem({
+    item,
+    isActive,
+    sidebarOpen,
+    indented,
+    onClick,
+}: {
+    item: MenuItem;
+    isActive: boolean;
+    sidebarOpen: boolean;
+    indented: boolean;
+    onClick: () => void;
+}) {
+    const IconComponent = item.icon;
+    const theme = getMenuTheme(item.id);
+
+    return (
+        <div className="relative group">
+            {isActive && sidebarOpen ? (
+                <div
+                    className={cn(
+                        `absolute inset-0 bg-gradient-to-r ${theme.glow} opacity-20 rounded-xl`,
+                    )}
+                    style={{ filter: "blur(16px)" }}
+                />
+            ) : null}
+            <Button
+                variant="ghost"
+                className={cn(
+                    "relative w-full justify-start overflow-hidden group/btn",
+                    isActive
+                        ? `${theme.activeBg} ${theme.text} shadow-sm border-r-4 ${theme.border}`
+                        : `${theme.hover} text-gray-600 hover:text-gray-900`,
+                    !sidebarOpen && "justify-center px-0 border-r-0",
+                    indented && sidebarOpen && "pl-9 h-9",
+                )}
+                style={{ transition: "all 200ms ease-out" }}
+                onClick={onClick}
+            >
+                {isActive && sidebarOpen && (
+                    <div
+                        className={cn(
+                            "absolute -right-2 -top-2 w-12 h-12 rounded-full pointer-events-none",
+                            theme.activeBg,
+                        )}
+                        style={{ filter: "blur(12px)" }}
+                    />
+                )}
+
+                <div
+                    className={cn(
+                        "relative z-10 flex items-center w-full",
+                        !sidebarOpen && "justify-center",
+                    )}
+                >
+                    <div
+                        className={cn(
+                            "rounded-lg",
+                            indented && sidebarOpen ? "p-1.5" : "p-2",
+                            isActive
+                                ? "bg-white shadow-sm"
+                                : `${theme.lightBg} group-hover/btn:scale-110`,
+                        )}
+                        style={{
+                            transition: `transform 200ms ease-out, background-color 200ms ease-out`,
+                        }}
+                    >
+                        <span style={{ transition: "color 200ms ease-out" }}>
+                            <IconComponent
+                                className={cn(
+                                    indented && sidebarOpen
+                                        ? "h-4 w-4"
+                                        : "h-4 w-4",
+                                    isActive
+                                        ? theme.text
+                                        : "text-gray-500 group-hover/btn:text-gray-900",
+                                )}
+                            />
+                        </span>
+                    </div>
+                    {sidebarOpen && (
+                        <span className="ml-3 font-medium whitespace-nowrap">
+                            {item.label}
+                        </span>
+                    )}
+                </div>
+            </Button>
+        </div>
+    );
+}
+
+function SidebarMenuGroup({
+    group,
+    selectedMenu,
+    sidebarOpen,
+    isExpanded,
+    onToggle,
+    onItemClick,
+}: {
+    group: MenuGroup;
+    selectedMenu: string;
+    sidebarOpen: boolean;
+    isExpanded: boolean;
+    onToggle: () => void;
+    onItemClick: (menuId: string) => void;
+}) {
+    const GroupIcon = group.icon;
+    // Check if any child in this group is active
+    const hasActiveChild = group.items.some((item) => item.id === selectedMenu);
+
+    // In collapsed sidebar mode, show only child item icons
+    if (!sidebarOpen) {
+        return (
+            <div className="space-y-0.5">
+                {group.items.map((item) => (
+                    <SidebarMenuItem
+                        key={item.id}
+                        item={item}
+                        isActive={selectedMenu === item.id}
+                        sidebarOpen={false}
+                        indented={false}
+                        onClick={() => onItemClick(item.id)}
+                    />
+                ))}
+            </div>
+        );
+    }
+
+    return (
+        <div className="space-y-0.5">
+            {/* Group Header */}
+            <button
+                type="button"
+                onClick={onToggle}
+                className={cn(
+                    "flex items-center w-full px-3 py-1.5 rounded-lg text-left transition-colors duration-200",
+                    hasActiveChild
+                        ? "text-gray-900 bg-gray-100/60"
+                        : "text-gray-500 hover:text-gray-700 hover:bg-gray-50",
+                )}
+            >
+                <GroupIcon
+                    className={cn(
+                        "h-4 w-4 mr-2.5 shrink-0",
+                        hasActiveChild ? "text-gray-700" : "text-gray-400",
+                    )}
+                />
+                <span className="text-sm font-semibold uppercase tracking-wider flex-1 whitespace-nowrap">
+                    {group.label}
+                </span>
+                <ChevronDown
+                    className={cn(
+                        "h-3.5 w-3.5 text-gray-400 shrink-0 transition-transform duration-200",
+                        isExpanded && "rotate-180",
+                    )}
+                />
+            </button>
+
+            {/* Collapsible Children */}
+            <div
+                className="overflow-hidden"
+                style={{
+                    maxHeight: isExpanded
+                        ? `${group.items.length * 40}px`
+                        : "0px",
+                    opacity: isExpanded ? 1 : 0,
+                    transition: `max-height 250ms ${TRANSITION_EASE}, opacity 200ms ${TRANSITION_EASE}`,
+                }}
+            >
+                <div className="ml-2 border-l-2 border-gray-200/70 pl-1 space-y-px py-0.5">
+                    {group.items.map((item) => (
+                        <SidebarMenuItem
+                            key={item.id}
+                            item={item}
+                            isActive={selectedMenu === item.id}
+                            sidebarOpen
+                            indented
+                            onClick={() => onItemClick(item.id)}
+                        />
+                    ))}
+                </div>
+            </div>
+        </div>
+    );
+}
+
 export function DashboardSidebar() {
     const { selectedMenu, sidebarOpen, handleMenuClick, setSidebarOpen } =
         useDashboardUIContext();
-    const { user, availableMenuItems: menuItems } = useDashboardDataContext();
+    const { user, availableMenuGroups, sessionMenuItem } =
+        useDashboardDataContext();
 
-    const dashboardTheme = getMenuTheme("dashboard");
+    // Default: expand all groups
+    const [expandedGroups, setExpandedGroups] = useState<Set<string>>(
+        () => new Set(availableMenuGroups.map((g) => g.id)),
+    );
+
+    const toggleGroup = (groupId: string) => {
+        setExpandedGroups((prev) => {
+            const next = new Set(prev);
+            if (next.has(groupId)) next.delete(groupId);
+            else next.add(groupId);
+            return next;
+        });
+    };
 
     const onToggle = () => setSidebarOpen(!sidebarOpen);
 
@@ -26,7 +230,7 @@ export function DashboardSidebar() {
                 sidebarOpen ? "w-64" : "w-16",
             )}
             style={{
-                transition: "width 300ms cubic-bezier(0.4, 0, 0.2, 1)",
+                transition: `width 300ms ${TRANSITION_EASE}`,
             }}
         >
             {/* Header */}
@@ -36,7 +240,7 @@ export function DashboardSidebar() {
                     sidebarOpen ? "p-4" : "p-2",
                 )}
                 style={{
-                    transition: "padding 300ms cubic-bezier(0.4, 0, 0.2, 1)",
+                    transition: `padding 300ms ${TRANSITION_EASE}`,
                 }}
             >
                 <div
@@ -71,176 +275,52 @@ export function DashboardSidebar() {
             {/* Navigation */}
             <nav
                 className={cn(
-                    "flex-1 space-y-2 overflow-y-auto overflow-x-hidden custom-scrollbar",
-                    sidebarOpen ? "p-4" : "p-2",
+                    "flex-1 space-y-1 overflow-y-auto overflow-x-hidden custom-scrollbar",
+                    sidebarOpen ? "px-4 py-3" : "p-2",
                 )}
                 style={{
-                    transition: "padding 300ms cubic-bezier(0.4, 0, 0.2, 1)",
+                    transition: `padding 300ms ${TRANSITION_EASE}`,
                 }}
             >
-                <div className="relative group">
-                    {/* Decorative Glow for Active State */}
-                    {selectedMenu === "dashboard" && sidebarOpen ? (
-                        <div
-                            className={cn(
-                                `absolute inset-0 bg-gradient-to-r ${dashboardTheme.glow} opacity-20 rounded-xl`,
-                            )}
-                            style={{ filter: "blur(16px)" }}
-                        />
-                    ) : null}
-                    <Button
-                        variant="ghost"
-                        className={cn(
-                            "relative w-full justify-start overflow-hidden group/btn",
-                            selectedMenu === "dashboard"
-                                ? `${dashboardTheme.activeBg} ${dashboardTheme.text} shadow-sm border-r-4 ${dashboardTheme.border}`
-                                : `${dashboardTheme.hover} text-gray-600 hover:text-gray-900`,
-                            !sidebarOpen && "justify-center px-0 border-r-0",
-                        )}
-                        style={{
-                            transition:
-                                "transform 200ms ease-out, background-color 200ms ease-out",
-                        }}
-                        onClick={() => handleMenuClick("dashboard")}
-                    >
-                        {/* Decorative Blob for Active State */}
-                        {selectedMenu === "dashboard" && sidebarOpen ? (
-                            <div
-                                className="absolute -right-2 -top-2 w-12 h-12 bg-blue-200/50 rounded-full pointer-events-none"
-                                style={{ filter: "blur(12px)" }}
-                            />
-                        ) : null}
+                {/* Dashboard Button (standalone) */}
+                <SidebarMenuItem
+                    item={{
+                        id: "dashboard",
+                        label: "หน้าแรก",
+                        icon: Home,
+                        description: "หน้าหลัก",
+                    }}
+                    isActive={selectedMenu === "dashboard"}
+                    sidebarOpen={sidebarOpen}
+                    indented={false}
+                    onClick={() => handleMenuClick("dashboard")}
+                />
 
-                        <div
-                            className={cn(
-                                "relative z-10 flex items-center w-full",
-                                !sidebarOpen && "justify-center",
-                            )}
-                        >
-                            <div
-                                className={cn(
-                                    "p-2 rounded-lg",
-                                    selectedMenu === "dashboard"
-                                        ? "bg-white shadow-sm"
-                                        : `${dashboardTheme.lightBg} group-hover/btn:scale-110`,
-                                )}
-                                style={{
-                                    transition:
-                                        "transform 200ms ease-out, background-color 200ms ease-out",
-                                }}
-                            >
-                                <span
-                                    style={{
-                                        transition: "color 200ms ease-out",
-                                    }}
-                                >
-                                    <Settings
-                                        className={cn(
-                                            "h-4 w-4",
-                                            selectedMenu === "dashboard"
-                                                ? dashboardTheme.text
-                                                : "text-gray-500 group-hover/btn:text-gray-900",
-                                        )}
-                                    />
-                                </span>
-                            </div>
-                            {sidebarOpen ? (
-                                <span className="ml-3 font-medium whitespace-nowrap">
-                                    แดชบอร์ด
-                                </span>
-                            ) : null}
-                        </div>
-                    </Button>
-                </div>
+                <Separator className="my-1.5" />
 
-                <Separator className="my-2" />
+                {/* Menu Groups */}
+                {availableMenuGroups.map((group) => (
+                    <SidebarMenuGroup
+                        key={group.id}
+                        group={group}
+                        selectedMenu={selectedMenu}
+                        sidebarOpen={sidebarOpen}
+                        isExpanded={expandedGroups.has(group.id)}
+                        onToggle={() => toggleGroup(group.id)}
+                        onItemClick={handleMenuClick}
+                    />
+                ))}
 
-                {menuItems.map((item) => {
-                    const IconComponent = item.icon;
-                    const isActive = selectedMenu === item.id;
-                    const theme = getMenuTheme(item.id);
+                <Separator className="my-1.5" />
 
-                    return (
-                        <div key={item.id} className="relative group">
-                            {/* Decorative Glow for Active State */}
-                            {isActive && sidebarOpen ? (
-                                <div
-                                    className={cn(
-                                        `absolute inset-0 bg-gradient-to-r ${theme.glow} opacity-20 rounded-xl`,
-                                    )}
-                                    style={{ filter: "blur(16px)" }}
-                                />
-                            ) : null}
-                            <Button
-                                variant="ghost"
-                                className={cn(
-                                    "relative w-full justify-start overflow-hidden group/btn",
-                                    isActive
-                                        ? `${theme.activeBg} ${theme.text} shadow-sm border-r-4 ${theme.border}`
-                                        : `${theme.hover} text-gray-600 hover:text-gray-900`,
-                                    !sidebarOpen &&
-                                        "justify-center px-0 border-r-0",
-                                )}
-                                style={{
-                                    transition: "all 200ms ease-out",
-                                }}
-                                onClick={() => handleMenuClick(item.id)}
-                            >
-                                {/* Decorative Blob for Active State - visible only when open to prevent overflow */}
-                                {isActive && sidebarOpen && (
-                                    <div
-                                        className={cn(
-                                            "absolute -right-2 -top-2 w-12 h-12 rounded-full pointer-events-none",
-                                            theme.activeBg,
-                                        )}
-                                        style={{ filter: "blur(12px)" }}
-                                    />
-                                )}
-
-                                <div
-                                    className={cn(
-                                        "relative z-10 flex items-center w-full",
-                                        !sidebarOpen && "justify-center",
-                                    )}
-                                >
-                                    <div
-                                        className={cn(
-                                            "p-2 rounded-lg",
-                                            isActive
-                                                ? "bg-white shadow-sm"
-                                                : `${theme.lightBg} group-hover/btn:scale-110`,
-                                        )}
-                                        style={{
-                                            transition:
-                                                "transform 200ms ease-out, background-color 200ms ease-out",
-                                        }}
-                                    >
-                                        <span
-                                            style={{
-                                                transition:
-                                                    "color 200ms ease-out",
-                                            }}
-                                        >
-                                            <IconComponent
-                                                className={cn(
-                                                    "h-4 w-4",
-                                                    isActive
-                                                        ? theme.text
-                                                        : "text-gray-500 group-hover/btn:text-gray-900",
-                                                )}
-                                            />
-                                        </span>
-                                    </div>
-                                    {sidebarOpen && (
-                                        <span className="ml-3 font-medium whitespace-nowrap">
-                                            {item.label}
-                                        </span>
-                                    )}
-                                </div>
-                            </Button>
-                        </div>
-                    );
-                })}
+                {/* Session Management (standalone) */}
+                <SidebarMenuItem
+                    item={sessionMenuItem}
+                    isActive={selectedMenu === "sessions"}
+                    sidebarOpen={sidebarOpen}
+                    indented={false}
+                    onClick={() => handleMenuClick("sessions")}
+                />
             </nav>
 
             {/* User Info */}
@@ -266,4 +346,3 @@ export function DashboardSidebar() {
         </div>
     );
 }
-

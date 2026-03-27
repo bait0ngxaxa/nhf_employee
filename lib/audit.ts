@@ -232,3 +232,32 @@ export async function logLeaveEvent(
         },
     });
 }
+
+/**
+ * Create audit log for stock management events
+ */
+export async function logStockEvent(
+    action:
+        | "STOCK_ITEM_CREATE"
+        | "STOCK_ITEM_UPDATE"
+        | "STOCK_ITEM_DELETE"
+        | "STOCK_ADJUST"
+        | "STOCK_CATEGORY_CREATE"
+        | "STOCK_CATEGORY_DELETE"
+        | "STOCK_REQUEST_CREATE"
+        | "STOCK_REQUEST_APPROVE"
+        | "STOCK_REQUEST_REJECT",
+    entityId: number,
+    userId: number,
+    userEmail: string,
+    details?: AuditLogDetails,
+): Promise<void> {
+    await createAuditLog({
+        action,
+        entityType: "Stock",
+        entityId,
+        userId,
+        userEmail,
+        details,
+    });
+}

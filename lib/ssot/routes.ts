@@ -67,4 +67,14 @@ export const API_ROUTES = {
     emailRequest: {
         list: "/api/email-request",
     },
+    stock: {
+        categories: "/api/stock/categories",
+        items: "/api/stock/items",
+        itemById: (id: number | string): string => `/api/stock/items/${id}`,
+        adjustById: (id: number | string): string =>
+            `/api/stock/items/${id}/adjust`,
+        requests: "/api/stock/requests",
+        reviewById: (id: number | string): string =>
+            `/api/stock/requests/${id}/review`,
+    },
 } as const;

@@ -7,9 +7,12 @@ import {
     Upload,
     CalendarRange,
     FileText,
+    AppWindow,
+    ShieldCheck,
 } from "lucide-react";
-import { type MenuItem } from "@/types/dashboard";
+import { type MenuItem, type MenuGroup } from "@/types/dashboard";
 
+/** Flat lookup used by handleMenuClick for role validation */
 export const DASHBOARD_MENU_ITEMS: MenuItem[] = [
     {
         id: "leave-management",
@@ -19,13 +22,13 @@ export const DASHBOARD_MENU_ITEMS: MenuItem[] = [
     },
     {
         id: "it-equipment",
-        label: "IT-Equipments",
+        label: "ระบบสต็อค",
         icon: Computer,
         description: "จัดการครุภัณฑ์ไอทีขององค์กร",
     },
     {
         id: "it-support",
-        label: "IT Support",
+        label: "ระบบแจ้งปัญหาไอที",
         icon: AlertTriangle,
         description: "แจ้งปัญหาไอทีและติดตามสถานะ",
     },
@@ -65,11 +68,44 @@ export const DASHBOARD_MENU_ITEMS: MenuItem[] = [
     },
 ];
 
-export function getAvailableMenuItems(isAdmin: boolean): MenuItem[] {
-    return DASHBOARD_MENU_ITEMS.filter(
-        (item) =>
-            !item.requiredRole || (item.requiredRole === "ADMIN" && isAdmin),
-    );
+export const DASHBOARD_MENU_GROUPS: MenuGroup[] = [
+    {
+        id: "employee-apps",
+        label: "แอปพลิเคชัน",
+        icon: AppWindow,
+        items: [
+            DASHBOARD_MENU_ITEMS[0], // ระบบลางาน
+            DASHBOARD_MENU_ITEMS[1], // IT-Equipments
+            DASHBOARD_MENU_ITEMS[2], // IT Support
+        ],
+    },
+    {
+        id: "management",
+        label: "การจัดการระบบ",
+        icon: ShieldCheck,
+        items: [
+            DASHBOARD_MENU_ITEMS[3], // ขออีเมล (ADMIN)
+            DASHBOARD_MENU_ITEMS[4], // ข้อมูลพนักงาน
+            DASHBOARD_MENU_ITEMS[5], // เพิ่มพนักงาน (ADMIN)
+            DASHBOARD_MENU_ITEMS[6], // นำเข้า CSV (ADMIN)
+            DASHBOARD_MENU_ITEMS[7], // บันทึกการใช้งาน (ADMIN)
+        ],
+    },
+];
+
+/** Filter groups by role — removes ADMIN-only items for non-admins, drops empty groups */
+export function getAvailableMenuGroups(isAdmin: boolean): MenuGroup[] {
+    return DASHBOARD_MENU_GROUPS
+        .map((group) => {
+            const filteredItems = group.items.filter(
+                (item) =>
+                    !item.requiredRole ||
+                    (item.requiredRole === "ADMIN" && isAdmin),
+            );
+            if (filteredItems.length === 0) return null;
+            return { ...group, items: filteredItems };
+        })
+        .filter((g): g is MenuGroup => g !== null);
 }
 
 export const getMenuTheme = (menuId: string) => {

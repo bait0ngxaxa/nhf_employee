@@ -14,7 +14,7 @@ import useSWR from "swr";
 import { Smartphone } from "lucide-react";
 import {
     DASHBOARD_MENU_ITEMS,
-    getAvailableMenuItems,
+    getAvailableMenuGroups,
 } from "@/constants/dashboard";
 import { DashboardDataContext, DashboardUIContext } from "./DashboardContext";
 import {
@@ -115,10 +115,12 @@ export function DashboardProvider({ children }: DashboardProviderProps) {
         };
     }, [status]);
 
-    const availableMenuItems = useMemo(
-        () => [...getAvailableMenuItems(isAdmin), SESSION_MENU_ITEM],
+    const availableMenuGroups = useMemo(
+        () => getAvailableMenuGroups(isAdmin),
         [isAdmin],
     );
+
+    const sessionMenuItem = SESSION_MENU_ITEM;
 
     const { data: statsData, mutate: mutateStats } = useSWR<{
         stats: EmployeeStats;
@@ -168,7 +170,8 @@ export function DashboardProvider({ children }: DashboardProviderProps) {
             employeeStats,
             refreshTrigger,
             handleEmployeeAdded,
-            availableMenuItems,
+            availableMenuGroups,
+            sessionMenuItem,
         }),
         [
             status,
@@ -177,7 +180,8 @@ export function DashboardProvider({ children }: DashboardProviderProps) {
             employeeStats,
             refreshTrigger,
             handleEmployeeAdded,
-            availableMenuItems,
+            availableMenuGroups,
+            sessionMenuItem,
         ],
     );
 

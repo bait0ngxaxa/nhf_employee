@@ -1,0 +1,14 @@
+-- Alter notification enum to support stock events
+ALTER TABLE `notifications`
+MODIFY `type` ENUM(
+  'TICKET_CREATED',
+  'NEW_COMMENT',
+  'TICKET_UPDATED',
+  'SYSTEM_ALERT',
+  'LEAVE_REQUESTED',
+  'LEAVE_APPROVED',
+  'LEAVE_REJECTED',
+  'STOCK_REQUEST_NEW',
+  'STOCK_APPROVED',
+  'STOCK_REJECTED'
+) NOT NULL;
