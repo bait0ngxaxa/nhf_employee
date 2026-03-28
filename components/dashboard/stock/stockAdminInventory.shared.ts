@@ -1,0 +1,111 @@
+import type { StockItem } from "../context/stock/types";
+
+export type VariantDraftAttribute = {
+    name: string;
+    value: string;
+};
+
+export type VariantDraft = {
+    sku: string;
+    unit: string;
+    quantity: number;
+    minStock: number;
+    imageUrl: string;
+    attributes: VariantDraftAttribute[];
+};
+
+export const STOCK_ADMIN_TEXT = {
+    addItem: "เพิ่มวัสดุ",
+    addCategory: "เพิ่มหมวดหมู่",
+    loading: "กำลังโหลด...",
+    image: "รูป",
+    sku: "รหัส (SKU)",
+    itemName: "ชื่อวัสดุ",
+    category: "หมวดหมู่",
+    quantity: "คงเหลือ",
+    minStock: "จุดสั่งซื้อ",
+    noVariant: "ยังไม่มี variant",
+    childSku: "SKU ย่อย",
+    deleteConfirm: "ลบ \"{name}\" ออกจากรายการหรือไม่?",
+    deleteSuccess: "ลบ {name} เรียบร้อยแล้ว",
+    genericError: "เกิดข้อผิดพลาด",
+    save: "บันทึกข้อมูล",
+    saving: "กำลังบันทึก...",
+    cancel: "ยกเลิก",
+    addNewItem: "เพิ่มวัสดุใหม่",
+    itemDescription: "รายละเอียด",
+    itemDescriptionPlaceholder:
+        "เช่น กระดาษ post-it สำหรับจดข้อความสั้น",
+    imageUrl: "ลิงก์รูปภาพ",
+    unit: "หน่วย",
+    initialQuantity: "จำนวนเริ่มต้น",
+    categoryPlaceholder:
+        "เลือกหมวดหมู่ (ไม่บังคับ)",
+    itemAdded: "เพิ่มวัสดุเรียบร้อยแล้ว",
+    variantsTitle: "ตัวเลือกย่อย",
+    variantsHint:
+        "เพิ่มสี ขนาด ชนิด หรือคุณสมบัติที่ทำให้วัสดุนี้ต้องแยก stock",
+    addVariant: "เพิ่ม variant",
+    autoVariantHint:
+        "หากไม่เพิ่ม variant ระบบจะสร้าง variant เริ่มต้นให้อัตโนมัติ",
+    variantLabel: "ตัวเลือก",
+    remove: "ลบ",
+    attributes: "คุณสมบัติ",
+    addAttribute: "เพิ่มคุณสมบัติ",
+    attributeNamePlaceholder: "เช่น สี",
+    attributeValuePlaceholder: "เช่น ชมพู",
+    adjustStockTitle: "ปรับยอดสต็อก",
+    currentStock: "คงเหลือปัจจุบัน",
+    inboundQuantity: "จำนวนรับเข้า",
+    adjustSuccess: "ปรับยอด {name} เรียบร้อยแล้ว",
+    saveAdjust: "บันทึกการปรับ",
+    addCategoryTitle: "เพิ่มหมวดหมู่",
+    categoryName: "ชื่อหมวดหมู่",
+    categoryDescription: "คำอธิบาย (ถ้ามี)",
+    categoryAdded: "เพิ่มหมวดหมู่เรียบร้อยแล้ว",
+} as const;
+
+export function createDeleteConfirmMessage(name: string): string {
+    return STOCK_ADMIN_TEXT.deleteConfirm.replace("{name}", name);
+}
+
+export function createDeleteSuccessMessage(name: string): string {
+    return STOCK_ADMIN_TEXT.deleteSuccess.replace("{name}", name);
+}
+
+export function createAdjustSuccessMessage(name: string): string {
+    return STOCK_ADMIN_TEXT.adjustSuccess.replace("{name}", name);
+}
+
+export function createVariantSummary(item: StockItem): string {
+    const defaultVariant = item.variants?.[0];
+    if (!defaultVariant) {
+        return STOCK_ADMIN_TEXT.noVariant;
+    }
+
+    const attributeLabels = defaultVariant.attributeValues?.map(
+        (attributeValue) =>
+            `${attributeValue.attributeValue.attribute.name}: ${attributeValue.attributeValue.value}`,
+    );
+
+    if (!attributeLabels || attributeLabels.length === 0) {
+        return `${STOCK_ADMIN_TEXT.childSku}: ${defaultVariant.sku}`;
+    }
+
+    return attributeLabels.join(" • ");
+}
+
+export function createEmptyVariantAttribute(): VariantDraftAttribute {
+    return { name: "", value: "" };
+}
+
+export function createEmptyVariant(): VariantDraft {
+    return {
+        sku: "",
+        unit: "",
+        quantity: 1,
+        minStock: 1,
+        imageUrl: "",
+        attributes: [createEmptyVariantAttribute()],
+    };
+}

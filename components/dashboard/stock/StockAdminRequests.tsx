@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { type StockRequestStatus } from "@prisma/client";
 import { CheckCircle, ClipboardList, XCircle } from "lucide-react";
 import { Pagination } from "@/components/Pagination";
 import { Button } from "@/components/ui/button";
@@ -33,6 +34,12 @@ import { useStockDataContext, useStockUIContext } from "../context/stock";
 import type { StockRequest } from "../context/stock/types";
 
 const REQUESTS_PER_PAGE = 20;
+const REQUEST_STATUS_OPTIONS = [
+    { value: "all", label: "ทั้งหมด" },
+    { value: "PENDING_ISSUE", label: "รอจ่าย" },
+    { value: "ISSUED", label: "จ่ายแล้ว" },
+    { value: "CANCELLED", label: "ยกเลิก" },
+] as const;
 
 function formatDate(dateStr: string): string {
     return new Date(dateStr).toLocaleDateString("th-TH", {
@@ -49,17 +56,17 @@ export function StockAdminRequests() {
         useStockDataContext();
     const { requestsPage, setRequestsPage, statusFilter, setStatusFilter } =
         useStockUIContext();
-    const [rejectTarget, setRejectTarget] = useState<StockRequest | null>(null);
+    const [cancelTarget, setCancelTarget] = useState<StockRequest | null>(null);
     const [processing, setProcessing] = useState<number | null>(null);
     const totalPages = Math.max(1, Math.ceil(totalRequests / REQUESTS_PER_PAGE));
 
-    async function handleApprove(requestId: number): Promise<void> {
+    async function handleIssue(requestId: number): Promise<void> {
         setProcessing(requestId);
         try {
-            const res = await fetch(API_ROUTES.stock.reviewById(requestId), {
+            const res = await fetch(API_ROUTES.stock.issueById(requestId), {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ action: "approve" }),
+                body: JSON.stringify({}),
             });
 
             if (!res.ok) {
@@ -67,7 +74,7 @@ export function StockAdminRequests() {
                 throw new Error(err.error ?? "เกิดข้อผิดพลาด");
             }
 
-            toast.success(`อนุมัติคำขอ #${requestId} เรียบร้อยแล้ว`);
+            toast.success(`จ่ายคำขอ #${requestId} เรียบร้อยแล้ว`);
             refreshRequests();
             refreshItems();
         } catch (error: unknown) {
@@ -77,15 +84,14 @@ export function StockAdminRequests() {
         }
     }
 
-    async function handleReject(requestId: number, reason: string): Promise<void> {
+    async function handleCancel(requestId: number, reason: string): Promise<void> {
         setProcessing(requestId);
         try {
-            const res = await fetch(API_ROUTES.stock.reviewById(requestId), {
+            const res = await fetch(API_ROUTES.stock.cancelById(requestId), {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                    action: "reject",
-                    rejectReason: reason || null,
+                    cancelReason: reason || null,
                 }),
             });
 
@@ -94,13 +100,13 @@ export function StockAdminRequests() {
                 throw new Error(err.error ?? "เกิดข้อผิดพลาด");
             }
 
-            toast.success(`ปฏิเสธคำขอ #${requestId} เรียบร้อยแล้ว`);
+            toast.success(`ยกเลิกคำขอ #${requestId} เรียบร้อยแล้ว`);
             refreshRequests();
         } catch (error: unknown) {
             toast.error(error instanceof Error ? error.message : "เกิดข้อผิดพลาด");
         } finally {
             setProcessing(null);
-            setRejectTarget(null);
+            setCancelTarget(null);
         }
     }
 
@@ -127,11 +133,7 @@ export function StockAdminRequests() {
                             setStatusFilter(
                                 value === "all"
                                     ? undefined
-                                    : (value as
-                                          | "PENDING"
-                                          | "APPROVED"
-                                          | "REJECTED"
-                                          | "CANCELLED"),
+                                    : (value as StockRequestStatus),
                             )
                         }
                     >
@@ -139,11 +141,11 @@ export function StockAdminRequests() {
                             <SelectValue placeholder="กรองสถานะ" />
                         </SelectTrigger>
                         <SelectContent>
-                            <SelectItem value="all">ทั้งหมด</SelectItem>
-                            <SelectItem value="PENDING">รออนุมัติ</SelectItem>
-                            <SelectItem value="APPROVED">อนุมัติแล้ว</SelectItem>
-                            <SelectItem value="REJECTED">ปฏิเสธ</SelectItem>
-                            <SelectItem value="CANCELLED">ยกเลิก</SelectItem>
+                            {REQUEST_STATUS_OPTIONS.map((option) => (
+                                <SelectItem key={option.value} value={option.value}>
+                                    {option.label}
+                                </SelectItem>
+                            ))}
                         </SelectContent>
                     </Select>
                 </div>
@@ -163,7 +165,7 @@ export function StockAdminRequests() {
                     </TableHeader>
                     <TableBody>
                         {requests.map((req) => {
-                            const isPending = req.status === "PENDING";
+                            const isPendingIssue = req.status === "PENDING_ISSUE";
 
                             return (
                                 <TableRow key={req.id} className="hover:bg-blue-50/30 transition-colors border-b-gray-50/80">
@@ -197,26 +199,26 @@ export function StockAdminRequests() {
                                         <RequestStatusBadge status={req.status} />
                                     </TableCell>
                                     <TableCell>
-                                        {isPending && (
+                                        {isPendingIssue && (
                                             <div className="flex gap-2 justify-end">
                                                 <Button
                                                     size="sm"
                                                     className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm transition-all hover:shadow-md"
                                                     disabled={processing === req.id}
-                                                    onClick={() => handleApprove(req.id)}
+                                                    onClick={() => handleIssue(req.id)}
                                                 >
                                                     <CheckCircle className="mr-1.5 h-3.5 w-3.5" />
-                                                    อนุมัติ
+                                                    จ่ายแล้ว
                                                 </Button>
                                                 <Button
                                                     size="sm"
                                                     variant="outline"
                                                     className="text-rose-600 hover:text-rose-700 border-rose-200 hover:bg-rose-50 hover:border-rose-300 transition-all shadow-sm"
                                                     disabled={processing === req.id}
-                                                    onClick={() => setRejectTarget(req)}
+                                                    onClick={() => setCancelTarget(req)}
                                                 >
                                                     <XCircle className="mr-1.5 h-3.5 w-3.5" />
-                                                    ปฏิเสธ
+                                                    ยกเลิก
                                                 </Button>
                                             </div>
                                         )}
@@ -241,29 +243,29 @@ export function StockAdminRequests() {
                 }
             />
 
-            <RejectDialog
-                request={rejectTarget}
-                onClose={() => setRejectTarget(null)}
-                onReject={handleReject}
+            <CancelDialog
+                request={cancelTarget}
+                onClose={() => setCancelTarget(null)}
+                onCancel={handleCancel}
                 loading={processing !== null}
             />
         </div>
     );
 }
 
-interface RejectDialogProps {
+interface CancelDialogProps {
     request: StockRequest | null;
     onClose: () => void;
-    onReject: (id: number, reason: string) => void;
+    onCancel: (id: number, reason: string) => void;
     loading: boolean;
 }
 
-function RejectDialog({
+function CancelDialog({
     request,
     onClose,
-    onReject,
+    onCancel,
     loading,
-}: RejectDialogProps) {
+}: CancelDialogProps) {
     const [reason, setReason] = useState("");
 
     if (!request) return null;
@@ -272,16 +274,16 @@ function RejectDialog({
         <Dialog open onOpenChange={onClose}>
             <DialogContent className="sm:max-w-[400px] overflow-hidden p-0">
                 <div className="px-6 py-4 border-b border-rose-100 bg-rose-50/50">
-                    <DialogTitle className="text-lg font-semibold text-rose-800">ปฏิเสธคำขอ #{request.id}</DialogTitle>
+                    <DialogTitle className="text-lg font-semibold text-rose-800">ยกเลิกคำขอ #{request.id}</DialogTitle>
                 </div>
                 <div className="px-6 py-5 space-y-5">
                     <div className="space-y-1.5">
-                        <Label htmlFor="reject-reason" className="text-sm font-semibold text-slate-700">เหตุผล (ถ้ามี)</Label>
+                        <Label htmlFor="cancel-reason" className="text-sm font-semibold text-slate-700">เหตุผล (ถ้ามี)</Label>
                         <Input
-                            id="reject-reason"
+                            id="cancel-reason"
                             value={reason}
                             onChange={(e) => setReason(e.target.value)}
-                            placeholder="ระบุเหตุผลที่ปฏิเสธเพื่อแจ้งผู้เบิก"
+                            placeholder="ระบุเหตุผลที่ยกเลิกเพื่อแจ้งผู้เบิก"
                             className="h-10 focus-visible:ring-rose-500"
                         />
                     </div>
@@ -292,10 +294,10 @@ function RejectDialog({
                         <Button
                             variant="destructive"
                             disabled={loading}
-                            onClick={() => onReject(request.id, reason)}
+                            onClick={() => onCancel(request.id, reason)}
                             className="h-10 px-7 font-bold bg-rose-600 hover:bg-rose-700 text-white shadow-sm transition-all"
                         >
-                            {loading ? "กำลังดำเนินการ..." : "ยืนยันการปฏิเสธ"}
+                            {loading ? "กำลังดำเนินการ..." : "ยืนยันการยกเลิก"}
                         </Button>
                     </div>
                 </div>

@@ -64,6 +64,9 @@ export const API_ROUTES = {
     auditLogs: {
         export: "/api/audit-logs/export",
     },
+    uploads: {
+        image: "/api/uploads/image",
+    },
     emailRequest: {
         list: "/api/email-request",
     },
@@ -74,6 +77,10 @@ export const API_ROUTES = {
         adjustById: (id: number | string): string =>
             `/api/stock/items/${id}/adjust`,
         requests: "/api/stock/requests",
+        issueById: (id: number | string): string =>
+            `/api/stock/requests/${id}/issue`,
+        cancelById: (id: number | string): string =>
+            `/api/stock/requests/${id}/cancel`,
         reviewById: (id: number | string): string =>
             `/api/stock/requests/${id}/review`,
     },

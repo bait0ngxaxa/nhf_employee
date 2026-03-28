@@ -34,6 +34,24 @@ const REQUEST_STATUS_META: Record<string, RequestStatusMeta> = {
         iconClass: "text-slate-500",
         icon: Ban,
     },
+    PENDING_ISSUE: {
+        label: "รอจ่าย",
+        colorClass: "bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100",
+        iconClass: "text-amber-500",
+        icon: Clock3,
+    },
+    ISSUED: {
+        label: "จ่ายแล้ว",
+        colorClass: "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100",
+        iconClass: "text-emerald-500",
+        icon: CheckCircle2,
+    },
+    REJECTED_LEGACY: {
+        label: "ปฏิเสธ (เดิม)",
+        colorClass: "bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100",
+        iconClass: "text-rose-500",
+        icon: XCircle,
+    },
 };
 
 export function getRequestStatusMeta(status: string): RequestStatusMeta {

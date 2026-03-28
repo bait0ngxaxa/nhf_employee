@@ -8,47 +8,48 @@ datasource db {
 }
 
 model User {
-  id              Int             @id @default(autoincrement())
-  email           String          @unique
-  name            String
-  password        String
-  role            String          @default("USER")
-  tokenVersion    Int             @default(1)
-  createdAt       DateTime        @default(now())
-  updatedAt       DateTime        @updatedAt
-  employeeId      Int?            @unique
-  isActive        Boolean         @default(true)
-  deletedAt       DateTime?
-  comments        TicketComment[]
-  ticketViews     TicketView[]
-  assignedTickets Ticket[]        @relation("AssignedTickets")
-  reportedTickets Ticket[]        @relation("ReportedTickets")
-  employee        Employee?       @relation(fields: [employeeId], references: [id])
-  auditLogs       AuditLog[]
-  emailRequests   EmailRequest[]
-  notifications      Notification[]
-  refreshTokens      AuthRefreshToken[]
-  stockTransactions  StockTransaction[]
-  stockRequests      StockRequest[]      @relation("StockRequester")
-  stockReviews       StockRequest[]      @relation("StockReviewer")
+  id                     Int                @id @default(autoincrement())
+  email                  String             @unique
+  name                   String
+  password               String
+  role                   String             @default("USER")
+  tokenVersion           Int                @default(1)
+  createdAt              DateTime           @default(now())
+  updatedAt              DateTime           @updatedAt
+  employeeId             Int?               @unique
+  isActive               Boolean            @default(true)
+  deletedAt              DateTime?
+  comments               TicketComment[]
+  ticketViews            TicketView[]
+  assignedTickets        Ticket[]           @relation("AssignedTickets")
+  reportedTickets        Ticket[]           @relation("ReportedTickets")
+  employee               Employee?          @relation(fields: [employeeId], references: [id])
+  auditLogs              AuditLog[]
+  emailRequests          EmailRequest[]
+  notifications          Notification[]
+  refreshTokens          AuthRefreshToken[]
+  stockTransactions      StockTransaction[]
+  stockRequests          StockRequest[]     @relation("StockRequester")
+  stockIssuedRequests    StockRequest[]     @relation("StockIssuer")
+  stockCancelledRequests StockRequest[]     @relation("StockCanceller")
 
   @@map("users")
 }
 
 model AuthRefreshToken {
-  id            String   @id @default(cuid())
+  id            String    @id @default(cuid())
   userId        Int
-  tokenHash     String   @unique @db.VarChar(128)
-  familyId      String   @db.VarChar(64)
-  rotatedFromId String?  @db.VarChar(36)
+  tokenHash     String    @unique @db.VarChar(128)
+  familyId      String    @db.VarChar(64)
+  rotatedFromId String?   @db.VarChar(36)
   expiresAt     DateTime
   revokedAt     DateTime?
-  userAgent     String?  @db.VarChar(512)
-  ipAddress     String?  @db.VarChar(64)
+  userAgent     String?   @db.VarChar(512)
+  ipAddress     String?   @db.VarChar(64)
   lastUsedAt    DateTime?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([familyId])
@@ -58,25 +59,25 @@ model AuthRefreshToken {
 }
 
 model Employee {
-  id           Int            @id @default(autoincrement())
-  firstName    String
-  lastName     String
-  phone        String?
-  email        String         @unique
-  position     String
-  hireDate     DateTime       @default(now())
-  status       EmployeeStatus @default(ACTIVE)
-  deletedAt    DateTime?
-  createdAt    DateTime       @default(now())
-  updatedAt    DateTime       @updatedAt
-  departmentId Int
-  affiliation  String?
-  nickname     String?
-  managerId    Int?
-  dept         Department     @relation(fields: [departmentId], references: [id])
-  manager      Employee?      @relation("ManagerToSubordinate", fields: [managerId], references: [id])
-  subordinates Employee[]     @relation("ManagerToSubordinate")
-  user         User?
+  id            Int            @id @default(autoincrement())
+  firstName     String
+  lastName      String
+  phone         String?
+  email         String         @unique
+  position      String
+  hireDate      DateTime       @default(now())
+  status        EmployeeStatus @default(ACTIVE)
+  deletedAt     DateTime?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  departmentId  Int
+  affiliation   String?
+  nickname      String?
+  managerId     Int?
+  dept          Department     @relation(fields: [departmentId], references: [id])
+  manager       Employee?      @relation("ManagerToSubordinate", fields: [managerId], references: [id])
+  subordinates  Employee[]     @relation("ManagerToSubordinate")
+  user          User?
   leaveQuotas   LeaveQuota[]
   leaveRequests LeaveRequest[] @relation("LeaveRequester")
   approvals     LeaveRequest[] @relation("LeaveApprover")
@@ -253,8 +254,8 @@ enum AuditAction {
   STOCK_ITEM_DELETE
   STOCK_ADJUST
   STOCK_REQUEST_CREATE
-  STOCK_REQUEST_APPROVE
-  STOCK_REQUEST_REJECT
+  STOCK_REQUEST_ISSUE   @map("STOCK_REQUEST_APPROVE")
+  STOCK_REQUEST_CANCEL  @map("STOCK_REQUEST_REJECT")
   STOCK_CATEGORY_CREATE
   STOCK_CATEGORY_DELETE
 
@@ -324,7 +325,7 @@ model Notification {
   message     String           @db.Text
   isRead      Boolean          @default(false)
   actionUrl   String?
-  referenceId String?          // ID of Ticket, Comment, etc.
+  referenceId String? // ID of Ticket, Comment, etc.
   createdAt   DateTime         @default(now())
 
   @@index([userId, isRead])
@@ -341,8 +342,8 @@ enum NotificationType {
   LEAVE_APPROVED
   LEAVE_REJECTED
   STOCK_REQUEST_NEW
-  STOCK_APPROVED
-  STOCK_REJECTED
+  STOCK_ISSUED      @map("STOCK_APPROVED")
+  STOCK_CANCELLED   @map("STOCK_REJECTED")
 }
 
 // ==========================================
@@ -350,42 +351,43 @@ enum NotificationType {
 // ==========================================
 
 model LeaveQuota {
-  id          String    @id @default(cuid())
-  employeeId  Int
-  year        Int       // ปี ค.ศ. (เช่น 2026)
-  leaveType   LeaveType 
-  totalDays   Float     // โควต้าทั้งหมด (ป่วย=30, กิจ=10, พักร้อน=6)
-  usedDays    Float     @default(0) // วันที่ใช้ไปแล้ว (ทศนิยมได้ เช่น 0.5)
+  id         String    @id @default(cuid())
+  employeeId Int
+  year       Int // ปี ค.ศ. (เช่น 2026)
+  leaveType  LeaveType
+  totalDays  Float // โควต้าทั้งหมด (ป่วย=30, กิจ=10, พักร้อน=6)
+  usedDays   Float     @default(0) // วันที่ใช้ไปแล้ว (ทศนิยมได้ เช่น 0.5)
 
-  employee    Employee  @relation(fields: [employeeId], references: [id])
+  employee Employee @relation(fields: [employeeId], references: [id])
+
   @@unique([employeeId, year, leaveType]) // 1 คนมีโควต้า 1 ประเภทต่อ 1 ปี
   @@map("leave_quotas")
 }
 
 model LeaveRequest {
-  id            String       @id @default(cuid())
-  employeeId    Int
-  leaveType     LeaveType
-  startDate     DateTime     
-  endDate       DateTime     
-  period        LeavePeriod  @default(FULL_DAY) 
-  durationDays  Float        // จำนวนวันลาสุทธิ (เช่น 1.5 วัน)
-  reason        String       @db.Text
-  
-  status        LeaveStatus  @default(PENDING)
-  
+  id           String      @id @default(cuid())
+  employeeId   Int
+  leaveType    LeaveType
+  startDate    DateTime
+  endDate      DateTime
+  period       LeavePeriod @default(FULL_DAY)
+  durationDays Float // จำนวนวันลาสุทธิ (เช่น 1.5 วัน)
+  reason       String      @db.Text
+
+  status LeaveStatus @default(PENDING)
+
   // ผู้อนุมัติ
-  approverId    Int?         // หัวหน้าที่ต้องอนุมัติตอนนั้น (ดึงจาก managerId ของพนักงาน)
-  approvedAt    DateTime?    // เวลาที่กดอนุมัติ/ปฏิเสธ
-  rejectReason  String?      @db.Text // เหตุผลที่ปฏิเสธ (ถ้ามี)
+  approverId   Int? // หัวหน้าที่ต้องอนุมัติตอนนั้น (ดึงจาก managerId ของพนักงาน)
+  approvedAt   DateTime? // เวลาที่กดอนุมัติ/ปฏิเสธ
+  rejectReason String?   @db.Text // เหตุผลที่ปฏิเสธ (ถ้ามี)
 
-  attachmentUrl String?      @db.Text // เผื่อต้องแนบใบรับรองแพทย์
+  attachmentUrl String? @db.Text // เผื่อต้องแนบใบรับรองแพทย์
 
-  createdAt     DateTime     @default(now())
-  updatedAt     DateTime     @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  employee      Employee     @relation("LeaveRequester", fields: [employeeId], references: [id])
-  approver      Employee?    @relation("LeaveApprover", fields: [approverId], references: [id])
+  employee Employee  @relation("LeaveRequester", fields: [employeeId], references: [id])
+  approver Employee? @relation("LeaveApprover", fields: [approverId], references: [id])
 
   @@index([employeeId])
   @@index([approverId])
@@ -394,22 +396,22 @@ model LeaveRequest {
 }
 
 enum LeaveType {
-  SICK       // ลาป่วย
-  PERSONAL   // ลากิจ
-  VACATION   // ลาพักร้อน
+  SICK // ลาป่วย
+  PERSONAL // ลากิจ
+  VACATION // ลาพักร้อน
 }
 
 enum LeavePeriod {
-  FULL_DAY   // เต็มวัน (1.0)
-  MORNING    // ครึ่งวันเช้า (0.5)
-  AFTERNOON  // ครึ่งวันบ่าย (0.5)
+  FULL_DAY // เต็มวัน (1.0)
+  MORNING // ครึ่งวันเช้า (0.5)
+  AFTERNOON // ครึ่งวันบ่าย (0.5)
 }
 
 enum LeaveStatus {
-  PENDING    // รออนุมัติ
-  APPROVED   // อนุมัติแล้ว
-  REJECTED   // ปฏิเสธ
-  CANCELLED  // ยกเลิกโดยตัวพนักงานเอง
+  PENDING // รออนุมัติ
+  APPROVED // อนุมัติแล้ว
+  REJECTED // ปฏิเสธ
+  CANCELLED // ยกเลิกโดยตัวพนักงานเอง
 }
 
 // ==========================================
@@ -430,8 +432,10 @@ model StockCategory {
 model StockItem {
   id           Int                @id @default(autoincrement())
   name         String
+  description  String?            @db.Text
+  imageUrl     String?            @db.Text
   sku          String             @unique
-  unit         String             // รีม, ตลับ, ชิ้น
+  unit         String // รีม, ตลับ, ชิ้น
   quantity     Int                @default(0)
   minStock     Int                @default(0)
   categoryId   Int
@@ -441,68 +445,136 @@ model StockItem {
   category     StockCategory      @relation(fields: [categoryId], references: [id])
   transactions StockTransaction[]
   requestItems StockRequestItem[]
+  variants     StockItemVariant[]
 
   @@index([categoryId])
   @@map("stock_items")
 }
 
+model StockItemVariant {
+  id              Int                          @id @default(autoincrement())
+  stockItemId     Int
+  sku             String                       @unique
+  unit            String
+  quantity        Int                          @default(0)
+  minStock        Int                          @default(0)
+  imageUrl        String?                      @db.Text
+  isActive        Boolean                      @default(true)
+  createdAt       DateTime                     @default(now())
+  updatedAt       DateTime                     @updatedAt
+  stockItem       StockItem                    @relation(fields: [stockItemId], references: [id], onDelete: Cascade)
+  transactions    StockTransaction[]
+  requestItems    StockRequestItem[]
+  attributeValues StockVariantAttributeValue[]
+
+  @@index([stockItemId])
+  @@index([isActive])
+  @@map("stock_item_variants")
+}
+
+model StockAttribute {
+  id        Int                   @id @default(autoincrement())
+  name      String                @unique
+  createdAt DateTime              @default(now())
+  updatedAt DateTime              @updatedAt
+  values    StockAttributeValue[]
+
+  @@map("stock_attributes")
+}
+
+model StockAttributeValue {
+  id          Int                          @id @default(autoincrement())
+  attributeId Int
+  value       String
+  createdAt   DateTime                     @default(now())
+  updatedAt   DateTime                     @updatedAt
+  attribute   StockAttribute               @relation(fields: [attributeId], references: [id], onDelete: Cascade)
+  variants    StockVariantAttributeValue[]
+
+  @@unique([attributeId, value])
+  @@index([attributeId])
+  @@map("stock_attribute_values")
+}
+
+model StockVariantAttributeValue {
+  variantId        Int
+  attributeValueId Int
+  variant          StockItemVariant    @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  attributeValue   StockAttributeValue @relation(fields: [attributeValueId], references: [id], onDelete: Cascade)
+
+  @@id([variantId, attributeValueId])
+  @@index([attributeValueId])
+  @@map("stock_variant_attribute_values")
+}
+
 model StockTransaction {
-  id          Int         @id @default(autoincrement())
+  id          Int               @id @default(autoincrement())
   itemId      Int
+  variantId   Int?
   type        StockTxType
-  quantity    Int         // บวก=เพิ่ม, ลบ=ลด
-  note        String?     @db.Text
+  quantity    Int // บวก=เพิ่ม, ลบ=ลด
+  note        String?           @db.Text
   performedBy Int
-  createdAt   DateTime    @default(now())
-  item        StockItem   @relation(fields: [itemId], references: [id])
-  user        User        @relation(fields: [performedBy], references: [id])
+  createdAt   DateTime          @default(now())
+  item        StockItem         @relation(fields: [itemId], references: [id])
+  variant     StockItemVariant? @relation(fields: [variantId], references: [id])
+  user        User              @relation(fields: [performedBy], references: [id])
 
   @@index([itemId])
+  @@index([variantId])
   @@index([performedBy])
   @@map("stock_transactions")
 }
 
 model StockRequest {
-  id           Int                @id @default(autoincrement())
-  requestedBy  Int
-  status       StockRequestStatus @default(PENDING)
-  note         String?            @db.Text
-  reviewedBy   Int?
-  reviewedAt   DateTime?
-  rejectReason String?            @db.Text
-  createdAt    DateTime           @default(now())
-  updatedAt    DateTime           @updatedAt
-  requester    User               @relation("StockRequester", fields: [requestedBy], references: [id])
-  reviewer     User?              @relation("StockReviewer", fields: [reviewedBy], references: [id])
-  items        StockRequestItem[]
+  id            Int                @id @default(autoincrement())
+  requestedBy   Int
+  status        StockRequestStatus @default(PENDING_ISSUE)
+  note          String?            @db.Text
+  issuedById    Int?               @map("reviewedBy")
+  issuedAt      DateTime?          @map("reviewedAt")
+  cancelReason  String?            @map("rejectReason") @db.Text
+  cancelledById Int?
+  cancelledAt   DateTime?
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+  requester     User               @relation("StockRequester", fields: [requestedBy], references: [id])
+  issuer        User?              @relation("StockIssuer", fields: [issuedById], references: [id])
+  canceller     User?              @relation("StockCanceller", fields: [cancelledById], references: [id])
+  items         StockRequestItem[]
 
   @@index([requestedBy])
   @@index([status])
+  @@index([issuedById])
+  @@index([cancelledById])
   @@map("stock_requests")
 }
 
 model StockRequestItem {
-  id        Int          @id @default(autoincrement())
+  id        Int               @id @default(autoincrement())
   requestId Int
   itemId    Int
+  variantId Int?
   quantity  Int
-  request   StockRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
-  item      StockItem    @relation(fields: [itemId], references: [id])
+  request   StockRequest      @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  item      StockItem         @relation(fields: [itemId], references: [id])
+  variant   StockItemVariant? @relation(fields: [variantId], references: [id])
 
   @@index([requestId])
   @@index([itemId])
+  @@index([variantId])
   @@map("stock_request_items")
 }
 
 enum StockTxType {
-  IN     // รับเข้าสต็อค
-  OUT    // เบิกออก (เมื่ออนุมัติ)
+  IN // รับเข้าสต็อค
+  OUT // เบิกออก (เมื่ออนุมัติ)
   ADJUST // ปรับยอดคงเหลือ
 }
 
 enum StockRequestStatus {
-  PENDING   // รออนุมัติ
-  APPROVED  // อนุมัติแล้ว
-  REJECTED  // ปฏิเสธ
-  CANCELLED // ยกเลิกโดยผู้เบิก
+  PENDING_ISSUE   @map("PENDING") // รอจ่าย
+  ISSUED          @map("APPROVED") // จ่ายแล้ว
+  CANCELLED       @map("CANCELLED") // ยกเลิก
+  REJECTED_LEGACY @map("REJECTED") // สถานะเก่าจาก flow เดิม
 }

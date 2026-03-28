@@ -15,6 +15,8 @@ export interface StockItemCategory {
 export interface StockItem {
     id: number;
     name: string;
+    description?: string | null;
+    imageUrl?: string | null;
     sku: string;
     unit: string;
     quantity: number;
@@ -22,13 +24,45 @@ export interface StockItem {
     categoryId: number;
     isActive: boolean;
     category: StockItemCategory;
+    variants?: StockItemVariant[];
+}
+
+export interface StockItemVariantAttributeValue {
+    attributeValue: {
+        id: number;
+        value: string;
+        attribute: {
+            id: number;
+            name: string;
+        };
+    };
+}
+
+export interface StockItemVariant {
+    id: number;
+    stockItemId: number;
+    sku: string;
+    unit: string;
+    quantity: number;
+    minStock: number;
+    imageUrl: string | null;
+    isActive: boolean;
+    attributeValues?: StockItemVariantAttributeValue[];
 }
 
 export interface StockRequestItemDetail {
     id: number;
     itemId: number;
+    variantId: number | null;
     quantity: number;
     item: { id: number; name: string; sku: string; unit: string };
+    variant?: {
+        id: number;
+        sku: string;
+        unit: string;
+        imageUrl: string | null;
+        attributeValues?: StockItemVariantAttributeValue[];
+    } | null;
 }
 
 export interface StockRequest {
@@ -36,12 +70,15 @@ export interface StockRequest {
     requestedBy: number;
     status: StockRequestStatus;
     note: string | null;
-    reviewedBy: number | null;
-    reviewedAt: string | null;
-    rejectReason: string | null;
+    issuedById: number | null;
+    issuedAt: string | null;
+    cancelReason: string | null;
+    cancelledById: number | null;
+    cancelledAt: string | null;
     createdAt: string;
     requester: { id: number; name: string; email: string };
-    reviewer: { id: number; name: string } | null;
+    issuer: { id: number; name: string } | null;
+    canceller: { id: number; name: string } | null;
     items: StockRequestItemDetail[];
 }
 

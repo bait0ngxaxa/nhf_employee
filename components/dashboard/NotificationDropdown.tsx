@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useState } from "react";
 import useSWR from "swr";
@@ -10,6 +10,7 @@ import {
     Info,
     Loader2,
     MessageSquare,
+    XCircle,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -70,8 +71,13 @@ export function NotificationDropdown() {
             dedupingInterval: 30_000,
         },
     );
+    const notifications = data?.notifications ?? [];
+    const unreadCount = data?.unreadCount ?? 0;
 
-    const handleMarkAsRead = async (id: string, actionUrl: string | null): Promise<void> => {
+    const handleMarkAsRead = async (
+        id: string,
+        actionUrl: string | null,
+    ): Promise<void> => {
         try {
             await apiPatch(API_ROUTES.notifications.read(id));
             mutate();
@@ -107,10 +113,10 @@ export function NotificationDropdown() {
                 return <AlertCircle className="h-4 w-4 text-orange-500" />;
             case "STOCK_REQUEST_NEW":
                 return <Bell className="h-4 w-4 text-amber-500" />;
-            case "STOCK_APPROVED":
+            case "STOCK_ISSUED":
                 return <Check className="h-4 w-4 text-emerald-500" />;
-            case "STOCK_REJECTED":
-                return <AlertCircle className="h-4 w-4 text-rose-500" />;
+            case "STOCK_CANCELLED":
+                return <XCircle className="h-4 w-4 text-rose-500" />;
             case "NEW_COMMENT":
                 return <MessageSquare className="h-4 w-4 text-blue-500" />;
             case "SYSTEM_ALERT":
@@ -128,9 +134,9 @@ export function NotificationDropdown() {
                     className="relative h-9 w-9 text-gray-600 hover:text-gray-900"
                 >
                     <Bell className="h-5 w-5" />
-                    {data && data.unreadCount > 0 && (
+                    {unreadCount > 0 && (
                         <span className="absolute -top-0.5 -right-0.5 flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold leading-none">
-                            {data.unreadCount > 9 ? "9+" : data.unreadCount}
+                            {unreadCount > 9 ? "9+" : unreadCount}
                         </span>
                     )}
                 </Button>
@@ -144,7 +150,7 @@ export function NotificationDropdown() {
                     <DropdownMenuLabel className="p-0 font-bold text-gray-900">
                         แจ้งเตือน
                     </DropdownMenuLabel>
-                    {data && data.unreadCount > 0 && (
+                    {unreadCount > 0 && (
                         <Button
                             variant="ghost"
                             size="sm"
@@ -163,15 +169,17 @@ export function NotificationDropdown() {
                             <Loader2 className="h-6 w-6 animate-spin" />
                         </div>
                     ) : error ? (
-                        <div className="py-8 text-center text-sm text-red-500">โหลดข้อมูลล้มเหลว</div>
-                    ) : data?.notifications.length === 0 ? (
+                        <div className="py-8 text-center text-sm text-red-500">
+                            โหลดข้อมูลล้มเหลว
+                        </div>
+                    ) : notifications.length === 0 ? (
                         <div className="py-8 text-center text-sm text-gray-500 flex flex-col items-center">
                             <Bell className="h-8 w-8 text-gray-300 mb-2" />
                             ไม่มีการแจ้งเตือนใหม่
                         </div>
                     ) : (
                         <DropdownMenuGroup className="p-1">
-                            {data?.notifications.map((notification) => (
+                            {notifications.map((notification) => (
                                 <DropdownMenuItem
                                     key={notification.id}
                                     className={`flex items-start gap-3 p-3 cursor-pointer rounded-xl transition-colors ${
@@ -180,7 +188,10 @@ export function NotificationDropdown() {
                                             : "bg-blue-50/50"
                                     }`}
                                     onClick={() =>
-                                        handleMarkAsRead(notification.id, notification.actionUrl)
+                                        handleMarkAsRead(
+                                            notification.id,
+                                            notification.actionUrl,
+                                        )
                                     }
                                 >
                                     <div className="mt-1 shrink-0 bg-white p-1.5 rounded-full shadow-sm border border-gray-100">

@@ -37,6 +37,14 @@ export async function PATCH(
         const item = await stockService.updateItem(itemId, result.data);
         return NextResponse.json({ item });
     } catch (error) {
+        const message = error instanceof Error ? error.message : "";
+        if (
+            message.includes("พบรายการย่อยไม่ถูกต้อง") ||
+            message.includes("จำนวนรายการย่อยไม่ตรงกับข้อมูลปัจจุบัน")
+        ) {
+            return jsonError(message, 400);
+        }
+
         if (error instanceof PrismaClientKnownRequestError) {
             if (error.code === "P2025") {
                 return jsonError("ไม่พบรายการวัสดุ", 404);
@@ -45,6 +53,7 @@ export async function PATCH(
                 return jsonError("รหัสวัสดุ (SKU) นี้มีอยู่แล้ว", 409);
             }
         }
+
         console.error("Error updating stock item:", error);
         return serverError();
     }
@@ -65,13 +74,13 @@ export async function DELETE(
         const itemId = Number(id);
         if (isNaN(itemId)) return jsonError("ID ไม่ถูกต้อง", 400);
 
-        // Soft delete — set isActive = false
         await stockService.updateItem(itemId, { isActive: false });
         return NextResponse.json({ success: true });
     } catch (error) {
         if (error instanceof PrismaClientKnownRequestError && error.code === "P2025") {
             return jsonError("ไม่พบรายการวัสดุ", 404);
         }
+
         console.error("Error deleting stock item:", error);
         return serverError();
     }

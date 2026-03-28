@@ -1,4 +1,4 @@
-﻿import { useState } from "react";
+import { useState } from "react";
 import { useForm, type UseFormReturn } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
@@ -28,13 +28,13 @@ const getTodayString = (): string => {
     return `${now.getFullYear()}-${month}-${day}`;
 };
 
-const hasThaiText = (value: string): boolean => /[\u0E00-\u0E7F]/.test(value);
+const hasThaiText = (value: string): boolean => /[ก-๿]/.test(value);
 
 const LEAVE_REQUEST_MESSAGES = {
     success: "ส่งคำขอลาสำเร็จ",
     holidayConflict: "วันที่ลาตรงกับวันหยุด",
     approverNotConfigured: "ยังไม่ได้ตั้งค่าผู้อนุมัติ",
-    overlapConflict: "มีคำขอลาในช่วงวันที่นี้อยู่แล้ว",
+    overlapConflict: "มีคำขอลาในช่วงวันนี้อยู่แล้ว",
     quotaExceeded: "สิทธิ์ลาคงเหลือไม่เพียงพอ",
     halfDayMultiDate: "การลาครึ่งวันต้องเลือกวันลาเพียงวันเดียว",
     genericError: "ไม่สามารถส่งคำขอลาได้ กรุณาลองใหม่อีกครั้ง",
@@ -97,7 +97,10 @@ export function useLeaveRequestFormModel({
         form.setValue("period", "FULL_DAY");
     };
 
-    const handleStartDateChange = (value: string, onFieldChange: (value: string) => void): void => {
+    const handleStartDateChange = (
+        value: string,
+        onFieldChange: (value: string) => void,
+    ): void => {
         onFieldChange(value);
         if (!isMultiDay) {
             form.setValue("endDate", value);

@@ -245,8 +245,8 @@ export async function logStockEvent(
         | "STOCK_CATEGORY_CREATE"
         | "STOCK_CATEGORY_DELETE"
         | "STOCK_REQUEST_CREATE"
-        | "STOCK_REQUEST_APPROVE"
-        | "STOCK_REQUEST_REJECT",
+        | "STOCK_REQUEST_ISSUE"
+        | "STOCK_REQUEST_CANCEL",
     entityId: number,
     userId: number,
     userEmail: string,

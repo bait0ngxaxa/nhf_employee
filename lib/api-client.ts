@@ -110,7 +110,7 @@ function getThaiErrorMessageByCode(code: ApiErrorCode): string {
 }
 
 function containsThai(text: string): boolean {
-    return /[\u0E00-\u0E7F]/.test(text);
+    return /[ก-๿]/.test(text);
 }
 
 function resolveThaiErrorMessage(code: ApiErrorCode, rawMessage: string): string {
@@ -204,7 +204,14 @@ export async function apiRequest<T>(
     endpoint: string,
     config: RequestConfig = {},
 ): Promise<ApiResponse<T>> {
-    const { data, headers, timeoutMs, retryCount, requestId: customRequestId, ...customConfig } = config;
+    const {
+        data,
+        headers,
+        timeoutMs,
+        retryCount,
+        requestId: customRequestId,
+        ...customConfig
+    } = config;
     const method = customConfig.method?.toUpperCase() ?? "GET";
     const requestId = customRequestId ?? createRequestId();
     const finalRetryCount = method === "GET" ? (retryCount ?? DEFAULT_GET_RETRY_COUNT) : 0;
@@ -238,7 +245,10 @@ export async function apiRequest<T>(
             const responseData = await parseResponse(response);
             if (!response.ok) {
                 const code = mapStatusToCode(response.status);
-                const errorMessage = extractErrorMessage(responseData, response.statusText || "Request failed");
+                const errorMessage = extractErrorMessage(
+                    responseData,
+                    response.statusText || "Request failed",
+                );
                 return {
                     success: false,
                     error: errorMessage,
@@ -283,10 +293,6 @@ export async function apiRequest<T>(
         requestId,
     };
 }
-
-// ----------------------------------------------------------------------
-// Convenience wrapper functions
-// ----------------------------------------------------------------------
 
 export const apiGet = <T>(
     endpoint: string,

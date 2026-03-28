@@ -2,10 +2,14 @@ import { type NextRequest, NextResponse } from "next/server";
 import { getApiAuthSession } from "@/lib/server-auth";
 import { buildUserContext } from "@/lib/context";
 import { isAdminRole } from "@/lib/ssot/permissions";
-import { unauthorized, forbidden, jsonError, serverError } from "@/lib/ssot/http";
+import { unauthorized, jsonError, serverError } from "@/lib/ssot/http";
 import { stockService } from "@/lib/services/stock";
+import { cancelRequestSchema } from "@/lib/validations/stock";
 import { logStockEvent } from "@/lib/audit";
-import { notifyStockRequestResult } from "@/lib/services/stock/notifications";
+import {
+    notifyAdminsStockRequestCancelledByRequester,
+    notifyStockRequestResult,
+} from "@/lib/services/stock/notifications";
 
 interface RouteParams {
     params: Promise<{ id: string }>;
@@ -20,55 +24,45 @@ export async function POST(
         if (!session) return unauthorized();
 
         const user = buildUserContext(session);
-        if (!isAdminRole(user.role)) return forbidden();
+        const isAdmin = isAdminRole(user.role);
 
         const { id } = await params;
         const requestId = Number(id);
-        if (isNaN(requestId)) return jsonError("ID ไม่ถูกต้อง", 400);
-
-        const body = (await request.json()) as {
-            action?: string;
-            rejectReason?: string | null;
-            cancelReason?: string | null;
-        };
-        const action = body.action;
-
-        if (action === "approve" || action === "issue") {
-            const updated = await stockService.issueRequest(requestId, user.id);
-            await logStockEvent("STOCK_REQUEST_ISSUE", requestId, user.id, user.email);
-            try {
-                await notifyStockRequestResult(requestId, updated.requestedBy, true);
-            } catch (notificationError) {
-                console.error("Error sending stock issued notification:", {
-                    requestId,
-                    issuerId: user.id,
-                    requesterId: updated.requestedBy,
-                    error: notificationError,
-                });
-            }
-            return NextResponse.json({ request: updated });
+        if (Number.isNaN(requestId)) {
+            return jsonError("ID ไม่ถูกต้อง", 400);
         }
 
-        if (action !== "reject" && action !== "cancel") {
-            return jsonError("action ต้องเป็น issue หรือ cancel", 400);
+        const body = await request.json();
+        const parsed = cancelRequestSchema.safeParse(body);
+        if (!parsed.success) {
+            return jsonError("ข้อมูลไม่ถูกต้อง", 400, {
+                details: parsed.error.flatten().fieldErrors,
+            });
         }
 
-        const cancelReason = body.cancelReason ?? body.rejectReason ?? null;
         const updated = await stockService.cancelRequest(
             requestId,
             user.id,
-            cancelReason,
+            parsed.data.cancelReason,
+            { isAdmin },
         );
         await logStockEvent("STOCK_REQUEST_CANCEL", requestId, user.id, user.email, {
-            metadata: { reason: cancelReason },
+            metadata: { reason: parsed.data.cancelReason },
         });
+
         try {
             await notifyStockRequestResult(
                 requestId,
                 updated.requestedBy,
                 false,
-                cancelReason,
+                parsed.data.cancelReason,
             );
+            if (!isAdmin) {
+                await notifyAdminsStockRequestCancelledByRequester(
+                    requestId,
+                    user.name ?? user.email,
+                );
+            }
         } catch (notificationError) {
             console.error("Error sending stock cancellation notification:", {
                 requestId,
@@ -77,17 +71,19 @@ export async function POST(
                 error: notificationError,
             });
         }
+
         return NextResponse.json({ request: updated });
     } catch (error) {
         const message = error instanceof Error ? error.message : "";
         if (
             message.includes("ไม่พบ") ||
             message.includes("ดำเนินการแล้ว") ||
-            message.includes("ไม่เพียงพอ")
+            message.includes("ไม่มีสิทธิ์")
         ) {
             return jsonError(message, 400);
         }
-        console.error("Error handling stock request review compatibility route:", error);
+
+        console.error("Error cancelling stock request:", error);
         return serverError();
     }
 }
