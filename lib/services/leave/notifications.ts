@@ -1,4 +1,4 @@
-﻿import { emailService } from "@/lib/email";
+import { emailService } from "@/lib/email";
 import { type LeaveActionPayload, type LeaveResultPayload } from "@/lib/email/types";
 import { prisma } from "@/lib/prisma";
 import {
@@ -28,12 +28,14 @@ export async function sendLeaveActionNotifications(
         throw new Error("Manager or manager email not found");
     }
 
-    // PUBLIC_APPROVE_URL = Cloudflare Tunnel domain (accessible outside LAN)
-    // Falls back to NEXTAUTH_URL for dev / non-tunnel setups
     const publicBase = process.env.PUBLIC_APPROVE_URL || process.env.NEXTAUTH_URL;
     const dashboardLink = `${publicBase}${toDashboardTabPath(APP_DASHBOARD_TABS.managerApproval)}`;
 
-    await emailService.sendLeaveActionNotification(manager.email, leaveRequestPayload, dashboardLink);
+    await emailService.sendLeaveActionNotification(
+        manager.email,
+        leaveRequestPayload,
+        dashboardLink,
+    );
 
     if (manager.user?.id) {
         const typeLabel = LEAVE_TYPE_LABELS[leaveRequestPayload.leaveType] ?? "ลา";

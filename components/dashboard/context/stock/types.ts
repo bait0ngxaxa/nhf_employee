@@ -20,6 +20,8 @@ export interface StockItem {
     sku: string;
     unit: string;
     quantity: number;
+    reservedQuantity: number;
+    availableQuantity: number;
     minStock: number;
     categoryId: number;
     isActive: boolean;
@@ -44,6 +46,8 @@ export interface StockItemVariant {
     sku: string;
     unit: string;
     quantity: number;
+    reservedQuantity: number;
+    availableQuantity: number;
     minStock: number;
     imageUrl: string | null;
     isActive: boolean;

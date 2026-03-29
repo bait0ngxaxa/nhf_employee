@@ -66,32 +66,32 @@ export function StockInventoryTable({
     }
 
     return (
-        <div className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-100">
-            <Table>
+        <div className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200">
+            <Table className="border-separate border-spacing-0">
                 <TableHeader>
-                    <TableRow className="border-b-gray-100 bg-slate-50/50 hover:bg-slate-50/50">
-                        <TableHead className="w-20 font-semibold text-slate-600">
+                    <TableRow className="border-b-2 border-slate-200 bg-slate-100/80 hover:bg-slate-100/80">
+                        <TableHead className="w-20 border-r border-slate-200 font-semibold text-slate-700">
                             {STOCK_ADMIN_TEXT.image}
                         </TableHead>
-                        <TableHead className="w-32 font-semibold text-slate-600">
+                        <TableHead className="w-32 border-r border-slate-200 font-semibold text-slate-700">
                             {STOCK_ADMIN_TEXT.sku}
                         </TableHead>
-                        <TableHead className="font-semibold text-slate-600">
+                        <TableHead className="border-r border-slate-200 font-semibold text-slate-700">
                             {STOCK_ADMIN_TEXT.itemName}
                         </TableHead>
-                        <TableHead className="w-40 font-semibold text-slate-600">
+                        <TableHead className="w-40 border-r border-slate-200 font-semibold text-slate-700">
                             {STOCK_ADMIN_TEXT.category}
                         </TableHead>
-                        <TableHead className="w-32 text-right font-semibold text-slate-600">
+                        <TableHead className="w-32 border-r border-slate-200 text-right font-semibold text-slate-700">
                             {STOCK_ADMIN_TEXT.quantity}
                         </TableHead>
-                        <TableHead className="w-32 text-right font-semibold text-slate-600">
+                        <TableHead className="w-32 border-r border-slate-200 text-right font-semibold text-slate-700">
                             {STOCK_ADMIN_TEXT.minStock}
                         </TableHead>
-                        <TableHead className="w-24 border-b-gray-100" />
+                        <TableHead className="w-24" />
                     </TableRow>
                 </TableHeader>
-                <TableBody>
+                <TableBody className="[&_tr:nth-child(odd)]:bg-white [&_tr:nth-child(even)]:bg-slate-100/70">
                     {items.map((item) => (
                         <InventoryRow
                             key={item.id}
@@ -120,12 +120,14 @@ function InventoryRow({ item, onAdjust, onDelete }: InventoryRowProps) {
     }
 
     return (
-        <TableRow className="border-b-gray-50/80 transition-colors hover:bg-blue-50/30">
-            <TableCell>{item.imageUrl ? <InventoryImage item={item} /> : <ImagePlaceholder />}</TableCell>
-            <TableCell className="mx-2 my-1 inline-block rounded-r-md border-r border-slate-50/50 bg-slate-50/50 px-2 py-0.5 font-mono text-xs font-medium text-slate-500">
+        <TableRow className="border-b-2 border-slate-300 transition-colors hover:bg-blue-100/70">
+            <TableCell className="border-r border-slate-300 py-4">
+                {item.imageUrl ? <InventoryImage item={item} /> : <ImagePlaceholder />}
+            </TableCell>
+            <TableCell className="border-r border-slate-300 py-4 font-mono text-xs font-medium text-slate-600">
                 {item.sku}
             </TableCell>
-            <TableCell>
+            <TableCell className="border-r border-slate-300 py-4">
                 <div className="space-y-1">
                     <div className="font-semibold text-slate-800">{item.name}</div>
                     {item.description && (
@@ -136,7 +138,7 @@ function InventoryRow({ item, onAdjust, onDelete }: InventoryRowProps) {
                     <VariantBreakdown item={item} />
                 </div>
             </TableCell>
-            <TableCell>
+            <TableCell className="border-r border-slate-300 py-4">
                 <Badge
                     variant="secondary"
                     className="border-none bg-indigo-50/80 font-medium text-indigo-700 hover:bg-indigo-100"
@@ -144,7 +146,7 @@ function InventoryRow({ item, onAdjust, onDelete }: InventoryRowProps) {
                     {item.category.name}
                 </Badge>
             </TableCell>
-            <TableCell className="text-right">
+            <TableCell className="border-r border-slate-300 py-4 text-right">
                 <span
                     className={`rounded-lg px-2 py-1 text-sm font-bold ${
                         inventory.isLowStock
@@ -161,11 +163,11 @@ function InventoryRow({ item, onAdjust, onDelete }: InventoryRowProps) {
                     )}
                 </span>
             </TableCell>
-            <TableCell className="text-right text-sm font-medium text-slate-500">
+            <TableCell className="border-r border-slate-300 py-4 text-right text-sm font-medium text-slate-600">
                 {inventory.minStock}{" "}
                 <span className="text-xs">{inventory.unit}</span>
             </TableCell>
-            <TableCell>
+            <TableCell className="py-4">
                 <div className="flex justify-end gap-1">
                     <Button
                         variant="ghost"
@@ -192,13 +194,8 @@ function InventoryRow({ item, onAdjust, onDelete }: InventoryRowProps) {
 function VariantBreakdown({ item }: { item: StockItem }) {
     const variants = item.variants ?? [];
 
-    if (variants.length === 0) {
-        return (
-            <div className="flex items-center gap-2 text-xs text-slate-500">
-                <Layers3 className="h-3.5 w-3.5 text-slate-400" />
-                <span>{STOCK_ADMIN_TEXT.noVariant}</span>
-            </div>
-        );
+    if (variants.length <= 1) {
+        return null;
     }
 
     return (

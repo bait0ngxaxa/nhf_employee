@@ -21,7 +21,7 @@ export const DASHBOARD_MENU_ITEMS: MenuItem[] = [
         description: "ยื่นใบลาและตรวจสอบโควต้าวันลา",
     },
     {
-        id: "it-equipment",
+        id: "stock",
         label: "ระบบสต็อค",
         icon: Computer,
         description: "จัดการครุภัณฑ์ไอทีขององค์กร",
@@ -150,7 +150,7 @@ export const getMenuTheme = (menuId: string) => {
                 activeBg: "bg-orange-50/80",
                 glow: "from-orange-400 via-amber-400 to-yellow-400",
             };
-        case "it-equipment":
+        case "stock":
             return {
                 gradient: "from-pink-500 to-rose-500",
                 lightBg: "bg-pink-50",

@@ -226,13 +226,17 @@ async function dispatchNotification(notification: NotificationOutbox): Promise<v
         }
         case "LEAVE_ACTION": {
             const parsedLeaveAction = parseLeaveActionPayload(payload);
-            const { sendLeaveActionNotifications } = await import("./leave/notifications");
+            const { sendLeaveActionNotifications } = await import(
+                "../leave/notifications"
+            );
             await sendLeaveActionNotifications(parsedLeaveAction);
             return;
         }
         case "LEAVE_RESULT": {
             const parsedLeaveResult = parseLeaveResultPayload(payload);
-            const { sendLeaveResultNotifications } = await import("./leave/notifications");
+            const { sendLeaveResultNotifications } = await import(
+                "../leave/notifications"
+            );
             await sendLeaveResultNotifications(parsedLeaveResult);
             return;
         }

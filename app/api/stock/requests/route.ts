@@ -80,6 +80,14 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
         return NextResponse.json({ request: stockRequest }, { status: 201 });
     } catch (error) {
+        const message = error instanceof Error ? error.message : "";
+        if (
+            message.includes("กรุณาเลือก") ||
+            message.includes("มีไม่เพียงพอ")
+        ) {
+            return jsonError(message, 400);
+        }
+
         console.error("Error creating stock request:", error);
         return serverError();
     }

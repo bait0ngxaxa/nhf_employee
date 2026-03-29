@@ -136,7 +136,7 @@ export function StockImageUploadField({
                             {uploading ? "กำลังอัปโหลด..." : "อัปโหลดรูปภาพ"}
                         </span>
                         <span className="text-xs text-slate-400">
-                            รองรับ JPG, PNG, WEBP และระบบจะย่อรูปให้อัตโนมัติ
+                            รองรับ JPG, PNG, WEBP
                         </span>
                     </button>
                 )}

@@ -8,6 +8,7 @@ import { API_ROUTES } from "@/lib/ssot/routes";
 import type { StockItem } from "../context/stock/types";
 import {
     createEmptyVariantAttribute,
+    resolveStockApiErrorMessage,
     STOCK_ADMIN_TEXT,
 } from "./stockAdminInventory.shared";
 import { StockImageUploadField } from "./StockImageUploadField";
@@ -31,8 +32,8 @@ function createEditableVariant(item: StockItem, variant?: StockItemVariant) {
         id: variant?.id,
         sku: variant?.sku ?? "",
         unit: variant?.unit ?? item.unit,
-        quantity: variant?.quantity ?? 1,
-        minStock: variant?.minStock ?? 1,
+        quantity: String(variant?.quantity ?? 1),
+        minStock: String(variant?.minStock ?? 1),
         imageUrl: variant?.imageUrl ?? "",
         attributes:
             variant?.attributeValues?.map((attributeValue) => ({
@@ -40,6 +41,15 @@ function createEditableVariant(item: StockItem, variant?: StockItemVariant) {
                 value: attributeValue.attributeValue.value,
             })) ?? [createEmptyVariantAttribute()],
     };
+}
+
+function parseVariantNumber(value: string): number {
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed) || parsed < 1) {
+        return 1;
+    }
+
+    return Math.trunc(parsed);
 }
 
 function createEditableVariants(item: StockItem): EditableVariant[] {
@@ -63,11 +73,19 @@ export function EditItemDialog({
     );
 
     const totalQuantity = useMemo(
-        () => variants.reduce((sum, variant) => sum + variant.quantity, 0),
+        () =>
+            variants.reduce(
+                (sum, variant) => sum + parseVariantNumber(variant.quantity),
+                0,
+            ),
         [variants],
     );
     const totalMinStock = useMemo(
-        () => variants.reduce((sum, variant) => sum + variant.minStock, 0),
+        () =>
+            variants.reduce(
+                (sum, variant) => sum + parseVariantNumber(variant.minStock),
+                0,
+            ),
         [variants],
     );
 
@@ -85,9 +103,12 @@ export function EditItemDialog({
                         ...(variant.id !== undefined && { id: variant.id }),
                         sku: variant.sku.trim() || undefined,
                         unit: variant.unit.trim(),
-                        quantity: variant.quantity,
-                        minStock: variant.minStock,
-                        imageUrl: variant.imageUrl.trim() || null,
+                        quantity: parseVariantNumber(variant.quantity),
+                        minStock: parseVariantNumber(variant.minStock),
+                        imageUrl:
+                            variants.length === 1
+                                ? itemImageUrl.trim() || null
+                                : variant.imageUrl.trim() || null,
                         attributes: variant.attributes
                             .map((attribute) => ({
                                 name: attribute.name.trim(),
@@ -100,7 +121,9 @@ export function EditItemDialog({
 
             if (!res.ok) {
                 const err = await res.json();
-                throw new Error(err.error ?? "เกิดข้อผิดพลาด");
+                throw new Error(
+                    resolveStockApiErrorMessage(err, "เกิดข้อผิดพลาด"),
+                );
             }
 
             toast.success(`อัปเดตสต็อก ${item.name} เรียบร้อยแล้ว`);
@@ -145,6 +168,7 @@ export function EditItemDialog({
 
                     <StockInventoryVariantEditor
                         variants={variants}
+                        hideSingleVariantImage
                         onAddVariant={() =>
                             setVariants((current) => [
                                 ...current,

@@ -8,6 +8,7 @@ import {
     STOCK_ADMIN_TEXT,
     createEmptyVariant,
     createEmptyVariantAttribute,
+    resolveStockApiErrorMessage,
 } from "./stockAdminInventory.shared";
 import type { VariantDraft } from "./stockAdminInventory.shared";
 import {
@@ -53,6 +54,12 @@ export function AddItemDialog({
 
     async function handleSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
         event.preventDefault();
+
+        if (!selectedCategoryId) {
+            toast.error("กรุณาเลือกหมวดหมู่");
+            return;
+        }
+
         setLoading(true);
 
         const formData = new FormData(event.currentTarget);
@@ -67,14 +74,19 @@ export function AddItemDialog({
                     description: formData.get("description") || null,
                     imageUrl: itemImageUrl || null,
                     sku: formData.get("sku") || undefined,
-                    categoryId: selectedCategoryId ? Number(selectedCategoryId) : undefined,
+                    categoryId: Number(selectedCategoryId),
                     variants: normalizedVariants,
                 }),
             });
 
             if (!res.ok) {
                 const err = await res.json();
-                throw new Error(err.error ?? STOCK_ADMIN_TEXT.genericError);
+                throw new Error(
+                    resolveStockApiErrorMessage(
+                        err,
+                        STOCK_ADMIN_TEXT.genericError,
+                    ),
+                );
             }
 
             toast.success(STOCK_ADMIN_TEXT.itemAdded);
@@ -106,6 +118,8 @@ export function AddItemDialog({
                     />
                     <StockInventoryVariantEditor
                         variants={variants}
+                        hideSingleVariantSku
+                        hideSingleVariantImage
                         onAddVariant={() =>
                             setVariants((current) => [...current, createEmptyVariant()])
                         }
@@ -207,8 +221,8 @@ function BaseFields(props: {
                 <InventoryTextField
                     id="sku"
                     name="sku"
-                    label="SKU"
-                    placeholder="เว้นว่างเพื่อสร้างอัตโนมัติ"
+                    label="SKU หลัก"
+                    placeholder="เว้นว่างเพื่อให้ระบบสร้างให้อัตโนมัติ"
                 />
             </div>
             <InventoryTextField
@@ -227,6 +241,7 @@ function BaseFields(props: {
                 categories={props.categories}
                 value={props.selectedCategoryId}
                 onChange={props.onCategoryChange}
+                required
             />
         </>
     );
@@ -241,12 +256,20 @@ function normalizeVariantDraft(variant: VariantDraft): {
     attributes: Array<{ name: string; value: string }>;
 } {
     const normalizedSku = variant.sku.trim();
+    const normalizedQuantity = Number(variant.quantity);
+    const normalizedMinStock = Number(variant.minStock);
 
     return {
         sku: normalizedSku || undefined,
         unit: variant.unit.trim(),
-        quantity: variant.quantity,
-        minStock: variant.minStock,
+        quantity:
+            Number.isFinite(normalizedQuantity) && normalizedQuantity >= 1
+                ? Math.trunc(normalizedQuantity)
+                : 1,
+        minStock:
+            Number.isFinite(normalizedMinStock) && normalizedMinStock >= 1
+                ? Math.trunc(normalizedMinStock)
+                : 1,
         imageUrl: variant.imageUrl.trim() || null,
         attributes: variant.attributes
             .map((attribute) => ({

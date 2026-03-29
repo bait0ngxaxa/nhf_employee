@@ -23,7 +23,7 @@ const MENU_ITEM_CONFIG: Record<
         bgClass: "bg-indigo-100",
         iconClass: "text-indigo-600",
     },
-    "it-equipment": {
+    stock: {
         gradient: "from-orange-500 to-red-600",
         bgClass: "bg-orange-100",
         iconClass: "text-orange-600",

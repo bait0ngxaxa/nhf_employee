@@ -28,6 +28,15 @@ export const AUDIT_ACTION_LABELS: Record<string, string> = {
     LEAVE_REQUEST_APPROVE: "อนุมัติคำขอลา",
     LEAVE_REQUEST_REJECT: "ไม่อนุมัติคำขอลา",
     LEAVE_REQUEST_CANCEL: "ยกเลิกคำขอลา",
+    STOCK_ITEM_CREATE: "สร้างรายการสต็อก",
+    STOCK_ITEM_UPDATE: "แก้ไขรายการสต็อก",
+    STOCK_ITEM_DELETE: "ลบรายการสต็อก",
+    STOCK_ADJUST: "ปรับยอดสต็อก",
+    STOCK_CATEGORY_CREATE: "สร้างหมวดหมู่สต็อก",
+    STOCK_CATEGORY_DELETE: "ลบหมวดหมู่สต็อก",
+    STOCK_REQUEST_CREATE: "สร้างคำขอเบิกวัสดุ",
+    STOCK_REQUEST_ISSUE: "จ่ายคำขอเบิกวัสดุ",
+    STOCK_REQUEST_CANCEL: "ยกเลิกคำขอเบิกวัสดุ",
 };
 
 /**
@@ -48,6 +57,15 @@ export const AUDIT_ACTION_FILTER_OPTIONS = [
     { value: "LEAVE_REQUEST_APPROVE", label: "อนุมัติคำขอลา" },
     { value: "LEAVE_REQUEST_REJECT", label: "ไม่อนุมัติคำขอลา" },
     { value: "LEAVE_REQUEST_CANCEL", label: "ยกเลิกคำขอลา" },
+    { value: "STOCK_ITEM_CREATE", label: "สร้างรายการสต็อก" },
+    { value: "STOCK_ITEM_UPDATE", label: "แก้ไขรายการสต็อก" },
+    { value: "STOCK_ITEM_DELETE", label: "ลบรายการสต็อก" },
+    { value: "STOCK_ADJUST", label: "ปรับยอดสต็อก" },
+    { value: "STOCK_CATEGORY_CREATE", label: "สร้างหมวดหมู่สต็อก" },
+    { value: "STOCK_CATEGORY_DELETE", label: "ลบหมวดหมู่สต็อก" },
+    { value: "STOCK_REQUEST_CREATE", label: "สร้างคำขอเบิกวัสดุ" },
+    { value: "STOCK_REQUEST_ISSUE", label: "จ่ายคำขอเบิกวัสดุ" },
+    { value: "STOCK_REQUEST_CANCEL", label: "ยกเลิกคำขอเบิกวัสดุ" },
 ];
 
 /**
@@ -58,6 +76,7 @@ export const AUDIT_ENTITY_TYPE_OPTIONS = [
     { value: "User", label: "User" },
     { value: "Employee", label: "Employee" },
     { value: "Ticket", label: "Ticket" },
+    { value: "Stock", label: "Stock" },
 ];
 
 /**

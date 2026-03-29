@@ -74,7 +74,7 @@ export function StockMyRequests() {
         return <div className="py-12 text-center text-gray-500">กำลังโหลด...</div>;
     }
 
-    if (requests.length === 0) {
+    if (requests.length === 0 && statusFilter === undefined) {
         return (
             <div className="py-12 text-center text-gray-500">
                 <ClipboardList className="mx-auto mb-3 h-12 w-12 opacity-50" />
@@ -90,29 +90,36 @@ export function StockMyRequests() {
                 onStatusChange={setStatusFilter}
             />
 
-            <div className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-100">
-                <Table>
+            {requests.length === 0 ? (
+                <div className="py-12 text-center text-gray-500">
+                    <ClipboardList className="mx-auto mb-3 h-12 w-12 opacity-50" />
+                    <p>ยังไม่มีประวัติการเบิก</p>
+                </div>
+            ) : (
+                <>
+            <div className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200">
+                <Table className="border-separate border-spacing-0">
                     <TableHeader>
-                        <TableRow className="border-b-gray-100 bg-slate-50/50 hover:bg-slate-50/50">
-                            <TableHead className="w-20 font-semibold text-slate-600">
+                        <TableRow className="border-b-2 border-slate-200 bg-slate-100/80 hover:bg-slate-100/80">
+                            <TableHead className="w-20 border-r border-slate-200 font-semibold text-slate-700">
                                 เลขที่
                             </TableHead>
-                            <TableHead className="w-40 font-semibold text-slate-600">
+                            <TableHead className="w-40 border-r border-slate-200 font-semibold text-slate-700">
                                 วันที่
                             </TableHead>
-                            <TableHead className="font-semibold text-slate-600">
+                            <TableHead className="border-r border-slate-200 font-semibold text-slate-700">
                                 รายการ
                             </TableHead>
-                            <TableHead className="w-32 font-semibold text-slate-600">
+                            <TableHead className="w-32 border-r border-slate-200 font-semibold text-slate-700">
                                 สถานะ
                             </TableHead>
-                            <TableHead className="font-semibold text-slate-600">
+                            <TableHead className="border-r border-slate-200 font-semibold text-slate-700">
                                 หมายเหตุ
                             </TableHead>
                             <TableHead className="w-36" />
                         </TableRow>
                     </TableHeader>
-                    <TableBody>
+                    <TableBody className="[&_tr:nth-child(odd)]:bg-white [&_tr:nth-child(even)]:bg-slate-100/70">
                         {requests.map((request) => (
                             <RequestRow
                                 key={request.id}
@@ -135,6 +142,8 @@ export function StockMyRequests() {
                     setRequestsPage(Math.min(totalPages, requestsPage + 1))
                 }
             />
+                </>
+            )}
 
             <StockRequestCancelDialog
                 request={cancelTarget}
@@ -188,12 +197,12 @@ function RequestRow(props: {
     const isPendingIssue = request.status === "PENDING_ISSUE";
 
     return (
-        <TableRow className="border-b-gray-50/80 transition-colors hover:bg-blue-50/30">
-            <TableCell className="font-medium text-slate-700">#{request.id}</TableCell>
-            <TableCell className="text-sm text-slate-600">
+        <TableRow className="border-b-2 border-slate-300 transition-colors hover:bg-blue-100/70">
+            <TableCell className="border-r border-slate-300 py-4 font-medium text-slate-800">#{request.id}</TableCell>
+            <TableCell className="border-r border-slate-300 py-4 text-sm text-slate-700">
                 {formatDate(request.createdAt)}
             </TableCell>
-            <TableCell>
+            <TableCell className="border-r border-slate-300 py-4">
                 <div className="space-y-1.5 py-1">
                     {request.items.map((requestItem) => (
                         <div key={requestItem.id} className="flex items-center gap-2 text-sm">
@@ -207,13 +216,13 @@ function RequestRow(props: {
                     ))}
                 </div>
             </TableCell>
-            <TableCell>
+            <TableCell className="border-r border-slate-300 py-4">
                 <RequestStatusBadge status={request.status} />
             </TableCell>
-            <TableCell className="text-sm text-slate-500">
+            <TableCell className="border-r border-slate-300 py-4 text-sm text-slate-600">
                 {renderRequestNote(request)}
             </TableCell>
-            <TableCell className="text-right">
+            <TableCell className="py-4 text-right">
                 {isPendingIssue && (
                     <Button
                         size="sm"

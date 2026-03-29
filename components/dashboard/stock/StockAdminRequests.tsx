@@ -114,7 +114,7 @@ export function StockAdminRequests() {
         return <div className="py-12 text-center text-gray-500">กำลังโหลด...</div>;
     }
 
-    if (requests.length === 0) {
+    if (requests.length === 0 && statusFilter === undefined) {
         return (
             <div className="py-12 text-center text-gray-500">
                 <ClipboardList className="mx-auto mb-3 h-12 w-12 opacity-50" />
@@ -151,29 +151,36 @@ export function StockAdminRequests() {
                 </div>
             </div>
 
-            <div className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-100">
-                <Table>
+            {requests.length === 0 ? (
+                <div className="py-12 text-center text-gray-500">
+                    <ClipboardList className="mx-auto mb-3 h-12 w-12 opacity-50" />
+                    <p>ไม่มีคำขอเบิกวัสดุ</p>
+                </div>
+            ) : (
+                <>
+            <div className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200">
+                <Table className="border-separate border-spacing-0">
                     <TableHeader>
-                        <TableRow className="bg-slate-50/50 hover:bg-slate-50/50 border-b-gray-100">
-                            <TableHead className="w-16 font-semibold text-slate-600">เลขที่</TableHead>
-                            <TableHead className="w-40 font-semibold text-slate-600">วันที่</TableHead>
-                            <TableHead className="font-semibold text-slate-600">ผู้เบิก</TableHead>
-                            <TableHead className="font-semibold text-slate-600">รายการ</TableHead>
-                            <TableHead className="w-32 font-semibold text-slate-600">สถานะ</TableHead>
+                        <TableRow className="border-b-2 border-slate-200 bg-slate-100/80 hover:bg-slate-100/80">
+                            <TableHead className="w-16 border-r border-slate-200 font-semibold text-slate-700">เลขที่</TableHead>
+                            <TableHead className="w-40 border-r border-slate-200 font-semibold text-slate-700">วันที่</TableHead>
+                            <TableHead className="border-r border-slate-200 font-semibold text-slate-700">ผู้เบิก</TableHead>
+                            <TableHead className="border-r border-slate-200 font-semibold text-slate-700">รายการ</TableHead>
+                            <TableHead className="w-32 border-r border-slate-200 font-semibold text-slate-700">สถานะ</TableHead>
                             <TableHead className="w-52" />
                         </TableRow>
                     </TableHeader>
-                    <TableBody>
+                    <TableBody className="[&_tr:nth-child(odd)]:bg-white [&_tr:nth-child(even)]:bg-slate-100/70">
                         {requests.map((req) => {
                             const isPendingIssue = req.status === "PENDING_ISSUE";
 
                             return (
-                                <TableRow key={req.id} className="hover:bg-blue-50/30 transition-colors border-b-gray-50/80">
-                                    <TableCell className="font-medium text-slate-700">#{req.id}</TableCell>
-                                    <TableCell className="text-slate-600 text-sm">
+                                <TableRow key={req.id} className="border-b-2 border-slate-300 transition-colors hover:bg-blue-100/70">
+                                    <TableCell className="border-r border-slate-300 py-4 font-medium text-slate-800">#{req.id}</TableCell>
+                                    <TableCell className="border-r border-slate-300 py-4 text-slate-700 text-sm">
                                         {formatDate(req.createdAt)}
                                     </TableCell>
-                                    <TableCell>
+                                    <TableCell className="border-r border-slate-300 py-4">
                                         <div className="flex flex-col">
                                             <span className="text-sm font-semibold text-slate-800">
                                                 {req.requester.name}
@@ -183,7 +190,7 @@ export function StockAdminRequests() {
                                             </span>
                                         </div>
                                     </TableCell>
-                                    <TableCell>
+                                    <TableCell className="border-r border-slate-300 py-4">
                                         <div className="space-y-1.5 py-1">
                                             {req.items.map((ri) => (
                                                 <div key={ri.id} className="text-sm flex items-center gap-2">
@@ -195,10 +202,10 @@ export function StockAdminRequests() {
                                             ))}
                                         </div>
                                     </TableCell>
-                                    <TableCell>
+                                    <TableCell className="border-r border-slate-300 py-4">
                                         <RequestStatusBadge status={req.status} />
                                     </TableCell>
-                                    <TableCell>
+                                    <TableCell className="py-4">
                                         {isPendingIssue && (
                                             <div className="flex gap-2 justify-end">
                                                 <Button
@@ -242,6 +249,8 @@ export function StockAdminRequests() {
                     setRequestsPage(Math.min(totalPages, requestsPage + 1))
                 }
             />
+                </>
+            )}
 
             <CancelDialog
                 request={cancelTarget}

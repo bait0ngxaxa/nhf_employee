@@ -20,6 +20,16 @@ describe("hybrid auth middleware", () => {
         expect(response.headers.get("location")).toBe("http://localhost/login");
     });
 
+    it("redirects unauthenticated user from stock dashboard route to /login", async () => {
+        const request = buildRequest(
+            "http://localhost/dashboard?tab=stock&stockTab=browse",
+        );
+        const response = await middleware(request);
+
+        expect(response.status).toBe(307);
+        expect(response.headers.get("location")).toBe("http://localhost/login");
+    });
+
     it("allows access to public route without authentication", async () => {
         const request = buildRequest("http://localhost/login");
         const response = await middleware(request);
@@ -40,5 +50,39 @@ describe("hybrid auth middleware", () => {
         const response = await middleware(request);
 
         expect(response.status).toBe(200);
+    });
+
+    it("allows stock dashboard route when valid hybrid access token exists", async () => {
+        process.env.AUTH_ACCESS_TOKEN_SECRET = "middleware-test-secret";
+        const token = await issueAccessToken({
+            userId: 1,
+            role: "ADMIN",
+            sessionId: "family-1",
+            tokenVersion: 1,
+        });
+
+        const request = buildRequest(
+            "http://localhost/dashboard?tab=stock&stockTab=admin-requests",
+            `nhf_at=${token}`,
+        );
+        const response = await middleware(request);
+
+        expect(response.status).toBe(200);
+    });
+
+    it("redirects authenticated user away from /login to /dashboard", async () => {
+        process.env.AUTH_ACCESS_TOKEN_SECRET = "middleware-test-secret";
+        const token = await issueAccessToken({
+            userId: 1,
+            role: "USER",
+            sessionId: "family-2",
+            tokenVersion: 1,
+        });
+
+        const request = buildRequest("http://localhost/login", `nhf_at=${token}`);
+        const response = await middleware(request);
+
+        expect(response.status).toBe(307);
+        expect(response.headers.get("location")).toBe("http://localhost/dashboard");
     });
 });

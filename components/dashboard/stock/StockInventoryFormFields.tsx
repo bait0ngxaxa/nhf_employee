@@ -68,11 +68,13 @@ export function InventoryCategoryField(props: {
     categories: CategoryOption[];
     value: string;
     onChange: (value: string) => void;
+    required?: boolean;
 }) {
     return (
         <div className="space-y-1.5">
             <Label htmlFor="categoryId" className="text-sm font-semibold text-slate-700">
-                {STOCK_ADMIN_TEXT.category}
+                {STOCK_ADMIN_TEXT.category}{" "}
+                {props.required && <span className="text-rose-500">*</span>}
             </Label>
             <Select name="categoryId" value={props.value} onValueChange={props.onChange}>
                 <SelectTrigger className="h-10 focus:ring-blue-500">

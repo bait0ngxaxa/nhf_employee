@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import type { StockItem, StockItemVariant } from "../context/stock/types";
 import {
     getBrowseImageUrl,
+    getVariantAvailableQuantity,
     getVariantAttributeSummary,
 } from "./stockVariant.shared";
 
@@ -41,7 +42,9 @@ export function StockVariantPickerDialog({
         }
 
         const firstAvailableVariant =
-            variants.find((variant) => variant.quantity > 0) ?? variants[0] ?? null;
+            variants.find((variant) => getVariantAvailableQuantity(variant) > 0) ??
+            variants[0] ??
+            null;
         setSelectedVariantId(firstAvailableVariant?.id ?? null);
         setQuantity(1);
     }, [open, variants]);
@@ -50,6 +53,9 @@ export function StockVariantPickerDialog({
         () => variants.find((variant) => variant.id === selectedVariantId) ?? null,
         [selectedVariantId, variants],
     );
+    const selectedVariantAvailableQuantity = selectedVariant
+        ? getVariantAvailableQuantity(selectedVariant)
+        : 0;
 
     if (!item) {
         return null;
@@ -137,7 +143,8 @@ export function StockVariantPickerDialog({
                                             </div>
                                             <div
                                                 className={`rounded-lg px-2.5 py-1 text-sm font-bold ${
-                                                    variant.quantity <= variant.minStock
+                                                    getVariantAvailableQuantity(variant) <=
+                                                    variant.minStock
                                                         ? "bg-rose-50 text-rose-700"
                                                         : "bg-slate-50 text-slate-700"
                                                 }`}
@@ -183,10 +190,13 @@ export function StockVariantPickerDialog({
                                     className="h-9 w-9 rounded-lg bg-white"
                                     onClick={() =>
                                         setQuantity((current) =>
-                                            Math.min(selectedVariant.quantity, current + 1),
+                                            Math.min(
+                                                selectedVariantAvailableQuantity,
+                                                current + 1,
+                                            ),
                                         )
                                     }
-                                    disabled={quantity >= selectedVariant.quantity}
+                                    disabled={quantity >= selectedVariantAvailableQuantity}
                                 >
                                     <Plus className="h-4 w-4" />
                                 </Button>
@@ -199,13 +209,17 @@ export function StockVariantPickerDialog({
                             ยกเลิก
                         </Button>
                         <Button
+                            className="bg-blue-600 font-bold text-white hover:bg-blue-700"
                             onClick={() => {
                                 if (!selectedVariant) {
                                     return;
                                 }
                                 onConfirm(selectedVariant, quantity);
                             }}
-                            disabled={!selectedVariant || selectedVariant.quantity === 0}
+                            disabled={
+                                !selectedVariant ||
+                                selectedVariantAvailableQuantity === 0
+                            }
                         >
                             เพิ่มในรายการเบิก
                         </Button>

@@ -2,7 +2,10 @@ import Image from "next/image";
 import { Minus, Plus, ShoppingCart, Trash2, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { BrowseCartItem } from "./stockVariant.shared";
-import { getVariantDisplayName } from "./stockVariant.shared";
+import {
+    getVariantAvailableQuantity,
+    getVariantDisplayName,
+} from "./stockVariant.shared";
 
 type StockBrowseCartPanelProps = {
     items: BrowseCartItem[];
@@ -26,56 +29,56 @@ export function StockBrowseCartPanel({
     onSubmit,
 }: StockBrowseCartPanelProps) {
     return (
-        <div className="sticky bottom-6 z-10 px-4 sm:px-0">
-            <div className="mx-auto max-w-4xl space-y-3 rounded-3xl bg-white/95 p-4 shadow-2xl shadow-slate-900/10 ring-1 ring-slate-200 backdrop-blur-md">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div className="flex items-center gap-3">
-                        <div className="rounded-2xl bg-blue-50 p-2.5 text-blue-700">
-                            <ShoppingCart className="h-5 w-5" />
-                        </div>
-                        <div>
-                            <div className="text-sm font-semibold text-slate-800">
-                                สรุปรายการเบิก
-                            </div>
-                            <div className="text-sm text-slate-500">
-                                {cartSize} รายการ • {cartCount} ชิ้น
-                            </div>
-                        </div>
+        <div className="flex h-full flex-col bg-white">
+            <div className="border-b border-slate-200 px-5 py-4">
+                <div className="flex items-center gap-3">
+                    <div className="rounded-2xl bg-blue-50 p-2.5 text-blue-700">
+                        <ShoppingCart className="h-5 w-5" />
                     </div>
-
-                    <div className="flex flex-wrap gap-2">
-                        <Button
-                            type="button"
-                            variant="ghost"
-                            onClick={onClear}
-                            disabled={submitting}
-                            className="text-rose-600 hover:bg-rose-50 hover:text-rose-700"
-                        >
-                            <XCircle className="mr-1.5 h-4 w-4" />
-                            ยกเลิกทั้งหมด
-                        </Button>
-                        <Button
-                            type="button"
-                            onClick={onSubmit}
-                            disabled={submitting}
-                            className="bg-blue-600 font-bold text-white hover:bg-blue-700"
-                        >
-                            {submitting ? "กำลังดำเนินการ..." : "ยืนยันการเบิก"}
-                        </Button>
+                    <div>
+                        <div className="text-sm font-semibold text-slate-800">
+                            สรุปรายการเบิก
+                        </div>
+                        <div className="text-sm text-slate-500">
+                            {cartSize} รายการ รวม {cartCount} ชิ้น
+                        </div>
                     </div>
                 </div>
+            </div>
 
-                <div className="grid gap-3">
-                    {items.map((cartItem) => (
-                        <CartRow
-                            key={cartItem.variant.id}
-                            item={cartItem}
-                            onRemove={() => onRemove(cartItem.variant.id)}
-                            onDecrease={() => onChangeQuantity(cartItem.variant.id, -1)}
-                            onIncrease={() => onChangeQuantity(cartItem.variant.id, 1)}
-                            disabled={submitting}
-                        />
-                    ))}
+            <div className="flex-1 space-y-3 overflow-y-auto px-5 py-4">
+                {items.map((cartItem) => (
+                    <CartRow
+                        key={cartItem.variant.id}
+                        item={cartItem}
+                        onRemove={() => onRemove(cartItem.variant.id)}
+                        onDecrease={() => onChangeQuantity(cartItem.variant.id, -1)}
+                        onIncrease={() => onChangeQuantity(cartItem.variant.id, 1)}
+                        disabled={submitting}
+                    />
+                ))}
+            </div>
+
+            <div className="border-t border-slate-200 bg-slate-50/70 px-5 py-4">
+                <div className="flex flex-col gap-2">
+                    <Button
+                        type="button"
+                        onClick={onSubmit}
+                        disabled={submitting}
+                        className="w-full bg-blue-600 font-bold text-white hover:bg-blue-700"
+                    >
+                        {submitting ? "กำลังดำเนินการ..." : "ยืนยันการเบิก"}
+                    </Button>
+                    <Button
+                        type="button"
+                        variant="ghost"
+                        onClick={onClear}
+                        disabled={submitting}
+                        className="w-full text-rose-600 hover:bg-rose-50 hover:text-rose-700"
+                    >
+                        <XCircle className="mr-1.5 h-4 w-4" />
+                        ยกเลิกทั้งหมด
+                    </Button>
                 </div>
             </div>
         </div>
@@ -120,7 +123,8 @@ function CartRow(props: {
                         จำนวนที่เบิก: {item.qty} {item.variant.unit}
                     </span>
                     <span>
-                        คงเหลือสูงสุด {item.variant.quantity} {item.variant.unit}
+                        คงเหลือสูงสุด {getVariantAvailableQuantity(item.variant)}{" "}
+                        {item.variant.unit}
                     </span>
                 </div>
             </div>
@@ -144,7 +148,10 @@ function CartRow(props: {
                     variant="ghost"
                     size="icon"
                     onClick={props.onIncrease}
-                    disabled={props.disabled || item.qty >= item.variant.quantity}
+                    disabled={
+                        props.disabled ||
+                        item.qty >= getVariantAvailableQuantity(item.variant)
+                    }
                     className="h-9 w-9 rounded-lg bg-white text-slate-700 hover:bg-slate-100"
                 >
                     <Plus className="h-4 w-4" />

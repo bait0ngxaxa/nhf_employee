@@ -9,16 +9,17 @@ import {
     type ReactNode,
 } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import useSWR from "swr";
 import { type StockRequestStatus } from "@prisma/client";
 import { useSession } from "next-auth/react";
 import { isAdminRole } from "@/lib/ssot/permissions";
 import { API_ROUTES, APP_ROUTES } from "@/lib/ssot/routes";
 import { StockDataContext, StockUIContext } from "./StockContext";
+import {
+    useStockCategoriesQuery,
+    useStockItemsQuery,
+    useStockRequestsQuery,
+} from "./hooks";
 import type {
-    StockCategory,
-    StockItem,
-    StockRequest,
     StockDataContextValue,
     StockUIContextValue,
 } from "./types";
@@ -27,34 +28,13 @@ interface StockProviderProps {
     children: ReactNode;
 }
 
-interface StockCategoriesResponse {
-    categories?: StockCategory[];
-}
-
-interface StockItemsResponse {
-    items?: StockItem[];
-    total?: number;
-}
-
-interface StockRequestsResponse {
-    requests?: StockRequest[];
-    total?: number;
-}
-
 const STOCK_TAB_QUERY_KEY = "stockTab";
 const STOCK_REQUESTS_PAGE_QUERY_KEY = "stockRequestsPage";
-const DASHBOARD_STOCK_MENU = "it-equipment";
+const DASHBOARD_STOCK_MENU = "stock";
+const DASHBOARD_STOCK_MENU_LEGACY = "it-equipment";
 const STOCK_DEFAULT_TAB = "browse";
 const STOCK_ADMIN_TABS = new Set(["inventory", "admin-requests"]);
 const STOCK_LIST_LIMIT = 20;
-
-async function jsonFetcher<T>(url: string): Promise<T> {
-    const res = await fetch(url);
-    if (!res.ok) {
-        throw new Error(`Request failed: ${res.status}`);
-    }
-    return (await res.json()) as T;
-}
 
 function normalizeStockTab(tab: string | null, isAdmin: boolean): string {
     if (!tab) return STOCK_DEFAULT_TAB;
@@ -67,6 +47,10 @@ function parsePositivePage(value: string | null): number {
     const parsed = Number(value);
     if (!Number.isInteger(parsed) || parsed < 1) return 1;
     return parsed;
+}
+
+function isStockDashboardMenu(tab: string | null): boolean {
+    return tab === DASHBOARD_STOCK_MENU || tab === DASHBOARD_STOCK_MENU_LEGACY;
 }
 
 export function StockProvider({ children }: StockProviderProps) {
@@ -114,7 +98,7 @@ export function StockProvider({ children }: StockProviderProps) {
 
             if (
                 pathname !== APP_ROUTES.dashboard ||
-                searchParams.get("tab") !== DASHBOARD_STOCK_MENU
+                !isStockDashboardMenu(searchParams.get("tab"))
             ) {
                 return;
             }
@@ -140,7 +124,7 @@ export function StockProvider({ children }: StockProviderProps) {
 
             if (
                 pathname !== APP_ROUTES.dashboard ||
-                searchParams.get("tab") !== DASHBOARD_STOCK_MENU
+                !isStockDashboardMenu(searchParams.get("tab"))
             ) {
                 return;
             }
@@ -186,38 +170,17 @@ export function StockProvider({ children }: StockProviderProps) {
         data: categoriesData,
         isLoading: isCategoriesLoading,
         mutate: mutateCategories,
-    } = useSWR<StockCategoriesResponse>(
-        API_ROUTES.stock.categories,
-        jsonFetcher,
-        {
-            keepPreviousData: true,
-            dedupingInterval: 30_000,
-            revalidateOnFocus: false,
-            shouldRetryOnError: false,
-        },
-    );
-
+    } = useStockCategoriesQuery();
     const {
         data: itemsData,
         isLoading: isItemsLoading,
         mutate: mutateItems,
-    } = useSWR<StockItemsResponse>(itemsQuery, jsonFetcher, {
-        keepPreviousData: true,
-        dedupingInterval: 10_000,
-        revalidateOnFocus: false,
-        shouldRetryOnError: false,
-    });
-
+    } = useStockItemsQuery(itemsQuery);
     const {
         data: requestsData,
         isLoading: isRequestsLoading,
         mutate: mutateRequests,
-    } = useSWR<StockRequestsResponse>(requestsQuery, jsonFetcher, {
-        keepPreviousData: true,
-        dedupingInterval: 10_000,
-        revalidateOnFocus: false,
-        shouldRetryOnError: false,
-    });
+    } = useStockRequestsQuery(requestsQuery);
 
     const refreshCategories = useCallback((): void => {
         void mutateCategories();

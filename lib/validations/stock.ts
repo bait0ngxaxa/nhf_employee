@@ -112,8 +112,7 @@ export const createItemSchema = z
         categoryId: z.coerce
             .number()
             .int()
-            .positive("กรุณาเลือกหมวดหมู่")
-            .optional(),
+            .positive("กรุณาเลือกหมวดหมู่"),
         variants: z
             .array(variantSchema)
             .min(1, "กรุณาเพิ่มรายการย่อยอย่างน้อย 1 รายการ")

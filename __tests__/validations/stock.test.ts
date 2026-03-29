@@ -66,6 +66,7 @@ describe("Stock Validation", () => {
         it("should accept item creation without parent stock fields when variant is present", () => {
             const result = createItemSchema.safeParse({
                 name: "Post-it",
+                categoryId: 1,
                 imageUrl: "/api/uploads/stock/items/2026/03/item.webp",
                 variants: [
                     {

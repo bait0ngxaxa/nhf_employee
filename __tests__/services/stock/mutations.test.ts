@@ -219,6 +219,86 @@ describe("Stock Service Mutations", () => {
         });
     });
 
+    describe("createRequest", () => {
+        it("should reject when available quantity is lower than requested after pending reserve", async () => {
+            prismaMock.stockItemVariant.findMany
+                .mockResolvedValueOnce(
+                    asNever([{ id: 301, stockItemId: 30 }]),
+                )
+                .mockResolvedValueOnce(
+                    asNever([
+                        {
+                            id: 301,
+                            quantity: 5,
+                            unit: "ชิ้น",
+                            stockItem: { name: "เมาส์" },
+                        },
+                    ]),
+                );
+            prismaMock.stockRequestItem.findMany.mockResolvedValue(
+                asNever([
+                    { itemId: 30, variantId: 301, quantity: 3 },
+                ]),
+            );
+
+            await expect(
+                stockService.createRequest(
+                    {
+                        items: [{ variantId: 301, quantity: 3 }],
+                    },
+                    7,
+                ),
+            ).rejects.toThrow("มีไม่เพียงพอสำหรับเบิก");
+
+            expect(prismaMock.stockRequest.create).not.toHaveBeenCalled();
+        });
+
+        it("should create request with normalized item and variant ids when stock is available", async () => {
+            prismaMock.stockItemVariant.findMany
+                .mockResolvedValueOnce(
+                    asNever([{ id: 401, stockItemId: 40 }]),
+                )
+                .mockResolvedValueOnce(
+                    asNever([
+                        {
+                            id: 401,
+                            quantity: 10,
+                            unit: "ชิ้น",
+                            stockItem: { name: "คีย์บอร์ด" },
+                        },
+                    ]),
+                );
+            prismaMock.stockRequestItem.findMany.mockResolvedValue(
+                asNever([
+                    { itemId: 40, variantId: 401, quantity: 2 },
+                ]),
+            );
+            prismaMock.stockRequest.create.mockResolvedValue(
+                asNever({ id: 123, status: "PENDING_ISSUE" }),
+            );
+
+            await stockService.createRequest(
+                {
+                    items: [{ variantId: 401, quantity: 3 }],
+                    note: "ทดสอบเบิก",
+                },
+                9,
+            );
+
+            expect(prismaMock.stockRequest.create).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    data: expect.objectContaining({
+                        requestedBy: 9,
+                        note: "ทดสอบเบิก",
+                        items: {
+                            create: [{ itemId: 40, variantId: 401, quantity: 3 }],
+                        },
+                    }),
+                }),
+            );
+        });
+    });
+
     describe("cancelRequest", () => {
         it("should cancel only pending issue requests", async () => {
             prismaMock.stockRequest.findUnique.mockResolvedValue(

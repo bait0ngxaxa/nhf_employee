@@ -14,6 +14,8 @@ import { StockImageUploadField } from "./StockImageUploadField";
 
 type StockInventoryVariantEditorProps = {
     variants: VariantDraft[];
+    hideSingleVariantSku?: boolean;
+    hideSingleVariantImage?: boolean;
     onAddVariant: () => void;
     onRemoveVariant: (index: number) => void;
     onVariantChange: (index: number, variant: VariantDraft) => void;
@@ -31,27 +33,23 @@ export function StockInventoryVariantEditor(
     props: StockInventoryVariantEditorProps,
 ) {
     const { variants } = props;
+    const showVariantSkuField = !props.hideSingleVariantSku || variants.length > 1;
+    const showVariantImageField =
+        !props.hideSingleVariantImage || variants.length > 1;
+    const variantCountLabel =
+        variants.length === 1
+            ? `มี ${variants.length} variant`
+            : `มี ${variants.length} variants`;
 
     return (
         <div className="space-y-4 rounded-2xl border border-slate-200 bg-slate-50/60 p-4">
-            <div className="flex items-start justify-between gap-3">
-                <div className="space-y-1">
-                    <div className="text-sm font-semibold text-slate-800">
-                        {STOCK_ADMIN_TEXT.variantsTitle}
-                    </div>
-                    <p className="text-xs text-slate-500">
-                        {STOCK_ADMIN_TEXT.variantsHint}
-                    </p>
+            <div className="space-y-1">
+                <div className="text-sm font-semibold text-slate-800">
+                    {STOCK_ADMIN_TEXT.variantsTitle}
                 </div>
-                <Button
-                    type="button"
-                    variant="outline"
-                    onClick={props.onAddVariant}
-                    className="border-blue-200 text-blue-700 hover:bg-blue-50"
-                >
-                    <Plus className="mr-1 h-4 w-4" />
-                    {STOCK_ADMIN_TEXT.addVariant}
-                </Button>
+                <p className="text-xs text-slate-500">
+                    {STOCK_ADMIN_TEXT.variantsHint}
+                </p>
             </div>
             {variants.length === 0 ? (
                 <div className="rounded-xl border border-dashed border-slate-300 bg-white px-4 py-5 text-sm text-slate-500">
@@ -64,12 +62,19 @@ export function StockInventoryVariantEditor(
                             key={`${index}-${variant.sku}`}
                             index={index}
                             variant={variant}
+                            showVariantSkuField={showVariantSkuField}
+                            showVariantImageField={showVariantImageField}
                             onRemove={() => props.onRemoveVariant(index)}
                             onChange={(nextVariant) =>
                                 props.onVariantChange(index, nextVariant)
                             }
                             onAttributeChange={(attributeIndex, field, value) =>
-                                props.onAttributeChange(index, attributeIndex, field, value)
+                                props.onAttributeChange(
+                                    index,
+                                    attributeIndex,
+                                    field,
+                                    value,
+                                )
                             }
                             onAddAttribute={() => props.onAddAttribute(index)}
                             onRemoveAttribute={(attributeIndex) =>
@@ -77,6 +82,27 @@ export function StockInventoryVariantEditor(
                             }
                         />
                     ))}
+
+                    <div className="sticky bottom-0 z-10 -mx-4 rounded-b-2xl border-t border-slate-200 bg-white/95 px-4 py-3 shadow-[0_-8px_24px_rgba(15,23,42,0.06)] backdrop-blur">
+                        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                            <div className="space-y-0.5">
+                                <div className="text-sm font-semibold text-slate-800">
+                                    เพิ่มรายการย่อยได้ต่อเนื่อง
+                                </div>
+                                <p className="text-xs text-slate-500">
+                                    {variantCountLabel}
+                                </p>
+                            </div>
+                            <Button
+                                type="button"
+                                onClick={props.onAddVariant}
+                                className="bg-blue-600 text-white hover:bg-blue-700"
+                            >
+                                <Plus className="mr-1 h-4 w-4" />
+                                {STOCK_ADMIN_TEXT.addVariant}
+                            </Button>
+                        </div>
+                    </div>
                 </div>
             )}
         </div>
@@ -86,6 +112,8 @@ export function StockInventoryVariantEditor(
 function VariantCard(props: {
     index: number;
     variant: VariantDraft;
+    showVariantSkuField: boolean;
+    showVariantImageField: boolean;
     onRemove: () => void;
     onChange: (variant: VariantDraft) => void;
     onAttributeChange: (
@@ -115,31 +143,50 @@ function VariantCard(props: {
                     {STOCK_ADMIN_TEXT.remove}
                 </Button>
             </div>
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                <FieldShell label="SKU">
-                    <Input
-                        value={variant.sku}
-                        onChange={(event) =>
-                            props.onChange({ ...variant, sku: event.target.value })
+            <div
+                className={`grid grid-cols-1 gap-4 ${
+                    props.showVariantSkuField || props.showVariantImageField
+                        ? "md:grid-cols-2"
+                        : ""
+                }`}
+            >
+                {props.showVariantSkuField && (
+                    <FieldShell
+                        label="SKU ย่อย"
+                        hint="ถ้าไม่กรอก ระบบจะสร้างต่อจาก SKU หลักให้อัตโนมัติ"
+                    >
+                        <Input
+                            value={variant.sku}
+                            onChange={(event) =>
+                                props.onChange({
+                                    ...variant,
+                                    sku: event.target.value,
+                                })
+                            }
+                            className="h-10 focus-visible:ring-blue-500"
+                        />
+                    </FieldShell>
+                )}
+                {props.showVariantImageField && (
+                    <StockImageUploadField
+                        label={STOCK_ADMIN_TEXT.imageUrl}
+                        scope="variant"
+                        value={variant.imageUrl}
+                        onChange={(value) =>
+                            props.onChange({ ...variant, imageUrl: value })
                         }
-                        className="h-10 focus-visible:ring-blue-500"
                     />
-                </FieldShell>
-                <StockImageUploadField
-                    label={STOCK_ADMIN_TEXT.imageUrl}
-                    scope="variant"
-                    value={variant.imageUrl}
-                    onChange={(value) =>
-                        props.onChange({ ...variant, imageUrl: value })
-                    }
-                />
+                )}
             </div>
             <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                 <FieldShell label={STOCK_ADMIN_TEXT.unit}>
                     <Input
                         value={variant.unit}
                         onChange={(event) =>
-                            props.onChange({ ...variant, unit: event.target.value })
+                            props.onChange({
+                                ...variant,
+                                unit: event.target.value,
+                            })
                         }
                         className="h-10 focus-visible:ring-blue-500"
                     />
@@ -152,7 +199,7 @@ function VariantCard(props: {
                         onChange={(event) =>
                             props.onChange({
                                 ...variant,
-                                quantity: Number(event.target.value) || 1,
+                                quantity: event.target.value,
                             })
                         }
                         className="h-10 focus-visible:ring-blue-500"
@@ -166,7 +213,7 @@ function VariantCard(props: {
                         onChange={(event) =>
                             props.onChange({
                                 ...variant,
-                                minStock: Number(event.target.value) || 1,
+                                minStock: event.target.value,
                             })
                         }
                         className="h-10 focus-visible:ring-blue-500"
@@ -218,7 +265,9 @@ function AttributeEditor(props: {
                     >
                         <Input
                             value={attribute.name}
-                            placeholder={STOCK_ADMIN_TEXT.attributeNamePlaceholder}
+                            placeholder={
+                                STOCK_ADMIN_TEXT.attributeNamePlaceholder
+                            }
                             onChange={(event) =>
                                 props.onAttributeChange(
                                     attributeIndex,
@@ -230,7 +279,9 @@ function AttributeEditor(props: {
                         />
                         <Input
                             value={attribute.value}
-                            placeholder={STOCK_ADMIN_TEXT.attributeValuePlaceholder}
+                            placeholder={
+                                STOCK_ADMIN_TEXT.attributeValuePlaceholder
+                            }
                             onChange={(event) =>
                                 props.onAttributeChange(
                                     attributeIndex,
@@ -244,7 +295,9 @@ function AttributeEditor(props: {
                             type="button"
                             variant="ghost"
                             size="icon"
-                            onClick={() => props.onRemoveAttribute(attributeIndex)}
+                            onClick={() =>
+                                props.onRemoveAttribute(attributeIndex)
+                            }
                             disabled={props.variant.attributes.length === 1}
                             className="h-10 w-10 text-rose-600 hover:bg-rose-50 hover:text-rose-700"
                         >
@@ -257,12 +310,19 @@ function AttributeEditor(props: {
     );
 }
 
-function FieldShell(props: { label: string; children: ReactNode }) {
+function FieldShell(props: {
+    label: string;
+    hint?: string;
+    children: ReactNode;
+}) {
     return (
         <div className="space-y-1.5">
             <Label className="text-sm font-semibold text-slate-700">
                 {props.label}
             </Label>
+            {props.hint && (
+                <p className="text-xs text-slate-500">{props.hint}</p>
+            )}
             {props.children}
         </div>
     );

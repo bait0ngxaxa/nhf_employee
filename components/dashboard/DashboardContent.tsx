@@ -93,7 +93,7 @@ function getPageTitle(menu: string): string {
     switch (menu) {
         case "dashboard": return "Dashboard | NHF IT System";
         case "leave-management": return "Leave Management | NHF IT System";
-        case "it-equipment": return "IT Equipment | NHF IT System";
+        case "stock": return "Stock | NHF IT System";
         case "it-support": return "IT Support | NHF IT System";
         case "email-request": return "Email Request | NHF IT System";
         case "employee-management": return "Employee Management | NHF IT System";
@@ -128,7 +128,7 @@ export function DashboardContent() {
                 );
             }
 
-            case "it-equipment":
+            case "stock":
                 return (
                     <Suspense fallback={<SectionSkeleton />}>
                         <StockSection />

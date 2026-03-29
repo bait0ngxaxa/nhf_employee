@@ -9,6 +9,7 @@ import type { StockItem } from "../context/stock/types";
 import type { BrowseCartItem } from "./stockVariant.shared";
 import {
     getBrowseCardImageUrl,
+    getItemAvailableQuantity,
     getPreferredVariant,
     getSelectableVariantCount,
     getVariantAttributeSummary,
@@ -52,7 +53,8 @@ function BrowseCard(props: {
     const { item } = props;
     const defaultVariant = getPreferredVariant(item);
     const imageUrl = getBrowseCardImageUrl(item);
-    const isLowStock = item.quantity <= item.minStock;
+    const availableQuantity = getItemAvailableQuantity(item);
+    const isLowStock = availableQuantity <= item.minStock;
     const variantCount = getSelectableVariantCount(item);
     const totalInCart = Array.from(props.cart.values()).reduce(
         (sum, cartItem) => (cartItem.item.id === item.id ? sum + cartItem.qty : sum),
@@ -129,9 +131,14 @@ function BrowseCard(props: {
                                     : "bg-white text-slate-700"
                             }`}
                         >
-                            {item.quantity} {item.unit}
+                            {availableQuantity} {item.unit}
                         </span>
                     </div>
+                    {item.reservedQuantity > 0 && (
+                        <div className="text-xs text-amber-600">
+                            รอจ่าย {item.reservedQuantity} {item.unit}
+                        </div>
+                    )}
                 </div>
 
                 <div className="space-y-2">
@@ -142,21 +149,21 @@ function BrowseCard(props: {
                         </div>
                     )}
                     <Button
-                        variant="outline"
+                        variant="default"
                         className={`w-full rounded-xl shadow-sm transition-all ${
-                            item.quantity === 0
+                            availableQuantity === 0
                                 ? "border-gray-200 bg-gray-50/50 text-gray-400"
-                                : "bg-white text-gray-700 hover:border-blue-200 hover:bg-blue-50/50 hover:text-blue-600"
+                                : "border border-blue-600 bg-blue-600 text-white hover:border-blue-700 hover:bg-blue-700"
                         }`}
                         onClick={() =>
                             hasSelectableVariants(item)
                                 ? props.onOpenVariantPicker(item)
                                 : props.onAddDirect(item)
                         }
-                        disabled={item.quantity === 0}
+                        disabled={availableQuantity === 0}
                     >
                         <Plus className="mr-1 h-4 w-4" />
-                        {item.quantity === 0
+                        {availableQuantity === 0
                             ? "สินค้าหมด"
                             : hasSelectableVariants(item)
                               ? "เลือกตัวเลือกแล้วเพิ่ม"

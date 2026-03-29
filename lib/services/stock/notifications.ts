@@ -19,7 +19,7 @@ export async function notifyStockRequestResult(
             message: isIssued
                 ? `คำขอเบิก #${requestId} ถูกจ่ายเรียบร้อยแล้ว`
                 : `คำขอเบิก #${requestId} ถูกยกเลิก${cancelReason ? `: ${cancelReason}` : ""}`,
-            actionUrl: "/dashboard?tab=it-equipment&stockTab=my-requests",
+            actionUrl: "/dashboard?tab=stock&stockTab=my-requests",
             referenceId: String(requestId),
         },
     });
@@ -45,7 +45,7 @@ export async function notifyAdminsNewStockRequest(
                 type: "STOCK_REQUEST_NEW",
                 title: "คำขอเบิกวัสดุใหม่",
                 message: `${requesterName} ส่งคำขอเบิกวัสดุ #${requestId}`,
-                actionUrl: "/dashboard?tab=it-equipment&stockTab=admin-requests",
+                actionUrl: "/dashboard?tab=stock&stockTab=admin-requests",
                 referenceId: String(requestId),
             })),
     });
@@ -68,7 +68,7 @@ export async function notifyAdminsStockRequestCancelledByRequester(
             type: "STOCK_CANCELLED",
             title: "คำขอเบิกถูกผู้ใช้ยกเลิก",
             message: `${requesterName} ยกเลิกคำขอเบิก #${requestId} แล้ว`,
-            actionUrl: "/dashboard?tab=it-equipment&stockTab=admin-requests",
+            actionUrl: "/dashboard?tab=stock&stockTab=admin-requests",
             referenceId: String(requestId),
         })),
     });

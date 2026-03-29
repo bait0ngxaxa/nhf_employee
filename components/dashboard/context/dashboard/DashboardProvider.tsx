@@ -33,6 +33,7 @@ import { isAdminRole, USER_ROLES } from "@/lib/ssot/permissions";
 
 interface DashboardProviderProps {
     children: ReactNode;
+    initialUser?: DashboardDataContextValue["user"];
 }
 
 const SESSION_MENU_ITEM = {
@@ -49,16 +50,31 @@ const defaultStats: EmployeeStats = {
     academic: 0,
 };
 
-export function DashboardProvider({ children }: DashboardProviderProps) {
+function normalizeDashboardTab(tab: string | null): string {
+    if (tab === "it-equipment") {
+        return "stock";
+    }
+
+    return tab ?? "dashboard";
+}
+
+export function DashboardProvider({
+    children,
+    initialUser,
+}: DashboardProviderProps) {
     const { data: session, status } = useSession();
     const router = useRouter();
     const searchParams = useSearchParams();
     const pathname = usePathname();
-    const user = session?.user;
+    const user = session?.user ?? initialUser;
     const isAdmin = isAdminRole(user?.role);
+    const effectiveStatus =
+        status === "authenticated" || initialUser
+            ? "authenticated"
+            : status;
 
     // Initialize selectedMenu from URL ?tab= param, fallback to "dashboard"
-    const initialTab = searchParams.get("tab") ?? "dashboard";
+    const initialTab = normalizeDashboardTab(searchParams.get("tab"));
     const [selectedMenu, setSelectedMenu] = useState<string>(initialTab);
     const [sidebarOpen, setSidebarOpen] = useState(true);
     const [refreshTrigger, setRefreshTrigger] = useState(0);
@@ -66,9 +82,9 @@ export function DashboardProvider({ children }: DashboardProviderProps) {
 
     // Sync selectedMenu when URL ?tab= changes (e.g. notification click or browser back/forward)
     useEffect(() => {
-        const tabFromUrl = searchParams.get("tab");
+        const tabFromUrl = normalizeDashboardTab(searchParams.get("tab"));
         startTransition(() => {
-            setSelectedMenu(tabFromUrl || "dashboard");
+            setSelectedMenu(tabFromUrl);
         });
     }, [searchParams]);
 
@@ -164,7 +180,7 @@ export function DashboardProvider({ children }: DashboardProviderProps) {
 
     const dataValue = useMemo<DashboardDataContextValue>(
         () => ({
-            status,
+            status: effectiveStatus,
             user,
             isAdmin,
             employeeStats,
@@ -174,7 +190,7 @@ export function DashboardProvider({ children }: DashboardProviderProps) {
             sessionMenuItem,
         }),
         [
-            status,
+            effectiveStatus,
             user,
             isAdmin,
             employeeStats,

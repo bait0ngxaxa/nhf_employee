@@ -8,8 +8,8 @@ export type VariantDraftAttribute = {
 export type VariantDraft = {
     sku: string;
     unit: string;
-    quantity: number;
-    minStock: number;
+    quantity: string;
+    minStock: string;
     imageUrl: string;
     attributes: VariantDraftAttribute[];
 };
@@ -26,7 +26,7 @@ export const STOCK_ADMIN_TEXT = {
     minStock: "จุดสั่งซื้อ",
     noVariant: "ยังไม่มี variant",
     childSku: "SKU ย่อย",
-    deleteConfirm: "ลบ \"{name}\" ออกจากรายการหรือไม่?",
+    deleteConfirm: 'ลบ "{name}" ออกจากรายการหรือไม่?',
     deleteSuccess: "ลบ {name} เรียบร้อยแล้ว",
     genericError: "เกิดข้อผิดพลาด",
     save: "บันทึกข้อมูล",
@@ -34,13 +34,11 @@ export const STOCK_ADMIN_TEXT = {
     cancel: "ยกเลิก",
     addNewItem: "เพิ่มวัสดุใหม่",
     itemDescription: "รายละเอียด",
-    itemDescriptionPlaceholder:
-        "เช่น กระดาษ post-it สำหรับจดข้อความสั้น",
+    itemDescriptionPlaceholder: "เช่น กระดาษ post-it สำหรับจดข้อความสั้น",
     imageUrl: "ลิงก์รูปภาพ",
     unit: "หน่วย",
     initialQuantity: "จำนวนเริ่มต้น",
-    categoryPlaceholder:
-        "เลือกหมวดหมู่ (ไม่บังคับ)",
+    categoryPlaceholder: "เลือกหมวดหมู่",
     itemAdded: "เพิ่มวัสดุเรียบร้อยแล้ว",
     variantsTitle: "ตัวเลือกย่อย",
     variantsHint:
@@ -77,6 +75,56 @@ export function createAdjustSuccessMessage(name: string): string {
     return STOCK_ADMIN_TEXT.adjustSuccess.replace("{name}", name);
 }
 
+function findFirstErrorMessage(value: unknown): string | null {
+    if (typeof value === "string" && value.trim()) {
+        return value;
+    }
+
+    if (Array.isArray(value)) {
+        for (const item of value) {
+            const message = findFirstErrorMessage(item);
+            if (message) {
+                return message;
+            }
+        }
+        return null;
+    }
+
+    if (value && typeof value === "object") {
+        for (const nestedValue of Object.values(value)) {
+            const message = findFirstErrorMessage(nestedValue);
+            if (message) {
+                return message;
+            }
+        }
+    }
+
+    return null;
+}
+
+export function resolveStockApiErrorMessage(
+    payload: unknown,
+    fallback: string,
+): string {
+    if (!payload || typeof payload !== "object") {
+        return fallback;
+    }
+
+    const detailsMessage = findFirstErrorMessage(
+        "details" in payload ? payload.details : undefined,
+    );
+    if (detailsMessage) {
+        return detailsMessage;
+    }
+
+    const errorMessage =
+        "error" in payload && typeof payload.error === "string"
+            ? payload.error.trim()
+            : "";
+
+    return errorMessage || fallback;
+}
+
 export function createVariantSummary(item: StockItem): string {
     const defaultVariant = item.variants?.[0];
     if (!defaultVariant) {
@@ -103,8 +151,8 @@ export function createEmptyVariant(): VariantDraft {
     return {
         sku: "",
         unit: "",
-        quantity: 1,
-        minStock: 1,
+        quantity: "1",
+        minStock: "1",
         imageUrl: "",
         attributes: [createEmptyVariantAttribute()],
     };

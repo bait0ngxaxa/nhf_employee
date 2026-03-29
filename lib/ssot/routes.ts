@@ -15,6 +15,7 @@ export const APP_DASHBOARD_TABS = {
     leaveManagement: "leave-management",
     leaveHistory: "leave-history",
     managerApproval: "manager-approval",
+    stock: "stock",
     itSupport: "it-support",
 } as const;
 

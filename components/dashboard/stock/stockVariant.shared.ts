@@ -49,6 +49,14 @@ export function getPreferredVariant(item: StockItem): StockItemVariant | null {
     return item.variants?.[0] ?? null;
 }
 
+export function getItemAvailableQuantity(item: StockItem): number {
+    return item.availableQuantity;
+}
+
+export function getVariantAvailableQuantity(variant: StockItemVariant): number {
+    return variant.availableQuantity;
+}
+
 export function getBrowseImageUrl(item: StockItem, variant?: StockItemVariant | null): string | null {
     return variant?.imageUrl ?? item.imageUrl ?? null;
 }

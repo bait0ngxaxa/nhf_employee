@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { Package } from "lucide-react";
 import { toast } from "sonner";
+import { Pagination } from "@/components/Pagination";
 import { API_ROUTES } from "@/lib/ssot/routes";
 import { useStockDataContext, useStockUIContext } from "../context/stock";
 import type { StockItem, StockItemVariant } from "../context/stock/types";
@@ -13,15 +14,21 @@ import { StockVariantPickerDialog } from "./StockVariantPickerDialog";
 import {
     type BrowseCartItem,
     getPreferredVariant,
+    getVariantAvailableQuantity,
 } from "./stockVariant.shared";
 
+const ITEMS_PER_PAGE = 20;
+
 export function StockBrowse() {
-    const { items, categories, isLoading, refreshRequests } = useStockDataContext();
+    const { items, categories, isLoading, refreshRequests, totalItems } =
+        useStockDataContext();
     const {
         searchQuery,
         setSearchQuery,
         selectedCategoryId,
         setSelectedCategoryId,
+        itemsPage,
+        setItemsPage,
     } = useStockUIContext();
     const [cart, setCart] = useState<Map<number, BrowseCartItem>>(new Map());
     const [submitting, setSubmitting] = useState(false);
@@ -35,7 +42,7 @@ export function StockBrowse() {
         setCart((prev) => {
             const next = new Map(prev);
             const existing = next.get(variant.id);
-            const maxQuantity = variant.quantity;
+            const maxQuantity = getVariantAvailableQuantity(variant);
             const nextQuantity = Math.min(
                 maxQuantity,
                 (existing?.qty ?? 0) + Math.max(1, quantity),
@@ -52,7 +59,7 @@ export function StockBrowse() {
 
     function handleAddDirect(item: StockItem): void {
         const defaultVariant = getPreferredVariant(item);
-        if (!defaultVariant || defaultVariant.quantity === 0) {
+        if (!defaultVariant || getVariantAvailableQuantity(defaultVariant) === 0) {
             toast.error("รายการนี้ไม่มีสต็อกพร้อมเบิก");
             return;
         }
@@ -111,7 +118,7 @@ export function StockBrowse() {
             }
 
             const nextQuantity = Math.min(
-                existing.variant.quantity,
+                getVariantAvailableQuantity(existing.variant),
                 Math.max(0, existing.qty + delta),
             );
 
@@ -137,6 +144,7 @@ export function StockBrowse() {
         [cart],
     );
     const cartItems = useMemo(() => Array.from(cart.values()), [cart]);
+    const totalPages = Math.max(1, Math.ceil(totalItems / ITEMS_PER_PAGE));
 
     return (
         <div className="space-y-6">
@@ -160,6 +168,15 @@ export function StockBrowse() {
                     onOpenVariantPicker={setVariantPickerItem}
                 />
             )}
+
+            <Pagination
+                currentPage={itemsPage}
+                totalPages={totalPages}
+                itemsPerPage={ITEMS_PER_PAGE}
+                onPageChange={setItemsPage}
+                onPreviousPage={() => setItemsPage(Math.max(1, itemsPage - 1))}
+                onNextPage={() => setItemsPage(Math.min(totalPages, itemsPage + 1))}
+            />
 
             {cartCount > 0 && (
                 <StockBrowseCartBar

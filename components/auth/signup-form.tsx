@@ -83,16 +83,13 @@ export function SignupForm({
                 toast.success("สมัครสมาชิกสำเร็จ!", {
                     description: `ยินดีต้อนรับ${data.user?.name ? ` ${data.user.name}` : ""}! บัญชีของคุณถูกสร้างเรียบร้อยแล้ว`,
                 });
-                // Reset form
                 setFormData({
                     email: "",
                     password: "",
                     confirmPassword: "",
                 });
-                // Redirect to login
-                setTimeout(() => {
-                    router.push(APP_ROUTES.login);
-                }, 2000);
+                router.push(APP_ROUTES.dashboard);
+                router.refresh();
             } else {
                 setError(result.error);
             }

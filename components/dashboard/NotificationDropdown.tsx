@@ -49,6 +49,14 @@ interface NotificationsData {
     unreadCount: number;
 }
 
+function normalizeNotificationActionUrl(actionUrl: string | null): string | null {
+    if (!actionUrl) {
+        return null;
+    }
+
+    return actionUrl.replace("tab=it-equipment", "tab=stock");
+}
+
 const fetcher = async <T,>(url: string): Promise<T> => {
     const result = await apiGet<T>(url);
     if (!result.success) {
@@ -83,8 +91,12 @@ export function NotificationDropdown() {
             mutate();
 
             if (actionUrl) {
+                const normalizedActionUrl =
+                    normalizeNotificationActionUrl(actionUrl);
                 setOpen(false);
-                router.push(actionUrl);
+                if (normalizedActionUrl) {
+                    router.push(normalizedActionUrl);
+                }
             }
         } catch (requestError) {
             console.error("Failed to mark notification as read", requestError);
