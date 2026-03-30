@@ -34,7 +34,9 @@ const DASHBOARD_STOCK_MENU = "stock";
 const DASHBOARD_STOCK_MENU_LEGACY = "it-equipment";
 const STOCK_DEFAULT_TAB = "browse";
 const STOCK_ADMIN_TABS = new Set(["inventory", "admin-requests"]);
-const STOCK_LIST_LIMIT = 20;
+const STOCK_BROWSE_LIMIT = 12;
+const STOCK_ADMIN_ITEMS_LIMIT = 10;
+const STOCK_REQUESTS_LIMIT = 10;
 
 function normalizeStockTab(tab: string | null, isAdmin: boolean): string {
     if (!tab) return STOCK_DEFAULT_TAB;
@@ -53,12 +55,23 @@ function isStockDashboardMenu(tab: string | null): boolean {
     return tab === DASHBOARD_STOCK_MENU || tab === DASHBOARD_STOCK_MENU_LEGACY;
 }
 
+function shouldSyncStockRequestsPage(
+    pathname: string,
+    searchParams: URLSearchParams,
+): boolean {
+    return (
+        pathname === APP_ROUTES.dashboard &&
+        isStockDashboardMenu(searchParams.get("tab"))
+    );
+}
+
 export function StockProvider({ children }: StockProviderProps) {
     const { data: session } = useSession();
     const router = useRouter();
     const searchParams = useSearchParams();
     const pathname = usePathname();
     const isAdmin = isAdminRole(session?.user?.role);
+    const latestSearchParamsRef = useRef(searchParams);
 
     const [activeTab, setActiveTabState] = useState(
         normalizeStockTab(searchParams.get(STOCK_TAB_QUERY_KEY), isAdmin),
@@ -67,6 +80,7 @@ export function StockProvider({ children }: StockProviderProps) {
     const [requestsPage, setRequestsPageState] = useState(
         parsePositivePage(searchParams.get(STOCK_REQUESTS_PAGE_QUERY_KEY)),
     );
+    const [requestSearchQuery, setRequestSearchQuery] = useState("");
     const [searchQuery, setSearchQuery] = useState("");
     const [selectedCategoryId, setSelectedCategoryId] = useState<
         number | undefined
@@ -75,6 +89,10 @@ export function StockProvider({ children }: StockProviderProps) {
         StockRequestStatus | undefined
     >();
     const hasInitializedStatusFilterRef = useRef(false);
+
+    useEffect(() => {
+        latestSearchParamsRef.current = searchParams;
+    }, [searchParams]);
 
     useEffect(() => {
         const tabFromUrl = searchParams.get(STOCK_TAB_QUERY_KEY);
@@ -145,9 +163,11 @@ export function StockProvider({ children }: StockProviderProps) {
     );
 
     const itemsQuery = useMemo(() => {
+        const itemsLimit =
+            activeTab === "inventory" ? STOCK_ADMIN_ITEMS_LIMIT : STOCK_BROWSE_LIMIT;
         const params = new URLSearchParams({
             page: String(itemsPage),
-            limit: String(STOCK_LIST_LIMIT),
+            limit: String(itemsLimit),
             activeOnly: "true",
         });
         if (searchQuery) params.set("search", searchQuery);
@@ -155,16 +175,22 @@ export function StockProvider({ children }: StockProviderProps) {
             params.set("categoryId", String(selectedCategoryId));
         }
         return `${API_ROUTES.stock.items}?${params.toString()}`;
-    }, [itemsPage, searchQuery, selectedCategoryId]);
+    }, [activeTab, itemsPage, searchQuery, selectedCategoryId]);
 
     const requestsQuery = useMemo(() => {
+        const requestScope =
+            isAdmin && activeTab === "admin-requests" ? "all" : "mine";
         const params = new URLSearchParams({
             page: String(requestsPage),
-            limit: String(STOCK_LIST_LIMIT),
+            limit: String(STOCK_REQUESTS_LIMIT),
+            scope: requestScope,
         });
         if (statusFilter) params.set("status", statusFilter);
+        if (requestSearchQuery.trim()) {
+            params.set("search", requestSearchQuery.trim());
+        }
         return `${API_ROUTES.stock.requests}?${params.toString()}`;
-    }, [requestsPage, statusFilter]);
+    }, [activeTab, isAdmin, requestSearchQuery, requestsPage, statusFilter]);
 
     const {
         data: categoriesData,
@@ -203,12 +229,32 @@ export function StockProvider({ children }: StockProviderProps) {
             hasInitializedStatusFilterRef.current = true;
             return;
         }
-        void setRequestsPage(1);
-    }, [setRequestsPage, statusFilter]);
+        setRequestsPageState(1);
+
+        const latestSearchParams = latestSearchParamsRef.current;
+
+        if (!shouldSyncStockRequestsPage(pathname, latestSearchParams)) {
+            return;
+        }
+
+        const currentPage = parsePositivePage(
+            latestSearchParams.get(STOCK_REQUESTS_PAGE_QUERY_KEY),
+        );
+        if (currentPage === 1) {
+            return;
+        }
+
+        const nextParams = new URLSearchParams(latestSearchParams.toString());
+        nextParams.set("tab", DASHBOARD_STOCK_MENU);
+        nextParams.set(STOCK_REQUESTS_PAGE_QUERY_KEY, "1");
+        router.push(`${APP_ROUTES.dashboard}?${nextParams.toString()}`, {
+            scroll: false,
+        });
+    }, [pathname, requestSearchQuery, router, statusFilter]);
 
     useEffect(() => {
         const totalRequests = requestsData?.total ?? 0;
-        const totalPages = Math.max(1, Math.ceil(totalRequests / STOCK_LIST_LIMIT));
+        const totalPages = Math.max(1, Math.ceil(totalRequests / STOCK_REQUESTS_LIMIT));
         if (requestsPage > totalPages) {
             void setRequestsPage(totalPages);
         }
@@ -269,6 +315,8 @@ export function StockProvider({ children }: StockProviderProps) {
             setItemsPage,
             requestsPage,
             setRequestsPage,
+            requestSearchQuery,
+            setRequestSearchQuery,
             searchQuery,
             setSearchQuery,
             selectedCategoryId,
@@ -282,6 +330,7 @@ export function StockProvider({ children }: StockProviderProps) {
             itemsPage,
             requestsPage,
             searchQuery,
+            requestSearchQuery,
             selectedCategoryId,
             statusFilter,
             setRequestsPage,

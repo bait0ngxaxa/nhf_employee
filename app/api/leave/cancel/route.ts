@@ -6,6 +6,7 @@ import { getEmployeeIdFromUserId } from "@/lib/services/leave/get-employee-id";
 import { getApiAuthSession } from "@/lib/server-auth";
 import { jsonError, unauthorized } from "@/lib/ssot/http";
 import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
+import { APP_DASHBOARD_TABS, toDashboardTabPath } from "@/lib/ssot/routes";
 
 export async function POST(req: Request) {
     try {
@@ -38,10 +39,23 @@ export async function POST(req: Request) {
                 throw new Error(COMMON_API_MESSAGES.operationFailed);
             }
 
-            return tx.leaveRequest.update({
+            const updatedLeaveRequest = await tx.leaveRequest.update({
                 where: { id: leaveId },
                 data: { status: "CANCELLED" },
             });
+
+            await tx.notification.create({
+                data: {
+                    userId,
+                    type: "SYSTEM_ALERT",
+                    title: "ยกเลิกคำขอลาแล้ว",
+                    message: `คำขอลาเลขที่ ${leaveId} ถูกยกเลิกเรียบร้อยแล้ว`,
+                    actionUrl: toDashboardTabPath(APP_DASHBOARD_TABS.leaveHistory),
+                    referenceId: leaveId,
+                },
+            });
+
+            return updatedLeaveRequest;
         });
 
         await logLeaveEvent("LEAVE_REQUEST_CANCEL", leaveId, userId, session.user.email || "", {

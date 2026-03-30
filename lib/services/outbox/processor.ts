@@ -8,6 +8,10 @@ import {
 } from "@/lib/services/ticket/notifications";
 import type { TicketWithRelations } from "@/lib/services/ticket/types";
 import type { LeaveActionPayload, LeaveResultPayload } from "@/lib/email/types";
+import type {
+    StockLowLineData,
+    StockRequestLineData,
+} from "@/types/api";
 import {
     MAX_OUTBOX_ATTEMPTS,
     OUTBOX_STATUSES,
@@ -44,6 +48,9 @@ type EmailRequestPayload = {
     replyEmail: string;
     requestedAt: string;
 };
+
+type StockRequestLinePayload = StockRequestLineData;
+type StockLowLinePayload = StockLowLineData;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
     return typeof value === "object" && value !== null;
@@ -153,6 +160,99 @@ function parseLeaveResultPayload(payload: unknown): LeaveResultPayload {
     };
 }
 
+function parseStockRequestItems(
+    items: unknown[],
+): StockRequestLinePayload["items"] {
+    return items.map((item, index) => {
+        if (
+            !isRecord(item) ||
+            typeof item.name !== "string" ||
+            typeof item.quantity !== "number" ||
+            typeof item.unit !== "string"
+        ) {
+            throw new Error(`Invalid STOCK_REQUEST_LINE payload item at index ${index}`);
+        }
+
+        return {
+            name: item.name,
+            quantity: item.quantity,
+            unit: item.unit,
+            variantLabel:
+                typeof item.variantLabel === "string" ? item.variantLabel : undefined,
+        };
+    });
+}
+
+function parseStockLowItems(items: unknown[]): StockLowLinePayload["items"] {
+    return items.map((item, index) => {
+        if (
+            !isRecord(item) ||
+            typeof item.itemId !== "number" ||
+            typeof item.name !== "string" ||
+            typeof item.sku !== "string" ||
+            typeof item.quantity !== "number" ||
+            typeof item.minStock !== "number" ||
+            typeof item.unit !== "string"
+        ) {
+            throw new Error(`Invalid STOCK_LOW_LINE payload item at index ${index}`);
+        }
+
+        return {
+            itemId: item.itemId,
+            name: item.name,
+            sku: item.sku,
+            quantity: item.quantity,
+            minStock: item.minStock,
+            unit: item.unit,
+        };
+    });
+}
+
+function parseStockRequestLinePayload(
+    payload: unknown,
+): StockRequestLinePayload {
+    if (
+        !isRecord(payload) ||
+        typeof payload.requestId !== "number" ||
+        typeof payload.projectCode !== "string" ||
+        typeof payload.requesterName !== "string" ||
+        typeof payload.requestedAt !== "string" ||
+        typeof payload.itemCount !== "number" ||
+        typeof payload.totalQuantity !== "number" ||
+        !Array.isArray(payload.items)
+    ) {
+        throw new Error("Invalid STOCK_REQUEST_LINE payload");
+    }
+
+    return {
+        requestId: payload.requestId,
+        projectCode: payload.projectCode,
+        requesterName: payload.requesterName,
+        note: typeof payload.note === "string" ? payload.note : null,
+        requestedAt: payload.requestedAt,
+        itemCount: payload.itemCount,
+        totalQuantity: payload.totalQuantity,
+        items: parseStockRequestItems(payload.items),
+    };
+}
+
+function parseStockLowLinePayload(payload: unknown): StockLowLinePayload {
+    if (
+        !isRecord(payload) ||
+        typeof payload.alertedAt !== "string" ||
+        typeof payload.itemCount !== "number" ||
+        !Array.isArray(payload.items)
+    ) {
+        throw new Error("Invalid STOCK_LOW_LINE payload");
+    }
+
+    return {
+        alertedAt: payload.alertedAt,
+        itemCount: payload.itemCount,
+        items: parseStockLowItems(payload.items),
+    };
+}
+
 async function markStaleProcessingRows(): Promise<void> {
     const staleBefore = new Date(
         Date.now() - STALE_OUTBOX_PROCESSING_MINUTES * 60_000,
@@ -238,6 +338,24 @@ async function dispatchNotification(notification: NotificationOutbox): Promise<v
                 "../leave/notifications"
             );
             await sendLeaveResultNotifications(parsedLeaveResult);
+            return;
+        }
+        case "STOCK_REQUEST_LINE": {
+            const parsedPayload = parseStockRequestLinePayload(payload);
+            const isSent =
+                await lineNotificationService.sendStockRequestNotification(parsedPayload);
+            if (!isSent) {
+                throw new Error("LINE stock request notification failed");
+            }
+            return;
+        }
+        case "STOCK_LOW_LINE": {
+            const parsedPayload = parseStockLowLinePayload(payload);
+            const isSent =
+                await lineNotificationService.sendStockLowNotification(parsedPayload);
+            if (!isSent) {
+                throw new Error("LINE low stock notification failed");
+            }
             return;
         }
     }

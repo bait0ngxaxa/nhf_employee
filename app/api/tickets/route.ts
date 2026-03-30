@@ -95,12 +95,18 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
             });
 
             if (admins.length > 0) {
+                const reporterName =
+                    ticket.reportedBy.employee?.firstName &&
+                    ticket.reportedBy.employee?.lastName
+                        ? `${ticket.reportedBy.employee.firstName} ${ticket.reportedBy.employee.lastName}`
+                        : ticket.reportedBy.name;
+
                 await prisma.notification.createMany({
                     data: admins.map((admin) => ({
                         userId: admin.id,
                         type: "TICKET_CREATED",
-                        title: "Notification",
-                        message: COMMON_API_MESSAGES.operationCompleted,
+                        title: "คำขอ IT Support ใหม่",
+                        message: `${reporterName} แจ้ง "${ticket.title}" (ความสำคัญ: ${ticket.priority})`,
                         actionUrl: `${APP_ROUTES.dashboard}?tab=it-support&ticketId=${ticket.id}`,
                         referenceId: ticket.id.toString(),
                     })),

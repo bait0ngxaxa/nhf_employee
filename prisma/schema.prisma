@@ -184,6 +184,8 @@ enum NotificationOutboxType {
   EMAIL_REQUEST
   LEAVE_ACTION
   LEAVE_RESULT
+  STOCK_REQUEST_LINE
+  STOCK_LOW_LINE
 }
 
 enum NotificationOutboxStatus {
@@ -355,12 +357,12 @@ model LeaveQuota {
   employeeId Int
   year       Int // ปี ค.ศ. (เช่น 2026)
   leaveType  LeaveType
-  totalDays  Float // โควต้าทั้งหมด (ป่วย=30, กิจ=10, พักร้อน=6)
+  totalDays  Float // โควตาทั้งหมด (ป่วย=30, กิจ=10, พักร้อน=6)
   usedDays   Float     @default(0) // วันที่ใช้ไปแล้ว (ทศนิยมได้ เช่น 0.5)
 
   employee Employee @relation(fields: [employeeId], references: [id])
 
-  @@unique([employeeId, year, leaveType]) // 1 คนมีโควต้า 1 ประเภทต่อ 1 ปี
+  @@unique([employeeId, year, leaveType]) // 1 คนมีโควตา 1 ประเภทต่อ 1 ปี
   @@map("leave_quotas")
 }
 
@@ -411,7 +413,7 @@ enum LeaveStatus {
   PENDING // รออนุมัติ
   APPROVED // อนุมัติแล้ว
   REJECTED // ปฏิเสธ
-  CANCELLED // ยกเลิกโดยตัวพนักงานเอง
+  CANCELLED // ยกเลิกโดยพนักงาน
 }
 
 // ==========================================
@@ -529,6 +531,7 @@ model StockTransaction {
 model StockRequest {
   id            Int                @id @default(autoincrement())
   requestedBy   Int
+  projectCode   String             @db.VarChar(100)
   status        StockRequestStatus @default(PENDING_ISSUE)
   note          String?            @db.Text
   issuedById    Int?               @map("reviewedBy")
@@ -544,6 +547,7 @@ model StockRequest {
   items         StockRequestItem[]
 
   @@index([requestedBy])
+  @@index([projectCode])
   @@index([status])
   @@index([issuedById])
   @@index([cancelledById])
@@ -567,7 +571,7 @@ model StockRequestItem {
 }
 
 enum StockTxType {
-  IN // รับเข้าสต็อค
+  IN // รับเข้าสต็อก
   OUT // เบิกออก (เมื่ออนุมัติ)
   ADJUST // ปรับยอดคงเหลือ
 }

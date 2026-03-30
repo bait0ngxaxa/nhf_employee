@@ -1,6 +1,8 @@
 import Image from "next/image";
-import { Minus, Plus, ShoppingCart, Trash2, XCircle } from "lucide-react";
+import { CheckCircle2, Minus, Plus, ShoppingCart, Trash2, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import type { BrowseCartItem } from "./stockVariant.shared";
 import {
     getVariantAvailableQuantity,
@@ -11,7 +13,9 @@ type StockBrowseCartPanelProps = {
     items: BrowseCartItem[];
     cartSize: number;
     cartCount: number;
+    projectCode: string;
     submitting: boolean;
+    onProjectCodeChange: (value: string) => void;
     onRemove: (variantId: number) => void;
     onChangeQuantity: (variantId: number, delta: number) => void;
     onClear: () => void;
@@ -22,7 +26,9 @@ export function StockBrowseCartPanel({
     items,
     cartSize,
     cartCount,
+    projectCode,
     submitting,
+    onProjectCodeChange,
     onRemove,
     onChangeQuantity,
     onClear,
@@ -47,6 +53,28 @@ export function StockBrowseCartPanel({
             </div>
 
             <div className="flex-1 space-y-3 overflow-y-auto px-5 py-4">
+                <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
+                    <div className="space-y-1.5">
+                        <Label
+                            htmlFor="stock-project-code"
+                            className="text-sm font-semibold text-slate-700"
+                        >
+                            รหัสโครงการ
+                        </Label>
+                        <Input
+                            id="stock-project-code"
+                            value={projectCode}
+                            onChange={(event) =>
+                                onProjectCodeChange(event.target.value.toUpperCase())
+                            }
+                            placeholder="เช่น ABC-2569/01"
+                            className="h-11 border-slate-200 bg-white focus-visible:ring-blue-500"
+                        />
+                        <p className="text-xs text-slate-500">
+                            ระบุรหัสโครงการก่อนส่งคำขอเบิก
+                        </p>
+                    </div>
+                </div>
                 {items.map((cartItem) => (
                     <CartRow
                         key={cartItem.variant.id}
@@ -60,13 +88,34 @@ export function StockBrowseCartPanel({
             </div>
 
             <div className="border-t border-slate-200 bg-slate-50/70 px-5 py-4">
+                <div className="mb-3 rounded-2xl border border-slate-200 bg-white/90 px-4 py-3">
+                    <div className="flex items-center justify-between gap-3 text-sm">
+                        <span className="text-slate-500">สรุปรายการ</span>
+                        <span className="font-semibold text-slate-800">
+                            {cartSize} รายการ
+                        </span>
+                    </div>
+                    <div className="mt-1 flex items-center justify-between gap-3 text-sm">
+                        <span className="text-slate-500">จำนวนรวม</span>
+                        <span className="font-semibold text-slate-800">
+                            {cartCount} ชิ้น
+                        </span>
+                    </div>
+                    <div className="mt-1 flex items-center justify-between gap-3 text-sm">
+                        <span className="text-slate-500">รหัสโครงการ</span>
+                        <span className="truncate font-semibold text-slate-800">
+                            {projectCode.trim() || "-"}
+                        </span>
+                    </div>
+                </div>
                 <div className="flex flex-col gap-2">
                     <Button
                         type="button"
                         onClick={onSubmit}
-                        disabled={submitting}
+                        disabled={submitting || projectCode.trim().length === 0}
                         className="w-full bg-blue-600 font-bold text-white hover:bg-blue-700"
                     >
+                        <CheckCircle2 className="mr-1.5 h-4 w-4" />
                         {submitting ? "กำลังดำเนินการ..." : "ยืนยันการเบิก"}
                     </Button>
                     <Button
@@ -96,8 +145,8 @@ function CartRow(props: {
     const imageUrl = item.variant.imageUrl ?? item.item.imageUrl ?? null;
 
     return (
-        <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50/70 p-3">
-            <div className="overflow-hidden rounded-xl bg-white ring-1 ring-slate-200">
+        <div className="flex items-center gap-3 rounded-[1.35rem] border border-slate-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(248,250,252,0.96))] p-3 shadow-[0_16px_32px_-26px_rgba(15,23,42,0.35)]">
+            <div className="overflow-hidden rounded-xl bg-white ring-1 ring-slate-200 shadow-inner shadow-white">
                 {imageUrl ? (
                     <Image
                         src={imageUrl}
@@ -136,7 +185,7 @@ function CartRow(props: {
                     size="icon"
                     onClick={props.onDecrease}
                     disabled={props.disabled}
-                    className="h-9 w-9 rounded-lg bg-white text-slate-700 hover:bg-slate-100"
+                    className="h-9 w-9 rounded-lg bg-white text-slate-700 shadow-sm hover:bg-slate-100"
                 >
                     <Minus className="h-4 w-4" />
                 </Button>
@@ -152,7 +201,7 @@ function CartRow(props: {
                         props.disabled ||
                         item.qty >= getVariantAvailableQuantity(item.variant)
                     }
-                    className="h-9 w-9 rounded-lg bg-white text-slate-700 hover:bg-slate-100"
+                    className="h-9 w-9 rounded-lg bg-white text-slate-700 shadow-sm hover:bg-slate-100"
                 >
                     <Plus className="h-4 w-4" />
                 </Button>

@@ -54,7 +54,6 @@ function BrowseCard(props: {
     const defaultVariant = getPreferredVariant(item);
     const imageUrl = getBrowseCardImageUrl(item);
     const availableQuantity = getItemAvailableQuantity(item);
-    const isLowStock = availableQuantity <= item.minStock;
     const variantCount = getSelectableVariantCount(item);
     const totalInCart = Array.from(props.cart.values()).reduce(
         (sum, cartItem) => (cartItem.item.id === item.id ? sum + cartItem.qty : sum),
@@ -63,10 +62,10 @@ function BrowseCard(props: {
     const variantSummary = getVariantAttributeSummary(defaultVariant?.attributeValues);
 
     return (
-        <Card className="group relative overflow-hidden rounded-[1.25rem] border border-gray-100/80 bg-white transition-all duration-500 hover:border-blue-100 hover:shadow-xl hover:shadow-blue-500/5">
-            <div className="absolute inset-x-0 -top-px h-px w-full bg-gradient-to-r from-transparent via-blue-300/30 to-transparent opacity-0 transition-opacity duration-500 group-hover:opacity-100" />
-            <CardContent className="space-y-4 p-5">
-                <div className="overflow-hidden rounded-2xl bg-slate-100 ring-1 ring-slate-200">
+        <Card className="group relative h-full overflow-hidden rounded-[1.6rem] border border-slate-200/80 bg-white transition-all duration-500 hover:-translate-y-1 hover:border-orange-200 hover:shadow-[0_28px_60px_-32px_rgba(249,115,22,0.28)]">
+            <div className="absolute inset-x-0 -top-px h-px w-full bg-gradient-to-r from-transparent via-orange-300/40 to-transparent opacity-0 transition-opacity duration-500 group-hover:opacity-100" />
+            <CardContent className="flex h-full flex-col gap-3 p-4">
+                <div className="overflow-hidden rounded-[1.35rem] bg-slate-100 ring-1 ring-slate-200 shadow-inner shadow-white/70">
                     {imageUrl ? (
                         <Image
                             src={imageUrl}
@@ -74,10 +73,10 @@ function BrowseCard(props: {
                             width={400}
                             height={240}
                             unoptimized
-                            className="h-40 w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
+                            className="h-32 w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
                         />
                     ) : (
-                        <div className="flex h-40 items-center justify-center text-slate-400">
+                        <div className="flex h-32 items-center justify-center text-slate-400">
                             <Package className="h-10 w-10" />
                         </div>
                     )}
@@ -85,65 +84,67 @@ function BrowseCard(props: {
 
                 <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0 flex-1 space-y-1">
-                        <h3 className="truncate font-bold text-gray-800 transition-colors group-hover:text-blue-700">
+                        <h3 className="truncate font-bold text-gray-800 transition-colors group-hover:text-orange-700">
                             {item.name}
                         </h3>
-                        <p className="inline-block rounded-md bg-gray-50 px-1.5 py-0.5 font-mono text-xs font-medium text-gray-400">
+                        <p
+                            title={item.sku}
+                            className="truncate rounded-md bg-gray-50 px-1.5 py-0.5 font-mono text-xs font-medium text-gray-400"
+                        >
                             {item.sku}
                         </p>
                     </div>
                     <Badge
                         variant="secondary"
-                        className="shrink-0 border-none bg-indigo-50/80 px-2.5 text-indigo-700 shadow-sm hover:bg-indigo-100"
+                        className="max-w-[8.5rem] shrink-0 truncate border border-indigo-100 bg-indigo-50/90 px-2.5 text-indigo-700 shadow-sm shadow-indigo-100/60 hover:bg-indigo-100"
+                        title={item.category.name}
                     >
                         {item.category.name}
                     </Badge>
                 </div>
 
-                {item.description && (
-                    <p className="line-clamp-2 min-h-10 text-sm text-slate-500">
-                        {item.description}
-                    </p>
-                )}
-
-                <div className="space-y-2 rounded-xl bg-slate-50/70 p-3">
-                    {hasSelectableVariants(item) ? (
-                        <div className="text-sm font-medium text-slate-700">
-                            มี {variantCount} ตัวเลือก
-                        </div>
-                    ) : variantSummary ? (
-                        <div className="text-sm font-medium text-slate-700">
-                            {variantSummary}
-                        </div>
-                    ) : (
-                        <div className="text-sm font-medium text-slate-500">
-                            ใช้ตัวเลือกเริ่มต้น
-                        </div>
-                    )}
-                    <div className="flex items-center justify-between">
-                        <span className="text-xs font-semibold uppercase tracking-wider text-gray-400">
-                            คงเหลือ
-                        </span>
-                        <span
-                            className={`rounded-lg px-2.5 py-1 text-sm font-bold ${
-                                isLowStock
-                                    ? "bg-rose-50 text-rose-700"
-                                    : "bg-white text-slate-700"
-                            }`}
-                        >
-                            {availableQuantity} {item.unit}
-                        </span>
-                    </div>
-                    {item.reservedQuantity > 0 && (
-                        <div className="text-xs text-amber-600">
-                            รอจ่าย {item.reservedQuantity} {item.unit}
-                        </div>
-                    )}
+                <div className="min-h-[2.25rem]">
+                    {item.description ? (
+                        <p className="line-clamp-2 text-sm text-slate-500">
+                            {item.description}
+                        </p>
+                    ) : null}
                 </div>
 
-                <div className="space-y-2">
+                <div className="flex min-h-[6.5rem] flex-col justify-between rounded-[1.2rem] border border-slate-200/80 bg-slate-50 p-3 shadow-inner shadow-white">
+                    <div className="min-h-4 text-sm font-medium text-slate-700">
+                        {hasSelectableVariants(item) ? (
+                            <>มี {variantCount} ตัวเลือก</>
+                        ) : variantSummary ? (
+                            variantSummary
+                        ) : null}
+                    </div>
+                    <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                            <span className="text-xs font-semibold uppercase tracking-wider text-gray-400">
+                                คงเหลือ
+                            </span>
+                            <span className="rounded-lg bg-white px-2.5 py-1 text-sm font-bold text-slate-700 shadow-sm">
+                                {availableQuantity} {item.unit}
+                            </span>
+                        </div>
+                        <div
+                            className={`min-h-[0.875rem] text-xs ${
+                                item.reservedQuantity > 0
+                                    ? "text-amber-600"
+                                    : "text-transparent"
+                            }`}
+                        >
+                            {item.reservedQuantity > 0
+                                ? `รอจ่าย ${item.reservedQuantity} ${item.unit}`
+                                : ""}
+                        </div>
+                    </div>
+                </div>
+
+                <div className="mt-auto space-y-2">
                     {totalInCart > 0 && (
-                        <div className="flex items-center gap-2 text-sm font-medium text-blue-700">
+                        <div className="flex min-h-4 items-center gap-2 text-sm font-medium text-orange-700">
                             <ShoppingCart className="h-4 w-4" />
                             อยู่ในรายการเบิกแล้ว {totalInCart} {item.unit}
                         </div>
@@ -153,7 +154,7 @@ function BrowseCard(props: {
                         className={`w-full rounded-xl shadow-sm transition-all ${
                             availableQuantity === 0
                                 ? "border-gray-200 bg-gray-50/50 text-gray-400"
-                                : "border border-blue-600 bg-blue-600 text-white hover:border-blue-700 hover:bg-blue-700"
+                                : "border border-blue-600 bg-[linear-gradient(135deg,#2563EB,#1D4ED8)] text-white shadow-[0_16px_30px_-18px_rgba(37,99,235,0.9)] hover:border-blue-700 hover:from-blue-700 hover:to-blue-700"
                         }`}
                         onClick={() =>
                             hasSelectableVariants(item)
@@ -166,8 +167,8 @@ function BrowseCard(props: {
                         {availableQuantity === 0
                             ? "สินค้าหมด"
                             : hasSelectableVariants(item)
-                              ? "เลือกตัวเลือกแล้วเพิ่ม"
-                              : "เพิ่มในรายการเบิก"}
+                              ? "เลือกแล้วเพิ่ม"
+                              : "เพิ่มรายการ"}
                     </Button>
                 </div>
             </CardContent>

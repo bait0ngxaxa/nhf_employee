@@ -3,14 +3,19 @@ import {
     type EmailRequestData,
     type TicketEmailData,
     type LineFlexMessage,
+    type StockLowLineData,
+    type StockRequestLineData,
 } from "@/types/api";
 import { type LineWebhookData } from "./types";
 import { generateTicketFlexMessage } from "./flex-messages/ticket";
 import { generateEmailRequestFlexMessage } from "./flex-messages/email-request";
+import { generateStockLowFlexMessage } from "./flex-messages/stock-low";
+import { generateStockRequestFlexMessage } from "./flex-messages/stock";
 
 // Configuration (read once)
 const getConfig = () => ({
     channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN || "",
+    stockChannelAccessToken: process.env.LINE_STOCK_CHANNEL_ACCESS_TOKEN || "",
     lineWebhookUrl: process.env.LINE_WEBHOOK_URL || "",
     baseUrl: process.env.NEXTAUTH_URL || "http://localhost:3000",
     itTeamUserId: process.env.LINE_IT_TEAM_USER_ID || "",
@@ -96,6 +101,47 @@ export async function sendLineBroadcast(
         }
     } catch (error) {
         console.error("❌ เกิดข้อผิดพลาดใน LINE Broadcast:", error);
+        return false;
+    }
+}
+
+export async function sendStockLineBroadcast(
+    message: LineFlexMessage
+): Promise<boolean> {
+    const { stockChannelAccessToken } = getConfig();
+
+    if (!stockChannelAccessToken) {
+        return false;
+    }
+
+    try {
+        const response = await fetch(
+            "https://api.line.me/v2/bot/message/broadcast",
+            {
+                method: "POST",
+                headers: {
+                    Authorization: `Bearer ${stockChannelAccessToken}`,
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                    messages: [message],
+                }),
+            }
+        );
+
+        if (response.ok) {
+            return true;
+        } else {
+            const errorText = await response.text();
+            console.error(
+                "LINE Stock Broadcast ส่งไม่สำเร็จ:",
+                response.status,
+                errorText
+            );
+            return false;
+        }
+    } catch (error) {
+        console.error("เกิดข้อผิดพลาดใน LINE Stock Broadcast:", error);
         return false;
     }
 }
@@ -195,15 +241,39 @@ export async function sendEmailRequestNotification(
     return await sendToITTeamOrBroadcast(flexMessage);
 }
 
+export async function sendStockRequestNotification(
+    stockRequestData: StockRequestLineData
+): Promise<boolean> {
+    const { baseUrl } = getConfig();
+    const flexMessage = generateStockRequestFlexMessage(
+        stockRequestData,
+        baseUrl
+    );
+
+    return await sendStockLineBroadcast(flexMessage);
+}
+
+export async function sendStockLowNotification(
+    stockLowData: StockLowLineData
+): Promise<boolean> {
+    const { baseUrl } = getConfig();
+    const flexMessage = generateStockLowFlexMessage(stockLowData, baseUrl);
+
+    return await sendStockLineBroadcast(flexMessage);
+}
+
 // Export as object for backward compatibility
 export const lineNotificationService = {
     sendLineMessage,
     sendLineBroadcast,
+    sendStockLineBroadcast,
     sendLineWebhook,
     sendNewTicketNotification,
     sendStatusUpdateNotification,
     sendITTeamNotification,
     sendEmailRequestNotification,
+    sendStockLowNotification,
+    sendStockRequestNotification,
 };
 
 export type { LineWebhookData };

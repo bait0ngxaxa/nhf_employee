@@ -1,11 +1,13 @@
-import { type NextRequest, NextResponse } from "next/server";
+import { after, type NextRequest, NextResponse } from "next/server";
 import { getApiAuthSession } from "@/lib/server-auth";
 import { buildUserContext } from "@/lib/context";
 import { isAdminRole } from "@/lib/ssot/permissions";
 import { unauthorized, forbidden, jsonError, serverError } from "@/lib/ssot/http";
 import { stockService } from "@/lib/services/stock";
+import { processOutbox } from "@/lib/services/outbox/processor";
 import { adjustStockSchema } from "@/lib/validations/stock";
 import { logStockEvent } from "@/lib/audit";
+import { enqueueLineLowStockReached } from "@/lib/services/stock/notifications";
 
 interface RouteParams {
     params: Promise<{ id: string }>;
@@ -49,6 +51,22 @@ export async function POST(
                 newMinStock: adjustment.newMinStock,
             },
         });
+
+        after(async () => {
+            try {
+                await enqueueLineLowStockReached(adjustment.lowStockAlerts);
+                processOutbox().catch((err) =>
+                    console.error("Outbox processor failed:", err),
+                );
+            } catch (notificationError) {
+                console.error("Error queueing low stock notification:", {
+                    itemId,
+                    actorId: user.id,
+                    error: notificationError,
+                });
+            }
+        });
+
         return NextResponse.json({ adjustment });
     } catch (error) {
         const message = error instanceof Error ? error.message : "";

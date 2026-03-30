@@ -36,10 +36,7 @@ export function StockInventoryVariantEditor(
     const showVariantSkuField = !props.hideSingleVariantSku || variants.length > 1;
     const showVariantImageField =
         !props.hideSingleVariantImage || variants.length > 1;
-    const variantCountLabel =
-        variants.length === 1
-            ? `มี ${variants.length} variant`
-            : `มี ${variants.length} variants`;
+    const variantCountLabel = `มี ${variants.length} รายการ`;
 
     return (
         <div className="space-y-4 rounded-2xl border border-slate-200 bg-slate-50/60 p-4">
@@ -87,7 +84,7 @@ export function StockInventoryVariantEditor(
                         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                             <div className="space-y-0.5">
                                 <div className="text-sm font-semibold text-slate-800">
-                                    เพิ่มรายการย่อยได้ต่อเนื่อง
+                                    เพิ่มรายการได้ต่อเนื่อง
                                 </div>
                                 <p className="text-xs text-slate-500">
                                     {variantCountLabel}
@@ -182,6 +179,7 @@ function VariantCard(props: {
                 <FieldShell label={STOCK_ADMIN_TEXT.unit}>
                     <Input
                         value={variant.unit}
+                        placeholder={STOCK_ADMIN_TEXT.unitPlaceholder}
                         onChange={(event) =>
                             props.onChange({
                                 ...variant,

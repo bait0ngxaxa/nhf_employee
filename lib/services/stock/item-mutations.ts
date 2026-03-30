@@ -15,7 +15,38 @@ import {
     summarizeVariantInventory,
     variantHasReferences,
 } from "./shared";
-import type { CreateStockItemInput } from "./types";
+import type {
+    AdjustStockResult,
+    CreateStockItemInput,
+    LowStockAlertCandidate,
+} from "./types";
+
+function buildLowStockAlert(
+    item: {
+        id: number;
+        name: string;
+        sku: string;
+        unit: string;
+        quantity: number;
+    },
+    nextQuantity: number,
+    nextMinStock: number,
+): LowStockAlertCandidate[] {
+    if (item.quantity <= nextMinStock || nextQuantity > nextMinStock) {
+        return [];
+    }
+
+    return [
+        {
+            itemId: item.id,
+            name: item.name,
+            sku: item.sku,
+            quantity: nextQuantity,
+            minStock: nextMinStock,
+            unit: item.unit,
+        },
+    ];
+}
 
 export async function createCategory(data: CreateCategoryInput) {
     return prisma.stockCategory.create({ data });
@@ -345,12 +376,13 @@ export async function adjustStock(
     itemId: number,
     input: AdjustStockInput,
     userId: number,
-) {
+): Promise<AdjustStockResult> {
     return prisma.$transaction(async (tx) => {
         const item = await tx.stockItem.findUnique({
             where: { id: itemId },
             select: {
                 id: true,
+                name: true,
                 sku: true,
                 unit: true,
                 quantity: true,
@@ -368,6 +400,8 @@ export async function adjustStock(
         if (newQty < 0) {
             throw new Error("ยอดคงเหลือต้องไม่ติดลบ");
         }
+
+        const lowStockAlerts = buildLowStockAlert(item, newQty, input.minStock);
 
         await tx.stockItem.update({
             where: { id: itemId },
@@ -404,6 +438,7 @@ export async function adjustStock(
             newQty,
             previousMinStock: item.minStock,
             newMinStock: input.minStock,
+            lowStockAlerts,
         };
     });
 }

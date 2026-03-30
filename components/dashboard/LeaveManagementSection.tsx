@@ -1,3 +1,5 @@
+"use client";
+
 import { CalendarRange, CalendarDays, CheckSquare, Settings2 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useDashboardDataContext } from "./context/dashboard/DashboardContext";
@@ -20,6 +22,7 @@ export function LeaveManagementSection({ defaultTab = "my-leave" }: LeaveManagem
     const showApprovalTab = isManager;
 
     const [activeTab, setActiveTab] = useState(defaultTab);
+    const [isMounted, setIsMounted] = useState(false);
 
     // Ensure the tab changes if the user clicks a deep link while already on this page
     useEffect(() => {
@@ -27,6 +30,10 @@ export function LeaveManagementSection({ defaultTab = "my-leave" }: LeaveManagem
             setActiveTab(defaultTab);
         }
     }, [defaultTab]);
+
+    useEffect(() => {
+        setIsMounted(true);
+    }, []);
 
     const tabs: SectionTabItem[] = [
         {
@@ -68,7 +75,7 @@ export function LeaveManagementSection({ defaultTab = "my-leave" }: LeaveManagem
                 badgeColor="bg-indigo-50 text-indigo-700 border-indigo-100"
             />
 
-            {hasTabs ? (
+            {isMounted && hasTabs ? (
                 <SectionTabs
                     value={activeTab}
                     onValueChange={setActiveTab}

@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { PrismaClient } from "@prisma/client";
 import { mockDeep, mockReset } from "vitest-mock-extended";
 import { prisma } from "@/lib/prisma";
-import { getItems } from "@/lib/services/stock/queries";
+import { getItems, getRequests } from "@/lib/services/stock/queries";
 import { ensureItemVariantsExist } from "@/lib/services/stock/shared";
 
 vi.mock("@/lib/prisma", () => ({
@@ -211,6 +211,66 @@ describe("Stock Queries", () => {
                 availableQuantity: 8,
                 reservedQuantity: 0,
             });
+        });
+    });
+
+    describe("getRequests", () => {
+        it("should search stock requests by projectCode for admin scope all", async () => {
+            prismaMock.stockRequest.findMany.mockResolvedValue(asNever([]));
+            prismaMock.stockRequest.count.mockResolvedValue(asNever(0));
+
+            await getRequests(
+                {
+                    search: "PRJ-2569",
+                    page: 1,
+                    limit: 10,
+                },
+                99,
+                true,
+                "all",
+            );
+
+            expect(prismaMock.stockRequest.findMany).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    where: expect.objectContaining({
+                        OR: expect.arrayContaining([
+                            { projectCode: { contains: "PRJ-2569" } },
+                        ]),
+                    }),
+                }),
+            );
+            expect(prismaMock.stockRequest.count).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    where: expect.objectContaining({
+                        OR: expect.arrayContaining([
+                            { projectCode: { contains: "PRJ-2569" } },
+                        ]),
+                    }),
+                }),
+            );
+        });
+
+        it("should keep my-request scope for admin when scope is mine", async () => {
+            prismaMock.stockRequest.findMany.mockResolvedValue(asNever([]));
+            prismaMock.stockRequest.count.mockResolvedValue(asNever(0));
+
+            await getRequests(
+                {
+                    page: 1,
+                    limit: 10,
+                },
+                7,
+                true,
+                "mine",
+            );
+
+            expect(prismaMock.stockRequest.findMany).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    where: expect.objectContaining({
+                        requestedBy: 7,
+                    }),
+                }),
+            );
         });
     });
 });

@@ -72,6 +72,7 @@ export interface StockRequestItemDetail {
 export interface StockRequest {
     id: number;
     requestedBy: number;
+    projectCode: string;
     status: StockRequestStatus;
     note: string | null;
     issuedById: number | null;
@@ -106,6 +107,8 @@ export interface StockUIContextValue {
     setItemsPage: (page: number) => void;
     requestsPage: number;
     setRequestsPage: (page: number) => void;
+    requestSearchQuery: string;
+    setRequestSearchQuery: (q: string) => void;
     searchQuery: string;
     setSearchQuery: (q: string) => void;
     selectedCategoryId: number | undefined;

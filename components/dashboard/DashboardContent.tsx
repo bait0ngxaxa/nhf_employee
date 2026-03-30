@@ -16,7 +16,7 @@ const StockSection = dynamic(
         import("@/components/dashboard/StockSection").then(
             (mod) => mod.StockSection,
         ),
-    { loading: () => <SectionSkeleton /> },
+    { loading: () => <SectionSkeleton />, ssr: false },
 );
 const ITSupportSection = dynamic(
     () =>

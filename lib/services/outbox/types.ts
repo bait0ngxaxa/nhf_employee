@@ -3,7 +3,9 @@ export const OUTBOX_NOTIFICATION_TYPES = [
     "TICKET_UPDATED",
     "EMAIL_REQUEST",
     "LEAVE_ACTION",
-    "LEAVE_RESULT"
+    "LEAVE_RESULT",
+    "STOCK_REQUEST_LINE",
+    "STOCK_LOW_LINE",
 ] as const;
 
 export type OutboxNotificationType = (typeof OUTBOX_NOTIFICATION_TYPES)[number];

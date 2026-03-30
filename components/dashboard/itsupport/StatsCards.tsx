@@ -23,8 +23,7 @@ interface StatItem {
     iconClass: string;
 }
 
-// Static configuration
-const STAT_CONFIG: Omit<StatItem, 'value'>[] = [
+const STAT_CONFIG: Omit<StatItem, "value">[] = [
     {
         label: "Tickets ทั้งหมด",
         unit: "tickets",
@@ -58,7 +57,7 @@ const STAT_CONFIG: Omit<StatItem, 'value'>[] = [
         iconClass: "text-emerald-600",
     },
     {
-        label: "ของฉัน",
+        label: "ที่ปิดแล้ว",
         unit: "tickets",
         gradient: "from-purple-500 to-pink-600",
         icon: List,
@@ -68,21 +67,15 @@ const STAT_CONFIG: Omit<StatItem, 'value'>[] = [
 ];
 
 export const StatsCards = React.memo(function StatsCards() {
-    const { ticketStats, isAdmin } = useITSupportDataContext();
+    const { ticketStats } = useITSupportDataContext();
 
     const statItems: StatItem[] = [
         { ...STAT_CONFIG[0], value: ticketStats.total },
         { ...STAT_CONFIG[1], value: ticketStats.newTickets ?? 0 },
         { ...STAT_CONFIG[2], value: ticketStats.open + ticketStats.inProgress },
         { ...STAT_CONFIG[3], value: ticketStats.resolved },
-        { ...STAT_CONFIG[4], value: ticketStats.userTickets ?? 0 },
+        { ...STAT_CONFIG[4], value: ticketStats.closed },
     ];
-
-    // Update unit for "Mine" based on role
-    statItems[4] = {
-        ...statItems[4],
-        unit: isAdmin ? "มอบหมาย" : "ที่ฉันแจ้ง",
-    };
 
     return (
         <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4 lg:gap-5">
@@ -95,15 +88,14 @@ export const StatsCards = React.memo(function StatsCards() {
                         key={item.label}
                         className={cn(
                             "relative overflow-hidden bg-white border-gray-200 shadow-lg hover:shadow-xl transition-[box-shadow,transform] duration-300 rounded-2xl group",
-                            isNewCard && "ring-2 ring-blue-200"
+                            isNewCard && "ring-2 ring-blue-200",
                         )}
                     >
-                        {/* Decorative Background Blob */}
                         <div
                             className={cn(
                                 "absolute -right-6 -top-6 w-32 h-32 rounded-full opacity-10 blur-2xl bg-gradient-to-br",
                                 item.gradient,
-                                "group-hover:opacity-20 transition-opacity duration-500"
+                                "group-hover:opacity-20 transition-opacity duration-500",
                             )}
                         />
 
@@ -117,7 +109,7 @@ export const StatsCards = React.memo(function StatsCards() {
                                         <p
                                             className={cn(
                                                 "text-2xl font-bold bg-gradient-to-r bg-clip-text text-transparent",
-                                                item.gradient
+                                                item.gradient,
                                             )}
                                         >
                                             {item.value}
@@ -130,14 +122,14 @@ export const StatsCards = React.memo(function StatsCards() {
                                 <div
                                     className={cn(
                                         "p-2.5 rounded-xl group-hover:scale-110 transition-transform duration-300",
-                                        item.bgClass
+                                        item.bgClass,
                                     )}
                                 >
                                     <Icon
                                         className={cn(
                                             "h-5 w-5",
                                             item.iconClass,
-                                            isNewCard && "animate-pulse"
+                                            isNewCard && "animate-pulse",
                                         )}
                                     />
                                 </div>

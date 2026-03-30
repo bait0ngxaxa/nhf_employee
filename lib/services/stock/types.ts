@@ -24,3 +24,27 @@ export type PendingRequestItemRecord = {
     variantId: number | null;
     quantity: number;
 };
+
+export type LowStockAlertCandidate = {
+    itemId: number;
+    name: string;
+    sku: string;
+    quantity: number;
+    minStock: number;
+    unit: string;
+};
+
+export type AdjustStockResult = {
+    itemId: number;
+    variantId: number;
+    previousQty: number;
+    newQty: number;
+    previousMinStock: number;
+    newMinStock: number;
+    lowStockAlerts: LowStockAlertCandidate[];
+};
+
+export type IssueRequestResult<TRequest> = {
+    request: TRequest;
+    lowStockAlerts: LowStockAlertCandidate[];
+};

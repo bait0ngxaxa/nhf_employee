@@ -1,13 +1,13 @@
 import { NotificationOutboxType } from "@prisma/client";
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 
 import { logLeaveEvent } from "@/lib/audit";
 import { prisma } from "@/lib/prisma";
+import { processOutbox } from "@/lib/services/outbox/processor";
 import { getApiAuthSession } from "@/lib/server-auth";
 import { getEmployeeIdFromUserId } from "@/lib/services/leave/get-employee-id";
 import { operationFailed, unauthorized } from "@/lib/ssot/http";
 import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
-import { APP_DASHBOARD_TABS, toDashboardTabPath } from "@/lib/ssot/routes";
 
 export async function POST(req: Request): Promise<NextResponse> {
     try {
@@ -90,27 +90,6 @@ export async function POST(req: Request): Promise<NextResponse> {
                 },
             });
 
-            const employeeUser = await tx.user.findUnique({
-                where: { employeeId: leaveRequest.employeeId },
-                select: { id: true },
-            });
-
-            if (employeeUser) {
-                const actionTextTh = action === "APPROVE" ? "Approved" : "Rejected";
-                await tx.notification.create({
-                    data: {
-                        userId: employeeUser.id,
-                        type: action === "APPROVE" ? "LEAVE_APPROVED" : "LEAVE_REJECTED",
-                        title: "Notification",
-                        message: `Your leave request was reviewed: **${actionTextTh}**${
-                            action === "REJECT" && reason ? ` (Reason: ${reason})` : ""
-                        }`,
-                        actionUrl: toDashboardTabPath(APP_DASHBOARD_TABS.leaveManagement),
-                        referenceId: leaveId,
-                    },
-                });
-            }
-
             return updatedRequest;
         });
 
@@ -123,6 +102,12 @@ export async function POST(req: Request): Promise<NextResponse> {
                 reason: action === "REJECT" ? reason : null,
             },
         }).catch((err) => console.error("Failed to log audit event:", err));
+
+        after(() => {
+            processOutbox().catch((err) =>
+                console.error("Failed to process leave outbox in background:", err),
+            );
+        });
 
         return NextResponse.json({ success: true, data: result });
     } catch (error) {

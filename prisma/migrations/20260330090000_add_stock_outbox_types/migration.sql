@@ -1,0 +1,10 @@
+-- AlterTable
+ALTER TABLE `notification_outbox` MODIFY `type` ENUM(
+    'TICKET_CREATED',
+    'TICKET_UPDATED',
+    'EMAIL_REQUEST',
+    'LEAVE_ACTION',
+    'LEAVE_RESULT',
+    'STOCK_REQUEST_LINE',
+    'STOCK_LOW_LINE'
+) NOT NULL;

@@ -10,7 +10,47 @@ import {
     getAvailableQuantity,
     normalizeRequestItems,
 } from "./shared";
-import type { CancelRequestOptions } from "./types";
+import type {
+    CancelRequestOptions,
+    IssueRequestResult,
+    LowStockAlertCandidate,
+} from "./types";
+
+function buildLowStockAlerts(
+    items: Array<{
+        id: number;
+        name: string;
+        sku: string;
+        unit: string;
+        quantity: number;
+        minStock: number;
+    }>,
+    decrementedByItemId: Map<number, number>,
+): LowStockAlertCandidate[] {
+    return items.flatMap((item) => {
+        const decrementedQuantity = decrementedByItemId.get(item.id) ?? 0;
+        const nextQuantity = item.quantity - decrementedQuantity;
+
+        if (
+            decrementedQuantity <= 0 ||
+            item.quantity <= item.minStock ||
+            nextQuantity > item.minStock
+        ) {
+            return [];
+        }
+
+        return [
+            {
+                itemId: item.id,
+                name: item.name,
+                sku: item.sku,
+                quantity: nextQuantity,
+                minStock: item.minStock,
+                unit: item.unit,
+            },
+        ];
+    });
+}
 
 export async function createRequest(
     data: CreateRequestInput,
@@ -118,6 +158,7 @@ export async function createRequest(
             return tx.stockRequest.create({
                 data: {
                     requestedBy: userId,
+                    projectCode: data.projectCode,
                     note: data.note ?? null,
                     items: {
                         create: normalizedItems,
@@ -135,7 +176,7 @@ export async function createRequest(
 export async function issueRequest(
     requestId: number,
     adminId: number,
-) {
+): Promise<IssueRequestResult<{ id: number; requestedBy: number }>> {
     return prisma.$transaction(async (tx) => {
         const request = await tx.stockRequest.findUnique({
             where: { id: requestId },
@@ -167,6 +208,7 @@ export async function issueRequest(
             number,
             { itemId: number; quantity: number }
         >();
+        const requestedQtyByItemId = new Map<number, number>();
 
         for (const requestItem of request.items) {
             const variantId =
@@ -180,7 +222,24 @@ export async function issueRequest(
                 itemId: requestItem.itemId,
                 quantity: (existing?.quantity ?? 0) + requestItem.quantity,
             });
+            requestedQtyByItemId.set(
+                requestItem.itemId,
+                (requestedQtyByItemId.get(requestItem.itemId) ?? 0) + requestItem.quantity,
+            );
         }
+
+        const items = await tx.stockItem.findMany({
+            where: { id: { in: Array.from(requestedQtyByItemId.keys()) } },
+            select: {
+                id: true,
+                name: true,
+                sku: true,
+                unit: true,
+                quantity: true,
+                minStock: true,
+            },
+        });
+        const lowStockAlerts = buildLowStockAlerts(items, requestedQtyByItemId);
 
         const variants = await tx.stockItemVariant.findMany({
             where: { id: { in: Array.from(requestedQtyByVariantId.keys()) } },
@@ -249,7 +308,7 @@ export async function issueRequest(
             });
         }
 
-        return tx.stockRequest.update({
+        const updatedRequest = await tx.stockRequest.update({
             where: { id: requestId },
             data: {
                 status: "ISSUED",
@@ -259,7 +318,16 @@ export async function issueRequest(
                 cancelledById: null,
                 cancelledAt: null,
             },
+            select: {
+                id: true,
+                requestedBy: true,
+            },
         });
+
+        return {
+            request: updatedRequest,
+            lowStockAlerts,
+        };
     });
 }
 

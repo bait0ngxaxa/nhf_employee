@@ -104,14 +104,26 @@ export async function PATCH(
                 console.error("Outbox processor failed:", err),
             );
 
+            const ticket = result.ticket;
+            if (!ticket) {
+                return;
+            }
+
             const currentUserId = Number(user.id);
-            if (result.ticket && result.ticket.reportedById !== currentUserId && updateData.status) {
+            const hasStatusChanged =
+                typeof result.oldStatus === "string" &&
+                ticket.status !== result.oldStatus;
+
+            if (
+                hasStatusChanged &&
+                ticket.reportedById !== currentUserId
+            ) {
                 await prisma.notification.create({
                     data: {
-                        userId: result.ticket.reportedById,
+                        userId: ticket.reportedById,
                         type: "TICKET_UPDATED",
-                        title: "Ticket status updated",
-                        message: `Ticket '${result.ticket.title}' updated to: ${updateData.status}`,
+                        title: "สถานะคำขอ IT Support อัปเดต",
+                        message: `คำขอ "${ticket.title}" เปลี่ยนสถานะจาก ${result.oldStatus} เป็น ${ticket.status}`,
                         actionUrl: `${APP_ROUTES.dashboard}?tab=it-support&ticketId=${ticketId}`,
                         referenceId: ticketId.toString(),
                     },

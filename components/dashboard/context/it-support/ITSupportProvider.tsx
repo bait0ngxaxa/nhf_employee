@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useCallback, useMemo, type ReactNode } from "react";
+import { useState, useCallback, useMemo, useEffect, type ReactNode } from "react";
 import { useSession } from "next-auth/react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import useSWR from "swr";
 import { type TicketStats, type Ticket } from "@/types/tickets";
 import { ITSupportDataContext, ITSupportUIContext } from "./ITSupportContext";
 import { isAdminRole } from "@/lib/ssot/permissions";
-import { API_ROUTES } from "@/lib/ssot/routes";
+import { API_ROUTES, APP_ROUTES } from "@/lib/ssot/routes";
 import {
     type ITSupportDataContextValue,
     type ITSupportUIContextValue,
@@ -43,6 +44,9 @@ const defaultStats: TicketStats = {
 
 export function ITSupportProvider({ children }: ITSupportProviderProps) {
     const { data: session } = useSession();
+    const router = useRouter();
+    const pathname = usePathname();
+    const searchParams = useSearchParams();
     const [activeTab, setActiveTab] = useState("tickets");
     const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
     const [refreshTrigger, setRefreshTrigger] = useState(0);
@@ -53,6 +57,59 @@ export function ITSupportProvider({ children }: ITSupportProviderProps) {
     const { data, mutate, isLoading } = useSWR<{ tickets: Ticket[] }>(
         session ? `${API_ROUTES.tickets.list}?limit=100` : null,
     );
+
+    const syncTicketIdToUrl = useCallback(
+        (ticketId: number | null) => {
+            if (pathname !== APP_ROUTES.dashboard) {
+                return;
+            }
+
+            const nextParams = new URLSearchParams(searchParams.toString());
+            if (ticketId === null) {
+                nextParams.delete("ticketId");
+            } else {
+                nextParams.set("ticketId", String(ticketId));
+            }
+
+            const current = searchParams.toString();
+            const next = nextParams.toString();
+            if (current === next) {
+                return;
+            }
+
+            const nextUrl = next ? `${pathname}?${next}` : pathname;
+            router.replace(nextUrl, { scroll: false });
+        },
+        [pathname, router, searchParams],
+    );
+
+    useEffect(() => {
+        if (searchParams.get("tab") !== "it-support") {
+            return;
+        }
+
+        const ticketIdParam = searchParams.get("ticketId");
+        if (!ticketIdParam) {
+            return;
+        }
+
+        const ticketId = Number(ticketIdParam);
+        if (!Number.isInteger(ticketId) || ticketId <= 0) {
+            return;
+        }
+
+        const ticketFromList = data?.tickets?.find((ticket) => ticket.id === ticketId);
+        if (!ticketFromList) {
+            return;
+        }
+
+        if (selectedTicket?.id !== ticketId) {
+            setSelectedTicket(ticketFromList);
+        }
+        if (activeTab !== "detail") {
+            setActiveTab("detail");
+        }
+    }, [activeTab, data?.tickets, searchParams, selectedTicket?.id]);
 
     const ticketStats = useMemo<TicketStats>(() => {
         if (!data?.tickets) return defaultStats;
@@ -92,24 +149,29 @@ export function ITSupportProvider({ children }: ITSupportProviderProps) {
         setRefreshTrigger((prev) => prev + 1);
         setShowCreateModal(false);
         setActiveTab("tickets");
-    }, [mutate]);
+        setSelectedTicket(null);
+        syncTicketIdToUrl(null);
+    }, [mutate, syncTicketIdToUrl]);
 
     const handleTicketSelect = useCallback((ticket: Ticket) => {
         setSelectedTicket(ticket);
         setActiveTab("detail");
-    }, []);
+        syncTicketIdToUrl(ticket.id);
+    }, [syncTicketIdToUrl]);
 
     const handleTicketUpdated = useCallback(() => {
         mutate();
         setRefreshTrigger((prev) => prev + 1);
         setSelectedTicket(null);
         setActiveTab("tickets");
-    }, [mutate]);
+        syncTicketIdToUrl(null);
+    }, [mutate, syncTicketIdToUrl]);
 
     const handleBackToList = useCallback(() => {
         setSelectedTicket(null);
         setActiveTab("tickets");
-    }, []);
+        syncTicketIdToUrl(null);
+    }, [syncTicketIdToUrl]);
 
     const dataValue = useMemo<ITSupportDataContextValue>(
         () => ({

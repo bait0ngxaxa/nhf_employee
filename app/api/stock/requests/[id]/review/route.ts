@@ -34,19 +34,24 @@ export async function POST(
         const action = body.action;
 
         if (action === "approve" || action === "issue") {
-            const updated = await stockService.issueRequest(requestId, user.id);
+            const issuedResult = await stockService.issueRequest(requestId, user.id);
+            const updatedRequest = issuedResult.request;
             await logStockEvent("STOCK_REQUEST_ISSUE", requestId, user.id, user.email);
             try {
-                await notifyStockRequestResult(requestId, updated.requestedBy, true);
+                await notifyStockRequestResult(
+                    requestId,
+                    updatedRequest.requestedBy,
+                    true,
+                );
             } catch (notificationError) {
                 console.error("Error sending stock issued notification:", {
                     requestId,
                     issuerId: user.id,
-                    requesterId: updated.requestedBy,
+                    requesterId: updatedRequest.requestedBy,
                     error: notificationError,
                 });
             }
-            return NextResponse.json({ request: updated });
+            return NextResponse.json({ request: updatedRequest });
         }
 
         if (action !== "reject" && action !== "cancel") {

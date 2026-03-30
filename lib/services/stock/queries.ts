@@ -1,4 +1,4 @@
-import { StockRequestStatus } from "@prisma/client";
+import { StockRequestStatus, type Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import type {
     StockItemsFilter,
@@ -133,11 +133,31 @@ export async function getRequests(
     filters: StockRequestsFilter,
     userId: number,
     isAdmin: boolean,
+    scope: "mine" | "all" = "mine",
 ) {
-    const { status, page, limit } = filters;
-    const where = {
+    const { status, search, page, limit } = filters;
+    const shouldShowAll = isAdmin && scope === "all";
+    const trimmedSearch = search?.trim();
+    const numericSearch = trimmedSearch ? Number(trimmedSearch) : Number.NaN;
+    const searchFilters: Prisma.StockRequestWhereInput[] = [];
+
+    if (trimmedSearch) {
+        searchFilters.push(
+            { projectCode: { contains: trimmedSearch } },
+            { requester: { name: { contains: trimmedSearch } } },
+            { requester: { email: { contains: trimmedSearch } } },
+            { items: { some: { item: { name: { contains: trimmedSearch } } } } },
+        );
+
+        if (Number.isInteger(numericSearch) && numericSearch > 0) {
+            searchFilters.push({ id: numericSearch });
+        }
+    }
+
+    const where: Prisma.StockRequestWhereInput = {
         ...(status !== undefined && { status }),
-        ...(!isAdmin && { requestedBy: userId }),
+        ...(!shouldShowAll && { requestedBy: userId }),
+        ...(searchFilters.length > 0 && { OR: searchFilters }),
     };
 
     const [requests, total] = await Promise.all([

@@ -10,6 +10,7 @@ import { APP_ROUTES } from "@/lib/ssot/routes";
 async function notifyCommentParticipants(
     ticket: { id: number; title: string; reportedById: number; assignedToId: number | null },
     commentAuthorId: number,
+    commentAuthorName: string,
     isAdmin: boolean,
     isAssigned: boolean,
     isOwner: boolean,
@@ -22,8 +23,8 @@ async function notifyCommentParticipants(
             data: {
                 userId: ticket.reportedById,
                 type: "NEW_COMMENT",
-                title: "New comment",
-                message: `A staff member replied on ticket: ${ticket.title}`,
+                title: "มีความคิดเห็นใหม่ในคำขอ IT Support",
+                message: `${commentAuthorName} แสดงความคิดเห็นในคำขอ "${ticket.title}"`,
                 actionUrl,
                 referenceId,
             },
@@ -38,8 +39,8 @@ async function notifyCommentParticipants(
             data: {
                 userId: ticket.assignedToId,
                 type: "NEW_COMMENT",
-                title: "Reporter replied",
-                message: `New comment on ticket: ${ticket.title}`,
+                title: "ผู้แจ้งเพิ่มความคิดเห็นในคำขอ IT Support",
+                message: `${commentAuthorName} แสดงความคิดเห็นในคำขอ "${ticket.title}"`,
                 actionUrl,
                 referenceId,
             },
@@ -57,8 +58,8 @@ async function notifyCommentParticipants(
             data: admins.map((admin) => ({
                 userId: admin.id,
                 type: "NEW_COMMENT" as const,
-                title: "Reporter replied",
-                message: `New comment on ticket: ${ticket.title}`,
+                title: "ผู้แจ้งเพิ่มความคิดเห็นในคำขอ IT Support",
+                message: `${commentAuthorName} แสดงความคิดเห็นในคำขอ "${ticket.title}"`,
                 actionUrl,
                 referenceId,
             })),
@@ -130,10 +131,24 @@ export async function POST(
             },
         });
 
-        after(() => {
-            notifyCommentParticipants(ticket, currentUserId, isAdmin, isAssigned, isOwner).catch((err) =>
-                console.error("Comment notification failed:", err),
-            );
+        const commentAuthorName =
+            comment.author.employee?.firstName && comment.author.employee?.lastName
+                ? `${comment.author.employee.firstName} ${comment.author.employee.lastName}`
+                : comment.author.name;
+
+        after(async () => {
+            try {
+                await notifyCommentParticipants(
+                    ticket,
+                    currentUserId,
+                    commentAuthorName,
+                    isAdmin,
+                    isAssigned,
+                    isOwner,
+                );
+            } catch (err) {
+                console.error("Comment notification failed:", err);
+            }
         });
 
         return NextResponse.json({ comment }, { status: 201 });

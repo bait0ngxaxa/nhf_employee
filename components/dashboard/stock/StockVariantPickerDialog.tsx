@@ -141,14 +141,7 @@ export function StockVariantPickerDialog({
                                                     SKU: {variant.sku}
                                                 </div>
                                             </div>
-                                            <div
-                                                className={`rounded-lg px-2.5 py-1 text-sm font-bold ${
-                                                    getVariantAvailableQuantity(variant) <=
-                                                    variant.minStock
-                                                        ? "bg-rose-50 text-rose-700"
-                                                        : "bg-slate-50 text-slate-700"
-                                                }`}
-                                            >
+                                            <div className="rounded-lg bg-slate-50 px-2.5 py-1 text-sm font-bold text-slate-700">
                                                 คงเหลือ {variant.quantity} {variant.unit}
                                             </div>
                                         </div>

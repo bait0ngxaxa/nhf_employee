@@ -341,8 +341,20 @@ const requestItemSchema = z
         }
     });
 
+const projectCodeSchema = z
+    .string({ message: "กรุณากรอกรหัสโครงการ" })
+    .trim()
+    .min(1, "กรุณากรอกรหัสโครงการ")
+    .max(100, "รหัสโครงการต้องไม่เกิน 100 ตัวอักษร")
+    .regex(
+        /^[A-Za-z0-9/_\-\s]+$/,
+        "รหัสโครงการใช้ได้เฉพาะตัวอักษรอังกฤษ ตัวเลข เว้นวรรค / _ -",
+    )
+    .transform((value) => value.toUpperCase());
+
 export const createRequestSchema = z
     .object({
+        projectCode: projectCodeSchema,
         items: z
             .array(requestItemSchema)
             .min(1, "กรุณาเลือกอย่างน้อย 1 รายการ")
@@ -402,6 +414,7 @@ export const stockRequestsFilterSchema = z.object({
         emptyToUndefined,
         z.nativeEnum(StockRequestStatus).optional(),
     ),
+    search: z.preprocess(emptyToUndefined, z.string().max(100).trim().optional()),
     page: z.coerce.number().int().min(1).default(1),
     limit: z.coerce.number().int().min(1).max(100).default(20),
 });

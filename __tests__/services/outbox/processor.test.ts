@@ -21,6 +21,8 @@ vi.mock("@/lib/services/ticket/notifications", () => ({
 vi.mock("@/lib/line", () => ({
     lineNotificationService: {
         sendEmailRequestNotification: vi.fn(),
+        sendStockRequestNotification: vi.fn(),
+        sendStockLowNotification: vi.fn(),
     },
 }));
 
@@ -207,6 +209,89 @@ describe("processOutbox", () => {
                     status: "FAILED",
                     error: "Network failure",
                 }),
+            }),
+        );
+    });
+
+    it("processes STOCK_REQUEST_LINE successfully", async () => {
+        vi.mocked(
+            lineNotificationService.sendStockRequestNotification,
+        ).mockResolvedValue(true);
+        prismaMock.notificationOutbox.findMany.mockResolvedValue(
+            asNever([
+                buildNotification(
+                    105,
+                    "STOCK_REQUEST_LINE",
+                    JSON.stringify({
+                        requestId: 77,
+                        projectCode: "PRJ-2569/01",
+                        requesterName: "สมชาย",
+                        requestedAt: new Date().toISOString(),
+                        itemCount: 1,
+                        totalQuantity: 2,
+                        items: [
+                            {
+                                name: "กระดาษ",
+                                quantity: 2,
+                                unit: "รีม",
+                            },
+                        ],
+                    }),
+                ),
+            ]),
+        );
+
+        const result = await processOutbox();
+
+        expect(result).toEqual({ processed: 1, failed: 0 });
+        expect(
+            lineNotificationService.sendStockRequestNotification,
+        ).toHaveBeenCalledWith(
+            expect.objectContaining({
+                projectCode: "PRJ-2569/01",
+                requesterName: "สมชาย",
+            }),
+        );
+    });
+
+    it("processes STOCK_LOW_LINE successfully", async () => {
+        vi.mocked(lineNotificationService.sendStockLowNotification).mockResolvedValue(
+            true,
+        );
+        prismaMock.notificationOutbox.findMany.mockResolvedValue(
+            asNever([
+                buildNotification(
+                    106,
+                    "STOCK_LOW_LINE",
+                    JSON.stringify({
+                        alertedAt: new Date().toISOString(),
+                        itemCount: 1,
+                        items: [
+                            {
+                                itemId: 10,
+                                name: "ปากกา",
+                                sku: "PEN-001",
+                                quantity: 3,
+                                minStock: 5,
+                                unit: "ด้าม",
+                            },
+                        ],
+                    }),
+                ),
+            ]),
+        );
+
+        const result = await processOutbox();
+
+        expect(result).toEqual({ processed: 1, failed: 0 });
+        expect(lineNotificationService.sendStockLowNotification).toHaveBeenCalledWith(
+            expect.objectContaining({
+                itemCount: 1,
+                items: [
+                    expect.objectContaining({
+                        sku: "PEN-001",
+                    }),
+                ],
             }),
         );
     });

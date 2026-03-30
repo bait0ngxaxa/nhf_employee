@@ -244,6 +244,7 @@ describe("Stock Service Mutations", () => {
             await expect(
                 stockService.createRequest(
                     {
+                        projectCode: "PRJ-2569/01",
                         items: [{ variantId: 301, quantity: 3 }],
                     },
                     7,
@@ -279,6 +280,7 @@ describe("Stock Service Mutations", () => {
 
             await stockService.createRequest(
                 {
+                    projectCode: "PRJ-2569/02",
                     items: [{ variantId: 401, quantity: 3 }],
                     note: "ทดสอบเบิก",
                 },
@@ -289,6 +291,7 @@ describe("Stock Service Mutations", () => {
                 expect.objectContaining({
                     data: expect.objectContaining({
                         requestedBy: 9,
+                        projectCode: "PRJ-2569/02",
                         note: "ทดสอบเบิก",
                         items: {
                             create: [{ itemId: 40, variantId: 401, quantity: 3 }],

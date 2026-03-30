@@ -14,7 +14,7 @@ import { StockBrowseFilters } from "./StockBrowseFilters";
 import { StockInventoryTable } from "./StockInventoryTable";
 import { STOCK_ADMIN_TEXT } from "./stockAdminInventory.shared";
 
-const ITEMS_PER_PAGE = 20;
+const ITEMS_PER_PAGE = 10;
 
 export function StockAdminInventory() {
     const {

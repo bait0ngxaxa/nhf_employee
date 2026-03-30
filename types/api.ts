@@ -58,6 +58,39 @@ export interface EmailRequestData {
   requestedAt: string;
 }
 
+export interface StockRequestLineItemData {
+  name: string;
+  quantity: number;
+  unit: string;
+  variantLabel?: string;
+}
+
+export interface StockRequestLineData {
+  requestId: number;
+  projectCode: string;
+  requesterName: string;
+  note?: string | null;
+  requestedAt: string;
+  itemCount: number;
+  totalQuantity: number;
+  items: StockRequestLineItemData[];
+}
+
+export interface StockLowLineItemData {
+  itemId: number;
+  name: string;
+  sku: string;
+  quantity: number;
+  minStock: number;
+  unit: string;
+}
+
+export interface StockLowLineData {
+  alertedAt: string;
+  itemCount: number;
+  items: StockLowLineItemData[];
+}
+
 // LINE Flex Message type definitions
 export interface LineFlexText {
   type: 'text';
