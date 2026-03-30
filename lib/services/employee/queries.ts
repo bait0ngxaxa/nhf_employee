@@ -1,5 +1,6 @@
 import { cache } from "react";
 import { prisma } from "@/lib/prisma";
+import { getBootstrapAdminEmails } from "@/lib/ssot/admin-bootstrap";
 import type { Prisma, EmployeeStatus } from "@prisma/client";
 import {
     EMPLOYEE_WITH_RELATIONS_INCLUDE,
@@ -16,11 +17,12 @@ import type {
  * Note: Not cached as it's a pure function with no async operations
  */
 function buildWhereClause(filters: EmployeeFilters): Prisma.EmployeeWhereInput {
+    const bootstrapAdminEmails = getBootstrapAdminEmails();
     const where: Prisma.EmployeeWhereInput = {
         deletedAt: null,
-        NOT: {
-            email: "admin@thainhf.org",
-        },
+        NOT: bootstrapAdminEmails.length === 1
+            ? { email: bootstrapAdminEmails[0] }
+            : { email: { in: bootstrapAdminEmails } },
     };
 
     // Status filter

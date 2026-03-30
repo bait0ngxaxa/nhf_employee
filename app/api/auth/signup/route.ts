@@ -18,6 +18,7 @@ import {
     issueAccessToken,
 } from "@/lib/hybrid-auth-tokens";
 import { prisma } from "@/lib/prisma";
+import { isBootstrapAdminEmail } from "@/lib/ssot/admin-bootstrap";
 import { signupSchema } from "@/lib/validations/auth";
 
 export const POST = withTrustedMutation(
@@ -86,8 +87,7 @@ export const POST = withTrustedMutation(
 
             const hashedPassword = await bcrypt.hash(password, 12);
             const employeeName = `${matchedEmployee.firstName} ${matchedEmployee.lastName}`;
-            const assignedRole =
-                email === "admin@thainhf.org" ? "ADMIN" : "USER";
+            const assignedRole = isBootstrapAdminEmail(email) ? "ADMIN" : "USER";
 
             const user = await prisma.user.create({
                 data: {

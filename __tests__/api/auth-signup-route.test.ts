@@ -146,6 +146,43 @@ describe("Auth signup route", () => {
         expect(response.headers.get("set-cookie")).toContain("nhf_at=");
     });
 
+    it("assigns ADMIN role for bootstrap admin email", async () => {
+        prismaMock.user.findUnique.mockResolvedValue(null);
+        prismaMock.employee.findUnique.mockResolvedValue({
+            id: 11,
+            firstName: "System",
+            lastName: "Administrator",
+            user: null,
+        });
+        prismaMock.user.create.mockResolvedValue({
+            id: 8,
+            name: "System Administrator",
+            email: "admin@thainhf.org",
+            role: "ADMIN",
+            tokenVersion: 1,
+        });
+        prismaMock.authRefreshToken.create.mockResolvedValue({ id: "rt-2" });
+        prismaMock.auditLog.create.mockResolvedValue({ id: 2 });
+
+        const response = await signupRoute(
+            buildRequest({
+                email: "admin@thainhf.org",
+                password: "secret1",
+                confirmPassword: "secret1",
+            }),
+        );
+
+        expect(response.status).toBe(201);
+        expect(prismaMock.user.create).toHaveBeenCalledWith(
+            expect.objectContaining({
+                data: expect.objectContaining({
+                    email: "admin@thainhf.org",
+                    role: "ADMIN",
+                }),
+            }),
+        );
+    });
+
     it("returns 429 when signup attempts exceed limit", async () => {
         prismaMock.user.findUnique.mockResolvedValue({
             id: 1,

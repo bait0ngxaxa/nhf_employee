@@ -2,6 +2,20 @@ import { PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
 
+function getPrimaryBootstrapAdminEmail(): string {
+    const raw = process.env.BOOTSTRAP_ADMIN_EMAILS;
+    if (!raw) {
+        return "admin@thainhf.org";
+    }
+
+    const first = raw
+        .split(",")
+        .map((value) => value.trim().toLowerCase())
+        .find((value) => value.length > 0);
+
+    return first || "admin@thainhf.org";
+}
+
 async function main() {
     // eslint-disable-next-line no-console
     console.log("🌱 เริ่มต้น seed ข้อมูลพื้นฐาน...");
@@ -36,14 +50,15 @@ async function main() {
 
     // สร้างพนักงานผู้ดูแลระบบ (Admin) เพื่อให้ User คนแรก สมัครแล้วได้สิทธิ์ Admin ทันที
     const adminDept = departments.find((d) => d.code === "ADMIN");
+    const bootstrapAdminEmail = getPrimaryBootstrapAdminEmail();
     if (adminDept) {
         const adminEmployee = await prisma.employee.upsert({
-            where: { email: "admin@thainhf.org" },
+            where: { email: bootstrapAdminEmail },
             update: {},
             create: {
                 firstName: "System",
                 lastName: "Administrator",
-                email: "admin@thainhf.org",
+                email: bootstrapAdminEmail,
                 position: "IT Manager",
                 departmentId: adminDept.id,
                 status: "ACTIVE",

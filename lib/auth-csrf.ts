@@ -4,12 +4,42 @@ import { AUTH_ERROR_MESSAGES } from "@/lib/auth-ssot";
 const AJAX_HEADER_NAME = "x-requested-with";
 const AJAX_HEADER_VALUE = "XMLHttpRequest";
 
+function parseOrigin(value: string): string | null {
+    try {
+        return new URL(value).origin;
+    } catch {
+        return null;
+    }
+}
+
+function getConfiguredTrustedOrigins(): string[] {
+    const raw = process.env.AUTH_TRUSTED_ORIGINS;
+    if (!raw) {
+        return [];
+    }
+
+    return raw
+        .split(",")
+        .map((entry) => entry.trim())
+        .filter((entry) => entry.length > 0)
+        .map((entry) => parseOrigin(entry))
+        .filter((entry): entry is string => entry !== null);
+}
+
 function buildTrustedOrigins(internalOrigin: string): ReadonlySet<string> {
     const origins = new Set<string>([internalOrigin]);
     const nextAuthUrl = process.env.NEXTAUTH_URL;
     if (nextAuthUrl) {
-        origins.add(new URL(nextAuthUrl).origin);
+        const nextAuthOrigin = parseOrigin(nextAuthUrl);
+        if (nextAuthOrigin) {
+            origins.add(nextAuthOrigin);
+        }
     }
+
+    for (const origin of getConfiguredTrustedOrigins()) {
+        origins.add(origin);
+    }
+
     return origins;
 }
 

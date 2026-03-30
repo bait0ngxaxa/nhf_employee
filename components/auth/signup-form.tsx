@@ -14,6 +14,7 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { signIn } from "next-auth/react";
 import { useTitle } from "@/hooks/useTitle";
 import Link from "next/link";
 import { apiPost } from "@/lib/api-client";
@@ -80,6 +81,11 @@ export function SignupForm({
 
             if (result.success) {
                 const data = result.data;
+                await signIn("credentials", {
+                    email: formData.email.trim().toLowerCase(),
+                    password: formData.password,
+                    redirect: false,
+                });
                 toast.success("สมัครสมาชิกสำเร็จ!", {
                     description: `ยินดีต้อนรับ${data.user?.name ? ` ${data.user.name}` : ""}! บัญชีของคุณถูกสร้างเรียบร้อยแล้ว`,
                 });
