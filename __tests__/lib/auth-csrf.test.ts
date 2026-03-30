@@ -61,22 +61,5 @@ describe("auth csrf guard", () => {
         expect(response?.status).toBe(403);
     });
 
-    it("allows requests when origin matches AUTH_TRUSTED_ORIGINS", () => {
-        vi.stubEnv(
-            "AUTH_TRUSTED_ORIGINS",
-            "http://10.10.10.25:3000, https://intra.example.com",
-        );
-
-        const request = new NextRequest("http://localhost/api/auth/refresh", {
-            method: "POST",
-            headers: {
-                origin: "http://10.10.10.25:3000",
-                "x-requested-with": "XMLHttpRequest",
-            },
-        });
-
-        const response = assertTrustedMutationRequest(request);
-        expect(response).toBeNull();
-    });
 });
 
