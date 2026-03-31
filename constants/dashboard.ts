@@ -1,5 +1,5 @@
 import {
-    Computer,
+    Boxes,
     AlertTriangle,
     Mail,
     Users,
@@ -16,19 +16,19 @@ import { type MenuItem, type MenuGroup } from "@/types/dashboard";
 export const DASHBOARD_MENU_ITEMS: MenuItem[] = [
     {
         id: "leave-management",
-        label: "ระบบลางาน",
+        label: "NHF Leave",
         icon: CalendarRange,
         description: "ยื่นใบลาและตรวจสอบโควต้าวันลา",
     },
     {
         id: "stock",
-        label: "ระบบสต็อค",
-        icon: Computer,
-        description: "จัดการครุภัณฑ์ไอทีขององค์กร",
+        label: "NHF Stock",
+        icon: Boxes,
+        description: "เบิกวัสดุจากคลัง",
     },
     {
         id: "it-support",
-        label: "ระบบแจ้งปัญหาไอที",
+        label: "NHF IT-Support",
         icon: AlertTriangle,
         description: "แจ้งปัญหาไอทีและติดตามสถานะ",
     },
@@ -75,7 +75,7 @@ export const DASHBOARD_MENU_GROUPS: MenuGroup[] = [
         icon: AppWindow,
         items: [
             DASHBOARD_MENU_ITEMS[0], // ระบบลางาน
-            DASHBOARD_MENU_ITEMS[1], // IT-Equipments
+            DASHBOARD_MENU_ITEMS[1], // ระบบคลังวัสดุ
             DASHBOARD_MENU_ITEMS[2], // IT Support
         ],
     },
@@ -95,17 +95,15 @@ export const DASHBOARD_MENU_GROUPS: MenuGroup[] = [
 
 /** Filter groups by role — removes ADMIN-only items for non-admins, drops empty groups */
 export function getAvailableMenuGroups(isAdmin: boolean): MenuGroup[] {
-    return DASHBOARD_MENU_GROUPS
-        .map((group) => {
-            const filteredItems = group.items.filter(
-                (item) =>
-                    !item.requiredRole ||
-                    (item.requiredRole === "ADMIN" && isAdmin),
-            );
-            if (filteredItems.length === 0) return null;
-            return { ...group, items: filteredItems };
-        })
-        .filter((g): g is MenuGroup => g !== null);
+    return DASHBOARD_MENU_GROUPS.map((group) => {
+        const filteredItems = group.items.filter(
+            (item) =>
+                !item.requiredRole ||
+                (item.requiredRole === "ADMIN" && isAdmin),
+        );
+        if (filteredItems.length === 0) return null;
+        return { ...group, items: filteredItems };
+    }).filter((g): g is MenuGroup => g !== null);
 }
 
 export const getMenuTheme = (menuId: string) => {
@@ -132,33 +130,33 @@ export const getMenuTheme = (menuId: string) => {
             };
         case "employee-management":
             return {
-                gradient: "from-purple-500 to-violet-500",
-                lightBg: "bg-purple-50",
-                text: "text-purple-600",
-                border: "border-purple-600",
-                hover: "hover:bg-purple-50",
-                activeBg: "bg-purple-50/80",
-                glow: "from-purple-400 via-violet-400 to-fuchsia-400",
+                gradient: "from-sky-600 to-blue-700",
+                lightBg: "bg-sky-50",
+                text: "text-sky-700",
+                border: "border-sky-700",
+                hover: "hover:bg-sky-50",
+                activeBg: "bg-sky-50/80",
+                glow: "from-sky-400 via-blue-400 to-cyan-400",
             };
         case "email-request":
             return {
-                gradient: "from-orange-500 to-amber-500",
+                gradient: "from-indigo-600 to-violet-700",
+                lightBg: "bg-indigo-50",
+                text: "text-indigo-700",
+                border: "border-indigo-700",
+                hover: "hover:bg-indigo-50",
+                activeBg: "bg-indigo-50/80",
+                glow: "from-indigo-400 via-violet-400 to-purple-400",
+            };
+        case "stock":
+            return {
+                gradient: "from-orange-500 to-red-600",
                 lightBg: "bg-orange-50",
                 text: "text-orange-600",
                 border: "border-orange-600",
                 hover: "hover:bg-orange-50",
                 activeBg: "bg-orange-50/80",
-                glow: "from-orange-400 via-amber-400 to-yellow-400",
-            };
-        case "stock":
-            return {
-                gradient: "from-pink-500 to-rose-500",
-                lightBg: "bg-pink-50",
-                text: "text-pink-600",
-                border: "border-pink-600",
-                hover: "hover:bg-pink-50",
-                activeBg: "bg-pink-50/80",
-                glow: "from-pink-400 via-rose-400 to-red-400",
+                glow: "from-orange-400 via-red-400 to-amber-400",
             };
         case "leave-management":
             return {
@@ -169,6 +167,46 @@ export const getMenuTheme = (menuId: string) => {
                 hover: "hover:bg-indigo-50",
                 activeBg: "bg-indigo-50/80",
                 glow: "from-indigo-400 via-sky-400 to-cyan-400",
+            };
+        case "add-employee":
+            return {
+                gradient: "from-pink-500 to-rose-600",
+                lightBg: "bg-pink-50",
+                text: "text-pink-600",
+                border: "border-pink-600",
+                hover: "hover:bg-pink-50",
+                activeBg: "bg-pink-50/80",
+                glow: "from-pink-400 via-rose-400 to-red-400",
+            };
+        case "import-employee":
+            return {
+                gradient: "from-teal-500 to-cyan-600",
+                lightBg: "bg-teal-50",
+                text: "text-teal-600",
+                border: "border-teal-600",
+                hover: "hover:bg-teal-50",
+                activeBg: "bg-teal-50/80",
+                glow: "from-teal-400 via-cyan-400 to-sky-400",
+            };
+        case "audit-logs":
+            return {
+                gradient: "from-yellow-500 to-amber-600",
+                lightBg: "bg-yellow-50",
+                text: "text-amber-600",
+                border: "border-amber-600",
+                hover: "hover:bg-yellow-50",
+                activeBg: "bg-yellow-50/80",
+                glow: "from-yellow-400 via-amber-400 to-orange-400",
+            };
+        case "sessions":
+            return {
+                gradient: "from-cyan-600 to-teal-700",
+                lightBg: "bg-cyan-50",
+                text: "text-cyan-700",
+                border: "border-cyan-700",
+                hover: "hover:bg-cyan-50",
+                activeBg: "bg-cyan-50/80",
+                glow: "from-cyan-400 via-teal-400 to-emerald-400",
             };
         default:
             return {

@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Image from "next/image";
 import {
     AlertTriangle,
@@ -10,6 +11,14 @@ import {
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog";
 import {
     Table,
     TableBody,
@@ -22,7 +31,6 @@ import { API_ROUTES } from "@/lib/ssot/routes";
 import type { StockItem } from "../context/stock/types";
 import {
     STOCK_ADMIN_TEXT,
-    createDeleteConfirmMessage,
     createDeleteSuccessMessage,
 } from "./stockAdminInventory.shared";
 import {
@@ -43,13 +51,21 @@ export function StockInventoryTable({
     onDeleted,
     onDeleteError,
 }: StockInventoryTableProps) {
-    async function handleDelete(item: StockItem): Promise<void> {
-        if (!confirm(createDeleteConfirmMessage(item.name))) {
+    const [pendingDeleteItem, setPendingDeleteItem] = useState<StockItem | null>(null);
+    const [isDeleting, setIsDeleting] = useState(false);
+
+    function handleDeleteRequest(item: StockItem): void {
+        setPendingDeleteItem(item);
+    }
+
+    async function handleConfirmDelete(): Promise<void> {
+        if (!pendingDeleteItem) {
             return;
         }
 
+        setIsDeleting(true);
         try {
-            const res = await fetch(API_ROUTES.stock.itemById(item.id), {
+            const res = await fetch(API_ROUTES.stock.itemById(pendingDeleteItem.id), {
                 method: "DELETE",
             });
             if (!res.ok) {
@@ -57,67 +73,106 @@ export function StockInventoryTable({
                 throw new Error(err.error ?? STOCK_ADMIN_TEXT.genericError);
             }
 
-            onDeleted(createDeleteSuccessMessage(item.name));
+            onDeleted(createDeleteSuccessMessage(pendingDeleteItem.name));
+            setPendingDeleteItem(null);
         } catch (error) {
             const message =
                 error instanceof Error ? error.message : STOCK_ADMIN_TEXT.genericError;
             onDeleteError(message);
+        } finally {
+            setIsDeleting(false);
         }
     }
 
     return (
-        <div className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200">
-            <Table className="border-separate border-spacing-0">
-                <TableHeader>
-                    <TableRow className="border-b-2 border-slate-200 bg-slate-100/80 hover:bg-slate-100/80">
-                        <TableHead className="w-20 border-r border-slate-200 font-semibold text-slate-700">
-                            {STOCK_ADMIN_TEXT.image}
-                        </TableHead>
-                        <TableHead className="w-32 border-r border-slate-200 font-semibold text-slate-700">
-                            {STOCK_ADMIN_TEXT.sku}
-                        </TableHead>
-                        <TableHead className="border-r border-slate-200 font-semibold text-slate-700">
-                            {STOCK_ADMIN_TEXT.itemName}
-                        </TableHead>
-                        <TableHead className="w-40 border-r border-slate-200 font-semibold text-slate-700">
-                            {STOCK_ADMIN_TEXT.category}
-                        </TableHead>
-                        <TableHead className="w-32 border-r border-slate-200 text-right font-semibold text-slate-700">
-                            {STOCK_ADMIN_TEXT.quantity}
-                        </TableHead>
-                        <TableHead className="w-32 border-r border-slate-200 text-right font-semibold text-slate-700">
-                            {STOCK_ADMIN_TEXT.minStock}
-                        </TableHead>
-                        <TableHead className="w-24" />
-                    </TableRow>
-                </TableHeader>
-                <TableBody className="[&_tr:nth-child(odd)]:bg-white [&_tr:nth-child(even)]:bg-slate-100/70">
-                    {items.map((item) => (
-                        <InventoryRow
-                            key={item.id}
-                            item={item}
-                            onAdjust={onAdjust}
-                            onDelete={handleDelete}
-                        />
-                    ))}
-                </TableBody>
-            </Table>
-        </div>
+        <>
+            <div className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200">
+                <Table className="border-separate border-spacing-0">
+                    <TableHeader>
+                        <TableRow className="border-b-2 border-slate-200 bg-slate-100/80 hover:bg-slate-100/80">
+                            <TableHead className="w-20 border-r border-slate-200 font-semibold text-slate-700">
+                                {STOCK_ADMIN_TEXT.image}
+                            </TableHead>
+                            <TableHead className="w-32 border-r border-slate-200 font-semibold text-slate-700">
+                                {STOCK_ADMIN_TEXT.sku}
+                            </TableHead>
+                            <TableHead className="border-r border-slate-200 font-semibold text-slate-700">
+                                {STOCK_ADMIN_TEXT.itemName}
+                            </TableHead>
+                            <TableHead className="w-40 border-r border-slate-200 font-semibold text-slate-700">
+                                {STOCK_ADMIN_TEXT.category}
+                            </TableHead>
+                            <TableHead className="w-32 border-r border-slate-200 text-right font-semibold text-slate-700">
+                                {STOCK_ADMIN_TEXT.quantity}
+                            </TableHead>
+                            <TableHead className="w-32 border-r border-slate-200 text-right font-semibold text-slate-700">
+                                {STOCK_ADMIN_TEXT.minStock}
+                            </TableHead>
+                            <TableHead className="w-24" />
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody className="[&_tr:nth-child(odd)]:bg-white [&_tr:nth-child(even)]:bg-slate-100/70">
+                        {items.map((item) => (
+                            <InventoryRow
+                                key={item.id}
+                                item={item}
+                                onAdjust={onAdjust}
+                                onDelete={handleDeleteRequest}
+                                deleteDisabled={isDeleting}
+                            />
+                        ))}
+                    </TableBody>
+                </Table>
+            </div>
+
+            <Dialog
+                open={pendingDeleteItem !== null}
+                onOpenChange={(open) => {
+                    if (!open && !isDeleting) {
+                        setPendingDeleteItem(null);
+                    }
+                }}
+            >
+                <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                        <DialogTitle className="text-rose-700">
+                            ยืนยันการลบรายการวัสดุ
+                        </DialogTitle>
+                        <DialogDescription>
+                            ต้องการลบรายการ {pendingDeleteItem?.name} ออกจากสต็อกหรือไม่? การกระทำนี้ไม่สามารถย้อนกลับได้
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter className="gap-2 sm:justify-end">
+                        <Button
+                            variant="outline"
+                            onClick={() => setPendingDeleteItem(null)}
+                            disabled={isDeleting}
+                        >
+                            ยกเลิก
+                        </Button>
+                        <Button
+                            variant="destructive"
+                            onClick={() => void handleConfirmDelete()}
+                            disabled={isDeleting}
+                        >
+                            {isDeleting ? "กำลังลบ..." : "ยืนยันการลบ"}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+        </>
     );
 }
 
 type InventoryRowProps = {
     item: StockItem;
     onAdjust: (item: StockItem) => void;
-    onDelete: (item: StockItem) => Promise<void>;
+    onDelete: (item: StockItem) => void;
+    deleteDisabled: boolean;
 };
 
-function InventoryRow({ item, onAdjust, onDelete }: InventoryRowProps) {
+function InventoryRow({ item, onAdjust, onDelete, deleteDisabled }: InventoryRowProps) {
     const inventory = getItemInventoryMetrics(item);
-
-    async function handleDeleteClick(): Promise<void> {
-        await onDelete(item);
-    }
 
     return (
         <TableRow className="border-b-2 border-slate-300 transition-colors hover:bg-blue-100/70">
@@ -181,7 +236,8 @@ function InventoryRow({ item, onAdjust, onDelete }: InventoryRowProps) {
                         variant="ghost"
                         size="icon"
                         className="h-8 w-8 text-rose-500 transition-colors hover:bg-rose-50 hover:text-rose-700"
-                        onClick={handleDeleteClick}
+                        onClick={() => onDelete(item)}
+                        disabled={deleteDisabled}
                     >
                         <Trash2 className="h-4 w-4" />
                     </Button>

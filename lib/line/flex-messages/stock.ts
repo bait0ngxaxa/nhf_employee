@@ -36,17 +36,18 @@ export function generateStockRequestFlexMessage(
                         type: "text",
                         text: "มีคำขอเบิกวัสดุใหม่",
                         weight: "bold",
-                        color: "#FFFFFF",
-                        size: "lg",
+                        color: "#ffffff",
+                        size: "xl",
                     },
                     {
                         type: "text",
                         text: `เลขที่คำขอ #${data.requestId}`,
-                        color: "#FDE68A",
+                        color: "#d1fae5",
                         size: "sm",
+                        margin: "sm"
                     },
                 ],
-                backgroundColor: "#1E3A8A",
+                backgroundColor: "#059669",
                 paddingAll: "20px",
             },
             body: {
@@ -210,7 +211,7 @@ export function generateStockRequestFlexMessage(
                             label: "ดูคำขอเบิก",
                             uri: `${baseUrl}/dashboard?tab=stock&stockTab=admin-requests`,
                         },
-                        color: "#2563EB",
+                        color: "#059669",
                     },
                     {
                         type: "spacer",

@@ -1,7 +1,6 @@
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
     Select,
@@ -10,7 +9,8 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
-import { Filter, Search } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Filter, Search, X } from "lucide-react";
 import {
     TICKET_CATEGORIES,
     TICKET_PRIORITIES,
@@ -27,27 +27,27 @@ interface TicketFilters {
 interface TicketFiltersCardProps {
     filters: TicketFilters;
     onFiltersChange: React.Dispatch<React.SetStateAction<TicketFilters>>;
-    onReset: () => void;
 }
 
 export function TicketFiltersCard({
     filters,
     onFiltersChange,
-    onReset,
 }: TicketFiltersCardProps) {
     return (
-        <Card>
-            <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                    <Filter className="h-5 w-5" />
+        <Card className="overflow-hidden border-indigo-100/80 bg-gradient-to-br from-white/95 via-slate-50/90 to-sky-50/80 shadow-[0_22px_50px_-40px_rgba(30,41,59,0.42)]">
+            <CardHeader className="border-b border-indigo-100/80 bg-gradient-to-r from-white to-indigo-50/70">
+                <CardTitle className="flex items-center gap-2 text-slate-800">
+                    <span className="rounded-lg bg-indigo-100 p-1.5 text-indigo-700">
+                        <Filter className="h-4 w-4" />
+                    </span>
                     ตัวกรอง
                 </CardTitle>
             </CardHeader>
-            <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+            <CardContent className="bg-gradient-to-b from-white/35 to-sky-50/45">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                     {/* Search */}
-                    <div className="space-y-2">
-                        <label htmlFor="ticket-search" className="text-sm font-medium">ค้นหา</label>
+                    <div className="space-y-2 rounded-xl border border-slate-200/80 bg-white/80 p-3 shadow-sm">
+                        <label htmlFor="ticket-search" className="text-sm font-medium text-slate-700">ค้นหา</label>
                         <div className="relative">
                             <Search className="absolute left-2 top-2.5 h-4 w-4 text-gray-500" />
                             <Input
@@ -61,14 +61,30 @@ export function TicketFiltersCard({
                                         search: e.target.value,
                                     }))
                                 }
-                                className="pl-8"
+                                className="pl-8 border-slate-200 bg-white"
                             />
+                            {filters.search.trim().length > 0 && (
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() =>
+                                        onFiltersChange((prev) => ({
+                                            ...prev,
+                                            search: "",
+                                        }))
+                                    }
+                                    className="absolute right-2 top-1/2 h-8 w-8 -translate-y-1/2 rounded-full text-slate-400 hover:bg-slate-200/70 hover:text-slate-600"
+                                >
+                                    <X className="h-4 w-4" />
+                                </Button>
+                            )}
                         </div>
                     </div>
 
                     {/* Status */}
-                    <div className="space-y-2">
-                        <label className="text-sm font-medium">สถานะ</label>
+                    <div className="space-y-2 rounded-xl border border-slate-200/80 bg-white/80 p-3 shadow-sm">
+                        <label className="text-sm font-medium text-slate-700">สถานะ</label>
                         <Select
                             value={filters.status || undefined}
                             onValueChange={(value) =>
@@ -78,7 +94,7 @@ export function TicketFiltersCard({
                                 }))
                             }
                         >
-                            <SelectTrigger>
+                            <SelectTrigger className="border-slate-200 bg-white">
                                 <SelectValue placeholder="ทุกสถานะ" />
                             </SelectTrigger>
                             <SelectContent>
@@ -96,8 +112,8 @@ export function TicketFiltersCard({
                     </div>
 
                     {/* Category */}
-                    <div className="space-y-2">
-                        <label className="text-sm font-medium">หมวดหมู่</label>
+                    <div className="space-y-2 rounded-xl border border-slate-200/80 bg-white/80 p-3 shadow-sm">
+                        <label className="text-sm font-medium text-slate-700">หมวดหมู่</label>
                         <Select
                             value={filters.category || undefined}
                             onValueChange={(value) =>
@@ -107,7 +123,7 @@ export function TicketFiltersCard({
                                 }))
                             }
                         >
-                            <SelectTrigger>
+                            <SelectTrigger className="border-slate-200 bg-white">
                                 <SelectValue placeholder="ทุกหมวดหมู่" />
                             </SelectTrigger>
                             <SelectContent>
@@ -125,8 +141,8 @@ export function TicketFiltersCard({
                     </div>
 
                     {/* Priority */}
-                    <div className="space-y-2">
-                        <label className="text-sm font-medium">ความสำคัญ</label>
+                    <div className="space-y-2 rounded-xl border border-slate-200/80 bg-white/80 p-3 shadow-sm">
+                        <label className="text-sm font-medium text-slate-700">ความสำคัญ</label>
                         <Select
                             value={filters.priority || undefined}
                             onValueChange={(value) =>
@@ -136,7 +152,7 @@ export function TicketFiltersCard({
                                 }))
                             }
                         >
-                            <SelectTrigger>
+                            <SelectTrigger className="border-slate-200 bg-white">
                                 <SelectValue placeholder="ทุกระดับ" />
                             </SelectTrigger>
                             <SelectContent>
@@ -153,19 +169,6 @@ export function TicketFiltersCard({
                         </Select>
                     </div>
 
-                    {/* Reset */}
-                    <div className="space-y-2">
-                        <label className="text-sm font-medium">
-                            รีเซ็ตตัวกรอง
-                        </label>
-                        <Button
-                            variant="outline"
-                            onClick={onReset}
-                            className="w-full"
-                        >
-                            ล้างตัวกรอง
-                        </Button>
-                    </div>
                 </div>
             </CardContent>
         </Card>

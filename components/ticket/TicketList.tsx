@@ -29,7 +29,6 @@ export default function TicketList({
         setFilters,
         pagination,
         handlePageChange,
-        resetFilters,
         isNewTicket,
     } = useTicketList(refreshTrigger);
 
@@ -51,19 +50,18 @@ export default function TicketList({
             <TicketFiltersCard
                 filters={filters}
                 onFiltersChange={setFilters}
-                onReset={resetFilters}
             />
 
             {/* Tickets List */}
-            <Card className="border-gray-300 shadow-lg bg-slate-50/80">
-                <CardHeader className="border-b border-gray-200 bg-white">
+            <Card className="border-indigo-100/80 shadow-[0_24px_62px_-42px_rgba(30,41,59,0.46)] bg-gradient-to-b from-white/95 via-slate-50/90 to-indigo-50/50 overflow-hidden">
+                <CardHeader className="border-b border-indigo-100/80 bg-gradient-to-r from-white via-slate-50 to-indigo-50/70">
                     <CardTitle>รายการ Tickets</CardTitle>
-                    <CardDescription>
+                    <CardDescription className="text-slate-600">
                         แสดง {tickets.length} รายการจากทั้งหมด{" "}
                         {pagination.total} รายการ
                     </CardDescription>
                 </CardHeader>
-                <CardContent className="p-5 space-y-4 bg-slate-50/50">
+                <CardContent className="p-5 space-y-4 bg-gradient-to-b from-white/45 to-indigo-50/45">
                     {loading ? (
                         <div className="space-y-4 py-4 animate-pulse">
                             {/* Filter Bar Skeleton */}

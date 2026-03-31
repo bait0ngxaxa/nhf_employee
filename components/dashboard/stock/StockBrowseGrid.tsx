@@ -1,12 +1,11 @@
 "use client";
 
 import Image from "next/image";
-import { Package, Plus, ShoppingCart } from "lucide-react";
+import { Check, Package, Plus, ShoppingCart } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import type { StockItem } from "../context/stock/types";
-import type { BrowseCartItem } from "./stockVariant.shared";
 import {
     getBrowseCardImageUrl,
     getItemAvailableQuantity,
@@ -18,16 +17,18 @@ import {
 
 type StockBrowseGridProps = {
     items: StockItem[];
-    cart: Map<number, BrowseCartItem>;
+    cartQuantityByItemId: Map<number, number>;
     onAddDirect: (item: StockItem) => void;
     onOpenVariantPicker: (item: StockItem) => void;
+    recentlyAddedItemId: number | null;
 };
 
 export function StockBrowseGrid({
     items,
-    cart,
+    cartQuantityByItemId,
     onAddDirect,
     onOpenVariantPicker,
+    recentlyAddedItemId,
 }: StockBrowseGridProps) {
     return (
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
@@ -35,9 +36,10 @@ export function StockBrowseGrid({
                 <BrowseCard
                     key={item.id}
                     item={item}
-                    cart={cart}
+                    cartQuantityByItemId={cartQuantityByItemId}
                     onAddDirect={onAddDirect}
                     onOpenVariantPicker={onOpenVariantPicker}
+                    recentlyAddedItemId={recentlyAddedItemId}
                 />
             ))}
         </div>
@@ -46,23 +48,22 @@ export function StockBrowseGrid({
 
 function BrowseCard(props: {
     item: StockItem;
-    cart: Map<number, BrowseCartItem>;
+    cartQuantityByItemId: Map<number, number>;
     onAddDirect: (item: StockItem) => void;
     onOpenVariantPicker: (item: StockItem) => void;
+    recentlyAddedItemId: number | null;
 }) {
     const { item } = props;
     const defaultVariant = getPreferredVariant(item);
     const imageUrl = getBrowseCardImageUrl(item);
     const availableQuantity = getItemAvailableQuantity(item);
     const variantCount = getSelectableVariantCount(item);
-    const totalInCart = Array.from(props.cart.values()).reduce(
-        (sum, cartItem) => (cartItem.item.id === item.id ? sum + cartItem.qty : sum),
-        0,
-    );
+    const totalInCart = props.cartQuantityByItemId.get(item.id) ?? 0;
+    const isRecentlyAdded = props.recentlyAddedItemId === item.id;
     const variantSummary = getVariantAttributeSummary(defaultVariant?.attributeValues);
 
     return (
-        <Card className="group relative h-full overflow-hidden rounded-[1.6rem] border border-slate-200/80 bg-white transition-all duration-500 hover:-translate-y-1 hover:border-orange-200 hover:shadow-[0_28px_60px_-32px_rgba(249,115,22,0.28)]">
+        <Card className={`group relative h-full overflow-hidden rounded-[1.6rem] border border-slate-200/80 bg-white transition-all duration-500 hover:-translate-y-1 hover:border-orange-200 hover:shadow-[0_28px_60px_-32px_rgba(249,115,22,0.28)] ${isRecentlyAdded ? "ring-2 ring-emerald-300/70 shadow-[0_28px_60px_-32px_rgba(16,185,129,0.35)]" : ""}`}>
             <div className="absolute inset-x-0 -top-px h-px w-full bg-gradient-to-r from-transparent via-orange-300/40 to-transparent opacity-0 transition-opacity duration-500 group-hover:opacity-100" />
             <CardContent className="flex h-full flex-col gap-3 p-4">
                 <div className="overflow-hidden rounded-[1.35rem] bg-slate-100 ring-1 ring-slate-200 shadow-inner shadow-white/70">
@@ -154,6 +155,8 @@ function BrowseCard(props: {
                         className={`w-full rounded-xl shadow-sm transition-all ${
                             availableQuantity === 0
                                 ? "border-gray-200 bg-gray-50/50 text-gray-400"
+                                : isRecentlyAdded
+                                  ? "border border-emerald-600 bg-[linear-gradient(135deg,#10B981,#059669)] text-white shadow-[0_16px_30px_-18px_rgba(16,185,129,0.9)]"
                                 : "border border-blue-600 bg-[linear-gradient(135deg,#2563EB,#1D4ED8)] text-white shadow-[0_16px_30px_-18px_rgba(37,99,235,0.9)] hover:border-blue-700 hover:from-blue-700 hover:to-blue-700"
                         }`}
                         onClick={() =>
@@ -163,9 +166,15 @@ function BrowseCard(props: {
                         }
                         disabled={availableQuantity === 0}
                     >
-                        <Plus className="mr-1 h-4 w-4" />
+                        {isRecentlyAdded ? (
+                            <Check className="mr-1 h-4 w-4" />
+                        ) : (
+                            <Plus className="mr-1 h-4 w-4" />
+                        )}
                         {availableQuantity === 0
                             ? "สินค้าหมด"
+                            : isRecentlyAdded
+                              ? "เพิ่มแล้ว"
                             : hasSelectableVariants(item)
                               ? "เลือกแล้วเพิ่ม"
                               : "เพิ่มรายการ"}

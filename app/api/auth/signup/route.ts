@@ -1,7 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 
-import { createAuditLog, logAuthEvent } from "@/lib/audit";
+import { createAuditLog } from "@/lib/audit";
 import {
     clearSignupRateLimit,
     isSignupRateLimited,
@@ -9,14 +9,7 @@ import {
 } from "@/lib/auth-signup-rate-limit";
 import { AUTH_SIGNUP_MESSAGES } from "@/lib/auth-ssot";
 import { withTrustedMutation } from "@/lib/auth-csrf";
-import {
-    getClientMetadata,
-    setHybridAuthCookies,
-} from "@/lib/hybrid-auth-session";
-import {
-    buildRefreshTokenRecord,
-    issueAccessToken,
-} from "@/lib/hybrid-auth-tokens";
+import { getClientMetadata } from "@/lib/hybrid-auth-session";
 import { prisma } from "@/lib/prisma";
 import { isBootstrapAdminEmail } from "@/lib/ssot/admin-bootstrap";
 import { signupSchema } from "@/lib/validations/auth";
@@ -100,29 +93,6 @@ export const POST = withTrustedMutation(
                 },
             });
 
-            const refreshDraft = buildRefreshTokenRecord({
-                userId: user.id,
-                userAgent: metadata.userAgent,
-                ipAddress: metadata.ipAddress,
-            });
-            const accessToken = await issueAccessToken({
-                userId: user.id,
-                role: user.role,
-                sessionId: refreshDraft.record.familyId,
-                tokenVersion: user.tokenVersion ?? 1,
-            });
-
-            await prisma.authRefreshToken.create({
-                data: {
-                    userId: refreshDraft.record.userId,
-                    tokenHash: refreshDraft.record.tokenHash,
-                    familyId: refreshDraft.record.familyId,
-                    expiresAt: refreshDraft.record.expiresAt,
-                    userAgent: refreshDraft.record.userAgent,
-                    ipAddress: refreshDraft.record.ipAddress,
-                },
-            });
-
             clearSignupRateLimit(email, ipAddress);
 
             await createAuditLog({
@@ -143,11 +113,12 @@ export const POST = withTrustedMutation(
                     },
                 },
             });
-            await logAuthEvent("LOGIN_SUCCESS", user.id, user.email, {
-                metadata: { method: "signup_auto_login" },
-            });
 
-            const response = NextResponse.json(
+            // Session creation is handled on the client side via
+            // signIn("credentials") → NextAuth session, then
+            // POST /api/auth/bootstrap → hybrid auth session.
+            // This avoids the duplicate session bug.
+            return NextResponse.json(
                 {
                     message: AUTH_SIGNUP_MESSAGES.signupSuccessThai,
                     user: {
@@ -159,8 +130,6 @@ export const POST = withTrustedMutation(
                 },
                 { status: 201 },
             );
-            setHybridAuthCookies(response, accessToken, refreshDraft.rawToken);
-            return response;
         } catch (error) {
             console.error("Signup error:", error);
             return NextResponse.json(
@@ -170,3 +139,4 @@ export const POST = withTrustedMutation(
         }
     },
 );
+

@@ -1,6 +1,5 @@
 "use client";
 
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -22,12 +21,11 @@ import { Search, RefreshCw } from "lucide-react";
 import { Pagination } from "@/components/Pagination";
 import { useAuditLogsContext } from "@/components/dashboard/context/audit-logs/AuditLogsContext";
 import {
-    AUDIT_ACTION_LABELS,
     AUDIT_ACTION_FILTER_OPTIONS,
     AUDIT_ENTITY_TYPE_OPTIONS,
-    getAuditActionBadgeColor,
 } from "@/constants/audit";
 import { formatThaiDateTime } from "@/lib/helpers/date-helpers";
+import { AuditActionBadge } from "./AuditActionBadge";
 
 interface AuditLogViewerProps {
     className?: string;
@@ -225,15 +223,7 @@ export function AuditLogViewer({ className }: AuditLogViewerProps) {
                                             {formatThaiDateTime(log.createdAt)}
                                         </td>
                                         <td className="px-4 py-3">
-                                            <Badge
-                                                className={getAuditActionBadgeColor(
-                                                    log.action,
-                                                )}
-                                            >
-                                                {AUDIT_ACTION_LABELS[
-                                                    log.action
-                                                ] || log.action}
-                                            </Badge>
+                                            <AuditActionBadge action={log.action} />
                                         </td>
                                         <td className="px-4 py-3 text-sm">
                                             <div className="font-medium text-gray-900">

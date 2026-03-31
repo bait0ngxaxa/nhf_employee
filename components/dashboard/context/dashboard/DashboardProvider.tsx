@@ -5,6 +5,7 @@ import {
     useCallback,
     useEffect,
     useMemo,
+    useRef,
     startTransition,
     type ReactNode,
 } from "react";
@@ -42,6 +43,8 @@ const SESSION_MENU_ITEM = {
     icon: Smartphone,
     description: "จัดการอุปกรณ์ที่ล็อกอินอยู่และยกเลิกเซสชันได้",
 } as const;
+const STOCK_BROWSE_CART_STORAGE_KEY_PREFIX = "stock:browse-cart:v1:user:";
+const STOCK_BROWSE_CART_LEGACY_KEY = "stock:browse-cart:v1";
 
 const defaultStats: EmployeeStats = {
     total: 0,
@@ -79,6 +82,9 @@ export function DashboardProvider({
     const [sidebarOpen, setSidebarOpen] = useState(true);
     const [refreshTrigger, setRefreshTrigger] = useState(0);
     const [hybridBootstrapped, setHybridBootstrapped] = useState(false);
+    // Ref guard prevents double bootstrap in React Strict Mode (dev)
+    // where useEffect fires twice before the async setState completes.
+    const bootstrapCalledRef = useRef(false);
 
     // Sync selectedMenu when URL ?tab= changes (e.g. notification click or browser back/forward)
     useEffect(() => {
@@ -89,9 +95,11 @@ export function DashboardProvider({
     }, [searchParams]);
 
     useEffect(() => {
-        if (status !== "authenticated" || hybridBootstrapped) {
+        if (status !== "authenticated" || hybridBootstrapped || bootstrapCalledRef.current) {
             return;
         }
+
+        bootstrapCalledRef.current = true;
 
         void (async () => {
             try {
@@ -107,7 +115,7 @@ export function DashboardProvider({
     }, [status, hybridBootstrapped]);
 
     useEffect(() => {
-        if (status !== "authenticated") {
+        if (status !== "authenticated" || !hybridBootstrapped) {
             return;
         }
 
@@ -115,7 +123,7 @@ export function DashboardProvider({
             void refreshHybridSession();
         };
 
-        refreshSession();
+        // Skip immediate refresh — bootstrap just issued a fresh access token.
 
         const intervalId = window.setInterval(refreshSession, 5 * 60 * 1000);
         const onVisibilityChange = (): void => {
@@ -129,7 +137,7 @@ export function DashboardProvider({
             window.clearInterval(intervalId);
             document.removeEventListener("visibilitychange", onVisibilityChange);
         };
-    }, [status]);
+    }, [status, hybridBootstrapped]);
 
     const availableMenuGroups = useMemo(
         () => getAvailableMenuGroups(isAdmin),
@@ -173,10 +181,24 @@ export function DashboardProvider({
 
     const handleSignOut = useCallback(() => {
         void (async () => {
+            const userId =
+                typeof user?.id === "string"
+                    ? user.id.trim()
+                    : typeof user?.id === "number"
+                      ? String(user.id)
+                      : "";
+            if (typeof window !== "undefined") {
+                if (userId) {
+                    window.localStorage.removeItem(
+                        `${STOCK_BROWSE_CART_STORAGE_KEY_PREFIX}${userId}`,
+                    );
+                }
+                window.localStorage.removeItem(STOCK_BROWSE_CART_LEGACY_KEY);
+            }
             await logoutHybridSession();
             await signOut({ callbackUrl: "/login" });
         })();
-    }, []);
+    }, [user?.id]);
 
     const dataValue = useMemo<DashboardDataContextValue>(
         () => ({

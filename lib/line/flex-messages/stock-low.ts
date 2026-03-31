@@ -47,18 +47,19 @@ export function generateStockLowFlexMessage(
                         type: "text",
                         text: getHeaderText(data),
                         weight: "bold",
-                        color: "#FFFFFF",
-                        size: "lg",
+                        color: "#ffffff",
+                        size: "xl",
                     },
                     {
                         type: "text",
                         text: `แจ้งเตือนเมื่อ ${formatDate(data.alertedAt)}`,
-                        color: "#DBEAFE",
+                        color: "#ffedd5",
                         size: "sm",
                         wrap: true,
+                        margin: "sm"
                     },
                 ],
-                backgroundColor: "#B45309",
+                backgroundColor: "#ea580c",
                 paddingAll: "20px",
             },
             body: {
@@ -100,7 +101,7 @@ export function generateStockLowFlexMessage(
                             label: "เปิดหน้าคลังวัสดุ",
                             uri: `${baseUrl}/dashboard?tab=stock&stockTab=inventory`,
                         },
-                        color: "#2563EB",
+                        color: "#ea580c",
                     },
                     {
                         type: "spacer",

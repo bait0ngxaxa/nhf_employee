@@ -122,7 +122,6 @@ describe("Auth signup route", () => {
             role: "USER",
             tokenVersion: 1,
         });
-        prismaMock.authRefreshToken.create.mockResolvedValue({ id: "rt-1" });
         prismaMock.auditLog.create.mockResolvedValue({ id: 1 });
 
         const response = await signupRoute(
@@ -142,8 +141,8 @@ describe("Auth signup route", () => {
                 }),
             }),
         );
-        expect(prismaMock.authRefreshToken.create).toHaveBeenCalledTimes(1);
-        expect(response.headers.get("set-cookie")).toContain("nhf_at=");
+        expect(prismaMock.authRefreshToken.create).not.toHaveBeenCalled();
+        expect(response.headers.get("set-cookie")).toBeNull();
     });
 
     it("assigns ADMIN role for bootstrap admin email", async () => {
@@ -161,7 +160,6 @@ describe("Auth signup route", () => {
             role: "ADMIN",
             tokenVersion: 1,
         });
-        prismaMock.authRefreshToken.create.mockResolvedValue({ id: "rt-2" });
         prismaMock.auditLog.create.mockResolvedValue({ id: 2 });
 
         const response = await signupRoute(

@@ -1,6 +1,5 @@
 "use client";
 
-import { Badge } from "@/components/ui/badge";
 import {
     Clock,
     MessageSquare,
@@ -13,11 +12,9 @@ import { type Ticket } from "@/types/tickets";
 import { formatThaiDate } from "@/lib/helpers/date-helpers";
 import {
     getTicketCategoryLabel,
-    getTicketPriorityLabel,
     getTicketStatusLabel,
-    getPriorityBadgeColor,
-    getStatusBadgeColor,
 } from "@/lib/helpers/ticket-helpers";
+import { TicketPriorityBadge, TicketStatusBadge } from "./TicketBadges";
 
 interface TicketCardProps {
     ticket: Ticket;
@@ -77,22 +74,8 @@ export function TicketCard({
                 </div>
 
                 <div className="flex flex-wrap gap-2 flex-shrink-0">
-                    <Badge
-                        className={`
-                        font-semibold px-3 py-1.5 text-xs rounded-full shadow-sm
-                        ${getPriorityBadgeColor(ticket.priority)}
-                    `}
-                    >
-                        {getTicketPriorityLabel(ticket.priority)}
-                    </Badge>
-                    <Badge
-                        className={`
-                        font-semibold px-3 py-1.5 text-xs rounded-full shadow-sm
-                        ${getStatusBadgeColor(ticket.status)}
-                    `}
-                    >
-                        {getTicketStatusLabel(ticket.status)}
-                    </Badge>
+                    <TicketPriorityBadge priority={ticket.priority} />
+                    <TicketStatusBadge status={ticket.status} />
                 </div>
             </div>
 

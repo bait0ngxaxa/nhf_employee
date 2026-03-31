@@ -59,7 +59,7 @@ function StockContent() {
         >
             <SectionHeader
                 icon={Package}
-                title="ระบบสต็อค"
+                title="NHF Stock"
                 subtitle="เบิกจ่ายวัสดุสำนักงาน"
                 iconGradient="from-orange-500 to-red-600"
                 iconGlow="from-orange-500/40 to-red-500/30"

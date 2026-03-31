@@ -67,7 +67,7 @@ export function LeaveManagementSection({ defaultTab = "my-leave" }: LeaveManagem
         >
             <SectionHeader
                 icon={CalendarRange}
-                title="ระบบลางาน"
+                title="NHF Leave"
                 subtitle="จัดการวันลาพักผ่อน ลากิจ ลาป่วย และตรวจสอบโควต้าของคุณ"
                 iconGradient="from-indigo-500 to-blue-600"
                 iconGlow="from-indigo-500/40 to-blue-500/40"

@@ -1,11 +1,12 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Package } from "lucide-react";
 import { toast } from "sonner";
 import { Pagination } from "@/components/Pagination";
 import { API_ROUTES } from "@/lib/ssot/routes";
 import { useStockDataContext, useStockUIContext } from "../context/stock";
+import { useDashboardDataContext } from "../context/dashboard/DashboardContext";
 import type { StockItem, StockItemVariant } from "../context/stock/types";
 import { StockBrowseCartBar } from "./StockBrowseCartBar";
 import { StockBrowseFilters } from "./StockBrowseFilters";
@@ -19,8 +20,130 @@ import {
 } from "./stockVariant.shared";
 
 const ITEMS_PER_PAGE = 12;
+const STOCK_BROWSE_CART_STORAGE_KEY_PREFIX = "stock:browse-cart:v1:user:";
+
+interface PersistedStockBrowseCartState {
+    projectCode: string;
+    cartItems: PersistedStockBrowseCartItem[];
+}
+
+interface PersistedStockBrowseCartItem {
+    itemId: number;
+    itemName: string;
+    itemImageUrl: string | null;
+    variantId: number;
+    variantSku: string;
+    variantUnit: string;
+    variantImageUrl: string | null;
+    variantAvailableQuantity: number;
+    qty: number;
+}
+
+function serializeCartItems(
+    cart: Map<number, BrowseCartItem>,
+): PersistedStockBrowseCartItem[] {
+    return Array.from(cart.values()).map((cartItem) => ({
+        itemId: cartItem.item.id,
+        itemName: cartItem.item.name,
+        itemImageUrl: cartItem.item.imageUrl ?? null,
+        variantId: cartItem.variant.id,
+        variantSku: cartItem.variant.sku,
+        variantUnit: cartItem.variant.unit,
+        variantImageUrl: cartItem.variant.imageUrl ?? null,
+        variantAvailableQuantity: cartItem.variant.availableQuantity,
+        qty: cartItem.qty,
+    }));
+}
+
+function isPersistedBrowseCartItem(
+    value: unknown,
+): value is PersistedStockBrowseCartItem {
+    if (!value || typeof value !== "object") {
+        return false;
+    }
+
+    const maybeItem = value as Record<string, unknown>;
+    const maybeQty = maybeItem.qty;
+    const itemImageUrl = maybeItem.itemImageUrl;
+    const variantImageUrl = maybeItem.variantImageUrl;
+    const itemId = maybeItem.itemId;
+    const variantId = maybeItem.variantId;
+    const variantAvailableQuantity = maybeItem.variantAvailableQuantity;
+
+    if (typeof maybeQty !== "number" || !Number.isInteger(maybeQty) || maybeQty <= 0) {
+        return false;
+    }
+    if (typeof itemId !== "number" || !Number.isInteger(itemId) || itemId <= 0) {
+        return false;
+    }
+    if (typeof variantId !== "number" || !Number.isInteger(variantId) || variantId <= 0) {
+        return false;
+    }
+    return (
+        typeof maybeItem.itemName === "string"
+        && (itemImageUrl === null || itemImageUrl === undefined || typeof itemImageUrl === "string")
+        && typeof maybeItem.variantSku === "string"
+        && typeof maybeItem.variantUnit === "string"
+        && (variantImageUrl === null || variantImageUrl === undefined || typeof variantImageUrl === "string")
+        && typeof variantAvailableQuantity === "number"
+        && Number.isFinite(variantAvailableQuantity)
+    );
+}
+
+function parsePersistedStockBrowseCartState(
+    rawValue: string | null,
+): PersistedStockBrowseCartState | null {
+    if (!rawValue) {
+        return null;
+    }
+
+    try {
+        const parsed: unknown = JSON.parse(rawValue);
+        if (!parsed || typeof parsed !== "object") {
+            return null;
+        }
+
+        const typedParsed = parsed as Record<string, unknown>;
+        const rawProjectCode = typedParsed.projectCode;
+        const rawCartItems = typedParsed.cartItems;
+
+        const projectCode = typeof rawProjectCode === "string"
+            ? rawProjectCode
+            : "";
+
+        if (!Array.isArray(rawCartItems)) {
+            return { projectCode, cartItems: [] };
+        }
+
+        const cartItems = rawCartItems.filter(isPersistedBrowseCartItem);
+        return { projectCode, cartItems };
+    } catch {
+        return null;
+    }
+}
+
+function hydrateCartItem(
+    persistedCartItem: PersistedStockBrowseCartItem,
+): BrowseCartItem {
+    return {
+        item: {
+            id: persistedCartItem.itemId,
+            name: persistedCartItem.itemName,
+            imageUrl: persistedCartItem.itemImageUrl ?? null,
+        },
+        variant: {
+            id: persistedCartItem.variantId,
+            sku: persistedCartItem.variantSku,
+            unit: persistedCartItem.variantUnit,
+            imageUrl: persistedCartItem.variantImageUrl ?? null,
+            availableQuantity: persistedCartItem.variantAvailableQuantity,
+        },
+        qty: persistedCartItem.qty,
+    };
+}
 
 export function StockBrowse() {
+    const { user } = useDashboardDataContext();
     const { items, categories, isLoading, refreshRequests, totalItems } =
         useStockDataContext();
     const {
@@ -35,6 +158,86 @@ export function StockBrowse() {
     const [projectCode, setProjectCode] = useState("");
     const [submitting, setSubmitting] = useState(false);
     const [variantPickerItem, setVariantPickerItem] = useState<StockItem | null>(null);
+    const [recentlyAddedItemId, setRecentlyAddedItemId] = useState<number | null>(null);
+    const [hydratedStorageKey, setHydratedStorageKey] = useState<string | null>(null);
+
+    const userStorageId = useMemo(() => {
+        if (typeof user?.id === "string" && user.id.trim().length > 0) {
+            return user.id;
+        }
+        if (typeof user?.id === "number") {
+            return String(user.id);
+        }
+        return null;
+    }, [user?.id]);
+
+    const storageKey = useMemo(() => {
+        if (!userStorageId) {
+            return null;
+        }
+        return `${STOCK_BROWSE_CART_STORAGE_KEY_PREFIX}${userStorageId}`;
+    }, [userStorageId]);
+
+    useEffect(() => {
+        if (!storageKey) {
+            setCart(new Map());
+            setProjectCode("");
+            setHydratedStorageKey(null);
+            return;
+        }
+
+        const persistedState = parsePersistedStockBrowseCartState(
+            window.localStorage.getItem(storageKey),
+        );
+
+        if (persistedState) {
+            const restoredCart = new Map<number, BrowseCartItem>();
+            for (const cartItem of persistedState.cartItems) {
+                const hydratedCartItem = hydrateCartItem(cartItem);
+                restoredCart.set(hydratedCartItem.variant.id, hydratedCartItem);
+            }
+            setCart(restoredCart);
+            setProjectCode(persistedState.projectCode);
+        } else {
+            setCart(new Map());
+            setProjectCode("");
+        }
+
+        setHydratedStorageKey(storageKey);
+    }, [storageKey]);
+
+    useEffect(() => {
+        if (!storageKey || hydratedStorageKey !== storageKey) {
+            return;
+        }
+
+        const payload: PersistedStockBrowseCartState = {
+            projectCode,
+            cartItems: serializeCartItems(cart),
+        };
+        window.localStorage.setItem(
+            storageKey,
+            JSON.stringify(payload),
+        );
+    }, [cart, hydratedStorageKey, projectCode, storageKey]);
+
+    useEffect(() => {
+        if (recentlyAddedItemId === null) {
+            return;
+        }
+
+        const timeoutId = window.setTimeout(() => {
+            setRecentlyAddedItemId(null);
+        }, 1100);
+
+        return () => {
+            window.clearTimeout(timeoutId);
+        };
+    }, [recentlyAddedItemId]);
+
+    function markItemRecentlyAdded(itemId: number): void {
+        setRecentlyAddedItemId(itemId);
+    }
 
     function addVariantToCart(
         item: StockItem,
@@ -67,6 +270,7 @@ export function StockBrowse() {
         }
 
         addVariantToCart(item, defaultVariant, 1);
+        markItemRecentlyAdded(item.id);
     }
 
     async function handleSubmit(): Promise<void> {
@@ -150,6 +354,16 @@ export function StockBrowse() {
         () => Array.from(cart.values()).reduce((sum, cartItem) => sum + cartItem.qty, 0),
         [cart],
     );
+    const cartQuantityByItemId = useMemo(() => {
+        const quantityByItemId = new Map<number, number>();
+        for (const cartItem of cart.values()) {
+            quantityByItemId.set(
+                cartItem.item.id,
+                (quantityByItemId.get(cartItem.item.id) ?? 0) + cartItem.qty,
+            );
+        }
+        return quantityByItemId;
+    }, [cart]);
     const cartItems = useMemo(() => Array.from(cart.values()), [cart]);
     const totalPages = Math.max(1, Math.ceil(totalItems / ITEMS_PER_PAGE));
 
@@ -199,9 +413,10 @@ export function StockBrowse() {
             ) : (
                 <StockBrowseGrid
                     items={items}
-                    cart={cart}
+                    cartQuantityByItemId={cartQuantityByItemId}
                     onAddDirect={handleAddDirect}
                     onOpenVariantPicker={setVariantPickerItem}
+                    recentlyAddedItemId={recentlyAddedItemId}
                 />
             )}
 
@@ -238,6 +453,7 @@ export function StockBrowse() {
                         return;
                     }
                     addVariantToCart(variantPickerItem, variant, quantity);
+                    markItemRecentlyAdded(variantPickerItem.id);
                     setVariantPickerItem(null);
                 }}
             />

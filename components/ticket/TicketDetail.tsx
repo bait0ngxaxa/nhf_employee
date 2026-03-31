@@ -8,7 +8,6 @@ import {
     CardTitle,
 } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -23,14 +22,11 @@ import { useTicketDetail } from "@/hooks/useTicketDetail";
 import { TICKET_STATUSES } from "@/constants/tickets";
 import {
     getTicketCategoryLabel,
-    getTicketPriorityLabel,
-    getTicketStatusLabel,
-    getPriorityBadgeColor,
-    getStatusBadgeColor,
     getTicketStatusIcon,
 } from "@/lib/helpers/ticket-helpers";
 import { formatThaiDateTime } from "@/lib/helpers/date-helpers";
 import { CommentItem } from "./CommentItem";
+import { TicketPriorityBadge, TicketStatusBadge } from "./TicketBadges";
 
 interface TicketDetailProps {
     ticketId: number;
@@ -177,18 +173,8 @@ export default function TicketDetail({
                             </CardDescription>
                         </div>
                         <div className="flex gap-2">
-                            <Badge
-                                className={getPriorityBadgeColor(
-                                    ticket.priority,
-                                )}
-                            >
-                                {getTicketPriorityLabel(ticket.priority)}
-                            </Badge>
-                            <Badge
-                                className={getStatusBadgeColor(ticket.status)}
-                            >
-                                {getTicketStatusLabel(ticket.status)}
-                            </Badge>
+                            <TicketPriorityBadge priority={ticket.priority} />
+                            <TicketStatusBadge status={ticket.status} />
                         </div>
                     </div>
                 </CardHeader>
@@ -269,6 +255,7 @@ export default function TicketDetail({
                                         updateLoading ||
                                         statusUpdate === ticket.status
                                     }
+                                    className="flex items-center gap-2 focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white shadow-md shadow-indigo-500/25 transition-[transform,background-color,box-shadow] duration-300 hover:shadow-lg motion-safe:hover:-translate-y-0.5"
                                 >
                                     {updateLoading
                                         ? "กำลังอัปเดต…"
@@ -326,7 +313,7 @@ export default function TicketDetail({
                                     disabled={
                                         commentLoading || !newComment.trim()
                                     }
-                                    className="flex items-center gap-2"
+                                    className="flex items-center gap-2 focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white shadow-md shadow-indigo-500/25 transition-[transform,background-color,box-shadow] duration-300 hover:shadow-lg motion-safe:hover:-translate-y-0.5"
                                 >
                                     <Send className="h-4 w-4" />
                                     {commentLoading

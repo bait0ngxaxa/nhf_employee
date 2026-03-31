@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useMemo, useEffect, type ReactNode } from "react";
+import { useState, useCallback, useMemo, useEffect, useRef, type ReactNode } from "react";
 import { useSession } from "next-auth/react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import useSWR from "swr";
@@ -47,10 +47,12 @@ export function ITSupportProvider({ children }: ITSupportProviderProps) {
     const router = useRouter();
     const pathname = usePathname();
     const searchParams = useSearchParams();
+    const searchParamsString = searchParams.toString();
     const [activeTab, setActiveTab] = useState("tickets");
     const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
     const [refreshTrigger, setRefreshTrigger] = useState(0);
     const [showCreateModal, setShowCreateModal] = useState(false);
+    const shouldIgnoreUrlTicketSyncRef = useRef(false);
 
     const isAdmin = isAdminRole(session?.user?.role);
 
@@ -64,14 +66,14 @@ export function ITSupportProvider({ children }: ITSupportProviderProps) {
                 return;
             }
 
-            const nextParams = new URLSearchParams(searchParams.toString());
+            const nextParams = new URLSearchParams(searchParamsString);
             if (ticketId === null) {
                 nextParams.delete("ticketId");
             } else {
                 nextParams.set("ticketId", String(ticketId));
             }
 
-            const current = searchParams.toString();
+            const current = searchParamsString;
             const next = nextParams.toString();
             if (current === next) {
                 return;
@@ -80,16 +82,22 @@ export function ITSupportProvider({ children }: ITSupportProviderProps) {
             const nextUrl = next ? `${pathname}?${next}` : pathname;
             router.replace(nextUrl, { scroll: false });
         },
-        [pathname, router, searchParams],
+        [pathname, router, searchParamsString],
     );
 
     useEffect(() => {
-        if (searchParams.get("tab") !== "it-support") {
+        const currentSearchParams = new URLSearchParams(searchParamsString);
+        if (currentSearchParams.get("tab") !== "it-support") {
             return;
         }
 
-        const ticketIdParam = searchParams.get("ticketId");
+        const ticketIdParam = currentSearchParams.get("ticketId");
         if (!ticketIdParam) {
+            shouldIgnoreUrlTicketSyncRef.current = false;
+            return;
+        }
+
+        if (shouldIgnoreUrlTicketSyncRef.current) {
             return;
         }
 
@@ -109,7 +117,7 @@ export function ITSupportProvider({ children }: ITSupportProviderProps) {
         if (activeTab !== "detail") {
             setActiveTab("detail");
         }
-    }, [activeTab, data?.tickets, searchParams, selectedTicket?.id]);
+    }, [activeTab, data?.tickets, searchParamsString, selectedTicket?.id]);
 
     const ticketStats = useMemo<TicketStats>(() => {
         if (!data?.tickets) return defaultStats;
@@ -154,12 +162,14 @@ export function ITSupportProvider({ children }: ITSupportProviderProps) {
     }, [mutate, syncTicketIdToUrl]);
 
     const handleTicketSelect = useCallback((ticket: Ticket) => {
+        shouldIgnoreUrlTicketSyncRef.current = false;
         setSelectedTicket(ticket);
         setActiveTab("detail");
         syncTicketIdToUrl(ticket.id);
     }, [syncTicketIdToUrl]);
 
     const handleTicketUpdated = useCallback(() => {
+        shouldIgnoreUrlTicketSyncRef.current = true;
         mutate();
         setRefreshTrigger((prev) => prev + 1);
         setSelectedTicket(null);
@@ -168,6 +178,7 @@ export function ITSupportProvider({ children }: ITSupportProviderProps) {
     }, [mutate, syncTicketIdToUrl]);
 
     const handleBackToList = useCallback(() => {
+        shouldIgnoreUrlTicketSyncRef.current = true;
         setSelectedTicket(null);
         setActiveTab("tickets");
         syncTicketIdToUrl(null);

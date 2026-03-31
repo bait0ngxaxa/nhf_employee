@@ -6,10 +6,15 @@ import type {
 } from "../context/stock/types";
 
 export type BrowseCartItem = {
-    item: StockItem;
-    variant: StockItemVariant;
+    item: Pick<StockItem, "id" | "name" | "imageUrl">;
+    variant: Pick<
+        StockItemVariant,
+        "id" | "sku" | "unit" | "imageUrl" | "availableQuantity"
+    >;
     qty: number;
 };
+
+type VariantWithAvailableQuantity = Pick<StockItemVariant, "availableQuantity">;
 
 export function getVariantAttributeSummary(
     attributeValues?: StockItemVariantAttributeValue[],
@@ -53,7 +58,7 @@ export function getItemAvailableQuantity(item: StockItem): number {
     return item.availableQuantity;
 }
 
-export function getVariantAvailableQuantity(variant: StockItemVariant): number {
+export function getVariantAvailableQuantity(variant: VariantWithAvailableQuantity): number {
     return variant.availableQuantity;
 }
 

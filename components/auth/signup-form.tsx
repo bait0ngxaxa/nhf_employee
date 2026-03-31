@@ -81,11 +81,23 @@ export function SignupForm({
 
             if (result.success) {
                 const data = result.data;
-                await signIn("credentials", {
+
+                // Step 1: Create NextAuth session (for useSession() on client)
+                const signInResult = await signIn("credentials", {
                     email: formData.email.trim().toLowerCase(),
                     password: formData.password,
                     redirect: false,
                 });
+
+                if (signInResult?.error) {
+                    setError("สมัครสมาชิกสำเร็จ แต่เข้าสู่ระบบอัตโนมัติล้มเหลว กรุณาเข้าสู่ระบบด้วยตนเอง");
+                    return;
+                }
+
+                // Hybrid auth session is bootstrapped automatically by
+                // DashboardProvider when the dashboard mounts, so we only
+                // need the NextAuth session established above.
+
                 toast.success("สมัครสมาชิกสำเร็จ!", {
                     description: `ยินดีต้อนรับ${data.user?.name ? ` ${data.user.name}` : ""}! บัญชีของคุณถูกสร้างเรียบร้อยแล้ว`,
                 });

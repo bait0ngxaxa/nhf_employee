@@ -14,7 +14,7 @@ export const Header = memo(function Header() {
     return (
         <SectionHeader
             icon={Settings}
-            title="ระบบแจ้งปัญหาไอที"
+            title="NHF IT-Support"
             subtitle="ระบบแจ้งปัญหาและติดตามการแก้ไขปัญหาไอที"
             iconGradient="from-emerald-500 to-teal-700"
             iconGlow="from-emerald-500/40 to-teal-500/40"

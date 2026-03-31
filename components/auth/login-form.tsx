@@ -16,8 +16,7 @@ import { useState, useEffect } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { AUTH_MUTATION_HEADERS } from "@/lib/auth-csrf";
-import { API_ROUTES, APP_ROUTES } from "@/lib/ssot/routes";
+import { APP_ROUTES } from "@/lib/ssot/routes";
 
 // Type definitions for login
 interface LoginFormData {
@@ -65,11 +64,8 @@ export function LoginForm({
             if (result?.error) {
                 setError("อีเมลหรือรหัสผ่านไม่ถูกต้อง");
             } else if (result?.ok) {
-                await fetch(API_ROUTES.auth.bootstrap, {
-                    method: "POST",
-                    credentials: "include",
-                    headers: AUTH_MUTATION_HEADERS,
-                });
+                // Hybrid auth session is bootstrapped automatically by
+                // DashboardProvider when the dashboard mounts.
                 toast.success("เข้าสู่ระบบสำเร็จ!", {
                     description: "ยินดีต้อนรับ! กำลังนำคุณไปยังหน้าแดชบอร์ด",
                 });
