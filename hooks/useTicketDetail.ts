@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import useSWR from "swr";
 import { apiPost, apiPatch } from "@/lib/api-client";
@@ -87,6 +87,10 @@ export function useTicketDetail(
 
     const ticket = data?.ticket || null;
     const error = swrError ? swrError.message || "เกิดข้อผิดพลาด" : "";
+
+    useEffect(() => {
+        setStatusUpdate(ticket?.status ?? "");
+    }, [ticketId, ticket?.status]);
 
     const handleAddComment = useCallback(async () => {
         if (!newComment.trim()) return;

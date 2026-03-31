@@ -19,6 +19,7 @@ function parseQueryParams(url: string):
         status: searchParams.get("status"),
         category: searchParams.get("category"),
         priority: searchParams.get("priority"),
+        search: searchParams.get("search"),
         page: searchParams.get("page") ?? "1",
         limit: searchParams.get("limit") ?? "10",
     });

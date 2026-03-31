@@ -303,6 +303,7 @@ export default function TicketDetail({
                             <div className="space-y-3">
                                 <Textarea
                                     placeholder="แสดงความคิดเห็นหรือให้ข้อมูลเพิ่มเติม…"
+                                    value={newComment}
                                     onChange={(e) =>
                                         setNewComment(e.target.value)
                                     }

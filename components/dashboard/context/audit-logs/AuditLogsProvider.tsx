@@ -34,6 +34,9 @@ export function AuditLogsProvider({ children }: AuditLogsProviderProps) {
     if (entityTypeFilter !== "all") {
         params.set("entityType", entityTypeFilter);
     }
+    if (debouncedSearchTerm.trim().length > 0) {
+        params.set("search", debouncedSearchTerm.trim());
+    }
 
     const swrKey = `/api/audit-logs?${params.toString()}`;
 
@@ -50,18 +53,12 @@ export function AuditLogsProvider({ children }: AuditLogsProviderProps) {
         setCurrentPage(1);
     }, [actionFilter, entityTypeFilter]);
 
-    const filteredLogs = useMemo(() => {
-        return auditLogs.filter((log) => {
-            if (!debouncedSearchTerm) return true;
-            const searchLower = debouncedSearchTerm.toLowerCase();
-            return (
-                log.userEmail?.toLowerCase().includes(searchLower) ||
-                log.user?.name.toLowerCase().includes(searchLower) ||
-                log.action.toLowerCase().includes(searchLower) ||
-                log.entityType.toLowerCase().includes(searchLower)
-            );
-        });
-    }, [auditLogs, debouncedSearchTerm]);
+    const filteredLogs = useMemo(() => auditLogs, [auditLogs]);
+
+    const handleSearchTermChange = useCallback((term: string) => {
+        setSearchTerm(term);
+        setCurrentPage(1);
+    }, []);
 
     const handlePreviousPage = useCallback(() => {
         setCurrentPage((p) => Math.max(p - 1, 1));
@@ -89,7 +86,7 @@ export function AuditLogsProvider({ children }: AuditLogsProviderProps) {
             entityTypeFilter,
             setEntityTypeFilter,
             searchTerm,
-            setSearchTerm,
+            setSearchTerm: handleSearchTermChange,
             refresh,
             handlePreviousPage,
             handleNextPage,
@@ -107,7 +104,7 @@ export function AuditLogsProvider({ children }: AuditLogsProviderProps) {
             entityTypeFilter,
             setEntityTypeFilter,
             searchTerm,
-            setSearchTerm,
+            handleSearchTermChange,
             refresh,
             handlePreviousPage,
             handleNextPage,

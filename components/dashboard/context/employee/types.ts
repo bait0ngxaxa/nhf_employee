@@ -19,6 +19,7 @@ export interface EmployeeDataContextValue {
 
 export interface EmployeeUIContextValue {
     // Search & Filter State
+    searchTerm: string;
     debouncedSearchTerm: string;
     setSearchTerm: (term: string) => void;
     statusFilter: string;

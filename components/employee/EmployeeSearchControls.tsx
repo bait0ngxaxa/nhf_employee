@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef, useCallback } from "react";
+import { useCallback } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
@@ -10,7 +10,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
-import { Search, Download, Filter } from "lucide-react";
+import { Search, Download, Filter, X } from "lucide-react";
 import { STATUS_FILTER_OPTIONS } from "@/constants/ui";
 import {
     useEmployeeUIContext,
@@ -21,43 +21,12 @@ interface EmployeeSearchControlsProps {
     onExportClick: () => void;
 }
 
-// Memoized search input - won't re-render when parent re-renders
-const SearchInput = React.memo(function SearchInput({
-    onSearch,
-}: {
-    onSearch: (value: string) => void;
-}) {
-    const [localValue, setLocalValue] = useState("");
-    const inputRef = useRef<HTMLInputElement>(null);
-
-    const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-        const value = e.target.value;
-        setLocalValue(value);
-        onSearch(value);
-    }, [onSearch]);
-
-    return (
-        <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-            <Input
-                ref={inputRef}
-                id="employee-search"
-                type="text"
-                aria-label="ค้นหาพนักงาน"
-                placeholder="ค้นหาพนักงาน (ชื่อ, ชื่อเล่น, อีเมล, ตำแหน่ง, แผนก, สังกัด)"
-                value={localValue}
-                onChange={handleChange}
-                className="pl-10 rounded-xl border-gray-200 focus:border-blue-500 focus:ring-blue-500/20 bg-white/50"
-            />
-        </div>
-    );
-});
-
 export function EmployeeSearchControls({
     onExportClick,
 }: EmployeeSearchControlsProps) {
     const { employees, totalEmployees } = useEmployeeDataContext();
     const {
+        searchTerm,
         setSearchTerm,
         statusFilter,
         setStatusFilter,
@@ -71,8 +40,29 @@ export function EmployeeSearchControls({
     return (
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-3 sm:space-y-0 sm:space-x-3">
             <div className="flex flex-col sm:flex-row space-y-3 sm:space-y-0 sm:space-x-3 flex-1">
-                {/* Search Input - memoized */}
-                <SearchInput onSearch={handleSearch} />
+                <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                    <Input
+                        id="employee-search"
+                        type="text"
+                        aria-label="ค้นหาพนักงาน"
+                        placeholder="ค้นหาพนักงาน (ชื่อ, ชื่อเล่น, อีเมล, ตำแหน่ง, แผนก, สังกัด)"
+                        value={searchTerm}
+                        onChange={(event) => handleSearch(event.target.value)}
+                        className="rounded-xl border-gray-200 bg-white/50 pl-10 pr-10 focus:border-blue-500 focus:ring-blue-500/20"
+                    />
+                    {searchTerm.trim().length > 0 && (
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleSearch("")}
+                            className="absolute right-1.5 top-1/2 h-7 w-7 -translate-y-1/2 rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                        >
+                            <X className="h-4 w-4" />
+                        </Button>
+                    )}
+                </div>
 
                 {/* Status Filter */}
                 <div className="w-full sm:w-48">

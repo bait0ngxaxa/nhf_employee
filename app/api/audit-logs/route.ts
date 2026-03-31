@@ -15,6 +15,7 @@ function parseQueryParams(url: string): AuditLogFilters {
 
     const action = searchParams.get("action");
     const entityType = searchParams.get("entityType");
+    const search = searchParams.get("search");
     const userId = searchParams.get("userId");
     const startDate = searchParams.get("startDate");
     const endDate = searchParams.get("endDate");
@@ -22,6 +23,7 @@ function parseQueryParams(url: string): AuditLogFilters {
     return {
         action: action || undefined,
         entityType: entityType || undefined,
+        search: search?.trim() ? search.trim() : undefined,
         userId: userId ? parseInt(userId) : undefined,
         startDate: startDate ? new Date(startDate) : undefined,
         endDate: endDate ? new Date(endDate) : undefined,

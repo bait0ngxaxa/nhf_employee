@@ -6,6 +6,7 @@ import type { AuditLog } from "@prisma/client";
 export interface AuditLogFilters {
     action?: string;
     entityType?: string;
+    search?: string;
     userId?: number;
     startDate?: Date;
     endDate?: Date;

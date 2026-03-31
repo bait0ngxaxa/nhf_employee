@@ -320,6 +320,7 @@ export function EmployeeProvider({ children }: EmployeeProviderProps) {
 
     const uiValue = useMemo<EmployeeUIContextValue>(
         () => ({
+            searchTerm,
             debouncedSearchTerm,
             setSearchTerm: uiHandlers.handleSearchTermChange,
             statusFilter,
@@ -340,6 +341,7 @@ export function EmployeeProvider({ children }: EmployeeProviderProps) {
             handleEmployeeUpdate: uiHandlers.handleEmployeeUpdate,
         }),
         [
+            searchTerm,
             debouncedSearchTerm,
             statusFilter,
             currentPage,

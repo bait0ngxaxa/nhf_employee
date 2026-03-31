@@ -86,7 +86,7 @@ export function TicketFiltersCard({
                     <div className="space-y-2 rounded-xl border border-slate-200/80 bg-white/80 p-3 shadow-sm">
                         <label className="text-sm font-medium text-slate-700">สถานะ</label>
                         <Select
-                            value={filters.status || undefined}
+                            value={filters.status || "all"}
                             onValueChange={(value) =>
                                 onFiltersChange((prev) => ({
                                     ...prev,
@@ -115,7 +115,7 @@ export function TicketFiltersCard({
                     <div className="space-y-2 rounded-xl border border-slate-200/80 bg-white/80 p-3 shadow-sm">
                         <label className="text-sm font-medium text-slate-700">หมวดหมู่</label>
                         <Select
-                            value={filters.category || undefined}
+                            value={filters.category || "all"}
                             onValueChange={(value) =>
                                 onFiltersChange((prev) => ({
                                     ...prev,
@@ -144,7 +144,7 @@ export function TicketFiltersCard({
                     <div className="space-y-2 rounded-xl border border-slate-200/80 bg-white/80 p-3 shadow-sm">
                         <label className="text-sm font-medium text-slate-700">ความสำคัญ</label>
                         <Select
-                            value={filters.priority || undefined}
+                            value={filters.priority || "all"}
                             onValueChange={(value) =>
                                 onFiltersChange((prev) => ({
                                     ...prev,

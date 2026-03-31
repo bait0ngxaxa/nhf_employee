@@ -49,8 +49,14 @@ export function EmployeeList({ userRole }: EmployeeListProps) {
         handleEditEmployee,
     } = useEmployeeUIContext();
 
-    // Don't show loading screen for subsequent loads to prevent focus loss
-    const isInitialLoading = isLoading && employees.length === 0;
+    // Show full skeleton only for the very first unfiltered load.
+    // Keep search controls mounted during filtering/searching to avoid input focus loss.
+    const isInitialLoading =
+        isLoading
+        && employees.length === 0
+        && totalEmployees === 0
+        && debouncedSearchTerm.trim().length === 0
+        && statusFilter === "all";
 
     // Handle export button click - fetch data then trigger CSV download
     const onExportClick = async () => {
@@ -107,19 +113,20 @@ export function EmployeeList({ userRole }: EmployeeListProps) {
         );
     }
 
-    if (error && employees.length === 0) {
-        return (
-            <div className="text-center p-8">
-                <div className="text-red-600 bg-red-50 p-4 rounded-md">
-                    {error}
-                </div>
-            </div>
-        );
-    }
-
     // Calculate display range
-    const startIndex = (currentPage - 1) * itemsPerPage;
-    const endIndex = Math.min(startIndex + employees.length, totalEmployees);
+    const hasActiveFilters =
+        debouncedSearchTerm.trim().length > 0 || statusFilter !== "all";
+    const startIndex =
+        totalEmployees === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1;
+    const endIndex =
+        totalEmployees === 0
+            ? 0
+            : Math.min((currentPage - 1) * itemsPerPage + employees.length, totalEmployees);
+    const emptyMessage = error
+        ? error
+        : hasActiveFilters
+          ? "ไม่พบพนักงานที่ตรงกับเงื่อนไขการค้นหาหรือการกรอง"
+          : "ยังไม่มีข้อมูลพนักงาน";
 
     return (
         <div className="space-y-6">
@@ -137,7 +144,7 @@ export function EmployeeList({ userRole }: EmployeeListProps) {
             {/* Results Summary */}
             <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center space-y-2 sm:space-y-0">
                 <div className="text-sm text-gray-600">
-                    แสดงผล {startIndex + 1}-{endIndex} จาก {totalEmployees} คน
+                    แสดงผล {startIndex}-{endIndex} จาก {totalEmployees} คน
                     {statusFilter !== "all" ? (
                         <span className="text-blue-600">
                             (กรองตามสถานะ:{" "}
@@ -159,10 +166,14 @@ export function EmployeeList({ userRole }: EmployeeListProps) {
 
             {/* Employee Table */}
             {employees.length === 0 ? (
-                <div className="text-center p-8 text-gray-500">
-                    {debouncedSearchTerm || statusFilter !== "all"
-                        ? "ไม่พบพนักงานที่ตรงกับเงื่อนไขการค้นหาหรือการกรอง"
-                        : "ยังไม่มีข้อมูลพนักงาน"}
+                <div
+                    className={`rounded-xl border p-8 text-center ${
+                        error
+                            ? "border-red-200 bg-red-50 text-red-600"
+                            : "border-gray-200 bg-gray-50 text-gray-500"
+                    }`}
+                >
+                    {emptyMessage}
                 </div>
             ) : (
                 <EmployeeTable

@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useCallback, useMemo, useEffect } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import useSWR from "swr";
 import { type Ticket } from "@/types/tickets";
 import { PAGINATION_DEFAULTS } from "@/constants/ui";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 
 interface TicketFilters {
     status: string;
@@ -50,6 +51,7 @@ export function useTicketList(refreshTrigger?: number): UseTicketListReturn {
     const { data: session } = useSession();
     const [filters, setFilters] = useState<TicketFilters>(initialFilters);
     const [page, setPage] = useState(1);
+    const debouncedSearch = useDebouncedValue(filters.search, 300);
 
     const searchParams = new URLSearchParams({
         page: page.toString(),
@@ -59,6 +61,9 @@ export function useTicketList(refreshTrigger?: number): UseTicketListReturn {
     if (filters.status) searchParams.append("status", filters.status);
     if (filters.category) searchParams.append("category", filters.category);
     if (filters.priority) searchParams.append("priority", filters.priority);
+    if (debouncedSearch.trim().length > 0) {
+        searchParams.append("search", debouncedSearch.trim());
+    }
 
     const swrKey = session ? `/api/tickets?${searchParams.toString()}` : null;
 
@@ -70,20 +75,7 @@ export function useTicketList(refreshTrigger?: number): UseTicketListReturn {
         }
     }, [refreshTrigger, mutate]);
 
-    // Client-side search filtering
-    const tickets = useMemo(() => {
-        if (!data?.tickets) return [];
-        let filtered = data.tickets;
-        if (filters.search) {
-            const searchLower = filters.search.toLowerCase();
-            filtered = filtered.filter(
-                (ticket: Ticket) =>
-                    ticket.title.toLowerCase().includes(searchLower) ||
-                    ticket.description.toLowerCase().includes(searchLower),
-            );
-        }
-        return filtered;
-    }, [data, filters.search]);
+    const tickets: Ticket[] = data?.tickets ?? [];
 
     const pagination = data?.pagination || defaultPagination;
     const error = swrError ? swrError.message || "เกิดข้อผิดพลาด" : "";
@@ -97,7 +89,8 @@ export function useTicketList(refreshTrigger?: number): UseTicketListReturn {
                 if (
                     newVal.status !== prev.status ||
                     newVal.category !== prev.category ||
-                    newVal.priority !== prev.priority
+                    newVal.priority !== prev.priority ||
+                    newVal.search !== prev.search
                 ) {
                     setPage(1);
                 }

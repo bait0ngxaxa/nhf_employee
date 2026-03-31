@@ -22,6 +22,39 @@ function buildWhereClause(filters: AuditLogFilters): Record<string, unknown> {
     if (filters.action) where.action = filters.action;
     if (filters.entityType) where.entityType = filters.entityType;
     if (filters.userId) where.userId = filters.userId;
+    if (filters.search && filters.search.trim().length > 0) {
+        const searchTerm = filters.search.trim();
+        where.OR = [
+            {
+                action: {
+                    contains: searchTerm,
+                    mode: "insensitive",
+                },
+            },
+            {
+                entityType: {
+                    contains: searchTerm,
+                    mode: "insensitive",
+                },
+            },
+            {
+                userEmail: {
+                    contains: searchTerm,
+                    mode: "insensitive",
+                },
+            },
+            {
+                user: {
+                    is: {
+                        name: {
+                            contains: searchTerm,
+                            mode: "insensitive",
+                        },
+                    },
+                },
+            },
+        ];
+    }
 
     if (filters.startDate || filters.endDate) {
         where.createdAt = {};

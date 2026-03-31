@@ -32,6 +32,22 @@ function buildWhereClause(
     if (filters.status) where.status = filters.status;
     if (filters.category) where.category = filters.category;
     if (filters.priority) where.priority = filters.priority;
+    if (filters.search && filters.search.trim().length > 0) {
+        where.OR = [
+            {
+                title: {
+                    contains: filters.search.trim(),
+                    mode: "insensitive",
+                },
+            },
+            {
+                description: {
+                    contains: filters.search.trim(),
+                    mode: "insensitive",
+                },
+            },
+        ];
+    }
 
     return where;
 }
