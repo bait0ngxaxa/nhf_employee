@@ -14,6 +14,26 @@ describe("Email Request Validation", () => {
         };
         const result = emailRequestSchema.safeParse(data);
         expect(result.success).toBe(true);
+        if (result.success) {
+            expect(result.data.phone).toBe("081-2345678");
+        }
+    });
+
+    it("should validate dashed phone format", () => {
+        const data = {
+            thaiName: "สมชาย",
+            englishName: "Somchai",
+            phone: "081-2345678",
+            nickname: "Chai",
+            position: "Dev",
+            department: "IT",
+            replyEmail: "test@email.com",
+        };
+        const result = emailRequestSchema.safeParse(data);
+        expect(result.success).toBe(true);
+        if (result.success) {
+            expect(result.data.phone).toBe("081-2345678");
+        }
     });
 
     it("should fail on invalid phone format", () => {

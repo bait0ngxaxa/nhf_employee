@@ -52,7 +52,15 @@ export function AuditLogViewer({ className }: AuditLogViewerProps) {
         handleNextPage,
     } = useAuditLogsContext();
 
-    if (isLoading) {
+    const isInitialLoading =
+        isLoading
+        && filteredLogs.length === 0
+        && currentPage === 1
+        && actionFilter === "all"
+        && entityTypeFilter === "all"
+        && searchTerm.trim().length === 0;
+
+    if (isInitialLoading) {
         return (
             <Card>
                 <CardHeader>
@@ -204,7 +212,16 @@ export function AuditLogViewer({ className }: AuditLogViewerProps) {
                             </tr>
                         </thead>
                         <tbody className="bg-white divide-y divide-gray-200">
-                            {filteredLogs.length === 0 ? (
+                            {isLoading && filteredLogs.length === 0 ? (
+                                <tr>
+                                    <td
+                                        colSpan={5}
+                                        className="px-4 py-8 text-center text-gray-500"
+                                    >
+                                        กำลังโหลดข้อมูล...
+                                    </td>
+                                </tr>
+                            ) : filteredLogs.length === 0 ? (
                                 <tr>
                                     <td
                                         colSpan={5}

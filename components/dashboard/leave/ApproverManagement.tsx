@@ -8,6 +8,7 @@ import { useApproverManagementModel } from "@/hooks/leave/useApproverManagementM
 import { ApproverStats } from "./_components/ApproverStats";
 import { ApproverFilters } from "./_components/ApproverFilters";
 import { ApproverTable } from "./_components/ApproverTable";
+import { Pagination } from "@/components/Pagination";
 
 export function ApproverManagement() {
     const model = useApproverManagementModel();
@@ -86,7 +87,7 @@ export function ApproverManagement() {
 
                 <CardContent>
                     <ApproverTable
-                        employees={model.filteredEmployees}
+                        employees={model.pagedEmployees}
                         allEmployees={model.employees}
                         assignments={model.assignments}
                         noApproverValue={model.NO_APPROVER_VALUE}
@@ -94,8 +95,46 @@ export function ApproverManagement() {
                         getManagerId={model.getManagerId}
                         onAssign={model.handleAssign}
                     />
+
+                    <div className="mt-4">
+                        <Pagination
+                            currentPage={model.currentPage}
+                            totalPages={model.totalPages}
+                            itemsPerPage={model.itemsPerPage}
+                            onPageChange={model.setCurrentPage}
+                            onPreviousPage={model.handlePreviousPage}
+                            onNextPage={model.handleNextPage}
+                        />
+                    </div>
                 </CardContent>
             </Card>
+
+            {model.assignments.size > 0 ? (
+                <div className="fixed bottom-4 left-1/2 z-50 w-[calc(100vw-1.5rem)] max-w-3xl -translate-x-1/2">
+                    <div className="flex items-center justify-between gap-3 rounded-2xl border border-indigo-200 bg-white/95 px-4 py-3 shadow-[0_16px_40px_-24px_rgba(79,70,229,0.55)] backdrop-blur">
+                        <div className="min-w-0">
+                            <p className="text-sm font-semibold text-indigo-700">
+                                มีรายการที่ยังไม่บันทึก {model.assignments.size} รายการ
+                            </p>
+                            <p className="text-xs text-slate-500">
+                                กดบันทึกเพื่ออัปเดตผู้อนุมัติลา
+                            </p>
+                        </div>
+                        <Button
+                            onClick={model.handleSave}
+                            disabled={model.isSaving}
+                            className="shrink-0 bg-indigo-600 hover:bg-indigo-700"
+                        >
+                            {model.isSaving ? (
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            ) : (
+                                <Save className="mr-2 h-4 w-4" />
+                            )}
+                            บันทึก ({model.assignments.size})
+                        </Button>
+                    </div>
+                </div>
+            ) : null}
         </div>
     );
 }

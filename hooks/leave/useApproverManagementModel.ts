@@ -1,5 +1,6 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import useSWR from "swr";
+import { toast } from "sonner";
 import {
     fetchApproverEmployees,
     saveApproverAssignments,
@@ -9,6 +10,7 @@ import {
 const NO_APPROVER_VALUE = "";
 const APPROVER_SAVE_SUCCESS_MESSAGE = "บันทึกการกำหนดผู้อนุมัติเรียบร้อยแล้ว";
 const APPROVER_SAVE_ERROR_MESSAGE = "บันทึกไม่สำเร็จ กรุณาลองใหม่อีกครั้ง";
+const APPROVER_ITEMS_PER_PAGE = 25;
 
 const formatName = (employee: {
     firstName: string;
@@ -28,6 +30,7 @@ export function useApproverManagementModel() {
     const [isSaving, setIsSaving] = useState(false);
     const [search, setSearch] = useState("");
     const [filterApprover, setFilterApprover] = useState("all");
+    const [currentPage, setCurrentPage] = useState(1);
     const [saveMsg, setSaveMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
 
     const getManagerId = useCallback(
@@ -69,6 +72,38 @@ export function useApproverManagementModel() {
         [employees, getManagerId],
     );
 
+    const totalPages = useMemo(
+        () => Math.max(1, Math.ceil(filteredEmployees.length / APPROVER_ITEMS_PER_PAGE)),
+        [filteredEmployees.length],
+    );
+
+    const pagedEmployees = useMemo(() => {
+        const startIndex = (currentPage - 1) * APPROVER_ITEMS_PER_PAGE;
+        return filteredEmployees.slice(startIndex, startIndex + APPROVER_ITEMS_PER_PAGE);
+    }, [currentPage, filteredEmployees]);
+
+    useEffect(() => {
+        setCurrentPage((prev) => Math.min(prev, totalPages));
+    }, [totalPages]);
+
+    const handleSearchChange = useCallback((value: string) => {
+        setSearch(value);
+        setCurrentPage(1);
+    }, []);
+
+    const handleFilterApproverChange = useCallback((value: string) => {
+        setFilterApprover(value);
+        setCurrentPage(1);
+    }, []);
+
+    const handlePreviousPage = useCallback(() => {
+        setCurrentPage((prev) => Math.max(1, prev - 1));
+    }, []);
+
+    const handleNextPage = useCallback(() => {
+        setCurrentPage((prev) => Math.min(totalPages, prev + 1));
+    }, [totalPages]);
+
     const handleAssign = (employeeId: number, rawValue: string): void => {
         const managerId = rawValue === NO_APPROVER_VALUE ? null : Number(rawValue);
         const original = employees.find((employee) => employee.id === employeeId)?.managerId ?? null;
@@ -78,6 +113,11 @@ export function useApproverManagementModel() {
                 next.delete(employeeId);
             } else {
                 next.set(employeeId, managerId);
+            }
+            if (prev.size === 0 && next.size > 0) {
+                toast.info("มีการเปลี่ยนแปลงที่ยังไม่บันทึก", {
+                    description: "อย่าลืมกดปุ่มบันทึกเพื่อยืนยันการแก้ไข",
+                });
             }
             return next;
         });
@@ -96,10 +136,12 @@ export function useApproverManagementModel() {
 
             await saveApproverAssignments({ assignments: payload });
             setSaveMsg({ type: "ok", text: APPROVER_SAVE_SUCCESS_MESSAGE });
+            toast.success(APPROVER_SAVE_SUCCESS_MESSAGE);
             setAssignments(new Map());
             await mutate();
         } catch {
             setSaveMsg({ type: "err", text: APPROVER_SAVE_ERROR_MESSAGE });
+            toast.error(APPROVER_SAVE_ERROR_MESSAGE);
         } finally {
             setIsSaving(false);
         }
@@ -110,7 +152,11 @@ export function useApproverManagementModel() {
         employees,
         activeApprovers,
         filteredEmployees,
+        pagedEmployees,
         unassignedCount,
+        currentPage,
+        totalPages,
+        itemsPerPage: APPROVER_ITEMS_PER_PAGE,
         assignments,
         isSaving,
         isLoading,
@@ -118,8 +164,11 @@ export function useApproverManagementModel() {
         search,
         filterApprover,
         saveMsg,
-        setSearch,
-        setFilterApprover,
+        setSearch: handleSearchChange,
+        setFilterApprover: handleFilterApproverChange,
+        setCurrentPage,
+        handlePreviousPage,
+        handleNextPage,
         handleAssign,
         getManagerId,
         handleSave,

@@ -1,4 +1,5 @@
 import { cache } from "react";
+import { AuditAction } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import type {
     AuditLogFilters,
@@ -24,23 +25,20 @@ function buildWhereClause(filters: AuditLogFilters): Record<string, unknown> {
     if (filters.userId) where.userId = filters.userId;
     if (filters.search && filters.search.trim().length > 0) {
         const searchTerm = filters.search.trim();
-        where.OR = [
-            {
-                action: {
-                    contains: searchTerm,
-                    mode: "insensitive",
-                },
-            },
+        const normalizedAction = searchTerm.toUpperCase();
+        const matchedAction = Object.values(AuditAction).find(
+            (action) => action === normalizedAction,
+        );
+
+        const searchClauses: Record<string, unknown>[] = [
             {
                 entityType: {
                     contains: searchTerm,
-                    mode: "insensitive",
                 },
             },
             {
                 userEmail: {
                     contains: searchTerm,
-                    mode: "insensitive",
                 },
             },
             {
@@ -48,12 +46,20 @@ function buildWhereClause(filters: AuditLogFilters): Record<string, unknown> {
                     is: {
                         name: {
                             contains: searchTerm,
-                            mode: "insensitive",
                         },
                     },
                 },
             },
         ];
+        if (matchedAction) {
+            searchClauses.push({
+                action: {
+                    equals: matchedAction,
+                },
+            });
+        }
+
+        where.OR = searchClauses;
     }
 
     if (filters.startDate || filters.endDate) {

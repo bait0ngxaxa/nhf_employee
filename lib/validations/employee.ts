@@ -1,5 +1,40 @@
 import { z } from "zod";
 
+const PHONE_ERROR_MESSAGE =
+    "กรุณาระบุเบอร์โทรศัพท์ให้ถูกต้อง (10 หลัก เช่น 0889999999 หรือ 088-9999999)";
+
+function normalizePhoneNumber(value: string): string {
+    return value.replace(/\D/g, "");
+}
+
+function toPhoneStoragePattern(value: string): string {
+    return `${value.slice(0, 3)}-${value.slice(3)}`;
+}
+
+function isValidThaiPhone(value: string): boolean {
+    if (value === "") {
+        return true;
+    }
+    return normalizePhoneNumber(value).length === 10;
+}
+
+const employeePhoneSchema = z
+    .string()
+    .trim()
+    .max(20, PHONE_ERROR_MESSAGE)
+    .refine(isValidThaiPhone, PHONE_ERROR_MESSAGE)
+    .nullish()
+    .transform((val) => {
+        if (!val) {
+            return null;
+        }
+        const normalized = normalizePhoneNumber(val);
+        if (normalized.length === 0) {
+            return null;
+        }
+        return toPhoneStoragePattern(normalized);
+    });
+
 export const createEmployeeSchema = z.object({
     firstName: z
         .string({ message: "กรุณากรอกชื่อ" })
@@ -23,12 +58,7 @@ export const createEmployeeSchema = z.object({
         .email("รูปแบบอีเมลไม่ถูกต้อง")
         .toLowerCase()
         .trim(),
-    phone: z
-        .string()
-        .max(10, "เบอร์โทรต้องไม่เกิน 10 ตัวอักษร")
-        .trim()
-        .nullish()
-        .transform((val) => val || null),
+    phone: employeePhoneSchema,
     position: z
         .string({ message: "กรุณากรอกตำแหน่ง" })
         .min(1, "กรุณากรอกตำแหน่ง")
@@ -75,15 +105,7 @@ export const updateEmployeeSchema = z.object({
         .optional()
         .or(z.literal(""))
         .or(z.literal("-")),
-    phone: z
-        .string()
-        .max(
-            11,
-            "กรุณาระบุเบอร์โทรศัพท์ให้ถูกต้อง(example 0889999999 หรือ 088-9999999)",
-        )
-        .trim()
-        .nullish()
-        .transform((val) => val || null),
+    phone: employeePhoneSchema,
     position: z
         .string()
         .min(1, "กรุณากรอกตำแหน่ง")
