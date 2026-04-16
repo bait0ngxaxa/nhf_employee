@@ -4,8 +4,10 @@ import { Button } from "@/components/ui/button";
 import { Edit } from "lucide-react";
 import { type Employee } from "@/types/employees";
 import {
+    getEmployeeDepartmentBadgeClass,
     getEmployeeStatusLabel,
     getEmployeeStatusBadge,
+    formatEmployeePhone,
 } from "@/lib/helpers/employee-helpers";
 import { isAdminRole } from "@/lib/ssot/permissions";
 
@@ -99,7 +101,10 @@ export const EmployeeTable = memo(function EmployeeTable({
                                 </div>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap">
-                                <Badge variant="outline" className="bg-slate-50 text-slate-700 border-slate-200/80 font-medium shadow-sm hover:bg-slate-100 px-2.5">
+                                <Badge
+                                    variant="outline"
+                                    className={`${getEmployeeDepartmentBadgeClass(employee.dept.name)} px-2.5 font-medium shadow-sm`}
+                                >
                                     {employee.dept.name}
                                 </Badge>
                             </td>
@@ -112,7 +117,7 @@ export const EmployeeTable = memo(function EmployeeTable({
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap">
                                 <div className="text-sm text-gray-900">
-                                    {employee.phone || "-"}
+                                    {formatEmployeePhone(employee.phone)}
                                 </div>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap">

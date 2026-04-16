@@ -125,9 +125,9 @@ export function StockBrowseCartPanel({
                             type="button"
                             onClick={onSubmit}
                             disabled={submitting || projectCode.trim().length === 0}
-                            className="w-full bg-blue-600 font-bold text-white hover:bg-blue-700"
+                            className="group/submit w-full bg-[linear-gradient(135deg,#2563EB,#1D4ED8)] font-bold text-white shadow-[0_18px_34px_-22px_rgba(37,99,235,0.95)] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_22px_38px_-20px_rgba(37,99,235,0.95)]"
                         >
-                            <CheckCircle2 className="mr-1.5 h-4 w-4" />
+                            <CheckCircle2 className="mr-1.5 h-4 w-4 transition-transform duration-300 group-hover/submit:scale-110" />
                             {submitting ? "กำลังดำเนินการ..." : "ยืนยันการเบิก"}
                         </Button>
                         <Button
@@ -135,9 +135,9 @@ export function StockBrowseCartPanel({
                             variant="ghost"
                             onClick={() => setIsClearConfirmOpen(true)}
                             disabled={submitting}
-                            className="w-full text-rose-600 hover:bg-rose-50 hover:text-rose-700"
+                            className="group/clear w-full border border-rose-100 text-rose-600 transition-all duration-300 hover:-translate-y-0.5 hover:border-rose-200 hover:bg-rose-50 hover:text-rose-700 hover:shadow-[0_18px_28px_-24px_rgba(190,24,93,0.7)]"
                         >
-                            <XCircle className="mr-1.5 h-4 w-4" />
+                            <XCircle className="mr-1.5 h-4 w-4 transition-transform duration-300 group-hover/clear:scale-110" />
                             ยกเลิกทั้งหมด
                         </Button>
                     </div>
@@ -237,7 +237,7 @@ function CartRow(props: {
                     size="icon"
                     onClick={props.onDecrease}
                     disabled={props.disabled}
-                    className="h-9 w-9 rounded-lg bg-white text-slate-700 shadow-sm hover:bg-slate-100"
+                    className="h-9 w-9 rounded-lg border border-transparent bg-white text-slate-700 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-200 hover:bg-slate-100 hover:shadow-md"
                 >
                     <Minus className="h-4 w-4" />
                 </Button>
@@ -253,7 +253,7 @@ function CartRow(props: {
                         props.disabled ||
                         item.qty >= getVariantAvailableQuantity(item.variant)
                     }
-                    className="h-9 w-9 rounded-lg bg-white text-slate-700 shadow-sm hover:bg-slate-100"
+                    className="h-9 w-9 rounded-lg border border-transparent bg-white text-slate-700 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-200 hover:bg-slate-100 hover:shadow-md"
                 >
                     <Plus className="h-4 w-4" />
                 </Button>
@@ -263,7 +263,7 @@ function CartRow(props: {
                     size="icon"
                     onClick={props.onRemove}
                     disabled={props.disabled}
-                    className="h-9 w-9 text-rose-600 hover:bg-rose-50 hover:text-rose-700"
+                    className="h-9 w-9 rounded-lg border border-transparent text-rose-600 transition-all duration-200 hover:-translate-y-0.5 hover:border-rose-100 hover:bg-rose-50 hover:text-rose-700 hover:shadow-md"
                 >
                     <Trash2 className="h-4 w-4" />
                 </Button>

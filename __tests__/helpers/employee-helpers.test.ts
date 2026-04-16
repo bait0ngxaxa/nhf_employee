@@ -33,7 +33,7 @@ describe("Employee Helpers", () => {
 
     describe("formatEmployeePhone", () => {
         it("should format 10 digit phone", () => {
-            expect(formatEmployeePhone("0812345678")).toBe("081-234-5678");
+            expect(formatEmployeePhone("0812345678")).toBe("081-2345678");
         });
 
         it("should return original if not 10 digits", () => {

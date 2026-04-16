@@ -1,0 +1,12 @@
+Windows/PowerShell commands for this repo:
+- `Get-ChildItem -Force` list files
+- `rg --files` fast file listing
+- `rg "pattern" components app lib` fast text search
+- `npm run dev` start Next.js dev server
+- `npm run build` production build
+- `npm run start` run built app
+- `npm run lint` run ESLint
+- `npm run test` run Vitest
+- `npm run test:coverage` run tests with coverage
+- `npm run db:seed` seed Prisma database
+- `git status`, `git diff -- <path>`, `git log --oneline --decorate -n 20` for git inspection

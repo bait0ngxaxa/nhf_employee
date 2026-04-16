@@ -152,12 +152,12 @@ function BrowseCard(props: {
                     )}
                     <Button
                         variant="default"
-                        className={`w-full rounded-xl shadow-sm transition-all ${
+                        className={`group/button w-full rounded-xl shadow-sm transition-all duration-300 ${
                             availableQuantity === 0
                                 ? "border-gray-200 bg-gray-50/50 text-gray-400"
                                 : isRecentlyAdded
                                   ? "border border-emerald-600 bg-[linear-gradient(135deg,#10B981,#059669)] text-white shadow-[0_16px_30px_-18px_rgba(16,185,129,0.9)]"
-                                : "border border-blue-600 bg-[linear-gradient(135deg,#2563EB,#1D4ED8)] text-white shadow-[0_16px_30px_-18px_rgba(37,99,235,0.9)] hover:border-blue-700 hover:from-blue-700 hover:to-blue-700"
+                                : "border border-blue-600 bg-[linear-gradient(135deg,#2563EB,#1D4ED8)] text-white shadow-[0_16px_30px_-18px_rgba(37,99,235,0.9)] hover:-translate-y-0.5 hover:border-blue-700 hover:shadow-[0_20px_34px_-18px_rgba(37,99,235,0.95)]"
                         }`}
                         onClick={() =>
                             hasSelectableVariants(item)
@@ -167,9 +167,9 @@ function BrowseCard(props: {
                         disabled={availableQuantity === 0}
                     >
                         {isRecentlyAdded ? (
-                            <Check className="mr-1 h-4 w-4" />
+                            <Check className="mr-1 h-4 w-4 transition-transform duration-300 group-hover/button:scale-110" />
                         ) : (
-                            <Plus className="mr-1 h-4 w-4" />
+                            <Plus className="mr-1 h-4 w-4 transition-transform duration-300 group-hover/button:translate-x-0.5 group-hover/button:scale-110" />
                         )}
                         {availableQuantity === 0
                             ? "สินค้าหมด"

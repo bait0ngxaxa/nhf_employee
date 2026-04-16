@@ -2,9 +2,12 @@ import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import crypto from "node:crypto";
 import sharp from "sharp";
+import {
+    IMAGE_UPLOAD_ACCEPTED_TYPES,
+    IMAGE_UPLOAD_MAX_BYTES,
+} from "@/lib/ssot/uploads";
 
 const UPLOAD_ROOT = path.join(process.cwd(), ".uploads");
-const MAX_UPLOAD_BYTES = 8 * 1024 * 1024;
 const MAX_DIMENSION = 1600;
 const WEBP_QUALITY = 80;
 
@@ -16,7 +19,9 @@ const SCOPE_SEGMENTS = {
 type UploadScope = keyof typeof SCOPE_SEGMENTS;
 
 function isAllowedImageType(contentType: string): boolean {
-    return ["image/jpeg", "image/png", "image/webp"].includes(contentType);
+    return IMAGE_UPLOAD_ACCEPTED_TYPES.includes(
+        contentType as (typeof IMAGE_UPLOAD_ACCEPTED_TYPES)[number],
+    );
 }
 
 function createUploadName(scope: UploadScope): string {
@@ -70,7 +75,7 @@ export async function saveLocalImageUpload(input: {
         throw new Error("รองรับเฉพาะไฟล์ JPG, PNG และ WEBP");
     }
 
-    if (file.size > MAX_UPLOAD_BYTES) {
+    if (file.size > IMAGE_UPLOAD_MAX_BYTES) {
         throw new Error("ไฟล์รูปต้องมีขนาดไม่เกิน 8MB");
     }
 

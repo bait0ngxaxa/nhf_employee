@@ -122,10 +122,10 @@ export function StockVariantPickerDialog({
                                     <button
                                         key={variant.id}
                                         type="button"
-                                        className={`rounded-2xl border p-4 text-left transition-all ${
+                                        className={`group/variant rounded-2xl border p-4 text-left transition-all duration-300 ${
                                             isSelected
-                                                ? "border-blue-300 bg-blue-50/60 shadow-sm"
-                                                : "border-slate-200 bg-white hover:border-blue-200 hover:bg-blue-50/30"
+                                                ? "border-blue-300 bg-[linear-gradient(135deg,rgba(239,246,255,0.96),rgba(219,234,254,0.88))] shadow-[0_18px_34px_-24px_rgba(37,99,235,0.45)]"
+                                                : "border-slate-200 bg-white hover:-translate-y-0.5 hover:border-blue-200 hover:bg-blue-50/30 hover:shadow-[0_16px_28px_-24px_rgba(37,99,235,0.35)]"
                                         }`}
                                         onClick={() => {
                                             setSelectedVariantId(variant.id);
@@ -141,7 +141,7 @@ export function StockVariantPickerDialog({
                                                     SKU: {variant.sku}
                                                 </div>
                                             </div>
-                                            <div className="rounded-lg bg-slate-50 px-2.5 py-1 text-sm font-bold text-slate-700">
+                                            <div className="rounded-lg bg-slate-50 px-2.5 py-1 text-sm font-bold text-slate-700 transition-all duration-300 group-hover/variant:bg-white group-hover/variant:shadow-sm">
                                                 คงเหลือ {variant.quantity} {variant.unit}
                                             </div>
                                         </div>
@@ -166,7 +166,7 @@ export function StockVariantPickerDialog({
                                     type="button"
                                     variant="ghost"
                                     size="icon"
-                                    className="h-9 w-9 rounded-lg bg-white"
+                                    className="h-9 w-9 rounded-lg border border-transparent bg-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-200 hover:bg-slate-100 hover:shadow-md"
                                     onClick={() =>
                                         setQuantity((current) => Math.max(1, current - 1))
                                     }
@@ -180,7 +180,7 @@ export function StockVariantPickerDialog({
                                     type="button"
                                     variant="ghost"
                                     size="icon"
-                                    className="h-9 w-9 rounded-lg bg-white"
+                                    className="h-9 w-9 rounded-lg border border-transparent bg-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-200 hover:bg-slate-100 hover:shadow-md"
                                     onClick={() =>
                                         setQuantity((current) =>
                                             Math.min(
@@ -198,11 +198,15 @@ export function StockVariantPickerDialog({
                     )}
 
                     <div className="flex justify-end gap-3 pt-2">
-                        <Button variant="ghost" onClick={onClose}>
+                        <Button
+                            variant="ghost"
+                            onClick={onClose}
+                            className="border border-slate-100 transition-all duration-300 hover:-translate-y-0.5 hover:border-slate-200 hover:bg-slate-50 hover:shadow-sm"
+                        >
                             ยกเลิก
                         </Button>
                         <Button
-                            className="bg-blue-600 font-bold text-white hover:bg-blue-700"
+                            className="group/confirm bg-[linear-gradient(135deg,#2563EB,#1D4ED8)] font-bold text-white shadow-[0_18px_34px_-22px_rgba(37,99,235,0.95)] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_22px_38px_-20px_rgba(37,99,235,0.95)]"
                             onClick={() => {
                                 if (!selectedVariant) {
                                     return;
@@ -214,6 +218,7 @@ export function StockVariantPickerDialog({
                                 selectedVariantAvailableQuantity === 0
                             }
                         >
+                            <Plus className="mr-1 h-4 w-4 transition-transform duration-300 group-hover/confirm:translate-x-0.5 group-hover/confirm:scale-110" />
                             เพิ่มในรายการเบิก
                         </Button>
                     </div>

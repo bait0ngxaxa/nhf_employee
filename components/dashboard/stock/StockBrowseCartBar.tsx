@@ -35,11 +35,11 @@ export function StockBrowseCartBar(props: StockBrowseCartBarProps) {
                 <Button
                     type="button"
                     onClick={() => setOpen(true)}
-                    className="flex h-auto w-full items-center justify-between gap-4 rounded-[1.6rem] border border-slate-200 bg-white px-4 py-3 text-left text-slate-800 shadow-[0_24px_60px_-24px_rgba(15,23,42,0.16)] transition-[background-color,border-color,box-shadow,transform] duration-200 ease-out hover:-translate-y-0.5 hover:border-slate-300 hover:bg-slate-50/80 hover:shadow-[0_28px_64px_-28px_rgba(15,23,42,0.18)] sm:min-w-[340px]"
+                    className="group/cart-bar flex h-auto w-full items-center justify-between gap-4 rounded-[1.6rem] border border-slate-200 bg-white px-4 py-3 text-left text-slate-800 shadow-[0_24px_60px_-24px_rgba(15,23,42,0.16)] transition-[background-color,border-color,box-shadow,transform] duration-300 ease-out hover:-translate-y-1 hover:border-blue-200 hover:bg-[linear-gradient(135deg,rgba(255,255,255,1),rgba(239,246,255,0.92))] hover:shadow-[0_28px_64px_-28px_rgba(37,99,235,0.26)] sm:min-w-[340px]"
                 >
                     <div className="flex items-center gap-3">
-                        <div className="rounded-2xl bg-blue-50 p-2.5 text-blue-700">
-                            <ShoppingCart className="h-5 w-5" />
+                        <div className="rounded-2xl bg-blue-50 p-2.5 text-blue-700 transition-all duration-300 group-hover/cart-bar:scale-105 group-hover/cart-bar:bg-blue-100">
+                            <ShoppingCart className="h-5 w-5 transition-transform duration-300 group-hover/cart-bar:-rotate-6" />
                         </div>
                         <div>
                             <div className="text-sm font-semibold">
@@ -51,10 +51,10 @@ export function StockBrowseCartBar(props: StockBrowseCartBarProps) {
                         </div>
                     </div>
                     <div className="flex items-center gap-2">
-                        <div className="rounded-full bg-blue-600 px-2.5 py-1 text-xs font-bold text-white shadow-sm">
+                        <div className="rounded-full bg-blue-600 px-2.5 py-1 text-xs font-bold text-white shadow-sm transition-all duration-300 group-hover/cart-bar:scale-105 group-hover/cart-bar:shadow-[0_12px_24px_-14px_rgba(37,99,235,0.9)]">
                             {props.cartCount}
                         </div>
-                        <ChevronRight className="h-4 w-4 text-slate-400" />
+                        <ChevronRight className="h-4 w-4 text-slate-400 transition-transform duration-300 group-hover/cart-bar:translate-x-0.5" />
                     </div>
                 </Button>
             </div>

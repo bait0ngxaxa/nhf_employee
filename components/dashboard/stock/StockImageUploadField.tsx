@@ -6,6 +6,7 @@ import { ImagePlus, Loader2, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { API_ROUTES } from "@/lib/ssot/routes";
+import { IMAGE_UPLOAD_MAX_BYTES, IMAGE_UPLOAD_MAX_MB } from "@/lib/ssot/uploads";
 
 type StockImageUploadFieldProps = {
     label: string;
@@ -36,6 +37,12 @@ export function StockImageUploadField({
     ): Promise<void> {
         const file = event.target.files?.[0];
         if (!file) {
+            return;
+        }
+
+        if (file.size > IMAGE_UPLOAD_MAX_BYTES) {
+            toast.error(`ไฟล์รูปต้องมีขนาดไม่เกิน ${IMAGE_UPLOAD_MAX_MB} MB`);
+            event.target.value = "";
             return;
         }
 
@@ -136,7 +143,7 @@ export function StockImageUploadField({
                             {uploading ? "กำลังอัปโหลด..." : "อัปโหลดรูปภาพ"}
                         </span>
                         <span className="text-xs text-slate-400">
-                            รองรับ JPG, PNG, WEBP
+                            รองรับ JPG, PNG, WEBP ไม่เกิน {IMAGE_UPLOAD_MAX_MB} MB
                         </span>
                     </button>
                 )}

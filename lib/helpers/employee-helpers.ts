@@ -62,12 +62,28 @@ export function getEmployeeEmailStatus(email: string): 'valid' | 'temp' | 'inval
 
 export function formatEmployeePhone(phone?: string): string {
   if (!phone) return '-';
-  
+
   const cleaned = phone.replace(/\D/g, '');
-  
+
   if (cleaned.length === 10) {
-    return `${cleaned.slice(0, 3)}-${cleaned.slice(3, 6)}-${cleaned.slice(6)}`;
+    return `${cleaned.slice(0, 3)}-${cleaned.slice(3)}`;
   }
-  
+
   return phone;
+}
+
+export function getEmployeeDepartmentLabel(department?: string): string {
+  if (department === 'ADMIN' || department === 'บริหาร') {
+    return 'บริหาร';
+  }
+
+  return 'วิชาการ';
+}
+
+export function getEmployeeDepartmentBadgeClass(department?: string): string {
+  if (department === 'ADMIN' || department === 'บริหาร') {
+    return 'bg-amber-50 text-amber-700 border-amber-200/80 hover:bg-amber-100';
+  }
+
+  return 'bg-sky-50 text-sky-700 border-sky-200/80 hover:bg-sky-100';
 }

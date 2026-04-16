@@ -1,0 +1,1 @@
+After completing a change, at minimum run targeted verification and preferably `npm run lint`. For logic changes, also run relevant Vitest commands (`npm run test` or focused test files if available). For UI-only changes, inspect diff carefully and confirm Thai copy/UTF-8 text was preserved. Do not revert unrelated user changes in dirty worktrees.

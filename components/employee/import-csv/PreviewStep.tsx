@@ -10,6 +10,11 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Alert } from "@/components/ui/alert";
+import {
+    formatEmployeePhone,
+    getEmployeeDepartmentBadgeClass,
+    getEmployeeDepartmentLabel,
+} from "@/lib/helpers/employee-helpers";
 import { FileText, CheckCircle, XCircle } from "lucide-react";
 import { type PreviewStepProps } from "./types";
 
@@ -77,15 +82,15 @@ export function PreviewStep({
                                         {employee.position}
                                     </td>
                                     <td className="px-4 py-4 text-sm">
-                                        <Badge variant="outline" className="bg-slate-50 text-slate-700 border-slate-200/80 font-medium shadow-sm hover:bg-slate-100 px-2.5">
-                                            {employee.department === "ADMIN" ||
-                                            employee.department === "บริหาร"
-                                                ? "บริหาร"
-                                                : "วิชาการ"}
+                                        <Badge
+                                            variant="outline"
+                                            className={`${getEmployeeDepartmentBadgeClass(employee.department)} px-2.5 font-medium shadow-sm`}
+                                        >
+                                            {getEmployeeDepartmentLabel(employee.department)}
                                         </Badge>
                                     </td>
                                     <td className="px-4 py-4 text-sm text-gray-600">
-                                        {employee.phone || "-"}
+                                        {formatEmployeePhone(employee.phone)}
                                     </td>
                                     <td className="px-4 py-4 text-sm text-gray-600">
                                         {employee.nickname ? (
