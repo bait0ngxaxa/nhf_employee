@@ -1,3 +1,4 @@
+import type { ApiResponse } from "@/lib/api-client";
 import type { StockItem } from "../context/stock/types";
 
 export type VariantDraftAttribute = {
@@ -124,6 +125,25 @@ export function resolveStockApiErrorMessage(
             : "";
 
     return errorMessage || fallback;
+}
+
+export function ensureStockApiSuccess<T>(
+    response: ApiResponse<T>,
+    fallback: string,
+): T {
+    if (response.success) {
+        return response.data;
+    }
+
+    const message =
+        response.details !== undefined
+            ? resolveStockApiErrorMessage(
+                  response.details,
+                  response.errorThai || response.error || fallback,
+              )
+            : response.errorThai || response.error || fallback;
+
+    throw new Error(message);
 }
 
 export function createVariantSummary(item: StockItem): string {

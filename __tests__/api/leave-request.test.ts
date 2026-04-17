@@ -5,9 +5,10 @@ import { prisma } from "@/lib/prisma";
 import { getEmployeeIdFromUserId } from "@/lib/services/leave/get-employee-id";
 import { processOutbox } from "@/lib/services/outbox/processor";
 import { NextRequest } from "next/server";
+import type * as NextServerModule from "next/server";
 
 vi.mock("next/server", async (importOriginal) => {
-    const actual = await importOriginal<typeof import("next/server")>();
+    const actual = await importOriginal<typeof NextServerModule>();
     return {
         ...actual,
         after: vi.fn((callback) => {

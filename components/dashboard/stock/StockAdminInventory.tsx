@@ -6,6 +6,7 @@ import { Pagination } from "@/components/Pagination";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { useStockDataContext, useStockUIContext } from "../context/stock";
+import { STOCK_ADMIN_ITEMS_LIMIT as ITEMS_PER_PAGE } from "../context/stock/provider.shared";
 import type { StockItem } from "../context/stock/types";
 import { AddItemDialog } from "./StockInventoryAddItemDialog";
 import { AddCategoryDialog } from "./StockInventoryDialogs";
@@ -13,8 +14,6 @@ import { EditItemDialog } from "./StockInventoryEditDialog";
 import { StockBrowseFilters } from "./StockBrowseFilters";
 import { StockInventoryTable } from "./StockInventoryTable";
 import { STOCK_ADMIN_TEXT } from "./stockAdminInventory.shared";
-
-const ITEMS_PER_PAGE = 10;
 
 export function StockAdminInventory() {
     const {

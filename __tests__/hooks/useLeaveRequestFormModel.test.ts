@@ -37,7 +37,7 @@ describe("useLeaveRequestFormModel", () => {
         const { result } = renderHook(() => useLeaveRequestFormModel({ onSuccess }));
 
         act(() => {
-            result.current.form.setValue("period", "HALF_AM");
+            result.current.form.setValue("period", "MORNING");
             result.current.switchToMultiDay();
         });
 

@@ -10,9 +10,11 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
+import { apiPost } from "@/lib/api-client";
 import { API_ROUTES } from "@/lib/ssot/routes";
 import type { StockItem } from "../context/stock/types";
 import {
+    ensureStockApiSuccess,
     STOCK_ADMIN_TEXT,
     createAdjustSuccessMessage,
 } from "./stockAdminInventory.shared";
@@ -32,23 +34,18 @@ export function AdjustDialog({ item, onClose, onSuccess }: AdjustDialogProps) {
         const formData = new FormData(event.currentTarget);
 
         try {
-            const res = await fetch(API_ROUTES.stock.adjustById(item.id), {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
+            ensureStockApiSuccess(
+                await apiPost(API_ROUTES.stock.adjustById(item.id), {
                     type: "IN",
                     quantity: Number(formData.get("quantity")),
                     minStock: Number(formData.get("minStock")),
                 }),
-            });
-            if (!res.ok) {
-                const err = await res.json();
-                throw new Error(err.error ?? STOCK_ADMIN_TEXT.genericError);
-            }
+                STOCK_ADMIN_TEXT.genericError,
+            );
 
             toast.success(createAdjustSuccessMessage(item.name));
             onSuccess();
-        } catch (error) {
+        } catch (error: unknown) {
             const message =
                 error instanceof Error ? error.message : STOCK_ADMIN_TEXT.genericError;
             toast.error(message);
@@ -117,22 +114,17 @@ export function AddCategoryDialog({
         const formData = new FormData(event.currentTarget);
 
         try {
-            const res = await fetch(API_ROUTES.stock.categories, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
+            ensureStockApiSuccess(
+                await apiPost(API_ROUTES.stock.categories, {
                     name: formData.get("name"),
                     description: formData.get("description") || null,
                 }),
-            });
-            if (!res.ok) {
-                const err = await res.json();
-                throw new Error(err.error ?? STOCK_ADMIN_TEXT.genericError);
-            }
+                STOCK_ADMIN_TEXT.genericError,
+            );
 
             toast.success(STOCK_ADMIN_TEXT.categoryAdded);
             onSuccess();
-        } catch (error) {
+        } catch (error: unknown) {
             const message =
                 error instanceof Error ? error.message : STOCK_ADMIN_TEXT.genericError;
             toast.error(message);

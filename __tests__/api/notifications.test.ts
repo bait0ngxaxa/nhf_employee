@@ -24,7 +24,17 @@ vi.mock("@/lib/prisma", () => ({
 }));
 
 describe("Notification API Routes", () => {
-    const mockUser = { id: "1", name: "Test User", email: "test@example.com" };
+    const mockUser = {
+        id: "1",
+        name: "Test User",
+        email: "test@example.com",
+        role: "USER",
+    };
+    const mockGetApiAuthSession = vi.mocked(getApiAuthSession);
+    const mockFindMany = vi.mocked(prisma.notification.findMany);
+    const mockCount = vi.mocked(prisma.notification.count);
+    const mockUpdate = vi.mocked(prisma.notification.update);
+    const mockUpdateMany = vi.mocked(prisma.notification.updateMany);
 
     beforeEach(() => {
         vi.clearAllMocks();
@@ -32,7 +42,7 @@ describe("Notification API Routes", () => {
 
     describe("GET /api/notifications", () => {
         it("should return unauthorized if no session exists", async () => {
-            (getApiAuthSession as any).mockResolvedValue(null);
+            mockGetApiAuthSession.mockResolvedValue(null);
             const req = new NextRequest("http://localhost/api/notifications");
             const res = await getNotifications(req);
             
@@ -42,15 +52,15 @@ describe("Notification API Routes", () => {
         });
 
         it("should return notifications and unread count for authenticated user", async () => {
-            (getApiAuthSession as any).mockResolvedValue({ user: mockUser });
+            mockGetApiAuthSession.mockResolvedValue({ user: mockUser });
             
             const mockNotifications = [
                 { id: "1", title: "Test 1", message: "Msg 1", isRead: false, createdAt: new Date() },
                 { id: "2", title: "Test 2", message: "Msg 2", isRead: true, createdAt: new Date() },
             ];
             
-            (prisma.notification.findMany as any).mockResolvedValue(mockNotifications);
-            (prisma.notification.count as any).mockResolvedValue(1);
+            mockFindMany.mockResolvedValue(mockNotifications as never);
+            mockCount.mockResolvedValue(1);
 
             const req = new NextRequest("http://localhost/api/notifications");
             const res = await getNotifications(req);
@@ -70,12 +80,15 @@ describe("Notification API Routes", () => {
 
     describe("PATCH /api/notifications/[id]/read", () => {
         it("should mark a single notification as read", async () => {
-            (getApiAuthSession as any).mockResolvedValue({ user: mockUser });
+            mockGetApiAuthSession.mockResolvedValue({ user: mockUser });
             
             const mockNotificationId = "notif-123";
             const params = Promise.resolve({ id: mockNotificationId });
 
-            (prisma.notification.update as any).mockResolvedValue({ id: mockNotificationId, isRead: true });
+            mockUpdate.mockResolvedValue({
+                id: mockNotificationId,
+                isRead: true,
+            } as never);
 
             const req = new NextRequest(`http://localhost/api/notifications/${mockNotificationId}/read`, {
                 method: "PATCH"
@@ -94,7 +107,7 @@ describe("Notification API Routes", () => {
         });
 
         it("should return unauthorized for patch without session", async () => {
-            (getApiAuthSession as any).mockResolvedValue(null);
+            mockGetApiAuthSession.mockResolvedValue(null);
             const params = Promise.resolve({ id: "123" });
             const req = new NextRequest("http://localhost/api/notifications/123/read", { method: "PATCH" });
             
@@ -105,8 +118,8 @@ describe("Notification API Routes", () => {
 
     describe("POST /api/notifications/mark-all-read", () => {
         it("should mark all user's notifications as read", async () => {
-            (getApiAuthSession as any).mockResolvedValue({ user: mockUser });
-            (prisma.notification.updateMany as any).mockResolvedValue({ count: 5 });
+            mockGetApiAuthSession.mockResolvedValue({ user: mockUser });
+            mockUpdateMany.mockResolvedValue({ count: 5 } as never);
 
             const req = new NextRequest("http://localhost/api/notifications/mark-all-read", {
                 method: "POST"

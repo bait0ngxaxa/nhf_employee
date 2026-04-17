@@ -23,8 +23,8 @@ import {
     type DashboardDataContextValue,
     type DashboardUIContextValue,
 } from "./types";
+import { apiPost } from "@/lib/api-client";
 import { logoutHybridSession, refreshHybridSession } from "@/lib/client-auth";
-import { AUTH_MUTATION_HEADERS } from "@/lib/auth-csrf";
 import {
     API_ROUTES,
     APP_ROUTES,
@@ -103,11 +103,7 @@ export function DashboardProvider({
 
         void (async () => {
             try {
-                await fetch(API_ROUTES.auth.bootstrap, {
-                    method: "POST",
-                    credentials: "include",
-                    headers: AUTH_MUTATION_HEADERS,
-                });
+                await apiPost(API_ROUTES.auth.bootstrap, {});
             } finally {
                 setHybridBootstrapped(true);
             }

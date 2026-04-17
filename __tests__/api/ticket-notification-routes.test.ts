@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
+import type * as NextServerModule from "next/server";
 import { PATCH as patchTicketRoute } from "@/app/api/tickets/[id]/route";
 import { POST as postTicketCommentRoute } from "@/app/api/tickets/[id]/comments/route";
 import { getApiAuthSession } from "@/lib/server-auth";
@@ -10,7 +11,7 @@ import { prisma } from "@/lib/prisma";
 import { isAdminRole } from "@/lib/ssot/permissions";
 
 vi.mock("next/server", async (importOriginal) => {
-    const actual = await importOriginal<typeof import("next/server")>();
+    const actual = await importOriginal<typeof NextServerModule>();
     return {
         ...actual,
         after: vi.fn((callback: () => void | Promise<void>) => {

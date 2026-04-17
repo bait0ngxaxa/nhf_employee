@@ -44,6 +44,17 @@ function isRecord(value: unknown): value is Record<string, unknown> {
     return typeof value === "object" && value !== null;
 }
 
+function isRawRequestData(value: unknown): value is BodyInit {
+    return (
+        (typeof FormData !== "undefined" && value instanceof FormData)
+        || (typeof URLSearchParams !== "undefined" && value instanceof URLSearchParams)
+        || (typeof Blob !== "undefined" && value instanceof Blob)
+        || (typeof ArrayBuffer !== "undefined" && value instanceof ArrayBuffer)
+        || ArrayBuffer.isView(value)
+        || (typeof ReadableStream !== "undefined" && value instanceof ReadableStream)
+    );
+}
+
 function createRequestId(): string {
     if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
         return crypto.randomUUID();
@@ -54,14 +65,14 @@ function createRequestId(): string {
 function createHeaders(
     headers: HeadersInit | undefined,
     method: string | undefined,
-    hasData: boolean,
+    hasJsonData: boolean,
     requestId: string,
 ): Headers {
     const reqHeaders = new Headers(headers);
     if (!reqHeaders.has("X-Request-Id")) {
         reqHeaders.set("X-Request-Id", requestId);
     }
-    if (!reqHeaders.has("Content-Type") && hasData) {
+    if (!reqHeaders.has("Content-Type") && hasJsonData) {
         reqHeaders.set("Content-Type", "application/json");
     }
 
@@ -216,7 +227,9 @@ export async function apiRequest<T>(
     const requestId = customRequestId ?? createRequestId();
     const finalRetryCount = method === "GET" ? (retryCount ?? DEFAULT_GET_RETRY_COUNT) : 0;
     const finalTimeoutMs = timeoutMs ?? DEFAULT_TIMEOUT_MS;
-    const reqHeaders = createHeaders(headers, method, data !== undefined, requestId);
+    const hasRawRequestData = isRawRequestData(data);
+    const hasJsonData = data !== undefined && !hasRawRequestData;
+    const reqHeaders = createHeaders(headers, method, hasJsonData, requestId);
 
     const requestInit: RequestInit = {
         ...customConfig,
@@ -226,7 +239,7 @@ export async function apiRequest<T>(
     };
 
     if (data !== undefined) {
-        requestInit.body = JSON.stringify(data);
+        requestInit.body = hasRawRequestData ? data : JSON.stringify(data);
     }
 
     for (let attempt = 0; attempt <= finalRetryCount; attempt += 1) {

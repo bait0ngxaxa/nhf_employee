@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { ClipboardList, Search, X } from "lucide-react";
 import { type StockRequestStatus } from "@prisma/client";
-import { toast } from "sonner";
 import { Pagination } from "@/components/Pagination";
 import { RequestStatusBadge } from "@/components/dashboard/shared/RequestStatusBadge";
 import { Button } from "@/components/ui/button";
@@ -23,19 +22,16 @@ import {
     TableHeader,
     TableRow,
 } from "@/components/ui/table";
-import { API_ROUTES } from "@/lib/ssot/routes";
 import { useStockDataContext, useStockUIContext } from "../context/stock";
+import { STOCK_REQUESTS_LIMIT as REQUESTS_PER_PAGE } from "../context/stock/provider.shared";
 import type { StockRequest } from "../context/stock/types";
 import { StockRequestCancelDialog } from "./StockRequestCancelDialog";
+import {
+    formatStockRequestDate,
+    REQUEST_STATUS_OPTIONS,
+} from "./stockRequest.shared";
 import { getRequestItemDisplayName } from "./stockVariant.shared";
-
-const REQUESTS_PER_PAGE = 10;
-const REQUEST_STATUS_OPTIONS = [
-    { value: "all", label: "ทั้งหมด" },
-    { value: "PENDING_ISSUE", label: "รอจ่าย" },
-    { value: "ISSUED", label: "จ่ายแล้ว" },
-    { value: "CANCELLED", label: "ยกเลิก" },
-] as const;
+import { useStockRequestActions } from "./useStockRequestActions";
 
 export function StockMyRequests() {
     const { requests, isLoading, totalRequests, refreshRequests } = useStockDataContext();
@@ -47,36 +43,17 @@ export function StockMyRequests() {
         requestSearchQuery,
         setRequestSearchQuery,
     } = useStockUIContext();
-    const [processingId, setProcessingId] = useState<number | null>(null);
     const [cancelTarget, setCancelTarget] = useState<StockRequest | null>(null);
+    const { processingRequestId, runCancelRequest } = useStockRequestActions({
+        onCancelSuccess: refreshRequests,
+        onCancelSettled: () => setCancelTarget(null),
+    });
     const totalPages = Math.max(1, Math.ceil(totalRequests / REQUESTS_PER_PAGE));
     const hasActiveFilters =
         statusFilter !== undefined || requestSearchQuery.trim().length > 0;
 
     async function handleCancel(requestId: number, cancelReason?: string): Promise<void> {
-        setProcessingId(requestId);
-        try {
-            const response = await fetch(API_ROUTES.stock.cancelById(requestId), {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    cancelReason: cancelReason?.trim() ? cancelReason.trim() : null,
-                }),
-            });
-
-            if (!response.ok) {
-                const errorResult = (await response.json()) as { error?: string };
-                throw new Error(errorResult.error ?? "เกิดข้อผิดพลาด");
-            }
-
-            toast.success(`ยกเลิกคำขอ #${requestId} เรียบร้อยแล้ว`);
-            refreshRequests();
-        } catch (error: unknown) {
-            toast.error(error instanceof Error ? error.message : "เกิดข้อผิดพลาด");
-        } finally {
-            setProcessingId(null);
-            setCancelTarget(null);
-        }
+        await runCancelRequest(requestId, cancelReason);
     }
 
     return (
@@ -131,7 +108,7 @@ export function StockMyRequests() {
                                     <RequestRow
                                         key={request.id}
                                         request={request}
-                                        processingId={processingId}
+                                        processingId={processingRequestId}
                                         onOpenCancel={() => setCancelTarget(request)}
                                     />
                                 ))}
@@ -154,7 +131,7 @@ export function StockMyRequests() {
 
             <StockRequestCancelDialog
                 request={cancelTarget}
-                loading={processingId !== null}
+                loading={processingRequestId !== null}
                 onClose={() => setCancelTarget(null)}
                 onConfirm={handleCancel}
             />
@@ -241,7 +218,7 @@ function RequestRow(props: {
                 #{request.id}
             </TableCell>
             <TableCell className="border-r border-slate-300 py-4 text-sm text-slate-700">
-                {formatDate(request.createdAt)}
+                {formatStockRequestDate(request.createdAt)}
             </TableCell>
             <TableCell className="border-r border-slate-300 py-4 text-sm font-medium text-slate-700">
                 {request.projectCode}
@@ -293,19 +270,8 @@ function renderRequestNote(request: StockRequest): string {
     }
 
     if (request.status === "ISSUED" && request.issuedAt) {
-        return `จ่ายเมื่อ ${formatDate(request.issuedAt)}`;
+        return `จ่ายเมื่อ ${formatStockRequestDate(request.issuedAt)}`;
     }
 
     return "-";
-}
-
-function formatDate(dateStr: string): string {
-    return new Date(dateStr).toLocaleDateString("th-TH", {
-        day: "numeric",
-        month: "short",
-        year: "2-digit",
-        hour: "2-digit",
-        minute: "2-digit",
-        timeZone: "Asia/Bangkok",
-    });
 }

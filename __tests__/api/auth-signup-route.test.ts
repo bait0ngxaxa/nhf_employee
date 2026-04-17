@@ -1,6 +1,7 @@
 // @vitest-environment node
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
+import type * as HybridAuthTokensModule from "@/lib/hybrid-auth-tokens";
 
 import { POST as signupRoute } from "@/app/api/auth/signup/route";
 import { resetSignupRateLimit } from "@/lib/auth-signup-rate-limit";
@@ -35,7 +36,7 @@ vi.mock("@/lib/prisma", () => ({
 
 vi.mock("@/lib/hybrid-auth-tokens", async () => {
     const actual =
-        await vi.importActual<typeof import("@/lib/hybrid-auth-tokens")>(
+        await vi.importActual<typeof HybridAuthTokensModule>(
             "@/lib/hybrid-auth-tokens",
         );
 

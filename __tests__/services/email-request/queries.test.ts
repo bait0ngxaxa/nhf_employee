@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { mockDeep, mockReset } from "vitest-mock-extended";
+import type { PrismaClient } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getEmailRequests } from "@/lib/services/email-request/queries";
-import { PrismaClient } from "@prisma/client";
 
 vi.mock("@/lib/prisma", () => ({
     prisma: mockDeep<PrismaClient>(),
@@ -23,7 +23,7 @@ describe("Email Request Queries", () => {
             prismaMock.emailRequest.count.mockResolvedValue(1);
             prismaMock.emailRequest.findMany.mockResolvedValue([
                 { id: 1 },
-            ] as any);
+            ] as never);
 
             await getEmailRequests({ page: 1, limit: 10 }, user);
 
@@ -39,7 +39,7 @@ describe("Email Request Queries", () => {
             prismaMock.emailRequest.count.mockResolvedValue(1);
             prismaMock.emailRequest.findMany.mockResolvedValue([
                 { id: 1 },
-            ] as any);
+            ] as never);
 
             await getEmailRequests({ page: 1, limit: 10 }, user);
 

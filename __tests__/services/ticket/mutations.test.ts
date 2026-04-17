@@ -1,12 +1,12 @@
 ﻿import { describe, it, expect, vi, beforeEach } from "vitest";
 import { mockDeep, mockReset } from "vitest-mock-extended";
 import { prisma } from "@/lib/prisma";
+import type { PrismaClient } from "@prisma/client";
 import {
     createTicket,
     updateTicket,
     deleteTicket,
 } from "@/lib/services/ticket/mutations";
-import { PrismaClient } from "@prisma/client";
 
 vi.mock("@/lib/prisma", () => ({
     prisma: mockDeep<PrismaClient>(),

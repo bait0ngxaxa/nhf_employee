@@ -6,6 +6,7 @@ import useSWR from "swr";
 import { toast } from "sonner";
 
 import { apiPost } from "@/lib/api-client";
+import type { ApiResponse } from "@/lib/api-client";
 
 // Mock useSWR
 vi.mock("swr");
@@ -60,10 +61,31 @@ const TestComponent = () => {
 
 describe("EmailRequestProvider", () => {
     const mockMutate = vi.fn();
+    const mockUseSWR = vi.mocked(useSWR);
+
+    function createSuccessResponse<T>(data: T): ApiResponse<T> {
+        return {
+            success: true,
+            data,
+            status: 200,
+            requestId: "test-request-id",
+        };
+    }
+
+    function createErrorResponse(message: string, status = 400): ApiResponse<never> {
+        return {
+            success: false,
+            error: message,
+            errorThai: message,
+            code: "VALIDATION_ERROR",
+            status,
+            requestId: "test-request-id",
+        };
+    }
 
     beforeEach(() => {
         vi.clearAllMocks();
-        (useSWR as any).mockReturnValue({
+        mockUseSWR.mockReturnValue({
             data: {
                 success: true,
                 emailRequests: [],
@@ -71,6 +93,7 @@ describe("EmailRequestProvider", () => {
             },
             mutate: mockMutate,
             isLoading: false,
+            isValidating: false,
             error: null,
         });
     });
@@ -100,11 +123,9 @@ describe("EmailRequestProvider", () => {
     });
 
     it("should handle successful submission and show toast", async () => {
-        vi.mocked(apiPost).mockResolvedValueOnce({
-            success: true,
-            data: { success: true },
-            status: 200,
-        });
+        vi.mocked(apiPost).mockResolvedValueOnce(
+            createSuccessResponse({ success: true }),
+        );
 
         render(
             <EmailRequestProvider>
@@ -139,11 +160,7 @@ describe("EmailRequestProvider", () => {
     });
 
     it("should handle submission failure", async () => {
-        vi.mocked(apiPost).mockResolvedValueOnce({
-            success: false,
-            error: "API Error",
-            status: 400,
-        });
+        vi.mocked(apiPost).mockResolvedValueOnce(createErrorResponse("API Error"));
 
         render(
             <EmailRequestProvider>
@@ -162,17 +179,18 @@ describe("EmailRequestProvider", () => {
     });
 
     it("should display data from SWR", () => {
-        (useSWR as any).mockReturnValue({
+        mockUseSWR.mockReturnValue({
             data: {
                 success: true,
                 emailRequests: [
-                    { id: "1", thaiName: "Test User 1" },
-                    { id: "2", thaiName: "Test User 2" },
+                    { id: 1, thaiName: "Test User 1" },
+                    { id: 2, thaiName: "Test User 2" },
                 ],
                 pagination: { page: 1, limit: 10, total: 2, totalPages: 1 },
             },
             mutate: mockMutate,
             isLoading: false,
+            isValidating: false,
             error: null,
         });
 

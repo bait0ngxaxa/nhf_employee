@@ -22,7 +22,6 @@ const eslintConfig = [
             "lib/generated/**",
             "*.config.js",
             "*.config.ts",
-            "__tests__/**",
         ],
     },
     {

@@ -1,6 +1,7 @@
 "use client";
 
 import useSWR from "swr";
+import { apiGet } from "@/lib/api-client";
 import { API_ROUTES } from "@/lib/ssot/routes";
 import type {
     StockCategory,
@@ -28,19 +29,19 @@ const DEFAULT_SWR_OPTIONS = {
     shouldRetryOnError: false,
 } as const;
 
-async function jsonFetcher<T>(url: string): Promise<T> {
-    const response = await fetch(url);
-    if (!response.ok) {
-        throw new Error(`Request failed: ${response.status}`);
+async function apiGetFetcher<T>(url: string): Promise<T> {
+    const response = await apiGet<T>(url);
+    if (!response.success) {
+        throw new Error(response.errorThai || response.error || "ไม่สามารถดึงข้อมูลได้");
     }
 
-    return (await response.json()) as T;
+    return response.data;
 }
 
 export function useStockCategoriesQuery() {
     return useSWR<StockCategoriesResponse>(
         API_ROUTES.stock.categories,
-        jsonFetcher,
+        apiGetFetcher,
         {
             ...DEFAULT_SWR_OPTIONS,
             dedupingInterval: 30_000,
@@ -49,14 +50,14 @@ export function useStockCategoriesQuery() {
 }
 
 export function useStockItemsQuery(query: string) {
-    return useSWR<StockItemsResponse>(query, jsonFetcher, {
+    return useSWR<StockItemsResponse>(query, apiGetFetcher, {
         ...DEFAULT_SWR_OPTIONS,
         dedupingInterval: 10_000,
     });
 }
 
 export function useStockRequestsQuery(query: string) {
-    return useSWR<StockRequestsResponse>(query, jsonFetcher, {
+    return useSWR<StockRequestsResponse>(query, apiGetFetcher, {
         ...DEFAULT_SWR_OPTIONS,
         dedupingInterval: 10_000,
     });

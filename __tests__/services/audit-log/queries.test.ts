@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { mockDeep, mockReset } from "vitest-mock-extended";
+import type { PrismaClient } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getAuditLogs } from "@/lib/services/audit-log/queries";
-import { PrismaClient } from "@prisma/client";
 
 vi.mock("@/lib/prisma", () => ({
     prisma: mockDeep<PrismaClient>(),
@@ -22,7 +22,7 @@ describe("Audit Log Queries", () => {
             prismaMock.auditLog.count.mockResolvedValue(1);
             prismaMock.auditLog.findMany.mockResolvedValue([
                 { id: 1, details: '{"foo":"bar"}' },
-            ] as any);
+            ] as never);
 
             const result = await getAuditLogs({ page: 1, limit: 10 });
 
@@ -64,7 +64,7 @@ describe("Audit Log Queries", () => {
             prismaMock.auditLog.count.mockResolvedValue(1);
             prismaMock.auditLog.findMany.mockResolvedValue([
                 { id: 1, details: "invalid-json" },
-            ] as any);
+            ] as never);
 
             const result = await getAuditLogs({ page: 1, limit: 10 });
 

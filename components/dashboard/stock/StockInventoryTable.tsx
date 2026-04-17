@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { apiDelete } from "@/lib/api-client";
 import {
     Dialog,
     DialogContent,
@@ -32,6 +33,7 @@ import type { StockItem } from "../context/stock/types";
 import {
     STOCK_ADMIN_TEXT,
     createDeleteSuccessMessage,
+    ensureStockApiSuccess,
 } from "./stockAdminInventory.shared";
 import {
     getItemInventoryMetrics,
@@ -65,17 +67,14 @@ export function StockInventoryTable({
 
         setIsDeleting(true);
         try {
-            const res = await fetch(API_ROUTES.stock.itemById(pendingDeleteItem.id), {
-                method: "DELETE",
-            });
-            if (!res.ok) {
-                const err = await res.json();
-                throw new Error(err.error ?? STOCK_ADMIN_TEXT.genericError);
-            }
+            ensureStockApiSuccess(
+                await apiDelete(API_ROUTES.stock.itemById(pendingDeleteItem.id)),
+                STOCK_ADMIN_TEXT.genericError,
+            );
 
             onDeleted(createDeleteSuccessMessage(pendingDeleteItem.name));
             setPendingDeleteItem(null);
-        } catch (error) {
+        } catch (error: unknown) {
             const message =
                 error instanceof Error ? error.message : STOCK_ADMIN_TEXT.genericError;
             onDeleteError(message);

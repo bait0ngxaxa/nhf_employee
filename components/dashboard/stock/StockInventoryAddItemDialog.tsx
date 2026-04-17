@@ -3,12 +3,13 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
+import { apiPost } from "@/lib/api-client";
 import { API_ROUTES } from "@/lib/ssot/routes";
 import {
+    ensureStockApiSuccess,
     STOCK_ADMIN_TEXT,
     createEmptyVariant,
     createEmptyVariantAttribute,
-    resolveStockApiErrorMessage,
 } from "./stockAdminInventory.shared";
 import type { VariantDraft } from "./stockAdminInventory.shared";
 import {
@@ -66,10 +67,8 @@ export function AddItemDialog({
         const normalizedVariants = variants.map(normalizeVariantDraft);
 
         try {
-            const res = await fetch(API_ROUTES.stock.items, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
+            ensureStockApiSuccess(
+                await apiPost(API_ROUTES.stock.items, {
                     name: formData.get("name"),
                     description: formData.get("description") || null,
                     imageUrl: itemImageUrl || null,
@@ -77,21 +76,12 @@ export function AddItemDialog({
                     categoryId: Number(selectedCategoryId),
                     variants: normalizedVariants,
                 }),
-            });
-
-            if (!res.ok) {
-                const err = await res.json();
-                throw new Error(
-                    resolveStockApiErrorMessage(
-                        err,
-                        STOCK_ADMIN_TEXT.genericError,
-                    ),
-                );
-            }
+                STOCK_ADMIN_TEXT.genericError,
+            );
 
             toast.success(STOCK_ADMIN_TEXT.itemAdded);
             onSuccess();
-        } catch (error) {
+        } catch (error: unknown) {
             const message =
                 error instanceof Error ? error.message : STOCK_ADMIN_TEXT.genericError;
             toast.error(message);

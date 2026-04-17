@@ -2,7 +2,7 @@
 import { mockDeep, mockReset } from "vitest-mock-extended";
 import { prisma } from "@/lib/prisma";
 import { createEmailRequest } from "@/lib/services/email-request/mutations";
-import { PrismaClient } from "@prisma/client";
+import type { PrismaClient } from "@prisma/client";
 
 vi.mock("@/lib/prisma", () => ({
     prisma: mockDeep<PrismaClient>(),

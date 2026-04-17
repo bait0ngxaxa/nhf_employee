@@ -5,8 +5,10 @@ import Image from "next/image";
 import { ImagePlus, Loader2, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { apiPost } from "@/lib/api-client";
 import { API_ROUTES } from "@/lib/ssot/routes";
 import { IMAGE_UPLOAD_MAX_BYTES, IMAGE_UPLOAD_MAX_MB } from "@/lib/ssot/uploads";
+import { ensureStockApiSuccess } from "./stockAdminInventory.shared";
 
 type StockImageUploadFieldProps = {
     label: string;
@@ -52,18 +54,17 @@ export function StockImageUploadField({
         formData.append("file", file);
 
         try {
-            const response = await fetch(API_ROUTES.uploads.image, {
-                method: "POST",
-                body: formData,
-            });
-            const result = (await response.json()) as UploadResponse;
+            const result = ensureStockApiSuccess(
+                await apiPost<UploadResponse>(API_ROUTES.uploads.image, formData),
+                "อัปโหลดรูปไม่สำเร็จ",
+            );
 
-            if (!response.ok || !result.upload?.url) {
+            if (!result.upload?.url) {
                 throw new Error(result.error ?? "อัปโหลดรูปไม่สำเร็จ");
             }
 
             onChange(result.upload.url);
-        } catch (error) {
+        } catch (error: unknown) {
             const message =
                 error instanceof Error ? error.message : "อัปโหลดรูปไม่สำเร็จ";
             toast.error(message);

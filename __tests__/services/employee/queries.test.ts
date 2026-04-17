@@ -1,12 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { mockDeep, mockReset } from "vitest-mock-extended";
 import { prisma } from "@/lib/prisma";
+import type { PrismaClient } from "@prisma/client";
 import {
     getEmployees,
     getEmployeeById,
     emailExists,
 } from "@/lib/services/employee/queries";
-import { PrismaClient } from "@prisma/client";
 
 // Mock prisma module
 vi.mock("@/lib/prisma", () => ({
@@ -31,7 +31,7 @@ describe("Employee Queries", () => {
             ];
             prismaMock.employee.count.mockResolvedValue(2);
             prismaMock.employee.findMany.mockResolvedValue(
-                mockEmployees as any,
+                mockEmployees as never,
             );
 
             // Act
@@ -89,7 +89,7 @@ describe("Employee Queries", () => {
         it("should return employee if found", async () => {
             const mockEmployee = { id: 1, firstName: "John" };
             prismaMock.employee.findFirst.mockResolvedValue(
-                mockEmployee as any,
+                mockEmployee as never,
             );
 
             const result = await getEmployeeById(1);
@@ -116,7 +116,7 @@ describe("Employee Queries", () => {
             prismaMock.employee.findFirst.mockResolvedValue({
                 id: 1,
                 email: "test@test.com",
-            } as any);
+            } as never);
 
             const result = await emailExists("test@test.com");
 
@@ -135,7 +135,7 @@ describe("Employee Queries", () => {
             prismaMock.employee.findFirst.mockResolvedValue({
                 id: 1,
                 email: "test@test.com",
-            } as any);
+            } as never);
 
             const result = await emailExists("test@test.com", 1);
 

@@ -4,11 +4,12 @@ import { useMemo, useState, type FormEvent } from "react";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { apiPatch } from "@/lib/api-client";
 import { API_ROUTES } from "@/lib/ssot/routes";
 import type { StockItem } from "../context/stock/types";
 import {
     createEmptyVariantAttribute,
-    resolveStockApiErrorMessage,
+    ensureStockApiSuccess,
     STOCK_ADMIN_TEXT,
 } from "./stockAdminInventory.shared";
 import { StockImageUploadField } from "./StockImageUploadField";
@@ -94,10 +95,8 @@ export function EditItemDialog({
         setLoading(true);
 
         try {
-            const res = await fetch(API_ROUTES.stock.itemById(item.id), {
-                method: "PATCH",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
+            ensureStockApiSuccess(
+                await apiPatch(API_ROUTES.stock.itemById(item.id), {
                     imageUrl: itemImageUrl || null,
                     variants: variants.map((variant) => ({
                         ...(variant.id !== undefined && { id: variant.id }),
@@ -117,18 +116,12 @@ export function EditItemDialog({
                             .filter((attribute) => attribute.name && attribute.value),
                     })),
                 }),
-            });
-
-            if (!res.ok) {
-                const err = await res.json();
-                throw new Error(
-                    resolveStockApiErrorMessage(err, "เกิดข้อผิดพลาด"),
-                );
-            }
+                "เกิดข้อผิดพลาด",
+            );
 
             toast.success(`อัปเดตสต็อก ${item.name} เรียบร้อยแล้ว`);
             onSuccess();
-        } catch (error) {
+        } catch (error: unknown) {
             const message = error instanceof Error ? error.message : "เกิดข้อผิดพลาด";
             toast.error(message);
         } finally {

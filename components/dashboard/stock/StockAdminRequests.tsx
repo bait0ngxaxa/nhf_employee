@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { type StockRequestStatus } from "@prisma/client";
 import { CheckCircle, ClipboardList, Search, X, XCircle } from "lucide-react";
-import { toast } from "sonner";
 import { Pagination } from "@/components/Pagination";
 import { RequestStatusBadge } from "@/components/dashboard/shared/RequestStatusBadge";
 import { Button } from "@/components/ui/button";
@@ -25,28 +24,14 @@ import {
 } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { API_ROUTES } from "@/lib/ssot/routes";
 import { useStockDataContext, useStockUIContext } from "../context/stock";
+import { STOCK_REQUESTS_LIMIT as REQUESTS_PER_PAGE } from "../context/stock/provider.shared";
 import type { StockRequest } from "../context/stock/types";
-
-const REQUESTS_PER_PAGE = 10;
-const REQUEST_STATUS_OPTIONS = [
-    { value: "all", label: "ทั้งหมด" },
-    { value: "PENDING_ISSUE", label: "รอจ่าย" },
-    { value: "ISSUED", label: "จ่ายแล้ว" },
-    { value: "CANCELLED", label: "ยกเลิก" },
-] as const;
-
-function formatDate(dateStr: string): string {
-    return new Date(dateStr).toLocaleDateString("th-TH", {
-        day: "numeric",
-        month: "short",
-        year: "2-digit",
-        hour: "2-digit",
-        minute: "2-digit",
-        timeZone: "Asia/Bangkok",
-    });
-}
+import {
+    formatStockRequestDate,
+    REQUEST_STATUS_OPTIONS,
+} from "./stockRequest.shared";
+import { useStockRequestActions } from "./useStockRequestActions";
 
 export function StockAdminRequests() {
     const { requests, isLoading, refreshRequests, refreshItems, totalRequests } =
@@ -60,59 +45,25 @@ export function StockAdminRequests() {
         setRequestSearchQuery,
     } = useStockUIContext();
     const [cancelTarget, setCancelTarget] = useState<StockRequest | null>(null);
-    const [processing, setProcessing] = useState<number | null>(null);
+    const { processingRequestId, runCancelRequest, runIssueRequest } =
+        useStockRequestActions({
+            onIssueSuccess: () => {
+                refreshRequests();
+                refreshItems();
+            },
+            onCancelSuccess: refreshRequests,
+            onCancelSettled: () => setCancelTarget(null),
+        });
     const totalPages = Math.max(1, Math.ceil(totalRequests / REQUESTS_PER_PAGE));
     const hasActiveFilters =
         statusFilter !== undefined || requestSearchQuery.trim().length > 0;
 
     async function handleIssue(requestId: number): Promise<void> {
-        setProcessing(requestId);
-        try {
-            const res = await fetch(API_ROUTES.stock.issueById(requestId), {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({}),
-            });
-
-            if (!res.ok) {
-                const err = (await res.json()) as { error?: string };
-                throw new Error(err.error ?? "เกิดข้อผิดพลาด");
-            }
-
-            toast.success(`จ่ายคำขอ #${requestId} เรียบร้อยแล้ว`);
-            refreshRequests();
-            refreshItems();
-        } catch (error: unknown) {
-            toast.error(error instanceof Error ? error.message : "เกิดข้อผิดพลาด");
-        } finally {
-            setProcessing(null);
-        }
+        await runIssueRequest(requestId);
     }
 
     async function handleCancel(requestId: number, reason: string): Promise<void> {
-        setProcessing(requestId);
-        try {
-            const res = await fetch(API_ROUTES.stock.cancelById(requestId), {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    cancelReason: reason || null,
-                }),
-            });
-
-            if (!res.ok) {
-                const err = (await res.json()) as { error?: string };
-                throw new Error(err.error ?? "เกิดข้อผิดพลาด");
-            }
-
-            toast.success(`ยกเลิกคำขอ #${requestId} เรียบร้อยแล้ว`);
-            refreshRequests();
-        } catch (error: unknown) {
-            toast.error(error instanceof Error ? error.message : "เกิดข้อผิดพลาด");
-        } finally {
-            setProcessing(null);
-            setCancelTarget(null);
-        }
+        await runCancelRequest(requestId, reason);
     }
 
     return (
@@ -227,7 +178,7 @@ export function StockAdminRequests() {
                                                 #{req.id}
                                             </TableCell>
                                             <TableCell className="border-r border-slate-300 py-4 text-sm text-slate-700">
-                                                {formatDate(req.createdAt)}
+                                                {formatStockRequestDate(req.createdAt)}
                                             </TableCell>
                                             <TableCell className="border-r border-slate-300 py-4 text-sm font-medium text-slate-700">
                                                 {req.projectCode}
@@ -268,7 +219,7 @@ export function StockAdminRequests() {
                                                         <Button
                                                             size="sm"
                                                             className="bg-emerald-600 text-white shadow-sm transition-all hover:bg-emerald-700 hover:shadow-md"
-                                                            disabled={processing === req.id}
+                                                            disabled={processingRequestId === req.id}
                                                             onClick={() =>
                                                                 void handleIssue(req.id)
                                                             }
@@ -280,7 +231,7 @@ export function StockAdminRequests() {
                                                             size="sm"
                                                             variant="outline"
                                                             className="border-rose-200 text-rose-600 shadow-sm transition-all hover:border-rose-300 hover:bg-rose-50 hover:text-rose-700"
-                                                            disabled={processing === req.id}
+                                                            disabled={processingRequestId === req.id}
                                                             onClick={() => setCancelTarget(req)}
                                                         >
                                                             <XCircle className="mr-1.5 h-3.5 w-3.5" />
@@ -315,7 +266,7 @@ export function StockAdminRequests() {
                 request={cancelTarget}
                 onClose={() => setCancelTarget(null)}
                 onCancel={handleCancel}
-                loading={processing !== null}
+                loading={processingRequestId !== null}
             />
         </div>
     );

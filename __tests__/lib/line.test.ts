@@ -4,10 +4,24 @@ import {
     sendLineBroadcast,
     sendNewTicketNotification,
 } from "@/lib/line";
+import type { LineFlexMessage, TicketEmailData } from "@/types/api";
 
 // Mock fetch
 const fetchMock = vi.fn();
 global.fetch = fetchMock;
+
+const flexMessage: LineFlexMessage = {
+    type: "flex",
+    altText: "Hello",
+    contents: {
+        type: "bubble",
+        body: {
+            type: "box",
+            layout: "vertical",
+            contents: [{ type: "text", text: "Hello" }],
+        },
+    },
+};
 
 describe("LINE Notification Service", () => {
     beforeEach(() => {
@@ -30,10 +44,7 @@ describe("LINE Notification Service", () => {
 
     describe("sendLineMessage", () => {
         it("should send push message", async () => {
-            const result = await sendLineMessage("user1", {
-                type: "text",
-                text: "Hello",
-            } as any);
+            const result = await sendLineMessage("user1", flexMessage);
             expect(result).toBe(true);
             expect(fetchMock).toHaveBeenCalledWith(
                 "https://api.line.me/v2/bot/message/push",
@@ -49,10 +60,7 @@ describe("LINE Notification Service", () => {
 
         it("should fail if no token", async () => {
             delete process.env.LINE_CHANNEL_ACCESS_TOKEN;
-            const result = await sendLineMessage("user1", {
-                type: "text",
-                text: "Hello",
-            } as any);
+            const result = await sendLineMessage("user1", flexMessage);
             expect(result).toBe(false);
             expect(fetchMock).not.toHaveBeenCalled();
         });
@@ -63,20 +71,14 @@ describe("LINE Notification Service", () => {
                 text: async () => "Error msg",
                 status: 400,
             });
-            const result = await sendLineMessage("user1", {
-                type: "text",
-                text: "Hello",
-            } as any);
+            const result = await sendLineMessage("user1", flexMessage);
             expect(result).toBe(false);
         });
     });
 
     describe("sendLineBroadcast", () => {
         it("should send broadcast", async () => {
-            const result = await sendLineBroadcast({
-                type: "text",
-                text: "Hello",
-            } as any);
+            const result = await sendLineBroadcast(flexMessage);
             expect(result).toBe(true);
             expect(fetchMock).toHaveBeenCalledWith(
                 "https://api.line.me/v2/bot/message/broadcast",
@@ -88,14 +90,16 @@ describe("LINE Notification Service", () => {
     describe("sendNewTicketNotification", () => {
         it("should use IT Team User ID if present (Push)", async () => {
             process.env.LINE_IT_TEAM_USER_ID = "it_user";
-            const ticket = {
+            const ticket: TicketEmailData = {
                 ticketId: 1,
                 title: "T",
                 description: "D",
+                category: "HARDWARE",
                 status: "OPEN",
                 priority: "HIGH",
-                reportedBy: { name: "U" },
-            } as any;
+                reportedBy: { name: "U", email: "u@test.com" },
+                createdAt: new Date().toISOString(),
+            };
 
             await sendNewTicketNotification(ticket);
 
@@ -108,14 +112,16 @@ describe("LINE Notification Service", () => {
 
         it("should use Broadcast if IT Team ID missing", async () => {
             delete process.env.LINE_IT_TEAM_USER_ID;
-            const ticket = {
+            const ticket: TicketEmailData = {
                 ticketId: 1,
                 title: "T",
                 description: "D",
+                category: "HARDWARE",
                 status: "OPEN",
                 priority: "HIGH",
-                reportedBy: { name: "U" },
-            } as any;
+                reportedBy: { name: "U", email: "u@test.com" },
+                createdAt: new Date().toISOString(),
+            };
 
             await sendNewTicketNotification(ticket);
 

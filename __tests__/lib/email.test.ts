@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import nodemailer from "nodemailer";
 import { sendEmail, sendNewTicketNotification } from "@/lib/email";
+import type { TicketEmailData } from "@/types/api";
 
 // Mock nodemailer with factory
 const sendMailMock = vi.fn();
@@ -12,7 +12,7 @@ const createTransportMock = vi.fn().mockReturnValue({
 
 vi.mock("nodemailer", () => ({
     default: {
-        createTransport: (...args: any[]) => createTransportMock(...args),
+        createTransport: (...args: unknown[]) => createTransportMock(...args),
     },
 }));
 
@@ -49,9 +49,9 @@ describe("Email Service", () => {
 
             // Should fail twice then succeed
             sendMailMock
-                .mockRejectedValueOnce(new Error("Fail 1") as any)
-                .mockRejectedValueOnce(new Error("Fail 2") as any)
-                .mockResolvedValueOnce({ messageId: "OK" } as any);
+                .mockRejectedValueOnce(new Error("Fail 1"))
+                .mockRejectedValueOnce(new Error("Fail 2"))
+                .mockResolvedValueOnce({ messageId: "OK" } as never);
 
             const promise = sendEmail({
                 to: "t",
@@ -99,16 +99,17 @@ describe("Email Service", () => {
 
     describe("sendNewTicketNotification", () => {
         it("should send notification", async () => {
-            const ticketData = {
+            const ticketData: TicketEmailData = {
                 ticketId: 1,
                 title: "Issue",
                 description: "Desc",
+                category: "HARDWARE",
                 status: "OPEN",
                 priority: "HIGH",
                 reportedBy: { email: "u@t.c", name: "User" },
                 createdAt: new Date().toISOString(),
             };
-            await sendNewTicketNotification(ticketData as any);
+            await sendNewTicketNotification(ticketData);
             expect(sendMailMock).toHaveBeenCalledWith(
                 expect.objectContaining({ to: "u@t.c" }),
             );

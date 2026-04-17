@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
+import type * as NextServerModule from "next/server";
 import { POST as createTicketRoute } from "@/app/api/tickets/route";
 import { getApiAuthSession } from "@/lib/server-auth";
 import { buildUserContext } from "@/lib/context";
@@ -9,7 +10,7 @@ import { processOutbox } from "@/lib/services/outbox/processor";
 import { logTicketEvent } from "@/lib/audit";
 
 vi.mock("next/server", async (importOriginal) => {
-    const actual = await importOriginal<typeof import("next/server")>();
+    const actual = await importOriginal<typeof NextServerModule>();
     return {
         ...actual,
         after: vi.fn((callback: () => void | Promise<void>) => {
@@ -117,8 +118,13 @@ describe("POST /api/tickets", () => {
 
         const createManyCall = vi.mocked(prisma.notification.createMany).mock.calls[0]?.[0];
         expect(createManyCall).toBeDefined();
-        const firstPayload = createManyCall?.data?.[0];
+        const firstPayload = Array.isArray(createManyCall?.data)
+            ? createManyCall.data[0]
+            : undefined;
         expect(firstPayload).toBeDefined();
+        if (!firstPayload) {
+            throw new Error("Expected notification payload");
+        }
         expect(firstPayload.title).not.toBe("Notification");
         expect(firstPayload.message).not.toBe("Operation completed");
         expect(firstPayload.message).toContain("Printer not working");

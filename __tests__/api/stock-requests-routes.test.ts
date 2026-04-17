@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
+import type * as NextServerModule from "next/server";
 import { GET as getRequestsRoute, POST as postRequestsRoute } from "@/app/api/stock/requests/route";
 import { POST as issueRequestRoute } from "@/app/api/stock/requests/[id]/issue/route";
 import { POST as cancelRequestRoute } from "@/app/api/stock/requests/[id]/cancel/route";
@@ -18,7 +19,7 @@ import {
 } from "@/lib/services/stock/notifications";
 
 vi.mock("next/server", async (importOriginal) => {
-    const actual = await importOriginal<typeof import("next/server")>();
+    const actual = await importOriginal<typeof NextServerModule>();
     return {
         ...actual,
         after: vi.fn((callback: () => void | Promise<void>) => {

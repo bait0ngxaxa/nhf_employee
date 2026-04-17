@@ -1,6 +1,6 @@
 ﻿import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { apiGet } from "@/lib/api-client";
+import { apiGet, apiPost } from "@/lib/api-client";
 
 describe("api-client refresh retry", () => {
     afterEach(() => {
@@ -51,5 +51,37 @@ describe("api-client refresh retry", () => {
             "/api/protected",
             expect.objectContaining({ credentials: "include", method: "GET" }),
         );
+    });
+
+    it("sends FormData without forcing JSON content-type", async () => {
+        const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+            new Response(JSON.stringify({ upload: { url: "/uploads/item/test.webp" } }), {
+                status: 200,
+                headers: { "content-type": "application/json" },
+            }),
+        );
+        const formData = new FormData();
+
+        formData.append("scope", "item");
+        formData.append(
+            "file",
+            new Blob(["image"], { type: "image/webp" }),
+            "test.webp",
+        );
+
+        const result = await apiPost<{ upload: { url: string } }>(
+            "/api/uploads/image",
+            formData,
+        );
+
+        expect(result.success).toBe(true);
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+
+        const requestInit = fetchMock.mock.calls[0]?.[1] as RequestInit;
+        const headers = new Headers(requestInit.headers);
+
+        expect(requestInit.body).toBe(formData);
+        expect(headers.get("Content-Type")).toBeNull();
+        expect(headers.get("X-Requested-With")).toBe("XMLHttpRequest");
     });
 });

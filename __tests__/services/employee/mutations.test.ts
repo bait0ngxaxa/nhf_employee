@@ -1,12 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { mockDeep, mockReset } from "vitest-mock-extended";
 import { prisma } from "@/lib/prisma";
+import type { PrismaClient } from "@prisma/client";
 import {
     createEmployee,
     updateEmployee,
     deleteEmployee,
 } from "@/lib/services/employee/mutations";
-import { PrismaClient } from "@prisma/client";
 
 vi.mock("@/lib/prisma", () => ({
     prisma: mockDeep<PrismaClient>(),
@@ -62,7 +62,7 @@ describe("Employee Mutations", () => {
             prismaMock.employee.create.mockResolvedValue({
                 id: 1,
                 ...mockData,
-            } as any);
+            } as never);
 
             const result = await createEmployee(mockData);
 
@@ -86,11 +86,11 @@ describe("Employee Mutations", () => {
             prismaMock.employee.findFirst.mockResolvedValue({
                 id: 1,
                 firstName: "Old",
-            } as any);
+            } as never);
             prismaMock.employee.update.mockResolvedValue({
                 id: 1,
                 firstName: "New",
-            } as any);
+            } as never);
 
             const result = await updateEmployee(1, { firstName: "New" });
 
@@ -108,7 +108,7 @@ describe("Employee Mutations", () => {
                 id: 1,
                 firstName: "Old",
                 email: "old@thainhf.org",
-            } as any);
+            } as never);
 
             const result = await updateEmployee(1, { email: "new@gmail.com" });
 
@@ -134,7 +134,7 @@ describe("Employee Mutations", () => {
             prismaMock.employee.findFirst.mockResolvedValue({
                 id: 1,
                 firstName: "DeleteMe",
-            } as any);
+            } as never);
 
             const result = await deleteEmployee(1);
 

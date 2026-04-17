@@ -12,13 +12,23 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { type StockRequestStatus } from "@prisma/client";
 import { useSession } from "next-auth/react";
 import { isAdminRole } from "@/lib/ssot/permissions";
-import { API_ROUTES, APP_ROUTES } from "@/lib/ssot/routes";
 import { StockDataContext, StockUIContext } from "./StockContext";
 import {
     useStockCategoriesQuery,
     useStockItemsQuery,
     useStockRequestsQuery,
 } from "./hooks";
+import {
+    buildStockItemsQuery,
+    buildStockRequestsQuery,
+    createStockDashboardUrl,
+    isStockDashboardRoute,
+    normalizeStockTab,
+    parsePositivePage,
+    STOCK_REQUESTS_LIMIT,
+    STOCK_REQUESTS_PAGE_QUERY_KEY,
+    STOCK_TAB_QUERY_KEY,
+} from "./provider.shared";
 import type {
     StockDataContextValue,
     StockUIContextValue,
@@ -26,43 +36,6 @@ import type {
 
 interface StockProviderProps {
     children: ReactNode;
-}
-
-const STOCK_TAB_QUERY_KEY = "stockTab";
-const STOCK_REQUESTS_PAGE_QUERY_KEY = "stockRequestsPage";
-const DASHBOARD_STOCK_MENU = "stock";
-const DASHBOARD_STOCK_MENU_LEGACY = "it-equipment";
-const STOCK_DEFAULT_TAB = "browse";
-const STOCK_ADMIN_TABS = new Set(["inventory", "admin-requests"]);
-const STOCK_BROWSE_LIMIT = 12;
-const STOCK_ADMIN_ITEMS_LIMIT = 10;
-const STOCK_REQUESTS_LIMIT = 10;
-
-function normalizeStockTab(tab: string | null, isAdmin: boolean): string {
-    if (!tab) return STOCK_DEFAULT_TAB;
-    if (!isAdmin && STOCK_ADMIN_TABS.has(tab)) return STOCK_DEFAULT_TAB;
-    return tab;
-}
-
-function parsePositivePage(value: string | null): number {
-    if (!value) return 1;
-    const parsed = Number(value);
-    if (!Number.isInteger(parsed) || parsed < 1) return 1;
-    return parsed;
-}
-
-function isStockDashboardMenu(tab: string | null): boolean {
-    return tab === DASHBOARD_STOCK_MENU || tab === DASHBOARD_STOCK_MENU_LEGACY;
-}
-
-function shouldSyncStockRequestsPage(
-    pathname: string,
-    searchParams: URLSearchParams,
-): boolean {
-    return (
-        pathname === APP_ROUTES.dashboard &&
-        isStockDashboardMenu(searchParams.get("tab"))
-    );
 }
 
 export function StockProvider({ children }: StockProviderProps) {
@@ -114,10 +87,7 @@ export function StockProvider({ children }: StockProviderProps) {
             const nextTab = normalizeStockTab(tab, isAdmin);
             setActiveTabState(nextTab);
 
-            if (
-                pathname !== APP_ROUTES.dashboard ||
-                !isStockDashboardMenu(searchParams.get("tab"))
-            ) {
+            if (!isStockDashboardRoute(pathname, searchParams)) {
                 return;
             }
 
@@ -125,10 +95,9 @@ export function StockProvider({ children }: StockProviderProps) {
                 return;
             }
 
-            const nextParams = new URLSearchParams(searchParams.toString());
-            nextParams.set("tab", DASHBOARD_STOCK_MENU);
-            nextParams.set(STOCK_TAB_QUERY_KEY, nextTab);
-            router.push(`${APP_ROUTES.dashboard}?${nextParams.toString()}`, {
+            router.push(createStockDashboardUrl(searchParams, {
+                [STOCK_TAB_QUERY_KEY]: nextTab,
+            }), {
                 scroll: false,
             });
         },
@@ -140,10 +109,7 @@ export function StockProvider({ children }: StockProviderProps) {
             const nextPage = Number.isInteger(page) && page > 0 ? page : 1;
             setRequestsPageState(nextPage);
 
-            if (
-                pathname !== APP_ROUTES.dashboard ||
-                !isStockDashboardMenu(searchParams.get("tab"))
-            ) {
+            if (!isStockDashboardRoute(pathname, searchParams)) {
                 return;
             }
 
@@ -152,45 +118,37 @@ export function StockProvider({ children }: StockProviderProps) {
             );
             if (currentPage === nextPage) return;
 
-            const nextParams = new URLSearchParams(searchParams.toString());
-            nextParams.set("tab", DASHBOARD_STOCK_MENU);
-            nextParams.set(STOCK_REQUESTS_PAGE_QUERY_KEY, String(nextPage));
-            router.push(`${APP_ROUTES.dashboard}?${nextParams.toString()}`, {
+            router.push(createStockDashboardUrl(searchParams, {
+                [STOCK_REQUESTS_PAGE_QUERY_KEY]: String(nextPage),
+            }), {
                 scroll: false,
             });
         },
         [pathname, router, searchParams],
     );
 
-    const itemsQuery = useMemo(() => {
-        const itemsLimit =
-            activeTab === "inventory" ? STOCK_ADMIN_ITEMS_LIMIT : STOCK_BROWSE_LIMIT;
-        const params = new URLSearchParams({
-            page: String(itemsPage),
-            limit: String(itemsLimit),
-            activeOnly: "true",
-        });
-        if (searchQuery) params.set("search", searchQuery);
-        if (selectedCategoryId !== undefined) {
-            params.set("categoryId", String(selectedCategoryId));
-        }
-        return `${API_ROUTES.stock.items}?${params.toString()}`;
-    }, [activeTab, itemsPage, searchQuery, selectedCategoryId]);
+    const itemsQuery = useMemo(
+        () =>
+            buildStockItemsQuery({
+                activeTab,
+                itemsPage,
+                searchQuery,
+                selectedCategoryId,
+            }),
+        [activeTab, itemsPage, searchQuery, selectedCategoryId],
+    );
 
-    const requestsQuery = useMemo(() => {
-        const requestScope =
-            isAdmin && activeTab === "admin-requests" ? "all" : "mine";
-        const params = new URLSearchParams({
-            page: String(requestsPage),
-            limit: String(STOCK_REQUESTS_LIMIT),
-            scope: requestScope,
-        });
-        if (statusFilter) params.set("status", statusFilter);
-        if (requestSearchQuery.trim()) {
-            params.set("search", requestSearchQuery.trim());
-        }
-        return `${API_ROUTES.stock.requests}?${params.toString()}`;
-    }, [activeTab, isAdmin, requestSearchQuery, requestsPage, statusFilter]);
+    const requestsQuery = useMemo(
+        () =>
+            buildStockRequestsQuery({
+                activeTab,
+                isAdmin,
+                requestSearchQuery,
+                requestsPage,
+                statusFilter,
+            }),
+        [activeTab, isAdmin, requestSearchQuery, requestsPage, statusFilter],
+    );
 
     const {
         data: categoriesData,
@@ -233,7 +191,7 @@ export function StockProvider({ children }: StockProviderProps) {
 
         const latestSearchParams = latestSearchParamsRef.current;
 
-        if (!shouldSyncStockRequestsPage(pathname, latestSearchParams)) {
+        if (!isStockDashboardRoute(pathname, latestSearchParams)) {
             return;
         }
 
@@ -244,10 +202,9 @@ export function StockProvider({ children }: StockProviderProps) {
             return;
         }
 
-        const nextParams = new URLSearchParams(latestSearchParams.toString());
-        nextParams.set("tab", DASHBOARD_STOCK_MENU);
-        nextParams.set(STOCK_REQUESTS_PAGE_QUERY_KEY, "1");
-        router.push(`${APP_ROUTES.dashboard}?${nextParams.toString()}`, {
+        router.push(createStockDashboardUrl(latestSearchParams, {
+            [STOCK_REQUESTS_PAGE_QUERY_KEY]: "1",
+        }), {
             scroll: false,
         });
     }, [pathname, requestSearchQuery, router, statusFilter]);

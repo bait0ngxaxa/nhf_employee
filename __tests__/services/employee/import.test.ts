@@ -1,8 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { mockDeep, mockReset } from "vitest-mock-extended";
+import type { PrismaClient } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { importEmployeesFromCSV } from "@/lib/services/employee/import";
-import { PrismaClient } from "@prisma/client";
+import type { CSVImportEmployee } from "@/lib/services/employee/types";
 
 vi.mock("@/lib/prisma", () => ({
     prisma: mockDeep<PrismaClient>(),
@@ -20,17 +21,17 @@ describe("Employee Import", () => {
     it("should import valid employees", async () => {
         // Arrange
         const mockDepts = [{ id: 1, code: "ADMIN", name: "Administration" }];
-        prismaMock.department.findMany.mockResolvedValue(mockDepts as any);
+        prismaMock.department.findMany.mockResolvedValue(mockDepts as never);
         prismaMock.employee.findMany.mockResolvedValue([]); // No existing emails
-        prismaMock.employee.create.mockImplementation(((args: any) =>
+        prismaMock.employee.create.mockImplementation((args) =>
             Promise.resolve({
                 ...args.data,
                 departmentId: 1,
                 dept: { name: "ADMIN" },
                 user: null,
-            })) as any);
+            }) as never);
 
-        const csvData = [
+        const csvData: Partial<CSVImportEmployee>[] = [
             {
                 firstName: "John",
                 lastName: "Doe",
@@ -53,11 +54,11 @@ describe("Employee Import", () => {
         prismaMock.department.findMany.mockResolvedValue([]);
         prismaMock.employee.findMany.mockResolvedValue([]);
 
-        const csvData = [
+        const csvData: Partial<CSVImportEmployee>[] = [
             { firstName: "", lastName: "Doe" }, // Missing fields
         ];
 
-        const result = await importEmployeesFromCSV(csvData as any);
+        const result = await importEmployeesFromCSV(csvData);
 
         expect(result.errors).toHaveLength(1);
         expect(result.errors[0].error).toContain("เป็นข้อมูลที่จำเป็น");
@@ -66,10 +67,10 @@ describe("Employee Import", () => {
     it("should handle duplicate emails inside CSV or DB", async () => {
         prismaMock.department.findMany.mockResolvedValue([
             { id: 1, code: "ADMIN" },
-        ] as any);
+        ] as never);
         prismaMock.employee.findMany.mockResolvedValue([
             { email: "taken@test.com", firstName: "A", lastName: "B" },
-        ] as any);
+        ] as never);
 
         const csvData = [
             {
@@ -94,7 +95,7 @@ describe("Employee Import", () => {
             departmentId: 1,
             dept: { name: "ADMIN" },
             user: null,
-        } as any);
+        } as never);
 
         const result = await importEmployeesFromCSV(csvData);
 
@@ -106,14 +107,14 @@ describe("Employee Import", () => {
     it("should handle duplicate names inside DB", async () => {
         prismaMock.department.findMany.mockResolvedValue([
             { id: 1, code: "ADMIN" },
-        ] as any);
+        ] as never);
         prismaMock.employee.findMany.mockResolvedValue([
             {
                 email: "some@test.com",
                 firstName: "Duplicate",
                 lastName: "Name",
             },
-        ] as any);
+        ] as never);
 
         const csvData = [
             {
@@ -125,7 +126,7 @@ describe("Employee Import", () => {
             },
         ];
 
-        const result = await importEmployeesFromCSV(csvData as any);
+        const result = await importEmployeesFromCSV(csvData);
 
         expect(result.errors).toHaveLength(1); // duplicate name
         expect(result.success).toHaveLength(0);
