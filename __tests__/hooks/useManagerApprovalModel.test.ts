@@ -3,9 +3,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useManagerApprovalModel } from "@/hooks/leave/useManagerApprovalModel";
 import { useLeaveApprovals } from "@/hooks/useLeaveApprovals";
 import {
-    fetchLeaveExportRows,
+    downloadLeaveExportFile,
+    fetchLeaveExportMeta,
     fetchLeaveExportYears,
-    logLeaveExportAudit,
     submitLeaveApprovalAction,
 } from "@/lib/services/leave/client";
 import { toast } from "sonner";
@@ -15,9 +15,9 @@ vi.mock("@/hooks/useLeaveApprovals", () => ({
 }));
 
 vi.mock("@/lib/services/leave/client", () => ({
-    fetchLeaveExportRows: vi.fn(),
+    downloadLeaveExportFile: vi.fn(),
+    fetchLeaveExportMeta: vi.fn(),
     fetchLeaveExportYears: vi.fn(),
-    logLeaveExportAudit: vi.fn(),
     submitLeaveApprovalAction: vi.fn(),
 }));
 
@@ -65,9 +65,12 @@ describe("useManagerApprovalModel", () => {
         });
 
         vi.mocked(fetchLeaveExportYears).mockResolvedValue({ years: [2030, 2029] });
-        vi.mocked(fetchLeaveExportRows).mockResolvedValue([{ col: "value" }]);
+        vi.mocked(fetchLeaveExportMeta).mockResolvedValue({
+            count: 1,
+            maxRows: 3000,
+        });
         vi.mocked(submitLeaveApprovalAction).mockResolvedValue(undefined);
-        vi.mocked(logLeaveExportAudit).mockResolvedValue(undefined);
+        vi.mocked(downloadLeaveExportFile).mockImplementation(() => undefined);
     });
 
     it("loads available years and sets initial export year", async () => {
@@ -95,35 +98,18 @@ describe("useManagerApprovalModel", () => {
         expect(toast.success).toHaveBeenCalledTimes(1);
     });
 
-    it("exports csv and writes audit log", async () => {
-        vi.useFakeTimers();
+    it("exports csv through download endpoint", async () => {
         const { result } = renderHook(() => useManagerApprovalModel());
         act(() => {
             result.current.setExportYear(2030);
-        });
-
-        const click = vi.fn();
-        const csvRef = {
-            link: { click },
-        } as unknown as { link: { click: () => void } };
-
-        act(() => {
-            (result.current.csvLinkRef as { current: unknown }).current = csvRef;
         });
 
         await act(async () => {
             await result.current.exportCsv();
         });
 
-        act(() => {
-            vi.advanceTimersByTime(100);
-        });
-
-        expect(fetchLeaveExportRows).toHaveBeenCalledWith(result.current.exportYear);
-        expect(logLeaveExportAudit).toHaveBeenCalledWith(result.current.exportYear, 1);
-        expect(click).toHaveBeenCalledTimes(1);
+        expect(fetchLeaveExportMeta).toHaveBeenCalledWith(result.current.exportYear);
+        expect(downloadLeaveExportFile).toHaveBeenCalledWith(result.current.exportYear);
         expect(toast.success).toHaveBeenCalledTimes(1);
-
-        vi.useRealTimers();
     });
 });

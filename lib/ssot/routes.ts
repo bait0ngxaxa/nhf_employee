@@ -38,6 +38,7 @@ export const API_ROUTES = {
     },
     employees: {
         list: "/api/employees",
+        export: "/api/employees/export",
         stats: "/api/employees/stats",
         import: "/api/employees/import",
         departments: "/api/departments",

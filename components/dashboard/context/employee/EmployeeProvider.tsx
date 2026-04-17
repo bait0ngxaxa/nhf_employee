@@ -12,16 +12,12 @@ import {
 import useSWR from "swr";
 
 import { toast } from "sonner";
-import { apiGet, apiPost } from "@/lib/api-client";
-import { type Employee, type EmployeeCSVData } from "@/types/employees";
+import { type Employee } from "@/types/employees";
 import { PAGINATION_DEFAULTS } from "@/constants/ui";
-import {
-    getEmployeeStatusLabel,
-    getEmployeeEmailStatus,
-} from "@/lib/helpers/employee-helpers";
-import { generateFilename } from "@/lib/helpers/date-helpers";
+import { triggerDownload } from "@/lib/helpers/download";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { EmployeeDataContext, EmployeeUIContext } from "./EmployeeContext";
+import { EXPORT_LIMITS } from "@/lib/ssot/exports";
 import { API_ROUTES } from "@/lib/ssot/routes";
 import {
     type EmployeeDataContextValue,
@@ -71,7 +67,6 @@ export function EmployeeProvider({ children }: EmployeeProviderProps) {
     const [isEditFormOpen, setIsEditFormOpen] = useState(false);
     const [employeeToEdit, setEmployeeToEdit] = useState<Employee | null>(null);
     const [refreshTrigger, setRefreshTrigger] = useState(0);
-    const [exportData, setExportData] = useState<EmployeeCSVData[]>([]);
 
     const debouncedSearchTerm = useDebouncedValue(searchTerm, 300);
 
@@ -139,97 +134,49 @@ export function EmployeeProvider({ children }: EmployeeProviderProps) {
         });
     }, [pagination.totalPages]);
 
-    // Export Logic (remains mostly same, uses fetch directly as it's separate query)
-    const fetchAllForExport = useCallback(async (): Promise<Employee[]> => {
-        const params = new URLSearchParams({
-            page: "1",
-            limit: "10000",
-        });
-
-        if (debouncedSearchTerm) {
-            params.append("search", debouncedSearchTerm);
-        }
-        if (statusFilter && statusFilter !== "all") {
-            params.append("status", statusFilter);
-        }
-
-        const response = await apiGet<{ employees: Employee[] }>(
-            `${API_ROUTES.employees.list}?${params}`,
-        );
-        if (response.success) {
-            return response.data.employees;
-        }
-        return [];
-    }, [debouncedSearchTerm, statusFilter]);
-
-    const prepareCsvData = (allEmployees: Employee[]): EmployeeCSVData[] => {
-        return allEmployees.map((employee, index) => ({
-            ลำดับ: index + 1,
-            ชื่อ: employee.firstName,
-            นามสกุล: employee.lastName,
-            ชื่อเล่น: employee.nickname || "-",
-            ตำแหน่ง: employee.position,
-            สังกัด: employee.affiliation || "-",
-            แผนก: employee.dept.name,
-            อีเมล:
-                getEmployeeEmailStatus(employee.email) === "temp"
-                    ? "-"
-                    : employee.email,
-            เบอร์โทร: employee.phone || "-",
-            สถานะ: getEmployeeStatusLabel(employee.status),
-        }));
-    };
-
-    const getExportFileName = useCallback(() => {
-        const searchSuffix = debouncedSearchTerm
-            ? `_ค้นหา-${debouncedSearchTerm}`
-            : "";
-        const statusSuffix =
-            statusFilter !== "all"
-                ? `_สถานะ-${getEmployeeStatusLabel(statusFilter)}`
-                : "";
-        const prefix = `รายชื่อพนักงาน${searchSuffix}${statusSuffix}`;
-        return generateFilename(prefix, "csv");
-    }, [debouncedSearchTerm, statusFilter]);
-
-    const handleExportCSV = useCallback(async (): Promise<
-        EmployeeCSVData[]
-    > => {
+    const handleExportCSV = useCallback(async (): Promise<void> => {
         setIsExporting(true);
         try {
-            const allEmployees = await fetchAllForExport();
-            const csvData = prepareCsvData(allEmployees);
+            if (pagination.total === 0) {
+                toast.error("ไม่มีข้อมูลสำหรับดาวน์โหลด");
+                return;
+            }
 
-            startTransition(() => {
-                setExportData(csvData);
-            });
+            if (pagination.total > EXPORT_LIMITS.employee.maxRows) {
+                toast.error("ข้อมูลเกินขนาดที่กำหนด", {
+                    description: `ส่งออกข้อมูลพนักงานได้ไม่เกิน ${EXPORT_LIMITS.employee.maxRows} รายการต่อครั้ง กรุณากรองข้อมูลเพิ่มเติม`,
+                });
+                return;
+            }
 
-            await apiPost(API_ROUTES.auditLogs.export, {
-                entityType: "Employee",
-                recordCount: allEmployees.length,
-                filters: {
-                    search: debouncedSearchTerm || null,
-                    status: statusFilter !== "all" ? statusFilter : null,
-                },
-            });
+            const exportParams = new URLSearchParams();
+            if (debouncedSearchTerm) {
+                exportParams.set("search", debouncedSearchTerm);
+            }
+            if (statusFilter && statusFilter !== "all") {
+                exportParams.set("status", statusFilter);
+            }
 
-            toast.success("ดาวน์โหลดสำเร็จ", {
-                description: `เตรียมข้อมูลพนักงานทั้งหมด ${allEmployees.length} รายการเรียบร้อยแล้ว`,
+            const queryString = exportParams.toString();
+            const exportUrl = queryString
+                ? `${API_ROUTES.employees.export}?${queryString}`
+                : API_ROUTES.employees.export;
+
+            triggerDownload(exportUrl);
+
+            toast.success("เริ่มดาวน์โหลดไฟล์แล้ว", {
+                description: `กำลังส่งออกข้อมูลพนักงาน ${pagination.total} รายการ`,
             });
-            return csvData;
         } catch (err) {
-            console.error("Error fetching for export:", err);
+            console.error("Error preparing employee export:", err);
             toast.error("เกิดข้อผิดพลาดในการดาวน์โหลด", {
                 description:
-                    "ไม่สามารถเตรียมข้อมูลสำหรับ Export ได้ กรุณาลองใหม่อีกครั้ง",
+                    "ไม่สามารถเริ่มการดาวน์โหลดไฟล์ได้ กรุณาลองใหม่อีกครั้ง",
             });
-            return [];
         } finally {
             setTimeout(() => setIsExporting(false), 500);
         }
-    }, [fetchAllForExport, debouncedSearchTerm, statusFilter]);
-
-    const getExportData = useCallback(() => exportData, [exportData]);
+    }, [debouncedSearchTerm, pagination.total, statusFilter]);
 
     const handleEditEmployee = useCallback((employee: Employee) => {
         setEmployeeToEdit(employee);
@@ -296,8 +243,6 @@ export function EmployeeProvider({ children }: EmployeeProviderProps) {
             handlePageChange,
             handlePreviousPage,
             handleNextPage,
-            getExportData,
-            getExportFileName,
             handleExportCSV,
             handleEditEmployee,
             handleCloseEditForm,
@@ -309,8 +254,6 @@ export function EmployeeProvider({ children }: EmployeeProviderProps) {
             handlePageChange,
             handlePreviousPage,
             handleNextPage,
-            getExportData,
-            getExportFileName,
             handleExportCSV,
             handleEditEmployee,
             handleCloseEditForm,
@@ -331,8 +274,6 @@ export function EmployeeProvider({ children }: EmployeeProviderProps) {
             handlePreviousPage: uiHandlers.handlePreviousPage,
             handleNextPage: uiHandlers.handleNextPage,
             isExporting,
-            getExportData: uiHandlers.getExportData,
-            getExportFileName: uiHandlers.getExportFileName,
             handleExportCSV: uiHandlers.handleExportCSV,
             isEditFormOpen,
             employeeToEdit,

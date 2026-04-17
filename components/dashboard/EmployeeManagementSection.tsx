@@ -9,7 +9,6 @@ import {
     CardTitle,
 } from "@/components/ui/card";
 import { Download, Upload, Plus, Users } from "lucide-react";
-import { CSVLink } from "react-csv";
 import { EmployeeStatsCards, EmployeeList } from "@/components/employee";
 import {
     useDashboardUIContext,
@@ -25,8 +24,7 @@ function EmployeeManagementContent() {
     const { handleMenuClick } = useDashboardUIContext();
     const { employeeStats, user, isAdmin } = useDashboardDataContext();
     const { employees, refreshTrigger } = useEmployeeDataContext();
-    const { isExporting, getExportData, getExportFileName, handleExportCSV } =
-        useEmployeeUIContext();
+    const { isExporting, handleExportCSV } = useEmployeeUIContext();
 
     return (
         <div className="relative min-h-[calc(100vh-6rem)] bg-slate-50/50 rounded-3xl overflow-hidden border border-white/60 shadow-inner">
@@ -60,25 +58,19 @@ function EmployeeManagementContent() {
                     {isAdmin && (
                         <div className="flex flex-wrap items-center gap-3">
                             {employees.length > 0 && (
-                                <CSVLink
-                                    data={getExportData()}
-                                    filename={getExportFileName()}
-                                    className="inline-flex"
-                                    onClick={handleExportCSV}
+                                <Button
+                                    variant="outline"
+                                    className="flex items-center space-x-2 bg-white/95 hover:bg-gray-50 text-gray-700 border-gray-200 shadow-sm rounded-xl"
+                                    disabled={isExporting}
+                                    onClick={() => void handleExportCSV()}
                                 >
-                                    <Button
-                                        variant="outline"
-                                        className="flex items-center space-x-2 bg-white/95 hover:bg-gray-50 text-gray-700 border-gray-200 shadow-sm rounded-xl"
-                                        disabled={isExporting}
-                                    >
-                                        <Download className="h-4 w-4" />
-                                        <span>
-                                            {isExporting
-                                                ? "กำลังเตรียมข้อมูล..."
-                                                : "Export CSV"}
-                                        </span>
-                                    </Button>
-                                </CSVLink>
+                                    <Download className="h-4 w-4" />
+                                    <span>
+                                        {isExporting
+                                            ? "กำลังเตรียมข้อมูล..."
+                                            : "Export CSV"}
+                                    </span>
+                                </Button>
                             )}
                             <Button
                                 onClick={() => handleMenuClick("import-employee")}

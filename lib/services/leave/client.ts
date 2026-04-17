@@ -1,10 +1,15 @@
 ﻿import { apiGet, apiPost, apiPut, type ApiResponse } from "@/lib/api-client";
+import { triggerDownload } from "@/lib/helpers/download";
 import { API_ROUTES } from "@/lib/ssot/routes";
-import { mapLeaveRowToCSV, type LeaveRequestRow } from "@/lib/helpers/csv-helpers";
 import type { LeaveRequestValues } from "@/lib/validations/leave";
 
 export interface LeaveExportYearsResponse {
     years: number[];
+}
+
+export interface LeaveExportMetaResponse {
+    count: number;
+    maxRows: number;
 }
 
 export interface ApproverEmployeeItem {
@@ -26,24 +31,12 @@ interface ApproverAssignmentsResponse {
     message: string;
 }
 
-export interface LeaveExportResponse {
-    data: LeaveRequestRow[];
-}
-
-export type LeaveExportCsvRow = Record<string, string | number>;
-
 export type LeaveApprovalAction = "APPROVE" | "REJECT";
 
 interface LeaveApprovalPayload {
     leaveId: string;
     action: LeaveApprovalAction;
     reason?: string;
-}
-
-interface AuditExportPayload {
-    entityType: "LeaveRequest";
-    recordCount: number;
-    filters: { year: number };
 }
 
 const DEFAULT_FETCH_ERROR = "ไม่สามารถดึงข้อมูลได้";
@@ -66,10 +59,15 @@ export const fetchApproverEmployees = async (): Promise<ApproverEmployeeItem[]> 
     return data.employees;
 };
 
-export const fetchLeaveExportRows = async (year: number): Promise<LeaveExportCsvRow[]> => {
-    const response = await apiGet<LeaveExportResponse>(`${API_ROUTES.leave.export}?year=${year}`);
-    const data = ensureSuccess(response);
-    return data.data.map(mapLeaveRowToCSV);
+export const fetchLeaveExportMeta = async (year: number): Promise<LeaveExportMetaResponse> => {
+    const response = await apiGet<LeaveExportMetaResponse>(
+        `${API_ROUTES.leave.export}?year=${year}&metaOnly=1`,
+    );
+    return ensureSuccess(response);
+};
+
+export const downloadLeaveExportFile = (year: number): void => {
+    triggerDownload(`${API_ROUTES.leave.export}?year=${year}&format=csv`);
 };
 
 export const saveApproverAssignments = async (
@@ -89,11 +87,3 @@ export const submitLeaveApprovalAction = async (payload: LeaveApprovalPayload): 
     ensureSuccess(response);
 };
 
-export const logLeaveExportAudit = async (year: number, recordCount: number): Promise<void> => {
-    const payload: AuditExportPayload = {
-        entityType: "LeaveRequest",
-        recordCount,
-        filters: { year },
-    };
-    await apiPost(API_ROUTES.auditLogs.export, payload);
-};

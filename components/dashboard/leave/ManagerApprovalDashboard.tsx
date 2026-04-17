@@ -29,8 +29,6 @@ export function ManagerApprovalDashboard() {
                     availableYears={model.availableYears}
                     exportYear={model.exportYear}
                     isExporting={model.isExporting}
-                    exportData={model.exportData}
-                    csvLinkRef={model.csvLinkRef}
                     onYearChange={model.setExportYear}
                     onExport={model.exportCsv}
                 />

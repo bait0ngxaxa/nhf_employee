@@ -16,7 +16,9 @@ import type {
  * Build Prisma where clause based on filters
  * Note: Not cached as it's a pure function with no async operations
  */
-function buildWhereClause(filters: EmployeeFilters): Prisma.EmployeeWhereInput {
+export function createEmployeeWhereClause(
+    filters: EmployeeFilters,
+): Prisma.EmployeeWhereInput {
     const bootstrapAdminEmails = getBootstrapAdminEmails();
     const where: Prisma.EmployeeWhereInput = {
         deletedAt: null,
@@ -60,7 +62,7 @@ export const getEmployees = async (
     );
     const skip = (page - 1) * limit;
 
-    const where = buildWhereClause(filters);
+    const where = createEmployeeWhereClause(filters);
 
     const [total, employees] = await Promise.all([
         prisma.employee.count({ where }),

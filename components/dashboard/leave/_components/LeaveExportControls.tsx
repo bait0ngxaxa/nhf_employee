@@ -1,5 +1,4 @@
 import { Button } from "@/components/ui/button";
-import type { RefObject } from "react";
 import {
     Select,
     SelectContent,
@@ -8,16 +7,11 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import { Download, Loader2 } from "lucide-react";
-import { CSVLink } from "react-csv";
-import { generateFilename } from "@/lib/helpers/date-helpers";
-import type { LeaveExportCsvRow } from "@/lib/services/leave/client";
 
 interface LeaveExportControlsProps {
     availableYears: number[];
     exportYear: number;
     isExporting: boolean;
-    exportData: LeaveExportCsvRow[];
-    csvLinkRef: RefObject<CSVLink & HTMLAnchorElement & { link: HTMLAnchorElement } | null>;
     onYearChange: (year: number) => void;
     onExport: () => Promise<void>;
 }
@@ -26,8 +20,6 @@ export function LeaveExportControls({
     availableYears,
     exportYear,
     isExporting,
-    exportData,
-    csvLinkRef,
     onYearChange,
     onExport,
 }: LeaveExportControlsProps) {
@@ -49,12 +41,6 @@ export function LeaveExportControls({
                 {isExporting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Download className="w-4 h-4 mr-2" />}
                 ดาวน์โหลด CSV
             </Button>
-            <CSVLink
-                ref={csvLinkRef}
-                data={exportData}
-                filename={generateFilename(`รายงานการลา_ปี-${exportYear}`, "csv")}
-                className="hidden"
-            />
         </div>
     );
 }

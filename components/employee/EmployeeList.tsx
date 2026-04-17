@@ -1,7 +1,5 @@
 "use client";
 
-import { useRef } from "react";
-import { CSVLink } from "react-csv";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
     EmployeeTable,
@@ -18,10 +16,6 @@ import {
 } from "@/components/dashboard/context/employee/EmployeeContext";
 
 export function EmployeeList({ userRole }: EmployeeListProps) {
-    const csvLinkRef = useRef<
-        CSVLink & HTMLAnchorElement & { link: HTMLAnchorElement }
-    >(null);
-
     const {
         employees,
         currentEmployees,
@@ -41,11 +35,7 @@ export function EmployeeList({ userRole }: EmployeeListProps) {
         handlePageChange,
         handlePreviousPage,
         handleNextPage,
-
-        getExportData,
-        getExportFileName,
         handleExportCSV,
-
         handleEditEmployee,
     } = useEmployeeUIContext();
 
@@ -61,10 +51,6 @@ export function EmployeeList({ userRole }: EmployeeListProps) {
     // Handle export button click - fetch data then trigger CSV download
     const onExportClick = async () => {
         await handleExportCSV();
-        // Wait a bit for state to update, then trigger download
-        setTimeout(() => {
-            csvLinkRef.current?.link.click();
-        }, 100);
     };
 
     if (isInitialLoading) {
@@ -130,14 +116,6 @@ export function EmployeeList({ userRole }: EmployeeListProps) {
 
     return (
         <div className="space-y-6">
-            {/* Hidden CSVLink for async download trigger */}
-            <CSVLink
-                ref={csvLinkRef}
-                data={getExportData()}
-                filename={getExportFileName()}
-                className="hidden"
-            />
-
             {/* Search, Filter and Export Controls */}
             <EmployeeSearchControls onExportClick={onExportClick} />
 

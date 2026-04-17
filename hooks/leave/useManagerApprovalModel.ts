@@ -1,14 +1,12 @@
-import { useEffect, useRef, useState, type RefObject } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { type CSVLink } from "react-csv";
 import { useLeaveApprovals, type PendingLeave } from "@/hooks/useLeaveApprovals";
 import {
-    fetchLeaveExportRows,
+    downloadLeaveExportFile,
+    fetchLeaveExportMeta,
     fetchLeaveExportYears,
-    logLeaveExportAudit,
     submitLeaveApprovalAction,
     type LeaveApprovalAction,
-    type LeaveExportCsvRow,
 } from "@/lib/services/leave/client";
 
 interface UseManagerApprovalModelResult {
@@ -22,8 +20,6 @@ interface UseManagerApprovalModelResult {
     availableYears: number[];
     exportYear: number;
     isExporting: boolean;
-    exportData: LeaveExportCsvRow[];
-    csvLinkRef: RefObject<CSVLink & HTMLAnchorElement & { link: HTMLAnchorElement } | null>;
     setRejectReason: (value: string) => void;
     setExportYear: (year: number) => void;
     openRejectDialog: (leave: PendingLeave) => void;
@@ -44,8 +40,6 @@ export function useManagerApprovalModel(): UseManagerApprovalModelResult {
     const [availableYears, setAvailableYears] = useState<number[]>([currentYear]);
     const [exportYear, setExportYear] = useState(currentYear);
     const [isExporting, setIsExporting] = useState(false);
-    const [exportData, setExportData] = useState<LeaveExportCsvRow[]>([]);
-    const csvLinkRef = useRef<CSVLink & HTMLAnchorElement & { link: HTMLAnchorElement } | null>(null);
 
     useEffect(() => {
         let mounted = true;
@@ -92,14 +86,23 @@ export function useManagerApprovalModel(): UseManagerApprovalModelResult {
     const exportCsv = async (): Promise<void> => {
         setIsExporting(true);
         try {
-            const rows = await fetchLeaveExportRows(exportYear);
-            setExportData(rows);
-            setTimeout(() => {
-                csvLinkRef.current?.link.click();
-            }, 100);
-            await logLeaveExportAudit(exportYear, rows.length);
-            toast.success("ดาวน์โหลดสำเร็จ", {
-                description: `เตรียมข้อมูลการลา ${rows.length} รายการ (ปี ${exportYear}) เรียบร้อยแล้ว`,
+            const exportMeta = await fetchLeaveExportMeta(exportYear);
+
+            if (exportMeta.count === 0) {
+                toast.error("ไม่มีข้อมูลสำหรับดาวน์โหลด");
+                return;
+            }
+
+            if (exportMeta.count > exportMeta.maxRows) {
+                toast.error("ข้อมูลเกินขนาดที่กำหนด", {
+                    description: `ส่งออกข้อมูลการลาได้ไม่เกิน ${exportMeta.maxRows} รายการต่อครั้ง กรุณาเลือกปีที่มีข้อมูลน้อยลง`,
+                });
+                return;
+            }
+
+            downloadLeaveExportFile(exportYear);
+            toast.success("เริ่มดาวน์โหลดไฟล์แล้ว", {
+                description: `กำลังส่งออกข้อมูลการลา ${exportMeta.count} รายการ (ปี ${exportYear})`,
             });
         } catch {
             toast.error("เกิดข้อผิดพลาดในการดาวน์โหลด");
@@ -119,8 +122,6 @@ export function useManagerApprovalModel(): UseManagerApprovalModelResult {
         availableYears,
         exportYear,
         isExporting,
-        exportData,
-        csvLinkRef,
         setRejectReason,
         setExportYear,
         openRejectDialog: (leave: PendingLeave) => {

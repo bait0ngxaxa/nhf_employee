@@ -1,4 +1,4 @@
-import { type Employee, type EmployeeCSVData } from "@/types/employees";
+import { type Employee } from "@/types/employees";
 
 export interface EmployeeDataContextValue {
     // Data
@@ -34,9 +34,7 @@ export interface EmployeeUIContextValue {
 
     // Export State & Actions
     isExporting: boolean;
-    getExportData: () => EmployeeCSVData[];
-    getExportFileName: () => string;
-    handleExportCSV: () => Promise<EmployeeCSVData[]>;
+    handleExportCSV: () => Promise<void>;
 
     // Edit Modal State & Actions
     isEditFormOpen: boolean;
