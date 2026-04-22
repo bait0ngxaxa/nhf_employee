@@ -9,7 +9,7 @@ export type BrowseCartItem = {
     item: Pick<StockItem, "id" | "name" | "imageUrl">;
     variant: Pick<
         StockItemVariant,
-        "id" | "sku" | "unit" | "imageUrl" | "availableQuantity"
+        "id" | "sku" | "unit" | "imageUrl" | "availableQuantity" | "attributeValues"
     >;
     qty: number;
 };

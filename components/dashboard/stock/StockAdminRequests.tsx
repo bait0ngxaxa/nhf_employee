@@ -31,6 +31,7 @@ import {
     formatStockRequestDate,
     REQUEST_STATUS_OPTIONS,
 } from "./stockRequest.shared";
+import { getRequestItemDisplayName } from "./stockVariant.shared";
 import { useStockRequestActions } from "./useStockRequestActions";
 
 export function StockAdminRequests() {
@@ -201,7 +202,7 @@ export function StockAdminRequests() {
                                                             className="flex items-center gap-2 text-sm"
                                                         >
                                                             <span className="font-medium text-slate-800">
-                                                                {ri.item.name}
+                                                                {getRequestItemDisplayName(ri)}
                                                             </span>
                                                             <span className="rounded-full bg-slate-100/80 px-2 py-0.5 text-xs font-medium text-slate-600">
                                                                 x {ri.quantity} {ri.item.unit}

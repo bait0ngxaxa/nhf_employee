@@ -4,7 +4,11 @@ import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { apiPost } from "@/lib/api-client";
 import { API_ROUTES } from "@/lib/ssot/routes";
-import type { StockItem, StockItemVariant } from "../context/stock/types";
+import type {
+    StockItem,
+    StockItemVariant,
+    StockItemVariantAttributeValue,
+} from "../context/stock/types";
 import { ensureStockApiSuccess } from "./stockAdminInventory.shared";
 import {
     type BrowseCartItem,
@@ -28,6 +32,7 @@ interface PersistedStockBrowseCartItem {
     variantUnit: string;
     variantImageUrl: string | null;
     variantAvailableQuantity: number;
+    variantAttributeValues?: StockItemVariantAttributeValue[];
     qty: number;
 }
 
@@ -79,6 +84,7 @@ function serializeCartItems(
         variantUnit: cartItem.variant.unit,
         variantImageUrl: cartItem.variant.imageUrl ?? null,
         variantAvailableQuantity: cartItem.variant.availableQuantity,
+        variantAttributeValues: cartItem.variant.attributeValues,
         qty: cartItem.qty,
     }));
 }
@@ -165,6 +171,7 @@ function hydrateCartItem(
             unit: persistedCartItem.variantUnit,
             imageUrl: persistedCartItem.variantImageUrl ?? null,
             availableQuantity: persistedCartItem.variantAvailableQuantity,
+            attributeValues: persistedCartItem.variantAttributeValues,
         },
         qty: persistedCartItem.qty,
     };
