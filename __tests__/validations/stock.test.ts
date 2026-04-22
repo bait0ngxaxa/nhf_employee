@@ -20,6 +20,18 @@ describe("Stock Validation", () => {
             expect(result.success).toBe(false);
         });
 
+        it("should accept request with Thai projectCode", () => {
+            const result = createRequestSchema.safeParse({
+                projectCode: "โครงการทดสอบ-001",
+                items: [{ itemId: 10, quantity: 1 }],
+            });
+
+            expect(result.success).toBe(true);
+            if (result.success) {
+                expect(result.data.projectCode).toBe("โครงการทดสอบ-001");
+            }
+        });
+
         it("should accept request with unique itemId", () => {
             const result = createRequestSchema.safeParse({
                 projectCode: "prj-001",

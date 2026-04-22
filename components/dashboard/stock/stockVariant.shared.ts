@@ -44,7 +44,7 @@ export function getVariantDisplayName(
 
     const attributeSummary = getVariantAttributeSummary(variant.attributeValues);
     if (!attributeSummary) {
-        return `${itemName} • ${variant.sku}`;
+        return itemName;
     }
 
     return `${itemName} • ${attributeSummary}`;
