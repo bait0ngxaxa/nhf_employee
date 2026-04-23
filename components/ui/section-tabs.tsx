@@ -1,4 +1,4 @@
-import { type ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { type LucideIcon } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
@@ -28,7 +28,7 @@ interface SectionTabsProps {
 }
 
 const TAB_TRIGGER_CLASS =
-    "flex-1 flex items-center justify-center gap-2 rounded-full px-6 py-2.5 " +
+    "shrink-0 md:flex-1 flex items-center justify-center gap-2 rounded-full px-6 py-2.5 " +
     "data-[state=active]:bg-white data-[state=active]:shadow-sm " +
     "transition-[color,background-color,box-shadow] " +
     "text-gray-600 hover:text-gray-900 font-medium whitespace-nowrap";
@@ -40,6 +40,20 @@ export function SectionTabs({
     activeColor = "#4f46e5", // default indigo-600
 }: SectionTabsProps) {
     const visibleTabs = tabs.filter((t) => t.visible !== false);
+    const triggerRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+
+    useEffect(() => {
+        const activeTrigger = triggerRefs.current[value];
+        if (!activeTrigger) {
+            return;
+        }
+
+        activeTrigger.scrollIntoView({
+            behavior: "smooth",
+            block: "nearest",
+            inline: "nearest",
+        });
+    }, [value]);
 
     return (
         <Tabs
@@ -54,9 +68,9 @@ export function SectionTabs({
                 }
             `}</style>
 
-            <div className="flex justify-center md:justify-start w-full mb-2">
+            <div className="mb-2 w-full overflow-x-auto pb-1">
                 <TabsList
-                    className="flex h-auto max-w-full overflow-x-auto flex-nowrap bg-gray-100 p-1.5 rounded-[2rem] shadow-inner gap-1 hide-scrollbar"
+                    className="flex h-auto min-w-max flex-nowrap gap-1 rounded-[2rem] bg-gray-100 p-1.5 shadow-inner hide-scrollbar md:min-w-0 md:w-full"
                     data-section-tabs=""
                 >
                     {visibleTabs.map((tab) => {
@@ -66,6 +80,9 @@ export function SectionTabs({
                                 key={tab.value}
                                 value={tab.value}
                                 className={TAB_TRIGGER_CLASS}
+                                ref={(node) => {
+                                    triggerRefs.current[tab.value] = node;
+                                }}
                             >
                                 {TabIcon && (
                                     <TabIcon className="h-4 w-4 shrink-0" />

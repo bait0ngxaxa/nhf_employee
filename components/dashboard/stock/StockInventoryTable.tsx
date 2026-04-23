@@ -6,6 +6,7 @@ import {
     AlertTriangle,
     Image as ImageIcon,
     Layers3,
+    Loader2,
     Pencil,
     Trash2,
 } from "lucide-react";
@@ -154,7 +155,14 @@ export function StockInventoryTable({
                             onClick={() => void handleConfirmDelete()}
                             disabled={isDeleting}
                         >
-                            {isDeleting ? "กำลังลบ..." : "ยืนยันการลบ"}
+                            {isDeleting ? (
+                                <>
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    กำลังลบ...
+                                </>
+                            ) : (
+                                "ยืนยันการลบ"
+                            )}
                         </Button>
                     </DialogFooter>
                 </DialogContent>

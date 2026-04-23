@@ -42,7 +42,6 @@ export interface UpdateTicketData {
     priority?: TicketPriority;
     status?: TicketStatus;
     assignedToId?: number | null;
-    resolution?: string | null;
 }
 
 // ==================== Relation Types ====================

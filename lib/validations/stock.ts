@@ -389,6 +389,14 @@ export const cancelRequestSchema = z.object({
     cancelReason: z.string().max(500).trim().nullish(),
 });
 
+export const stockReviewActionSchema = z.object({
+    action: z.enum(["approve", "issue", "reject", "cancel"], {
+        message: "action ไม่ถูกต้อง",
+    }),
+    rejectReason: z.string().max(500).trim().nullish(),
+    cancelReason: z.string().max(500).trim().nullish(),
+});
+
 const emptyToUndefined = (value: unknown): unknown =>
     value === "" || value === null ? undefined : value;
 
@@ -426,5 +434,6 @@ export type AdjustStockInput = z.infer<typeof adjustStockSchema>;
 export type CreateRequestInput = z.infer<typeof createRequestSchema>;
 export type IssueRequestInput = z.infer<typeof issueRequestSchema>;
 export type CancelRequestInput = z.infer<typeof cancelRequestSchema>;
+export type StockReviewActionInput = z.infer<typeof stockReviewActionSchema>;
 export type StockItemsFilter = z.infer<typeof stockItemsFilterSchema>;
 export type StockRequestsFilter = z.infer<typeof stockRequestsFilterSchema>;

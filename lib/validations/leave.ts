@@ -28,4 +28,35 @@ export const leaveRequestSchema = z.object({
     path: ["startDate"]
 });
 
+const leaveIdSchema = z
+  .string({ message: "ไม่พบรหัสคำขอลา" })
+  .trim()
+  .min(1, "ไม่พบรหัสคำขอลา");
+
+const emptyToNull = (value: unknown): unknown => {
+  if (typeof value !== "string") {
+    return value;
+  }
+
+  const trimmed = value.trim();
+  return trimmed === "" ? null : trimmed;
+};
+
+export const leaveCancelSchema = z.object({
+  leaveId: leaveIdSchema,
+});
+
+export const leaveActionSchema = z.object({
+  leaveId: leaveIdSchema,
+  action: z.enum(["APPROVE", "REJECT"], {
+    message: "การดำเนินการไม่ถูกต้อง",
+  }),
+  reason: z.preprocess(
+    emptyToNull,
+    z.string().trim().max(1000, "เหตุผลต้องไม่เกิน 1000 ตัวอักษร").nullish(),
+  ),
+});
+
 export type LeaveRequestValues = z.infer<typeof leaveRequestSchema>;
+export type LeaveCancelValues = z.infer<typeof leaveCancelSchema>;
+export type LeaveActionValues = z.infer<typeof leaveActionSchema>;

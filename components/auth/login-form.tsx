@@ -16,6 +16,7 @@ import { useState, useEffect } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
+import { Loader2 } from "lucide-react";
 import { APP_ROUTES } from "@/lib/ssot/routes";
 
 // Type definitions for login
@@ -163,9 +164,14 @@ export function LoginForm({
                                     className="w-full rounded-xl bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white shadow-lg shadow-blue-500/25 transition-[transform,background-color,box-shadow] duration-300 motion-safe:hover:scale-[1.02]"
                                     disabled={isLoading}
                                 >
-                                    {isLoading
-                                        ? "กำลังเข้าสู่ระบบ…"
-                                        : "เข้าสู่ระบบ"}
+                                    {isLoading ? (
+                                        <>
+                                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                            กำลังเข้าสู่ระบบ…
+                                        </>
+                                    ) : (
+                                        "เข้าสู่ระบบ"
+                                    )}
                                 </Button>
                             </div>
                         </div>

@@ -18,7 +18,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { AlertCircle, CheckCircle2 } from 'lucide-react';
+import { AlertCircle, CheckCircle2, Loader2 } from 'lucide-react';
 import { toast } from "sonner";
 import { type EditStatusModalProps } from '@/types/employees';
 import { type EmployeeStatusValue } from '@/types/employees';
@@ -143,7 +143,14 @@ export function EditStatusModal({
             onClick={handleUpdate} 
             disabled={isUpdating || !selectedStatus || selectedStatus === employee.status}
           >
-            {isUpdating ? 'กำลังอัปเดต...' : 'บันทึกการเปลี่ยนแปลง'}
+            {isUpdating ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                กำลังอัปเดต...
+              </>
+            ) : (
+              'บันทึกการเปลี่ยนแปลง'
+            )}
           </Button>
         </DialogFooter>
       </DialogContent>

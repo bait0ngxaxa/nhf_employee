@@ -91,7 +91,6 @@ export async function PATCH(
             priority: validationResult.data.priority,
             status: validationResult.data.status,
             assignedToId: validationResult.data.assignedToId,
-            resolution: validationResult.data.resolution,
         };
 
         const result = await ticketService.updateTicket(ticketId, updateData, user);

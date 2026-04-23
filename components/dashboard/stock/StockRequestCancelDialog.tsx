@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
     Dialog,
@@ -78,7 +79,14 @@ export function StockRequestCancelDialog({
                             onClick={() => void onConfirm(request.id, reason)}
                             className="h-10 bg-rose-600 px-7 font-bold text-white shadow-sm transition-all hover:bg-rose-700"
                         >
-                            {loading ? "กำลังดำเนินการ..." : "ยืนยันการยกเลิก"}
+                            {loading ? (
+                                <>
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    กำลังดำเนินการ...
+                                </>
+                            ) : (
+                                "ยืนยันการยกเลิก"
+                            )}
                         </Button>
                     </div>
                 </div>

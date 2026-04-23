@@ -1,7 +1,7 @@
 import { cache } from "react";
 import { prisma } from "@/lib/prisma";
 import { getBootstrapAdminEmails } from "@/lib/ssot/admin-bootstrap";
-import type { Prisma, EmployeeStatus } from "@prisma/client";
+import type { Prisma } from "@prisma/client";
 import {
     EMPLOYEE_WITH_RELATIONS_INCLUDE,
     PAGINATION_DEFAULTS,
@@ -29,7 +29,7 @@ export function createEmployeeWhereClause(
 
     // Status filter
     if (filters.status && filters.status !== "all") {
-        where.status = filters.status as EmployeeStatus;
+        where.status = filters.status;
     }
 
     // Search filter (search in multiple fields)

@@ -6,6 +6,7 @@ import { jsonError, unauthorized } from "@/lib/ssot/http";
 import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
 import { isAdminRole } from "@/lib/ssot/permissions";
 import { APP_ROUTES } from "@/lib/ssot/routes";
+import { createTicketCommentSchema } from "@/lib/validations/ticket";
 
 async function notifyCommentParticipants(
     ticket: { id: number; title: string; reportedById: number; assignedToId: number | null },
@@ -70,12 +71,14 @@ async function notifyCommentParticipants(
 export async function POST(
     request: NextRequest,
     { params }: { params: Promise<{ id: string }> },
-): Promise<NextResponse> {
+    ): Promise<NextResponse> {
     try {
-        const { content } = await request.json();
-
-        if (!content || content.trim() === "") {
-            return jsonError(COMMON_API_MESSAGES.commentContentRequired, 400);
+        const body = await request.json();
+        const parsed = createTicketCommentSchema.safeParse(body);
+        if (!parsed.success) {
+            return jsonError(COMMON_API_MESSAGES.invalidInput, 400, {
+                details: parsed.error.flatten().fieldErrors,
+            });
         }
 
         const session = await getApiAuthSession();
@@ -109,7 +112,7 @@ export async function POST(
 
         const comment = await prisma.ticketComment.create({
             data: {
-                content: content.trim(),
+                content: parsed.data.content,
                 ticketId,
                 authorId: currentUserId,
             },

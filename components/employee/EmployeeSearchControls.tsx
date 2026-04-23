@@ -10,7 +10,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
-import { Search, Download, Filter, X } from "lucide-react";
+import { Search, Download, Filter, Loader2, X } from "lucide-react";
 import { STATUS_FILTER_OPTIONS } from "@/constants/ui";
 import {
     useEmployeeUIContext,
@@ -97,7 +97,11 @@ export function EmployeeSearchControls({
                     disabled={isExporting}
                     onClick={onExportClick}
                 >
-                    <Download className="h-4 w-4" />
+                    {isExporting ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                        <Download className="h-4 w-4" />
+                    )}
                     <span>
                         {isExporting
                             ? "กำลังเตรียม\u2026"

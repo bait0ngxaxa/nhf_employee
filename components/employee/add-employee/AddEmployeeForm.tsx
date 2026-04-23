@@ -9,7 +9,7 @@ import {
     CardTitle,
 } from "@/components/ui/card";
 import { Alert } from "@/components/ui/alert";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, Loader2 } from "lucide-react";
 import { type AddEmployeeFormProps } from "@/types/employees";
 import { EmployeeFormFields } from "../shared";
 import { useAddEmployee } from "./useAddEmployee";
@@ -55,9 +55,14 @@ export function AddEmployeeForm({ onSuccess }: AddEmployeeFormProps) {
                             className="w-full h-11 font-bold bg-blue-600 hover:bg-blue-700 text-white shadow-sm transition-all text-base"
                             disabled={isLoading}
                         >
-                            {isLoading
-                                ? "กำลังเพิ่มพนักงาน..."
-                                : "เพิ่มพนักงาน"}
+                            {isLoading ? (
+                                <>
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    กำลังเพิ่มพนักงาน...
+                                </>
+                            ) : (
+                                "เพิ่มพนักงาน"
+                            )}
                         </Button>
                     </div>
                 </form>

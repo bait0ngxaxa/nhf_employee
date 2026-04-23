@@ -17,7 +17,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
-import { MessageSquare, Send, ArrowLeft } from "lucide-react";
+import { Loader2, MessageSquare, Send, ArrowLeft } from "lucide-react";
 import { useTicketDetail } from "@/hooks/useTicketDetail";
 import { TICKET_STATUSES } from "@/constants/tickets";
 import {
@@ -257,6 +257,9 @@ export default function TicketDetail({
                                     }
                                     className="flex items-center gap-2 focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white shadow-md shadow-indigo-500/25 transition-[transform,background-color,box-shadow] duration-300 hover:shadow-lg motion-safe:hover:-translate-y-0.5"
                                 >
+                                    {updateLoading && (
+                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                    )}
                                     {updateLoading
                                         ? "กำลังอัปเดต…"
                                         : "อัปเดตสถานะ"}
@@ -316,7 +319,11 @@ export default function TicketDetail({
                                     }
                                     className="flex items-center gap-2 focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white shadow-md shadow-indigo-500/25 transition-[transform,background-color,box-shadow] duration-300 hover:shadow-lg motion-safe:hover:-translate-y-0.5"
                                 >
-                                    <Send className="h-4 w-4" />
+                                    {commentLoading ? (
+                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                    ) : (
+                                        <Send className="h-4 w-4" />
+                                    )}
                                     {commentLoading
                                         ? "กำลังส่ง…"
                                         : "ส่งความคิดเห็น"}

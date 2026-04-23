@@ -78,11 +78,6 @@ export const updateTicketSchema = z.object({
             message: "สถานะไม่ถูกต้อง",
         })
         .optional(),
-    resolution: z
-        .string()
-        .max(5000, "การแก้ไขต้องไม่เกิน 5000 ตัวอักษร")
-        .trim()
-        .nullish(),
     assignedToId: z
         .union([z.string(), z.number()])
         .transform((val) => (typeof val === "string" ? parseInt(val, 10) : val))
@@ -92,7 +87,16 @@ export const updateTicketSchema = z.object({
         .nullish(),
 });
 
+export const createTicketCommentSchema = z.object({
+    content: z
+        .string({ message: "กรุณากรอกความคิดเห็น" })
+        .trim()
+        .min(1, "กรุณากรอกความคิดเห็น")
+        .max(5000, "ความคิดเห็นต้องไม่เกิน 5000 ตัวอักษร"),
+});
+
 // Inferred types for use in API routes
 export type TicketFiltersInput = z.infer<typeof ticketFiltersSchema>;
 export type CreateTicketInput = z.infer<typeof createTicketSchema>;
 export type UpdateTicketInput = z.infer<typeof updateTicketSchema>;
+export type CreateTicketCommentInput = z.infer<typeof createTicketCommentSchema>;

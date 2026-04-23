@@ -1,6 +1,9 @@
 ﻿import { after, type NextRequest, NextResponse } from "next/server";
 import { getApiAuthSession } from "@/lib/server-auth";
-import { createEmployeeSchema } from "@/lib/validations/employee";
+import {
+    createEmployeeSchema,
+    employeeFiltersSchema,
+} from "@/lib/validations/employee";
 import { logEmployeeEvent } from "@/lib/audit";
 import { employeeService, type EmployeeFilters } from "@/lib/services/employee";
 import { buildUserContext } from "@/lib/context";
@@ -11,14 +14,27 @@ import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
 /**
  * Parse query parameters into EmployeeFilters
  */
-function parseQueryParams(url: string): EmployeeFilters {
+function parseQueryParams(
+    url: string,
+): { success: true; data: EmployeeFilters } | { success: false; response: NextResponse } {
     const { searchParams } = new URL(url);
-    return {
-        search: searchParams.get("search") || undefined,
-        status: searchParams.get("status") || undefined,
-        page: parseInt(searchParams.get("page") || "1"),
-        limit: parseInt(searchParams.get("limit") || "10"),
-    };
+    const parsed = employeeFiltersSchema.safeParse({
+        search: searchParams.get("search"),
+        status: searchParams.get("status"),
+        page: searchParams.get("page") ?? "1",
+        limit: searchParams.get("limit") ?? "10",
+    });
+
+    if (!parsed.success) {
+        return {
+            success: false,
+            response: operationFailed(400, {
+                details: parsed.error.flatten().fieldErrors,
+            }),
+        };
+    }
+
+    return { success: true, data: parsed.data };
 }
 
 // NOTE: normalized to remove mojibake
@@ -30,8 +46,12 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
             return operationFailed(401);
         }
 
-        const filters = parseQueryParams(request.url);
-        const result = await employeeService.getEmployees(filters);
+        const parsedFilters = parseQueryParams(request.url);
+        if (!parsedFilters.success) {
+            return parsedFilters.response;
+        }
+
+        const result = await employeeService.getEmployees(parsedFilters.data);
 
         return NextResponse.json({
             success: true,

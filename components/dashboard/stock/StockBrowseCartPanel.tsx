@@ -1,6 +1,6 @@
 import Image from "next/image";
 import { useState } from "react";
-import { CheckCircle2, Minus, Plus, ShoppingCart, Trash2, XCircle } from "lucide-react";
+import { CheckCircle2, Loader2, Minus, Plus, ShoppingCart, Trash2, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
     Dialog,
@@ -127,7 +127,11 @@ export function StockBrowseCartPanel({
                             disabled={submitting || projectCode.trim().length === 0}
                             className="group/submit w-full bg-[linear-gradient(135deg,#2563EB,#1D4ED8)] font-bold text-white shadow-[0_18px_34px_-22px_rgba(37,99,235,0.95)] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_22px_38px_-20px_rgba(37,99,235,0.95)]"
                         >
-                            <CheckCircle2 className="mr-1.5 h-4 w-4 transition-transform duration-300 group-hover/submit:scale-110" />
+                            {submitting ? (
+                                <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+                            ) : (
+                                <CheckCircle2 className="mr-1.5 h-4 w-4 transition-transform duration-300 group-hover/submit:scale-110" />
+                            )}
                             {submitting ? "กำลังดำเนินการ..." : "ยืนยันการเบิก"}
                         </Button>
                         <Button

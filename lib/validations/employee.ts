@@ -18,6 +18,9 @@ function isValidThaiPhone(value: string): boolean {
     return normalizePhoneNumber(value).length === 10;
 }
 
+const emptyToUndefined = (value: unknown): unknown =>
+    value === "" || value === null ? undefined : value;
+
 const employeePhoneSchema = z
     .string()
     .trim()
@@ -129,6 +132,20 @@ export const updateEmployeeSchema = z.object({
     managerId: z.number().int().positive().nullable().optional(),
 });
 
+export const employeeFiltersSchema = z.object({
+    search: z.preprocess(
+        emptyToUndefined,
+        z.string().trim().max(200).optional(),
+    ),
+    status: z.preprocess(
+        emptyToUndefined,
+        z.enum(["ACTIVE", "INACTIVE", "SUSPENDED", "all"]).optional(),
+    ),
+    page: z.coerce.number().int().min(1).default(1),
+    limit: z.coerce.number().int().min(1).max(100).default(10),
+});
+
 // Inferred types for use in API routes
 export type CreateEmployeeInput = z.infer<typeof createEmployeeSchema>;
 export type UpdateEmployeeInput = z.infer<typeof updateEmployeeSchema>;
+export type EmployeeFiltersInput = z.infer<typeof employeeFiltersSchema>;

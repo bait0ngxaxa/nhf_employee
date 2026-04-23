@@ -17,6 +17,7 @@ import { useRouter } from "next/navigation";
 import { signIn } from "next-auth/react";
 import { useTitle } from "@/hooks/useTitle";
 import Link from "next/link";
+import { Loader2 } from "lucide-react";
 import { apiPost } from "@/lib/api-client";
 import { API_ROUTES, APP_ROUTES } from "@/lib/ssot/routes";
 
@@ -216,7 +217,14 @@ export function SignupForm({
                                 className="w-full rounded-xl bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white shadow-lg shadow-blue-500/25 transition-[transform,background-color,box-shadow] duration-300 motion-safe:hover:scale-[1.02]"
                                 disabled={isLoading}
                             >
-                                {isLoading ? "กำลังลงทะเบียน…" : "ลงทะเบียน"}
+                                {isLoading ? (
+                                    <>
+                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                        กำลังลงทะเบียน…
+                                    </>
+                                ) : (
+                                    "ลงทะเบียน"
+                                )}
                             </Button>
                         </div>
 

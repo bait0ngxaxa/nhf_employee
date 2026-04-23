@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { type StockRequestStatus } from "@prisma/client";
-import { CheckCircle, ClipboardList, Search, X, XCircle } from "lucide-react";
+import { CheckCircle, ClipboardList, Loader2, Search, X, XCircle } from "lucide-react";
 import { Pagination } from "@/components/Pagination";
 import { RequestStatusBadge } from "@/components/dashboard/shared/RequestStatusBadge";
 import { Button } from "@/components/ui/button";
@@ -329,7 +329,14 @@ function CancelDialog({
                             onClick={() => onCancel(request.id, reason)}
                             className="h-10 bg-rose-600 px-7 font-bold text-white shadow-sm transition-all hover:bg-rose-700"
                         >
-                            {loading ? "กำลังดำเนินการ..." : "ยืนยันการยกเลิก"}
+                            {loading ? (
+                                <>
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    กำลังดำเนินการ...
+                                </>
+                            ) : (
+                                "ยืนยันการยกเลิก"
+                            )}
                         </Button>
                     </div>
                 </div>

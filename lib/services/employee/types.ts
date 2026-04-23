@@ -5,7 +5,7 @@ import type { Employee, Department, EmployeeStatus } from "@prisma/client";
 /** Filters for querying employees list */
 export interface EmployeeFilters {
     search?: string;
-    status?: string;
+    status?: EmployeeStatus | "all";
     page: number;
     limit: number;
 }
@@ -40,6 +40,7 @@ export interface UpdateEmployeeData {
     affiliation?: string | null;
     departmentId?: number;
     status?: EmployeeStatus;
+    managerId?: number | null;
 }
 
 // ==================== CSV Import Types ====================

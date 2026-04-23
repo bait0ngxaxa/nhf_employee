@@ -14,16 +14,29 @@ import type { EmployeeFilters } from "@/lib/services/employee/types";
 import { EXPORT_LIMITS } from "@/lib/ssot/exports";
 import { jsonError, unauthorized } from "@/lib/ssot/http";
 import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
+import { employeeFiltersSchema } from "@/lib/validations/employee";
 
-function parseExportFilters(url: string): EmployeeFilters {
+function parseExportFilters(
+    url: string,
+): { success: true; data: EmployeeFilters } | { success: false; response: NextResponse } {
     const { searchParams } = new URL(url);
-
-    return {
+    const parsed = employeeFiltersSchema.safeParse({
         search: searchParams.get("search") || undefined,
         status: searchParams.get("status") || undefined,
-        page: 1,
-        limit: EXPORT_LIMITS.employee.maxRows,
-    };
+        page: "1",
+        limit: String(EXPORT_LIMITS.employee.maxRows),
+    });
+
+    if (!parsed.success) {
+        return {
+            success: false,
+            response: jsonError(COMMON_API_MESSAGES.invalidInput, 400, {
+                details: parsed.error.flatten().fieldErrors,
+            }),
+        };
+    }
+
+    return { success: true, data: parsed.data };
 }
 
 function sanitizeFilenamePart(value: string): string {
@@ -60,7 +73,12 @@ export async function GET(request: NextRequest): Promise<Response> {
             );
         }
 
-        const filters = parseExportFilters(request.url);
+        const parsedFilters = parseExportFilters(request.url);
+        if (!parsedFilters.success) {
+            return parsedFilters.response;
+        }
+
+        const filters = parsedFilters.data;
         const where = createEmployeeWhereClause(filters);
         const recordCount = await prisma.employee.count({ where });
 

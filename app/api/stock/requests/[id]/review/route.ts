@@ -6,6 +6,7 @@ import { unauthorized, forbidden, jsonError, serverError } from "@/lib/ssot/http
 import { stockService } from "@/lib/services/stock";
 import { logStockEvent } from "@/lib/audit";
 import { notifyStockRequestResult } from "@/lib/services/stock/notifications";
+import { stockReviewActionSchema } from "@/lib/validations/stock";
 
 interface RouteParams {
     params: Promise<{ id: string }>;
@@ -26,12 +27,14 @@ export async function POST(
         const requestId = Number(id);
         if (isNaN(requestId)) return jsonError("ID ไม่ถูกต้อง", 400);
 
-        const body = (await request.json()) as {
-            action?: string;
-            rejectReason?: string | null;
-            cancelReason?: string | null;
-        };
-        const action = body.action;
+        const body = await request.json();
+        const parsed = stockReviewActionSchema.safeParse(body);
+        if (!parsed.success) {
+            return jsonError("ข้อมูลไม่ถูกต้อง", 400, {
+                details: parsed.error.flatten().fieldErrors,
+            });
+        }
+        const { action } = parsed.data;
 
         if (action === "approve" || action === "issue") {
             const issuedResult = await stockService.issueRequest(requestId, user.id);
@@ -58,7 +61,8 @@ export async function POST(
             return jsonError("action ต้องเป็น issue หรือ cancel", 400);
         }
 
-        const cancelReason = body.cancelReason ?? body.rejectReason ?? null;
+        const cancelReason =
+            parsed.data.cancelReason ?? parsed.data.rejectReason ?? null;
         const updated = await stockService.cancelRequest(
             requestId,
             user.id,

@@ -8,7 +8,7 @@ import {
     CardHeader,
     CardTitle,
 } from "@/components/ui/card";
-import { Download, Upload, Plus, Users } from "lucide-react";
+import { Download, Loader2, Upload, Plus, Users } from "lucide-react";
 import { EmployeeStatsCards, EmployeeList } from "@/components/employee";
 import {
     useDashboardUIContext,
@@ -64,7 +64,11 @@ function EmployeeManagementContent() {
                                     disabled={isExporting}
                                     onClick={() => void handleExportCSV()}
                                 >
-                                    <Download className="h-4 w-4" />
+                                    {isExporting ? (
+                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                    ) : (
+                                        <Download className="h-4 w-4" />
+                                    )}
                                     <span>
                                         {isExporting
                                             ? "กำลังเตรียมข้อมูล..."

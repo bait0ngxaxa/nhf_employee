@@ -7,6 +7,7 @@ import { getApiAuthSession } from "@/lib/server-auth";
 import { jsonError, unauthorized } from "@/lib/ssot/http";
 import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
 import { APP_DASHBOARD_TABS, toDashboardTabPath } from "@/lib/ssot/routes";
+import { leaveCancelSchema } from "@/lib/validations/leave";
 
 export async function POST(req: Request) {
     try {
@@ -25,10 +26,14 @@ export async function POST(req: Request) {
             return jsonError(COMMON_API_MESSAGES.employeeProfileNotFound, 404);
         }
 
-        const { leaveId } = await req.json();
-        if (!leaveId) {
-            return jsonError(COMMON_API_MESSAGES.leaveIdRequired, 400);
+        const body = await req.json();
+        const parsed = leaveCancelSchema.safeParse(body);
+        if (!parsed.success) {
+            return jsonError(COMMON_API_MESSAGES.invalidInput, 400, {
+                details: parsed.error.flatten().fieldErrors,
+            });
         }
+        const { leaveId } = parsed.data;
 
         const result = await prisma.$transaction(async (tx) => {
             const leaveRequest = await tx.leaveRequest.findUnique({

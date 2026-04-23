@@ -8,6 +8,7 @@ import { getApiAuthSession } from "@/lib/server-auth";
 import { getEmployeeIdFromUserId } from "@/lib/services/leave/get-employee-id";
 import { operationFailed, unauthorized } from "@/lib/ssot/http";
 import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
+import { leaveActionSchema } from "@/lib/validations/leave";
 
 export async function POST(req: Request): Promise<NextResponse> {
     try {
@@ -26,11 +27,18 @@ export async function POST(req: Request): Promise<NextResponse> {
             return operationFailed(404);
         }
 
-        const { leaveId, action, reason } = await req.json();
-
-        if (!leaveId || !action || !["APPROVE", "REJECT"].includes(action)) {
-            return NextResponse.json({ error: COMMON_API_MESSAGES.invalidActionParameters }, { status: 400 });
+        const body = await req.json();
+        const parsed = leaveActionSchema.safeParse(body);
+        if (!parsed.success) {
+            return NextResponse.json(
+                {
+                    error: COMMON_API_MESSAGES.invalidActionParameters,
+                    details: parsed.error.flatten().fieldErrors,
+                },
+                { status: 400 },
+            );
         }
+        const { leaveId, action, reason } = parsed.data;
 
         const result = await prisma.$transaction(async (tx) => {
             const leaveRequest = await tx.leaveRequest.findUnique({

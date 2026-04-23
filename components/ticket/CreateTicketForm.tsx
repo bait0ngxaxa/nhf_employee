@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import { type CreateTicketFormProps, type TicketFormData } from '@/types/tickets';
 import { TICKET_CATEGORIES, TICKET_PRIORITIES } from '@/constants/tickets';
 import { apiPost } from "@/lib/api-client";
+import { Loader2 } from "lucide-react";
 
 export default function CreateTicketForm({ isOpen, onClose, onTicketCreated }: CreateTicketFormProps) {
   const { data: session } = useSession();
@@ -178,7 +179,14 @@ export default function CreateTicketForm({ isOpen, onClose, onTicketCreated }: C
                 ยกเลิก
               </Button>
               <Button type="submit" disabled={isLoading} className="h-10 px-7 font-bold bg-blue-600 hover:bg-blue-700 text-white shadow-sm transition-all">
-                {isLoading ? 'กำลังส่ง...' : 'ส่งคำร้องแจ้งปัญหา'}
+                {isLoading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    กำลังส่ง...
+                  </>
+                ) : (
+                  'ส่งคำร้องแจ้งปัญหา'
+                )}
               </Button>
             </div>
           </form>

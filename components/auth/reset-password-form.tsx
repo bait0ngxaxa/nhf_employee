@@ -14,7 +14,7 @@ import { Label } from "@/components/ui/label";
 import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
-import { KeyRound, Eye, EyeOff, CheckCircle2, XCircle } from "lucide-react";
+import { KeyRound, Eye, EyeOff, CheckCircle2, XCircle, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { apiPost } from "@/lib/api-client";
 import { API_ROUTES, APP_ROUTES } from "@/lib/ssot/routes";
@@ -260,9 +260,14 @@ export function ResetPasswordForm({
                                 className="w-full rounded-xl bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white shadow-lg shadow-blue-500/25 transition-[transform,background-color,box-shadow] duration-300 motion-safe:hover:scale-[1.02]"
                                 disabled={isLoading}
                             >
-                                {isLoading
-                                    ? "กำลังบันทึก…"
-                                    : "ตั้งรหัสผ่านใหม่"}
+                                {isLoading ? (
+                                    <>
+                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                        กำลังบันทึก…
+                                    </>
+                                ) : (
+                                    "ตั้งรหัสผ่านใหม่"
+                                )}
                             </Button>
                         </div>
 
