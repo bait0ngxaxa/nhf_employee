@@ -55,6 +55,13 @@ type UseStockBrowseCartResult = {
         variant: StockItemVariant,
         quantity: number,
     ) => void;
+    addVariantsToCart: (
+        item: StockItem,
+        variants: ReadonlyArray<{
+            variant: StockItemVariant;
+            quantity: number;
+        }>,
+    ) => void;
     clearCart: () => void;
     removeFromCart: (variantId: number) => void;
     setProjectCode: (value: string) => void;
@@ -268,28 +275,55 @@ export function useStockBrowseCart({
         };
     }, [recentlyAddedItemId]);
 
+    function addVariantsToCart(
+        item: StockItem,
+        variants: ReadonlyArray<{
+            variant: StockItemVariant;
+            quantity: number;
+        }>,
+    ): void {
+        if (variants.length === 0) {
+            return;
+        }
+
+        setCart((prev) => {
+            const next = new Map(prev);
+
+            for (const entry of variants) {
+                if (entry.quantity <= 0) {
+                    continue;
+                }
+
+                const existing = next.get(entry.variant.id);
+                const maxQuantity = getVariantAvailableQuantity(entry.variant);
+                const nextQuantity = Math.min(
+                    maxQuantity,
+                    (existing?.qty ?? 0) + Math.max(1, entry.quantity),
+                );
+
+                if (nextQuantity === 0) {
+                    next.delete(entry.variant.id);
+                    continue;
+                }
+
+                next.set(entry.variant.id, {
+                    item,
+                    variant: entry.variant,
+                    qty: nextQuantity,
+                });
+            }
+
+            return next;
+        });
+        setRecentlyAddedItemId(item.id);
+    }
+
     function addVariantToCart(
         item: StockItem,
         variant: StockItemVariant,
         quantity: number,
     ): void {
-        setCart((prev) => {
-            const next = new Map(prev);
-            const existing = next.get(variant.id);
-            const maxQuantity = getVariantAvailableQuantity(variant);
-            const nextQuantity = Math.min(
-                maxQuantity,
-                (existing?.qty ?? 0) + Math.max(1, quantity),
-            );
-
-            next.set(variant.id, {
-                item,
-                variant,
-                qty: nextQuantity,
-            });
-            return next;
-        });
-        setRecentlyAddedItemId(item.id);
+        addVariantsToCart(item, [{ variant, quantity }]);
     }
 
     function addDirectItem(item: StockItem): void {
@@ -392,6 +426,7 @@ export function useStockBrowseCart({
         submitting,
         addDirectItem,
         addVariantToCart,
+        addVariantsToCart,
         clearCart,
         removeFromCart,
         setProjectCode,

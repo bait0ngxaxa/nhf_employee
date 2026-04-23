@@ -76,8 +76,12 @@ export function useManagerApprovalModel(): UseManagerApprovalModelResult {
                 toast.success("ปฏิเสธใบลาเรียบร้อยแล้ว");
             }
             resetRejectDialog();
-        } catch {
-            toast.error("เกิดข้อผิดพลาดในการดำเนินการ");
+        } catch (error: unknown) {
+            toast.error(
+                error instanceof Error && error.message
+                    ? error.message
+                    : "เกิดข้อผิดพลาดในการดำเนินการ",
+            );
         } finally {
             setIsProcessing(false);
         }

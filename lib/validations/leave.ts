@@ -1,5 +1,10 @@
 import * as z from "zod";
 
+const LEAVE_VALIDATION_MESSAGES = {
+  crossYearRequest: "ไม่สามารถลาข้ามปีได้ กรุณาแยกคำขอเป็นคนละปี",
+  rejectReasonRequired: "กรุณาระบุเหตุผลในการไม่อนุมัติ",
+} as const;
+
 export const leaveRequestSchema = z.object({
   leaveType: z.enum(["SICK", "PERSONAL", "VACATION"], {
     message: "กรุณาเลือกประเภทการลา",
@@ -16,6 +21,13 @@ export const leaveRequestSchema = z.object({
     return end >= start;
 }, {
     message: "วันที่สิ้นสุดต้องไม่ก่อนวันที่เริ่มต้น",
+    path: ["endDate"]
+}).refine((data) => {
+    const start = new Date(data.startDate);
+    const end = new Date(data.endDate);
+    return start.getFullYear() === end.getFullYear();
+}, {
+    message: LEAVE_VALIDATION_MESSAGES.crossYearRequest,
     path: ["endDate"]
 }).refine((data) => {
     const start = new Date(data.startDate);
@@ -55,6 +67,14 @@ export const leaveActionSchema = z.object({
     emptyToNull,
     z.string().trim().max(1000, "เหตุผลต้องไม่เกิน 1000 ตัวอักษร").nullish(),
   ),
+}).superRefine((data, ctx) => {
+  if (data.action === "REJECT" && !data.reason) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["reason"],
+      message: LEAVE_VALIDATION_MESSAGES.rejectReasonRequired,
+    });
+  }
 });
 
 export type LeaveRequestValues = z.infer<typeof leaveRequestSchema>;

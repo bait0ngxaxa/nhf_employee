@@ -35,7 +35,7 @@ export function StockBrowse() {
         recentlyAddedItemId,
         submitting,
         addDirectItem,
-        addVariantToCart,
+        addVariantsToCart,
         clearCart,
         removeFromCart,
         setProjectCode,
@@ -128,11 +128,11 @@ export function StockBrowse() {
                 item={variantPickerItem}
                 open={variantPickerItem !== null}
                 onClose={() => setVariantPickerItem(null)}
-                onConfirm={(variant, quantity) => {
+                onConfirm={(selections) => {
                     if (!variantPickerItem) {
                         return;
                     }
-                    addVariantToCart(variantPickerItem, variant, quantity);
+                    addVariantsToCart(variantPickerItem, selections);
                     setVariantPickerItem(null);
                 }}
             />

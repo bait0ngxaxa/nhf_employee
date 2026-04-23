@@ -33,6 +33,7 @@ export function StockInventoryVariantEditor(
     props: StockInventoryVariantEditorProps,
 ) {
     const { variants } = props;
+    const shouldShowAttributes = variants.length > 1;
     const showVariantSkuField = !props.hideSingleVariantSku || variants.length > 1;
     const showVariantImageField =
         !props.hideSingleVariantImage || variants.length > 1;
@@ -61,6 +62,7 @@ export function StockInventoryVariantEditor(
                             variant={variant}
                             showVariantSkuField={showVariantSkuField}
                             showVariantImageField={showVariantImageField}
+                            shouldShowAttributes={shouldShowAttributes}
                             onRemove={() => props.onRemoveVariant(index)}
                             onChange={(nextVariant) =>
                                 props.onVariantChange(index, nextVariant)
@@ -111,6 +113,7 @@ function VariantCard(props: {
     variant: VariantDraft;
     showVariantSkuField: boolean;
     showVariantImageField: boolean;
+    shouldShowAttributes: boolean;
     onRemove: () => void;
     onChange: (variant: VariantDraft) => void;
     onAttributeChange: (
@@ -218,12 +221,14 @@ function VariantCard(props: {
                     />
                 </FieldShell>
             </div>
-            <AttributeEditor
-                variant={variant}
-                onAttributeChange={props.onAttributeChange}
-                onAddAttribute={props.onAddAttribute}
-                onRemoveAttribute={props.onRemoveAttribute}
-            />
+            {props.shouldShowAttributes && (
+                <AttributeEditor
+                    variant={variant}
+                    onAttributeChange={props.onAttributeChange}
+                    onAddAttribute={props.onAddAttribute}
+                    onRemoveAttribute={props.onRemoveAttribute}
+                />
+            )}
         </div>
     );
 }

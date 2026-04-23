@@ -9,6 +9,21 @@ import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
 import { APP_DASHBOARD_TABS, toDashboardTabPath } from "@/lib/ssot/routes";
 import { leaveCancelSchema } from "@/lib/validations/leave";
 
+const LEAVE_CANCEL_MESSAGES = {
+    notFound: "ไม่พบคำขอลาที่ยกเลิกได้",
+    invalidStatus: "คำขอนี้ไม่สามารถยกเลิกได้แล้ว",
+} as const;
+
+class LeaveCancelError extends Error {
+    readonly statusCode: number;
+
+    constructor(message: string, statusCode: number) {
+        super(message);
+        this.name = "LeaveCancelError";
+        this.statusCode = statusCode;
+    }
+}
+
 export async function POST(req: Request) {
     try {
         const session = await getApiAuthSession();
@@ -40,8 +55,11 @@ export async function POST(req: Request) {
                 where: { id: leaveId },
             });
 
-            if (!leaveRequest || leaveRequest.employeeId !== employeeId || leaveRequest.status !== "PENDING") {
-                throw new Error(COMMON_API_MESSAGES.operationFailed);
+            if (!leaveRequest || leaveRequest.employeeId !== employeeId) {
+                throw new LeaveCancelError(LEAVE_CANCEL_MESSAGES.notFound, 404);
+            }
+            if (leaveRequest.status !== "PENDING") {
+                throw new LeaveCancelError(LEAVE_CANCEL_MESSAGES.invalidStatus, 409);
             }
 
             const updatedLeaveRequest = await tx.leaveRequest.update({
@@ -70,9 +88,9 @@ export async function POST(req: Request) {
         return NextResponse.json({ success: true, data: result });
     } catch (error) {
         console.error("Cancel leave error:", error);
-        return jsonError(
-            error instanceof Error ? error.message : COMMON_API_MESSAGES.internalServerError,
-            500,
-        );
+        if (error instanceof LeaveCancelError) {
+            return jsonError(error.message, error.statusCode);
+        }
+        return jsonError(COMMON_API_MESSAGES.internalServerError, 500);
     }
 }

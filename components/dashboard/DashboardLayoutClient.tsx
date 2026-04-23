@@ -48,7 +48,7 @@ export function DashboardLayoutClient({
             {/* Mobile Overlay */}
             {sidebarOpen && (
                 <div
-                    className="fixed inset-0 bg-black/20 backdrop-blur-sm z-10 md:hidden"
+                    className="fixed inset-0 z-30 bg-black/20 backdrop-blur-sm md:hidden"
                     onClick={() => setSidebarOpen(false)}
                 />
             )}
@@ -56,7 +56,7 @@ export function DashboardLayoutClient({
             {/* Sidebar */}
             <div
                 className={`
-                    fixed md:relative inset-y-0 left-0 z-20 h-full flex-shrink-0
+                    fixed inset-y-0 left-0 z-40 h-full flex-shrink-0 md:relative md:z-20
                     transform transition-transform duration-300 ease-in-out
                     ${sidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}
                 `}

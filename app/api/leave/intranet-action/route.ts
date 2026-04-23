@@ -6,9 +6,27 @@ import { prisma } from "@/lib/prisma";
 import { processOutbox } from "@/lib/services/outbox/processor";
 import { getApiAuthSession } from "@/lib/server-auth";
 import { getEmployeeIdFromUserId } from "@/lib/services/leave/get-employee-id";
-import { operationFailed, unauthorized } from "@/lib/ssot/http";
+import { jsonError, operationFailed, unauthorized } from "@/lib/ssot/http";
 import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
 import { leaveActionSchema } from "@/lib/validations/leave";
+
+const LEAVE_APPROVAL_MESSAGES = {
+    requestNotFound: "ไม่พบคำขอลา",
+    alreadyProcessed: "คำขอนี้ถูกดำเนินการไปแล้ว",
+    forbidden: "คุณไม่มีสิทธิ์อนุมัติคำขอนี้",
+    quotaNotFound: "ไม่สามารถตรวจสอบสิทธิ์ลาของคำขอนี้ได้ กรุณาติดต่อผู้ดูแลระบบ",
+    quotaExceeded: "สิทธิ์ลาคงเหลือไม่เพียงพอ ไม่สามารถอนุมัติได้",
+} as const;
+
+class LeaveApprovalError extends Error {
+    readonly statusCode: number;
+
+    constructor(message: string, statusCode: number) {
+        super(message);
+        this.name = "LeaveApprovalError";
+        this.statusCode = statusCode;
+    }
+}
 
 export async function POST(req: Request): Promise<NextResponse> {
     try {
@@ -46,10 +64,14 @@ export async function POST(req: Request): Promise<NextResponse> {
                 include: { employee: true },
             });
 
-            if (!leaveRequest) throw new Error("Leave request not found");
-            if (leaveRequest.status !== "PENDING") throw new Error("This request is already processed");
+            if (!leaveRequest) {
+                throw new LeaveApprovalError(LEAVE_APPROVAL_MESSAGES.requestNotFound, 404);
+            }
+            if (leaveRequest.status !== "PENDING") {
+                throw new LeaveApprovalError(LEAVE_APPROVAL_MESSAGES.alreadyProcessed, 409);
+            }
             if (leaveRequest.approverId !== managerId) {
-                throw new Error("You are not authorized to approve this request");
+                throw new LeaveApprovalError(LEAVE_APPROVAL_MESSAGES.forbidden, 403);
             }
 
             const newStatus = action === "APPROVE" ? "APPROVED" : "REJECTED";
@@ -72,11 +94,19 @@ export async function POST(req: Request): Promise<NextResponse> {
                     },
                 });
 
-                if (!quota) throw new Error("Leave quota not found");
+                if (!quota) {
+                    throw new LeaveApprovalError(
+                        LEAVE_APPROVAL_MESSAGES.quotaNotFound,
+                        409,
+                    );
+                }
 
                 const remaining = quota.totalDays - quota.usedDays;
                 if (leaveRequest.durationDays > remaining) {
-                    throw new Error(COMMON_API_MESSAGES.operationFailed);
+                    throw new LeaveApprovalError(
+                        LEAVE_APPROVAL_MESSAGES.quotaExceeded,
+                        409,
+                    );
                 }
 
                 await tx.leaveQuota.update({
@@ -120,11 +150,9 @@ export async function POST(req: Request): Promise<NextResponse> {
         return NextResponse.json({ success: true, data: result });
     } catch (error) {
         console.error("Intranet Leave Approval Error:", error);
-        return NextResponse.json(
-            {
-                error: error instanceof Error ? error.message : COMMON_API_MESSAGES.failedToProcessLeaveApproval,
-            },
-            { status: 500 },
-        );
+        if (error instanceof LeaveApprovalError) {
+            return jsonError(error.message, error.statusCode);
+        }
+        return jsonError(COMMON_API_MESSAGES.failedToProcessLeaveApproval, 500);
     }
 }

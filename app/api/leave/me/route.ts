@@ -7,6 +7,11 @@ import { getApiAuthSession } from "@/lib/server-auth";
 import { jsonError, unauthorized } from "@/lib/ssot/http";
 import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
 
+const LEAVE_PAGINATION_MESSAGES = {
+    invalidPage: "หมายเลขหน้าต้องเป็นจำนวนเต็มที่มากกว่าหรือเท่ากับ 1",
+    invalidLimit: "จำนวนรายการต่อหน้าต้องอยู่ระหว่าง 1 ถึง 50",
+} as const;
+
 export async function GET(req: Request) {
     try {
         const session = await getApiAuthSession();
@@ -51,8 +56,16 @@ export async function GET(req: Request) {
                 : existingQuotas;
 
         const url = new URL(req.url);
-        const page = parseInt(url.searchParams.get("page") || "1", 10);
-        const limit = parseInt(url.searchParams.get("limit") || "10", 10);
+        const page = Number.parseInt(url.searchParams.get("page") || "1", 10);
+        const limit = Number.parseInt(url.searchParams.get("limit") || "10", 10);
+
+        if (!Number.isInteger(page) || page < 1) {
+            return jsonError(LEAVE_PAGINATION_MESSAGES.invalidPage, 400);
+        }
+        if (!Number.isInteger(limit) || limit < 1 || limit > 50) {
+            return jsonError(LEAVE_PAGINATION_MESSAGES.invalidLimit, 400);
+        }
+
         const skip = (page - 1) * limit;
 
         const [history, totalCount] = await Promise.all([

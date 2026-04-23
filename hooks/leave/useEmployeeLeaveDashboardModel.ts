@@ -42,8 +42,12 @@ export function useEmployeeLeaveDashboardModel() {
             setIsSubmitting(true);
             await cancelLeave(cancelConfirmId);
             toast.success("ยกเลิกคำขอลาเรียบร้อยแล้ว");
-        } catch {
-            toast.error("เกิดข้อผิดพลาดในการยกเลิกคำขอลา");
+        } catch (error: unknown) {
+            toast.error(
+                error instanceof Error && error.message
+                    ? error.message
+                    : "เกิดข้อผิดพลาดในการยกเลิกคำขอลา",
+            );
         } finally {
             setIsSubmitting(false);
             setCancelConfirmId(null);

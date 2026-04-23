@@ -5,7 +5,7 @@ import { API_ROUTES } from "@/lib/ssot/routes";
 
 const fetcher = async <T,>(url: string): Promise<T> => {
     const res = await apiGet<T>(url);
-    if (!res.success) throw new Error(res.error);
+    if (!res.success) throw new Error(res.errorThai || res.error);
     return res.data;
 };
 
@@ -71,7 +71,9 @@ export function useLeaveProfile(page: number = 1) {
             const response = await apiPost(API_ROUTES.leave.cancel, { leaveId });
 
             if (!response.success) {
-                throw new Error(response.error || "ไม่สามารถยกเลิกคำขอลาได้");
+                throw new Error(
+                    response.errorThai || response.error || "ไม่สามารถยกเลิกคำขอลาได้",
+                );
             }
 
             // Immediately re-fetch the data to reflect the CANCELLED status & restored quota

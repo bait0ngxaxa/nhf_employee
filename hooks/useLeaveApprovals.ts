@@ -4,7 +4,7 @@ import { API_ROUTES } from "@/lib/ssot/routes";
 
 const fetcher = async <T,>(url: string): Promise<T> => {
     const res = await apiGet<T>(url);
-    if (!res.success) throw new Error(res.error);
+    if (!res.success) throw new Error(res.errorThai || res.error);
     return res.data;
 };
 

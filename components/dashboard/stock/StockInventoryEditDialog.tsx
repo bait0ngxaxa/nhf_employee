@@ -25,6 +25,12 @@ type StockItemVariant = NonNullable<StockItem["variants"]>[number];
 type EditableVariant = ReturnType<typeof createEditableVariant>;
 
 function createEditableVariant(item: StockItem, variant?: StockItemVariant) {
+    const existingAttributes =
+        variant?.attributeValues?.map((attributeValue) => ({
+            name: attributeValue.attributeValue.attribute.name,
+            value: attributeValue.attributeValue.value,
+        })) ?? [];
+
     return {
         clientKey:
             variant?.id !== undefined
@@ -37,10 +43,9 @@ function createEditableVariant(item: StockItem, variant?: StockItemVariant) {
         minStock: String(variant?.minStock ?? 1),
         imageUrl: variant?.imageUrl ?? "",
         attributes:
-            variant?.attributeValues?.map((attributeValue) => ({
-                name: attributeValue.attributeValue.attribute.name,
-                value: attributeValue.attributeValue.value,
-            })) ?? [createEmptyVariantAttribute()],
+            existingAttributes.length > 0
+                ? existingAttributes
+                : [createEmptyVariantAttribute()],
     };
 }
 
@@ -148,9 +153,11 @@ export function EditItemDialog({
                         </div>
                     </div>
 
-                    <div className="rounded-xl border border-amber-100 bg-amber-50/70 px-4 py-3 text-sm text-amber-800">
-                        ถ้ามีหลายรายการย่อย ต้องระบุคุณสมบัติของแต่ละตัวให้ชัด เช่น สี ขนาด หรือชนิด
-                    </div>
+                    {variants.length > 1 && (
+                        <div className="rounded-xl border border-amber-100 bg-amber-50/70 px-4 py-3 text-sm text-amber-800">
+                            ถ้ามีหลายรายการย่อย ต้องระบุคุณสมบัติของแต่ละตัวให้ชัด เช่น สี ขนาด หรือชนิด
+                        </div>
+                    )}
 
                     <StockImageUploadField
                         label={STOCK_ADMIN_TEXT.imageUrl}

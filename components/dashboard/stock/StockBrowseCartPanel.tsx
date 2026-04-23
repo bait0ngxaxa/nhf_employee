@@ -201,8 +201,8 @@ function CartRow(props: {
     const imageUrl = item.variant.imageUrl ?? item.item.imageUrl ?? null;
 
     return (
-        <div className="flex items-center gap-3 rounded-[1.35rem] border border-slate-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(248,250,252,0.96))] p-3 shadow-[0_16px_32px_-26px_rgba(15,23,42,0.35)]">
-            <div className="overflow-hidden rounded-xl bg-white ring-1 ring-slate-200 shadow-inner shadow-white">
+        <div className="flex items-start gap-3 rounded-[1.35rem] border border-slate-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(248,250,252,0.96))] p-3 shadow-[0_16px_32px_-26px_rgba(15,23,42,0.35)] sm:items-center">
+            <div className="shrink-0 overflow-hidden rounded-xl bg-white ring-1 ring-slate-200 shadow-inner shadow-white">
                 {imageUrl ? (
                     <Image
                         src={imageUrl}
@@ -210,67 +210,71 @@ function CartRow(props: {
                         width={64}
                         height={64}
                         unoptimized
-                        className="h-16 w-16 object-cover"
+                        className="h-14 w-14 object-cover sm:h-16 sm:w-16"
                     />
                 ) : (
-                    <div className="flex h-16 w-16 items-center justify-center text-xs text-slate-400">
+                    <div className="flex h-14 w-14 items-center justify-center text-xs text-slate-400 sm:h-16 sm:w-16">
                         ไม่มีรูป
                     </div>
                 )}
             </div>
 
-            <div className="min-w-0 flex-1">
-                <div className="truncate text-sm font-semibold text-slate-800">
-                    {getVariantDisplayName(item.item.name, item.variant)}
+            <div className="min-w-0 flex-1 space-y-3">
+                <div className="space-y-1">
+                    <div className="text-sm font-semibold leading-snug text-slate-800 break-words sm:truncate">
+                        {getVariantDisplayName(item.item.name, item.variant)}
+                    </div>
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
+                        <span>
+                            จำนวนที่เบิก: {item.qty} {item.variant.unit}
+                        </span>
+                        <span>
+                            คงเหลือสูงสุด {getVariantAvailableQuantity(item.variant)}{" "}
+                            {item.variant.unit}
+                        </span>
+                    </div>
                 </div>
-                <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-slate-500">
-                    <span>
-                        จำนวนที่เบิก: {item.qty} {item.variant.unit}
-                    </span>
-                    <span>
-                        คงเหลือสูงสุด {getVariantAvailableQuantity(item.variant)}{" "}
-                        {item.variant.unit}
-                    </span>
-                </div>
-            </div>
 
-            <div className="flex items-center gap-1">
-                <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    onClick={props.onDecrease}
-                    disabled={props.disabled}
-                    className="h-9 w-9 rounded-lg border border-transparent bg-white text-slate-700 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-200 hover:bg-slate-100 hover:shadow-md"
-                >
-                    <Minus className="h-4 w-4" />
-                </Button>
-                <div className="w-10 text-center text-sm font-bold text-blue-700">
-                    {item.qty}
+                <div className="flex items-center justify-between gap-2 sm:justify-end">
+                    <div className="flex items-center gap-1">
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            onClick={props.onDecrease}
+                            disabled={props.disabled}
+                            className="h-8 w-8 rounded-lg border border-transparent bg-white text-slate-700 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-200 hover:bg-slate-100 hover:shadow-md sm:h-9 sm:w-9"
+                        >
+                            <Minus className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                        </Button>
+                        <div className="w-8 text-center text-xs font-bold text-blue-700 sm:w-10 sm:text-sm">
+                            {item.qty}
+                        </div>
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            onClick={props.onIncrease}
+                            disabled={
+                                props.disabled ||
+                                item.qty >= getVariantAvailableQuantity(item.variant)
+                            }
+                            className="h-8 w-8 rounded-lg border border-transparent bg-white text-slate-700 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-200 hover:bg-slate-100 hover:shadow-md sm:h-9 sm:w-9"
+                        >
+                            <Plus className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                        </Button>
+                    </div>
+                    <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={props.onRemove}
+                        disabled={props.disabled}
+                        className="h-8 w-8 shrink-0 rounded-lg border border-transparent text-rose-600 transition-all duration-200 hover:-translate-y-0.5 hover:border-rose-100 hover:bg-rose-50 hover:text-rose-700 hover:shadow-md sm:h-9 sm:w-9"
+                    >
+                        <Trash2 className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                    </Button>
                 </div>
-                <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    onClick={props.onIncrease}
-                    disabled={
-                        props.disabled ||
-                        item.qty >= getVariantAvailableQuantity(item.variant)
-                    }
-                    className="h-9 w-9 rounded-lg border border-transparent bg-white text-slate-700 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-200 hover:bg-slate-100 hover:shadow-md"
-                >
-                    <Plus className="h-4 w-4" />
-                </Button>
-                <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    onClick={props.onRemove}
-                    disabled={props.disabled}
-                    className="h-9 w-9 rounded-lg border border-transparent text-rose-600 transition-all duration-200 hover:-translate-y-0.5 hover:border-rose-100 hover:bg-rose-50 hover:text-rose-700 hover:shadow-md"
-                >
-                    <Trash2 className="h-4 w-4" />
-                </Button>
             </div>
         </div>
     );

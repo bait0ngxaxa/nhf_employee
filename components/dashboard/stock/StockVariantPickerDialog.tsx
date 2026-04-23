@@ -1,27 +1,28 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
+import { useEffect, useMemo, useState } from "react";
 import { Minus, Package, Plus } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import {
-    Dialog,
-    DialogContent,
-    DialogTitle,
-} from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import type { StockItem, StockItemVariant } from "../context/stock/types";
 import {
     getBrowseImageUrl,
-    getVariantAvailableQuantity,
     getVariantAttributeSummary,
+    getVariantAvailableQuantity,
 } from "./stockVariant.shared";
+
+type VariantSelection = {
+    variant: StockItemVariant;
+    quantity: number;
+};
 
 type StockVariantPickerDialogProps = {
     item: StockItem | null;
     open: boolean;
     onClose: () => void;
-    onConfirm: (variant: StockItemVariant, quantity: number) => void;
+    onConfirm: (selections: VariantSelection[]) => void;
 };
 
 export function StockVariantPickerDialog({
@@ -31,13 +32,13 @@ export function StockVariantPickerDialog({
     onConfirm,
 }: StockVariantPickerDialogProps) {
     const variants = useMemo(() => item?.variants ?? [], [item]);
-    const [selectedVariantId, setSelectedVariantId] = useState<number | null>(null);
-    const [quantity, setQuantity] = useState(1);
+    const [activeVariantId, setActiveVariantId] = useState<number | null>(null);
+    const [selectedQuantities, setSelectedQuantities] = useState<Record<number, number>>({});
 
     useEffect(() => {
         if (!open) {
-            setSelectedVariantId(null);
-            setQuantity(1);
+            setActiveVariantId(null);
+            setSelectedQuantities({});
             return;
         }
 
@@ -45,20 +46,88 @@ export function StockVariantPickerDialog({
             variants.find((variant) => getVariantAvailableQuantity(variant) > 0) ??
             variants[0] ??
             null;
-        setSelectedVariantId(firstAvailableVariant?.id ?? null);
-        setQuantity(1);
+
+        setActiveVariantId(firstAvailableVariant?.id ?? null);
+        setSelectedQuantities({});
     }, [open, variants]);
 
-    const selectedVariant = useMemo(
-        () => variants.find((variant) => variant.id === selectedVariantId) ?? null,
-        [selectedVariantId, variants],
+    const activeVariant = useMemo(
+        () => variants.find((variant) => variant.id === activeVariantId) ?? null,
+        [activeVariantId, variants],
     );
-    const selectedVariantAvailableQuantity = selectedVariant
-        ? getVariantAvailableQuantity(selectedVariant)
-        : 0;
+
+    const selections = useMemo(
+        () =>
+            variants.flatMap((variant) => {
+                const quantity = Math.min(
+                    getVariantAvailableQuantity(variant),
+                    selectedQuantities[variant.id] ?? 0,
+                );
+
+                if (quantity <= 0) {
+                    return [];
+                }
+
+                return [{ variant, quantity }];
+            }),
+        [selectedQuantities, variants],
+    );
+
+    const selectedVariantCount = selections.length;
+    const selectedTotalQuantity = selections.reduce(
+        (total, selection) => total + selection.quantity,
+        0,
+    );
 
     if (!item) {
         return null;
+    }
+
+    function updateVariantQuantity(variant: StockItemVariant, delta: number): void {
+        const maxQuantity = getVariantAvailableQuantity(variant);
+
+        setActiveVariantId(variant.id);
+        setSelectedQuantities((current) => {
+            const existingQuantity = current[variant.id] ?? 0;
+            const nextQuantity = Math.min(
+                maxQuantity,
+                Math.max(0, existingQuantity + delta),
+            );
+
+            if (nextQuantity === existingQuantity) {
+                return current;
+            }
+
+            if (nextQuantity === 0) {
+                const next = { ...current };
+                delete next[variant.id];
+                return next;
+            }
+
+            return {
+                ...current,
+                [variant.id]: nextQuantity,
+            };
+        });
+    }
+
+    function handleVariantCardClick(variant: StockItemVariant): void {
+        setActiveVariantId(variant.id);
+
+        if (getVariantAvailableQuantity(variant) === 0) {
+            return;
+        }
+
+        setSelectedQuantities((current) => {
+            if ((current[variant.id] ?? 0) > 0) {
+                return current;
+            }
+
+            return {
+                ...current,
+                [variant.id]: 1,
+            };
+        });
     }
 
     return (
@@ -72,9 +141,9 @@ export function StockVariantPickerDialog({
                 <div className="space-y-5 px-6 py-5">
                     <div className="flex flex-col gap-4 rounded-2xl border border-slate-100 bg-white p-4 sm:flex-row">
                         <div className="h-24 w-24 overflow-hidden rounded-2xl bg-slate-100 ring-1 ring-slate-200">
-                            {getBrowseImageUrl(item, selectedVariant) ? (
+                            {getBrowseImageUrl(item, activeVariant) ? (
                                 <Image
-                                    src={getBrowseImageUrl(item, selectedVariant) ?? ""}
+                                    src={getBrowseImageUrl(item, activeVariant) ?? ""}
                                     alt={item.name}
                                     width={96}
                                     height={96}
@@ -98,12 +167,29 @@ export function StockVariantPickerDialog({
                                     </p>
                                 )}
                             </div>
-                            <Badge
-                                variant="secondary"
-                                className="border-none bg-indigo-50 text-indigo-700"
-                            >
-                                {item.category.name}
-                            </Badge>
+                            <div className="flex flex-wrap items-center gap-2">
+                                <Badge
+                                    variant="secondary"
+                                    className="border-none bg-indigo-50 text-indigo-700"
+                                >
+                                    {item.category.name}
+                                </Badge>
+                                <Badge
+                                    variant="secondary"
+                                    className="border-none bg-blue-50 text-blue-700"
+                                >
+                                    เลือกแล้ว {selectedVariantCount} รายการ
+                                </Badge>
+                                <Badge
+                                    variant="secondary"
+                                    className="border-none bg-emerald-50 text-emerald-700"
+                                >
+                                    รวม {selectedTotalQuantity} ชิ้น
+                                </Badge>
+                            </div>
+                            <p className="text-xs text-slate-500">
+                                เลือกจำนวนของแต่ละตัวเลือกได้หลายรายการ แล้วเพิ่มเข้าตะกร้าครั้งเดียว
+                            </p>
                         </div>
                     </div>
 
@@ -113,89 +199,103 @@ export function StockVariantPickerDialog({
                         </div>
                         <div className="grid gap-3">
                             {variants.map((variant) => {
-                                const isSelected = variant.id === selectedVariantId;
+                                const availableQuantity = getVariantAvailableQuantity(variant);
+                                const quantity = selectedQuantities[variant.id] ?? 0;
+                                const isActive = variant.id === activeVariantId;
+                                const isSelected = quantity > 0;
                                 const summary = getVariantAttributeSummary(
                                     variant.attributeValues,
                                 );
 
                                 return (
-                                    <button
+                                    <div
                                         key={variant.id}
-                                        type="button"
-                                        className={`group/variant rounded-2xl border p-4 text-left transition-all duration-300 ${
+                                        className={`rounded-2xl border p-4 text-left transition-all duration-300 ${
                                             isSelected
                                                 ? "border-blue-300 bg-[linear-gradient(135deg,rgba(239,246,255,0.96),rgba(219,234,254,0.88))] shadow-[0_18px_34px_-24px_rgba(37,99,235,0.45)]"
-                                                : "border-slate-200 bg-white hover:-translate-y-0.5 hover:border-blue-200 hover:bg-blue-50/30 hover:shadow-[0_16px_28px_-24px_rgba(37,99,235,0.35)]"
-                                        }`}
-                                        onClick={() => {
-                                            setSelectedVariantId(variant.id);
-                                            setQuantity(1);
-                                        }}
+                                                : isActive
+                                                    ? "border-slate-300 bg-slate-50 shadow-[0_12px_24px_-24px_rgba(15,23,42,0.45)]"
+                                                    : "border-slate-200 bg-white hover:-translate-y-0.5 hover:border-blue-200 hover:bg-blue-50/30 hover:shadow-[0_16px_28px_-24px_rgba(37,99,235,0.35)]"
+                                        } ${availableQuantity === 0 ? "opacity-60" : ""}`}
                                     >
-                                        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                                            <div className="space-y-1">
-                                                <div className="font-semibold text-slate-800">
-                                                    {summary || variant.sku}
+                                        <div className="flex flex-col gap-3">
+                                            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                                                <div className="space-y-1">
+                                                    <div className="font-semibold text-slate-800">
+                                                        {summary || variant.sku}
+                                                    </div>
+                                                    <div className="text-xs text-slate-500">
+                                                        SKU: {variant.sku}
+                                                    </div>
                                                 </div>
-                                                <div className="text-xs text-slate-500">
-                                                    SKU: {variant.sku}
+                                                <div className="flex items-center gap-2 self-start">
+                                                    <div className="rounded-lg bg-slate-50 px-2.5 py-1 text-sm font-bold text-slate-700">
+                                                        คงเหลือ {availableQuantity} {variant.unit}
+                                                    </div>
+                                                    {availableQuantity > 0 && quantity === 0 && (
+                                                        <Button
+                                                            type="button"
+                                                            variant="outline"
+                                                            className="h-8 rounded-lg border-blue-200 px-3 text-xs font-semibold text-blue-700 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-800"
+                                                            onClick={() =>
+                                                                handleVariantCardClick(variant)
+                                                            }
+                                                        >
+                                                            เลือก
+                                                        </Button>
+                                                    )}
                                                 </div>
                                             </div>
-                                            <div className="rounded-lg bg-slate-50 px-2.5 py-1 text-sm font-bold text-slate-700 transition-all duration-300 group-hover/variant:bg-white group-hover/variant:shadow-sm">
-                                                คงเหลือ {variant.quantity} {variant.unit}
+
+                                            <div className="flex items-center justify-between gap-3">
+                                                <div className="text-xs text-slate-500">
+                                                    {availableQuantity === 0
+                                                        ? "สินค้าหมดชั่วคราว"
+                                                        : "กด + / - เพื่อกำหนดจำนวนของตัวเลือกนี้"}
+                                                </div>
+                                                <div
+                                                    className="flex items-center gap-2"
+                                                    onClick={(event) => event.stopPropagation()}
+                                                    onKeyDown={(event) => event.stopPropagation()}
+                                                >
+                                                    <Button
+                                                        type="button"
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        className="h-8 w-8 rounded-lg border border-transparent bg-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-200 hover:bg-slate-100 hover:shadow-md"
+                                                        onClick={() =>
+                                                            updateVariantQuantity(variant, -1)
+                                                        }
+                                                        disabled={quantity === 0}
+                                                    >
+                                                        <Minus className="h-3.5 w-3.5" />
+                                                    </Button>
+                                                    <div className="w-12 text-center text-sm font-bold text-blue-700">
+                                                        {quantity}
+                                                    </div>
+                                                    <Button
+                                                        type="button"
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        className="h-8 w-8 rounded-lg border border-transparent bg-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-200 hover:bg-slate-100 hover:shadow-md"
+                                                        onClick={() =>
+                                                            updateVariantQuantity(variant, 1)
+                                                        }
+                                                        disabled={
+                                                            availableQuantity === 0
+                                                            || quantity >= availableQuantity
+                                                        }
+                                                    >
+                                                        <Plus className="h-3.5 w-3.5" />
+                                                    </Button>
+                                                </div>
                                             </div>
                                         </div>
-                                    </button>
+                                    </div>
                                 );
                             })}
                         </div>
                     </div>
-
-                    {selectedVariant && (
-                        <div className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-slate-50/60 p-4 sm:flex-row sm:items-center sm:justify-between">
-                            <div className="space-y-1">
-                                <div className="text-sm font-semibold text-slate-800">
-                                    จำนวนที่ต้องการเบิก
-                                </div>
-                                <div className="text-xs text-slate-500">
-                                    สูงสุด {selectedVariant.quantity} {selectedVariant.unit}
-                                </div>
-                            </div>
-                            <div className="flex items-center gap-2">
-                                <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-9 w-9 rounded-lg border border-transparent bg-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-200 hover:bg-slate-100 hover:shadow-md"
-                                    onClick={() =>
-                                        setQuantity((current) => Math.max(1, current - 1))
-                                    }
-                                >
-                                    <Minus className="h-4 w-4" />
-                                </Button>
-                                <div className="w-16 text-center font-bold text-blue-700">
-                                    {quantity}
-                                </div>
-                                <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-9 w-9 rounded-lg border border-transparent bg-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-200 hover:bg-slate-100 hover:shadow-md"
-                                    onClick={() =>
-                                        setQuantity((current) =>
-                                            Math.min(
-                                                selectedVariantAvailableQuantity,
-                                                current + 1,
-                                            ),
-                                        )
-                                    }
-                                    disabled={quantity >= selectedVariantAvailableQuantity}
-                                >
-                                    <Plus className="h-4 w-4" />
-                                </Button>
-                            </div>
-                        </div>
-                    )}
 
                     <div className="flex justify-end gap-3 pt-2">
                         <Button
@@ -207,19 +307,11 @@ export function StockVariantPickerDialog({
                         </Button>
                         <Button
                             className="group/confirm bg-[linear-gradient(135deg,#2563EB,#1D4ED8)] font-bold text-white shadow-[0_18px_34px_-22px_rgba(37,99,235,0.95)] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_22px_38px_-20px_rgba(37,99,235,0.95)]"
-                            onClick={() => {
-                                if (!selectedVariant) {
-                                    return;
-                                }
-                                onConfirm(selectedVariant, quantity);
-                            }}
-                            disabled={
-                                !selectedVariant ||
-                                selectedVariantAvailableQuantity === 0
-                            }
+                            onClick={() => onConfirm(selections)}
+                            disabled={selections.length === 0}
                         >
                             <Plus className="mr-1 h-4 w-4 transition-transform duration-300 group-hover/confirm:translate-x-0.5 group-hover/confirm:scale-110" />
-                            เพิ่มในรายการเบิก
+                            เพิ่ม {selectedVariantCount} รายการ ({selectedTotalQuantity} ชิ้น)
                         </Button>
                     </div>
                 </div>
