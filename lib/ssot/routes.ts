@@ -75,6 +75,7 @@ export const API_ROUTES = {
     stock: {
         categories: "/api/stock/categories",
         items: "/api/stock/items",
+        reportsExport: "/api/stock/reports/export",
         itemById: (id: number | string): string => `/api/stock/items/${id}`,
         adjustById: (id: number | string): string =>
             `/api/stock/items/${id}/adjust`,

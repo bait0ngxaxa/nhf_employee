@@ -1,10 +1,7 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { toast } from "sonner";
 import { useLeaveApprovals, type PendingLeave } from "@/hooks/useLeaveApprovals";
 import {
-    downloadLeaveExportFile,
-    fetchLeaveExportMeta,
-    fetchLeaveExportYears,
     submitLeaveApprovalAction,
     type LeaveApprovalAction,
 } from "@/lib/services/leave/client";
@@ -17,19 +14,12 @@ interface UseManagerApprovalModelResult {
     isRejectDialogOpen: boolean;
     rejectReason: string;
     isProcessing: boolean;
-    availableYears: number[];
-    exportYear: number;
-    isExporting: boolean;
     setRejectReason: (value: string) => void;
-    setExportYear: (year: number) => void;
     openRejectDialog: (leave: PendingLeave) => void;
     closeRejectDialog: () => void;
     approveLeave: (leaveId: string) => Promise<void>;
     rejectLeave: () => Promise<void>;
-    exportCsv: () => Promise<void>;
 }
-
-const currentYear = new Date().getFullYear();
 
 export function useManagerApprovalModel(): UseManagerApprovalModelResult {
     const { pending, history, isLoading, mutate } = useLeaveApprovals();
@@ -37,27 +27,6 @@ export function useManagerApprovalModel(): UseManagerApprovalModelResult {
     const [isRejectDialogOpen, setIsRejectDialogOpen] = useState(false);
     const [rejectReason, setRejectReason] = useState("");
     const [isProcessing, setIsProcessing] = useState(false);
-    const [availableYears, setAvailableYears] = useState<number[]>([currentYear]);
-    const [exportYear, setExportYear] = useState(currentYear);
-    const [isExporting, setIsExporting] = useState(false);
-
-    useEffect(() => {
-        let mounted = true;
-        fetchLeaveExportYears()
-            .then((data) => {
-                if (!mounted || data.years.length === 0) {
-                    return;
-                }
-                setAvailableYears(data.years);
-                setExportYear(data.years[0]);
-            })
-            .catch(() => {
-                // Keep default year state for resilience if export-year endpoint fails.
-            });
-        return () => {
-            mounted = false;
-        };
-    }, []);
 
     const resetRejectDialog = (): void => {
         setIsRejectDialogOpen(false);
@@ -87,34 +56,6 @@ export function useManagerApprovalModel(): UseManagerApprovalModelResult {
         }
     };
 
-    const exportCsv = async (): Promise<void> => {
-        setIsExporting(true);
-        try {
-            const exportMeta = await fetchLeaveExportMeta(exportYear);
-
-            if (exportMeta.count === 0) {
-                toast.error("ไม่มีข้อมูลสำหรับดาวน์โหลด");
-                return;
-            }
-
-            if (exportMeta.count > exportMeta.maxRows) {
-                toast.error("ข้อมูลเกินขนาดที่กำหนด", {
-                    description: `ส่งออกข้อมูลการลาได้ไม่เกิน ${exportMeta.maxRows} รายการต่อครั้ง กรุณาเลือกปีที่มีข้อมูลน้อยลง`,
-                });
-                return;
-            }
-
-            downloadLeaveExportFile(exportYear);
-            toast.success("เริ่มดาวน์โหลดไฟล์แล้ว", {
-                description: `กำลังส่งออกข้อมูลการลา ${exportMeta.count} รายการ (ปี ${exportYear})`,
-            });
-        } catch {
-            toast.error("เกิดข้อผิดพลาดในการดาวน์โหลด");
-        } finally {
-            setTimeout(() => setIsExporting(false), 500);
-        }
-    };
-
     return {
         pending,
         history,
@@ -123,11 +64,7 @@ export function useManagerApprovalModel(): UseManagerApprovalModelResult {
         isRejectDialogOpen,
         rejectReason,
         isProcessing,
-        availableYears,
-        exportYear,
-        isExporting,
         setRejectReason,
-        setExportYear,
         openRejectDialog: (leave: PendingLeave) => {
             setSelectedLeave(leave);
             setIsRejectDialogOpen(true);
@@ -138,6 +75,5 @@ export function useManagerApprovalModel(): UseManagerApprovalModelResult {
             if (!selectedLeave) return;
             await executeAction("REJECT", selectedLeave.id, rejectReason);
         },
-        exportCsv,
     };
 }

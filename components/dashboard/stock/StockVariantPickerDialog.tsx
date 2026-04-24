@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
-import { Minus, Package, Plus } from "lucide-react";
+import { Minus, Package, Plus, X, ZoomIn } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
@@ -25,6 +25,15 @@ type StockVariantPickerDialogProps = {
     onConfirm: (selections: VariantSelection[]) => void;
 };
 
+function getInitialActiveVariantId(variants: StockItemVariant[]): number | null {
+    const firstAvailableVariant =
+        variants.find((variant) => getVariantAvailableQuantity(variant) > 0) ??
+        variants[0] ??
+        null;
+
+    return firstAvailableVariant?.id ?? null;
+}
+
 export function StockVariantPickerDialog({
     item,
     open,
@@ -32,24 +41,29 @@ export function StockVariantPickerDialog({
     onConfirm,
 }: StockVariantPickerDialogProps) {
     const variants = useMemo(() => item?.variants ?? [], [item]);
+    const itemId = item?.id ?? null;
+    const [initializedItemId, setInitializedItemId] = useState<number | null>(null);
     const [activeVariantId, setActiveVariantId] = useState<number | null>(null);
+    const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
     const [selectedQuantities, setSelectedQuantities] = useState<Record<number, number>>({});
 
     useEffect(() => {
         if (!open) {
+            setInitializedItemId(null);
             setActiveVariantId(null);
+            setPreviewImageUrl(null);
             setSelectedQuantities({});
             return;
         }
 
-        const firstAvailableVariant =
-            variants.find((variant) => getVariantAvailableQuantity(variant) > 0) ??
-            variants[0] ??
-            null;
+        if (itemId === null || initializedItemId === itemId) {
+            return;
+        }
 
-        setActiveVariantId(firstAvailableVariant?.id ?? null);
+        setInitializedItemId(itemId);
+        setActiveVariantId(getInitialActiveVariantId(variants));
         setSelectedQuantities({});
-    }, [open, variants]);
+    }, [initializedItemId, itemId, open, variants]);
 
     const activeVariant = useMemo(
         () => variants.find((variant) => variant.id === activeVariantId) ?? null,
@@ -83,10 +97,16 @@ export function StockVariantPickerDialog({
         return null;
     }
 
+    const activeImageUrl = getBrowseImageUrl(item, activeVariant);
+
+    function focusVariant(variant: StockItemVariant): void {
+        setActiveVariantId(variant.id);
+    }
+
     function updateVariantQuantity(variant: StockItemVariant, delta: number): void {
         const maxQuantity = getVariantAvailableQuantity(variant);
 
-        setActiveVariantId(variant.id);
+        focusVariant(variant);
         setSelectedQuantities((current) => {
             const existingQuantity = current[variant.id] ?? 0;
             const nextQuantity = Math.min(
@@ -112,7 +132,7 @@ export function StockVariantPickerDialog({
     }
 
     function handleVariantCardClick(variant: StockItemVariant): void {
-        setActiveVariantId(variant.id);
+        focusVariant(variant);
 
         if (getVariantAvailableQuantity(variant) === 0) {
             return;
@@ -131,8 +151,23 @@ export function StockVariantPickerDialog({
     }
 
     return (
-        <Dialog open={open} onOpenChange={onClose}>
-            <DialogContent className="max-h-[90vh] overflow-y-auto p-0 sm:max-w-[720px]">
+        <>
+            <Dialog
+                open={open}
+                onOpenChange={(nextOpen) => {
+                    if (nextOpen) {
+                        return;
+                    }
+
+                    if (previewImageUrl) {
+                        setPreviewImageUrl(null);
+                        return;
+                    }
+
+                    onClose();
+                }}
+            >
+                <DialogContent className="max-h-[90vh] overflow-y-auto p-0 sm:max-w-[720px]">
                 <div className="border-b border-gray-100 bg-slate-50/60 px-6 py-4">
                     <DialogTitle className="text-lg font-semibold text-slate-800">
                         เลือกรายการย่อยสำหรับเบิก
@@ -141,18 +176,32 @@ export function StockVariantPickerDialog({
                 <div className="space-y-5 px-6 py-5">
                     <div className="flex flex-col gap-4 rounded-2xl border border-slate-100 bg-white p-4 sm:flex-row">
                         <div className="h-24 w-24 overflow-hidden rounded-2xl bg-slate-100 ring-1 ring-slate-200">
-                            {getBrowseImageUrl(item, activeVariant) ? (
-                                <Image
-                                    src={getBrowseImageUrl(item, activeVariant) ?? ""}
-                                    alt={item.name}
-                                    width={96}
-                                    height={96}
-                                    unoptimized
-                                    className="h-full w-full object-contain"
-                                />
+                            {activeImageUrl ? (
+                                <button
+                                    type="button"
+                                    onClick={(event) => {
+                                        event.stopPropagation();
+                                        setPreviewImageUrl(activeImageUrl);
+                                    }}
+                                    className="group/preview relative h-full w-full overflow-hidden text-left outline-none transition-transform duration-300 hover:scale-[1.02] focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-2 active:scale-95"
+                                    aria-label={`ดูรูป ${item.name} แบบพรีวิว`}
+                                >
+                                    <Image
+                                        src={activeImageUrl}
+                                        alt={item.name}
+                                        width={96}
+                                        height={96}
+                                        unoptimized
+                                        className="h-full w-full object-contain transition-transform duration-500 group-hover/preview:scale-110"
+                                    />
+                                    <span className="absolute inset-0 bg-slate-950/0 transition-colors duration-300 group-hover/preview:bg-slate-950/20" />
+                                    <span className="absolute bottom-1.5 right-1.5 flex h-7 w-7 translate-y-1 scale-95 items-center justify-center rounded-full bg-white/90 text-slate-700 opacity-0 shadow-lg shadow-slate-900/15 transition-all duration-300 group-hover/preview:translate-y-0 group-hover/preview:scale-110 group-hover/preview:opacity-100 group-hover/preview:text-blue-700 group-focus-visible/preview:translate-y-0 group-focus-visible/preview:scale-110 group-focus-visible/preview:opacity-100 group-focus-visible/preview:text-blue-700">
+                                        <ZoomIn className="h-3.5 w-3.5" aria-hidden="true" />
+                                    </span>
+                                </button>
                             ) : (
                                 <div className="flex h-full w-full items-center justify-center text-slate-400">
-                                    <Package className="h-8 w-8" />
+                                    <Package className="h-8 w-8" aria-hidden="true" />
                                 </div>
                             )}
                         </div>
@@ -210,24 +259,30 @@ export function StockVariantPickerDialog({
                                 return (
                                     <div
                                         key={variant.id}
+                                        onClick={() => focusVariant(variant)}
                                         className={`rounded-2xl border p-4 text-left transition-all duration-300 ${
                                             isSelected
                                                 ? "border-blue-300 bg-[linear-gradient(135deg,rgba(239,246,255,0.96),rgba(219,234,254,0.88))] shadow-[0_18px_34px_-24px_rgba(37,99,235,0.45)]"
                                                 : isActive
                                                     ? "border-slate-300 bg-slate-50 shadow-[0_12px_24px_-24px_rgba(15,23,42,0.45)]"
                                                     : "border-slate-200 bg-white hover:-translate-y-0.5 hover:border-blue-200 hover:bg-blue-50/30 hover:shadow-[0_16px_28px_-24px_rgba(37,99,235,0.35)]"
-                                        } ${availableQuantity === 0 ? "opacity-60" : ""}`}
+                                        } ${availableQuantity === 0 ? "opacity-60" : "cursor-pointer"}`}
                                     >
                                         <div className="flex flex-col gap-3">
                                             <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                                                <div className="space-y-1">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => focusVariant(variant)}
+                                                    className="min-w-0 flex-1 space-y-1 rounded-xl text-left outline-none transition-colors duration-200 hover:text-blue-700 focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-2"
+                                                    aria-label={`ดูรูปและรายละเอียด ${summary || variant.sku}`}
+                                                >
                                                     <div className="font-semibold text-slate-800">
                                                         {summary || variant.sku}
                                                     </div>
                                                     <div className="text-xs text-slate-500">
                                                         SKU: {variant.sku}
                                                     </div>
-                                                </div>
+                                                </button>
                                                 <div className="flex items-center gap-2 self-start">
                                                     <div className="rounded-lg bg-slate-50 px-2.5 py-1 text-sm font-bold text-slate-700">
                                                         คงเหลือ {availableQuantity} {variant.unit}
@@ -240,6 +295,7 @@ export function StockVariantPickerDialog({
                                                             onClick={() =>
                                                                 handleVariantCardClick(variant)
                                                             }
+                                                            aria-label={`เลือก ${summary || variant.sku}`}
                                                         >
                                                             เลือก
                                                         </Button>
@@ -253,11 +309,7 @@ export function StockVariantPickerDialog({
                                                         ? "สินค้าหมดชั่วคราว"
                                                         : "กด + / - เพื่อกำหนดจำนวนของตัวเลือกนี้"}
                                                 </div>
-                                                <div
-                                                    className="flex items-center gap-2"
-                                                    onClick={(event) => event.stopPropagation()}
-                                                    onKeyDown={(event) => event.stopPropagation()}
-                                                >
+                                                <div className="flex items-center gap-2">
                                                     <Button
                                                         type="button"
                                                         variant="ghost"
@@ -267,8 +319,9 @@ export function StockVariantPickerDialog({
                                                             updateVariantQuantity(variant, -1)
                                                         }
                                                         disabled={quantity === 0}
+                                                        aria-label={`ลดจำนวน ${summary || variant.sku}`}
                                                     >
-                                                        <Minus className="h-3.5 w-3.5" />
+                                                        <Minus className="h-3.5 w-3.5" aria-hidden="true" />
                                                     </Button>
                                                     <div className="w-12 text-center text-sm font-bold text-blue-700">
                                                         {quantity}
@@ -285,8 +338,9 @@ export function StockVariantPickerDialog({
                                                             availableQuantity === 0
                                                             || quantity >= availableQuantity
                                                         }
+                                                        aria-label={`เพิ่มจำนวน ${summary || variant.sku}`}
                                                     >
-                                                        <Plus className="h-3.5 w-3.5" />
+                                                        <Plus className="h-3.5 w-3.5" aria-hidden="true" />
                                                     </Button>
                                                 </div>
                                             </div>
@@ -310,12 +364,45 @@ export function StockVariantPickerDialog({
                             onClick={() => onConfirm(selections)}
                             disabled={selections.length === 0}
                         >
-                            <Plus className="mr-1 h-4 w-4 transition-transform duration-300 group-hover/confirm:translate-x-0.5 group-hover/confirm:scale-110" />
+                            <Plus className="mr-1 h-4 w-4 transition-transform duration-300 group-hover/confirm:translate-x-0.5 group-hover/confirm:scale-110" aria-hidden="true" />
                             เพิ่ม {selectedVariantCount} รายการ ({selectedTotalQuantity} ชิ้น)
                         </Button>
                     </div>
                 </div>
-            </DialogContent>
-        </Dialog>
+
+                {previewImageUrl && (
+                    <div
+                        className="fixed inset-0 z-[70] flex items-center justify-center bg-white/10 p-4 backdrop-blur-xl sm:p-6"
+                        role="dialog"
+                        aria-modal="true"
+                        aria-label="พรีวิวรูปวัสดุ"
+                        onClick={() => setPreviewImageUrl(null)}
+                    >
+                        <div
+                            className="relative flex max-h-[86vh] w-full max-w-[860px] items-center justify-center rounded-[1.75rem] border border-white/15 bg-slate-900/80 p-3 shadow-[0_30px_90px_-34px_rgba(0,0,0,0.95)] backdrop-blur-xl sm:p-4"
+                            onClick={(event) => event.stopPropagation()}
+                        >
+                            <button
+                                type="button"
+                                onClick={() => setPreviewImageUrl(null)}
+                                className="group/close absolute right-3 top-3 z-10 flex h-10 w-10 items-center justify-center rounded-2xl border border-white/20 bg-white/90 text-slate-950 shadow-[0_18px_36px_-18px_rgba(0,0,0,0.85)] backdrop-blur-md transition-all duration-200 hover:-translate-y-0.5 hover:rotate-3 hover:bg-white hover:shadow-[0_22px_44px_-18px_rgba(0,0,0,0.95)] focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 sm:right-4 sm:top-4 sm:h-11 sm:w-11"
+                                aria-label="ปิดพรีวิวรูป"
+                            >
+                                <X className="h-5 w-5 transition-transform duration-200 group-hover/close:scale-110" aria-hidden="true" />
+                            </button>
+                            <Image
+                                src={previewImageUrl}
+                                alt={item.name}
+                                width={1200}
+                                height={900}
+                                unoptimized
+                                className="h-auto max-h-[78vh] w-auto max-w-full rounded-[1.25rem] object-contain"
+                            />
+                        </div>
+                    </div>
+                )}
+                </DialogContent>
+            </Dialog>
+        </>
     );
 }

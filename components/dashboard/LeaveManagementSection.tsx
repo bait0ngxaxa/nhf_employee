@@ -1,11 +1,12 @@
 "use client";
 
-import { CalendarRange, CalendarDays, CheckSquare, Settings2 } from "lucide-react";
+import { CalendarRange, CalendarDays, CheckSquare, Settings2, BarChart3 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useDashboardDataContext } from "./context/dashboard/DashboardContext";
 import { EmployeeLeaveDashboard } from "./leave/EmployeeLeaveDashboard";
 import { ManagerApprovalDashboard } from "./leave/ManagerApprovalDashboard";
 import { ApproverManagement } from "./leave/ApproverManagement";
+import { LeaveReportsDashboard } from "./leave/LeaveReportsDashboard";
 import { isAdminRole } from "@/lib/ssot/permissions";
 import { SectionShell } from "@/components/ui/section-shell";
 import { SectionHeader } from "@/components/ui/section-header";
@@ -47,6 +48,13 @@ export function LeaveManagementSection({ defaultTab = "my-leave" }: LeaveManagem
             label: "อนุมัติการลา",
             icon: CheckSquare,
             content: <ManagerApprovalDashboard />,
+            visible: showApprovalTab,
+        },
+        {
+            value: "reports",
+            label: "รีพอร์ต",
+            icon: BarChart3,
+            content: <LeaveReportsDashboard />,
             visible: showApprovalTab,
         },
         {

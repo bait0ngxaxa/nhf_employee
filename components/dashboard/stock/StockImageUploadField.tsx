@@ -85,6 +85,7 @@ export function StockImageUploadField({
                     id={inputId}
                     type="file"
                     accept="image/png,image/jpeg,image/webp"
+                    aria-label={label}
                     className="hidden"
                     onChange={(event) => void handleFileChange(event)}
                 />
@@ -110,9 +111,9 @@ export function StockImageUploadField({
                                 className="border-blue-200 text-blue-700 hover:bg-blue-50"
                             >
                                 {uploading ? (
-                                    <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+                                    <Loader2 className="mr-1.5 h-4 w-4 animate-spin" aria-hidden="true" />
                                 ) : (
-                                    <ImagePlus className="mr-1.5 h-4 w-4" />
+                                    <ImagePlus className="mr-1.5 h-4 w-4" aria-hidden="true" />
                                 )}
                                 เปลี่ยนรูป
                             </Button>
@@ -123,7 +124,7 @@ export function StockImageUploadField({
                                 onClick={() => onChange("")}
                                 className="text-rose-600 hover:bg-rose-50 hover:text-rose-700"
                             >
-                                <Trash2 className="mr-1.5 h-4 w-4" />
+                                <Trash2 className="mr-1.5 h-4 w-4" aria-hidden="true" />
                                 ลบรูป
                             </Button>
                         </div>
@@ -136,12 +137,12 @@ export function StockImageUploadField({
                         className="flex w-full flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 bg-white px-4 py-8 text-sm text-slate-500 transition hover:border-blue-300 hover:text-blue-700 disabled:cursor-not-allowed"
                     >
                         {uploading ? (
-                            <Loader2 className="h-5 w-5 animate-spin" />
+                            <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" />
                         ) : (
-                            <ImagePlus className="h-5 w-5" />
+                            <ImagePlus className="h-5 w-5" aria-hidden="true" />
                         )}
                         <span>
-                            {uploading ? "กำลังอัปโหลด..." : "อัปโหลดรูปภาพ"}
+                            {uploading ? "กำลังอัปโหลด…" : "อัปโหลดรูปภาพ"}
                         </span>
                         <span className="text-xs text-slate-400">
                             รองรับ JPG, PNG, WEBP ไม่เกิน {IMAGE_UPLOAD_MAX_MB} MB

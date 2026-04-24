@@ -7,4 +7,8 @@ export const EXPORT_LIMITS = {
         maxRows: 3000,
         batchSize: 250,
     },
+    stock: {
+        maxRows: 5000,
+        batchSize: 250,
+    },
 } as const;

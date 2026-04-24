@@ -25,9 +25,12 @@ const DASHBOARD_TAB_QUERY_KEY = "tab";
 const DASHBOARD_STOCK_MENU = "stock";
 const DASHBOARD_STOCK_MENU_LEGACY = "it-equipment";
 const STOCK_DEFAULT_TAB = "browse";
-const STOCK_ADMIN_TABS = new Set(["inventory", "admin-requests"]);
+const STOCK_ADMIN_TABS = new Set(["inventory", "admin-requests", "reports"]);
 
 export const STOCK_TAB_QUERY_KEY = "stockTab";
+export const STOCK_ITEMS_PAGE_QUERY_KEY = "stockItemsPage";
+export const STOCK_ITEMS_SEARCH_QUERY_KEY = "stockSearch";
+export const STOCK_ITEMS_CATEGORY_QUERY_KEY = "stockCategoryId";
 export const STOCK_REQUESTS_PAGE_QUERY_KEY = "stockRequestsPage";
 export const STOCK_BROWSE_LIMIT = 12;
 export const STOCK_ADMIN_ITEMS_LIMIT = 10;
@@ -51,6 +54,19 @@ export function parsePositivePage(value: string | null): number {
     const parsed = Number(value);
     if (!Number.isInteger(parsed) || parsed < 1) {
         return 1;
+    }
+
+    return parsed;
+}
+
+export function parseOptionalPositiveInteger(value: string | null): number | undefined {
+    if (!value) {
+        return undefined;
+    }
+
+    const parsed = Number(value);
+    if (!Number.isInteger(parsed) || parsed < 1) {
+        return undefined;
     }
 
     return parsed;
@@ -121,12 +137,17 @@ export function buildStockRequestsQuery({
 
 export function createStockDashboardUrl(
     searchParams: SearchParamsLike,
-    updates: Record<string, string>,
+    updates: Record<string, string | null>,
 ): string {
     const nextParams = new URLSearchParams(searchParams.toString());
     nextParams.set(DASHBOARD_TAB_QUERY_KEY, DASHBOARD_STOCK_MENU);
 
     for (const [key, value] of Object.entries(updates)) {
+        if (value === null) {
+            nextParams.delete(key);
+            continue;
+        }
+
         nextParams.set(key, value);
     }
 

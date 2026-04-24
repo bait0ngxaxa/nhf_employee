@@ -51,7 +51,7 @@ export function StockBrowseCartPanel({
                 <div className="border-b border-slate-200 px-5 py-4">
                     <div className="flex items-center gap-3">
                         <div className="rounded-2xl bg-blue-50 p-2.5 text-blue-700">
-                            <ShoppingCart className="h-5 w-5" />
+                            <ShoppingCart className="h-5 w-5" aria-hidden="true" />
                         </div>
                         <div>
                             <div className="text-sm font-semibold text-slate-800">
@@ -75,6 +75,8 @@ export function StockBrowseCartPanel({
                             </Label>
                             <Input
                                 id="stock-project-code"
+                                name="stock-project-code"
+                                autoComplete="off"
                                 value={projectCode}
                                 onChange={(event) =>
                                     onProjectCodeChange(event.target.value.toUpperCase())
@@ -128,11 +130,11 @@ export function StockBrowseCartPanel({
                             className="group/submit w-full bg-[linear-gradient(135deg,#2563EB,#1D4ED8)] font-bold text-white shadow-[0_18px_34px_-22px_rgba(37,99,235,0.95)] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_22px_38px_-20px_rgba(37,99,235,0.95)]"
                         >
                             {submitting ? (
-                                <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+                                <Loader2 className="mr-1.5 h-4 w-4 animate-spin" aria-hidden="true" />
                             ) : (
-                                <CheckCircle2 className="mr-1.5 h-4 w-4 transition-transform duration-300 group-hover/submit:scale-110" />
+                                <CheckCircle2 className="mr-1.5 h-4 w-4 transition-transform duration-300 group-hover/submit:scale-110" aria-hidden="true" />
                             )}
-                            {submitting ? "กำลังดำเนินการ..." : "ยืนยันการเบิก"}
+                            {submitting ? "กำลังดำเนินการ…" : "ยืนยันการเบิก"}
                         </Button>
                         <Button
                             type="button"
@@ -141,7 +143,7 @@ export function StockBrowseCartPanel({
                             disabled={submitting}
                             className="group/clear w-full border border-rose-100 text-rose-600 transition-all duration-300 hover:-translate-y-0.5 hover:border-rose-200 hover:bg-rose-50 hover:text-rose-700 hover:shadow-[0_18px_28px_-24px_rgba(190,24,93,0.7)]"
                         >
-                            <XCircle className="mr-1.5 h-4 w-4 transition-transform duration-300 group-hover/clear:scale-110" />
+                            <XCircle className="mr-1.5 h-4 w-4 transition-transform duration-300 group-hover/clear:scale-110" aria-hidden="true" />
                             ยกเลิกทั้งหมด
                         </Button>
                     </div>
@@ -244,8 +246,9 @@ function CartRow(props: {
                             onClick={props.onDecrease}
                             disabled={props.disabled}
                             className="h-8 w-8 rounded-lg border border-transparent bg-white text-slate-700 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-200 hover:bg-slate-100 hover:shadow-md sm:h-9 sm:w-9"
+                            aria-label={`ลดจำนวน ${getVariantDisplayName(item.item.name, item.variant)}`}
                         >
-                            <Minus className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                            <Minus className="h-3.5 w-3.5 sm:h-4 sm:w-4" aria-hidden="true" />
                         </Button>
                         <div className="w-8 text-center text-xs font-bold text-blue-700 sm:w-10 sm:text-sm">
                             {item.qty}
@@ -260,8 +263,9 @@ function CartRow(props: {
                                 item.qty >= getVariantAvailableQuantity(item.variant)
                             }
                             className="h-8 w-8 rounded-lg border border-transparent bg-white text-slate-700 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-200 hover:bg-slate-100 hover:shadow-md sm:h-9 sm:w-9"
+                            aria-label={`เพิ่มจำนวน ${getVariantDisplayName(item.item.name, item.variant)}`}
                         >
-                            <Plus className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                            <Plus className="h-3.5 w-3.5 sm:h-4 sm:w-4" aria-hidden="true" />
                         </Button>
                     </div>
                     <Button
@@ -271,8 +275,9 @@ function CartRow(props: {
                         onClick={props.onRemove}
                         disabled={props.disabled}
                         className="h-8 w-8 shrink-0 rounded-lg border border-transparent text-rose-600 transition-all duration-200 hover:-translate-y-0.5 hover:border-rose-100 hover:bg-rose-50 hover:text-rose-700 hover:shadow-md sm:h-9 sm:w-9"
+                        aria-label={`ลบ ${getVariantDisplayName(item.item.name, item.variant)} ออกจากตะกร้า`}
                     >
-                        <Trash2 className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                        <Trash2 className="h-3.5 w-3.5 sm:h-4 sm:w-4" aria-hidden="true" />
                     </Button>
                 </div>
             </div>

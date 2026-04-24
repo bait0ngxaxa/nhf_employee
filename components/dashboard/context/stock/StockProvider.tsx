@@ -24,7 +24,11 @@ import {
     createStockDashboardUrl,
     isStockDashboardRoute,
     normalizeStockTab,
+    parseOptionalPositiveInteger,
     parsePositivePage,
+    STOCK_ITEMS_CATEGORY_QUERY_KEY,
+    STOCK_ITEMS_PAGE_QUERY_KEY,
+    STOCK_ITEMS_SEARCH_QUERY_KEY,
     STOCK_REQUESTS_LIMIT,
     STOCK_REQUESTS_PAGE_QUERY_KEY,
     STOCK_TAB_QUERY_KEY,
@@ -49,15 +53,19 @@ export function StockProvider({ children }: StockProviderProps) {
     const [activeTab, setActiveTabState] = useState(
         normalizeStockTab(searchParams.get(STOCK_TAB_QUERY_KEY), isAdmin),
     );
-    const [itemsPage, setItemsPage] = useState(1);
+    const [itemsPage, setItemsPageState] = useState(
+        parsePositivePage(searchParams.get(STOCK_ITEMS_PAGE_QUERY_KEY)),
+    );
     const [requestsPage, setRequestsPageState] = useState(
         parsePositivePage(searchParams.get(STOCK_REQUESTS_PAGE_QUERY_KEY)),
     );
     const [requestSearchQuery, setRequestSearchQuery] = useState("");
-    const [searchQuery, setSearchQuery] = useState("");
-    const [selectedCategoryId, setSelectedCategoryId] = useState<
+    const [searchQuery, setSearchQueryState] = useState(
+        searchParams.get(STOCK_ITEMS_SEARCH_QUERY_KEY) ?? "",
+    );
+    const [selectedCategoryId, setSelectedCategoryIdState] = useState<
         number | undefined
-    >();
+    >(parseOptionalPositiveInteger(searchParams.get(STOCK_ITEMS_CATEGORY_QUERY_KEY)));
     const [statusFilter, setStatusFilter] = useState<
         StockRequestStatus | undefined
     >();
@@ -79,6 +87,25 @@ export function StockProvider({ children }: StockProviderProps) {
         );
         setRequestsPageState((prev) =>
             prev === pageFromUrl ? prev : pageFromUrl,
+        );
+    }, [searchParams]);
+
+    useEffect(() => {
+        const pageFromUrl = parsePositivePage(
+            searchParams.get(STOCK_ITEMS_PAGE_QUERY_KEY),
+        );
+        setItemsPageState((prev) => (prev === pageFromUrl ? prev : pageFromUrl));
+
+        const searchFromUrl = searchParams.get(STOCK_ITEMS_SEARCH_QUERY_KEY) ?? "";
+        setSearchQueryState((prev) =>
+            prev === searchFromUrl ? prev : searchFromUrl,
+        );
+
+        const categoryFromUrl = parseOptionalPositiveInteger(
+            searchParams.get(STOCK_ITEMS_CATEGORY_QUERY_KEY),
+        );
+        setSelectedCategoryIdState((prev) =>
+            prev === categoryFromUrl ? prev : categoryFromUrl,
         );
     }, [searchParams]);
 
@@ -120,6 +147,68 @@ export function StockProvider({ children }: StockProviderProps) {
 
             router.push(createStockDashboardUrl(searchParams, {
                 [STOCK_REQUESTS_PAGE_QUERY_KEY]: String(nextPage),
+            }), {
+                scroll: false,
+            });
+        },
+        [pathname, router, searchParams],
+    );
+
+    const setItemsPage = useCallback(
+        (page: number) => {
+            const nextPage = Number.isInteger(page) && page > 0 ? page : 1;
+            setItemsPageState(nextPage);
+
+            if (!isStockDashboardRoute(pathname, searchParams)) {
+                return;
+            }
+
+            const currentPage = parsePositivePage(
+                searchParams.get(STOCK_ITEMS_PAGE_QUERY_KEY),
+            );
+            if (currentPage === nextPage) return;
+
+            router.push(createStockDashboardUrl(searchParams, {
+                [STOCK_ITEMS_PAGE_QUERY_KEY]: String(nextPage),
+            }), {
+                scroll: false,
+            });
+        },
+        [pathname, router, searchParams],
+    );
+
+    const setSearchQuery = useCallback(
+        (value: string) => {
+            setSearchQueryState(value);
+            setItemsPageState(1);
+
+            if (!isStockDashboardRoute(pathname, searchParams)) {
+                return;
+            }
+
+            router.replace(createStockDashboardUrl(searchParams, {
+                [STOCK_ITEMS_PAGE_QUERY_KEY]: "1",
+                [STOCK_ITEMS_SEARCH_QUERY_KEY]: value.trim() || null,
+            }), {
+                scroll: false,
+            });
+        },
+        [pathname, router, searchParams],
+    );
+
+    const setSelectedCategoryId = useCallback(
+        (categoryId: number | undefined) => {
+            setSelectedCategoryIdState(categoryId);
+            setItemsPageState(1);
+
+            if (!isStockDashboardRoute(pathname, searchParams)) {
+                return;
+            }
+
+            router.replace(createStockDashboardUrl(searchParams, {
+                [STOCK_ITEMS_PAGE_QUERY_KEY]: "1",
+                [STOCK_ITEMS_CATEGORY_QUERY_KEY]:
+                    categoryId === undefined ? null : String(categoryId),
             }), {
                 scroll: false,
             });
@@ -179,7 +268,7 @@ export function StockProvider({ children }: StockProviderProps) {
     }, [mutateRequests]);
 
     useEffect(() => {
-        setItemsPage((prev) => (prev === 1 ? prev : 1));
+        setItemsPageState((prev) => (prev === 1 ? prev : 1));
     }, [searchQuery, selectedCategoryId]);
 
     useEffect(() => {
@@ -291,6 +380,9 @@ export function StockProvider({ children }: StockProviderProps) {
             selectedCategoryId,
             statusFilter,
             setRequestsPage,
+            setItemsPage,
+            setSearchQuery,
+            setSelectedCategoryId,
         ],
     );
 

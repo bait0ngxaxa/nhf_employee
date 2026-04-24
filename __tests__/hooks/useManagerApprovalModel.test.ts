@@ -3,9 +3,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useManagerApprovalModel } from "@/hooks/leave/useManagerApprovalModel";
 import { useLeaveApprovals } from "@/hooks/useLeaveApprovals";
 import {
-    downloadLeaveExportFile,
-    fetchLeaveExportMeta,
-    fetchLeaveExportYears,
     submitLeaveApprovalAction,
 } from "@/lib/services/leave/client";
 import { toast } from "sonner";
@@ -15,9 +12,6 @@ vi.mock("@/hooks/useLeaveApprovals", () => ({
 }));
 
 vi.mock("@/lib/services/leave/client", () => ({
-    downloadLeaveExportFile: vi.fn(),
-    fetchLeaveExportMeta: vi.fn(),
-    fetchLeaveExportYears: vi.fn(),
     submitLeaveApprovalAction: vi.fn(),
 }));
 
@@ -64,22 +58,7 @@ describe("useManagerApprovalModel", () => {
             mutate,
         });
 
-        vi.mocked(fetchLeaveExportYears).mockResolvedValue({ years: [2030, 2029] });
-        vi.mocked(fetchLeaveExportMeta).mockResolvedValue({
-            count: 1,
-            maxRows: 3000,
-        });
         vi.mocked(submitLeaveApprovalAction).mockResolvedValue(undefined);
-        vi.mocked(downloadLeaveExportFile).mockImplementation(() => undefined);
-    });
-
-    it("loads available years and sets initial export year", async () => {
-        const { result } = renderHook(() => useManagerApprovalModel());
-
-        await waitFor(() => {
-            expect(result.current.availableYears).toEqual([2030, 2029]);
-            expect(result.current.exportYear).toBe(2030);
-        });
     });
 
     it("approves leave and refreshes list", async () => {
@@ -98,18 +77,25 @@ describe("useManagerApprovalModel", () => {
         expect(toast.success).toHaveBeenCalledTimes(1);
     });
 
-    it("exports csv through download endpoint", async () => {
+    it("opens reject dialog and clears state when closed", async () => {
         const { result } = renderHook(() => useManagerApprovalModel());
+
         act(() => {
-            result.current.setExportYear(2030);
+            result.current.openRejectDialog(result.current.pending[0]);
         });
 
-        await act(async () => {
-            await result.current.exportCsv();
+        expect(result.current.isRejectDialogOpen).toBe(true);
+        expect(result.current.selectedLeave?.id).toBe("leave-1");
+
+        act(() => {
+            result.current.setRejectReason("ไม่อนุมัติ");
+            result.current.closeRejectDialog();
         });
 
-        expect(fetchLeaveExportMeta).toHaveBeenCalledWith(result.current.exportYear);
-        expect(downloadLeaveExportFile).toHaveBeenCalledWith(result.current.exportYear);
-        expect(toast.success).toHaveBeenCalledTimes(1);
+        await waitFor(() => {
+            expect(result.current.isRejectDialogOpen).toBe(false);
+            expect(result.current.selectedLeave).toBeNull();
+            expect(result.current.rejectReason).toBe("");
+        });
     });
 });

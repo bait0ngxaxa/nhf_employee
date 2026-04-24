@@ -236,8 +236,9 @@ function InventoryRow({ item, onAdjust, onDelete, deleteDisabled }: InventoryRow
                         size="icon"
                         className="h-8 w-8 text-blue-600 transition-colors hover:bg-blue-50 hover:text-blue-700"
                         onClick={() => onAdjust(item)}
+                        aria-label={`แก้ไข ${item.name}`}
                     >
-                        <Pencil className="h-4 w-4" />
+                        <Pencil className="h-4 w-4" aria-hidden="true" />
                     </Button>
                     <Button
                         variant="ghost"
@@ -245,8 +246,9 @@ function InventoryRow({ item, onAdjust, onDelete, deleteDisabled }: InventoryRow
                         className="h-8 w-8 text-rose-500 transition-colors hover:bg-rose-50 hover:text-rose-700"
                         onClick={() => onDelete(item)}
                         disabled={deleteDisabled}
+                        aria-label={`ลบ ${item.name}`}
                     >
-                        <Trash2 className="h-4 w-4" />
+                        <Trash2 className="h-4 w-4" aria-hidden="true" />
                     </Button>
                 </div>
             </TableCell>

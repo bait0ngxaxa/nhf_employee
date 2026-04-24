@@ -2,7 +2,6 @@
 
 import { Loader2 } from "lucide-react";
 import { useManagerApprovalModel } from "@/hooks/leave/useManagerApprovalModel";
-import { LeaveExportControls } from "./_components/LeaveExportControls";
 import { PendingApprovalList } from "./_components/PendingApprovalList";
 import { ApprovalHistoryList } from "./_components/ApprovalHistoryList";
 import { RejectLeaveDialog } from "./_components/RejectLeaveDialog";
@@ -25,13 +24,6 @@ export function ManagerApprovalDashboard() {
                     <h2 className="text-xl font-semibold text-gray-800">รายการรอพิจารณา</h2>
                     <p className="text-sm text-gray-500">ใบลาคงค้างของพนักงานในทีมที่รอรับการอนุมัติ</p>
                 </div>
-                <LeaveExportControls
-                    availableYears={model.availableYears}
-                    exportYear={model.exportYear}
-                    isExporting={model.isExporting}
-                    onYearChange={model.setExportYear}
-                    onExport={model.exportCsv}
-                />
             </div>
 
             <PendingApprovalList

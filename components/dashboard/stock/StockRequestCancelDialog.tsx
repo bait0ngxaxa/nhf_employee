@@ -58,6 +58,8 @@ export function StockRequestCancelDialog({
                         </Label>
                         <Input
                             id="my-request-cancel-reason"
+                            name="my-request-cancel-reason"
+                            autoComplete="off"
                             value={reason}
                             onChange={(event) => setReason(event.target.value)}
                             placeholder="ระบุเหตุผลเพิ่มเติมเพื่อให้เจ้าหน้าที่ทราบ"
@@ -81,8 +83,8 @@ export function StockRequestCancelDialog({
                         >
                             {loading ? (
                                 <>
-                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                    กำลังดำเนินการ...
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
+                                    กำลังดำเนินการ…
                                 </>
                             ) : (
                                 "ยืนยันการยกเลิก"

@@ -427,6 +427,19 @@ export const stockRequestsFilterSchema = z.object({
     limit: z.coerce.number().int().min(1).max(100).default(20),
 });
 
+export const stockReportExportQuerySchema = z.object({
+    year: z.coerce.number().int().min(2000).max(2100).optional(),
+    yearsOnly: z
+        .enum(["0", "1"])
+        .optional()
+        .transform((value) => value === "1"),
+    metaOnly: z
+        .enum(["0", "1"])
+        .optional()
+        .transform((value) => value === "1"),
+    format: z.enum(["csv"]).optional().default("csv"),
+});
+
 export type CreateCategoryInput = z.infer<typeof createCategorySchema>;
 export type CreateItemInput = z.infer<typeof createItemSchema>;
 export type UpdateItemInput = z.infer<typeof updateItemSchema>;
@@ -437,3 +450,4 @@ export type CancelRequestInput = z.infer<typeof cancelRequestSchema>;
 export type StockReviewActionInput = z.infer<typeof stockReviewActionSchema>;
 export type StockItemsFilter = z.infer<typeof stockItemsFilterSchema>;
 export type StockRequestsFilter = z.infer<typeof stockRequestsFilterSchema>;
+export type StockReportExportQuery = z.infer<typeof stockReportExportQuerySchema>;

@@ -82,8 +82,11 @@ export function StockAdminRequests() {
                 </div>
                 <div className="flex flex-col gap-3 sm:flex-row">
                     <div className="relative flex-1">
-                        <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                        <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" aria-hidden="true" />
                         <Input
+                            aria-label="ค้นหาคำขอเบิกวัสดุ"
+                            name="stock-admin-request-search"
+                            autoComplete="off"
                             value={requestSearchQuery}
                             onChange={(event) => setRequestSearchQuery(event.target.value)}
                             placeholder="ค้นหาเลขที่คำขอ รหัสโครงการ ชื่อ อีเมล หรือรายการ"
@@ -96,8 +99,9 @@ export function StockAdminRequests() {
                                 size="icon"
                                 onClick={() => setRequestSearchQuery("")}
                                 className="absolute right-2 top-1/2 h-8 w-8 -translate-y-1/2 rounded-full text-slate-400 hover:bg-slate-200/70 hover:text-slate-600"
+                                aria-label="ล้างคำค้นหาคำขอเบิกวัสดุ"
                             >
-                                <X className="h-4 w-4" />
+                                <X className="h-4 w-4" aria-hidden="true" />
                             </Button>
                         )}
                     </div>
@@ -112,7 +116,10 @@ export function StockAdminRequests() {
                                 )
                             }
                         >
-                            <SelectTrigger className="h-12 rounded-2xl border-slate-200 bg-slate-50/80 shadow-inner shadow-slate-200/50">
+                            <SelectTrigger
+                                className="h-12 rounded-2xl border-slate-200 bg-slate-50/80 shadow-inner shadow-slate-200/50"
+                                aria-label="กรองสถานะคำขอเบิกวัสดุ"
+                            >
                                 <SelectValue placeholder="กรองสถานะ" />
                             </SelectTrigger>
                             <SelectContent>
@@ -308,6 +315,8 @@ function CancelDialog({
                         </Label>
                         <Input
                             id="cancel-reason"
+                            name="cancel-reason"
+                            autoComplete="off"
                             value={reason}
                             onChange={(e) => setReason(e.target.value)}
                             placeholder="ระบุเหตุผลที่ยกเลิกเพื่อแจ้งผู้เบิก"
@@ -331,8 +340,8 @@ function CancelDialog({
                         >
                             {loading ? (
                                 <>
-                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                    กำลังดำเนินการ...
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
+                                    กำลังดำเนินการ…
                                 </>
                             ) : (
                                 "ยืนยันการยกเลิก"

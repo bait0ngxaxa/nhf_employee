@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Package, ShoppingCart, ClipboardList, Boxes, FileText } from "lucide-react";
+import { Package, ShoppingCart, ClipboardList, Boxes, FileText, BarChart3 } from "lucide-react";
 import { SectionShell } from "@/components/ui/section-shell";
 import { SectionHeader } from "@/components/ui/section-header";
 import { SectionTabs, type SectionTabItem } from "@/components/ui/section-tabs";
@@ -11,6 +11,7 @@ import {
     StockMyRequests,
     StockAdminInventory,
     StockAdminRequests,
+    StockAdminReports,
 } from "./stock";
 
 function StockContent() {
@@ -47,6 +48,13 @@ function StockContent() {
             label: "คำขอเบิก",
             icon: ClipboardList,
             content: <StockAdminRequests />,
+            visible: isAdmin,
+        },
+        {
+            value: "reports",
+            label: "รีพอร์ต",
+            icon: BarChart3,
+            content: <StockAdminReports />,
             visible: isAdmin,
         },
     ];

@@ -39,9 +39,12 @@ export function StockBrowseFilters({
             </div>
             <div className="flex flex-col gap-3 sm:flex-row">
                 <div className="relative flex-1">
-                    <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                    <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" aria-hidden="true" />
                     <Input
-                        placeholder="ค้นหาวัสดุ..."
+                        aria-label="ค้นหาวัสดุ"
+                        name="stock-search"
+                        autoComplete="off"
+                        placeholder="ค้นหาวัสดุ…"
                         value={searchQuery}
                         onChange={(event) => onSearchChange(event.target.value)}
                         className="h-12 rounded-2xl border-slate-200 bg-slate-50/80 pl-11 pr-11 shadow-inner shadow-slate-200/50 focus-visible:border-orange-300 focus-visible:ring-orange-200"
@@ -53,8 +56,9 @@ export function StockBrowseFilters({
                             size="icon"
                             onClick={() => onSearchChange("")}
                             className="absolute right-2 top-1/2 h-8 w-8 -translate-y-1/2 rounded-full text-slate-400 hover:bg-slate-200/70 hover:text-slate-600"
+                            aria-label="ล้างคำค้นหาวัสดุ"
                         >
-                            <X className="h-4 w-4" />
+                            <X className="h-4 w-4" aria-hidden="true" />
                         </Button>
                     )}
                 </div>
@@ -69,7 +73,10 @@ export function StockBrowseFilters({
                             onCategoryChange(value === "all" ? undefined : Number(value))
                         }
                     >
-                        <SelectTrigger className="h-12 rounded-2xl border-slate-200 bg-slate-50/80 shadow-inner shadow-slate-200/50">
+                        <SelectTrigger
+                            className="h-12 rounded-2xl border-slate-200 bg-slate-50/80 shadow-inner shadow-slate-200/50"
+                            aria-label="กรองหมวดหมู่วัสดุ"
+                        >
                             <SelectValue placeholder="เลือกหมวดหมู่" />
                         </SelectTrigger>
                         <SelectContent>

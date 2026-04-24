@@ -139,7 +139,7 @@ function VariantCard(props: {
                     onClick={props.onRemove}
                     className="text-rose-600 hover:bg-rose-50 hover:text-rose-700"
                 >
-                    <Trash2 className="mr-1 h-4 w-4" />
+                    <Trash2 className="mr-1 h-4 w-4" aria-hidden="true" />
                     {STOCK_ADMIN_TEXT.remove}
                 </Button>
             </div>
@@ -303,8 +303,9 @@ function AttributeEditor(props: {
                             }
                             disabled={props.variant.attributes.length === 1}
                             className="h-10 w-10 text-rose-600 hover:bg-rose-50 hover:text-rose-700"
+                            aria-label={`ลบคุณสมบัติที่ ${attributeIndex + 1}`}
                         >
-                            <Trash2 className="h-4 w-4" />
+                            <Trash2 className="h-4 w-4" aria-hidden="true" />
                         </Button>
                     </div>
                 ))}

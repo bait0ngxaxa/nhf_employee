@@ -157,8 +157,11 @@ function RequestFilters(props: {
             </div>
             <div className="flex flex-col gap-3 sm:flex-row">
                 <div className="relative flex-1">
-                    <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                    <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" aria-hidden="true" />
                     <Input
+                        aria-label="ค้นหาประวัติคำขอเบิกวัสดุ"
+                        name="stock-my-request-search"
+                        autoComplete="off"
                         value={props.requestSearchQuery}
                         onChange={(event) => props.onSearchChange(event.target.value)}
                         placeholder="ค้นหาเลขที่คำขอ รหัสโครงการ หรือรายการ"
@@ -171,8 +174,9 @@ function RequestFilters(props: {
                             size="icon"
                             onClick={() => props.onSearchChange("")}
                             className="absolute right-2 top-1/2 h-8 w-8 -translate-y-1/2 rounded-full text-slate-400 hover:bg-slate-200/70 hover:text-slate-600"
+                            aria-label="ล้างคำค้นหาประวัติคำขอเบิกวัสดุ"
                         >
-                            <X className="h-4 w-4" />
+                            <X className="h-4 w-4" aria-hidden="true" />
                         </Button>
                     )}
                 </div>
@@ -187,7 +191,10 @@ function RequestFilters(props: {
                             )
                         }
                     >
-                        <SelectTrigger className="h-12 rounded-2xl border-slate-200 bg-slate-50/80 shadow-inner shadow-slate-200/50">
+                        <SelectTrigger
+                            className="h-12 rounded-2xl border-slate-200 bg-slate-50/80 shadow-inner shadow-slate-200/50"
+                            aria-label="กรองสถานะประวัติคำขอเบิกวัสดุ"
+                        >
                             <SelectValue placeholder="กรองสถานะ" />
                         </SelectTrigger>
                         <SelectContent>
