@@ -168,44 +168,61 @@ export function DashboardHomeSection() {
                         {allMenuItems.map((item, i) => {
                             const IconComponent = item.icon;
                             const config = MENU_ITEM_CONFIG[item.id] ?? DEFAULT_MENU_CONFIG;
-                            
+                            const disabled = item.comingSoon === true;
+
                             return (
                                 <button
                                     key={item.id}
-                                    onClick={() => handleMenuClick(item.id)}
+                                    disabled={disabled}
+                                    onClick={disabled ? undefined : () => handleMenuClick(item.id)}
                                     className={cn(
                                         "group text-left relative overflow-hidden flex flex-col h-[180px] w-full rounded-[1.5rem] bg-white/60 backdrop-blur-md border border-white/80",
-                                        "shadow-sm transition-all duration-500 hover:-translate-y-1",
-                                        config.glow
+                                        "shadow-sm transition-all duration-500",
+                                        disabled
+                                            ? "opacity-60 cursor-not-allowed"
+                                            : cn("hover:-translate-y-1", config.glow),
                                     )}
                                     // Stagger the entrance animation
                                     style={{ animationDelay: `${200 + i * 50}ms` }}
                                 >
-                                    {/* Glassmorphic Shine */}
-                                    <div className="absolute inset-0 bg-gradient-to-br from-white/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none" />
-                                    
-                                    {/* Action Icon in Corner */}
-                                    <div className="absolute top-5 right-5 w-8 h-8 rounded-full bg-slate-50 border border-slate-100/50 flex items-center justify-center opacity-0 -translate-y-2 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-300 z-10 shadow-sm">
-                                        <ArrowUpRight className={cn("w-4 h-4", config.icon)} />
-                                    </div>
+                                    {/* Glassmorphic Shine — suppressed when disabled */}
+                                    {!disabled && (
+                                        <div className="absolute inset-0 bg-gradient-to-br from-white/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none" />
+                                    )}
+
+                                    {/* Action Icon in Corner — suppressed when disabled */}
+                                    {!disabled && (
+                                        <div className="absolute top-5 right-5 w-8 h-8 rounded-full bg-slate-50 border border-slate-100/50 flex items-center justify-center opacity-0 -translate-y-2 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-300 z-10 shadow-sm">
+                                            <ArrowUpRight className={cn("w-4 h-4", config.icon)} />
+                                        </div>
+                                    )}
+
+                                    {/* Coming-soon badge */}
+                                    {disabled && (
+                                        <span className="absolute top-4 right-4 z-10 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 border border-amber-200">
+                                            เร็วๆ นี้
+                                        </span>
+                                    )}
 
                                     {/* Dynamic Color Hint background */}
                                     <div className={cn(
-                                        "absolute -bottom-12 -right-12 w-32 h-32 rounded-full opacity-0 blur-3xl transition-opacity duration-700 group-hover:opacity-40 bg-gradient-to-tr pointer-events-none",
+                                        "absolute -bottom-12 -right-12 w-32 h-32 rounded-full opacity-0 blur-3xl transition-opacity duration-700 bg-gradient-to-tr pointer-events-none",
+                                        !disabled && "group-hover:opacity-40",
                                         config.gradient
                                     )} />
 
                                     <div className="relative z-10 flex flex-col h-full p-5 lg:p-6">
                                         <div
                                             className={cn(
-                                                "w-12 h-12 rounded-2xl flex items-center justify-center mb-auto border shadow-sm transition-transform duration-500 group-hover:scale-110",
+                                                "w-12 h-12 rounded-2xl flex items-center justify-center mb-auto border shadow-sm transition-transform duration-500",
+                                                !disabled && "group-hover:scale-110",
                                                 config.bg,
                                                 config.border
                                             )}
                                         >
                                             <IconComponent className={cn("w-6 h-6", config.icon)} />
                                         </div>
-                                        
+
                                         <div className="mt-4">
                                             <h3 className={cn(
                                                 "text-base lg:text-lg font-bold tracking-tight mb-1 transition-colors duration-300",

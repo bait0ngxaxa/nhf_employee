@@ -30,6 +30,7 @@ function SidebarMenuItem({
 }) {
     const IconComponent = item.icon;
     const theme = getMenuTheme(item.id);
+    const disabled = item.comingSoon === true;
 
     return (
         <div className="relative group">
@@ -43,6 +44,7 @@ function SidebarMenuItem({
             ) : null}
             <Button
                 variant="ghost"
+                disabled={disabled}
                 className={cn(
                     "relative w-full justify-start overflow-hidden group/btn",
                     isActive
@@ -50,9 +52,11 @@ function SidebarMenuItem({
                         : `${theme.hover} text-gray-600 hover:text-gray-900`,
                     !sidebarOpen && "justify-center px-0 border-r-0",
                     indented && sidebarOpen && "pl-9 h-9",
+                    // Dim but keep visible for coming-soon items
+                    disabled && "opacity-50 cursor-not-allowed hover:bg-transparent",
                 )}
                 style={{ transition: "all 200ms ease-out" }}
-                onClick={onClick}
+                onClick={disabled ? undefined : onClick}
             >
                 {isActive && sidebarOpen && (
                     <div
@@ -77,6 +81,7 @@ function SidebarMenuItem({
                             isActive
                                 ? "bg-white shadow-sm"
                                 : `${theme.lightBg} group-hover/btn:scale-110`,
+                            disabled && "group-hover/btn:scale-100",
                         )}
                         style={{
                             transition: `transform 200ms ease-out, background-color 200ms ease-out`,
@@ -101,6 +106,12 @@ function SidebarMenuItem({
                         </span>
                     )}
                 </div>
+                {/* Coming-soon badge — absolute so it never shifts the label */}
+                {sidebarOpen && disabled && (
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 z-10 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 border border-amber-200 pointer-events-none">
+                        เร็วๆ นี้
+                    </span>
+                )}
             </Button>
         </div>
     );

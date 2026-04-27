@@ -6,6 +6,8 @@ export interface MenuItem {
     icon: ComponentType<{ className?: string }>;
     description: string;
     requiredRole?: "ADMIN";
+    /** Mark module as under development — visible but non-interactive */
+    comingSoon?: boolean;
 }
 
 export interface MenuGroup {
