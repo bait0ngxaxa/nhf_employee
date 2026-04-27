@@ -112,6 +112,7 @@ export function StockAdminInventory() {
             {editingItem && (
                 <EditItemDialog
                     item={editingItem}
+                    categories={categories}
                     onClose={() => setEditingItem(null)}
                     onSuccess={() => {
                         refreshItems();

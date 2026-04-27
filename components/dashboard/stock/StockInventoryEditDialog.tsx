@@ -12,11 +12,15 @@ import {
     ensureStockApiSuccess,
     STOCK_ADMIN_TEXT,
 } from "./stockAdminInventory.shared";
+import { InventoryCategoryField } from "./StockInventoryFormFields";
 import { StockImageUploadField } from "./StockImageUploadField";
 import { StockInventoryVariantEditor } from "./StockInventoryVariantEditor";
 
+type CategoryOption = { id: number; name: string };
+
 type EditItemDialogProps = {
     item: StockItem;
+    categories: CategoryOption[];
     onClose: () => void;
     onSuccess: () => void;
 };
@@ -69,10 +73,14 @@ function createEditableVariants(item: StockItem): EditableVariant[] {
 
 export function EditItemDialog({
     item,
+    categories,
     onClose,
     onSuccess,
 }: EditItemDialogProps) {
     const [loading, setLoading] = useState(false);
+    const [selectedCategoryId, setSelectedCategoryId] = useState(
+        String(item.categoryId),
+    );
     const [itemImageUrl, setItemImageUrl] = useState(item.imageUrl ?? "");
     const [variants, setVariants] = useState<EditableVariant[]>(
         createEditableVariants(item),
@@ -102,6 +110,7 @@ export function EditItemDialog({
         try {
             ensureStockApiSuccess(
                 await apiPatch(API_ROUTES.stock.itemById(item.id), {
+                    categoryId: Number(selectedCategoryId),
                     imageUrl: itemImageUrl || null,
                     variants: variants.map((variant) => ({
                         ...(variant.id !== undefined && { id: variant.id }),
@@ -158,6 +167,13 @@ export function EditItemDialog({
                             ถ้ามีหลายรายการย่อย ต้องระบุคุณสมบัติของแต่ละตัวให้ชัด เช่น สี ขนาด หรือชนิด
                         </div>
                     )}
+
+                    <InventoryCategoryField
+                        categories={categories}
+                        value={selectedCategoryId}
+                        onChange={setSelectedCategoryId}
+                        required
+                    />
 
                     <StockImageUploadField
                         label={STOCK_ADMIN_TEXT.imageUrl}
