@@ -32,6 +32,7 @@ import {
 } from "./stockRequest.shared";
 import { getRequestItemDisplayName } from "./stockVariant.shared";
 import { useStockRequestActions } from "./useStockRequestActions";
+import { StockRequestNote } from "./StockRequestNote";
 
 export function StockMyRequests() {
     const { requests, isLoading, totalRequests, refreshRequests } = useStockDataContext();
@@ -248,8 +249,8 @@ function RequestRow(props: {
             <TableCell className="border-r border-slate-300 py-4">
                 <RequestStatusBadge status={request.status} />
             </TableCell>
-            <TableCell className="border-r border-slate-300 py-4 text-sm text-slate-600">
-                {renderRequestNote(request)}
+            <TableCell className="border-r border-slate-300 py-4">
+                <StockRequestNote request={request} />
             </TableCell>
             <TableCell className="py-4 text-right">
                 {isPendingIssue && (
@@ -268,17 +269,3 @@ function RequestRow(props: {
     );
 }
 
-function renderRequestNote(request: StockRequest): string {
-    if (
-        (request.status === "CANCELLED" || request.status === "REJECTED_LEGACY") &&
-        request.cancelReason
-    ) {
-        return request.cancelReason;
-    }
-
-    if (request.status === "ISSUED" && request.issuedAt) {
-        return `จ่ายเมื่อ ${formatStockRequestDate(request.issuedAt)}`;
-    }
-
-    return "-";
-}

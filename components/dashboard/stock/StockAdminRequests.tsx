@@ -33,6 +33,7 @@ import {
 } from "./stockRequest.shared";
 import { getRequestItemDisplayName } from "./stockVariant.shared";
 import { useStockRequestActions } from "./useStockRequestActions";
+import { StockRequestNote } from "./StockRequestNote";
 
 export function StockAdminRequests() {
     const { requests, isLoading, refreshRequests, refreshItems, totalRequests } =
@@ -69,6 +70,7 @@ export function StockAdminRequests() {
 
     return (
         <div className="space-y-4">
+            {/* Search & Filter bar */}
             <div className="rounded-[1.75rem] border border-slate-200/80 bg-white/80 p-3 shadow-[0_20px_48px_-32px_rgba(15,23,42,0.22)] backdrop-blur">
                 <div className="mb-3 flex items-center justify-between px-1">
                     <div>
@@ -174,9 +176,7 @@ export function StockAdminRequests() {
                             </TableHeader>
                             <TableBody className="[&_tr:nth-child(odd)]:bg-white [&_tr:nth-child(even)]:bg-slate-100/70">
                                 {requests.map((req) => {
-                                    const isPendingIssue =
-                                        req.status === "PENDING_ISSUE";
-
+                                    const isPendingIssue = req.status === "PENDING_ISSUE";
                                     return (
                                         <TableRow
                                             key={req.id}
@@ -208,10 +208,13 @@ export function StockAdminRequests() {
                                                             key={ri.id}
                                                             className="flex items-center gap-2 text-sm"
                                                         >
-                                                            <span className="font-medium text-slate-800">
+                                                            <span
+                                                                className="min-w-0 truncate font-medium text-slate-800"
+                                                                title={getRequestItemDisplayName(ri)}
+                                                            >
                                                                 {getRequestItemDisplayName(ri)}
                                                             </span>
-                                                            <span className="rounded-full bg-slate-100/80 px-2 py-0.5 text-xs font-medium text-slate-600">
+                                                            <span className="shrink-0 rounded-full bg-slate-100/80 px-2 py-0.5 text-xs font-medium text-slate-600">
                                                                 x {ri.quantity} {ri.item.unit}
                                                             </span>
                                                         </div>
@@ -222,15 +225,13 @@ export function StockAdminRequests() {
                                                 <RequestStatusBadge status={req.status} />
                                             </TableCell>
                                             <TableCell className="py-4">
-                                                {isPendingIssue && (
+                                                {isPendingIssue ? (
                                                     <div className="flex justify-end gap-2">
                                                         <Button
                                                             size="sm"
                                                             className="bg-emerald-600 text-white shadow-sm transition-all hover:bg-emerald-700 hover:shadow-md"
                                                             disabled={processingRequestId === req.id}
-                                                            onClick={() =>
-                                                                void handleIssue(req.id)
-                                                            }
+                                                            onClick={() => void handleIssue(req.id)}
                                                         >
                                                             <CheckCircle className="mr-1.5 h-3.5 w-3.5" />
                                                             จ่ายแล้ว
@@ -246,6 +247,8 @@ export function StockAdminRequests() {
                                                             ยกเลิก
                                                         </Button>
                                                     </div>
+                                                ) : (
+                                                    <StockRequestNote request={req} />
                                                 )}
                                             </TableCell>
                                         </TableRow>

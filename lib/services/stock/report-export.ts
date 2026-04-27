@@ -47,13 +47,41 @@ function formatVariantSummary(
         | undefined,
 ): string {
     if (!attributeValues || attributeValues.length === 0) {
-        return "-";
+        return "";
     }
 
     return attributeValues
         .map((attributeValue) =>
             `${attributeValue.attributeValue.attribute.name}: ${attributeValue.attributeValue.value}`,
         )
+        .join(", ");
+}
+
+type RequestItem = {
+    quantity: number;
+    item: { name: string; sku: string; unit: string };
+    variant: {
+        sku: string;
+        unit: string;
+        attributeValues: Array<{
+            attributeValue: { value: string; attribute: { name: string } };
+        }>;
+    } | null;
+};
+
+/** Collapses all items in a request into one readable cell, e.g. "ปากกา [SKU001] x2 ชิ้น | กระดาษ [SKU002] x10 แผ่น" */
+function formatItemsSummary(items: RequestItem[]): string {
+    return items
+        .map((requestItem) => {
+            const name = requestItem.item.name;
+            const sku = requestItem.variant?.sku ?? requestItem.item.sku;
+            const unit = requestItem.variant?.unit ?? requestItem.item.unit;
+            const qty = requestItem.quantity;
+            const attrs = formatVariantSummary(requestItem.variant?.attributeValues);
+            return attrs
+                ? `${name} [${sku}] (${attrs}) x${qty} ${unit}`
+                : `${name} [${sku}] x${qty} ${unit}`;
+        })
         .join(" | ");
 }
 
@@ -124,12 +152,7 @@ export async function createStockRequestReportCsvResponse(
                     "สถานะ",
                     "ผู้ขอ",
                     "อีเมลผู้ขอ",
-                    "ชื่อวัสดุ",
-                    "SKU วัสดุ",
-                    "SKU รายการย่อย",
-                    "คุณสมบัติรายการย่อย",
-                    "จำนวน",
-                    "หน่วย",
+                    "รายการวัสดุ",
                     "ผู้จ่าย",
                     "วันที่จ่าย",
                     "ผู้ยกเลิก",
@@ -181,29 +204,22 @@ export async function createStockRequestReportCsvResponse(
                 });
 
                 for (const request of requests) {
-                    for (const requestItem of request.items) {
-                        controller.enqueue(
-                            encodeCsvRow([
-                                request.id,
-                                formatDateTime(request.createdAt),
-                                request.projectCode,
-                                STOCK_STATUS_LABELS[request.status] ?? request.status,
-                                request.requester.name,
-                                request.requester.email,
-                                requestItem.item.name,
-                                requestItem.item.sku,
-                                requestItem.variant?.sku ?? "-",
-                                formatVariantSummary(requestItem.variant?.attributeValues),
-                                requestItem.quantity,
-                                requestItem.variant?.unit ?? requestItem.item.unit,
-                                request.issuer?.name ?? "-",
-                                formatDateTime(request.issuedAt),
-                                request.canceller?.name ?? "-",
-                                formatDateTime(request.cancelledAt),
-                                request.cancelReason ?? "-",
-                            ]),
-                        );
-                    }
+                    controller.enqueue(
+                        encodeCsvRow([
+                            request.id,
+                            formatDateTime(request.createdAt),
+                            request.projectCode,
+                            STOCK_STATUS_LABELS[request.status] ?? request.status,
+                            request.requester.name,
+                            request.requester.email,
+                            formatItemsSummary(request.items),
+                            request.issuer?.name ?? "-",
+                            formatDateTime(request.issuedAt),
+                            request.canceller?.name ?? "-",
+                            formatDateTime(request.cancelledAt),
+                            request.cancelReason ?? "-",
+                        ]),
+                    );
                 }
             }
         },
