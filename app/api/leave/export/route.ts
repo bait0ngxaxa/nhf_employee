@@ -14,6 +14,13 @@ import { getEmployeeIdFromUserId } from "@/lib/services/leave/get-employee-id";
 import { EXPORT_LIMITS } from "@/lib/ssot/exports";
 import { jsonError, operationFailed, unauthorized } from "@/lib/ssot/http";
 import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
+import type { LeaveStatus } from "@prisma/client";
+
+const PROCESSED_LEAVE_STATUSES: LeaveStatus[] = [
+    "APPROVED",
+    "REJECTED",
+    "CANCELLED",
+];
 
 function createYearRange(year: number): { startOfYear: Date; endOfYear: Date } {
     return {
@@ -51,7 +58,10 @@ export async function GET(request: NextRequest): Promise<Response> {
 
         if (yearsOnly) {
             const rows = await prisma.leaveRequest.findMany({
-                where: { approverId: managerId },
+                where: {
+                    approverId: managerId,
+                    status: { in: PROCESSED_LEAVE_STATUSES },
+                },
                 select: { startDate: true },
                 distinct: ["startDate"],
             });
@@ -73,6 +83,7 @@ export async function GET(request: NextRequest): Promise<Response> {
                 gte: startOfYear,
                 lt: endOfYear,
             },
+            status: { in: PROCESSED_LEAVE_STATUSES },
         };
 
         const recordCount = await prisma.leaveRequest.count({ where });

@@ -11,6 +11,12 @@ const STOCK_STATUS_LABELS: Record<StockRequestStatus, string> = {
     REJECTED_LEGACY: "ปฏิเสธ (เดิม)",
 };
 
+const PROCESSED_STATUSES: StockRequestStatus[] = [
+    "ISSUED",
+    "CANCELLED",
+    "REJECTED_LEGACY",
+];
+
 function createYearRange(year: number): { startOfYear: Date; endOfYear: Date } {
     return {
         startOfYear: new Date(`${year}-01-01T00:00:00.000Z`),
@@ -53,6 +59,9 @@ function formatVariantSummary(
 
 export async function getStockRequestReportYears(): Promise<number[]> {
     const rows = await prisma.stockRequest.findMany({
+        where: {
+            status: { in: PROCESSED_STATUSES },
+        },
         select: { createdAt: true },
         distinct: ["createdAt"],
     });
@@ -75,6 +84,7 @@ export async function getStockRequestReportMeta(year: number): Promise<{
                 gte: startOfYear,
                 lt: endOfYear,
             },
+            status: { in: PROCESSED_STATUSES },
         },
     });
 
@@ -93,6 +103,7 @@ export async function createStockRequestReportCsvResponse(
             gte: startOfYear,
             lt: endOfYear,
         },
+        status: { in: PROCESSED_STATUSES as StockRequestStatus[] },
     };
     const recordCount = await prisma.stockRequest.count({ where });
 
