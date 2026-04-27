@@ -26,7 +26,7 @@ const flexMessage: LineFlexMessage = {
 describe("LINE Notification Service", () => {
     beforeEach(() => {
         vi.clearAllMocks();
-        process.env.LINE_CHANNEL_ACCESS_TOKEN = "test_token";
+        process.env.LINE_IT_CHANNEL_ACCESS_TOKEN = "test_token";
         process.env.LINE_IT_TEAM_USER_ID = "user_123";
         process.env.NEXTAUTH_URL = "http://localhost:3000";
 
@@ -59,7 +59,7 @@ describe("LINE Notification Service", () => {
         });
 
         it("should fail if no token", async () => {
-            delete process.env.LINE_CHANNEL_ACCESS_TOKEN;
+            delete process.env.LINE_IT_CHANNEL_ACCESS_TOKEN;
             const result = await sendLineMessage("user1", flexMessage);
             expect(result).toBe(false);
             expect(fetchMock).not.toHaveBeenCalled();

@@ -14,7 +14,7 @@ import { generateStockRequestFlexMessage } from "./flex-messages/stock";
 
 // Configuration (read once)
 const getConfig = () => ({
-    channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN || "",
+    channelAccessToken: process.env.LINE_IT_CHANNEL_ACCESS_TOKEN || "",
     stockChannelAccessToken: process.env.LINE_STOCK_CHANNEL_ACCESS_TOKEN || "",
     lineWebhookUrl: process.env.LINE_WEBHOOK_URL || "",
     baseUrl: process.env.NEXTAUTH_URL || "http://localhost:3000",
