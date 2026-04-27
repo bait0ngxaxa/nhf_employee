@@ -206,12 +206,9 @@ export function StockAdminRequests() {
                                                     {req.items.map((ri) => (
                                                         <div
                                                             key={ri.id}
-                                                            className="flex items-center gap-2 text-sm"
+                                                            className="flex flex-wrap items-start gap-x-2 gap-y-0.5 text-sm"
                                                         >
-                                                            <span
-                                                                className="min-w-0 truncate font-medium text-slate-800"
-                                                                title={getRequestItemDisplayName(ri)}
-                                                            >
+                                                            <span className="font-medium text-slate-800">
                                                                 {getRequestItemDisplayName(ri)}
                                                             </span>
                                                             <span className="shrink-0 rounded-full bg-slate-100/80 px-2 py-0.5 text-xs font-medium text-slate-600">

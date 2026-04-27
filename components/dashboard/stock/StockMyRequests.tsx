@@ -98,10 +98,14 @@ export function StockMyRequests() {
                                     <TableHead className="w-32 border-r border-slate-200 font-semibold text-slate-700">
                                         สถานะ
                                     </TableHead>
-                                    <TableHead className="border-r border-slate-200 font-semibold text-slate-700">
+                                    <TableHead className={`font-semibold text-slate-700${requests.some((r) => r.status === "PENDING_ISSUE") ? " border-r border-slate-200" : ""}`}>
                                         หมายเหตุ
                                     </TableHead>
-                                    <TableHead className="w-36" />
+                                    {requests.some((r) => r.status === "PENDING_ISSUE") && (
+                                        <TableHead className="font-semibold text-slate-700">
+                                            ดำเนินการ
+                                        </TableHead>
+                                    )}
                                 </TableRow>
                             </TableHeader>
                             <TableBody className="[&_tr:nth-child(odd)]:bg-white [&_tr:nth-child(even)]:bg-slate-100/70">
@@ -111,6 +115,7 @@ export function StockMyRequests() {
                                         request={request}
                                         processingId={processingRequestId}
                                         onOpenCancel={() => setCancelTarget(request)}
+                                        showActionColumn={requests.some((r) => r.status === "PENDING_ISSUE")}
                                     />
                                 ))}
                             </TableBody>
@@ -216,8 +221,9 @@ function RequestRow(props: {
     request: StockRequest;
     processingId: number | null;
     onOpenCancel: () => void;
+    showActionColumn: boolean;
 }) {
-    const { request, processingId, onOpenCancel } = props;
+    const { request, processingId, onOpenCancel, showActionColumn } = props;
     const isPendingIssue = request.status === "PENDING_ISSUE";
 
     return (
@@ -234,11 +240,11 @@ function RequestRow(props: {
             <TableCell className="border-r border-slate-300 py-4">
                 <div className="space-y-1.5 py-1">
                     {request.items.map((requestItem) => (
-                        <div key={requestItem.id} className="flex items-center gap-2 text-sm">
+                        <div key={requestItem.id} className="flex flex-wrap items-start gap-x-2 gap-y-0.5 text-sm">
                             <span className="font-medium text-slate-800">
                                 {getRequestItemDisplayName(requestItem)}
                             </span>
-                            <span className="rounded-full bg-slate-100/80 px-2 py-0.5 text-xs font-medium text-slate-600">
+                            <span className="shrink-0 rounded-full bg-slate-100/80 px-2 py-0.5 text-xs font-medium text-slate-600">
                                 x {requestItem.quantity}{" "}
                                 {requestItem.variant?.unit ?? requestItem.item.unit}
                             </span>
@@ -249,22 +255,24 @@ function RequestRow(props: {
             <TableCell className="border-r border-slate-300 py-4">
                 <RequestStatusBadge status={request.status} />
             </TableCell>
-            <TableCell className="border-r border-slate-300 py-4">
+            <TableCell className={`py-4${showActionColumn ? " border-r border-slate-300" : ""}`}>
                 <StockRequestNote request={request} />
             </TableCell>
-            <TableCell className="py-4 text-right">
-                {isPendingIssue && (
-                    <Button
-                        size="sm"
-                        variant="outline"
-                        className="border-rose-200 text-rose-600 hover:bg-rose-50 hover:text-rose-700"
-                        disabled={processingId === request.id}
-                        onClick={onOpenCancel}
-                    >
-                        ยกเลิกคำขอ
-                    </Button>
-                )}
-            </TableCell>
+            {showActionColumn && (
+                <TableCell className="py-4">
+                    {isPendingIssue && (
+                        <Button
+                            size="sm"
+                            variant="outline"
+                            className="border-rose-200 text-rose-600 hover:bg-rose-50 hover:text-rose-700"
+                            disabled={processingId === request.id}
+                            onClick={onOpenCancel}
+                        >
+                            ยกเลิกคำขอ
+                        </Button>
+                    )}
+                </TableCell>
+            )}
         </TableRow>
     );
 }
