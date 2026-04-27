@@ -20,11 +20,10 @@ function parseExportFilters(
     url: string,
 ): { success: true; data: EmployeeFilters } | { success: false; response: NextResponse } {
     const { searchParams } = new URL(url);
+    // Only parse search/status filters — export manages its own batching via EXPORT_LIMITS
     const parsed = employeeFiltersSchema.safeParse({
         search: searchParams.get("search") || undefined,
         status: searchParams.get("status") || undefined,
-        page: "1",
-        limit: String(EXPORT_LIMITS.employee.maxRows),
     });
 
     if (!parsed.success) {
