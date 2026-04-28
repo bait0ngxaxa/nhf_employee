@@ -3,7 +3,7 @@ import { type Metadata } from "next";
 import { ForgotPasswordForm } from "@/components/auth/forgot-password-form";
 
 export const metadata: Metadata = {
-    title: "ลืมรหัสผ่าน | NHF IT System",
+    title: "ลืมรหัสผ่าน | NHFapp",
 };
 
 function ForgotPasswordContent() {

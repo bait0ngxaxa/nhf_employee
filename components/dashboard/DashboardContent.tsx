@@ -91,18 +91,18 @@ const SessionManagementSection = dynamic(
 
 function getPageTitle(menu: string): string {
     switch (menu) {
-        case "dashboard": return "Dashboard | NHF IT System";
-        case "leave-management": return "Leave Management | NHF IT System";
-        case "stock": return "Stock | NHF IT System";
-        case "it-support": return "IT Support | NHF IT System";
-        case "email-request": return "Email Request | NHF IT System";
-        case "employee-management": return "Employee Management | NHF IT System";
-        case "add-employee": return "Add Employee | NHF IT System";
-        case "import-employee": return "Import Employee CSV | NHF IT System";
-        case "audit-logs": return "Audit Logs | NHF IT System";
-        case "notifications": return "Notifications | NHF IT System";
-        case "sessions": return "Session Management | NHF IT System";
-        default: return "NHF IT System";
+        case "dashboard": return "Dashboard | NHFapp";
+        case "leave-management": return "Leave Management | NHFapp";
+        case "stock": return "Stock | NHFapp";
+        case "it-support": return "IT Support | NHFapp";
+        case "email-request": return "Email Request | NHFapp";
+        case "employee-management": return "Employee Management | NHFapp";
+        case "add-employee": return "Add Employee | NHFapp";
+        case "import-employee": return "Import Employee CSV | NHFapp";
+        case "audit-logs": return "Audit Logs | NHFapp";
+        case "notifications": return "Notifications | NHFapp";
+        case "sessions": return "Session Management | NHFapp";
+        default: return "NHFapp";
     }
 }
 

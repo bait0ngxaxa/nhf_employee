@@ -437,6 +437,10 @@ export const stockReportExportQuerySchema = z.object({
         .enum(["0", "1"])
         .optional()
         .transform((value) => value === "1"),
+    reportType: z
+        .enum(["requests", "balances"])
+        .optional()
+        .default("requests"),
     format: z.enum(["csv"]).optional().default("csv"),
 });
 

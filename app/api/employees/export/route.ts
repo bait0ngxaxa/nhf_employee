@@ -94,7 +94,7 @@ export async function GET(request: NextRequest): Promise<Response> {
 
         after(async () => {
             try {
-                await logDataExport(userId, session.user.email || "", {
+                await logDataExport("Employee", userId, session.user.email || "", {
                     metadata: {
                         entityType: "Employee",
                         recordCount,

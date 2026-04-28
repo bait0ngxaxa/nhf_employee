@@ -1,7 +1,7 @@
 import { DashboardContent } from "@/components/dashboard/DashboardContent";
 
 export const metadata = {
-    title: "Dashboard | NHF IT System",
+    title: "Dashboard | NHFapp",
     description: "IT Management Dashboard for NHF",
 };
 

@@ -262,7 +262,7 @@ export function DashboardSidebar() {
                 >
                     {sidebarOpen ? (
                         <h1 className="text-xl font-bold bg-gradient-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent whitespace-nowrap overflow-hidden">
-                            NHF Platform
+                            NHFapp
                         </h1>
                     ) : null}
                     <Button

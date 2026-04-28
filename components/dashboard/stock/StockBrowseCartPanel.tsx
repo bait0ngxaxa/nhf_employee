@@ -1,6 +1,14 @@
 import Image from "next/image";
 import { useState } from "react";
-import { CheckCircle2, Loader2, Minus, Plus, ShoppingCart, Trash2, XCircle } from "lucide-react";
+import {
+    CheckCircle2,
+    Loader2,
+    Minus,
+    Plus,
+    ShoppingCart,
+    Trash2,
+    XCircle,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
     Dialog,
@@ -51,7 +59,10 @@ export function StockBrowseCartPanel({
                 <div className="border-b border-slate-200 px-5 py-4">
                     <div className="flex items-center gap-3">
                         <div className="rounded-2xl bg-blue-50 p-2.5 text-blue-700">
-                            <ShoppingCart className="h-5 w-5" aria-hidden="true" />
+                            <ShoppingCart
+                                className="h-5 w-5"
+                                aria-hidden="true"
+                            />
                         </div>
                         <div>
                             <div className="text-sm font-semibold text-slate-800">
@@ -71,7 +82,7 @@ export function StockBrowseCartPanel({
                                 htmlFor="stock-project-code"
                                 className="text-sm font-semibold text-slate-700"
                             >
-                                รหัสโครงการ
+                                ชื่อย่อโครงการ
                             </Label>
                             <Input
                                 id="stock-project-code"
@@ -79,14 +90,13 @@ export function StockBrowseCartPanel({
                                 autoComplete="off"
                                 value={projectCode}
                                 onChange={(event) =>
-                                    onProjectCodeChange(event.target.value.toUpperCase())
+                                    onProjectCodeChange(
+                                        event.target.value.toUpperCase(),
+                                    )
                                 }
-                                placeholder="เช่น ABC-2569/01"
+                                placeholder="กรุณาระบุชื่อย่อโครงการ"
                                 className="h-11 border-slate-200 bg-white focus-visible:ring-blue-500"
                             />
-                            <p className="text-xs text-slate-500">
-                                ระบุรหัสโครงการก่อนส่งคำขอเบิก
-                            </p>
                         </div>
                     </div>
                     {items.map((cartItem) => (
@@ -94,8 +104,12 @@ export function StockBrowseCartPanel({
                             key={cartItem.variant.id}
                             item={cartItem}
                             onRemove={() => onRemove(cartItem.variant.id)}
-                            onDecrease={() => onChangeQuantity(cartItem.variant.id, -1)}
-                            onIncrease={() => onChangeQuantity(cartItem.variant.id, 1)}
+                            onDecrease={() =>
+                                onChangeQuantity(cartItem.variant.id, -1)
+                            }
+                            onIncrease={() =>
+                                onChangeQuantity(cartItem.variant.id, 1)
+                            }
                             disabled={submitting}
                         />
                     ))}
@@ -116,7 +130,9 @@ export function StockBrowseCartPanel({
                             </span>
                         </div>
                         <div className="mt-1 flex items-center justify-between gap-3 text-sm">
-                            <span className="text-slate-500">รหัสโครงการ</span>
+                            <span className="text-slate-500">
+                                ชื่อย่อโครงการ
+                            </span>
                             <span className="truncate font-semibold text-slate-800">
                                 {projectCode.trim() || "-"}
                             </span>
@@ -126,13 +142,21 @@ export function StockBrowseCartPanel({
                         <Button
                             type="button"
                             onClick={onSubmit}
-                            disabled={submitting || projectCode.trim().length === 0}
+                            disabled={
+                                submitting || projectCode.trim().length === 0
+                            }
                             className="group/submit w-full bg-[linear-gradient(135deg,#2563EB,#1D4ED8)] font-bold text-white shadow-[0_18px_34px_-22px_rgba(37,99,235,0.95)] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_22px_38px_-20px_rgba(37,99,235,0.95)]"
                         >
                             {submitting ? (
-                                <Loader2 className="mr-1.5 h-4 w-4 animate-spin" aria-hidden="true" />
+                                <Loader2
+                                    className="mr-1.5 h-4 w-4 animate-spin"
+                                    aria-hidden="true"
+                                />
                             ) : (
-                                <CheckCircle2 className="mr-1.5 h-4 w-4 transition-transform duration-300 group-hover/submit:scale-110" aria-hidden="true" />
+                                <CheckCircle2
+                                    className="mr-1.5 h-4 w-4 transition-transform duration-300 group-hover/submit:scale-110"
+                                    aria-hidden="true"
+                                />
                             )}
                             {submitting ? "กำลังดำเนินการ…" : "ยืนยันการเบิก"}
                         </Button>
@@ -143,7 +167,10 @@ export function StockBrowseCartPanel({
                             disabled={submitting}
                             className="group/clear w-full border border-rose-100 text-rose-600 transition-all duration-300 hover:-translate-y-0.5 hover:border-rose-200 hover:bg-rose-50 hover:text-rose-700 hover:shadow-[0_18px_28px_-24px_rgba(190,24,93,0.7)]"
                         >
-                            <XCircle className="mr-1.5 h-4 w-4 transition-transform duration-300 group-hover/clear:scale-110" aria-hidden="true" />
+                            <XCircle
+                                className="mr-1.5 h-4 w-4 transition-transform duration-300 group-hover/clear:scale-110"
+                                aria-hidden="true"
+                            />
                             ยกเลิกทั้งหมด
                         </Button>
                     </div>
@@ -231,7 +258,8 @@ function CartRow(props: {
                             จำนวนที่เบิก: {item.qty} {item.variant.unit}
                         </span>
                         <span>
-                            คงเหลือสูงสุด {getVariantAvailableQuantity(item.variant)}{" "}
+                            คงเหลือสูงสุด{" "}
+                            {getVariantAvailableQuantity(item.variant)}{" "}
                             {item.variant.unit}
                         </span>
                     </div>
@@ -248,7 +276,10 @@ function CartRow(props: {
                             className="h-8 w-8 rounded-lg border border-transparent bg-white text-slate-700 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-200 hover:bg-slate-100 hover:shadow-md sm:h-9 sm:w-9"
                             aria-label={`ลดจำนวน ${getVariantDisplayName(item.item.name, item.variant)}`}
                         >
-                            <Minus className="h-3.5 w-3.5 sm:h-4 sm:w-4" aria-hidden="true" />
+                            <Minus
+                                className="h-3.5 w-3.5 sm:h-4 sm:w-4"
+                                aria-hidden="true"
+                            />
                         </Button>
                         <div className="w-8 text-center text-xs font-bold text-blue-700 sm:w-10 sm:text-sm">
                             {item.qty}
@@ -260,12 +291,16 @@ function CartRow(props: {
                             onClick={props.onIncrease}
                             disabled={
                                 props.disabled ||
-                                item.qty >= getVariantAvailableQuantity(item.variant)
+                                item.qty >=
+                                    getVariantAvailableQuantity(item.variant)
                             }
                             className="h-8 w-8 rounded-lg border border-transparent bg-white text-slate-700 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-200 hover:bg-slate-100 hover:shadow-md sm:h-9 sm:w-9"
                             aria-label={`เพิ่มจำนวน ${getVariantDisplayName(item.item.name, item.variant)}`}
                         >
-                            <Plus className="h-3.5 w-3.5 sm:h-4 sm:w-4" aria-hidden="true" />
+                            <Plus
+                                className="h-3.5 w-3.5 sm:h-4 sm:w-4"
+                                aria-hidden="true"
+                            />
                         </Button>
                     </div>
                     <Button
@@ -277,7 +312,10 @@ function CartRow(props: {
                         className="h-8 w-8 shrink-0 rounded-lg border border-transparent text-rose-600 transition-all duration-200 hover:-translate-y-0.5 hover:border-rose-100 hover:bg-rose-50 hover:text-rose-700 hover:shadow-md sm:h-9 sm:w-9"
                         aria-label={`ลบ ${getVariantDisplayName(item.item.name, item.variant)} ออกจากตะกร้า`}
                     >
-                        <Trash2 className="h-3.5 w-3.5 sm:h-4 sm:w-4" aria-hidden="true" />
+                        <Trash2
+                            className="h-3.5 w-3.5 sm:h-4 sm:w-4"
+                            aria-hidden="true"
+                        />
                     </Button>
                 </div>
             </div>

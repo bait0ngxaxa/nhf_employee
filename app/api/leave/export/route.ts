@@ -134,7 +134,7 @@ export async function GET(request: NextRequest): Promise<Response> {
         if (format === "csv") {
             after(async () => {
                 try {
-                    await logDataExport(userId, session.user.email || "", {
+                    await logDataExport("LeaveRequest", userId, session.user.email || "", {
                         metadata: {
                             entityType: "LeaveRequest",
                             recordCount,

@@ -1,8 +1,15 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
-import { BarChart3, FileSpreadsheet } from "lucide-react";
+import {
+    Archive,
+    BarChart3,
+    FileSpreadsheet,
+    Package,
+} from "lucide-react";
 import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
 import { apiGet } from "@/lib/api-client";
 import { triggerDownload } from "@/lib/helpers/download";
 import { API_ROUTES } from "@/lib/ssot/routes";
@@ -18,13 +25,20 @@ type StockReportMetaResponse = {
     maxRows: number;
 };
 
+type StockBalanceMetaResponse = {
+    count: number;
+    maxRows: number;
+};
+
 export function StockAdminReports() {
     const currentYear = new Date().getFullYear();
     const [availableYears, setAvailableYears] = useState<number[]>([currentYear]);
     const [selectedYear, setSelectedYear] = useState(currentYear);
     const [isLoadingYears, setIsLoadingYears] = useState(true);
     const [isLoadingMeta, setIsLoadingMeta] = useState(true);
+    const [isLoadingBalanceMeta, setIsLoadingBalanceMeta] = useState(true);
     const [meta, setMeta] = useState<StockReportMetaResponse | null>(null);
+    const [balanceMeta, setBalanceMeta] = useState<StockBalanceMetaResponse | null>(null);
 
     useEffect(() => {
         let isCancelled = false;
@@ -92,12 +106,48 @@ export function StockAdminReports() {
         };
     }, [selectedYear]);
 
+    useEffect(() => {
+        let isCancelled = false;
+
+        async function loadBalanceMeta(): Promise<void> {
+            setIsLoadingBalanceMeta(true);
+            const result = await apiGet<StockBalanceMetaResponse>(
+                `${API_ROUTES.stock.reportsExport}?metaOnly=1&reportType=balances`,
+            );
+
+            if (isCancelled) {
+                return;
+            }
+
+            if (!result.success) {
+                toast.error(result.errorThai);
+                setBalanceMeta(null);
+                setIsLoadingBalanceMeta(false);
+                return;
+            }
+
+            setBalanceMeta(result.data);
+            setIsLoadingBalanceMeta(false);
+        }
+
+        void loadBalanceMeta();
+
+        return () => {
+            isCancelled = true;
+        };
+    }, []);
+
     const isDisabled =
         isLoadingYears ||
         isLoadingMeta ||
         !meta ||
         meta.count === 0 ||
         meta.count > meta.maxRows;
+    const isBalanceDisabled =
+        isLoadingBalanceMeta ||
+        !balanceMeta ||
+        balanceMeta.count === 0 ||
+        balanceMeta.count > balanceMeta.maxRows;
 
     return (
         <div className="space-y-5">
@@ -142,12 +192,88 @@ export function StockAdminReports() {
                     },
                 ]}
             />
+
+            <div className="rounded-[1.9rem] border border-slate-200/80 bg-[linear-gradient(135deg,rgba(239,246,255,0.96),rgba(236,253,245,0.96))] p-5 shadow-[0_24px_60px_-34px_rgba(15,23,42,0.28)]">
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                    <div className="space-y-2">
+                        <div className="inline-flex items-center gap-2 rounded-full border border-emerald-100 bg-white/80 px-3 py-1 text-xs font-semibold text-emerald-700 shadow-sm">
+                            <Archive className="h-3.5 w-3.5" aria-hidden="true" />
+                            STOCK BALANCE
+                        </div>
+                        <div>
+                            <h3 className="text-lg font-bold text-slate-800">
+                                Export ยอดคงเหลือสต๊อก
+                            </h3>
+                            <p className="text-sm text-slate-500">
+                                ดาวน์โหลดรายการวัสดุคงเหลือปัจจุบัน พร้อมยอดจองและยอดพร้อมใช้ในรูปแบบ CSV
+                            </p>
+                        </div>
+                    </div>
+
+                    <Button
+                        type="button"
+                        variant="outline"
+                        disabled={isBalanceDisabled}
+                        onClick={() =>
+                            triggerDownload(
+                                `${API_ROUTES.stock.reportsExport}?format=csv&reportType=balances`,
+                            )
+                        }
+                        className="h-11 rounded-2xl bg-[linear-gradient(135deg,#059669,#0f766e)] px-5 text-sm font-semibold text-white shadow-[0_20px_36px_-24px_rgba(15,118,110,0.95)] transition-all duration-300 hover:-translate-y-0.5 hover:bg-[linear-gradient(135deg,#059669,#0f766e)] hover:text-white hover:shadow-[0_24px_40px_-22px_rgba(15,118,110,0.95)] disabled:text-white/80"
+                    >
+                        <FileSpreadsheet className="mr-2 h-4 w-4" aria-hidden="true" />
+                        ดาวน์โหลดสต๊อกคงเหลือ
+                    </Button>
+                </div>
+
+                <div className="mt-5 grid gap-3 md:grid-cols-3">
+                    <ReportStatCard
+                        icon={<Package className="h-4 w-4" aria-hidden="true" />}
+                        label="จำนวนวัสดุ"
+                        value={
+                            isLoadingBalanceMeta
+                                ? "กำลังโหลด..."
+                                : `${balanceMeta?.count ?? 0} รายการ`
+                        }
+                    />
+                    <ReportStatCard
+                        icon={<Archive className="h-4 w-4" aria-hidden="true" />}
+                        label="ขอบเขตข้อมูล"
+                        value="ยอดคงเหลือปัจจุบัน"
+                    />
+                    <ReportStatCard
+                        icon={<FileSpreadsheet className="h-4 w-4" aria-hidden="true" />}
+                        label="สถานะการส่งออก"
+                        value={resolveExportState(balanceMeta, isLoadingBalanceMeta)}
+                    />
+                </div>
+            </div>
+        </div>
+    );
+}
+
+function ReportStatCard({
+    icon,
+    label,
+    value,
+}: {
+    icon: ReactNode;
+    label: string;
+    value: string;
+}) {
+    return (
+        <div className="rounded-2xl border border-white/80 bg-white/90 p-4 shadow-sm">
+            <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+                {icon}
+                {label}
+            </div>
+            <div className="mt-2 text-base font-bold text-slate-800">{value}</div>
         </div>
     );
 }
 
 function resolveExportState(
-    meta: StockReportMetaResponse | null,
+    meta: StockBalanceMetaResponse | StockReportMetaResponse | null,
     isLoadingMeta: boolean,
 ): string {
     if (isLoadingMeta) {

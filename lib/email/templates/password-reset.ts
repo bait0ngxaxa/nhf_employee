@@ -8,7 +8,7 @@ export function generatePasswordResetEmailHTML(
   <head>
       <meta charset="UTF-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>รีเซ็ตรหัสผ่าน - NHF IT System</title>
+      <title>รีเซ็ตรหัสผ่าน - NHFapp</title>
       <style>
           body { 
               font-family: 'Sarabun', Arial, sans-serif; 
@@ -92,7 +92,7 @@ export function generatePasswordResetEmailHTML(
       <div class="container">
           <div class="header">
               <h1>🔐 รีเซ็ตรหัสผ่าน</h1>
-              <p style="margin: 10px 0 0 0; opacity: 0.9;">NHF IT System</p>
+              <p style="margin: 10px 0 0 0; opacity: 0.9;">NHFapp</p>
           </div>
           
           <div class="content">
@@ -120,7 +120,7 @@ export function generatePasswordResetEmailHTML(
           </div>
           
           <div class="footer">
-              <p>อีเมลนี้ถูกส่งอัตโนมัติจากระบบ NHF IT System<br>
+              <p>อีเมลนี้ถูกส่งอัตโนมัติจากระบบ NHFapp<br>
               National Health Foundation (NHF)</p>
           </div>
       </div>

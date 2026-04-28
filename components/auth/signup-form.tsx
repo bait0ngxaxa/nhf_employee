@@ -46,7 +46,7 @@ export function SignupForm({
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState("");
     const router = useRouter();
-    useTitle("สมัครสมาชิก | NHF IT System");
+    useTitle("สมัครสมาชิก | NHFapp");
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();

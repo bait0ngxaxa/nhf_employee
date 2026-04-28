@@ -16,14 +16,19 @@ export async function POST(request: NextRequest) {
         const { entityType, recordCount, filters } = body;
 
         after(async () => {
-            await logDataExport(parseInt(session.user.id, 10), session.user.email || "", {
+            await logDataExport(
+                entityType,
+                parseInt(session.user.id, 10),
+                session.user.email || "",
+                {
                 metadata: {
                     entityType,
                     recordCount,
                     filters,
                     exportedAt: new Date().toISOString(),
                 },
-            });
+                },
+            );
         });
 
         return NextResponse.json({ success: true });

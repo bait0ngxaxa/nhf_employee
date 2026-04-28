@@ -39,6 +39,12 @@ describe("StockAdminReports", () => {
             } as never)
             .mockResolvedValueOnce({
                 success: true,
+                data: { count: 12, maxRows: 5000 },
+                status: 200,
+                requestId: "req-balance-meta",
+            } as never)
+            .mockResolvedValueOnce({
+                success: true,
                 data: { year: 2031, count: 8, maxRows: 5000 },
                 status: 200,
                 requestId: "req-meta",
@@ -50,6 +56,9 @@ describe("StockAdminReports", () => {
             expect(apiGet).toHaveBeenCalledWith("/api/stock/reports/export?yearsOnly=1");
             expect(apiGet).toHaveBeenCalledWith(
                 "/api/stock/reports/export?metaOnly=1&year=2026",
+            );
+            expect(apiGet).toHaveBeenCalledWith(
+                "/api/stock/reports/export?metaOnly=1&reportType=balances",
             );
             expect(apiGet).toHaveBeenCalledWith(
                 "/api/stock/reports/export?metaOnly=1&year=2031",
@@ -72,6 +81,14 @@ describe("StockAdminReports", () => {
 
         expect(triggerDownload).toHaveBeenCalledWith(
             "/api/stock/reports/export?format=csv&year=2031",
+        );
+
+        fireEvent.click(
+            screen.getByRole("button", { name: "ดาวน์โหลดสต๊อกคงเหลือ" }),
+        );
+
+        expect(triggerDownload).toHaveBeenCalledWith(
+            "/api/stock/reports/export?format=csv&reportType=balances",
         );
     });
 });

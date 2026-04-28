@@ -3,6 +3,7 @@ import {
     adjustStockSchema,
     createItemSchema,
     createRequestSchema,
+    stockReportExportQuerySchema,
     updateItemSchema,
 } from "@/lib/validations/stock";
 
@@ -207,6 +208,30 @@ describe("Stock Validation", () => {
             });
 
             expect(result.success).toBe(true);
+        });
+    });
+
+    describe("stockReportExportQuerySchema", () => {
+        it("should default to request export", () => {
+            const result = stockReportExportQuerySchema.safeParse({});
+
+            expect(result.success).toBe(true);
+            if (result.success) {
+                expect(result.data.reportType).toBe("requests");
+            }
+        });
+
+        it("should accept stock balance export type", () => {
+            const result = stockReportExportQuerySchema.safeParse({
+                reportType: "balances",
+                metaOnly: "1",
+            });
+
+            expect(result.success).toBe(true);
+            if (result.success) {
+                expect(result.data.reportType).toBe("balances");
+                expect(result.data.metaOnly).toBe(true);
+            }
         });
     });
 });

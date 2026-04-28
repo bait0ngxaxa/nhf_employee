@@ -1,12 +1,18 @@
+import type { Metadata } from "next";
 import { AuthStatus } from "@/components/auth";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Shield, Database, Zap, ArrowRight } from "lucide-react";
+import { Shield, Database, Zap, ArrowRight, Package } from "lucide-react";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { isValidSessionUser } from "@/lib/auth-ssot";
 import { APP_ROUTES } from "@/lib/ssot/routes";
 import { redirect } from "next/navigation";
+
+export const metadata: Metadata = {
+    title: "NHFapp",
+    description: "แพลตฟอร์มส่วนกลางสำหรับการจัดการข้อมูลและงานไอทีของ NHF",
+};
 
 export default async function Home() {
     const session = await getServerSession(authOptions);
@@ -73,8 +79,8 @@ export default async function Home() {
                     <p className="text-lg md:text-xl text-gray-500 max-w-2xl mx-auto mb-10 leading-relaxed font-light">
                         แพลตฟอร์มส่วนกลางสำหรับ{" "}
                         <strong>มูลนิธิสาธารณสุขแห่งชาติ</strong>{" "}
-                        ในการจัดเก็บข้อมูลพนักงาน แจ้งปัญหา/ซ่อมอุปกรณ์
-                        และติดตามสถานะช่วยเหลือ
+                        ในการจัดเก็บข้อมูลพนักงาน เบิกจ่ายวัสดุ
+                        แจ้งปัญหา/ซ่อมอุปกรณ์ และติดตามสถานะช่วยเหลือ
                     </p>
                     <div className="flex flex-col sm:flex-row justify-center gap-4">
                         <Button
@@ -86,6 +92,14 @@ export default async function Home() {
                                 เข้าสู่ระบบ
                                 <ArrowRight className="ml-2 h-5 w-5" />
                             </Link>
+                        </Button>
+                        <Button
+                            asChild
+                            size="lg"
+                            variant="outline"
+                            className="border-blue-200 bg-white/80 px-8 py-6 text-lg text-blue-700 shadow-lg shadow-cyan-100/40 transition duration-300 motion-safe:hover:scale-105 hover:bg-white hover:text-blue-800 hover:shadow-xl focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+                        >
+                            <Link href={APP_ROUTES.signup}>ลงทะเบียน</Link>
                         </Button>
                     </div>
                 </div>
@@ -129,13 +143,13 @@ export default async function Home() {
                             {/* Feature 3 */}
                             <div className="group text-center md:text-left">
                                 <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-br from-purple-50 to-violet-100 border border-purple-200 mb-4 group-hover:scale-110 transition-transform duration-300">
-                                    <Zap className="h-7 w-7 text-purple-600" />
+                                    <Package className="h-7 w-7 text-purple-600" />
                                 </div>
                                 <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                                    IT Equipments
+                                    Stock & Supplies
                                 </h3>
                                 <p className="text-sm text-gray-600">
-                                    จัดการครุภัณฑ์และอุปกรณ์ไอทีขององค์กร
+                                    เบิกวัสดุ ติดตามยอดคงเหลือ และจัดการคำขอจ่ายวัสดุขององค์กร
                                 </p>
                             </div>
                         </div>

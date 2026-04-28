@@ -187,13 +187,14 @@ export async function logTicketEvent(
  * Create audit log for data export events
  */
 export async function logDataExport(
+    entityType: string,
     userId: number,
     userEmail: string,
-    details?: AuditLogDetails
+    details?: AuditLogDetails,
 ): Promise<void> {
     await createAuditLog({
         action: "DATA_EXPORT",
-        entityType: "Employee",
+        entityType,
         userId,
         userEmail,
         details,

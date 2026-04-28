@@ -59,9 +59,8 @@ function formatVariantSummary(
 
 type RequestItem = {
     quantity: number;
-    item: { name: string; sku: string; unit: string };
+    item: { name: string; unit: string };
     variant: {
-        sku: string;
         unit: string;
         attributeValues: Array<{
             attributeValue: { value: string; attribute: { name: string } };
@@ -69,18 +68,17 @@ type RequestItem = {
     } | null;
 };
 
-/** Collapses all items in a request into one readable cell, e.g. "ปากกา [SKU001] x2 ชิ้น | กระดาษ [SKU002] x10 แผ่น" */
+/** Collapses all items in a request into one readable cell, e.g. "ปากกา x2 ชิ้น | กระดาษ x10 แผ่น" */
 function formatItemsSummary(items: RequestItem[]): string {
     return items
         .map((requestItem) => {
             const name = requestItem.item.name;
-            const sku = requestItem.variant?.sku ?? requestItem.item.sku;
             const unit = requestItem.variant?.unit ?? requestItem.item.unit;
             const qty = requestItem.quantity;
             const attrs = formatVariantSummary(requestItem.variant?.attributeValues);
             return attrs
-                ? `${name} [${sku}] (${attrs}) x${qty} ${unit}`
-                : `${name} [${sku}] x${qty} ${unit}`;
+                ? `${name} (${attrs}) x${qty} ${unit}`
+                : `${name} x${qty} ${unit}`;
         })
         .join(" | ");
 }
@@ -181,10 +179,9 @@ export async function createStockRequestReportCsvResponse(
                         items: {
                             select: {
                                 quantity: true,
-                                item: { select: { name: true, sku: true, unit: true } },
+                                item: { select: { name: true, unit: true } },
                                 variant: {
                                     select: {
-                                        sku: true,
                                         unit: true,
                                         attributeValues: {
                                             select: {

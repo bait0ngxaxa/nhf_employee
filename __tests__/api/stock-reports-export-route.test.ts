@@ -5,6 +5,10 @@ import { GET as stockReportsExportRoute } from "@/app/api/stock/reports/export/r
 import { getApiAuthSession } from "@/lib/server-auth";
 import { isAdminRole } from "@/lib/ssot/permissions";
 import {
+    createStockBalanceReportCsvResponse,
+    getStockBalanceReportMeta,
+} from "@/lib/services/stock/balance-export";
+import {
     createStockRequestReportCsvResponse,
     getStockRequestReportMeta,
     getStockRequestReportYears,
@@ -27,6 +31,11 @@ vi.mock("@/lib/server-auth", () => ({
 
 vi.mock("@/lib/ssot/permissions", () => ({
     isAdminRole: vi.fn(),
+}));
+
+vi.mock("@/lib/services/stock/balance-export", () => ({
+    getStockBalanceReportMeta: vi.fn(),
+    createStockBalanceReportCsvResponse: vi.fn(),
 }));
 
 vi.mock("@/lib/services/stock/report-export", () => ({
@@ -82,6 +91,36 @@ describe("GET /api/stock/reports/export", () => {
         });
     });
 
+    it("exports current stock balances and logs audit", async () => {
+        vi.mocked(getStockBalanceReportMeta).mockResolvedValue({
+            count: 15,
+            maxRows: 5000,
+        });
+        vi.mocked(createStockBalanceReportCsvResponse).mockResolvedValue(
+            new Response("csv-data", { status: 200 }),
+        );
+
+        const request = new NextRequest(
+            "http://localhost/api/stock/reports/export?format=csv&reportType=balances",
+        );
+        const response = await stockReportsExportRoute(request);
+
+        expect(response.status).toBe(200);
+        expect(createStockBalanceReportCsvResponse).toHaveBeenCalledTimes(1);
+        expect(logDataExport).toHaveBeenCalledWith(
+            "StockItem",
+            1,
+            "admin@test.com",
+            expect.objectContaining({
+                metadata: expect.objectContaining({
+                    entityType: "StockItem",
+                    recordCount: 15,
+                    filters: { reportType: "balances" },
+                }),
+            }),
+        );
+    });
+
     it("exports the selected year and logs audit", async () => {
         vi.mocked(getStockRequestReportMeta).mockResolvedValue({
             count: 3,
@@ -99,6 +138,7 @@ describe("GET /api/stock/reports/export", () => {
         expect(response.status).toBe(200);
         expect(createStockRequestReportCsvResponse).toHaveBeenCalledWith(2031);
         expect(logDataExport).toHaveBeenCalledWith(
+            "StockRequest",
             1,
             "admin@test.com",
             expect.objectContaining({

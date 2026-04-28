@@ -3,7 +3,7 @@ import { Suspense } from "react";
 import { type Metadata } from "next";
 
 export const metadata: Metadata = {
-    title: "เข้าสู่ระบบ | NHF IT System",
+    title: "เข้าสู่ระบบ | NHFapp",
 };
 
 function LoginPageContent() {

@@ -13,9 +13,9 @@ const googleSans = localFont({
 });
 
 export const metadata: Metadata = {
-    title: "NHF IT Management System",
+    title: "NHFapp",
     description:
-        "ระบบบริหารจัดการทรัพยากรบุคคลและไอที NHF (NHF IT Management System)",
+        "ระบบบริหารจัดการทรัพยากรบุคคลและไอที NHF (NHFapp)",
 };
 
 export const viewport: Viewport = {
