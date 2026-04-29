@@ -1,5 +1,5 @@
 import { type useRouter } from "next/navigation";
-import { type MenuItem, type MenuGroup } from "@/types/dashboard";
+import { type MenuGroup } from "@/types/dashboard";
 
 export interface EmployeeStats {
     total: number;
@@ -30,7 +30,6 @@ export interface DashboardDataContextValue {
 
     // Navigation Data
     availableMenuGroups: MenuGroup[];
-    sessionMenuItem: MenuItem;
 }
 
 export interface DashboardUIContextValue {

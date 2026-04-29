@@ -2,7 +2,7 @@
 
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Menu, User, LogOut, ChevronDown } from "lucide-react";
+import { Menu, User, LogOut, ChevronDown, Smartphone } from "lucide-react";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -27,7 +27,7 @@ import { NotificationDropdown } from "./NotificationDropdown";
 import { getRoleLabelThai } from "@/lib/ssot/permissions";
 
 export function DashboardNavbar() {
-    const { sidebarOpen, setSidebarOpen, handleSignOut } =
+    const { sidebarOpen, setSidebarOpen, handleSignOut, handleMenuClick } =
         useDashboardUIContext();
     const { user } = useDashboardDataContext();
     const [showLogoutDialog, setShowLogoutDialog] = useState(false);
@@ -98,6 +98,13 @@ export function DashboardNavbar() {
                             </div>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem
+                                onClick={() => handleMenuClick("sessions")}
+                            >
+                                <Smartphone className="h-4 w-4 mr-2" />
+                                จัดการเซสชัน
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
                                 onClick={() => setShowLogoutDialog(true)}
                                 className="text-red-600 focus:text-red-600 focus:bg-red-50"
                             >
@@ -107,16 +114,37 @@ export function DashboardNavbar() {
                         </DropdownMenuContent>
                     </DropdownMenu>
 
-                    {/* Mobile user button */}
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        className="sm:hidden h-9 w-9"
-                        aria-label="ออกจากระบบ"
-                        onClick={() => setShowLogoutDialog(true)}
-                    >
-                        <LogOut className="h-5 w-5 text-red-500" />
-                    </Button>
+                    {/* Mobile user dropdown */}
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                className="sm:hidden h-9 w-9"
+                                aria-label="เมนูผู้ใช้"
+                            >
+                                <div className="flex items-center justify-center h-7 w-7 rounded-full bg-gradient-to-br from-blue-500 to-cyan-500">
+                                    <User className="h-4 w-4 text-white" />
+                                </div>
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-48">
+                            <DropdownMenuItem
+                                onClick={() => handleMenuClick("sessions")}
+                            >
+                                <Smartphone className="h-4 w-4 mr-2" />
+                                จัดการเซสชัน
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                                onClick={() => setShowLogoutDialog(true)}
+                                className="text-red-600 focus:text-red-600 focus:bg-red-50"
+                            >
+                                <LogOut className="h-4 w-4 mr-2" />
+                                ออกจากระบบ
+                            </DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
                 </div>
             </div>
 

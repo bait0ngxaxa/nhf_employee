@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
 import { Menu, X, User, Home, ChevronDown } from "lucide-react";
 
 import { getMenuTheme } from "@/constants/dashboard";
@@ -215,7 +214,7 @@ function SidebarMenuGroup({
 export function DashboardSidebar() {
     const { selectedMenu, sidebarOpen, handleMenuClick, setSidebarOpen } =
         useDashboardUIContext();
-    const { user, availableMenuGroups, sessionMenuItem } =
+    const { user, availableMenuGroups } =
         useDashboardDataContext();
 
     // Default: expand all groups
@@ -307,7 +306,7 @@ export function DashboardSidebar() {
                     onClick={() => handleMenuClick("dashboard")}
                 />
 
-                <Separator className="my-1.5" />
+                <hr className="my-1.5 border-t border-gray-200" />
 
                 {/* Menu Groups */}
                 {availableMenuGroups.map((group) => (
@@ -321,17 +320,6 @@ export function DashboardSidebar() {
                         onItemClick={handleMenuClick}
                     />
                 ))}
-
-                <Separator className="my-1.5" />
-
-                {/* Session Management (standalone) */}
-                <SidebarMenuItem
-                    item={sessionMenuItem}
-                    isActive={selectedMenu === "sessions"}
-                    sidebarOpen={sidebarOpen}
-                    indented={false}
-                    onClick={() => handleMenuClick("sessions")}
-                />
             </nav>
 
             {/* User Info */}

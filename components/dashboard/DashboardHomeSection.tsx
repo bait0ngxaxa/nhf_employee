@@ -106,7 +106,7 @@ function getGreeting(): string {
 // ----------------------------------------------------------------------
 
 export function DashboardHomeSection() {
-    const { user, availableMenuGroups, sessionMenuItem } = useDashboardDataContext();
+    const { user, availableMenuGroups } = useDashboardDataContext();
     const { handleMenuClick } = useDashboardUIContext();
     const [greeting, setGreeting] = useState("สวัสดี");
 
@@ -116,7 +116,6 @@ export function DashboardHomeSection() {
 
     const allMenuItems = [
         ...availableMenuGroups.flatMap((group) => group.items),
-        sessionMenuItem,
     ];
 
     return (

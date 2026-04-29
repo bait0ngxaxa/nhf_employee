@@ -12,7 +12,6 @@ import {
 import { useSession, signOut } from "next-auth/react";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import useSWR from "swr";
-import { Smartphone } from "lucide-react";
 import {
     DASHBOARD_MENU_ITEMS,
     getAvailableMenuGroups,
@@ -37,12 +36,6 @@ interface DashboardProviderProps {
     initialUser?: DashboardDataContextValue["user"];
 }
 
-const SESSION_MENU_ITEM = {
-    id: "sessions",
-    label: "จัดการเซสชัน",
-    icon: Smartphone,
-    description: "จัดการอุปกรณ์ที่ล็อกอินอยู่และยกเลิกเซสชันได้",
-} as const;
 const STOCK_BROWSE_CART_STORAGE_KEY_PREFIX = "stock:browse-cart:v1:user:";
 const STOCK_BROWSE_CART_LEGACY_KEY = "stock:browse-cart:v1";
 
@@ -140,7 +133,7 @@ export function DashboardProvider({
         [isAdmin],
     );
 
-    const sessionMenuItem = SESSION_MENU_ITEM;
+
 
     const { data: statsData, mutate: mutateStats } = useSWR<{
         stats: EmployeeStats;
@@ -205,7 +198,6 @@ export function DashboardProvider({
             refreshTrigger,
             handleEmployeeAdded,
             availableMenuGroups,
-            sessionMenuItem,
         }),
         [
             effectiveStatus,
@@ -215,7 +207,6 @@ export function DashboardProvider({
             refreshTrigger,
             handleEmployeeAdded,
             availableMenuGroups,
-            sessionMenuItem,
         ],
     );
 
