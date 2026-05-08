@@ -15,6 +15,7 @@ import {
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
+import { cn } from "@/lib/utils";
 import { apiGet, apiPatch, apiPost } from "@/lib/api-client";
 import { getRelativeTime } from "@/lib/helpers/date-helpers";
 import {
@@ -30,7 +31,6 @@ import {
     DropdownMenuGroup,
     DropdownMenuItem,
     DropdownMenuLabel,
-    DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
@@ -143,11 +143,11 @@ export function NotificationDropdown() {
                 <Button
                     variant="ghost"
                     size="icon"
-                    className="relative h-9 w-9 text-gray-600 hover:text-gray-900"
+                    className="relative h-10 w-10 rounded-xl bg-white border border-slate-100 hover:border-slate-200 hover:bg-slate-50 transition-all duration-300 shadow-sm"
                 >
-                    <Bell className="h-5 w-5" />
+                    <Bell className="h-5 w-5 text-slate-500" />
                     {unreadCount > 0 && (
-                        <span className="absolute -top-0.5 -right-0.5 flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold leading-none">
+                        <span className="absolute -top-1 -right-1 flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-slate-900 text-white text-[9px] font-black leading-none shadow-lg shadow-slate-200">
                             {unreadCount > 9 ? "9+" : unreadCount}
                         </span>
                     )}
@@ -156,49 +156,59 @@ export function NotificationDropdown() {
 
             <DropdownMenuContent
                 align="end"
-                className="w-80 p-0 overflow-hidden shadow-2xl rounded-2xl border-gray-100"
+                className="w-96 p-0 overflow-hidden shadow-[0_30px_60px_-12px_rgba(0,0,0,0.15)] rounded-[2rem] border-slate-100 bg-white/95 backdrop-blur-xl"
             >
-                <div className="flex items-center justify-between px-4 py-3 bg-gray-50/80 border-b border-gray-100">
-                    <DropdownMenuLabel className="p-0 font-bold text-gray-900">
-                        แจ้งเตือน
-                    </DropdownMenuLabel>
+                <div className="flex items-center justify-between px-6 py-5 border-b border-slate-50 bg-slate-50/30">
+                    <div className="space-y-0.5">
+                        <DropdownMenuLabel className="p-0 text-lg font-black text-slate-900 tracking-tight">
+                            Activity
+                        </DropdownMenuLabel>
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Recent Notifications</p>
+                    </div>
                     {unreadCount > 0 && (
                         <Button
                             variant="ghost"
                             size="sm"
                             onClick={handleMarkAllAsRead}
-                            className="h-8 text-xs text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                            className="h-8 rounded-lg text-[10px] font-black uppercase tracking-widest text-sky-600 hover:text-sky-700 hover:bg-sky-50"
                         >
-                            <Check className="h-3 w-3 mr-1" />
-                            อ่านทั้งหมด
+                            <Check className="h-3 w-3 mr-1.5" />
+                            Mark all read
                         </Button>
                     )}
                 </div>
 
-                <div className="max-h-[350px] overflow-y-auto">
+                <div className="max-h-[420px] overflow-y-auto custom-scrollbar">
                     {isLoading ? (
-                        <div className="flex justify-center items-center py-8 text-gray-400">
-                            <Loader2 className="h-6 w-6 animate-spin" />
+                        <div className="flex flex-col justify-center items-center py-12 text-slate-400 gap-3">
+                            <Loader2 className="h-8 w-8 animate-spin text-slate-200" />
+                            <span className="text-xs font-bold uppercase tracking-widest opacity-50">Loading Feed</span>
                         </div>
                     ) : error ? (
-                        <div className="py-8 text-center text-sm text-red-500">
-                            โหลดข้อมูลล้มเหลว
+                        <div className="py-12 text-center text-xs font-bold text-rose-500 uppercase tracking-widest">
+                            Connection Error
                         </div>
                     ) : notifications.length === 0 ? (
-                        <div className="py-8 text-center text-sm text-gray-500 flex flex-col items-center">
-                            <Bell className="h-8 w-8 text-gray-300 mb-2" />
-                            ไม่มีการแจ้งเตือนใหม่
+                        <div className="py-16 text-center text-slate-400 flex flex-col items-center gap-4">
+                            <div className="w-16 h-16 rounded-3xl bg-slate-50 flex items-center justify-center text-slate-200">
+                                <Bell className="h-8 w-8" />
+                            </div>
+                            <div className="space-y-1">
+                                <p className="text-sm font-black text-slate-900">All caught up</p>
+                                <p className="text-xs font-medium text-slate-400">No new notifications for now</p>
+                            </div>
                         </div>
                     ) : (
-                        <DropdownMenuGroup className="p-1">
+                        <DropdownMenuGroup className="p-2 space-y-1">
                             {notifications.map((notification) => (
                                 <DropdownMenuItem
                                     key={notification.id}
-                                    className={`flex items-start gap-3 p-3 cursor-pointer rounded-xl transition-colors ${
+                                    className={cn(
+                                        "flex items-start gap-4 p-4 cursor-pointer rounded-2xl transition-all duration-300",
                                         notification.isRead
-                                            ? "bg-transparent opacity-70"
-                                            : "bg-blue-50/50"
-                                    }`}
+                                            ? "opacity-60 grayscale-[0.5] hover:bg-slate-50"
+                                            : "bg-white border border-slate-50 hover:border-slate-100 hover:shadow-sm"
+                                    )}
                                     onClick={() =>
                                         handleMarkAsRead(
                                             notification.id,
@@ -206,30 +216,39 @@ export function NotificationDropdown() {
                                         )
                                     }
                                 >
-                                    <div className="mt-1 shrink-0 bg-white p-1.5 rounded-full shadow-sm border border-gray-100">
+                                    <div className={cn(
+                                        "mt-1 shrink-0 w-10 h-10 rounded-xl flex items-center justify-center border shadow-sm",
+                                        notification.isRead ? "bg-slate-50 border-slate-100" : "bg-white border-slate-50"
+                                    )}>
                                         {getIconPrefix(notification.type)}
                                     </div>
                                     <div className="flex flex-col gap-1 overflow-hidden w-full">
                                         <div className="flex justify-between items-start w-full">
                                             <span
-                                                className={`text-sm font-semibold truncate pr-2 ${
+                                                className={cn(
+                                                    "text-sm tracking-tight truncate pr-4",
                                                     notification.isRead
-                                                        ? "text-gray-700"
-                                                        : "text-gray-900"
-                                                }`}
+                                                        ? "font-bold text-slate-600"
+                                                        : "font-black text-slate-900"
+                                                )}
                                             >
                                                 {notification.title}
                                             </span>
                                             {!notification.isRead && (
-                                                <span className="w-2 h-2 rounded-full bg-blue-500 shrink-0 mt-1.5" />
+                                                <span className="w-2 h-2 rounded-full bg-sky-500 shrink-0 mt-2 shadow-[0_0_8px_rgba(14,165,233,0.5)]" />
                                             )}
                                         </div>
-                                        <span className="text-xs text-gray-600 line-clamp-2 leading-relaxed">
+                                        <span className="text-xs text-slate-500 font-medium line-clamp-2 leading-relaxed mb-1">
                                             {notification.message}
                                         </span>
-                                        <span className="text-[10px] text-gray-400 font-medium">
-                                            {getRelativeTime(notification.createdAt)}
-                                        </span>
+                                        <div className="flex items-center justify-between mt-1">
+                                            <span className="text-[10px] font-black text-slate-300 uppercase tracking-widest">
+                                                {getRelativeTime(notification.createdAt)}
+                                            </span>
+                                            {!notification.isRead && (
+                                                <span className="text-[8px] font-black uppercase tracking-widest text-sky-600 bg-sky-50 px-2 py-0.5 rounded-full">New</span>
+                                            )}
+                                        </div>
                                     </div>
                                 </DropdownMenuItem>
                             ))}
@@ -237,18 +256,17 @@ export function NotificationDropdown() {
                     )}
                 </div>
 
-                <DropdownMenuSeparator className="m-0 border-gray-100" />
-                <div className="p-2 bg-gray-50/50">
+                <div className="p-4 bg-slate-50/50 border-t border-slate-50">
                     <Button
                         variant="ghost"
-                        className="w-full text-xs text-gray-500 justify-center h-8 hover:bg-gray-100 rounded-lg gap-1"
+                        className="w-full text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 hover:text-slate-900 hover:bg-white rounded-xl h-10 transition-all"
                         onClick={() => {
                             setOpen(false);
                             router.push(toDashboardTabPath(APP_DASHBOARD_TABS.notifications));
                         }}
                     >
-                        <ExternalLink className="h-3 w-3" />
-                        ดูการแจ้งเตือนทั้งหมด
+                        View Full History
+                        <ExternalLink className="h-3 w-3 ml-2" />
                     </Button>
                 </div>
             </DropdownMenuContent>

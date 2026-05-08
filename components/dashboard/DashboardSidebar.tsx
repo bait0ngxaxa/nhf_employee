@@ -1,9 +1,8 @@
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Menu, X, User, Home, ChevronDown } from "lucide-react";
+import { User, Home, ChevronDown, PanelLeftClose, PanelLeft } from "lucide-react";
 
-import { getMenuTheme } from "@/constants/dashboard";
 import { getRoleLabelThai } from "@/lib/ssot/permissions";
 import { type MenuGroup } from "@/types/dashboard";
 import { type MenuItem } from "@/types/dashboard";
@@ -11,8 +10,6 @@ import {
     useDashboardUIContext,
     useDashboardDataContext,
 } from "@/components/dashboard/context/dashboard/DashboardContext";
-
-const TRANSITION_EASE = "cubic-bezier(0.4, 0, 0.2, 1)";
 
 function SidebarMenuItem({
     item,
@@ -28,45 +25,24 @@ function SidebarMenuItem({
     onClick: () => void;
 }) {
     const IconComponent = item.icon;
-    const theme = getMenuTheme(item.id);
     const disabled = item.comingSoon === true;
 
     return (
-        <div className="relative group">
-            {isActive && sidebarOpen ? (
-                <div
-                    className={cn(
-                        `absolute inset-0 bg-gradient-to-r ${theme.glow} opacity-20 rounded-xl`,
-                    )}
-                    style={{ filter: "blur(16px)" }}
-                />
-            ) : null}
+        <div className="relative group px-2">
             <Button
                 variant="ghost"
                 disabled={disabled}
                 className={cn(
-                    "relative w-full justify-start overflow-hidden group/btn",
+                    "relative w-full justify-start overflow-hidden group/btn h-12 rounded-[1rem] transition-all duration-500",
                     isActive
-                        ? `${theme.activeBg} ${theme.text} shadow-sm border-r-4 ${theme.border}`
-                        : `${theme.hover} text-gray-600 hover:text-gray-900`,
-                    !sidebarOpen && "justify-center px-0 border-r-0",
-                    indented && sidebarOpen && "pl-9 h-9",
-                    // Dim but keep visible for coming-soon items
-                    disabled && "opacity-50 cursor-not-allowed hover:bg-transparent",
+                        ? "bg-sky-50 text-sky-600 shadow-sm border border-sky-100/50"
+                        : "text-slate-500 hover:text-slate-900 hover:bg-slate-50",
+                    !sidebarOpen && "justify-center px-0",
+                    indented && sidebarOpen && "pl-10 h-10",
+                    disabled && "opacity-40 cursor-not-allowed",
                 )}
-                style={{ transition: "all 200ms ease-out" }}
                 onClick={disabled ? undefined : onClick}
             >
-                {isActive && sidebarOpen && (
-                    <div
-                        className={cn(
-                            "absolute -right-2 -top-2 w-12 h-12 rounded-full pointer-events-none",
-                            theme.activeBg,
-                        )}
-                        style={{ filter: "blur(12px)" }}
-                    />
-                )}
-
                 <div
                     className={cn(
                         "relative z-10 flex items-center w-full",
@@ -75,40 +51,37 @@ function SidebarMenuItem({
                 >
                     <div
                         className={cn(
-                            "rounded-lg",
-                            indented && sidebarOpen ? "p-1.5" : "p-2",
-                            isActive
-                                ? "bg-white shadow-sm"
-                                : `${theme.lightBg} group-hover/btn:scale-110`,
-                            disabled && "group-hover/btn:scale-100",
+                            "flex items-center justify-center shrink-0 transition-transform duration-500",
+                            indented && sidebarOpen ? "w-5 h-5" : "w-6 h-6",
+                            isActive ? "scale-110" : "group-hover/btn:scale-110",
                         )}
-                        style={{
-                            transition: `transform 200ms ease-out, background-color 200ms ease-out`,
-                        }}
                     >
-                        <span style={{ transition: "color 200ms ease-out" }}>
-                            <IconComponent
-                                className={cn(
-                                    indented && sidebarOpen
-                                        ? "h-4 w-4"
-                                        : "h-4 w-4",
-                                    isActive
-                                        ? theme.text
-                                        : "text-gray-500 group-hover/btn:text-gray-900",
-                                )}
-                            />
-                        </span>
+                        <IconComponent
+                            className={cn(
+                                indented && sidebarOpen ? "h-3.5 w-3.5" : "h-5 w-5",
+                                isActive ? "text-sky-600" : "text-slate-400 group-hover/btn:text-slate-900",
+                            )}
+                        />
                     </div>
                     {sidebarOpen && (
-                        <span className="ml-3 font-medium whitespace-nowrap">
+                        <span className={cn(
+                            "ml-3 whitespace-nowrap tracking-tight transition-all duration-300",
+                            isActive ? "font-black text-sm" : "font-semibold text-sm opacity-80 group-hover/btn:opacity-100"
+                        )}>
                             {item.label}
                         </span>
                     )}
                 </div>
-                {/* Coming-soon badge — absolute so it never shifts the label */}
+                
+                {/* Active Indicator Bar */}
+                {isActive && sidebarOpen && (
+                    <div className="absolute left-0 top-3 bottom-3 w-1 bg-sky-500 rounded-full" />
+                )}
+
+                {/* Coming-soon badge */}
                 {sidebarOpen && disabled && (
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 z-10 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 border border-amber-200 pointer-events-none">
-                        เร็วๆ นี้
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 z-10 text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full bg-slate-100 text-slate-400 border border-slate-200 pointer-events-none">
+                        Soon
                     </span>
                 )}
             </Button>
@@ -131,14 +104,11 @@ function SidebarMenuGroup({
     onToggle: () => void;
     onItemClick: (menuId: string) => void;
 }) {
-    const GroupIcon = group.icon;
-    // Check if any child in this group is active
     const hasActiveChild = group.items.some((item) => item.id === selectedMenu);
 
-    // In collapsed sidebar mode, show only child item icons
     if (!sidebarOpen) {
         return (
-            <div className="space-y-0.5">
+            <div className="space-y-1 mb-2">
                 {group.items.map((item) => (
                     <SidebarMenuItem
                         key={item.id}
@@ -154,30 +124,22 @@ function SidebarMenuGroup({
     }
 
     return (
-        <div className="space-y-0.5">
+        <div className="space-y-1 mb-4">
             {/* Group Header */}
             <button
                 type="button"
                 onClick={onToggle}
                 className={cn(
-                    "flex items-center w-full px-3 py-1.5 rounded-lg text-left transition-colors duration-200",
-                    hasActiveChild
-                        ? "text-gray-900 bg-gray-100/60"
-                        : "text-gray-500 hover:text-gray-700 hover:bg-gray-50",
+                    "flex items-center w-full px-5 py-2 rounded-lg text-left transition-all duration-300 group/header",
+                    hasActiveChild ? "text-slate-900" : "text-slate-400 hover:text-slate-600",
                 )}
             >
-                <GroupIcon
-                    className={cn(
-                        "h-4 w-4 mr-2.5 shrink-0",
-                        hasActiveChild ? "text-gray-700" : "text-gray-400",
-                    )}
-                />
-                <span className="text-sm font-semibold uppercase tracking-wider flex-1 whitespace-nowrap">
+                <span className="text-[10px] font-black uppercase tracking-[0.2em] flex-1 whitespace-nowrap">
                     {group.label}
                 </span>
                 <ChevronDown
                     className={cn(
-                        "h-3.5 w-3.5 text-gray-400 shrink-0 transition-transform duration-200",
+                        "h-3 w-3 transition-transform duration-500",
                         isExpanded && "rotate-180",
                     )}
                 />
@@ -185,23 +147,20 @@ function SidebarMenuGroup({
 
             {/* Collapsible Children */}
             <div
-                className="overflow-hidden"
+                className="overflow-hidden transition-all duration-500 ease-in-out"
                 style={{
-                    maxHeight: isExpanded
-                        ? `${group.items.length * 40}px`
-                        : "0px",
+                    maxHeight: isExpanded ? `${group.items.length * 48}px` : "0px",
                     opacity: isExpanded ? 1 : 0,
-                    transition: `max-height 250ms ${TRANSITION_EASE}, opacity 200ms ${TRANSITION_EASE}`,
                 }}
             >
-                <div className="ml-2 border-l-2 border-gray-200/70 pl-1 space-y-px py-0.5">
+                <div className="space-y-1 mt-1">
                     {group.items.map((item) => (
                         <SidebarMenuItem
                             key={item.id}
                             item={item}
                             isActive={selectedMenu === item.id}
-                            sidebarOpen
-                            indented
+                            sidebarOpen={true}
+                            indented={true}
                             onClick={() => onItemClick(item.id)}
                         />
                     ))}
@@ -217,7 +176,6 @@ export function DashboardSidebar() {
     const { user, availableMenuGroups } =
         useDashboardDataContext();
 
-    // Default: expand all groups
     const [expandedGroups, setExpandedGroups] = useState<Set<string>>(
         () => new Set(availableMenuGroups.map((g) => g.id)),
     );
@@ -236,77 +194,62 @@ export function DashboardSidebar() {
     return (
         <div
             className={cn(
-                "h-full bg-white shadow-lg border-r border-gray-200/50 flex flex-col z-20 overflow-hidden will-change-transform",
-                sidebarOpen ? "w-64" : "w-16",
+                "h-full bg-white border-r border-slate-100 flex flex-col z-20 overflow-hidden transition-all duration-500 ease-in-out",
+                sidebarOpen ? "w-72" : "w-20",
             )}
-            style={{
-                transition: `width 300ms ${TRANSITION_EASE}`,
-            }}
         >
-            {/* Header */}
-            <div
-                className={cn(
-                    "border-b border-gray-100",
-                    sidebarOpen ? "p-4" : "p-2",
+            {/* Header / Logo Section */}
+            <div className={cn(
+                "flex items-center gap-4 transition-all duration-500",
+                sidebarOpen ? "p-8" : "p-4 flex-col gap-3"
+            )}>
+                <div className="relative group/logo">
+                    <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-sky-500 to-indigo-600 flex items-center justify-center text-white shadow-[0_8px_16px_-4px_rgba(14,165,233,0.3)] transition-transform duration-500 group-hover/logo:rotate-12">
+                        <span className="text-xl font-black">N</span>
+                    </div>
+                </div>
+                {sidebarOpen && (
+                    <div className="flex-1 min-w-0 animate-in fade-in slide-in-from-left-2 duration-500">
+                        <h1 className="text-xl font-black tracking-tighter text-slate-900 leading-none">
+                            NHF<span className="text-sky-500">app</span>
+                        </h1>
+                    </div>
                 )}
-                style={{
-                    transition: `padding 300ms ${TRANSITION_EASE}`,
-                }}
-            >
-                <div
-                    className={cn(
-                        "flex items-center",
-                        sidebarOpen ? "justify-between" : "justify-center",
-                    )}
+                {/* Sidebar Toggle Button */}
+                <Button
+                    variant="ghost"
+                    size="icon"
+                    className="hidden md:flex h-8 w-8 rounded-xl bg-slate-50 border border-slate-100 hover:bg-sky-50 hover:border-sky-100 transition-all duration-300 shrink-0"
+                    aria-label={sidebarOpen ? "ย่อเมนู" : "ขยายเมนู"}
+                    onClick={onToggle}
                 >
                     {sidebarOpen ? (
-                        <h1 className="text-xl font-bold bg-gradient-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent whitespace-nowrap overflow-hidden">
-                            NHFapp
-                        </h1>
-                    ) : null}
-                    <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={onToggle}
-                        aria-label={
-                            sidebarOpen ? "ปิด Sidebar" : "เปิด Sidebar"
-                        }
-                        className={cn(!sidebarOpen && "h-10 w-10 p-0")}
-                    >
-                        {sidebarOpen ? (
-                            <X className="h-4 w-4" />
-                        ) : (
-                            <Menu className="h-4 w-4" />
-                        )}
-                    </Button>
-                </div>
+                        <PanelLeftClose className="h-4 w-4 text-slate-500" />
+                    ) : (
+                        <PanelLeft className="h-4 w-4 text-slate-500" />
+                    )}
+                </Button>
             </div>
 
-            {/* Navigation */}
-            <nav
-                className={cn(
-                    "flex-1 space-y-1 overflow-y-auto overflow-x-hidden custom-scrollbar",
-                    sidebarOpen ? "px-4 py-3" : "p-2",
-                )}
-                style={{
-                    transition: `padding 300ms ${TRANSITION_EASE}`,
-                }}
-            >
-                {/* Dashboard Button (standalone) */}
-                <SidebarMenuItem
-                    item={{
-                        id: "dashboard",
-                        label: "หน้าแรก",
-                        icon: Home,
-                        description: "หน้าหลัก",
-                    }}
-                    isActive={selectedMenu === "dashboard"}
-                    sidebarOpen={sidebarOpen}
-                    indented={false}
-                    onClick={() => handleMenuClick("dashboard")}
-                />
-
-                <hr className="my-1.5 border-t border-gray-200" />
+            {/* Navigation Area */}
+            <nav className={cn(
+                "flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar",
+                sidebarOpen ? "px-2" : "px-0"
+            )}>
+                <div className="space-y-1 mb-6">
+                    <SidebarMenuItem
+                        item={{
+                            id: "dashboard",
+                            label: "Overview",
+                            icon: Home,
+                            description: "Main Dashboard",
+                        }}
+                        isActive={selectedMenu === "dashboard"}
+                        sidebarOpen={sidebarOpen}
+                        indented={false}
+                        onClick={() => handleMenuClick("dashboard")}
+                    />
+                </div>
 
                 {/* Menu Groups */}
                 {availableMenuGroups.map((group) => (
@@ -322,26 +265,35 @@ export function DashboardSidebar() {
                 ))}
             </nav>
 
-            {/* User Info */}
-            {sidebarOpen && user && (
-                <div className="border-t border-gray-100 p-4">
-                    <div className="p-3 bg-gradient-to-br from-gray-50 to-blue-50/50 rounded-xl border border-blue-100/50 overflow-hidden">
-                        <div className="flex items-center space-x-3">
-                            <div className="p-2 bg-white rounded-lg shadow-sm shrink-0">
-                                <User className="h-4 w-4 text-blue-600" />
+            {/* Footer / User Profile Section */}
+            <div className={cn(
+                "transition-all duration-500 border-t border-slate-50",
+                sidebarOpen ? "p-6" : "p-4"
+            )}>
+                {sidebarOpen ? (
+                    <div className="relative group/profile p-1 rounded-[1.5rem] bg-slate-50/50 border border-slate-100 hover:border-sky-100 transition-all duration-500">
+                        <div className="flex items-center gap-3 p-3 rounded-2xl bg-white shadow-sm">
+                            <div className="w-10 h-10 rounded-xl bg-sky-50 flex items-center justify-center text-sky-600 shrink-0 border border-sky-100/50">
+                                <User className="h-5 w-5" />
                             </div>
                             <div className="flex-1 min-w-0">
-                                <p className="text-sm font-bold text-gray-900 truncate">
-                                    {user.name}
+                                <p className="text-sm font-black text-slate-900 truncate tracking-tight">
+                                    {user?.name}
                                 </p>
-                                <p className="text-xs text-blue-600 font-medium truncate">
-                                    {getRoleLabelThai(user.role)}
+                                <p className="text-[10px] font-bold text-sky-600 uppercase tracking-wider">
+                                    {getRoleLabelThai(user?.role)}
                                 </p>
                             </div>
                         </div>
                     </div>
-                </div>
-            )}
+                ) : (
+                    <div className="flex justify-center">
+                        <div className="w-12 h-12 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-400 hover:bg-sky-500 hover:text-white transition-all duration-500 cursor-pointer">
+                            <User className="h-5 w-5" />
+                        </div>
+                    </div>
+                )}
+            </div>
         </div>
     );
 }

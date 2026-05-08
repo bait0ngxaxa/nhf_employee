@@ -1,6 +1,6 @@
 import { type ReactNode } from "react";
 import { type LucideIcon } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 
 /**
  * SectionHeader — shared dashboard section header with glowing icon, title,
@@ -28,41 +28,52 @@ export function SectionHeader({
     icon: Icon,
     title,
     subtitle,
-    iconGradient = "from-emerald-500 to-teal-700",
-    iconGlow = "from-emerald-500/40 to-teal-500/40",
-    iconShadow = "shadow-emerald-500/25",
+    iconGradient = "from-sky-500 to-indigo-600",
+    iconGlow = "from-sky-500/20 to-indigo-500/10",
+    iconShadow = "shadow-sky-100",
     roleBadge,
-    badgeColor = "bg-indigo-50 text-indigo-700 border-indigo-100",
+    badgeColor = "bg-sky-50 text-sky-600 border-sky-100/50",
     extra,
 }: SectionHeaderProps) {
     return (
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 animate-in fade-in slide-in-from-bottom-2 duration-700 ease-out">
-            <div className="flex items-center space-x-5">
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 animate-in fade-in slide-in-from-bottom-4 duration-700 ease-out">
+            <div className="flex items-center space-x-6">
                 <div className="relative group cursor-default">
                     <div
-                        className={`absolute -inset-2 rounded-2xl bg-gradient-to-r ${iconGlow} blur-xl opacity-70 group-hover:opacity-100 group-hover:scale-110 transition-[opacity,transform] duration-500 will-change-transform`}
+                        className={cn(
+                            "absolute -inset-3 rounded-[2rem] bg-gradient-to-r blur-2xl opacity-0 group-hover:opacity-40 transition-opacity duration-700",
+                            iconGlow,
+                        )}
                     />
                     <div
-                        className={`relative flex items-center justify-center w-14 h-14 bg-gradient-to-br ${iconGradient} rounded-2xl shadow-lg ${iconShadow} ring-1 ring-white/20`}
+                        className={cn(
+                            "relative flex items-center justify-center w-16 h-16 rounded-[1.5rem] bg-gradient-to-br shadow-xl ring-1 ring-white/20 transition-transform duration-500 group-hover:scale-105 group-hover:rotate-3",
+                            iconGradient,
+                            iconShadow,
+                        )}
                     >
-                        <Icon className="h-7 w-7 text-white" />
+                        <Icon className="h-8 w-8 text-white" />
                     </div>
                 </div>
                 <div className="space-y-1">
-                    <h2 className="text-3xl font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-br from-gray-900 via-gray-800 to-gray-600 pb-1">
+                    <h2 className="text-4xl md:text-5xl font-black tracking-tighter text-slate-900 leading-none">
                         {title}
                     </h2>
-                    <p className="text-gray-500 font-medium">{subtitle}</p>
+                    <p className="text-sm text-slate-500 font-medium tracking-tight">
+                        {subtitle}
+                    </p>
                 </div>
             </div>
             <div className="flex items-center gap-3">
                 {roleBadge && (
-                    <Badge
-                        variant="secondary"
-                        className={`px-3 py-1 text-sm font-semibold tracking-wide rounded-full border ${badgeColor} hover:opacity-90 transition-colors`}
+                    <div
+                        className={cn(
+                            "px-4 py-1.5 text-[10px] font-black uppercase tracking-[0.2em] rounded-full border shadow-sm transition-all duration-300 hover:-translate-y-0.5",
+                            badgeColor,
+                        )}
                     >
                         {roleBadge}
-                    </Badge>
+                    </div>
                 )}
                 {extra}
             </div>
