@@ -168,79 +168,83 @@ export function StockVariantPickerDialog({
                 }}
             >
                 <DialogContent className="max-h-[90vh] overflow-y-auto p-0 sm:max-w-[720px]">
-                <div className="border-b border-gray-100 bg-slate-50/60 px-6 py-4">
-                    <DialogTitle className="text-lg font-semibold text-slate-800">
-                        เลือกรายการย่อยสำหรับเบิก
-                    </DialogTitle>
-                </div>
-                <div className="space-y-5 px-6 py-5">
-                    <div className="flex flex-col gap-4 rounded-2xl border border-slate-100 bg-white p-4 sm:flex-row">
-                        <div className="h-24 w-24 overflow-hidden rounded-2xl bg-slate-100 ring-1 ring-slate-200">
-                            {activeImageUrl ? (
-                                <button
-                                    type="button"
-                                    onClick={(event) => {
-                                        event.stopPropagation();
-                                        setPreviewImageUrl(activeImageUrl);
-                                    }}
-                                    className="group/preview relative h-full w-full overflow-hidden text-left outline-none transition-transform duration-300 hover:scale-[1.02] focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-2 active:scale-95"
-                                    aria-label={`ดูรูป ${item.name} แบบพรีวิว`}
-                                >
-                                    <Image
-                                        src={activeImageUrl}
-                                        alt={item.name}
-                                        width={96}
-                                        height={96}
-                                        unoptimized
-                                        className="h-full w-full object-contain transition-transform duration-500 group-hover/preview:scale-110"
-                                    />
-                                    <span className="absolute inset-0 bg-slate-950/0 transition-colors duration-300 group-hover/preview:bg-slate-950/20" />
-                                    <span className="absolute bottom-1.5 right-1.5 flex h-7 w-7 translate-y-1 scale-95 items-center justify-center rounded-full bg-white/90 text-slate-700 opacity-0 shadow-lg shadow-slate-900/15 transition-all duration-300 group-hover/preview:translate-y-0 group-hover/preview:scale-110 group-hover/preview:opacity-100 group-hover/preview:text-blue-700 group-focus-visible/preview:translate-y-0 group-focus-visible/preview:scale-110 group-focus-visible/preview:opacity-100 group-focus-visible/preview:text-blue-700">
-                                        <ZoomIn className="h-3.5 w-3.5" aria-hidden="true" />
-                                    </span>
-                                </button>
-                            ) : (
-                                <div className="flex h-full w-full items-center justify-center text-slate-400">
-                                    <Package className="h-8 w-8" aria-hidden="true" />
-                                </div>
-                            )}
-                        </div>
-                        <div className="flex-1 space-y-2">
-                            <div className="space-y-1">
-                                <h3 className="text-lg font-bold text-slate-800">
-                                    {item.name}
-                                </h3>
-                                {item.description && (
-                                    <p className="text-sm text-slate-500">
-                                        {item.description}
-                                    </p>
+                <div className="sticky top-0 z-20 border-b border-gray-100 bg-white/95 shadow-[0_12px_28px_-28px_rgba(15,23,42,0.75)] backdrop-blur">
+                    <div className="bg-slate-50/80 px-6 py-4">
+                        <DialogTitle className="text-lg font-semibold text-slate-800">
+                            เลือกรายการย่อยสำหรับเบิก
+                        </DialogTitle>
+                    </div>
+                    <div className="px-6 py-4">
+                        <div className="flex flex-col gap-4 rounded-2xl border border-slate-100 bg-white p-4 sm:flex-row">
+                            <div className="h-24 w-24 overflow-hidden rounded-2xl bg-slate-100 ring-1 ring-slate-200">
+                                {activeImageUrl ? (
+                                    <button
+                                        type="button"
+                                        onClick={(event) => {
+                                            event.stopPropagation();
+                                            setPreviewImageUrl(activeImageUrl);
+                                        }}
+                                        className="group/preview relative h-full w-full overflow-hidden text-left outline-none transition-transform duration-300 hover:scale-[1.02] focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-2 active:scale-95"
+                                        aria-label={`ดูรูป ${item.name} แบบพรีวิว`}
+                                    >
+                                        <Image
+                                            src={activeImageUrl}
+                                            alt={item.name}
+                                            width={96}
+                                            height={96}
+                                            unoptimized
+                                            className="h-full w-full object-contain transition-transform duration-500 group-hover/preview:scale-110"
+                                        />
+                                        <span className="absolute inset-0 bg-slate-950/0 transition-colors duration-300 group-hover/preview:bg-slate-950/20" />
+                                        <span className="absolute bottom-1.5 right-1.5 flex h-7 w-7 translate-y-1 scale-95 items-center justify-center rounded-full bg-white/90 text-slate-700 opacity-0 shadow-lg shadow-slate-900/15 transition-all duration-300 group-hover/preview:translate-y-0 group-hover/preview:scale-110 group-hover/preview:opacity-100 group-hover/preview:text-blue-700 group-focus-visible/preview:translate-y-0 group-focus-visible/preview:scale-110 group-focus-visible/preview:opacity-100 group-focus-visible/preview:text-blue-700">
+                                            <ZoomIn className="h-3.5 w-3.5" aria-hidden="true" />
+                                        </span>
+                                    </button>
+                                ) : (
+                                    <div className="flex h-full w-full items-center justify-center text-slate-400">
+                                        <Package className="h-8 w-8" aria-hidden="true" />
+                                    </div>
                                 )}
                             </div>
-                            <div className="flex flex-wrap items-center gap-2">
-                                <Badge
-                                    variant="secondary"
-                                    className="border-none bg-indigo-50 text-indigo-700"
-                                >
-                                    {item.category.name}
-                                </Badge>
-                                <Badge
-                                    variant="secondary"
-                                    className="border-none bg-blue-50 text-blue-700"
-                                >
-                                    เลือกแล้ว {selectedVariantCount} รายการ
-                                </Badge>
-                                <Badge
-                                    variant="secondary"
-                                    className="border-none bg-emerald-50 text-emerald-700"
-                                >
-                                    รวม {selectedTotalQuantity} ชิ้น
-                                </Badge>
+                            <div className="flex-1 space-y-2">
+                                <div className="space-y-1">
+                                    <h3 className="text-lg font-bold text-slate-800">
+                                        {item.name}
+                                    </h3>
+                                    {item.description && (
+                                        <p className="text-sm text-slate-500">
+                                            {item.description}
+                                        </p>
+                                    )}
+                                </div>
+                                <div className="flex flex-wrap items-center gap-2">
+                                    <Badge
+                                        variant="secondary"
+                                        className="border-none bg-indigo-50 text-indigo-700"
+                                    >
+                                        {item.category.name}
+                                    </Badge>
+                                    <Badge
+                                        variant="secondary"
+                                        className="border-none bg-blue-50 text-blue-700"
+                                    >
+                                        เลือกแล้ว {selectedVariantCount} รายการ
+                                    </Badge>
+                                    <Badge
+                                        variant="secondary"
+                                        className="border-none bg-emerald-50 text-emerald-700"
+                                    >
+                                        รวม {selectedTotalQuantity} ชิ้น
+                                    </Badge>
+                                </div>
+                                <p className="text-xs text-slate-500">
+                                    เลือกจำนวนของแต่ละตัวเลือกได้หลายรายการ แล้วเพิ่มเข้าตะกร้าครั้งเดียว
+                                </p>
                             </div>
-                            <p className="text-xs text-slate-500">
-                                เลือกจำนวนของแต่ละตัวเลือกได้หลายรายการ แล้วเพิ่มเข้าตะกร้าครั้งเดียว
-                            </p>
                         </div>
                     </div>
+                </div>
+                <div className="space-y-5 px-6 py-5">
 
                     <div className="space-y-3">
                         <div className="text-sm font-semibold text-slate-700">

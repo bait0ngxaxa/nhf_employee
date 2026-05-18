@@ -4,6 +4,9 @@ import { useMemo, useState, type FormEvent } from "react";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { apiPatch } from "@/lib/api-client";
 import { API_ROUTES } from "@/lib/ssot/routes";
 import type { StockItem } from "../context/stock/types";
@@ -27,6 +30,22 @@ type EditItemDialogProps = {
 
 type StockItemVariant = NonNullable<StockItem["variants"]>[number];
 type EditableVariant = ReturnType<typeof createEditableVariant>;
+type NormalizedVariant = {
+    id?: number;
+    sku?: string;
+    unit: string;
+    quantity: number;
+    minStock: number;
+    imageUrl: string | null;
+    attributes: Array<{ name: string; value: string }>;
+};
+type NormalizedEditSnapshot = {
+    name: string;
+    description: string | null;
+    categoryId: number;
+    imageUrl: string | null;
+    variants: NormalizedVariant[];
+};
 
 function createEditableVariant(item: StockItem, variant?: StockItemVariant) {
     const existingAttributes =
@@ -71,6 +90,52 @@ function createEditableVariants(item: StockItem): EditableVariant[] {
     return variants.map((variant) => createEditableVariant(item, variant));
 }
 
+function normalizeVariantForUpdate(
+    variant: EditableVariant,
+    variantsLength: number,
+    itemImageUrl: string,
+): NormalizedVariant {
+    return {
+        ...(variant.id !== undefined && { id: variant.id }),
+        sku: variant.sku.trim() || undefined,
+        unit: variant.unit.trim(),
+        quantity: parseVariantNumber(variant.quantity),
+        minStock: parseVariantNumber(variant.minStock),
+        imageUrl:
+            variantsLength === 1
+                ? itemImageUrl.trim() || null
+                : variant.imageUrl.trim() || null,
+        attributes: variant.attributes
+            .map((attribute) => ({
+                name: attribute.name.trim(),
+                value: attribute.value.trim(),
+            }))
+            .filter((attribute) => attribute.name && attribute.value),
+    };
+}
+
+function createEditSnapshot(params: {
+    name: string;
+    description: string;
+    categoryId: string;
+    imageUrl: string;
+    variants: EditableVariant[];
+}): NormalizedEditSnapshot {
+    return {
+        name: params.name.trim(),
+        description: params.description.trim() || null,
+        categoryId: Number(params.categoryId),
+        imageUrl: params.imageUrl.trim() || null,
+        variants: params.variants.map((variant) =>
+            normalizeVariantForUpdate(
+                variant,
+                params.variants.length,
+                params.imageUrl,
+            ),
+        ),
+    };
+}
+
 export function EditItemDialog({
     item,
     categories,
@@ -78,6 +143,8 @@ export function EditItemDialog({
     onSuccess,
 }: EditItemDialogProps) {
     const [loading, setLoading] = useState(false);
+    const [itemName, setItemName] = useState(item.name);
+    const [itemDescription, setItemDescription] = useState(item.description ?? "");
     const [selectedCategoryId, setSelectedCategoryId] = useState(
         String(item.categoryId),
     );
@@ -102,38 +169,60 @@ export function EditItemDialog({
             ),
         [variants],
     );
+    const initialSnapshot = useMemo(
+        () =>
+            createEditSnapshot({
+                name: item.name,
+                description: item.description ?? "",
+                categoryId: String(item.categoryId),
+                imageUrl: item.imageUrl ?? "",
+                variants: createEditableVariants(item),
+            }),
+        [item],
+    );
+    const currentSnapshot = useMemo(
+        () =>
+            createEditSnapshot({
+                name: itemName,
+                description: itemDescription,
+                categoryId: selectedCategoryId,
+                imageUrl: itemImageUrl,
+                variants,
+            }),
+        [itemDescription, itemImageUrl, itemName, selectedCategoryId, variants],
+    );
+    const hasChanges =
+        JSON.stringify(currentSnapshot) !== JSON.stringify(initialSnapshot);
 
     async function handleSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
         event.preventDefault();
+
+        if (!hasChanges) {
+            return;
+        }
+
+        const normalizedName = currentSnapshot.name;
+
+        if (!normalizedName) {
+            toast.error("กรุณากรอกชื่อวัสดุ");
+            return;
+        }
+
         setLoading(true);
 
         try {
             ensureStockApiSuccess(
                 await apiPatch(API_ROUTES.stock.itemById(item.id), {
-                    categoryId: Number(selectedCategoryId),
-                    imageUrl: itemImageUrl || null,
-                    variants: variants.map((variant) => ({
-                        ...(variant.id !== undefined && { id: variant.id }),
-                        sku: variant.sku.trim() || undefined,
-                        unit: variant.unit.trim(),
-                        quantity: parseVariantNumber(variant.quantity),
-                        minStock: parseVariantNumber(variant.minStock),
-                        imageUrl:
-                            variants.length === 1
-                                ? itemImageUrl.trim() || null
-                                : variant.imageUrl.trim() || null,
-                        attributes: variant.attributes
-                            .map((attribute) => ({
-                                name: attribute.name.trim(),
-                                value: attribute.value.trim(),
-                            }))
-                            .filter((attribute) => attribute.name && attribute.value),
-                    })),
+                    name: currentSnapshot.name,
+                    description: currentSnapshot.description,
+                    categoryId: currentSnapshot.categoryId,
+                    imageUrl: currentSnapshot.imageUrl,
+                    variants: currentSnapshot.variants,
                 }),
                 "เกิดข้อผิดพลาด",
             );
 
-            toast.success(`อัปเดตสต็อก ${item.name} เรียบร้อยแล้ว`);
+            toast.success(`อัปเดตสต็อก ${normalizedName} เรียบร้อยแล้ว`);
             onSuccess();
         } catch (error: unknown) {
             const message = error instanceof Error ? error.message : "เกิดข้อผิดพลาด";
@@ -154,7 +243,7 @@ export function EditItemDialog({
                 <form onSubmit={handleSubmit} className="space-y-5 px-6 py-5">
                     <div className="rounded-2xl border border-blue-100 bg-blue-50/60 p-4">
                         <div className="text-sm font-semibold text-slate-800">
-                            {item.name}
+                            ข้อมูลหลักของวัสดุ
                         </div>
                         <div className="mt-2 flex flex-wrap gap-3 text-sm text-slate-600">
                             <span>คงเหลือรวม: {totalQuantity}</span>
@@ -167,6 +256,45 @@ export function EditItemDialog({
                             ถ้ามีหลายรายการย่อย ต้องระบุคุณสมบัติของแต่ละตัวให้ชัด เช่น สี ขนาด หรือชนิด
                         </div>
                     )}
+
+                    <div className="grid gap-4 sm:grid-cols-2">
+                        <div className="space-y-1.5">
+                            <Label
+                                htmlFor="edit-item-name"
+                                className="text-sm font-semibold text-slate-700"
+                            >
+                                {STOCK_ADMIN_TEXT.itemName}{" "}
+                                <span className="text-rose-500">*</span>
+                            </Label>
+                            <Input
+                                id="edit-item-name"
+                                value={itemName}
+                                onChange={(event) => setItemName(event.target.value)}
+                                required
+                                maxLength={200}
+                                placeholder="เช่น กระดาษ A4"
+                                className="h-10 focus-visible:ring-blue-500"
+                            />
+                        </div>
+                        <div className="space-y-1.5">
+                            <Label
+                                htmlFor="edit-item-description"
+                                className="text-sm font-semibold text-slate-700"
+                            >
+                                {STOCK_ADMIN_TEXT.itemDescription}
+                            </Label>
+                            <Textarea
+                                id="edit-item-description"
+                                value={itemDescription}
+                                onChange={(event) =>
+                                    setItemDescription(event.target.value)
+                                }
+                                maxLength={2000}
+                                placeholder={STOCK_ADMIN_TEXT.itemDescriptionPlaceholder}
+                                className="min-h-10 resize-y focus-visible:ring-blue-500"
+                            />
+                        </div>
+                    </div>
 
                     <InventoryCategoryField
                         categories={categories}
@@ -276,7 +404,7 @@ export function EditItemDialog({
                         </Button>
                         <Button
                             type="submit"
-                            disabled={loading}
+                            disabled={loading || !hasChanges}
                             className="h-10 bg-blue-600 px-7 font-bold text-white shadow-sm transition-all hover:bg-blue-700"
                         >
                             {loading ? STOCK_ADMIN_TEXT.saving : "บันทึกการแก้ไข"}
