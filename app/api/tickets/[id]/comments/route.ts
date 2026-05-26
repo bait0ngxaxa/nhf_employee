@@ -1,8 +1,8 @@
 ﻿import { after, type NextRequest, NextResponse } from "next/server";
 
+import { requireApiSession } from "@/lib/api-auth";
 import { prisma } from "@/lib/prisma";
-import { getApiAuthSession } from "@/lib/server-auth";
-import { jsonError, unauthorized } from "@/lib/ssot/http";
+import { jsonError } from "@/lib/ssot/http";
 import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
 import { isAdminRole } from "@/lib/ssot/permissions";
 import { APP_ROUTES } from "@/lib/ssot/routes";
@@ -81,10 +81,8 @@ export async function POST(
             });
         }
 
-        const session = await getApiAuthSession();
-        if (!session) {
-            return unauthorized();
-        }
+        const auth = await requireApiSession();
+        if (!auth.ok) return auth.response;
 
         const resolvedParams = await params;
         const ticketId = parseInt(resolvedParams.id, 10);
@@ -92,7 +90,7 @@ export async function POST(
             return jsonError(COMMON_API_MESSAGES.invalidTicketId, 400);
         }
 
-        const currentUserId = parseInt(session.user.id, 10);
+        const currentUserId = parseInt(auth.session.user.id, 10);
         if (Number.isNaN(currentUserId)) {
             return jsonError(COMMON_API_MESSAGES.invalidUserSession, 400);
         }
@@ -103,7 +101,7 @@ export async function POST(
         }
 
         const isOwner = ticket.reportedById === currentUserId;
-        const isAdmin = isAdminRole(session.user?.role);
+        const isAdmin = isAdminRole(auth.session.user.role);
         const isAssigned = ticket.assignedToId === currentUserId;
 
         if (!isOwner && !isAdmin && !isAssigned) {

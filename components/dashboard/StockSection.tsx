@@ -1,6 +1,5 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { Package, ShoppingCart, ClipboardList, Boxes, FileText, BarChart3 } from "lucide-react";
 import { SectionShell } from "@/components/ui/section-shell";
 import { SectionHeader } from "@/components/ui/section-header";
@@ -17,11 +16,6 @@ import {
 function StockContent() {
     const { isAdmin } = useStockDataContext();
     const { activeTab, setActiveTab } = useStockUIContext();
-    const [isMounted, setIsMounted] = useState(false);
-
-    useEffect(() => {
-        setIsMounted(true);
-    }, []);
 
     const tabs: SectionTabItem[] = [
         {
@@ -75,16 +69,12 @@ function StockContent() {
                 badgeColor="bg-orange-50 text-orange-700 border-orange-100"
                 roleBadge={isAdmin ? "ผู้ดูแลระบบ" : "ผู้ใช้งาน"}
             />
-            {isMounted ? (
-                <SectionTabs
-                    value={activeTab}
-                    onValueChange={setActiveTab}
-                    tabs={tabs}
-                    activeColor="#ea580c"
-                />
-            ) : (
-                <StockBrowse />
-            )}
+            <SectionTabs
+                value={activeTab}
+                onValueChange={setActiveTab}
+                tabs={tabs}
+                activeColor="#ea580c"
+            />
         </SectionShell>
     );
 }

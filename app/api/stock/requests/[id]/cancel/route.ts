@@ -1,8 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { getApiAuthSession } from "@/lib/server-auth";
-import { buildUserContext } from "@/lib/context";
+import { requireApiSession } from "@/lib/api-auth";
 import { isAdminRole } from "@/lib/ssot/permissions";
-import { unauthorized, jsonError, serverError } from "@/lib/ssot/http";
+import { jsonError, serverError } from "@/lib/ssot/http";
 import { stockService } from "@/lib/services/stock";
 import { cancelRequestSchema } from "@/lib/validations/stock";
 import { logStockEvent } from "@/lib/audit";
@@ -20,10 +19,10 @@ export async function POST(
     { params }: RouteParams,
 ): Promise<NextResponse> {
     try {
-        const session = await getApiAuthSession();
-        if (!session) return unauthorized();
+        const auth = await requireApiSession();
+        if (!auth.ok) return auth.response;
 
-        const user = buildUserContext(session);
+        const { user } = auth;
         const isAdmin = isAdminRole(user.role);
 
         const { id } = await params;

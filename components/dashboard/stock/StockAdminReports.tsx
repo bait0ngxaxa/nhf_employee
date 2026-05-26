@@ -14,6 +14,7 @@ import { apiGet } from "@/lib/api-client";
 import { triggerDownload } from "@/lib/helpers/download";
 import { API_ROUTES } from "@/lib/ssot/routes";
 import { YearlyReportExportPanel } from "@/components/dashboard/shared/YearlyReportExportPanel";
+import { StockLoadingState } from "./StockLoadingState";
 
 type StockReportYearsResponse = {
     years: number[];
@@ -138,16 +139,17 @@ export function StockAdminReports() {
     }, []);
 
     const isDisabled =
-        isLoadingYears ||
-        isLoadingMeta ||
         !meta ||
         meta.count === 0 ||
         meta.count > meta.maxRows;
     const isBalanceDisabled =
-        isLoadingBalanceMeta ||
         !balanceMeta ||
         balanceMeta.count === 0 ||
         balanceMeta.count > balanceMeta.maxRows;
+
+    if (isLoadingYears || isLoadingMeta || isLoadingBalanceMeta) {
+        return <StockLoadingState message="กำลังโหลดข้อมูลรีพอร์ต..." />;
+    }
 
     return (
         <div className="space-y-5">
@@ -183,12 +185,12 @@ export function StockAdminReports() {
                     {
                         icon: <BarChart3 className="h-4 w-4" aria-hidden="true" />,
                         label: "จำนวนรายการ",
-                        value: isLoadingMeta ? "กำลังโหลด..." : `${meta?.count ?? 0} รายการ`,
+                        value: `${meta?.count ?? 0} รายการ`,
                     },
                     {
                         icon: <FileSpreadsheet className="h-4 w-4" aria-hidden="true" />,
                         label: "สถานะการส่งออก",
-                        value: resolveExportState(meta, isLoadingMeta),
+                        value: resolveExportState(meta),
                     },
                 ]}
             />
@@ -230,11 +232,7 @@ export function StockAdminReports() {
                     <ReportStatCard
                         icon={<Package className="h-4 w-4" aria-hidden="true" />}
                         label="จำนวนวัสดุ"
-                        value={
-                            isLoadingBalanceMeta
-                                ? "กำลังโหลด..."
-                                : `${balanceMeta?.count ?? 0} รายการ`
-                        }
+                        value={`${balanceMeta?.count ?? 0} รายการ`}
                     />
                     <ReportStatCard
                         icon={<Archive className="h-4 w-4" aria-hidden="true" />}
@@ -244,7 +242,7 @@ export function StockAdminReports() {
                     <ReportStatCard
                         icon={<FileSpreadsheet className="h-4 w-4" aria-hidden="true" />}
                         label="สถานะการส่งออก"
-                        value={resolveExportState(balanceMeta, isLoadingBalanceMeta)}
+                        value={resolveExportState(balanceMeta)}
                     />
                 </div>
             </div>
@@ -274,12 +272,7 @@ function ReportStatCard({
 
 function resolveExportState(
     meta: StockBalanceMetaResponse | StockReportMetaResponse | null,
-    isLoadingMeta: boolean,
 ): string {
-    if (isLoadingMeta) {
-        return "กำลังตรวจสอบ";
-    }
-
     if (!meta || meta.count === 0) {
         return "ไม่มีข้อมูล";
     }

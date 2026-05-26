@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useState } from "react";
+import { memo, useCallback, useState } from "react";
 import { Check, Package, Plus, ShoppingCart, X, ZoomIn } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -29,6 +29,16 @@ type ImagePreviewState = {
     itemName: string;
 } | null;
 
+type BrowseCardProps = {
+    item: StockItem;
+    totalInCart: number;
+    isRecentlyAdded: boolean;
+    isPriorityImage: boolean;
+    onAddDirect: (item: StockItem) => void;
+    onOpenVariantPicker: (item: StockItem) => void;
+    onPreviewImage: (imageUrl: string, itemName: string) => void;
+};
+
 export function StockBrowseGrid({
     items,
     cartQuantityByItemId,
@@ -37,30 +47,42 @@ export function StockBrowseGrid({
     recentlyAddedItemId,
 }: StockBrowseGridProps) {
     const [imagePreview, setImagePreview] = useState<ImagePreviewState>(null);
+    const handlePreviewImage = useCallback(
+        (imageUrl: string, itemName: string): void => {
+            setImagePreview({ imageUrl, itemName });
+        },
+        [],
+    );
+    const handleClosePreview = useCallback((): void => {
+        setImagePreview(null);
+    }, []);
 
     return (
         <>
             <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                {items.map((item) => (
-                    <BrowseCard
-                        key={item.id}
-                        item={item}
-                        cartQuantityByItemId={cartQuantityByItemId}
-                        onAddDirect={onAddDirect}
-                        onOpenVariantPicker={onOpenVariantPicker}
-                        onPreviewImage={(imageUrl) =>
-                            setImagePreview({ imageUrl, itemName: item.name })
-                        }
-                        recentlyAddedItemId={recentlyAddedItemId}
-                    />
-                ))}
+                {items.map((item, index) => {
+                    const totalInCart = cartQuantityByItemId.get(item.id) ?? 0;
+
+                    return (
+                        <BrowseCard
+                            key={item.id}
+                            item={item}
+                            totalInCart={totalInCart}
+                            isRecentlyAdded={recentlyAddedItemId === item.id}
+                            isPriorityImage={index === 0}
+                            onAddDirect={onAddDirect}
+                            onOpenVariantPicker={onOpenVariantPicker}
+                            onPreviewImage={handlePreviewImage}
+                        />
+                    );
+                })}
             </div>
 
             {imagePreview && (
                 <ImagePreviewOverlay
                     imageUrl={imagePreview.imageUrl}
                     itemName={imagePreview.itemName}
-                    onClose={() => setImagePreview(null)}
+                    onClose={handleClosePreview}
                 />
             )}
         </>
@@ -109,21 +131,13 @@ function ImagePreviewOverlay({
     );
 }
 
-function BrowseCard(props: {
-    item: StockItem;
-    cartQuantityByItemId: Map<number, number>;
-    onAddDirect: (item: StockItem) => void;
-    onOpenVariantPicker: (item: StockItem) => void;
-    onPreviewImage: (imageUrl: string) => void;
-    recentlyAddedItemId: number | null;
-}) {
+function BrowseCardBase(props: BrowseCardProps) {
     const { item } = props;
     const defaultVariant = getPreferredVariant(item);
     const imageUrl = getBrowseCardImageUrl(item);
     const availableQuantity = getItemAvailableQuantity(item);
     const variantCount = getSelectableVariantCount(item);
-    const totalInCart = props.cartQuantityByItemId.get(item.id) ?? 0;
-    const isRecentlyAdded = props.recentlyAddedItemId === item.id;
+    const { isRecentlyAdded, totalInCart } = props;
     const variantSummary = getVariantAttributeSummary(defaultVariant?.attributeValues);
 
     return (
@@ -134,7 +148,7 @@ function BrowseCard(props: {
                     {imageUrl ? (
                         <button
                             type="button"
-                            onClick={() => props.onPreviewImage(imageUrl)}
+                            onClick={() => props.onPreviewImage(imageUrl, item.name)}
                             className="group/preview relative block h-40 w-full overflow-hidden text-left outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-2"
                             aria-label={`ดูรูป ${item.name} แบบพรีวิว`}
                         >
@@ -143,6 +157,9 @@ function BrowseCard(props: {
                                 alt={item.name}
                                 width={400}
                                 height={280}
+                                priority={props.isPriorityImage}
+                                fetchPriority={props.isPriorityImage ? "high" : "auto"}
+                                sizes="(min-width: 1280px) 25vw, (min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw"
                                 unoptimized
                                 className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.04] group-hover/preview:scale-[1.08]"
                             />
@@ -262,5 +279,19 @@ function BrowseCard(props: {
                 </div>
             </CardContent>
         </Card>
+    );
+}
+
+const BrowseCard = memo(BrowseCardBase, areBrowseCardPropsEqual);
+
+function areBrowseCardPropsEqual(
+    prev: BrowseCardProps,
+    next: BrowseCardProps,
+): boolean {
+    return (
+        prev.item === next.item
+        && prev.totalInCart === next.totalInCart
+        && prev.isRecentlyAdded === next.isRecentlyAdded
+        && prev.isPriorityImage === next.isPriorityImage
     );
 }

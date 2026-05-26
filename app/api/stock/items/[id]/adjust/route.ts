@@ -1,8 +1,6 @@
 import { after, type NextRequest, NextResponse } from "next/server";
-import { getApiAuthSession } from "@/lib/server-auth";
-import { buildUserContext } from "@/lib/context";
-import { isAdminRole } from "@/lib/ssot/permissions";
-import { unauthorized, forbidden, jsonError, serverError } from "@/lib/ssot/http";
+import { requireAdminSession } from "@/lib/api-auth";
+import { jsonError, serverError } from "@/lib/ssot/http";
 import { stockService } from "@/lib/services/stock";
 import { processOutbox } from "@/lib/services/outbox/processor";
 import { adjustStockSchema } from "@/lib/validations/stock";
@@ -18,11 +16,8 @@ export async function POST(
     { params }: RouteParams,
 ): Promise<NextResponse> {
     try {
-        const session = await getApiAuthSession();
-        if (!session) return unauthorized();
-
-        const user = buildUserContext(session);
-        if (!isAdminRole(user.role)) return forbidden();
+        const auth = await requireAdminSession();
+        if (!auth.ok) return auth.response;
 
         const { id } = await params;
         const itemId = Number(id);
@@ -39,9 +34,9 @@ export async function POST(
         const adjustment = await stockService.adjustStock(
             itemId,
             result.data,
-            user.id,
+            auth.user.id,
         );
-        await logStockEvent("STOCK_ADJUST", itemId, user.id, user.email, {
+        await logStockEvent("STOCK_ADJUST", itemId, auth.user.id, auth.user.email, {
             after: {
                 type: result.data.type,
                 quantity: result.data.quantity,
@@ -61,7 +56,7 @@ export async function POST(
             } catch (notificationError) {
                 console.error("Error queueing low stock notification:", {
                     itemId,
-                    actorId: user.id,
+                    actorId: auth.user.id,
                     error: notificationError,
                 });
             }

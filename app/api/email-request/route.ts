@@ -1,28 +1,23 @@
 ﻿import { type NextRequest, NextResponse, after } from "next/server";
 
+import { requireAdminSession, requireApiSession } from "@/lib/api-auth";
 import { createAuditLog } from "@/lib/audit";
-import { buildUserContext } from "@/lib/context";
 import { processOutbox } from "@/lib/services/outbox/processor";
 import {
     emailRequestService,
     type EmailRequestFilters,
 } from "@/lib/services/email-request";
-import { getApiAuthSession } from "@/lib/server-auth";
 import { forbidden, operationFailed, unauthorized } from "@/lib/ssot/http";
 import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
-import { isAdminRole } from "@/lib/ssot/permissions";
 import { emailRequestSchema } from "@/lib/validations/email-request";
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
     try {
-        const session = await getApiAuthSession();
-        if (!session?.user) {
-            return unauthorized({ success: false });
-        }
-
-        if (!isAdminRole(session.user.role)) {
-            return forbidden({ success: false });
-        }
+        const auth = await requireAdminSession({
+            unauthorizedResponse: () => unauthorized({ success: false }),
+            forbiddenResponse: () => forbidden({ success: false }),
+        });
+        if (!auth.ok) return auth.response;
 
         const body = await req.json();
         const validation = emailRequestSchema.safeParse(body);
@@ -35,8 +30,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
             );
         }
 
-        const user = buildUserContext(session);
-        const result = await emailRequestService.createEmailRequest(validation.data, user);
+        const result = await emailRequestService.createEmailRequest(validation.data, auth.user);
 
         if (!result.success) {
             return NextResponse.json(
@@ -53,8 +47,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
             action: "EMAIL_REQUEST",
             entityType: "EmailRequest",
             entityId: result.emailRequest.id,
-            userId: user.id,
-            userEmail: user.email,
+            userId: auth.user.id,
+            userEmail: auth.user.email,
             details: {
                 after: {
                     thaiName: validation.data.thaiName,
@@ -92,10 +86,10 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
 export async function GET(req: NextRequest): Promise<NextResponse> {
     try {
-        const session = await getApiAuthSession();
-        if (!session?.user) {
-            return unauthorized({ success: false });
-        }
+        const auth = await requireApiSession({
+            unauthorizedResponse: () => unauthorized({ success: false }),
+        });
+        if (!auth.ok) return auth.response;
 
         const { searchParams } = new URL(req.url);
         const filters: EmailRequestFilters = {
@@ -103,8 +97,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
             limit: parseInt(searchParams.get("limit") || "10", 10),
         };
 
-        const user = buildUserContext(session);
-        const result = await emailRequestService.getEmailRequests(filters, user);
+        const result = await emailRequestService.getEmailRequests(filters, auth.user);
 
         return NextResponse.json({
             success: true,

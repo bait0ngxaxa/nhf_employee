@@ -1,15 +1,15 @@
 import { NextResponse } from "next/server";
 
+import { requireApiSession } from "@/lib/api-auth";
 import { prisma } from "@/lib/prisma";
-import { getApiAuthSession } from "@/lib/server-auth";
 import { operationFailed } from "@/lib/ssot/http";
 
 export async function GET(): Promise<NextResponse> {
     try {
-        const session = await getApiAuthSession();
-        if (!session) {
-            return operationFailed(403);
-        }
+        const auth = await requireApiSession({
+            unauthorizedResponse: () => operationFailed(403),
+        });
+        if (!auth.ok) return auth.response;
 
         const departments = await prisma.department.findMany({
             orderBy: { name: "asc" },

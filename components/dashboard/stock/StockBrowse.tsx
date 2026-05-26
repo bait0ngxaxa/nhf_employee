@@ -1,17 +1,29 @@
 "use client";
 
 import { useState } from "react";
+import dynamic from "next/dynamic";
 import { Package } from "lucide-react";
 import { Pagination } from "@/components/Pagination";
 import { useStockDataContext, useStockUIContext } from "../context/stock";
 import { STOCK_BROWSE_LIMIT as ITEMS_PER_PAGE } from "../context/stock/provider.shared";
 import { useDashboardDataContext } from "../context/dashboard/DashboardContext";
 import type { StockItem } from "../context/stock/types";
-import { StockBrowseCartBar } from "./StockBrowseCartBar";
 import { StockBrowseFilters } from "./StockBrowseFilters";
 import { StockBrowseGrid } from "./StockBrowseGrid";
-import { StockVariantPickerDialog } from "./StockVariantPickerDialog";
+import { StockLoadingState } from "./StockLoadingState";
 import { useStockBrowseCart } from "./useStockBrowseCart";
+
+const StockBrowseCartBar = dynamic(
+    () => import("./StockBrowseCartBar").then((mod) => mod.StockBrowseCartBar),
+    { ssr: false },
+);
+const StockVariantPickerDialog = dynamic(
+    () =>
+        import("./StockVariantPickerDialog").then(
+            (mod) => mod.StockVariantPickerDialog,
+        ),
+    { ssr: false },
+);
 
 export function StockBrowse() {
     const { user } = useDashboardDataContext();
@@ -87,7 +99,7 @@ export function StockBrowse() {
             />
 
             {isLoading ? (
-                <LoadingState />
+                <StockLoadingState message="กำลังโหลดข้อมูลวัสดุ..." />
             ) : items.length === 0 ? (
                 <EmptyState />
             ) : (
@@ -136,15 +148,6 @@ export function StockBrowse() {
                     setVariantPickerItem(null);
                 }}
             />
-        </div>
-    );
-}
-
-function LoadingState() {
-    return (
-        <div className="rounded-[2rem] border border-slate-200/80 bg-white/80 py-20 text-center text-gray-500 shadow-[0_18px_40px_-28px_rgba(15,23,42,0.35)] backdrop-blur">
-            <div className="mx-auto mb-4 h-8 w-8 animate-spin rounded-full border-b-2 border-blue-600" />
-            <p className="animate-pulse">กำลังโหลดข้อมูลวัสดุ...</p>
         </div>
     );
 }

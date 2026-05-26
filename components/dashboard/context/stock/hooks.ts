@@ -49,14 +49,14 @@ export function useStockCategoriesQuery() {
     );
 }
 
-export function useStockItemsQuery(query: string) {
+export function useStockItemsQuery(query: string | null) {
     return useSWR<StockItemsResponse>(query, apiGetFetcher, {
         ...DEFAULT_SWR_OPTIONS,
         dedupingInterval: 10_000,
     });
 }
 
-export function useStockRequestsQuery(query: string) {
+export function useStockRequestsQuery(query: string | null) {
     return useSWR<StockRequestsResponse>(query, apiGetFetcher, {
         ...DEFAULT_SWR_OPTIONS,
         dedupingInterval: 10_000,

@@ -1,9 +1,8 @@
 import { type NextRequest, NextResponse } from "next/server";
 
-import { getApiAuthSession } from "@/lib/server-auth";
+import { requireAdminSession } from "@/lib/api-auth";
 import { employeeService } from "@/lib/services/employee";
 import { operationFailed } from "@/lib/ssot/http";
-import { isAdminRole } from "@/lib/ssot/permissions";
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
     try {
@@ -13,10 +12,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
             return operationFailed(400);
         }
 
-        const session = await getApiAuthSession();
-        if (!session || !isAdminRole(session.user?.role)) {
-            return operationFailed(403);
-        }
+        const auth = await requireAdminSession({
+            unauthorizedResponse: () => operationFailed(403),
+            forbiddenResponse: () => operationFailed(403),
+        });
+        if (!auth.ok) return auth.response;
 
         const result = await employeeService.importEmployeesFromCSV(employees);
 

@@ -1,16 +1,13 @@
 ﻿import { NextResponse } from "next/server";
 
+import { requireApiSession } from "@/lib/api-auth";
 import { prisma } from "@/lib/prisma";
-import { getApiAuthSession } from "@/lib/server-auth";
-import { operationFailed, unauthorized } from "@/lib/ssot/http";
+import { operationFailed } from "@/lib/ssot/http";
 
 export async function GET() {
     try {
-        const session = await getApiAuthSession();
-
-        if (!session) {
-            return unauthorized();
-        }
+        const auth = await requireApiSession();
+        if (!auth.ok) return auth.response;
 
         const [total, active, inactive, suspended, adminDept, academicDept] =
             await Promise.all([

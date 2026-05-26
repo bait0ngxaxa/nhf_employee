@@ -1,5 +1,6 @@
 import { after, type NextRequest, NextResponse } from "next/server";
 
+import { requireApiSession } from "@/lib/api-auth";
 import { logDataExport } from "@/lib/audit";
 import { generateFilename } from "@/lib/helpers/date-helpers";
 import {
@@ -9,10 +10,9 @@ import {
 } from "@/lib/helpers/csv-helpers";
 import { prisma } from "@/lib/prisma";
 import { createCsvDownloadResponse, encodeCsvRow } from "@/lib/server/csv";
-import { getApiAuthSession } from "@/lib/server-auth";
 import { getEmployeeIdFromUserId } from "@/lib/services/leave/get-employee-id";
 import { EXPORT_LIMITS } from "@/lib/ssot/exports";
-import { jsonError, operationFailed, unauthorized } from "@/lib/ssot/http";
+import { jsonError, operationFailed } from "@/lib/ssot/http";
 import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
 import type { LeaveStatus } from "@prisma/client";
 
@@ -31,12 +31,10 @@ function createYearRange(year: number): { startOfYear: Date; endOfYear: Date } {
 
 export async function GET(request: NextRequest): Promise<Response> {
     try {
-        const session = await getApiAuthSession();
-        if (!session?.user?.id) {
-            return unauthorized();
-        }
+        const auth = await requireApiSession();
+        if (!auth.ok) return auth.response;
 
-        const userId = Number(session.user.id);
+        const userId = Number(auth.session.user.id);
         if (Number.isNaN(userId)) {
             return NextResponse.json(
                 { error: COMMON_API_MESSAGES.invalidUserId },
@@ -134,7 +132,7 @@ export async function GET(request: NextRequest): Promise<Response> {
         if (format === "csv") {
             after(async () => {
                 try {
-                    await logDataExport("LeaveRequest", userId, session.user.email || "", {
+                    await logDataExport("LeaveRequest", userId, auth.user.email, {
                         metadata: {
                             entityType: "LeaveRequest",
                             recordCount,

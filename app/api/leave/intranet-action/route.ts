@@ -1,12 +1,12 @@
 import { NotificationOutboxType } from "@prisma/client";
 import { after, NextResponse } from "next/server";
 
+import { requireApiSession } from "@/lib/api-auth";
 import { logLeaveEvent } from "@/lib/audit";
 import { prisma } from "@/lib/prisma";
 import { processOutbox } from "@/lib/services/outbox/processor";
-import { getApiAuthSession } from "@/lib/server-auth";
 import { getEmployeeIdFromUserId } from "@/lib/services/leave/get-employee-id";
-import { jsonError, operationFailed, unauthorized } from "@/lib/ssot/http";
+import { jsonError, operationFailed } from "@/lib/ssot/http";
 import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
 import { leaveActionSchema } from "@/lib/validations/leave";
 
@@ -30,12 +30,10 @@ class LeaveApprovalError extends Error {
 
 export async function POST(req: Request): Promise<NextResponse> {
     try {
-        const session = await getApiAuthSession();
-        if (!session?.user?.id) {
-            return unauthorized();
-        }
+        const auth = await requireApiSession();
+        if (!auth.ok) return auth.response;
 
-        const userId = Number(session.user.id);
+        const userId = Number(auth.session.user.id);
         if (isNaN(userId)) {
             return NextResponse.json({ error: COMMON_API_MESSAGES.invalidUserId }, { status: 400 });
         }
@@ -132,7 +130,7 @@ export async function POST(req: Request): Promise<NextResponse> {
         });
 
         const auditAction = action === "APPROVE" ? "LEAVE_REQUEST_APPROVE" : "LEAVE_REQUEST_REJECT";
-        const userEmail = session.user.email || `User ${userId}`;
+        const userEmail = auth.user.email || `User ${userId}`;
 
         await logLeaveEvent(auditAction, leaveId, userId, userEmail, {
             after: {

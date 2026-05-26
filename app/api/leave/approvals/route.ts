@@ -1,19 +1,17 @@
 import { NextResponse } from "next/server";
 
+import { requireApiSession } from "@/lib/api-auth";
 import { prisma } from "@/lib/prisma";
-import { getApiAuthSession } from "@/lib/server-auth";
 import { getEmployeeIdFromUserId } from "@/lib/services/leave/get-employee-id";
-import { operationFailed, unauthorized } from "@/lib/ssot/http";
+import { operationFailed } from "@/lib/ssot/http";
 import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
 
 export async function GET(): Promise<NextResponse> {
     try {
-        const session = await getApiAuthSession();
-        if (!session?.user?.id) {
-            return unauthorized();
-        }
+        const auth = await requireApiSession();
+        if (!auth.ok) return auth.response;
 
-        const userId = Number(session.user.id);
+        const userId = Number(auth.session.user.id);
         if (isNaN(userId)) {
             return NextResponse.json({ error: COMMON_API_MESSAGES.invalidUserId }, { status: 400 });
         }

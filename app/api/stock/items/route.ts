@@ -1,16 +1,14 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { getApiAuthSession } from "@/lib/server-auth";
-import { buildUserContext } from "@/lib/context";
-import { isAdminRole } from "@/lib/ssot/permissions";
-import { unauthorized, forbidden, jsonError, serverError } from "@/lib/ssot/http";
+import { requireAdminSession, requireApiSession } from "@/lib/api-auth";
+import { jsonError, serverError } from "@/lib/ssot/http";
 import { stockService } from "@/lib/services/stock";
 import { createItemSchema, stockItemsFilterSchema } from "@/lib/validations/stock";
 import { logStockEvent } from "@/lib/audit";
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
     try {
-        const session = await getApiAuthSession();
-        if (!session) return unauthorized();
+        const auth = await requireApiSession();
+        if (!auth.ok) return auth.response;
 
         const { searchParams } = new URL(request.url);
         const parsed = stockItemsFilterSchema.safeParse({
@@ -37,11 +35,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
     try {
-        const session = await getApiAuthSession();
-        if (!session) return unauthorized();
-
-        const user = buildUserContext(session);
-        if (!isAdminRole(user.role)) return forbidden();
+        const auth = await requireAdminSession();
+        if (!auth.ok) return auth.response;
 
         const body = await request.json();
         const result = createItemSchema.safeParse(body);
@@ -52,7 +47,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         }
 
         const item = await stockService.createItem(result.data);
-        await logStockEvent("STOCK_ITEM_CREATE", item.id, user.id, user.email, {
+        await logStockEvent("STOCK_ITEM_CREATE", item.id, auth.user.id, auth.user.email, {
             after: { name: item.name, sku: item.sku },
         });
         return NextResponse.json({ item }, { status: 201 });

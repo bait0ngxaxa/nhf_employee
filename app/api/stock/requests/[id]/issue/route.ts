@@ -1,8 +1,6 @@
 import { after, type NextRequest, NextResponse } from "next/server";
-import { getApiAuthSession } from "@/lib/server-auth";
-import { buildUserContext } from "@/lib/context";
-import { isAdminRole } from "@/lib/ssot/permissions";
-import { unauthorized, forbidden, jsonError, serverError } from "@/lib/ssot/http";
+import { requireAdminSession } from "@/lib/api-auth";
+import { jsonError, serverError } from "@/lib/ssot/http";
 import { stockService } from "@/lib/services/stock";
 import { processOutbox } from "@/lib/services/outbox/processor";
 import { issueRequestSchema } from "@/lib/validations/stock";
@@ -21,11 +19,8 @@ export async function POST(
     { params }: RouteParams,
 ): Promise<NextResponse> {
     try {
-        const session = await getApiAuthSession();
-        if (!session) return unauthorized();
-
-        const user = buildUserContext(session);
-        if (!isAdminRole(user.role)) return forbidden();
+        const auth = await requireAdminSession();
+        if (!auth.ok) return auth.response;
 
         const { id } = await params;
         const requestId = Number(id);
@@ -41,16 +36,16 @@ export async function POST(
             });
         }
 
-        const issuedResult = await stockService.issueRequest(requestId, user.id);
+        const issuedResult = await stockService.issueRequest(requestId, auth.user.id);
         const updated = issuedResult.request;
-        await logStockEvent("STOCK_REQUEST_ISSUE", requestId, user.id, user.email);
+        await logStockEvent("STOCK_REQUEST_ISSUE", requestId, auth.user.id, auth.user.email);
 
         try {
             await notifyStockRequestResult(requestId, updated.requestedBy, true);
         } catch (notificationError) {
             console.error("Error sending stock issued notification:", {
                 requestId,
-                issuerId: user.id,
+                issuerId: auth.user.id,
                 requesterId: updated.requestedBy,
                 error: notificationError,
             });
@@ -65,7 +60,7 @@ export async function POST(
             } catch (notificationError) {
                 console.error("Error queueing low stock notification:", {
                     requestId,
-                    issuerId: user.id,
+                    issuerId: auth.user.id,
                     error: notificationError,
                 });
             }

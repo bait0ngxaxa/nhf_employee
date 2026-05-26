@@ -1,8 +1,7 @@
 import { after, type NextRequest, NextResponse } from "next/server";
-import { getApiAuthSession } from "@/lib/server-auth";
-import { buildUserContext } from "@/lib/context";
+import { requireApiSession } from "@/lib/api-auth";
 import { isAdminRole } from "@/lib/ssot/permissions";
-import { unauthorized, jsonError, serverError } from "@/lib/ssot/http";
+import { jsonError, serverError } from "@/lib/ssot/http";
 import { stockService } from "@/lib/services/stock";
 import { processOutbox } from "@/lib/services/outbox/processor";
 import {
@@ -17,10 +16,10 @@ import {
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
     try {
-        const session = await getApiAuthSession();
-        if (!session) return unauthorized();
+        const auth = await requireApiSession();
+        if (!auth.ok) return auth.response;
 
-        const user = buildUserContext(session);
+        const { user } = auth;
         const { searchParams } = new URL(request.url);
         const scopeParam = searchParams.get("scope");
         const scope = scopeParam === "all" ? "all" : "mine";
@@ -54,10 +53,10 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
     try {
-        const session = await getApiAuthSession();
-        if (!session) return unauthorized();
+        const auth = await requireApiSession();
+        if (!auth.ok) return auth.response;
 
-        const user = buildUserContext(session);
+        const { session, user } = auth;
 
         const body = await request.json();
         const result = createRequestSchema.safeParse(body);

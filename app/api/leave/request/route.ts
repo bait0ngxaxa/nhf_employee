@@ -1,13 +1,13 @@
 ﻿import { NextResponse, after } from "next/server";
 
 import { DEFAULT_LEAVE_QUOTAS } from "@/constants/leave";
+import { requireApiSession } from "@/lib/api-auth";
 import { logLeaveEvent } from "@/lib/audit";
 import { prisma } from "@/lib/prisma";
 import { getEmployeeIdFromUserId } from "@/lib/services/leave/get-employee-id";
 import { getWorkingDays } from "@/lib/services/leave/utils";
 import { processOutbox } from "@/lib/services/outbox/processor";
-import { getApiAuthSession } from "@/lib/server-auth";
-import { jsonError, unauthorized } from "@/lib/ssot/http";
+import { jsonError } from "@/lib/ssot/http";
 import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
 import { leaveRequestSchema } from "@/lib/validations/leave";
 
@@ -37,12 +37,10 @@ const isWorkingDay = (date: Date): boolean => {
 
 export async function POST(req: Request) {
     try {
-        const session = await getApiAuthSession();
-        if (!session?.user?.id) {
-            return unauthorized();
-        }
+        const auth = await requireApiSession();
+        if (!auth.ok) return auth.response;
 
-        const userId = Number(session.user.id);
+        const userId = Number(auth.session.user.id);
         if (Number.isNaN(userId)) {
             return jsonError(COMMON_API_MESSAGES.invalidUserId, 400);
         }
@@ -173,7 +171,7 @@ export async function POST(req: Request) {
             );
         });
 
-        await logLeaveEvent("LEAVE_REQUEST_CREATE", result.id, userId, session.user.email || "", {
+        await logLeaveEvent("LEAVE_REQUEST_CREATE", result.id, userId, auth.user.email, {
             metadata: {
                 leaveType,
                 period,

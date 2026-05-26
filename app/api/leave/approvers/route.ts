@@ -1,11 +1,10 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
+import { requireAdminSession } from "@/lib/api-auth";
 import { prisma } from "@/lib/prisma";
-import { getApiAuthSession } from "@/lib/server-auth";
 import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
 import { forbidden } from "@/lib/ssot/http";
-import { isAdminRole } from "@/lib/ssot/permissions";
 
 const bulkAssignSchema = z.object({
     assignments: z
@@ -20,10 +19,10 @@ const bulkAssignSchema = z.object({
 
 export async function GET(): Promise<NextResponse> {
     try {
-        const session = await getApiAuthSession();
-        if (!session || !isAdminRole(session.user?.role)) {
-            return forbidden();
-        }
+        const auth = await requireAdminSession({
+            unauthorizedResponse: () => forbidden(),
+        });
+        if (!auth.ok) return auth.response;
 
         const employees = await prisma.employee.findMany({
             where: { status: "ACTIVE" },
@@ -52,10 +51,10 @@ export async function GET(): Promise<NextResponse> {
 
 export async function PUT(req: Request): Promise<NextResponse> {
     try {
-        const session = await getApiAuthSession();
-        if (!session || !isAdminRole(session.user?.role)) {
-            return forbidden();
-        }
+        const auth = await requireAdminSession({
+            unauthorizedResponse: () => forbidden(),
+        });
+        if (!auth.ok) return auth.response;
 
         const body = await req.json();
         const parsed = bulkAssignSchema.safeParse(body);

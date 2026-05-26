@@ -1,9 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
-import { getApiAuthSession } from "@/lib/server-auth";
-import { buildUserContext } from "@/lib/context";
-import { isAdminRole } from "@/lib/ssot/permissions";
-import { unauthorized, forbidden, jsonError, serverError } from "@/lib/ssot/http";
+import { requireAdminSession } from "@/lib/api-auth";
+import { jsonError, serverError } from "@/lib/ssot/http";
 import { stockService } from "@/lib/services/stock";
 import { updateItemSchema } from "@/lib/validations/stock";
 
@@ -16,11 +14,8 @@ export async function PATCH(
     { params }: RouteParams,
 ): Promise<NextResponse> {
     try {
-        const session = await getApiAuthSession();
-        if (!session) return unauthorized();
-
-        const user = buildUserContext(session);
-        if (!isAdminRole(user.role)) return forbidden();
+        const auth = await requireAdminSession();
+        if (!auth.ok) return auth.response;
 
         const { id } = await params;
         const itemId = Number(id);
@@ -64,11 +59,8 @@ export async function DELETE(
     { params }: RouteParams,
 ): Promise<NextResponse> {
     try {
-        const session = await getApiAuthSession();
-        if (!session) return unauthorized();
-
-        const user = buildUserContext(session);
-        if (!isAdminRole(user.role)) return forbidden();
+        const auth = await requireAdminSession();
+        if (!auth.ok) return auth.response;
 
         const { id } = await params;
         const itemId = Number(id);

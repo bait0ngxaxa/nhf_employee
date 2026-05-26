@@ -1,8 +1,8 @@
 ﻿import { type NextRequest, NextResponse } from "next/server";
 
+import { requireApiSession } from "@/lib/api-auth";
 import { prisma } from "@/lib/prisma";
-import { getApiAuthSession } from "@/lib/server-auth";
-import { jsonError, unauthorized } from "@/lib/ssot/http";
+import { jsonError } from "@/lib/ssot/http";
 import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
 
 export async function PATCH(
@@ -10,12 +10,10 @@ export async function PATCH(
     { params }: { params: Promise<{ id: string }> },
 ): Promise<NextResponse> {
     try {
-        const session = await getApiAuthSession();
-        if (!session?.user?.id) {
-            return unauthorized();
-        }
+        const auth = await requireApiSession();
+        if (!auth.ok) return auth.response;
 
-        const userId = parseInt(session.user.id, 10);
+        const userId = parseInt(auth.session.user.id, 10);
         if (Number.isNaN(userId)) {
             return jsonError(COMMON_API_MESSAGES.invalidUserSession, 400);
         }

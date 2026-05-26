@@ -1,16 +1,11 @@
 import { NextResponse } from "next/server";
-import { getApiAuthSession } from "@/lib/server-auth";
-import { buildUserContext } from "@/lib/context";
-import { isAdminRole } from "@/lib/ssot/permissions";
-import { forbidden, jsonError, unauthorized } from "@/lib/ssot/http";
+import { requireAdminSession } from "@/lib/api-auth";
+import { jsonError } from "@/lib/ssot/http";
 import { saveLocalImageUpload } from "@/lib/uploads/local";
 
 export async function POST(request: Request): Promise<NextResponse> {
-    const session = await getApiAuthSession();
-    if (!session) return unauthorized();
-
-    const user = buildUserContext(session);
-    if (!isAdminRole(user.role)) return forbidden();
+    const auth = await requireAdminSession();
+    if (!auth.ok) return auth.response;
 
     const formData = await request.formData();
     const scope = formData.get("scope");

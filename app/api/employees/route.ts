@@ -1,14 +1,12 @@
 ﻿import { after, type NextRequest, NextResponse } from "next/server";
-import { getApiAuthSession } from "@/lib/server-auth";
+import { requireAdminSession, requireApiSession } from "@/lib/api-auth";
 import {
     createEmployeeSchema,
     employeeFiltersSchema,
 } from "@/lib/validations/employee";
 import { logEmployeeEvent } from "@/lib/audit";
 import { employeeService, type EmployeeFilters } from "@/lib/services/employee";
-import { buildUserContext } from "@/lib/context";
 import { operationFailed } from "@/lib/ssot/http";
-import { isAdminRole } from "@/lib/ssot/permissions";
 import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
 
 /**
@@ -40,11 +38,10 @@ function parseQueryParams(
 // NOTE: normalized to remove mojibake
 export async function GET(request: NextRequest): Promise<NextResponse> {
     try {
-        const session = await getApiAuthSession();
-
-        if (!session) {
-            return operationFailed(401);
-        }
+        const auth = await requireApiSession({
+            unauthorizedResponse: () => operationFailed(401),
+        });
+        if (!auth.ok) return auth.response;
 
         const parsedFilters = parseQueryParams(request.url);
         if (!parsedFilters.success) {
@@ -76,13 +73,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         }
 
         // 2. Auth Check & Access Control
-        const session = await getApiAuthSession();
+        const auth = await requireAdminSession({
+            unauthorizedResponse: () => operationFailed(403),
+            forbiddenResponse: () => operationFailed(403),
+        });
+        if (!auth.ok) return auth.response;
 
-        if (!session || !isAdminRole(session.user?.role)) {
-            return operationFailed(403);
-        }
-
-        const user = buildUserContext(session);
         const createResult = await employeeService.createEmployee(result.data);
 
         if (!createResult.success) {
@@ -103,8 +99,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
             await logEmployeeEvent(
                 "EMPLOYEE_CREATE",
                 employee.id,
-                user.id,
-                user.email,
+                auth.user.id,
+                auth.user.email,
                 {
                     after: {
                         firstName: employee.firstName,

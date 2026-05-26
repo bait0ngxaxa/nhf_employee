@@ -34,6 +34,7 @@ import {
 import { getRequestItemDisplayName } from "./stockVariant.shared";
 import { useStockRequestActions } from "./useStockRequestActions";
 import { StockRequestNote } from "./StockRequestNote";
+import { StockLoadingState } from "./StockLoadingState";
 
 export function StockAdminRequests() {
     const { requests, isLoading, refreshRequests, refreshItems, totalRequests } =
@@ -137,7 +138,7 @@ export function StockAdminRequests() {
             </div>
 
             {isLoading ? (
-                <div className="py-12 text-center text-gray-500">กำลังโหลด...</div>
+                <StockLoadingState message="กำลังโหลดคำขอเบิก..." />
             ) : requests.length === 0 ? (
                 <div className="py-12 text-center text-gray-500">
                     <ClipboardList className="mx-auto mb-3 h-12 w-12 opacity-50" />

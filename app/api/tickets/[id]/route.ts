@@ -1,12 +1,11 @@
 ﻿import { after } from "next/server";
 import { type NextRequest, NextResponse } from "next/server";
 
-import { buildUserContext } from "@/lib/context";
+import { requireApiSession } from "@/lib/api-auth";
 import { prisma } from "@/lib/prisma";
 import { processOutbox } from "@/lib/services/outbox/processor";
 import { ticketService, type UpdateTicketData } from "@/lib/services/ticket";
-import { getApiAuthSession } from "@/lib/server-auth";
-import { jsonError, unauthorized } from "@/lib/ssot/http";
+import { jsonError } from "@/lib/ssot/http";
 import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
 import { APP_ROUTES } from "@/lib/ssot/routes";
 import { updateTicketSchema } from "@/lib/validations/ticket";
@@ -32,10 +31,8 @@ export async function GET(
     { params }: { params: Promise<{ id: string }> },
 ): Promise<NextResponse> {
     try {
-        const session = await getApiAuthSession();
-        if (!session) {
-            return unauthorized();
-        }
+        const auth = await requireApiSession();
+        if (!auth.ok) return auth.response;
 
         const { ticketId, error } = await parseTicketId(params);
         if (error) return error;
@@ -43,14 +40,13 @@ export async function GET(
             return jsonError(COMMON_API_MESSAGES.invalidTicketId, 400);
         }
 
-        const user = buildUserContext(session);
-        const result = await ticketService.getTicketById(ticketId, user);
+        const result = await ticketService.getTicketById(ticketId, auth.user);
 
         if (result.error) {
             return jsonError(result.error, result.status || 500);
         }
 
-        await ticketService.recordTicketView(ticketId, user.id);
+        await ticketService.recordTicketView(ticketId, auth.user.id);
         return NextResponse.json({ ticket: result.ticket }, { status: 200 });
     } catch (error) {
         console.error("Error fetching ticket:", error);
@@ -78,12 +74,9 @@ export async function PATCH(
             });
         }
 
-        const session = await getApiAuthSession();
-        if (!session) {
-            return unauthorized();
-        }
+        const auth = await requireApiSession();
+        if (!auth.ok) return auth.response;
 
-        const user = buildUserContext(session);
         const updateData: UpdateTicketData = {
             title: validationResult.data.title,
             description: validationResult.data.description,
@@ -93,7 +86,7 @@ export async function PATCH(
             assignedToId: validationResult.data.assignedToId,
         };
 
-        const result = await ticketService.updateTicket(ticketId, updateData, user);
+        const result = await ticketService.updateTicket(ticketId, updateData, auth.user);
         if (result.error) {
             return jsonError(result.error, result.status || 500);
         }
@@ -108,7 +101,7 @@ export async function PATCH(
                 return;
             }
 
-            const currentUserId = Number(user.id);
+            const currentUserId = Number(auth.user.id);
             const hasStatusChanged =
                 typeof result.oldStatus === "string" &&
                 ticket.status !== result.oldStatus;
@@ -142,10 +135,8 @@ export async function DELETE(
     { params }: { params: Promise<{ id: string }> },
 ): Promise<NextResponse> {
     try {
-        const session = await getApiAuthSession();
-        if (!session) {
-            return unauthorized();
-        }
+        const auth = await requireApiSession();
+        if (!auth.ok) return auth.response;
 
         const { ticketId, error } = await parseTicketId(params);
         if (error) return error;
@@ -153,8 +144,7 @@ export async function DELETE(
             return jsonError(COMMON_API_MESSAGES.invalidTicketId, 400);
         }
 
-        const user = buildUserContext(session);
-        const result = await ticketService.deleteTicket(ticketId, user);
+        const result = await ticketService.deleteTicket(ticketId, auth.user);
 
         if (!result.success) {
             return jsonError(result.error || COMMON_API_MESSAGES.operationFailed, result.status || 500);

@@ -227,6 +227,10 @@ export function StockProvider({ children }: StockProviderProps) {
         [activeTab, itemsPage, searchQuery, selectedCategoryId],
     );
 
+    const shouldFetchItems = activeTab === "browse" || activeTab === "inventory";
+    const shouldFetchRequests =
+        activeTab === "my-requests" || activeTab === "admin-requests";
+
     const requestsQuery = useMemo(
         () =>
             buildStockRequestsQuery({
@@ -248,12 +252,12 @@ export function StockProvider({ children }: StockProviderProps) {
         data: itemsData,
         isLoading: isItemsLoading,
         mutate: mutateItems,
-    } = useStockItemsQuery(itemsQuery);
+    } = useStockItemsQuery(shouldFetchItems ? itemsQuery : null);
     const {
         data: requestsData,
         isLoading: isRequestsLoading,
         mutate: mutateRequests,
-    } = useStockRequestsQuery(requestsQuery);
+    } = useStockRequestsQuery(shouldFetchRequests ? requestsQuery : null);
 
     const refreshCategories = useCallback((): void => {
         void mutateCategories();
@@ -320,11 +324,9 @@ export function StockProvider({ children }: StockProviderProps) {
     );
     const totalItems = itemsData?.total ?? 0;
     const totalRequests = requestsData?.total ?? 0;
-    const isLoading =
-        isCategoriesLoading ||
-        isItemsLoading ||
-        isRequestsLoading ||
-        (!categoriesData && !itemsData && !requestsData);
+    const isLoading = isCategoriesLoading
+        || (shouldFetchItems && (isItemsLoading || !itemsData))
+        || (shouldFetchRequests && (isRequestsLoading || !requestsData));
 
     const dataValue: StockDataContextValue = useMemo(
         () => ({

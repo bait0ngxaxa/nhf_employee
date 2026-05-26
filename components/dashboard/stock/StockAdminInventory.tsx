@@ -13,6 +13,7 @@ import { AddCategoryDialog } from "./StockInventoryDialogs";
 import { EditItemDialog } from "./StockInventoryEditDialog";
 import { StockBrowseFilters } from "./StockBrowseFilters";
 import { StockInventoryTable } from "./StockInventoryTable";
+import { StockLoadingState } from "./StockLoadingState";
 import { STOCK_ADMIN_TEXT } from "./stockAdminInventory.shared";
 
 export function StockAdminInventory() {
@@ -65,9 +66,7 @@ export function StockAdminInventory() {
             />
 
             {isLoading ? (
-                <div className="py-12 text-center text-gray-500">
-                    {STOCK_ADMIN_TEXT.loading}
-                </div>
+                <StockLoadingState message={STOCK_ADMIN_TEXT.loading} />
             ) : items.length === 0 ? (
                 <div className="py-12 text-center text-gray-500">
                     ไม่พบรายการวัสดุตามเงื่อนไขที่เลือก

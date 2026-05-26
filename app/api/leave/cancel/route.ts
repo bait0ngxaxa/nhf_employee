@@ -1,10 +1,10 @@
 ﻿import { NextResponse } from "next/server";
 
+import { requireApiSession } from "@/lib/api-auth";
 import { logLeaveEvent } from "@/lib/audit";
 import { prisma } from "@/lib/prisma";
 import { getEmployeeIdFromUserId } from "@/lib/services/leave/get-employee-id";
-import { getApiAuthSession } from "@/lib/server-auth";
-import { jsonError, unauthorized } from "@/lib/ssot/http";
+import { jsonError } from "@/lib/ssot/http";
 import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
 import { APP_DASHBOARD_TABS, toDashboardTabPath } from "@/lib/ssot/routes";
 import { leaveCancelSchema } from "@/lib/validations/leave";
@@ -26,12 +26,10 @@ class LeaveCancelError extends Error {
 
 export async function POST(req: Request) {
     try {
-        const session = await getApiAuthSession();
-        if (!session?.user?.id) {
-            return unauthorized();
-        }
+        const auth = await requireApiSession();
+        if (!auth.ok) return auth.response;
 
-        const userId = Number(session.user.id);
+        const userId = Number(auth.session.user.id);
         if (Number.isNaN(userId)) {
             return jsonError(COMMON_API_MESSAGES.invalidUserId, 400);
         }
@@ -81,7 +79,7 @@ export async function POST(req: Request) {
             return updatedLeaveRequest;
         });
 
-        await logLeaveEvent("LEAVE_REQUEST_CANCEL", leaveId, userId, session.user.email || "", {
+        await logLeaveEvent("LEAVE_REQUEST_CANCEL", leaveId, userId, auth.user.email, {
             after: { status: "CANCELLED" },
         }).catch((err) => console.error("Failed to log leave cancel:", err));
 

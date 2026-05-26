@@ -1,16 +1,15 @@
 ﻿import { after, type NextRequest, NextResponse } from "next/server";
 
+import { requireApiSession } from "@/lib/api-auth";
 import { logDataExport } from "@/lib/audit";
-import { getApiAuthSession } from "@/lib/server-auth";
 import { forbidden, operationFailed } from "@/lib/ssot/http";
 
 export async function POST(request: NextRequest) {
     try {
-        const session = await getApiAuthSession();
-
-        if (!session) {
-            return forbidden();
-        }
+        const auth = await requireApiSession({
+            unauthorizedResponse: () => forbidden(),
+        });
+        if (!auth.ok) return auth.response;
 
         const body = await request.json();
         const { entityType, recordCount, filters } = body;
@@ -18,8 +17,8 @@ export async function POST(request: NextRequest) {
         after(async () => {
             await logDataExport(
                 entityType,
-                parseInt(session.user.id, 10),
-                session.user.email || "",
+                parseInt(auth.session.user.id, 10),
+                auth.user.email,
                 {
                 metadata: {
                     entityType,

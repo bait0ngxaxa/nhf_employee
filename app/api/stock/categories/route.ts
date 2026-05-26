@@ -1,16 +1,14 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { getApiAuthSession } from "@/lib/server-auth";
-import { buildUserContext } from "@/lib/context";
-import { isAdminRole } from "@/lib/ssot/permissions";
-import { unauthorized, forbidden, jsonError, serverError } from "@/lib/ssot/http";
+import { requireAdminSession, requireApiSession } from "@/lib/api-auth";
+import { jsonError, serverError } from "@/lib/ssot/http";
 import { stockService } from "@/lib/services/stock";
 import { createCategorySchema } from "@/lib/validations/stock";
 import { logStockEvent } from "@/lib/audit";
 
 export async function GET(): Promise<NextResponse> {
     try {
-        const session = await getApiAuthSession();
-        if (!session) return unauthorized();
+        const auth = await requireApiSession();
+        if (!auth.ok) return auth.response;
 
         const categories = await stockService.getCategories();
         return NextResponse.json({ categories });
@@ -22,11 +20,8 @@ export async function GET(): Promise<NextResponse> {
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
     try {
-        const session = await getApiAuthSession();
-        if (!session) return unauthorized();
-
-        const user = buildUserContext(session);
-        if (!isAdminRole(user.role)) return forbidden();
+        const auth = await requireAdminSession();
+        if (!auth.ok) return auth.response;
 
         const body = await request.json();
         const result = createCategorySchema.safeParse(body);
@@ -37,7 +32,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         }
 
         const category = await stockService.createCategory(result.data);
-        await logStockEvent("STOCK_CATEGORY_CREATE", category.id, user.id, user.email, {
+        await logStockEvent("STOCK_CATEGORY_CREATE", category.id, auth.user.id, auth.user.email, {
             after: { name: result.data.name },
         });
         return NextResponse.json({ category }, { status: 201 });
@@ -53,11 +48,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
 export async function DELETE(request: NextRequest): Promise<NextResponse> {
     try {
-        const session = await getApiAuthSession();
-        if (!session) return unauthorized();
-
-        const user = buildUserContext(session);
-        if (!isAdminRole(user.role)) return forbidden();
+        const auth = await requireAdminSession();
+        if (!auth.ok) return auth.response;
 
         const { searchParams } = new URL(request.url);
         const id = Number(searchParams.get("id"));
@@ -66,7 +58,7 @@ export async function DELETE(request: NextRequest): Promise<NextResponse> {
         }
 
         await stockService.deleteCategory(id);
-        await logStockEvent("STOCK_CATEGORY_DELETE", id, user.id, user.email);
+        await logStockEvent("STOCK_CATEGORY_DELETE", id, auth.user.id, auth.user.email);
         return NextResponse.json({ success: true });
     } catch (error) {
         const message = error instanceof Error ? error.message : "";

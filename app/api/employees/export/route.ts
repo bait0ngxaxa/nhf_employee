@@ -1,5 +1,6 @@
 import { after, type NextRequest, NextResponse } from "next/server";
 
+import { requireApiSession } from "@/lib/api-auth";
 import { logDataExport } from "@/lib/audit";
 import { generateFilename } from "@/lib/helpers/date-helpers";
 import {
@@ -8,11 +9,10 @@ import {
 } from "@/lib/helpers/employee-helpers";
 import { prisma } from "@/lib/prisma";
 import { createCsvDownloadResponse, encodeCsvRow } from "@/lib/server/csv";
-import { getApiAuthSession } from "@/lib/server-auth";
 import { createEmployeeWhereClause } from "@/lib/services/employee/queries";
 import type { EmployeeFilters } from "@/lib/services/employee/types";
 import { EXPORT_LIMITS } from "@/lib/ssot/exports";
-import { jsonError, unauthorized } from "@/lib/ssot/http";
+import { jsonError } from "@/lib/ssot/http";
 import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
 import { employeeFiltersSchema } from "@/lib/validations/employee";
 
@@ -58,13 +58,10 @@ function buildEmployeeExportFilename(filters: EmployeeFilters): string {
 
 export async function GET(request: NextRequest): Promise<Response> {
     try {
-        const session = await getApiAuthSession();
+        const auth = await requireApiSession();
+        if (!auth.ok) return auth.response;
 
-        if (!session?.user?.id) {
-            return unauthorized();
-        }
-
-        const userId = Number(session.user.id);
+        const userId = Number(auth.session.user.id);
         if (Number.isNaN(userId)) {
             return NextResponse.json(
                 { error: COMMON_API_MESSAGES.invalidUserId },
@@ -94,7 +91,7 @@ export async function GET(request: NextRequest): Promise<Response> {
 
         after(async () => {
             try {
-                await logDataExport("Employee", userId, session.user.email || "", {
+                await logDataExport("Employee", userId, auth.user.email, {
                     metadata: {
                         entityType: "Employee",
                         recordCount,

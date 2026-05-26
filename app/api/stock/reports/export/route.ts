@@ -1,8 +1,7 @@
 import { after, type NextRequest, NextResponse } from "next/server";
 import { logDataExport } from "@/lib/audit";
-import { getApiAuthSession } from "@/lib/server-auth";
-import { isAdminRole } from "@/lib/ssot/permissions";
-import { forbidden, jsonError, unauthorized } from "@/lib/ssot/http";
+import { requireAdminSession } from "@/lib/api-auth";
+import { jsonError } from "@/lib/ssot/http";
 import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
 import {
     createStockBalanceReportCsvResponse,
@@ -17,16 +16,10 @@ import { stockReportExportQuerySchema } from "@/lib/validations/stock";
 
 export async function GET(request: NextRequest): Promise<Response> {
     try {
-        const session = await getApiAuthSession();
-        if (!session?.user?.id) {
-            return unauthorized();
-        }
+        const auth = await requireAdminSession();
+        if (!auth.ok) return auth.response;
 
-        if (!isAdminRole(session.user.role)) {
-            return forbidden();
-        }
-
-        const userId = Number(session.user.id);
+        const userId = Number(auth.session.user.id);
         if (Number.isNaN(userId)) {
             return NextResponse.json(
                 { error: COMMON_API_MESSAGES.invalidUserId },
@@ -78,7 +71,7 @@ export async function GET(request: NextRequest): Promise<Response> {
 
             after(async () => {
                 try {
-                    await logDataExport("StockItem", userId, session.user.email || "", {
+                    await logDataExport("StockItem", userId, auth.user.email, {
                         metadata: {
                             entityType: "StockItem",
                             recordCount: meta.count,
@@ -120,7 +113,7 @@ export async function GET(request: NextRequest): Promise<Response> {
 
         after(async () => {
             try {
-                await logDataExport("StockRequest", userId, session.user.email || "", {
+                await logDataExport("StockRequest", userId, auth.user.email, {
                     metadata: {
                         entityType: "StockRequest",
                         recordCount: meta.count,

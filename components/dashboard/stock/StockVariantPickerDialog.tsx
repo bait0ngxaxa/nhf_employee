@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Minus, Package, Plus, X, ZoomIn } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogPortal, DialogTitle } from "@/components/ui/dialog";
 import type { StockItem, StockItemVariant } from "../context/stock/types";
 import {
     getBrowseImageUrl,
@@ -374,38 +374,40 @@ export function StockVariantPickerDialog({
                     </div>
                 </div>
 
-                {previewImageUrl && (
-                    <div
-                        className="fixed inset-0 z-[70] flex items-center justify-center bg-white/10 p-4 backdrop-blur-xl sm:p-6"
-                        role="dialog"
-                        aria-modal="true"
-                        aria-label="พรีวิวรูปวัสดุ"
-                        onClick={() => setPreviewImageUrl(null)}
-                    >
-                        <div
-                            className="relative flex max-h-[86vh] w-full max-w-[860px] items-center justify-center rounded-[1.75rem] border border-white/15 bg-slate-900/80 p-3 shadow-[0_30px_90px_-34px_rgba(0,0,0,0.95)] backdrop-blur-xl sm:p-4"
-                            onClick={(event) => event.stopPropagation()}
-                        >
-                            <button
-                                type="button"
-                                onClick={() => setPreviewImageUrl(null)}
-                                className="group/close absolute right-3 top-3 z-10 flex h-10 w-10 items-center justify-center rounded-2xl border border-white/20 bg-white/90 text-slate-950 shadow-[0_18px_36px_-18px_rgba(0,0,0,0.85)] backdrop-blur-md transition-all duration-200 hover:-translate-y-0.5 hover:rotate-3 hover:bg-white hover:shadow-[0_22px_44px_-18px_rgba(0,0,0,0.95)] focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 sm:right-4 sm:top-4 sm:h-11 sm:w-11"
-                                aria-label="ปิดพรีวิวรูป"
-                            >
-                                <X className="h-5 w-5 transition-transform duration-200 group-hover/close:scale-110" aria-hidden="true" />
-                            </button>
-                            <Image
-                                src={previewImageUrl}
-                                alt={item.name}
-                                width={1200}
-                                height={900}
-                                unoptimized
-                                className="h-auto max-h-[78vh] w-auto max-w-full rounded-[1.25rem] object-contain"
-                            />
-                        </div>
-                    </div>
-                )}
                 </DialogContent>
+                {previewImageUrl && (
+                    <DialogPortal>
+                        <div
+                            className="fixed inset-0 z-[70] flex items-center justify-center bg-white/10 p-4 backdrop-blur-xl sm:p-6"
+                            role="dialog"
+                            aria-modal="true"
+                            aria-label="พรีวิวรูปวัสดุ"
+                            onClick={() => setPreviewImageUrl(null)}
+                        >
+                            <div
+                                className="relative flex max-h-[86vh] w-full max-w-[860px] items-center justify-center rounded-[1.75rem] border border-white/15 bg-slate-900/80 p-3 shadow-[0_30px_90px_-34px_rgba(0,0,0,0.95)] backdrop-blur-xl sm:p-4"
+                                onClick={(event) => event.stopPropagation()}
+                            >
+                                <button
+                                    type="button"
+                                    onClick={() => setPreviewImageUrl(null)}
+                                    className="group/close absolute right-3 top-3 z-10 flex h-10 w-10 items-center justify-center rounded-2xl border border-white/20 bg-white/90 text-slate-950 shadow-[0_18px_36px_-18px_rgba(0,0,0,0.85)] backdrop-blur-md transition-all duration-200 hover:-translate-y-0.5 hover:rotate-3 hover:bg-white hover:shadow-[0_22px_44px_-18px_rgba(0,0,0,0.95)] focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 sm:right-4 sm:top-4 sm:h-11 sm:w-11"
+                                    aria-label="ปิดพรีวิวรูป"
+                                >
+                                    <X className="h-5 w-5 transition-transform duration-200 group-hover/close:scale-110" aria-hidden="true" />
+                                </button>
+                                <Image
+                                    src={previewImageUrl}
+                                    alt={item.name}
+                                    width={1200}
+                                    height={900}
+                                    unoptimized
+                                    className="h-auto max-h-[78vh] w-auto max-w-full rounded-[1.25rem] object-contain"
+                                />
+                            </div>
+                        </div>
+                    </DialogPortal>
+                )}
             </Dialog>
         </>
     );

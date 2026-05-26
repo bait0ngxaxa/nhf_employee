@@ -1,12 +1,10 @@
 ﻿import { after, type NextRequest, NextResponse } from "next/server";
 
-import { buildUserContext } from "@/lib/context";
+import { requireAdminSession } from "@/lib/api-auth";
 import { logEmployeeEvent } from "@/lib/audit";
 import { employeeService } from "@/lib/services/employee";
-import { getApiAuthSession } from "@/lib/server-auth";
-import { forbidden, jsonError, unauthorized } from "@/lib/ssot/http";
+import { jsonError } from "@/lib/ssot/http";
 import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
-import { isAdminRole } from "@/lib/ssot/permissions";
 import { updateEmployeeSchema } from "@/lib/validations/employee";
 
 async function parseEmployeeId(
@@ -45,16 +43,9 @@ export async function PATCH(
             });
         }
 
-        const session = await getApiAuthSession();
-        if (!session) {
-            return unauthorized();
-        }
+        const auth = await requireAdminSession();
+        if (!auth.ok) return auth.response;
 
-        if (!isAdminRole(session.user?.role)) {
-            return forbidden();
-        }
-
-        const user = buildUserContext(session);
         const result = await employeeService.updateEmployee(employeeId, validationResult.data);
 
         if (!result.success) {
@@ -67,7 +58,7 @@ export async function PATCH(
                 : ("EMPLOYEE_UPDATE" as const);
 
         after(async () => {
-            await logEmployeeEvent(actionType, employeeId, user.id, user.email, {
+            await logEmployeeEvent(actionType, employeeId, auth.user.id, auth.user.email, {
                 before: result.beforeData,
                 after: validationResult.data as Record<string, unknown>,
             });
@@ -91,14 +82,8 @@ export async function DELETE(
     { params }: { params: Promise<{ id: string }> },
 ): Promise<NextResponse> {
     try {
-        const session = await getApiAuthSession();
-        if (!session) {
-            return unauthorized();
-        }
-
-        if (!isAdminRole(session.user?.role)) {
-            return forbidden();
-        }
+        const auth = await requireAdminSession();
+        if (!auth.ok) return auth.response;
 
         const { employeeId, error } = await parseEmployeeId(params);
         if (error) return error;
@@ -106,7 +91,6 @@ export async function DELETE(
             return jsonError(COMMON_API_MESSAGES.invalidEmployeeId, 400);
         }
 
-        const user = buildUserContext(session);
         const result = await employeeService.deleteEmployee(employeeId);
 
         if (!result.success) {
@@ -114,7 +98,7 @@ export async function DELETE(
         }
 
         after(async () => {
-            await logEmployeeEvent("EMPLOYEE_DELETE", employeeId, user.id, user.email, {
+            await logEmployeeEvent("EMPLOYEE_DELETE", employeeId, auth.user.id, auth.user.email, {
                 before: result.beforeData,
             });
         });

@@ -1,10 +1,10 @@
 ﻿import { NextResponse } from "next/server";
 
 import { ALL_LEAVE_TYPES, DEFAULT_LEAVE_QUOTAS } from "@/constants/leave";
+import { requireApiSession } from "@/lib/api-auth";
 import { prisma } from "@/lib/prisma";
 import { getEmployeeIdFromUserId } from "@/lib/services/leave/get-employee-id";
-import { getApiAuthSession } from "@/lib/server-auth";
-import { jsonError, unauthorized } from "@/lib/ssot/http";
+import { jsonError } from "@/lib/ssot/http";
 import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
 
 const LEAVE_PAGINATION_MESSAGES = {
@@ -14,12 +14,10 @@ const LEAVE_PAGINATION_MESSAGES = {
 
 export async function GET(req: Request) {
     try {
-        const session = await getApiAuthSession();
-        if (!session?.user?.id) {
-            return unauthorized();
-        }
+        const auth = await requireApiSession();
+        if (!auth.ok) return auth.response;
 
-        const userId = Number(session.user.id);
+        const userId = Number(auth.session.user.id);
         if (Number.isNaN(userId)) {
             return jsonError(COMMON_API_MESSAGES.invalidUserId, 400);
         }

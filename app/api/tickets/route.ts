@@ -1,13 +1,12 @@
 ﻿import { after, type NextRequest, NextResponse } from "next/server";
 
-import { buildUserContext } from "@/lib/context";
+import { requireApiSession } from "@/lib/api-auth";
 import { logTicketEvent } from "@/lib/audit";
 import { prisma } from "@/lib/prisma";
 import { APP_ROUTES } from "@/lib/ssot/routes";
 import { processOutbox } from "@/lib/services/outbox/processor";
 import { ticketService, type TicketFilters } from "@/lib/services/ticket";
-import { getApiAuthSession } from "@/lib/server-auth";
-import { jsonError, unauthorized } from "@/lib/ssot/http";
+import { jsonError } from "@/lib/ssot/http";
 import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
 import { createTicketSchema, ticketFiltersSchema } from "@/lib/validations/ticket";
 
@@ -38,18 +37,15 @@ function parseQueryParams(url: string):
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
     try {
-        const session = await getApiAuthSession();
-        if (!session) {
-            return unauthorized();
-        }
+        const auth = await requireApiSession();
+        if (!auth.ok) return auth.response;
 
         const parsedFilters = parseQueryParams(request.url);
         if (!parsedFilters.success) {
             return parsedFilters.response;
         }
 
-        const user = buildUserContext(session);
-        const result = await ticketService.getTickets(parsedFilters.data, user);
+        const result = await ticketService.getTickets(parsedFilters.data, auth.user);
 
         return NextResponse.json(result, { status: 200 });
     } catch (error) {
@@ -69,20 +65,17 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
             });
         }
 
-        const session = await getApiAuthSession();
-        if (!session) {
-            return unauthorized();
-        }
+        const auth = await requireApiSession();
+        if (!auth.ok) return auth.response;
 
-        const user = buildUserContext(session);
-        const ticket = await ticketService.createTicket(result.data, user.id);
+        const ticket = await ticketService.createTicket(result.data, auth.user.id);
 
         after(async () => {
             processOutbox().catch((err) =>
                 console.error("Outbox processor failed:", err),
             );
 
-            await logTicketEvent("TICKET_CREATE", ticket.id, user.id, user.email, {
+            await logTicketEvent("TICKET_CREATE", ticket.id, auth.user.id, auth.user.email, {
                 after: {
                     title: ticket.title,
                     category: ticket.category,
