@@ -1,8 +1,10 @@
 import { type LeaveResultPayload } from "../types";
+import { textToHtml } from "./html";
 
 export function generateLeaveResultEmailHTML(data: LeaveResultPayload): string {
     const statusText = data.status === "APPROVED" ? "อนุมัติ" : "ไม่อนุมัติ";
     const statusColor = data.status === "APPROVED" ? "#10b981" : "#ef4444";
+    const reason = data.reason ? textToHtml(data.reason) : "";
 
     return `
 <!DOCTYPE html>
@@ -23,7 +25,7 @@ export function generateLeaveResultEmailHTML(data: LeaveResultPayload): string {
         ${data.reason ? `
         <div style="background-color: #fff3cd; color: #856404; padding: 15px; border-radius: 6px; margin: 20px 0; border: 1px solid #ffeeba;">
             <strong>เหตุผลจากหัวหน้างาน:</strong><br>
-            ${data.reason}
+            ${reason}
         </div>
         ` : ''}
 

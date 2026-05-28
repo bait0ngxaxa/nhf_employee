@@ -4,16 +4,18 @@ import { AuditLogViewer } from "@/components/audit/AuditLogViewer";
 import { History } from "lucide-react";
 import { AuditLogsProvider } from "./context";
 
+const AUDIT_LOGS_BACKGROUND = [
+    "radial-gradient(circle at 100% 0%, rgba(255,228,230,0.6) 0%, transparent 34%)",
+    "radial-gradient(circle at 0% 100%, rgba(255,237,213,0.6) 0%, transparent 38%)",
+].join(", ");
+
 export function AuditLogsSection() {
     return (
         <AuditLogsProvider>
-            <div className="relative min-h-[calc(100vh-6rem)] bg-slate-50/50 rounded-3xl overflow-hidden border border-white/60 shadow-inner">
-                {/* Background Aesthetic Effects */}
-                <div className="absolute inset-0 pointer-events-none overflow-hidden rounded-3xl">
-                    <div className="absolute top-0 right-0 w-[800px] h-[800px] bg-[radial-gradient(circle_at_center,rgba(255,228,230,0.6)_0%,transparent_70%)] -translate-y-1/2 translate-x-1/3" />
-                    <div className="absolute bottom-0 left-0 w-[1000px] h-[1000px] bg-[radial-gradient(circle_at_center,rgba(255,237,213,0.6)_0%,transparent_70%)] translate-y-1/3 -translate-x-1/4" />
-                </div>
-
+            <div
+                className="relative min-h-[calc(100vh-6rem)] overflow-hidden rounded-3xl border border-white/60 bg-slate-50/50 shadow-inner"
+                style={{ backgroundImage: AUDIT_LOGS_BACKGROUND }}
+            >
                 <div className="relative z-10 p-4 md:p-8 space-y-8">
                     {/* Header */}
                     <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 animate-in fade-in slide-in-from-bottom-2 duration-700 ease-out">

@@ -7,15 +7,23 @@ import {
     getStatusHexColor,
 } from "@/lib/helpers/ticket-helpers";
 import { formatDateTime } from "@/lib/helpers/date-helpers";
+import { escapeHtml, textToHtml } from "./html";
 
 export function generateNewTicketEmailHTML(data: TicketEmailData): string {
+    const title = escapeHtml(data.title);
+    const description = textToHtml(data.description);
+    const reporterName = escapeHtml(data.reportedBy.name);
+    const reporterDepartment = data.reportedBy.department
+        ? ` (${escapeHtml(data.reportedBy.department)})`
+        : "";
+
     return `
   <!DOCTYPE html>
   <html lang="th">
   <head>
       <meta charset="UTF-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>Ticket ใหม่ - ${data.title}</title>
+      <title>Ticket ใหม่ - ${title}</title>
       <style>
           body { 
               font-family: 'Sarabun', Arial, sans-serif; 
@@ -116,7 +124,7 @@ export function generateNewTicketEmailHTML(data: TicketEmailData): string {
           </div>
           
           <div class="content">
-              <h2 style="color: #1F2937; margin-top: 0;">${data.title}</h2>
+              <h2 style="color: #1F2937; margin-top: 0;">${title}</h2>
               
               <div class="ticket-info ${
                   data.priority === "URGENT" ? "urgent" : ""
@@ -155,9 +163,7 @@ export function generateNewTicketEmailHTML(data: TicketEmailData): string {
                   </div>
                   <div class="info-row">
                       <span class="label">ผู้แจ้ง:</span>
-                      <span class="value">${data.reportedBy.name}${
-        data.reportedBy.department ? ` (${data.reportedBy.department})` : ""
-    }</span>
+                      <span class="value">${reporterName}${reporterDepartment}</span>
                   </div>
                   <div class="info-row">
                       <span class="label">วันที่สร้าง:</span>
@@ -170,7 +176,7 @@ export function generateNewTicketEmailHTML(data: TicketEmailData): string {
               <div>
                   <h3 style="color: #374151; margin-bottom: 10px;">รายละเอียดปัญหา:</h3>
                   <div class="description-box">
-                      ${data.description.replace(/\n/g, "<br>")}
+                      ${description}
                   </div>
               </div>
 

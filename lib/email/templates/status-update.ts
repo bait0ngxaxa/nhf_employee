@@ -7,18 +7,28 @@ import {
     getStatusHexColor,
 } from "@/lib/helpers/ticket-helpers";
 import { formatDateTime } from "@/lib/helpers/date-helpers";
+import { escapeHtml } from "./html";
 
 export function generateStatusUpdateEmailHTML(
     data: TicketEmailData,
     oldStatus: string
 ): string {
+    const title = escapeHtml(data.title);
+    const reporterName = escapeHtml(data.reportedBy.name);
+    const reporterDepartment = data.reportedBy.department
+        ? ` (${escapeHtml(data.reportedBy.department)})`
+        : "";
+    const assigneeName = data.assignedTo
+        ? escapeHtml(data.assignedTo.name)
+        : "";
+
     return `
   <!DOCTYPE html>
   <html lang="th">
   <head>
       <meta charset="UTF-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>อัพเดทสถานะ Ticket - ${data.title}</title>
+      <title>อัพเดทสถานะ Ticket - ${title}</title>
       <style>
           body { 
               font-family: 'Sarabun', Arial, sans-serif; 
@@ -126,7 +136,7 @@ export function generateStatusUpdateEmailHTML(
           </div>
           
           <div class="content">
-              <h2 style="color: #1F2937; margin-top: 0;">${data.title}</h2>
+              <h2 style="color: #1F2937; margin-top: 0;">${title}</h2>
               
               <div class="status-update">
                   <h3 style="margin-top: 0; color: #065F46;">สถานะได้รับการอัพเดท</h3>
@@ -170,16 +180,14 @@ export function generateStatusUpdateEmailHTML(
                   </div>
                   <div class="info-row">
                       <span class="label">ผู้แจ้ง:</span>
-                      <span class="value">${data.reportedBy.name}${
-        data.reportedBy.department ? ` (${data.reportedBy.department})` : ""
-    }</span>
+                      <span class="value">${reporterName}${reporterDepartment}</span>
                   </div>
                   ${
                       data.assignedTo
                           ? `
                   <div class="info-row">
                       <span class="label">ผู้รับผิดชอบ:</span>
-                      <span class="value">${data.assignedTo.name}</span>
+                      <span class="value">${assigneeName}</span>
                   </div>
                   `
                           : ""

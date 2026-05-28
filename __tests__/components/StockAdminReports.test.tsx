@@ -24,31 +24,41 @@ describe("StockAdminReports", () => {
     });
 
     it("uses a newly returned year for meta and export", async () => {
-        vi.mocked(apiGet)
-            .mockResolvedValueOnce({
-                success: true,
-                data: { years: [2031, 2030] },
-                status: 200,
-                requestId: "req-years",
-            } as never)
-            .mockResolvedValueOnce({
+        vi.mocked(apiGet).mockImplementation(async (url) => {
+            if (url === "/api/stock/reports/export?yearsOnly=1") {
+                return {
+                    success: true,
+                    data: { years: [2031, 2030] },
+                    status: 200,
+                    requestId: "req-years",
+                } as never;
+            }
+
+            if (url === "/api/stock/reports/export?metaOnly=1&year=2031") {
+                return {
+                    success: true,
+                    data: { year: 2031, count: 8, maxRows: 5000 },
+                    status: 200,
+                    requestId: "req-meta",
+                } as never;
+            }
+
+            if (url === "/api/stock/reports/export?metaOnly=1&reportType=balances") {
+                return {
+                    success: true,
+                    data: { count: 12, maxRows: 5000 },
+                    status: 200,
+                    requestId: "req-balance-meta",
+                } as never;
+            }
+
+            return {
                 success: true,
                 data: { year: 2026, count: 3, maxRows: 5000 },
                 status: 200,
                 requestId: "req-meta-current-year",
-            } as never)
-            .mockResolvedValueOnce({
-                success: true,
-                data: { count: 12, maxRows: 5000 },
-                status: 200,
-                requestId: "req-balance-meta",
-            } as never)
-            .mockResolvedValueOnce({
-                success: true,
-                data: { year: 2031, count: 8, maxRows: 5000 },
-                status: 200,
-                requestId: "req-meta",
-            } as never);
+            } as never;
+        });
 
         render(<StockAdminReports />);
 

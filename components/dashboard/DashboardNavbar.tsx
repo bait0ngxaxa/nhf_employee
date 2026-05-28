@@ -37,7 +37,7 @@ export function DashboardNavbar() {
     };
 
     return (
-        <header className="sticky top-0 z-30 bg-white/80 backdrop-blur-xl border-b border-slate-50">
+        <header className="sticky top-0 z-30 bg-white/95 border-b border-slate-50">
             <div className="flex items-center justify-between h-20 px-6 md:px-10">
                 {/* Left: Mobile menu + Page title */}
                 <div className="flex items-center gap-4">
@@ -67,12 +67,12 @@ export function DashboardNavbar() {
                             <Button
                                 variant="ghost"
                                 className={cn(
-                                    "h-12 gap-3 px-1 pr-4 rounded-[1.25rem] transition-all duration-500",
+                                    "h-12 gap-3 px-1 pr-4 rounded-[1.25rem] transition-colors",
                                     "bg-white border border-slate-100 hover:border-sky-100 shadow-sm hover:shadow-md",
                                     "hidden sm:flex group",
                                 )}
                             >
-                                <div className="flex items-center justify-center h-10 w-10 rounded-xl bg-gradient-to-br from-sky-400 to-indigo-500 transition-transform duration-500 group-hover:rotate-6 shadow-lg shadow-sky-100">
+                                <div className="flex items-center justify-center h-10 w-10 rounded-xl bg-gradient-to-br from-sky-400 to-indigo-500 shadow-lg shadow-sky-100">
                                     <User className="h-5 w-5 text-white" />
                                 </div>
                                 <div className="flex flex-col items-start text-left">
@@ -88,7 +88,7 @@ export function DashboardNavbar() {
                         </DropdownMenuTrigger>
                         <DropdownMenuContent
                             align="end"
-                            className="w-64 p-2 rounded-2xl border-slate-100 shadow-[0_20px_50px_-12px_rgba(0,0,0,0.12)] bg-white/95 backdrop-blur-xl"
+                            className="w-64 p-2 rounded-2xl border-slate-100 bg-white shadow-lg"
                         >
                             <div className="px-4 py-4 mb-2 rounded-xl bg-sky-50/50 border border-sky-100/50">
                                 <p className="text-sm font-black text-slate-900 leading-none mb-1">
@@ -173,7 +173,7 @@ export function DashboardNavbar() {
 
             {/* Logout Confirmation Dialog - Clean Refined */}
             <Dialog open={showLogoutDialog} onOpenChange={setShowLogoutDialog}>
-                <DialogContent className="sm:max-w-[400px] p-0 overflow-hidden border-none rounded-[2.5rem] shadow-[0_30px_60px_-12px_rgba(0,0,0,0.18)]">
+                <DialogContent className="sm:max-w-[400px] p-0 overflow-hidden border-none rounded-[2.5rem] shadow-xl">
                     <div className="bg-white p-10">
                         <div className="w-16 h-16 rounded-3xl bg-rose-50 flex items-center justify-center text-rose-500 mb-6 shadow-inner border border-rose-100/50">
                             <LogOut className="w-8 h-8" />

@@ -1,4 +1,5 @@
 import { type LeaveActionPayload } from "../types";
+import { escapeHtml, textToHtml } from "./html";
 
 export function generateLeaveActionEmailHTML(
     data: LeaveActionPayload,
@@ -10,6 +11,9 @@ export function generateLeaveActionEmailHTML(
             : data.leaveType === "PERSONAL"
               ? "ลากิจ"
               : "ลาพักร้อน";
+    const employeeName = escapeHtml(data.employeeName);
+    const reason = textToHtml(data.reason);
+    const dashboardHref = escapeHtml(dashboardLink);
 
     return `
 <!DOCTYPE html>
@@ -25,7 +29,7 @@ export function generateLeaveActionEmailHTML(
         </h2>
         
         <p>เรียน ผู้อนุมัติ,</p>
-        <p>พนักงาน <strong>${data.employeeName}</strong> ได้ส่งคำขออนุมัติ${typeLabel} โดยมีรายละเอียดดังนี้:</p>
+        <p>พนักงาน <strong>${employeeName}</strong> ได้ส่งคำขออนุมัติ${typeLabel} โดยมีรายละเอียดดังนี้:</p>
         
         <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
             <tr>
@@ -42,12 +46,12 @@ export function generateLeaveActionEmailHTML(
             </tr>
             <tr>
                 <td style="padding: 8px; border-bottom: 1px solid #e9ecef; color: #6c757d;">เหตุผล:</td>
-                <td style="padding: 8px; border-bottom: 1px solid #e9ecef;">${data.reason}</td>
+                <td style="padding: 8px; border-bottom: 1px solid #e9ecef;">${reason}</td>
             </tr>
         </table>
 
         <p style="margin-top: 30px; text-align: center;">
-            <a href="${dashboardLink}" style="display: inline-block; padding: 12px 24px; background-color: #3b82f6; color: white; text-decoration: none; border-radius: 6px; font-weight: bold;">
+            <a href="${dashboardHref}" style="display: inline-block; padding: 12px 24px; background-color: #3b82f6; color: white; text-decoration: none; border-radius: 6px; font-weight: bold;">
                 ดูรายละเอียดและพิจารณาใบลา
             </a>
         </p>

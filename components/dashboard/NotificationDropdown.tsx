@@ -143,7 +143,7 @@ export function NotificationDropdown() {
                 <Button
                     variant="ghost"
                     size="icon"
-                    className="relative h-10 w-10 rounded-xl bg-white border border-slate-100 hover:border-slate-200 hover:bg-slate-50 transition-all duration-300 shadow-sm"
+                    className="relative h-10 w-10 rounded-xl bg-white border border-slate-100 hover:border-slate-200 hover:bg-slate-50 transition-colors shadow-sm"
                 >
                     <Bell className="h-5 w-5 text-slate-500" />
                     {unreadCount > 0 && (
@@ -156,7 +156,7 @@ export function NotificationDropdown() {
 
             <DropdownMenuContent
                 align="end"
-                className="w-96 p-0 overflow-hidden shadow-[0_30px_60px_-12px_rgba(0,0,0,0.15)] rounded-[2rem] border-slate-100 bg-white/95 backdrop-blur-xl"
+                className="w-96 p-0 overflow-hidden rounded-[2rem] border-slate-100 bg-white shadow-lg"
             >
                 <div className="flex items-center justify-between px-6 py-5 border-b border-slate-50 bg-slate-50/30">
                     <div className="space-y-0.5">

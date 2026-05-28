@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import { memo, useCallback, useState } from "react";
+import { createPortal } from "react-dom";
 import { Check, Package, Plus, ShoppingCart, X, ZoomIn } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -98,9 +99,9 @@ function ImagePreviewOverlay({
     itemName: string;
     onClose: () => void;
 }) {
-    return (
+    return createPortal(
         <div
-            className="fixed inset-0 z-[70] flex items-center justify-center bg-white/10 p-4 backdrop-blur-xl sm:p-6"
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-white/10 p-4 backdrop-blur-xl sm:p-6"
             role="dialog"
             aria-modal="true"
             aria-label={`พรีวิวรูป ${itemName}`}
@@ -127,7 +128,8 @@ function ImagePreviewOverlay({
                     className="h-auto max-h-[78vh] w-auto max-w-full rounded-[1.25rem] object-contain"
                 />
             </div>
-        </div>
+        </div>,
+        document.body,
     );
 }
 

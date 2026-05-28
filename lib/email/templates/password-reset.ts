@@ -1,7 +1,12 @@
+import { escapeHtml } from "./html";
+
 export function generatePasswordResetEmailHTML(
     resetUrl: string,
     userName: string,
 ): string {
+    const safeResetUrl = escapeHtml(resetUrl);
+    const safeUserName = escapeHtml(userName);
+
     return `
   <!DOCTYPE html>
   <html lang="th">
@@ -96,12 +101,12 @@ export function generatePasswordResetEmailHTML(
           </div>
           
           <div class="content">
-              <p style="font-size: 16px; color: #1F2937;">สวัสดีคุณ <strong>${userName}</strong>,</p>
+              <p style="font-size: 16px; color: #1F2937;">สวัสดีคุณ <strong>${safeUserName}</strong>,</p>
               
               <p>เราได้รับคำขอรีเซ็ตรหัสผ่านสำหรับบัญชีของคุณ กรุณาคลิกปุ่มด้านล่างเพื่อตั้งรหัสผ่านใหม่:</p>
 
               <div style="text-align: center; margin: 30px 0;">
-                  <a href="${resetUrl}" class="button">
+                  <a href="${safeResetUrl}" class="button">
                       ตั้งรหัสผ่านใหม่
                   </a>
               </div>
@@ -115,7 +120,7 @@ export function generatePasswordResetEmailHTML(
                   <p style="margin: 0; font-size: 14px; color: #4B5563;">
                       <strong>หากปุ่มด้านบนไม่ทำงาน</strong> ให้คัดลอกลิงก์ด้านล่างไปวางในเบราว์เซอร์:
                   </p>
-                  <p class="link-text">${resetUrl}</p>
+                  <p class="link-text">${safeResetUrl}</p>
               </div>
           </div>
           
