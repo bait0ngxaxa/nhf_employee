@@ -3,9 +3,7 @@ import { AuthStatus } from "@/components/auth";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Shield, Database, Zap, ArrowRight, Package } from "lucide-react";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
-import { isValidSessionUser } from "@/lib/auth-ssot";
+import { getApiAuthSession } from "@/lib/server-auth";
 import { APP_ROUTES } from "@/lib/ssot/routes";
 import { redirect } from "next/navigation";
 
@@ -15,11 +13,10 @@ export const metadata: Metadata = {
 };
 
 export default async function Home() {
-    const session = await getServerSession(authOptions);
-    const hasValidSession = isValidSessionUser(session?.user);
+    const session = await getApiAuthSession();
 
     // Redirect authenticated users to dashboard on the server
-    if (hasValidSession) {
+    if (session) {
         redirect(APP_ROUTES.dashboard);
     }
 

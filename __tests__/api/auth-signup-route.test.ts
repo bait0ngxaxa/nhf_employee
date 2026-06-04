@@ -4,7 +4,7 @@ import { NextRequest } from "next/server";
 import type * as HybridAuthTokensModule from "@/lib/hybrid-auth-tokens";
 
 import { POST as signupRoute } from "@/app/api/auth/signup/route";
-import { resetSignupRateLimit } from "@/lib/auth-signup-rate-limit";
+import { resetAuthRateLimit } from "@/lib/auth-rate-limit";
 
 const { prismaMock } = vi.hoisted(() => ({
     prismaMock: {
@@ -76,7 +76,7 @@ function buildRequest(
 describe("Auth signup route", () => {
     beforeEach(() => {
         vi.clearAllMocks();
-        resetSignupRateLimit();
+        resetAuthRateLimit();
     });
 
     it("rejects signup without trusted mutation headers", async () => {

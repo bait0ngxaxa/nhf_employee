@@ -2,7 +2,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 
-const { prismaMock, getServerSessionMock } = vi.hoisted(() => ({
+const { prismaMock } = vi.hoisted(() => ({
     prismaMock: {
         user: {
             findUnique: vi.fn(),
@@ -16,11 +16,6 @@ const { prismaMock, getServerSessionMock } = vi.hoisted(() => ({
             create: vi.fn(),
         },
     },
-    getServerSessionMock: vi.fn(),
-}));
-
-vi.mock("next-auth", () => ({
-    getServerSession: getServerSessionMock,
 }));
 
 vi.mock("@/lib/prisma", () => ({
@@ -28,18 +23,8 @@ vi.mock("@/lib/prisma", () => ({
 }));
 
 import middleware from "@/middleware";
-import { POST as bootstrapRoute } from "@/app/api/auth/bootstrap/route";
 import { POST as logoutAllRoute } from "@/app/api/auth/logout-all/route";
 import { issueAccessToken } from "@/lib/hybrid-auth-tokens";
-
-function extractCookieValue(setCookieHeader: string | null, name: string): string | null {
-    if (!setCookieHeader) {
-        return null;
-    }
-
-    const match = setCookieHeader.match(new RegExp(`${name}=([^;]+)`));
-    return match ? match[1] : null;
-}
 
 describe("Hybrid critical flow", () => {
     const csrfHeaders = {
@@ -50,10 +35,6 @@ describe("Hybrid critical flow", () => {
     beforeEach(() => {
         vi.clearAllMocks();
         process.env.AUTH_ACCESS_TOKEN_SECRET = "critical-flow-test-secret";
-
-        getServerSessionMock.mockResolvedValue({
-            user: { id: "1", role: "ADMIN", email: "admin@test.com" },
-        });
 
         prismaMock.user.findUnique.mockResolvedValue({
             id: 1,
@@ -66,19 +47,13 @@ describe("Hybrid critical flow", () => {
         prismaMock.authRefreshToken.updateMany.mockResolvedValue({ count: 2 });
     });
 
-    it("bootstrap success then can access /dashboard", async () => {
-        const bootstrapRequest = new NextRequest("http://localhost/api/auth/bootstrap", {
-            method: "POST",
-            headers: csrfHeaders,
+    it("valid hybrid access token can access /dashboard", async () => {
+        const accessToken = await issueAccessToken({
+            userId: 1,
+            role: "ADMIN",
+            sessionId: "family_1",
+            tokenVersion: 1,
         });
-
-        const bootstrapResponse = await bootstrapRoute(bootstrapRequest);
-        expect(bootstrapResponse.status).toBe(200);
-
-        const setCookie = bootstrapResponse.headers.get("set-cookie");
-        const accessToken = extractCookieValue(setCookie, "nhf_at");
-        expect(accessToken).toBeTruthy();
-
         const dashboardRequest = new NextRequest("http://localhost/dashboard", {
             headers: { cookie: `nhf_at=${accessToken}` },
         });

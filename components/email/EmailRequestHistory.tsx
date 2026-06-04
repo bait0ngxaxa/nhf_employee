@@ -1,6 +1,5 @@
 "use client";
 
-import { useSession } from "next-auth/react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -21,9 +20,10 @@ import {
 } from "lucide-react";
 import { useEmailRequestHistory } from "@/hooks/useEmailRequestHistory";
 import { formatThaiDateTime } from "@/lib/helpers/date-helpers";
+import { useAuth } from "@/components/auth/HybridAuthProvider";
 
 export function EmailRequestHistory() {
-    const { data: session } = useSession();
+    const { user } = useAuth();
     const {
         emailRequests,
         pagination,
@@ -35,7 +35,7 @@ export function EmailRequestHistory() {
 
 
 
-    if (!session) {
+    if (!user) {
         return null;
     }
 

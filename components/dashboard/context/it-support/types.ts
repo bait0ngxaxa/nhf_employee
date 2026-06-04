@@ -1,9 +1,9 @@
 import { type Ticket, type TicketStats } from "@/types/tickets";
-import { type Session } from "next-auth";
+import { type HybridAuthSession } from "@/lib/auth-user";
 
 export interface ITSupportDataContextValue {
     // Session Data
-    session: Session | null;
+    session: HybridAuthSession | null;
     isAdmin: boolean;
 
     // Ticket Data

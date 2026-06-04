@@ -1,5 +1,4 @@
 import { jwtVerify } from "jose";
-import { getToken } from "next-auth/jwt";
 import { NextResponse, type NextRequest } from "next/server";
 
 import { hasRequiredAccessClaims } from "@/lib/auth-ssot";
@@ -31,24 +30,11 @@ async function hasValidHybridAccessToken(request: NextRequest): Promise<boolean>
     }
 }
 
-async function hasValidNextAuthSession(request: NextRequest): Promise<boolean> {
-    try {
-        const token = await getToken({
-            req: request,
-            secret: process.env.NEXTAUTH_SECRET,
-        });
-        return typeof token?.sub === "string" && token.sub.length > 0;
-    } catch {
-        return false;
-    }
-}
-
 export default async function middleware(request: NextRequest): Promise<NextResponse> {
     const { pathname } = request.nextUrl;
     const isPublicRoute = PUBLIC_ROUTES.has(pathname);
 
-    const hasHybridSession = await hasValidHybridAccessToken(request);
-    const isAuthenticated = hasHybridSession || await hasValidNextAuthSession(request);
+    const isAuthenticated = await hasValidHybridAccessToken(request);
 
     if (isAuthenticated && (pathname === "/login" || pathname === "/signup")) {
         return NextResponse.redirect(new URL("/dashboard", request.url));

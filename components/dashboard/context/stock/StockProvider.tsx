@@ -10,7 +10,6 @@ import {
 } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { type StockRequestStatus } from "@prisma/client";
-import { useSession } from "next-auth/react";
 import { isAdminRole } from "@/lib/ssot/permissions";
 import { StockDataContext, StockUIContext } from "./StockContext";
 import {
@@ -37,17 +36,18 @@ import type {
     StockDataContextValue,
     StockUIContextValue,
 } from "./types";
+import { useAuth } from "@/components/auth/HybridAuthProvider";
 
 interface StockProviderProps {
     children: ReactNode;
 }
 
 export function StockProvider({ children }: StockProviderProps) {
-    const { data: session } = useSession();
+    const { user } = useAuth();
     const router = useRouter();
     const searchParams = useSearchParams();
     const pathname = usePathname();
-    const isAdmin = isAdminRole(session?.user?.role);
+    const isAdmin = isAdminRole(user?.role);
     const latestSearchParamsRef = useRef(searchParams);
 
     const [activeTab, setActiveTabState] = useState(

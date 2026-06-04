@@ -5,11 +5,9 @@ import {
     useCallback,
     useEffect,
     useMemo,
-    useRef,
     startTransition,
     type ReactNode,
 } from "react";
-import { useSession, signOut } from "next-auth/react";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import useSWR from "swr";
 import {
@@ -22,14 +20,13 @@ import {
     type DashboardDataContextValue,
     type DashboardUIContextValue,
 } from "./types";
-import { apiPost } from "@/lib/api-client";
-import { logoutHybridSession, refreshHybridSession } from "@/lib/client-auth";
 import {
     API_ROUTES,
     APP_ROUTES,
     toDashboardTabPath,
 } from "@/lib/ssot/routes";
 import { isAdminRole, USER_ROLES } from "@/lib/ssot/permissions";
+import { useAuth } from "@/components/auth/HybridAuthProvider";
 
 interface DashboardProviderProps {
     children: ReactNode;
@@ -58,11 +55,11 @@ export function DashboardProvider({
     children,
     initialUser,
 }: DashboardProviderProps) {
-    const { data: session, status } = useSession();
+    const { user: authUser, status, signOut } = useAuth();
     const router = useRouter();
     const searchParams = useSearchParams();
     const pathname = usePathname();
-    const user = session?.user ?? initialUser;
+    const user = authUser ?? initialUser;
     const isAdmin = isAdminRole(user?.role);
     const effectiveStatus =
         status === "authenticated" || initialUser
@@ -74,10 +71,6 @@ export function DashboardProvider({
     const [selectedMenu, setSelectedMenu] = useState<string>(initialTab);
     const [sidebarOpen, setSidebarOpen] = useState(true);
     const [refreshTrigger, setRefreshTrigger] = useState(0);
-    const [hybridBootstrapped, setHybridBootstrapped] = useState(false);
-    // Ref guard prevents double bootstrap in React Strict Mode (dev)
-    // where useEffect fires twice before the async setState completes.
-    const bootstrapCalledRef = useRef(false);
 
     // Sync selectedMenu when URL ?tab= changes (e.g. notification click or browser back/forward)
     useEffect(() => {
@@ -86,47 +79,6 @@ export function DashboardProvider({
             setSelectedMenu(tabFromUrl);
         });
     }, [searchParams]);
-
-    useEffect(() => {
-        if (status !== "authenticated" || hybridBootstrapped || bootstrapCalledRef.current) {
-            return;
-        }
-
-        bootstrapCalledRef.current = true;
-
-        void (async () => {
-            try {
-                await apiPost(API_ROUTES.auth.bootstrap, {});
-            } finally {
-                setHybridBootstrapped(true);
-            }
-        })();
-    }, [status, hybridBootstrapped]);
-
-    useEffect(() => {
-        if (status !== "authenticated" || !hybridBootstrapped) {
-            return;
-        }
-
-        const refreshSession = (): void => {
-            void refreshHybridSession();
-        };
-
-        // Skip immediate refresh — bootstrap just issued a fresh access token.
-
-        const intervalId = window.setInterval(refreshSession, 5 * 60 * 1000);
-        const onVisibilityChange = (): void => {
-            if (document.visibilityState === "visible") {
-                refreshSession();
-            }
-        };
-
-        document.addEventListener("visibilitychange", onVisibilityChange);
-        return () => {
-            window.clearInterval(intervalId);
-            document.removeEventListener("visibilitychange", onVisibilityChange);
-        };
-    }, [status, hybridBootstrapped]);
 
     const availableMenuGroups = useMemo(
         () => getAvailableMenuGroups(isAdmin),
@@ -184,10 +136,9 @@ export function DashboardProvider({
                 }
                 window.localStorage.removeItem(STOCK_BROWSE_CART_LEGACY_KEY);
             }
-            await logoutHybridSession();
-            await signOut({ callbackUrl: "/login" });
+            await signOut();
         })();
-    }, [user?.id]);
+    }, [signOut, user?.id]);
 
     const dataValue = useMemo<DashboardDataContextValue>(
         () => ({

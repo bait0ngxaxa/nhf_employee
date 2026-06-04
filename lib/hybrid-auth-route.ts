@@ -1,7 +1,5 @@
-import { getServerSession } from "next-auth";
 import { type NextRequest } from "next/server";
 
-import { authOptions } from "@/lib/auth";
 import {
     HYBRID_ACCESS_COOKIE_NAME,
     HYBRID_REFRESH_COOKIE_NAME,
@@ -12,20 +10,16 @@ import { prisma } from "@/lib/prisma";
 
 export async function resolveAuthenticatedUserId(request: NextRequest): Promise<number | null> {
     const accessToken = request.cookies.get(HYBRID_ACCESS_COOKIE_NAME)?.value;
-    if (accessToken) {
-        try {
-            const claims = await verifyAccessToken(accessToken);
-            const userId = parseUserId(claims.sub);
-            if (userId) {
-                return userId;
-            }
-        } catch {
-            // Fallback to NextAuth session.
-        }
+    if (!accessToken) {
+        return null;
     }
 
-    const session = await getServerSession(authOptions);
-    return parseUserId(session?.user?.id);
+    try {
+        const claims = await verifyAccessToken(accessToken);
+        return parseUserId(claims.sub);
+    } catch {
+        return null;
+    }
 }
 
 export async function resolveCurrentSessionFamilyId(

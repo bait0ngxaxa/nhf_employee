@@ -14,12 +14,12 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { signIn } from "next-auth/react";
 import { useTitle } from "@/hooks/useTitle";
 import Link from "next/link";
 import { Loader2 } from "lucide-react";
 import { apiPost } from "@/lib/api-client";
 import { API_ROUTES, APP_ROUTES } from "@/lib/ssot/routes";
+import { useAuth } from "@/components/auth/HybridAuthProvider";
 
 // Type definitions for API response
 interface User {
@@ -46,6 +46,7 @@ export function SignupForm({
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState("");
     const router = useRouter();
+    const { refreshUser } = useAuth();
     useTitle("สมัครสมาชิก | NHFapp");
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -83,22 +84,17 @@ export function SignupForm({
             if (result.success) {
                 const data = result.data;
 
-                // Step 1: Create NextAuth session (for useSession() on client)
-                const signInResult = await signIn("credentials", {
+                const loginResult = await apiPost(API_ROUTES.auth.hybridLogin, {
                     email: formData.email.trim().toLowerCase(),
                     password: formData.password,
-                    redirect: false,
                 });
 
-                if (signInResult?.error) {
+                if (!loginResult.success) {
                     setError("สมัครสมาชิกสำเร็จ แต่เข้าสู่ระบบอัตโนมัติล้มเหลว กรุณาเข้าสู่ระบบด้วยตนเอง");
                     return;
                 }
 
-                // Hybrid auth session is bootstrapped automatically by
-                // DashboardProvider when the dashboard mounts, so we only
-                // need the NextAuth session established above.
-
+                await refreshUser();
                 toast.success("สมัครสมาชิกสำเร็จ!", {
                     description: `ยินดีต้อนรับ${data.user?.name ? ` ${data.user.name}` : ""}! บัญชีของคุณถูกสร้างเรียบร้อยแล้ว`,
                 });

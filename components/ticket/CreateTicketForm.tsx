@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from 'react';
-import { useSession } from 'next-auth/react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -13,9 +12,10 @@ import { type CreateTicketFormProps, type TicketFormData } from '@/types/tickets
 import { TICKET_CATEGORIES, TICKET_PRIORITIES } from '@/constants/tickets';
 import { apiPost } from "@/lib/api-client";
 import { Loader2 } from "lucide-react";
+import { useAuth } from "@/components/auth/HybridAuthProvider";
 
 export default function CreateTicketForm({ isOpen, onClose, onTicketCreated }: CreateTicketFormProps) {
-  const { data: session } = useSession();
+  const { user } = useAuth();
   const [formData, setFormData] = useState<TicketFormData>({
     title: '',
     description: '',
@@ -82,7 +82,7 @@ export default function CreateTicketForm({ isOpen, onClose, onTicketCreated }: C
 
 
 
-  if (!session) {
+  if (!user) {
     return (
       <Dialog open={isOpen} onOpenChange={onClose}>
         <DialogContent className="sm:max-w-md">

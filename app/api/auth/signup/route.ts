@@ -3,16 +3,22 @@ import bcrypt from "bcryptjs";
 
 import { createAuditLog } from "@/lib/audit";
 import {
-    clearSignupRateLimit,
-    isSignupRateLimited,
-    recordSignupAttempt,
-} from "@/lib/auth-signup-rate-limit";
+    clearAuthIdentityRateLimit,
+    isAuthRateLimited,
+    recordAuthAttempt,
+} from "@/lib/auth-rate-limit";
 import { AUTH_SIGNUP_MESSAGES } from "@/lib/auth-ssot";
 import { withTrustedMutation } from "@/lib/auth-csrf";
 import { getClientMetadata } from "@/lib/hybrid-auth-session";
 import { prisma } from "@/lib/prisma";
 import { isBootstrapAdminEmail } from "@/lib/ssot/admin-bootstrap";
 import { signupSchema } from "@/lib/validations/auth";
+
+const SIGNUP_RATE_LIMIT_POLICY = {
+    windowMs: 60 * 60 * 1000,
+    maxAttemptsPerIdentity: 5,
+    maxAttemptsPerIp: 25,
+} as const;
 
 export const POST = withTrustedMutation(
     async (request: NextRequest): Promise<NextResponse> => {
@@ -33,15 +39,20 @@ export const POST = withTrustedMutation(
             const { email, password } = parsed.data;
             const metadata = getClientMetadata(request);
             const { ipAddress } = metadata;
+            const rateLimitInput = {
+                scope: "signup",
+                identity: email,
+                ipAddress,
+            };
 
-            if (isSignupRateLimited(email, ipAddress)) {
+            if (isAuthRateLimited(rateLimitInput, SIGNUP_RATE_LIMIT_POLICY)) {
                 return NextResponse.json(
                     { error: AUTH_SIGNUP_MESSAGES.rateLimitedThai },
                     { status: 429 },
                 );
             }
 
-            recordSignupAttempt(email, ipAddress);
+            recordAuthAttempt(rateLimitInput, SIGNUP_RATE_LIMIT_POLICY);
 
             const existingUser = await prisma.user.findUnique({
                 where: { email },
@@ -93,7 +104,7 @@ export const POST = withTrustedMutation(
                 },
             });
 
-            clearSignupRateLimit(email, ipAddress);
+            clearAuthIdentityRateLimit(rateLimitInput);
 
             await createAuditLog({
                 action: "USER_CREATE",
@@ -115,9 +126,7 @@ export const POST = withTrustedMutation(
             });
 
             // Session creation is handled on the client side via
-            // signIn("credentials") → NextAuth session, then
-            // POST /api/auth/bootstrap → hybrid auth session.
-            // This avoids the duplicate session bug.
+            // POST /api/auth/hybrid-login after signup succeeds.
             return NextResponse.json(
                 {
                     message: AUTH_SIGNUP_MESSAGES.signupSuccessThai,

@@ -13,16 +13,24 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { useState, useEffect } from "react";
-import { signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Loader2 } from "lucide-react";
-import { APP_ROUTES } from "@/lib/ssot/routes";
+import { apiPost } from "@/lib/api-client";
+import { API_ROUTES, APP_ROUTES } from "@/lib/ssot/routes";
+import { useAuth } from "@/components/auth/HybridAuthProvider";
 
 // Type definitions for login
 interface LoginFormData {
     email: string;
     password: string;
+}
+
+function resolveLoginErrorMessage(error: string): string {
+    if (error === "Invalid email or password") {
+        return "อีเมลหรือรหัสผ่านไม่ถูกต้อง";
+    }
+    return "เกิดข้อผิดพลาดในการเข้าสู่ระบบ";
 }
 
 export function LoginForm({
@@ -37,6 +45,7 @@ export function LoginForm({
     const [error, setError] = useState("");
     const router = useRouter();
     const searchParams = useSearchParams();
+    const { refreshUser } = useAuth();
 
     // Check for success message from signup
     useEffect(() => {
@@ -56,27 +65,23 @@ export function LoginForm({
         setIsLoading(true);
 
         try {
-            const result = await signIn("credentials", {
-                email: formData.email,
+            const result = await apiPost(API_ROUTES.auth.hybridLogin, {
+                email: formData.email.trim().toLowerCase(),
                 password: formData.password,
-                redirect: false,
             });
 
-            if (result?.error) {
-                setError("อีเมลหรือรหัสผ่านไม่ถูกต้อง");
-            } else if (result?.ok) {
-                // Hybrid auth session is bootstrapped automatically by
-                // DashboardProvider when the dashboard mounts.
-                toast.success("เข้าสู่ระบบสำเร็จ!", {
-                    description: "ยินดีต้อนรับ! กำลังนำคุณไปยังหน้าแดชบอร์ด",
-                });
-                // Reset form
-                setFormData({ email: "", password: "" });
-                // Redirect to dashboard after a short delay
-                setTimeout(() => {
-                    router.push(APP_ROUTES.dashboard);
-                }, 1500);
+            if (!result.success) {
+                setError(resolveLoginErrorMessage(result.error));
+                return;
             }
+
+            await refreshUser();
+            toast.success("เข้าสู่ระบบสำเร็จ!", {
+                description: "ยินดีต้อนรับ! กำลังนำคุณไปยังหน้าแดชบอร์ด",
+            });
+            setFormData({ email: "", password: "" });
+            router.push(APP_ROUTES.dashboard);
+            router.refresh();
         } catch {
             setError("เกิดข้อผิดพลาดในการเข้าสู่ระบบ");
         } finally {

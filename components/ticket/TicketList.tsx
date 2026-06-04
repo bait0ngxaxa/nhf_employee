@@ -1,6 +1,5 @@
 "use client";
 
-import { useSession } from "next-auth/react";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
     Card,
@@ -15,12 +14,13 @@ import { type TicketListProps } from "@/types/tickets";
 import { useTicketList } from "@/hooks/useTicketList";
 import { TicketCard } from "./TicketCard";
 import { TicketFiltersCard } from "./TicketFiltersCard";
+import { useAuth } from "@/components/auth/HybridAuthProvider";
 
 export default function TicketList({
     onTicketSelect,
     refreshTrigger,
 }: TicketListProps) {
-    const { data: session } = useSession();
+    const { user } = useAuth();
     const {
         tickets,
         loading,
@@ -32,7 +32,7 @@ export default function TicketList({
         isNewTicket,
     } = useTicketList(refreshTrigger);
 
-    if (!session) {
+    if (!user) {
         return (
             <Card>
                 <CardContent className="p-6">

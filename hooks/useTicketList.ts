@@ -1,11 +1,11 @@
 "use client";
 
 import { useState, useCallback, useEffect } from "react";
-import { useSession } from "next-auth/react";
 import useSWR from "swr";
 import { type Ticket } from "@/types/tickets";
 import { PAGINATION_DEFAULTS } from "@/constants/ui";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
+import { useAuth } from "@/components/auth/HybridAuthProvider";
 
 interface TicketFilters {
     status: string;
@@ -48,7 +48,7 @@ const defaultPagination: Pagination = {
 };
 
 export function useTicketList(refreshTrigger?: number): UseTicketListReturn {
-    const { data: session } = useSession();
+    const { user } = useAuth();
     const [filters, setFilters] = useState<TicketFilters>(initialFilters);
     const [page, setPage] = useState(1);
     const debouncedSearch = useDebouncedValue(filters.search, 300);
@@ -65,7 +65,7 @@ export function useTicketList(refreshTrigger?: number): UseTicketListReturn {
         searchParams.append("search", debouncedSearch.trim());
     }
 
-    const swrKey = session ? `/api/tickets?${searchParams.toString()}` : null;
+    const swrKey = user ? `/api/tickets?${searchParams.toString()}` : null;
 
     const { data, isLoading, error: swrError, mutate } = useSWR(swrKey);
 

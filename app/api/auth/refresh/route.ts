@@ -12,9 +12,12 @@ import {
     HYBRID_REFRESH_COOKIE_NAME,
     clearHybridAuthCookies,
     getClientMetadata,
+    setHybridAccessCookie,
     setHybridAuthCookies,
 } from "@/lib/hybrid-auth-session";
 import { prisma } from "@/lib/prisma";
+
+const REFRESH_ROTATION_GRACE_MS = 10_000;
 
 function unauthorizedResponse(): NextResponse {
     const response = NextResponse.json({ error: AUTH_ERROR_MESSAGES.unauthorized }, { status: 401 });
@@ -48,6 +51,49 @@ async function logRefreshSecurityEvent(input: {
     });
 }
 
+function isWithinRotationGrace(input: {
+    lastUsedAt: Date | null;
+    revokedAt: Date | null;
+    now: Date;
+}): boolean {
+    if (!input.lastUsedAt || !input.revokedAt) {
+        return false;
+    }
+
+    const elapsedMs = input.now.getTime() - input.lastUsedAt.getTime();
+    return elapsedMs >= 0 && elapsedMs <= REFRESH_ROTATION_GRACE_MS;
+}
+
+async function hasSuccessorToken(rotatedFromId: string): Promise<boolean> {
+    const successor = await prisma.authRefreshToken.findFirst({
+        where: {
+            rotatedFromId,
+            revokedAt: null,
+            expiresAt: { gt: new Date() },
+        },
+        select: { id: true },
+    });
+
+    return Boolean(successor);
+}
+
+async function buildAccessOnlyRefreshResponse(input: {
+    userId: number;
+    role: string;
+    familyId: string;
+    tokenVersion: number;
+}): Promise<NextResponse> {
+    const accessToken = await issueAccessToken({
+        userId: input.userId,
+        role: input.role,
+        sessionId: input.familyId,
+        tokenVersion: input.tokenVersion,
+    });
+    const response = NextResponse.json({ success: true });
+    setHybridAccessCookie(response, accessToken);
+    return response;
+}
+
 export const POST = withTrustedMutation(async (request: NextRequest): Promise<NextResponse> => {
     try {
         const metadata = getClientMetadata(request);
@@ -71,7 +117,39 @@ export const POST = withTrustedMutation(async (request: NextRequest): Promise<Ne
         }
 
         const now = new Date();
-        if (existingToken.revokedAt || existingToken.expiresAt <= now) {
+        if (existingToken.revokedAt) {
+            const isRecentRotation = isWithinRotationGrace({
+                lastUsedAt: existingToken.lastUsedAt,
+                revokedAt: existingToken.revokedAt,
+                now,
+            });
+
+            if (
+                isRecentRotation &&
+                existingToken.user.isActive &&
+                await hasSuccessorToken(existingToken.id)
+            ) {
+                return buildAccessOnlyRefreshResponse({
+                    userId: existingToken.userId,
+                    role: existingToken.user.role,
+                    familyId: existingToken.familyId,
+                    tokenVersion: existingToken.user.tokenVersion ?? 1,
+                });
+            }
+
+            await revokeFamily(existingToken.familyId);
+            await logRefreshSecurityEvent({
+                userId: existingToken.userId,
+                email: existingToken.user.email,
+                familyId: existingToken.familyId,
+                reason: "refresh_token_reuse_or_expired",
+                ipAddress: metadata.ipAddress,
+                userAgent: metadata.userAgent,
+            });
+            return unauthorizedResponse();
+        }
+
+        if (existingToken.expiresAt <= now) {
             await revokeFamily(existingToken.familyId);
             await logRefreshSecurityEvent({
                 userId: existingToken.userId,
@@ -111,23 +189,35 @@ export const POST = withTrustedMutation(async (request: NextRequest): Promise<Ne
             tokenVersion: existingToken.user.tokenVersion ?? 1,
         });
 
-        await prisma.$transaction([
-            prisma.authRefreshToken.update({
-                where: { id: existingToken.id },
-                data: { revokedAt: now, lastUsedAt: now },
-            }),
-            prisma.authRefreshToken.create({
-                data: {
-                    userId: nextToken.record.userId,
-                    tokenHash: nextToken.record.tokenHash,
-                    familyId: nextToken.record.familyId,
-                    rotatedFromId: existingToken.id,
-                    expiresAt: nextToken.record.expiresAt,
-                    userAgent: nextToken.record.userAgent,
-                    ipAddress: nextToken.record.ipAddress,
-                },
-            }),
-        ]);
+        const claimedToken = await prisma.authRefreshToken.updateMany({
+            where: { id: existingToken.id, revokedAt: null },
+            data: { revokedAt: now, lastUsedAt: now },
+        });
+
+        if (claimedToken.count === 0) {
+            if (await hasSuccessorToken(existingToken.id)) {
+                return buildAccessOnlyRefreshResponse({
+                    userId: existingToken.userId,
+                    role: existingToken.user.role,
+                    familyId: existingToken.familyId,
+                    tokenVersion: existingToken.user.tokenVersion ?? 1,
+                });
+            }
+
+            return unauthorizedResponse();
+        }
+
+        await prisma.authRefreshToken.create({
+            data: {
+                userId: nextToken.record.userId,
+                tokenHash: nextToken.record.tokenHash,
+                familyId: nextToken.record.familyId,
+                rotatedFromId: existingToken.id,
+                expiresAt: nextToken.record.expiresAt,
+                userAgent: nextToken.record.userAgent,
+                ipAddress: nextToken.record.ipAddress,
+            },
+        });
 
         const response = NextResponse.json({ success: true });
         setHybridAuthCookies(response, accessToken, nextToken.rawToken);

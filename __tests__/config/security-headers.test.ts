@@ -23,5 +23,20 @@ describe("security headers config", () => {
         expect(headerMap.get("Content-Security-Policy")).toContain(
             "default-src 'self'",
         );
+        expect(headerMap.get("Content-Security-Policy")).toContain(
+            "object-src 'none'",
+        );
+        expect(headerMap.get("Content-Security-Policy")).toContain(
+            "base-uri 'self'",
+        );
+        expect(headerMap.get("Content-Security-Policy")).toContain(
+            "form-action 'self'",
+        );
+        expect(headerMap.get("Content-Security-Policy")).toContain(
+            "frame-ancestors 'none'",
+        );
+        expect(headerMap.get("Content-Security-Policy")).not.toContain(
+            "'unsafe-eval'",
+        );
     });
 });

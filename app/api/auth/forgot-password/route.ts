@@ -3,12 +3,19 @@ import crypto from "crypto";
 
 import { sendEmail } from "@/lib/email";
 import { generatePasswordResetEmailHTML } from "@/lib/email/templates/password-reset";
+import { isAuthRateLimited, recordAuthAttempt } from "@/lib/auth-rate-limit";
 import { prisma } from "@/lib/prisma";
 import { forgotPasswordSchema } from "@/lib/validations/auth";
 import { AUTH_FORGOT_PASSWORD_MESSAGES } from "@/lib/auth-ssot";
+import { getClientMetadata } from "@/lib/hybrid-auth-session";
 
 const MAX_REQUESTS_PER_HOUR = 3;
 const TOKEN_EXPIRY_HOURS = 1;
+const FORGOT_PASSWORD_RATE_LIMIT_POLICY = {
+    windowMs: 60 * 60 * 1000,
+    maxAttemptsPerIdentity: MAX_REQUESTS_PER_HOUR,
+    maxAttemptsPerIp: 30,
+} as const;
 
 function hashToken(token: string): string {
     return crypto.createHash("sha256").update(token).digest("hex");
@@ -45,10 +52,21 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
         const { email } = result.data;
         const normalizedEmail = email.toLowerCase().trim();
+        const metadata = getClientMetadata(request);
+        const rateLimitInput = {
+            scope: "forgot-password",
+            identity: normalizedEmail,
+            ipAddress: metadata.ipAddress,
+        };
 
-        if (await isRateLimited(normalizedEmail)) {
+        if (
+            isAuthRateLimited(rateLimitInput, FORGOT_PASSWORD_RATE_LIMIT_POLICY) ||
+            await isRateLimited(normalizedEmail)
+        ) {
             return acceptedResponse();
         }
+
+        recordAuthAttempt(rateLimitInput, FORGOT_PASSWORD_RATE_LIMIT_POLICY);
 
         const user = await prisma.user.findUnique({
             where: { email: normalizedEmail },

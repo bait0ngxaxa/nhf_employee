@@ -1,10 +1,8 @@
-import { getServerSession } from "next-auth";
 import { type NextRequest, NextResponse } from "next/server";
 
 import { AUTH_ERROR_MESSAGES } from "@/lib/auth-ssot";
 import { withTrustedMutation } from "@/lib/auth-csrf";
 import { logAuthEvent } from "@/lib/audit";
-import { authOptions } from "@/lib/auth";
 import {
     HYBRID_ACCESS_COOKIE_NAME,
     clearHybridAuthCookies,
@@ -15,17 +13,16 @@ import { prisma } from "@/lib/prisma";
 
 async function resolveUserId(request: NextRequest): Promise<number | null> {
     const accessToken = request.cookies.get(HYBRID_ACCESS_COOKIE_NAME)?.value;
-    if (accessToken) {
-        try {
-            const claims = await verifyAccessToken(accessToken);
-            return parseUserId(claims.sub);
-        } catch {
-            // fall back to NextAuth session
-        }
+    if (!accessToken) {
+        return null;
     }
 
-    const session = await getServerSession(authOptions);
-    return parseUserId(session?.user?.id);
+    try {
+        const claims = await verifyAccessToken(accessToken);
+        return parseUserId(claims.sub);
+    } catch {
+        return null;
+    }
 }
 
 export const POST = withTrustedMutation(async (request: NextRequest): Promise<NextResponse> => {

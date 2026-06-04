@@ -1,22 +1,16 @@
 "use client";
 
-import { useSession, signOut } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { User, LogOut } from "lucide-react";
 import Link from "next/link";
-import { logoutHybridSession } from "@/lib/client-auth";
 import { isValidSessionUser } from "@/lib/auth-ssot";
 import { APP_ROUTES } from "@/lib/ssot/routes";
+import { useAuth } from "@/components/auth/HybridAuthProvider";
 
 export function AuthStatus() {
-    const { data: session, status } = useSession();
-    const hasValidSession = isValidSessionUser(session?.user);
-
-    const handleSignOut = async (): Promise<void> => {
-        await logoutHybridSession();
-        await signOut();
-    };
+    const { user, status, signOut } = useAuth();
+    const hasValidSession = isValidSessionUser(user);
 
     if (status === "loading") {
         return <Skeleton className="h-9 w-28 rounded-md" />;
@@ -29,15 +23,15 @@ export function AuthStatus() {
                     <User className="h-4 w-4 text-gray-600" />
                     <div className="text-sm">
                         <p className="font-medium text-gray-900">
-                            {session.user?.name}
+                            {user?.name}
                         </p>
                         <p className="text-gray-500">
-                            {session.user?.department}
+                            {user?.department}
                         </p>
                     </div>
                 </div>
                 <Button
-                    onClick={() => void handleSignOut()}
+                    onClick={() => void signOut()}
                     variant="outline"
                     size="sm"
                     className="flex items-center space-x-2"

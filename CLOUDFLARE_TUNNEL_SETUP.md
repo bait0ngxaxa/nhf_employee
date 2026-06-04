@@ -91,7 +91,7 @@ ingress:
       service:
           http://localhost:3000
 
-          # เพิ่มบรรทัดนี้ — ให้ NextAuth session ทำงานได้
+          # เพิ่มบรรทัดนี้ — ให้ hybrid auth endpoints ทำงานได้
     - hostname: approve.baitongtestdeploy.online
       path: /api/auth/*
       service: http://localhost:3000

@@ -1,9 +1,8 @@
 // @vitest-environment node
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { cookiesMock, getServerSessionMock, verifyAccessTokenMock, prismaMock } = vi.hoisted(() => ({
+const { cookiesMock, verifyAccessTokenMock, prismaMock } = vi.hoisted(() => ({
     cookiesMock: vi.fn(),
-    getServerSessionMock: vi.fn(),
     verifyAccessTokenMock: vi.fn(),
     prismaMock: {
         user: {
@@ -14,10 +13,6 @@ const { cookiesMock, getServerSessionMock, verifyAccessTokenMock, prismaMock } =
 
 vi.mock("next/headers", () => ({
     cookies: cookiesMock,
-}));
-
-vi.mock("next-auth", () => ({
-    getServerSession: getServerSessionMock,
 }));
 
 vi.mock("@/lib/hybrid-auth-tokens", () => ({
@@ -33,7 +28,6 @@ import { getApiAuthSession } from "@/lib/server-auth";
 describe("server auth tokenVersion validation", () => {
     beforeEach(() => {
         vi.clearAllMocks();
-        getServerSessionMock.mockResolvedValue(null);
         cookiesMock.mockResolvedValue({
             get: vi.fn(() => ({ value: "access.token" })),
         });

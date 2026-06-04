@@ -75,7 +75,7 @@ describe("StockAdminReports", () => {
             );
         });
 
-        expect(screen.getByRole("combobox", { name: "เลือกปีรีพอร์ตวัสดุ" })).toHaveTextContent(
+        expect(await screen.findByRole("combobox", { name: "เลือกปีรีพอร์ตวัสดุ" })).toHaveTextContent(
             "2031",
         );
         await waitFor(() => {

@@ -10,6 +10,7 @@ const { prismaMock } = vi.hoisted(() => ({
     prismaMock: {
         authRefreshToken: {
             findUnique: vi.fn(),
+            findFirst: vi.fn(),
             updateMany: vi.fn(),
             update: vi.fn(),
             create: vi.fn(),
@@ -57,6 +58,8 @@ describe("Hybrid auth routes", () => {
     beforeEach(() => {
         vi.clearAllMocks();
         prismaMock.$transaction.mockResolvedValue(undefined);
+        prismaMock.authRefreshToken.findFirst.mockResolvedValue(null);
+        prismaMock.authRefreshToken.updateMany.mockResolvedValue({ count: 1 });
     });
 
     it("refresh rotates token and returns success", async () => {
@@ -76,16 +79,22 @@ describe("Hybrid auth routes", () => {
         const response = await refreshRoute(request);
 
         expect(response.status).toBe(200);
-        expect(prismaMock.$transaction).toHaveBeenCalledTimes(1);
+        expect(prismaMock.authRefreshToken.updateMany).toHaveBeenCalledWith({
+            where: { id: "rt1", revokedAt: null },
+            data: { revokedAt: expect.any(Date), lastUsedAt: expect.any(Date) },
+        });
+        expect(prismaMock.authRefreshToken.create).toHaveBeenCalledTimes(1);
         expect(response.headers.get("set-cookie")).toContain("nhf_at=");
     });
 
     it("refresh revokes family on reused token", async () => {
+        const oldDate = new Date(Date.now() - 60_000);
         prismaMock.authRefreshToken.findUnique.mockResolvedValue({
             id: "rt1",
             userId: 1,
             familyId: "family-1",
-            revokedAt: new Date("2025-01-01T00:00:00.000Z"),
+            revokedAt: oldDate,
+            lastUsedAt: oldDate,
             expiresAt: new Date("2030-01-01T00:00:00.000Z"),
             user: { id: 1, email: "u@test.com", role: "ADMIN", isActive: true },
         });
@@ -101,6 +110,31 @@ describe("Hybrid auth routes", () => {
             where: { familyId: "family-1", revokedAt: null },
             data: { revokedAt: expect.any(Date) },
         });
+    });
+
+    it("refresh allows recently rotated token for multi-tab race", async () => {
+        const now = new Date();
+        prismaMock.authRefreshToken.findUnique.mockResolvedValue({
+            id: "rt1",
+            userId: 1,
+            familyId: "family-1",
+            revokedAt: now,
+            lastUsedAt: now,
+            expiresAt: new Date("2030-01-01T00:00:00.000Z"),
+            user: { id: 1, email: "u@test.com", role: "ADMIN", isActive: true, tokenVersion: 1 },
+        });
+        prismaMock.authRefreshToken.findFirst.mockResolvedValue({ id: "rt2" });
+
+        const request = new NextRequest("http://localhost/api/auth/refresh", {
+            method: "POST",
+            headers: { ...csrfHeaders, cookie: "nhf_rt=old-refresh-token" },
+        });
+        const response = await refreshRoute(request);
+
+        expect(response.status).toBe(200);
+        expect(prismaMock.authRefreshToken.updateMany).not.toHaveBeenCalled();
+        expect(prismaMock.authRefreshToken.create).not.toHaveBeenCalled();
+        expect(response.headers.get("set-cookie")).toContain("nhf_at=");
     });
 
     it("logout revokes current refresh token", async () => {

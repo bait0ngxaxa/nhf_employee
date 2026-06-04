@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import { AUTH_ERROR_MESSAGES, authLoginUserSelect } from "@/lib/auth-ssot";
 import { withTrustedMutation } from "@/lib/auth-csrf";
+import { isAuthRateLimited, recordAuthAttempt } from "@/lib/auth-rate-limit";
 import { logAuthEvent } from "@/lib/audit";
 import { setHybridAuthCookies, getClientMetadata } from "@/lib/hybrid-auth-session";
 import { buildRefreshTokenRecord, issueAccessToken } from "@/lib/hybrid-auth-tokens";
@@ -13,6 +14,12 @@ const hybridLoginSchema = z.object({
     email: z.string().email(),
     password: z.string().min(1),
 });
+
+const LOGIN_RATE_LIMIT_POLICY = {
+    windowMs: 15 * 60 * 1000,
+    maxAttemptsPerIdentity: 8,
+    maxAttemptsPerIp: 40,
+} as const;
 
 export const POST = withTrustedMutation(async (request: NextRequest): Promise<NextResponse> => {
     try {
@@ -24,6 +31,17 @@ export const POST = withTrustedMutation(async (request: NextRequest): Promise<Ne
         }
 
         const normalizedEmail = parsed.data.email.trim().toLowerCase();
+        const metadata = getClientMetadata(request);
+        const rateLimitInput = {
+            scope: "login",
+            identity: normalizedEmail,
+            ipAddress: metadata.ipAddress,
+        };
+
+        if (isAuthRateLimited(rateLimitInput, LOGIN_RATE_LIMIT_POLICY)) {
+            return NextResponse.json({ error: AUTH_ERROR_MESSAGES.unauthorized }, { status: 429 });
+        }
+
         const user = await prisma.user.findUnique({
             where: { email: normalizedEmail },
             select: authLoginUserSelect,
@@ -34,13 +52,13 @@ export const POST = withTrustedMutation(async (request: NextRequest): Promise<Ne
             : false;
 
         if (!user || !isPasswordValid || !user.isActive || user.deletedAt) {
+            recordAuthAttempt(rateLimitInput, LOGIN_RATE_LIMIT_POLICY);
             await logAuthEvent("LOGIN_FAILED", user?.id, normalizedEmail, {
                 metadata: { method: "hybrid_login", reason: "invalid_credentials_or_inactive" },
             });
             return NextResponse.json({ error: AUTH_ERROR_MESSAGES.invalidEmailOrPassword }, { status: 401 });
         }
 
-        const metadata = getClientMetadata(request);
         const refreshDraft = buildRefreshTokenRecord({
             userId: user.id,
             userAgent: metadata.userAgent,

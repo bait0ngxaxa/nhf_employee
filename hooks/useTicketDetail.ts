@@ -1,9 +1,9 @@
 "use client";
 
 import { useState, useCallback, useEffect } from "react";
-import { useSession } from "next-auth/react";
 import useSWR from "swr";
 import { apiPost, apiPatch } from "@/lib/api-client";
+import { useAuth } from "@/components/auth/HybridAuthProvider";
 
 interface Comment {
     id: number;
@@ -76,7 +76,7 @@ export function useTicketDetail(
     ticketId: number,
     onTicketUpdated?: () => void,
 ): UseTicketDetailReturn {
-    const { data: session } = useSession();
+    const { user } = useAuth();
     const [newComment, setNewComment] = useState("");
     const [commentLoading, setCommentLoading] = useState(false);
     const [updateLoading, setUpdateLoading] = useState(false);
@@ -149,13 +149,13 @@ export function useTicketDetail(
         }
     }, [ticketId, statusUpdate, ticket?.status, onTicketUpdated, mutate]);
 
-    const isAdmin = session?.user?.role === "ADMIN";
+    const isAdmin = user?.role === "ADMIN";
     const isOwner =
-        ticket && session && ticket.reportedBy.id === parseInt(session.user.id);
+        ticket && user && ticket.reportedBy.id === parseInt(user.id, 10);
     const canComment =
         isAdmin ||
         isOwner ||
-        ticket?.assignedTo?.id === parseInt(session?.user?.id || "");
+        ticket?.assignedTo?.id === parseInt(user?.id || "", 10);
 
     return {
         ticket,

@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useCallback, useMemo, useEffect, useRef, type ReactNode } from "react";
-import { useSession } from "next-auth/react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import useSWR from "swr";
 import { type TicketStats, type Ticket } from "@/types/tickets";
@@ -12,6 +11,7 @@ import {
     type ITSupportDataContextValue,
     type ITSupportUIContextValue,
 } from "./types";
+import { useAuth } from "@/components/auth/HybridAuthProvider";
 
 interface ITSupportProviderProps {
     children: ReactNode;
@@ -43,7 +43,8 @@ const defaultStats: TicketStats = {
 };
 
 export function ITSupportProvider({ children }: ITSupportProviderProps) {
-    const { data: session } = useSession();
+    const { user } = useAuth();
+    const session = useMemo(() => (user ? { user } : null), [user]);
     const router = useRouter();
     const pathname = usePathname();
     const searchParams = useSearchParams();
@@ -142,15 +143,15 @@ export function ITSupportProvider({ children }: ITSupportProviderProps) {
                 ? tickets.filter(
                       (t) =>
                           t.assignedTo?.id ===
-                          parseInt(session?.user?.id || "0"),
+                          parseInt(user?.id || "0", 10),
                   ).length
                 : tickets.filter(
                       (t) =>
                           t.reportedBy.id ===
-                          parseInt(session?.user?.id || "0"),
+                          parseInt(user?.id || "0", 10),
                   ).length,
         };
-    }, [data, isAdmin, session]);
+    }, [data, isAdmin, user?.id]);
 
     const handleTicketCreated = useCallback(() => {
         mutate();

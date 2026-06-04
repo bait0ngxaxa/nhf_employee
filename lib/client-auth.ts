@@ -64,6 +64,6 @@ export async function logoutHybridSession(path = API_ROUTES.auth.logout): Promis
             headers: AUTH_MUTATION_HEADERS,
         });
     } catch {
-        // Best-effort logout; caller will still clear NextAuth session.
+        // Best-effort logout; caller will still clear client auth state.
     }
 }

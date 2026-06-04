@@ -68,6 +68,13 @@ export function setHybridAuthCookies(
     response.cookies.set(HYBRID_REFRESH_COOKIE_NAME, refreshToken, getRefreshCookieOptions());
 }
 
+export function setHybridAccessCookie(
+    response: NextResponse,
+    accessToken: string,
+): void {
+    response.cookies.set(HYBRID_ACCESS_COOKIE_NAME, accessToken, getAccessCookieOptions());
+}
+
 export function clearHybridAuthCookies(response: NextResponse): void {
     response.cookies.set(HYBRID_ACCESS_COOKIE_NAME, "", {
         httpOnly: true,

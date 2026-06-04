@@ -25,13 +25,14 @@ export function toDashboardTabPath(tab: string): string {
 
 export const API_ROUTES = {
     auth: {
-        bootstrap: "/api/auth/bootstrap",
         forgotPassword: "/api/auth/forgot-password",
+        hybridLogin: "/api/auth/hybrid-login",
         resetPassword: "/api/auth/reset-password",
         signup: "/api/auth/signup",
         refresh: "/api/auth/refresh",
         logout: "/api/auth/logout",
         logoutAll: "/api/auth/logout-all",
+        me: "/api/auth/me",
         sessions: "/api/auth/sessions",
         revokeSession: "/api/auth/sessions/revoke",
         cleanup: "/api/auth/cleanup",

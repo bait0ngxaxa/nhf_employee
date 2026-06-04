@@ -2,7 +2,7 @@ import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
 import { Toaster } from "sonner";
-import { SessionProvider } from "../components/auth/SessionProvider";
+import { HybridAuthProvider } from "../components/auth/HybridAuthProvider";
 import { SWRProvider } from "../components/providers/SWRProvider";
 
 const googleSans = localFont({
@@ -37,8 +37,8 @@ export default function RootLayout({
                 >
                     ข้ามไปเนื้อหาหลัก
                 </a>
-                <SessionProvider>
-                    <SWRProvider>
+                <SWRProvider>
+                    <HybridAuthProvider>
                         {children}
                         <Toaster 
                             position="top-right"
@@ -51,8 +51,8 @@ export default function RootLayout({
                                 },
                             }}
                         />
-                    </SWRProvider>
-                </SessionProvider>
+                    </HybridAuthProvider>
+                </SWRProvider>
             </body>
         </html>
     );
