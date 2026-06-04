@@ -41,7 +41,10 @@ function buildTicketEmailData(): TicketEmailData {
 
 describe("email template XSS escaping", () => {
     it("escapes user controlled ticket fields in new ticket emails", () => {
-        const html = generateNewTicketEmailHTML(buildTicketEmailData());
+        const html = generateNewTicketEmailHTML(
+            buildTicketEmailData(),
+            "https://example.com/dashboard/it-issues",
+        );
 
         expectEscapedHtml(html);
         expect(html).toContain("รายละเอียดบรรทัดสอง");
@@ -52,6 +55,7 @@ describe("email template XSS escaping", () => {
         const html = generateStatusUpdateEmailHTML(
             buildTicketEmailData(),
             "OPEN",
+            "https://example.com/dashboard/it-issues",
         );
 
         expectEscapedHtml(html);
@@ -77,7 +81,7 @@ describe("email template XSS escaping", () => {
             employeeEmail: "user@example.com",
             status: "REJECTED",
             reason: XSS_PAYLOAD,
-        });
+        }, "https://example.com/dashboard/leave");
 
         expectEscapedHtml(actionHtml);
         expectEscapedHtml(resultHtml);

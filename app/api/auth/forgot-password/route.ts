@@ -8,6 +8,7 @@ import { prisma } from "@/lib/prisma";
 import { forgotPasswordSchema } from "@/lib/validations/auth";
 import { AUTH_FORGOT_PASSWORD_MESSAGES } from "@/lib/auth-ssot";
 import { getClientMetadata } from "@/lib/hybrid-auth-session";
+import { buildPublicUrl } from "@/lib/public-url";
 
 const MAX_REQUESTS_PER_HOUR = 3;
 const TOKEN_EXPIRY_HOURS = 1;
@@ -96,14 +97,14 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
             },
         });
 
-        const baseUrl = process.env.NEXTAUTH_URL || "http://localhost:3000";
-        const resetUrl = `${baseUrl}/reset-password?token=${rawToken}`;
+        const resetUrl = buildPublicUrl("/reset-password", request);
+        resetUrl.searchParams.set("token", rawToken);
 
         await sendEmail({
             to: user.email,
             subject: AUTH_FORGOT_PASSWORD_MESSAGES.resetSubjectThai,
-            html: generatePasswordResetEmailHTML(resetUrl, user.name),
-            text: AUTH_FORGOT_PASSWORD_MESSAGES.resetMailTextThai(user.name, resetUrl),
+            html: generatePasswordResetEmailHTML(resetUrl.toString(), user.name),
+            text: AUTH_FORGOT_PASSWORD_MESSAGES.resetMailTextThai(user.name, resetUrl.toString()),
         });
 
         return acceptedResponse();

@@ -5,6 +5,10 @@ import { NextRequest } from "next/server";
 import { POST as refreshRoute } from "@/app/api/auth/refresh/route";
 import { POST as logoutRoute } from "@/app/api/auth/logout/route";
 import { POST as logoutAllRoute } from "@/app/api/auth/logout-all/route";
+import {
+    HYBRID_ACCESS_COOKIE_NAME,
+    HYBRID_REFRESH_COOKIE_NAME,
+} from "@/lib/hybrid-auth-constants";
 
 const { prismaMock } = vi.hoisted(() => ({
     prismaMock: {
@@ -74,9 +78,10 @@ describe("Hybrid auth routes", () => {
 
         const request = new NextRequest("http://localhost/api/auth/refresh", {
             method: "POST",
-            headers: { ...csrfHeaders, cookie: "nhf_rt=old-refresh-token" },
+            headers: { ...csrfHeaders, cookie: `${HYBRID_REFRESH_COOKIE_NAME}=old-refresh-token` },
         });
         const response = await refreshRoute(request);
+        const setCookie = response.headers.get("set-cookie") ?? "";
 
         expect(response.status).toBe(200);
         expect(prismaMock.authRefreshToken.updateMany).toHaveBeenCalledWith({
@@ -84,7 +89,10 @@ describe("Hybrid auth routes", () => {
             data: { revokedAt: expect.any(Date), lastUsedAt: expect.any(Date) },
         });
         expect(prismaMock.authRefreshToken.create).toHaveBeenCalledTimes(1);
-        expect(response.headers.get("set-cookie")).toContain("nhf_at=");
+        expect(setCookie).toContain(`${HYBRID_ACCESS_COOKIE_NAME}=`);
+        expect(setCookie).toContain(`${HYBRID_REFRESH_COOKIE_NAME}=`);
+        expect(setCookie).toContain("Path=/");
+        expect(setCookie).toContain("Secure");
     });
 
     it("refresh revokes family on reused token", async () => {
@@ -101,7 +109,7 @@ describe("Hybrid auth routes", () => {
 
         const request = new NextRequest("http://localhost/api/auth/refresh", {
             method: "POST",
-            headers: { ...csrfHeaders, cookie: "nhf_rt=old-refresh-token" },
+            headers: { ...csrfHeaders, cookie: `${HYBRID_REFRESH_COOKIE_NAME}=old-refresh-token` },
         });
         const response = await refreshRoute(request);
 
@@ -127,14 +135,14 @@ describe("Hybrid auth routes", () => {
 
         const request = new NextRequest("http://localhost/api/auth/refresh", {
             method: "POST",
-            headers: { ...csrfHeaders, cookie: "nhf_rt=old-refresh-token" },
+            headers: { ...csrfHeaders, cookie: `${HYBRID_REFRESH_COOKIE_NAME}=old-refresh-token` },
         });
         const response = await refreshRoute(request);
 
         expect(response.status).toBe(200);
         expect(prismaMock.authRefreshToken.updateMany).not.toHaveBeenCalled();
         expect(prismaMock.authRefreshToken.create).not.toHaveBeenCalled();
-        expect(response.headers.get("set-cookie")).toContain("nhf_at=");
+        expect(response.headers.get("set-cookie")).toContain(`${HYBRID_ACCESS_COOKIE_NAME}=`);
     });
 
     it("logout revokes current refresh token", async () => {
@@ -146,13 +154,13 @@ describe("Hybrid auth routes", () => {
 
         const request = new NextRequest("http://localhost/api/auth/logout", {
             method: "POST",
-            headers: { ...csrfHeaders, cookie: "nhf_rt=old-refresh-token" },
+            headers: { ...csrfHeaders, cookie: `${HYBRID_REFRESH_COOKIE_NAME}=old-refresh-token` },
         });
         const response = await logoutRoute(request);
 
         expect(response.status).toBe(200);
         expect(prismaMock.authRefreshToken.update).toHaveBeenCalledTimes(1);
-        expect(response.headers.get("set-cookie")).toContain("nhf_rt=");
+        expect(response.headers.get("set-cookie")).toContain(`${HYBRID_REFRESH_COOKIE_NAME}=`);
     });
 
     it("logout-all revokes all active refresh tokens for authenticated user", async () => {
@@ -161,7 +169,7 @@ describe("Hybrid auth routes", () => {
 
         const request = new NextRequest("http://localhost/api/auth/logout-all", {
             method: "POST",
-            headers: { ...csrfHeaders, cookie: "nhf_at=access-token" },
+            headers: { ...csrfHeaders, cookie: `${HYBRID_ACCESS_COOKIE_NAME}=access-token` },
         });
         const response = await logoutAllRoute(request);
 

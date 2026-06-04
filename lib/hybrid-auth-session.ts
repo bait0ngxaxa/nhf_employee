@@ -11,10 +11,6 @@ import {
 
 export { HYBRID_ACCESS_COOKIE_NAME, HYBRID_REFRESH_COOKIE_NAME } from "@/lib/hybrid-auth-constants";
 
-function isProduction(): boolean {
-    return process.env.NODE_ENV === "production";
-}
-
 export function getClientMetadata(request: NextRequest): {
     ipAddress?: string;
     userAgent?: string;
@@ -36,7 +32,7 @@ function getAccessCookieOptions(): {
 } {
     return {
         httpOnly: true,
-        secure: isProduction(),
+        secure: true,
         sameSite: "lax",
         path: "/",
         maxAge: getAccessTokenTtlSeconds(),
@@ -52,9 +48,9 @@ function getRefreshCookieOptions(): {
 } {
     return {
         httpOnly: true,
-        secure: isProduction(),
+        secure: true,
         sameSite: "lax",
-        path: "/api/auth",
+        path: "/",
         maxAge: getRefreshTokenTtlSeconds(),
     };
 }
@@ -78,16 +74,16 @@ export function setHybridAccessCookie(
 export function clearHybridAuthCookies(response: NextResponse): void {
     response.cookies.set(HYBRID_ACCESS_COOKIE_NAME, "", {
         httpOnly: true,
-        secure: isProduction(),
+        secure: true,
         sameSite: "lax",
         path: "/",
         maxAge: 0,
     });
     response.cookies.set(HYBRID_REFRESH_COOKIE_NAME, "", {
         httpOnly: true,
-        secure: isProduction(),
+        secure: true,
         sameSite: "lax",
-        path: "/api/auth",
+        path: "/",
         maxAge: 0,
     });
 }

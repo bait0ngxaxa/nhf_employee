@@ -9,6 +9,7 @@ import { generateNewTicketEmailHTML } from "./templates/new-ticket";
 import { generateStatusUpdateEmailHTML } from "./templates/status-update";
 import { generateLeaveActionEmailHTML } from "./templates/leave-action";
 import { generateLeaveResultEmailHTML } from "./templates/leave-result";
+import { getPublicOrigin } from "@/lib/public-url";
 
 // Create transporter (singleton pattern using closure)
 let transporter: nodemailer.Transporter | null = null;
@@ -143,19 +144,18 @@ export async function sendEmail(emailData: EmailData): Promise<boolean> {
 export async function sendNewTicketNotification(
     ticketData: TicketEmailData
 ): Promise<boolean> {
+    const ticketUrl = `${getPublicOrigin()}/dashboard/it-issues`;
     const emailData: EmailData = {
         to: ticketData.reportedBy.email,
         subject: `[NHF IT] Ticket #${ticketData.ticketId} ถูกสร้างแล้ว - ${ticketData.title}`,
-        html: generateNewTicketEmailHTML(ticketData),
+        html: generateNewTicketEmailHTML(ticketData, ticketUrl),
         text: `Ticket #${ticketData.ticketId} ถูกสร้างแล้ว\n\nหัวข้อ: ${
             ticketData.title
         }\nคำอธิบาย: ${ticketData.description}\nสถานะ: ${getTicketStatusLabel(
             ticketData.status
         )}\nความสำคัญ: ${getTicketPriorityLabel(
             ticketData.priority
-        )}\n\nดู Ticket ได้ที่: ${
-            process.env.NEXTAUTH_URL
-        }/dashboard/it-issues`,
+        )}\n\nดู Ticket ได้ที่: ${ticketUrl}`,
     };
 
     return await sendEmail(emailData);
@@ -165,12 +165,13 @@ export async function sendStatusUpdateNotification(
     ticketData: TicketEmailData,
     oldStatus: string
 ): Promise<boolean> {
+    const ticketUrl = `${getPublicOrigin()}/dashboard/it-issues`;
     const emailData: EmailData = {
         to: ticketData.reportedBy.email,
         subject: `[NHF IT] อัพเดทสถานะ Ticket #${
             ticketData.ticketId
         } - ${getTicketStatusLabel(ticketData.status)}`,
-        html: generateStatusUpdateEmailHTML(ticketData, oldStatus),
+        html: generateStatusUpdateEmailHTML(ticketData, oldStatus, ticketUrl),
         text: `สถานะ Ticket #${
             ticketData.ticketId
         } ได้รับการอัพเดท\n\nหัวข้อ: ${
@@ -179,9 +180,7 @@ export async function sendStatusUpdateNotification(
             oldStatus
         )}\nสถานะใหม่: ${getTicketStatusLabel(
             ticketData.status
-        )}\n\nดู Ticket ได้ที่: ${
-            process.env.NEXTAUTH_URL
-        }/dashboard/it-issues`,
+        )}\n\nดู Ticket ได้ที่: ${ticketUrl}`,
     };
 
     return await sendEmail(emailData);
@@ -195,21 +194,20 @@ export async function sendITTeamNotification(
         return false;
     }
 
+    const ticketUrl = `${getPublicOrigin()}/dashboard/it-issues`;
     const emailData: EmailData = {
         to: itTeamEmail,
         subject: `[NHF IT] Ticket ${
             ticketData.priority === "URGENT" ? "เร่งด่วน" : "ความสำคัญสูง"
         } #${ticketData.ticketId} - ${ticketData.title}`,
-        html: generateNewTicketEmailHTML(ticketData),
+        html: generateNewTicketEmailHTML(ticketData, ticketUrl),
         text: `Ticket ใหม่ที่ต้องให้ความสำคัญ\n\nTicket #${
             ticketData.ticketId
         }\nหัวข้อ: ${ticketData.title}\nผู้แจ้ง: ${
             ticketData.reportedBy.name
         }\nความสำคัญ: ${getTicketPriorityLabel(
             ticketData.priority
-        )}\n\nดู Ticket ได้ที่: ${
-            process.env.NEXTAUTH_URL
-        }/dashboard/it-issues`,
+        )}\n\nดู Ticket ได้ที่: ${ticketUrl}`,
     };
 
     return await sendEmail(emailData);
@@ -234,10 +232,11 @@ export async function sendLeaveResultNotification(
     employeeEmail: string,
     data: LeaveResultPayload
 ): Promise<boolean> {
+    const dashboardUrl = `${getPublicOrigin()}/dashboard/leave`;
     const emailData: EmailData = {
         to: employeeEmail,
         subject: `[NHF Leave] ผลการอนุมัติลางานของคุณ: ${data.status === "APPROVED" ? "อนุมัติ" : "ไม่อนุมัติ"}`,
-        html: generateLeaveResultEmailHTML(data),
+        html: generateLeaveResultEmailHTML(data, dashboardUrl),
         text: `ผลการพิจารณาลางาน: ${data.status}\nเหตุผล: ${data.reason || "-"}`,
     };
 

@@ -8,6 +8,9 @@ const { cookiesMock, verifyAccessTokenMock, prismaMock } = vi.hoisted(() => ({
         user: {
             findUnique: vi.fn(),
         },
+        authRefreshToken: {
+            findUnique: vi.fn(),
+        },
     },
 }));
 
@@ -16,6 +19,7 @@ vi.mock("next/headers", () => ({
 }));
 
 vi.mock("@/lib/hybrid-auth-tokens", () => ({
+    hashRefreshToken: (token: string): string => `hashed:${token}`,
     verifyAccessToken: verifyAccessTokenMock,
 }));
 
@@ -24,13 +28,20 @@ vi.mock("@/lib/prisma", () => ({
 }));
 
 import { getApiAuthSession } from "@/lib/server-auth";
+import {
+    HYBRID_ACCESS_COOKIE_NAME,
+    HYBRID_REFRESH_COOKIE_NAME,
+} from "@/lib/hybrid-auth-constants";
 
 describe("server auth tokenVersion validation", () => {
     beforeEach(() => {
         vi.clearAllMocks();
         cookiesMock.mockResolvedValue({
-            get: vi.fn(() => ({ value: "access.token" })),
+            get: vi.fn((name: string) =>
+                name === HYBRID_ACCESS_COOKIE_NAME ? { value: "access.token" } : undefined,
+            ),
         });
+        prismaMock.authRefreshToken.findUnique.mockResolvedValue(null);
     });
 
     it("returns null when access token version mismatches current user tokenVersion", async () => {
@@ -53,6 +64,40 @@ describe("server auth tokenVersion validation", () => {
 
         const session = await getApiAuthSession();
         expect(session).toBeNull();
+    });
+
+    it("returns session from valid refresh token when access token is missing", async () => {
+        cookiesMock.mockResolvedValue({
+            get: vi.fn((name: string) =>
+                name === HYBRID_REFRESH_COOKIE_NAME ? { value: "refresh.token" } : undefined,
+            ),
+        });
+        prismaMock.authRefreshToken.findUnique.mockResolvedValue({
+            userId: 1,
+            revokedAt: null,
+            expiresAt: new Date(Date.now() + 60_000),
+        });
+        prismaMock.user.findUnique.mockResolvedValue({
+            id: 1,
+            role: "ADMIN",
+            email: "admin@test.com",
+            name: "Admin",
+            isActive: true,
+            tokenVersion: 2,
+            employee: null,
+        });
+
+        const session = await getApiAuthSession();
+
+        expect(session?.user.email).toBe("admin@test.com");
+        expect(prismaMock.authRefreshToken.findUnique).toHaveBeenCalledWith({
+            where: { tokenHash: "hashed:refresh.token" },
+            select: {
+                expiresAt: true,
+                revokedAt: true,
+                userId: true,
+            },
+        });
     });
 });
 

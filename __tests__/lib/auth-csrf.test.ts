@@ -31,8 +31,8 @@ describe("auth csrf guard", () => {
         expect(response).toBeNull();
     });
 
-    it("allows requests when origin matches NEXTAUTH_URL behind reverse proxy", () => {
-        vi.stubEnv("NEXTAUTH_URL", "https://approve.example.com");
+    it("allows requests when origin matches PUBLIC_APPROVE_URL behind reverse proxy", () => {
+        vi.stubEnv("PUBLIC_APPROVE_URL", "https://approve.example.com");
 
         const request = new NextRequest("http://localhost/api/auth/refresh", {
             method: "POST",
@@ -46,8 +46,8 @@ describe("auth csrf guard", () => {
         expect(response).toBeNull();
     });
 
-    it("rejects when origin matches neither nextUrl nor NEXTAUTH_URL", () => {
-        vi.stubEnv("NEXTAUTH_URL", "https://approve.example.com");
+    it("rejects when origin matches neither nextUrl nor PUBLIC_APPROVE_URL", () => {
+        vi.stubEnv("PUBLIC_APPROVE_URL", "https://approve.example.com");
 
         const request = new NextRequest("http://localhost/api/auth/refresh", {
             method: "POST",

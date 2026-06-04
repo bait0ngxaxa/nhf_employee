@@ -9,7 +9,10 @@ import {
 import { formatDateTime } from "@/lib/helpers/date-helpers";
 import { escapeHtml, textToHtml } from "./html";
 
-export function generateNewTicketEmailHTML(data: TicketEmailData): string {
+export function generateNewTicketEmailHTML(
+    data: TicketEmailData,
+    ticketUrl: string,
+): string {
     const title = escapeHtml(data.title);
     const description = textToHtml(data.description);
     const reporterName = escapeHtml(data.reportedBy.name);
@@ -181,9 +184,7 @@ export function generateNewTicketEmailHTML(data: TicketEmailData): string {
               </div>
 
               <div style="text-align: center; margin-top: 30px;">
-                  <a href="${
-                      process.env.NEXTAUTH_URL
-                  }/dashboard/it-issues" class="button">
+                  <a href="${ticketUrl}" class="button">
                       ดู Ticket ในระบบ
                   </a>
               </div>

@@ -2,7 +2,12 @@ import { jwtVerify } from "jose";
 import { NextResponse, type NextRequest } from "next/server";
 
 import { hasRequiredAccessClaims } from "@/lib/auth-ssot";
-import { HYBRID_ACCESS_COOKIE_NAME, getHybridSecretKey } from "@/lib/hybrid-auth-constants";
+import {
+    HYBRID_ACCESS_COOKIE_NAME,
+    HYBRID_REFRESH_COOKIE_NAME,
+    getHybridSecretKey,
+} from "@/lib/hybrid-auth-constants";
+import { buildPublicUrl } from "@/lib/public-url";
 
 const PUBLIC_ROUTES = new Set([
     "/",
@@ -35,13 +40,14 @@ export default async function middleware(request: NextRequest): Promise<NextResp
     const isPublicRoute = PUBLIC_ROUTES.has(pathname);
 
     const isAuthenticated = await hasValidHybridAccessToken(request);
+    const hasRefreshToken = Boolean(request.cookies.get(HYBRID_REFRESH_COOKIE_NAME)?.value);
 
     if (isAuthenticated && (pathname === "/login" || pathname === "/signup")) {
-        return NextResponse.redirect(new URL("/dashboard", request.url));
+        return NextResponse.redirect(buildPublicUrl("/dashboard", request));
     }
 
-    if (!isPublicRoute && !isAuthenticated) {
-        return NextResponse.redirect(new URL("/login", request.url));
+    if (!isPublicRoute && !isAuthenticated && !hasRefreshToken) {
+        return NextResponse.redirect(buildPublicUrl("/login", request));
     }
 
     return NextResponse.next();

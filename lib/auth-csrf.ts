@@ -1,14 +1,15 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { AUTH_ERROR_MESSAGES } from "@/lib/auth-ssot";
+import { getConfiguredPublicOrigin } from "@/lib/public-url";
 
 const AJAX_HEADER_NAME = "x-requested-with";
 const AJAX_HEADER_VALUE = "XMLHttpRequest";
 
 function buildTrustedOrigins(internalOrigin: string): ReadonlySet<string> {
     const origins = new Set<string>([internalOrigin]);
-    const nextAuthUrl = process.env.NEXTAUTH_URL;
-    if (nextAuthUrl) {
-        origins.add(new URL(nextAuthUrl).origin);
+    const publicOrigin = getConfiguredPublicOrigin();
+    if (publicOrigin) {
+        origins.add(publicOrigin);
     }
 
     return origins;

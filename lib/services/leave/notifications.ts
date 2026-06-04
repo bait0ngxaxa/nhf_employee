@@ -5,6 +5,7 @@ import {
     APP_DASHBOARD_TABS,
     toDashboardTabPath,
 } from "@/lib/ssot/routes";
+import { getPublicOrigin } from "@/lib/public-url";
 
 const LEAVE_TYPE_LABELS: Record<string, string> = {
     SICK: "ลาป่วย",
@@ -28,8 +29,7 @@ export async function sendLeaveActionNotifications(
         throw new Error("Manager or manager email not found");
     }
 
-    const publicBase = process.env.PUBLIC_APPROVE_URL || process.env.NEXTAUTH_URL;
-    const dashboardLink = `${publicBase}${toDashboardTabPath(APP_DASHBOARD_TABS.managerApproval)}`;
+    const dashboardLink = `${getPublicOrigin()}${toDashboardTabPath(APP_DASHBOARD_TABS.managerApproval)}`;
 
     await emailService.sendLeaveActionNotification(
         manager.email,

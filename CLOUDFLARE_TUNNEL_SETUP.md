@@ -141,14 +141,11 @@ cloudflared service install
 เปิดไฟล์ `.env` ของโปรเจค `employee_nhf` แล้วเพิ่ม 1 บรรทัดดังนี้:
 
 ```env
-# URL ภายในองค์กร (ใช้สำหรับตอนคนอยู่ในออฟฟิศ)
-NEXTAUTH_URL=http://192.168.1.100:3000
-
 # URL สาธารณะ ผ่าน Cloudflare Tunnel (สร้างขึ้นใหม่)
 PUBLIC_APPROVE_URL=https://approve.baitongtestdeploy.online
 ```
 
-> **Note:** โค้ดในส่วนของการสร้าง "Magic Link" จะถูกปรับให้อ่าน `PUBLIC_APPROVE_URL` ก่อน ถ้าใน `.env` ไม่ได้ระบุไว้ มันจะ fallback กลับไปใช้ `NEXTAUTH_URL` แทน
+> **Note:** โค้ดในส่วนของการสร้างลิงก์สาธารณะจะอ่าน `PUBLIC_APPROVE_URL` เท่านั้น เพื่อไม่ให้สับสนกับ URL ภายในหรือ localhost
 
 ---
 

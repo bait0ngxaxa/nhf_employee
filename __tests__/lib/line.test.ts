@@ -28,7 +28,7 @@ describe("LINE Notification Service", () => {
         vi.clearAllMocks();
         process.env.LINE_IT_CHANNEL_ACCESS_TOKEN = "test_token";
         process.env.LINE_IT_TEAM_USER_ID = "user_123";
-        process.env.NEXTAUTH_URL = "http://localhost:3000";
+        process.env.PUBLIC_APPROVE_URL = "http://localhost:3000";
 
         fetchMock.mockResolvedValue({
             ok: true,

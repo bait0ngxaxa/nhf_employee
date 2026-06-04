@@ -11,13 +11,14 @@ import { generateTicketFlexMessage } from "./flex-messages/ticket";
 import { generateEmailRequestFlexMessage } from "./flex-messages/email-request";
 import { generateStockLowFlexMessage } from "./flex-messages/stock-low";
 import { generateStockRequestFlexMessage } from "./flex-messages/stock";
+import { getPublicOrigin } from "@/lib/public-url";
 
 // Configuration (read once)
 const getConfig = () => ({
     channelAccessToken: process.env.LINE_IT_CHANNEL_ACCESS_TOKEN || "",
     stockChannelAccessToken: process.env.LINE_STOCK_CHANNEL_ACCESS_TOKEN || "",
     lineWebhookUrl: process.env.LINE_WEBHOOK_URL || "",
-    baseUrl: process.env.NEXTAUTH_URL || "http://localhost:3000",
+    baseUrl: getPublicOrigin(),
     itTeamUserId: process.env.LINE_IT_TEAM_USER_ID || "",
 });
 

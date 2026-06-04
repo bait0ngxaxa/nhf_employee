@@ -97,7 +97,7 @@ npm run check
 - `typecheck`
 - `test:run`
 
-หากระบบอยู่หลัง reverse proxy หรือ Cloudflare ให้ตั้ง `NEXTAUTH_URL` และ `PUBLIC_APPROVE_URL` เป็น public URL จริงของระบบ เช่น `https://approve.example.com`
+หากระบบอยู่หลัง reverse proxy หรือ Cloudflare ให้ตั้ง `PUBLIC_APPROVE_URL` เป็น public URL จริงของระบบ เช่น `https://approve.example.com`
 
 ## หมายเหตุ
 

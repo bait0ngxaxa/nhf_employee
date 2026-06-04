@@ -25,6 +25,7 @@ vi.mock("@/lib/prisma", () => ({
 import middleware from "@/middleware";
 import { POST as logoutAllRoute } from "@/app/api/auth/logout-all/route";
 import { issueAccessToken } from "@/lib/hybrid-auth-tokens";
+import { HYBRID_ACCESS_COOKIE_NAME } from "@/lib/hybrid-auth-constants";
 
 describe("Hybrid critical flow", () => {
     const csrfHeaders = {
@@ -55,7 +56,7 @@ describe("Hybrid critical flow", () => {
             tokenVersion: 1,
         });
         const dashboardRequest = new NextRequest("http://localhost/dashboard", {
-            headers: { cookie: `nhf_at=${accessToken}` },
+            headers: { cookie: `${HYBRID_ACCESS_COOKIE_NAME}=${accessToken}` },
         });
 
         const middlewareResponse = await middleware(dashboardRequest);
@@ -72,7 +73,7 @@ describe("Hybrid critical flow", () => {
 
         const logoutAllRequest = new NextRequest("http://localhost/api/auth/logout-all", {
             method: "POST",
-            headers: { ...csrfHeaders, cookie: `nhf_at=${accessToken}` },
+            headers: { ...csrfHeaders, cookie: `${HYBRID_ACCESS_COOKIE_NAME}=${accessToken}` },
         });
 
         const logoutAllResponse = await logoutAllRoute(logoutAllRequest);

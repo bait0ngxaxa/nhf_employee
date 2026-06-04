@@ -1,19 +1,74 @@
 import { cookies } from "next/headers";
 
 import type { HybridAuthSession } from "@/lib/auth-user";
-import { HYBRID_ACCESS_COOKIE_NAME } from "@/lib/hybrid-auth-constants";
+import {
+    HYBRID_ACCESS_COOKIE_NAME,
+    HYBRID_REFRESH_COOKIE_NAME,
+} from "@/lib/hybrid-auth-constants";
 import { parseUserId } from "@/lib/hybrid-auth-session";
-import { verifyAccessToken } from "@/lib/hybrid-auth-tokens";
+import { hashRefreshToken, verifyAccessToken } from "@/lib/hybrid-auth-tokens";
 import { prisma } from "@/lib/prisma";
 
 export type ApiAuthSession = HybridAuthSession;
 
+type SessionUser = NonNullable<Awaited<ReturnType<typeof findActiveUser>>>;
+
+async function findActiveUser(userId: number) {
+    return prisma.user.findUnique({
+        where: { id: userId, isActive: true },
+        include: {
+            employee: {
+                include: {
+                    dept: { select: { name: true } },
+                    subordinates: { select: { id: true }, take: 1 },
+                },
+            },
+        },
+    });
+}
+
+function toApiAuthSession(user: SessionUser): ApiAuthSession {
+    return {
+        user: {
+            id: String(user.id),
+            role: user.role,
+            email: user.email,
+            name: user.name,
+            department: user.employee?.dept?.name,
+            isManager: (user.employee?.subordinates?.length ?? 0) > 0,
+        },
+    };
+}
+
+async function getSessionFromRefreshToken(refreshToken: string | undefined): Promise<ApiAuthSession | null> {
+    if (!refreshToken) {
+        return null;
+    }
+
+    const record = await prisma.authRefreshToken.findUnique({
+        where: { tokenHash: hashRefreshToken(refreshToken) },
+        select: {
+            expiresAt: true,
+            revokedAt: true,
+            userId: true,
+        },
+    });
+
+    if (!record || record.revokedAt || record.expiresAt <= new Date()) {
+        return null;
+    }
+
+    const user = await findActiveUser(record.userId);
+    return user ? toApiAuthSession(user) : null;
+}
+
 export async function getApiAuthSession(): Promise<ApiAuthSession | null> {
     const cookieStore = await cookies();
     const accessToken = cookieStore.get(HYBRID_ACCESS_COOKIE_NAME)?.value;
+    const refreshToken = cookieStore.get(HYBRID_REFRESH_COOKIE_NAME)?.value;
 
     if (!accessToken) {
-        return null;
+        return getSessionFromRefreshToken(refreshToken);
     }
 
     try {
@@ -23,33 +78,14 @@ export async function getApiAuthSession(): Promise<ApiAuthSession | null> {
             return null;
         }
 
-        const user = await prisma.user.findUnique({
-            where: { id: userId, isActive: true },
-            include: {
-                employee: {
-                    include: {
-                        dept: { select: { name: true } },
-                        subordinates: { select: { id: true }, take: 1 },
-                    },
-                },
-            },
-        });
+        const user = await findActiveUser(userId);
 
         if (!user || claims.tokenVersion !== user.tokenVersion) {
             return null;
         }
 
-        return {
-            user: {
-                id: String(user.id),
-                role: user.role,
-                email: user.email,
-                name: user.name,
-                department: user.employee?.dept?.name,
-                isManager: (user.employee?.subordinates?.length ?? 0) > 0,
-            },
-        };
+        return toApiAuthSession(user);
     } catch {
-        return null;
+        return getSessionFromRefreshToken(refreshToken);
     }
 }

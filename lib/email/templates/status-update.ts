@@ -11,7 +11,8 @@ import { escapeHtml } from "./html";
 
 export function generateStatusUpdateEmailHTML(
     data: TicketEmailData,
-    oldStatus: string
+    oldStatus: string,
+    ticketUrl: string,
 ): string {
     const title = escapeHtml(data.title);
     const reporterName = escapeHtml(data.reportedBy.name);
@@ -201,9 +202,7 @@ export function generateStatusUpdateEmailHTML(
               </div>
 
               <div style="text-align: center; margin-top: 30px;">
-                  <a href="${
-                      process.env.NEXTAUTH_URL
-                  }/dashboard/it-issues" class="button">
+                  <a href="${ticketUrl}" class="button">
                       ดู Ticket ในระบบ
                   </a>
               </div>

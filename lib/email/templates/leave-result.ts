@@ -1,7 +1,10 @@
 import { type LeaveResultPayload } from "../types";
 import { textToHtml } from "./html";
 
-export function generateLeaveResultEmailHTML(data: LeaveResultPayload): string {
+export function generateLeaveResultEmailHTML(
+    data: LeaveResultPayload,
+    dashboardUrl: string,
+): string {
     const statusText = data.status === "APPROVED" ? "อนุมัติ" : "ไม่อนุมัติ";
     const statusColor = data.status === "APPROVED" ? "#10b981" : "#ef4444";
     const reason = data.reason ? textToHtml(data.reason) : "";
@@ -31,7 +34,7 @@ export function generateLeaveResultEmailHTML(data: LeaveResultPayload): string {
 
         <p style="margin-top: 30px;">
             คุณสามารถตรวจสอบข้อมูลและประวัติการลางานทั้งหมดได้ที่:<br>
-            <a href="${process.env.NEXTAUTH_URL}/dashboard/leave" style="color: #3b82f6; text-decoration: none; font-weight: bold;">หน้าแดชบอร์ดการลางานของคุณ</a>
+            <a href="${dashboardUrl}" style="color: #3b82f6; text-decoration: none; font-weight: bold;">หน้าแดชบอร์ดการลางานของคุณ</a>
         </p>
 
         <p style="font-size: 12px; color: #6c757d; margin-top: 40px; border-top: 1px solid #e9ecef; padding-top: 20px;">
