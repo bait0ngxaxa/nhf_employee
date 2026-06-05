@@ -1,12 +1,17 @@
 "use client";
 
 import Image from "next/image";
-import { memo, useCallback, useState } from "react";
+import { memo, useCallback, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Check, Package, Plus, ShoppingCart, X, ZoomIn } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipTrigger,
+} from "@/components/ui/tooltip";
 import type { StockItem } from "../context/stock/types";
 import {
     getBrowseCardImageUrl,
@@ -145,13 +150,22 @@ function BrowseCardBase(props: BrowseCardProps) {
     return (
         <Card className={`group relative h-full overflow-hidden rounded-[1.6rem] border border-slate-200/80 bg-white transition-all duration-500 hover:-translate-y-1 hover:border-orange-200 hover:shadow-[0_28px_60px_-32px_rgba(249,115,22,0.28)] ${isRecentlyAdded ? "ring-2 ring-emerald-300/70 shadow-[0_28px_60px_-32px_rgba(16,185,129,0.35)]" : ""}`}>
             <div className="absolute inset-x-0 -top-px h-px w-full bg-gradient-to-r from-transparent via-orange-300/40 to-transparent opacity-0 transition-opacity duration-500 group-hover:opacity-100" />
-            <CardContent className="flex h-full flex-col gap-3 p-4">
+            <CardContent className="flex h-full flex-col gap-2.5 p-3">
                 <div className="overflow-hidden rounded-[1.35rem] bg-slate-100 ring-1 ring-slate-200 shadow-inner shadow-white/70">
+                    <div className="flex h-9 items-center border-b border-slate-200/80 bg-white/85 px-2 py-1 backdrop-blur">
+                        <Badge
+                            variant="secondary"
+                            className="max-w-full justify-start whitespace-normal border border-indigo-100 bg-indigo-50/85 px-2 text-left text-[11px] leading-tight text-indigo-700 shadow-sm shadow-indigo-100/50 [display:-webkit-box] [overflow-wrap:anywhere] [-webkit-box-orient:vertical] [-webkit-line-clamp:2] hover:bg-indigo-50"
+                            title={item.category.name}
+                        >
+                            {item.category.name}
+                        </Badge>
+                    </div>
                     {imageUrl ? (
                         <button
                             type="button"
                             onClick={() => props.onPreviewImage(imageUrl, item.name)}
-                            className="group/preview relative block h-40 w-full overflow-hidden text-left outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-2"
+                            className="group/preview relative block h-32 w-full overflow-hidden text-left outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-2"
                             aria-label={`ดูรูป ${item.name} แบบพรีวิว`}
                         >
                             <Image
@@ -171,34 +185,25 @@ function BrowseCardBase(props: BrowseCardProps) {
                             </span>
                         </button>
                     ) : (
-                        <div className="flex h-40 items-center justify-center text-slate-400">
+                        <div className="flex h-32 items-center justify-center text-slate-400">
                             <Package className="h-10 w-10" aria-hidden="true" />
                         </div>
                     )}
                 </div>
 
-                <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0 flex-1 space-y-1">
-                        <h3 className="truncate font-bold text-gray-800 transition-colors group-hover:text-orange-700">
-                            {item.name}
-                        </h3>
+                <div className="space-y-1.5">
+                    <StockItemName name={item.name} />
+                    <div className="flex flex-wrap items-start gap-2">
                         <p
                             title={item.sku}
-                            className="truncate rounded-md bg-gray-50 px-1.5 py-0.5 font-mono text-xs font-medium text-gray-400"
+                            className="max-w-full rounded-md bg-gray-50 px-1.5 py-0.5 font-mono text-xs font-medium text-gray-400 [overflow-wrap:anywhere]"
                         >
                             {item.sku}
                         </p>
                     </div>
-                    <Badge
-                        variant="secondary"
-                        className="max-w-[8.5rem] shrink-0 truncate border border-indigo-100 bg-indigo-50/90 px-2.5 text-indigo-700 shadow-sm shadow-indigo-100/60 hover:bg-indigo-100"
-                        title={item.category.name}
-                    >
-                        {item.category.name}
-                    </Badge>
                 </div>
 
-                <div className="min-h-[2.25rem]">
+                <div className="min-h-8">
                     {item.description ? (
                         <p className="line-clamp-2 text-sm text-slate-500">
                             {item.description}
@@ -206,7 +211,7 @@ function BrowseCardBase(props: BrowseCardProps) {
                     ) : null}
                 </div>
 
-                <div className="flex min-h-[6.5rem] flex-col justify-between rounded-[1.2rem] border border-slate-200/80 bg-slate-50 p-3 shadow-inner shadow-white">
+                <div className="flex min-h-[5.75rem] flex-col justify-between rounded-[1.2rem] border border-slate-200/80 bg-slate-50 p-2.5 shadow-inner shadow-white">
                     <div className="min-h-4 text-sm font-medium text-slate-700">
                         {hasSelectableVariants(item) ? (
                             <>มี {variantCount} ตัวเลือก</>
@@ -214,7 +219,7 @@ function BrowseCardBase(props: BrowseCardProps) {
                             variantSummary
                         ) : null}
                     </div>
-                    <div className="space-y-2">
+                    <div className="space-y-1.5">
                         <div className="flex items-center justify-between">
                             <span className="text-xs font-semibold uppercase tracking-wider text-gray-400">
                                 คงเหลือ
@@ -285,6 +290,55 @@ function BrowseCardBase(props: BrowseCardProps) {
 }
 
 const BrowseCard = memo(BrowseCardBase, areBrowseCardPropsEqual);
+
+function StockItemName({ name }: { name: string }) {
+    const titleRef = useRef<HTMLHeadingElement | null>(null);
+    const [isTooltipOpen, setIsTooltipOpen] = useState(false);
+
+    function isNameTruncated(): boolean {
+        const titleElement = titleRef.current;
+
+        if (!titleElement) {
+            return false;
+        }
+
+        return titleElement.scrollWidth > titleElement.clientWidth;
+    }
+
+    function handleTooltipOpenChange(open: boolean): void {
+        if (!open) {
+            setIsTooltipOpen(false);
+            return;
+        }
+
+        setIsTooltipOpen(isNameTruncated());
+    }
+
+    return (
+        <div className="min-w-0 space-y-1">
+            <Tooltip open={isTooltipOpen} onOpenChange={handleTooltipOpenChange}>
+                <TooltipTrigger asChild>
+                    <span className="block min-w-0">
+                        <h3
+                            ref={titleRef}
+                            className="truncate font-bold leading-snug text-gray-800 transition-colors group-hover:text-orange-700"
+                        >
+                            {name}
+                        </h3>
+                    </span>
+                </TooltipTrigger>
+                <TooltipContent
+                    side="top"
+                    align="start"
+                    hideArrow
+                    className="max-w-72 whitespace-normal border border-orange-200 bg-orange-50 text-left leading-snug text-orange-900 shadow-lg shadow-orange-100/70"
+                >
+                    {name}
+                </TooltipContent>
+            </Tooltip>
+        </div>
+    );
+}
 
 function areBrowseCardPropsEqual(
     prev: BrowseCardProps,

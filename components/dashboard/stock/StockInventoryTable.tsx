@@ -99,7 +99,7 @@ export function StockInventoryTable({
                             <TableHead className="border-r border-slate-200 font-semibold text-slate-700">
                                 {STOCK_ADMIN_TEXT.itemName}
                             </TableHead>
-                            <TableHead className="w-40 border-r border-slate-200 font-semibold text-slate-700">
+                            <TableHead className="w-52 border-r border-slate-200 font-semibold text-slate-700">
                                 {STOCK_ADMIN_TEXT.category}
                             </TableHead>
                             <TableHead className="w-32 border-r border-slate-200 text-right font-semibold text-slate-700">
@@ -186,12 +186,12 @@ function InventoryRow({ item, onAdjust, onDelete, deleteDisabled }: InventoryRow
             <TableCell className="border-r border-slate-300 py-4">
                 {item.imageUrl ? <InventoryImage item={item} /> : <ImagePlaceholder />}
             </TableCell>
-            <TableCell className="border-r border-slate-300 py-4 font-mono text-xs font-medium text-slate-600">
+            <TableCell className="border-r border-slate-300 py-4 font-mono text-xs font-medium text-slate-600 [overflow-wrap:anywhere]">
                 {item.sku}
             </TableCell>
             <TableCell className="border-r border-slate-300 py-4">
                 <div className="space-y-1">
-                    <div className="font-semibold text-slate-800">{item.name}</div>
+                    <div className="font-semibold leading-snug text-slate-800 [overflow-wrap:anywhere]">{item.name}</div>
                     {item.description && (
                         <div className="line-clamp-2 text-xs text-slate-500">
                             {item.description}
@@ -200,10 +200,10 @@ function InventoryRow({ item, onAdjust, onDelete, deleteDisabled }: InventoryRow
                     <VariantBreakdown item={item} />
                 </div>
             </TableCell>
-            <TableCell className="border-r border-slate-300 py-4">
+            <TableCell className="border-r border-slate-300 py-4 align-top">
                 <Badge
                     variant="secondary"
-                    className="border-none bg-indigo-50/80 font-medium text-indigo-700 hover:bg-indigo-100"
+                    className="max-w-full justify-start whitespace-normal border-none bg-indigo-50/80 text-left font-medium leading-snug text-indigo-700 [overflow-wrap:anywhere] hover:bg-indigo-100"
                 >
                     {item.category.name}
                 </Badge>

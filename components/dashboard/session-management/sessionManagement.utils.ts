@@ -50,8 +50,21 @@ export function formatRelativeTime(value: string | null): string {
     return formatDateTime(value);
 }
 
-function extractMajorVersion(version: string): string {
-    return version.split(".")[0];
+function parseBrowserName(userAgent: string): string {
+    const browserMatchers: Array<{ pattern: RegExp; name: string }> = [
+        { pattern: /SamsungBrowser\/[\d.]+/, name: "Samsung Internet" },
+        { pattern: /Brave\/[\d.]+/, name: "Brave" },
+        { pattern: /Edg(?:e|A|iOS)?\/[\d.]+/, name: "Microsoft Edge" },
+        { pattern: /(?:OPR|Opera)\/[\d.]+/, name: "Opera" },
+        { pattern: /(?:Firefox|FxiOS)\/[\d.]+/, name: "Mozilla Firefox" },
+        { pattern: /(?:Chrome|CriOS|CriA)\/[\d.]+/, name: "Google Chrome" },
+        { pattern: /Chromium\/[\d.]+/, name: "Chromium" },
+        { pattern: /Version\/[\d.]+.*Safari/, name: "Safari" },
+    ];
+
+    const match = browserMatchers.find((matcher) => matcher.pattern.test(userAgent));
+
+    return match?.name ?? "ไม่ทราบเบราว์เซอร์";
 }
 
 export function parseUserAgent(userAgent: string | null): ParsedUserAgent {
@@ -73,27 +86,7 @@ export function parseUserAgent(userAgent: string | null): ParsedUserAgent {
         deviceType = "tablet";
     }
 
-    let browser = "ไม่ทราบเบราว์เซอร์";
-    const edgMatch = ua.match(/Edg(?:e|A|iOS)?\/([\d.]+)/);
-    const braveMatch = ua.match(/Brave\/([\d.]+)/);
-    const operaMatch = ua.match(/(?:OPR|Opera)\/([\d.]+)/);
-    const chromeMatch = ua.match(/Chrome\/([\d.]+)/);
-    const firefoxMatch = ua.match(/Firefox\/([\d.]+)/);
-    const safariMatch = ua.match(/Version\/([\d.]+).*Safari/);
-
-    if (braveMatch) {
-        browser = `Brave ${extractMajorVersion(braveMatch[1])}`;
-    } else if (edgMatch) {
-        browser = `Edge ${extractMajorVersion(edgMatch[1])}`;
-    } else if (operaMatch) {
-        browser = `Opera ${extractMajorVersion(operaMatch[1])}`;
-    } else if (chromeMatch && !safariMatch) {
-        browser = `Chrome ${extractMajorVersion(chromeMatch[1])}`;
-    } else if (firefoxMatch) {
-        browser = `Firefox ${extractMajorVersion(firefoxMatch[1])}`;
-    } else if (safariMatch) {
-        browser = `Safari ${extractMajorVersion(safariMatch[1])}`;
-    }
+    const browser = parseBrowserName(ua);
 
     let os = "ไม่ทราบ OS";
     if (ua.includes("Windows NT 10.0")) {
