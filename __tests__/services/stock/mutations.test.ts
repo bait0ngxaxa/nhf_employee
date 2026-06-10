@@ -519,5 +519,90 @@ describe("Stock Service Mutations", () => {
                 }),
             );
         });
+
+        it("should skip inactive variant sku when auto-creating the eleventh variant", async () => {
+            const existingVariants = Array.from({ length: 11 }, (_, index) => ({
+                id: 270 + index,
+                sku: `SKU-27-V${index + 1}`,
+                imageUrl: null,
+                isActive: index < 10,
+            }));
+            const submittedVariants = existingVariants
+                .slice(0, 10)
+                .map((variant) => ({
+                    id: variant.id,
+                    sku: variant.sku,
+                    unit: "ชิ้น",
+                    quantity: 1,
+                    minStock: 1,
+                    attributes: [{ name: "ลำดับ", value: String(variant.id) }],
+                }));
+
+            prismaMock.stockItem.findUniqueOrThrow.mockResolvedValue(
+                asNever({
+                    id: 27,
+                    sku: "SKU-27",
+                    unit: "ชิ้น",
+                    quantity: 10,
+                    minStock: 1,
+                    imageUrl: null,
+                    isActive: true,
+                }),
+            );
+            prismaMock.stockItemVariant.findMany.mockResolvedValue(
+                asNever(existingVariants),
+            );
+            prismaMock.stockItem.update
+                .mockResolvedValueOnce(
+                    asNever({
+                        id: 27,
+                        sku: "SKU-27",
+                        imageUrl: null,
+                    }),
+                )
+                .mockResolvedValueOnce(asNever({ id: 27 }));
+            prismaMock.stockItemVariant.update.mockResolvedValue(asNever({ id: 270 }));
+            prismaMock.stockItemVariant.create.mockResolvedValueOnce(
+                asNever({ id: 281 }),
+            );
+            prismaMock.stockVariantAttributeValue.deleteMany.mockResolvedValue(
+                asNever({ count: 1 }),
+            );
+            prismaMock.stockAttribute.upsert.mockResolvedValue(asNever({ id: 1 }));
+            prismaMock.stockAttributeValue.upsert.mockResolvedValue(
+                asNever({ id: 11 }),
+            );
+            prismaMock.stockVariantAttributeValue.create.mockResolvedValue(
+                asNever({ variantId: 281, attributeValueId: 11 }),
+            );
+            prismaMock.stockTransaction.findFirst.mockResolvedValue(
+                asNever({ id: 1 }),
+            );
+            prismaMock.stockRequestItem.findFirst.mockResolvedValue(null as never);
+            prismaMock.stockItem.findUnique.mockResolvedValue(
+                asNever({ id: 27, variants: [] }),
+            );
+
+            await stockService.updateItem(27, {
+                variants: [
+                    ...submittedVariants,
+                    {
+                        unit: "ชิ้น",
+                        quantity: 1,
+                        minStock: 1,
+                        attributes: [{ name: "ลำดับ", value: "ใหม่" }],
+                    },
+                ],
+            });
+
+            expect(prismaMock.stockItemVariant.create).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    data: expect.objectContaining({
+                        stockItemId: 27,
+                        sku: "SKU-27-V12",
+                    }),
+                }),
+            );
+        });
     });
 });

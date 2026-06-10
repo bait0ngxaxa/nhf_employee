@@ -17,6 +17,8 @@ import {
     trackUploadUrl,
 } from "./item-update.types";
 
+const MAX_VARIANT_SKU_LENGTH = 50;
+
 async function getItemForVariantUpdate(
     tx: StockTxClient,
     itemId: number,
@@ -94,6 +96,47 @@ function collectSubmittedVariantIds(variants: SubmittedVariant[]): Set<number> {
     );
 }
 
+function buildVariantSku(parentSku: string, suffixNumber: number): string {
+    const suffix = `-V${suffixNumber}`;
+    const base = parentSku.slice(0, MAX_VARIANT_SKU_LENGTH - suffix.length);
+    return `${base}${suffix}`;
+}
+
+function collectUsedVariantSkus(
+    existingVariants: ExistingVariantRecord[],
+    variants: SubmittedVariant[],
+): Set<string> {
+    const usedSkus = new Set(existingVariants.map((variant) => variant.sku));
+
+    for (const variant of variants) {
+        const normalizedSku = variant.sku?.trim();
+        if (normalizedSku) {
+            usedSkus.add(normalizedSku);
+        }
+    }
+
+    return usedSkus;
+}
+
+function createAvailableVariantSku(
+    parentSku: string,
+    preferredNumber: number,
+    usedSkus: Set<string>,
+): string {
+    let nextNumber = preferredNumber;
+
+    while (nextNumber <= Number.MAX_SAFE_INTEGER) {
+        const candidate = buildVariantSku(parentSku, nextNumber);
+        if (!usedSkus.has(candidate)) {
+            usedSkus.add(candidate);
+            return candidate;
+        }
+        nextNumber += 1;
+    }
+
+    throw new Error("ไม่สามารถสร้าง SKU รายการย่อยได้");
+}
+
 async function createSubmittedVariant(
     tx: StockTxClient,
     itemId: number,
@@ -101,13 +144,17 @@ async function createSubmittedVariant(
     parentImageUrl: string | null,
     variant: SubmittedVariant,
     index: number,
+    usedSkus: Set<string>,
     tracking: UploadUrlTracking,
 ): Promise<void> {
     const nextVariantImageUrl = variant.imageUrl ?? parentImageUrl;
+    const normalizedSku = variant.sku?.trim();
+    const nextSku =
+        normalizedSku || createAvailableVariantSku(parentSku, index + 1, usedSkus);
     const createdVariant = await tx.stockItemVariant.create({
         data: {
             stockItemId: itemId,
-            sku: variant.sku?.trim() || `${parentSku}-V${index + 1}`,
+            sku: nextSku,
             unit: variant.unit,
             quantity: variant.quantity,
             minStock: variant.minStock,
@@ -161,6 +208,7 @@ async function syncSubmittedVariants(
     nextItem: Pick<ExistingItemRecord, "sku" | "imageUrl">,
     variants: SubmittedVariant[],
     existingVariantById: Map<number, ExistingVariantRecord>,
+    usedSkus: Set<string>,
     tracking: UploadUrlTracking,
 ): Promise<Set<number>> {
     const submittedIds = collectSubmittedVariantIds(variants);
@@ -176,6 +224,7 @@ async function syncSubmittedVariants(
                 nextItem.imageUrl,
                 variant,
                 index,
+                usedSkus,
                 tracking,
             );
             continue;
@@ -243,6 +292,7 @@ export async function updateItemWithVariants(
     const item = await getItemForVariantUpdate(tx, itemId);
     const existingVariants = await getExistingVariants(tx, itemId, item);
     const existingVariantById = createExistingVariantMap(existingVariants);
+    const usedSkus = collectUsedVariantSkus(existingVariants, variants);
 
     assertSubmittedVariantsExist(variants, existingVariantById);
 
@@ -270,6 +320,7 @@ export async function updateItemWithVariants(
         nextItem,
         variants,
         existingVariantById,
+        usedSkus,
         tracking,
     );
 
