@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { PackagePlus, Plus } from "lucide-react";
+import { PackageSearch, PackagePlus, Plus } from "lucide-react";
 import { Pagination } from "@/components/Pagination";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -13,7 +13,7 @@ import { AddCategoryDialog } from "./StockInventoryDialogs";
 import { EditItemDialog } from "./StockInventoryEditDialog";
 import { StockBrowseFilters } from "./StockBrowseFilters";
 import { StockInventoryTable } from "./StockInventoryTable";
-import { StockLoadingState } from "./StockLoadingState";
+import { StockEmptyState, StockLoadingState } from "./StockLoadingState";
 import { STOCK_ADMIN_TEXT } from "./stockAdminInventory.shared";
 
 export function StockAdminInventory() {
@@ -42,14 +42,14 @@ export function StockAdminInventory() {
         <div className="space-y-4">
             <div className="flex flex-wrap gap-3">
                 <Button
-                    className="bg-blue-600 px-5 font-semibold text-white shadow-sm transition-all hover:bg-blue-700"
+                    className="h-11 bg-blue-600 px-5 font-semibold text-white shadow-sm transition-colors hover:bg-blue-700"
                     onClick={() => setShowAddItem(true)}
                 >
                     <Plus className="mr-1.5 h-4 w-4" /> {STOCK_ADMIN_TEXT.addItem}
                 </Button>
                 <Button
                     variant="outline"
-                    className="border-slate-200 px-5 font-medium text-slate-600 transition-all hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700"
+                    className="h-11 border-slate-200 px-5 font-medium text-slate-600 transition-colors hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700"
                     onClick={() => setShowAddCategory(true)}
                 >
                     <PackagePlus className="mr-1.5 h-4 w-4" />
@@ -68,9 +68,10 @@ export function StockAdminInventory() {
             {isLoading ? (
                 <StockLoadingState message={STOCK_ADMIN_TEXT.loading} />
             ) : items.length === 0 ? (
-                <div className="py-12 text-center text-gray-500">
-                    ไม่พบรายการวัสดุตามเงื่อนไขที่เลือก
-                </div>
+                <StockEmptyState
+                    icon={<PackageSearch className="h-6 w-6" aria-hidden="true" />}
+                    message="ไม่พบรายการวัสดุตามเงื่อนไขที่เลือก"
+                />
             ) : (
                 <>
                     <StockInventoryTable

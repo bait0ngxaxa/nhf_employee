@@ -29,37 +29,45 @@ type StockBrowseCartBarProps = {
 export function StockBrowseCartBar(props: StockBrowseCartBarProps) {
     const [open, setOpen] = useState(false);
 
+    function handleOpenChange(nextOpen: boolean): void {
+        if (props.submitting && !nextOpen) {
+            return;
+        }
+
+        setOpen(nextOpen);
+    }
+
     return (
         <>
             <div className="fixed inset-x-4 bottom-5 z-30 sm:inset-x-auto sm:right-6 sm:w-auto">
                 <Button
                     type="button"
                     onClick={() => setOpen(true)}
-                    className="group/cart-bar flex h-auto w-full items-center justify-between gap-4 rounded-[1.6rem] border border-slate-200 bg-white px-4 py-3 text-left text-slate-800 shadow-[0_24px_60px_-24px_rgba(15,23,42,0.16)] transition-[background-color,border-color,box-shadow,transform] duration-300 ease-out hover:-translate-y-1 hover:border-blue-200 hover:bg-[linear-gradient(135deg,rgba(255,255,255,1),rgba(239,246,255,0.92))] hover:shadow-[0_28px_64px_-28px_rgba(37,99,235,0.26)] sm:min-w-[340px]"
+                    className="group/cart-bar flex h-auto w-full items-center justify-between gap-4 rounded-2xl border border-blue-200 bg-blue-600 px-4 py-3 text-left text-white shadow-lg shadow-blue-900/20 transition-colors duration-200 hover:border-blue-300 hover:bg-blue-700 sm:min-w-[340px]"
                 >
                     <div className="flex items-center gap-3">
-                        <div className="rounded-2xl bg-blue-50 p-2.5 text-blue-700 transition-all duration-300 group-hover/cart-bar:scale-105 group-hover/cart-bar:bg-blue-100">
-                            <ShoppingCart className="h-5 w-5 transition-transform duration-300 group-hover/cart-bar:-rotate-6" />
+                        <div className="rounded-xl bg-white/15 p-2.5 text-white ring-1 ring-white/20 transition-colors duration-200 group-hover/cart-bar:bg-white/20">
+                            <ShoppingCart className="h-5 w-5" />
                         </div>
                         <div>
-                            <div className="text-sm font-semibold">
+                            <div className="text-sm font-semibold leading-5">
                                 รายการเบิก {props.cartSize} รายการ
                             </div>
-                            <div className="text-xs text-slate-500">
+                            <div className="text-xs font-medium leading-5 text-blue-50/85">
                                 รวม {props.cartCount} ชิ้น กดเพื่อเปิดตะกร้า
                             </div>
                         </div>
                     </div>
                     <div className="flex items-center gap-2">
-                        <div className="rounded-full bg-blue-600 px-2.5 py-1 text-xs font-bold text-white shadow-sm transition-all duration-300 group-hover/cart-bar:scale-105 group-hover/cart-bar:shadow-[0_12px_24px_-14px_rgba(37,99,235,0.9)]">
+                        <div className="rounded-full bg-white px-2.5 py-1 text-xs font-bold tabular-nums leading-5 text-blue-700 shadow-sm">
                             {props.cartCount}
                         </div>
-                        <ChevronRight className="h-4 w-4 text-slate-400 transition-transform duration-300 group-hover/cart-bar:translate-x-0.5" />
+                        <ChevronRight className="h-4 w-4 text-blue-100" />
                     </div>
                 </Button>
             </div>
 
-            <Sheet open={open} onOpenChange={setOpen}>
+            <Sheet open={open} onOpenChange={handleOpenChange}>
                 <SheetContent
                     side="right"
                     className="w-full border-l-0 bg-white p-0 sm:max-w-xl"

@@ -1,9 +1,9 @@
 "use client";
 
 import Image from "next/image";
-import { memo, useCallback, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Check, Package, Plus, ShoppingCart, X, ZoomIn } from "lucide-react";
+import { Check, Package, Plus, ShoppingCart, ZoomIn } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -21,6 +21,7 @@ import {
     getVariantAttributeSummary,
     hasSelectableVariants,
 } from "./stockVariant.shared";
+import { StockImagePreviewSurface } from "./StockImagePreviewSurface";
 
 type StockBrowseGridProps = {
     items: StockItem[];
@@ -104,36 +105,27 @@ function ImagePreviewOverlay({
     itemName: string;
     onClose: () => void;
 }) {
+    useEffect(() => {
+        function handleKeyDown(event: KeyboardEvent): void {
+            if (event.key === "Escape") {
+                onClose();
+            }
+        }
+
+        document.addEventListener("keydown", handleKeyDown);
+
+        return () => {
+            document.removeEventListener("keydown", handleKeyDown);
+        };
+    }, [onClose]);
+
     return createPortal(
-        <div
-            className="fixed inset-0 z-[100] flex items-center justify-center bg-white/10 p-4 backdrop-blur-xl sm:p-6"
-            role="dialog"
-            aria-modal="true"
-            aria-label={`พรีวิวรูป ${itemName}`}
-            onClick={onClose}
-        >
-            <div
-                className="relative flex max-h-[86vh] w-full max-w-[860px] items-center justify-center rounded-[1.75rem] border border-white/15 bg-slate-900/80 p-3 shadow-[0_30px_90px_-34px_rgba(0,0,0,0.95)] backdrop-blur-xl sm:p-4"
-                onClick={(event) => event.stopPropagation()}
-            >
-                <button
-                    type="button"
-                    onClick={onClose}
-                    className="group/close absolute right-3 top-3 z-10 flex h-10 w-10 items-center justify-center rounded-2xl border border-white/20 bg-white/90 text-slate-950 shadow-[0_18px_36px_-18px_rgba(0,0,0,0.85)] backdrop-blur-md transition-all duration-200 hover:-translate-y-0.5 hover:rotate-3 hover:bg-white hover:shadow-[0_22px_44px_-18px_rgba(0,0,0,0.95)] focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 sm:right-4 sm:top-4 sm:h-11 sm:w-11"
-                    aria-label="ปิดพรีวิวรูป"
-                >
-                    <X className="h-5 w-5 transition-transform duration-200 group-hover/close:scale-110" aria-hidden="true" />
-                </button>
-                <Image
-                    src={imageUrl}
-                    alt={itemName}
-                    width={1200}
-                    height={900}
-                    unoptimized
-                    className="h-auto max-h-[78vh] w-auto max-w-full rounded-[1.25rem] object-contain"
-                />
-            </div>
-        </div>,
+        <StockImagePreviewSurface
+            imageUrl={imageUrl}
+            itemName={itemName}
+            onClose={onClose}
+            ariaLabel={`พรีวิวรูป ${itemName}`}
+        />,
         document.body,
     );
 }
@@ -148,14 +140,19 @@ function BrowseCardBase(props: BrowseCardProps) {
     const variantSummary = getVariantAttributeSummary(defaultVariant?.attributeValues);
 
     return (
-        <Card className={`group relative h-full overflow-hidden rounded-[1.6rem] border border-slate-200/80 bg-white transition-all duration-500 hover:-translate-y-1 hover:border-orange-200 hover:shadow-[0_28px_60px_-32px_rgba(249,115,22,0.28)] ${isRecentlyAdded ? "ring-2 ring-emerald-300/70 shadow-[0_28px_60px_-32px_rgba(16,185,129,0.35)]" : ""}`}>
-            <div className="absolute inset-x-0 -top-px h-px w-full bg-gradient-to-r from-transparent via-orange-300/40 to-transparent opacity-0 transition-opacity duration-500 group-hover:opacity-100" />
+        <Card className={`group relative h-full overflow-hidden rounded-2xl border bg-white transition-colors duration-200 ${
+            isRecentlyAdded
+                ? "border-emerald-300 ring-2 ring-emerald-300/70"
+                : availableQuantity === 0
+                    ? "border-slate-200/80"
+                    : "border-blue-100/80 hover:border-blue-300"
+        }`}>
             <CardContent className="flex h-full flex-col gap-2.5 p-3">
-                <div className="overflow-hidden rounded-[1.35rem] bg-slate-100 ring-1 ring-slate-200 shadow-inner shadow-white/70">
-                    <div className="flex h-9 items-center border-b border-slate-200/80 bg-white/85 px-2 py-1 backdrop-blur">
+                <div className="overflow-hidden rounded-2xl bg-blue-50/50 ring-1 ring-blue-100 shadow-inner shadow-white/70">
+                    <div className="flex h-9 items-center border-b border-indigo-100/80 bg-indigo-50/80 px-2 py-1 backdrop-blur">
                         <Badge
                             variant="secondary"
-                            className="max-w-full justify-start whitespace-normal border border-indigo-100 bg-indigo-50/85 px-2 text-left text-[11px] leading-tight text-indigo-700 shadow-sm shadow-indigo-100/50 [display:-webkit-box] [overflow-wrap:anywhere] [-webkit-box-orient:vertical] [-webkit-line-clamp:2] hover:bg-indigo-50"
+                            className="max-w-full justify-start whitespace-normal border border-indigo-200 bg-white/85 px-2 text-left text-xs font-medium leading-5 text-indigo-800 shadow-sm shadow-indigo-100/50 [display:-webkit-box] [overflow-wrap:anywhere] [-webkit-box-orient:vertical] [-webkit-line-clamp:2] hover:bg-white"
                             title={item.category.name}
                         >
                             {item.category.name}
@@ -177,15 +174,15 @@ function BrowseCardBase(props: BrowseCardProps) {
                                 fetchPriority={props.isPriorityImage ? "high" : "auto"}
                                 sizes="(min-width: 1280px) 25vw, (min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw"
                                 unoptimized
-                                className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.04] group-hover/preview:scale-[1.08]"
+                                className="h-full w-full object-cover transition-transform duration-200 group-hover/preview:scale-[1.03]"
                             />
                             <span className="absolute inset-0 bg-slate-950/0 transition-colors duration-300 group-hover/preview:bg-slate-950/20" />
-                            <span className="absolute bottom-2 right-2 flex h-8 w-8 translate-y-1 scale-95 items-center justify-center rounded-full bg-white/90 text-slate-700 opacity-0 shadow-lg shadow-slate-900/15 transition-all duration-300 group-hover/preview:translate-y-0 group-hover/preview:scale-110 group-hover/preview:opacity-100 group-hover/preview:text-blue-700 group-focus-visible/preview:translate-y-0 group-focus-visible/preview:scale-110 group-focus-visible/preview:opacity-100 group-focus-visible/preview:text-blue-700">
+                            <span className="absolute bottom-2 right-2 flex h-8 w-8 items-center justify-center rounded-full bg-white/90 text-slate-700 opacity-0 shadow-sm transition-opacity duration-200 group-hover/preview:opacity-100 group-hover/preview:text-blue-700 group-focus-visible/preview:opacity-100 group-focus-visible/preview:text-blue-700">
                                 <ZoomIn className="h-4 w-4" aria-hidden="true" />
                             </span>
                         </button>
                     ) : (
-                        <div className="flex h-32 items-center justify-center text-slate-400">
+                        <div className="flex h-32 items-center justify-center text-blue-300">
                             <Package className="h-10 w-10" aria-hidden="true" />
                         </div>
                     )}
@@ -196,7 +193,7 @@ function BrowseCardBase(props: BrowseCardProps) {
                     <div className="flex flex-wrap items-start gap-2">
                         <p
                             title={item.sku}
-                            className="max-w-full rounded-md bg-gray-50 px-1.5 py-0.5 font-mono text-xs font-medium text-gray-400 [overflow-wrap:anywhere]"
+                            className="max-w-full rounded-md bg-blue-50 px-1.5 py-0.5 font-mono text-xs font-medium leading-5 text-blue-700/70 [overflow-wrap:anywhere]"
                         >
                             {item.sku}
                         </p>
@@ -205,14 +202,14 @@ function BrowseCardBase(props: BrowseCardProps) {
 
                 <div className="min-h-8">
                     {item.description ? (
-                        <p className="line-clamp-2 text-sm text-slate-500">
+                        <p className="line-clamp-2 text-sm leading-6 text-slate-500">
                             {item.description}
                         </p>
                     ) : null}
                 </div>
 
-                <div className="flex min-h-[5.75rem] flex-col justify-between rounded-[1.2rem] border border-slate-200/80 bg-slate-50 p-2.5 shadow-inner shadow-white">
-                    <div className="min-h-4 text-sm font-medium text-slate-700">
+                <div className="flex min-h-[5.75rem] flex-col justify-between rounded-2xl border border-blue-100/80 bg-blue-50/45 p-2.5 shadow-inner shadow-white">
+                    <div className="min-h-5 text-sm font-semibold leading-5 text-blue-950">
                         {hasSelectableVariants(item) ? (
                             <>มี {variantCount} ตัวเลือก</>
                         ) : variantSummary ? (
@@ -221,15 +218,21 @@ function BrowseCardBase(props: BrowseCardProps) {
                     </div>
                     <div className="space-y-1.5">
                         <div className="flex items-center justify-between">
-                            <span className="text-xs font-semibold uppercase tracking-wider text-gray-400">
+                            <span className="text-xs font-semibold leading-5 text-blue-700/75">
                                 คงเหลือ
                             </span>
-                            <span className="rounded-lg bg-white px-2.5 py-1 text-sm font-bold text-slate-700 shadow-sm">
+                            <span
+                                className={`rounded-lg px-2.5 py-1 text-sm font-bold tabular-nums leading-5 shadow-sm ${
+                                    availableQuantity === 0
+                                        ? "bg-slate-100 text-slate-500"
+                                        : "bg-white text-blue-800"
+                                }`}
+                            >
                                 {availableQuantity} {item.unit}
                             </span>
                         </div>
                         <div
-                            className={`min-h-[0.875rem] text-xs ${
+                            className={`min-h-5 text-xs font-medium leading-5 ${
                                 item.reservedQuantity > 0
                                     ? "text-amber-600"
                                     : "text-transparent"
@@ -244,19 +247,19 @@ function BrowseCardBase(props: BrowseCardProps) {
 
                 <div className="mt-auto space-y-2">
                     {totalInCart > 0 && (
-                        <div className="flex min-h-4 items-center gap-2 text-sm font-medium text-orange-700">
+                        <div className="flex min-h-9 items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-sm font-medium leading-5 text-amber-800">
                             <ShoppingCart className="h-4 w-4" aria-hidden="true" />
                             อยู่ในรายการเบิกแล้ว {totalInCart} {item.unit}
                         </div>
                     )}
                     <Button
                         variant="default"
-                        className={`group/button relative isolate w-full overflow-hidden rounded-xl shadow-sm ring-offset-2 transition-all duration-300 focus-visible:ring-2 focus-visible:ring-blue-400 active:translate-y-0.5 active:scale-[0.98] ${
+                        className={`group/button relative isolate w-full overflow-hidden rounded-xl shadow-sm ring-offset-2 transition-colors duration-200 focus-visible:ring-2 focus-visible:ring-blue-400 active:translate-y-0.5 active:scale-[0.98] ${
                             availableQuantity === 0
-                                ? "border-gray-200 bg-gray-50/50 text-gray-400"
+                                ? "border-slate-200 bg-slate-50/50 text-slate-400"
                                 : isRecentlyAdded
-                                  ? "border border-emerald-600 bg-[linear-gradient(135deg,#10B981,#059669)] text-white shadow-[0_16px_30px_-18px_rgba(16,185,129,0.9)] hover:-translate-y-1 hover:shadow-[0_22px_38px_-18px_rgba(16,185,129,0.95)]"
-                                : "border border-blue-600 bg-[linear-gradient(135deg,#2563EB,#1D4ED8)] text-white shadow-[0_16px_30px_-18px_rgba(37,99,235,0.9)] before:absolute before:inset-y-0 before:-left-1/3 before:z-[-1] before:w-1/3 before:-skew-x-12 before:bg-white/25 before:opacity-0 before:transition-all before:duration-700 hover:-translate-y-1 hover:border-blue-700 hover:shadow-[0_24px_42px_-18px_rgba(37,99,235,0.95)] hover:before:left-full hover:before:opacity-100"
+                                  ? "border border-emerald-600 bg-emerald-600 text-white hover:bg-emerald-700"
+                                : "border border-blue-600 bg-blue-600 text-white hover:border-blue-700 hover:bg-blue-700"
                         }`}
                         onClick={() =>
                             hasSelectableVariants(item)
@@ -269,11 +272,11 @@ function BrowseCardBase(props: BrowseCardProps) {
                             <span className="pointer-events-none absolute inset-x-3 bottom-0 h-px bg-white/45 opacity-60 transition-opacity duration-300 group-hover/button:opacity-100" />
                         )}
                         {isRecentlyAdded ? (
-                            <Check className="relative z-10 mr-1 h-4 w-4 transition-transform duration-300 group-hover/button:scale-125 group-active/button:scale-95" aria-hidden="true" />
+                            <Check className="relative z-10 mr-1 h-4 w-4" aria-hidden="true" />
                         ) : (
-                            <Plus className="relative z-10 mr-1 h-4 w-4 transition-transform duration-300 group-hover/button:rotate-90 group-hover/button:scale-125 group-active/button:rotate-180 group-active/button:scale-95" aria-hidden="true" />
+                            <Plus className="relative z-10 mr-1 h-4 w-4" aria-hidden="true" />
                         )}
-                        <span className="relative z-10 transition-transform duration-300 group-hover/button:translate-x-0.5 group-active/button:translate-x-0">
+                        <span className="relative z-10 text-sm font-semibold leading-5">
                             {availableQuantity === 0
                                 ? "สินค้าหมด"
                                 : isRecentlyAdded
@@ -295,14 +298,17 @@ function StockItemName({ name }: { name: string }) {
     const titleRef = useRef<HTMLHeadingElement | null>(null);
     const [isTooltipOpen, setIsTooltipOpen] = useState(false);
 
-    function isNameTruncated(): boolean {
+    function isNameClamped(): boolean {
         const titleElement = titleRef.current;
 
         if (!titleElement) {
             return false;
         }
 
-        return titleElement.scrollWidth > titleElement.clientWidth;
+        return (
+            titleElement.scrollHeight > titleElement.clientHeight
+            || titleElement.scrollWidth > titleElement.clientWidth
+        );
     }
 
     function handleTooltipOpenChange(open: boolean): void {
@@ -311,7 +317,7 @@ function StockItemName({ name }: { name: string }) {
             return;
         }
 
-        setIsTooltipOpen(isNameTruncated());
+        setIsTooltipOpen(isNameClamped());
     }
 
     return (
@@ -321,7 +327,7 @@ function StockItemName({ name }: { name: string }) {
                     <span className="block min-w-0">
                         <h3
                             ref={titleRef}
-                            className="truncate font-bold leading-snug text-gray-800 transition-colors group-hover:text-orange-700"
+                            className="line-clamp-2 min-h-11 text-base font-bold leading-[1.35] text-slate-900 [overflow-wrap:anywhere] transition-colors group-hover:text-blue-800"
                         >
                             {name}
                         </h3>
@@ -331,7 +337,7 @@ function StockItemName({ name }: { name: string }) {
                     side="top"
                     align="start"
                     hideArrow
-                    className="max-w-72 whitespace-normal border border-orange-200 bg-orange-50 text-left leading-snug text-orange-900 shadow-lg shadow-orange-100/70"
+                    className="max-w-72 whitespace-normal border border-blue-200 bg-blue-50 text-left leading-6 text-blue-950 shadow-lg shadow-blue-100/70"
                 >
                     {name}
                 </TooltipContent>

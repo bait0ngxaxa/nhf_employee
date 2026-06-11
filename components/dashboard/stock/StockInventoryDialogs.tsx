@@ -25,6 +25,20 @@ type AdjustDialogProps = {
     onSuccess: () => void;
 };
 
+function closeWhenIdle(loading: boolean, onClose: () => void): void {
+    if (!loading) {
+        onClose();
+    }
+}
+
+function getTrimmedFormText(
+    formData: FormData,
+    fieldName: string,
+): string {
+    const value = formData.get(fieldName);
+    return typeof value === "string" ? value.trim() : "";
+}
+
 export function AdjustDialog({ item, onClose, onSuccess }: AdjustDialogProps) {
     const [loading, setLoading] = useState(false);
 
@@ -55,16 +69,16 @@ export function AdjustDialog({ item, onClose, onSuccess }: AdjustDialogProps) {
     }
 
     return (
-        <Dialog open onOpenChange={onClose}>
+        <Dialog open onOpenChange={() => closeWhenIdle(loading, onClose)}>
             <DialogContent className="overflow-hidden p-0 sm:max-w-[400px]">
-                <div className="border-b border-gray-100 bg-slate-50/50 px-6 py-4">
+                <div className="border-b border-gray-100 bg-slate-50/50 px-5 py-4 sm:px-6">
                     <DialogTitle className="text-lg font-semibold text-slate-800">
                         {STOCK_ADMIN_TEXT.adjustStockTitle}
                     </DialogTitle>
                 </div>
-                <form onSubmit={handleSubmit} className="space-y-5 px-6 py-5">
+                <form onSubmit={handleSubmit} className="space-y-5 px-5 py-5 sm:px-6">
                     <div className="flex flex-col gap-0.5 rounded-xl border border-blue-100/60 bg-blue-50/60 p-3.5 shadow-inner">
-                        <span className="text-[13px] font-semibold uppercase tracking-wider text-blue-800">
+                        <span className="text-sm font-semibold text-blue-800">
                             {item.name}
                         </span>
                         <span className="flex items-center gap-1.5 text-sm font-medium text-blue-600/90">
@@ -110,14 +124,22 @@ export function AddCategoryDialog({
 
     async function handleSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
         event.preventDefault();
-        setLoading(true);
         const formData = new FormData(event.currentTarget);
+        const categoryName = getTrimmedFormText(formData, "name");
+        const categoryDescription = getTrimmedFormText(formData, "description");
+
+        if (!categoryName) {
+            toast.error("กรุณากรอกชื่อหมวดหมู่");
+            return;
+        }
+
+        setLoading(true);
 
         try {
             ensureStockApiSuccess(
                 await apiPost(API_ROUTES.stock.categories, {
-                    name: formData.get("name"),
-                    description: formData.get("description") || null,
+                    name: categoryName,
+                    description: categoryDescription || null,
                 }),
                 STOCK_ADMIN_TEXT.genericError,
             );
@@ -134,14 +156,14 @@ export function AddCategoryDialog({
     }
 
     return (
-        <Dialog open={open} onOpenChange={onClose}>
+        <Dialog open={open} onOpenChange={() => closeWhenIdle(loading, onClose)}>
             <DialogContent className="overflow-hidden p-0 sm:max-w-[400px]">
-                <div className="border-b border-gray-100 bg-slate-50/50 px-6 py-4">
+                <div className="border-b border-gray-100 bg-slate-50/50 px-5 py-4 sm:px-6">
                     <DialogTitle className="text-lg font-semibold text-slate-800">
                         {STOCK_ADMIN_TEXT.addCategoryTitle}
                     </DialogTitle>
                 </div>
-                <form onSubmit={handleSubmit} className="space-y-5 px-6 py-5">
+                <form onSubmit={handleSubmit} className="space-y-5 px-5 py-5 sm:px-6">
                     <DialogTextField
                         id="cat-name"
                         name="name"
@@ -216,20 +238,20 @@ function DialogActions(props: {
     onClose: () => void;
 }) {
     return (
-        <div className="flex justify-end gap-3 pt-3">
+        <div className="flex flex-col-reverse gap-2 pt-3 sm:flex-row sm:justify-end">
             <Button
                 type="button"
                 variant="ghost"
                 onClick={props.onClose}
                 disabled={props.loading}
-                className="h-10 px-5 font-medium text-slate-600 hover:bg-slate-100"
+                className="h-11 px-5 font-medium text-slate-600 hover:bg-slate-100"
             >
                 {STOCK_ADMIN_TEXT.cancel}
             </Button>
             <Button
                 type="submit"
                 disabled={props.loading}
-                className="h-10 bg-blue-600 px-7 font-bold text-white shadow-sm transition-all hover:bg-blue-700"
+                className="h-11 bg-blue-600 px-7 font-bold text-white shadow-sm transition-colors hover:bg-blue-700"
             >
                 {props.loading ? STOCK_ADMIN_TEXT.saving : props.submitLabel}
             </Button>

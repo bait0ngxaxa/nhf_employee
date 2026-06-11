@@ -53,7 +53,7 @@ export function YearlyReportExportPanel({
 }: YearlyReportExportPanelProps) {
     if (layout === "card") {
         return (
-            <div className="rounded-[1.9rem] border border-slate-200/80 bg-[linear-gradient(135deg,rgba(248,250,252,0.98),rgba(255,247,237,0.9))] p-5 shadow-[0_24px_60px_-34px_rgba(15,23,42,0.28)]">
+            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                     <div className="space-y-2">
                         {badge ? badge : null}
@@ -89,9 +89,9 @@ export function YearlyReportExportPanel({
                         {stats.map((stat) => (
                             <div
                                 key={stat.label}
-                                className="rounded-2xl border border-white/80 bg-white/90 p-4 shadow-sm"
+                                className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4"
                             >
-                                <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+                                <div className="flex items-center gap-2 text-xs font-semibold text-slate-500">
                                     {stat.icon}
                                     {stat.label}
                                 </div>

@@ -31,6 +31,7 @@ import {
 } from "@/components/ui/table";
 import { API_ROUTES } from "@/lib/ssot/routes";
 import type { StockItem } from "../context/stock/types";
+import { StockInventoryMobileCards } from "./StockInventoryMobileCards";
 import {
     STOCK_ADMIN_TEXT,
     createDeleteSuccessMessage,
@@ -86,10 +87,17 @@ export function StockInventoryTable({
 
     return (
         <>
-            <div className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200">
-                <Table className="border-separate border-spacing-0">
+            <StockInventoryMobileCards
+                items={items}
+                onAdjust={onAdjust}
+                onDelete={handleDeleteRequest}
+                deleteDisabled={isDeleting}
+            />
+
+            <div className="hidden overflow-x-auto rounded-2xl bg-white shadow-sm ring-1 ring-slate-200 md:block">
+                <Table className="min-w-[900px] border-separate border-spacing-0">
                     <TableHeader>
-                        <TableRow className="border-b-2 border-slate-200 bg-slate-100/80 hover:bg-slate-100/80">
+                        <TableRow className="border-b border-slate-200 bg-slate-50 hover:bg-slate-50">
                             <TableHead className="w-20 border-r border-slate-200 font-semibold text-slate-700">
                                 {STOCK_ADMIN_TEXT.image}
                             </TableHead>
@@ -111,7 +119,7 @@ export function StockInventoryTable({
                             <TableHead className="w-24" />
                         </TableRow>
                     </TableHeader>
-                    <TableBody className="[&_tr:nth-child(odd)]:bg-white [&_tr:nth-child(even)]:bg-slate-100/70">
+                    <TableBody className="[&_tr:nth-child(odd)]:bg-white [&_tr:nth-child(even)]:bg-slate-50/80">
                         {items.map((item) => (
                             <InventoryRow
                                 key={item.id}
@@ -142,7 +150,7 @@ export function StockInventoryTable({
                             ต้องการลบรายการ {pendingDeleteItem?.name} ออกจากสต็อกหรือไม่? การกระทำนี้ไม่สามารถย้อนกลับได้
                         </DialogDescription>
                     </DialogHeader>
-                    <DialogFooter className="gap-2 sm:justify-end">
+                    <DialogFooter className="flex-col-reverse gap-2 sm:flex-row sm:justify-end">
                         <Button
                             variant="outline"
                             onClick={() => setPendingDeleteItem(null)}
@@ -182,14 +190,14 @@ function InventoryRow({ item, onAdjust, onDelete, deleteDisabled }: InventoryRow
     const inventory = getItemInventoryMetrics(item);
 
     return (
-        <TableRow className="border-b-2 border-slate-300 transition-colors hover:bg-blue-100/70">
-            <TableCell className="border-r border-slate-300 py-4">
+        <TableRow className="border-b border-slate-200 transition-colors hover:bg-blue-50/60">
+            <TableCell className="border-r border-slate-200 py-4">
                 {item.imageUrl ? <InventoryImage item={item} /> : <ImagePlaceholder />}
             </TableCell>
-            <TableCell className="border-r border-slate-300 py-4 font-mono text-xs font-medium text-slate-600 [overflow-wrap:anywhere]">
+            <TableCell className="border-r border-slate-200 py-4 font-mono text-xs font-medium text-slate-600 [overflow-wrap:anywhere]">
                 {item.sku}
             </TableCell>
-            <TableCell className="border-r border-slate-300 py-4">
+            <TableCell className="border-r border-slate-200 py-4">
                 <div className="space-y-1">
                     <div className="font-semibold leading-snug text-slate-800 [overflow-wrap:anywhere]">{item.name}</div>
                     {item.description && (
@@ -200,7 +208,7 @@ function InventoryRow({ item, onAdjust, onDelete, deleteDisabled }: InventoryRow
                     <VariantBreakdown item={item} />
                 </div>
             </TableCell>
-            <TableCell className="border-r border-slate-300 py-4 align-top">
+            <TableCell className="border-r border-slate-200 py-4 align-top">
                 <Badge
                     variant="secondary"
                     className="max-w-full justify-start whitespace-normal border-none bg-indigo-50/80 text-left font-medium leading-snug text-indigo-700 [overflow-wrap:anywhere] hover:bg-indigo-100"
@@ -208,7 +216,7 @@ function InventoryRow({ item, onAdjust, onDelete, deleteDisabled }: InventoryRow
                     {item.category.name}
                 </Badge>
             </TableCell>
-            <TableCell className="border-r border-slate-300 py-4 text-right">
+            <TableCell className="border-r border-slate-200 py-4 text-right">
                 <span
                     className={`rounded-lg px-2 py-1 text-sm font-bold ${
                         inventory.isLowStock
@@ -225,7 +233,7 @@ function InventoryRow({ item, onAdjust, onDelete, deleteDisabled }: InventoryRow
                     )}
                 </span>
             </TableCell>
-            <TableCell className="border-r border-slate-300 py-4 text-right text-sm font-medium text-slate-600">
+            <TableCell className="border-r border-slate-200 py-4 text-right text-sm font-medium text-slate-600">
                 {inventory.minStock}{" "}
                 <span className="text-xs">{inventory.unit}</span>
             </TableCell>
@@ -234,7 +242,7 @@ function InventoryRow({ item, onAdjust, onDelete, deleteDisabled }: InventoryRow
                     <Button
                         variant="ghost"
                         size="icon"
-                        className="h-8 w-8 text-blue-600 transition-colors hover:bg-blue-50 hover:text-blue-700"
+                        className="h-11 w-11 text-blue-600 transition-colors hover:bg-blue-50 hover:text-blue-700"
                         onClick={() => onAdjust(item)}
                         aria-label={`แก้ไข ${item.name}`}
                     >
@@ -243,7 +251,7 @@ function InventoryRow({ item, onAdjust, onDelete, deleteDisabled }: InventoryRow
                     <Button
                         variant="ghost"
                         size="icon"
-                        className="h-8 w-8 text-rose-500 transition-colors hover:bg-rose-50 hover:text-rose-700"
+                        className="h-11 w-11 text-rose-500 transition-colors hover:bg-rose-50 hover:text-rose-700"
                         onClick={() => onDelete(item)}
                         disabled={deleteDisabled}
                         aria-label={`ลบ ${item.name}`}
@@ -303,6 +311,8 @@ function InventoryImage({ item }: { item: StockItem }) {
             alt={item.name}
             width={48}
             height={48}
+            sizes="48px"
+            loading="lazy"
             unoptimized
             className="h-12 w-12 rounded-xl object-cover ring-1 ring-slate-200"
         />

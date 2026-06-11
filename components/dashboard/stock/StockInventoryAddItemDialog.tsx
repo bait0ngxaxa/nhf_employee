@@ -29,6 +29,14 @@ type AddItemDialogProps = {
     onSuccess: () => void;
 };
 
+function getTrimmedFormText(
+    formData: FormData,
+    fieldName: string,
+): string {
+    const value = formData.get(fieldName);
+    return typeof value === "string" ? value.trim() : "";
+}
+
 export function AddItemDialog({
     open,
     onClose,
@@ -61,18 +69,26 @@ export function AddItemDialog({
             return;
         }
 
-        setLoading(true);
-
         const formData = new FormData(event.currentTarget);
+        const itemName = getTrimmedFormText(formData, "name");
+        const itemDescription = getTrimmedFormText(formData, "description");
+        const itemSku = getTrimmedFormText(formData, "sku");
         const normalizedVariants = variants.map(normalizeVariantDraft);
+
+        if (!itemName) {
+            toast.error("กรุณากรอกชื่อวัสดุ");
+            return;
+        }
+
+        setLoading(true);
 
         try {
             ensureStockApiSuccess(
                 await apiPost(API_ROUTES.stock.items, {
-                    name: formData.get("name"),
-                    description: formData.get("description") || null,
+                    name: itemName,
+                    description: itemDescription || null,
                     imageUrl: itemImageUrl || null,
-                    sku: formData.get("sku") || undefined,
+                    sku: itemSku || undefined,
                     categoryId: Number(selectedCategoryId),
                     variants: normalizedVariants,
                 }),
@@ -91,96 +107,116 @@ export function AddItemDialog({
     }
 
     return (
-        <Dialog open={open} onOpenChange={onClose}>
-            <DialogContent className="max-h-[90vh] overflow-y-auto p-0 sm:max-w-[760px]">
-                <div className="border-b border-gray-100 bg-slate-50/50 px-6 py-4">
+        <Dialog
+            open={open}
+            onOpenChange={(nextOpen) => {
+                if (!nextOpen && !loading) {
+                    onClose();
+                }
+            }}
+        >
+            <DialogContent className="flex max-h-[90vh] flex-col overflow-hidden p-0 sm:max-w-[760px]">
+                <div className="shrink-0 border-b border-gray-100 bg-slate-50/50 px-5 py-4 sm:px-6">
                     <DialogTitle className="text-lg font-semibold text-slate-800">
                         {STOCK_ADMIN_TEXT.addNewItem}
                     </DialogTitle>
                 </div>
-                <form onSubmit={handleSubmit} className="space-y-5 px-6 py-5">
-                    <BaseFields
-                        categories={categories}
-                        selectedCategoryId={selectedCategoryId}
-                        onCategoryChange={setSelectedCategoryId}
-                        itemImageUrl={itemImageUrl}
-                        onItemImageChange={setItemImageUrl}
-                    />
-                    <StockInventoryVariantEditor
-                        variants={variants}
-                        hideSingleVariantSku
-                        hideSingleVariantImage
-                        onAddVariant={() =>
-                            setVariants((current) => [...current, createEmptyVariant()])
-                        }
-                        onRemoveVariant={(index) =>
-                            setVariants((current) =>
-                                current.length === 1
-                                    ? current
-                                    : current.filter(
-                                          (_, variantIndex) => variantIndex !== index,
-                                      ),
-                            )
-                        }
-                        onVariantChange={(index, variant) =>
-                            setVariants((current) =>
-                                current.map((currentVariant, variantIndex) =>
-                                    variantIndex === index ? variant : currentVariant,
-                                ),
-                            )
-                        }
-                        onAttributeChange={(variantIndex, attributeIndex, field, value) =>
-                            setVariants((current) =>
-                                current.map((variant, index) =>
-                                    index === variantIndex
-                                        ? {
-                                              ...variant,
-                                              attributes: variant.attributes.map(
-                                                  (attribute, attrIndex) =>
-                                                      attrIndex === attributeIndex
-                                                          ? {
-                                                                ...attribute,
-                                                                [field]: value,
-                                                            }
-                                                          : attribute,
-                                              ),
-                                          }
-                                        : variant,
-                                ),
-                            )
-                        }
-                        onAddAttribute={(variantIndex) =>
-                            setVariants((current) =>
-                                current.map((variant, index) =>
-                                    index === variantIndex
-                                        ? {
-                                              ...variant,
-                                              attributes: [
-                                                  ...variant.attributes,
-                                                  createEmptyVariantAttribute(),
-                                              ],
-                                          }
-                                        : variant,
-                                ),
-                            )
-                        }
-                        onRemoveAttribute={(variantIndex, attributeIndex) =>
-                            setVariants((current) =>
-                                current.map((variant, index) =>
-                                    index === variantIndex &&
-                                    variant.attributes.length > 1
-                                        ? {
-                                              ...variant,
-                                              attributes: variant.attributes.filter(
-                                                  (_, attrIndex) =>
-                                                      attrIndex !== attributeIndex,
-                                              ),
-                                          }
-                                        : variant,
-                                ),
-                            )
-                        }
-                    />
+                <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
+                    <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-5 py-5 sm:px-6">
+                        <BaseFields
+                            categories={categories}
+                            selectedCategoryId={selectedCategoryId}
+                            onCategoryChange={setSelectedCategoryId}
+                            itemImageUrl={itemImageUrl}
+                            onItemImageChange={setItemImageUrl}
+                        />
+                        <StockInventoryVariantEditor
+                            variants={variants}
+                            hideSingleVariantSku
+                            hideSingleVariantImage
+                            onAddVariant={() =>
+                                setVariants((current) => [
+                                    ...current,
+                                    createEmptyVariant(),
+                                ])
+                            }
+                            onRemoveVariant={(index) =>
+                                setVariants((current) =>
+                                    current.length === 1
+                                        ? current
+                                        : current.filter(
+                                              (_, variantIndex) =>
+                                                  variantIndex !== index,
+                                          ),
+                                )
+                            }
+                            onVariantChange={(index, variant) =>
+                                setVariants((current) =>
+                                    current.map((currentVariant, variantIndex) =>
+                                        variantIndex === index
+                                            ? variant
+                                            : currentVariant,
+                                    ),
+                                )
+                            }
+                            onAttributeChange={(
+                                variantIndex,
+                                attributeIndex,
+                                field,
+                                value,
+                            ) =>
+                                setVariants((current) =>
+                                    current.map((variant, index) =>
+                                        index === variantIndex
+                                            ? {
+                                                  ...variant,
+                                                  attributes: variant.attributes.map(
+                                                      (attribute, attrIndex) =>
+                                                          attrIndex === attributeIndex
+                                                              ? {
+                                                                    ...attribute,
+                                                                    [field]: value,
+                                                                }
+                                                              : attribute,
+                                                  ),
+                                              }
+                                            : variant,
+                                    ),
+                                )
+                            }
+                            onAddAttribute={(variantIndex) =>
+                                setVariants((current) =>
+                                    current.map((variant, index) =>
+                                        index === variantIndex
+                                            ? {
+                                                  ...variant,
+                                                  attributes: [
+                                                      ...variant.attributes,
+                                                      createEmptyVariantAttribute(),
+                                                  ],
+                                              }
+                                            : variant,
+                                    ),
+                                )
+                            }
+                            onRemoveAttribute={(variantIndex, attributeIndex) =>
+                                setVariants((current) =>
+                                    current.map((variant, index) =>
+                                        index === variantIndex &&
+                                        variant.attributes.length > 1
+                                            ? {
+                                                  ...variant,
+                                                  attributes: variant.attributes.filter(
+                                                      (_, attrIndex) =>
+                                                          attrIndex !== attributeIndex,
+                                                  ),
+                                              }
+                                            : variant,
+                                    ),
+                                )
+                            }
+                        />
+                    </div>
                     <InventoryDialogActions
                         loading={loading}
                         submitLabel={STOCK_ADMIN_TEXT.save}
@@ -201,7 +237,7 @@ function BaseFields(props: {
 }) {
     return (
         <>
-            <div className="grid grid-cols-2 gap-5">
+            <div className="grid gap-4 sm:grid-cols-2">
                 <InventoryTextField
                     id="name"
                     name="name"

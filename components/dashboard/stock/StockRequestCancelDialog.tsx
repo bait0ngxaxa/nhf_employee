@@ -38,14 +38,21 @@ export function StockRequestCancelDialog({
     }
 
     return (
-        <Dialog open onOpenChange={onClose}>
+        <Dialog
+            open
+            onOpenChange={() => {
+                if (!loading) {
+                    onClose();
+                }
+            }}
+        >
             <DialogContent className="overflow-hidden p-0 sm:max-w-[420px]">
-                <div className="border-b border-rose-100 bg-rose-50/50 px-6 py-4">
+                <div className="border-b border-rose-100 bg-rose-50/50 px-5 py-4 sm:px-6">
                     <DialogTitle className="text-lg font-semibold text-rose-800">
                         ยืนยันการยกเลิกคำขอ #{request.id}
                     </DialogTitle>
                 </div>
-                <div className="space-y-5 px-6 py-5">
+                <div className="space-y-5 px-5 py-5 sm:px-6">
                     <div className="text-sm text-slate-600">
                         รายการนี้ยังอยู่ในสถานะรอจ่าย หากยืนยันแล้วคำขอจะถูกยกเลิกทันที
                     </div>
@@ -66,20 +73,20 @@ export function StockRequestCancelDialog({
                             className="h-10 focus-visible:ring-rose-500"
                         />
                     </div>
-                    <div className="flex justify-end gap-3 pt-3">
+                    <div className="flex flex-col-reverse gap-2 pt-3 sm:flex-row sm:justify-end">
                         <Button
                             variant="ghost"
                             onClick={onClose}
                             disabled={loading}
-                            className="h-10 px-5 font-medium text-slate-600 hover:bg-slate-100"
+                            className="h-11 px-5 font-medium text-slate-600 hover:bg-slate-100"
                         >
                             ปิด
                         </Button>
                         <Button
                             variant="destructive"
                             disabled={loading}
-                            onClick={() => void onConfirm(request.id, reason)}
-                            className="h-10 bg-rose-600 px-7 font-bold text-white shadow-sm transition-all hover:bg-rose-700"
+                            onClick={() => void onConfirm(request.id, reason.trim())}
+                            className="h-11 bg-rose-600 px-7 font-bold text-white shadow-sm transition-colors hover:bg-rose-700"
                         >
                             {loading ? (
                                 <>

@@ -98,6 +98,8 @@ export function StockImageUploadField({
                                 alt={label}
                                 width={640}
                                 height={360}
+                                sizes="(max-width: 760px) 100vw, 640px"
+                                loading="lazy"
                                 unoptimized
                                 className="h-40 w-full object-contain"
                             />

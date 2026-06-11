@@ -33,7 +33,8 @@ import {
 import { getRequestItemDisplayName } from "./stockVariant.shared";
 import { useStockRequestActions } from "./useStockRequestActions";
 import { StockRequestNote } from "./StockRequestNote";
-import { StockLoadingState } from "./StockLoadingState";
+import { StockEmptyState, StockLoadingState } from "./StockLoadingState";
+import { StockRequestMobileCards } from "./StockRequestMobileCards";
 
 export function StockMyRequests() {
     const { requests, isLoading, totalRequests, refreshRequests } = useStockDataContext();
@@ -70,20 +71,37 @@ export function StockMyRequests() {
             {isLoading ? (
                 <StockLoadingState message="กำลังโหลดประวัติการเบิก..." />
             ) : requests.length === 0 ? (
-                <div className="py-12 text-center text-gray-500">
-                    <ClipboardList className="mx-auto mb-3 h-12 w-12 opacity-50" />
-                    <p>
-                        {hasActiveFilters
+                <StockEmptyState
+                    icon={<ClipboardList className="h-6 w-6" aria-hidden="true" />}
+                    message={
+                        hasActiveFilters
                             ? "ไม่พบคำขอเบิกที่ตรงกับเงื่อนไขค้นหา"
-                            : "ยังไม่มีประวัติการเบิก"}
-                    </p>
-                </div>
+                            : "ยังไม่มีประวัติการเบิก"
+                    }
+                />
             ) : (
                 <>
-                    <div className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200">
-                        <Table className="border-separate border-spacing-0">
+                    <StockRequestMobileCards
+                        requests={requests}
+                        renderActions={(request) =>
+                            request.status === "PENDING_ISSUE" ? (
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-11 border-rose-200 text-rose-600 hover:bg-rose-50 hover:text-rose-700"
+                                    disabled={processingRequestId === request.id}
+                                    onClick={() => setCancelTarget(request)}
+                                >
+                                    ยกเลิกคำขอ
+                                </Button>
+                            ) : null
+                        }
+                    />
+
+                    <div className="hidden overflow-x-auto rounded-2xl bg-white shadow-sm ring-1 ring-slate-200 md:block">
+                        <Table className="min-w-[880px] border-separate border-spacing-0">
                             <TableHeader>
-                                <TableRow className="border-b-2 border-slate-200 bg-slate-100/80 hover:bg-slate-100/80">
+                                <TableRow className="border-b border-slate-200 bg-slate-50 hover:bg-slate-50">
                                     <TableHead className="w-20 border-r border-slate-200 font-semibold text-slate-700">
                                         เลขที่
                                     </TableHead>
@@ -109,7 +127,7 @@ export function StockMyRequests() {
                                     )}
                                 </TableRow>
                             </TableHeader>
-                            <TableBody className="[&_tr:nth-child(odd)]:bg-white [&_tr:nth-child(even)]:bg-slate-100/70">
+                            <TableBody className="[&_tr:nth-child(odd)]:bg-white [&_tr:nth-child(even)]:bg-slate-50/80">
                                 {requests.map((request) => (
                                     <RequestRow
                                         key={request.id}
@@ -153,18 +171,18 @@ function RequestFilters(props: {
     onStatusChange: (status: StockRequestStatus | undefined) => void;
 }) {
     return (
-        <div className="rounded-[1.75rem] border border-slate-200/80 bg-white/80 p-3 shadow-[0_20px_48px_-32px_rgba(15,23,42,0.22)] backdrop-blur">
+        <div className="rounded-2xl border border-blue-100/80 bg-blue-50/40 p-3 shadow-sm">
             <div className="mb-3 px-1">
-                <div className="text-sm font-semibold text-slate-800">
+                <div className="text-sm font-semibold text-blue-900">
                     ค้นหาและกรองประวัติการเบิก
                 </div>
-                <div className="text-xs text-slate-500">
+                <div className="text-xs text-blue-700/75">
                     ค้นหาจากเลขที่คำขอ รหัสโครงการ หรือชื่อรายการที่เคยเบิก
                 </div>
             </div>
             <div className="flex flex-col gap-3 sm:flex-row">
                 <div className="relative flex-1">
-                    <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" aria-hidden="true" />
+                    <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-blue-500" aria-hidden="true" />
                     <Input
                         aria-label="ค้นหาประวัติคำขอเบิกวัสดุ"
                         name="stock-my-request-search"
@@ -172,7 +190,7 @@ function RequestFilters(props: {
                         value={props.requestSearchQuery}
                         onChange={(event) => props.onSearchChange(event.target.value)}
                         placeholder="ค้นหาเลขที่คำขอ รหัสโครงการ หรือรายการ"
-                        className="h-12 rounded-2xl border-slate-200 bg-slate-50/80 pl-11 pr-11 shadow-inner shadow-slate-200/50 focus-visible:border-orange-300 focus-visible:ring-orange-200"
+                        className="h-12 rounded-2xl border-blue-100 bg-white pl-11 pr-11 shadow-inner shadow-blue-100/50 focus-visible:border-blue-300 focus-visible:ring-blue-200"
                     />
                     {props.requestSearchQuery.trim().length > 0 && (
                         <Button
@@ -180,7 +198,7 @@ function RequestFilters(props: {
                             variant="ghost"
                             size="icon"
                             onClick={() => props.onSearchChange("")}
-                            className="absolute right-2 top-1/2 h-8 w-8 -translate-y-1/2 rounded-full text-slate-400 hover:bg-slate-200/70 hover:text-slate-600"
+                            className="absolute right-2 top-1/2 h-8 w-8 -translate-y-1/2 rounded-full text-blue-500 hover:bg-blue-100 hover:text-blue-700"
                             aria-label="ล้างคำค้นหาประวัติคำขอเบิกวัสดุ"
                         >
                             <X className="h-4 w-4" aria-hidden="true" />
@@ -199,7 +217,7 @@ function RequestFilters(props: {
                         }
                     >
                         <SelectTrigger
-                            className="h-12 rounded-2xl border-slate-200 bg-slate-50/80 shadow-inner shadow-slate-200/50"
+                            className="h-12 rounded-2xl border-blue-100 bg-white shadow-inner shadow-blue-100/50 focus:ring-blue-200"
                             aria-label="กรองสถานะประวัติคำขอเบิกวัสดุ"
                         >
                             <SelectValue placeholder="กรองสถานะ" />
@@ -228,17 +246,17 @@ function RequestRow(props: {
     const isPendingIssue = request.status === "PENDING_ISSUE";
 
     return (
-        <TableRow className="border-b-2 border-slate-300 transition-colors hover:bg-blue-100/70">
-            <TableCell className="border-r border-slate-300 py-4 font-medium text-slate-800">
+        <TableRow className="border-b border-slate-200 transition-colors hover:bg-blue-50/60">
+            <TableCell className="border-r border-slate-200 py-4 font-medium text-slate-800">
                 #{request.id}
             </TableCell>
-            <TableCell className="border-r border-slate-300 py-4 text-sm text-slate-700">
+            <TableCell className="border-r border-slate-200 py-4 text-sm text-slate-700">
                 {formatStockRequestDate(request.createdAt)}
             </TableCell>
-            <TableCell className="border-r border-slate-300 py-4 text-sm font-medium text-slate-700">
+            <TableCell className="border-r border-slate-200 py-4 text-sm font-medium text-slate-700">
                 {request.projectCode}
             </TableCell>
-            <TableCell className="border-r border-slate-300 py-4">
+            <TableCell className="border-r border-slate-200 py-4">
                 <div className="space-y-1.5 py-1">
                     {request.items.map((requestItem) => (
                         <div key={requestItem.id} className="flex flex-wrap items-start gap-x-2 gap-y-0.5 text-sm">
@@ -253,10 +271,10 @@ function RequestRow(props: {
                     ))}
                 </div>
             </TableCell>
-            <TableCell className="border-r border-slate-300 py-4">
+            <TableCell className="border-r border-slate-200 py-4">
                 <RequestStatusBadge status={request.status} />
             </TableCell>
-            <TableCell className={`py-4${showActionColumn ? " border-r border-slate-300" : ""}`}>
+            <TableCell className={`py-4${showActionColumn ? " border-r border-slate-200" : ""}`}>
                 <StockRequestNote request={request} />
             </TableCell>
             {showActionColumn && (

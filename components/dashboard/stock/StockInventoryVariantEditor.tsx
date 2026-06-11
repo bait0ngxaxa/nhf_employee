@@ -82,7 +82,7 @@ export function StockInventoryVariantEditor(
                         />
                     ))}
 
-                    <div className="sticky bottom-0 z-10 -mx-4 rounded-b-2xl border-t border-slate-200 bg-white/95 px-4 py-3 shadow-[0_-8px_24px_rgba(15,23,42,0.06)] backdrop-blur">
+                    <div className="-mx-4 rounded-b-2xl border-t border-slate-200 bg-white px-4 py-3">
                         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                             <div className="space-y-0.5">
                                 <div className="text-sm font-semibold text-slate-800">
@@ -262,10 +262,7 @@ function AttributeEditor(props: {
             </div>
             <div className="space-y-3">
                 {props.variant.attributes.map((attribute, attributeIndex) => (
-                    <div
-                        key={attributeIndex}
-                        className="grid grid-cols-[1fr_1fr_auto] gap-3"
-                    >
+                    <div key={attributeIndex} className="grid gap-3 sm:grid-cols-[1fr_1fr_auto]">
                         <Input
                             value={attribute.name}
                             placeholder={
@@ -302,7 +299,7 @@ function AttributeEditor(props: {
                                 props.onRemoveAttribute(attributeIndex)
                             }
                             disabled={props.variant.attributes.length === 1}
-                            className="h-10 w-10 text-rose-600 hover:bg-rose-50 hover:text-rose-700"
+                            className="h-11 w-full text-rose-600 hover:bg-rose-50 hover:text-rose-700 sm:w-11"
                             aria-label={`ลบคุณสมบัติที่ ${attributeIndex + 1}`}
                         >
                             <Trash2 className="h-4 w-4" aria-hidden="true" />

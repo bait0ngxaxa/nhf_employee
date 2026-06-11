@@ -25,6 +25,10 @@ import {
     getVariantAvailableQuantity,
     getVariantDisplayName,
 } from "./stockVariant.shared";
+import {
+    STOCK_PROJECT_CODE_MAX_LENGTH,
+    normalizeStockProjectCode,
+} from "./stockBrowseCart.shared";
 
 type StockBrowseCartPanelProps = {
     items: BrowseCartItem[];
@@ -52,11 +56,13 @@ export function StockBrowseCartPanel({
     onSubmit,
 }: StockBrowseCartPanelProps) {
     const [isClearConfirmOpen, setIsClearConfirmOpen] = useState(false);
+    const trimmedProjectCode = projectCode.trim();
+    const canSubmit = !submitting && trimmedProjectCode.length > 0 && cartSize > 0;
 
     return (
         <>
             <div className="flex h-full flex-col bg-white">
-                <div className="border-b border-slate-200 px-5 py-4">
+                <div className="border-b border-blue-100 bg-blue-50/45 px-5 py-4">
                     <div className="flex items-center gap-3">
                         <div className="rounded-2xl bg-blue-50 p-2.5 text-blue-700">
                             <ShoppingCart
@@ -64,11 +70,11 @@ export function StockBrowseCartPanel({
                                 aria-hidden="true"
                             />
                         </div>
-                        <div>
-                            <div className="text-sm font-semibold text-slate-800">
+                        <div className="min-w-0">
+                            <div className="text-[0.9375rem] font-semibold leading-6 text-blue-950">
                                 สรุปรายการเบิก
                             </div>
-                            <div className="text-sm text-slate-500">
+                            <div className="text-sm leading-5 text-blue-800/70">
                                 {cartSize} รายการ รวม {cartCount} ชิ้น
                             </div>
                         </div>
@@ -76,11 +82,11 @@ export function StockBrowseCartPanel({
                 </div>
 
                 <div className="flex-1 space-y-3 overflow-y-auto px-5 py-4">
-                    <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
+                    <div className="rounded-2xl border border-blue-100 bg-blue-50/45 p-4">
                         <div className="space-y-1.5">
                             <Label
                                 htmlFor="stock-project-code"
-                                className="text-sm font-semibold text-slate-700"
+                                className="text-sm font-semibold leading-5 text-blue-900"
                             >
                                 ชื่อย่อโครงการ
                             </Label>
@@ -89,14 +95,19 @@ export function StockBrowseCartPanel({
                                 name="stock-project-code"
                                 autoComplete="off"
                                 value={projectCode}
+                                maxLength={STOCK_PROJECT_CODE_MAX_LENGTH}
                                 onChange={(event) =>
                                     onProjectCodeChange(
-                                        event.target.value.toUpperCase(),
+                                        normalizeStockProjectCode(event.target.value),
                                     )
                                 }
                                 placeholder="กรุณาระบุชื่อย่อโครงการ"
-                                className="h-11 border-slate-200 bg-white focus-visible:ring-blue-500"
+                                disabled={submitting}
+                                className="h-11 border-blue-100 bg-white font-medium uppercase tracking-normal shadow-inner shadow-blue-100/50 focus-visible:border-blue-300 focus-visible:ring-blue-200"
                             />
+                            <div className="text-xs font-medium leading-5 text-blue-700/70">
+                                ใช้สำหรับอ้างอิงคำขอเบิก สูงสุด {STOCK_PROJECT_CODE_MAX_LENGTH} ตัวอักษร
+                            </div>
                         </div>
                     </div>
                     {items.map((cartItem) => (
@@ -115,26 +126,26 @@ export function StockBrowseCartPanel({
                     ))}
                 </div>
 
-                <div className="border-t border-slate-200 bg-slate-50/70 px-5 py-4">
-                    <div className="mb-3 rounded-2xl border border-slate-200 bg-white/90 px-4 py-3">
-                        <div className="flex items-center justify-between gap-3 text-sm">
+                <div className="border-t border-blue-100 bg-blue-50/45 px-5 py-4">
+                    <div className="mb-3 rounded-2xl border border-blue-100 bg-white/95 px-4 py-3">
+                        <div className="flex items-center justify-between gap-3 text-sm leading-5">
                             <span className="text-slate-500">สรุปรายการ</span>
-                            <span className="font-semibold text-slate-800">
+                            <span className="font-semibold tabular-nums text-slate-800">
                                 {cartSize} รายการ
                             </span>
                         </div>
-                        <div className="mt-1 flex items-center justify-between gap-3 text-sm">
+                        <div className="mt-1 flex items-center justify-between gap-3 text-sm leading-5">
                             <span className="text-slate-500">จำนวนรวม</span>
-                            <span className="font-semibold text-slate-800">
+                            <span className="font-semibold tabular-nums text-slate-800">
                                 {cartCount} ชิ้น
                             </span>
                         </div>
-                        <div className="mt-1 flex items-center justify-between gap-3 text-sm">
+                        <div className="mt-1 flex items-center justify-between gap-3 text-sm leading-5">
                             <span className="text-slate-500">
                                 ชื่อย่อโครงการ
                             </span>
-                            <span className="truncate font-semibold text-slate-800">
-                                {projectCode.trim() || "-"}
+                            <span className="min-w-0 truncate font-semibold text-slate-800">
+                                {trimmedProjectCode || "-"}
                             </span>
                         </div>
                     </div>
@@ -142,10 +153,8 @@ export function StockBrowseCartPanel({
                         <Button
                             type="button"
                             onClick={onSubmit}
-                            disabled={
-                                submitting || projectCode.trim().length === 0
-                            }
-                            className="group/submit w-full bg-[linear-gradient(135deg,#2563EB,#1D4ED8)] font-bold text-white shadow-[0_18px_34px_-22px_rgba(37,99,235,0.95)] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_22px_38px_-20px_rgba(37,99,235,0.95)]"
+                            disabled={!canSubmit}
+                            className="group/submit h-11 w-full bg-blue-600 font-bold text-white shadow-sm transition-colors duration-200 hover:bg-blue-700"
                         >
                             {submitting ? (
                                 <Loader2
@@ -164,8 +173,8 @@ export function StockBrowseCartPanel({
                             type="button"
                             variant="ghost"
                             onClick={() => setIsClearConfirmOpen(true)}
-                            disabled={submitting}
-                            className="group/clear w-full border border-rose-100 text-rose-600 transition-all duration-300 hover:-translate-y-0.5 hover:border-rose-200 hover:bg-rose-50 hover:text-rose-700 hover:shadow-[0_18px_28px_-24px_rgba(190,24,93,0.7)]"
+                            disabled={submitting || cartSize === 0}
+                            className="group/clear h-11 w-full border border-rose-100 text-rose-600 transition-colors duration-200 hover:border-rose-200 hover:bg-rose-50 hover:text-rose-700"
                         >
                             <XCircle
                                 className="mr-1.5 h-4 w-4 transition-transform duration-300 group-hover/clear:scale-110"
@@ -194,7 +203,7 @@ export function StockBrowseCartPanel({
                             ต้องการล้างรายการในตะกร้าและยกเลิกการเบิกทั้งหมดใช่หรือไม่?
                         </DialogDescription>
                     </DialogHeader>
-                    <DialogFooter className="gap-2 sm:justify-end">
+                    <DialogFooter className="flex-col-reverse gap-2 sm:flex-row sm:justify-end">
                         <Button
                             variant="outline"
                             onClick={() => setIsClearConfirmOpen(false)}
@@ -228,9 +237,11 @@ function CartRow(props: {
 }) {
     const { item } = props;
     const imageUrl = item.variant.imageUrl ?? item.item.imageUrl ?? null;
+    const availableQuantity = getVariantAvailableQuantity(item.variant);
+    const displayName = getVariantDisplayName(item.item.name, item.variant);
 
     return (
-        <div className="flex items-start gap-3 rounded-[1.35rem] border border-slate-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(248,250,252,0.96))] p-3 shadow-[0_16px_32px_-26px_rgba(15,23,42,0.35)] sm:items-center">
+        <div className="flex items-start gap-3 rounded-2xl border border-slate-200/80 bg-white p-3 shadow-sm sm:items-center">
             <div className="shrink-0 overflow-hidden rounded-xl bg-white ring-1 ring-slate-200 shadow-inner shadow-white">
                 {imageUrl ? (
                     <Image
@@ -238,6 +249,8 @@ function CartRow(props: {
                         alt={item.item.name}
                         width={64}
                         height={64}
+                        sizes="64px"
+                        loading="lazy"
                         unoptimized
                         className="h-14 w-14 object-cover sm:h-16 sm:w-16"
                     />
@@ -250,17 +263,16 @@ function CartRow(props: {
 
             <div className="min-w-0 flex-1 space-y-3">
                 <div className="space-y-1">
-                    <div className="text-sm font-semibold leading-snug text-slate-800 break-words sm:truncate">
-                        {getVariantDisplayName(item.item.name, item.variant)}
+                    <div className="text-sm font-semibold leading-5 text-slate-800 break-words sm:line-clamp-2">
+                        {displayName}
                     </div>
-                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-medium leading-5 text-slate-500">
                         <span>
                             จำนวนที่เบิก: {item.qty} {item.variant.unit}
                         </span>
                         <span>
                             คงเหลือสูงสุด{" "}
-                            {getVariantAvailableQuantity(item.variant)}{" "}
-                            {item.variant.unit}
+                            {availableQuantity} {item.variant.unit}
                         </span>
                     </div>
                 </div>
@@ -272,16 +284,16 @@ function CartRow(props: {
                             variant="ghost"
                             size="icon"
                             onClick={props.onDecrease}
-                            disabled={props.disabled}
-                            className="h-8 w-8 rounded-lg border border-transparent bg-white text-slate-700 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-200 hover:bg-slate-100 hover:shadow-md sm:h-9 sm:w-9"
-                            aria-label={`ลดจำนวน ${getVariantDisplayName(item.item.name, item.variant)}`}
+                            disabled={props.disabled || item.qty <= 1}
+                            className="h-11 w-11 rounded-lg border border-blue-100 bg-white text-blue-700 shadow-sm transition-colors duration-200 hover:border-blue-200 hover:bg-blue-50"
+                            aria-label={`ลดจำนวน ${displayName}`}
                         >
                             <Minus
                                 className="h-3.5 w-3.5 sm:h-4 sm:w-4"
                                 aria-hidden="true"
                             />
                         </Button>
-                        <div className="w-8 text-center text-xs font-bold text-blue-700 sm:w-10 sm:text-sm">
+                        <div className="w-8 rounded-lg bg-blue-50 py-1 text-center text-xs font-bold tabular-nums text-blue-800 sm:w-10 sm:text-sm">
                             {item.qty}
                         </div>
                         <Button
@@ -291,11 +303,10 @@ function CartRow(props: {
                             onClick={props.onIncrease}
                             disabled={
                                 props.disabled ||
-                                item.qty >=
-                                    getVariantAvailableQuantity(item.variant)
+                                item.qty >= availableQuantity
                             }
-                            className="h-8 w-8 rounded-lg border border-transparent bg-white text-slate-700 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-200 hover:bg-slate-100 hover:shadow-md sm:h-9 sm:w-9"
-                            aria-label={`เพิ่มจำนวน ${getVariantDisplayName(item.item.name, item.variant)}`}
+                            className="h-11 w-11 rounded-lg border border-blue-100 bg-white text-blue-700 shadow-sm transition-colors duration-200 hover:border-blue-200 hover:bg-blue-50"
+                            aria-label={`เพิ่มจำนวน ${displayName}`}
                         >
                             <Plus
                                 className="h-3.5 w-3.5 sm:h-4 sm:w-4"
@@ -309,8 +320,8 @@ function CartRow(props: {
                         size="icon"
                         onClick={props.onRemove}
                         disabled={props.disabled}
-                        className="h-8 w-8 shrink-0 rounded-lg border border-transparent text-rose-600 transition-all duration-200 hover:-translate-y-0.5 hover:border-rose-100 hover:bg-rose-50 hover:text-rose-700 hover:shadow-md sm:h-9 sm:w-9"
-                        aria-label={`ลบ ${getVariantDisplayName(item.item.name, item.variant)} ออกจากตะกร้า`}
+                        className="h-11 w-11 shrink-0 rounded-lg border border-transparent text-rose-600 transition-colors duration-200 hover:border-rose-100 hover:bg-rose-50 hover:text-rose-700"
+                        aria-label={`ลบ ${displayName} ออกจากตะกร้า`}
                     >
                         <Trash2
                             className="h-3.5 w-3.5 sm:h-4 sm:w-4"

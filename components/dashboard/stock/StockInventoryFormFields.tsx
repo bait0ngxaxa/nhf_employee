@@ -98,20 +98,20 @@ export function InventoryDialogActions(props: {
     onClose: () => void;
 }) {
     return (
-        <div className="flex justify-end gap-3 pt-3">
+        <div className="flex shrink-0 flex-col-reverse gap-2 border-t border-slate-200 bg-white px-5 py-4 sm:flex-row sm:justify-end sm:px-6">
             <Button
                 type="button"
                 variant="ghost"
                 onClick={props.onClose}
                 disabled={props.loading}
-                className="h-10 px-5 font-medium text-slate-600 hover:bg-slate-100"
+                className="h-11 px-5 font-medium text-slate-600 hover:bg-slate-100"
             >
                 {STOCK_ADMIN_TEXT.cancel}
             </Button>
             <Button
                 type="submit"
                 disabled={props.loading}
-                className="h-10 bg-blue-600 px-7 font-bold text-white shadow-sm transition-all hover:bg-blue-700"
+                className="h-11 bg-blue-600 px-7 font-bold text-white shadow-sm transition-colors hover:bg-blue-700"
             >
                 {props.loading ? STOCK_ADMIN_TEXT.saving : props.submitLabel}
             </Button>

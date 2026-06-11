@@ -15,6 +15,7 @@ import {
     getPreferredVariant,
     getVariantAvailableQuantity,
 } from "./stockVariant.shared";
+import { normalizeStockProjectCode } from "./stockBrowseCart.shared";
 
 const STOCK_BROWSE_CART_STORAGE_KEY_PREFIX = "stock:browse-cart:v1:user:";
 
@@ -148,7 +149,9 @@ function parsePersistedStockBrowseCartState(
         const typedParsed = parsed as Record<string, unknown>;
         const rawProjectCode = typedParsed.projectCode;
         const rawCartItems = typedParsed.cartItems;
-        const projectCode = typeof rawProjectCode === "string" ? rawProjectCode : "";
+        const projectCode = typeof rawProjectCode === "string"
+            ? normalizeStockProjectCode(rawProjectCode)
+            : "";
 
         if (!Array.isArray(rawCartItems)) {
             return { projectCode, cartItems: [] };
@@ -160,6 +163,27 @@ function parsePersistedStockBrowseCartState(
         };
     } catch {
         return null;
+    }
+}
+
+function readPersistedCart(storageKey: string): PersistedStockBrowseCartState | null {
+    try {
+        return parsePersistedStockBrowseCartState(
+            window.localStorage.getItem(storageKey),
+        );
+    } catch {
+        return null;
+    }
+}
+
+function writePersistedCart(
+    storageKey: string,
+    state: PersistedStockBrowseCartState,
+): void {
+    try {
+        window.localStorage.setItem(storageKey, JSON.stringify(state));
+    } catch {
+        // Storage can be unavailable or full; the active in-memory cart still works.
     }
 }
 
@@ -232,9 +256,7 @@ export function useStockBrowseCart({
             return;
         }
 
-        const persistedState = parsePersistedStockBrowseCartState(
-            window.localStorage.getItem(storageKey),
-        );
+        const persistedState = readPersistedCart(storageKey);
 
         if (persistedState) {
             setCart(hydratePersistedCart(persistedState));
@@ -252,12 +274,12 @@ export function useStockBrowseCart({
             return;
         }
 
-        window.localStorage.setItem(
+        writePersistedCart(
             storageKey,
-            JSON.stringify({
+            {
                 projectCode,
                 cartItems: serializeCartItems(cart),
-            } satisfies PersistedStockBrowseCartState),
+            },
         );
     }, [cart, hydratedStorageKey, projectCode, storageKey]);
 
@@ -376,8 +398,22 @@ export function useStockBrowseCart({
         setProjectCode("");
     }
 
+    function updateProjectCode(value: string): void {
+        setProjectCode(normalizeStockProjectCode(value));
+    }
+
     async function submitRequest(): Promise<void> {
+        if (submitting) {
+            return;
+        }
+
         if (cart.size === 0) {
+            return;
+        }
+
+        const normalizedProjectCode = normalizeStockProjectCode(projectCode);
+        if (!normalizedProjectCode) {
+            toast.error("กรุณาระบุชื่อย่อโครงการ");
             return;
         }
 
@@ -385,7 +421,7 @@ export function useStockBrowseCart({
         try {
             ensureStockApiSuccess(
                 await apiPost(API_ROUTES.stock.requests, {
-                    projectCode,
+                    projectCode: normalizedProjectCode,
                     items: Array.from(cart.values()).map((cartItem) => ({
                         itemId: cartItem.item.id,
                         variantId: cartItem.variant.id,
@@ -429,7 +465,7 @@ export function useStockBrowseCart({
         addVariantsToCart,
         clearCart,
         removeFromCart,
-        setProjectCode,
+        setProjectCode: updateProjectCode,
         submitRequest,
         updateCartQuantity,
     };

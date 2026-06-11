@@ -57,7 +57,7 @@ function StockContent() {
         <SectionShell
             gradientFrom="transparent"
             gradientTo="transparent"
-            className="border-slate-200/70 bg-white shadow-[0_24px_80px_-32px_rgba(15,23,42,0.28)]"
+            className="border-slate-200/70 bg-white shadow-sm"
         >
             <SectionHeader
                 icon={Package}
