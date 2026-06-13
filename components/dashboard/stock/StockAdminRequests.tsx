@@ -73,20 +73,20 @@ export function StockAdminRequests() {
     return (
         <div className="space-y-4">
             {/* Search & Filter bar */}
-            <div className="rounded-2xl border border-blue-100/80 bg-blue-50/40 p-3 shadow-sm">
+            <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-3 shadow-sm">
                 <div className="mb-3 flex items-center justify-between px-1">
                     <div>
-                        <div className="text-sm font-semibold text-blue-900">
+                        <div className="text-sm font-semibold text-slate-900">
                             ค้นหาและกรองคำขอเบิก
                         </div>
-                        <div className="text-xs text-blue-700/75">
+                        <div className="text-xs text-slate-600">
                             ค้นหาจากเลขที่คำขอ รหัสโครงการ ชื่อผู้ขอ อีเมล หรือชื่อรายการที่ขอเบิก
                         </div>
                     </div>
                 </div>
                 <div className="flex flex-col gap-3 sm:flex-row">
                     <div className="relative flex-1">
-                        <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-blue-500" aria-hidden="true" />
+                        <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" aria-hidden="true" />
                         <Input
                             aria-label="ค้นหาคำขอเบิกวัสดุ"
                             name="stock-admin-request-search"
@@ -94,7 +94,7 @@ export function StockAdminRequests() {
                             value={requestSearchQuery}
                             onChange={(event) => setRequestSearchQuery(event.target.value)}
                             placeholder="ค้นหาเลขที่คำขอ รหัสโครงการ ชื่อ อีเมล หรือรายการ"
-                            className="h-12 rounded-2xl border-blue-100 bg-white pl-11 pr-11 shadow-inner shadow-blue-100/50 focus-visible:border-blue-300 focus-visible:ring-blue-200"
+                            className="h-12 rounded-2xl border-slate-200 bg-white pl-11 pr-11 text-slate-900 placeholder:text-slate-500 focus-visible:border-blue-300 focus-visible:ring-blue-200"
                         />
                         {requestSearchQuery.trim().length > 0 && (
                             <Button
@@ -102,7 +102,7 @@ export function StockAdminRequests() {
                                 variant="ghost"
                                 size="icon"
                                 onClick={() => setRequestSearchQuery("")}
-                                className="absolute right-2 top-1/2 h-8 w-8 -translate-y-1/2 rounded-full text-blue-500 hover:bg-blue-100 hover:text-blue-700"
+                                className="absolute right-2 top-1/2 h-8 w-8 -translate-y-1/2 rounded-full text-slate-500 hover:bg-slate-100 hover:text-slate-700"
                                 aria-label="ล้างคำค้นหาคำขอเบิกวัสดุ"
                             >
                                 <X className="h-4 w-4" aria-hidden="true" />
@@ -121,7 +121,7 @@ export function StockAdminRequests() {
                             }
                         >
                             <SelectTrigger
-                                className="h-12 rounded-2xl border-blue-100 bg-white shadow-inner shadow-blue-100/50 focus:ring-blue-200"
+                                className="h-12 rounded-2xl border-slate-200 bg-white text-slate-900 focus:ring-blue-200"
                                 aria-label="กรองสถานะคำขอเบิกวัสดุ"
                             >
                                 <SelectValue placeholder="กรองสถานะ" />

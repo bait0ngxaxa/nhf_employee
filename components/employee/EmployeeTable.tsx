@@ -1,7 +1,5 @@
 import { memo } from "react";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Edit } from "lucide-react";
 import { type Employee } from "@/types/employees";
 import {
     getEmployeeDepartmentBadgeClass,
@@ -10,6 +8,13 @@ import {
     formatEmployeePhone,
 } from "@/lib/helpers/employee-helpers";
 import { isAdminRole } from "@/lib/ssot/permissions";
+import { EmployeeMobileCard } from "./EmployeeMobileCard";
+import {
+    EditEmployeeButton,
+    EmployeeAvatar,
+    getEmployeeFullName,
+    isTemporaryEmail,
+} from "./EmployeeTablePrimitives";
 
 interface EmployeeTableProps {
     employees: Employee[];
@@ -26,101 +31,131 @@ export const EmployeeTable = memo(function EmployeeTable({
         return null;
     }
 
+    const canEdit = isAdminRole(userRole) && Boolean(onEditEmployee);
+
     return (
-        <div
-            className="overflow-auto max-h-[70vh] border border-gray-200/60 rounded-2xl shadow-sm bg-white"
-            style={{
-                contentVisibility: "auto",
-                containIntrinsicSize: "0 500px",
-            }}
-        >
-            <table className="w-full text-sm text-left">
-                <thead className="bg-gray-50 border-b border-gray-200/60 sticky top-0 z-10">
+        <div className="space-y-3">
+            <div className="grid gap-3 lg:hidden">
+                {employees.map((employee) => (
+                    <EmployeeMobileCard
+                        key={employee.id}
+                        employee={employee}
+                        canEdit={canEdit}
+                        onEditEmployee={onEditEmployee}
+                    />
+                ))}
+            </div>
+
+            <div
+                className="hidden max-h-[70vh] overflow-auto rounded-xl border border-slate-200 bg-white lg:block"
+                style={{
+                    contentVisibility: "auto",
+                    containIntrinsicSize: "0 500px",
+                }}
+            >
+                <table className="w-full min-w-[1120px] table-fixed text-left text-sm">
+                    <colgroup>
+                        <col className="w-[19%]" />
+                        <col className="w-[9%]" />
+                        <col className="w-[16%]" />
+                        <col className="w-[13%]" />
+                        <col className="w-[11%]" />
+                        <col className="w-[17%]" />
+                        <col className="w-[9%]" />
+                        <col className="w-[10%]" />
+                        {canEdit ? <col className="w-[8%]" /> : null}
+                    </colgroup>
+                    <thead className="sticky top-0 z-10 border-b border-slate-200 bg-slate-50">
                     <tr>
-                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                        <th className="px-5 py-4 text-left text-xs font-semibold text-slate-600">
                             ชื่อ-นามสกุล
                         </th>
-                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                        <th className="px-4 py-4 text-left text-xs font-semibold text-slate-600">
                             ชื่อเล่น
                         </th>
-                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                        <th className="px-4 py-4 text-left text-xs font-semibold text-slate-600">
                             ตำแหน่ง
                         </th>
-                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                        <th className="px-4 py-4 text-left text-xs font-semibold text-slate-600">
                             สังกัด
                         </th>
-                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                        <th className="px-4 py-4 text-left text-xs font-semibold text-slate-600">
                             แผนก
                         </th>
-                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                        <th className="px-4 py-4 text-left text-xs font-semibold text-slate-600">
                             อีเมล
                         </th>
-                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                        <th className="px-4 py-4 text-left text-xs font-semibold text-slate-600">
                             เบอร์โทร
                         </th>
-                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                        <th className="px-4 py-4 text-left text-xs font-semibold text-slate-600">
                             สถานะ
                         </th>
-                        {isAdminRole(userRole) ? (
-                            <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider sticky right-0 bg-gray-50">
+                        {canEdit ? (
+                            <th className="sticky right-0 bg-slate-50 px-4 py-4 text-left text-xs font-semibold text-slate-600 shadow-[-10px_0_18px_-18px_rgba(15,23,42,0.45)]">
                                 การจัดการ
                             </th>
                         ) : null}
                     </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-200">
+                <tbody className="divide-y divide-slate-100">
                     {employees.map((employee) => (
                         <tr
                             key={employee.id}
-                            className="hover:bg-blue-50/30 transition-colors border-b border-gray-100 last:border-0"
+                            className="group border-b border-slate-100 transition-colors hover:bg-sky-50/40 last:border-0"
                         >
-                            <td className="px-6 py-4 whitespace-nowrap">
-                                <div className="text-sm font-medium text-gray-900">
-                                    {employee.firstName} {employee.lastName}
+                            <td className="px-5 py-4">
+                                <div className="flex min-w-0 items-center gap-3">
+                                    <EmployeeAvatar employee={employee} />
+                                    <div className="min-w-0">
+                                        <div
+                                            className="truncate text-sm font-semibold text-slate-950"
+                                            title={getEmployeeFullName(employee)}
+                                        >
+                                            {getEmployeeFullName(employee)}
+                                        </div>
+                                    </div>
                                 </div>
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                                <div className="text-sm text-gray-900">
-                                    {employee.nickname ? (
-                                        <Badge variant="secondary" className="bg-violet-50 text-violet-700 hover:bg-violet-100 border border-violet-200/60 font-medium shadow-sm px-2.5">
-                                            {employee.nickname}
-                                        </Badge>
-                                    ) : (
-                                        <span className="text-gray-400">-</span>
-                                    )}
-                                </div>
+                            <td className="px-4 py-4">
+                                <NicknameBadge nickname={employee.nickname} />
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                                <div className="text-sm text-gray-900">
+                            <td className="px-4 py-4">
+                                <div
+                                    className="line-clamp-2 text-sm leading-6 text-slate-800 [overflow-wrap:anywhere]"
+                                    title={employee.position}
+                                >
                                     {employee.position}
                                 </div>
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                                <div className="text-sm text-gray-900">
+                            <td className="px-4 py-4">
+                                <div
+                                    className="line-clamp-2 text-sm leading-6 text-slate-700 [overflow-wrap:anywhere]"
+                                    title={employee.affiliation || undefined}
+                                >
                                     {employee.affiliation || "-"}
                                 </div>
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
+                            <td className="px-4 py-4">
                                 <Badge
                                     variant="outline"
-                                    className={`${getEmployeeDepartmentBadgeClass(employee.dept.name)} px-2.5 font-medium shadow-sm`}
+                                    className={`${getEmployeeDepartmentBadgeClass(employee.dept.name)} max-w-full px-2.5 font-medium`}
+                                    title={employee.dept.name}
                                 >
-                                    {employee.dept.name}
+                                    <span className="truncate">
+                                        {employee.dept.name}
+                                    </span>
                                 </Badge>
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                                <div className="text-sm text-gray-900">
-                                    {employee.email.includes("@temp.local")
-                                        ? "-"
-                                        : employee.email}
-                                </div>
+                            <td className="px-4 py-4">
+                                <EmailValue email={employee.email} />
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                                <div className="text-sm text-gray-900">
+                            <td className="px-4 py-4">
+                                <div className="whitespace-nowrap text-sm text-slate-800">
                                     {formatEmployeePhone(employee.phone)}
                                 </div>
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
+                            <td className="px-4 py-4">
                                 <Badge
                                     className={getEmployeeStatusBadge(
                                         employee.status,
@@ -129,30 +164,50 @@ export const EmployeeTable = memo(function EmployeeTable({
                                     {getEmployeeStatusLabel(employee.status)}
                                 </Badge>
                             </td>
-                            {isAdminRole(userRole) && onEditEmployee && (
-                                <td className="px-6 py-4 whitespace-nowrap sticky right-0 bg-white">
-                                    <div className="flex items-center space-x-2">
-                                        <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            onClick={() =>
-                                                onEditEmployee(employee)
-                                            }
-                                            className="h-8 group relative overflow-hidden bg-emerald-50 text-emerald-600 hover:bg-emerald-100 hover:text-emerald-700 border-0 shadow-sm transition-[box-shadow,background-color] duration-300 rounded-lg px-3"
-                                        >
-                                            <div className="absolute inset-0 bg-gradient-to-r from-emerald-100/50 to-teal-100/50 opacity-0 group-hover:opacity-100 transition-opacity" />
-                                            <span className="relative flex items-center gap-1.5 font-medium">
-                                                <Edit className="h-3.5 w-3.5" />
-                                                <span>แก้ไข</span>
-                                            </span>
-                                        </Button>
-                                    </div>
+                            {canEdit && onEditEmployee ? (
+                                <td className="sticky right-0 bg-white px-4 py-4 shadow-[-10px_0_18px_-18px_rgba(15,23,42,0.45)] group-hover:bg-sky-50">
+                                    <EditEmployeeButton
+                                        employee={employee}
+                                        onEditEmployee={onEditEmployee}
+                                    />
                                 </td>
-                            )}
+                            ) : null}
                         </tr>
                     ))}
                 </tbody>
             </table>
         </div>
+        </div>
     );
 });
+
+function NicknameBadge({ nickname }: { nickname?: string }) {
+    if (!nickname) {
+        return <span className="text-sm text-slate-400">-</span>;
+    }
+
+    return (
+        <Badge
+            variant="secondary"
+            className="max-w-full border border-violet-200/70 bg-violet-50 px-2.5 font-medium text-violet-700 hover:bg-violet-50"
+            title={nickname}
+        >
+            <span className="truncate">{nickname}</span>
+        </Badge>
+    );
+}
+
+function EmailValue({ email }: { email: string }) {
+    if (isTemporaryEmail(email)) {
+        return <span className="text-sm text-slate-400">-</span>;
+    }
+
+    return (
+        <div
+            className="truncate text-sm text-slate-800"
+            title={email}
+        >
+            {email}
+        </div>
+    );
+}

@@ -2,7 +2,15 @@
 
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Menu, User, LogOut, ChevronDown, Smartphone } from "lucide-react";
+import {
+    AlertCircle,
+    ChevronDown,
+    Loader2,
+    LogOut,
+    Menu,
+    Smartphone,
+    User,
+} from "lucide-react";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -13,6 +21,7 @@ import {
 import {
     Dialog,
     DialogContent,
+    DialogFooter,
     DialogHeader,
     DialogTitle,
     DialogDescription,
@@ -30,10 +39,36 @@ export function DashboardNavbar() {
         useDashboardUIContext();
     const { user } = useDashboardDataContext();
     const [showLogoutDialog, setShowLogoutDialog] = useState(false);
+    const [isLoggingOut, setIsLoggingOut] = useState(false);
+    const [logoutError, setLogoutError] = useState("");
 
-    const confirmLogout = () => {
+    const openLogoutDialog = () => {
+        setLogoutError("");
+        setShowLogoutDialog(true);
+    };
+
+    const closeLogoutDialog = () => {
+        if (isLoggingOut) {
+            return;
+        }
+
+        setLogoutError("");
         setShowLogoutDialog(false);
-        handleSignOut();
+    };
+
+    const confirmLogout = async () => {
+        if (isLoggingOut) {
+            return;
+        }
+
+        setIsLoggingOut(true);
+        setLogoutError("");
+        try {
+            await handleSignOut();
+        } catch {
+            setIsLoggingOut(false);
+            setLogoutError("ไม่สามารถออกจากระบบได้ กรุณาลองใหม่อีกครั้ง");
+        }
     };
 
     return (
@@ -118,7 +153,7 @@ export function DashboardNavbar() {
                             </DropdownMenuItem>
                             <DropdownMenuSeparator className="my-1 bg-slate-50" />
                             <DropdownMenuItem
-                                onClick={() => setShowLogoutDialog(true)}
+                                onClick={openLogoutDialog}
                                 className="h-11 rounded-xl focus:bg-rose-50 cursor-pointer text-rose-600 focus:text-rose-600"
                             >
                                 <LogOut className="h-4 w-4 mr-3" />
@@ -158,7 +193,7 @@ export function DashboardNavbar() {
                             </DropdownMenuItem>
                             <DropdownMenuSeparator className="my-1 bg-slate-50" />
                             <DropdownMenuItem
-                                onClick={() => setShowLogoutDialog(true)}
+                                onClick={openLogoutDialog}
                                 className="h-11 rounded-xl text-rose-600"
                             >
                                 <LogOut className="h-4 w-4 mr-3" />
@@ -171,38 +206,84 @@ export function DashboardNavbar() {
                 </div>
             </div>
 
-            {/* Logout Confirmation Dialog - Clean Refined */}
-            <Dialog open={showLogoutDialog} onOpenChange={setShowLogoutDialog}>
-                <DialogContent className="sm:max-w-[400px] p-0 overflow-hidden border-none rounded-[2.5rem] shadow-xl">
-                    <div className="bg-white p-10">
-                        <div className="w-16 h-16 rounded-3xl bg-rose-50 flex items-center justify-center text-rose-500 mb-6 shadow-inner border border-rose-100/50">
-                            <LogOut className="w-8 h-8" />
+            <Dialog open={showLogoutDialog} onOpenChange={(open) => {
+                if (!open) {
+                    closeLogoutDialog();
+                    return;
+                }
+                setShowLogoutDialog(true);
+            }}>
+                <DialogContent
+                    showCloseButton={!isLoggingOut}
+                    onEscapeKeyDown={(event) => {
+                        if (isLoggingOut) {
+                            event.preventDefault();
+                        }
+                    }}
+                    onPointerDownOutside={(event) => {
+                        if (isLoggingOut) {
+                            event.preventDefault();
+                        }
+                    }}
+                    className="max-h-[calc(100vh-2rem)] overflow-y-auto rounded-2xl border border-slate-200 p-0 shadow-xl sm:max-w-[26rem]"
+                >
+                    <div className="space-y-5 bg-white px-6 pb-5 pt-6 sm:px-7">
+                        <div className="flex items-start gap-4">
+                            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-rose-100 bg-rose-50 text-rose-600">
+                                <LogOut className="h-5 w-5" aria-hidden="true" />
+                            </div>
+                            <DialogHeader className="min-w-0 flex-1 text-left">
+                                <DialogTitle className="text-lg font-semibold leading-7 text-slate-950 [overflow-wrap:anywhere]">
+                                    ออกจากระบบบัญชีนี้?
+                                </DialogTitle>
+                                <DialogDescription className="text-sm font-medium leading-6 text-slate-600 [overflow-wrap:anywhere]">
+                                    ระบบจะสิ้นสุดเซสชันบนอุปกรณ์นี้ และพาคุณกลับไปหน้าเข้าสู่ระบบ
+                                </DialogDescription>
+                            </DialogHeader>
                         </div>
-                        <DialogHeader>
-                            <DialogTitle className="text-2xl font-black text-slate-900 tracking-tight mb-2">
-                                Confirm Logout
-                            </DialogTitle>
-                            <DialogDescription className="text-slate-500 font-medium leading-relaxed">
-                                คุณแน่ใจหรือไม่ว่าต้องการออกจากระบบบัญชีของคุณ?
-                                การดำเนินการนี้จะสิ้นสุดเซสชันปัจจุบันของคุณ
-                            </DialogDescription>
-                        </DialogHeader>
+
+                        <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-700">
+                            งานที่ยังไม่ได้บันทึกในหน้านี้อาจหายไป ตรวจสอบข้อมูลให้เรียบร้อยก่อนออกจากระบบ
+                        </div>
+
+                        {logoutError ? (
+                            <div
+                                className="flex items-start gap-2 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium leading-6 text-rose-700"
+                                role="alert"
+                            >
+                                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+                                <span>{logoutError}</span>
+                            </div>
+                        ) : null}
                     </div>
-                    <div className="bg-slate-50/50 p-6 flex gap-3 justify-end px-10 pb-10">
+
+                    <DialogFooter className="border-t border-slate-200 bg-slate-50 px-6 py-4 sm:px-7">
                         <Button
-                            variant="ghost"
-                            onClick={() => setShowLogoutDialog(false)}
-                            className="h-12 px-6 rounded-xl font-bold text-slate-400 hover:text-slate-900 hover:bg-white"
+                            type="button"
+                            variant="outline"
+                            onClick={closeLogoutDialog}
+                            disabled={isLoggingOut}
+                            className="h-11 rounded-lg border-slate-200 bg-white px-5 font-semibold text-slate-700 hover:bg-slate-100 hover:text-slate-900"
                         >
                             ยกเลิก
                         </Button>
                         <Button
-                            onClick={confirmLogout}
-                            className="h-12 px-8 rounded-xl bg-rose-500 hover:bg-rose-600 text-white font-black uppercase tracking-widest text-[10px] shadow-lg shadow-rose-200"
+                            type="button"
+                            onClick={() => void confirmLogout()}
+                            disabled={isLoggingOut}
+                            className="h-11 rounded-lg bg-rose-600 px-6 font-semibold text-white hover:bg-rose-700 disabled:opacity-80"
+                            aria-busy={isLoggingOut}
                         >
-                            ออกจากระบบ
+                            {isLoggingOut ? (
+                                <>
+                                    <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                                    กำลังออกจากระบบ
+                                </>
+                            ) : (
+                                "ออกจากระบบ"
+                            )}
                         </Button>
-                    </div>
+                    </DialogFooter>
                 </DialogContent>
             </Dialog>
         </header>

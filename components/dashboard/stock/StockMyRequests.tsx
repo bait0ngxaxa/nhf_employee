@@ -171,18 +171,18 @@ function RequestFilters(props: {
     onStatusChange: (status: StockRequestStatus | undefined) => void;
 }) {
     return (
-        <div className="rounded-2xl border border-blue-100/80 bg-blue-50/40 p-3 shadow-sm">
+        <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-3 shadow-sm">
             <div className="mb-3 px-1">
-                <div className="text-sm font-semibold text-blue-900">
+                <div className="text-sm font-semibold text-slate-900">
                     ค้นหาและกรองประวัติการเบิก
                 </div>
-                <div className="text-xs text-blue-700/75">
+                <div className="text-xs text-slate-600">
                     ค้นหาจากเลขที่คำขอ รหัสโครงการ หรือชื่อรายการที่เคยเบิก
                 </div>
             </div>
             <div className="flex flex-col gap-3 sm:flex-row">
                 <div className="relative flex-1">
-                    <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-blue-500" aria-hidden="true" />
+                    <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" aria-hidden="true" />
                     <Input
                         aria-label="ค้นหาประวัติคำขอเบิกวัสดุ"
                         name="stock-my-request-search"
@@ -190,7 +190,7 @@ function RequestFilters(props: {
                         value={props.requestSearchQuery}
                         onChange={(event) => props.onSearchChange(event.target.value)}
                         placeholder="ค้นหาเลขที่คำขอ รหัสโครงการ หรือรายการ"
-                        className="h-12 rounded-2xl border-blue-100 bg-white pl-11 pr-11 shadow-inner shadow-blue-100/50 focus-visible:border-blue-300 focus-visible:ring-blue-200"
+                        className="h-12 rounded-2xl border-slate-200 bg-white pl-11 pr-11 text-slate-900 placeholder:text-slate-500 focus-visible:border-blue-300 focus-visible:ring-blue-200"
                     />
                     {props.requestSearchQuery.trim().length > 0 && (
                         <Button
@@ -198,7 +198,7 @@ function RequestFilters(props: {
                             variant="ghost"
                             size="icon"
                             onClick={() => props.onSearchChange("")}
-                            className="absolute right-2 top-1/2 h-8 w-8 -translate-y-1/2 rounded-full text-blue-500 hover:bg-blue-100 hover:text-blue-700"
+                            className="absolute right-2 top-1/2 h-8 w-8 -translate-y-1/2 rounded-full text-slate-500 hover:bg-slate-100 hover:text-slate-700"
                             aria-label="ล้างคำค้นหาประวัติคำขอเบิกวัสดุ"
                         >
                             <X className="h-4 w-4" aria-hidden="true" />
@@ -217,7 +217,7 @@ function RequestFilters(props: {
                         }
                     >
                         <SelectTrigger
-                            className="h-12 rounded-2xl border-blue-100 bg-white shadow-inner shadow-blue-100/50 focus:ring-blue-200"
+                            className="h-12 rounded-2xl border-slate-200 bg-white text-slate-900 focus:ring-blue-200"
                             aria-label="กรองสถานะประวัติคำขอเบิกวัสดุ"
                         >
                             <SelectValue placeholder="กรองสถานะ" />

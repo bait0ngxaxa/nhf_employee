@@ -51,6 +51,23 @@ function normalizeDashboardTab(tab: string | null): string {
     return tab ?? "dashboard";
 }
 
+function clearStockCartStorage(userId: string): void {
+    if (typeof window === "undefined") {
+        return;
+    }
+
+    try {
+        if (userId) {
+            window.localStorage.removeItem(
+                `${STOCK_BROWSE_CART_STORAGE_KEY_PREFIX}${userId}`,
+            );
+        }
+        window.localStorage.removeItem(STOCK_BROWSE_CART_LEGACY_KEY);
+    } catch {
+        // Logout must continue even when storage is unavailable.
+    }
+}
+
 export function DashboardProvider({
     children,
     initialUser,
@@ -120,24 +137,16 @@ export function DashboardProvider({
         [isAdmin, router, searchParams, pathname],
     );
 
-    const handleSignOut = useCallback(() => {
-        void (async () => {
-            const userId =
-                typeof user?.id === "string"
-                    ? user.id.trim()
-                    : typeof user?.id === "number"
-                      ? String(user.id)
-                      : "";
-            if (typeof window !== "undefined") {
-                if (userId) {
-                    window.localStorage.removeItem(
-                        `${STOCK_BROWSE_CART_STORAGE_KEY_PREFIX}${userId}`,
-                    );
-                }
-                window.localStorage.removeItem(STOCK_BROWSE_CART_LEGACY_KEY);
-            }
-            await signOut();
-        })();
+    const handleSignOut = useCallback(async (): Promise<void> => {
+        const userId =
+            typeof user?.id === "string"
+                ? user.id.trim()
+                : typeof user?.id === "number"
+                  ? String(user.id)
+                  : "";
+
+        clearStockCartStorage(userId);
+        await signOut();
     }, [signOut, user?.id]);
 
     const dataValue = useMemo<DashboardDataContextValue>(

@@ -249,7 +249,7 @@ export function EditItemDialog({
                 </div>
                 <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
                     <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-5 py-5 sm:px-6">
-                        <div className="rounded-2xl border border-blue-100 bg-blue-50/60 p-4">
+                        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                             <div className="text-sm font-semibold text-slate-800">
                                 ข้อมูลหลักของวัสดุ
                             </div>

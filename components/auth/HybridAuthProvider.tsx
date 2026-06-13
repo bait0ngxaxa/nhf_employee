@@ -19,7 +19,7 @@ import { API_ROUTES, APP_ROUTES } from "@/lib/ssot/routes";
 export type HybridAuthStatus = "loading" | "authenticated" | "unauthenticated";
 
 interface AuthMeResponse {
-    user: AuthenticatedUser;
+    user: AuthenticatedUser | null;
 }
 
 interface HybridAuthContextValue {

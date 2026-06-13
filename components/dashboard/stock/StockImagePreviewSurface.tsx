@@ -25,15 +25,15 @@ export function StockImagePreviewSurface({
             onClick={onClose}
         >
             <div
-                className="flex max-h-[88vh] w-full max-w-[920px] flex-col overflow-hidden rounded-3xl border border-blue-100 bg-white shadow-2xl shadow-slate-950/30"
+                className="flex max-h-[88vh] w-full max-w-[920px] flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl shadow-slate-950/30"
                 onClick={(event) => event.stopPropagation()}
             >
-                <div className="flex items-center justify-between gap-3 border-b border-blue-100 bg-blue-50/70 px-4 py-3 sm:px-5">
+                <div className="flex items-center justify-between gap-3 border-b border-slate-200 bg-slate-50 px-4 py-3 sm:px-5">
                     <div className="min-w-0">
-                        <div className="text-xs font-semibold text-blue-700">
+                        <div className="text-xs font-semibold text-slate-600">
                             พรีวิวรูปวัสดุ
                         </div>
-                        <div className="truncate text-sm font-bold text-blue-950">
+                        <div className="truncate text-sm font-bold text-slate-900">
                             {itemName}
                         </div>
                     </div>

@@ -45,6 +45,12 @@ export function ResetPasswordForm({
     const searchParams = useSearchParams();
 
     const token = searchParams.get("token");
+    const isPasswordValid = PASSWORD_REQUIREMENTS.every((req) => req.test(password));
+    const canSubmit =
+        Boolean(token) &&
+        isPasswordValid &&
+        password === confirmPassword &&
+        !isLoading;
 
     const handleSubmit = async (e: React.FormEvent): Promise<void> => {
         e.preventDefault();
@@ -93,7 +99,7 @@ export function ResetPasswordForm({
     if (!token) {
         return (
             <div className={cn("flex flex-col gap-6", className)} {...props}>
-                <Card className="border-gray-200/50 shadow-xl shadow-gray-200/50 bg-white/80 backdrop-blur-xl rounded-3xl">
+                <Card className="rounded-2xl border-gray-200/70 bg-white/90 shadow-sm">
                     <CardContent className="pt-8 pb-8">
                         <div className="flex flex-col items-center text-center space-y-4">
                             <div className="w-16 h-16 rounded-full bg-red-100 flex items-center justify-center">
@@ -120,15 +126,15 @@ export function ResetPasswordForm({
 
     return (
         <div className={cn("flex flex-col gap-6", className)} {...props}>
-            <Card className="border-gray-200/50 shadow-xl shadow-gray-200/50 bg-white/80 backdrop-blur-xl rounded-3xl">
+            <Card className="rounded-2xl border-gray-200/70 bg-white/90 shadow-sm">
                 <CardHeader className="text-center pb-2">
                     <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center mx-auto mb-3">
                         <KeyRound className="h-6 w-6 text-blue-600" />
                     </div>
-                    <CardTitle className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent">
+                    <CardTitle className="text-2xl font-bold text-blue-700">
                         ตั้งรหัสผ่านใหม่
                     </CardTitle>
-                    <CardDescription className="text-gray-500">
+                    <CardDescription className="text-gray-600">
                         กรอกรหัสผ่านใหม่ที่ต้องการใช้งาน
                     </CardDescription>
                 </CardHeader>
@@ -136,38 +142,44 @@ export function ResetPasswordForm({
                     <form onSubmit={handleSubmit}>
                         <div className="flex flex-col gap-5">
                             {error && (
-                                <div className="text-sm text-red-600 bg-red-50 p-3 rounded-md" role="alert" aria-live="polite">
+                                <div
+                                    className="rounded-md bg-red-50 p-3 text-sm font-medium text-red-700"
+                                    role="alert"
+                                    aria-live="polite"
+                                >
                                     {error}
                                 </div>
                             )}
 
                             <div className="grid gap-3">
-                                <Label
-                                    htmlFor="password"
-                                    className="text-gray-700"
-                                >
+                                <Label htmlFor="password" className="text-gray-700">
                                     รหัสผ่านใหม่
                                 </Label>
                                 <div className="relative">
                                     <Input
                                         id="password"
-                                        type={
-                                            showPassword ? "text" : "password"
-                                        }
+                                        type={showPassword ? "text" : "password"}
                                         autoComplete="new-password"
                                         value={password}
                                         onChange={(e) =>
                                             setPassword(e.target.value)
                                         }
                                         required
-                                        className="rounded-xl border-gray-200 focus:border-blue-500 focus:ring-blue-500/20 bg-white/50 pr-10"
+                                        aria-invalid={error ? true : undefined}
+                                        className="rounded-xl border-gray-200 bg-white/70 pr-10 focus:border-blue-500 focus:ring-blue-500/20"
                                     />
                                     <button
                                         type="button"
                                         onClick={() =>
                                             setShowPassword(!showPassword)
                                         }
-                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                                        aria-label={
+                                            showPassword
+                                                ? "ซ่อนรหัสผ่าน"
+                                                : "แสดงรหัสผ่าน"
+                                        }
+                                        aria-pressed={showPassword}
+                                        className="absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-md text-gray-500 hover:bg-blue-50 hover:text-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40"
                                     >
                                         {showPassword ? (
                                             <EyeOff className="h-4 w-4" />
@@ -191,13 +203,13 @@ export function ResetPasswordForm({
                                                 {passed ? (
                                                     <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
                                                 ) : (
-                                                    <XCircle className="h-3.5 w-3.5 text-gray-300" />
+                                                    <XCircle className="h-3.5 w-3.5 text-gray-400" />
                                                 )}
                                                 <span
                                                     className={
                                                         passed
                                                             ? "text-green-600"
-                                                            : "text-gray-400"
+                                                            : "text-gray-600"
                                                     }
                                                 >
                                                     {req.label}
@@ -209,27 +221,26 @@ export function ResetPasswordForm({
                             )}
 
                             <div className="grid gap-3">
-                                <Label
-                                    htmlFor="confirmPassword"
-                                    className="text-gray-700"
-                                >
+                                <Label htmlFor="confirmPassword" className="text-gray-700">
                                     ยืนยันรหัสผ่านใหม่
                                 </Label>
                                 <div className="relative">
                                     <Input
                                         id="confirmPassword"
-                                        type={
-                                            showConfirmPassword
-                                                ? "text"
-                                                : "password"
-                                        }
+                                        type={showConfirmPassword ? "text" : "password"}
                                         autoComplete="new-password"
                                         value={confirmPassword}
                                         onChange={(e) =>
                                             setConfirmPassword(e.target.value)
                                         }
                                         required
-                                        className="rounded-xl border-gray-200 focus:border-blue-500 focus:ring-blue-500/20 bg-white/50 pr-10"
+                                        aria-invalid={
+                                            confirmPassword.length > 0 &&
+                                            password !== confirmPassword
+                                                ? true
+                                                : undefined
+                                        }
+                                        className="rounded-xl border-gray-200 bg-white/70 pr-10 focus:border-blue-500 focus:ring-blue-500/20"
                                     />
                                     <button
                                         type="button"
@@ -238,7 +249,13 @@ export function ResetPasswordForm({
                                                 !showConfirmPassword,
                                             )
                                         }
-                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                                        aria-label={
+                                            showConfirmPassword
+                                                ? "ซ่อนรหัสผ่านยืนยัน"
+                                                : "แสดงรหัสผ่านยืนยัน"
+                                        }
+                                        aria-pressed={showConfirmPassword}
+                                        className="absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-md text-gray-500 hover:bg-blue-50 hover:text-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40"
                                     >
                                         {showConfirmPassword ? (
                                             <EyeOff className="h-4 w-4" />
@@ -257,8 +274,8 @@ export function ResetPasswordForm({
 
                             <Button
                                 type="submit"
-                                className="w-full rounded-xl bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white shadow-lg shadow-blue-500/25 transition-[transform,background-color,box-shadow] duration-300 motion-safe:hover:scale-[1.02]"
-                                disabled={isLoading}
+                                className="w-full rounded-xl bg-gradient-to-r from-blue-600 to-cyan-600 text-white hover:from-blue-700 hover:to-cyan-700 disabled:opacity-70"
+                                disabled={!canSubmit}
                             >
                                 {isLoading ? (
                                     <>

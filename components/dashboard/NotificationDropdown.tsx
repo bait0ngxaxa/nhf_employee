@@ -1,22 +1,14 @@
 "use client";
 
+import type React from "react";
 import { useState } from "react";
 import useSWR from "swr";
-import {
-    AlertCircle,
-    Bell,
-    Check,
-    ExternalLink,
-    Info,
-    Loader2,
-    MessageSquare,
-    XCircle,
-} from "lucide-react";
+import { Bell, Check, ExternalLink } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
 import { cn } from "@/lib/utils";
-import { apiGet, apiPatch, apiPost } from "@/lib/api-client";
+import { apiPatch, apiPost } from "@/lib/api-client";
 import { getRelativeTime } from "@/lib/helpers/date-helpers";
 import {
     API_ROUTES,
@@ -33,45 +25,38 @@ import {
     DropdownMenuLabel,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+    formatNotificationBadge,
+    NotificationEmptyState,
+    NotificationErrorState,
+    NotificationIcon,
+    NotificationInlineLoading,
+    NotificationLoadingState,
+    normalizeNotificationActionUrl,
+    notificationFetcher,
+} from "@/components/dashboard/NotificationShared";
+import type {
+    NotificationItem,
+    NotificationsData,
+} from "@/components/dashboard/NotificationShared";
 
-interface Notification {
-    id: string;
-    type: string;
-    title: string;
-    message: string;
-    isRead: boolean;
-    actionUrl: string | null;
-    createdAt: string;
-}
-
-interface NotificationsData {
-    notifications: Notification[];
-    unreadCount: number;
-}
-
-function normalizeNotificationActionUrl(actionUrl: string | null): string | null {
-    if (!actionUrl) {
-        return null;
+function getNotificationButtonLabel(unreadCount: number): string {
+    if (unreadCount <= 0) {
+        return "เปิดการแจ้งเตือน";
     }
 
-    return actionUrl.replace("tab=it-equipment", "tab=stock");
+    return `เปิดการแจ้งเตือน มี ${unreadCount} รายการที่ยังไม่อ่าน`;
 }
 
-const fetcher = async <T,>(url: string): Promise<T> => {
-    const result = await apiGet<T>(url);
-    if (!result.success) {
-        throw new Error(result.error);
-    }
-    return result.data;
-};
-
-export function NotificationDropdown() {
+export function NotificationDropdown(): React.ReactElement {
     const router = useRouter();
     const [open, setOpen] = useState(false);
+    const [pendingId, setPendingId] = useState<string | null>(null);
+    const [isMarkingAll, setIsMarkingAll] = useState(false);
 
     const { data, error, isLoading, mutate } = useSWR<NotificationsData>(
         API_ROUTES.notifications.list,
-        fetcher,
+        notificationFetcher,
         {
             refreshInterval: 60_000,
             revalidateOnFocus: false,
@@ -83,57 +68,48 @@ export function NotificationDropdown() {
     const unreadCount = data?.unreadCount ?? 0;
 
     const handleMarkAsRead = async (
-        id: string,
-        actionUrl: string | null,
+        notification: NotificationItem,
     ): Promise<void> => {
-        try {
-            await apiPatch(API_ROUTES.notifications.read(id));
-            mutate();
+        if (pendingId || isMarkingAll) {
+            return;
+        }
 
-            if (actionUrl) {
-                const normalizedActionUrl =
-                    normalizeNotificationActionUrl(actionUrl);
+        setPendingId(notification.id);
+        try {
+            await apiPatch(API_ROUTES.notifications.read(notification.id));
+            await mutate();
+
+            const normalizedActionUrl = normalizeNotificationActionUrl(
+                notification.actionUrl,
+            );
+            if (normalizedActionUrl) {
                 setOpen(false);
-                if (normalizedActionUrl) {
-                    router.push(normalizedActionUrl);
-                }
+                router.push(normalizedActionUrl);
             }
-        } catch (requestError) {
-            console.error("Failed to mark notification as read", requestError);
-            toast.error("เกิดข้อผิดพลาด", {
-                description: "ไม่สามารถอัปเดตสถานะการอ่านได้",
+        } catch {
+            toast.error("อัปเดตการแจ้งเตือนไม่สำเร็จ", {
+                description: "ลองเปิดรายการนี้อีกครั้ง หรือโหลดข้อมูลใหม่",
             });
+        } finally {
+            setPendingId(null);
         }
     };
 
     const handleMarkAllAsRead = async (): Promise<void> => {
+        if (isMarkingAll || unreadCount <= 0) {
+            return;
+        }
+
+        setIsMarkingAll(true);
         try {
             await apiPost(API_ROUTES.notifications.markAllRead);
-            mutate();
-        } catch (requestError) {
-            console.error("Failed to mark all as read", requestError);
-            toast.error("เกิดข้อผิดพลาด", {
-                description: "ไม่สามารถอัปเดตสถานะการอ่านได้",
+            await mutate();
+        } catch {
+            toast.error("อ่านทั้งหมดไม่สำเร็จ", {
+                description: "ตรวจสอบการเชื่อมต่อ แล้วลองอีกครั้ง",
             });
-        }
-    };
-
-    const getIconPrefix = (type: string) => {
-        switch (type) {
-            case "TICKET_CREATED":
-            case "TICKET_UPDATED":
-                return <AlertCircle className="h-4 w-4 text-orange-500" />;
-            case "STOCK_REQUEST_NEW":
-                return <Bell className="h-4 w-4 text-amber-500" />;
-            case "STOCK_ISSUED":
-                return <Check className="h-4 w-4 text-emerald-500" />;
-            case "STOCK_CANCELLED":
-                return <XCircle className="h-4 w-4 text-rose-500" />;
-            case "NEW_COMMENT":
-                return <MessageSquare className="h-4 w-4 text-blue-500" />;
-            case "SYSTEM_ALERT":
-            default:
-                return <Info className="h-4 w-4 text-gray-500" />;
+        } finally {
+            setIsMarkingAll(false);
         }
     };
 
@@ -143,133 +119,166 @@ export function NotificationDropdown() {
                 <Button
                     variant="ghost"
                     size="icon"
-                    className="relative h-10 w-10 rounded-xl bg-white border border-slate-100 hover:border-slate-200 hover:bg-slate-50 transition-colors shadow-sm"
-                >
-                    <Bell className="h-5 w-5 text-slate-500" />
-                    {unreadCount > 0 && (
-                        <span className="absolute -top-1 -right-1 flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-slate-900 text-white text-[9px] font-black leading-none shadow-lg shadow-slate-200">
-                            {unreadCount > 9 ? "9+" : unreadCount}
-                        </span>
+                    className={cn(
+                        "relative h-10 w-10 rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm transition-colors",
+                        "hover:border-slate-300 hover:bg-slate-50 hover:text-slate-950",
+                        "focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2",
                     )}
+                    aria-label={getNotificationButtonLabel(unreadCount)}
+                >
+                    <Bell className="h-5 w-5" aria-hidden="true" />
+                    {unreadCount > 0 ? (
+                        <span className="absolute -right-1 -top-1 flex h-[1.125rem] min-w-[1.125rem] items-center justify-center rounded-full bg-slate-950 px-1 text-[0.625rem] font-bold leading-none text-white ring-2 ring-white">
+                            {formatNotificationBadge(unreadCount)}
+                        </span>
+                    ) : null}
                 </Button>
             </DropdownMenuTrigger>
 
             <DropdownMenuContent
                 align="end"
-                className="w-96 p-0 overflow-hidden rounded-[2rem] border-slate-100 bg-white shadow-lg"
+                sideOffset={10}
+                className="w-[min(calc(100vw-1rem),24rem)] overflow-hidden rounded-xl border-slate-200 bg-white p-0 shadow-lg"
             >
-                <div className="flex items-center justify-between px-6 py-5 border-b border-slate-50 bg-slate-50/30">
-                    <div className="space-y-0.5">
-                        <DropdownMenuLabel className="p-0 text-lg font-black text-slate-900 tracking-tight">
-                            Activity
+                <div className="flex items-start justify-between gap-3 border-b border-slate-200 bg-slate-50 px-5 py-4">
+                    <div className="min-w-0">
+                        <DropdownMenuLabel className="p-0 text-base font-semibold text-slate-950">
+                            การแจ้งเตือน
                         </DropdownMenuLabel>
-                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Recent Notifications</p>
+                        <p className="mt-1 text-sm text-slate-600">
+                            {unreadCount > 0
+                                ? `${unreadCount} รายการที่ยังไม่อ่าน`
+                                : "ไม่มีรายการค้างอ่าน"}
+                        </p>
                     </div>
-                    {unreadCount > 0 && (
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={handleMarkAllAsRead}
-                            className="h-8 rounded-lg text-[10px] font-black uppercase tracking-widest text-sky-600 hover:text-sky-700 hover:bg-sky-50"
-                        >
-                            <Check className="h-3 w-3 mr-1.5" />
-                            Mark all read
-                        </Button>
-                    )}
+                    <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => void handleMarkAllAsRead()}
+                        disabled={unreadCount <= 0 || isMarkingAll}
+                        className="h-9 shrink-0 rounded-lg border-slate-200 bg-white text-sm font-semibold text-slate-700"
+                        aria-busy={isMarkingAll}
+                    >
+                        {isMarkingAll ? (
+                            <NotificationInlineLoading label="กำลังอ่าน" />
+                        ) : (
+                            <>
+                                <Check className="h-3.5 w-3.5" aria-hidden="true" />
+                                อ่านทั้งหมด
+                            </>
+                        )}
+                    </Button>
                 </div>
 
-                <div className="max-h-[420px] overflow-y-auto custom-scrollbar">
+                <div className="max-h-[min(26rem,calc(100vh-12rem))] overflow-y-auto">
                     {isLoading ? (
-                        <div className="flex flex-col justify-center items-center py-12 text-slate-400 gap-3">
-                            <Loader2 className="h-8 w-8 animate-spin text-slate-200" />
-                            <span className="text-xs font-bold uppercase tracking-widest opacity-50">Loading Feed</span>
-                        </div>
+                        <NotificationLoadingState compact />
                     ) : error ? (
-                        <div className="py-12 text-center text-xs font-bold text-rose-500 uppercase tracking-widest">
-                            Connection Error
-                        </div>
+                        <NotificationErrorState
+                            compact
+                            onRetry={() => void mutate()}
+                        />
                     ) : notifications.length === 0 ? (
-                        <div className="py-16 text-center text-slate-400 flex flex-col items-center gap-4">
-                            <div className="w-16 h-16 rounded-3xl bg-slate-50 flex items-center justify-center text-slate-200">
-                                <Bell className="h-8 w-8" />
-                            </div>
-                            <div className="space-y-1">
-                                <p className="text-sm font-black text-slate-900">All caught up</p>
-                                <p className="text-xs font-medium text-slate-400">No new notifications for now</p>
-                            </div>
-                        </div>
+                        <NotificationEmptyState compact />
                     ) : (
-                        <DropdownMenuGroup className="p-2 space-y-1">
+                        <DropdownMenuGroup className="space-y-1 p-2">
                             {notifications.map((notification) => (
-                                <DropdownMenuItem
+                                <NotificationDropdownItem
                                     key={notification.id}
-                                    className={cn(
-                                        "flex items-start gap-4 p-4 cursor-pointer rounded-2xl transition-all duration-300",
-                                        notification.isRead
-                                            ? "opacity-60 grayscale-[0.5] hover:bg-slate-50"
-                                            : "bg-white border border-slate-50 hover:border-slate-100 hover:shadow-sm"
-                                    )}
-                                    onClick={() =>
-                                        handleMarkAsRead(
-                                            notification.id,
-                                            notification.actionUrl,
-                                        )
-                                    }
-                                >
-                                    <div className={cn(
-                                        "mt-1 shrink-0 w-10 h-10 rounded-xl flex items-center justify-center border shadow-sm",
-                                        notification.isRead ? "bg-slate-50 border-slate-100" : "bg-white border-slate-50"
-                                    )}>
-                                        {getIconPrefix(notification.type)}
-                                    </div>
-                                    <div className="flex flex-col gap-1 overflow-hidden w-full">
-                                        <div className="flex justify-between items-start w-full">
-                                            <span
-                                                className={cn(
-                                                    "text-sm tracking-tight truncate pr-4",
-                                                    notification.isRead
-                                                        ? "font-bold text-slate-600"
-                                                        : "font-black text-slate-900"
-                                                )}
-                                            >
-                                                {notification.title}
-                                            </span>
-                                            {!notification.isRead && (
-                                                <span className="w-2 h-2 rounded-full bg-sky-500 shrink-0 mt-2 shadow-[0_0_8px_rgba(14,165,233,0.5)]" />
-                                            )}
-                                        </div>
-                                        <span className="text-xs text-slate-500 font-medium line-clamp-2 leading-relaxed mb-1">
-                                            {notification.message}
-                                        </span>
-                                        <div className="flex items-center justify-between mt-1">
-                                            <span className="text-[10px] font-black text-slate-300 uppercase tracking-widest">
-                                                {getRelativeTime(notification.createdAt)}
-                                            </span>
-                                            {!notification.isRead && (
-                                                <span className="text-[8px] font-black uppercase tracking-widest text-sky-600 bg-sky-50 px-2 py-0.5 rounded-full">New</span>
-                                            )}
-                                        </div>
-                                    </div>
-                                </DropdownMenuItem>
+                                    notification={notification}
+                                    isPending={pendingId === notification.id}
+                                    isDisabled={Boolean(pendingId) || isMarkingAll}
+                                    onOpen={handleMarkAsRead}
+                                />
                             ))}
                         </DropdownMenuGroup>
                     )}
                 </div>
 
-                <div className="p-4 bg-slate-50/50 border-t border-slate-50">
+                <div className="border-t border-slate-200 bg-white p-3">
                     <Button
+                        type="button"
                         variant="ghost"
-                        className="w-full text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 hover:text-slate-900 hover:bg-white rounded-xl h-10 transition-all"
+                        className="h-10 w-full rounded-lg text-sm font-semibold text-slate-700 hover:bg-slate-50 hover:text-slate-950"
                         onClick={() => {
                             setOpen(false);
-                            router.push(toDashboardTabPath(APP_DASHBOARD_TABS.notifications));
+                            router.push(
+                                toDashboardTabPath(
+                                    APP_DASHBOARD_TABS.notifications,
+                                ),
+                            );
                         }}
                     >
-                        View Full History
-                        <ExternalLink className="h-3 w-3 ml-2" />
+                        ดูประวัติทั้งหมด
+                        <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
                     </Button>
                 </div>
             </DropdownMenuContent>
         </DropdownMenu>
+    );
+}
+
+function NotificationDropdownItem({
+    notification,
+    isPending,
+    isDisabled,
+    onOpen,
+}: {
+    notification: NotificationItem;
+    isPending: boolean;
+    isDisabled: boolean;
+    onOpen: (notification: NotificationItem) => Promise<void>;
+}): React.ReactElement {
+    return (
+        <DropdownMenuItem
+            disabled={isDisabled}
+            className={cn(
+                "items-start gap-3 rounded-lg p-3 outline-none transition-colors",
+                "focus:bg-slate-50 data-[disabled]:opacity-70",
+                notification.isRead
+                    ? "bg-white text-slate-700"
+                    : "border border-slate-200 bg-slate-50 text-slate-950",
+            )}
+            onSelect={(event) => {
+                event.preventDefault();
+                void onOpen(notification);
+            }}
+        >
+            <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white">
+                {isPending ? (
+                    <NotificationInlineLoading label="" />
+                ) : (
+                    <NotificationIcon
+                        type={notification.type}
+                        className="h-4 w-4"
+                    />
+                )}
+            </div>
+            <div className="min-w-0 flex-1">
+                <div className="flex min-w-0 items-start gap-2">
+                    <span
+                        className={cn(
+                            "min-w-0 flex-1 truncate text-sm leading-5",
+                            notification.isRead ? "font-medium" : "font-semibold",
+                        )}
+                    >
+                        {notification.title}
+                    </span>
+                    {!notification.isRead ? (
+                        <span
+                            className="mt-2 h-2 w-2 shrink-0 rounded-full bg-sky-500"
+                            aria-label="ยังไม่อ่าน"
+                        />
+                    ) : null}
+                </div>
+                <p className="mt-1 line-clamp-2 text-sm leading-6 text-slate-600 [overflow-wrap:anywhere]">
+                    {notification.message}
+                </p>
+                <p className="mt-2 text-xs font-medium text-slate-500">
+                    {getRelativeTime(notification.createdAt)}
+                </p>
+            </div>
+        </DropdownMenuItem>
     );
 }

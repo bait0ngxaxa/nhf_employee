@@ -62,19 +62,19 @@ export function StockBrowseCartPanel({
     return (
         <>
             <div className="flex h-full flex-col bg-white">
-                <div className="border-b border-blue-100 bg-blue-50/45 px-5 py-4">
+                <div className="border-b border-slate-200 bg-slate-50 px-5 py-4">
                     <div className="flex items-center gap-3">
-                        <div className="rounded-2xl bg-blue-50 p-2.5 text-blue-700">
+                        <div className="rounded-2xl bg-slate-100 p-2.5 text-slate-700">
                             <ShoppingCart
                                 className="h-5 w-5"
                                 aria-hidden="true"
                             />
                         </div>
                         <div className="min-w-0">
-                            <div className="text-[0.9375rem] font-semibold leading-6 text-blue-950">
+                            <div className="text-[0.9375rem] font-semibold leading-6 text-slate-900">
                                 สรุปรายการเบิก
                             </div>
-                            <div className="text-sm leading-5 text-blue-800/70">
+                            <div className="text-sm leading-5 text-slate-600">
                                 {cartSize} รายการ รวม {cartCount} ชิ้น
                             </div>
                         </div>
@@ -82,11 +82,11 @@ export function StockBrowseCartPanel({
                 </div>
 
                 <div className="flex-1 space-y-3 overflow-y-auto px-5 py-4">
-                    <div className="rounded-2xl border border-blue-100 bg-blue-50/45 p-4">
+                    <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
                         <div className="space-y-1.5">
                             <Label
                                 htmlFor="stock-project-code"
-                                className="text-sm font-semibold leading-5 text-blue-900"
+                                className="text-sm font-semibold leading-5 text-slate-800"
                             >
                                 ชื่อย่อโครงการ
                             </Label>
@@ -103,9 +103,9 @@ export function StockBrowseCartPanel({
                                 }
                                 placeholder="กรุณาระบุชื่อย่อโครงการ"
                                 disabled={submitting}
-                                className="h-11 border-blue-100 bg-white font-medium uppercase tracking-normal shadow-inner shadow-blue-100/50 focus-visible:border-blue-300 focus-visible:ring-blue-200"
+                                className="h-11 border-slate-200 bg-white font-medium uppercase tracking-normal text-slate-900 placeholder:text-slate-500 focus-visible:border-blue-300 focus-visible:ring-blue-200"
                             />
-                            <div className="text-xs font-medium leading-5 text-blue-700/70">
+                            <div className="text-xs font-medium leading-5 text-slate-600">
                                 ใช้สำหรับอ้างอิงคำขอเบิก สูงสุด {STOCK_PROJECT_CODE_MAX_LENGTH} ตัวอักษร
                             </div>
                         </div>
@@ -126,7 +126,7 @@ export function StockBrowseCartPanel({
                     ))}
                 </div>
 
-                <div className="border-t border-blue-100 bg-blue-50/45 px-5 py-4">
+                <div className="border-t border-slate-200 bg-slate-50 px-5 py-4">
                     <div className="mb-3 rounded-2xl border border-blue-100 bg-white/95 px-4 py-3">
                         <div className="flex items-center justify-between gap-3 text-sm leading-5">
                             <span className="text-slate-500">สรุปรายการ</span>
@@ -285,7 +285,7 @@ function CartRow(props: {
                             size="icon"
                             onClick={props.onDecrease}
                             disabled={props.disabled || item.qty <= 1}
-                            className="h-11 w-11 rounded-lg border border-blue-100 bg-white text-blue-700 shadow-sm transition-colors duration-200 hover:border-blue-200 hover:bg-blue-50"
+                            className="h-11 w-11 rounded-lg border border-slate-200 bg-white text-slate-700 shadow-sm transition-colors duration-200 hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700"
                             aria-label={`ลดจำนวน ${displayName}`}
                         >
                             <Minus
@@ -293,7 +293,7 @@ function CartRow(props: {
                                 aria-hidden="true"
                             />
                         </Button>
-                        <div className="w-8 rounded-lg bg-blue-50 py-1 text-center text-xs font-bold tabular-nums text-blue-800 sm:w-10 sm:text-sm">
+                        <div className="w-8 rounded-lg bg-slate-100 py-1 text-center text-xs font-bold tabular-nums text-slate-800 sm:w-10 sm:text-sm">
                             {item.qty}
                         </div>
                         <Button
@@ -305,7 +305,7 @@ function CartRow(props: {
                                 props.disabled ||
                                 item.qty >= availableQuantity
                             }
-                            className="h-11 w-11 rounded-lg border border-blue-100 bg-white text-blue-700 shadow-sm transition-colors duration-200 hover:border-blue-200 hover:bg-blue-50"
+                            className="h-11 w-11 rounded-lg border border-slate-200 bg-white text-slate-700 shadow-sm transition-colors duration-200 hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700"
                             aria-label={`เพิ่มจำนวน ${displayName}`}
                         >
                             <Plus

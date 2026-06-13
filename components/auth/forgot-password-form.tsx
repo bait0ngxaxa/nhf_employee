@@ -50,7 +50,7 @@ export function ForgotPasswordForm({
     if (isSubmitted) {
         return (
             <div className={cn("flex flex-col gap-6", className)} {...props}>
-                <Card className="border-gray-200/50 shadow-xl shadow-gray-200/50 bg-white/80 backdrop-blur-xl rounded-3xl">
+                <Card className="rounded-2xl border-gray-200/70 bg-white/90 shadow-sm">
                     <CardContent className="pt-8 pb-8">
                         <div className="flex flex-col items-center text-center space-y-4">
                             <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center">
@@ -59,8 +59,10 @@ export function ForgotPasswordForm({
                             <h3 className="text-lg font-semibold text-gray-900">
                                 ตรวจสอบอีเมลของคุณ
                             </h3>
-                            <p className="text-sm text-gray-600 max-w-xs">
-                                หากอีเมล <strong>{email}</strong> มีอยู่ในระบบ
+                            <p className="max-w-xs text-sm leading-6 text-gray-600">
+                                หากอีเมล{" "}
+                                <strong className="break-all">{email}</strong>{" "}
+                                มีอยู่ในระบบ
                                 คุณจะได้รับลิงก์สำหรับรีเซ็ตรหัสผ่าน
                                 ลิงก์จะหมดอายุภายใน 1 ชั่วโมง
                             </p>
@@ -80,15 +82,15 @@ export function ForgotPasswordForm({
 
     return (
         <div className={cn("flex flex-col gap-6", className)} {...props}>
-            <Card className="border-gray-200/50 shadow-xl shadow-gray-200/50 bg-white/80 backdrop-blur-xl rounded-3xl">
+            <Card className="rounded-2xl border-gray-200/70 bg-white/90 shadow-sm">
                 <CardHeader className="text-center pb-2">
                     <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center mx-auto mb-3">
                         <Mail className="h-6 w-6 text-blue-600" />
                     </div>
-                    <CardTitle className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent">
+                    <CardTitle className="text-2xl font-bold text-blue-700">
                         ลืมรหัสผ่าน
                     </CardTitle>
-                    <CardDescription className="text-gray-500">
+                    <CardDescription className="text-gray-600">
                         กรอกอีเมลเพื่อรับลิงก์รีเซ็ตรหัสผ่าน
                     </CardDescription>
                 </CardHeader>
@@ -96,7 +98,11 @@ export function ForgotPasswordForm({
                     <form onSubmit={handleSubmit}>
                         <div className="flex flex-col gap-5">
                             {error && (
-                                <div className="text-sm text-red-600 bg-red-50 p-3 rounded-md" role="alert" aria-live="polite">
+                                <div
+                                    className="rounded-md bg-red-50 p-3 text-sm font-medium text-red-700"
+                                    role="alert"
+                                    aria-live="polite"
+                                >
                                     {error}
                                 </div>
                             )}
@@ -117,13 +123,14 @@ export function ForgotPasswordForm({
                                     value={email}
                                     onChange={(e) => setEmail(e.target.value)}
                                     required
-                                    className="rounded-xl border-gray-200 focus:border-blue-500 focus:ring-blue-500/20 bg-white/50"
+                                    aria-invalid={error ? true : undefined}
+                                    className="rounded-xl border-gray-200 bg-white/70 focus:border-blue-500 focus:ring-blue-500/20"
                                 />
                             </div>
 
                             <Button
                                 type="submit"
-                                className="w-full rounded-xl bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white shadow-lg shadow-blue-500/25 transition-[transform,background-color,box-shadow] duration-300 motion-safe:hover:scale-[1.02]"
+                                className="w-full rounded-xl bg-gradient-to-r from-blue-600 to-cyan-600 text-white hover:from-blue-700 hover:to-cyan-700 disabled:opacity-70"
                                 disabled={isLoading}
                             >
                                 {isLoading ? (

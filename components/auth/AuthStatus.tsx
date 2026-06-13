@@ -44,9 +44,9 @@ export function AuthStatus() {
     }
 
     return (
-        <div className="flex items-center space-x-4">
+        <div className="flex items-center gap-2 sm:gap-3">
             <Link href={APP_ROUTES.login}>
-                <Button className="flex items-center space-x-2 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white shadow-lg shadow-blue-500/25 transition-[transform,background-color,box-shadow] duration-300 motion-safe:hover:scale-[1.02]">
+                <Button className="bg-gradient-to-r from-blue-600 to-cyan-600 text-white hover:from-blue-700 hover:to-cyan-700">
                     <User className="h-4 w-4" />
                     <span>เข้าสู่ระบบ</span>
                 </Button>
@@ -54,7 +54,7 @@ export function AuthStatus() {
             <Link href={APP_ROUTES.signup}>
                 <Button
                     variant="outline"
-                    className="flex items-center space-x-2 border-blue-200 text-blue-600 hover:bg-blue-50 hover:text-blue-700 transition-colors duration-300"
+                    className="hidden border-blue-200 text-blue-700 hover:bg-blue-50 hover:text-blue-800 sm:inline-flex"
                 >
                     <User className="h-4 w-4" />
                     <span>ลงทะเบียน</span>

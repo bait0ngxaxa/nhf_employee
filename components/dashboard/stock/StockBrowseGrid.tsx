@@ -148,11 +148,11 @@ function BrowseCardBase(props: BrowseCardProps) {
                     : "border-blue-100/80 hover:border-blue-300"
         }`}>
             <CardContent className="flex h-full flex-col gap-2.5 p-3">
-                <div className="overflow-hidden rounded-2xl bg-blue-50/50 ring-1 ring-blue-100 shadow-inner shadow-white/70">
-                    <div className="flex h-9 items-center border-b border-indigo-100/80 bg-indigo-50/80 px-2 py-1 backdrop-blur">
+                <div className="overflow-hidden rounded-2xl bg-slate-50 ring-1 ring-slate-200 shadow-inner shadow-white/70">
+                    <div className="flex h-9 items-center border-b border-slate-200 bg-slate-50 px-2 py-1">
                         <Badge
                             variant="secondary"
-                            className="max-w-full justify-start whitespace-normal border border-indigo-200 bg-white/85 px-2 text-left text-xs font-medium leading-5 text-indigo-800 shadow-sm shadow-indigo-100/50 [display:-webkit-box] [overflow-wrap:anywhere] [-webkit-box-orient:vertical] [-webkit-line-clamp:2] hover:bg-white"
+                            className="max-w-full justify-start whitespace-normal border border-slate-200 bg-white px-2 text-left text-xs font-medium leading-5 text-slate-700 [display:-webkit-box] [overflow-wrap:anywhere] [-webkit-box-orient:vertical] [-webkit-line-clamp:2] hover:bg-white"
                             title={item.category.name}
                         >
                             {item.category.name}
@@ -182,7 +182,7 @@ function BrowseCardBase(props: BrowseCardProps) {
                             </span>
                         </button>
                     ) : (
-                        <div className="flex h-32 items-center justify-center text-blue-300">
+                        <div className="flex h-32 items-center justify-center text-slate-300">
                             <Package className="h-10 w-10" aria-hidden="true" />
                         </div>
                     )}
@@ -193,7 +193,7 @@ function BrowseCardBase(props: BrowseCardProps) {
                     <div className="flex flex-wrap items-start gap-2">
                         <p
                             title={item.sku}
-                            className="max-w-full rounded-md bg-blue-50 px-1.5 py-0.5 font-mono text-xs font-medium leading-5 text-blue-700/70 [overflow-wrap:anywhere]"
+                            className="max-w-full rounded-md bg-slate-100 px-1.5 py-0.5 font-mono text-xs font-medium leading-5 text-slate-600 [overflow-wrap:anywhere]"
                         >
                             {item.sku}
                         </p>
@@ -208,8 +208,8 @@ function BrowseCardBase(props: BrowseCardProps) {
                     ) : null}
                 </div>
 
-                <div className="flex min-h-[5.75rem] flex-col justify-between rounded-2xl border border-blue-100/80 bg-blue-50/45 p-2.5 shadow-inner shadow-white">
-                    <div className="min-h-5 text-sm font-semibold leading-5 text-blue-950">
+                <div className="flex min-h-[5.75rem] flex-col justify-between rounded-2xl border border-slate-200 bg-slate-50/80 p-2.5 shadow-inner shadow-white">
+                    <div className="min-h-5 text-sm font-semibold leading-5 text-slate-800">
                         {hasSelectableVariants(item) ? (
                             <>มี {variantCount} ตัวเลือก</>
                         ) : variantSummary ? (
@@ -218,14 +218,14 @@ function BrowseCardBase(props: BrowseCardProps) {
                     </div>
                     <div className="space-y-1.5">
                         <div className="flex items-center justify-between">
-                            <span className="text-xs font-semibold leading-5 text-blue-700/75">
+                            <span className="text-xs font-semibold leading-5 text-slate-500">
                                 คงเหลือ
                             </span>
                             <span
                                 className={`rounded-lg px-2.5 py-1 text-sm font-bold tabular-nums leading-5 shadow-sm ${
                                     availableQuantity === 0
                                         ? "bg-slate-100 text-slate-500"
-                                        : "bg-white text-blue-800"
+                                        : "bg-white text-slate-800"
                                 }`}
                             >
                                 {availableQuantity} {item.unit}
@@ -278,7 +278,7 @@ function BrowseCardBase(props: BrowseCardProps) {
                         )}
                         <span className="relative z-10 text-sm font-semibold leading-5">
                             {availableQuantity === 0
-                                ? "สินค้าหมด"
+                                ? "วัสดุหมด"
                                 : isRecentlyAdded
                                   ? "เพิ่มแล้ว"
                                 : hasSelectableVariants(item)
@@ -327,7 +327,7 @@ function StockItemName({ name }: { name: string }) {
                     <span className="block min-w-0">
                         <h3
                             ref={titleRef}
-                            className="line-clamp-2 min-h-11 text-base font-bold leading-[1.35] text-slate-900 [overflow-wrap:anywhere] transition-colors group-hover:text-blue-800"
+                            className="line-clamp-2 min-h-11 text-base font-bold leading-[1.35] text-slate-900 [overflow-wrap:anywhere] transition-colors group-hover:text-slate-950"
                         >
                             {name}
                         </h3>
@@ -337,7 +337,7 @@ function StockItemName({ name }: { name: string }) {
                     side="top"
                     align="start"
                     hideArrow
-                    className="max-w-72 whitespace-normal border border-blue-200 bg-blue-50 text-left leading-6 text-blue-950 shadow-lg shadow-blue-100/70"
+                    className="max-w-72 whitespace-normal border border-slate-200 bg-white text-left leading-6 text-slate-900 shadow-lg"
                 >
                     {name}
                 </TooltipContent>

@@ -1,166 +1,234 @@
 import type { Metadata } from "next";
-import { AuthStatus } from "@/components/auth";
 import Link from "next/link";
+import {
+    ArrowRight,
+    Building2,
+    CheckCircle2,
+    ShieldCheck,
+    Sparkles,
+    UsersRound,
+} from "lucide-react";
+import { redirect } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Shield, Database, Zap, ArrowRight, Package } from "lucide-react";
 import { getApiAuthSession } from "@/lib/server-auth";
 import { APP_ROUTES } from "@/lib/ssot/routes";
-import { redirect } from "next/navigation";
 
 export const metadata: Metadata = {
     title: "NHFapp",
-    description: "แพลตฟอร์มส่วนกลางสำหรับการจัดการข้อมูลและงานไอทีของ NHF",
+    description: "แอปพลิเคชันภายในองค์กรสำหรับผู้ใช้งาน NHF",
 };
+
+interface IntroPoint {
+    title: string;
+    description: string;
+    icon: React.ElementType;
+    cardClassName: string;
+    iconClassName: string;
+}
+
+const INTRO_POINTS: IntroPoint[] = [
+    {
+        title: "พื้นที่เดียวขององค์กร",
+        description: "ออกแบบให้เป็นจุดเริ่มต้นสำหรับผู้ใช้งานภายใน NHF",
+        icon: Building2,
+        cardClassName: "bg-blue-50 ring-blue-100",
+        iconClassName: "bg-white text-blue-700 ring-1 ring-blue-200",
+    },
+    {
+        title: "เข้าถึงตามบทบาท",
+        description: "เหมาะกับผู้ใช้งานในแต่ละบทบาทขององค์กร",
+        icon: ShieldCheck,
+        cardClassName: "bg-indigo-50 ring-indigo-100",
+        iconClassName: "bg-white text-indigo-700 ring-1 ring-indigo-200",
+    },
+    {
+        title: "ใช้งานง่าย",
+        description: "หน้าจอเรียบง่าย อ่านสบาย และไม่ซับซ้อนเกินจำเป็น",
+        icon: Sparkles,
+        cardClassName: "bg-cyan-50 ring-cyan-100",
+        iconClassName: "bg-white text-cyan-700 ring-1 ring-cyan-200",
+    },
+    {
+        title: "สำหรับพนักงาน NHF",
+        description: "สร้างขึ้นเพื่อรองรับการทำงานร่วมกันของคนในองค์กร",
+        icon: UsersRound,
+        cardClassName: "bg-slate-50 ring-slate-200",
+        iconClassName: "bg-white text-blue-700 ring-1 ring-blue-200",
+    },
+];
+
+const TRUST_POINTS = [
+    "สำหรับผู้ใช้งานภายในมูลนิธิสาธารณสุขแห่งชาติ",
+    "ใช้บัญชีที่ได้รับอนุญาตจากองค์กร",
+    "ใช้งานได้ทุกสถานที่ไม่ต้องมี VPN",
+] as const;
+
+function BrandMark() {
+    return (
+        <Link
+            href={APP_ROUTES.home}
+            className="flex items-center gap-3 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-sky-600 focus-visible:ring-offset-4"
+            aria-label="NHFapp หน้าแรก"
+        >
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-blue-600 to-cyan-600 text-white">
+                <Building2 className="h-5 w-5" aria-hidden="true" />
+            </div>
+            <div className="leading-tight">
+                <p className="text-base font-bold text-slate-950">NHFapp</p>
+                <p className="text-xs font-medium text-slate-600">
+                    ระบบงานภายในองค์กร
+                </p>
+            </div>
+        </Link>
+    );
+}
+
+function IntroPointList() {
+    return (
+        <div className="grid gap-3 sm:grid-cols-2">
+            {INTRO_POINTS.map((point) => {
+                const Icon = point.icon;
+                return (
+                    <div
+                        key={point.title}
+                        className={`rounded-xl p-4 ring-1 ${point.cardClassName}`}
+                    >
+                        <div
+                            className={`mb-3 flex h-10 w-10 items-center justify-center rounded-lg ${point.iconClassName}`}
+                        >
+                            <Icon className="h-5 w-5" aria-hidden="true" />
+                        </div>
+                        <h3 className="text-base font-bold leading-6 text-slate-950 [overflow-wrap:anywhere]">
+                            {point.title}
+                        </h3>
+                        <p className="mt-1 text-sm font-medium leading-6 text-slate-700 [overflow-wrap:anywhere]">
+                            {point.description}
+                        </p>
+                    </div>
+                );
+            })}
+        </div>
+    );
+}
+
+function AccessPanel() {
+    return (
+        <aside className="rounded-2xl border border-gray-200/70 bg-white/90 p-6 text-slate-950 shadow-sm md:p-8">
+            <div className="flex items-start justify-between gap-4">
+                <div>
+                    <p className="text-sm font-semibold text-blue-700">
+                        แอปภายในองค์กร
+                    </p>
+                    <h2 className="mt-3 text-2xl font-bold leading-tight text-slate-950 text-balance">
+                        เริ่มต้นใช้งาน NHFapp
+                    </h2>
+                </div>
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-700 ring-1 ring-blue-100">
+                    <ShieldCheck className="h-5 w-5" aria-hidden="true" />
+                </div>
+            </div>
+
+            <div className="mt-6 space-y-3">
+                {TRUST_POINTS.map((point) => (
+                    <div key={point} className="flex gap-3">
+                        <CheckCircle2
+                            className="mt-0.5 h-5 w-5 shrink-0 text-blue-600"
+                            aria-hidden="true"
+                        />
+                        <p className="text-sm font-medium leading-6 text-slate-700 [overflow-wrap:anywhere]">
+                            {point}
+                        </p>
+                    </div>
+                ))}
+            </div>
+
+            <div className="mt-8 flex flex-col gap-3 sm:flex-row lg:flex-col">
+                <Button
+                    asChild
+                    size="lg"
+                    className="rounded-xl bg-gradient-to-r from-blue-600 to-cyan-600 text-white hover:from-blue-700 hover:to-cyan-700"
+                >
+                    <Link href={APP_ROUTES.login}>
+                        เข้าสู่ระบบ
+                        <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                    </Link>
+                </Button>
+                <Button
+                    asChild
+                    size="lg"
+                    variant="outline"
+                    className="rounded-xl border-blue-200 bg-white/80 text-blue-700 hover:bg-blue-50 hover:text-blue-800"
+                >
+                    <Link href={APP_ROUTES.signup}>ลงทะเบียนบัญชี</Link>
+                </Button>
+            </div>
+        </aside>
+    );
+}
 
 export default async function Home() {
     const session = await getApiAuthSession();
 
-    // Redirect authenticated users to dashboard on the server
     if (session) {
         redirect(APP_ROUTES.dashboard);
     }
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 relative overflow-hidden">
-            {/* Background Effects */}
-            <div className="absolute inset-0 overflow-hidden">
-                <div className="absolute -top-40 -right-40 w-80 h-80 bg-blue-200/50 rounded-full blur-3xl" />
-                <div className="absolute top-1/2 -left-40 w-96 h-96 bg-purple-200/40 rounded-full blur-3xl" />
-                <div className="absolute bottom-20 right-1/4 w-72 h-72 bg-cyan-200/30 rounded-full blur-3xl" />
-            </div>
-
-            {/* Header */}
-            <header className="relative z-10 border-b border-gray-200/50 backdrop-blur-sm bg-white/70">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                    <div className="flex justify-between items-center py-4">
-                        <Link
-                            href="/"
-                            className="flex items-center space-x-3 group rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-4"
-                        >
-                            <div className="bg-gradient-to-br from-blue-600 to-cyan-500 p-2.5 rounded-xl shadow-md shadow-blue-500/20 group-hover:shadow-blue-500/40 transition duration-300 motion-safe:group-hover:scale-105">
-                                <Zap className="h-5 w-5 text-white" />
-                            </div>
-                            <div className="flex flex-col justify-center">
-                                <span className="text-xl font-black tracking-tight text-gray-900 leading-none">
-                                    NHF
-                                </span>
-                                <span className="text-[10px] font-bold tracking-widest text-blue-600 uppercase mt-1">
-                                    Workspace
-                                </span>
-                            </div>
-                        </Link>
-                        <AuthStatus />
-                    </div>
+        <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 text-slate-950">
+            <header className="border-b border-gray-200/50 bg-white/70">
+                <div className="mx-auto flex max-w-7xl items-center px-4 py-4 sm:px-6 lg:px-8">
+                    <BrandMark />
                 </div>
             </header>
 
-            {/* Hero Section */}
-            <main className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 md:py-24">
-                <div className="text-center mb-16 mt-8">
-                    <div className="inline-flex items-center px-4 py-2 rounded-full bg-white/60 backdrop-blur-md border border-gray-200/60 shadow-sm mb-8">
-                        <span className="flex h-2 w-2 rounded-full bg-blue-600 mr-3 motion-safe:animate-pulse" />
-                        <span className="text-sm text-gray-600 font-medium tracking-wide">
-                            ระบบสารสนเทศภายในองค์กร
-                        </span>
-                    </div>
-                    <h2 className="text-5xl md:text-7xl font-extrabold tracking-tight text-gray-900 mb-6 leading-[1.15]">
-                        National Health Foundation
-                        <br />
-                        <span className="relative inline-block mt-2">
-                            <span className="relative z-10 bg-gradient-to-r from-blue-600 via-cyan-600 to-teal-500 bg-clip-text text-transparent">
-                                Platform
-                            </span>
-                            <span className="absolute -bottom-2 left-0 w-full h-4 bg-blue-100/50 -z-10 rounded-full blur-sm" />
-                        </span>
-                    </h2>
-                    <p className="text-lg md:text-xl text-gray-500 max-w-2xl mx-auto mb-10 leading-relaxed font-light">
-                        แพลตฟอร์มส่วนกลางสำหรับ{" "}
-                        <strong>มูลนิธิสาธารณสุขแห่งชาติ</strong>{" "}
-                        ในการจัดเก็บข้อมูลพนักงาน เบิกจ่ายวัสดุ
-                        แจ้งปัญหา/ซ่อมอุปกรณ์ และติดตามสถานะช่วยเหลือ
-                    </p>
-                    <div className="flex flex-col sm:flex-row justify-center gap-4">
-                        <Button
-                            asChild
-                            size="lg"
-                            className="bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white px-8 py-6 text-lg rounded-xl shadow-lg shadow-blue-500/25 transition duration-300 motion-safe:hover:scale-105 hover:shadow-xl focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
-                        >
-                            <Link href={APP_ROUTES.login}>
-                                เข้าสู่ระบบ
-                                <ArrowRight className="ml-2 h-5 w-5" />
-                            </Link>
-                        </Button>
-                        <Button
-                            asChild
-                            size="lg"
-                            variant="outline"
-                            className="border-blue-200 bg-white/80 px-8 py-6 text-lg text-blue-700 shadow-lg shadow-cyan-100/40 transition duration-300 motion-safe:hover:scale-105 hover:bg-white hover:text-blue-800 hover:shadow-xl focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
-                        >
-                            <Link href={APP_ROUTES.signup}>ลงทะเบียน</Link>
-                        </Button>
-                    </div>
-                </div>
-
-                {/* Hero Card */}
-                <div className="relative max-w-4xl mx-auto">
-                    {/* Card Glow Effect */}
-                    <div className="absolute -inset-1 bg-gradient-to-r from-blue-400 via-cyan-400 to-purple-400 rounded-3xl blur-lg opacity-20" />
-
-                    {/* Main Card */}
-                    <div className="relative bg-white/80 backdrop-blur-xl rounded-3xl p-8 md:p-12 border border-gray-200/50 shadow-xl shadow-gray-200/50">
-                        {/* Features Grid */}
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                            {/* Feature 1 */}
-                            <div className="group text-center md:text-left">
-                                <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-200 mb-4 group-hover:scale-110 transition-transform duration-300">
-                                    <Shield className="h-7 w-7 text-blue-600" />
-                                </div>
-                                <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                                    IT Support Ticket
-                                </h3>
-                                <p className="text-sm text-gray-600">
-                                    แจ้งปัญหาและติดตามสถานะการแก้ไขปัญหาสารสนเทศ
-                                </p>
-                            </div>
-
-                            {/* Feature 2 */}
-                            <div className="group text-center md:text-left">
-                                <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-br from-cyan-50 to-teal-100 border border-cyan-200 mb-4 group-hover:scale-110 transition-transform duration-300">
-                                    <Database className="h-7 w-7 text-cyan-600" />
-                                </div>
-                                <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                                    Employee Management
-                                </h3>
-                                <p className="text-sm text-gray-600">
-                                    บันทึกและจัดการข้อมูลพนักงานอย่างเป็นระบบเพื่อเป็น
-                                    Single Source of Truth
-                                </p>
-                            </div>
-
-                            {/* Feature 3 */}
-                            <div className="group text-center md:text-left">
-                                <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-br from-purple-50 to-violet-100 border border-purple-200 mb-4 group-hover:scale-110 transition-transform duration-300">
-                                    <Package className="h-7 w-7 text-purple-600" />
-                                </div>
-                                <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                                    Stock & Supplies
-                                </h3>
-                                <p className="text-sm text-gray-600">
-                                    เบิกวัสดุ ติดตามยอดคงเหลือ และจัดการคำขอจ่ายวัสดุขององค์กร
-                                </p>
-                            </div>
+            <main
+                id="main"
+                className="mx-auto max-w-7xl px-4 py-10 sm:px-6 sm:py-14 lg:px-8"
+            >
+                <section className="grid items-start gap-8 lg:grid-cols-[minmax(0,1fr)_24rem] lg:gap-12">
+                    <div className="min-w-0">
+                        <div className="mb-5 flex flex-wrap items-center gap-3">
+                            <p className="inline-flex rounded-full bg-blue-100 px-3 py-1 text-sm font-bold text-blue-800">
+                                National Health Foundation
+                            </p>
+                            <p className="inline-flex rounded-full bg-white/80 px-3 py-1 text-sm font-semibold text-slate-700 ring-1 ring-blue-100">
+                                สำหรับผู้ใช้งานภายในองค์กร
+                            </p>
                         </div>
+                        <h1 className="max-w-4xl text-4xl font-bold leading-tight tracking-tight text-slate-950 text-balance sm:text-5xl">
+                            National Health Foundation Application
+                        </h1>
+                        <p className="mt-5 max-w-3xl text-base font-medium leading-8 text-slate-700 sm:text-lg">
+                            พื้นที่ดิจิทัลของมูลนิธิสาธารณสุขแห่งชาติ
+                            สำหรับการเข้าใช้งานระบบภายใน
+                        </p>
                     </div>
-                </div>
+
+                    <AccessPanel />
+                </section>
+
+                <section className="mt-12 border-t border-blue-100 pt-8">
+                    <div className="mb-5 flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
+                        <div>
+                            <h2 className="text-xl font-bold leading-8 text-slate-950">
+                                แอปพลิเคชัน NHFapp
+                            </h2>
+                            <p className="mt-1 max-w-2xl text-sm font-medium leading-6 text-slate-600">
+                                Single source of truth
+                            </p>
+                        </div>
+                        <p className="text-sm font-semibold text-slate-500">
+                            เวอร์ชันสำหรับใช้งานภายในองค์กร
+                        </p>
+                    </div>
+                    <IntroPointList />
+                </section>
             </main>
 
-            {/* Footer */}
-            <footer className="relative z-10 border-t border-gray-200/50 py-6">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                    <p className="text-center text-sm text-gray-500">
-                        &copy; {new Date().getFullYear()} National Health
-                        Foundation. All rights reserved.
-                    </p>
+            <footer className="border-t border-gray-200/50 bg-white/70">
+                <div className="mx-auto flex max-w-7xl flex-col gap-2 px-4 py-5 text-sm font-medium text-slate-600 sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8">
+                    <p>© {new Date().getFullYear()} National Health Foundation</p>
+                    <p>NHFapp สำหรับผู้ใช้งานภายในองค์กร</p>
                 </div>
             </footer>
         </div>

@@ -41,7 +41,7 @@ export interface DashboardUIContextValue {
     handleMenuClick: (menuId: string) => void;
 
     // Actions
-    handleSignOut: () => void;
+    handleSignOut: () => Promise<void>;
 
     // Router
     router: ReturnType<typeof useRouter>;

@@ -77,11 +77,11 @@ export function AdjustDialog({ item, onClose, onSuccess }: AdjustDialogProps) {
                     </DialogTitle>
                 </div>
                 <form onSubmit={handleSubmit} className="space-y-5 px-5 py-5 sm:px-6">
-                    <div className="flex flex-col gap-0.5 rounded-xl border border-blue-100/60 bg-blue-50/60 p-3.5 shadow-inner">
-                        <span className="text-sm font-semibold text-blue-800">
+                    <div className="flex flex-col gap-0.5 rounded-xl border border-slate-200 bg-slate-50 p-3.5 shadow-inner">
+                        <span className="text-sm font-semibold text-slate-900">
                             {item.name}
                         </span>
-                        <span className="flex items-center gap-1.5 text-sm font-medium text-blue-600/90">
+                        <span className="flex items-center gap-1.5 text-sm font-medium text-slate-600">
                             <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-blue-500" />
                             {STOCK_ADMIN_TEXT.currentStock}: {item.quantity} {item.unit}
                         </span>
