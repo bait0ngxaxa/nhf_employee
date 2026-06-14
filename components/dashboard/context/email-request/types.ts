@@ -1,3 +1,5 @@
+import type { ChangeEvent, FormEvent } from "react";
+
 export interface EmailRequest {
     id: number;
     thaiName: string;
@@ -48,6 +50,7 @@ export interface EmailRequestContextValue {
     formData: EmailRequestFormData;
     isFormLoading: boolean;
     formError: string | null;
-    handleInputChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
-    handleSubmit: (e: React.FormEvent) => Promise<void>;
+    fieldErrors: Partial<Record<keyof EmailRequestFormData, string>>;
+    handleInputChange: (e: ChangeEvent<HTMLInputElement>) => void;
+    handleSubmit: (e: FormEvent) => Promise<boolean>;
 }

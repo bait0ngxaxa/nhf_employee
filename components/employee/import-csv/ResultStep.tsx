@@ -9,41 +9,45 @@ import {
 import { CheckCircle, XCircle, AlertTriangle } from "lucide-react";
 import { type ResultStepProps } from "./types";
 
+const ERROR_DETAIL_LIMIT = 50;
+
 export function ResultStep({
     importResult,
     onResetUpload,
     onBack,
 }: ResultStepProps) {
+    const visibleErrors = importResult.errors.slice(0, ERROR_DETAIL_LIMIT);
+    const hiddenErrorCount = Math.max(0, importResult.errors.length - visibleErrors.length);
+
     return (
         <div className="space-y-6">
-            {/* Success Summary */}
-            <Card>
+            <Card className="rounded-2xl border-slate-200 bg-white shadow-sm">
                 <CardHeader>
-                    <CardTitle className="flex items-center space-x-2 text-green-600">
-                        <CheckCircle className="h-5 w-5" />
+                    <CardTitle className="flex min-w-0 items-center gap-2 text-xl font-bold text-green-700">
+                        <CheckCircle className="h-5 w-5 shrink-0" />
                         <span>ผลลัพธ์การนำเข้าข้อมูล</span>
                     </CardTitle>
-                    <CardDescription>
-                        นำเข้าสำเร็จ {importResult.success.length} คน
+                    <CardDescription className="text-sm leading-6 text-slate-600 [overflow-wrap:anywhere]">
+                        นำเข้าสำเร็จ {importResult.success.length.toLocaleString("th-TH")} คน
                         {importResult.errors.length > 0
-                            ? `, มีข้อผิดพลาด ${importResult.errors.length} รายการ`
+                            ? `, มีข้อผิดพลาด ${importResult.errors.length.toLocaleString("th-TH")} รายการ`
                             : ""}
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="text-center p-4 bg-green-50 rounded-lg">
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                        <div className="rounded-lg bg-green-50 p-4 text-center">
                             <div className="text-2xl font-bold text-green-600">
-                                {importResult.success.length}
+                                {importResult.success.length.toLocaleString("th-TH")}
                             </div>
                             <div className="text-sm text-green-700">
                                 นำเข้าสำเร็จ
                             </div>
                         </div>
                         {importResult.errors.length > 0 ? (
-                            <div className="text-center p-4 bg-red-50 rounded-lg">
+                            <div className="rounded-lg bg-red-50 p-4 text-center">
                                 <div className="text-2xl font-bold text-red-600">
-                                    {importResult.errors.length}
+                                    {importResult.errors.length.toLocaleString("th-TH")}
                                 </div>
                                 <div className="text-sm text-red-700">
                                     มีข้อผิดพลาด
@@ -54,32 +58,37 @@ export function ResultStep({
                 </CardContent>
             </Card>
 
-            {/* Error Details */}
             {importResult.errors.length > 0 ? (
-                <Card>
+                <Card className="rounded-2xl border-red-200 bg-white shadow-sm">
                     <CardHeader>
-                        <CardTitle className="flex items-center space-x-2 text-red-600">
-                            <AlertTriangle className="h-5 w-5" />
+                        <CardTitle className="flex min-w-0 items-center gap-2 text-xl font-bold text-red-700">
+                            <AlertTriangle className="h-5 w-5 shrink-0" />
                             <span>รายการที่มีข้อผิดพลาด</span>
                         </CardTitle>
+                        <CardDescription className="text-sm leading-6 text-red-700 [overflow-wrap:anywhere]">
+                            แสดง {visibleErrors.length.toLocaleString("th-TH")} รายการแรก
+                            {hiddenErrorCount > 0
+                                ? ` ยังมีอีก ${hiddenErrorCount.toLocaleString("th-TH")} รายการ`
+                                : ""}
+                        </CardDescription>
                     </CardHeader>
                     <CardContent>
                         <div className="space-y-4">
-                            {importResult.errors.map((err, index) => (
+                            {visibleErrors.map((err, index) => (
                                 <div
                                     key={index}
-                                    className="p-4 border border-red-200 rounded-lg bg-red-50"
+                                    className="rounded-lg border border-red-200 bg-red-50 p-4"
                                 >
-                                    <div className="flex items-start space-x-3">
-                                        <XCircle className="h-5 w-5 text-red-500 flex-shrink-0 mt-0.5" />
-                                        <div className="flex-1">
+                                    <div className="flex items-start gap-3">
+                                        <XCircle className="mt-0.5 h-5 w-5 flex-shrink-0 text-red-500" />
+                                        <div className="min-w-0 flex-1">
                                             <div className="font-medium text-red-800">
                                                 แถวที่ {err.row}:
                                             </div>
-                                            <div className="text-sm text-red-700 mt-1">
+                                            <div className="mt-1 text-sm leading-6 text-red-700 [overflow-wrap:anywhere]">
                                                 {err.error}
                                             </div>
-                                            <div className="text-xs text-red-600 mt-2">
+                                            <div className="mt-2 text-xs leading-5 text-red-600 [overflow-wrap:anywhere]">
                                                 ข้อมูล:{" "}
                                                 {JSON.stringify(err.data)}
                                             </div>
@@ -92,15 +101,15 @@ export function ResultStep({
                 </Card>
             ) : null}
 
-            {/* Action Buttons */}
-            <div className="flex items-center justify-between">
-                <Button variant="outline" onClick={onResetUpload}>
+            <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <Button type="button" variant="outline" onClick={onResetUpload}>
                     นำเข้าไฟล์ใหม่
                 </Button>
                 {onBack ? (
                     <Button
+                        type="button"
                         onClick={onBack}
-                        className="flex items-center space-x-2"
+                        className="h-11 justify-center"
                     >
                         <span>กลับไปหน้าจัดการพนักงาน</span>
                     </Button>

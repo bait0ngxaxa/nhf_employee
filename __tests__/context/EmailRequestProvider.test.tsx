@@ -47,6 +47,42 @@ const TestComponent = () => {
                 value={formData.thaiName}
                 onChange={handleInputChange}
             />
+            <input
+                data-testid="input-englishName"
+                name="englishName"
+                value={formData.englishName}
+                onChange={handleInputChange}
+            />
+            <input
+                data-testid="input-phone"
+                name="phone"
+                value={formData.phone}
+                onChange={handleInputChange}
+            />
+            <input
+                data-testid="input-nickname"
+                name="nickname"
+                value={formData.nickname}
+                onChange={handleInputChange}
+            />
+            <input
+                data-testid="input-position"
+                name="position"
+                value={formData.position}
+                onChange={handleInputChange}
+            />
+            <input
+                data-testid="input-department"
+                name="department"
+                value={formData.department}
+                onChange={handleInputChange}
+            />
+            <input
+                data-testid="input-replyEmail"
+                name="replyEmail"
+                value={formData.replyEmail}
+                onChange={handleInputChange}
+            />
             <button data-testid="submit-btn" onClick={handleSubmit}>
                 Submit
             </button>
@@ -81,6 +117,30 @@ describe("EmailRequestProvider", () => {
             status,
             requestId: "test-request-id",
         };
+    }
+
+    function fillValidForm(): void {
+        fireEvent.change(screen.getByTestId("input-thaiName"), {
+            target: { value: "สมชาย ใจดี" },
+        });
+        fireEvent.change(screen.getByTestId("input-englishName"), {
+            target: { value: "Somchai Jaidee" },
+        });
+        fireEvent.change(screen.getByTestId("input-phone"), {
+            target: { value: "081-234-5678" },
+        });
+        fireEvent.change(screen.getByTestId("input-nickname"), {
+            target: { value: "ชาย" },
+        });
+        fireEvent.change(screen.getByTestId("input-position"), {
+            target: { value: "เจ้าหน้าที่บัญชี" },
+        });
+        fireEvent.change(screen.getByTestId("input-department"), {
+            target: { value: "มสช." },
+        });
+        fireEvent.change(screen.getByTestId("input-replyEmail"), {
+            target: { value: "reply@example.com" },
+        });
     }
 
     beforeEach(() => {
@@ -133,6 +193,7 @@ describe("EmailRequestProvider", () => {
             </EmailRequestProvider>,
         );
 
+        fillValidForm();
         const submitBtn = screen.getByTestId("submit-btn");
         fireEvent.click(submitBtn);
 
@@ -140,8 +201,8 @@ describe("EmailRequestProvider", () => {
             expect(apiPost).toHaveBeenCalledWith(
                 "/api/email-request",
                 expect.objectContaining({
-                    thaiName: "",
-                    // The rest of the form data
+                    thaiName: "สมชาย ใจดี",
+                    phone: "081-2345678",
                 }),
             );
         });
@@ -168,6 +229,7 @@ describe("EmailRequestProvider", () => {
             </EmailRequestProvider>,
         );
 
+        fillValidForm();
         const submitBtn = screen.getByTestId("submit-btn");
         fireEvent.click(submitBtn);
 

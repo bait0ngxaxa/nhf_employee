@@ -31,32 +31,34 @@ export function ImportEmployeeCSV({
             <ImportHeader onBack={onBack} />
             <ProgressSteps step={step} />
 
-            {step === "upload" && (
-                <UploadStep
-                    fileInputRef={fileInputRef}
-                    previewError={previewError}
-                    onFileSelect={handleFileSelect}
-                    onDownloadSample={downloadSample}
-                />
-            )}
+            <div aria-live="polite" aria-atomic="false">
+                {step === "upload" && (
+                    <UploadStep
+                        fileInputRef={fileInputRef}
+                        previewError={previewError}
+                        onFileSelect={handleFileSelect}
+                        onDownloadSample={downloadSample}
+                    />
+                )}
 
-            {step === "preview" && (
-                <PreviewStep
-                    parsedData={parsedData}
-                    error={error}
-                    isLoading={isLoading}
-                    onResetUpload={resetUpload}
-                    onImport={handleImport}
-                />
-            )}
+                {step === "preview" && (
+                    <PreviewStep
+                        parsedData={parsedData}
+                        error={error}
+                        isLoading={isLoading}
+                        onResetUpload={resetUpload}
+                        onImport={handleImport}
+                    />
+                )}
 
-            {step === "result" && importResult && (
-                <ResultStep
-                    importResult={importResult}
-                    onResetUpload={resetUpload}
-                    onBack={onBack}
-                />
-            )}
+                {step === "result" && importResult && (
+                    <ResultStep
+                        importResult={importResult}
+                        onResetUpload={resetUpload}
+                        onBack={onBack}
+                    />
+                )}
+            </div>
         </div>
     );
 }

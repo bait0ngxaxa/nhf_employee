@@ -1,4 +1,4 @@
-import { Loader2, Monitor, ShieldCheck, Smartphone, Trash2 } from "lucide-react";
+import { Loader2, Monitor, RefreshCw, ShieldCheck, Smartphone, Trash2 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
@@ -50,30 +50,38 @@ function SessionCard({
     return (
         <div
             className={cn(
-                "rounded-xl border bg-white p-4 shadow-sm",
+                "rounded-xl border bg-white p-4",
                 session.isCurrent ? "border-cyan-200 ring-1 ring-cyan-100" : "border-gray-200",
             )}
         >
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                <div className="space-y-2">
-                    <div className="flex items-center gap-2">
+                <div className="min-w-0 space-y-2">
+                    <div className="flex min-w-0 flex-wrap items-center gap-2">
                         {parsed.deviceType === "mobile" ? (
-                            <Smartphone className="h-4 w-4 text-cyan-600" />
+                            <Smartphone className="h-4 w-4 shrink-0 text-cyan-600" />
                         ) : (
-                            <Monitor className="h-4 w-4 text-cyan-600" />
+                            <Monitor className="h-4 w-4 shrink-0 text-cyan-600" />
                         )}
-                        <span className="text-sm font-semibold text-gray-900">{parsed.browser}</span>
-                        <span className="text-xs text-gray-400">|</span>
-                        <span className="text-sm text-gray-600">{parsed.os}</span>
+                        <span className="min-w-0 text-sm font-semibold text-gray-900 [overflow-wrap:anywhere]">
+                            {parsed.browser}
+                        </span>
+                        <span className="text-xs text-gray-400" aria-hidden="true">
+                            |
+                        </span>
+                        <span className="min-w-0 text-sm text-gray-600 [overflow-wrap:anywhere]">
+                            {parsed.os}
+                        </span>
                         {session.isCurrent ? (
-                            <Badge className="bg-cyan-100 text-cyan-700 hover:bg-cyan-100">
+                            <Badge className="bg-cyan-100 text-cyan-800 hover:bg-cyan-100">
                                 อุปกรณ์นี้
                             </Badge>
                         ) : null}
                     </div>
                     <p className="text-xs text-gray-400">{getDeviceTypeLabel(parsed.deviceType)}</p>
-                    <div className="grid gap-1 text-xs text-gray-500 sm:grid-cols-2">
-                        <span>IP: {session.ipAddress ?? "ไม่ทราบ"}</span>
+                    <div className="grid min-w-0 gap-1 text-xs leading-5 text-gray-600 sm:grid-cols-2">
+                        <span className="min-w-0 [overflow-wrap:anywhere]">
+                            IP: {session.ipAddress ?? "ไม่ทราบ"}
+                        </span>
                         <span>เริ่มใช้งาน: {formatDateTime(session.createdAt)}</span>
                         <span>ใช้งานล่าสุด: {formatRelativeTime(lastActive)}</span>
                         <span>หมดอายุ: {formatDateTime(session.expiresAt)}</span>
@@ -83,9 +91,10 @@ function SessionCard({
                     <Button
                         variant="outline"
                         size="sm"
-                        className="rounded-xl"
+                        className="h-10 shrink-0 rounded-xl"
                         onClick={() => onRequestRevoke(session.id)}
                         disabled={isRevoking || isValidating}
+                        aria-label={`ยกเลิกเซสชัน ${parsed.browser} ${parsed.os}`}
                     >
                         {isRevoking ? (
                             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -113,28 +122,23 @@ export function SessionManagementView({
 }: SessionManagementViewProps) {
     const otherSessionCount = sessions.filter((session) => !session.isCurrent).length;
     const { title, description } = getConfirmTexts(confirmAction);
+    const isConfirming = Boolean(revokingId) || isRevokingOthers;
 
     return (
-        <div className="relative min-h-[calc(100vh-6rem)] bg-slate-50/50 rounded-3xl overflow-hidden border border-white/60 shadow-inner">
-            <div className="absolute inset-0 pointer-events-none overflow-hidden rounded-3xl">
-                <div className="absolute top-0 right-0 w-[800px] h-[800px] bg-[radial-gradient(circle_at_center,rgba(207,250,254,0.6)_0%,transparent_70%)] -translate-y-1/2 translate-x-1/3" />
-                <div className="absolute bottom-0 left-0 w-[1000px] h-[1000px] bg-[radial-gradient(circle_at_center,rgba(224,242,254,0.6)_0%,transparent_70%)] translate-y-1/3 -translate-x-1/4" />
-            </div>
-
-            <div className="relative z-10 p-4 md:p-8 space-y-8">
-                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between animate-in fade-in slide-in-from-bottom-2 duration-700 ease-out">
-                    <div className="flex items-center space-x-5">
-                        <div className="relative group cursor-default">
-                            <div className="absolute -inset-2 rounded-2xl bg-gradient-to-r from-cyan-500/40 to-teal-500/40 blur-xl opacity-70 group-hover:opacity-100 group-hover:scale-110 transition-[opacity,transform] duration-500 will-change-transform" />
-                            <div className="relative flex items-center justify-center w-14 h-14 bg-gradient-to-br from-cyan-600 to-teal-700 rounded-2xl shadow-lg shadow-cyan-500/25 ring-1 ring-white/20">
+        <div className="min-h-[calc(100vh-6rem)] overflow-hidden rounded-2xl border border-slate-200 bg-slate-50">
+            <div className="space-y-8 p-4 md:p-8">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex min-w-0 items-center gap-4">
+                        <div className="shrink-0">
+                            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-cyan-700">
                                 <ShieldCheck className="h-7 w-7 text-white" />
                             </div>
                         </div>
-                        <div className="space-y-1">
-                            <h2 className="text-3xl font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-br from-gray-900 via-gray-800 to-gray-600 pb-1">
+                        <div className="min-w-0 space-y-1">
+                            <h2 className="text-2xl font-bold tracking-tight text-slate-950 [overflow-wrap:anywhere] md:text-3xl">
                                 จัดการเซสชัน
                             </h2>
-                            <p className="text-gray-500 font-medium">
+                            <p className="text-sm font-medium leading-6 text-slate-600 [overflow-wrap:anywhere]">
                                 ตรวจสอบอุปกรณ์ที่กำลังใช้งาน และยกเลิกการเข้าถึงได้ทันที
                             </p>
                         </div>
@@ -144,7 +148,7 @@ export function SessionManagementView({
                             variant="outline"
                             onClick={() => onSetConfirmAction({ type: "signout-others" })}
                             disabled={isRevokingOthers || otherSessionCount === 0}
-                            className="bg-white/95 hover:bg-gray-50 text-gray-700 border-gray-200 shadow-sm rounded-xl"
+                            className="h-11 w-full rounded-xl border-gray-200 bg-white text-gray-700 hover:bg-gray-50 sm:w-auto"
                         >
                             {isRevokingOthers ? (
                                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -155,17 +159,17 @@ export function SessionManagementView({
                         </Button>
                         <Button
                             onClick={() => onSetConfirmAction({ type: "signout-current" })}
-                            className="bg-gradient-to-r from-cyan-600 to-teal-600 hover:from-cyan-700 hover:to-teal-700 text-white shadow-md shadow-cyan-500/25 transition-[transform,background-color,box-shadow] duration-300 hover:shadow-lg motion-safe:hover:-translate-y-0.5 rounded-xl"
+                            className="h-11 w-full rounded-xl bg-cyan-700 text-white transition-colors hover:bg-cyan-800 sm:w-auto"
                         >
                             ออกจากระบบอุปกรณ์นี้
                         </Button>
                     </div>
                 </div>
 
-                <div className="space-y-6 animate-in fade-in slide-in-from-bottom-6 duration-700 ease-out delay-150">
-                    <div className="bg-white/95 rounded-2xl shadow-lg ring-1 ring-gray-200 p-1">
-                        <Card className="border-0 shadow-none bg-transparent">
-                            <CardHeader className="border-b border-gray-100 bg-gray-50/50 px-6 py-5 rounded-t-2xl">
+                <div className="space-y-6">
+                    <div className="rounded-2xl border border-gray-200 bg-white">
+                        <Card className="border-0 bg-transparent shadow-none">
+                            <CardHeader className="border-b border-gray-100 bg-gray-50/70 px-5 py-5 sm:px-6">
                                 <CardTitle className="text-xl font-bold tracking-tight text-gray-900">
                                     เซสชันที่ใช้งานอยู่ <span className="text-cyan-700">{sessions.length}</span>
                                 </CardTitle>
@@ -198,12 +202,14 @@ export function SessionManagementView({
                                     >
                                         {isValidating ? (
                                             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                        ) : null}
+                                        ) : (
+                                            <RefreshCw className="mr-2 h-4 w-4" />
+                                        )}
                                         รีเฟรช
                                     </Button>
                                 </div>
                                 {currentSession ? (
-                                    <p className="text-xs text-gray-400">
+                                    <p className="text-xs leading-5 text-gray-500 [overflow-wrap:anywhere]">
                                         รหัสเซสชันปัจจุบัน: {currentSession.familyId}
                                     </p>
                                 ) : null}
@@ -216,14 +222,27 @@ export function SessionManagementView({
             <Dialog open={Boolean(confirmAction)} onOpenChange={(open) => !open && onSetConfirmAction(null)}>
                 <DialogContent className="sm:max-w-md">
                     <DialogHeader>
-                        <DialogTitle>{title}</DialogTitle>
-                        <DialogDescription>{description}</DialogDescription>
+                        <DialogTitle className="[overflow-wrap:anywhere]">{title}</DialogTitle>
+                        <DialogDescription className="[overflow-wrap:anywhere]">
+                            {description}
+                        </DialogDescription>
                     </DialogHeader>
                     <DialogFooter className="flex gap-2 sm:justify-end">
-                        <Button variant="outline" onClick={() => onSetConfirmAction(null)}>
+                        <Button
+                            variant="outline"
+                            onClick={() => onSetConfirmAction(null)}
+                            disabled={isConfirming}
+                        >
                             ยกเลิก
                         </Button>
-                        <Button variant="destructive" onClick={onConfirmAction}>
+                        <Button
+                            variant="destructive"
+                            onClick={onConfirmAction}
+                            disabled={isConfirming}
+                        >
+                            {isConfirming ? (
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            ) : null}
                             ยืนยัน
                         </Button>
                     </DialogFooter>

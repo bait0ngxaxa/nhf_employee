@@ -1,36 +1,52 @@
 "use client";
 
-import { Loader2 } from "lucide-react";
+import { AlertTriangle, Loader2, RefreshCw } from "lucide-react";
 
 import { useDashboardUIContext } from "@/components/dashboard/context/dashboard/DashboardContext";
 import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { SessionManagementView } from "./session-management/SessionManagementView";
 import { useSessionManagement } from "./session-management/useSessionManagement";
 
 function SessionLoadingState() {
     return (
-        <div className="relative min-h-[calc(100vh-6rem)] bg-slate-50/50 rounded-3xl overflow-hidden border border-white/60 shadow-inner">
-            <div className="absolute inset-0 pointer-events-none overflow-hidden rounded-3xl">
-                <div className="absolute top-0 right-0 w-[800px] h-[800px] bg-[radial-gradient(circle_at_center,rgba(207,250,254,0.6)_0%,transparent_70%)] -translate-y-1/2 translate-x-1/3" />
-                <div className="absolute bottom-0 left-0 w-[1000px] h-[1000px] bg-[radial-gradient(circle_at_center,rgba(224,242,254,0.6)_0%,transparent_70%)] translate-y-1/3 -translate-x-1/4" />
-            </div>
-            <div className="relative z-10 flex min-h-[320px] items-center justify-center">
-                <Loader2 className="h-6 w-6 animate-spin text-gray-500" />
+        <div className="min-h-[calc(100vh-6rem)] overflow-hidden rounded-2xl border border-slate-200 bg-slate-50">
+            <div className="flex min-h-[320px] items-center justify-center">
+                <div className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-600">
+                    <Loader2 className="h-5 w-5 animate-spin text-cyan-700" />
+                    กำลังโหลดข้อมูลเซสชัน...
+                </div>
             </div>
         </div>
     );
 }
 
-function SessionErrorState() {
+function SessionErrorState({ onRetry }: { onRetry: () => void }) {
     return (
-        <div className="relative min-h-[calc(100vh-6rem)] bg-slate-50/50 rounded-3xl overflow-hidden border border-white/60 shadow-inner">
-            <div className="absolute inset-0 pointer-events-none overflow-hidden rounded-3xl">
-                <div className="absolute top-0 right-0 w-[800px] h-[800px] bg-[radial-gradient(circle_at_center,rgba(254,226,226,0.7)_0%,transparent_70%)] -translate-y-1/2 translate-x-1/3" />
-            </div>
-            <div className="relative z-10 p-4 md:p-8">
-                <Card className="rounded-2xl border-red-100 bg-red-50/30">
-                    <CardContent className="p-6 text-sm text-red-700">
-                        โหลดข้อมูลเซสชันไม่สำเร็จ กรุณาลองใหม่อีกครั้ง
+        <div className="min-h-[calc(100vh-6rem)] overflow-hidden rounded-2xl border border-slate-200 bg-slate-50">
+            <div className="p-4 md:p-8">
+                <Card className="rounded-2xl border-red-200 bg-white shadow-sm">
+                    <CardContent className="flex flex-col gap-4 p-6 sm:flex-row sm:items-center sm:justify-between">
+                        <div className="flex min-w-0 gap-3">
+                            <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-red-600" />
+                            <div className="min-w-0 space-y-1">
+                                <p className="font-semibold text-red-800">
+                                    โหลดข้อมูลเซสชันไม่สำเร็จ
+                                </p>
+                                <p className="text-sm leading-6 text-red-700 [overflow-wrap:anywhere]">
+                                    กรุณาลองใหม่อีกครั้ง หากยังไม่สำเร็จให้เข้าสู่ระบบใหม่
+                                </p>
+                            </div>
+                        </div>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            className="h-10 shrink-0 border-red-200 text-red-700 hover:bg-red-50"
+                            onClick={onRetry}
+                        >
+                            <RefreshCw className="mr-2 h-4 w-4" />
+                            โหลดใหม่
+                        </Button>
                     </CardContent>
                 </Card>
             </div>
@@ -59,7 +75,13 @@ export function SessionManagementSection() {
     }
 
     if (error) {
-        return <SessionErrorState />;
+        return (
+            <SessionErrorState
+                onRetry={() => {
+                    void refresh();
+                }}
+            />
+        );
     }
 
     return (

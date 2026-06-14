@@ -9,43 +9,34 @@ function EmailRequestContent() {
     const { handleMenuClick } = useDashboardUIContext();
 
     return (
-        <div className="relative min-h-[calc(100vh-6rem)] bg-slate-50/50 rounded-3xl overflow-hidden border border-white/60 shadow-inner">
-            {/* Background Aesthetic Effects */}
-            <div className="absolute inset-0 pointer-events-none overflow-hidden rounded-3xl">
-                <div className="absolute top-0 right-0 w-[800px] h-[800px] bg-[radial-gradient(circle_at_center,rgba(237,212,255,0.6)_0%,transparent_70%)] -translate-y-1/2 translate-x-1/3" />
-                <div className="absolute bottom-0 left-0 w-[1000px] h-[1000px] bg-[radial-gradient(circle_at_center,rgba(250,204,255,0.6)_0%,transparent_70%)] translate-y-1/3 -translate-x-1/4" />
-            </div>
-
-            <div className="relative z-10 p-4 md:p-8 space-y-8">
-                {/* Header */}
-                <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 animate-in fade-in slide-in-from-bottom-2 duration-700 ease-out">
-                    <div className="flex items-center space-x-5">
-                        <div className="relative group cursor-default">
-                            <div className="absolute -inset-2 rounded-2xl bg-gradient-to-r from-indigo-500/40 to-violet-500/40 blur-xl opacity-70 group-hover:opacity-100 group-hover:scale-110 transition-[opacity,transform] duration-500 will-change-transform" />
-                            <div className="relative flex items-center justify-center w-14 h-14 bg-gradient-to-br from-indigo-600 to-violet-700 rounded-2xl shadow-lg shadow-indigo-500/25 ring-1 ring-white/20">
+        <div className="min-h-[calc(100vh-6rem)] overflow-hidden rounded-2xl border border-slate-200 bg-slate-50">
+            <div className="space-y-8 p-4 md:p-8">
+                <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end">
+                    <div className="flex min-w-0 items-center gap-4">
+                        <div className="shrink-0">
+                            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-indigo-700">
                                 <Mail className="h-7 w-7 text-white" />
                             </div>
                         </div>
-                        <div className="space-y-1">
-                            <h2 className="text-3xl font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-br from-gray-900 via-gray-800 to-gray-600 pb-1">
+                        <div className="min-w-0 space-y-1">
+                            <h2 className="text-2xl font-bold tracking-tight text-slate-950 [overflow-wrap:anywhere] md:text-3xl">
                                 ขออีเมลพนักงานใหม่
                             </h2>
-                            <p className="text-gray-500 font-medium">
+                            <p className="text-sm font-medium leading-6 text-slate-600 [overflow-wrap:anywhere]">
                                 ส่งคำขออีเมลสำหรับพนักงานใหม่ให้ทีมไอที
                             </p>
                         </div>
                     </div>
                 </div>
 
-                <div className="space-y-8 animate-in fade-in slide-in-from-bottom-6 duration-700 ease-out delay-150">
-                <EmailRequestForm
-                    onCancel={() => handleMenuClick("dashboard")}
-                    onSuccess={() => handleMenuClick("dashboard")}
-                />
-            </div>
+                <div className="space-y-8">
+                    <EmailRequestForm
+                        onCancel={() => handleMenuClick("dashboard")}
+                        onSuccess={() => handleMenuClick("dashboard")}
+                    />
+                </div>
 
-                {/* Email Request History */}
-                <div className="bg-white/80 backdrop-blur-md rounded-2xl shadow-lg ring-1 ring-gray-200 p-1">
+                <div>
                     <EmailRequestHistory />
                 </div>
             </div>

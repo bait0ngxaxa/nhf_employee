@@ -2,10 +2,11 @@
 
 import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { Minus, Package, Plus, ZoomIn } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogPortal, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import type { StockItem, StockItemVariant } from "../context/stock/types";
 import {
     getBrowseImageUrl,
@@ -414,16 +415,16 @@ export function StockVariantPickerDialog({
                         </Button>
                     </div>
                 </DialogContent>
-                {previewImageUrl && (
-                    <DialogPortal>
+                {previewImageUrl &&
+                    createPortal(
                         <StockImagePreviewSurface
                             imageUrl={previewImageUrl}
                             itemName={item.name}
                             onClose={() => setPreviewImageUrl(null)}
                             ariaLabel="พรีวิวรูปวัสดุ"
-                        />
-                    </DialogPortal>
-                )}
+                        />,
+                        document.body,
+                    )}
             </Dialog>
         </>
     );

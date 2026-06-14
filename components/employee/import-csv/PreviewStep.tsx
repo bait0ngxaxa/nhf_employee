@@ -9,14 +9,16 @@ import {
     CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Alert } from "@/components/ui/alert";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
     formatEmployeePhone,
     getEmployeeDepartmentBadgeClass,
     getEmployeeDepartmentLabel,
 } from "@/lib/helpers/employee-helpers";
-import { FileText, CheckCircle, XCircle } from "lucide-react";
+import { FileText, CheckCircle, Loader2, XCircle } from "lucide-react";
 import { type PreviewStepProps } from "./types";
+
+const PREVIEW_ROW_LIMIT = 100;
 
 export function PreviewStep({
     parsedData,
@@ -25,76 +27,85 @@ export function PreviewStep({
     onResetUpload,
     onImport,
 }: PreviewStepProps) {
+    const visibleRows = parsedData.slice(0, PREVIEW_ROW_LIMIT);
+    const hiddenRowCount = Math.max(0, parsedData.length - visibleRows.length);
+
     return (
-        <Card>
+        <Card className="rounded-2xl border-slate-200 bg-white shadow-sm">
             <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                    <FileText className="h-5 w-5" />
+                <CardTitle className="flex min-w-0 items-center gap-2 text-xl font-bold text-slate-950">
+                    <FileText className="h-5 w-5 shrink-0" />
                     <span>ตรวจสอบข้อมูลก่อนนำเข้า</span>
                 </CardTitle>
-                <CardDescription>
-                    พบข้อมูลพนักงาน {parsedData.length} คน
+                <CardDescription className="text-sm leading-6 text-slate-600 [overflow-wrap:anywhere]">
+                    พบข้อมูลพนักงาน {parsedData.length.toLocaleString("th-TH")} คน
                     กรุณาตรวจสอบความถูกต้องก่อนทำการนำเข้า
                 </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-                {/* Preview Table */}
-                <div className="overflow-x-auto max-h-96 border rounded-lg">
-                    <table className="min-w-full divide-y divide-gray-200">
-                        <thead className="bg-gray-50 sticky top-0">
+                <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm leading-6 text-blue-900 [overflow-wrap:anywhere]">
+                    แสดงตัวอย่าง {visibleRows.length.toLocaleString("th-TH")} รายการแรก
+                    {hiddenRowCount > 0
+                        ? ` ยังมีอีก ${hiddenRowCount.toLocaleString("th-TH")} รายการที่จะถูกนำเข้าพร้อมกัน`
+                        : ""}
+                </div>
+
+                <div className="max-h-96 overflow-auto rounded-lg border border-slate-200">
+                    <table className="min-w-[920px] divide-y divide-gray-200">
+                        <thead className="sticky top-0 z-10 bg-gray-50">
                             <tr>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-600">
                                     ลำดับ
                                 </th>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-600">
                                     ชื่อ-นามสกุล
                                 </th>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-600">
                                     อีเมล
                                 </th>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-600">
                                     ตำแหน่ง
                                 </th>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-600">
                                     แผนก
                                 </th>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-600">
                                     เบอร์โทร
                                 </th>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-600">
                                     ชื่อเล่น
                                 </th>
                             </tr>
                         </thead>
-                        <tbody className="bg-white divide-y divide-gray-200">
-                            {parsedData.map((employee, index) => (
+                        <tbody className="divide-y divide-gray-200 bg-white">
+                            {visibleRows.map((employee, index) => (
                                 <tr key={index} className="hover:bg-gray-50">
                                     <td className="px-4 py-4 text-sm text-gray-900">
                                         {index + 1}
                                     </td>
-                                    <td className="px-4 py-4 text-sm font-medium text-gray-900">
+                                    <td className="max-w-56 px-4 py-4 text-sm font-medium text-gray-900 [overflow-wrap:anywhere]">
                                         {employee.firstName} {employee.lastName}
                                     </td>
-                                    <td className="px-4 py-4 text-sm text-gray-600">
+                                    <td className="max-w-64 px-4 py-4 text-sm text-gray-600 [overflow-wrap:anywhere]">
                                         {employee.email || "-"}
                                     </td>
-                                    <td className="px-4 py-4 text-sm text-gray-600">
+                                    <td className="max-w-56 px-4 py-4 text-sm text-gray-600 [overflow-wrap:anywhere]">
                                         {employee.position}
                                     </td>
-                                    <td className="px-4 py-4 text-sm">
+                                    <td className="max-w-52 px-4 py-4 text-sm">
                                         <Badge
                                             variant="outline"
-                                            className={`${getEmployeeDepartmentBadgeClass(employee.department)} px-2.5 font-medium shadow-sm`}
+                                            className={`${getEmployeeDepartmentBadgeClass(employee.department)} max-w-full px-2.5 font-medium [overflow-wrap:anywhere]`}
                                         >
                                             {getEmployeeDepartmentLabel(employee.department)}
                                         </Badge>
                                     </td>
-                                    <td className="px-4 py-4 text-sm text-gray-600">
+                                    <td className="max-w-40 px-4 py-4 text-sm text-gray-600 [overflow-wrap:anywhere]">
                                         {formatEmployeePhone(employee.phone)}
                                     </td>
-                                    <td className="px-4 py-4 text-sm text-gray-600">
+                                    <td className="max-w-44 px-4 py-4 text-sm text-gray-600">
                                         {employee.nickname ? (
-                                            <Badge variant="secondary" className="bg-violet-50 text-violet-700 hover:bg-violet-100 border border-violet-200/60 font-medium shadow-sm px-2.5">
+                                            <Badge variant="secondary" className="max-w-full border border-violet-200/60 bg-violet-50 px-2.5 font-medium text-violet-700 hover:bg-violet-100 [overflow-wrap:anywhere]">
                                                 {employee.nickname}
                                             </Badge>
                                         ) : (
@@ -108,25 +119,35 @@ export function PreviewStep({
                 </div>
 
                 {error && (
-                    <Alert className="border-red-200 bg-red-50">
+                    <Alert className="border-red-200 bg-red-50" aria-live="assertive">
                         <XCircle className="h-4 w-4 text-red-600" />
-                        <div className="text-red-700">{error}</div>
+                        <AlertTitle className="text-red-800">
+                            นำเข้าข้อมูลไม่สำเร็จ
+                        </AlertTitle>
+                        <AlertDescription className="whitespace-pre-line text-red-700 [overflow-wrap:anywhere]">
+                            {error}
+                        </AlertDescription>
                     </Alert>
                 )}
 
-                {/* Action Buttons */}
-                <div className="flex items-center justify-between">
-                    <Button variant="outline" onClick={onResetUpload}>
+                <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <Button
+                        type="button"
+                        variant="outline"
+                        onClick={onResetUpload}
+                        disabled={isLoading}
+                    >
                         เลือกไฟล์ใหม่
                     </Button>
                     <Button
+                        type="button"
                         onClick={onImport}
                         disabled={isLoading || parsedData.length === 0}
-                        className="flex items-center space-x-2"
+                        className="h-11 justify-center gap-2"
                     >
                         {isLoading ? (
                             <>
-                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
+                                <Loader2 className="h-4 w-4 animate-spin" />
                                 <span>กำลังนำเข้า...</span>
                             </>
                         ) : (

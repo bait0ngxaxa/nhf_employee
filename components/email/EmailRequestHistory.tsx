@@ -16,7 +16,9 @@ import {
     ChevronLeft,
     ChevronRight,
     CheckCircle,
+    AlertCircle,
     History,
+    RefreshCw,
 } from "lucide-react";
 import { useEmailRequestHistory } from "@/hooks/useEmailRequestHistory";
 import { formatThaiDateTime } from "@/lib/helpers/date-helpers";
@@ -31,6 +33,7 @@ export function EmailRequestHistory() {
         error,
         currentPage,
         setCurrentPage,
+        refresh,
     } = useEmailRequestHistory();
 
 
@@ -40,39 +43,50 @@ export function EmailRequestHistory() {
     }
 
     return (
-        <Card className="bg-white/95 border-gray-200/50 shadow-xl rounded-3xl">
+        <Card className="rounded-2xl border-gray-200 bg-white shadow-sm">
             <CardHeader>
-                <div className="flex items-center gap-3">
-                    <div className="p-2 bg-gradient-to-br from-purple-100 to-indigo-100 rounded-xl">
-                        <History className="h-5 w-5 text-purple-600" />
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="flex min-w-0 items-center gap-3">
+                        <div className="rounded-xl bg-indigo-100 p-2">
+                            <History className="h-5 w-5 text-indigo-700" />
+                        </div>
+                        <div className="min-w-0">
+                            <CardTitle className="text-xl [overflow-wrap:anywhere]">
+                                ประวัติคำขออีเมล
+                            </CardTitle>
+                            <p className="text-sm leading-6 text-gray-600 [overflow-wrap:anywhere]">
+                                รายการคำขออีเมลที่เคยส่งไปแล้ว
+                            </p>
+                        </div>
                     </div>
-                    <div>
-                        <CardTitle className="text-xl">
-                            ประวัติคำขออีเมล
-                        </CardTitle>
-                        <p className="text-sm text-gray-500">
-                            รายการคำขออีเมลที่เคยส่งไปแล้ว
-                        </p>
-                    </div>
+                    <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={refresh}
+                        disabled={isLoading}
+                        className="h-10 shrink-0"
+                    >
+                        <RefreshCw className={isLoading ? "mr-2 h-4 w-4 animate-spin" : "mr-2 h-4 w-4"} />
+                        รีเฟรช
+                    </Button>
                 </div>
             </CardHeader>
 
             <CardContent>
                 {isLoading ? (
-                    <div className="space-y-4 py-6 animate-pulse">
-                        {/* Table Header Skeleton */}
-                        <div className="flex gap-4 pb-4 border-b border-gray-100">
+                    <div className="space-y-4 py-6" aria-busy="true">
+                        <div className="flex gap-4 border-b border-gray-100 pb-4">
                             {Array.from({ length: 5 }).map((_, i) => (
                                 <Skeleton key={i} className="h-4 flex-1" />
                             ))}
                         </div>
-                        {/* Table Rows Skeleton */}
                         <div className="space-y-4">
                             {Array.from({ length: 4 }).map((_, rowIndex) => (
-                                <div key={rowIndex} className="flex gap-4 items-center">
+                                <div key={rowIndex} className="flex items-center gap-4">
                                     {Array.from({ length: 5 }).map((_, colIndex) => (
-                                        <Skeleton 
-                                            key={colIndex} 
+                                        <Skeleton
+                                            key={colIndex}
                                             className="h-12 flex-1"
                                         />
                                     ))}
@@ -81,17 +95,29 @@ export function EmailRequestHistory() {
                         </div>
                     </div>
                 ) : error ? (
-                    <div className="text-center py-12 text-red-600">
-                        {error}
+                    <div className="flex flex-col items-center gap-4 rounded-xl border border-red-200 bg-red-50 px-4 py-8 text-center text-red-700">
+                        <AlertCircle className="h-6 w-6 text-red-600" />
+                        <p className="max-w-xl text-sm leading-6 [overflow-wrap:anywhere]">
+                            {error}
+                        </p>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            className="border-red-200 bg-white text-red-700 hover:bg-red-50"
+                            onClick={refresh}
+                        >
+                            <RefreshCw className="mr-2 h-4 w-4" />
+                            โหลดใหม่
+                        </Button>
                     </div>
                 ) : emailRequests.length === 0 ? (
-                    <div className="text-center py-12 text-gray-500">
-                        ยังไม่มีรายการคำขออีเมล
+                    <div className="rounded-xl border border-dashed border-gray-300 px-4 py-12 text-center text-sm leading-6 text-gray-600">
+                        ยังไม่มีรายการคำขออีเมล เมื่อส่งคำขอแล้วรายการจะแสดงที่นี่
                     </div>
                 ) : (
                     <>
                         <div className="overflow-x-auto rounded-xl border border-gray-200">
-                            <Table>
+                            <Table className="min-w-[760px]">
                                 <TableHeader>
                                     <TableRow className="bg-gray-50">
                                         <TableHead className="font-semibold">
@@ -117,27 +143,27 @@ export function EmailRequestHistory() {
                                             key={request.id}
                                             className="hover:bg-gray-50"
                                         >
-                                            <TableCell>
-                                                <div>
-                                                    <p className="font-medium">
+                                            <TableCell className="max-w-56 align-top">
+                                                <div className="min-w-0">
+                                                    <p className="font-medium text-gray-900 [overflow-wrap:anywhere]">
                                                         {request.thaiName}
                                                     </p>
-                                                    <p className="text-sm text-gray-500">
+                                                    <p className="text-sm text-gray-600 [overflow-wrap:anywhere]">
                                                         {request.englishName}
                                                     </p>
                                                 </div>
                                             </TableCell>
-                                            <TableCell>
+                                            <TableCell className="max-w-56 align-top [overflow-wrap:anywhere]">
                                                 {request.position}
                                             </TableCell>
-                                            <TableCell>
+                                            <TableCell className="max-w-56 align-top [overflow-wrap:anywhere]">
                                                 {request.department}
                                             </TableCell>
-                                            <TableCell className="text-sm">
+                                            <TableCell className="text-sm align-top whitespace-nowrap">
                                                 {formatThaiDateTime(request.createdAt)}
                                             </TableCell>
-                                            <TableCell>
-                                                <Badge className="bg-green-100 text-green-800 flex items-center gap-1 w-fit">
+                                            <TableCell className="align-top">
+                                                <Badge className="flex w-fit items-center gap-1 bg-green-100 text-green-800 hover:bg-green-100">
                                                     <CheckCircle className="h-3 w-3" />
                                                     เสร็จสิ้น
                                                 </Badge>
@@ -148,14 +174,13 @@ export function EmailRequestHistory() {
                             </Table>
                         </div>
 
-                        {/* Pagination */}
                         {pagination.totalPages > 1 && (
-                            <div className="flex items-center justify-between mt-4">
-                                <p className="text-sm text-gray-500">
-                                    แสดง {emailRequests.length} จาก{" "}
-                                    {pagination.total} รายการ
+                            <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                                <p className="text-sm text-gray-600">
+                                    แสดง {emailRequests.length.toLocaleString("th-TH")} จาก{" "}
+                                    {pagination.total.toLocaleString("th-TH")} รายการ
                                 </p>
-                                <div className="flex items-center gap-2">
+                                <div className="flex flex-wrap items-center gap-2">
                                     <Button
                                         variant="outline"
                                         size="sm"
@@ -168,8 +193,8 @@ export function EmailRequestHistory() {
                                         ก่อนหน้า
                                     </Button>
                                     <span className="text-sm text-gray-600">
-                                        หน้า {currentPage} /{" "}
-                                        {pagination.totalPages}
+                                        หน้า {currentPage.toLocaleString("th-TH")} /{" "}
+                                        {pagination.totalPages.toLocaleString("th-TH")}
                                     </span>
                                     <Button
                                         variant="outline"

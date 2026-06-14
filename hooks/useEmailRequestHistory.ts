@@ -50,7 +50,7 @@ export function useEmailRequestHistory(): UseEmailRequestHistoryReturn {
     const [currentPage, setCurrentPage] = useState(1);
     const [refreshTrigger, setRefreshTrigger] = useState(0);
 
-    const fetchEmailRequests = useCallback(async () => {
+    const fetchEmailRequests = useCallback(async (): Promise<void> => {
         try {
             setIsLoading(true);
             setError(null);
@@ -84,7 +84,12 @@ export function useEmailRequestHistory(): UseEmailRequestHistoryReturn {
         fetchEmailRequests();
     }, [fetchEmailRequests, refreshTrigger]);
 
-    const refresh = useCallback(() => {
+    const updateCurrentPage = useCallback((page: number): void => {
+        const maxPage = Math.max(1, pagination.totalPages || 1);
+        setCurrentPage(Math.min(Math.max(1, page), maxPage));
+    }, [pagination.totalPages]);
+
+    const refresh = useCallback((): void => {
         setRefreshTrigger((prev) => prev + 1);
     }, []);
 
@@ -94,7 +99,7 @@ export function useEmailRequestHistory(): UseEmailRequestHistoryReturn {
         isLoading,
         error,
         currentPage,
-        setCurrentPage,
+        setCurrentPage: updateCurrentPage,
         refresh,
     };
 }

@@ -1,10 +1,18 @@
 "use client";
 
-import { useState, useCallback, useMemo, type ReactNode } from "react";
+import {
+    useState,
+    useCallback,
+    useMemo,
+    type ChangeEvent,
+    type FormEvent,
+    type ReactNode,
+} from "react";
 import useSWR from "swr";
 import { toast } from "sonner";
 import { apiPost } from "@/lib/api-client";
 import { API_ROUTES } from "@/lib/ssot/routes";
+import { emailRequestSchema } from "@/lib/validations/email-request";
 import { EmailRequestContext } from "./EmailRequestContext";
 import {
     type EmailRequest,
@@ -34,6 +42,38 @@ const defaultPagination: Pagination = {
     totalPages: 0,
 };
 
+function getSubmitErrorMessage(error: unknown): string {
+    if (error instanceof Error && error.message.trim().length > 0) {
+        return error.message;
+    }
+
+    return "เกิดข้อผิดพลาดในการเชื่อมต่อ กรุณาลองใหม่อีกครั้ง";
+}
+
+function getValidationErrors(
+    formData: EmailRequestFormData,
+): {
+    data: EmailRequestFormData | null;
+    errors: Partial<Record<keyof EmailRequestFormData, string>>;
+    firstErrorField: keyof EmailRequestFormData | null;
+} {
+    const validation = emailRequestSchema.safeParse(formData);
+    if (validation.success) {
+        return { data: validation.data, errors: {}, firstErrorField: null };
+    }
+
+    const errors: Partial<Record<keyof EmailRequestFormData, string>> = {};
+    let firstErrorField: keyof EmailRequestFormData | null = null;
+
+    validation.error.issues.forEach((issue) => {
+        const field = issue.path[0] as keyof EmailRequestFormData;
+        errors[field] ??= issue.message;
+        firstErrorField ??= field;
+    });
+
+    return { data: null, errors, firstErrorField };
+}
+
 export function EmailRequestProvider({ children }: EmailRequestProviderProps) {
     // List state
     const [currentPage, setCurrentPage] = useState(1);
@@ -43,6 +83,9 @@ export function EmailRequestProvider({ children }: EmailRequestProviderProps) {
         useState<EmailRequestFormData>(initialFormData);
     const [isFormLoading, setIsFormLoading] = useState(false);
     const [formError, setFormError] = useState<string | null>(null);
+    const [fieldErrors, setFieldErrors] = useState<
+        Partial<Record<keyof EmailRequestFormData, string>>
+    >({});
 
     // SWR for List
     const {
@@ -72,26 +115,56 @@ export function EmailRequestProvider({ children }: EmailRequestProviderProps) {
 
     // Form handlers
     const handleInputChange = useCallback(
-        (e: React.ChangeEvent<HTMLInputElement>) => {
+        (e: ChangeEvent<HTMLInputElement>) => {
             const { name, value } = e.target;
+            const field = name as keyof EmailRequestFormData;
             setFormData((prev) => ({
                 ...prev,
-                [name]: value,
+                [field]: value,
             }));
+            setFormError(null);
+            setFieldErrors((current) => {
+                if (!current[field]) {
+                    return current;
+                }
+
+                const next = { ...current };
+                delete next[field];
+                return next;
+            });
         },
         [],
     );
 
     const handleSubmit = useCallback(
-        async (e: React.FormEvent) => {
+        async (e: FormEvent): Promise<boolean> => {
             e.preventDefault();
+            if (isFormLoading) {
+                return false;
+            }
+
+            const validation = getValidationErrors(formData);
+            if (!validation.data) {
+                setFieldErrors(validation.errors);
+                setFormError("กรุณาตรวจสอบข้อมูลที่กรอก");
+
+                if (validation.firstErrorField) {
+                    const element = document.getElementById(validation.firstErrorField);
+                    element?.scrollIntoView({ behavior: "smooth", block: "center" });
+                    element?.focus();
+                }
+
+                return false;
+            }
+
             setIsFormLoading(true);
             setFormError(null);
+            setFieldErrors({});
 
             try {
                 const response = await apiPost<{ success: boolean; error?: string }>(
                     API_ROUTES.emailRequest.list,
-                    formData,
+                    validation.data,
                 );
 
                 if (response.success) {
@@ -100,19 +173,19 @@ export function EmailRequestProvider({ children }: EmailRequestProviderProps) {
                         description: "คำขออีเมลของคุณถูกส่งไปยังทีมไอทีแล้ว",
                     });
                     mutate(); // Refresh the list
+                    return true;
                 } else {
                     setFormError(response.error || "เกิดข้อผิดพลาด");
+                    return false;
                 }
             } catch (err) {
-                console.error("Error submitting email request:", err);
-                setFormError(
-                    "เกิดข้อผิดพลาดในการเชื่อมต่อ กรุณาลองใหม่อีกครั้ง",
-                );
+                setFormError(getSubmitErrorMessage(err));
+                return false;
             } finally {
                 setIsFormLoading(false);
             }
         },
-        [formData, mutate],
+        [formData, isFormLoading, mutate],
     );
 
     const value = useMemo<EmailRequestContextValue>(
@@ -127,6 +200,7 @@ export function EmailRequestProvider({ children }: EmailRequestProviderProps) {
             formData,
             isFormLoading,
             formError,
+            fieldErrors,
             handleInputChange,
             handleSubmit,
         }),
@@ -141,6 +215,7 @@ export function EmailRequestProvider({ children }: EmailRequestProviderProps) {
             formData,
             isFormLoading,
             formError,
+            fieldErrors,
             handleInputChange,
             handleSubmit,
         ],

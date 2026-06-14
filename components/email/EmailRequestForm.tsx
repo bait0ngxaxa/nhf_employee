@@ -1,160 +1,199 @@
 "use client";
 
+import type { ChangeEvent, FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
-import { Loader2, Mail, Send } from "lucide-react";
+import { AlertCircle, Loader2, Mail, Send } from "lucide-react";
 import { useEmailRequestContext } from "@/components/dashboard/context/email-request/EmailRequestContext";
+import type { EmailRequestFormData } from "@/components/dashboard/context/email-request/types";
 
 interface EmailRequestFormProps {
     onCancel?: () => void;
     onSuccess?: () => void;
 }
 
-export function EmailRequestForm({ onCancel }: EmailRequestFormProps) {
+type EmailRequestFieldProps = {
+    id: keyof EmailRequestFormData;
+    label: string;
+    value: string;
+    error?: string;
+    placeholder: string;
+    type?: string;
+    autoComplete?: string;
+    inputMode?: "email" | "tel" | "text";
+    maxLength?: number;
+    onChange: (event: ChangeEvent<HTMLInputElement>) => void;
+};
+
+function EmailRequestField({
+    id,
+    label,
+    value,
+    error,
+    placeholder,
+    type = "text",
+    autoComplete,
+    inputMode,
+    maxLength,
+    onChange,
+}: EmailRequestFieldProps) {
+    const errorId = `${id}-error`;
+
+    return (
+        <div className="min-w-0 space-y-2">
+            <Label
+                htmlFor={id}
+                className={error ? "text-red-700 [overflow-wrap:anywhere]" : "[overflow-wrap:anywhere]"}
+            >
+                {label} <span className="text-red-600">*</span>
+            </Label>
+            <Input
+                id={id}
+                name={id}
+                type={type}
+                value={value}
+                onChange={onChange}
+                required
+                placeholder={placeholder}
+                autoComplete={autoComplete}
+                inputMode={inputMode}
+                maxLength={maxLength}
+                aria-invalid={Boolean(error)}
+                aria-describedby={error ? errorId : undefined}
+                className={error ? "border-red-500 focus-visible:ring-red-500" : ""}
+            />
+            {error ? (
+                <p id={errorId} className="text-xs leading-5 text-red-700 [overflow-wrap:anywhere]">
+                    {error}
+                </p>
+            ) : null}
+        </div>
+    );
+}
+
+export function EmailRequestForm({ onCancel, onSuccess }: EmailRequestFormProps) {
     const {
         formData,
         isFormLoading: isLoading,
         formError: error,
+        fieldErrors,
         handleInputChange,
         handleSubmit,
     } = useEmailRequestContext();
 
+    async function submitEmailRequest(event: FormEvent): Promise<void> {
+        const isSuccess = await handleSubmit(event);
+        if (isSuccess) {
+            onSuccess?.();
+        }
+    }
+
     return (
         <div className="space-y-6">
-            <Card className="bg-white/95 border-gray-200/50 shadow-xl rounded-3xl">
+            <Card className="rounded-2xl border-slate-200 bg-white shadow-sm">
                 <CardContent className="p-6 md:p-8">
                     {error && (
-                        <div className="mb-6 p-4 rounded-xl bg-red-50 border border-red-200 text-red-800 flex items-center">
-                            <span className="mr-2">⚠️</span>
-                            {error}
+                        <div
+                            className="mb-6 flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-red-800"
+                            role="alert"
+                            aria-live="assertive"
+                        >
+                            <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-red-600" />
+                            <p className="text-sm leading-6 [overflow-wrap:anywhere]">
+                                {error}
+                            </p>
                         </div>
                     )}
 
-                    <form onSubmit={handleSubmit} className="space-y-6">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div className="space-y-2">
-                                <Label htmlFor="thaiName">
-                                    ชื่อ-นามสกุล (ไทย){" "}
-                                    <span className="text-red-500">*</span>
-                                </Label>
-                                <Input
-                                    id="thaiName"
-                                    name="thaiName"
-                                    value={formData.thaiName}
-                                    onChange={handleInputChange}
-                                    required
-                                    placeholder="เช่น นาย สมชาย ใจดี"
-                                    className="rounded-xl border-gray-200 bg-white/50 focus:bg-white"
-                                />
-                            </div>
-
-                            <div className="space-y-2">
-                                <Label htmlFor="englishName">
-                                    ชื่อ-นามสกุล (อังกฤษ){" "}
-                                    <span className="text-red-500">*</span>
-                                </Label>
-                                <Input
-                                    id="englishName"
-                                    name="englishName"
-                                    value={formData.englishName}
-                                    onChange={handleInputChange}
-                                    required
-                                    placeholder="e.g. Mr. Somchai Jaidee"
-                                    className="rounded-xl border-gray-200 bg-white/50 focus:bg-white"
-                                />
-                            </div>
-
-                            <div className="space-y-2">
-                                <Label htmlFor="nickname">
-                                    ชื่อเล่น{" "}
-                                    <span className="text-red-500">*</span>
-                                </Label>
-                                <Input
-                                    id="nickname"
-                                    name="nickname"
-                                    value={formData.nickname}
-                                    onChange={handleInputChange}
-                                    required
-                                    placeholder="เช่น ชาย"
-                                    className="rounded-xl border-gray-200 bg-white/50 focus:bg-white"
-                                />
-                            </div>
-
-                            <div className="space-y-2">
-                                <Label htmlFor="phone">
-                                    เบอร์โทรศัพท์{" "}
-                                    <span className="text-red-500">*</span>
-                                </Label>
-                                <Input
-                                    id="phone"
-                                    name="phone"
-                                    value={formData.phone}
-                                    onChange={handleInputChange}
-                                    required
-                                    placeholder="เช่น 081-234-5678"
-                                    className="rounded-xl border-gray-200 bg-white/50 focus:bg-white"
-                                />
-                            </div>
-
-                            <div className="space-y-2">
-                                <Label htmlFor="position">
-                                    ตำแหน่ง{" "}
-                                    <span className="text-red-500">*</span>
-                                </Label>
-                                <Input
-                                    id="position"
-                                    name="position"
-                                    value={formData.position}
-                                    onChange={handleInputChange}
-                                    required
-                                    placeholder="เช่น เจ้าหน้าที่บัญชี"
-                                    className="rounded-xl border-gray-200 bg-white/50 focus:bg-white"
-                                />
-                            </div>
-
-                            <div className="space-y-2">
-                                <Label htmlFor="department">
-                                    สังกัด{" "}
-                                    <span className="text-red-500">*</span>
-                                </Label>
-                                <Input
-                                    id="department"
-                                    name="department"
-                                    value={formData.department}
-                                    onChange={handleInputChange}
-                                    required
-                                    placeholder="เช่น มสช. สพบ."
-                                    className="rounded-xl border-gray-200 bg-white/50 focus:bg-white"
-                                />
-                            </div>
-
-                            <div className="md:col-span-2 space-y-2">
-                                <Label htmlFor="replyEmail">
-                                    อีเมลที่ต้องการให้ส่งตอบกลับ{" "}
-                                    <span className="text-red-500">*</span>
-                                </Label>
-                                <Input
-                                    type="email"
+                    <form onSubmit={submitEmailRequest} className="space-y-6" noValidate aria-busy={isLoading}>
+                        <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                            <EmailRequestField
+                                id="thaiName"
+                                label="ชื่อ-นามสกุล (ไทย)"
+                                value={formData.thaiName}
+                                error={fieldErrors.thaiName}
+                                placeholder="เช่น นาย สมชาย ใจดี"
+                                autoComplete="name"
+                                maxLength={120}
+                                onChange={handleInputChange}
+                            />
+                            <EmailRequestField
+                                id="englishName"
+                                label="ชื่อ-นามสกุล (อังกฤษ)"
+                                value={formData.englishName}
+                                error={fieldErrors.englishName}
+                                placeholder="e.g. Mr. Somchai Jaidee"
+                                autoComplete="name"
+                                maxLength={120}
+                                onChange={handleInputChange}
+                            />
+                            <EmailRequestField
+                                id="nickname"
+                                label="ชื่อเล่น"
+                                value={formData.nickname}
+                                error={fieldErrors.nickname}
+                                placeholder="เช่น ชาย"
+                                autoComplete="nickname"
+                                maxLength={80}
+                                onChange={handleInputChange}
+                            />
+                            <EmailRequestField
+                                id="phone"
+                                label="เบอร์โทรศัพท์"
+                                value={formData.phone}
+                                error={fieldErrors.phone}
+                                placeholder="เช่น 081-234-5678"
+                                autoComplete="tel"
+                                inputMode="tel"
+                                maxLength={20}
+                                onChange={handleInputChange}
+                            />
+                            <EmailRequestField
+                                id="position"
+                                label="ตำแหน่ง"
+                                value={formData.position}
+                                error={fieldErrors.position}
+                                placeholder="เช่น เจ้าหน้าที่บัญชี"
+                                autoComplete="organization-title"
+                                maxLength={120}
+                                onChange={handleInputChange}
+                            />
+                            <EmailRequestField
+                                id="department"
+                                label="สังกัด"
+                                value={formData.department}
+                                error={fieldErrors.department}
+                                placeholder="เช่น มสช. สพบ."
+                                autoComplete="organization"
+                                maxLength={120}
+                                onChange={handleInputChange}
+                            />
+                            <div className="md:col-span-2">
+                                <EmailRequestField
                                     id="replyEmail"
-                                    name="replyEmail"
+                                    label="อีเมลที่ต้องการให้ส่งตอบกลับ"
                                     value={formData.replyEmail}
-                                    onChange={handleInputChange}
-                                    required
+                                    error={fieldErrors.replyEmail}
                                     placeholder="ระบุอีเมลที่ต้องการให้แจ้งกลับเมื่อสำเร็จ"
-                                    className="rounded-xl border-gray-200 bg-white/50 focus:bg-white"
+                                    type="email"
+                                    autoComplete="email"
+                                    inputMode="email"
+                                    maxLength={254}
+                                    onChange={handleInputChange}
                                 />
                             </div>
                         </div>
 
-                        <div className="flex justify-end space-x-4 pt-4">
+                        <div className="flex flex-col-reverse gap-3 pt-4 sm:flex-row sm:justify-end">
                             {onCancel && (
                                 <Button
                                     type="button"
                                     variant="outline"
                                     onClick={onCancel}
-                                    className="px-6 rounded-xl"
+                                    className="h-11 rounded-xl px-6"
+                                    disabled={isLoading}
                                 >
                                     ยกเลิก
                                 </Button>
@@ -162,7 +201,7 @@ export function EmailRequestForm({ onCancel }: EmailRequestFormProps) {
                             <Button
                                 type="submit"
                                 disabled={isLoading}
-                                className="px-8 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white shadow-lg shadow-purple-500/25"
+                                className="h-11 rounded-xl bg-indigo-700 px-8 text-white transition-colors hover:bg-indigo-800"
                             >
                                 {isLoading ? (
                                     <>
@@ -179,15 +218,15 @@ export function EmailRequestForm({ onCancel }: EmailRequestFormProps) {
                         </div>
                     </form>
 
-                    <div className="mt-8 p-4 bg-blue-50/50 border border-blue-100/50 rounded-xl flex items-start gap-3">
-                        <div className="p-2 bg-blue-100 rounded-lg flex-shrink-0">
+                    <div className="mt-8 flex items-start gap-3 rounded-xl border border-blue-100 bg-blue-50 p-4">
+                        <div className="flex-shrink-0 rounded-lg bg-blue-100 p-2">
                             <Mail className="h-5 w-5 text-blue-600" />
                         </div>
-                        <div>
+                        <div className="min-w-0">
                             <p className="text-sm font-medium text-blue-900">
                                 หมายเหตุ
                             </p>
-                            <p className="text-sm text-blue-700 mt-1">
+                            <p className="mt-1 text-sm leading-6 text-blue-800 [overflow-wrap:anywhere]">
                                 เมื่อส่งคำขอแล้ว ทีมไอทีจะได้รับแจ้งเตือนผ่าน
                                 LINE และจะดำเนินการสร้างอีเมลให้พนักงานใหม่ต่อไป
                                 โดยจะแจ้งผลการดำเนินการกลับไปยังอีเมลที่คุณระบุไว้

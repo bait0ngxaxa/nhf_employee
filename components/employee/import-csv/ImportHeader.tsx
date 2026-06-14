@@ -4,19 +4,18 @@ import { type ImportHeaderProps } from "./types";
 
 export function ImportHeader({ onBack }: ImportHeaderProps) {
     return (
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div className="flex items-center space-x-5">
-                <div className="relative group cursor-default">
-                    <div className="absolute -inset-2 rounded-2xl bg-gradient-to-r from-teal-500/40 to-cyan-500/40 blur-xl opacity-70 group-hover:opacity-100 group-hover:scale-110 transition-[opacity,transform] duration-500 will-change-transform" />
-                    <div className="relative flex items-center justify-center w-14 h-14 bg-gradient-to-br from-teal-500 to-cyan-600 rounded-2xl shadow-lg shadow-teal-500/25 ring-1 ring-white/20">
+        <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+            <div className="flex min-w-0 items-center gap-4">
+                <div className="shrink-0">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-teal-700">
                         <FileText className="h-7 w-7 text-white" />
                     </div>
                 </div>
-                <div>
-                    <h2 className="text-3xl font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-br from-gray-900 via-gray-800 to-gray-600 pb-1">
+                <div className="min-w-0 space-y-1">
+                    <h2 className="text-2xl font-bold tracking-tight text-slate-950 [overflow-wrap:anywhere] md:text-3xl">
                         นำเข้าข้อมูลพนักงานจาก CSV
                     </h2>
-                    <p className="text-gray-500 font-medium">
+                    <p className="text-sm font-medium leading-6 text-slate-600 [overflow-wrap:anywhere]">
                         อัพโหลดไฟล์ CSV เพื่อเพิ่มข้อมูลพนักงานหลายคนพร้อมกัน
                     </p>
                 </div>
@@ -25,7 +24,7 @@ export function ImportHeader({ onBack }: ImportHeaderProps) {
                 <Button
                     variant="outline"
                     onClick={onBack}
-                    className="flex items-center space-x-2 bg-white hover:bg-gray-50 text-gray-700 border-gray-200 shadow-sm"
+                    className="h-11 w-full justify-center gap-2 rounded-xl border-gray-200 bg-white text-gray-700 hover:bg-gray-50 sm:w-auto"
                 >
                     <ArrowLeft className="h-4 w-4" />
                     <span>กลับไปรายชื่อ</span>

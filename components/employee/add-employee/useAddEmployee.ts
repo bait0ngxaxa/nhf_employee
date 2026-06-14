@@ -19,6 +19,14 @@ const INITIAL_FORM_DATA: EmployeeFormData = {
     departmentId: "",
 };
 
+function getAddEmployeeErrorMessage(error: unknown): string {
+    if (error instanceof Error && error.message.trim().length > 0) {
+        return error.message;
+    }
+
+    return "เพิ่มพนักงานไม่สำเร็จ กรุณาตรวจสอบข้อมูลแล้วลองใหม่อีกครั้ง";
+}
+
 interface UseAddEmployeeOptions {
     onSuccess?: () => void;
 }
@@ -57,12 +65,26 @@ export function useAddEmployee({
             value: EmployeeFormData[K],
         ): void => {
             setFormData((prev) => ({ ...prev, [field]: value }));
+            setError("");
+            setFieldErrors((current) => {
+                if (!current[field]) {
+                    return current;
+                }
+
+                const next = { ...current };
+                delete next[field];
+                return next;
+            });
         },
         [],
     );
 
     const handleSubmit = async (e: React.FormEvent): Promise<void> => {
         e.preventDefault();
+        if (isLoading) {
+            return;
+        }
+
         setError("");
         setFieldErrors({});
 
@@ -97,23 +119,26 @@ export function useAddEmployee({
 
         setIsLoading(true);
 
-        setIsLoading(true);
+        try {
+            const apiResult = await apiPost(API_ROUTES.employees.list, result.data);
 
-        const apiResult = await apiPost(API_ROUTES.employees.list, formData);
+            if (apiResult.success) {
+                toast.success("เพิ่มพนักงานสำเร็จ", {
+                    description:
+                        "ข้อมูลพนักงานใหม่ถูกเพิ่มเข้าระบบเรียบร้อยแล้ว",
+                });
+                setFormData(INITIAL_FORM_DATA);
+                setFieldErrors({});
+                onSuccess?.();
+                return;
+            }
 
-        if (apiResult.success) {
-            toast.success("เพิ่มพนักงานสำเร็จ!", {
-                description:
-                    "ข้อมูลพนักงานใหม่ถูกเพิ่มเข้าระบบเรียบร้อยแล้ว",
-            });
-            setFormData(INITIAL_FORM_DATA);
-            setFieldErrors({});
-            onSuccess?.();
-        } else {
             setError(apiResult.error);
+        } catch (submitError) {
+            setError(getAddEmployeeErrorMessage(submitError));
+        } finally {
+            setIsLoading(false);
         }
-
-        setIsLoading(false);
     };
 
     return {
