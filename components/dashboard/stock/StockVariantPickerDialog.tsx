@@ -187,16 +187,16 @@ export function StockVariantPickerDialog({
                     onClose();
                 }}
             >
-                <DialogContent className="flex max-h-[90vh] flex-col overflow-hidden p-0 sm:max-w-[720px]">
+                <DialogContent className="flex max-h-[92dvh] flex-col overflow-hidden p-0 sm:max-h-[90vh] sm:max-w-[720px]">
                 <div className="shrink-0 border-b border-slate-200 bg-white">
-                    <div className="bg-slate-50 px-5 py-4 sm:px-6">
-                        <DialogTitle className="text-lg font-semibold text-slate-900">
+                    <div className="bg-slate-50 px-4 py-3 pr-12 sm:px-6 sm:py-4">
+                        <DialogTitle className="text-base font-semibold text-slate-900 sm:text-lg">
                             เลือกรายการย่อยสำหรับเบิก
                         </DialogTitle>
                     </div>
-                    <div className="px-5 py-4 sm:px-6">
-                        <div className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-slate-50/80 p-4 sm:flex-row">
-                            <div className="h-24 w-24 overflow-hidden rounded-2xl bg-white ring-1 ring-slate-200">
+                    <div className="px-4 py-3 sm:px-6 sm:py-4">
+                        <div className="flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50/80 p-3 sm:gap-4 sm:rounded-2xl sm:p-4">
+                            <div className="h-16 w-16 shrink-0 overflow-hidden rounded-xl bg-white ring-1 ring-slate-200 sm:h-24 sm:w-24 sm:rounded-2xl">
                                 {activeImageUrl ? (
                                     <button
                                         type="button"
@@ -212,7 +212,7 @@ export function StockVariantPickerDialog({
                                             alt={item.name}
                                             width={96}
                                             height={96}
-                                            sizes="96px"
+                                            sizes="(max-width: 640px) 64px, 96px"
                                             loading="lazy"
                                             unoptimized
                                             className="h-full w-full object-contain transition-transform duration-200 group-hover/preview:scale-[1.03]"
@@ -228,45 +228,45 @@ export function StockVariantPickerDialog({
                                     </div>
                                 )}
                             </div>
-                            <div className="flex-1 space-y-2">
+                            <div className="min-w-0 flex-1 space-y-1.5 sm:space-y-2">
                                 <div className="space-y-1">
-                                    <h3 className="text-lg font-bold text-slate-900">
+                                    <h3 className="line-clamp-2 text-base font-bold leading-snug text-slate-900 sm:text-lg">
                                         {item.name}
                                     </h3>
                                     {item.description && (
-                                        <p className="text-sm leading-6 text-slate-600">
+                                        <p className="hidden text-sm leading-6 text-slate-600 sm:line-clamp-2 sm:block">
                                             {item.description}
                                         </p>
                                     )}
                                 </div>
-                                <div className="flex flex-wrap items-center gap-2">
+                                <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
                                     <Badge
                                         variant="secondary"
-                                        className="border border-slate-200 bg-white text-slate-700"
+                                        className="max-w-full justify-start truncate border border-slate-200 bg-white text-xs text-slate-700 sm:text-sm"
                                     >
                                         {item.category.name}
                                     </Badge>
                                     <Badge
                                         variant="secondary"
-                                        className="border border-slate-200 bg-white text-slate-700"
+                                        className="border border-slate-200 bg-white text-xs text-slate-700 sm:text-sm"
                                     >
                                         เลือกแล้ว {selectedVariantCount} รายการ
                                     </Badge>
                                     <Badge
                                         variant="secondary"
-                                        className="border border-emerald-200 bg-emerald-50 text-emerald-800"
+                                        className="border border-emerald-200 bg-emerald-50 text-xs text-emerald-800 sm:text-sm"
                                     >
                                         รวม {selectedTotalQuantity} ชิ้น
                                     </Badge>
                                 </div>
-                                <p className="text-xs leading-5 text-slate-600">
+                                <p className="hidden text-xs leading-5 text-slate-600 sm:block">
                                     เลือกจำนวนของแต่ละตัวเลือกได้หลายรายการ แล้วเพิ่มเข้าตะกร้าครั้งเดียว
                                 </p>
                             </div>
                         </div>
                     </div>
                 </div>
-                <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-5 py-5 sm:px-6">
+                <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4 sm:space-y-5 sm:px-6 sm:py-5">
 
                     <div className="space-y-3">
                         <div className="text-sm font-semibold text-slate-900">
