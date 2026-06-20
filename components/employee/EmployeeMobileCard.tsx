@@ -38,7 +38,7 @@ export function EmployeeMobileCard({
                 <div className="flex min-w-0 items-center gap-3">
                     <EmployeeAvatar employee={employee} />
                     <div className="min-w-0">
-                        <h3 className="truncate text-sm font-semibold text-slate-950">
+                        <h3 className="text-sm font-semibold leading-6 text-slate-950 [overflow-wrap:anywhere]">
                             {getEmployeeFullName(employee)}
                         </h3>
                         <p className="mt-0.5 line-clamp-2 text-xs leading-5 text-slate-600 [overflow-wrap:anywhere]">

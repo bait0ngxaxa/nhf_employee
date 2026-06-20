@@ -1,21 +1,20 @@
 import React from "react";
-import { Card, CardContent } from "@/components/ui/card";
 import {
-    Users,
-    UserCheck,
     Building2,
     GraduationCap,
+    UserCheck,
+    Users,
     type LucideIcon,
 } from "lucide-react";
+
+import { cn } from "@/lib/utils";
 
 interface StatItem {
     label: string;
     value: number;
-    unit: string;
-    gradient: string;
+    detail: string;
     icon: LucideIcon;
-    bgClass: string;
-    iconClass: string;
+    iconClassName: string;
 }
 
 interface EmployeeStats {
@@ -29,99 +28,83 @@ interface EmployeeStatsCardsProps {
     stats: EmployeeStats;
 }
 
-// Static configuration - defined outside component to prevent recreation
-const STAT_CONFIG: Omit<StatItem, 'value'>[] = [
-    {
-        label: "พนักงานทั้งหมด",
-        unit: "คน",
-        gradient: "from-blue-600 to-cyan-600",
-        icon: Users,
-        bgClass: "bg-blue-50/50",
-        iconClass: "text-blue-600",
-    },
-    {
-        label: "พนักงานปัจจุบัน",
-        unit: "คน (Active)",
-        gradient: "from-green-500 to-emerald-600",
-        icon: UserCheck,
-        bgClass: "bg-green-50/50",
-        iconClass: "text-green-600",
-    },
-    {
-        label: "แผนกบริหาร",
-        unit: "คน",
-        gradient: "from-orange-500 to-amber-600",
-        icon: Building2,
-        bgClass: "bg-orange-50/50",
-        iconClass: "text-orange-600",
-    },
-    {
-        label: "แผนกวิชาการ",
-        unit: "คน",
-        gradient: "from-purple-500 to-violet-600",
-        icon: GraduationCap,
-        bgClass: "bg-purple-50/50",
-        iconClass: "text-purple-600",
-    },
-];
-
-// Build stat items from config + stats data
 function buildStatItems(stats: EmployeeStats): StatItem[] {
     return [
-        { ...STAT_CONFIG[0], value: stats.total },
-        { ...STAT_CONFIG[1], value: stats.active },
-        { ...STAT_CONFIG[2], value: stats.admin },
-        { ...STAT_CONFIG[3], value: stats.academic },
+        {
+            label: "พนักงานทั้งหมด",
+            value: stats.total,
+            detail: "รายชื่อในระบบ",
+            icon: Users,
+            iconClassName: "bg-slate-100 text-slate-700",
+        },
+        {
+            label: "กำลังปฏิบัติงาน",
+            value: stats.active,
+            detail: "สถานะ Active",
+            icon: UserCheck,
+            iconClassName: "bg-emerald-50 text-emerald-700",
+        },
+        {
+            label: "ฝ่ายบริหาร",
+            value: stats.admin,
+            detail: "บุคลากรสายบริหาร",
+            icon: Building2,
+            iconClassName: "bg-amber-50 text-amber-700",
+        },
+        {
+            label: "ฝ่ายวิชาการ",
+            value: stats.academic,
+            detail: "บุคลากรสายวิชาการ",
+            icon: GraduationCap,
+            iconClassName: "bg-sky-50 text-sky-700",
+        },
     ];
 }
 
-export const EmployeeStatsCards = React.memo(function EmployeeStatsCards({ stats }: EmployeeStatsCardsProps) {
+export const EmployeeStatsCards = React.memo(function EmployeeStatsCards({
+    stats,
+}: EmployeeStatsCardsProps): React.ReactElement {
     const statItems = buildStatItems(stats);
 
     return (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
-            {statItems.map((item) => {
-                const Icon = item.icon;
-                return (
-                    <Card
-                        key={item.label}
-                        className="relative overflow-hidden bg-white border-gray-100 shadow-lg hover:shadow-xl transition-[box-shadow,transform] duration-300 rounded-2xl group border-l-4 will-change-transform"
-                        style={{ borderLeftColor: "transparent" }}
-                    >
-                        {/* Decorative Background Blob */}
-                        <div
-                            className={`absolute -right-6 -top-6 w-32 h-32 rounded-full opacity-10 blur-2xl bg-gradient-to-br ${item.gradient} group-hover:opacity-20 transition-opacity duration-500`}
-                        />
+        <section className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+            <div className="flex flex-col gap-1 border-b border-slate-200 px-5 py-4 sm:flex-row sm:items-baseline sm:justify-between">
+                <h3 className="font-semibold text-slate-950">ภาพรวมบุคลากร</h3>
+                <p className="text-sm text-slate-600">สรุปจำนวนพนักงาน</p>
+            </div>
+            <dl className="grid grid-cols-2 lg:grid-cols-4">
+                {statItems.map((item, index) => {
+                    const Icon = item.icon;
 
-                        <CardContent className="p-6">
-                            <div className="flex justify-between items-start">
-                                <div>
-                                    <p className="text-sm font-medium text-gray-500 uppercase tracking-wider mb-1">
-                                        {item.label}
-                                    </p>
-                                    <div className="flex items-baseline space-x-2">
-                                        <p
-                                            className={`text-3xl font-bold bg-gradient-to-r ${item.gradient} bg-clip-text text-transparent`}
-                                        >
-                                            {item.value}
-                                        </p>
-                                        <p className="text-xs text-gray-500">
-                                            {item.unit}
-                                        </p>
-                                    </div>
-                                </div>
-                                <div
-                                    className={`p-3 rounded-xl ${item.bgClass} group-hover:scale-110 transition-transform duration-300`}
-                                >
-                                    <Icon
-                                        className={`h-6 w-6 ${item.iconClass}`}
-                                    />
-                                </div>
+                    return (
+                        <div
+                            key={item.label}
+                            className={cn(
+                                "min-w-0 p-4 sm:p-5",
+                                index < 2 && "border-b border-slate-100 lg:border-b-0",
+                                index % 2 === 0 && "border-r border-slate-100 lg:border-r-0",
+                                index < 3 && "lg:border-r lg:border-slate-100",
+                            )}
+                        >
+                            <div className="flex items-center gap-2.5">
+                                <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${item.iconClassName}`}>
+                                    <Icon className="h-4 w-4" aria-hidden="true" />
+                                </span>
+                                <dt className="min-w-0 text-sm font-medium text-slate-700">
+                                    {item.label}
+                                </dt>
                             </div>
-                        </CardContent>
-                    </Card>
-                );
-            })}
-        </div>
+                            <dd className="mt-4 flex items-baseline gap-2">
+                                <span className="text-2xl font-semibold tracking-tight text-slate-950">
+                                    {item.value}
+                                </span>
+                                <span className="text-sm text-slate-500">คน</span>
+                            </dd>
+                            <p className="mt-1 text-xs text-slate-500">{item.detail}</p>
+                        </div>
+                    );
+                })}
+            </dl>
+        </section>
     );
 });

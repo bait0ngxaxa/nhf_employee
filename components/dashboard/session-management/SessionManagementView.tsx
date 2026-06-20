@@ -1,9 +1,17 @@
-import { Loader2, Monitor, RefreshCw, ShieldCheck, Smartphone, Trash2 } from "lucide-react";
+import type React from "react";
+import {
+    Clock3,
+    Loader2,
+    Monitor,
+    RefreshCw,
+    ShieldCheck,
+    Smartphone,
+    Trash2,
+} from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
     Dialog,
     DialogContent,
@@ -33,7 +41,7 @@ interface SessionManagementViewProps {
     onConfirmAction: () => void;
 }
 
-function SessionCard({
+function SessionRow({
     session,
     isRevoking,
     isValidating,
@@ -43,68 +51,75 @@ function SessionCard({
     isRevoking: boolean;
     isValidating: boolean;
     onRequestRevoke: (sessionId: string) => void;
-}) {
+}): React.ReactElement {
     const parsed = parseUserAgent(session.userAgent);
     const lastActive = session.lastUsedAt ?? session.createdAt;
+    const DeviceIcon = parsed.deviceType === "mobile" ? Smartphone : Monitor;
 
     return (
-        <div
-            className={cn(
-                "rounded-xl border bg-white p-4",
-                session.isCurrent ? "border-cyan-200 ring-1 ring-cyan-100" : "border-gray-200",
-            )}
-        >
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                <div className="min-w-0 space-y-2">
-                    <div className="flex min-w-0 flex-wrap items-center gap-2">
-                        {parsed.deviceType === "mobile" ? (
-                            <Smartphone className="h-4 w-4 shrink-0 text-cyan-600" />
-                        ) : (
-                            <Monitor className="h-4 w-4 shrink-0 text-cyan-600" />
-                        )}
-                        <span className="min-w-0 text-sm font-semibold text-gray-900 [overflow-wrap:anywhere]">
-                            {parsed.browser}
-                        </span>
-                        <span className="text-xs text-gray-400" aria-hidden="true">
-                            |
-                        </span>
-                        <span className="min-w-0 text-sm text-gray-600 [overflow-wrap:anywhere]">
-                            {parsed.os}
-                        </span>
-                        {session.isCurrent ? (
-                            <Badge className="bg-cyan-100 text-cyan-800 hover:bg-cyan-100">
-                                อุปกรณ์นี้
-                            </Badge>
-                        ) : null}
-                    </div>
-                    <p className="text-xs text-gray-400">{getDeviceTypeLabel(parsed.deviceType)}</p>
-                    <div className="grid min-w-0 gap-1 text-xs leading-5 text-gray-600 sm:grid-cols-2">
-                        <span className="min-w-0 [overflow-wrap:anywhere]">
-                            IP: {session.ipAddress ?? "ไม่ทราบ"}
-                        </span>
-                        <span>เริ่มใช้งาน: {formatDateTime(session.createdAt)}</span>
-                        <span>ใช้งานล่าสุด: {formatRelativeTime(lastActive)}</span>
-                        <span>หมดอายุ: {formatDateTime(session.expiresAt)}</span>
-                    </div>
+        <li className={cn(
+            "grid gap-4 p-5 sm:grid-cols-[minmax(0,1fr)_10rem] sm:items-start",
+            session.isCurrent && "bg-cyan-50/60",
+        )}>
+            <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2.5">
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-600">
+                        <DeviceIcon className="h-4 w-4" aria-hidden="true" />
+                    </span>
+                    <span className="text-sm font-semibold text-slate-950">
+                        {parsed.browser}
+                    </span>
+                    <span className="text-sm text-slate-600">{parsed.os}</span>
+                    {session.isCurrent ? (
+                        <Badge className="bg-cyan-100 text-cyan-800 hover:bg-cyan-100">
+                            อุปกรณ์นี้
+                        </Badge>
+                    ) : null}
                 </div>
+                <p className="mt-2 text-xs font-medium text-slate-500">
+                    {getDeviceTypeLabel(parsed.deviceType)}
+                </p>
+                <dl className="mt-3 grid gap-x-6 gap-y-2 text-xs leading-5 text-slate-600 lg:grid-cols-2 2xl:grid-cols-4">
+                    <SessionDetail label="IP" value={session.ipAddress ?? "ไม่ทราบ"} />
+                    <SessionDetail label="เริ่มใช้งาน" value={formatDateTime(session.createdAt)} />
+                    <SessionDetail label="ใช้งานล่าสุด" value={formatRelativeTime(lastActive)} />
+                    <SessionDetail label="หมดอายุ" value={formatDateTime(session.expiresAt)} />
+                </dl>
+            </div>
+            <div className="flex min-w-0 sm:justify-end">
                 {!session.isCurrent ? (
                     <Button
                         variant="outline"
                         size="sm"
-                        className="h-10 shrink-0 rounded-xl"
+                        className="h-10 w-full border-rose-200 text-rose-700 hover:bg-rose-50 hover:text-rose-800"
                         onClick={() => onRequestRevoke(session.id)}
                         disabled={isRevoking || isValidating}
                         aria-label={`ยกเลิกเซสชัน ${parsed.browser} ${parsed.os}`}
                     >
                         {isRevoking ? (
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
                         ) : (
-                            <Trash2 className="mr-2 h-4 w-4" />
+                            <Trash2 className="h-4 w-4" aria-hidden="true" />
                         )}
                         ยกเลิกเซสชัน
                     </Button>
                 ) : null}
             </div>
+        </li>
+    );
+}
+
+function SessionDetail({
+    label,
+    value,
+}: {
+    label: string;
+    value: string;
+}): React.ReactElement {
+    return (
+        <div className="min-w-0">
+            <dt className="text-slate-500">{label}</dt>
+            <dd className="font-medium text-slate-700 [overflow-wrap:anywhere]">{value}</dd>
         </div>
     );
 }
@@ -119,103 +134,100 @@ export function SessionManagementView({
     onSetConfirmAction,
     onRefresh,
     onConfirmAction,
-}: SessionManagementViewProps) {
+}: SessionManagementViewProps): React.ReactElement {
     const otherSessionCount = sessions.filter((session) => !session.isCurrent).length;
     const { title, description } = getConfirmTexts(confirmAction);
     const isConfirming = Boolean(revokingId) || isRevokingOthers;
 
     return (
-        <div className="min-h-[calc(100vh-6rem)] overflow-hidden rounded-2xl border border-slate-200 bg-slate-50">
-            <div className="space-y-8 p-4 md:p-8">
-                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                    <div className="flex min-w-0 items-center gap-4">
-                        <div className="shrink-0">
-                            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-cyan-700">
-                                <ShieldCheck className="h-7 w-7 text-white" />
-                            </div>
+        <section className="min-h-[calc(100vh-6rem)] bg-slate-50 px-4 py-6 md:px-8 md:py-8">
+            <div className="mx-auto max-w-6xl space-y-5">
+                <header className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                    <div className="flex min-w-0 items-center gap-3">
+                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-cyan-100 text-cyan-700">
+                            <ShieldCheck className="h-5 w-5" aria-hidden="true" />
                         </div>
-                        <div className="min-w-0 space-y-1">
-                            <h2 className="text-2xl font-bold tracking-tight text-slate-950 [overflow-wrap:anywhere] md:text-3xl">
+                        <div className="min-w-0">
+                            <h2 className="text-2xl font-bold tracking-tight text-slate-950">
                                 จัดการเซสชัน
                             </h2>
-                            <p className="text-sm font-medium leading-6 text-slate-600 [overflow-wrap:anywhere]">
-                                ตรวจสอบอุปกรณ์ที่กำลังใช้งาน และยกเลิกการเข้าถึงได้ทันที
+                            <p className="mt-0.5 text-sm text-slate-600">
+                                ตรวจสอบอุปกรณ์ที่กำลังเข้าถึงบัญชีของคุณ
                             </p>
                         </div>
                     </div>
-                    <div className="flex flex-wrap items-center gap-3">
+                    <div className="flex flex-col gap-2 sm:flex-row">
                         <Button
                             variant="outline"
                             onClick={() => onSetConfirmAction({ type: "signout-others" })}
                             disabled={isRevokingOthers || otherSessionCount === 0}
-                            className="h-11 w-full rounded-xl border-gray-200 bg-white text-gray-700 hover:bg-gray-50 sm:w-auto"
+                            className="h-10 border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
                         >
                             {isRevokingOthers ? (
-                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
                             ) : (
-                                <Trash2 className="mr-2 h-4 w-4" />
+                                <Trash2 className="h-4 w-4" aria-hidden="true" />
                             )}
-                            ออกจากระบบอุปกรณ์อื่น
+                            ออกจากอุปกรณ์อื่น
                         </Button>
                         <Button
                             onClick={() => onSetConfirmAction({ type: "signout-current" })}
-                            className="h-11 w-full rounded-xl bg-cyan-700 text-white transition-colors hover:bg-cyan-800 sm:w-auto"
+                            className="h-10 bg-cyan-700 text-white hover:bg-cyan-800"
                         >
-                            ออกจากระบบอุปกรณ์นี้
+                            ออกจากอุปกรณ์นี้
                         </Button>
                     </div>
-                </div>
+                </header>
 
-                <div className="space-y-6">
-                    <div className="rounded-2xl border border-gray-200 bg-white">
-                        <Card className="border-0 bg-transparent shadow-none">
-                            <CardHeader className="border-b border-gray-100 bg-gray-50/70 px-5 py-5 sm:px-6">
-                                <CardTitle className="text-xl font-bold tracking-tight text-gray-900">
-                                    เซสชันที่ใช้งานอยู่ <span className="text-cyan-700">{sessions.length}</span>
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent className="p-4 sm:p-6 space-y-4">
-                                <div className="space-y-3">
-                                    {sessions.map((session) => (
-                                        <SessionCard
-                                            key={session.id}
-                                            session={session}
-                                            isRevoking={revokingId === session.id}
-                                            isValidating={isValidating}
-                                            onRequestRevoke={(sessionId) =>
-                                                onSetConfirmAction({ type: "revoke-session", sessionId })
-                                            }
-                                        />
-                                    ))}
-                                </div>
-                                {sessions.length === 0 ? (
-                                    <div className="rounded-xl border border-dashed border-gray-300 p-8 text-center text-sm text-gray-500">
-                                        ไม่พบเซสชันที่กำลังใช้งาน
-                                    </div>
-                                ) : null}
-                                <div className="flex justify-end">
-                                    <Button
-                                        variant="ghost"
-                                        className="rounded-xl"
-                                        onClick={onRefresh}
-                                        disabled={isValidating}
-                                    >
-                                        {isValidating ? (
-                                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                        ) : (
-                                            <RefreshCw className="mr-2 h-4 w-4" />
-                                        )}
-                                        รีเฟรช
-                                    </Button>
-                                </div>
-                                {currentSession ? (
-                                    <p className="text-xs leading-5 text-gray-500 [overflow-wrap:anywhere]">
-                                        รหัสเซสชันปัจจุบัน: {currentSession.familyId}
-                                    </p>
-                                ) : null}
-                            </CardContent>
-                        </Card>
+                <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+                    <div className="flex flex-col gap-3 border-b border-slate-200 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                            <h3 className="font-semibold text-slate-950">
+                                อุปกรณ์ที่กำลังใช้งาน <span className="text-cyan-700">{sessions.length}</span>
+                            </h3>
+                            <p className="mt-0.5 text-sm text-slate-600">
+                                เลือกยกเลิกอุปกรณ์ที่คุณไม่รู้จักได้ทันที
+                            </p>
+                        </div>
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-9 self-start text-slate-700 hover:bg-slate-100 sm:self-auto"
+                            onClick={onRefresh}
+                            disabled={isValidating}
+                        >
+                            {isValidating ? (
+                                <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                            ) : (
+                                <RefreshCw className="h-4 w-4" aria-hidden="true" />
+                            )}
+                            รีเฟรช
+                        </Button>
                     </div>
+                    {sessions.length > 0 ? (
+                        <ul className="divide-y divide-slate-100">
+                            {sessions.map((session) => (
+                                <SessionRow
+                                    key={session.id}
+                                    session={session}
+                                    isRevoking={revokingId === session.id}
+                                    isValidating={isValidating}
+                                    onRequestRevoke={(sessionId) => onSetConfirmAction({ type: "revoke-session", sessionId })}
+                                />
+                            ))}
+                        </ul>
+                    ) : (
+                        <div className="px-5 py-12 text-center">
+                            <Clock3 className="mx-auto h-5 w-5 text-slate-400" aria-hidden="true" />
+                            <p className="mt-3 text-sm font-semibold text-slate-900">ไม่พบเซสชันที่กำลังใช้งาน</p>
+                            <p className="mt-1 text-sm text-slate-600">ลองโหลดข้อมูลใหม่อีกครั้ง</p>
+                        </div>
+                    )}
+                    {currentSession ? (
+                        <div className="border-t border-slate-100 px-5 py-3 text-xs text-slate-500 [overflow-wrap:anywhere]">
+                            รหัสเซสชันปัจจุบัน: {currentSession.familyId}
+                        </div>
+                    ) : null}
                 </div>
             </div>
 
@@ -223,31 +235,19 @@ export function SessionManagementView({
                 <DialogContent className="sm:max-w-md">
                     <DialogHeader>
                         <DialogTitle className="[overflow-wrap:anywhere]">{title}</DialogTitle>
-                        <DialogDescription className="[overflow-wrap:anywhere]">
-                            {description}
-                        </DialogDescription>
+                        <DialogDescription className="[overflow-wrap:anywhere]">{description}</DialogDescription>
                     </DialogHeader>
                     <DialogFooter className="flex gap-2 sm:justify-end">
-                        <Button
-                            variant="outline"
-                            onClick={() => onSetConfirmAction(null)}
-                            disabled={isConfirming}
-                        >
+                        <Button variant="outline" onClick={() => onSetConfirmAction(null)} disabled={isConfirming}>
                             ยกเลิก
                         </Button>
-                        <Button
-                            variant="destructive"
-                            onClick={onConfirmAction}
-                            disabled={isConfirming}
-                        >
-                            {isConfirming ? (
-                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            ) : null}
+                        <Button variant="destructive" onClick={onConfirmAction} disabled={isConfirming}>
+                            {isConfirming ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : null}
                             ยืนยัน
                         </Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
-        </div>
+        </section>
     );
 }

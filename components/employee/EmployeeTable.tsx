@@ -53,18 +53,7 @@ export const EmployeeTable = memo(function EmployeeTable({
                     containIntrinsicSize: "0 500px",
                 }}
             >
-                <table className="w-full min-w-[1120px] table-fixed text-left text-sm">
-                    <colgroup>
-                        <col className="w-[19%]" />
-                        <col className="w-[9%]" />
-                        <col className="w-[16%]" />
-                        <col className="w-[13%]" />
-                        <col className="w-[11%]" />
-                        <col className="w-[17%]" />
-                        <col className="w-[9%]" />
-                        <col className="w-[10%]" />
-                        {canEdit ? <col className="w-[8%]" /> : null}
-                    </colgroup>
+                <table className="w-max min-w-[1360px] text-left text-sm">
                     <thead className="sticky top-0 z-10 border-b border-slate-200 bg-slate-50">
                     <tr>
                         <th className="px-5 py-4 text-left text-xs font-semibold text-slate-600">
@@ -105,13 +94,10 @@ export const EmployeeTable = memo(function EmployeeTable({
                             className="group border-b border-slate-100 transition-colors hover:bg-sky-50/40 last:border-0"
                         >
                             <td className="px-5 py-4">
-                                <div className="flex min-w-0 items-center gap-3">
+                                <div className="flex items-center gap-3">
                                     <EmployeeAvatar employee={employee} />
-                                    <div className="min-w-0">
-                                        <div
-                                            className="truncate text-sm font-semibold text-slate-950"
-                                            title={getEmployeeFullName(employee)}
-                                        >
+                                    <div>
+                                        <div className="whitespace-nowrap text-sm font-semibold text-slate-950">
                                             {getEmployeeFullName(employee)}
                                         </div>
                                     </div>
@@ -203,10 +189,7 @@ function EmailValue({ email }: { email: string }) {
     }
 
     return (
-        <div
-            className="truncate text-sm text-slate-800"
-            title={email}
-        >
+        <div className="whitespace-nowrap text-sm text-slate-800">
             {email}
         </div>
     );

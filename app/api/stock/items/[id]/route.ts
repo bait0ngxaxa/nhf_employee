@@ -4,6 +4,7 @@ import { requireAdminSession } from "@/lib/api-auth";
 import { jsonError, serverError } from "@/lib/ssot/http";
 import { stockService } from "@/lib/services/stock";
 import { updateItemSchema } from "@/lib/validations/stock";
+import { logStockEvent } from "@/lib/audit";
 
 interface RouteParams {
     params: Promise<{ id: string }>;
@@ -30,6 +31,19 @@ export async function PATCH(
         }
 
         const item = await stockService.updateItem(itemId, result.data);
+        await logStockEvent(
+            "STOCK_ITEM_UPDATE",
+            itemId,
+            auth.user.id,
+            auth.user.email,
+            {
+                after: {
+                    name: item.name,
+                    sku: item.sku,
+                    isActive: item.isActive,
+                },
+            },
+        );
         return NextResponse.json({ item });
     } catch (error) {
         const message = error instanceof Error ? error.message : "";
@@ -66,7 +80,20 @@ export async function DELETE(
         const itemId = Number(id);
         if (isNaN(itemId)) return jsonError("ID ไม่ถูกต้อง", 400);
 
-        await stockService.updateItem(itemId, { isActive: false });
+        const item = await stockService.updateItem(itemId, { isActive: false });
+        await logStockEvent(
+            "STOCK_ITEM_DELETE",
+            itemId,
+            auth.user.id,
+            auth.user.email,
+            {
+                after: {
+                    name: item.name,
+                    sku: item.sku,
+                    isActive: item.isActive,
+                },
+            },
+        );
         return NextResponse.json({ success: true });
     } catch (error) {
         if (error instanceof PrismaClientKnownRequestError && error.code === "P2025") {

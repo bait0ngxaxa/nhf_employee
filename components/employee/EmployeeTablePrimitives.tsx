@@ -8,9 +8,18 @@ export function getEmployeeFullName(employee: Employee): string {
     return fullName || "ไม่ระบุชื่อ";
 }
 
-function getEmployeeAvatarLetter(employee: Employee): string {
-    const first = employee.firstName.trim().charAt(0);
-    return first || "N";
+export function getEmployeeAvatarLetter(employee: Employee): string {
+    const firstName = employee.firstName.trim();
+    const firstCharacter = Array.from(firstName)[0];
+    if (!firstCharacter) {
+        return "N";
+    }
+
+    if (!/^[เแโใไ]$/.test(firstCharacter)) {
+        return firstCharacter;
+    }
+
+    return firstName.match(/[ก-ฮ]/)?.[0] ?? firstCharacter;
 }
 
 export function isTemporaryEmail(email: string): boolean {

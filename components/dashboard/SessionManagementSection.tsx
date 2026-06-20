@@ -1,24 +1,16 @@
 "use client";
 
-import { AlertTriangle, Loader2, RefreshCw } from "lucide-react";
+import { AlertTriangle, RefreshCw } from "lucide-react";
 
 import { useDashboardUIContext } from "@/components/dashboard/context/dashboard/DashboardContext";
+import { SectionSkeleton } from "@/components/dashboard/SectionSkeleton";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { SessionManagementView } from "./session-management/SessionManagementView";
 import { useSessionManagement } from "./session-management/useSessionManagement";
 
 function SessionLoadingState() {
-    return (
-        <div className="min-h-[calc(100vh-6rem)] overflow-hidden rounded-2xl border border-slate-200 bg-slate-50">
-            <div className="flex min-h-[320px] items-center justify-center">
-                <div className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-600">
-                    <Loader2 className="h-5 w-5 animate-spin text-cyan-700" />
-                    กำลังโหลดข้อมูลเซสชัน...
-                </div>
-            </div>
-        </div>
-    );
+    return <SectionSkeleton />;
 }
 
 function SessionErrorState({ onRetry }: { onRetry: () => void }) {

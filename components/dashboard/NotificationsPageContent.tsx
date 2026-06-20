@@ -148,8 +148,8 @@ export function NotificationsSection(): React.ReactElement {
     };
 
     return (
-        <section className="min-h-[calc(100vh-6rem)] bg-slate-50 px-4 py-6 md:px-8">
-            <div className="mx-auto max-w-5xl space-y-6">
+        <section className="min-h-[calc(100vh-6rem)] bg-slate-50 px-4 py-6 md:px-8 md:py-8">
+            <div className="mx-auto max-w-6xl space-y-5">
                 <NotificationsHeader
                     filter={filter}
                     totalCount={totalCount}
@@ -161,7 +161,7 @@ export function NotificationsSection(): React.ReactElement {
                     filter={filter}
                     onChange={handleFilterChange}
                 />
-                <div className="space-y-3">
+                <div className="space-y-4">
                     {isLoading ? (
                         <NotificationLoadingState />
                     ) : error ? (
@@ -177,14 +177,14 @@ export function NotificationsSection(): React.ReactElement {
                         />
                     )}
                     {hasMore ? (
-                        <div className="flex max-w-3xl justify-center pt-2">
+                        <div className="flex justify-center pt-1">
                             <Button
                                 type="button"
                                 variant="outline"
                                 size="sm"
                                 onClick={() => void loadMore()}
                                 disabled={isLoadingMore}
-                                className="h-10 rounded-lg border-slate-200 bg-white text-sm font-semibold text-slate-700"
+                                className="h-10 border-slate-300 bg-white text-sm font-semibold text-slate-700 hover:bg-slate-50"
                                 aria-busy={isLoadingMore}
                             >
                                 {isLoadingMore ? (
