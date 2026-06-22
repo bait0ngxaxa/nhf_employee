@@ -75,20 +75,20 @@ function SidebarSkeleton() {
     return (
         <div className="w-64 bg-white shadow-lg border-r border-gray-200/50 p-4 hidden md:flex flex-col h-full">
             {/* Logo */}
-            <div className="h-8 bg-gray-200 rounded-lg animate-pulse mb-6" />
+            <Skeleton className="h-8 rounded-lg mb-6" />
             
             {/* Menu Items */}
             <div className="space-y-3 flex-1">
                 {Array.from({ length: 6 }).map((_, i) => (
-                    <div
+                    <Skeleton
                         key={i}
-                        className="h-10 bg-gray-100 rounded-xl animate-pulse"
+                        className="h-10 rounded-xl"
                     />
                 ))}
             </div>
             
             {/* User Section */}
-            <div className="h-20 bg-gray-100 rounded-xl animate-pulse mt-4" />
+            <Skeleton className="h-20 rounded-xl mt-4" />
         </div>
     );
 }
