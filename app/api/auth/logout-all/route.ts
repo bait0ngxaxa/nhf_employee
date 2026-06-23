@@ -4,30 +4,14 @@ import { AUTH_ERROR_MESSAGES } from "@/lib/auth-ssot";
 import { withTrustedMutation } from "@/lib/auth-csrf";
 import { logAuthEvent } from "@/lib/audit";
 import {
-    HYBRID_ACCESS_COOKIE_NAME,
     clearHybridAuthCookies,
-    parseUserId,
 } from "@/lib/hybrid-auth-session";
-import { verifyAccessToken } from "@/lib/hybrid-auth-tokens";
+import { resolveAuthenticatedUserId } from "@/lib/hybrid-auth-route";
 import { prisma } from "@/lib/prisma";
-
-async function resolveUserId(request: NextRequest): Promise<number | null> {
-    const accessToken = request.cookies.get(HYBRID_ACCESS_COOKIE_NAME)?.value;
-    if (!accessToken) {
-        return null;
-    }
-
-    try {
-        const claims = await verifyAccessToken(accessToken);
-        return parseUserId(claims.sub);
-    } catch {
-        return null;
-    }
-}
 
 export const POST = withTrustedMutation(async (request: NextRequest): Promise<NextResponse> => {
     try {
-        const userId = await resolveUserId(request);
+        const userId = await resolveAuthenticatedUserId(request);
         if (!userId) {
             const unauthorized = NextResponse.json({ error: AUTH_ERROR_MESSAGES.unauthorized }, { status: 401 });
             clearHybridAuthCookies(unauthorized);

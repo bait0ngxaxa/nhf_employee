@@ -9,6 +9,7 @@ const { prismaMock } = vi.hoisted(() => ({
         },
         authRefreshToken: {
             create: vi.fn(),
+            findFirst: vi.fn(),
             findUnique: vi.fn(),
             updateMany: vi.fn(),
         },
@@ -45,6 +46,7 @@ describe("Hybrid critical flow", () => {
         });
 
         prismaMock.authRefreshToken.create.mockResolvedValue({ id: "rt_1" });
+        prismaMock.authRefreshToken.findFirst.mockResolvedValue({ id: "rt_1" });
         prismaMock.authRefreshToken.updateMany.mockResolvedValue({ count: 2 });
     });
 

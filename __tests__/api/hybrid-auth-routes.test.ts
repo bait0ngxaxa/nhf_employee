@@ -62,7 +62,7 @@ describe("Hybrid auth routes", () => {
     beforeEach(() => {
         vi.clearAllMocks();
         prismaMock.$transaction.mockResolvedValue(undefined);
-        prismaMock.authRefreshToken.findFirst.mockResolvedValue(null);
+        prismaMock.authRefreshToken.findFirst.mockResolvedValue({ id: "active-session" });
         prismaMock.authRefreshToken.updateMany.mockResolvedValue({ count: 1 });
     });
 
@@ -178,6 +178,20 @@ describe("Hybrid auth routes", () => {
             where: { userId: 1, revokedAt: null },
             data: { revokedAt: expect.any(Date) },
         });
+    });
+
+    it("logout-all rejects an access JWT from a revoked session family", async () => {
+        prismaMock.authRefreshToken.findFirst.mockResolvedValue(null);
+
+        const request = new NextRequest("http://localhost/api/auth/logout-all", {
+            method: "POST",
+            headers: { ...csrfHeaders, cookie: `${HYBRID_ACCESS_COOKIE_NAME}=access-token` },
+        });
+        const response = await logoutAllRoute(request);
+
+        expect(response.status).toBe(401);
+        expect(prismaMock.user.findUnique).not.toHaveBeenCalled();
+        expect(prismaMock.authRefreshToken.updateMany).not.toHaveBeenCalled();
     });
 });
     const csrfHeaders = {

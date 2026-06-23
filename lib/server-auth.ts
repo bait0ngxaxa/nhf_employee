@@ -6,6 +6,7 @@ import {
     HYBRID_REFRESH_COOKIE_NAME,
 } from "@/lib/hybrid-auth-constants";
 import { parseUserId } from "@/lib/hybrid-auth-session";
+import { hasActiveSessionFamily } from "@/lib/hybrid-auth-session-store";
 import { hashRefreshToken, verifyAccessToken } from "@/lib/hybrid-auth-tokens";
 import { prisma } from "@/lib/prisma";
 
@@ -78,9 +79,12 @@ export async function getApiAuthSession(): Promise<ApiAuthSession | null> {
             return null;
         }
 
-        const user = await findActiveUser(userId);
+        const [user, hasActiveSession] = await Promise.all([
+            findActiveUser(userId),
+            hasActiveSessionFamily(userId, claims.sessionId),
+        ]);
 
-        if (!user || claims.tokenVersion !== user.tokenVersion) {
+        if (!user || !hasActiveSession || claims.tokenVersion !== user.tokenVersion) {
             return null;
         }
 

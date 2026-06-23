@@ -9,6 +9,7 @@ const { cookiesMock, verifyAccessTokenMock, prismaMock } = vi.hoisted(() => ({
             findUnique: vi.fn(),
         },
         authRefreshToken: {
+            findFirst: vi.fn(),
             findUnique: vi.fn(),
         },
     },
@@ -41,6 +42,7 @@ describe("server auth tokenVersion validation", () => {
                 name === HYBRID_ACCESS_COOKIE_NAME ? { value: "access.token" } : undefined,
             ),
         });
+        prismaMock.authRefreshToken.findFirst.mockResolvedValue({ id: "session-1" });
         prismaMock.authRefreshToken.findUnique.mockResolvedValue(null);
     });
 
@@ -97,6 +99,38 @@ describe("server auth tokenVersion validation", () => {
                 revokedAt: true,
                 userId: true,
             },
+        });
+    });
+
+    it("returns null when access JWT belongs to a revoked session family", async () => {
+        verifyAccessTokenMock.mockResolvedValue({
+            sub: "1",
+            role: "ADMIN",
+            sessionId: "revoked-family",
+            tokenVersion: 1,
+        });
+        prismaMock.authRefreshToken.findFirst.mockResolvedValue(null);
+        prismaMock.user.findUnique.mockResolvedValue({
+            id: 1,
+            role: "ADMIN",
+            email: "admin@test.com",
+            name: "Admin",
+            isActive: true,
+            tokenVersion: 1,
+            employee: null,
+        });
+
+        const session = await getApiAuthSession();
+
+        expect(session).toBeNull();
+        expect(prismaMock.authRefreshToken.findFirst).toHaveBeenCalledWith({
+            where: {
+                userId: 1,
+                familyId: "revoked-family",
+                revokedAt: null,
+                expiresAt: { gt: expect.any(Date) },
+            },
+            select: { id: true },
         });
     });
 });

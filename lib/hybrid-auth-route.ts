@@ -5,6 +5,7 @@ import {
     HYBRID_REFRESH_COOKIE_NAME,
     parseUserId,
 } from "@/lib/hybrid-auth-session";
+import { hasActiveSessionFamily } from "@/lib/hybrid-auth-session-store";
 import { hashRefreshToken, verifyAccessToken } from "@/lib/hybrid-auth-tokens";
 import { prisma } from "@/lib/prisma";
 
@@ -16,7 +17,14 @@ export async function resolveAuthenticatedUserId(request: NextRequest): Promise<
 
     try {
         const claims = await verifyAccessToken(accessToken);
-        return parseUserId(claims.sub);
+        const userId = parseUserId(claims.sub);
+        if (!userId) {
+            return null;
+        }
+
+        return (await hasActiveSessionFamily(userId, claims.sessionId))
+            ? userId
+            : null;
     } catch {
         return null;
     }
