@@ -21,10 +21,14 @@ import {
     buildStockItemsQuery,
     buildStockRequestsQuery,
     createStockDashboardUrl,
+    getStockItemsLimit,
+    getStockItemsPageQueryKey,
     isStockDashboardRoute,
+    normalizePositivePage,
     normalizeStockTab,
     parseOptionalPositiveInteger,
     parsePositivePage,
+    STOCK_INVENTORY_ITEMS_PAGE_QUERY_KEY,
     STOCK_ITEMS_CATEGORY_QUERY_KEY,
     STOCK_ITEMS_PAGE_QUERY_KEY,
     STOCK_ITEMS_SEARCH_QUERY_KEY,
@@ -49,12 +53,22 @@ export function StockProvider({ children }: StockProviderProps) {
     const pathname = usePathname();
     const isAdmin = isAdminRole(user?.role);
     const latestSearchParamsRef = useRef(searchParams);
-
-    const [activeTab, setActiveTabState] = useState(
-        normalizeStockTab(searchParams.get(STOCK_TAB_QUERY_KEY), isAdmin),
+    const tabFromUrl = normalizeStockTab(
+        searchParams.get(STOCK_TAB_QUERY_KEY),
+        isAdmin,
     );
-    const [itemsPage, setItemsPageState] = useState(
+
+    const [activeTab, setActiveTabState] = useState(tabFromUrl);
+    const [browseItemsPage, setBrowseItemsPageState] = useState(
         parsePositivePage(searchParams.get(STOCK_ITEMS_PAGE_QUERY_KEY)),
+    );
+    const [inventoryItemsPage, setInventoryItemsPageState] = useState(
+        parsePositivePage(
+            searchParams.get(STOCK_INVENTORY_ITEMS_PAGE_QUERY_KEY)
+            ?? (tabFromUrl === "inventory"
+                ? searchParams.get(STOCK_ITEMS_PAGE_QUERY_KEY)
+                : null),
+        ),
     );
     const [requestsPage, setRequestsPageState] = useState(
         parsePositivePage(searchParams.get(STOCK_REQUESTS_PAGE_QUERY_KEY)),
@@ -70,16 +84,16 @@ export function StockProvider({ children }: StockProviderProps) {
         StockRequestStatus | undefined
     >();
     const hasInitializedStatusFilterRef = useRef(false);
+    const itemsPage =
+        activeTab === "inventory" ? inventoryItemsPage : browseItemsPage;
 
     useEffect(() => {
         latestSearchParamsRef.current = searchParams;
     }, [searchParams]);
 
     useEffect(() => {
-        const tabFromUrl = searchParams.get(STOCK_TAB_QUERY_KEY);
-        const nextTab = normalizeStockTab(tabFromUrl, isAdmin);
-        setActiveTabState((prev) => (prev === nextTab ? prev : nextTab));
-    }, [searchParams, isAdmin]);
+        setActiveTabState((prev) => (prev === tabFromUrl ? prev : tabFromUrl));
+    }, [tabFromUrl]);
 
     useEffect(() => {
         const pageFromUrl = parsePositivePage(
@@ -91,10 +105,22 @@ export function StockProvider({ children }: StockProviderProps) {
     }, [searchParams]);
 
     useEffect(() => {
-        const pageFromUrl = parsePositivePage(
+        const browsePageFromUrl = parsePositivePage(
             searchParams.get(STOCK_ITEMS_PAGE_QUERY_KEY),
         );
-        setItemsPageState((prev) => (prev === pageFromUrl ? prev : pageFromUrl));
+        setBrowseItemsPageState((prev) =>
+            prev === browsePageFromUrl ? prev : browsePageFromUrl,
+        );
+
+        const inventoryPageFromUrl = parsePositivePage(
+            searchParams.get(STOCK_INVENTORY_ITEMS_PAGE_QUERY_KEY)
+            ?? (tabFromUrl === "inventory"
+                ? searchParams.get(STOCK_ITEMS_PAGE_QUERY_KEY)
+                : null),
+        );
+        setInventoryItemsPageState((prev) =>
+            prev === inventoryPageFromUrl ? prev : inventoryPageFromUrl,
+        );
 
         const searchFromUrl = searchParams.get(STOCK_ITEMS_SEARCH_QUERY_KEY) ?? "";
         setSearchQueryState((prev) =>
@@ -107,7 +133,7 @@ export function StockProvider({ children }: StockProviderProps) {
         setSelectedCategoryIdState((prev) =>
             prev === categoryFromUrl ? prev : categoryFromUrl,
         );
-    }, [searchParams]);
+    }, [searchParams, tabFromUrl]);
 
     const setActiveTab = useCallback(
         (tab: string) => {
@@ -133,7 +159,7 @@ export function StockProvider({ children }: StockProviderProps) {
 
     const setRequestsPage = useCallback(
         (page: number) => {
-            const nextPage = Number.isInteger(page) && page > 0 ? page : 1;
+            const nextPage = normalizePositivePage(page);
             setRequestsPageState(nextPage);
 
             if (!isStockDashboardRoute(pathname, searchParams)) {
@@ -156,31 +182,38 @@ export function StockProvider({ children }: StockProviderProps) {
 
     const setItemsPage = useCallback(
         (page: number) => {
-            const nextPage = Number.isInteger(page) && page > 0 ? page : 1;
-            setItemsPageState(nextPage);
+            const nextPage = normalizePositivePage(page);
+            const pageQueryKey = getStockItemsPageQueryKey(activeTab);
+
+            if (activeTab === "inventory") {
+                setInventoryItemsPageState(nextPage);
+            } else {
+                setBrowseItemsPageState(nextPage);
+            }
 
             if (!isStockDashboardRoute(pathname, searchParams)) {
                 return;
             }
 
             const currentPage = parsePositivePage(
-                searchParams.get(STOCK_ITEMS_PAGE_QUERY_KEY),
+                searchParams.get(pageQueryKey),
             );
             if (currentPage === nextPage) return;
 
             router.push(createStockDashboardUrl(searchParams, {
-                [STOCK_ITEMS_PAGE_QUERY_KEY]: String(nextPage),
+                [pageQueryKey]: String(nextPage),
             }), {
                 scroll: false,
             });
         },
-        [pathname, router, searchParams],
+        [activeTab, pathname, router, searchParams],
     );
 
     const setSearchQuery = useCallback(
         (value: string) => {
             setSearchQueryState(value);
-            setItemsPageState(1);
+            setBrowseItemsPageState(1);
+            setInventoryItemsPageState(1);
 
             if (!isStockDashboardRoute(pathname, searchParams)) {
                 return;
@@ -188,6 +221,7 @@ export function StockProvider({ children }: StockProviderProps) {
 
             router.replace(createStockDashboardUrl(searchParams, {
                 [STOCK_ITEMS_PAGE_QUERY_KEY]: "1",
+                [STOCK_INVENTORY_ITEMS_PAGE_QUERY_KEY]: null,
                 [STOCK_ITEMS_SEARCH_QUERY_KEY]: value.trim() || null,
             }), {
                 scroll: false,
@@ -199,7 +233,8 @@ export function StockProvider({ children }: StockProviderProps) {
     const setSelectedCategoryId = useCallback(
         (categoryId: number | undefined) => {
             setSelectedCategoryIdState(categoryId);
-            setItemsPageState(1);
+            setBrowseItemsPageState(1);
+            setInventoryItemsPageState(1);
 
             if (!isStockDashboardRoute(pathname, searchParams)) {
                 return;
@@ -207,6 +242,7 @@ export function StockProvider({ children }: StockProviderProps) {
 
             router.replace(createStockDashboardUrl(searchParams, {
                 [STOCK_ITEMS_PAGE_QUERY_KEY]: "1",
+                [STOCK_INVENTORY_ITEMS_PAGE_QUERY_KEY]: null,
                 [STOCK_ITEMS_CATEGORY_QUERY_KEY]:
                     categoryId === undefined ? null : String(categoryId),
             }), {
@@ -272,7 +308,8 @@ export function StockProvider({ children }: StockProviderProps) {
     }, [mutateRequests]);
 
     useEffect(() => {
-        setItemsPageState((prev) => (prev === 1 ? prev : 1));
+        setBrowseItemsPageState((prev) => (prev === 1 ? prev : 1));
+        setInventoryItemsPageState((prev) => (prev === 1 ? prev : 1));
     }, [searchQuery, selectedCategoryId]);
 
     useEffect(() => {
@@ -301,6 +338,20 @@ export function StockProvider({ children }: StockProviderProps) {
             scroll: false,
         });
     }, [pathname, requestSearchQuery, router, statusFilter]);
+
+    useEffect(() => {
+        if (!shouldFetchItems || !itemsData) {
+            return;
+        }
+
+        const totalPages = Math.max(
+            1,
+            Math.ceil((itemsData.total ?? 0) / getStockItemsLimit(activeTab)),
+        );
+        if (itemsPage > totalPages) {
+            setItemsPage(totalPages);
+        }
+    }, [activeTab, itemsData, itemsPage, setItemsPage, shouldFetchItems]);
 
     useEffect(() => {
         const totalRequests = requestsData?.total ?? 0;

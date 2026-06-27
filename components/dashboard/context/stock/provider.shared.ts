@@ -29,6 +29,7 @@ const STOCK_ADMIN_TABS = new Set(["inventory", "admin-requests", "reports"]);
 
 export const STOCK_TAB_QUERY_KEY = "stockTab";
 export const STOCK_ITEMS_PAGE_QUERY_KEY = "stockItemsPage";
+export const STOCK_INVENTORY_ITEMS_PAGE_QUERY_KEY = "stockInventoryPage";
 export const STOCK_ITEMS_SEARCH_QUERY_KEY = "stockSearch";
 export const STOCK_ITEMS_CATEGORY_QUERY_KEY = "stockCategoryId";
 export const STOCK_REQUESTS_PAGE_QUERY_KEY = "stockRequestsPage";
@@ -59,6 +60,14 @@ export function parsePositivePage(value: string | null): number {
     return parsed;
 }
 
+export function normalizePositivePage(page: number): number {
+    if (!Number.isInteger(page) || page < 1) {
+        return 1;
+    }
+
+    return page;
+}
+
 export function parseOptionalPositiveInteger(value: string | null): number | undefined {
     if (!value) {
         return undefined;
@@ -84,14 +93,23 @@ export function isStockDashboardRoute(
         && isStockDashboardMenu(searchParams.get(DASHBOARD_TAB_QUERY_KEY));
 }
 
+export function getStockItemsLimit(activeTab: string): number {
+    return activeTab === "inventory" ? STOCK_ADMIN_ITEMS_LIMIT : STOCK_BROWSE_LIMIT;
+}
+
+export function getStockItemsPageQueryKey(activeTab: string): string {
+    return activeTab === "inventory"
+        ? STOCK_INVENTORY_ITEMS_PAGE_QUERY_KEY
+        : STOCK_ITEMS_PAGE_QUERY_KEY;
+}
+
 export function buildStockItemsQuery({
     activeTab,
     itemsPage,
     searchQuery,
     selectedCategoryId,
 }: BuildStockItemsQueryParams): string {
-    const itemsLimit =
-        activeTab === "inventory" ? STOCK_ADMIN_ITEMS_LIMIT : STOCK_BROWSE_LIMIT;
+    const itemsLimit = getStockItemsLimit(activeTab);
     const params = new URLSearchParams({
         page: String(itemsPage),
         limit: String(itemsLimit),
