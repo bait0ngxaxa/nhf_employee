@@ -61,7 +61,10 @@ vi.mock("@/lib/prisma", () => ({
 describe("Hybrid auth routes", () => {
     beforeEach(() => {
         vi.clearAllMocks();
-        prismaMock.$transaction.mockResolvedValue(undefined);
+        prismaMock.$transaction.mockImplementation(
+            async (callback: (client: typeof prismaMock) => Promise<unknown>) =>
+                callback(prismaMock),
+        );
         prismaMock.authRefreshToken.findFirst.mockResolvedValue({ id: "active-session" });
         prismaMock.authRefreshToken.updateMany.mockResolvedValue({ count: 1 });
     });
@@ -84,6 +87,7 @@ describe("Hybrid auth routes", () => {
         const setCookie = response.headers.get("set-cookie") ?? "";
 
         expect(response.status).toBe(200);
+        expect(prismaMock.$transaction).toHaveBeenCalledTimes(1);
         expect(prismaMock.authRefreshToken.updateMany).toHaveBeenCalledWith({
             where: { id: "rt1", revokedAt: null },
             data: { revokedAt: expect.any(Date), lastUsedAt: expect.any(Date) },
@@ -93,6 +97,63 @@ describe("Hybrid auth routes", () => {
         expect(setCookie).toContain(`${HYBRID_REFRESH_COOKIE_NAME}=`);
         expect(setCookie).toContain("Path=/");
         expect(setCookie).toContain("Secure");
+    });
+
+    it("refresh returns access token when another request already rotated token", async () => {
+        prismaMock.authRefreshToken.findUnique.mockResolvedValue({
+            id: "rt1",
+            userId: 1,
+            familyId: "family-1",
+            revokedAt: null,
+            expiresAt: new Date("2030-01-01T00:00:00.000Z"),
+            user: { id: 1, email: "u@test.com", role: "ADMIN", isActive: true, tokenVersion: 1 },
+        });
+        prismaMock.authRefreshToken.updateMany.mockResolvedValueOnce({ count: 0 });
+        prismaMock.authRefreshToken.findFirst.mockResolvedValueOnce({ id: "rt2" });
+
+        const request = new NextRequest("http://localhost/api/auth/refresh", {
+            method: "POST",
+            headers: { ...csrfHeaders, cookie: `${HYBRID_REFRESH_COOKIE_NAME}=old-refresh-token` },
+        });
+        const response = await refreshRoute(request);
+        const setCookie = response.headers.get("set-cookie") ?? "";
+
+        expect(response.status).toBe(200);
+        expect(prismaMock.authRefreshToken.updateMany).toHaveBeenCalledTimes(1);
+        expect(prismaMock.authRefreshToken.updateMany).toHaveBeenCalledWith({
+            where: { id: "rt1", revokedAt: null },
+            data: { revokedAt: expect.any(Date), lastUsedAt: expect.any(Date) },
+        });
+        expect(prismaMock.authRefreshToken.create).not.toHaveBeenCalled();
+        expect(setCookie).toContain(`${HYBRID_ACCESS_COOKIE_NAME}=`);
+        expect(setCookie).not.toContain(`${HYBRID_REFRESH_COOKIE_NAME}=`);
+    });
+
+    it("refresh treats rotatedFromId unique conflict as an already rotated token", async () => {
+        prismaMock.authRefreshToken.findUnique.mockResolvedValue({
+            id: "rt1",
+            userId: 1,
+            familyId: "family-1",
+            revokedAt: null,
+            expiresAt: new Date("2030-01-01T00:00:00.000Z"),
+            user: { id: 1, email: "u@test.com", role: "ADMIN", isActive: true, tokenVersion: 1 },
+        });
+        prismaMock.authRefreshToken.create.mockRejectedValueOnce({
+            code: "P2002",
+            meta: { target: ["rotatedFromId"] },
+        });
+
+        const request = new NextRequest("http://localhost/api/auth/refresh", {
+            method: "POST",
+            headers: { ...csrfHeaders, cookie: `${HYBRID_REFRESH_COOKIE_NAME}=old-refresh-token` },
+        });
+        const response = await refreshRoute(request);
+        const setCookie = response.headers.get("set-cookie") ?? "";
+
+        expect(response.status).toBe(200);
+        expect(prismaMock.authRefreshToken.create).toHaveBeenCalledTimes(1);
+        expect(setCookie).toContain(`${HYBRID_ACCESS_COOKIE_NAME}=`);
+        expect(setCookie).not.toContain(`${HYBRID_REFRESH_COOKIE_NAME}=`);
     });
 
     it("refresh revokes family on reused token", async () => {

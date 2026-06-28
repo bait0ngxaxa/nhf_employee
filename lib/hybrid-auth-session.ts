@@ -8,6 +8,7 @@ import {
     HYBRID_ACCESS_COOKIE_NAME,
     HYBRID_REFRESH_COOKIE_NAME,
 } from "@/lib/hybrid-auth-constants";
+import { getTrustedClientIp } from "@/lib/trusted-client-ip";
 
 export { HYBRID_ACCESS_COOKIE_NAME, HYBRID_REFRESH_COOKIE_NAME } from "@/lib/hybrid-auth-constants";
 
@@ -15,10 +16,8 @@ export function getClientMetadata(request: NextRequest): {
     ipAddress?: string;
     userAgent?: string;
 } {
-    const forwardedFor = request.headers.get("x-forwarded-for");
-    const realIp = request.headers.get("x-real-ip");
     const userAgent = request.headers.get("user-agent") ?? undefined;
-    const ipAddress = forwardedFor?.split(",")[0]?.trim() || realIp || undefined;
+    const ipAddress = getTrustedClientIp(request.headers) ?? undefined;
 
     return { ipAddress, userAgent };
 }

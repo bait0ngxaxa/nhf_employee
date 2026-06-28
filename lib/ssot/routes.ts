@@ -2,6 +2,7 @@ export const APP_ROUTES = {
     home: "/",
     login: "/login",
     signup: "/signup",
+    refreshSession: "/auth/refresh",
     dashboard: "/dashboard",
     accessDenied: "/access-denied",
     forgotPassword: "/forgot-password",

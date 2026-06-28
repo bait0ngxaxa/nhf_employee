@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { getTrustedClientIp } from "@/lib/trusted-client-ip";
 import { type AuditAction } from "@prisma/client";
 import { headers } from "next/headers";
 
@@ -38,11 +39,7 @@ export interface CreateAuditLogParams {
 async function getClientIp(): Promise<string | null> {
     try {
         const headersList = await headers();
-        return (
-            headersList.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-            headersList.get("x-real-ip") ||
-            null
-        );
+        return getTrustedClientIp(headersList);
     } catch {
         return null;
     }

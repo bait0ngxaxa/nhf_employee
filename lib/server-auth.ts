@@ -1,13 +1,10 @@
 import { cookies } from "next/headers";
 
 import type { HybridAuthSession } from "@/lib/auth-user";
-import {
-    HYBRID_ACCESS_COOKIE_NAME,
-    HYBRID_REFRESH_COOKIE_NAME,
-} from "@/lib/hybrid-auth-constants";
+import { HYBRID_ACCESS_COOKIE_NAME } from "@/lib/hybrid-auth-constants";
 import { parseUserId } from "@/lib/hybrid-auth-session";
 import { hasActiveSessionFamily } from "@/lib/hybrid-auth-session-store";
-import { hashRefreshToken, verifyAccessToken } from "@/lib/hybrid-auth-tokens";
+import { verifyAccessToken } from "@/lib/hybrid-auth-tokens";
 import { prisma } from "@/lib/prisma";
 
 export type ApiAuthSession = HybridAuthSession;
@@ -41,35 +38,12 @@ function toApiAuthSession(user: SessionUser): ApiAuthSession {
     };
 }
 
-async function getSessionFromRefreshToken(refreshToken: string | undefined): Promise<ApiAuthSession | null> {
-    if (!refreshToken) {
-        return null;
-    }
-
-    const record = await prisma.authRefreshToken.findUnique({
-        where: { tokenHash: hashRefreshToken(refreshToken) },
-        select: {
-            expiresAt: true,
-            revokedAt: true,
-            userId: true,
-        },
-    });
-
-    if (!record || record.revokedAt || record.expiresAt <= new Date()) {
-        return null;
-    }
-
-    const user = await findActiveUser(record.userId);
-    return user ? toApiAuthSession(user) : null;
-}
-
 export async function getApiAuthSession(): Promise<ApiAuthSession | null> {
     const cookieStore = await cookies();
     const accessToken = cookieStore.get(HYBRID_ACCESS_COOKIE_NAME)?.value;
-    const refreshToken = cookieStore.get(HYBRID_REFRESH_COOKIE_NAME)?.value;
 
     if (!accessToken) {
-        return getSessionFromRefreshToken(refreshToken);
+        return null;
     }
 
     try {
@@ -90,6 +64,6 @@ export async function getApiAuthSession(): Promise<ApiAuthSession | null> {
 
         return toApiAuthSession(user);
     } catch {
-        return getSessionFromRefreshToken(refreshToken);
+        return null;
     }
 }

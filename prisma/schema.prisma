@@ -41,7 +41,7 @@ model AuthRefreshToken {
   userId        Int
   tokenHash     String    @unique @db.VarChar(128)
   familyId      String    @db.VarChar(64)
-  rotatedFromId String?   @db.VarChar(36)
+  rotatedFromId String?   @unique @db.VarChar(36)
   expiresAt     DateTime
   revokedAt     DateTime?
   userAgent     String?   @db.VarChar(512)

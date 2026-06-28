@@ -1,3 +1,4 @@
+import type { Prisma } from "@prisma/client";
 import { type NextRequest, NextResponse } from "next/server";
 
 import { AUTH_ERROR_MESSAGES, authRefreshUserSelect } from "@/lib/auth-ssot";
@@ -18,6 +19,40 @@ import {
 import { prisma } from "@/lib/prisma";
 
 const REFRESH_ROTATION_GRACE_MS = 10_000;
+
+type RefreshTokenStore = Pick<Prisma.TransactionClient, "authRefreshToken">;
+
+type RefreshRotationResult =
+    | { status: "rotated"; rawToken: string }
+    | { status: "alreadyRotated" }
+    | { status: "invalid" };
+
+interface RefreshRotationInput {
+    tokenId: string;
+    userId: number;
+    familyId: string;
+    now: Date;
+    userAgent?: string;
+    ipAddress?: string;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === "object" && value !== null;
+}
+
+function hasRotatedFromUniqueTarget(target: unknown): boolean {
+    if (Array.isArray(target)) {
+        return target.includes("rotatedFromId");
+    }
+    return typeof target === "string" && target.includes("rotatedFromId");
+}
+
+function isRotatedFromUniqueConflict(error: unknown): boolean {
+    if (!isRecord(error) || error.code !== "P2002" || !isRecord(error.meta)) {
+        return false;
+    }
+    return hasRotatedFromUniqueTarget(error.meta.target);
+}
 
 function unauthorizedResponse(): NextResponse {
     const response = NextResponse.json({ error: AUTH_ERROR_MESSAGES.unauthorized }, { status: 401 });
@@ -64,8 +99,11 @@ function isWithinRotationGrace(input: {
     return elapsedMs >= 0 && elapsedMs <= REFRESH_ROTATION_GRACE_MS;
 }
 
-async function hasSuccessorToken(rotatedFromId: string): Promise<boolean> {
-    const successor = await prisma.authRefreshToken.findFirst({
+async function hasSuccessorToken(
+    rotatedFromId: string,
+    client: RefreshTokenStore = prisma,
+): Promise<boolean> {
+    const successor = await client.authRefreshToken.findFirst({
         where: {
             rotatedFromId,
             revokedAt: null,
@@ -75,6 +113,57 @@ async function hasSuccessorToken(rotatedFromId: string): Promise<boolean> {
     });
 
     return Boolean(successor);
+}
+
+async function rotateRefreshTokenAtomically(
+    input: RefreshRotationInput,
+): Promise<RefreshRotationResult> {
+    const nextToken = buildRefreshTokenRecord({
+        userId: input.userId,
+        familyId: input.familyId,
+        userAgent: input.userAgent,
+        ipAddress: input.ipAddress,
+    });
+
+    const result = await prisma.$transaction(async (tx) => {
+        const claimedToken = await tx.authRefreshToken.updateMany({
+            where: { id: input.tokenId, revokedAt: null },
+            data: { revokedAt: input.now, lastUsedAt: input.now },
+        });
+
+        if (claimedToken.count === 0) {
+            const hasSuccessor = await hasSuccessorToken(input.tokenId, tx);
+            return hasSuccessor
+                ? { status: "alreadyRotated" as const }
+                : { status: "invalid" as const };
+        }
+
+        try {
+            await tx.authRefreshToken.create({
+                data: {
+                    userId: nextToken.record.userId,
+                    tokenHash: nextToken.record.tokenHash,
+                    familyId: nextToken.record.familyId,
+                    rotatedFromId: input.tokenId,
+                    expiresAt: nextToken.record.expiresAt,
+                    userAgent: nextToken.record.userAgent,
+                    ipAddress: nextToken.record.ipAddress,
+                },
+            });
+        } catch (error) {
+            if (isRotatedFromUniqueConflict(error)) {
+                return { status: "alreadyRotated" as const };
+            }
+            throw error;
+        }
+
+        return { status: "rotated" as const };
+    });
+
+    if (result.status !== "rotated") {
+        return result;
+    }
+    return { status: "rotated", rawToken: nextToken.rawToken };
 }
 
 async function buildAccessOnlyRefreshResponse(input: {
@@ -175,12 +264,26 @@ export const POST = withTrustedMutation(async (request: NextRequest): Promise<Ne
             return unauthorizedResponse();
         }
 
-        const nextToken = buildRefreshTokenRecord({
+        const rotation = await rotateRefreshTokenAtomically({
+            tokenId: existingToken.id,
             userId: existingToken.userId,
             familyId: existingToken.familyId,
             userAgent: metadata.userAgent,
             ipAddress: metadata.ipAddress,
+            now,
         });
+
+        if (rotation.status === "alreadyRotated") {
+            return buildAccessOnlyRefreshResponse({
+                userId: existingToken.userId,
+                role: existingToken.user.role,
+                familyId: existingToken.familyId,
+                tokenVersion: existingToken.user.tokenVersion ?? 1,
+            });
+        }
+        if (rotation.status === "invalid") {
+            return unauthorizedResponse();
+        }
 
         const accessToken = await issueAccessToken({
             userId: existingToken.userId,
@@ -189,38 +292,8 @@ export const POST = withTrustedMutation(async (request: NextRequest): Promise<Ne
             tokenVersion: existingToken.user.tokenVersion ?? 1,
         });
 
-        const claimedToken = await prisma.authRefreshToken.updateMany({
-            where: { id: existingToken.id, revokedAt: null },
-            data: { revokedAt: now, lastUsedAt: now },
-        });
-
-        if (claimedToken.count === 0) {
-            if (await hasSuccessorToken(existingToken.id)) {
-                return buildAccessOnlyRefreshResponse({
-                    userId: existingToken.userId,
-                    role: existingToken.user.role,
-                    familyId: existingToken.familyId,
-                    tokenVersion: existingToken.user.tokenVersion ?? 1,
-                });
-            }
-
-            return unauthorizedResponse();
-        }
-
-        await prisma.authRefreshToken.create({
-            data: {
-                userId: nextToken.record.userId,
-                tokenHash: nextToken.record.tokenHash,
-                familyId: nextToken.record.familyId,
-                rotatedFromId: existingToken.id,
-                expiresAt: nextToken.record.expiresAt,
-                userAgent: nextToken.record.userAgent,
-                ipAddress: nextToken.record.ipAddress,
-            },
-        });
-
         const response = NextResponse.json({ success: true });
-        setHybridAuthCookies(response, accessToken, nextToken.rawToken);
+        setHybridAuthCookies(response, accessToken, rotation.rawToken);
         return response;
     } catch {
         return NextResponse.json({ error: AUTH_ERROR_MESSAGES.internalServerError }, { status: 500 });

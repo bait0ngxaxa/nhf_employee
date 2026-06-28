@@ -38,11 +38,26 @@ describe("hybrid auth middleware", () => {
         expect(response.headers.get("location")).toBe("http://localhost/login");
     });
 
-    it("allows protected route to continue when access token expired but refresh cookie exists", async () => {
-        const request = buildRequest("http://localhost/dashboard", `${HYBRID_REFRESH_COOKIE_NAME}=refresh-token`);
+    it("redirects protected route with only refresh cookie to refresh bridge", async () => {
+        const request = buildRequest("http://localhost/dashboard", `${HYBRID_REFRESH_COOKIE_NAME}=present`);
+        const response = await middleware(request);
+        const location = response.headers.get("location");
+
+        expect(response.status).toBe(307);
+        expect(location).toBe("http://localhost/auth/refresh?next=%2Fdashboard");
+    });
+
+    it("preserves protected route query when redirecting to refresh bridge", async () => {
+        const request = buildRequest(
+            "http://localhost/dashboard?tab=stock&stockTab=browse",
+            `${HYBRID_REFRESH_COOKIE_NAME}=present`,
+        );
         const response = await middleware(request);
 
-        expect(response.status).toBe(200);
+        expect(response.status).toBe(307);
+        expect(response.headers.get("location")).toBe(
+            "http://localhost/auth/refresh?next=%2Fdashboard%3Ftab%3Dstock%26stockTab%3Dbrowse",
+        );
     });
 
     it("allows access to public route without authentication", async () => {

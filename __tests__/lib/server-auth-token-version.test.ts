@@ -20,7 +20,6 @@ vi.mock("next/headers", () => ({
 }));
 
 vi.mock("@/lib/hybrid-auth-tokens", () => ({
-    hashRefreshToken: (token: string): string => `hashed:${token}`,
     verifyAccessToken: verifyAccessTokenMock,
 }));
 
@@ -68,38 +67,36 @@ describe("server auth tokenVersion validation", () => {
         expect(session).toBeNull();
     });
 
-    it("returns session from valid refresh token when access token is missing", async () => {
+    it("returns null when only a refresh token is present", async () => {
         cookiesMock.mockResolvedValue({
             get: vi.fn((name: string) =>
                 name === HYBRID_REFRESH_COOKIE_NAME ? { value: "refresh.token" } : undefined,
             ),
         });
-        prismaMock.authRefreshToken.findUnique.mockResolvedValue({
-            userId: 1,
-            revokedAt: null,
-            expiresAt: new Date(Date.now() + 60_000),
-        });
-        prismaMock.user.findUnique.mockResolvedValue({
-            id: 1,
-            role: "ADMIN",
-            email: "admin@test.com",
-            name: "Admin",
-            isActive: true,
-            tokenVersion: 2,
-            employee: null,
-        });
 
         const session = await getApiAuthSession();
 
-        expect(session?.user.email).toBe("admin@test.com");
-        expect(prismaMock.authRefreshToken.findUnique).toHaveBeenCalledWith({
-            where: { tokenHash: "hashed:refresh.token" },
-            select: {
-                expiresAt: true,
-                revokedAt: true,
-                userId: true,
-            },
+        expect(session).toBeNull();
+        expect(verifyAccessTokenMock).not.toHaveBeenCalled();
+        expect(prismaMock.authRefreshToken.findUnique).not.toHaveBeenCalled();
+        expect(prismaMock.user.findUnique).not.toHaveBeenCalled();
+    });
+
+    it("returns null when access token verification fails with refresh token present", async () => {
+        cookiesMock.mockResolvedValue({
+            get: vi.fn((name: string) => {
+                if (name === HYBRID_ACCESS_COOKIE_NAME) return { value: "bad.access.token" };
+                if (name === HYBRID_REFRESH_COOKIE_NAME) return { value: "refresh.token" };
+                return undefined;
+            }),
         });
+        verifyAccessTokenMock.mockRejectedValue(new Error("invalid access token"));
+
+        const session = await getApiAuthSession();
+
+        expect(session).toBeNull();
+        expect(prismaMock.authRefreshToken.findUnique).not.toHaveBeenCalled();
+        expect(prismaMock.user.findUnique).not.toHaveBeenCalled();
     });
 
     it("returns null when access JWT belongs to a revoked session family", async () => {

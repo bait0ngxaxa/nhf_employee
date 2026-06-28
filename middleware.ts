@@ -8,11 +8,13 @@ import {
     getHybridSecretKey,
 } from "@/lib/hybrid-auth-constants";
 import { buildPublicUrl } from "@/lib/public-url";
+import { APP_ROUTES } from "@/lib/ssot/routes";
 
 const PUBLIC_ROUTES = new Set([
     "/",
     "/login",
     "/signup",
+    "/auth/refresh",
     "/access-denied",
     "/forgot-password",
     "/reset-password",
@@ -35,6 +37,15 @@ async function hasValidHybridAccessToken(request: NextRequest): Promise<boolean>
     }
 }
 
+function buildRefreshSessionUrl(request: NextRequest): URL {
+    const refreshUrl = buildPublicUrl(APP_ROUTES.refreshSession, request);
+    refreshUrl.searchParams.set(
+        "next",
+        `${request.nextUrl.pathname}${request.nextUrl.search}`,
+    );
+    return refreshUrl;
+}
+
 export default async function middleware(request: NextRequest): Promise<NextResponse> {
     const { pathname } = request.nextUrl;
     const isPublicRoute = PUBLIC_ROUTES.has(pathname);
@@ -46,7 +57,10 @@ export default async function middleware(request: NextRequest): Promise<NextResp
         return NextResponse.redirect(buildPublicUrl("/dashboard", request));
     }
 
-    if (!isPublicRoute && !isAuthenticated && !hasRefreshToken) {
+    if (!isPublicRoute && !isAuthenticated) {
+        if (hasRefreshToken) {
+            return NextResponse.redirect(buildRefreshSessionUrl(request));
+        }
         return NextResponse.redirect(buildPublicUrl("/login", request));
     }
 
