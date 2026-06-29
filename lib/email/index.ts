@@ -9,7 +9,7 @@ import { generateNewTicketEmailHTML } from "./templates/new-ticket";
 import { generateStatusUpdateEmailHTML } from "./templates/status-update";
 import { generateLeaveActionEmailHTML } from "./templates/leave-action";
 import { generateLeaveResultEmailHTML } from "./templates/leave-result";
-import { getPublicOrigin } from "@/lib/public-url";
+import { getPublicOrigin } from "@/lib/network/public-url";
 
 // Create transporter (singleton pattern using closure)
 let transporter: nodemailer.Transporter | null = null;

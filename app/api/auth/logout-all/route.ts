@@ -1,13 +1,13 @@
 import { type NextRequest, NextResponse } from "next/server";
 
-import { AUTH_ERROR_MESSAGES } from "@/lib/auth-ssot";
-import { withTrustedMutation } from "@/lib/auth-csrf";
-import { logAuthEvent } from "@/lib/audit";
+import { AUTH_ERROR_MESSAGES } from "@/lib/auth/ssot";
+import { withTrustedMutation } from "@/lib/auth/csrf";
+import { logAuthEvent } from "@/lib/server/audit";
 import {
     clearHybridAuthCookies,
-} from "@/lib/hybrid-auth-session";
-import { resolveAuthenticatedUserId } from "@/lib/hybrid-auth-route";
-import { prisma } from "@/lib/prisma";
+} from "@/lib/auth/hybrid/session";
+import { resolveAuthenticatedUserId } from "@/lib/auth/hybrid/route";
+import { prisma } from "@/lib/db/prisma";
 
 export const POST = withTrustedMutation(async (request: NextRequest): Promise<NextResponse> => {
     try {

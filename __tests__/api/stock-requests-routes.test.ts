@@ -4,12 +4,12 @@ import type * as NextServerModule from "next/server";
 import { GET as getRequestsRoute, POST as postRequestsRoute } from "@/app/api/stock/requests/route";
 import { POST as issueRequestRoute } from "@/app/api/stock/requests/[id]/issue/route";
 import { POST as cancelRequestRoute } from "@/app/api/stock/requests/[id]/cancel/route";
-import { getApiAuthSession } from "@/lib/server-auth";
-import { buildUserContext } from "@/lib/context";
+import { getApiAuthSession } from "@/lib/auth/server";
+import { buildUserContext } from "@/lib/auth/context";
 import { isAdminRole } from "@/lib/ssot/permissions";
 import { stockService } from "@/lib/services/stock";
 import { processOutbox } from "@/lib/services/outbox/processor";
-import { logStockEvent } from "@/lib/audit";
+import { logStockEvent } from "@/lib/server/audit";
 import {
     enqueueLineLowStockReached,
     enqueueLineNewStockRequest,
@@ -28,11 +28,11 @@ vi.mock("next/server", async (importOriginal) => {
     };
 });
 
-vi.mock("@/lib/server-auth", () => ({
+vi.mock("@/lib/auth/server", () => ({
     getApiAuthSession: vi.fn(),
 }));
 
-vi.mock("@/lib/context", () => ({
+vi.mock("@/lib/auth/context", () => ({
     buildUserContext: vi.fn(),
 }));
 
@@ -53,7 +53,7 @@ vi.mock("@/lib/services/outbox/processor", () => ({
     processOutbox: vi.fn(),
 }));
 
-vi.mock("@/lib/audit", () => ({
+vi.mock("@/lib/server/audit", () => ({
     logStockEvent: vi.fn(),
 }));
 

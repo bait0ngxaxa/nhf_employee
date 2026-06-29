@@ -1,5 +1,5 @@
 import { after, type NextRequest, NextResponse } from "next/server";
-import { requireApiSession } from "@/lib/api-auth";
+import { requireApiSession } from "@/lib/auth/api";
 import { isAdminRole } from "@/lib/ssot/permissions";
 import { jsonError, serverError } from "@/lib/ssot/http";
 import { stockService } from "@/lib/services/stock";
@@ -8,7 +8,7 @@ import {
     createRequestSchema,
     stockRequestsFilterSchema,
 } from "@/lib/validations/stock";
-import { logStockEvent } from "@/lib/audit";
+import { logStockEvent } from "@/lib/server/audit";
 import {
     enqueueLineNewStockRequest,
     notifyAdminsNewStockRequest,

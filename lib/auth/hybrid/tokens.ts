@@ -1,8 +1,8 @@
 import { createHash, randomBytes } from "crypto";
 import { SignJWT, jwtVerify, type JWTPayload } from "jose";
 
-import { hasRequiredAccessClaims } from "@/lib/auth-ssot";
-import { getHybridSecretKey } from "@/lib/hybrid-auth-constants";
+import { hasRequiredAccessClaims } from "@/lib/auth/ssot";
+import { getHybridSecretKey } from "@/lib/auth/hybrid/constants";
 
 const DEFAULT_ACCESS_TOKEN_TTL_SECONDS = 15 * 60;
 const DEFAULT_REFRESH_TOKEN_TTL_SECONDS = 30 * 24 * 60 * 60;

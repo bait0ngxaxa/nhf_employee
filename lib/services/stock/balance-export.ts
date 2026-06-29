@@ -1,6 +1,6 @@
 import { StockRequestStatus } from "@prisma/client";
 import { generateFilename } from "@/lib/helpers/date-helpers";
-import { prisma } from "@/lib/prisma";
+import { prisma } from "@/lib/db/prisma";
 import { createCsvDownloadResponse, encodeCsvRow } from "@/lib/server/csv";
 import { EXPORT_LIMITS } from "@/lib/ssot/exports";
 import {

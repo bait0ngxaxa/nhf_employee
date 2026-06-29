@@ -5,7 +5,7 @@ import useSWR from "swr";
 import { toast } from "sonner";
 import { type EmployeeFormData, type Department } from "@/types/employees";
 import { createEmployeeSchema } from "@/lib/validations/employee";
-import { apiPost } from "@/lib/api-client";
+import { apiPost } from "@/lib/client/api-client";
 import { API_ROUTES } from "@/lib/ssot/routes";
 
 const INITIAL_FORM_DATA: EmployeeFormData = {

@@ -1,7 +1,7 @@
-﻿import { type NextRequest, NextResponse, after } from "next/server";
+import { type NextRequest, NextResponse, after } from "next/server";
 
-import { requireAdminSession, requireApiSession } from "@/lib/api-auth";
-import { createAuditLog } from "@/lib/audit";
+import { requireAdminSession, requireApiSession } from "@/lib/auth/api";
+import { createAuditLog } from "@/lib/server/audit";
 import { processOutbox } from "@/lib/services/outbox/processor";
 import {
     emailRequestService,

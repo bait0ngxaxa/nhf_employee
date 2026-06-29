@@ -2,7 +2,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 
-import { assertTrustedMutationRequest } from "@/lib/auth-csrf";
+import { assertTrustedMutationRequest } from "@/lib/auth/csrf";
 
 describe("auth csrf guard", () => {
     afterEach(() => {

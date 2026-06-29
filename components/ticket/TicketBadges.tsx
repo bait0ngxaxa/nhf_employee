@@ -1,6 +1,6 @@
 import { AlertCircle, ArrowDown, ArrowUp, Ban, CheckCircle2, Clock3 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { cn } from "@/lib/utils";
+import { cn } from "@/lib/ui/utils";
 import { getTicketPriorityLabel, getTicketStatusLabel } from "@/lib/helpers/ticket-helpers";
 
 type TicketBadgeMeta = {

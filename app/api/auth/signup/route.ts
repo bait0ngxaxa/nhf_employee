@@ -1,16 +1,16 @@
 import { type NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 
-import { createAuditLog } from "@/lib/audit";
+import { createAuditLog } from "@/lib/server/audit";
 import {
     clearAuthIdentityRateLimit,
     isAuthRateLimited,
     recordAuthAttempt,
-} from "@/lib/auth-rate-limit";
-import { AUTH_SIGNUP_MESSAGES } from "@/lib/auth-ssot";
-import { withTrustedMutation } from "@/lib/auth-csrf";
-import { getClientMetadata } from "@/lib/hybrid-auth-session";
-import { prisma } from "@/lib/prisma";
+} from "@/lib/auth/rate-limit";
+import { AUTH_SIGNUP_MESSAGES } from "@/lib/auth/ssot";
+import { withTrustedMutation } from "@/lib/auth/csrf";
+import { getClientMetadata } from "@/lib/auth/hybrid/session";
+import { prisma } from "@/lib/db/prisma";
 import { isBootstrapAdminEmail } from "@/lib/ssot/admin-bootstrap";
 import { signupSchema } from "@/lib/validations/auth";
 

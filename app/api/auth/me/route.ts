@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
-import { AUTH_ERROR_MESSAGES } from "@/lib/auth-ssot";
-import { getApiAuthSession } from "@/lib/server-auth";
+import { AUTH_ERROR_MESSAGES } from "@/lib/auth/ssot";
+import { getApiAuthSession } from "@/lib/auth/server";
 
 export async function GET(): Promise<NextResponse> {
     const session = await getApiAuthSession();

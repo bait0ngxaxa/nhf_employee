@@ -11,7 +11,7 @@ import { generateTicketFlexMessage } from "./flex-messages/ticket";
 import { generateEmailRequestFlexMessage } from "./flex-messages/email-request";
 import { generateStockLowFlexMessage } from "./flex-messages/stock-low";
 import { generateStockRequestFlexMessage } from "./flex-messages/stock";
-import { getPublicOrigin } from "@/lib/public-url";
+import { getPublicOrigin } from "@/lib/network/public-url";
 
 // Configuration (read once)
 const getConfig = () => ({

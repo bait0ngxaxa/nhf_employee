@@ -1,8 +1,8 @@
 "use client";
 
 import { useDashboardUIContext } from "@/components/dashboard/context/dashboard/DashboardContext";
-import { DashboardSidebar } from "@/components/dashboard/DashboardSidebar";
-import { DashboardNavbar } from "@/components/dashboard/DashboardNavbar";
+import { DashboardSidebar } from "@/components/dashboard/layout/DashboardSidebar";
+import { DashboardNavbar } from "@/components/dashboard/layout/DashboardNavbar";
 import { useDashboardContext } from "@/components/dashboard/context";
 
 export function DashboardLayoutClient({

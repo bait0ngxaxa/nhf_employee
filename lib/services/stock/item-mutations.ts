@@ -1,5 +1,5 @@
 import { type StockTxType } from "@prisma/client";
-import { prisma } from "@/lib/prisma";
+import { prisma } from "@/lib/db/prisma";
 import type {
     AdjustStockInput,
     CreateCategoryInput,

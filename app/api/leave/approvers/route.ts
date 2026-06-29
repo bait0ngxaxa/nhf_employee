@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
-import { requireAdminSession } from "@/lib/api-auth";
-import { prisma } from "@/lib/prisma";
+import { requireAdminSession } from "@/lib/auth/api";
+import { prisma } from "@/lib/db/prisma";
 import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
 import { forbidden } from "@/lib/ssot/http";
 

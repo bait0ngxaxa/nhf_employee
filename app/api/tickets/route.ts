@@ -1,8 +1,8 @@
-﻿import { after, type NextRequest, NextResponse } from "next/server";
+import { after, type NextRequest, NextResponse } from "next/server";
 
-import { requireApiSession } from "@/lib/api-auth";
-import { logTicketEvent } from "@/lib/audit";
-import { prisma } from "@/lib/prisma";
+import { requireApiSession } from "@/lib/auth/api";
+import { logTicketEvent } from "@/lib/server/audit";
+import { prisma } from "@/lib/db/prisma";
 import { APP_ROUTES } from "@/lib/ssot/routes";
 import { processOutbox } from "@/lib/services/outbox/processor";
 import { ticketService, type TicketFilters } from "@/lib/services/ticket";

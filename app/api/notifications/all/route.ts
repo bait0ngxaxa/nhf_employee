@@ -1,7 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 
-import { requireApiSession } from "@/lib/api-auth";
-import { prisma } from "@/lib/prisma";
+import { requireApiSession } from "@/lib/auth/api";
+import { prisma } from "@/lib/db/prisma";
 import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
 
 const PAGE_SIZE = 20;

@@ -1,6 +1,6 @@
 "use client";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/lib/ui/utils";
 import { Button } from "@/components/ui/button";
 import {
     Card,
@@ -16,7 +16,7 @@ import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Loader2 } from "lucide-react";
-import { apiPost } from "@/lib/api-client";
+import { apiPost } from "@/lib/client/api-client";
 import { API_ROUTES, APP_ROUTES } from "@/lib/ssot/routes";
 import { useAuth } from "@/components/auth/HybridAuthProvider";
 

@@ -1,6 +1,6 @@
 import { useEffect, useRef, type ReactNode } from "react";
 import { type LucideIcon } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn } from "@/lib/ui/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 /**

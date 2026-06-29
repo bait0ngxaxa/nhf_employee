@@ -1,13 +1,13 @@
 import { jwtVerify } from "jose";
 import { NextResponse, type NextRequest } from "next/server";
 
-import { hasRequiredAccessClaims } from "@/lib/auth-ssot";
+import { hasRequiredAccessClaims } from "@/lib/auth/ssot";
 import {
     HYBRID_ACCESS_COOKIE_NAME,
     HYBRID_REFRESH_COOKIE_NAME,
     getHybridSecretKey,
-} from "@/lib/hybrid-auth-constants";
-import { buildPublicUrl } from "@/lib/public-url";
+} from "@/lib/auth/hybrid/constants";
+import { buildPublicUrl } from "@/lib/network/public-url";
 import { APP_ROUTES } from "@/lib/ssot/routes";
 
 const PUBLIC_ROUTES = new Set([

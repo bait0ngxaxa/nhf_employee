@@ -1,5 +1,5 @@
 import { type Ticket, type TicketStats } from "@/types/tickets";
-import { type HybridAuthSession } from "@/lib/auth-user";
+import { type HybridAuthSession } from "@/lib/auth/types";
 
 export interface ITSupportDataContextValue {
     // Session Data

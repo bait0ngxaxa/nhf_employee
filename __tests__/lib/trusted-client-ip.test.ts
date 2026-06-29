@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { getTrustedClientIp } from "@/lib/trusted-client-ip";
+import { getTrustedClientIp } from "@/lib/network/trusted-client-ip";
 
 function buildHeaders(values: Record<string, string>): Headers {
     const headers = new Headers();

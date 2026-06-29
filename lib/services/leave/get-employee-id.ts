@@ -1,4 +1,4 @@
-import { prisma } from "@/lib/prisma";
+import { prisma } from "@/lib/db/prisma";
 
 /**
  * Resolve a User ID (from session) to the linked Employee ID.

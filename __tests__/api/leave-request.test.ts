@@ -1,7 +1,7 @@
-﻿import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { POST as submitLeaveRequest } from "@/app/api/leave/request/route";
-import { getApiAuthSession } from "@/lib/server-auth";
-import { prisma } from "@/lib/prisma";
+import { getApiAuthSession } from "@/lib/auth/server";
+import { prisma } from "@/lib/db/prisma";
 import { getEmployeeIdFromUserId } from "@/lib/services/leave/get-employee-id";
 import { processOutbox } from "@/lib/services/outbox/processor";
 import { NextRequest } from "next/server";
@@ -17,7 +17,7 @@ vi.mock("next/server", async (importOriginal) => {
     };
 });
 
-vi.mock("@/lib/server-auth", () => ({
+vi.mock("@/lib/auth/server", () => ({
     getApiAuthSession: vi.fn(),
 }));
 
@@ -29,7 +29,7 @@ vi.mock("@/lib/services/leave/get-employee-id", () => ({
     getEmployeeIdFromUserId: vi.fn(),
 }));
 
-vi.mock("@/lib/prisma", () => ({
+vi.mock("@/lib/db/prisma", () => ({
     prisma: {
         $transaction: vi.fn(),
         employee: {

@@ -1,6 +1,6 @@
 import { Ban, CheckCircle2, Clock3, XCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { cn } from "@/lib/utils";
+import { cn } from "@/lib/ui/utils";
 
 type RequestStatusMeta = {
     label: string;

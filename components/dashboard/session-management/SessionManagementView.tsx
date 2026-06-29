@@ -9,7 +9,7 @@ import {
     Trash2,
 } from "lucide-react";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/lib/ui/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {

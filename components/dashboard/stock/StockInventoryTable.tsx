@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { apiDelete } from "@/lib/api-client";
+import { apiDelete } from "@/lib/client/api-client";
 import {
     Dialog,
     DialogContent,

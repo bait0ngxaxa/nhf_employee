@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { SessionManagementSection } from "@/components/dashboard/SessionManagementSection";
+import { SessionManagementSection } from "@/components/dashboard/sections/SessionManagementSection";
 import { useDashboardUIContext } from "@/components/dashboard/context/dashboard/DashboardContext";
 import { useSessionManagement } from "@/components/dashboard/session-management/useSessionManagement";
 
@@ -12,7 +12,7 @@ vi.mock("@/components/dashboard/session-management/useSessionManagement", () => 
     useSessionManagement: vi.fn(),
 }));
 
-vi.mock("@/components/dashboard/SectionSkeleton", () => ({
+vi.mock("@/components/dashboard/feedback/SectionSkeleton", () => ({
     SectionSkeleton: () => <div data-testid="section-skeleton" />,
 }));
 

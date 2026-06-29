@@ -1,6 +1,6 @@
 import { cache } from "react";
 import { AuditAction } from "@prisma/client";
-import { prisma } from "@/lib/prisma";
+import { prisma } from "@/lib/db/prisma";
 import type {
     AuditLogFilters,
     PaginatedAuditLogsResult,

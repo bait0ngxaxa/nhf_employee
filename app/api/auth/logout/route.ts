@@ -1,14 +1,14 @@
 import { type NextRequest, NextResponse } from "next/server";
 
-import { AUTH_ERROR_MESSAGES } from "@/lib/auth-ssot";
-import { withTrustedMutation } from "@/lib/auth-csrf";
-import { logAuthEvent } from "@/lib/audit";
+import { AUTH_ERROR_MESSAGES } from "@/lib/auth/ssot";
+import { withTrustedMutation } from "@/lib/auth/csrf";
+import { logAuthEvent } from "@/lib/server/audit";
 import {
     HYBRID_REFRESH_COOKIE_NAME,
     clearHybridAuthCookies,
-} from "@/lib/hybrid-auth-session";
-import { hashRefreshToken } from "@/lib/hybrid-auth-tokens";
-import { prisma } from "@/lib/prisma";
+} from "@/lib/auth/hybrid/session";
+import { hashRefreshToken } from "@/lib/auth/hybrid/tokens";
+import { prisma } from "@/lib/db/prisma";
 
 async function revokeCurrentRefreshToken(tokenHash: string): Promise<{ userId: number; email: string } | null> {
     const tokenRecord = await prisma.authRefreshToken.findUnique({

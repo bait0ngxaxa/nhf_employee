@@ -3,18 +3,18 @@
 import type React from "react";
 import { Bell, Check, Filter, Loader2 } from "lucide-react";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/lib/ui/utils";
 import { getRelativeTime } from "@/lib/helpers/date-helpers";
 
 import { Button } from "@/components/ui/button";
 import {
     NotificationIcon,
     NotificationInlineLoading,
-} from "@/components/dashboard/NotificationShared";
+} from "@/components/dashboard/notifications/NotificationShared";
 import type {
     NotificationFilter,
     NotificationItem,
-} from "@/components/dashboard/NotificationShared";
+} from "@/components/dashboard/notifications/NotificationShared";
 
 export function NotificationsHeader({
     filter,

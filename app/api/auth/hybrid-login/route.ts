@@ -2,13 +2,13 @@ import bcrypt from "bcryptjs";
 import { type NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
-import { AUTH_ERROR_MESSAGES, authLoginUserSelect } from "@/lib/auth-ssot";
-import { withTrustedMutation } from "@/lib/auth-csrf";
-import { isAuthRateLimited, recordAuthAttempt } from "@/lib/auth-rate-limit";
-import { logAuthEvent } from "@/lib/audit";
-import { setHybridAuthCookies, getClientMetadata } from "@/lib/hybrid-auth-session";
-import { buildRefreshTokenRecord, issueAccessToken } from "@/lib/hybrid-auth-tokens";
-import { prisma } from "@/lib/prisma";
+import { AUTH_ERROR_MESSAGES, authLoginUserSelect } from "@/lib/auth/ssot";
+import { withTrustedMutation } from "@/lib/auth/csrf";
+import { isAuthRateLimited, recordAuthAttempt } from "@/lib/auth/rate-limit";
+import { logAuthEvent } from "@/lib/server/audit";
+import { setHybridAuthCookies, getClientMetadata } from "@/lib/auth/hybrid/session";
+import { buildRefreshTokenRecord, issueAccessToken } from "@/lib/auth/hybrid/tokens";
+import { prisma } from "@/lib/db/prisma";
 
 const hybridLoginSchema = z.object({
     email: z.string().email(),

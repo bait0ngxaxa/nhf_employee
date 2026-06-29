@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireAdminSession } from "@/lib/api-auth";
+import { requireAdminSession } from "@/lib/auth/api";
 import { jsonError } from "@/lib/ssot/http";
 import { saveLocalImageUpload } from "@/lib/uploads/local";
 

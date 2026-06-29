@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 import type * as NextServerModule from "next/server";
 import { GET as stockReportsExportRoute } from "@/app/api/stock/reports/export/route";
-import { getApiAuthSession } from "@/lib/server-auth";
+import { getApiAuthSession } from "@/lib/auth/server";
 import { isAdminRole } from "@/lib/ssot/permissions";
 import {
     createStockBalanceReportCsvResponse,
@@ -13,7 +13,7 @@ import {
     getStockRequestReportMeta,
     getStockRequestReportYears,
 } from "@/lib/services/stock/report-export";
-import { logDataExport } from "@/lib/audit";
+import { logDataExport } from "@/lib/server/audit";
 
 vi.mock("next/server", async (importOriginal) => {
     const actual = await importOriginal<typeof NextServerModule>();
@@ -25,7 +25,7 @@ vi.mock("next/server", async (importOriginal) => {
     };
 });
 
-vi.mock("@/lib/server-auth", () => ({
+vi.mock("@/lib/auth/server", () => ({
     getApiAuthSession: vi.fn(),
 }));
 
@@ -44,7 +44,7 @@ vi.mock("@/lib/services/stock/report-export", () => ({
     createStockRequestReportCsvResponse: vi.fn(),
 }));
 
-vi.mock("@/lib/audit", () => ({
+vi.mock("@/lib/server/audit", () => ({
     logDataExport: vi.fn(),
 }));
 

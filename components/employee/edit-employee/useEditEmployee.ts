@@ -9,7 +9,7 @@ import {
     type EmployeeStatusValue,
 } from "@/types/employees";
 import { updateEmployeeSchema } from "@/lib/validations/employee";
-import { apiPatch } from "@/lib/api-client";
+import { apiPatch } from "@/lib/client/api-client";
 import { API_ROUTES } from "@/lib/ssot/routes";
 
 function buildInitialFormData(employee: Employee | null): EmployeeFormData {

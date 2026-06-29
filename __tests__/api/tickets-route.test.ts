@@ -2,12 +2,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 import type * as NextServerModule from "next/server";
 import { POST as createTicketRoute } from "@/app/api/tickets/route";
-import { getApiAuthSession } from "@/lib/server-auth";
-import { buildUserContext } from "@/lib/context";
+import { getApiAuthSession } from "@/lib/auth/server";
+import { buildUserContext } from "@/lib/auth/context";
 import { ticketService } from "@/lib/services/ticket";
-import { prisma } from "@/lib/prisma";
+import { prisma } from "@/lib/db/prisma";
 import { processOutbox } from "@/lib/services/outbox/processor";
-import { logTicketEvent } from "@/lib/audit";
+import { logTicketEvent } from "@/lib/server/audit";
 
 vi.mock("next/server", async (importOriginal) => {
     const actual = await importOriginal<typeof NextServerModule>();
@@ -19,11 +19,11 @@ vi.mock("next/server", async (importOriginal) => {
     };
 });
 
-vi.mock("@/lib/server-auth", () => ({
+vi.mock("@/lib/auth/server", () => ({
     getApiAuthSession: vi.fn(),
 }));
 
-vi.mock("@/lib/context", () => ({
+vi.mock("@/lib/auth/context", () => ({
     buildUserContext: vi.fn(),
 }));
 
@@ -34,7 +34,7 @@ vi.mock("@/lib/services/ticket", () => ({
     },
 }));
 
-vi.mock("@/lib/prisma", () => ({
+vi.mock("@/lib/db/prisma", () => ({
     prisma: {
         user: {
             findMany: vi.fn(),
@@ -49,7 +49,7 @@ vi.mock("@/lib/services/outbox/processor", () => ({
     processOutbox: vi.fn(),
 }));
 
-vi.mock("@/lib/audit", () => ({
+vi.mock("@/lib/server/audit", () => ({
     logTicketEvent: vi.fn(),
 }));
 

@@ -2,7 +2,7 @@ import { LoginForm } from "@/components/auth";
 import { Suspense } from "react";
 import { type Metadata } from "next";
 import { redirect } from "next/navigation";
-import { getApiAuthSession } from "@/lib/server-auth";
+import { getApiAuthSession } from "@/lib/auth/server";
 import { APP_ROUTES } from "@/lib/ssot/routes";
 
 export const metadata: Metadata = {

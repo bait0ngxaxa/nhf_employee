@@ -6,7 +6,7 @@ import useSWR from "swr";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
-import { apiGet, apiPatch, apiPost } from "@/lib/api-client";
+import { apiGet, apiPatch, apiPost } from "@/lib/client/api-client";
 import { API_ROUTES } from "@/lib/ssot/routes";
 
 import { Button } from "@/components/ui/button";
@@ -14,7 +14,7 @@ import {
     NotificationFilterTabs,
     NotificationPageList,
     NotificationsHeader,
-} from "@/components/dashboard/NotificationPageParts";
+} from "@/components/dashboard/notifications/NotificationPageParts";
 import {
     NotificationEmptyState,
     NotificationErrorState,
@@ -22,12 +22,12 @@ import {
     NotificationLoadingState,
     normalizeNotificationActionUrl,
     notificationFetcher,
-} from "@/components/dashboard/NotificationShared";
+} from "@/components/dashboard/notifications/NotificationShared";
 import type {
     NotificationFilter,
     NotificationItem,
     NotificationsResponse,
-} from "@/components/dashboard/NotificationShared";
+} from "@/components/dashboard/notifications/NotificationShared";
 
 function getApiUrl(filter: NotificationFilter): string {
     return `${API_ROUTES.notifications.all}?filter=${filter}`;

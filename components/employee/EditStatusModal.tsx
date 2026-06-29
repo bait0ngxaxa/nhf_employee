@@ -23,7 +23,7 @@ import { toast } from "sonner";
 import { type EditStatusModalProps } from '@/types/employees';
 import { type EmployeeStatusValue } from '@/types/employees';
 import { EMPLOYEE_STATUSES } from '@/constants/employees';
-import { apiPatch } from '@/lib/api-client';
+import { apiPatch } from '@/lib/client/api-client';
 import { getEmployeeStatusInfo } from '@/lib/helpers/employee-helpers';
 
 export function EditStatusModal({

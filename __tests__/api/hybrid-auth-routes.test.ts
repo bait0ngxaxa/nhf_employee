@@ -1,4 +1,4 @@
-﻿// @vitest-environment node
+// @vitest-environment node
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 
@@ -8,7 +8,7 @@ import { POST as logoutAllRoute } from "@/app/api/auth/logout-all/route";
 import {
     HYBRID_ACCESS_COOKIE_NAME,
     HYBRID_REFRESH_COOKIE_NAME,
-} from "@/lib/hybrid-auth-constants";
+} from "@/lib/auth/hybrid/constants";
 
 const { prismaMock } = vi.hoisted(() => ({
     prismaMock: {
@@ -26,11 +26,11 @@ const { prismaMock } = vi.hoisted(() => ({
     },
 }));
 
-vi.mock("@/lib/audit", () => ({
+vi.mock("@/lib/server/audit", () => ({
     logAuthEvent: vi.fn(),
 }));
 
-vi.mock("@/lib/hybrid-auth-tokens", () => ({
+vi.mock("@/lib/auth/hybrid/tokens", () => ({
     hashRefreshToken: vi.fn((token: string) => `hash:${token}`),
     issueAccessToken: vi.fn(async () => "access.token"),
     buildRefreshTokenRecord: vi.fn(() => ({
@@ -54,7 +54,7 @@ vi.mock("@/lib/hybrid-auth-tokens", () => ({
     getRefreshTokenTtlSeconds: vi.fn(() => 2592000),
 }));
 
-vi.mock("@/lib/prisma", () => ({
+vi.mock("@/lib/db/prisma", () => ({
     prisma: prismaMock,
 }));
 

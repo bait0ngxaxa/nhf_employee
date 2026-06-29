@@ -1,4 +1,4 @@
-import type { ApiResponse } from "@/lib/api-client";
+import type { ApiResponse } from "@/lib/client/api-client";
 import type { StockItem } from "../context/stock/types";
 
 export type VariantDraftAttribute = {

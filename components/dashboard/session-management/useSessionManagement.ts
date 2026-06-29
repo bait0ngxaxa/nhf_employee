@@ -4,7 +4,7 @@ import { useState } from "react";
 import useSWR from "swr";
 import { toast } from "sonner";
 
-import { apiGet, apiPost } from "@/lib/api-client";
+import { apiGet, apiPost } from "@/lib/client/api-client";
 import { API_ROUTES } from "@/lib/ssot/routes";
 import type { ConfirmAction, SessionItem, SessionsResponse } from "./types";
 

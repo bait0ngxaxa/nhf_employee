@@ -3,11 +3,11 @@
 import { AlertTriangle, RefreshCw } from "lucide-react";
 
 import { useDashboardUIContext } from "@/components/dashboard/context/dashboard/DashboardContext";
-import { SectionSkeleton } from "@/components/dashboard/SectionSkeleton";
+import { SectionSkeleton } from "@/components/dashboard/feedback/SectionSkeleton";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { SessionManagementView } from "./session-management/SessionManagementView";
-import { useSessionManagement } from "./session-management/useSessionManagement";
+import { SessionManagementView } from "@/components/dashboard/session-management/SessionManagementView";
+import { useSessionManagement } from "@/components/dashboard/session-management/useSessionManagement";
 
 function SessionLoadingState() {
     return <SectionSkeleton />;

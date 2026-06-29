@@ -1,4 +1,4 @@
-﻿import { AUTH_MUTATION_HEADERS } from "@/lib/auth-csrf";
+import { AUTH_MUTATION_HEADERS } from "@/lib/auth/csrf";
 import { API_ROUTES } from "@/lib/ssot/routes";
 
 const HYBRID_AUTH_INTERNAL_PATHS: ReadonlySet<string> = new Set<string>([

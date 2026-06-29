@@ -1,6 +1,6 @@
 "use client";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/lib/ui/utils";
 import { Button } from "@/components/ui/button";
 import {
     AlertCircle,
@@ -31,7 +31,7 @@ import {
     useDashboardUIContext,
     useDashboardDataContext,
 } from "@/components/dashboard/context/dashboard/DashboardContext";
-import { NotificationDropdown } from "./NotificationDropdown";
+import { NotificationDropdown } from "@/components/dashboard/notifications/NotificationDropdown";
 import { getRoleLabelThai } from "@/lib/ssot/permissions";
 
 export function DashboardNavbar() {

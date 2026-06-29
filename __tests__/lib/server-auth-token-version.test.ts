@@ -19,19 +19,19 @@ vi.mock("next/headers", () => ({
     cookies: cookiesMock,
 }));
 
-vi.mock("@/lib/hybrid-auth-tokens", () => ({
+vi.mock("@/lib/auth/hybrid/tokens", () => ({
     verifyAccessToken: verifyAccessTokenMock,
 }));
 
-vi.mock("@/lib/prisma", () => ({
+vi.mock("@/lib/db/prisma", () => ({
     prisma: prismaMock,
 }));
 
-import { getApiAuthSession } from "@/lib/server-auth";
+import { getApiAuthSession } from "@/lib/auth/server";
 import {
     HYBRID_ACCESS_COOKIE_NAME,
     HYBRID_REFRESH_COOKIE_NAME,
-} from "@/lib/hybrid-auth-constants";
+} from "@/lib/auth/hybrid/constants";
 
 describe("server auth tokenVersion validation", () => {
     beforeEach(() => {

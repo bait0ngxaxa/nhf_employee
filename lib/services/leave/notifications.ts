@@ -1,11 +1,11 @@
 import { emailService } from "@/lib/email";
 import { type LeaveActionPayload, type LeaveResultPayload } from "@/lib/email/types";
-import { prisma } from "@/lib/prisma";
+import { prisma } from "@/lib/db/prisma";
 import {
     APP_DASHBOARD_TABS,
     toDashboardTabPath,
 } from "@/lib/ssot/routes";
-import { getPublicOrigin } from "@/lib/public-url";
+import { getPublicOrigin } from "@/lib/network/public-url";
 
 const LEAVE_TYPE_LABELS: Record<string, string> = {
     SICK: "ลาป่วย",

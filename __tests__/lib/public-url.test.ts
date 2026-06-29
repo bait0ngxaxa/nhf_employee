@@ -2,7 +2,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 
-import { buildPublicUrl, getPublicOrigin } from "@/lib/public-url";
+import { buildPublicUrl, getPublicOrigin } from "@/lib/network/public-url";
 
 describe("public url helpers", () => {
     afterEach(() => {

@@ -2,7 +2,7 @@
 
 import { EmailRequestForm, EmailRequestHistory } from "@/components/email";
 import { Mail } from "lucide-react";
-import { EmailRequestProvider } from "./context";
+import { EmailRequestProvider } from "@/components/dashboard/context/email-request/EmailRequestProvider";
 import { useDashboardUIContext } from "@/components/dashboard/context/dashboard/DashboardContext";
 
 function EmailRequestContent() {

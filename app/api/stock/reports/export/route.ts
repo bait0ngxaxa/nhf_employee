@@ -1,6 +1,6 @@
 import { after, type NextRequest, NextResponse } from "next/server";
-import { logDataExport } from "@/lib/audit";
-import { requireAdminSession } from "@/lib/api-auth";
+import { logDataExport } from "@/lib/server/audit";
+import { requireAdminSession } from "@/lib/auth/api";
 import { jsonError } from "@/lib/ssot/http";
 import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
 import {

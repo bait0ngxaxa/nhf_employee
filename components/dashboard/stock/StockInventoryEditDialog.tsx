@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { apiPatch } from "@/lib/api-client";
+import { apiPatch } from "@/lib/client/api-client";
 import { API_ROUTES } from "@/lib/ssot/routes";
 import type { StockItem } from "../context/stock/types";
 import {

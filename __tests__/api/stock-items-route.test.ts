@@ -4,17 +4,17 @@ import {
     DELETE as deleteItemRoute,
     PATCH as patchItemRoute,
 } from "@/app/api/stock/items/[id]/route";
-import { getApiAuthSession } from "@/lib/server-auth";
-import { buildUserContext } from "@/lib/context";
+import { getApiAuthSession } from "@/lib/auth/server";
+import { buildUserContext } from "@/lib/auth/context";
 import { isAdminRole } from "@/lib/ssot/permissions";
 import { stockService } from "@/lib/services/stock";
-import { logStockEvent } from "@/lib/audit";
+import { logStockEvent } from "@/lib/server/audit";
 
-vi.mock("@/lib/server-auth", () => ({
+vi.mock("@/lib/auth/server", () => ({
     getApiAuthSession: vi.fn(),
 }));
 
-vi.mock("@/lib/context", () => ({
+vi.mock("@/lib/auth/context", () => ({
     buildUserContext: vi.fn(),
 }));
 
@@ -28,7 +28,7 @@ vi.mock("@/lib/services/stock", () => ({
     },
 }));
 
-vi.mock("@/lib/audit", () => ({
+vi.mock("@/lib/server/audit", () => ({
     logStockEvent: vi.fn(),
 }));
 

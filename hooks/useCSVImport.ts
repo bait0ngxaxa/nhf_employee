@@ -2,7 +2,7 @@ import { useState, useRef, useCallback } from "react";
 import { type CSVEmployee, type ImportResult } from "@/types/employees";
 import { parseCSV, downloadSampleCSV } from "@/lib/helpers/csv-helpers";
 import { validateCSVFile } from "@/lib/helpers/file-validation";
-import { apiPost } from "@/lib/api-client";
+import { apiPost } from "@/lib/client/api-client";
 
 type ImportStep = "upload" | "preview" | "result";
 

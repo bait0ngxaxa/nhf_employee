@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { apiGet } from "@/lib/api-client";
+import { apiGet } from "@/lib/client/api-client";
 
 interface EmailRequest {
     id: number;

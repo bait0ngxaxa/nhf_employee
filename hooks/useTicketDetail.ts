@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect } from "react";
 import useSWR from "swr";
-import { apiPost, apiPatch } from "@/lib/api-client";
+import { apiPost, apiPatch } from "@/lib/client/api-client";
 import { useAuth } from "@/components/auth/HybridAuthProvider";
 
 interface Comment {

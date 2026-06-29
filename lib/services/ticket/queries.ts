@@ -1,5 +1,5 @@
-﻿import { cache } from "react";
-import { prisma } from "@/lib/prisma";
+import { cache } from "react";
+import { prisma } from "@/lib/db/prisma";
 import { isAdminRole } from "@/lib/ssot/permissions";
 import {
     getTicketListInclude,

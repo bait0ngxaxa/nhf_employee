@@ -3,11 +3,11 @@ import { NextRequest } from "next/server";
 import type * as NextServerModule from "next/server";
 import { PATCH as patchTicketRoute } from "@/app/api/tickets/[id]/route";
 import { POST as postTicketCommentRoute } from "@/app/api/tickets/[id]/comments/route";
-import { getApiAuthSession } from "@/lib/server-auth";
-import { buildUserContext } from "@/lib/context";
+import { getApiAuthSession } from "@/lib/auth/server";
+import { buildUserContext } from "@/lib/auth/context";
 import { ticketService } from "@/lib/services/ticket";
 import { processOutbox } from "@/lib/services/outbox/processor";
-import { prisma } from "@/lib/prisma";
+import { prisma } from "@/lib/db/prisma";
 import { isAdminRole } from "@/lib/ssot/permissions";
 
 vi.mock("next/server", async (importOriginal) => {
@@ -20,11 +20,11 @@ vi.mock("next/server", async (importOriginal) => {
     };
 });
 
-vi.mock("@/lib/server-auth", () => ({
+vi.mock("@/lib/auth/server", () => ({
     getApiAuthSession: vi.fn(),
 }));
 
-vi.mock("@/lib/context", () => ({
+vi.mock("@/lib/auth/context", () => ({
     buildUserContext: vi.fn(),
 }));
 
@@ -42,7 +42,7 @@ vi.mock("@/lib/ssot/permissions", () => ({
     isAdminRole: vi.fn(),
 }));
 
-vi.mock("@/lib/prisma", () => ({
+vi.mock("@/lib/db/prisma", () => ({
     prisma: {
         notification: {
             create: vi.fn(),

@@ -1,7 +1,7 @@
 import type { NextResponse } from "next/server";
 
-import { buildUserContext, type UserContext } from "@/lib/context";
-import { getApiAuthSession, type ApiAuthSession } from "@/lib/server-auth";
+import { buildUserContext, type UserContext } from "@/lib/auth/context";
+import { getApiAuthSession, type ApiAuthSession } from "@/lib/auth/server";
 import { forbidden, unauthorized } from "@/lib/ssot/http";
 import { isAdminRole } from "@/lib/ssot/permissions";
 

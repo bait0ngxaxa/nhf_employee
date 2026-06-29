@@ -1,10 +1,10 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
-import { requireAdminSession } from "@/lib/api-auth";
+import { requireAdminSession } from "@/lib/auth/api";
 import { jsonError, serverError } from "@/lib/ssot/http";
 import { stockService } from "@/lib/services/stock";
 import { updateItemSchema } from "@/lib/validations/stock";
-import { logStockEvent } from "@/lib/audit";
+import { logStockEvent } from "@/lib/server/audit";
 
 interface RouteParams {
     params: Promise<{ id: string }>;

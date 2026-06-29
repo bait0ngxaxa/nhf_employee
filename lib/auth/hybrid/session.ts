@@ -1,16 +1,16 @@
-﻿import { type NextRequest, type NextResponse } from "next/server";
+import { type NextRequest, type NextResponse } from "next/server";
 
 import {
     getAccessTokenTtlSeconds,
     getRefreshTokenTtlSeconds,
-} from "@/lib/hybrid-auth-tokens";
+} from "@/lib/auth/hybrid/tokens";
 import {
     HYBRID_ACCESS_COOKIE_NAME,
     HYBRID_REFRESH_COOKIE_NAME,
-} from "@/lib/hybrid-auth-constants";
-import { getTrustedClientIp } from "@/lib/trusted-client-ip";
+} from "@/lib/auth/hybrid/constants";
+import { getTrustedClientIp } from "@/lib/network/trusted-client-ip";
 
-export { HYBRID_ACCESS_COOKIE_NAME, HYBRID_REFRESH_COOKIE_NAME } from "@/lib/hybrid-auth-constants";
+export { HYBRID_ACCESS_COOKIE_NAME, HYBRID_REFRESH_COOKIE_NAME } from "@/lib/auth/hybrid/constants";
 
 export function getClientMetadata(request: NextRequest): {
     ipAddress?: string;

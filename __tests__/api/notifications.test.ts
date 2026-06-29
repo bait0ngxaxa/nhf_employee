@@ -2,17 +2,17 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { GET as getNotifications } from "@/app/api/notifications/route";
 import { PATCH as markAsRead } from "@/app/api/notifications/[id]/read/route";
 import { POST as markAllAsRead } from "@/app/api/notifications/mark-all-read/route";
-import { getApiAuthSession } from "@/lib/server-auth";
-import { prisma } from "@/lib/prisma";
+import { getApiAuthSession } from "@/lib/auth/server";
+import { prisma } from "@/lib/db/prisma";
 import { NextRequest } from "next/server";
 
 // Mock auth resolver
-vi.mock("@/lib/server-auth", () => ({
+vi.mock("@/lib/auth/server", () => ({
     getApiAuthSession: vi.fn(),
 }));
 
 // Mock prisma
-vi.mock("@/lib/prisma", () => ({
+vi.mock("@/lib/db/prisma", () => ({
     prisma: {
         notification: {
             findMany: vi.fn(),

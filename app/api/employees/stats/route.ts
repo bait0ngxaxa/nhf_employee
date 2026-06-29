@@ -1,7 +1,7 @@
-﻿import { NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 
-import { requireApiSession } from "@/lib/api-auth";
-import { prisma } from "@/lib/prisma";
+import { requireApiSession } from "@/lib/auth/api";
+import { prisma } from "@/lib/db/prisma";
 import { operationFailed } from "@/lib/ssot/http";
 
 export async function GET() {

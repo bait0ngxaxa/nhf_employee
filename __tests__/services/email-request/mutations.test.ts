@@ -1,10 +1,10 @@
-﻿import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import { mockDeep, mockReset } from "vitest-mock-extended";
-import { prisma } from "@/lib/prisma";
+import { prisma } from "@/lib/db/prisma";
 import { createEmailRequest } from "@/lib/services/email-request/mutations";
 import type { PrismaClient } from "@prisma/client";
 
-vi.mock("@/lib/prisma", () => ({
+vi.mock("@/lib/db/prisma", () => ({
     prisma: mockDeep<PrismaClient>(),
 }));
 

@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { toast } from "sonner";
 import { type CreateTicketFormProps, type TicketFormData } from '@/types/tickets';
 import { TICKET_CATEGORIES, TICKET_PRIORITIES } from '@/constants/tickets';
-import { apiPost } from "@/lib/api-client";
+import { apiPost } from "@/lib/client/api-client";
 import { Loader2 } from "lucide-react";
 import { useAuth } from "@/components/auth/HybridAuthProvider";
 

@@ -6,7 +6,7 @@ import {
     hashRefreshToken,
     issueAccessToken,
     verifyAccessToken,
-} from "@/lib/hybrid-auth-tokens";
+} from "@/lib/auth/hybrid/tokens";
 
 describe("hybrid auth token utilities", () => {
     beforeEach(() => {

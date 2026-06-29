@@ -17,8 +17,8 @@ import {
 import {
     useEmployeeDataContext,
     useEmployeeUIContext,
-    EmployeeProvider,
-} from "./context";
+} from "@/components/dashboard/context/employee/EmployeeContext";
+import { EmployeeProvider } from "@/components/dashboard/context/employee/EmployeeProvider";
 
 function EmployeeManagementContent() {
     const { handleMenuClick } = useDashboardUIContext();

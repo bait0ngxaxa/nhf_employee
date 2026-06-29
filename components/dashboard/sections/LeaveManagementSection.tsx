@@ -2,11 +2,11 @@
 
 import { CalendarRange, CalendarDays, CheckSquare, Settings2, BarChart3 } from "lucide-react";
 import { useState, useEffect } from "react";
-import { useDashboardDataContext } from "./context/dashboard/DashboardContext";
-import { EmployeeLeaveDashboard } from "./leave/EmployeeLeaveDashboard";
-import { ManagerApprovalDashboard } from "./leave/ManagerApprovalDashboard";
-import { ApproverManagement } from "./leave/ApproverManagement";
-import { LeaveReportsDashboard } from "./leave/LeaveReportsDashboard";
+import { useDashboardDataContext } from "@/components/dashboard/context/dashboard/DashboardContext";
+import { EmployeeLeaveDashboard } from "@/components/dashboard/leave/EmployeeLeaveDashboard";
+import { ManagerApprovalDashboard } from "@/components/dashboard/leave/ManagerApprovalDashboard";
+import { ApproverManagement } from "@/components/dashboard/leave/ApproverManagement";
+import { LeaveReportsDashboard } from "@/components/dashboard/leave/LeaveReportsDashboard";
 import { isAdminRole } from "@/lib/ssot/permissions";
 import { SectionShell } from "@/components/ui/section-shell";
 import { SectionHeader } from "@/components/ui/section-header";

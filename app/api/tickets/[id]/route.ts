@@ -1,8 +1,8 @@
-﻿import { after } from "next/server";
+import { after } from "next/server";
 import { type NextRequest, NextResponse } from "next/server";
 
-import { requireApiSession } from "@/lib/api-auth";
-import { prisma } from "@/lib/prisma";
+import { requireApiSession } from "@/lib/auth/api";
+import { prisma } from "@/lib/db/prisma";
 import { processOutbox } from "@/lib/services/outbox/processor";
 import { ticketService, type UpdateTicketData } from "@/lib/services/ticket";
 import { jsonError } from "@/lib/ssot/http";

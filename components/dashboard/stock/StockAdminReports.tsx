@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { apiGet } from "@/lib/api-client";
+import { apiGet } from "@/lib/client/api-client";
 import { triggerDownload } from "@/lib/helpers/download";
 import { API_ROUTES } from "@/lib/ssot/routes";
 import { YearlyReportExportPanel } from "@/components/dashboard/shared/YearlyReportExportPanel";

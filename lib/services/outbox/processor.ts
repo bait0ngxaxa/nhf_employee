@@ -1,6 +1,6 @@
 import type { NotificationOutbox } from "@prisma/client";
 import { lineNotificationService } from "@/lib/line";
-import { prisma } from "@/lib/prisma";
+import { prisma } from "@/lib/db/prisma";
 import { TICKET_WITH_USERS_INCLUDE } from "@/lib/services/ticket/constants";
 import {
     sendTicketCreatedNotifications,

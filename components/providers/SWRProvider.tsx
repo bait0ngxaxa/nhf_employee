@@ -2,7 +2,7 @@
 
 import { SWRConfig } from "swr";
 import { type ReactNode } from "react";
-import { swrConfig } from "@/lib/swr";
+import { swrConfig } from "@/lib/client/swr";
 
 interface SWRProviderProps {
     children: ReactNode;

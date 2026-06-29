@@ -1,15 +1,15 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
-import { AUTH_ERROR_MESSAGES } from "@/lib/auth-ssot";
-import { withTrustedMutation } from "@/lib/auth-csrf";
-import { logAuthEvent } from "@/lib/audit";
+import { AUTH_ERROR_MESSAGES } from "@/lib/auth/ssot";
+import { withTrustedMutation } from "@/lib/auth/csrf";
+import { logAuthEvent } from "@/lib/server/audit";
 import {
     resolveAuthenticatedUserId,
     resolveCurrentSessionFamilyId,
-} from "@/lib/hybrid-auth-route";
-import { clearHybridAuthCookies } from "@/lib/hybrid-auth-session";
-import { prisma } from "@/lib/prisma";
+} from "@/lib/auth/hybrid/route";
+import { clearHybridAuthCookies } from "@/lib/auth/hybrid/session";
+import { prisma } from "@/lib/db/prisma";
 
 const revokeSessionSchema = z.object({
     sessionId: z.string().min(1).max(64),

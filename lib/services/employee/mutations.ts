@@ -1,4 +1,4 @@
-import { prisma } from "@/lib/prisma";
+import { prisma } from "@/lib/db/prisma";
 import { EMPLOYEE_WITH_RELATIONS_INCLUDE } from "./constants";
 import type {
     CreateEmployeeData,

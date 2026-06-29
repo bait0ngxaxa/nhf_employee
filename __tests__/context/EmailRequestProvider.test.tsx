@@ -5,14 +5,14 @@ import { useEmailRequestContext } from "@/components/dashboard/context/email-req
 import useSWR from "swr";
 import { toast } from "sonner";
 
-import { apiPost } from "@/lib/api-client";
-import type { ApiResponse } from "@/lib/api-client";
+import { apiPost } from "@/lib/client/api-client";
+import type { ApiResponse } from "@/lib/client/api-client";
 
 // Mock useSWR
 vi.mock("swr");
 
 // Mock api-client
-vi.mock("@/lib/api-client", () => ({
+vi.mock("@/lib/client/api-client", () => ({
     apiGet: vi.fn(),
     apiPost: vi.fn(),
 }));

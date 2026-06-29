@@ -10,7 +10,7 @@ import {
     List,
     type LucideIcon,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn } from "@/lib/ui/utils";
 import { useITSupportDataContext } from "../context";
 
 interface StatItem {

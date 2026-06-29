@@ -7,8 +7,8 @@ import { Bell, Check, ExternalLink } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
-import { cn } from "@/lib/utils";
-import { apiPatch, apiPost } from "@/lib/api-client";
+import { cn } from "@/lib/ui/utils";
+import { apiPatch, apiPost } from "@/lib/client/api-client";
 import { getRelativeTime } from "@/lib/helpers/date-helpers";
 import {
     API_ROUTES,
@@ -34,11 +34,11 @@ import {
     NotificationLoadingState,
     normalizeNotificationActionUrl,
     notificationFetcher,
-} from "@/components/dashboard/NotificationShared";
+} from "@/components/dashboard/notifications/NotificationShared";
 import type {
     NotificationItem,
     NotificationsData,
-} from "@/components/dashboard/NotificationShared";
+} from "@/components/dashboard/notifications/NotificationShared";
 
 function getNotificationButtonLabel(unreadCount: number): string {
     if (unreadCount <= 0) {

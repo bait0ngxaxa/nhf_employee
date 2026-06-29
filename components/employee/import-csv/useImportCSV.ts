@@ -6,7 +6,7 @@ import { parseCSV, downloadSampleCSV } from "@/lib/helpers/csv-helpers";
 import { validateCSVFile } from "@/lib/helpers/file-validation";
 import { type UseImportCSVReturn, type ImportStep } from "./types";
 import { toast } from "sonner";
-import { apiPost } from "@/lib/api-client";
+import { apiPost } from "@/lib/client/api-client";
 import { API_ROUTES } from "@/lib/ssot/routes";
 
 const MAX_CSV_FILE_SIZE_BYTES = 5 * 1024 * 1024;

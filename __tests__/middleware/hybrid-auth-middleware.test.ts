@@ -1,13 +1,13 @@
-﻿// @vitest-environment node
+// @vitest-environment node
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 
 import middleware from "@/middleware";
-import { issueAccessToken } from "@/lib/hybrid-auth-tokens";
+import { issueAccessToken } from "@/lib/auth/hybrid/tokens";
 import {
     HYBRID_ACCESS_COOKIE_NAME,
     HYBRID_REFRESH_COOKIE_NAME,
-} from "@/lib/hybrid-auth-constants";
+} from "@/lib/auth/hybrid/constants";
 
 function buildRequest(url: string, cookie?: string): NextRequest {
     return new NextRequest(url, {

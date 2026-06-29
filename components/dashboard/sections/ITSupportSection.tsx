@@ -6,9 +6,11 @@ import {
     useITSupportUIContext,
     useITSupportDataContext,
 } from "@/components/dashboard/context/it-support/ITSupportContext";
-import { ITSupportProvider } from "./context";
+import { ITSupportProvider } from "@/components/dashboard/context/it-support/ITSupportProvider";
 import { SectionShell } from "@/components/ui/section-shell";
-import { Header, StatsCards, TicketTabs } from "./itsupport";
+import { Header } from "@/components/dashboard/itsupport/Header";
+import { StatsCards } from "@/components/dashboard/itsupport/StatsCards";
+import { TicketTabs } from "@/components/dashboard/itsupport/TicketTabs";
 
 function ITSupportContent() {
     const { showCreateModal, setShowCreateModal } = useITSupportUIContext();

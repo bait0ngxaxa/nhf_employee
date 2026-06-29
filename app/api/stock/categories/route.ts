@@ -1,9 +1,9 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { requireAdminSession, requireApiSession } from "@/lib/api-auth";
+import { requireAdminSession, requireApiSession } from "@/lib/auth/api";
 import { jsonError, serverError } from "@/lib/ssot/http";
 import { stockService } from "@/lib/services/stock";
 import { createCategorySchema } from "@/lib/validations/stock";
-import { logStockEvent } from "@/lib/audit";
+import { logStockEvent } from "@/lib/server/audit";
 
 export async function GET(): Promise<NextResponse> {
     try {

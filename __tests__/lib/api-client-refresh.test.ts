@@ -1,6 +1,6 @@
-﻿import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { apiGet, apiPost } from "@/lib/api-client";
+import { apiGet, apiPost } from "@/lib/client/api-client";
 
 describe("api-client refresh retry", () => {
     afterEach(() => {

@@ -1,5 +1,5 @@
-﻿import { OUTBOX_NOTIFICATION_TYPES } from "@/lib/services/outbox/types";
-import { prisma } from "@/lib/prisma";
+import { OUTBOX_NOTIFICATION_TYPES } from "@/lib/services/outbox/types";
+import { prisma } from "@/lib/db/prisma";
 import { isAdminRole } from "@/lib/ssot/permissions";
 import { TICKET_WITH_USERS_INCLUDE } from "./constants";
 import type {

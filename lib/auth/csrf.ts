@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { AUTH_ERROR_MESSAGES } from "@/lib/auth-ssot";
-import { getConfiguredPublicOrigin } from "@/lib/public-url";
+import { AUTH_ERROR_MESSAGES } from "@/lib/auth/ssot";
+import { getConfiguredPublicOrigin } from "@/lib/network/public-url";
 
 const AJAX_HEADER_NAME = "x-requested-with";
 const AJAX_HEADER_VALUE = "XMLHttpRequest";

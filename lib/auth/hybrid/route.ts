@@ -4,10 +4,10 @@ import {
     HYBRID_ACCESS_COOKIE_NAME,
     HYBRID_REFRESH_COOKIE_NAME,
     parseUserId,
-} from "@/lib/hybrid-auth-session";
-import { hasActiveSessionFamily } from "@/lib/hybrid-auth-session-store";
-import { hashRefreshToken, verifyAccessToken } from "@/lib/hybrid-auth-tokens";
-import { prisma } from "@/lib/prisma";
+} from "@/lib/auth/hybrid/session";
+import { hasActiveSessionFamily } from "@/lib/auth/hybrid/session-store";
+import { hashRefreshToken, verifyAccessToken } from "@/lib/auth/hybrid/tokens";
+import { prisma } from "@/lib/db/prisma";
 
 export async function resolveAuthenticatedUserId(request: NextRequest): Promise<number | null> {
     const accessToken = request.cookies.get(HYBRID_ACCESS_COOKIE_NAME)?.value;

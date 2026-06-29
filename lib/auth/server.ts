@@ -1,11 +1,11 @@
 import { cookies } from "next/headers";
 
-import type { HybridAuthSession } from "@/lib/auth-user";
-import { HYBRID_ACCESS_COOKIE_NAME } from "@/lib/hybrid-auth-constants";
-import { parseUserId } from "@/lib/hybrid-auth-session";
-import { hasActiveSessionFamily } from "@/lib/hybrid-auth-session-store";
-import { verifyAccessToken } from "@/lib/hybrid-auth-tokens";
-import { prisma } from "@/lib/prisma";
+import type { HybridAuthSession } from "@/lib/auth/types";
+import { HYBRID_ACCESS_COOKIE_NAME } from "@/lib/auth/hybrid/constants";
+import { parseUserId } from "@/lib/auth/hybrid/session";
+import { hasActiveSessionFamily } from "@/lib/auth/hybrid/session-store";
+import { verifyAccessToken } from "@/lib/auth/hybrid/tokens";
+import { prisma } from "@/lib/db/prisma";
 
 export type ApiAuthSession = HybridAuthSession;
 

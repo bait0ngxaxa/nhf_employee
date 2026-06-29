@@ -1,4 +1,4 @@
-import { prisma } from "@/lib/prisma";
+import { prisma } from "@/lib/db/prisma";
 import { DEPARTMENT_CODE_MAP } from "./constants";
 import type { CSVImportEmployee, ImportResult } from "./types";
 import { parseEmployeeStatus } from "@/lib/helpers/csv-helpers";

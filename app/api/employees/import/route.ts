@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 
-import { requireAdminSession } from "@/lib/api-auth";
+import { requireAdminSession } from "@/lib/auth/api";
 import { employeeService } from "@/lib/services/employee";
 import { operationFailed } from "@/lib/ssot/http";
 

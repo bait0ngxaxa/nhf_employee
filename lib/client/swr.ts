@@ -1,5 +1,5 @@
 import type { SWRConfiguration } from "swr";
-import { fetchWithRefresh } from "@/lib/client-auth";
+import { fetchWithRefresh } from "@/lib/auth/client";
 
 export const fetcher = async <T>(url: string): Promise<T> => {
     const response = await fetchWithRefresh(url, { credentials: "include" });

@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { User, LogOut } from "lucide-react";
 import Link from "next/link";
-import { isValidSessionUser } from "@/lib/auth-ssot";
+import { isValidSessionUser } from "@/lib/auth/ssot";
 import { APP_ROUTES } from "@/lib/ssot/routes";
 import { useAuth } from "@/components/auth/HybridAuthProvider";
 

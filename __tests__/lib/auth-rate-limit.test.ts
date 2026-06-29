@@ -4,7 +4,7 @@ import {
     isAuthRateLimited,
     recordAuthAttempt,
     resetAuthRateLimit,
-} from "@/lib/auth-rate-limit";
+} from "@/lib/auth/rate-limit";
 
 const policy = {
     windowMs: 60 * 1000,

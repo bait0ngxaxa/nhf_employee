@@ -1,10 +1,10 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { StockAdminReports } from "@/components/dashboard/stock/StockAdminReports";
-import { apiGet } from "@/lib/api-client";
+import { apiGet } from "@/lib/client/api-client";
 import { triggerDownload } from "@/lib/helpers/download";
 
-vi.mock("@/lib/api-client", () => ({
+vi.mock("@/lib/client/api-client", () => ({
     apiGet: vi.fn(),
 }));
 

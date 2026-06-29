@@ -1,22 +1,22 @@
 import type { Prisma } from "@prisma/client";
 import { type NextRequest, NextResponse } from "next/server";
 
-import { AUTH_ERROR_MESSAGES, authRefreshUserSelect } from "@/lib/auth-ssot";
-import { withTrustedMutation } from "@/lib/auth-csrf";
-import { logAuthEvent } from "@/lib/audit";
+import { AUTH_ERROR_MESSAGES, authRefreshUserSelect } from "@/lib/auth/ssot";
+import { withTrustedMutation } from "@/lib/auth/csrf";
+import { logAuthEvent } from "@/lib/server/audit";
 import {
     buildRefreshTokenRecord,
     hashRefreshToken,
     issueAccessToken,
-} from "@/lib/hybrid-auth-tokens";
+} from "@/lib/auth/hybrid/tokens";
 import {
     HYBRID_REFRESH_COOKIE_NAME,
     clearHybridAuthCookies,
     getClientMetadata,
     setHybridAccessCookie,
     setHybridAuthCookies,
-} from "@/lib/hybrid-auth-session";
-import { prisma } from "@/lib/prisma";
+} from "@/lib/auth/hybrid/session";
+import { prisma } from "@/lib/db/prisma";
 
 const REFRESH_ROTATION_GRACE_MS = 10_000;
 

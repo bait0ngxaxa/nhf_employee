@@ -5,7 +5,7 @@ import Image from "next/image";
 import { ImagePlus, Loader2, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { apiPost } from "@/lib/api-client";
+import { apiPost } from "@/lib/client/api-client";
 import { API_ROUTES } from "@/lib/ssot/routes";
 import { IMAGE_UPLOAD_MAX_BYTES, IMAGE_UPLOAD_MAX_MB } from "@/lib/ssot/uploads";
 import { ensureStockApiSuccess } from "./stockAdminInventory.shared";

@@ -1,5 +1,5 @@
 import { cache } from "react";
-import { prisma } from "@/lib/prisma";
+import { prisma } from "@/lib/db/prisma";
 import { getBootstrapAdminEmails } from "@/lib/ssot/admin-bootstrap";
 import type { Prisma } from "@prisma/client";
 import {

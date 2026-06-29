@@ -1,6 +1,6 @@
 "use client";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/lib/ui/utils";
 import { Button } from "@/components/ui/button";
 import {
     Card,
@@ -16,7 +16,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { KeyRound, Eye, EyeOff, CheckCircle2, XCircle, Loader2 } from "lucide-react";
 import Link from "next/link";
-import { apiPost } from "@/lib/api-client";
+import { apiPost } from "@/lib/client/api-client";
 import { API_ROUTES, APP_ROUTES } from "@/lib/ssot/routes";
 
 interface PasswordRequirement {

@@ -1,8 +1,8 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { requireAdminSession } from "@/lib/api-auth";
+import { requireAdminSession } from "@/lib/auth/api";
 import { jsonError, serverError } from "@/lib/ssot/http";
 import { stockService } from "@/lib/services/stock";
-import { logStockEvent } from "@/lib/audit";
+import { logStockEvent } from "@/lib/server/audit";
 import { notifyStockRequestResult } from "@/lib/services/stock/notifications";
 import { stockReviewActionSchema } from "@/lib/validations/stock";
 

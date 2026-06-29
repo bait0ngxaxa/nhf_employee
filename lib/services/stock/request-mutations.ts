@@ -1,5 +1,5 @@
 import { Prisma, StockRequestStatus } from "@prisma/client";
-import { prisma } from "@/lib/prisma";
+import { prisma } from "@/lib/db/prisma";
 import type {
     CreateRequestInput,
 } from "@/lib/validations/stock";

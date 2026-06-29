@@ -12,8 +12,8 @@ import {
     XCircle,
 } from "lucide-react";
 
-import { cn } from "@/lib/utils";
-import { apiGet } from "@/lib/api-client";
+import { cn } from "@/lib/ui/utils";
+import { apiGet } from "@/lib/client/api-client";
 
 import { Button } from "@/components/ui/button";
 

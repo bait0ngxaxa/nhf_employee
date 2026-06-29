@@ -4,14 +4,16 @@ import { Package, ShoppingCart, ClipboardList, Boxes, FileText, BarChart3 } from
 import { SectionShell } from "@/components/ui/section-shell";
 import { SectionHeader } from "@/components/ui/section-header";
 import { SectionTabs, type SectionTabItem } from "@/components/ui/section-tabs";
-import { StockProvider, useStockDataContext, useStockUIContext } from "./context/stock";
+import { StockProvider } from "@/components/dashboard/context/stock/StockProvider";
 import {
-    StockBrowse,
-    StockMyRequests,
-    StockAdminInventory,
-    StockAdminRequests,
-    StockAdminReports,
-} from "./stock";
+    useStockDataContext,
+    useStockUIContext,
+} from "@/components/dashboard/context/stock/StockContext";
+import { StockBrowse } from "@/components/dashboard/stock/StockBrowse";
+import { StockMyRequests } from "@/components/dashboard/stock/StockMyRequests";
+import { StockAdminInventory } from "@/components/dashboard/stock/StockAdminInventory";
+import { StockAdminRequests } from "@/components/dashboard/stock/StockAdminRequests";
+import { StockAdminReports } from "@/components/dashboard/stock/StockAdminReports";
 
 function StockContent() {
     const { isAdmin } = useStockDataContext();

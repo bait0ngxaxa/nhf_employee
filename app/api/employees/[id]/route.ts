@@ -1,7 +1,7 @@
-﻿import { after, type NextRequest, NextResponse } from "next/server";
+import { after, type NextRequest, NextResponse } from "next/server";
 
-import { requireAdminSession } from "@/lib/api-auth";
-import { logEmployeeEvent } from "@/lib/audit";
+import { requireAdminSession } from "@/lib/auth/api";
+import { logEmployeeEvent } from "@/lib/server/audit";
 import { employeeService } from "@/lib/services/employee";
 import { jsonError } from "@/lib/ssot/http";
 import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";

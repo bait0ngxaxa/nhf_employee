@@ -1,13 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "@prisma/client";
 import { mockDeep, mockReset } from "vitest-mock-extended";
-import { prisma } from "@/lib/prisma";
+import { prisma } from "@/lib/db/prisma";
 import { createStockBalanceReportCsvResponse } from "@/lib/services/stock/balance-export";
 import { createStockRequestReportCsvResponse } from "@/lib/services/stock/report-export";
 import { ensureItemVariantsExist } from "@/lib/services/stock/shared";
 import type * as StockSharedModule from "@/lib/services/stock/shared";
 
-vi.mock("@/lib/prisma", () => ({
+vi.mock("@/lib/db/prisma", () => ({
     prisma: mockDeep<PrismaClient>(),
 }));
 

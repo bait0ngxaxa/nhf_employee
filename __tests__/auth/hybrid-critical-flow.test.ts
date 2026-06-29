@@ -1,4 +1,4 @@
-﻿// @vitest-environment node
+// @vitest-environment node
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 
@@ -19,14 +19,14 @@ const { prismaMock } = vi.hoisted(() => ({
     },
 }));
 
-vi.mock("@/lib/prisma", () => ({
+vi.mock("@/lib/db/prisma", () => ({
     prisma: prismaMock,
 }));
 
 import middleware from "@/middleware";
 import { POST as logoutAllRoute } from "@/app/api/auth/logout-all/route";
-import { issueAccessToken } from "@/lib/hybrid-auth-tokens";
-import { HYBRID_ACCESS_COOKIE_NAME } from "@/lib/hybrid-auth-constants";
+import { issueAccessToken } from "@/lib/auth/hybrid/tokens";
+import { HYBRID_ACCESS_COOKIE_NAME } from "@/lib/auth/hybrid/constants";
 
 describe("Hybrid critical flow", () => {
     const csrfHeaders = {

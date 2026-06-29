@@ -1,5 +1,5 @@
-﻿import { type NextRequest, NextResponse } from "next/server";
-import { requireAdminSession } from "@/lib/api-auth";
+import { type NextRequest, NextResponse } from "next/server";
+import { requireAdminSession } from "@/lib/auth/api";
 import { operationFailed } from "@/lib/ssot/http";
 import {
     auditLogService,

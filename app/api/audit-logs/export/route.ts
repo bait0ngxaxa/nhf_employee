@@ -1,7 +1,7 @@
-﻿import { after, type NextRequest, NextResponse } from "next/server";
+import { after, type NextRequest, NextResponse } from "next/server";
 
-import { requireApiSession } from "@/lib/api-auth";
-import { logDataExport } from "@/lib/audit";
+import { requireApiSession } from "@/lib/auth/api";
+import { logDataExport } from "@/lib/server/audit";
 import { forbidden, operationFailed } from "@/lib/ssot/http";
 
 export async function POST(request: NextRequest) {

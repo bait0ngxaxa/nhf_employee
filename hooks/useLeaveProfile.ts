@@ -1,6 +1,6 @@
 import useSWR from "swr";
-import { apiPost } from "@/lib/api-client";
-import { apiGet } from "@/lib/api-client";
+import { apiPost } from "@/lib/client/api-client";
+import { apiGet } from "@/lib/client/api-client";
 import { API_ROUTES } from "@/lib/ssot/routes";
 
 const fetcher = async <T,>(url: string): Promise<T> => {

@@ -1,5 +1,5 @@
-import { prisma } from "@/lib/prisma";
-import { getTrustedClientIp } from "@/lib/trusted-client-ip";
+import { prisma } from "@/lib/db/prisma";
+import { getTrustedClientIp } from "@/lib/network/trusted-client-ip";
 import { type AuditAction } from "@prisma/client";
 import { headers } from "next/headers";
 

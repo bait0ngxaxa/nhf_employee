@@ -1,11 +1,11 @@
 import { type NextRequest, NextResponse } from "next/server";
 
-import { AUTH_ERROR_MESSAGES } from "@/lib/auth-ssot";
+import { AUTH_ERROR_MESSAGES } from "@/lib/auth/ssot";
 import {
     resolveAuthenticatedUserId,
     resolveCurrentSessionFamilyId,
-} from "@/lib/hybrid-auth-route";
-import { prisma } from "@/lib/prisma";
+} from "@/lib/auth/hybrid/route";
+import { prisma } from "@/lib/db/prisma";
 
 interface SessionItemResponse {
     id: string;

@@ -11,9 +11,9 @@ import {
 } from "react";
 import useSWR from "swr";
 
-import type { AuthenticatedUser } from "@/lib/auth-user";
-import { apiGet } from "@/lib/api-client";
-import { logoutHybridSession, refreshHybridSession } from "@/lib/client-auth";
+import type { AuthenticatedUser } from "@/lib/auth/types";
+import { apiGet } from "@/lib/client/api-client";
+import { logoutHybridSession, refreshHybridSession } from "@/lib/auth/client";
 import { API_ROUTES, APP_ROUTES } from "@/lib/ssot/routes";
 
 export type HybridAuthStatus = "loading" | "authenticated" | "unauthenticated";

@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 import { redirect } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { getApiAuthSession } from "@/lib/server-auth";
+import { getApiAuthSession } from "@/lib/auth/server";
 import { APP_ROUTES } from "@/lib/ssot/routes";
 
 export const metadata: Metadata = {

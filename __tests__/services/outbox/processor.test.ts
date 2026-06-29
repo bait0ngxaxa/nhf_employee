@@ -2,14 +2,14 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { NotificationOutbox, PrismaClient, NotificationOutboxType } from "@prisma/client";
 import { mockDeep, mockReset } from "vitest-mock-extended";
 import { lineNotificationService } from "@/lib/line";
-import { prisma } from "@/lib/prisma";
+import { prisma } from "@/lib/db/prisma";
 import { processOutbox } from "@/lib/services/outbox/processor";
 import {
     sendTicketCreatedNotifications,
     sendTicketUpdatedNotifications,
 } from "@/lib/services/ticket/notifications";
 
-vi.mock("@/lib/prisma", () => ({
+vi.mock("@/lib/db/prisma", () => ({
     prisma: mockDeep<PrismaClient>(),
 }));
 

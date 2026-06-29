@@ -1,13 +1,13 @@
 import { after, type NextRequest, NextResponse } from "next/server";
 
-import { requireApiSession } from "@/lib/api-auth";
-import { logDataExport } from "@/lib/audit";
+import { requireApiSession } from "@/lib/auth/api";
+import { logDataExport } from "@/lib/server/audit";
 import { generateFilename } from "@/lib/helpers/date-helpers";
 import {
     getEmployeeEmailStatus,
     getEmployeeStatusLabel,
 } from "@/lib/helpers/employee-helpers";
-import { prisma } from "@/lib/prisma";
+import { prisma } from "@/lib/db/prisma";
 import { createCsvDownloadResponse, encodeCsvRow } from "@/lib/server/csv";
 import { createEmployeeWhereClause } from "@/lib/services/employee/queries";
 import type { EmployeeFilters } from "@/lib/services/employee/types";

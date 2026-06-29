@@ -2,7 +2,7 @@
 
 import { AuditLogViewer } from "@/components/audit/AuditLogViewer";
 import { History } from "lucide-react";
-import { AuditLogsProvider } from "./context";
+import { AuditLogsProvider } from "@/components/dashboard/context/audit-logs/AuditLogsProvider";
 
 const AUDIT_LOGS_BACKGROUND = [
     "radial-gradient(circle at 100% 0%, rgba(255,228,230,0.6) 0%, transparent 34%)",

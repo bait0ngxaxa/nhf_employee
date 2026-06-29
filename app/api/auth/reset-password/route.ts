@@ -1,11 +1,11 @@
-﻿import { type NextRequest, NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
 
-import { AUTH_ERROR_MESSAGES } from "@/lib/auth-ssot";
-import { logAuthEvent } from "@/lib/audit";
-import { clearHybridAuthCookies } from "@/lib/hybrid-auth-session";
-import { prisma } from "@/lib/prisma";
+import { AUTH_ERROR_MESSAGES } from "@/lib/auth/ssot";
+import { logAuthEvent } from "@/lib/server/audit";
+import { clearHybridAuthCookies } from "@/lib/auth/hybrid/session";
+import { prisma } from "@/lib/db/prisma";
 import { resetPasswordSchema } from "@/lib/validations/auth";
 
 const BCRYPT_SALT_ROUNDS = 12;

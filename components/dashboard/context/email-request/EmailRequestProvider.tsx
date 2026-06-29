@@ -10,7 +10,7 @@ import {
 } from "react";
 import useSWR from "swr";
 import { toast } from "sonner";
-import { apiPost } from "@/lib/api-client";
+import { apiPost } from "@/lib/client/api-client";
 import { API_ROUTES } from "@/lib/ssot/routes";
 import { emailRequestSchema } from "@/lib/validations/email-request";
 import { EmailRequestContext } from "./EmailRequestContext";

@@ -1,10 +1,10 @@
 // @vitest-environment node
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
-import type * as HybridAuthTokensModule from "@/lib/hybrid-auth-tokens";
+import type * as HybridAuthTokensModule from "@/lib/auth/hybrid/tokens";
 
 import { POST as signupRoute } from "@/app/api/auth/signup/route";
-import { resetAuthRateLimit } from "@/lib/auth-rate-limit";
+import { resetAuthRateLimit } from "@/lib/auth/rate-limit";
 
 const { prismaMock } = vi.hoisted(() => ({
     prismaMock: {
@@ -30,14 +30,14 @@ vi.mock("bcryptjs", () => ({
     },
 }));
 
-vi.mock("@/lib/prisma", () => ({
+vi.mock("@/lib/db/prisma", () => ({
     prisma: prismaMock,
 }));
 
-vi.mock("@/lib/hybrid-auth-tokens", async () => {
+vi.mock("@/lib/auth/hybrid/tokens", async () => {
     const actual =
         await vi.importActual<typeof HybridAuthTokensModule>(
-            "@/lib/hybrid-auth-tokens",
+            "@/lib/auth/hybrid/tokens",
         );
 
     return {

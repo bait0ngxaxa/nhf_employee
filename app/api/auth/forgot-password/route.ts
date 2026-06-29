@@ -1,14 +1,14 @@
-﻿import { type NextRequest, NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 
 import { sendEmail } from "@/lib/email";
 import { generatePasswordResetEmailHTML } from "@/lib/email/templates/password-reset";
-import { isAuthRateLimited, recordAuthAttempt } from "@/lib/auth-rate-limit";
-import { prisma } from "@/lib/prisma";
+import { isAuthRateLimited, recordAuthAttempt } from "@/lib/auth/rate-limit";
+import { prisma } from "@/lib/db/prisma";
 import { forgotPasswordSchema } from "@/lib/validations/auth";
-import { AUTH_FORGOT_PASSWORD_MESSAGES } from "@/lib/auth-ssot";
-import { getClientMetadata } from "@/lib/hybrid-auth-session";
-import { buildPublicUrl } from "@/lib/public-url";
+import { AUTH_FORGOT_PASSWORD_MESSAGES } from "@/lib/auth/ssot";
+import { getClientMetadata } from "@/lib/auth/hybrid/session";
+import { buildPublicUrl } from "@/lib/network/public-url";
 
 const MAX_REQUESTS_PER_HOUR = 3;
 const TOKEN_EXPIRY_HOURS = 1;

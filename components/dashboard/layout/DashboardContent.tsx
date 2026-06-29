@@ -4,7 +4,7 @@ import { Suspense } from "react";
 import dynamic from "next/dynamic";
 
 import { useTitle } from "@/hooks/useTitle";
-import { SectionSkeleton } from "@/components/dashboard/SectionSkeleton";
+import { SectionSkeleton } from "@/components/dashboard/feedback/SectionSkeleton";
 import {
     useDashboardUIContext,
     useDashboardDataContext,
@@ -13,56 +13,56 @@ import {
 // Dynamically import Dashboard Sections for code splitting
 const StockSection = dynamic(
     () =>
-        import("@/components/dashboard/StockSection").then(
+        import("@/components/dashboard/sections/StockSection").then(
             (mod) => mod.StockSection,
         ),
     { loading: () => <SectionSkeleton />, ssr: false },
 );
 const ITSupportSection = dynamic(
     () =>
-        import("@/components/dashboard/ITSupportSection").then(
+        import("@/components/dashboard/sections/ITSupportSection").then(
             (mod) => mod.ITSupportSection,
         ),
     { loading: () => <SectionSkeleton /> },
 );
 const EmailRequestSection = dynamic(
     () =>
-        import("@/components/dashboard/EmailRequestSection").then(
+        import("@/components/dashboard/sections/EmailRequestSection").then(
             (mod) => mod.EmailRequestSection,
         ),
     { loading: () => <SectionSkeleton /> },
 );
 const EmployeeManagementSection = dynamic(
     () =>
-        import("@/components/dashboard/EmployeeManagementSection").then(
+        import("@/components/dashboard/sections/EmployeeManagementSection").then(
             (mod) => mod.EmployeeManagementSection,
         ),
     { loading: () => <SectionSkeleton /> },
 );
 const AddEmployeeSection = dynamic(
     () =>
-        import("@/components/dashboard/AddEmployeeSection").then(
+        import("@/components/dashboard/sections/AddEmployeeSection").then(
             (mod) => mod.AddEmployeeSection,
         ),
     { loading: () => <SectionSkeleton /> },
 );
 const AuditLogsSection = dynamic(
     () =>
-        import("@/components/dashboard/AuditLogsSection").then(
+        import("@/components/dashboard/sections/AuditLogsSection").then(
             (mod) => mod.AuditLogsSection,
         ),
     { loading: () => <SectionSkeleton /> },
 );
 const DashboardHomeSection = dynamic(
     () =>
-        import("@/components/dashboard/DashboardHomeSection").then(
+        import("@/components/dashboard/sections/DashboardHomeSection").then(
             (mod) => mod.DashboardHomeSection,
         ),
     { loading: () => <SectionSkeleton /> },
 );
 const LeaveManagementSection = dynamic(
     () =>
-        import("@/components/dashboard/LeaveManagementSection").then(
+        import("@/components/dashboard/sections/LeaveManagementSection").then(
             (mod) => mod.LeaveManagementSection,
         ),
     { loading: () => <SectionSkeleton /> },
@@ -76,14 +76,14 @@ const ImportEmployeeCSV = dynamic(
 );
 const NotificationsSection = dynamic(
     () =>
-        import("@/components/dashboard/NotificationsPageContent").then(
+        import("@/components/dashboard/notifications/NotificationsPageContent").then(
             (mod) => mod.NotificationsSection,
         ),
     { loading: () => <SectionSkeleton /> },
 );
 const SessionManagementSection = dynamic(
     () =>
-        import("@/components/dashboard/SessionManagementSection").then(
+        import("@/components/dashboard/sections/SessionManagementSection").then(
             (mod) => mod.SessionManagementSection,
         ),
     { loading: () => <SectionSkeleton /> },

@@ -1,4 +1,4 @@
-﻿import { apiGet, apiPost, apiPut, type ApiResponse } from "@/lib/api-client";
+import { apiGet, apiPost, apiPut, type ApiResponse } from "@/lib/client/api-client";
 import { triggerDownload } from "@/lib/helpers/download";
 import { API_ROUTES } from "@/lib/ssot/routes";
 import type { LeaveRequestValues } from "@/lib/validations/leave";

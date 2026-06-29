@@ -1,10 +1,10 @@
-﻿import { after, type NextRequest, NextResponse } from "next/server";
-import { requireAdminSession, requireApiSession } from "@/lib/api-auth";
+import { after, type NextRequest, NextResponse } from "next/server";
+import { requireAdminSession, requireApiSession } from "@/lib/auth/api";
 import {
     createEmployeeSchema,
     employeeFiltersSchema,
 } from "@/lib/validations/employee";
-import { logEmployeeEvent } from "@/lib/audit";
+import { logEmployeeEvent } from "@/lib/server/audit";
 import { employeeService, type EmployeeFilters } from "@/lib/services/employee";
 import { operationFailed } from "@/lib/ssot/http";
 import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
