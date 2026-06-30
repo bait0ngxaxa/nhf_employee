@@ -55,6 +55,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
                     englishName: validation.data.englishName,
                     position: validation.data.position,
                     department: validation.data.department,
+                    needsDocumentSystem: validation.data.needsDocumentSystem,
+                    sharedDriveAccess: validation.data.sharedDriveAccess,
                 },
             },
         });
@@ -75,6 +77,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
                 nickname: validation.data.nickname,
                 position: validation.data.position,
                 department: validation.data.department,
+                needsDocumentSystem: validation.data.needsDocumentSystem,
+                sharedDriveAccess: validation.data.sharedDriveAccess,
                 requestedAt: result.emailRequest.createdAt.toISOString(),
             },
         });

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { SHARED_DRIVE_OPTIONS } from "@/constants/email-request";
 
 const PHONE_ERROR_MESSAGE =
     "กรุณาระบุเบอร์โทรศัพท์ให้ถูกต้อง (10 หลัก เช่น 0889999999 หรือ 088-9999999)";
@@ -30,6 +31,15 @@ export const emailRequestSchema = z.object({
     position: z.string().min(1, "กรุณากรอกตำแหน่ง"),
     department: z.string().min(1, "กรุณากรอกสังกัด"),
     replyEmail: z.string().email("รูปแบบอีเมลไม่ถูกต้อง"),
+    needsDocumentSystem: z.boolean().default(false),
+    sharedDriveAccess: z
+        .array(z.enum(SHARED_DRIVE_OPTIONS))
+        .max(SHARED_DRIVE_OPTIONS.length)
+        .refine(
+            (value) => new Set(value).size === value.length,
+            "ไม่ควรเลือก Shared Drive ซ้ำ",
+        )
+        .default([]),
 });
 
 /**

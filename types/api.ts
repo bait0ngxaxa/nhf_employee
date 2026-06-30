@@ -1,6 +1,7 @@
 import { type TicketCategoryValue, type TicketPriorityValue, type TicketStatusValue } from '@/constants/tickets';
 import { type Ticket, } from '@/types/tickets';
 import { type Employee, } from '@/types/employees';
+import type { SharedDriveOption } from '@/constants/email-request';
 
 export interface EmailRequestBody {
   email: string;
@@ -55,6 +56,8 @@ export interface EmailRequestData {
   position: string;
   department: string;
   replyEmail: string;
+  needsDocumentSystem: boolean;
+  sharedDriveAccess: SharedDriveOption[];
   requestedAt: string;
 }
 

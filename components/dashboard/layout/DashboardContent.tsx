@@ -5,6 +5,7 @@ import dynamic from "next/dynamic";
 
 import { useTitle } from "@/hooks/useTitle";
 import { SectionSkeleton } from "@/components/dashboard/feedback/SectionSkeleton";
+import { EmailRequestSectionSkeleton } from "@/components/dashboard/feedback/EmailRequestSectionSkeleton";
 import {
     useDashboardUIContext,
     useDashboardDataContext,
@@ -30,7 +31,7 @@ const EmailRequestSection = dynamic(
         import("@/components/dashboard/sections/EmailRequestSection").then(
             (mod) => mod.EmailRequestSection,
         ),
-    { loading: () => <SectionSkeleton /> },
+    { loading: () => <EmailRequestSectionSkeleton /> },
 );
 const EmployeeManagementSection = dynamic(
     () =>
@@ -95,7 +96,7 @@ function getPageTitle(menu: string): string {
         case "leave-management": return "Leave Management | NHFapp";
         case "stock": return "Stock | NHFapp";
         case "it-support": return "IT Support | NHFapp";
-        case "email-request": return "Email Request | NHFapp";
+        case "email-request": return "New Employee Request | NHFapp";
         case "employee-management": return "Employee Management | NHFapp";
         case "add-employee": return "Add Employee | NHFapp";
         case "import-employee": return "Import Employee CSV | NHFapp";
@@ -144,7 +145,7 @@ export function DashboardContent() {
 
             case "email-request":
                 return (
-                    <Suspense fallback={<SectionSkeleton />}>
+                    <Suspense fallback={<EmailRequestSectionSkeleton />}>
                         <EmailRequestSection />
                     </Suspense>
                 );

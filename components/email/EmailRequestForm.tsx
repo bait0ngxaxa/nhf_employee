@@ -1,21 +1,33 @@
 "use client";
 
-import type { ChangeEvent, FormEvent } from "react";
+import {
+    useMemo,
+    type ChangeEvent,
+    type FormEvent,
+    type ReactElement,
+} from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { AlertCircle, Loader2, Mail, Send } from "lucide-react";
+import { EmailRequestAccessFields } from "./EmailRequestAccessFields";
 import { useEmailRequestContext } from "@/components/dashboard/context/email-request/EmailRequestContext";
 import type { EmailRequestFormData } from "@/components/dashboard/context/email-request/types";
+import type { SharedDriveOption } from "@/constants/email-request";
 
 interface EmailRequestFormProps {
     onCancel?: () => void;
     onSuccess?: () => void;
 }
 
+type EmailRequestTextFieldId = Exclude<
+    keyof EmailRequestFormData,
+    "needsDocumentSystem" | "sharedDriveAccess"
+>;
+
 type EmailRequestFieldProps = {
-    id: keyof EmailRequestFormData;
+    id: EmailRequestTextFieldId;
     label: string;
     value: string;
     error?: string;
@@ -24,6 +36,7 @@ type EmailRequestFieldProps = {
     autoComplete?: string;
     inputMode?: "email" | "tel" | "text";
     maxLength?: number;
+    disabled: boolean;
     onChange: (event: ChangeEvent<HTMLInputElement>) => void;
 };
 
@@ -37,8 +50,9 @@ function EmailRequestField({
     autoComplete,
     inputMode,
     maxLength,
+    disabled,
     onChange,
-}: EmailRequestFieldProps) {
+}: EmailRequestFieldProps): ReactElement {
     const errorId = `${id}-error`;
 
     return (
@@ -60,6 +74,7 @@ function EmailRequestField({
                 autoComplete={autoComplete}
                 inputMode={inputMode}
                 maxLength={maxLength}
+                disabled={disabled}
                 aria-invalid={Boolean(error)}
                 aria-describedby={error ? errorId : undefined}
                 className={error ? "border-red-500 focus-visible:ring-red-500" : ""}
@@ -90,9 +105,14 @@ export function EmailRequestForm({ onCancel, onSuccess }: EmailRequestFormProps)
         }
     }
 
+    const selectedDrives = useMemo<ReadonlySet<SharedDriveOption>>(
+        () => new Set(formData.sharedDriveAccess),
+        [formData.sharedDriveAccess],
+    );
+
     return (
         <div className="space-y-6">
-            <Card className="rounded-2xl border-slate-200 bg-white shadow-sm">
+            <Card className="rounded-2xl border-border bg-card shadow-sm">
                 <CardContent className="p-6 md:p-8">
                     {error && (
                         <div
@@ -117,6 +137,7 @@ export function EmailRequestForm({ onCancel, onSuccess }: EmailRequestFormProps)
                                 placeholder="เช่น นาย สมชาย ใจดี"
                                 autoComplete="name"
                                 maxLength={120}
+                                disabled={isLoading}
                                 onChange={handleInputChange}
                             />
                             <EmailRequestField
@@ -127,6 +148,7 @@ export function EmailRequestForm({ onCancel, onSuccess }: EmailRequestFormProps)
                                 placeholder="e.g. Mr. Somchai Jaidee"
                                 autoComplete="name"
                                 maxLength={120}
+                                disabled={isLoading}
                                 onChange={handleInputChange}
                             />
                             <EmailRequestField
@@ -137,6 +159,7 @@ export function EmailRequestForm({ onCancel, onSuccess }: EmailRequestFormProps)
                                 placeholder="เช่น ชาย"
                                 autoComplete="nickname"
                                 maxLength={80}
+                                disabled={isLoading}
                                 onChange={handleInputChange}
                             />
                             <EmailRequestField
@@ -148,6 +171,7 @@ export function EmailRequestForm({ onCancel, onSuccess }: EmailRequestFormProps)
                                 autoComplete="tel"
                                 inputMode="tel"
                                 maxLength={20}
+                                disabled={isLoading}
                                 onChange={handleInputChange}
                             />
                             <EmailRequestField
@@ -158,6 +182,7 @@ export function EmailRequestForm({ onCancel, onSuccess }: EmailRequestFormProps)
                                 placeholder="เช่น เจ้าหน้าที่บัญชี"
                                 autoComplete="organization-title"
                                 maxLength={120}
+                                disabled={isLoading}
                                 onChange={handleInputChange}
                             />
                             <EmailRequestField
@@ -168,6 +193,7 @@ export function EmailRequestForm({ onCancel, onSuccess }: EmailRequestFormProps)
                                 placeholder="เช่น มสช. สพบ."
                                 autoComplete="organization"
                                 maxLength={120}
+                                disabled={isLoading}
                                 onChange={handleInputChange}
                             />
                             <div className="md:col-span-2">
@@ -181,9 +207,18 @@ export function EmailRequestForm({ onCancel, onSuccess }: EmailRequestFormProps)
                                     autoComplete="email"
                                     inputMode="email"
                                     maxLength={254}
+                                    disabled={isLoading}
                                     onChange={handleInputChange}
                                 />
                             </div>
+                            <EmailRequestAccessFields
+                                needsDocumentSystem={
+                                    formData.needsDocumentSystem
+                                }
+                                selectedDrives={selectedDrives}
+                                disabled={isLoading}
+                                onChange={handleInputChange}
+                            />
                         </div>
 
                         <div className="flex flex-col-reverse gap-3 pt-4 sm:flex-row sm:justify-end">
@@ -201,7 +236,7 @@ export function EmailRequestForm({ onCancel, onSuccess }: EmailRequestFormProps)
                             <Button
                                 type="submit"
                                 disabled={isLoading}
-                                className="h-11 rounded-xl bg-indigo-700 px-8 text-white transition-colors hover:bg-indigo-800"
+                                className="h-11 rounded-xl px-8"
                             >
                                 {isLoading ? (
                                     <>
@@ -211,25 +246,25 @@ export function EmailRequestForm({ onCancel, onSuccess }: EmailRequestFormProps)
                                 ) : (
                                     <>
                                         <Send className="mr-2 h-4 w-4" />
-                                        ส่งคำขอ
+                                        ส่งคำร้อง
                                     </>
                                 )}
                             </Button>
                         </div>
                     </form>
 
-                    <div className="mt-8 flex items-start gap-3 rounded-xl border border-blue-100 bg-blue-50 p-4">
-                        <div className="flex-shrink-0 rounded-lg bg-blue-100 p-2">
-                            <Mail className="h-5 w-5 text-blue-600" />
+                    <div className="mt-8 flex items-start gap-3 rounded-xl border border-primary/15 bg-primary/5 p-4">
+                        <div className="flex-shrink-0 rounded-lg bg-primary/10 p-2">
+                            <Mail className="h-5 w-5 text-primary" />
                         </div>
                         <div className="min-w-0">
-                            <p className="text-sm font-medium text-blue-900">
+                            <p className="text-sm font-medium text-foreground">
                                 หมายเหตุ
                             </p>
-                            <p className="mt-1 text-sm leading-6 text-blue-800 [overflow-wrap:anywhere]">
-                                เมื่อส่งคำขอแล้ว ทีมไอทีจะได้รับแจ้งเตือนผ่าน
-                                LINE และจะดำเนินการสร้างอีเมลให้พนักงานใหม่ต่อไป
-                                โดยจะแจ้งผลการดำเนินการกลับไปยังอีเมลที่คุณระบุไว้
+                            <p className="mt-1 text-sm leading-6 text-muted-foreground [overflow-wrap:anywhere]">
+                                เมื่อส่งคำร้องแล้ว ทีมไอทีจะได้รับแจ้งเตือนผ่าน
+                                LINE และจะดำเนินการเรื่องอีเมล ระบบสารบรรณ และ
+                                Shared Drive ตามข้อมูลที่ระบุไว้
                             </p>
                         </div>
                     </div>

@@ -5,9 +5,17 @@ export function generateEmailRequestFlexMessage(
     data: EmailRequestData,
     baseUrl: string
 ): LineFlexMessage {
+    const documentSystemText = data.needsDocumentSystem
+        ? "ต้องการ"
+        : "ไม่ต้องการ";
+    const sharedDriveText =
+        data.sharedDriveAccess.length > 0
+            ? data.sharedDriveAccess.join(", ")
+            : "ไม่ได้ระบุ";
+
     return {
         type: "flex",
-        altText: `ขออีเมลพนักงานใหม่ - ${data.thaiName}`,
+        altText: `ส่งคำร้องพนักงานใหม่ - ${data.thaiName}`,
         contents: {
             type: "bubble",
             header: {
@@ -16,14 +24,14 @@ export function generateEmailRequestFlexMessage(
                 contents: [
                     {
                         type: "text",
-                        text: "📧 ขออีเมลพนักงานใหม่",
+                        text: "📧 ส่งคำร้องพนักงานใหม่",
                         weight: "bold",
                         color: "#FFFFFF",
                         size: "lg",
                     },
                     {
                         type: "text",
-                        text: "คำขออีเมลพนักงานใหม่จากระบบ",
+                        text: "คำร้องพนักงานใหม่จากระบบ",
                         color: "#FFFFFF",
                         size: "sm",
                     },
@@ -67,6 +75,50 @@ export function generateEmailRequestFlexMessage(
                                     {
                                         type: "text",
                                         text: data.nickname,
+                                        wrap: true,
+                                        color: "#333333",
+                                        size: "sm",
+                                        flex: 3,
+                                    },
+                                ],
+                            },
+                            {
+                                type: "box",
+                                layout: "baseline",
+                                spacing: "sm",
+                                contents: [
+                                    {
+                                        type: "text",
+                                        text: "สารบรรณ:",
+                                        color: "#666666",
+                                        size: "sm",
+                                        flex: 2,
+                                    },
+                                    {
+                                        type: "text",
+                                        text: documentSystemText,
+                                        wrap: true,
+                                        color: "#333333",
+                                        size: "sm",
+                                        flex: 3,
+                                    },
+                                ],
+                            },
+                            {
+                                type: "box",
+                                layout: "baseline",
+                                spacing: "sm",
+                                contents: [
+                                    {
+                                        type: "text",
+                                        text: "Shared Drive:",
+                                        color: "#666666",
+                                        size: "sm",
+                                        flex: 2,
+                                    },
+                                    {
+                                        type: "text",
+                                        text: sharedDriveText,
                                         wrap: true,
                                         color: "#333333",
                                         size: "sm",
@@ -199,8 +251,8 @@ export function generateEmailRequestFlexMessage(
                         height: "sm",
                         action: {
                             type: "uri",
-                            label: "ดูในระบบ",
-                            uri: `${baseUrl}/dashboard/email-request`,
+                            label: "ดูคำร้องในระบบ",
+                            uri: `${baseUrl}/dashboard?tab=email-request`,
                         },
                         color: "#7C3AED",
                     },

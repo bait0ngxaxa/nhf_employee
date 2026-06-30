@@ -22,6 +22,8 @@ export async function createEmailRequest(
         position: data.position,
         department: data.department,
         replyEmail: data.replyEmail,
+        needsDocumentSystem: data.needsDocumentSystem,
+        sharedDriveAccess: data.sharedDriveAccess,
         requestedAt: new Date().toISOString(),
     };
 
@@ -36,6 +38,8 @@ export async function createEmailRequest(
                 position: data.position,
                 department: data.department,
                 replyEmail: data.replyEmail,
+                needsDocumentSystem: data.needsDocumentSystem,
+                sharedDriveAccess: data.sharedDriveAccess,
                 requestedBy: user.id,
             },
         });

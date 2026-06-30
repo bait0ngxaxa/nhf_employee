@@ -38,9 +38,9 @@ export const DASHBOARD_MENU_ITEMS: MenuItem[] = [
     },
     {
         id: "email-request",
-        label: "ขออีเมลพนักงานใหม่",
+        label: "ส่งคำร้องพนักงานใหม่",
         icon: Mail,
-        description: "ขออีเมลสำหรับพนักงานใหม่จากทีมไอที",
+        description: "ส่งคำร้องอีเมล สารบรรณ และ Shared Drive ให้ทีมไอที",
         requiredRole: "ADMIN",
     },
     {
@@ -88,10 +88,9 @@ export const DASHBOARD_MENU_GROUPS: MenuGroup[] = [
         label: "การจัดการระบบ",
         icon: ShieldCheck,
         items: [
-            DASHBOARD_MENU_ITEMS[3], // ขออีเมล (ADMIN)
+            DASHBOARD_MENU_ITEMS[3], // ส่งคำร้องพนักงานใหม่ (ADMIN)
             DASHBOARD_MENU_ITEMS[4], // ข้อมูลพนักงาน
             DASHBOARD_MENU_ITEMS[5], // เพิ่มพนักงาน (ADMIN)
-            DASHBOARD_MENU_ITEMS[6], // นำเข้า CSV (ADMIN)
             DASHBOARD_MENU_ITEMS[7], // บันทึกการใช้งาน (ADMIN)
         ],
     },

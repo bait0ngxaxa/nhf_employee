@@ -13,6 +13,10 @@ import type {
     StockRequestLineData,
 } from "@/types/api";
 import {
+    isSharedDriveOption,
+    type SharedDriveOption,
+} from "@/constants/email-request";
+import {
     MAX_OUTBOX_ATTEMPTS,
     OUTBOX_STATUSES,
     STALE_OUTBOX_PROCESSING_MINUTES,
@@ -46,6 +50,8 @@ type EmailRequestPayload = {
     position: string;
     department: string;
     replyEmail: string;
+    needsDocumentSystem: boolean;
+    sharedDriveAccess: SharedDriveOption[];
     requestedAt: string;
 };
 
@@ -87,6 +93,28 @@ function parseTicketUpdatedPayload(payload: unknown): TicketUpdatedPayload {
     };
 }
 
+function parseSharedDriveAccess(
+    payload: Record<string, unknown>,
+): SharedDriveOption[] {
+    const value = payload.sharedDriveAccess;
+
+    if (value === undefined || value === null) {
+        return [];
+    }
+
+    if (
+        !Array.isArray(value) ||
+        !value.every(
+            (item) =>
+                typeof item === "string" && isSharedDriveOption(item),
+        )
+    ) {
+        throw new Error("Invalid EMAIL_REQUEST sharedDriveAccess payload");
+    }
+
+    return value as SharedDriveOption[];
+}
+
 function parseEmailRequestPayload(payload: unknown): EmailRequestPayload {
     if (
         !isRecord(payload) ||
@@ -109,6 +137,11 @@ function parseEmailRequestPayload(payload: unknown): EmailRequestPayload {
         position: payload.position,
         department: payload.department,
         replyEmail: payload.replyEmail,
+        needsDocumentSystem:
+            typeof payload.needsDocumentSystem === "boolean"
+                ? payload.needsDocumentSystem
+                : false,
+        sharedDriveAccess: parseSharedDriveAccess(payload),
         requestedAt: payload.requestedAt,
     };
 }

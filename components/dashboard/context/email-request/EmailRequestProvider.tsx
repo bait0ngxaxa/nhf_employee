@@ -10,6 +10,7 @@ import {
 } from "react";
 import useSWR from "swr";
 import { toast } from "sonner";
+import { isSharedDriveOption } from "@/constants/email-request";
 import { apiPost } from "@/lib/client/api-client";
 import { API_ROUTES } from "@/lib/ssot/routes";
 import { emailRequestSchema } from "@/lib/validations/email-request";
@@ -29,6 +30,8 @@ const initialFormData: EmailRequestFormData = {
     position: "",
     department: "",
     replyEmail: "",
+    needsDocumentSystem: false,
+    sharedDriveAccess: [],
 };
 
 interface EmailRequestProviderProps {
@@ -74,6 +77,27 @@ function getValidationErrors(
     return { data: null, errors, firstErrorField };
 }
 
+function getScrollBehavior(): ScrollBehavior {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+        return "auto";
+    }
+
+    return "smooth";
+}
+
+function focusInvalidField(field: keyof EmailRequestFormData): void {
+    const element = document.getElementById(field);
+    if (!(element instanceof HTMLElement)) {
+        return;
+    }
+
+    element.scrollIntoView({
+        behavior: getScrollBehavior(),
+        block: "center",
+    });
+    element.focus({ preventScroll: true });
+}
+
 export function EmailRequestProvider({ children }: EmailRequestProviderProps) {
     // List state
     const [currentPage, setCurrentPage] = useState(1);
@@ -116,12 +140,37 @@ export function EmailRequestProvider({ children }: EmailRequestProviderProps) {
     // Form handlers
     const handleInputChange = useCallback(
         (e: ChangeEvent<HTMLInputElement>) => {
-            const { name, value } = e.target;
+            const { name, type, checked, value } = e.target;
             const field = name as keyof EmailRequestFormData;
-            setFormData((prev) => ({
-                ...prev,
-                [field]: value,
-            }));
+            setFormData((prev) => {
+                if (field === "needsDocumentSystem") {
+                    return { ...prev, needsDocumentSystem: checked };
+                }
+
+                if (field === "sharedDriveAccess") {
+                    if (type !== "checkbox" || !isSharedDriveOption(value)) {
+                        return prev;
+                    }
+
+                    const selected = new Set(prev.sharedDriveAccess);
+
+                    if (checked) {
+                        selected.add(value);
+                    } else {
+                        selected.delete(value);
+                    }
+
+                    return {
+                        ...prev,
+                        sharedDriveAccess: Array.from(selected),
+                    };
+                }
+
+                return {
+                    ...prev,
+                    [field]: value,
+                };
+            });
             setFormError(null);
             setFieldErrors((current) => {
                 if (!current[field]) {
@@ -149,9 +198,7 @@ export function EmailRequestProvider({ children }: EmailRequestProviderProps) {
                 setFormError("กรุณาตรวจสอบข้อมูลที่กรอก");
 
                 if (validation.firstErrorField) {
-                    const element = document.getElementById(validation.firstErrorField);
-                    element?.scrollIntoView({ behavior: "smooth", block: "center" });
-                    element?.focus();
+                    focusInvalidField(validation.firstErrorField);
                 }
 
                 return false;
@@ -169,8 +216,8 @@ export function EmailRequestProvider({ children }: EmailRequestProviderProps) {
 
                 if (response.success) {
                     setFormData(initialFormData);
-                    toast.success("ส่งคำขออีเมลสำเร็จ", {
-                        description: "คำขออีเมลของคุณถูกส่งไปยังทีมไอทีแล้ว",
+                    toast.success("ส่งคำร้องพนักงานใหม่สำเร็จ", {
+                        description: "คำร้องถูกส่งไปยังทีมไอทีแล้ว",
                     });
                     mutate(); // Refresh the list
                     return true;

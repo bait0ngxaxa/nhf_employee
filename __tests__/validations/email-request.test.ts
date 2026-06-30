@@ -16,6 +16,8 @@ describe("Email Request Validation", () => {
         expect(result.success).toBe(true);
         if (result.success) {
             expect(result.data.phone).toBe("081-2345678");
+            expect(result.data.needsDocumentSystem).toBe(false);
+            expect(result.data.sharedDriveAccess).toEqual([]);
         }
     });
 
@@ -50,6 +52,78 @@ describe("Email Request Validation", () => {
         expect(result.success).toBe(false);
         if (!result.success) {
             expect(result.error.flatten().fieldErrors.phone).toBeDefined();
+        }
+    });
+
+    it("should validate document system and shared drive access", () => {
+        const data = {
+            thaiName: "สมชาย",
+            englishName: "Somchai",
+            phone: "0812345678",
+            nickname: "Chai",
+            position: "Dev",
+            department: "IT",
+            replyEmail: "test@email.com",
+            needsDocumentSystem: true,
+            sharedDriveAccess: ["account", "it", "project_research"],
+        };
+
+        const result = emailRequestSchema.safeParse(data);
+
+        expect(result.success).toBe(true);
+        if (result.success) {
+            expect(result.data.needsDocumentSystem).toBe(true);
+            expect(result.data.sharedDriveAccess).toEqual([
+                "account",
+                "it",
+                "project_research",
+            ]);
+        }
+    });
+
+    it("should fail on unknown shared drive access", () => {
+        const data = {
+            thaiName: "สมชาย",
+            englishName: "Somchai",
+            phone: "0812345678",
+            nickname: "Chai",
+            position: "Dev",
+            department: "IT",
+            replyEmail: "test@email.com",
+            needsDocumentSystem: false,
+            sharedDriveAccess: ["unknown_drive"],
+        };
+
+        const result = emailRequestSchema.safeParse(data);
+
+        expect(result.success).toBe(false);
+        if (!result.success) {
+            expect(
+                result.error.flatten().fieldErrors.sharedDriveAccess,
+            ).toBeDefined();
+        }
+    });
+
+    it("should fail on duplicate shared drive access", () => {
+        const data = {
+            thaiName: "สมชาย",
+            englishName: "Somchai",
+            phone: "0812345678",
+            nickname: "Chai",
+            position: "Dev",
+            department: "IT",
+            replyEmail: "test@email.com",
+            needsDocumentSystem: false,
+            sharedDriveAccess: ["it", "it"],
+        };
+
+        const result = emailRequestSchema.safeParse(data);
+
+        expect(result.success).toBe(false);
+        if (!result.success) {
+            expect(
+                result.error.flatten().fieldErrors.sharedDriveAccess,
+            ).toContain("ไม่ควรเลือก Shared Drive ซ้ำ");
         }
     });
 });

@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import { mockDeep, mockReset } from "vitest-mock-extended";
 import { prisma } from "@/lib/db/prisma";
 import { createEmailRequest } from "@/lib/services/email-request/mutations";
+import type { CreateEmailRequestData } from "@/lib/services/email-request/types";
 import type { PrismaClient } from "@prisma/client";
 
 vi.mock("@/lib/db/prisma", () => ({
@@ -31,7 +32,7 @@ describe("Email Request Mutations", () => {
 
     describe("createEmailRequest", () => {
         it("should create request and enqueue notification", async () => {
-            const data = {
+            const data: CreateEmailRequestData = {
                 thaiName: "T",
                 englishName: "E",
                 phone: "123",
@@ -39,6 +40,8 @@ describe("Email Request Mutations", () => {
                 position: "P",
                 replyEmail: "r@e.c",
                 nickname: "N",
+                needsDocumentSystem: true,
+                sharedDriveAccess: ["account", "it"],
             };
             prismaMock.emailRequest.create.mockResolvedValue(
                 asNever({
@@ -61,6 +64,12 @@ describe("Email Request Mutations", () => {
                     }),
                 }),
             );
+            const createCall = prismaMock.notificationOutbox.create.mock.calls[0]?.[0];
+            const payload = JSON.parse(
+                String(createCall?.data.payload),
+            ) as Record<string, unknown>;
+            expect(payload.needsDocumentSystem).toBe(true);
+            expect(payload.sharedDriveAccess).toEqual(["account", "it"]);
         });
     });
 });

@@ -94,7 +94,7 @@ export const AUDIT_ACTION_META: Record<string, AuditActionMeta> = {
         badgeClassName: "bg-yellow-100 text-yellow-700 border border-yellow-200",
     },
     EMAIL_REQUEST: {
-        label: "ขออีเมลพนักงานใหม่",
+        label: "ส่งคำร้องพนักงานใหม่",
         badgeClassName: "bg-indigo-100 text-indigo-700 border border-indigo-200",
     },
     LEAVE_REQUEST_CREATE: {

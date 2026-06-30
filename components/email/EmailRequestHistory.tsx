@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactElement } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -24,7 +25,17 @@ import { useEmailRequestHistory } from "@/hooks/useEmailRequestHistory";
 import { formatThaiDateTime } from "@/lib/helpers/date-helpers";
 import { useAuth } from "@/components/auth/HybridAuthProvider";
 
-export function EmailRequestHistory() {
+function formatSharedDriveAccess(
+    sharedDriveAccess: readonly string[] | null | undefined,
+): string {
+    if (!sharedDriveAccess || sharedDriveAccess.length === 0) {
+        return "ไม่ได้ระบุ";
+    }
+
+    return sharedDriveAccess.join(", ");
+}
+
+export function EmailRequestHistory(): ReactElement | null {
     const { user } = useAuth();
     const {
         emailRequests,
@@ -36,26 +47,28 @@ export function EmailRequestHistory() {
         refresh,
     } = useEmailRequestHistory();
 
-
-
     if (!user) {
         return null;
     }
 
+    const refreshIconClassName = isLoading
+        ? "mr-2 h-4 w-4 animate-spin"
+        : "mr-2 h-4 w-4";
+
     return (
-        <Card className="rounded-2xl border-gray-200 bg-white shadow-sm">
+        <Card className="rounded-2xl border-border bg-card shadow-sm">
             <CardHeader>
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div className="flex min-w-0 items-center gap-3">
-                        <div className="rounded-xl bg-indigo-100 p-2">
-                            <History className="h-5 w-5 text-indigo-700" />
+                        <div className="rounded-xl bg-primary/10 p-2">
+                            <History className="h-5 w-5 text-primary" />
                         </div>
                         <div className="min-w-0">
                             <CardTitle className="text-xl [overflow-wrap:anywhere]">
-                                ประวัติคำขออีเมล
+                                ประวัติคำร้องพนักงานใหม่
                             </CardTitle>
-                            <p className="text-sm leading-6 text-gray-600 [overflow-wrap:anywhere]">
-                                รายการคำขออีเมลที่เคยส่งไปแล้ว
+                            <p className="text-sm leading-6 text-muted-foreground [overflow-wrap:anywhere]">
+                                รายการคำร้องพนักงานใหม่ที่เคยส่งไปแล้ว
                             </p>
                         </div>
                     </div>
@@ -65,9 +78,10 @@ export function EmailRequestHistory() {
                         size="sm"
                         onClick={refresh}
                         disabled={isLoading}
+                        aria-label="รีเฟรชประวัติคำร้องพนักงานใหม่"
                         className="h-10 shrink-0"
                     >
-                        <RefreshCw className={isLoading ? "mr-2 h-4 w-4 animate-spin" : "mr-2 h-4 w-4"} />
+                        <RefreshCw className={refreshIconClassName} />
                         รีเฟรช
                     </Button>
                 </div>
@@ -75,8 +89,13 @@ export function EmailRequestHistory() {
 
             <CardContent>
                 {isLoading ? (
-                    <div className="space-y-4 py-6" aria-busy="true">
-                        <div className="flex gap-4 border-b border-gray-100 pb-4">
+                    <div
+                        className="space-y-4 py-6"
+                        role="status"
+                        aria-busy="true"
+                        aria-label="กำลังโหลดประวัติคำร้องพนักงานใหม่"
+                    >
+                        <div className="flex gap-4 border-b border-border pb-4">
                             {Array.from({ length: 5 }).map((_, i) => (
                                 <Skeleton key={i} className="h-4 flex-1" />
                             ))}
@@ -111,15 +130,15 @@ export function EmailRequestHistory() {
                         </Button>
                     </div>
                 ) : emailRequests.length === 0 ? (
-                    <div className="rounded-xl border border-dashed border-gray-300 px-4 py-12 text-center text-sm leading-6 text-gray-600">
-                        ยังไม่มีรายการคำขออีเมล เมื่อส่งคำขอแล้วรายการจะแสดงที่นี่
+                    <div className="rounded-xl border border-dashed border-border px-4 py-12 text-center text-sm leading-6 text-muted-foreground">
+                        ยังไม่มีรายการคำร้อง เมื่อส่งคำร้องแล้วรายการจะแสดงที่นี่
                     </div>
                 ) : (
                     <>
-                        <div className="overflow-x-auto rounded-xl border border-gray-200">
-                            <Table className="min-w-[760px]">
+                        <div className="overflow-x-auto rounded-xl border border-border">
+                            <Table className="min-w-[980px]">
                                 <TableHeader>
-                                    <TableRow className="bg-gray-50">
+                                    <TableRow className="bg-muted/60">
                                         <TableHead className="font-semibold">
                                             ชื่อ-นามสกุล
                                         </TableHead>
@@ -128,6 +147,9 @@ export function EmailRequestHistory() {
                                         </TableHead>
                                         <TableHead className="font-semibold">
                                             สังกัด
+                                        </TableHead>
+                                        <TableHead className="font-semibold">
+                                            สิทธิ์ระบบ
                                         </TableHead>
                                         <TableHead className="font-semibold">
                                             วันที่ขอ
@@ -141,14 +163,14 @@ export function EmailRequestHistory() {
                                     {emailRequests.map((request) => (
                                         <TableRow
                                             key={request.id}
-                                            className="hover:bg-gray-50"
+                                            className="hover:bg-muted/40"
                                         >
                                             <TableCell className="max-w-56 align-top">
                                                 <div className="min-w-0">
-                                                    <p className="font-medium text-gray-900 [overflow-wrap:anywhere]">
+                                                    <p className="font-medium text-foreground [overflow-wrap:anywhere]">
                                                         {request.thaiName}
                                                     </p>
-                                                    <p className="text-sm text-gray-600 [overflow-wrap:anywhere]">
+                                                    <p className="text-sm text-muted-foreground [overflow-wrap:anywhere]">
                                                         {request.englishName}
                                                     </p>
                                                 </div>
@@ -158,6 +180,33 @@ export function EmailRequestHistory() {
                                             </TableCell>
                                             <TableCell className="max-w-56 align-top [overflow-wrap:anywhere]">
                                                 {request.department}
+                                            </TableCell>
+                                            <TableCell className="max-w-72 align-top">
+                                                <div className="space-y-2">
+                                                    <Badge
+                                                        className={
+                                                            request.needsDocumentSystem
+                                                                ? "w-fit border-transparent bg-primary/10 text-primary hover:bg-primary/10"
+                                                                : "w-fit bg-secondary text-secondary-foreground hover:bg-secondary"
+                                                        }
+                                                    >
+                                                        สารบรรณ:{" "}
+                                                        {request.needsDocumentSystem
+                                                            ? "ต้องการ"
+                                                            : "ไม่ต้องการ"}
+                                                    </Badge>
+                                                    <p
+                                                        className="text-sm leading-6 text-muted-foreground [overflow-wrap:anywhere]"
+                                                        title={formatSharedDriveAccess(
+                                                            request.sharedDriveAccess,
+                                                        )}
+                                                    >
+                                                        Shared Drive:{" "}
+                                                        {formatSharedDriveAccess(
+                                                            request.sharedDriveAccess,
+                                                        )}
+                                                    </p>
+                                                </div>
                                             </TableCell>
                                             <TableCell className="text-sm align-top whitespace-nowrap">
                                                 {formatThaiDateTime(request.createdAt)}
@@ -176,12 +225,13 @@ export function EmailRequestHistory() {
 
                         {pagination.totalPages > 1 && (
                             <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                                <p className="text-sm text-gray-600">
+                                <p className="text-sm text-muted-foreground">
                                     แสดง {emailRequests.length.toLocaleString("th-TH")} จาก{" "}
                                     {pagination.total.toLocaleString("th-TH")} รายการ
                                 </p>
                                 <div className="flex flex-wrap items-center gap-2">
                                     <Button
+                                        type="button"
                                         variant="outline"
                                         size="sm"
                                         onClick={() =>
@@ -192,11 +242,12 @@ export function EmailRequestHistory() {
                                         <ChevronLeft className="h-4 w-4" />
                                         ก่อนหน้า
                                     </Button>
-                                    <span className="text-sm text-gray-600">
+                                    <span className="text-sm text-muted-foreground">
                                         หน้า {currentPage.toLocaleString("th-TH")} /{" "}
                                         {pagination.totalPages.toLocaleString("th-TH")}
                                     </span>
                                     <Button
+                                        type="button"
                                         variant="outline"
                                         size="sm"
                                         onClick={() =>

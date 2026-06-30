@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import type { SharedDriveOption } from "@/constants/email-request";
 import { apiGet } from "@/lib/client/api-client";
 
 interface EmailRequest {
@@ -10,6 +11,8 @@ interface EmailRequest {
     position: string;
     department: string;
     replyEmail: string;
+    needsDocumentSystem: boolean;
+    sharedDriveAccess: SharedDriveOption[] | null;
     createdAt: string;
     updatedAt: string;
     requestedBy: number;

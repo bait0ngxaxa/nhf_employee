@@ -269,18 +269,20 @@ enum AuditAction {
 
 // Email Request History for tracking new employee email requests
 model EmailRequest {
-  id          Int      @id @default(autoincrement())
-  thaiName    String
-  englishName String
-  phone       String
-  nickname    String
-  position    String
-  department  String
-  replyEmail  String
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  requestedBy Int
-  user        User     @relation(fields: [requestedBy], references: [id])
+  id                  Int      @id @default(autoincrement())
+  thaiName            String
+  englishName         String
+  phone               String
+  nickname            String
+  position            String
+  department          String
+  replyEmail          String
+  needsDocumentSystem Boolean  @default(false)
+  sharedDriveAccess   Json?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  requestedBy         Int
+  user                User     @relation(fields: [requestedBy], references: [id])
 
   @@index([requestedBy])
   @@index([createdAt])

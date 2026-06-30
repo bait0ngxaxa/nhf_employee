@@ -1,4 +1,5 @@
 import type { EmailRequest } from "@prisma/client";
+import type { SharedDriveOption } from "@/constants/email-request";
 
 // ==================== Input Types ====================
 
@@ -11,6 +12,8 @@ export interface CreateEmailRequestData {
     position: string;
     department: string;
     replyEmail: string;
+    needsDocumentSystem: boolean;
+    sharedDriveAccess: SharedDriveOption[];
 }
 
 /** Filters for querying email requests */

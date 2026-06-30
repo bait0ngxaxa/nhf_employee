@@ -1,3 +1,5 @@
+import type { SharedDriveOption } from "@/constants/email-request";
+
 /**
  * Email Request data interface matching Prisma model
  */
@@ -10,6 +12,8 @@ export interface EmailRequest {
     position: string;
     department: string;
     replyEmail: string;
+    needsDocumentSystem: boolean;
+    sharedDriveAccess: SharedDriveOption[] | null;
     createdAt: string;
     updatedAt: string;
     requestedBy: number;
@@ -31,6 +35,8 @@ export interface EmailRequestFormData {
     position: string;
     department: string;
     replyEmail: string;
+    needsDocumentSystem: boolean;
+    sharedDriveAccess: SharedDriveOption[];
 }
 
 /**

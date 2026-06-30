@@ -83,6 +83,21 @@ const TestComponent = () => {
                 value={formData.replyEmail}
                 onChange={handleInputChange}
             />
+            <input
+                data-testid="input-needsDocumentSystem"
+                name="needsDocumentSystem"
+                type="checkbox"
+                checked={formData.needsDocumentSystem}
+                onChange={handleInputChange}
+            />
+            <input
+                data-testid="input-sharedDrive-it"
+                name="sharedDriveAccess"
+                type="checkbox"
+                value="it"
+                checked={formData.sharedDriveAccess.includes("it")}
+                onChange={handleInputChange}
+            />
             <button data-testid="submit-btn" onClick={handleSubmit}>
                 Submit
             </button>
@@ -194,6 +209,8 @@ describe("EmailRequestProvider", () => {
         );
 
         fillValidForm();
+        fireEvent.click(screen.getByTestId("input-needsDocumentSystem"));
+        fireEvent.click(screen.getByTestId("input-sharedDrive-it"));
         const submitBtn = screen.getByTestId("submit-btn");
         fireEvent.click(submitBtn);
 
@@ -203,6 +220,8 @@ describe("EmailRequestProvider", () => {
                 expect.objectContaining({
                     thaiName: "สมชาย ใจดี",
                     phone: "081-2345678",
+                    needsDocumentSystem: true,
+                    sharedDriveAccess: ["it"],
                 }),
             );
         });
@@ -210,9 +229,9 @@ describe("EmailRequestProvider", () => {
         // Check that toast.success was called
         await waitFor(() => {
             expect(toast.success).toHaveBeenCalledWith(
-                "ส่งคำขออีเมลสำเร็จ",
+                "ส่งคำร้องพนักงานใหม่สำเร็จ",
                 expect.objectContaining({
-                    description: "คำขออีเมลของคุณถูกส่งไปยังทีมไอทีแล้ว",
+                    description: "คำร้องถูกส่งไปยังทีมไอทีแล้ว",
                 }),
             );
         });

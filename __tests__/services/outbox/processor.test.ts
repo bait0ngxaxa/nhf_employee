@@ -169,6 +169,51 @@ describe("processOutbox", () => {
         expect(
             lineNotificationService.sendEmailRequestNotification,
         ).toHaveBeenCalledTimes(1);
+        expect(
+            lineNotificationService.sendEmailRequestNotification,
+        ).toHaveBeenCalledWith(
+            expect.objectContaining({
+                needsDocumentSystem: false,
+                sharedDriveAccess: [],
+            }),
+        );
+    });
+
+    it("marks EMAIL_REQUEST failed for invalid shared drive payload", async () => {
+        prismaMock.notificationOutbox.findMany.mockResolvedValue(
+            asNever([
+                buildNotification(
+                    104,
+                    "EMAIL_REQUEST",
+                    JSON.stringify({
+                        thaiName: "Test",
+                        englishName: "Test",
+                        phone: "123",
+                        position: "IT",
+                        department: "IT",
+                        replyEmail: "test@nhf.or.th",
+                        sharedDriveAccess: ["unknown_drive"],
+                        requestedAt: new Date().toISOString(),
+                    }),
+                ),
+            ]),
+        );
+
+        const result = await processOutbox();
+
+        expect(result).toEqual({ processed: 0, failed: 1 });
+        expect(
+            lineNotificationService.sendEmailRequestNotification,
+        ).not.toHaveBeenCalled();
+        expect(prismaMock.notificationOutbox.updateMany).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: { id: 104, status: "PROCESSING" },
+                data: expect.objectContaining({
+                    status: "FAILED",
+                    error: "Invalid EMAIL_REQUEST sharedDriveAccess payload",
+                }),
+            }),
+        );
     });
 
     it("marks notification FAILED when dispatch throws", async () => {
