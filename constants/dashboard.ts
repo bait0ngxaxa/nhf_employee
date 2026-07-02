@@ -19,8 +19,6 @@ export const DASHBOARD_MENU_ITEMS: MenuItem[] = [
         label: "NHF Leave",
         icon: CalendarRange,
         description: "ยื่นใบลาและตรวจสอบโควต้าวันลา",
-        // Enabled only when NEXT_PUBLIC_FEATURE_LEAVE=true in .env
-        comingSoon: process.env.NEXT_PUBLIC_FEATURE_LEAVE !== "true",
     },
     {
         id: "stock",
