@@ -37,15 +37,37 @@ export interface PendingLeave {
     };
 }
 
+export interface LeaveApprovalPaginationMetadata {
+    currentPage: number;
+    totalPages: number;
+    totalItems: number;
+    itemsPerPage: number;
+}
+
 export interface LeaveApprovalsResponse {
     pending: PendingLeave[];
     notTakenPending: PendingLeave[];
     history: PendingLeave[];
+    metadata: {
+        pending: LeaveApprovalPaginationMetadata;
+        notTakenPending: LeaveApprovalPaginationMetadata;
+        history: LeaveApprovalPaginationMetadata;
+    };
 }
 
-export function useLeaveApprovals() {
+interface UseLeaveApprovalsPages {
+    pendingPage: number;
+    notTakenPage: number;
+    historyPage: number;
+}
+
+export function useLeaveApprovals({
+    pendingPage,
+    notTakenPage,
+    historyPage,
+}: UseLeaveApprovalsPages) {
     const { data, error, isLoading, mutate } = useSWR<LeaveApprovalsResponse>(
-        API_ROUTES.leave.approvals,
+        `${API_ROUTES.leave.approvals}?pendingPage=${pendingPage}&notTakenPage=${notTakenPage}&historyPage=${historyPage}`,
         fetcher,
         {
             revalidateOnFocus: false,
@@ -59,6 +81,7 @@ export function useLeaveApprovals() {
         pending: data?.pending || [],
         notTakenPending: data?.notTakenPending || [],
         history: data?.history || [],
+        metadata: data?.metadata,
         isLoading,
         isError: error,
         mutate,

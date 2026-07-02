@@ -1,7 +1,8 @@
 import type { ComponentType } from "react";
+import { Briefcase, Palmtree, Thermometer } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
-import { Thermometer, Briefcase, Palmtree } from "lucide-react";
 import type { LeaveQuota } from "@/hooks/useLeaveProfile";
+import { cn } from "@/lib/ui/utils";
 
 interface LeaveQuotaCardsProps {
     sickQuota: LeaveQuota | { totalDays: number; usedDays: number };
@@ -17,43 +18,52 @@ interface QuotaCardProps {
     note: string;
     icon: ComponentType<{ className?: string }>;
     theme: {
-        halo: string;
-        numberGradient: string;
-        iconBg: string;
+        iconSurface: string;
         iconColor: string;
+        valueColor: string;
+        barColor: string;
     };
 }
 
 function QuotaCard({ title, remain, used, total, note, icon: Icon, theme }: QuotaCardProps) {
     const isOverQuota = remain < 0;
+    const displayedRemain = isOverQuota ? Math.abs(remain) : remain;
+    const progress = getQuotaProgress(used, total);
 
     return (
-        <Card className="relative overflow-hidden bg-white/80 backdrop-blur-md border border-white/60 shadow-lg hover:shadow-xl transition-[box-shadow,transform] duration-300 rounded-3xl group">
-            <div
-                className={`absolute -right-6 -top-6 w-32 h-32 rounded-full opacity-10 blur-2xl ${theme.halo} group-hover:opacity-20 transition-opacity duration-500 pointer-events-none`}
-            />
-            <CardContent className="p-5 md:p-6 relative z-10">
-                <div className="flex justify-between items-start">
-                    <div>
-                        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">{title}</p>
-                        <div className="flex items-baseline space-x-2">
-                            <p
-                                className={`tabular-nums text-3xl font-extrabold bg-gradient-to-r ${theme.numberGradient} bg-clip-text text-transparent tracking-tight`}
-                            >
-                                {isOverQuota ? Math.abs(remain) : remain}
+        <Card className="border-slate-200 shadow-sm">
+            <CardContent className="p-5">
+                <div className="flex items-start justify-between gap-4">
+                    <div className="min-w-0">
+                        <p className="text-base/6 font-semibold text-slate-950">{title}</p>
+                        <p className="mt-1 text-xs/5 font-medium text-slate-500">{note}</p>
+                        <div className="mt-4 flex items-baseline gap-2">
+                            <p className={cn("tabular-nums text-4xl font-bold tracking-tight", isOverQuota ? "text-rose-700" : theme.valueColor)}>
+                                {displayedRemain}
                             </p>
-                            <p className="text-sm font-medium text-gray-500">
+                            <p className="text-sm/6 font-semibold text-slate-600">
                                 {isOverQuota ? "วันเกินสิทธิ์" : "วันคงเหลือ"}
                             </p>
                         </div>
-                        <p className="text-xs text-gray-400 mt-1">
-                            ใช้ไปแล้ว: {used}/{total} วัน ({note})
-                        </p>
+                    </div>
+                    <div className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-lg", theme.iconSurface)}>
+                        <Icon className={cn("h-5 w-5", theme.iconColor)} aria-hidden="true" />
+                    </div>
+                </div>
+
+                <div className="mt-5">
+                    <div className="flex items-center justify-between gap-3 text-xs/5 font-medium text-slate-600">
+                        <span>ใช้ไปแล้ว</span>
+                        <span className="tabular-nums">{used}/{total} วัน</span>
                     </div>
                     <div
-                        className={`p-3 rounded-2xl ${theme.iconBg} group-hover:scale-110 transition-transform duration-300`}
+                        className="mt-2 h-2 overflow-hidden rounded-full bg-slate-100"
+                        aria-label={`ใช้วันลาไปแล้ว ${used} จาก ${total} วัน`}
                     >
-                        <Icon className={`h-6 w-6 ${theme.iconColor}`} />
+                        <div
+                            className={cn("h-full rounded-full", isOverQuota ? "bg-rose-500" : theme.barColor)}
+                            style={{ width: `${progress}%` }}
+                        />
                     </div>
                 </div>
             </CardContent>
@@ -63,7 +73,7 @@ function QuotaCard({ title, remain, used, total, note, icon: Icon, theme }: Quot
 
 export function LeaveQuotaCards({ sickQuota, personalQuota, vacationQuota }: LeaveQuotaCardsProps) {
     return (
-        <div className="grid gap-6 md:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-3">
             <QuotaCard
                 title="ลาป่วย"
                 remain={sickQuota.totalDays - sickQuota.usedDays}
@@ -72,10 +82,10 @@ export function LeaveQuotaCards({ sickQuota, personalQuota, vacationQuota }: Lea
                 note="โควต้า 30 วัน/ปี"
                 icon={Thermometer}
                 theme={{
-                    halo: "bg-gradient-to-br from-emerald-500 to-teal-600",
-                    numberGradient: "from-emerald-500 to-teal-600",
-                    iconBg: "bg-emerald-100/80",
-                    iconColor: "text-emerald-600",
+                    iconSurface: "bg-emerald-50",
+                    iconColor: "text-emerald-700",
+                    valueColor: "text-emerald-700",
+                    barColor: "bg-emerald-500",
                 }}
             />
             <QuotaCard
@@ -86,10 +96,10 @@ export function LeaveQuotaCards({ sickQuota, personalQuota, vacationQuota }: Lea
                 note="สิทธิปีนี้"
                 icon={Briefcase}
                 theme={{
-                    halo: "bg-gradient-to-br from-blue-500 to-indigo-600",
-                    numberGradient: "from-blue-500 to-indigo-600",
-                    iconBg: "bg-blue-100/80",
-                    iconColor: "text-blue-600",
+                    iconSurface: "bg-sky-50",
+                    iconColor: "text-sky-700",
+                    valueColor: "text-sky-700",
+                    barColor: "bg-sky-500",
                 }}
             />
             <QuotaCard
@@ -100,12 +110,20 @@ export function LeaveQuotaCards({ sickQuota, personalQuota, vacationQuota }: Lea
                 note="สิทธิปีนี้"
                 icon={Palmtree}
                 theme={{
-                    halo: "bg-gradient-to-br from-amber-500 to-orange-600",
-                    numberGradient: "from-amber-500 to-orange-600",
-                    iconBg: "bg-amber-100/80",
-                    iconColor: "text-amber-600",
+                    iconSurface: "bg-amber-50",
+                    iconColor: "text-amber-700",
+                    valueColor: "text-amber-700",
+                    barColor: "bg-amber-500",
                 }}
             />
         </div>
     );
+}
+
+function getQuotaProgress(used: number, total: number): number {
+    if (total <= 0) {
+        return 0;
+    }
+
+    return Math.min(100, Math.max(0, (used / total) * 100));
 }

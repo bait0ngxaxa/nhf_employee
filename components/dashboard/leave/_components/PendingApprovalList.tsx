@@ -1,17 +1,19 @@
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import {
-    CheckCircle,
-    XCircle,
-    Clock,
-    CalendarRange,
-    UserCircle2,
-    Briefcase,
-    Thermometer,
-    Palmtree,
     AlertTriangle,
+    Briefcase,
+    CalendarRange,
+    CheckCircle,
+    Clock,
+    Palmtree,
+    Thermometer,
+    UserCircle2,
+    XCircle,
+    type LucideIcon,
 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import type { PendingLeave } from "@/hooks/useLeaveApprovals";
+import { LEAVE_THEME_BUTTON_CLASS } from "../leaveTheme";
 
 interface PendingApprovalListProps {
     pending: PendingLeave[];
@@ -32,6 +34,12 @@ const periodLabel = (period: PendingLeave["period"]): string => {
     return "บ่าย";
 };
 
+const leaveTypeIcon = (leaveType: PendingLeave["leaveType"]): LucideIcon => {
+    if (leaveType === "SICK") return Thermometer;
+    if (leaveType === "PERSONAL") return Briefcase;
+    return Palmtree;
+};
+
 export function PendingApprovalList({
     pending,
     isProcessing,
@@ -39,143 +47,184 @@ export function PendingApprovalList({
     onOpenReject,
 }: PendingApprovalListProps) {
     if (pending.length === 0) {
-        return (
-            <Card className="shadow-sm border-gray-100">
-                <div className="p-8 text-center flex flex-col items-center text-gray-500">
-                    <div className="bg-emerald-50 p-4 rounded-full mb-4">
-                        <CheckCircle className="h-8 w-8 text-emerald-400" />
-                    </div>
-                    <p className="text-lg font-medium text-gray-700">ไม่มีคำขอที่ต้องพิจารณา</p>
-                    <p className="text-sm text-gray-400 mt-1">ยอดเยี่ยม คุณตรวจสอบครบแล้ว</p>
-                </div>
-            </Card>
-        );
+        return <EmptyPendingApproval />;
     }
 
     return (
-        <div className="space-y-4">
+        <div className="space-y-3">
             {pending.map((leave) => (
-                <Card
+                <PendingApprovalCard
                     key={leave.id}
-                    className="group relative overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-md hover:shadow-xl hover:-translate-y-1 transition-all duration-300 hover:border-indigo-100"
-                >
-                    <div className="flex flex-col lg:flex-row gap-6 p-5 sm:p-6">
-                        <div className="flex-1 space-y-4">
-                            <div className="flex items-start justify-between">
-                                <div className="flex gap-4">
-                                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-indigo-100 to-indigo-50 text-indigo-600 ring-4 ring-white shadow-sm">
-                                        <UserCircle2 className="h-6 w-6" />
-                                    </div>
-                                    <div>
-                                        <h3 className="font-semibold text-gray-900 text-base">
-                                            {leave.employee.firstName} {leave.employee.lastName}
-                                            {leave.employee.nickname ? <span className="text-gray-500 font-normal ml-1">({leave.employee.nickname})</span> : null}
-                                        </h3>
-                                        <p className="text-sm text-gray-500 flex items-center gap-1.5 mt-0.5">
-                                            <Briefcase className="w-3.5 h-3.5" />
-                                            {leave.employee.position} <span className="text-gray-300">&bull;</span> {leave.employee.dept?.name}
-                                        </p>
-                                    </div>
-                                </div>
-                            </div>
+                    leave={leave}
+                    isProcessing={isProcessing}
+                    onApprove={onApprove}
+                    onOpenReject={onOpenReject}
+                />
+            ))}
+        </div>
+    );
+}
 
-                            <div className="rounded-xl border border-indigo-50/80 bg-indigo-50/30 p-4">
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                    <div className="space-y-1">
-                                        <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">ประเภทการลา</p>
-                                        <div className="flex items-center text-sm font-semibold text-indigo-700">
-                                            {leave.leaveType === "SICK" ? <Thermometer className="w-4 h-4 mr-1.5 text-indigo-500" /> : null}
-                                            {leave.leaveType === "PERSONAL" ? <Briefcase className="w-4 h-4 mr-1.5 text-indigo-500" /> : null}
-                                            {leave.leaveType === "VACATION" ? <Palmtree className="w-4 h-4 mr-1.5 text-indigo-500" /> : null}
-                                            {leaveTypeLabel(leave.leaveType)}
-                                        </div>
-                                    </div>
-                                    <div className="space-y-1">
-                                        <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">ระยะเวลา</p>
-                                        <div className="flex items-center text-sm font-medium text-gray-900">
-                                            <CalendarRange className="w-4 h-4 mr-1.5 text-gray-400" />
-                                            <span>
-                                                {new Intl.DateTimeFormat("th-TH", { day: "numeric", month: "short" }).format(new Date(leave.startDate))}
-                                                {leave.startDate !== leave.endDate
-                                                    ? ` - ${new Intl.DateTimeFormat("th-TH", { day: "numeric", month: "short" }).format(new Date(leave.endDate))}`
-                                                    : ""}
-                                            </span>
-                                            <span className="ml-2 inline-flex items-center rounded-md bg-white px-2 py-0.5 text-xs font-medium text-gray-600 ring-1 ring-inset ring-gray-200">
-                                                {leave.durationDays} วัน ({periodLabel(leave.period)})
-                                            </span>
-                                        </div>
-                                    </div>
-                                </div>
-                                {leave.reason ? (
-                                    <div className="mt-3 pt-3 border-t border-indigo-100/50">
-                                        <p className="text-sm leading-relaxed text-gray-700">
-                                            <span className="font-medium text-gray-900 mr-2">เหตุผล:</span>
-                                            {leave.reason}
-                                        </p>
-                                    </div>
-                                ) : null}
-                                {leave.emergencyReason || leave.specialReason || leave.overQuotaDays > 0 ? (
-                                    <div className="mt-3 flex flex-wrap gap-2 border-t border-indigo-100/50 pt-3">
-                                        {leave.emergencyReason ? (
-                                            <SpecialFlag label="ลาย้อนหลังกรณีฉุกเฉิน" />
-                                        ) : null}
-                                        {leave.specialReason || leave.overQuotaDays > 0 ? (
-                                            <SpecialFlag
-                                                label={
-                                                    leave.overQuotaDays > 0
-                                                        ? `เกินสิทธิ์ ${leave.overQuotaDays} วัน`
-                                                        : "ลาเกินโควต้ากรณีพิเศษ"
-                                                }
-                                            />
-                                        ) : null}
-                                    </div>
-                                ) : null}
-                            </div>
+function PendingApprovalCard({
+    leave,
+    isProcessing,
+    onApprove,
+    onOpenReject,
+}: {
+    leave: PendingLeave;
+    isProcessing: boolean;
+    onApprove: (leave: PendingLeave) => Promise<void>;
+    onOpenReject: (leave: PendingLeave) => void;
+}) {
+    const LeaveTypeIcon = leaveTypeIcon(leave.leaveType);
 
-                            <div className="text-xs text-gray-400 flex items-center gap-1.5">
-                                <Clock className="w-3.5 h-3.5" />
-                                ยื่นใบลาเมื่อ{" "}
-                                {new Intl.DateTimeFormat("th-TH", {
-                                    day: "numeric",
-                                    month: "long",
-                                    year: "numeric",
-                                    hour: "2-digit",
-                                    minute: "2-digit",
-                                }).format(new Date(leave.createdAt))}
-                            </div>
+    return (
+        <Card className="border-slate-200 p-5 shadow-sm">
+            <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+                <div className="min-w-0 flex-1 space-y-4">
+                    <div className="flex min-w-0 items-start gap-3">
+                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-indigo-50 text-indigo-700">
+                            <UserCircle2 className="h-5 w-5" aria-hidden="true" />
                         </div>
-
-                        <div className="flex lg:flex-col justify-end gap-3 pt-4 lg:pt-0 lg:pl-6 border-t lg:border-t-0 lg:border-l border-gray-100 lg:min-w-[140px]">
-                            <Button
-                                onClick={() => onApprove(leave)}
-                                disabled={isProcessing}
-                                className="w-full bg-emerald-500 hover:bg-emerald-600 text-white shadow-sm shadow-emerald-200 transition-all hover:shadow-md lg:hover:-translate-y-0.5"
-                            >
-                                <CheckCircle className="w-4 h-4 mr-2" />
-                                อนุมัติ
-                            </Button>
-                            <Button
-                                onClick={() => onOpenReject(leave)}
-                                disabled={isProcessing}
-                                variant="outline"
-                                className="w-full border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700 hover:border-red-300 transition-all"
-                            >
-                                <XCircle className="w-4 h-4 mr-2" />
-                                ไม่อนุมัติ
-                            </Button>
+                        <div className="min-w-0">
+                            <h3 className="break-words text-lg/7 font-semibold tracking-tight text-slate-950">
+                                {leave.employee.firstName} {leave.employee.lastName}
+                                {leave.employee.nickname ? (
+                                    <span className="font-normal text-slate-600">
+                                        {" "}({leave.employee.nickname})
+                                    </span>
+                                ) : null}
+                            </h3>
+                            <p className="mt-1 break-words text-sm/6 font-medium text-slate-600">
+                                {leave.employee.position} · {leave.employee.dept?.name ?? "ไม่ระบุแผนก"}
+                            </p>
                         </div>
                     </div>
-                </Card>
-            ))}
+
+                    <div className="grid gap-4 rounded-xl border border-indigo-100 bg-indigo-50/60 p-4 sm:grid-cols-2">
+                        <InfoRow
+                            icon={LeaveTypeIcon}
+                            label="ประเภทการลา"
+                            value={leaveTypeLabel(leave.leaveType)}
+                        />
+                        <InfoRow
+                            icon={CalendarRange}
+                            label="ระยะเวลา"
+                            value={`${formatLeaveDateRange(leave.startDate, leave.endDate)} (${leave.durationDays} วัน, ${periodLabel(leave.period)})`}
+                        />
+                    </div>
+
+                    {leave.reason ? (
+                        <p className="max-w-[75ch] rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm/6 text-slate-700">
+                            <span className="font-medium text-slate-950">เหตุผล: </span>
+                            <span className="break-words">{leave.reason}</span>
+                        </p>
+                    ) : null}
+
+                    {leave.emergencyReason || leave.specialReason || leave.overQuotaDays > 0 ? (
+                        <div className="flex flex-wrap gap-2">
+                            {leave.emergencyReason ? <SpecialFlag label="ลาย้อนหลังกรณีฉุกเฉิน" /> : null}
+                            {leave.specialReason || leave.overQuotaDays > 0 ? (
+                                <SpecialFlag
+                                    label={
+                                        leave.overQuotaDays > 0
+                                            ? `เกินสิทธิ์ ${leave.overQuotaDays} วัน`
+                                            : "ลาเกินโควต้ากรณีพิเศษ"
+                                    }
+                                />
+                            ) : null}
+                        </div>
+                    ) : null}
+
+                    <p className="flex items-center gap-1.5 text-xs/5 font-medium text-slate-500">
+                        <Clock className="h-3.5 w-3.5" aria-hidden="true" />
+                        ยื่นใบลาเมื่อ {formatSubmittedAt(leave.createdAt)}
+                    </p>
+                </div>
+
+                <div className="flex flex-col gap-2 sm:flex-row lg:w-40 lg:flex-col">
+                    <Button
+                        onClick={() => onApprove(leave)}
+                        disabled={isProcessing}
+                        className={LEAVE_THEME_BUTTON_CLASS}
+                    >
+                        <CheckCircle className="h-4 w-4" aria-hidden="true" />
+                        อนุมัติ
+                    </Button>
+                    <Button
+                        onClick={() => onOpenReject(leave)}
+                        disabled={isProcessing}
+                        variant="outline"
+                        className="border-rose-200 text-rose-700 hover:bg-rose-50 hover:text-rose-800"
+                    >
+                        <XCircle className="h-4 w-4" aria-hidden="true" />
+                        ไม่อนุมัติ
+                    </Button>
+                </div>
+            </div>
+        </Card>
+    );
+}
+
+function InfoRow({
+    icon: Icon,
+    label,
+    value,
+}: {
+    icon: LucideIcon;
+    label: string;
+    value: string;
+}) {
+    return (
+        <div className="min-w-0">
+            <p className="text-xs/5 font-medium text-indigo-700">{label}</p>
+            <p className="mt-1 flex items-start gap-2 break-words text-base/6 font-semibold text-slate-950">
+                <Icon className="mt-0.5 h-4 w-4 shrink-0 text-indigo-600" aria-hidden="true" />
+                <span>{value}</span>
+            </p>
         </div>
     );
 }
 
 function SpecialFlag({ label }: { label: string }) {
     return (
-        <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700">
-            <AlertTriangle className="mr-1 h-3.5 w-3.5" />
+        <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-800">
+            <AlertTriangle className="mr-1 h-3.5 w-3.5" aria-hidden="true" />
             {label}
         </span>
     );
+}
+
+function EmptyPendingApproval() {
+    return (
+        <Card className="border-dashed border-slate-300 p-8 text-center shadow-none">
+            <CheckCircle className="mx-auto h-8 w-8 text-emerald-600" aria-hidden="true" />
+            <p className="mt-3 text-base/6 font-semibold text-slate-900">ไม่มีคำขอที่ต้องพิจารณา</p>
+            <p className="mt-1 text-sm/6 text-slate-500">คำขอใหม่จากทีมจะแสดงที่นี่</p>
+        </Card>
+    );
+}
+
+function formatLeaveDateRange(startDate: string, endDate: string): string {
+    const formatter = new Intl.DateTimeFormat("th-TH", {
+        day: "numeric",
+        month: "short",
+    });
+    const start = formatter.format(new Date(startDate));
+
+    if (startDate === endDate) {
+        return start;
+    }
+
+    return `${start} - ${formatter.format(new Date(endDate))}`;
+}
+
+function formatSubmittedAt(createdAt: string): string {
+    return new Intl.DateTimeFormat("th-TH", {
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+    }).format(new Date(createdAt));
 }

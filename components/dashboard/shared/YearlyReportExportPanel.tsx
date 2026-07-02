@@ -53,7 +53,7 @@ export function YearlyReportExportPanel({
 }: YearlyReportExportPanelProps) {
     if (layout === "card") {
         return (
-            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                     <div className="space-y-2">
                         {badge ? badge : null}
@@ -89,7 +89,7 @@ export function YearlyReportExportPanel({
                         {stats.map((stat) => (
                             <div
                                 key={stat.label}
-                                className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4"
+                                className="rounded-lg border border-slate-200 bg-slate-50 p-4"
                             >
                                 <div className="flex items-center gap-2 text-xs font-semibold text-slate-500">
                                     {stat.icon}
@@ -157,7 +157,7 @@ function PanelControls({
             >
                 <SelectTrigger
                     className={cn(
-                        "w-[110px] rounded-2xl border-slate-200 bg-white/90 text-sm shadow-sm",
+                        "w-[110px] rounded-md border-slate-300 bg-white text-sm",
                         selectClassName ?? "h-9",
                     )}
                     aria-label={selectAriaLabel}
@@ -179,7 +179,7 @@ function PanelControls({
                 disabled={disabled}
                 variant="outline"
                 className={cn(
-                    "rounded-2xl px-5 text-sm font-semibold",
+                    "rounded-md px-5 text-sm font-semibold",
                     buttonClassName ?? "h-9",
                 )}
             >

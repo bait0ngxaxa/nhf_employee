@@ -191,6 +191,7 @@ function LeaveReasonField({ model }: { model: LeaveRequestFormModel }) {
                             placeholder="ระบุเหตุผลการลาของคุณ"
                             className="min-h-24 resize-none"
                             rows={4}
+                            maxLength={1000}
                             disabled={model.isSubmitting}
                             {...field}
                         />

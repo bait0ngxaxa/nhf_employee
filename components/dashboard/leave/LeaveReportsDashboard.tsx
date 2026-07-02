@@ -10,6 +10,7 @@ import {
     fetchLeaveExportYears,
     type LeaveExportMetaResponse,
 } from "@/lib/services/leave/client";
+import { LEAVE_THEME_BUTTON_CLASS } from "./leaveTheme";
 
 export function LeaveReportsDashboard() {
     const currentYear = new Date().getFullYear();
@@ -131,11 +132,11 @@ export function LeaveReportsDashboard() {
                 selectAriaLabel="เลือกปีรีพอร์ตการลา"
                 layout="card"
                 selectClassName="h-11"
-                buttonClassName="h-11 bg-[linear-gradient(135deg,#4f46e5,#2563eb)] text-white shadow-[0_20px_36px_-24px_rgba(37,99,235,0.95)] transition-all duration-300 hover:-translate-y-0.5 hover:bg-[linear-gradient(135deg,#4f46e5,#2563eb)] hover:text-white hover:shadow-[0_24px_40px_-22px_rgba(37,99,235,0.95)]"
+                buttonClassName={`h-11 ${LEAVE_THEME_BUTTON_CLASS}`}
                 badge={
-                    <div className="inline-flex items-center gap-2 rounded-full border border-indigo-100 bg-white/80 px-3 py-1 text-xs font-semibold text-indigo-700 shadow-sm">
+                    <div className="inline-flex items-center gap-2 rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-medium text-sky-800">
                         <BarChart3 className="h-3.5 w-3.5" aria-hidden="true" />
-                        MANAGER REPORTS
+                        รีพอร์ตผู้จัดการ
                     </div>
                 }
                 title="รีพอร์ตการลารายปี"

@@ -61,6 +61,26 @@ describe("useManagerApprovalModel", () => {
             pending: [pendingLeave],
             notTakenPending: [],
             history: [],
+            metadata: {
+                pending: {
+                    currentPage: 1,
+                    totalPages: 1,
+                    totalItems: 1,
+                    itemsPerPage: 10,
+                },
+                notTakenPending: {
+                    currentPage: 1,
+                    totalPages: 1,
+                    totalItems: 0,
+                    itemsPerPage: 10,
+                },
+                history: {
+                    currentPage: 1,
+                    totalPages: 1,
+                    totalItems: 0,
+                    itemsPerPage: 10,
+                },
+            },
             isLoading: false,
             isError: null,
             mutate,
@@ -84,6 +104,16 @@ describe("useManagerApprovalModel", () => {
         });
         expect(mutate).toHaveBeenCalledTimes(1);
         expect(toast.success).toHaveBeenCalledTimes(1);
+    });
+
+    it("loads approval lists with first page pagination", () => {
+        renderHook(() => useManagerApprovalModel());
+
+        expect(useLeaveApprovals).toHaveBeenCalledWith({
+            pendingPage: 1,
+            notTakenPage: 1,
+            historyPage: 1,
+        });
     });
 
     it("opens confirmation for special leave before approving", async () => {

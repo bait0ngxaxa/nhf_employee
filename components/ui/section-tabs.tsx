@@ -1,4 +1,4 @@
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useRef, type CSSProperties, type ReactNode } from "react";
 import { type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/ui/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -15,27 +15,27 @@ export interface SectionTabItem {
     visible?: boolean;
 }
 
-/**
- * SectionTabs — shared pill-style tabs matching IT Support design.
- *
- * Uses CSS custom property `--tab-active-color` to apply the active text color.
- */
 interface SectionTabsProps {
     value: string;
     onValueChange: (value: string) => void;
     tabs: SectionTabItem[];
-    /** CSS color for the active tab text (any valid CSS value, e.g. "#ea580c") */
+    /** CSS color for the active tab background (any valid CSS value, e.g. "#ea580c") */
     activeColor?: string;
+    ariaLabel?: string;
 }
 
 export function SectionTabs({
     value,
     onValueChange,
     tabs,
-    activeColor = "#0ea5e9", // default sky-500
+    activeColor = "#0369a1",
+    ariaLabel = "แท็บของส่วนงาน",
 }: SectionTabsProps) {
     const visibleTabs = tabs.filter((t) => t.visible !== false);
     const triggerRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+    const tabStyle: CSSProperties & { "--section-tab-active-color": string } = {
+        "--section-tab-active-color": activeColor,
+    };
 
     useEffect(() => {
         const activeTrigger = triggerRefs.current[value];
@@ -43,8 +43,9 @@ export function SectionTabs({
             return;
         }
 
+        const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
         activeTrigger.scrollIntoView({
-            behavior: "smooth",
+            behavior: prefersReducedMotion ? "auto" : "smooth",
             block: "nearest",
             inline: "nearest",
         });
@@ -54,19 +55,13 @@ export function SectionTabs({
         <Tabs
             value={value}
             onValueChange={onValueChange}
-            className="space-y-10 animate-in fade-in slide-in-from-bottom-6 duration-700 ease-out"
+            className="space-y-6"
+            style={tabStyle}
         >
-            {/* Scoped CSS for active tab background and shadow via custom property */}
-            <style>{`
-                [data-section-tabs] [data-state="active"] {
-                    background-color: ${activeColor} !important;
-                    box-shadow: 0 10px 15px -3px ${activeColor}33 !important;
-                }
-            `}</style>
-
-            <div className="mb-4 w-full overflow-x-auto pb-2">
+            <div className="w-full overflow-x-auto pb-1">
                 <TabsList
-                    className="flex h-auto min-w-max flex-nowrap gap-2 rounded-[1.75rem] bg-slate-50 border border-slate-100 p-1.5 hide-scrollbar md:min-w-0 md:w-full"
+                    aria-label={ariaLabel}
+                    className="flex h-auto min-w-max flex-nowrap gap-1 rounded-xl border border-slate-200 bg-slate-50 p-1 md:min-w-0 md:w-full"
                     data-section-tabs=""
                 >
                     {visibleTabs.map((tab) => {
@@ -76,19 +71,20 @@ export function SectionTabs({
                                 key={tab.value}
                                 value={tab.value}
                                 className={cn(
-                                    "shrink-0 md:flex-1 flex items-center justify-center gap-2.5 rounded-[1.25rem] px-6 py-3",
-                                    "data-[state=active]:text-white",
-                                    "transition-all duration-500",
-                                    "text-slate-400 hover:text-slate-900 font-bold tracking-tight whitespace-nowrap"
+                                    "flex min-h-10 shrink-0 items-center justify-center gap-2 rounded-lg border border-transparent px-4 py-2 text-sm font-medium",
+                                    "text-slate-600 hover:bg-white hover:text-slate-950",
+                                    "data-[state=active]:border-transparent data-[state=active]:bg-[var(--section-tab-active-color)] data-[state=active]:text-white",
+                                    "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+                                    "motion-safe:transition-[background-color,border-color,color] motion-safe:duration-200 md:flex-1"
                                 )}
                                 ref={(node) => {
                                     triggerRefs.current[tab.value] = node;
                                 }}
                             >
                                 {TabIcon && (
-                                    <TabIcon className="h-4 w-4 shrink-0 transition-transform duration-500 group-data-[state=active]:scale-110" />
+                                    <TabIcon className="h-4 w-4 shrink-0" aria-hidden="true" />
                                 )}
-                                <span className="text-xs uppercase tracking-[0.1em]">{tab.label}</span>
+                                <span className="truncate">{tab.label}</span>
                             </TabsTrigger>
                         );
                     })}
@@ -99,7 +95,7 @@ export function SectionTabs({
                 <TabsContent
                     key={tab.value}
                     value={tab.value}
-                    className="mt-0 focus-visible:outline-none animate-in fade-in slide-in-from-bottom-4 duration-500"
+                    className="mt-0 min-w-0 focus-visible:outline-none"
                 >
                     {tab.content}
                 </TabsContent>

@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/dialog";
 import { Form } from "@/components/ui/form";
 import { Separator } from "@/components/ui/separator";
+import { LEAVE_THEME_BUTTON_CLASS } from "./leaveTheme";
 import { useLeaveRequestFormModel } from "@/hooks/leave/useLeaveRequestFormModel";
 import type { LeaveQuota } from "@/hooks/useLeaveProfile";
 import { LeaveDialogFields } from "./_components/LeaveRequestFormFields";
@@ -105,7 +106,11 @@ export function LeaveRequestForm({ open, onSuccess, onCancel, quotas }: Props) {
                             >
                                 ยกเลิก
                             </Button>
-                            <Button type="submit" disabled={model.isSubmitting}>
+                            <Button
+                                type="submit"
+                                className={LEAVE_THEME_BUTTON_CLASS}
+                                disabled={model.isSubmitting}
+                            >
                                 {model.isSubmitting ? (
                                     <Loader2 data-icon="inline-start" className="animate-spin" />
                                 ) : null}

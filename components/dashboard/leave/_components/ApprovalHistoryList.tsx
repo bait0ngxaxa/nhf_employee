@@ -15,8 +15,11 @@ const leaveShortLabel = (leaveType: PendingLeave["leaveType"]): string => {
 export function ApprovalHistoryList({ history }: ApprovalHistoryListProps) {
     if (history.length === 0) {
         return (
-            <Card className="shadow-sm border-gray-100 p-8 text-center text-gray-500">
-                ยังไม่มีข้อมูลการพิจารณาในระบบ
+            <Card className="border-dashed border-slate-300 p-8 text-center shadow-none">
+                <p className="text-sm font-medium text-slate-800">ยังไม่มีข้อมูลการพิจารณาในระบบ</p>
+                <p className="mt-1 text-sm text-slate-500">
+                    รายการที่อนุมัติหรือไม่อนุมัติแล้วจะแสดงที่นี่
+                </p>
             </Card>
         );
     }
@@ -26,14 +29,16 @@ export function ApprovalHistoryList({ history }: ApprovalHistoryListProps) {
             {history.map((leave) => (
                 <Card
                     key={leave.id}
-                    className="shadow-sm border-gray-100 p-4 shrink-0 flex flex-col md:flex-row justify-between items-start md:items-center gap-3"
+                    className="flex flex-col gap-3 border-slate-200 p-4 shadow-sm md:flex-row md:items-start md:justify-between"
                 >
-                    <div>
-                        <p className="font-medium text-gray-800 text-sm">
+                    <div className="min-w-0">
+                        <p className="break-words text-sm font-medium text-slate-950">
                             {leave.employee.firstName} {leave.employee.lastName}
-                            <span className="text-gray-400 font-normal ml-2">ยื่นลา{leaveShortLabel(leave.leaveType)}</span>
+                            <span className="ml-2 font-normal text-slate-600">
+                                ยื่นลา{leaveShortLabel(leave.leaveType)}
+                            </span>
                         </p>
-                        <p className="text-xs text-gray-500 mt-1">
+                        <p className="mt-1 text-xs text-slate-600">
                             วันที่:{" "}
                             {new Intl.DateTimeFormat("th-TH", {
                                 day: "numeric",
@@ -50,12 +55,12 @@ export function ApprovalHistoryList({ history }: ApprovalHistoryListProps) {
                             ({leave.durationDays} วัน)
                         </p>
                         {leave.status === "NOT_TAKEN" && leave.notTakenReason ? (
-                            <p className="mt-2 rounded-md border border-cyan-100 bg-cyan-50 p-2 text-xs text-cyan-700">
+                            <p className="mt-2 break-words rounded-md border border-cyan-200 bg-cyan-50 p-2 text-sm leading-6 text-cyan-900">
                                 ไม่ได้ใช้วันลา: {leave.notTakenReason}
                             </p>
                         ) : null}
                     </div>
-                    <div>
+                    <div className="md:shrink-0">
                         <LeaveStatusBadge status={leave.status} />
                     </div>
                 </Card>

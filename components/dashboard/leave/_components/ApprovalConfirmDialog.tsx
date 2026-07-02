@@ -9,6 +9,7 @@ import {
     DialogTitle,
 } from "@/components/ui/dialog";
 import type { PendingLeave } from "@/hooks/useLeaveApprovals";
+import { LEAVE_THEME_BUTTON_CLASS } from "../leaveTheme";
 
 interface ApprovalConfirmDialogProps {
     leave: PendingLeave | null;
@@ -36,15 +37,15 @@ export function ApprovalConfirmDialog({
                     </DialogDescription>
                 </DialogHeader>
                 {leave ? (
-                    <div className="space-y-2 rounded-lg border border-amber-100 bg-amber-50 p-3 text-sm text-amber-900">
+                    <div className="space-y-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm leading-6 text-amber-950">
                         {leave.emergencyReason ? (
-                            <p>
+                            <p className="break-words">
                                 <span className="font-semibold">เหตุผลฉุกเฉิน:</span>{" "}
                                 {leave.emergencyReason}
                             </p>
                         ) : null}
                         {leave.specialReason ? (
-                            <p>
+                            <p className="break-words">
                                 <span className="font-semibold">เหตุผลพิเศษ:</span>{" "}
                                 {leave.specialReason}
                             </p>
@@ -67,10 +68,10 @@ export function ApprovalConfirmDialog({
                     </Button>
                     <Button
                         disabled={isProcessing}
-                        className="bg-emerald-600 hover:bg-emerald-700"
+                        className={LEAVE_THEME_BUTTON_CLASS}
                         onClick={onConfirm}
                     >
-                        {isProcessing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                        {isProcessing ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : null}
                         ยืนยันอนุมัติ
                     </Button>
                 </DialogFooter>

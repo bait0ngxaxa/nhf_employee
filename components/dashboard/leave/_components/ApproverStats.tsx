@@ -12,47 +12,47 @@ interface StatCardProps {
     icon: ComponentType<{ className?: string }>;
     label: string;
     value: number;
-    color: "indigo" | "emerald" | "amber" | "gray";
+    color: "sky" | "emerald" | "amber" | "gray";
 }
 
 function StatCard({ icon: Icon, label, value, color }: StatCardProps) {
     const colorMap: Record<StatCardProps["color"], { card: string; icon: string; text: string; bg: string }> = {
-        indigo: {
-            card: "from-indigo-50 to-sky-50 border-indigo-100",
-            icon: "text-indigo-600",
-            text: "text-indigo-700",
-            bg: "bg-indigo-100",
+        sky: {
+            card: "border-sky-200 bg-sky-50",
+            icon: "text-sky-700",
+            text: "text-sky-800",
+            bg: "bg-white",
         },
         emerald: {
-            card: "from-emerald-50 to-teal-50 border-emerald-100",
-            icon: "text-emerald-600",
-            text: "text-emerald-700",
-            bg: "bg-emerald-100",
+            card: "border-emerald-200 bg-emerald-50",
+            icon: "text-emerald-700",
+            text: "text-emerald-800",
+            bg: "bg-white",
         },
         amber: {
-            card: "from-amber-50 to-orange-50 border-amber-200",
-            icon: "text-amber-600",
-            text: "text-amber-700",
-            bg: "bg-amber-100",
+            card: "border-amber-200 bg-amber-50",
+            icon: "text-amber-700",
+            text: "text-amber-800",
+            bg: "bg-white",
         },
         gray: {
-            card: "from-gray-50 to-slate-50 border-gray-100",
-            icon: "text-gray-400",
-            text: "text-gray-400",
-            bg: "bg-gray-100",
+            card: "border-slate-200 bg-slate-50",
+            icon: "text-slate-500",
+            text: "text-slate-700",
+            bg: "bg-white",
         },
     };
     const c = colorMap[color];
 
     return (
-        <Card className={`bg-gradient-to-br ${c.card}`}>
+        <Card className={c.card}>
             <CardContent className="pt-5 pb-4">
                 <div className="flex items-center gap-3">
-                    <div className={`p-2 rounded-lg ${c.bg}`}>
-                        <Icon className={`h-5 w-5 ${c.icon}`} />
+                    <div className={`rounded-lg border border-white/80 p-2 ${c.bg}`}>
+                        <Icon className={`h-5 w-5 ${c.icon}`} aria-hidden="true" />
                     </div>
-                    <div>
-                        <p className="text-sm text-gray-500">{label}</p>
+                    <div className="min-w-0">
+                        <p className="text-sm text-slate-600">{label}</p>
                         <p className={`text-2xl font-bold ${c.text}`}>{value}</p>
                     </div>
                 </div>
@@ -68,7 +68,7 @@ export function ApproverStats({
 }: ApproverStatsProps) {
     return (
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <StatCard icon={Users} label="พนักงานทั้งหมด" value={totalEmployees} color="indigo" />
+            <StatCard icon={Users} label="พนักงานทั้งหมด" value={totalEmployees} color="sky" />
             <StatCard icon={Users} label="ผู้อนุมัติ" value={activeApprovers} color="emerald" />
             <StatCard
                 icon={AlertTriangle}

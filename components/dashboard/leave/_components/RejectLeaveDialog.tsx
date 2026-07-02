@@ -46,18 +46,20 @@ export function RejectLeaveDialog({
                         onChange={(event) => onRejectReasonChange(event.target.value)}
                         className="resize-none"
                         rows={4}
+                        maxLength={1000}
+                        disabled={isProcessing}
                     />
                 </div>
                 <DialogFooter>
-                    <Button variant="outline" onClick={() => onOpenChange(false)}>
+                    <Button variant="outline" disabled={isProcessing} onClick={() => onOpenChange(false)}>
                         ยกเลิก
                     </Button>
                     <Button
-                        className="bg-red-600 hover:bg-red-700 text-white"
+                        variant="destructive"
                         onClick={onConfirmReject}
                         disabled={!rejectReason.trim() || isProcessing}
                     >
-                        {isProcessing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+                        {isProcessing ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : null}
                         ยืนยันการปฏิเสธ
                     </Button>
                 </DialogFooter>

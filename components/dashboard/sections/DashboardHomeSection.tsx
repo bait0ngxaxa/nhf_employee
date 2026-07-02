@@ -16,6 +16,15 @@ const MENU_ITEM_CONFIG: Record<
         icon: string;
         border: string;
         featured?: boolean;
+        featuredSurface?: string;
+        featuredBorder?: string;
+        featuredShadow?: string;
+        featuredIconHover?: string;
+        featuredArrowHover?: string;
+        featuredBadge?: string;
+        featuredDescription?: string;
+        featuredCorner?: string;
+        featuredFocus?: string;
     }
 > = {
     "leave-management": {
@@ -23,6 +32,16 @@ const MENU_ITEM_CONFIG: Record<
         bg: "bg-indigo-50/70",
         icon: "text-indigo-600",
         border: "border-indigo-100",
+        featured: true,
+        featuredSurface: "bg-indigo-600",
+        featuredBorder: "border-indigo-500 hover:border-indigo-400",
+        featuredShadow: "shadow-indigo-900/15 hover:shadow-indigo-900/20",
+        featuredIconHover: "group-hover:text-indigo-700",
+        featuredArrowHover: "group-hover:bg-indigo-50",
+        featuredBadge: "text-indigo-700",
+        featuredDescription: "text-indigo-50",
+        featuredCorner: "bg-blue-500/40",
+        featuredFocus: "focus-visible:ring-indigo-300",
     },
     stock: {
         text: "text-orange-700",
@@ -30,6 +49,15 @@ const MENU_ITEM_CONFIG: Record<
         icon: "text-orange-600",
         border: "border-orange-100",
         featured: true,
+        featuredSurface: "bg-orange-600",
+        featuredBorder: "border-orange-500 hover:border-orange-400",
+        featuredShadow: "shadow-orange-900/15 hover:shadow-orange-900/20",
+        featuredIconHover: "group-hover:text-orange-700",
+        featuredArrowHover: "group-hover:bg-orange-50",
+        featuredBadge: "text-orange-700",
+        featuredDescription: "text-orange-50",
+        featuredCorner: "bg-orange-500/40",
+        featuredFocus: "focus-visible:ring-orange-300",
     },
     "it-support": {
         text: "text-emerald-950",
@@ -102,40 +130,72 @@ interface FeaturedCardProps {
 
 function FeaturedCard({ item, onClick, animationDelay }: FeaturedCardProps) {
     const IconComponent = item.icon;
+    const config = MENU_ITEM_CONFIG[item.id] ?? DEFAULT_MENU_CONFIG;
+
     return (
         <button
             onClick={onClick}
             style={{ animationDelay }}
             className={cn(
-                "dashboard-card-enter group relative flex w-full flex-col items-start gap-5 overflow-hidden rounded-3xl bg-orange-600 text-left text-white sm:flex-row sm:items-center",
-                "min-h-[196px] border border-orange-500 p-5 shadow-lg shadow-orange-900/15 transition-[border-color,box-shadow,transform] duration-200 hover:-translate-y-0.5 hover:border-orange-400 hover:shadow-xl hover:shadow-orange-900/20 active:translate-y-0 md:p-7",
-                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-300 focus-visible:ring-offset-2",
+                "dashboard-card-enter group relative flex w-full flex-col items-start gap-5 overflow-hidden rounded-3xl text-left text-white sm:flex-row sm:items-center",
+                "min-h-[196px] border p-5 shadow-lg transition-[border-color,box-shadow,transform] duration-200 hover:-translate-y-0.5 hover:shadow-xl active:translate-y-0 md:p-7",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2",
+                config.featuredSurface,
+                config.featuredBorder,
+                config.featuredShadow,
+                config.featuredFocus,
             )}
         >
             <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(135deg,rgba(255,255,255,0.16),rgba(255,255,255,0)_45%)]" />
             <div className="dashboard-stock-sheen pointer-events-none absolute inset-y-0 left-0 w-1/3 bg-white/20" />
-            <div className="pointer-events-none absolute bottom-0 right-0 h-28 w-28 rounded-tl-[3rem] bg-orange-500/40" />
+            <div
+                className={cn(
+                    "pointer-events-none absolute bottom-0 right-0 h-28 w-28 rounded-tl-[3rem]",
+                    config.featuredCorner,
+                )}
+            />
 
-            <div className="relative z-10 flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl border border-white/25 bg-white/15 text-white ring-1 ring-white/10 transition-colors duration-200 group-hover:bg-white group-hover:text-orange-700 sm:h-20 sm:w-20">
+            <div
+                className={cn(
+                    "relative z-10 flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl border border-white/25 bg-white/15 text-white ring-1 ring-white/10 transition-colors duration-200 group-hover:bg-white sm:h-20 sm:w-20",
+                    config.featuredIconHover,
+                )}
+            >
                 <IconComponent className="h-8 w-8 sm:h-10 sm:w-10" aria-hidden="true" />
             </div>
 
             <div className="relative z-10 min-w-0 flex-1">
                 <div className="mb-2 flex items-center gap-2">
-                    <span className="rounded-full border border-white/25 bg-white px-2.5 py-1 text-xs font-bold leading-5 text-orange-700 shadow-sm">
+                    <span
+                        className={cn(
+                            "rounded-full border border-white/25 bg-white px-2.5 py-1 text-xs font-bold leading-5 shadow-sm",
+                            config.featuredBadge,
+                        )}
+                    >
                         Quick action
                     </span>
                 </div>
                 <h3 className="line-clamp-2 text-3xl font-bold leading-tight text-white [overflow-wrap:anywhere] md:text-4xl">
                     {item.label}
                 </h3>
-                <p className="mt-2 line-clamp-2 max-w-[58ch] text-sm font-medium leading-6 text-orange-50 [overflow-wrap:anywhere]">
+                <p
+                    className={cn(
+                        "mt-2 line-clamp-2 max-w-[58ch] text-sm font-medium leading-6 [overflow-wrap:anywhere]",
+                        config.featuredDescription,
+                    )}
+                >
                     {item.description ||
                         "เข้าถึงงานสำคัญและติดตามสถานะที่เกี่ยวข้องกับคุณ"}
                 </p>
             </div>
 
-            <div className="relative z-10 flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-white/25 bg-white text-orange-700 shadow-sm transition-[background-color,transform] duration-200 group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:bg-orange-50">
+            <div
+                className={cn(
+                    "relative z-10 flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-white/25 bg-white shadow-sm transition-[background-color,transform] duration-200 group-hover:-translate-y-0.5 group-hover:translate-x-0.5",
+                    config.icon,
+                    config.featuredArrowHover,
+                )}
+            >
                 <ArrowUpRight className="h-5 w-5" aria-hidden="true" />
             </div>
         </button>
@@ -230,6 +290,15 @@ function RegularCard({
     );
 }
 
+const FEATURED_ORDER = new Map([
+    ["stock", 0],
+    ["leave-management", 1],
+]);
+
+function getFeaturedRank(id: string): number {
+    return FEATURED_ORDER.get(id) ?? Number.MAX_SAFE_INTEGER;
+}
+
 export function DashboardHomeSection() {
     const { user, availableMenuGroups } = useDashboardDataContext();
     const { handleMenuClick } = useDashboardUIContext();
@@ -243,10 +312,10 @@ export function DashboardHomeSection() {
         ...availableMenuGroups.flatMap((group) => group.items),
     ];
 
-    // Separate active from coming-soon; pin featured (stock) to the front
+    // Separate active from coming-soon; pin featured quick actions to the front
     const activeItems = allMenuItems
         .filter((item) => item.comingSoon !== true)
-        .sort((a) => (MENU_ITEM_CONFIG[a.id]?.featured === true ? -1 : 1));
+        .sort((a, b) => getFeaturedRank(a.id) - getFeaturedRank(b.id));
 
     const disabledItems = allMenuItems.filter(
         (item) => item.comingSoon === true,

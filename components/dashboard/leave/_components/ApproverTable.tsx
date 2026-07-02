@@ -30,29 +30,29 @@ function EmployeeRow({
 }) {
     return (
         <div
-            className={`flex flex-col sm:flex-row items-start sm:items-center gap-3 p-3 rounded-xl border transition-colors ${
+            className={`flex flex-col gap-3 rounded-xl border p-3 transition-colors sm:flex-row sm:items-center ${
                 hasChange
-                    ? "border-indigo-300 bg-indigo-50/50"
+                    ? "border-sky-300 bg-sky-50"
                     : !managerId
-                      ? "border-amber-200 bg-amber-50/30"
-                      : "border-gray-100 hover:bg-gray-50"
+                      ? "border-amber-200 bg-amber-50"
+                      : "border-slate-200 bg-white hover:bg-slate-50"
             }`}
         >
             <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-medium text-gray-900">{formatName(employee)}</span>
+                    <span className="break-words font-medium text-slate-950">{formatName(employee)}</span>
                     {hasChange ? (
-                        <Badge variant="outline" className="text-indigo-600 border-indigo-300 text-xs">
+                        <Badge variant="outline" className="border-sky-300 text-xs text-sky-700">
                             แก้ไขแล้ว
                         </Badge>
                     ) : null}
                     {!managerId && !hasChange ? (
-                        <Badge variant="outline" className="text-amber-600 border-amber-300 text-xs">
+                        <Badge variant="outline" className="border-amber-300 text-xs text-amber-700">
                             ยังไม่กำหนด
                         </Badge>
                     ) : null}
                 </div>
-                <p className="text-sm text-gray-500 truncate">
+                <p className="break-words text-sm text-slate-600">
                     {employee.position} • {employee.dept?.name ?? "ไม่ระบุแผนก"}
                 </p>
             </div>
@@ -60,7 +60,7 @@ function EmployeeRow({
             <select
                 value={managerId ? String(managerId) : noApproverValue}
                 onChange={(event) => onAssign(employee.id, event.target.value)}
-                className="w-full sm:w-[240px] h-9 rounded-md border border-gray-200 bg-white px-3 text-sm text-gray-700 focus-visible:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                className="h-9 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-700 focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 sm:w-[240px]"
                 aria-label={`เลือกผู้อนุมัติสำหรับ ${formatName(employee)}`}
             >
                 <option value={noApproverValue}>- ไม่ระบุ -</option>
@@ -86,7 +86,16 @@ export function ApproverTable({
     onAssign,
 }: ApproverTableProps) {
     if (employees.length === 0) {
-        return <p className="text-center text-gray-400 py-8">ไม่พบพนักงานที่ตรงกับการค้นหา</p>;
+        return (
+            <div className="rounded-xl border border-dashed border-slate-300 p-8 text-center">
+                <p className="text-sm font-medium text-slate-800">
+                    ไม่พบพนักงานที่ตรงกับการค้นหา
+                </p>
+                <p className="mt-1 text-sm text-slate-500">
+                    ลองเปลี่ยนคำค้นหาหรือตัวกรองผู้อนุมัติ
+                </p>
+            </div>
+        );
     }
 
     return (

@@ -31,15 +31,19 @@ export function CancelLeaveDialog({
                     </DialogDescription>
                 </DialogHeader>
                 <div className="flex justify-end gap-2 pt-2">
-                    <Button variant="outline" disabled={isSubmitting} onClick={() => onOpenChange(false)}>
+                    <Button
+                        variant="outline"
+                        disabled={isSubmitting}
+                        onClick={() => onOpenChange(false)}
+                    >
                         ปิด
                     </Button>
                     <Button
+                        variant="destructive"
                         disabled={isSubmitting}
-                        className="bg-red-600 hover:bg-red-700 focus:ring-red-500"
                         onClick={onConfirm}
                     >
-                        {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                        {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : null}
                         ยืนยันการยกเลิก
                     </Button>
                 </div>

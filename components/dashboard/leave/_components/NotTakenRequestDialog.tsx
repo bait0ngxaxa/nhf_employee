@@ -41,6 +41,8 @@ export function NotTakenRequestDialog({
                     placeholder="เช่น งานฉุกเฉินทำให้ไม่ได้หยุดตามวันที่ขอ..."
                     rows={4}
                     className="resize-none"
+                    maxLength={1000}
+                    disabled={isSubmitting}
                 />
                 <div className="flex justify-end gap-2 pt-2">
                     <Button
@@ -52,10 +54,10 @@ export function NotTakenRequestDialog({
                     </Button>
                     <Button
                         disabled={isSubmitting || note.trim().length < 5}
-                        className="bg-cyan-600 hover:bg-cyan-700"
+                        className="bg-cyan-700 text-white hover:bg-cyan-800"
                         onClick={onConfirm}
                     >
-                        {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                        {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : null}
                         ส่งให้หัวหน้ายืนยัน
                     </Button>
                 </div>

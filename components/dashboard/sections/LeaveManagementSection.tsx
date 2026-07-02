@@ -7,6 +7,7 @@ import { EmployeeLeaveDashboard } from "@/components/dashboard/leave/EmployeeLea
 import { ManagerApprovalDashboard } from "@/components/dashboard/leave/ManagerApprovalDashboard";
 import { ApproverManagement } from "@/components/dashboard/leave/ApproverManagement";
 import { LeaveReportsDashboard } from "@/components/dashboard/leave/LeaveReportsDashboard";
+import { LEAVE_THEME_COLOR } from "@/components/dashboard/leave/leaveTheme";
 import { isAdminRole } from "@/lib/ssot/permissions";
 import { SectionShell } from "@/components/ui/section-shell";
 import { SectionHeader } from "@/components/ui/section-header";
@@ -36,7 +37,43 @@ export function LeaveManagementSection({ defaultTab = "my-leave" }: LeaveManagem
         setIsMounted(true);
     }, []);
 
-    const tabs: SectionTabItem[] = [
+    const tabs = getLeaveTabs(showApprovalTab, isAdmin);
+    const hasTabs = showApprovalTab || isAdmin;
+    const activeTabIsVisible = tabs.some((tab) => tab.value === activeTab && tab.visible !== false);
+    const safeActiveTab = activeTabIsVisible ? activeTab : "my-leave";
+
+    return (
+        <SectionShell
+            gradientFrom="transparent"
+            gradientTo="transparent"
+            className="border-slate-200/70 bg-white shadow-sm"
+        >
+            <SectionHeader
+                icon={CalendarRange}
+                title="NHF Leave"
+                subtitle="จัดการวันลาพักผ่อน ลากิจ ลาป่วย และตรวจสอบโควต้าของคุณ"
+                iconGradient="from-indigo-500 to-blue-600"
+                iconGlow="from-indigo-500/40 to-blue-500/40"
+                iconShadow="shadow-indigo-500/25"
+                badgeColor="bg-indigo-50 text-indigo-700 border-indigo-100"
+            />
+            {isMounted && hasTabs ? (
+                <SectionTabs
+                    value={safeActiveTab}
+                    onValueChange={setActiveTab}
+                    tabs={tabs}
+                    activeColor={LEAVE_THEME_COLOR}
+                    ariaLabel="แท็บระบบลางาน"
+                />
+            ) : (
+                <EmployeeLeaveDashboard />
+            )}
+        </SectionShell>
+    );
+}
+
+function getLeaveTabs(showApprovalTab: boolean, isAdmin: boolean): SectionTabItem[] {
+    return [
         {
             value: "my-leave",
             label: "วันลาของฉัน",
@@ -65,34 +102,4 @@ export function LeaveManagementSection({ defaultTab = "my-leave" }: LeaveManagem
             visible: isAdmin,
         },
     ];
-
-    const hasTabs = showApprovalTab || isAdmin;
-
-    return (
-        <SectionShell
-            gradientFrom="rgba(199,210,254,0.3)"
-            gradientTo="rgba(14,165,233,0.15)"
-        >
-            <SectionHeader
-                icon={CalendarRange}
-                title="NHF Leave"
-                subtitle="จัดการวันลาพักผ่อน ลากิจ ลาป่วย และตรวจสอบโควต้าของคุณ"
-                iconGradient="from-indigo-500 to-blue-600"
-                iconGlow="from-indigo-500/40 to-blue-500/40"
-                iconShadow="shadow-indigo-500/25"
-                badgeColor="bg-indigo-50 text-indigo-700 border-indigo-100"
-            />
-
-            {isMounted && hasTabs ? (
-                <SectionTabs
-                    value={activeTab}
-                    onValueChange={setActiveTab}
-                    tabs={tabs}
-                    activeColor="#4f46e5"
-                />
-            ) : (
-                <EmployeeLeaveDashboard />
-            )}
-        </SectionShell>
-    );
 }

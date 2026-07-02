@@ -1,6 +1,10 @@
 import { useState } from "react";
 import { toast } from "sonner";
-import { useLeaveApprovals, type PendingLeave } from "@/hooks/useLeaveApprovals";
+import {
+    useLeaveApprovals,
+    type LeaveApprovalPaginationMetadata,
+    type PendingLeave,
+} from "@/hooks/useLeaveApprovals";
 import {
     confirmLeaveNotTaken,
     submitLeaveApprovalAction,
@@ -11,6 +15,11 @@ interface UseManagerApprovalModelResult {
     pending: PendingLeave[];
     notTakenPending: PendingLeave[];
     history: PendingLeave[];
+    metadata?: {
+        pending: LeaveApprovalPaginationMetadata;
+        notTakenPending: LeaveApprovalPaginationMetadata;
+        history: LeaveApprovalPaginationMetadata;
+    };
     isLoading: boolean;
     selectedLeave: PendingLeave | null;
     approvalConfirmLeave: PendingLeave | null;
@@ -18,6 +27,9 @@ interface UseManagerApprovalModelResult {
     rejectReason: string;
     isProcessing: boolean;
     setRejectReason: (value: string) => void;
+    setPendingPage: (page: number) => void;
+    setNotTakenPage: (page: number) => void;
+    setHistoryPage: (page: number) => void;
     openRejectDialog: (leave: PendingLeave) => void;
     closeRejectDialog: () => void;
     approveLeave: (leave: PendingLeave) => Promise<void>;
@@ -28,7 +40,14 @@ interface UseManagerApprovalModelResult {
 }
 
 export function useManagerApprovalModel(): UseManagerApprovalModelResult {
-    const { pending, notTakenPending, history, isLoading, mutate } = useLeaveApprovals();
+    const [pendingPage, setPendingPage] = useState(1);
+    const [notTakenPage, setNotTakenPage] = useState(1);
+    const [historyPage, setHistoryPage] = useState(1);
+    const { pending, notTakenPending, history, metadata, isLoading, mutate } = useLeaveApprovals({
+        pendingPage,
+        notTakenPage,
+        historyPage,
+    });
     const [selectedLeave, setSelectedLeave] = useState<PendingLeave | null>(null);
     const [approvalConfirmLeave, setApprovalConfirmLeave] = useState<PendingLeave | null>(null);
     const [isRejectDialogOpen, setIsRejectDialogOpen] = useState(false);
@@ -41,11 +60,18 @@ export function useManagerApprovalModel(): UseManagerApprovalModelResult {
         setSelectedLeave(null);
     };
 
+    const refreshFirstPages = async (): Promise<void> => {
+        setPendingPage(1);
+        setNotTakenPage(1);
+        setHistoryPage(1);
+        await mutate();
+    };
+
     const executeAction = async (action: LeaveApprovalAction, leaveId: string, reason?: string): Promise<void> => {
         setIsProcessing(true);
         try {
             await submitLeaveApprovalAction({ leaveId, action, reason });
-            await mutate();
+            await refreshFirstPages();
             if (action === "APPROVE") {
                 toast.success("อนุมัติใบลาเรียบร้อยแล้ว");
             } else {
@@ -85,7 +111,7 @@ export function useManagerApprovalModel(): UseManagerApprovalModelResult {
         setIsProcessing(true);
         try {
             await confirmLeaveNotTaken({ leaveId });
-            await mutate();
+            await refreshFirstPages();
             toast.success("ยืนยันไม่ได้ใช้วันลาและคืนโควต้าแล้ว");
         } catch (error: unknown) {
             toast.error(
@@ -102,6 +128,7 @@ export function useManagerApprovalModel(): UseManagerApprovalModelResult {
         pending,
         notTakenPending,
         history,
+        metadata,
         isLoading,
         selectedLeave,
         approvalConfirmLeave,
@@ -109,6 +136,9 @@ export function useManagerApprovalModel(): UseManagerApprovalModelResult {
         rejectReason,
         isProcessing,
         setRejectReason,
+        setPendingPage,
+        setNotTakenPage,
+        setHistoryPage,
         openRejectDialog: (leave: PendingLeave) => {
             setSelectedLeave(leave);
             setIsRejectDialogOpen(true);

@@ -29,8 +29,9 @@ export function ApproverFilters({
     return (
         <div className="flex flex-col sm:flex-row gap-3 mt-4">
             <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" aria-hidden="true" />
                 <Input
+                    aria-label="ค้นหาพนักงาน"
                     placeholder="ค้นหาชื่อ อีเมล หรือแผนก"
                     value={search}
                     onChange={(event) => onSearchChange(event.target.value)}
@@ -38,7 +39,7 @@ export function ApproverFilters({
                 />
             </div>
             <Select value={filterApprover} onValueChange={onFilterChange}>
-                <SelectTrigger className="w-full sm:w-[220px]">
+                <SelectTrigger className="w-full sm:w-[220px]" aria-label="กรองตามผู้อนุมัติ">
                     <SelectValue placeholder="กรองตามผู้อนุมัติ" />
                 </SelectTrigger>
                 <SelectContent>

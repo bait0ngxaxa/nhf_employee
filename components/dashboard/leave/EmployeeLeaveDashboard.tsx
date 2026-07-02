@@ -1,8 +1,10 @@
 "use client";
 
-import { Plus, Loader2 } from "lucide-react";
+import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { LeaveRequestForm } from "./LeaveRequestForm";
+import { LEAVE_THEME_BUTTON_CLASS } from "./leaveTheme";
 import { useEmployeeLeaveDashboardModel } from "@/hooks/leave/useEmployeeLeaveDashboardModel";
 import { LeaveQuotaCards } from "./_components/LeaveQuotaCards";
 import { EmployeeLeaveHistoryList } from "./_components/EmployeeLeaveHistoryList";
@@ -13,18 +15,22 @@ export function EmployeeLeaveDashboard() {
     const model = useEmployeeLeaveDashboardModel();
 
     if (model.isLoading) {
-        return (
-            <div className="flex justify-center items-center py-12">
-                <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
-            </div>
-        );
+        return <EmployeeLeaveDashboardSkeleton />;
     }
 
     return (
         <div className="flex flex-col gap-6">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <h2 className="text-xl font-semibold text-gray-800">โควต้าวันลาของคุณ</h2>
-                <Button onClick={model.openRequestForm}>
+                <div className="min-w-0">
+                    <p className="text-sm/6 font-medium text-indigo-700">วันลาของฉัน</p>
+                    <h2 className="mt-1 text-xl/7 font-semibold tracking-tight text-slate-950">
+                        โควต้าวันลาของคุณ
+                    </h2>
+                    <p className="mt-1 max-w-2xl text-sm/6 text-slate-600">
+                        ดูสิทธิ์คงเหลือก่อนยื่นคำขอใหม่
+                    </p>
+                </div>
+                <Button className={LEAVE_THEME_BUTTON_CLASS} onClick={model.openRequestForm}>
                     <Plus data-icon="inline-start" /> ยื่นใบลา
                 </Button>
             </div>
@@ -42,8 +48,20 @@ export function EmployeeLeaveDashboard() {
                 vacationQuota={model.vacationQuota}
             />
 
-            <div className="mt-2">
-                <h2 className="text-xl font-semibold text-gray-800 mb-4">ประวัติการลา (ล่าสุด)</h2>
+            <div className="mt-2 space-y-4">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+                    <div className="min-w-0">
+                        <h2 className="text-xl/7 font-semibold tracking-tight text-slate-950">
+                            ประวัติการลา
+                        </h2>
+                        <p className="mt-1 max-w-2xl text-sm/6 text-slate-600">
+                            รายการล่าสุดพร้อมสถานะและการดำเนินการที่ยังทำได้
+                        </p>
+                    </div>
+                    <span className="w-fit rounded-full border border-indigo-100 bg-indigo-50 px-3 py-1 text-sm font-medium text-indigo-700">
+                        {model.metadata?.totalItems ?? model.history.length} รายการ
+                    </span>
+                </div>
                 <EmployeeLeaveHistoryList
                     history={model.history}
                     metadata={model.metadata}
@@ -77,6 +95,31 @@ export function EmployeeLeaveDashboard() {
                 }}
                 onConfirm={model.confirmNotTakenRequest}
             />
+        </div>
+    );
+}
+
+function EmployeeLeaveDashboardSkeleton() {
+    return (
+        <div className="space-y-6" aria-label="กำลังโหลดข้อมูลวันลา">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="space-y-2">
+                    <Skeleton className="h-6 w-48" />
+                    <Skeleton className="h-4 w-64 max-w-full" />
+                </div>
+                <Skeleton className="h-9 w-28" />
+            </div>
+            <div className="grid gap-4 md:grid-cols-3">
+                {[1, 2, 3].map((item) => (
+                    <Skeleton key={item} className="h-36 rounded-xl" />
+                ))}
+            </div>
+            <div className="space-y-3">
+                <Skeleton className="h-6 w-40" />
+                {[1, 2, 3].map((item) => (
+                    <Skeleton key={item} className="h-24 rounded-xl" />
+                ))}
+            </div>
         </div>
     );
 }

@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Loader2, Save } from "lucide-react";
 import { useApproverManagementModel } from "@/hooks/leave/useApproverManagementModel";
+import { LEAVE_THEME_BUTTON_CLASS } from "./leaveTheme";
 import { ApproverStats } from "./_components/ApproverStats";
 import { ApproverFilters } from "./_components/ApproverFilters";
 import { ApproverTable } from "./_components/ApproverTable";
@@ -31,9 +32,14 @@ export function ApproverManagement() {
 
     if (model.fetchError) {
         return (
-            <div className="text-center py-12 text-red-500">
-                ไม่สามารถโหลดข้อมูลได้ กรุณาลองใหม่อีกครั้ง
-            </div>
+            <Card className="border-rose-200 bg-rose-50 p-8 text-center shadow-none">
+                <p className="text-sm font-medium text-rose-800">
+                    ไม่สามารถโหลดข้อมูลผู้อนุมัติได้
+                </p>
+                <p className="mt-1 text-sm text-rose-700">
+                    กรุณาลองรีเฟรชหน้าอีกครั้ง หากยังพบปัญหาให้ติดต่อผู้ดูแลระบบ
+                </p>
+            </Card>
         );
     }
 
@@ -45,19 +51,26 @@ export function ApproverManagement() {
                 unassignedCount={model.unassignedCount}
             />
 
-            <Card>
+            <Card className="border-slate-200 shadow-sm">
                 <CardHeader className="pb-4">
                     <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                        <CardTitle className="text-lg">กำหนดผู้อนุมัติ</CardTitle>
+                        <div className="min-w-0">
+                            <CardTitle className="text-lg text-slate-950">
+                                กำหนดผู้อนุมัติ
+                            </CardTitle>
+                            <p className="mt-1 text-sm text-slate-600">
+                                เลือกผู้อนุมัติการลาของพนักงานแต่ละคน
+                            </p>
+                        </div>
                         <Button
                             onClick={model.handleSave}
+                            className={LEAVE_THEME_BUTTON_CLASS}
                             disabled={model.assignments.size === 0 || model.isSaving}
-                            className="bg-indigo-600 hover:bg-indigo-700"
                         >
                             {model.isSaving ? (
-                                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                                <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
                             ) : (
-                                <Save className="h-4 w-4 mr-2" />
+                                <Save className="h-4 w-4" aria-hidden="true" />
                             )}
                             บันทึก {model.assignments.size > 0 ? `(${model.assignments.size})` : ""}
                         </Button>
@@ -65,6 +78,7 @@ export function ApproverManagement() {
 
                     {model.saveMsg ? (
                         <div
+                            role="status"
                             className={`px-4 py-2 rounded-lg text-sm mt-2 border ${
                                 model.saveMsg.type === "ok"
                                     ? "bg-emerald-50 border-emerald-200 text-emerald-700"
@@ -111,24 +125,27 @@ export function ApproverManagement() {
 
             {model.assignments.size > 0 ? (
                 <div className="fixed bottom-4 left-1/2 z-50 w-[calc(100vw-1.5rem)] max-w-3xl -translate-x-1/2">
-                    <div className="flex items-center justify-between gap-3 rounded-2xl border border-indigo-200 bg-white/95 px-4 py-3 shadow-[0_16px_40px_-24px_rgba(79,70,229,0.55)] backdrop-blur">
+                    <div
+                        role="status"
+                        className="flex items-center justify-between gap-3 rounded-lg border border-indigo-200 bg-white px-4 py-3 shadow-md"
+                    >
                         <div className="min-w-0">
                             <p className="text-sm font-semibold text-indigo-700">
                                 มีรายการที่ยังไม่บันทึก {model.assignments.size} รายการ
                             </p>
-                            <p className="text-xs text-slate-500">
+                            <p className="text-xs text-slate-600">
                                 กดบันทึกเพื่ออัปเดตผู้อนุมัติลา
                             </p>
                         </div>
                         <Button
                             onClick={model.handleSave}
                             disabled={model.isSaving}
-                            className="shrink-0 bg-indigo-600 hover:bg-indigo-700"
+                            className={`shrink-0 ${LEAVE_THEME_BUTTON_CLASS}`}
                         >
                             {model.isSaving ? (
-                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
                             ) : (
-                                <Save className="mr-2 h-4 w-4" />
+                                <Save className="h-4 w-4" aria-hidden="true" />
                             )}
                             บันทึก ({model.assignments.size})
                         </Button>
