@@ -18,6 +18,7 @@ vi.mock("sonner", () => ({
 describe("useEmployeeLeaveDashboardModel", () => {
     const mutate = vi.fn();
     const cancelLeave = vi.fn();
+    const requestNotTaken = vi.fn();
 
     beforeEach(() => {
         vi.clearAllMocks();
@@ -33,6 +34,7 @@ describe("useEmployeeLeaveDashboardModel", () => {
             error: null,
             mutate,
             cancelLeave,
+            requestNotTaken,
         });
     });
 
@@ -69,6 +71,24 @@ describe("useEmployeeLeaveDashboardModel", () => {
 
         expect(cancelLeave).toHaveBeenCalledWith("leave-2");
         expect(result.current.cancelConfirmId).toBeNull();
+        expect(toast.success).toHaveBeenCalledTimes(1);
+    });
+
+    it("submits not-taken request and resets dialog state", async () => {
+        requestNotTaken.mockResolvedValue(true);
+        const { result } = renderHook(() => useEmployeeLeaveDashboardModel());
+
+        act(() => {
+            result.current.openNotTakenDialog("leave-3");
+            result.current.setNotTakenNote("ไม่ได้ลาเพราะมีงานด่วน");
+        });
+
+        await act(async () => {
+            await result.current.confirmNotTakenRequest();
+        });
+
+        expect(requestNotTaken).toHaveBeenCalledWith("leave-3", "ไม่ได้ลาเพราะมีงานด่วน");
+        expect(result.current.notTakenRequestId).toBeNull();
         expect(toast.success).toHaveBeenCalledTimes(1);
     });
 });

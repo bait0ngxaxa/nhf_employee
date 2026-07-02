@@ -15,7 +15,7 @@ const LEAVE_APPROVAL_MESSAGES = {
     alreadyProcessed: "คำขอนี้ถูกดำเนินการไปแล้ว",
     forbidden: "คุณไม่มีสิทธิ์อนุมัติคำขอนี้",
     quotaNotFound: "ไม่สามารถตรวจสอบสิทธิ์ลาของคำขอนี้ได้ กรุณาติดต่อผู้ดูแลระบบ",
-    quotaExceeded: "สิทธิ์ลาคงเหลือไม่เพียงพอ ไม่สามารถอนุมัติได้",
+    specialReasonRequired: "สิทธิ์ลาคงเหลือไม่เพียงพอ ต้องมีเหตุผลพิเศษก่อนอนุมัติ",
 } as const;
 
 class LeaveApprovalError extends Error {
@@ -100,9 +100,10 @@ export async function POST(req: Request): Promise<NextResponse> {
                 }
 
                 const remaining = quota.totalDays - quota.usedDays;
-                if (leaveRequest.durationDays > remaining) {
+                const overQuotaDays = Math.max(0, leaveRequest.durationDays - remaining);
+                if (overQuotaDays > 0 && !leaveRequest.specialReason) {
                     throw new LeaveApprovalError(
-                        LEAVE_APPROVAL_MESSAGES.quotaExceeded,
+                        LEAVE_APPROVAL_MESSAGES.specialReasonRequired,
                         409,
                     );
                 }
@@ -111,6 +112,13 @@ export async function POST(req: Request): Promise<NextResponse> {
                     where: { id: quota.id },
                     data: { usedDays: quota.usedDays + leaveRequest.durationDays },
                 });
+
+                if (overQuotaDays > leaveRequest.overQuotaDays) {
+                    await tx.leaveRequest.update({
+                        where: { id: leaveId },
+                        data: { overQuotaDays },
+                    });
+                }
             }
 
             await tx.notificationOutbox.create({

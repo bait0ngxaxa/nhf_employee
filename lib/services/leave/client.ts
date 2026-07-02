@@ -39,6 +39,15 @@ interface LeaveApprovalPayload {
     reason?: string;
 }
 
+interface LeaveNotTakenPayload {
+    leaveId: string;
+    note: string;
+}
+
+interface LeaveNotTakenConfirmPayload {
+    leaveId: string;
+}
+
 const DEFAULT_FETCH_ERROR = "ไม่สามารถดึงข้อมูลได้";
 
 const ensureSuccess = <T>(response: ApiResponse<T>): T => {
@@ -84,6 +93,20 @@ export const submitLeaveRequest = async (payload: LeaveRequestValues): Promise<v
 
 export const submitLeaveApprovalAction = async (payload: LeaveApprovalPayload): Promise<void> => {
     const response = await apiPost(API_ROUTES.leave.intranetAction, payload);
+    ensureSuccess(response);
+};
+
+export const submitLeaveNotTakenRequest = async (
+    payload: LeaveNotTakenPayload,
+): Promise<void> => {
+    const response = await apiPost(API_ROUTES.leave.notTaken, payload);
+    ensureSuccess(response);
+};
+
+export const confirmLeaveNotTaken = async (
+    payload: LeaveNotTakenConfirmPayload,
+): Promise<void> => {
+    const response = await apiPut(API_ROUTES.leave.notTaken, payload);
     ensureSuccess(response);
 };
 

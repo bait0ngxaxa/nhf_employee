@@ -34,6 +34,12 @@ const REQUEST_STATUS_META: Record<string, RequestStatusMeta> = {
         iconClass: "text-slate-500",
         icon: Ban,
     },
+    NOT_TAKEN: {
+        label: "ไม่ได้ใช้วันลา",
+        colorClass: "bg-cyan-50 text-cyan-700 border-cyan-200 hover:bg-cyan-100",
+        iconClass: "text-cyan-500",
+        icon: Ban,
+    },
     PENDING_ISSUE: {
         label: "รอจ่าย",
         colorClass: "bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100",

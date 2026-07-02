@@ -7,6 +7,7 @@ import { useEmployeeLeaveDashboardModel } from "@/hooks/leave/useEmployeeLeaveDa
 import { LeaveQuotaCards } from "./_components/LeaveQuotaCards";
 import { EmployeeLeaveHistoryList } from "./_components/EmployeeLeaveHistoryList";
 import { CancelLeaveDialog } from "./_components/CancelLeaveDialog";
+import { NotTakenRequestDialog } from "./_components/NotTakenRequestDialog";
 
 export function EmployeeLeaveDashboard() {
     const model = useEmployeeLeaveDashboardModel();
@@ -30,7 +31,11 @@ export function EmployeeLeaveDashboard() {
 
             {model.isRequestFormOpen ? (
                 <div className="mb-8 animate-in fade-in slide-in-from-top-4">
-                    <LeaveRequestForm onSuccess={model.onRequestSuccess} onCancel={model.closeRequestForm} />
+                    <LeaveRequestForm
+                        onSuccess={model.onRequestSuccess}
+                        onCancel={model.closeRequestForm}
+                        quotas={model.quotas}
+                    />
                 </div>
             ) : null}
 
@@ -47,6 +52,7 @@ export function EmployeeLeaveDashboard() {
                     metadata={model.metadata}
                     isSubmitting={model.isSubmitting}
                     onCancelRequest={model.openCancelDialog}
+                    onNotTakenRequest={model.openNotTakenDialog}
                     onPageChange={model.setPage}
                 />
             </div>
@@ -60,6 +66,19 @@ export function EmployeeLeaveDashboard() {
                     }
                 }}
                 onConfirm={model.confirmCancelLeave}
+            />
+
+            <NotTakenRequestDialog
+                open={model.notTakenRequestId !== null}
+                note={model.notTakenNote}
+                isSubmitting={model.isSubmitting}
+                onNoteChange={model.setNotTakenNote}
+                onOpenChange={(open) => {
+                    if (!open) {
+                        model.closeNotTakenDialog();
+                    }
+                }}
+                onConfirm={model.confirmNotTakenRequest}
             />
         </div>
     );

@@ -235,6 +235,7 @@ export const LEAVE_STATUS_TH: Record<string, string> = {
     APPROVED: "อนุมัติแล้ว",
     REJECTED: "ไม่อนุมัติ",
     CANCELLED: "ยกเลิก",
+    NOT_TAKEN: "ไม่ได้ใช้วันลา",
 };
 
 /**
@@ -253,7 +254,7 @@ export function mapLeaveRowToCSV(
         "วันที่เริ่ม": new Date(r.startDate).toLocaleDateString("th-TH"),
         "วันที่สิ้นสุด": new Date(r.endDate).toLocaleDateString("th-TH"),
         "ช่วงเวลา": LEAVE_PERIOD_TH[r.period] ?? r.period,
-        "จำนวนวัน": r.durationDays,
+        "จำนวนวัน": r.status === "NOT_TAKEN" ? 0 : r.durationDays,
         "เหตุผล": r.reason,
         "สถานะ": LEAVE_STATUS_TH[r.status] ?? r.status,
         "วันที่ยื่น": new Date(r.createdAt).toLocaleDateString("th-TH"),

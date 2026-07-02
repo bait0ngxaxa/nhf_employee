@@ -2,6 +2,7 @@ import useSWR from "swr";
 import { apiPost } from "@/lib/client/api-client";
 import { apiGet } from "@/lib/client/api-client";
 import { API_ROUTES } from "@/lib/ssot/routes";
+import { submitLeaveNotTakenRequest } from "@/lib/services/leave/client";
 
 const fetcher = async <T,>(url: string): Promise<T> => {
     const res = await apiGet<T>(url);
@@ -29,10 +30,17 @@ export interface LeaveRequest {
     period: "FULL_DAY" | "MORNING" | "AFTERNOON";
     durationDays: number;
     reason: string;
-    status: "PENDING" | "APPROVED" | "REJECTED" | "CANCELLED";
+    emergencyReason: string | null;
+    specialReason: string | null;
+    overQuotaDays: number;
+    status: "PENDING" | "APPROVED" | "REJECTED" | "CANCELLED" | "NOT_TAKEN";
     approverId: number | null;
     approvedAt: string | null;
     rejectReason: string | null;
+    notTakenReason: string | null;
+    notTakenRequestedAt: string | null;
+    notTakenConfirmedAt: string | null;
+    notTakenConfirmedById: number | null;
     attachmentUrl: string | null;
     createdAt: string;
     updatedAt: string;
@@ -85,6 +93,12 @@ export function useLeaveProfile(page: number = 1) {
         }
     };
 
+    const requestNotTaken = async (leaveId: string, note: string): Promise<boolean> => {
+        await submitLeaveNotTakenRequest({ leaveId, note });
+        await mutate();
+        return true;
+    };
+
     return {
         quotas: data?.quotas || [],
         history: data?.history || [],
@@ -93,5 +107,6 @@ export function useLeaveProfile(page: number = 1) {
         error,
         mutate,
         cancelLeave,
+        requestNotTaken,
     };
 }

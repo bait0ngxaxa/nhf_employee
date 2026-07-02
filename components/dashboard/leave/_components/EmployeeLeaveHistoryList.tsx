@@ -1,8 +1,9 @@
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { X } from "lucide-react";
+import { RotateCcw, X } from "lucide-react";
 import { Pagination } from "@/components/Pagination";
 import type { LeaveRequest } from "@/hooks/useLeaveProfile";
+import { isAfterLeaveEnd } from "@/lib/services/leave/utils";
 
 interface LeaveHistoryMetadata {
     currentPage: number;
@@ -16,6 +17,7 @@ interface EmployeeLeaveHistoryListProps {
     metadata?: LeaveHistoryMetadata;
     isSubmitting: boolean;
     onCancelRequest: (leaveId: string) => void;
+    onNotTakenRequest: (leaveId: string) => void;
     onPageChange: (page: number) => void;
 }
 
@@ -35,6 +37,7 @@ const statusLabel = (status: LeaveRequest["status"]): string => {
     if (status === "APPROVED") return "อนุมัติแล้ว";
     if (status === "REJECTED") return "ไม่อนุมัติ";
     if (status === "CANCELLED") return "ยกเลิก";
+    if (status === "NOT_TAKEN") return "ไม่ได้ใช้วันลา";
     return "รออนุมัติ";
 };
 
@@ -42,6 +45,7 @@ const statusClassName = (status: LeaveRequest["status"]): string => {
     if (status === "APPROVED") return "bg-emerald-100 text-emerald-700 border border-emerald-200";
     if (status === "REJECTED") return "bg-red-100 text-red-700 border border-red-200";
     if (status === "CANCELLED") return "bg-gray-100 text-gray-700 border border-gray-200";
+    if (status === "NOT_TAKEN") return "bg-cyan-100 text-cyan-700 border border-cyan-200";
     return "bg-amber-100 text-amber-700 border border-amber-200";
 };
 
@@ -50,6 +54,7 @@ export function EmployeeLeaveHistoryList({
     metadata,
     isSubmitting,
     onCancelRequest,
+    onNotTakenRequest,
     onPageChange,
 }: EmployeeLeaveHistoryListProps) {
     if (history.length === 0) {
@@ -89,6 +94,26 @@ export function EmployeeLeaveHistoryList({
                                     เหตุผล: {request.rejectReason}
                                 </p>
                             ) : null}
+                            {request.emergencyReason ? (
+                                <p className="text-xs text-sky-700 mt-2 p-2 bg-sky-50 rounded-md border border-sky-100 font-medium">
+                                    เหตุผลฉุกเฉิน: {request.emergencyReason}
+                                </p>
+                            ) : null}
+                            {request.specialReason ? (
+                                <p className="text-xs text-amber-700 mt-2 p-2 bg-amber-50 rounded-md border border-amber-100 font-medium">
+                                    เหตุผลพิเศษ: {request.specialReason}
+                                </p>
+                            ) : null}
+                            {request.notTakenRequestedAt && request.status === "APPROVED" ? (
+                                <p className="text-xs text-cyan-700 mt-2 p-2 bg-cyan-50 rounded-md border border-cyan-100 font-medium">
+                                    แจ้งไม่ได้ใช้วันลาแล้ว รอหัวหน้ายืนยัน: {request.notTakenReason}
+                                </p>
+                            ) : null}
+                            {request.status === "NOT_TAKEN" && request.notTakenReason ? (
+                                <p className="text-xs text-cyan-700 mt-2 p-2 bg-cyan-50 rounded-md border border-cyan-100 font-medium">
+                                    โน๊ตไม่ได้ใช้วันลา: {request.notTakenReason}
+                                </p>
+                            ) : null}
                         </div>
                         <div className="flex items-center self-start md:self-center mt-2 md:mt-0">
                             <span
@@ -109,6 +134,19 @@ export function EmployeeLeaveHistoryList({
                                     <X className="h-4 w-4" />
                                 </Button>
                             ) : null}
+                            {canRequestNotTaken(request) ? (
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    aria-label="แจ้งไม่ได้ใช้วันลา"
+                                    className="h-6 w-6 p-0 text-cyan-600 hover:text-cyan-700 hover:bg-cyan-50"
+                                    title="แจ้งไม่ได้ใช้วันลา"
+                                    disabled={isSubmitting}
+                                    onClick={() => onNotTakenRequest(request.id)}
+                                >
+                                    <RotateCcw className="h-4 w-4" />
+                                </Button>
+                            ) : null}
                         </div>
                     </div>
                 </Card>
@@ -127,5 +165,13 @@ export function EmployeeLeaveHistoryList({
                 </div>
             ) : null}
         </div>
+    );
+}
+
+function canRequestNotTaken(request: LeaveRequest): boolean {
+    return (
+        request.status === "APPROVED"
+        && !request.notTakenRequestedAt
+        && isAfterLeaveEnd(new Date(request.endDate))
     );
 }

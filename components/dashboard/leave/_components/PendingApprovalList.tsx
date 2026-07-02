@@ -9,13 +9,14 @@ import {
     Briefcase,
     Thermometer,
     Palmtree,
+    AlertTriangle,
 } from "lucide-react";
 import type { PendingLeave } from "@/hooks/useLeaveApprovals";
 
 interface PendingApprovalListProps {
     pending: PendingLeave[];
     isProcessing: boolean;
-    onApprove: (leaveId: string) => Promise<void>;
+    onApprove: (leave: PendingLeave) => Promise<void>;
     onOpenReject: (leave: PendingLeave) => void;
 }
 
@@ -113,6 +114,22 @@ export function PendingApprovalList({
                                         </p>
                                     </div>
                                 ) : null}
+                                {leave.emergencyReason || leave.specialReason || leave.overQuotaDays > 0 ? (
+                                    <div className="mt-3 flex flex-wrap gap-2 border-t border-indigo-100/50 pt-3">
+                                        {leave.emergencyReason ? (
+                                            <SpecialFlag label="ลาย้อนหลังกรณีฉุกเฉิน" />
+                                        ) : null}
+                                        {leave.specialReason || leave.overQuotaDays > 0 ? (
+                                            <SpecialFlag
+                                                label={
+                                                    leave.overQuotaDays > 0
+                                                        ? `เกินสิทธิ์ ${leave.overQuotaDays} วัน`
+                                                        : "ลาเกินโควต้ากรณีพิเศษ"
+                                                }
+                                            />
+                                        ) : null}
+                                    </div>
+                                ) : null}
                             </div>
 
                             <div className="text-xs text-gray-400 flex items-center gap-1.5">
@@ -130,7 +147,7 @@ export function PendingApprovalList({
 
                         <div className="flex lg:flex-col justify-end gap-3 pt-4 lg:pt-0 lg:pl-6 border-t lg:border-t-0 lg:border-l border-gray-100 lg:min-w-[140px]">
                             <Button
-                                onClick={() => onApprove(leave.id)}
+                                onClick={() => onApprove(leave)}
                                 disabled={isProcessing}
                                 className="w-full bg-emerald-500 hover:bg-emerald-600 text-white shadow-sm shadow-emerald-200 transition-all hover:shadow-md lg:hover:-translate-y-0.5"
                             >
@@ -151,5 +168,14 @@ export function PendingApprovalList({
                 </Card>
             ))}
         </div>
+    );
+}
+
+function SpecialFlag({ label }: { label: string }) {
+    return (
+        <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700">
+            <AlertTriangle className="mr-1 h-3.5 w-3.5" />
+            {label}
+        </span>
     );
 }

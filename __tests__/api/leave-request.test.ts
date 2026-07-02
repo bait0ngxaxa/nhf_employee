@@ -293,7 +293,40 @@ describe("POST /api/leave/request", () => {
             const res = await submitLeaveRequest(req);
             expect(res.status).toBe(400);
             const data = await res.json();
-            expect(data.error).toBe("สิทธิ์ลาคงเหลือไม่เพียงพอ");
+            expect(data.error).toBe("กรุณาระบุเหตุผลพิเศษสำหรับการลาเกินโควต้า");
+        });
+
+        it("should allow insufficient quota with special reason", async () => {
+            (prisma.employee.findUnique as unknown as { mockResolvedValue: (v: { id: number; firstName: string; lastName: string; managerId: number }) => void }).mockResolvedValue({
+                id: mockEmployeeId,
+                firstName: "A",
+                lastName: "B",
+                managerId: 200,
+            });
+            (prisma.leaveRequest.findFirst as unknown as { mockResolvedValue: (v: null) => void }).mockResolvedValue(null);
+            (prisma.leaveQuota.findFirst as unknown as { mockResolvedValue: (v: { id: number; totalDays: number; usedDays: number }) => void }).mockResolvedValue({
+                id: 1,
+                totalDays: 6,
+                usedDays: 6,
+            });
+            (prisma.leaveRequest.create as unknown as { mockResolvedValue: (v: { id: number }) => void }).mockResolvedValue({ id: 123 });
+
+            const req = new NextRequest("http://localhost/api/leave/request", {
+                method: "POST",
+                body: JSON.stringify({
+                    ...validPayload,
+                    specialReason: "กรณีพิเศษที่หัวหน้าควรพิจารณา",
+                }),
+            });
+
+            const res = await submitLeaveRequest(req);
+            expect(res.status).toBe(201);
+            expect(prisma.leaveRequest.create).toHaveBeenCalledWith({
+                data: expect.objectContaining({
+                    overQuotaDays: 1,
+                    specialReason: "กรณีพิเศษที่หัวหน้าควรพิจารณา",
+                }),
+            });
         });
 
         it("should throw error if requests overlap", async () => {

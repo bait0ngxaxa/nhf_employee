@@ -18,14 +18,16 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import { useLeaveRequestFormModel } from "@/hooks/leave/useLeaveRequestFormModel";
+import type { LeaveQuota } from "@/hooks/useLeaveProfile";
 
 interface Props {
     onSuccess: () => void | Promise<void>;
     onCancel: () => void;
+    quotas: LeaveQuota[];
 }
 
-export function LeaveRequestForm({ onSuccess, onCancel }: Props) {
-    const model = useLeaveRequestFormModel({ onSuccess });
+export function LeaveRequestForm({ onSuccess, onCancel, quotas }: Props) {
+    const model = useLeaveRequestFormModel({ onSuccess, quotas });
 
     return (
         <div className="bg-white/80 backdrop-blur-xl p-6 md:p-8 rounded-3xl border border-white/60 shadow-xl relative overflow-hidden">
@@ -183,6 +185,54 @@ export function LeaveRequestForm({ onSuccess, onCancel }: Props) {
                             </FormItem>
                         )}
                     />
+
+                    {model.needsEmergencyReason ? (
+                        <FormField
+                            control={model.form.control}
+                            name="emergencyReason"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>เหตุผลฉุกเฉิน</FormLabel>
+                                    <FormControl>
+                                        <Textarea
+                                            placeholder="ระบุเหตุฉุกเฉินที่ทำให้ไม่สามารถยื่นลาตามเวลาปกติ..."
+                                            className="resize-none"
+                                            rows={3}
+                                            {...field}
+                                            value={field.value ?? ""}
+                                        />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                    ) : null}
+
+                    {model.needsSpecialReason ? (
+                        <FormField
+                            control={model.form.control}
+                            name="specialReason"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>เหตุผลพิเศษ</FormLabel>
+                                    <FormControl>
+                                        <Textarea
+                                            placeholder="ระบุเหตุผลที่ควรอนุมัติให้เกินโควต้า..."
+                                            className="resize-none"
+                                            rows={3}
+                                            {...field}
+                                            value={field.value ?? ""}
+                                        />
+                                    </FormControl>
+                                    <p className="text-xs text-amber-700">
+                                        คำขอนี้เกินสิทธิ์ {model.overQuotaDays} วัน
+                                        จากคงเหลือ {model.remainingQuota} วัน
+                                    </p>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                    ) : null}
 
                     <div className="flex justify-end space-x-4 pt-4 border-t">
                         <Button type="button" variant="outline" onClick={onCancel}>

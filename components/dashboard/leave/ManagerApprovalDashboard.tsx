@@ -5,6 +5,8 @@ import { useManagerApprovalModel } from "@/hooks/leave/useManagerApprovalModel";
 import { PendingApprovalList } from "./_components/PendingApprovalList";
 import { ApprovalHistoryList } from "./_components/ApprovalHistoryList";
 import { RejectLeaveDialog } from "./_components/RejectLeaveDialog";
+import { ApprovalConfirmDialog } from "./_components/ApprovalConfirmDialog";
+import { NotTakenPendingList } from "./_components/NotTakenPendingList";
 
 export function ManagerApprovalDashboard() {
     const model = useManagerApprovalModel();
@@ -33,6 +35,22 @@ export function ManagerApprovalDashboard() {
                 onOpenReject={model.openRejectDialog}
             />
 
+            <div className="space-y-3">
+                <div>
+                    <h2 className="text-lg font-semibold text-gray-800">
+                        รายการรอยืนยันไม่ได้ใช้วันลา
+                    </h2>
+                    <p className="text-sm text-gray-500">
+                        เมื่อยืนยันแล้วระบบจะคืนโควต้าตามวันลาสุทธิของคำขอเดิม
+                    </p>
+                </div>
+                <NotTakenPendingList
+                    items={model.notTakenPending}
+                    isProcessing={model.isProcessing}
+                    onConfirm={model.confirmNotTaken}
+                />
+            </div>
+
             <div className="mt-12">
                 <h2 className="text-xl font-semibold text-gray-800 mb-4">ประวัติการพิจารณา</h2>
                 <ApprovalHistoryList history={model.history} />
@@ -50,6 +68,17 @@ export function ManagerApprovalDashboard() {
                 }}
                 onRejectReasonChange={model.setRejectReason}
                 onConfirmReject={model.rejectLeave}
+            />
+
+            <ApprovalConfirmDialog
+                leave={model.approvalConfirmLeave}
+                isProcessing={model.isProcessing}
+                onOpenChange={(open) => {
+                    if (!open) {
+                        model.closeApprovalConfirmDialog();
+                    }
+                }}
+                onConfirm={model.confirmApproveLeave}
             />
         </div>
     );

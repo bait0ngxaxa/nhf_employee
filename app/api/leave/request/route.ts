@@ -5,7 +5,7 @@ import { requireApiSession } from "@/lib/auth/api";
 import { logLeaveEvent } from "@/lib/server/audit";
 import { prisma } from "@/lib/db/prisma";
 import { getEmployeeIdFromUserId } from "@/lib/services/leave/get-employee-id";
-import { getWorkingDays } from "@/lib/services/leave/utils";
+import { calculateLeaveDuration, isWorkingDay } from "@/lib/services/leave/utils";
 import { processOutbox } from "@/lib/services/outbox/processor";
 import { jsonError } from "@/lib/ssot/http";
 import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
@@ -17,7 +17,7 @@ const LEAVE_REQUEST_MESSAGES = {
     overlapConflict: "มีคำขอลาในช่วงวันที่นี้อยู่แล้ว",
     employeeNotFound: "ไม่พบข้อมูลพนักงาน",
     halfDayMultiDate: "การลาครึ่งวันต้องเลือกวันลาเพียงวันเดียว",
-    quotaExceeded: "สิทธิ์ลาคงเหลือไม่เพียงพอ",
+    specialReasonRequired: "กรุณาระบุเหตุผลพิเศษสำหรับการลาเกินโควต้า",
 } as const;
 
 class LeaveRequestError extends Error {
@@ -29,11 +29,6 @@ class LeaveRequestError extends Error {
         this.statusCode = statusCode;
     }
 }
-
-const isWorkingDay = (date: Date): boolean => {
-    const day = date.getDay();
-    return day !== 0 && day !== 6;
-};
 
 export async function POST(req: Request) {
     try {
@@ -58,7 +53,17 @@ export async function POST(req: Request) {
             });
         }
 
-        const { leaveType, startDate, endDate, period, reason } = parsed.data;
+        const {
+            leaveType,
+            startDate,
+            endDate,
+            period,
+            reason,
+            emergencyReason,
+            specialReason,
+        } = parsed.data;
+        const normalizedEmergencyReason = emergencyReason?.trim() ? emergencyReason.trim() : null;
+        const normalizedSpecialReason = specialReason?.trim() ? specialReason.trim() : null;
         const currentYear = new Date(startDate).getFullYear();
 
         if (period !== "FULL_DAY" && startDate !== endDate) {
@@ -67,20 +72,17 @@ export async function POST(req: Request) {
 
         const start = new Date(startDate);
         const end = new Date(endDate);
-        let diffDays = getWorkingDays(start, end);
+        const durationDays = calculateLeaveDuration(start, end, period);
 
         if (period !== "FULL_DAY") {
-            if (diffDays === 0) {
+            if (durationDays === 0) {
                 return jsonError(LEAVE_REQUEST_MESSAGES.holidayConflict, 400);
             }
-            diffDays = 0.5;
-        } else if (diffDays === 0) {
+        } else if (durationDays === 0) {
             return jsonError(LEAVE_REQUEST_MESSAGES.holidayConflict, 400);
         } else if (!isWorkingDay(start) || !isWorkingDay(end)) {
             return jsonError(LEAVE_REQUEST_MESSAGES.holidayConflict, 400);
         }
-
-        const durationDays = diffDays;
 
         const result = await prisma.$transaction(async (tx) => {
             const employee = await tx.employee.findUnique({
@@ -128,8 +130,9 @@ export async function POST(req: Request) {
             }
 
             const availableQuota = quota.totalDays - quota.usedDays;
-            if (durationDays > availableQuota) {
-                throw new LeaveRequestError(LEAVE_REQUEST_MESSAGES.quotaExceeded, 400);
+            const overQuotaDays = Math.max(0, durationDays - availableQuota);
+            if (overQuotaDays > 0 && !normalizedSpecialReason) {
+                throw new LeaveRequestError(LEAVE_REQUEST_MESSAGES.specialReasonRequired, 400);
             }
 
             const leaveRequest = await tx.leaveRequest.create({
@@ -141,6 +144,9 @@ export async function POST(req: Request) {
                     period,
                     durationDays,
                     reason,
+                    emergencyReason: normalizedEmergencyReason,
+                    specialReason: normalizedSpecialReason,
+                    overQuotaDays,
                     status: "PENDING",
                     approverId: employee.managerId,
                 },
@@ -158,6 +164,9 @@ export async function POST(req: Request) {
                         endDate,
                         durationDays,
                         reason,
+                        emergencyReason: normalizedEmergencyReason,
+                        specialReason: normalizedSpecialReason,
+                        overQuotaDays,
                     }),
                 },
             });
@@ -179,6 +188,8 @@ export async function POST(req: Request) {
                 startDate,
                 endDate,
                 reason,
+                emergencyReason: normalizedEmergencyReason,
+                specialReason: normalizedSpecialReason,
             },
         }).catch((err) => console.error("Failed to log audit event:", err));
 
@@ -188,9 +199,6 @@ export async function POST(req: Request) {
         if (error instanceof LeaveRequestError) {
             return jsonError(error.message, error.statusCode);
         }
-        return jsonError(
-            error instanceof Error ? error.message : COMMON_API_MESSAGES.failedToSubmitLeaveRequest,
-            500,
-        );
+        return jsonError(COMMON_API_MESSAGES.failedToSubmitLeaveRequest, 500);
     }
 }

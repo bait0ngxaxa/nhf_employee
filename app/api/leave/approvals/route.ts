@@ -21,58 +21,73 @@ export async function GET(): Promise<NextResponse> {
             return operationFailed(404);
         }
 
-        const pendingApprovals = await prisma.leaveRequest.findMany({
-            where: {
-                approverId: managerId,
-                status: "PENDING",
-            },
-            take: 50,
-            orderBy: {
-                createdAt: "asc",
-            },
-            include: {
-                employee: {
-                    select: {
-                        firstName: true,
-                        lastName: true,
-                        nickname: true,
-                        position: true,
-                        departmentId: true,
-                        dept: {
-                            select: {
-                                name: true,
-                            },
+        const employeeInclude = {
+            employee: {
+                select: {
+                    firstName: true,
+                    lastName: true,
+                    nickname: true,
+                    position: true,
+                    departmentId: true,
+                    dept: {
+                        select: {
+                            name: true,
                         },
                     },
                 },
             },
-        });
+        } as const;
 
-        const approvalHistory = await prisma.leaveRequest.findMany({
-            where: {
-                approverId: managerId,
-                status: {
-                    in: ["APPROVED", "REJECTED"],
+        const [pendingApprovals, notTakenPending, approvalHistory] = await Promise.all([
+            prisma.leaveRequest.findMany({
+                where: {
+                    approverId: managerId,
+                    status: "PENDING",
                 },
-            },
-            orderBy: {
-                updatedAt: "desc",
-            },
-            take: 20,
-            include: {
-                employee: {
-                    select: {
-                        firstName: true,
-                        lastName: true,
-                        nickname: true,
-                        position: true,
-                    },
+                take: 50,
+                orderBy: {
+                    createdAt: "asc",
                 },
-            },
-        });
+                include: employeeInclude,
+            }),
+            prisma.leaveRequest.findMany({
+                where: {
+                    approverId: managerId,
+                    status: "APPROVED",
+                    notTakenRequestedAt: { not: null },
+                    notTakenConfirmedAt: null,
+                },
+                take: 50,
+                orderBy: {
+                    notTakenRequestedAt: "asc",
+                },
+                include: employeeInclude,
+            }),
+            prisma.leaveRequest.findMany({
+                where: {
+                    approverId: managerId,
+                    OR: [
+                        { status: { in: ["REJECTED", "NOT_TAKEN"] } },
+                        {
+                            status: "APPROVED",
+                            OR: [
+                                { notTakenRequestedAt: null },
+                                { notTakenConfirmedAt: { not: null } },
+                            ],
+                        },
+                    ],
+                },
+                orderBy: {
+                    updatedAt: "desc",
+                },
+                take: 20,
+                include: employeeInclude,
+            }),
+        ]);
 
         return NextResponse.json({
             pending: pendingApprovals,
+            notTakenPending,
             history: approvalHistory,
         });
     } catch (error) {

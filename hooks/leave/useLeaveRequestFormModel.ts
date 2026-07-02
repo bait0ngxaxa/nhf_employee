@@ -4,9 +4,23 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
 import { leaveRequestSchema, type LeaveRequestValues } from "@/lib/validations/leave";
 import { submitLeaveRequest } from "@/lib/services/leave/client";
+import {
+    calculateLeaveDuration,
+    isPastDate,
+    type LeavePeriodValue,
+} from "@/lib/services/leave/utils";
+
+type LeaveTypeValue = LeaveRequestValues["leaveType"];
+
+interface LeaveQuotaSnapshot {
+    leaveType: LeaveTypeValue;
+    totalDays: number;
+    usedDays: number;
+}
 
 interface UseLeaveRequestFormModelArgs {
     onSuccess: () => void | Promise<void>;
+    quotas?: LeaveQuotaSnapshot[];
 }
 
 interface UseLeaveRequestFormModelResult {
@@ -15,6 +29,11 @@ interface UseLeaveRequestFormModelResult {
     errorMsg: string | null;
     isMultiDay: boolean;
     startDateValue: string;
+    needsEmergencyReason: boolean;
+    needsSpecialReason: boolean;
+    requestedDays: number;
+    overQuotaDays: number;
+    remainingQuota: number;
     submit: (data: LeaveRequestValues) => Promise<void>;
     switchToSingleDay: () => void;
     switchToMultiDay: () => void;
@@ -36,6 +55,7 @@ const LEAVE_REQUEST_MESSAGES = {
     approverNotConfigured: "ยังไม่ได้ตั้งค่าผู้อนุมัติ",
     overlapConflict: "มีคำขอลาในช่วงวันนี้อยู่แล้ว",
     quotaExceeded: "สิทธิ์ลาคงเหลือไม่เพียงพอ",
+    specialReasonRequired: "กรุณาระบุเหตุผลพิเศษสำหรับการลาเกินโควต้า",
     halfDayMultiDate: "การลาครึ่งวันต้องเลือกวันลาเพียงวันเดียว",
     genericError: "ไม่สามารถส่งคำขอลาได้ กรุณาลองใหม่อีกครั้ง",
 } as const;
@@ -70,6 +90,7 @@ const normalizeLeaveRequestErrorMessage = (rawMessage: string): string => {
 
 export function useLeaveRequestFormModel({
     onSuccess,
+    quotas = [],
 }: UseLeaveRequestFormModelArgs): UseLeaveRequestFormModelResult {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -84,8 +105,24 @@ export function useLeaveRequestFormModel({
             endDate: today,
             period: "FULL_DAY",
             reason: "",
+            emergencyReason: "",
+            specialReason: "",
         },
     });
+
+    const leaveType = form.watch("leaveType");
+    const startDateValue = form.watch("startDate");
+    const endDateValue = form.watch("endDate");
+    const periodValue = form.watch("period");
+
+    const quota = quotas.find((item) => item.leaveType === leaveType);
+    const remainingQuota = quota ? quota.totalDays - quota.usedDays : 0;
+    const requestedDays = getRequestedDays(startDateValue, endDateValue, periodValue);
+    const overQuotaDays = quota ? Math.max(0, requestedDays - remainingQuota) : 0;
+    const needsSpecialReason = overQuotaDays > 0;
+    const needsEmergencyReason = isValidDateString(startDateValue)
+        ? isPastDate(new Date(startDateValue))
+        : false;
 
     const switchToSingleDay = (): void => {
         setIsMultiDay(false);
@@ -108,6 +145,15 @@ export function useLeaveRequestFormModel({
     };
 
     const submit = async (data: LeaveRequestValues): Promise<void> => {
+        const submitOverQuotaDays = getOverQuotaDays(data, quotas);
+        if (submitOverQuotaDays > 0 && !data.specialReason?.trim()) {
+            form.setError("specialReason", {
+                type: "manual",
+                message: LEAVE_REQUEST_MESSAGES.specialReasonRequired,
+            });
+            return;
+        }
+
         setIsSubmitting(true);
         setErrorMsg(null);
         try {
@@ -129,10 +175,51 @@ export function useLeaveRequestFormModel({
         isSubmitting,
         errorMsg,
         isMultiDay,
-        startDateValue: form.watch("startDate"),
+        startDateValue,
+        needsEmergencyReason,
+        needsSpecialReason,
+        requestedDays,
+        overQuotaDays,
+        remainingQuota,
         submit,
         switchToSingleDay,
         switchToMultiDay,
         handleStartDateChange,
     };
+}
+
+function isValidDateString(value: string): boolean {
+    return value.length > 0 && !Number.isNaN(new Date(value).getTime());
+}
+
+function getRequestedDays(
+    startDate: string,
+    endDate: string,
+    period: LeavePeriodValue,
+): number {
+    if (!isValidDateString(startDate) || !isValidDateString(endDate)) {
+        return 0;
+    }
+
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    if (end < start) {
+        return 0;
+    }
+
+    return calculateLeaveDuration(start, end, period);
+}
+
+function getOverQuotaDays(
+    data: LeaveRequestValues,
+    quotas: LeaveQuotaSnapshot[],
+): number {
+    const quota = quotas.find((item) => item.leaveType === data.leaveType);
+    if (!quota) {
+        return 0;
+    }
+
+    const requestedDays = getRequestedDays(data.startDate, data.endDate, data.period);
+    const remainingQuota = quota.totalDays - quota.usedDays;
+    return Math.max(0, requestedDays - remainingQuota);
 }

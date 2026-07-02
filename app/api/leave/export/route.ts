@@ -20,6 +20,7 @@ const PROCESSED_LEAVE_STATUSES: LeaveStatus[] = [
     "APPROVED",
     "REJECTED",
     "CANCELLED",
+    "NOT_TAKEN",
 ];
 
 function createYearRange(year: number): { startOfYear: Date; endOfYear: Date } {
@@ -193,7 +194,9 @@ export async function GET(request: NextRequest): Promise<Response> {
                                     leaveRequest.startDate.toLocaleDateString("th-TH"),
                                     leaveRequest.endDate.toLocaleDateString("th-TH"),
                                     LEAVE_PERIOD_TH[leaveRequest.period] ?? leaveRequest.period,
-                                    leaveRequest.durationDays,
+                                    leaveRequest.status === "NOT_TAKEN"
+                                        ? 0
+                                        : leaveRequest.durationDays,
                                     leaveRequest.reason,
                                     LEAVE_STATUS_TH[leaveRequest.status] ?? leaveRequest.status,
                                     leaveRequest.createdAt.toLocaleDateString("th-TH"),

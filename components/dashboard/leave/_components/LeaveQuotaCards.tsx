@@ -25,6 +25,8 @@ interface QuotaCardProps {
 }
 
 function QuotaCard({ title, remain, used, total, note, icon: Icon, theme }: QuotaCardProps) {
+    const isOverQuota = remain < 0;
+
     return (
         <Card className="relative overflow-hidden bg-white/80 backdrop-blur-md border border-white/60 shadow-lg hover:shadow-xl transition-[box-shadow,transform] duration-300 rounded-3xl group">
             <div
@@ -38,9 +40,11 @@ function QuotaCard({ title, remain, used, total, note, icon: Icon, theme }: Quot
                             <p
                                 className={`tabular-nums text-3xl font-extrabold bg-gradient-to-r ${theme.numberGradient} bg-clip-text text-transparent tracking-tight`}
                             >
-                                {remain}
+                                {isOverQuota ? Math.abs(remain) : remain}
                             </p>
-                            <p className="text-sm font-medium text-gray-500">วันคงเหลือ</p>
+                            <p className="text-sm font-medium text-gray-500">
+                                {isOverQuota ? "วันเกินสิทธิ์" : "วันคงเหลือ"}
+                            </p>
                         </div>
                         <p className="text-xs text-gray-400 mt-1">
                             ใช้ไปแล้ว: {used}/{total} วัน ({note})
@@ -62,7 +66,7 @@ export function LeaveQuotaCards({ sickQuota, personalQuota, vacationQuota }: Lea
         <div className="grid gap-6 md:grid-cols-3">
             <QuotaCard
                 title="ลาป่วย"
-                remain={Math.max(0, sickQuota.totalDays - sickQuota.usedDays)}
+                remain={sickQuota.totalDays - sickQuota.usedDays}
                 used={sickQuota.usedDays}
                 total={sickQuota.totalDays}
                 note="โควต้า 30 วัน/ปี"
@@ -76,7 +80,7 @@ export function LeaveQuotaCards({ sickQuota, personalQuota, vacationQuota }: Lea
             />
             <QuotaCard
                 title="ลากิจ"
-                remain={Math.max(0, personalQuota.totalDays - personalQuota.usedDays)}
+                remain={personalQuota.totalDays - personalQuota.usedDays}
                 used={personalQuota.usedDays}
                 total={personalQuota.totalDays}
                 note="สิทธิปีนี้"
@@ -90,7 +94,7 @@ export function LeaveQuotaCards({ sickQuota, personalQuota, vacationQuota }: Lea
             />
             <QuotaCard
                 title="ลาพักร้อน"
-                remain={Math.max(0, vacationQuota.totalDays - vacationQuota.usedDays)}
+                remain={vacationQuota.totalDays - vacationQuota.usedDays}
                 used={vacationQuota.usedDays}
                 total={vacationQuota.totalDays}
                 note="สิทธิปีนี้"

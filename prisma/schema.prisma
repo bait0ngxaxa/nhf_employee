@@ -243,6 +243,8 @@ enum AuditAction {
   LEAVE_REQUEST_APPROVE
   LEAVE_REQUEST_REJECT
   LEAVE_REQUEST_CANCEL
+  LEAVE_REQUEST_NOT_TAKEN_REQUEST
+  LEAVE_REQUEST_NOT_TAKEN_CONFIRM
 
   // Admin actions
   USER_CREATE
@@ -377,6 +379,9 @@ model LeaveRequest {
   period       LeavePeriod @default(FULL_DAY)
   durationDays Float // จำนวนวันลาสุทธิ (เช่น 1.5 วัน)
   reason       String      @db.Text
+  emergencyReason String? @db.Text // เหตุผลฉุกเฉินเมื่อยื่นลาย้อนหลัง
+  specialReason   String? @db.Text // เหตุผลพิเศษเมื่อขอลาเกินโควต้า
+  overQuotaDays   Float   @default(0) // จำนวนวันที่เกินโควต้าตอนยื่นคำขอ
 
   status LeaveStatus @default(PENDING)
 
@@ -384,6 +389,10 @@ model LeaveRequest {
   approverId   Int? // หัวหน้าที่ต้องอนุมัติตอนนั้น (ดึงจาก managerId ของพนักงาน)
   approvedAt   DateTime? // เวลาที่กดอนุมัติ/ปฏิเสธ
   rejectReason String?   @db.Text // เหตุผลที่ปฏิเสธ (ถ้ามี)
+  notTakenReason        String?   @db.Text // โน๊ตเมื่ออนุมัติแล้วแต่ไม่ได้ใช้วันลา
+  notTakenRequestedAt   DateTime?
+  notTakenConfirmedAt   DateTime?
+  notTakenConfirmedById Int?
 
   attachmentUrl String? @db.Text // เผื่อต้องแนบใบรับรองแพทย์
 
@@ -396,6 +405,7 @@ model LeaveRequest {
   @@index([employeeId])
   @@index([approverId])
   @@index([status])
+  @@index([notTakenRequestedAt])
   @@map("leave_requests")
 }
 
@@ -416,6 +426,7 @@ enum LeaveStatus {
   APPROVED // อนุมัติแล้ว
   REJECTED // ปฏิเสธ
   CANCELLED // ยกเลิกโดยพนักงาน
+  NOT_TAKEN // อนุมัติแล้วแต่ไม่ได้ใช้วันลา
 }
 
 // ==========================================

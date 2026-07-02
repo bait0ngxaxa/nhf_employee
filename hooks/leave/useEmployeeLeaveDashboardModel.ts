@@ -7,7 +7,17 @@ export function useEmployeeLeaveDashboardModel() {
     const [page, setPage] = useState(1);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [cancelConfirmId, setCancelConfirmId] = useState<string | null>(null);
-    const { quotas, history, metadata, isLoading, mutate, cancelLeave } = useLeaveProfile(page);
+    const [notTakenRequestId, setNotTakenRequestId] = useState<string | null>(null);
+    const [notTakenNote, setNotTakenNote] = useState("");
+    const {
+        quotas,
+        history,
+        metadata,
+        isLoading,
+        mutate,
+        cancelLeave,
+        requestNotTaken,
+    } = useLeaveProfile(page);
 
     const getQuota = (type: "SICK" | "PERSONAL" | "VACATION") =>
         quotas.find((quota) => quota.leaveType === type) || { totalDays: 0, usedDays: 0 };
@@ -33,6 +43,16 @@ export function useEmployeeLeaveDashboardModel() {
         setCancelConfirmId(null);
     };
 
+    const openNotTakenDialog = (leaveId: string): void => {
+        setNotTakenRequestId(leaveId);
+        setNotTakenNote("");
+    };
+
+    const closeNotTakenDialog = (): void => {
+        setNotTakenRequestId(null);
+        setNotTakenNote("");
+    };
+
     const confirmCancelLeave = async (): Promise<void> => {
         if (!cancelConfirmId) {
             return;
@@ -54,14 +74,38 @@ export function useEmployeeLeaveDashboardModel() {
         }
     };
 
+    const confirmNotTakenRequest = async (): Promise<void> => {
+        if (!notTakenRequestId || !notTakenNote.trim()) {
+            return;
+        }
+
+        try {
+            setIsSubmitting(true);
+            await requestNotTaken(notTakenRequestId, notTakenNote);
+            toast.success("ส่งคำขอแจ้งไม่ได้ใช้วันลาแล้ว");
+        } catch (error: unknown) {
+            toast.error(
+                error instanceof Error && error.message
+                    ? error.message
+                    : "เกิดข้อผิดพลาดในการแจ้งไม่ได้ใช้วันลา",
+            );
+        } finally {
+            setIsSubmitting(false);
+            closeNotTakenDialog();
+        }
+    };
+
     return {
         isLoading,
         isRequestFormOpen,
+        quotas,
         history,
         metadata,
         page,
         isSubmitting,
         cancelConfirmId,
+        notTakenRequestId,
+        notTakenNote,
         sickQuota: getQuota("SICK"),
         personalQuota: getQuota("PERSONAL"),
         vacationQuota: getQuota("VACATION"),
@@ -72,5 +116,9 @@ export function useEmployeeLeaveDashboardModel() {
         openCancelDialog,
         closeCancelDialog,
         confirmCancelLeave,
+        openNotTakenDialog,
+        closeNotTakenDialog,
+        setNotTakenNote,
+        confirmNotTakenRequest,
     };
 }

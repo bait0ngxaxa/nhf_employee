@@ -113,6 +113,14 @@ export const AUDIT_ACTION_META: Record<string, AuditActionMeta> = {
         label: "ยกเลิกคำขอลา",
         badgeClassName: "bg-orange-100 text-orange-700 border border-orange-200",
     },
+    LEAVE_REQUEST_NOT_TAKEN_REQUEST: {
+        label: "แจ้งไม่ได้ใช้วันลา",
+        badgeClassName: "bg-sky-100 text-sky-700 border border-sky-200",
+    },
+    LEAVE_REQUEST_NOT_TAKEN_CONFIRM: {
+        label: "ยืนยันไม่ได้ใช้วันลา",
+        badgeClassName: "bg-cyan-100 text-cyan-700 border border-cyan-200",
+    },
     STOCK_ITEM_CREATE: {
         label: "สร้างรายการสต็อก",
         badgeClassName: "bg-emerald-100 text-emerald-700 border border-emerald-200",
@@ -172,6 +180,8 @@ const AUDIT_FILTER_ACTIONS = [
     "LEAVE_REQUEST_APPROVE",
     "LEAVE_REQUEST_REJECT",
     "LEAVE_REQUEST_CANCEL",
+    "LEAVE_REQUEST_NOT_TAKEN_REQUEST",
+    "LEAVE_REQUEST_NOT_TAKEN_CONFIRM",
     "STOCK_ITEM_CREATE",
     "STOCK_ITEM_UPDATE",
     "STOCK_ITEM_DELETE",

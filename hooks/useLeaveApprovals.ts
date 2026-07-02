@@ -17,7 +17,13 @@ export interface PendingLeave {
     period: "FULL_DAY" | "MORNING" | "AFTERNOON";
     durationDays: number;
     reason: string;
-    status: "PENDING" | "APPROVED" | "REJECTED" | "CANCELLED";
+    emergencyReason: string | null;
+    specialReason: string | null;
+    overQuotaDays: number;
+    status: "PENDING" | "APPROVED" | "REJECTED" | "CANCELLED" | "NOT_TAKEN";
+    notTakenReason: string | null;
+    notTakenRequestedAt: string | null;
+    notTakenConfirmedAt: string | null;
     createdAt: string;
     employee: {
         firstName: string;
@@ -33,6 +39,7 @@ export interface PendingLeave {
 
 export interface LeaveApprovalsResponse {
     pending: PendingLeave[];
+    notTakenPending: PendingLeave[];
     history: PendingLeave[];
 }
 
@@ -50,6 +57,7 @@ export function useLeaveApprovals() {
 
     return {
         pending: data?.pending || [],
+        notTakenPending: data?.notTakenPending || [],
         history: data?.history || [],
         isLoading,
         isError: error,

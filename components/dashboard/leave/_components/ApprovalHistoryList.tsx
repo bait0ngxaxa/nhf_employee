@@ -49,6 +49,11 @@ export function ApprovalHistoryList({ history }: ApprovalHistoryListProps) {
                                 : ""}
                             ({leave.durationDays} วัน)
                         </p>
+                        {leave.status === "NOT_TAKEN" && leave.notTakenReason ? (
+                            <p className="mt-2 rounded-md border border-cyan-100 bg-cyan-50 p-2 text-xs text-cyan-700">
+                                ไม่ได้ใช้วันลา: {leave.notTakenReason}
+                            </p>
+                        ) : null}
                     </div>
                     <div>
                         <LeaveStatusBadge status={leave.status} />
