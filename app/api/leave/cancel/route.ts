@@ -1,9 +1,19 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 
 import { requireApiSession } from "@/lib/auth/api";
 import { logLeaveEvent } from "@/lib/server/audit";
 import { prisma } from "@/lib/db/prisma";
 import { getEmployeeIdFromUserId } from "@/lib/services/leave/get-employee-id";
+import {
+    buildConfiguredApproverSnapshot,
+    buildLeaveRecipientSnapshot,
+    type LeaveCancelledPayload,
+} from "@/lib/services/leave/notification-payloads";
+import {
+    formatLeaveSummary,
+    getLeaveTypeLabel,
+} from "@/lib/services/leave/notification-format";
+import { processOutbox } from "@/lib/services/outbox/processor";
 import { jsonError } from "@/lib/ssot/http";
 import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
 import { APP_DASHBOARD_TABS, toDashboardTabPath } from "@/lib/ssot/routes";
@@ -12,6 +22,7 @@ import { leaveCancelSchema } from "@/lib/validations/leave";
 const LEAVE_CANCEL_MESSAGES = {
     notFound: "ไม่พบคำขอลาที่ยกเลิกได้",
     invalidStatus: "คำขอนี้ไม่สามารถยกเลิกได้แล้ว",
+    approverAccountNotConfigured: "ผู้อนุมัติยังไม่มีบัญชีผู้ใช้ในระบบ",
 } as const;
 
 class LeaveCancelError extends Error {
@@ -51,6 +62,16 @@ export async function POST(req: Request) {
         const result = await prisma.$transaction(async (tx) => {
             const leaveRequest = await tx.leaveRequest.findUnique({
                 where: { id: leaveId },
+                include: {
+                    employee: {
+                        include: { user: { select: { id: true } } },
+                    },
+                    approver: {
+                        include: {
+                            user: { select: { id: true, isActive: true } },
+                        },
+                    },
+                },
             });
 
             if (!leaveRequest || leaveRequest.employeeId !== employeeId) {
@@ -59,18 +80,52 @@ export async function POST(req: Request) {
             if (leaveRequest.status !== "PENDING") {
                 throw new LeaveCancelError(LEAVE_CANCEL_MESSAGES.invalidStatus, 409);
             }
+            if (!leaveRequest.approver?.user?.id || !leaveRequest.approver.user.isActive) {
+                throw new LeaveCancelError(
+                    LEAVE_CANCEL_MESSAGES.approverAccountNotConfigured,
+                    400,
+                );
+            }
 
             const updatedLeaveRequest = await tx.leaveRequest.update({
                 where: { id: leaveId },
                 data: { status: "CANCELLED" },
             });
 
+            const payload: LeaveCancelledPayload = {
+                leaveId,
+                employee: buildLeaveRecipientSnapshot(leaveRequest.employee),
+                approver: buildConfiguredApproverSnapshot(leaveRequest.approver),
+                leaveType: leaveRequest.leaveType,
+                startDate: leaveRequest.startDate.toISOString(),
+                endDate: leaveRequest.endDate.toISOString(),
+                period: leaveRequest.period,
+                durationDays: leaveRequest.durationDays,
+            };
+
+            await tx.notification.updateMany({
+                where: {
+                    userId: payload.approver.userId,
+                    type: "LEAVE_REQUESTED",
+                    referenceId: leaveId,
+                    isRead: false,
+                },
+                data: { isRead: true },
+            });
+
+            await tx.notificationOutbox.create({
+                data: {
+                    type: "LEAVE_CANCELLED",
+                    payload: JSON.stringify(payload),
+                },
+            });
+
             await tx.notification.create({
                 data: {
                     userId,
-                    type: "SYSTEM_ALERT",
-                    title: "ยกเลิกคำขอลาแล้ว",
-                    message: `คำขอลาเลขที่ ${leaveId} ถูกยกเลิกเรียบร้อยแล้ว`,
+                    type: "LEAVE_CANCELLED",
+                    title: "คำขอลาถูกยกเลิกแล้ว",
+                    message: `ยกเลิกคำขอ${getLeaveTypeLabel(leaveRequest.leaveType)} ${formatLeaveSummary(payload)} แล้ว`,
                     actionUrl: toDashboardTabPath(APP_DASHBOARD_TABS.leaveHistory),
                     referenceId: leaveId,
                 },
@@ -82,6 +137,12 @@ export async function POST(req: Request) {
         await logLeaveEvent("LEAVE_REQUEST_CANCEL", leaveId, userId, auth.user.email, {
             after: { status: "CANCELLED" },
         }).catch((err) => console.error("Failed to log leave cancel:", err));
+
+        after(() => {
+            processOutbox().catch((err) =>
+                console.error("Failed to process leave cancel outbox:", err),
+            );
+        });
 
         return NextResponse.json({ success: true, data: result });
     } catch (error) {

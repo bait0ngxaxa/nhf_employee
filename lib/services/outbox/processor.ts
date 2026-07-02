@@ -7,11 +7,17 @@ import {
     sendTicketUpdatedNotifications,
 } from "@/lib/services/ticket/notifications";
 import type { TicketWithRelations } from "@/lib/services/ticket/types";
-import type { LeaveActionPayload, LeaveResultPayload } from "@/lib/email/types";
 import type {
     StockLowLineData,
     StockRequestLineData,
 } from "@/types/api";
+import {
+    parseLeaveActionPayload,
+    parseLeaveCancelledPayload,
+    parseLeaveNotTakenConfirmedPayload,
+    parseLeaveNotTakenRequestedPayload,
+    parseLeaveResultPayload,
+} from "@/lib/services/leave/notification-payloads";
 import {
     isSharedDriveOption,
     type SharedDriveOption,
@@ -143,53 +149,6 @@ function parseEmailRequestPayload(payload: unknown): EmailRequestPayload {
                 : false,
         sharedDriveAccess: parseSharedDriveAccess(payload),
         requestedAt: payload.requestedAt,
-    };
-}
-
-function parseLeaveActionPayload(payload: unknown): LeaveActionPayload {
-    if (
-        !isRecord(payload) ||
-        typeof payload.leaveId !== "string" ||
-        typeof payload.employeeName !== "string" ||
-        typeof payload.managerId !== "number" ||
-        typeof payload.leaveType !== "string" ||
-        typeof payload.startDate !== "string" ||
-        typeof payload.endDate !== "string" ||
-        typeof payload.durationDays !== "number" ||
-        typeof payload.reason !== "string"
-    ) {
-        throw new Error("Invalid LEAVE_ACTION payload");
-    }
-
-    return {
-        leaveId: payload.leaveId,
-        employeeName: payload.employeeName,
-        managerId: payload.managerId,
-        leaveType: payload.leaveType as LeaveActionPayload["leaveType"],
-        startDate: payload.startDate,
-        endDate: payload.endDate,
-        durationDays: payload.durationDays,
-        reason: payload.reason,
-    };
-}
-
-function parseLeaveResultPayload(payload: unknown): LeaveResultPayload {
-    if (
-        !isRecord(payload) ||
-        typeof payload.leaveId !== "string" ||
-        typeof payload.employeeId !== "number" ||
-        typeof payload.employeeEmail !== "string" ||
-        typeof payload.status !== "string"
-    ) {
-        throw new Error("Invalid LEAVE_RESULT payload");
-    }
-
-    return {
-        leaveId: payload.leaveId,
-        employeeId: payload.employeeId,
-        employeeEmail: payload.employeeEmail,
-        status: payload.status,
-        reason: typeof payload.reason === "string" ? payload.reason : null,
     };
 }
 
@@ -371,6 +330,30 @@ async function dispatchNotification(notification: NotificationOutbox): Promise<v
                 "../leave/notifications"
             );
             await sendLeaveResultNotifications(parsedLeaveResult);
+            return;
+        }
+        case "LEAVE_CANCELLED": {
+            const parsedLeaveCancelled = parseLeaveCancelledPayload(payload);
+            const { sendLeaveCancelledNotifications } = await import(
+                "../leave/notifications"
+            );
+            await sendLeaveCancelledNotifications(parsedLeaveCancelled);
+            return;
+        }
+        case "LEAVE_NOT_TAKEN_REQUESTED": {
+            const parsedNotTaken = parseLeaveNotTakenRequestedPayload(payload);
+            const { sendLeaveNotTakenRequestedNotifications } = await import(
+                "../leave/notifications"
+            );
+            await sendLeaveNotTakenRequestedNotifications(parsedNotTaken);
+            return;
+        }
+        case "LEAVE_NOT_TAKEN_CONFIRMED": {
+            const parsedConfirmed = parseLeaveNotTakenConfirmedPayload(payload);
+            const { sendLeaveNotTakenConfirmedNotifications } = await import(
+                "../leave/notifications"
+            );
+            await sendLeaveNotTakenConfirmedNotifications(parsedConfirmed);
             return;
         }
         case "STOCK_REQUEST_LINE": {

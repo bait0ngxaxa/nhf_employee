@@ -4,6 +4,18 @@ import { POST, PUT } from "@/app/api/leave/not-taken/route";
 import { getApiAuthSession } from "@/lib/auth/server";
 import { prisma } from "@/lib/db/prisma";
 import { getEmployeeIdFromUserId } from "@/lib/services/leave/get-employee-id";
+import { processOutbox } from "@/lib/services/outbox/processor";
+import type * as NextServerModule from "next/server";
+
+vi.mock("next/server", async (importOriginal) => {
+    const actual = await importOriginal<typeof NextServerModule>();
+    return {
+        ...actual,
+        after: vi.fn((callback) => {
+            callback();
+        }),
+    };
+});
 
 vi.mock("@/lib/auth/server", () => ({
     getApiAuthSession: vi.fn(),
@@ -13,9 +25,20 @@ vi.mock("@/lib/services/leave/get-employee-id", () => ({
     getEmployeeIdFromUserId: vi.fn(),
 }));
 
+vi.mock("@/lib/services/outbox/processor", () => ({
+    processOutbox: vi.fn(),
+}));
+
 vi.mock("@/lib/db/prisma", () => ({
     prisma: {
         $transaction: vi.fn(),
+        notification: {
+            create: vi.fn(),
+            updateMany: vi.fn(),
+        },
+        notificationOutbox: {
+            create: vi.fn(),
+        },
         leaveRequest: {
             findUnique: vi.fn(),
             update: vi.fn(),
@@ -42,6 +65,7 @@ describe("/api/leave/not-taken", () => {
             },
         });
         vi.mocked(getEmployeeIdFromUserId).mockResolvedValue(10);
+        vi.mocked(processOutbox).mockResolvedValue({ processed: 0, failed: 0 });
         vi.mocked(prisma.$transaction).mockImplementation(async (callback) => {
             if (typeof callback === "function") {
                 return callback(prisma);
@@ -74,7 +98,21 @@ describe("/api/leave/not-taken", () => {
             attachmentUrl: null,
             createdAt: new Date("2000-01-01T00:00:00.000Z"),
             updatedAt: new Date("2000-01-01T00:00:00.000Z"),
-        });
+            employee: {
+                id: 10,
+                firstName: "Employee",
+                lastName: "User",
+                email: "employee@example.com",
+                user: { id: 1 },
+            },
+            approver: {
+                id: 20,
+                firstName: "Manager",
+                lastName: "User",
+                email: "manager@example.com",
+                user: { id: 2, isActive: true },
+            },
+        } as Awaited<ReturnType<typeof prisma.leaveRequest.findUnique>>);
         vi.mocked(prisma.leaveRequest.update).mockResolvedValue({
             id: "leave-1",
         } as Awaited<ReturnType<typeof prisma.leaveRequest.update>>);
@@ -94,6 +132,17 @@ describe("/api/leave/not-taken", () => {
             data: expect.objectContaining({
                 notTakenReason: "ไม่ได้ลาเพราะมีงานด่วน",
                 notTakenRequestedAt: expect.any(Date),
+            }),
+        });
+        expect(prisma.notificationOutbox.create).toHaveBeenCalledWith({
+            data: expect.objectContaining({
+                type: "LEAVE_NOT_TAKEN_REQUESTED",
+            }),
+        });
+        expect(prisma.notification.create).toHaveBeenCalledWith({
+            data: expect.objectContaining({
+                type: "LEAVE_NOT_TAKEN_REQUESTED",
+                userId: 1,
             }),
         });
     });
@@ -122,7 +171,20 @@ describe("/api/leave/not-taken", () => {
             attachmentUrl: null,
             createdAt: new Date("2000-02-01T00:00:00.000Z"),
             updatedAt: new Date("2000-02-02T00:00:00.000Z"),
-        });
+            employee: {
+                id: 10,
+                firstName: "Employee",
+                lastName: "User",
+                email: "employee@example.com",
+                user: { id: 1 },
+            },
+            approver: {
+                id: 10,
+                firstName: "Manager",
+                lastName: "User",
+                email: "manager@example.com",
+            },
+        } as Awaited<ReturnType<typeof prisma.leaveRequest.findUnique>>);
         vi.mocked(prisma.leaveQuota.findFirst).mockResolvedValue({
             id: "quota-1",
             employeeId: 10,
@@ -155,6 +217,20 @@ describe("/api/leave/not-taken", () => {
         expect(prisma.leaveQuota.update).toHaveBeenCalledWith({
             where: { id: "quota-1" },
             data: { usedDays: 2 },
+        });
+        expect(prisma.notification.updateMany).toHaveBeenCalledWith({
+            where: {
+                userId: 1,
+                type: "LEAVE_NOT_TAKEN_REQUESTED",
+                referenceId: "leave-2",
+                isRead: false,
+            },
+            data: { isRead: true },
+        });
+        expect(prisma.notificationOutbox.create).toHaveBeenCalledWith({
+            data: expect.objectContaining({
+                type: "LEAVE_NOT_TAKEN_CONFIRMED",
+            }),
         });
     });
 });

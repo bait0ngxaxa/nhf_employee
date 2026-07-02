@@ -1,12 +1,25 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 
 import { requireApiSession } from "@/lib/auth/api";
 import { prisma } from "@/lib/db/prisma";
 import { logLeaveEvent } from "@/lib/server/audit";
 import { getEmployeeIdFromUserId } from "@/lib/services/leave/get-employee-id";
+import {
+    buildConfiguredApproverSnapshot,
+    buildLeaveRecipientSnapshot,
+    formatEmployeeName,
+    type LeaveNotTakenConfirmedPayload,
+    type LeaveNotTakenRequestedPayload,
+} from "@/lib/services/leave/notification-payloads";
+import {
+    formatLeaveSummary,
+    getLeaveTypeLabel,
+} from "@/lib/services/leave/notification-format";
 import { isAfterLeaveEnd } from "@/lib/services/leave/utils";
+import { processOutbox } from "@/lib/services/outbox/processor";
 import { jsonError, operationFailed } from "@/lib/ssot/http";
 import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
+import { APP_DASHBOARD_TABS, toDashboardTabPath } from "@/lib/ssot/routes";
 import {
     leaveNotTakenConfirmSchema,
     leaveNotTakenRequestSchema,
@@ -20,6 +33,7 @@ const NOT_TAKEN_MESSAGES = {
     alreadyRequested: "คำขอนี้ถูกแจ้งว่าไม่ได้ใช้วันลาแล้ว",
     forbidden: "คุณไม่มีสิทธิ์ดำเนินการกับคำขอนี้",
     quotaNotFound: "ไม่สามารถตรวจสอบสิทธิ์ลาของคำขอนี้ได้ กรุณาติดต่อผู้ดูแลระบบ",
+    approverAccountNotConfigured: "ผู้อนุมัติยังไม่มีบัญชีผู้ใช้ในระบบ",
 } as const;
 
 class LeaveNotTakenError extends Error {
@@ -58,6 +72,16 @@ export async function POST(req: Request): Promise<NextResponse> {
         const result = await prisma.$transaction(async (tx) => {
             const leaveRequest = await tx.leaveRequest.findUnique({
                 where: { id: parsed.data.leaveId },
+                include: {
+                    employee: {
+                        include: { user: { select: { id: true } } },
+                    },
+                    approver: {
+                        include: {
+                            user: { select: { id: true, isActive: true } },
+                        },
+                    },
+                },
             });
 
             if (!leaveRequest || leaveRequest.employeeId !== employeeId) {
@@ -72,14 +96,52 @@ export async function POST(req: Request): Promise<NextResponse> {
             if (leaveRequest.notTakenRequestedAt) {
                 throw new LeaveNotTakenError(NOT_TAKEN_MESSAGES.alreadyRequested, 409);
             }
+            if (!leaveRequest.approver?.user?.id || !leaveRequest.approver.user.isActive) {
+                throw new LeaveNotTakenError(
+                    NOT_TAKEN_MESSAGES.approverAccountNotConfigured,
+                    400,
+                );
+            }
 
-            return tx.leaveRequest.update({
+            const updatedRequest = await tx.leaveRequest.update({
                 where: { id: leaveRequest.id },
                 data: {
                     notTakenReason: parsed.data.note,
                     notTakenRequestedAt: new Date(),
                 },
             });
+
+            const payload: LeaveNotTakenRequestedPayload = {
+                leaveId: leaveRequest.id,
+                employee: buildLeaveRecipientSnapshot(leaveRequest.employee),
+                approver: buildConfiguredApproverSnapshot(leaveRequest.approver),
+                leaveType: leaveRequest.leaveType,
+                startDate: leaveRequest.startDate.toISOString(),
+                endDate: leaveRequest.endDate.toISOString(),
+                period: leaveRequest.period,
+                durationDays: leaveRequest.durationDays,
+                note: parsed.data.note,
+            };
+
+            await tx.notificationOutbox.create({
+                data: {
+                    type: "LEAVE_NOT_TAKEN_REQUESTED",
+                    payload: JSON.stringify(payload),
+                },
+            });
+
+            await tx.notification.create({
+                data: {
+                    userId,
+                    type: "LEAVE_NOT_TAKEN_REQUESTED",
+                    title: "แจ้งไม่ได้ใช้วันลาแล้ว",
+                    message: `แจ้งไม่ได้ใช้วันลาแล้ว: ${getLeaveTypeLabel(leaveRequest.leaveType)} ${formatLeaveSummary(payload)}`,
+                    actionUrl: toDashboardTabPath(APP_DASHBOARD_TABS.leaveHistory),
+                    referenceId: leaveRequest.id,
+                },
+            });
+
+            return updatedRequest;
         });
 
         await logLeaveEvent(
@@ -89,6 +151,12 @@ export async function POST(req: Request): Promise<NextResponse> {
             auth.user.email,
             { metadata: { note: parsed.data.note } },
         ).catch((err) => console.error("Failed to log leave not-taken request:", err));
+
+        after(() => {
+            processOutbox().catch((err) =>
+                console.error("Failed to process leave not-taken outbox:", err),
+            );
+        });
 
         return NextResponse.json({ success: true, data: result });
     } catch (error) {
@@ -126,6 +194,12 @@ export async function PUT(req: Request): Promise<NextResponse> {
         const result = await prisma.$transaction(async (tx) => {
             const leaveRequest = await tx.leaveRequest.findUnique({
                 where: { id: parsed.data.leaveId },
+                include: {
+                    employee: {
+                        include: { user: { select: { id: true } } },
+                    },
+                    approver: true,
+                },
             });
 
             if (
@@ -166,6 +240,36 @@ export async function PUT(req: Request): Promise<NextResponse> {
                 data: { usedDays: quota.usedDays - leaveRequest.durationDays },
             });
 
+            await tx.notification.updateMany({
+                where: {
+                    userId,
+                    type: "LEAVE_NOT_TAKEN_REQUESTED",
+                    referenceId: leaveRequest.id,
+                    isRead: false,
+                },
+                data: { isRead: true },
+            });
+
+            const payload: LeaveNotTakenConfirmedPayload = {
+                leaveId: leaveRequest.id,
+                employee: buildLeaveRecipientSnapshot(leaveRequest.employee),
+                approverName: leaveRequest.approver
+                    ? formatEmployeeName(leaveRequest.approver)
+                    : auth.user.name,
+                leaveType: leaveRequest.leaveType,
+                startDate: leaveRequest.startDate.toISOString(),
+                endDate: leaveRequest.endDate.toISOString(),
+                period: leaveRequest.period,
+                durationDays: leaveRequest.durationDays,
+            };
+
+            await tx.notificationOutbox.create({
+                data: {
+                    type: "LEAVE_NOT_TAKEN_CONFIRMED",
+                    payload: JSON.stringify(payload),
+                },
+            });
+
             return updatedRequest;
         });
 
@@ -176,6 +280,12 @@ export async function PUT(req: Request): Promise<NextResponse> {
             auth.user.email,
             { after: { status: "NOT_TAKEN" } },
         ).catch((err) => console.error("Failed to log leave not-taken confirm:", err));
+
+        after(() => {
+            processOutbox().catch((err) =>
+                console.error("Failed to process leave not-taken confirm outbox:", err),
+            );
+        });
 
         return NextResponse.json({ success: true, data: result });
     } catch (error) {

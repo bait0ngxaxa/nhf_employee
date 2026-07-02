@@ -1,91 +1,181 @@
+import { Prisma, type NotificationType } from "@prisma/client";
+
 import { emailService } from "@/lib/email";
-import { type LeaveActionPayload, type LeaveResultPayload } from "@/lib/email/types";
 import { prisma } from "@/lib/db/prisma";
 import {
     APP_DASHBOARD_TABS,
     toDashboardTabPath,
 } from "@/lib/ssot/routes";
+import {
+    formatLeaveFlagSummary,
+    formatLeaveSummary,
+    getLeaveTypeLabel,
+} from "@/lib/services/leave/notification-format";
+import type {
+    LeaveActionPayload,
+    LeaveCancelledPayload,
+    LeaveNotTakenConfirmedPayload,
+    LeaveNotTakenRequestedPayload,
+    LeaveNotificationPayload,
+    LeaveResultPayload,
+} from "@/lib/services/leave/notification-payloads";
 import { getPublicOrigin } from "@/lib/network/public-url";
 
-const LEAVE_TYPE_LABELS: Record<string, string> = {
-    SICK: "ลาป่วย",
-    PERSONAL: "ลากิจ",
-    VACATION: "ลาพักร้อน",
+type LeaveNotificationInput = {
+    userId: number | null;
+    type: NotificationType;
+    title: string;
+    message: string;
+    actionUrl: string;
+    referenceId: string;
 };
 
-/**
- * Send notification to the manager when an employee requests leave.
- * Creates both an email and an in-app notification.
- */
-export async function sendLeaveActionNotifications(
-    leaveRequestPayload: LeaveActionPayload,
-): Promise<void> {
-    const manager = await prisma.employee.findUnique({
-        where: { id: leaveRequestPayload.managerId },
-        select: { email: true, user: { select: { id: true } } },
-    });
-
-    if (!manager || !manager.email) {
-        throw new Error("Manager or manager email not found");
-    }
-
-    const dashboardLink = `${getPublicOrigin()}${toDashboardTabPath(APP_DASHBOARD_TABS.managerApproval)}`;
-
-    await emailService.sendLeaveActionNotification(
-        manager.email,
-        leaveRequestPayload,
-        dashboardLink,
+function isUniqueConstraintError(error: unknown): boolean {
+    return (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2002"
     );
+}
 
-    if (manager.user?.id) {
-        const typeLabel = LEAVE_TYPE_LABELS[leaveRequestPayload.leaveType] ?? "ลา";
-        await prisma.notification.create({
-            data: {
-                userId: manager.user.id,
-                type: "LEAVE_REQUESTED",
-                title: "คำขออนุมัติลางานใหม่",
-                message: `${leaveRequestPayload.employeeName} ขออนุมัติ${typeLabel} ${leaveRequestPayload.durationDays} วัน (${leaveRequestPayload.startDate} - ${leaveRequestPayload.endDate})`,
-                actionUrl: toDashboardTabPath(APP_DASHBOARD_TABS.managerApproval),
-                referenceId: leaveRequestPayload.leaveId,
-            },
-        });
+async function assertEmailSent(
+    isSent: boolean,
+    label: string,
+): Promise<void> {
+    if (!isSent) {
+        throw new Error(`${label} email notification failed`);
     }
 }
 
-/**
- * Send notification to the employee when their manager approves/rejects the leave.
- * Creates both an email and an in-app notification.
- */
-export async function sendLeaveResultNotifications(
-    leaveResultPayload: LeaveResultPayload,
+function buildDedupeKey(input: LeaveNotificationInput): string {
+    return `leave:${input.userId}:${input.type}:${input.referenceId}`;
+}
+
+async function createNotificationOnce(
+    input: LeaveNotificationInput,
 ): Promise<void> {
-    if (!leaveResultPayload.employeeEmail) {
-        throw new Error("Employee email not found in payload");
+    if (!input.userId) {
+        return;
     }
 
-    await emailService.sendLeaveResultNotification(
-        leaveResultPayload.employeeEmail,
-        leaveResultPayload,
+    const { userId, ...data } = input;
+    try {
+        await prisma.notification.create({
+            data: { ...data, userId, dedupeKey: buildDedupeKey(input) },
+        });
+    } catch (error) {
+        if (isUniqueConstraintError(error)) {
+            return;
+        }
+        throw error;
+    }
+}
+
+function getAbsoluteDashboardPath(tab: string): string {
+    return `${getPublicOrigin()}${toDashboardTabPath(tab)}`;
+}
+
+function buildLeaveMessage(data: LeaveNotificationPayload): string {
+    return `${getLeaveTypeLabel(data.leaveType)} ${formatLeaveSummary(data)}`;
+}
+
+function buildLeaveActionMessage(data: LeaveActionPayload): string {
+    return `${data.employee.name} ส่งคำขอ${buildLeaveMessage(data)}${formatLeaveFlagSummary(data)}`;
+}
+
+export async function sendLeaveActionNotifications(
+    payload: LeaveActionPayload,
+): Promise<void> {
+    const dashboardLink = getAbsoluteDashboardPath(
+        APP_DASHBOARD_TABS.managerApproval,
+    );
+    await assertEmailSent(
+        await emailService.sendLeaveActionNotification(payload, dashboardLink),
+        "LEAVE_ACTION",
     );
 
-    const employeeUser = await prisma.user.findFirst({
-        where: { employeeId: leaveResultPayload.employeeId },
-        select: { id: true },
+    await createNotificationOnce({
+        userId: payload.approver.userId,
+        type: "LEAVE_REQUESTED",
+        title: "มีคำขอลาใหม่รออนุมัติ",
+        message: buildLeaveActionMessage(payload),
+        actionUrl: toDashboardTabPath(APP_DASHBOARD_TABS.managerApproval),
+        referenceId: payload.leaveId,
     });
+}
 
-    if (employeeUser) {
-        const isApproved = leaveResultPayload.status === "APPROVED";
-        await prisma.notification.create({
-            data: {
-                userId: employeeUser.id,
-                type: isApproved ? "LEAVE_APPROVED" : "LEAVE_REJECTED",
-                title: isApproved ? "ใบลาได้รับการอนุมัติ" : "ใบลาไม่ได้รับการอนุมัติ",
-                message: isApproved
-                    ? "ผู้อนุมัติได้อนุมัติคำขอลางานของคุณแล้ว"
-                    : `ผู้อนุมัติไม่อนุมัติคำขอลางานของคุณ${leaveResultPayload.reason ? `: ${leaveResultPayload.reason}` : ""}`,
-                actionUrl: toDashboardTabPath(APP_DASHBOARD_TABS.leaveHistory),
-                referenceId: leaveResultPayload.leaveId,
-            },
-        });
-    }
+export async function sendLeaveResultNotifications(
+    payload: LeaveResultPayload,
+): Promise<void> {
+    await assertEmailSent(
+        await emailService.sendLeaveResultNotification(payload),
+        "LEAVE_RESULT",
+    );
+
+    const isApproved = payload.status === "APPROVED";
+    await createNotificationOnce({
+        userId: payload.employee.userId,
+        type: isApproved ? "LEAVE_APPROVED" : "LEAVE_REJECTED",
+        title: isApproved
+            ? "คำขอลาได้รับการอนุมัติ"
+            : "คำขอลาไม่ได้รับการอนุมัติ",
+        message: isApproved
+            ? `ผู้อนุมัติอนุมัติ${buildLeaveMessage(payload)}แล้ว`
+            : `ผู้อนุมัติไม่อนุมัติ${buildLeaveMessage(payload)}`,
+        actionUrl: toDashboardTabPath(APP_DASHBOARD_TABS.leaveHistory),
+        referenceId: payload.leaveId,
+    });
+}
+
+export async function sendLeaveCancelledNotifications(
+    payload: LeaveCancelledPayload,
+): Promise<void> {
+    await assertEmailSent(
+        await emailService.sendLeaveCancelledNotification(payload),
+        "LEAVE_CANCELLED",
+    );
+
+    await createNotificationOnce({
+        userId: payload.approver.userId,
+        type: "LEAVE_CANCELLED",
+        title: "คำขอลาถูกยกเลิก",
+        message: `${payload.employee.name} ยกเลิกคำขอ${buildLeaveMessage(payload)}`,
+        actionUrl: toDashboardTabPath(APP_DASHBOARD_TABS.managerApproval),
+        referenceId: payload.leaveId,
+    });
+}
+
+export async function sendLeaveNotTakenRequestedNotifications(
+    payload: LeaveNotTakenRequestedPayload,
+): Promise<void> {
+    await assertEmailSent(
+        await emailService.sendLeaveNotTakenRequestedNotification(payload),
+        "LEAVE_NOT_TAKEN_REQUESTED",
+    );
+
+    await createNotificationOnce({
+        userId: payload.approver.userId,
+        type: "LEAVE_NOT_TAKEN_REQUESTED",
+        title: "มีรายการแจ้งไม่ได้ใช้วันลารอยืนยัน",
+        message: `${payload.employee.name} แจ้งไม่ได้ใช้วันลา: ${buildLeaveMessage(payload)}`,
+        actionUrl: toDashboardTabPath(APP_DASHBOARD_TABS.managerApproval),
+        referenceId: payload.leaveId,
+    });
+}
+
+export async function sendLeaveNotTakenConfirmedNotifications(
+    payload: LeaveNotTakenConfirmedPayload,
+): Promise<void> {
+    await assertEmailSent(
+        await emailService.sendLeaveNotTakenConfirmedNotification(payload),
+        "LEAVE_NOT_TAKEN_CONFIRMED",
+    );
+
+    await createNotificationOnce({
+        userId: payload.employee.userId,
+        type: "LEAVE_NOT_TAKEN_CONFIRMED",
+        title: "ยืนยันไม่ได้ใช้วันลาแล้ว",
+        message: `ผู้อนุมัติยืนยันไม่ได้ใช้วันลา: ${buildLeaveMessage(payload)}`,
+        actionUrl: toDashboardTabPath(APP_DASHBOARD_TABS.leaveHistory),
+        referenceId: payload.leaveId,
+    });
 }

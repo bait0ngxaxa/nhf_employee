@@ -8,6 +8,11 @@ import {
     sendTicketCreatedNotifications,
     sendTicketUpdatedNotifications,
 } from "@/lib/services/ticket/notifications";
+import {
+    sendLeaveCancelledNotifications,
+    sendLeaveNotTakenConfirmedNotifications,
+    sendLeaveNotTakenRequestedNotifications,
+} from "@/lib/services/leave/notifications";
 
 vi.mock("@/lib/db/prisma", () => ({
     prisma: mockDeep<PrismaClient>(),
@@ -16,6 +21,14 @@ vi.mock("@/lib/db/prisma", () => ({
 vi.mock("@/lib/services/ticket/notifications", () => ({
     sendTicketCreatedNotifications: vi.fn(),
     sendTicketUpdatedNotifications: vi.fn(),
+}));
+
+vi.mock("@/lib/services/leave/notifications", () => ({
+    sendLeaveActionNotifications: vi.fn(),
+    sendLeaveResultNotifications: vi.fn(),
+    sendLeaveCancelledNotifications: vi.fn(),
+    sendLeaveNotTakenRequestedNotifications: vi.fn(),
+    sendLeaveNotTakenConfirmedNotifications: vi.fn(),
 }));
 
 vi.mock("@/lib/line", () => ({
@@ -49,6 +62,31 @@ function buildNotification(
 
 function asNever<T>(value: T): never {
     return value as unknown as never;
+}
+
+function buildLeavePayload() {
+    return {
+        leaveId: "leave-1",
+        employee: {
+            employeeId: 10,
+            userId: 1,
+            email: "employee@example.com",
+            name: "Employee User",
+        },
+        approver: {
+            employeeId: 20,
+            userId: 2,
+            email: "manager@example.com",
+            name: "Manager User",
+        },
+        approverName: "Manager User",
+        leaveType: "SICK",
+        startDate: "2026-07-01T00:00:00.000Z",
+        endDate: "2026-07-01T00:00:00.000Z",
+        period: "FULL_DAY",
+        durationDays: 1,
+        note: "ไม่ได้ลาเพราะมีงานด่วน",
+    };
 }
 
 describe("processOutbox", () => {
@@ -253,6 +291,75 @@ describe("processOutbox", () => {
                 data: expect.objectContaining({
                     status: "FAILED",
                     error: "Network failure",
+                }),
+            }),
+        );
+    });
+
+    it("processes LEAVE_CANCELLED successfully", async () => {
+        prismaMock.notificationOutbox.findMany.mockResolvedValue(
+            asNever([
+                buildNotification(
+                    107,
+                    "LEAVE_CANCELLED",
+                    JSON.stringify(buildLeavePayload()),
+                ),
+            ]),
+        );
+
+        const result = await processOutbox();
+
+        expect(result).toEqual({ processed: 1, failed: 0 });
+        expect(sendLeaveCancelledNotifications).toHaveBeenCalledWith(
+            expect.objectContaining({ leaveId: "leave-1" }),
+        );
+    });
+
+    it("processes not-taken leave events successfully", async () => {
+        const payload = buildLeavePayload();
+        prismaMock.notificationOutbox.findMany.mockResolvedValue(
+            asNever([
+                buildNotification(
+                    108,
+                    "LEAVE_NOT_TAKEN_REQUESTED",
+                    JSON.stringify(payload),
+                ),
+                buildNotification(
+                    109,
+                    "LEAVE_NOT_TAKEN_CONFIRMED",
+                    JSON.stringify(payload),
+                ),
+            ]),
+        );
+
+        const result = await processOutbox();
+
+        expect(result).toEqual({ processed: 2, failed: 0 });
+        expect(sendLeaveNotTakenRequestedNotifications).toHaveBeenCalledTimes(1);
+        expect(sendLeaveNotTakenConfirmedNotifications).toHaveBeenCalledTimes(1);
+    });
+
+    it("marks leave event failed for invalid payload", async () => {
+        prismaMock.notificationOutbox.findMany.mockResolvedValue(
+            asNever([
+                buildNotification(
+                    110,
+                    "LEAVE_NOT_TAKEN_REQUESTED",
+                    JSON.stringify({ leaveId: "leave-1" }),
+                ),
+            ]),
+        );
+
+        const result = await processOutbox();
+
+        expect(result).toEqual({ processed: 0, failed: 1 });
+        expect(sendLeaveNotTakenRequestedNotifications).not.toHaveBeenCalled();
+        expect(prismaMock.notificationOutbox.updateMany).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: { id: 110, status: "PROCESSING" },
+                data: expect.objectContaining({
+                    status: "FAILED",
+                    error: "Invalid LEAVE_NOT_TAKEN_REQUESTED payload",
                 }),
             }),
         );

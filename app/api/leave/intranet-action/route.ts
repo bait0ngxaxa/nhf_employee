@@ -6,6 +6,11 @@ import { logLeaveEvent } from "@/lib/server/audit";
 import { prisma } from "@/lib/db/prisma";
 import { processOutbox } from "@/lib/services/outbox/processor";
 import { getEmployeeIdFromUserId } from "@/lib/services/leave/get-employee-id";
+import {
+    buildLeaveRecipientSnapshot,
+    formatEmployeeName,
+    type LeaveResultPayload,
+} from "@/lib/services/leave/notification-payloads";
 import { jsonError, operationFailed } from "@/lib/ssot/http";
 import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
 import { leaveActionSchema } from "@/lib/validations/leave";
@@ -59,7 +64,12 @@ export async function POST(req: Request): Promise<NextResponse> {
         const result = await prisma.$transaction(async (tx) => {
             const leaveRequest = await tx.leaveRequest.findUnique({
                 where: { id: leaveId },
-                include: { employee: true },
+                include: {
+                    employee: {
+                        include: { user: { select: { id: true } } },
+                    },
+                    approver: true,
+                },
             });
 
             if (!leaveRequest) {
@@ -121,16 +131,35 @@ export async function POST(req: Request): Promise<NextResponse> {
                 }
             }
 
+            await tx.notification.updateMany({
+                where: {
+                    userId,
+                    type: "LEAVE_REQUESTED",
+                    referenceId: leaveId,
+                    isRead: false,
+                },
+                data: { isRead: true },
+            });
+
+            const payload: LeaveResultPayload = {
+                leaveId,
+                employee: buildLeaveRecipientSnapshot(leaveRequest.employee),
+                approverName: leaveRequest.approver
+                    ? formatEmployeeName(leaveRequest.approver)
+                    : auth.user.name,
+                leaveType: leaveRequest.leaveType,
+                startDate: leaveRequest.startDate.toISOString(),
+                endDate: leaveRequest.endDate.toISOString(),
+                period: leaveRequest.period,
+                durationDays: leaveRequest.durationDays,
+                status: newStatus,
+                reason: action === "REJECT" ? reason ?? null : null,
+            };
+
             await tx.notificationOutbox.create({
                 data: {
                     type: NotificationOutboxType.LEAVE_RESULT,
-                    payload: JSON.stringify({
-                        leaveId,
-                        employeeId: leaveRequest.employeeId,
-                        employeeEmail: leaveRequest.employee.email,
-                        status: newStatus,
-                        reason: action === "REJECT" ? reason : null,
-                    }),
+                    payload: JSON.stringify(payload),
                 },
             });
 

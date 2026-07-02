@@ -56,6 +56,23 @@ vi.mock("@/lib/db/prisma", () => ({
 describe("POST /api/leave/request", () => {
     const mockUser = { id: "1", name: "Test User" };
     const mockEmployeeId = 100;
+    const mockManager = {
+        id: 200,
+        firstName: "Manager",
+        lastName: "User",
+        email: "manager@example.com",
+        user: { id: 2, isActive: true },
+    };
+
+    const buildEmployeeWithManager = () => ({
+        id: mockEmployeeId,
+        firstName: "A",
+        lastName: "B",
+        email: "employee@example.com",
+        managerId: mockManager.id,
+        user: { id: 1 },
+        manager: mockManager,
+    });
 
     beforeEach(() => {
         vi.clearAllMocks();
@@ -181,12 +198,7 @@ describe("POST /api/leave/request", () => {
             return Promise.resolve(arg);
         });
 
-        (prisma.employee.findUnique as unknown as { mockResolvedValue: (v: { id: number; firstName: string; lastName: string; managerId: number }) => void }).mockResolvedValue({
-            id: mockEmployeeId,
-            firstName: "A",
-            lastName: "B",
-            managerId: 200,
-        });
+        (prisma.employee.findUnique as unknown as { mockResolvedValue: (v: ReturnType<typeof buildEmployeeWithManager>) => void }).mockResolvedValue(buildEmployeeWithManager());
         (prisma.leaveRequest.findFirst as unknown as { mockResolvedValue: (v: null) => void }).mockResolvedValue(null);
         (prisma.leaveQuota.findFirst as unknown as { mockResolvedValue: (v: { id: number; totalDays: number; usedDays: number }) => void }).mockResolvedValue({
             id: 1,
@@ -255,9 +267,10 @@ describe("POST /api/leave/request", () => {
         });
 
         it("should throw error if employee has no managerId", async () => {
-            (prisma.employee.findUnique as unknown as { mockResolvedValue: (v: { id: number; managerId: null }) => void }).mockResolvedValue({
+            (prisma.employee.findUnique as unknown as { mockResolvedValue: (v: { id: number; managerId: null; manager: null }) => void }).mockResolvedValue({
                 id: mockEmployeeId,
                 managerId: null,
+                manager: null,
             });
 
             const req = new NextRequest("http://localhost/api/leave/request", {
@@ -272,12 +285,7 @@ describe("POST /api/leave/request", () => {
         });
 
         it("should throw error if insufficient quota", async () => {
-            (prisma.employee.findUnique as unknown as { mockResolvedValue: (v: { id: number; firstName: string; lastName: string; managerId: number }) => void }).mockResolvedValue({
-                id: mockEmployeeId,
-                firstName: "A",
-                lastName: "B",
-                managerId: 200,
-            });
+            (prisma.employee.findUnique as unknown as { mockResolvedValue: (v: ReturnType<typeof buildEmployeeWithManager>) => void }).mockResolvedValue(buildEmployeeWithManager());
             (prisma.leaveRequest.findFirst as unknown as { mockResolvedValue: (v: null) => void }).mockResolvedValue(null);
             (prisma.leaveQuota.findFirst as unknown as { mockResolvedValue: (v: { id: number; totalDays: number; usedDays: number }) => void }).mockResolvedValue({
                 id: 1,
@@ -297,12 +305,7 @@ describe("POST /api/leave/request", () => {
         });
 
         it("should allow insufficient quota with special reason", async () => {
-            (prisma.employee.findUnique as unknown as { mockResolvedValue: (v: { id: number; firstName: string; lastName: string; managerId: number }) => void }).mockResolvedValue({
-                id: mockEmployeeId,
-                firstName: "A",
-                lastName: "B",
-                managerId: 200,
-            });
+            (prisma.employee.findUnique as unknown as { mockResolvedValue: (v: ReturnType<typeof buildEmployeeWithManager>) => void }).mockResolvedValue(buildEmployeeWithManager());
             (prisma.leaveRequest.findFirst as unknown as { mockResolvedValue: (v: null) => void }).mockResolvedValue(null);
             (prisma.leaveQuota.findFirst as unknown as { mockResolvedValue: (v: { id: number; totalDays: number; usedDays: number }) => void }).mockResolvedValue({
                 id: 1,
@@ -330,10 +333,7 @@ describe("POST /api/leave/request", () => {
         });
 
         it("should throw error if requests overlap", async () => {
-            (prisma.employee.findUnique as unknown as { mockResolvedValue: (v: { id: number; managerId: number }) => void }).mockResolvedValue({
-                id: mockEmployeeId,
-                managerId: 200,
-            });
+            (prisma.employee.findUnique as unknown as { mockResolvedValue: (v: ReturnType<typeof buildEmployeeWithManager>) => void }).mockResolvedValue(buildEmployeeWithManager());
             (prisma.leaveRequest.findFirst as unknown as { mockResolvedValue: (v: { id: number; status: string }) => void }).mockResolvedValue({
                 id: 50,
                 status: "APPROVED",
@@ -351,12 +351,7 @@ describe("POST /api/leave/request", () => {
         });
 
         it("should complete successfully, creating default quota if none exists", async () => {
-            (prisma.employee.findUnique as unknown as { mockResolvedValue: (v: { id: number; firstName: string; lastName: string; managerId: number }) => void }).mockResolvedValue({
-                id: mockEmployeeId,
-                firstName: "A",
-                lastName: "B",
-                managerId: 200,
-            });
+            (prisma.employee.findUnique as unknown as { mockResolvedValue: (v: ReturnType<typeof buildEmployeeWithManager>) => void }).mockResolvedValue(buildEmployeeWithManager());
             (prisma.leaveRequest.findFirst as unknown as { mockResolvedValue: (v: null) => void }).mockResolvedValue(null);
             (prisma.leaveQuota.findFirst as unknown as { mockResolvedValue: (v: null) => void }).mockResolvedValue(null);
             (prisma.leaveQuota.create as unknown as { mockResolvedValue: (v: { id: number; totalDays: number; usedDays: number }) => void }).mockResolvedValue({

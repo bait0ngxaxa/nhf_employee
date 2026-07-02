@@ -184,6 +184,9 @@ enum NotificationOutboxType {
   EMAIL_REQUEST
   LEAVE_ACTION
   LEAVE_RESULT
+  LEAVE_CANCELLED
+  LEAVE_NOT_TAKEN_REQUESTED
+  LEAVE_NOT_TAKEN_CONFIRMED
   STOCK_REQUEST_LINE
   STOCK_LOW_LINE
 }
@@ -332,6 +335,7 @@ model Notification {
   isRead      Boolean          @default(false)
   actionUrl   String?
   referenceId String? // ID of Ticket, Comment, etc.
+  dedupeKey   String?          @unique
   createdAt   DateTime         @default(now())
 
   @@index([userId, isRead])
@@ -347,6 +351,9 @@ enum NotificationType {
   LEAVE_REQUESTED
   LEAVE_APPROVED
   LEAVE_REJECTED
+  LEAVE_CANCELLED
+  LEAVE_NOT_TAKEN_REQUESTED
+  LEAVE_NOT_TAKEN_CONFIRMED
   STOCK_REQUEST_NEW
   STOCK_ISSUED      @map("STOCK_APPROVED")
   STOCK_CANCELLED   @map("STOCK_REJECTED")

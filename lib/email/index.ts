@@ -5,13 +5,22 @@ import {
     getTicketPriorityLabel,
 } from "@/lib/helpers/ticket-helpers";
 import { type EmailData, type LeaveActionPayload, type LeaveResultPayload } from "./types";
+import type {
+    LeaveCancelledPayload,
+    LeaveNotTakenConfirmedPayload,
+    LeaveNotTakenRequestedPayload,
+} from "./types";
 import { generateNewTicketEmailHTML } from "./templates/new-ticket";
 import { generateStatusUpdateEmailHTML } from "./templates/status-update";
 import { generateLeaveActionEmailHTML } from "./templates/leave-action";
 import { generateLeaveResultEmailHTML } from "./templates/leave-result";
+import { generateLeaveEventEmailHTML } from "./templates/leave-event";
 import { getPublicOrigin } from "@/lib/network/public-url";
+import {
+    APP_DASHBOARD_TABS,
+    toDashboardTabPath,
+} from "@/lib/ssot/routes";
 
-// Create transporter (singleton pattern using closure)
 let transporter: nodemailer.Transporter | null = null;
 let isTransporterReady = false;
 
@@ -49,7 +58,6 @@ async function verifyConnection(): Promise<boolean> {
 
         // Reset and retry
         transporter = null;
-
         try {
             await getTransporter().verify();
             isTransporterReady = true;
@@ -214,36 +222,101 @@ export async function sendITTeamNotification(
 }
 
 export async function sendLeaveActionNotification(
-    to: string,
     data: LeaveActionPayload,
     dashboardLink: string
 ): Promise<boolean> {
     const emailData: EmailData = {
-        to: to,
-        subject: `[NHF Leave] คำขออนุมัติลางานใหม่จาก ${data.employeeName}`,
+        to: data.approver.email,
+        subject: `[NHF Leave] คำขอลาใหม่จาก ${data.employee.name}`,
         html: generateLeaveActionEmailHTML(data, dashboardLink),
-        text: `มีคำขออนุมัติลางานใหม่\nพนักงาน ${data.employeeName} ขอลา ${data.durationDays} วัน\n(กรุณาใช้ลิงก์ในอีเมลแบบ HTML เพื่อดำเนินการ)`,
+        text: `มีคำขอลาใหม่\nพนักงาน ${data.employee.name} ขอลา ${data.durationDays} วัน\nดูรายละเอียด: ${dashboardLink}`,
     };
 
     return await sendEmail(emailData);
 }
 
 export async function sendLeaveResultNotification(
-    employeeEmail: string,
     data: LeaveResultPayload
 ): Promise<boolean> {
-    const dashboardUrl = `${getPublicOrigin()}/dashboard/leave`;
+    const dashboardUrl = `${getPublicOrigin()}${toDashboardTabPath(APP_DASHBOARD_TABS.leaveHistory)}`;
     const emailData: EmailData = {
-        to: employeeEmail,
-        subject: `[NHF Leave] ผลการอนุมัติลางานของคุณ: ${data.status === "APPROVED" ? "อนุมัติ" : "ไม่อนุมัติ"}`,
+        to: data.employee.email,
+        subject: `[NHF Leave] ผลการพิจารณาคำขอลา: ${data.status === "APPROVED" ? "อนุมัติ" : "ไม่อนุมัติ"}`,
         html: generateLeaveResultEmailHTML(data, dashboardUrl),
-        text: `ผลการพิจารณาลางาน: ${data.status}\nเหตุผล: ${data.reason || "-"}`,
+        text: `ผลการพิจารณาคำขอลา: ${data.status}\nเหตุผล: ${data.reason || "-"}`,
     };
 
     return await sendEmail(emailData);
 }
 
-// Export as object for backward compatibility
+export async function sendLeaveCancelledNotification(
+    data: LeaveCancelledPayload,
+): Promise<boolean> {
+    const dashboardLink = `${getPublicOrigin()}${toDashboardTabPath(APP_DASHBOARD_TABS.managerApproval)}`;
+    const emailData: EmailData = {
+        to: data.approver.email,
+        subject: `[NHF Leave] ${data.employee.name} ยกเลิกคำขอลาแล้ว`,
+        html: generateLeaveEventEmailHTML({
+            ...data,
+            title: "คำขอลาถูกยกเลิก",
+            intro: `${data.employee.name} ยกเลิกคำขอลาที่รออนุมัติแล้ว`,
+            employeeName: data.employee.name,
+            dashboardLink,
+            ctaLabel: "ดูรายการอนุมัติ",
+        }),
+        text: `${data.employee.name} ยกเลิกคำขอลาแล้ว\nดูรายละเอียด: ${dashboardLink}`,
+    };
+
+    return sendEmail(emailData);
+}
+
+export async function sendLeaveNotTakenRequestedNotification(
+    data: LeaveNotTakenRequestedPayload,
+): Promise<boolean> {
+    const dashboardLink = `${getPublicOrigin()}${toDashboardTabPath(APP_DASHBOARD_TABS.managerApproval)}`;
+    const emailData: EmailData = {
+        to: data.approver.email,
+        subject: `[NHF Leave] มีรายการแจ้งไม่ได้ใช้วันลารอยืนยัน`,
+        html: generateLeaveEventEmailHTML({
+            ...data,
+            title: "มีรายการแจ้งไม่ได้ใช้วันลารอยืนยัน",
+            intro: `${data.employee.name} แจ้งว่าไม่ได้ใช้วันลาที่อนุมัติแล้ว`,
+            employeeName: data.employee.name,
+            dashboardLink,
+            ctaLabel: "ตรวจสอบและยืนยัน",
+            noteLabel: "โน๊ตจากพนักงาน",
+            note: data.note,
+        }),
+        text: `${data.employee.name} แจ้งไม่ได้ใช้วันลา\nดูรายละเอียด: ${dashboardLink}`,
+    };
+
+    return sendEmail(emailData);
+}
+
+export async function sendLeaveNotTakenConfirmedNotification(
+    data: LeaveNotTakenConfirmedPayload,
+): Promise<boolean> {
+    const dashboardLink = `${getPublicOrigin()}${toDashboardTabPath(APP_DASHBOARD_TABS.leaveHistory)}`;
+    const approverName = data.approverName ?? "ผู้อนุมัติ";
+    const emailData: EmailData = {
+        to: data.employee.email,
+        subject: "[NHF Leave] ยืนยันไม่ได้ใช้วันลาแล้ว",
+        html: generateLeaveEventEmailHTML({
+            ...data,
+            title: "ยืนยันไม่ได้ใช้วันลาแล้ว",
+            intro: "ผู้อนุมัติยืนยันว่าคุณไม่ได้ใช้วันลาตามคำขอนี้แล้ว",
+            employeeName: data.employee.name,
+            dashboardLink,
+            ctaLabel: "ดูประวัติการลา",
+            actorLabel: "ผู้อนุมัติ",
+            actorName: approverName,
+        }),
+        text: `ยืนยันไม่ได้ใช้วันลาแล้ว\nผู้อนุมัติ: ${approverName}\nดูรายละเอียด: ${dashboardLink}`,
+    };
+
+    return sendEmail(emailData);
+}
+
 export const emailService = {
     sendEmail,
     sendNewTicketNotification,
@@ -251,6 +324,9 @@ export const emailService = {
     sendITTeamNotification,
     sendLeaveActionNotification,
     sendLeaveResultNotification,
+    sendLeaveCancelledNotification,
+    sendLeaveNotTakenRequestedNotification,
+    sendLeaveNotTakenConfirmedNotification,
 };
 
 export type { EmailData };

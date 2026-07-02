@@ -5,6 +5,11 @@ import { requireApiSession } from "@/lib/auth/api";
 import { logLeaveEvent } from "@/lib/server/audit";
 import { prisma } from "@/lib/db/prisma";
 import { getEmployeeIdFromUserId } from "@/lib/services/leave/get-employee-id";
+import {
+    buildConfiguredApproverSnapshot,
+    buildLeaveRecipientSnapshot,
+    type LeaveActionPayload,
+} from "@/lib/services/leave/notification-payloads";
 import { calculateLeaveDuration, isWorkingDay } from "@/lib/services/leave/utils";
 import { processOutbox } from "@/lib/services/outbox/processor";
 import { jsonError } from "@/lib/ssot/http";
@@ -14,6 +19,7 @@ import { leaveRequestSchema } from "@/lib/validations/leave";
 const LEAVE_REQUEST_MESSAGES = {
     holidayConflict: "วันที่ลาตรงกับวันหยุด",
     approverNotConfigured: "ยังไม่ได้ตั้งค่าผู้อนุมัติ",
+    approverAccountNotConfigured: "ผู้อนุมัติยังไม่มีบัญชีผู้ใช้ในระบบ",
     overlapConflict: "มีคำขอลาในช่วงวันที่นี้อยู่แล้ว",
     employeeNotFound: "ไม่พบข้อมูลพนักงาน",
     halfDayMultiDate: "การลาครึ่งวันต้องเลือกวันลาเพียงวันเดียว",
@@ -87,7 +93,14 @@ export async function POST(req: Request) {
         const result = await prisma.$transaction(async (tx) => {
             const employee = await tx.employee.findUnique({
                 where: { id: employeeId },
-                include: { manager: true },
+                include: {
+                    user: { select: { id: true } },
+                    manager: {
+                        include: {
+                            user: { select: { id: true, isActive: true } },
+                        },
+                    },
+                },
             });
 
             if (!employee) {
@@ -96,6 +109,12 @@ export async function POST(req: Request) {
 
             if (!employee.managerId) {
                 throw new LeaveRequestError(LEAVE_REQUEST_MESSAGES.approverNotConfigured, 400);
+            }
+            if (!employee.manager?.user?.id || !employee.manager.user.isActive) {
+                throw new LeaveRequestError(
+                    LEAVE_REQUEST_MESSAGES.approverAccountNotConfigured,
+                    400,
+                );
             }
 
             const overlappingRequests = await tx.leaveRequest.findFirst({
@@ -152,22 +171,25 @@ export async function POST(req: Request) {
                 },
             });
 
+            const payload: LeaveActionPayload = {
+                leaveId: leaveRequest.id,
+                employee: buildLeaveRecipientSnapshot(employee),
+                approver: buildConfiguredApproverSnapshot(employee.manager),
+                leaveType,
+                startDate: start.toISOString(),
+                endDate: end.toISOString(),
+                period,
+                durationDays,
+                reason,
+                emergencyReason: normalizedEmergencyReason,
+                specialReason: normalizedSpecialReason,
+                overQuotaDays,
+            };
+
             await tx.notificationOutbox.create({
                 data: {
                     type: "LEAVE_ACTION",
-                    payload: JSON.stringify({
-                        leaveId: leaveRequest.id,
-                        employeeName: `${employee.firstName} ${employee.lastName}`,
-                        managerId: employee.managerId,
-                        leaveType,
-                        startDate,
-                        endDate,
-                        durationDays,
-                        reason,
-                        emergencyReason: normalizedEmergencyReason,
-                        specialReason: normalizedSpecialReason,
-                        overQuotaDays,
-                    }),
+                    payload: JSON.stringify(payload),
                 },
             });
 
