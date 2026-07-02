@@ -59,6 +59,21 @@ describe("useLeaveRequestFormModel", () => {
         expect(result.current.form.getValues("endDate")).toBe("2031-03-10");
     });
 
+    it("resets multi-day state and clears form values", () => {
+        const { result } = renderHook(() => useLeaveRequestFormModel({ onSuccess }));
+
+        act(() => {
+            result.current.switchToMultiDay();
+            result.current.form.setValue("reason", "ต้องลาพักผ่อน");
+            result.current.resetForm();
+        });
+
+        expect(result.current.isMultiDay).toBe(false);
+        expect(result.current.form.getValues("leaveType")).toBe("SICK");
+        expect(result.current.form.getValues("reason")).toBe("");
+        expect(result.current.errorMsg).toBeNull();
+    });
+
     it("submits leave request successfully", async () => {
         const { result } = renderHook(() => useLeaveRequestFormModel({ onSuccess }));
 

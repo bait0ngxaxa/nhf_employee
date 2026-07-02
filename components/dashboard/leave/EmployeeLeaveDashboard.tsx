@@ -21,23 +21,20 @@ export function EmployeeLeaveDashboard() {
     }
 
     return (
-        <div className="space-y-6">
-            <div className="flex justify-between items-center">
+        <div className="flex flex-col gap-6">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <h2 className="text-xl font-semibold text-gray-800">โควต้าวันลาของคุณ</h2>
-                <Button onClick={model.openRequestForm} className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm">
-                    <Plus className="mr-2 h-4 w-4" /> ยื่นใบลา
+                <Button onClick={model.openRequestForm}>
+                    <Plus data-icon="inline-start" /> ยื่นใบลา
                 </Button>
             </div>
 
-            {model.isRequestFormOpen ? (
-                <div className="mb-8 animate-in fade-in slide-in-from-top-4">
-                    <LeaveRequestForm
-                        onSuccess={model.onRequestSuccess}
-                        onCancel={model.closeRequestForm}
-                        quotas={model.quotas}
-                    />
-                </div>
-            ) : null}
+            <LeaveRequestForm
+                open={model.isRequestFormOpen}
+                onSuccess={model.onRequestSuccess}
+                onCancel={model.closeRequestForm}
+                quotas={model.quotas}
+            />
 
             <LeaveQuotaCards
                 sickQuota={model.sickQuota}
@@ -45,7 +42,7 @@ export function EmployeeLeaveDashboard() {
                 vacationQuota={model.vacationQuota}
             />
 
-            <div className="mt-8">
+            <div className="mt-2">
                 <h2 className="text-xl font-semibold text-gray-800 mb-4">ประวัติการลา (ล่าสุด)</h2>
                 <EmployeeLeaveHistoryList
                     history={model.history}

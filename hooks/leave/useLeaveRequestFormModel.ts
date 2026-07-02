@@ -35,6 +35,7 @@ interface UseLeaveRequestFormModelResult {
     overQuotaDays: number;
     remainingQuota: number;
     submit: (data: LeaveRequestValues) => Promise<void>;
+    resetForm: () => void;
     switchToSingleDay: () => void;
     switchToMultiDay: () => void;
     handleStartDateChange: (value: string, onFieldChange: (value: string) => void) => void;
@@ -45,6 +46,20 @@ const getTodayString = (): string => {
     const month = String(now.getMonth() + 1).padStart(2, "0");
     const day = String(now.getDate()).padStart(2, "0");
     return `${now.getFullYear()}-${month}-${day}`;
+};
+
+const createDefaultLeaveRequestValues = (): LeaveRequestValues => {
+    const today = getTodayString();
+
+    return {
+        leaveType: "SICK",
+        startDate: today,
+        endDate: today,
+        period: "FULL_DAY",
+        reason: "",
+        emergencyReason: "",
+        specialReason: "",
+    };
 };
 
 const hasThaiText = (value: string): boolean => /[ก-๿]/.test(value);
@@ -95,19 +110,10 @@ export function useLeaveRequestFormModel({
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [errorMsg, setErrorMsg] = useState<string | null>(null);
     const [isMultiDay, setIsMultiDay] = useState(false);
-    const today = getTodayString();
 
     const form = useForm<LeaveRequestValues>({
         resolver: zodResolver(leaveRequestSchema),
-        defaultValues: {
-            leaveType: "SICK",
-            startDate: today,
-            endDate: today,
-            period: "FULL_DAY",
-            reason: "",
-            emergencyReason: "",
-            specialReason: "",
-        },
+        defaultValues: createDefaultLeaveRequestValues(),
     });
 
     const leaveType = form.watch("leaveType");
@@ -144,6 +150,12 @@ export function useLeaveRequestFormModel({
         }
     };
 
+    const resetForm = (): void => {
+        form.reset(createDefaultLeaveRequestValues());
+        setErrorMsg(null);
+        setIsMultiDay(false);
+    };
+
     const submit = async (data: LeaveRequestValues): Promise<void> => {
         const submitOverQuotaDays = getOverQuotaDays(data, quotas);
         if (submitOverQuotaDays > 0 && !data.specialReason?.trim()) {
@@ -160,6 +172,7 @@ export function useLeaveRequestFormModel({
             await submitLeaveRequest(data);
             toast.success(LEAVE_REQUEST_MESSAGES.success);
             await onSuccess();
+            resetForm();
         } catch (error) {
             const rawMessage = error instanceof Error && error.message ? error.message : "";
             const message = normalizeLeaveRequestErrorMessage(rawMessage);
@@ -182,6 +195,7 @@ export function useLeaveRequestFormModel({
         overQuotaDays,
         remainingQuota,
         submit,
+        resetForm,
         switchToSingleDay,
         switchToMultiDay,
         handleStartDateChange,
