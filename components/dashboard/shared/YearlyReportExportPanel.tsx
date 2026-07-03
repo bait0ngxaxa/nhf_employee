@@ -176,7 +176,8 @@ function PanelControls({
             <Button
                 type="button"
                 onClick={onExport}
-                disabled={disabled}
+                disabled={disabled || isExporting}
+                aria-busy={isExporting}
                 variant="outline"
                 className={cn(
                     "rounded-md px-5 text-sm font-semibold",

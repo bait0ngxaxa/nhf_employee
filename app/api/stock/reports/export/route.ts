@@ -4,11 +4,11 @@ import { requireAdminSession } from "@/lib/auth/api";
 import { jsonError } from "@/lib/ssot/http";
 import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
 import {
-    createStockBalanceReportCsvResponse,
+    createStockBalanceReportXlsxResponse,
     getStockBalanceReportMeta,
 } from "@/lib/services/stock/balance-export";
 import {
-    createStockRequestReportCsvResponse,
+    createStockRequestReportXlsxResponse,
     getStockRequestReportMeta,
     getStockRequestReportYears,
 } from "@/lib/services/stock/report-export";
@@ -42,7 +42,7 @@ export async function GET(request: NextRequest): Promise<Response> {
             });
         }
 
-        const { year, yearsOnly, metaOnly, reportType } = parsedQuery.data;
+        const { year, yearsOnly, metaOnly, reportType, format } = parsedQuery.data;
         const resolvedYear = year ?? new Date().getFullYear();
 
         if (reportType === "balances") {
@@ -67,7 +67,7 @@ export async function GET(request: NextRequest): Promise<Response> {
                 );
             }
 
-            const response = await createStockBalanceReportCsvResponse();
+            const response = await createStockBalanceReportXlsxResponse();
 
             after(async () => {
                 try {
@@ -75,7 +75,7 @@ export async function GET(request: NextRequest): Promise<Response> {
                         metadata: {
                             entityType: "StockItem",
                             recordCount: meta.count,
-                            filters: { reportType },
+                            filters: { reportType, format },
                             exportedAt: new Date().toISOString(),
                         },
                     });
@@ -109,7 +109,7 @@ export async function GET(request: NextRequest): Promise<Response> {
             );
         }
 
-        const response = await createStockRequestReportCsvResponse(resolvedYear);
+        const response = await createStockRequestReportXlsxResponse(resolvedYear);
 
         after(async () => {
             try {
@@ -117,7 +117,7 @@ export async function GET(request: NextRequest): Promise<Response> {
                     metadata: {
                         entityType: "StockRequest",
                         recordCount: meta.count,
-                        filters: { year: resolvedYear },
+                        filters: { year: resolvedYear, format },
                         exportedAt: new Date().toISOString(),
                     },
                 });

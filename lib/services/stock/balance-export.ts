@@ -1,100 +1,48 @@
 import { StockRequestStatus } from "@prisma/client";
 import { generateFilename } from "@/lib/helpers/date-helpers";
 import { prisma } from "@/lib/db/prisma";
-import { createCsvDownloadResponse, encodeCsvRow } from "@/lib/server/csv";
+import { createXlsxDownloadResponse } from "@/lib/server/xlsx";
 import { EXPORT_LIMITS } from "@/lib/ssot/exports";
+import {
+    createStockBalanceReportWorkbook,
+    type StockBalanceVariant,
+    type StockBalanceItem,
+} from "@/lib/services/stock/balance-workbook";
 import {
     buildItemInclude,
     buildReservedQuantityMaps,
     ensureItemVariantsExist,
     getAvailableQuantity,
 } from "./shared";
+import type { PendingRequestItemRecord } from "./types";
 
-type ExportStockVariant = {
-    id: number;
-    unit: string;
-    quantity: number;
-    minStock: number;
-    availableQuantity: number;
-    attributeValues?: Array<{
-        attributeValue: {
-            value: string;
-            attribute: { name: string };
-        };
-    }>;
+type LoadedStockBalanceVariant = Omit<
+    StockBalanceVariant,
+    "reservedQuantity" | "availableQuantity"
+>;
+type LoadedStockBalanceItem = Omit<
+    StockBalanceItem,
+    "reservedQuantity" | "availableQuantity" | "variants"
+> & {
+    variants: LoadedStockBalanceVariant[];
 };
 
-type ExportStockItem = {
-    id: number;
-    name: string;
-    description: string | null;
-    unit: string;
-    quantity: number;
-    minStock: number;
-    reservedQuantity: number;
-    availableQuantity: number;
-    category: { name: string };
-    variants: ExportStockVariant[];
-};
+async function loadActiveStockItems(): Promise<StockBalanceItem[]> {
+    const items = await loadItemsWithVariants();
+    const pendingRequestItems = await loadPendingRequestItems(
+        items.map((item) => item.id),
+    );
+    const { reservedByItemId, reservedByVariantId } = buildReservedQuantityMaps(
+        pendingRequestItems,
+        buildDefaultVariantIdByItemId(items),
+    );
 
-function formatVariantSummary(
-    attributeValues: ExportStockVariant["attributeValues"],
-): string {
-    if (!attributeValues || attributeValues.length === 0) {
-        return "";
-    }
-
-    return attributeValues
-        .map(
-            (attributeValue) =>
-                `${attributeValue.attributeValue.attribute.name}: ${attributeValue.attributeValue.value}`,
-        )
-        .join(" • ");
+    return items.map((item) =>
+        toStockBalanceItem(item, reservedByItemId, reservedByVariantId),
+    );
 }
 
-function summarizeItemInventory(item: ExportStockItem): {
-    quantity: number;
-    minStock: number;
-    unit: string;
-} {
-    if (item.variants.length === 0) {
-        return {
-            quantity: item.quantity,
-            minStock: item.minStock,
-            unit: item.unit,
-        };
-    }
-
-    const quantity = item.variants.reduce((sum, variant) => sum + variant.quantity, 0);
-    const minStock = item.variants.reduce((sum, variant) => sum + variant.minStock, 0);
-    const units = Array.from(new Set(item.variants.map((variant) => variant.unit.trim())));
-
-    return {
-        quantity,
-        minStock,
-        unit: units.length === 1 ? (units[0] ?? item.unit) : item.unit,
-    };
-}
-
-function formatVariantBalances(variants: ExportStockVariant[]): string {
-    if (variants.length <= 1) {
-        return "-";
-    }
-
-    return variants
-        .map((variant) => {
-            const label = formatVariantSummary(variant.attributeValues);
-            const prefix = label ? `${label} ` : "";
-            return `${prefix}คงเหลือ ${variant.quantity} ${variant.unit} พร้อมใช้ ${variant.availableQuantity}`;
-        })
-        .join(" | ");
-}
-
-function resolveStockLevel(quantity: number, minStock: number): string {
-    return quantity <= minStock ? "ต่ำกว่าจุดสั่งซื้อ" : "ปกติ";
-}
-
-async function loadActiveStockItems(): Promise<ExportStockItem[]> {
+async function loadItemsWithVariants(): Promise<LoadedStockBalanceItem[]> {
     let items = await prisma.stockItem.findMany({
         where: { isActive: true },
         include: buildItemInclude(),
@@ -114,55 +62,76 @@ async function loadActiveStockItems(): Promise<ExportStockItem[]> {
         });
     }
 
-    const itemIds = items.map((item) => item.id);
-    const pendingRequestItems =
-        itemIds.length > 0
-            ? await prisma.stockRequestItem.findMany({
-                  where: {
-                      itemId: { in: itemIds },
-                      request: { status: StockRequestStatus.PENDING_ISSUE },
-                  },
-                  select: {
-                      itemId: true,
-                      variantId: true,
-                      quantity: true,
-                  },
-              })
-            : [];
-    const defaultVariantIdByItemId = new Map(
+    return items;
+}
+
+async function loadPendingRequestItems(
+    itemIds: number[],
+): Promise<PendingRequestItemRecord[]> {
+    if (itemIds.length === 0) {
+        return [];
+    }
+
+    return prisma.stockRequestItem.findMany({
+        where: {
+            itemId: { in: itemIds },
+            request: { status: StockRequestStatus.PENDING_ISSUE },
+        },
+        select: {
+            itemId: true,
+            variantId: true,
+            quantity: true,
+        },
+    });
+}
+
+function buildDefaultVariantIdByItemId(
+    items: LoadedStockBalanceItem[],
+): Map<number, number> {
+    return new Map(
         items
             .map((item) => [item.id, item.variants[0]?.id] as const)
             .filter((entry): entry is readonly [number, number] => entry[1] !== undefined),
     );
-    const { reservedByItemId, reservedByVariantId } = buildReservedQuantityMaps(
-        pendingRequestItems,
-        defaultVariantIdByItemId,
-    );
+}
 
-    return items.map((item) => {
-        const reservedQuantity = reservedByItemId.get(item.id) ?? 0;
-        const totalQuantity =
-            item.variants.length > 0
-                ? item.variants.reduce((sum, variant) => sum + variant.quantity, 0)
-                : item.quantity;
+function toStockBalanceItem(
+    item: LoadedStockBalanceItem,
+    reservedByItemId: Map<number, number>,
+    reservedByVariantId: Map<number, number>,
+): StockBalanceItem {
+    const reservedQuantity = reservedByItemId.get(item.id) ?? 0;
+    const totalQuantity = getTotalQuantity(item);
 
-        return {
-            ...item,
-            reservedQuantity,
-            availableQuantity: getAvailableQuantity(totalQuantity, reservedQuantity),
-            variants: item.variants.map((variant) => {
-                const variantReservedQuantity = reservedByVariantId.get(variant.id) ?? 0;
+    return {
+        ...item,
+        reservedQuantity,
+        availableQuantity: getAvailableQuantity(totalQuantity, reservedQuantity),
+        variants: item.variants.map((variant) =>
+            toStockBalanceVariant(variant, reservedByVariantId),
+        ),
+    };
+}
 
-                return {
-                    ...variant,
-                    availableQuantity: getAvailableQuantity(
-                        variant.quantity,
-                        variantReservedQuantity,
-                    ),
-                };
-            }),
-        };
-    });
+function toStockBalanceVariant(
+    variant: LoadedStockBalanceVariant,
+    reservedByVariantId: Map<number, number>,
+): StockBalanceVariant {
+    const reservedQuantity = reservedByVariantId.get(variant.id) ?? 0;
+
+    return {
+        ...variant,
+        reservedQuantity,
+        availableQuantity: getAvailableQuantity(variant.quantity, reservedQuantity),
+    };
+}
+
+function getTotalQuantity(item: LoadedStockBalanceItem): number {
+    if (item.variants.length === 0) {
+        return item.quantity;
+    }
+
+    return item.variants.reduce((sum, variant) => sum + variant.quantity, 0);
 }
 
 export async function getStockBalanceReportMeta(): Promise<{
@@ -179,7 +148,7 @@ export async function getStockBalanceReportMeta(): Promise<{
     };
 }
 
-export async function createStockBalanceReportCsvResponse(): Promise<Response> {
+export async function createStockBalanceReportXlsxResponse(): Promise<Response> {
     const meta = await getStockBalanceReportMeta();
     if (meta.count > meta.maxRows) {
         throw new Error(
@@ -188,43 +157,8 @@ export async function createStockBalanceReportCsvResponse(): Promise<Response> {
     }
 
     const items = await loadActiveStockItems();
+    const workbook = createStockBalanceReportWorkbook(items);
+    const filename = generateFilename("ยอดคงเหลือสต๊อกปัจจุบัน", "xlsx");
 
-    return createCsvDownloadResponse(
-        generateFilename("ยอดคงเหลือสต๊อกปัจจุบัน", "csv"),
-        async (controller) => {
-            controller.enqueue(
-                encodeCsvRow([
-                    "หมวดหมู่",
-                    "ชื่อวัสดุ",
-                    "คำอธิบาย",
-                    "ยอดคงเหลือ",
-                    "จองรอจ่าย",
-                    "พร้อมใช้",
-                    "จุดสั่งซื้อ",
-                    "หน่วย",
-                    "สถานะสต๊อก",
-                    "รายละเอียดรายการย่อย",
-                ]),
-            );
-
-            for (const item of items) {
-                const inventory = summarizeItemInventory(item);
-
-                controller.enqueue(
-                    encodeCsvRow([
-                        item.category.name,
-                        item.name,
-                        item.description ?? "-",
-                        inventory.quantity,
-                        item.reservedQuantity,
-                        item.availableQuantity,
-                        inventory.minStock,
-                        inventory.unit,
-                        resolveStockLevel(inventory.quantity, inventory.minStock),
-                        formatVariantBalances(item.variants),
-                    ]),
-                );
-            }
-        },
-    );
+    return createXlsxDownloadResponse(filename, workbook);
 }

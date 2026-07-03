@@ -5,11 +5,11 @@ import { GET as stockReportsExportRoute } from "@/app/api/stock/reports/export/r
 import { getApiAuthSession } from "@/lib/auth/server";
 import { isAdminRole } from "@/lib/ssot/permissions";
 import {
-    createStockBalanceReportCsvResponse,
+    createStockBalanceReportXlsxResponse,
     getStockBalanceReportMeta,
 } from "@/lib/services/stock/balance-export";
 import {
-    createStockRequestReportCsvResponse,
+    createStockRequestReportXlsxResponse,
     getStockRequestReportMeta,
     getStockRequestReportYears,
 } from "@/lib/services/stock/report-export";
@@ -35,13 +35,13 @@ vi.mock("@/lib/ssot/permissions", () => ({
 
 vi.mock("@/lib/services/stock/balance-export", () => ({
     getStockBalanceReportMeta: vi.fn(),
-    createStockBalanceReportCsvResponse: vi.fn(),
+    createStockBalanceReportXlsxResponse: vi.fn(),
 }));
 
 vi.mock("@/lib/services/stock/report-export", () => ({
     getStockRequestReportYears: vi.fn(),
     getStockRequestReportMeta: vi.fn(),
-    createStockRequestReportCsvResponse: vi.fn(),
+    createStockRequestReportXlsxResponse: vi.fn(),
 }));
 
 vi.mock("@/lib/server/audit", () => ({
@@ -96,17 +96,17 @@ describe("GET /api/stock/reports/export", () => {
             count: 15,
             maxRows: 5000,
         });
-        vi.mocked(createStockBalanceReportCsvResponse).mockResolvedValue(
-            new Response("csv-data", { status: 200 }),
+        vi.mocked(createStockBalanceReportXlsxResponse).mockResolvedValue(
+            new Response("xlsx-data", { status: 200 }),
         );
 
         const request = new NextRequest(
-            "http://localhost/api/stock/reports/export?format=csv&reportType=balances",
+            "http://localhost/api/stock/reports/export?format=xlsx&reportType=balances",
         );
         const response = await stockReportsExportRoute(request);
 
         expect(response.status).toBe(200);
-        expect(createStockBalanceReportCsvResponse).toHaveBeenCalledTimes(1);
+        expect(createStockBalanceReportXlsxResponse).toHaveBeenCalledTimes(1);
         expect(logDataExport).toHaveBeenCalledWith(
             "StockItem",
             1,
@@ -115,7 +115,7 @@ describe("GET /api/stock/reports/export", () => {
                 metadata: expect.objectContaining({
                     entityType: "StockItem",
                     recordCount: 15,
-                    filters: { reportType: "balances" },
+                    filters: { reportType: "balances", format: "xlsx" },
                 }),
             }),
         );
@@ -126,17 +126,17 @@ describe("GET /api/stock/reports/export", () => {
             count: 3,
             maxRows: 5000,
         });
-        vi.mocked(createStockRequestReportCsvResponse).mockResolvedValue(
-            new Response("csv-data", { status: 200 }),
+        vi.mocked(createStockRequestReportXlsxResponse).mockResolvedValue(
+            new Response("xlsx-data", { status: 200 }),
         );
 
         const request = new NextRequest(
-            "http://localhost/api/stock/reports/export?format=csv&year=2031",
+            "http://localhost/api/stock/reports/export?format=xlsx&year=2031",
         );
         const response = await stockReportsExportRoute(request);
 
         expect(response.status).toBe(200);
-        expect(createStockRequestReportCsvResponse).toHaveBeenCalledWith(2031);
+        expect(createStockRequestReportXlsxResponse).toHaveBeenCalledWith(2031);
         expect(logDataExport).toHaveBeenCalledWith(
             "StockRequest",
             1,
@@ -145,7 +145,7 @@ describe("GET /api/stock/reports/export", () => {
                 metadata: expect.objectContaining({
                     entityType: "StockRequest",
                     recordCount: 3,
-                    filters: { year: 2031 },
+                    filters: { year: 2031, format: "xlsx" },
                 }),
             }),
         );

@@ -441,7 +441,7 @@ export const stockReportExportQuerySchema = z.object({
         .enum(["requests", "balances"])
         .optional()
         .default("requests"),
-    format: z.enum(["csv"]).optional().default("csv"),
+    format: z.enum(["xlsx"]).optional().default("xlsx"),
 });
 
 export type CreateCategoryInput = z.infer<typeof createCategorySchema>;
