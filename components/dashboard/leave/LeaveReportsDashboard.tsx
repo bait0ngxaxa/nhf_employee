@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { BarChart3, CalendarRange, FileSpreadsheet } from "lucide-react";
+import { BarChart3, CalendarRange } from "lucide-react";
 import { toast } from "sonner";
 import { YearlyReportExportPanel } from "@/components/dashboard/shared/YearlyReportExportPanel";
 import {
@@ -10,10 +10,11 @@ import {
     fetchLeaveExportYears,
     type LeaveExportMetaResponse,
 } from "@/lib/services/leave/client";
+import { getCurrentLeaveYear } from "@/lib/services/leave/quota-year";
 import { LEAVE_THEME_BUTTON_CLASS } from "./leaveTheme";
 
 export function LeaveReportsDashboard() {
-    const currentYear = new Date().getFullYear();
+    const currentYear = getCurrentLeaveYear();
     const [availableYears, setAvailableYears] = useState<number[]>([currentYear]);
     const [selectedYear, setSelectedYear] = useState(currentYear);
     const [isLoadingYears, setIsLoadingYears] = useState(true);
@@ -89,20 +90,20 @@ export function LeaveReportsDashboard() {
         isLoadingMeta ||
         isExporting ||
         !meta ||
-        meta.count === 0 ||
-        meta.count > meta.maxRows;
+        meta.employeeCount === 0 ||
+        meta.requestCount > meta.maxRows;
 
     async function handleExport(): Promise<void> {
         setIsExporting(true);
         try {
             const exportMeta = await fetchLeaveExportMeta(selectedYear);
 
-            if (exportMeta.count === 0) {
-                toast.error("ไม่มีข้อมูลสำหรับดาวน์โหลด");
+            if (exportMeta.employeeCount === 0) {
+                toast.error("ไม่มีพนักงานในทีมสำหรับรายงาน");
                 return;
             }
 
-            if (exportMeta.count > exportMeta.maxRows) {
+            if (exportMeta.requestCount > exportMeta.maxRows) {
                 toast.error("ข้อมูลเกินขนาดที่กำหนด", {
                     description: `ส่งออกข้อมูลการลาได้ไม่เกิน ${exportMeta.maxRows} รายการต่อครั้ง กรุณาเลือกปีที่มีข้อมูลน้อยลง`,
                 });
@@ -111,7 +112,7 @@ export function LeaveReportsDashboard() {
 
             downloadLeaveExportFile(selectedYear);
             toast.success("เริ่มดาวน์โหลดไฟล์แล้ว", {
-                description: `กำลังส่งออกข้อมูลการลา ${exportMeta.count} รายการ (ปี ${selectedYear})`,
+                description: `กำลังส่งออกรายงานพนักงาน ${exportMeta.employeeCount} คน / คำขอ ${exportMeta.requestCount} รายการ (ปี ${selectedYear})`,
             });
         } catch {
             toast.error("เกิดข้อผิดพลาดในการดาวน์โหลด");
@@ -133,14 +134,15 @@ export function LeaveReportsDashboard() {
                 layout="card"
                 selectClassName="h-11"
                 buttonClassName={`h-11 ${LEAVE_THEME_BUTTON_CLASS}`}
+                exportLabel="ดาวน์โหลด Excel"
                 badge={
                     <div className="inline-flex items-center gap-2 rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-medium text-sky-800">
                         <BarChart3 className="h-3.5 w-3.5" aria-hidden="true" />
                         รีพอร์ตผู้จัดการ
                     </div>
                 }
-                title="รีพอร์ตการลารายปี"
-                description="สำหรับผู้จัดการ ใช้ดึงรายงานการลาของทีมตามปีที่ต้องการในรูปแบบ CSV"
+                title="รายงานสรุปการลารายปี"
+                description="ดาวน์โหลด Excel สรุปรายคนและรายละเอียดคำขอลาของทีมตามปีที่เลือก"
                 stats={[
                     {
                         icon: <CalendarRange className="h-4 w-4" aria-hidden="true" />,
@@ -149,11 +151,12 @@ export function LeaveReportsDashboard() {
                     },
                     {
                         icon: <BarChart3 className="h-4 w-4" aria-hidden="true" />,
-                        label: "จำนวนรายการ",
-                        value: isLoadingMeta ? "กำลังโหลด..." : `${meta?.count ?? 0} รายการ`,
+                        label: "ข้อมูลรายงาน",
+                        value: isLoadingMeta
+                            ? "กำลังโหลด..."
+                            : `พนักงาน ${meta?.employeeCount ?? 0} คน / คำขอ ${meta?.requestCount ?? 0} รายการ`,
                     },
                     {
-                        icon: <FileSpreadsheet className="h-4 w-4" aria-hidden="true" />,
                         label: "สถานะการส่งออก",
                         value: resolveExportState(meta, isLoadingMeta, isExporting),
                     },
@@ -176,11 +179,11 @@ function resolveExportState(
         return "กำลังตรวจสอบ";
     }
 
-    if (!meta || meta.count === 0) {
-        return "ไม่มีข้อมูล";
+    if (!meta || meta.employeeCount === 0) {
+        return "ไม่มีพนักงานในทีม";
     }
 
-    if (meta.count > meta.maxRows) {
+    if (meta.requestCount > meta.maxRows) {
         return `เกิน ${meta.maxRows} รายการ`;
     }
 

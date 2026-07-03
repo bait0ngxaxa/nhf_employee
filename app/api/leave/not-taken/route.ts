@@ -15,6 +15,7 @@ import {
     formatLeaveSummary,
     getLeaveTypeLabel,
 } from "@/lib/services/leave/notification-format";
+import { getLeaveYearFromDateValue } from "@/lib/services/leave/quota-year";
 import { isAfterLeaveEnd } from "@/lib/services/leave/utils";
 import { processOutbox } from "@/lib/services/outbox/processor";
 import { jsonError, operationFailed } from "@/lib/ssot/http";
@@ -218,7 +219,7 @@ export async function PUT(req: Request): Promise<NextResponse> {
                 where: {
                     employeeId: leaveRequest.employeeId,
                     leaveType: leaveRequest.leaveType,
-                    year: new Date(leaveRequest.startDate).getFullYear(),
+                    year: getLeaveYearFromDateValue(leaveRequest.startDate),
                 },
             });
 

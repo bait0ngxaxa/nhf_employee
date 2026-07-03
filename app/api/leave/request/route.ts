@@ -10,6 +10,7 @@ import {
     buildLeaveRecipientSnapshot,
     type LeaveActionPayload,
 } from "@/lib/services/leave/notification-payloads";
+import { getLeaveYearFromDateValue } from "@/lib/services/leave/quota-year";
 import { calculateLeaveDuration, isWorkingDay } from "@/lib/services/leave/utils";
 import { processOutbox } from "@/lib/services/outbox/processor";
 import { jsonError } from "@/lib/ssot/http";
@@ -70,7 +71,7 @@ export async function POST(req: Request) {
         } = parsed.data;
         const normalizedEmergencyReason = emergencyReason?.trim() ? emergencyReason.trim() : null;
         const normalizedSpecialReason = specialReason?.trim() ? specialReason.trim() : null;
-        const currentYear = new Date(startDate).getFullYear();
+        const currentYear = getLeaveYearFromDateValue(startDate);
 
         if (period !== "FULL_DAY" && startDate !== endDate) {
             return jsonError(LEAVE_REQUEST_MESSAGES.halfDayMultiDate, 400);

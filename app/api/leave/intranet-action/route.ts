@@ -11,6 +11,7 @@ import {
     formatEmployeeName,
     type LeaveResultPayload,
 } from "@/lib/services/leave/notification-payloads";
+import { getLeaveYearFromDateValue } from "@/lib/services/leave/quota-year";
 import { jsonError, operationFailed } from "@/lib/ssot/http";
 import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
 import { leaveActionSchema } from "@/lib/validations/leave";
@@ -98,7 +99,7 @@ export async function POST(req: Request): Promise<NextResponse> {
                     where: {
                         employeeId: leaveRequest.employeeId,
                         leaveType: leaveRequest.leaveType,
-                        year: new Date(leaveRequest.startDate).getFullYear(),
+                        year: getLeaveYearFromDateValue(leaveRequest.startDate),
                     },
                 });
 

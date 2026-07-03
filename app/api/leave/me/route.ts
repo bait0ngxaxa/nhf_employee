@@ -4,6 +4,7 @@ import { ALL_LEAVE_TYPES, DEFAULT_LEAVE_QUOTAS } from "@/constants/leave";
 import { requireApiSession } from "@/lib/auth/api";
 import { prisma } from "@/lib/db/prisma";
 import { getEmployeeIdFromUserId } from "@/lib/services/leave/get-employee-id";
+import { getCurrentLeaveYear } from "@/lib/services/leave/quota-year";
 import { jsonError } from "@/lib/ssot/http";
 import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
 
@@ -27,7 +28,7 @@ export async function GET(req: Request) {
             return jsonError(COMMON_API_MESSAGES.operationFailed, 404);
         }
 
-        const currentYear = new Date().getFullYear();
+        const currentYear = getCurrentLeaveYear();
         const existingQuotas = await prisma.leaveQuota.findMany({
             where: { employeeId, year: currentYear },
         });

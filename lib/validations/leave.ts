@@ -4,6 +4,7 @@ import {
   isPastDate,
   isWithinEmergencyBackdateWindow,
 } from "@/lib/services/leave/utils";
+import { getLeaveYearFromDateValue } from "@/lib/services/leave/quota-year";
 
 const LEAVE_VALIDATION_MESSAGES = {
   crossYearRequest: "ไม่สามารถลาข้ามปีได้ กรุณาแยกคำขอเป็นคนละปี",
@@ -39,9 +40,7 @@ export const leaveRequestSchema = z.object({
     message: "วันที่สิ้นสุดต้องไม่ก่อนวันที่เริ่มต้น",
     path: ["endDate"]
 }).refine((data) => {
-    const start = new Date(data.startDate);
-    const end = new Date(data.endDate);
-    return start.getFullYear() === end.getFullYear();
+    return getLeaveYearFromDateValue(data.startDate) === getLeaveYearFromDateValue(data.endDate);
 }, {
     message: LEAVE_VALIDATION_MESSAGES.crossYearRequest,
     path: ["endDate"]

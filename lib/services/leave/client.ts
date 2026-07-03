@@ -8,7 +8,9 @@ export interface LeaveExportYearsResponse {
 }
 
 export interface LeaveExportMetaResponse {
-    count: number;
+    year: number;
+    employeeCount: number;
+    requestCount: number;
     maxRows: number;
 }
 
@@ -76,7 +78,7 @@ export const fetchLeaveExportMeta = async (year: number): Promise<LeaveExportMet
 };
 
 export const downloadLeaveExportFile = (year: number): void => {
-    triggerDownload(`${API_ROUTES.leave.export}?year=${year}&format=csv`);
+    triggerDownload(`${API_ROUTES.leave.export}?year=${year}&format=xlsx`);
 };
 
 export const saveApproverAssignments = async (
