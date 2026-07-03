@@ -10,6 +10,7 @@ import {
     useDashboardUIContext,
     useDashboardDataContext,
 } from "@/components/dashboard/context/dashboard/DashboardContext";
+import { isDashboardTabEnabled } from "@/lib/ssot/features";
 
 // Dynamically import Dashboard Sections for code splitting
 const StockSection = dynamic(
@@ -110,17 +111,20 @@ function getPageTitle(menu: string): string {
 export function DashboardContent() {
     const { selectedMenu, handleMenuClick } = useDashboardUIContext();
     const { handleEmployeeAdded } = useDashboardDataContext();
-    useTitle(getPageTitle(selectedMenu));
+    const activeMenu = isDashboardTabEnabled(selectedMenu)
+        ? selectedMenu
+        : "dashboard";
+    useTitle(getPageTitle(activeMenu));
 
     const renderContent = () => {
-        switch (selectedMenu) {
+        switch (activeMenu) {
             case "leave-management":
             case "manager-approval":
             case "leave-history":
             {
                 const defaultLeaveTab =
-                    selectedMenu === "manager-approval" ? "approvals" :
-                    selectedMenu === "leave-history" ? "my-leave" : undefined;
+                    activeMenu === "manager-approval" ? "approvals" :
+                    activeMenu === "leave-history" ? "my-leave" : undefined;
 
                 return (
                     <Suspense fallback={<SectionSkeleton />}>

@@ -14,6 +14,8 @@ import {
 
 import { cn } from "@/lib/ui/utils";
 import { apiGet } from "@/lib/client/api-client";
+import { isDashboardTabEnabled } from "@/lib/ssot/features";
+import { toDashboardTabPath } from "@/lib/ssot/routes";
 
 import { Button } from "@/components/ui/button";
 
@@ -48,7 +50,18 @@ export function normalizeNotificationActionUrl(
         return null;
     }
 
-    return actionUrl.replace("tab=it-equipment", "tab=stock");
+    const normalizedUrl = actionUrl.replace("tab=it-equipment", "tab=stock");
+    try {
+        const parsedUrl = new URL(normalizedUrl, "http://localhost");
+        const tab = parsedUrl.searchParams.get("tab");
+        if (tab && !isDashboardTabEnabled(tab)) {
+            return toDashboardTabPath("dashboard");
+        }
+    } catch {
+        return normalizedUrl;
+    }
+
+    return normalizedUrl;
 }
 
 export function formatNotificationBadge(count: number): string {

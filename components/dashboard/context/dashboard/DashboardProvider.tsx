@@ -25,6 +25,7 @@ import {
     APP_ROUTES,
     toDashboardTabPath,
 } from "@/lib/ssot/routes";
+import { isDashboardTabEnabled } from "@/lib/ssot/features";
 import { isAdminRole, USER_ROLES } from "@/lib/ssot/permissions";
 import { useAuth } from "@/components/auth/HybridAuthProvider";
 
@@ -48,7 +49,8 @@ function normalizeDashboardTab(tab: string | null): string {
         return "stock";
     }
 
-    return tab ?? "dashboard";
+    const normalizedTab = tab ?? "dashboard";
+    return isDashboardTabEnabled(normalizedTab) ? normalizedTab : "dashboard";
 }
 
 function clearStockCartStorage(userId: string): void {
@@ -91,11 +93,20 @@ export function DashboardProvider({
 
     // Sync selectedMenu when URL ?tab= changes (e.g. notification click or browser back/forward)
     useEffect(() => {
-        const tabFromUrl = normalizeDashboardTab(searchParams.get("tab"));
+        const requestedTab = searchParams.get("tab");
+        const tabFromUrl = normalizeDashboardTab(requestedTab);
         startTransition(() => {
             setSelectedMenu(tabFromUrl);
         });
-    }, [searchParams]);
+
+        if (
+            pathname === APP_ROUTES.dashboard &&
+            requestedTab !== null &&
+            requestedTab !== tabFromUrl
+        ) {
+            router.replace(toDashboardTabPath(tabFromUrl), { scroll: false });
+        }
+    }, [pathname, router, searchParams]);
 
     const availableMenuGroups = useMemo(
         () => getAvailableMenuGroups(isAdmin),
@@ -120,6 +131,10 @@ export function DashboardProvider({
             const menuItem = DASHBOARD_MENU_ITEMS.find(
                 (item) => item.id === menuId,
             );
+            if (menuItem?.feature && !isDashboardTabEnabled(menuId)) {
+                router.push(toDashboardTabPath("dashboard"), { scroll: false });
+                return;
+            }
             if (menuItem?.requiredRole === USER_ROLES.ADMIN && !isAdmin) {
                 router.push(APP_ROUTES.accessDenied);
                 return;

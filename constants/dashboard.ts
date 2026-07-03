@@ -11,6 +11,7 @@ import {
     ShieldCheck,
 } from "lucide-react";
 import { type MenuItem, type MenuGroup } from "@/types/dashboard";
+import { FEATURE_KEYS, isFeatureEnabled } from "@/lib/ssot/features";
 
 /** Flat lookup used by handleMenuClick for role validation */
 export const DASHBOARD_MENU_ITEMS: MenuItem[] = [
@@ -19,6 +20,7 @@ export const DASHBOARD_MENU_ITEMS: MenuItem[] = [
         label: "NHF Leave",
         icon: CalendarRange,
         description: "ยื่นใบลาและตรวจสอบโควต้าวันลา",
+        feature: FEATURE_KEYS.leave,
     },
     {
         id: "stock",
@@ -31,8 +33,7 @@ export const DASHBOARD_MENU_ITEMS: MenuItem[] = [
         label: "NHF IT-Support",
         icon: AlertTriangle,
         description: "แจ้งปัญหาไอทีและติดตามสถานะ",
-        // Enabled only when NEXT_PUBLIC_FEATURE_ITSUPPORT=true in .env
-        comingSoon: process.env.NEXT_PUBLIC_FEATURE_ITSUPPORT !== "true",
+        feature: FEATURE_KEYS.itSupport,
     },
     {
         id: "email-request",
@@ -101,6 +102,9 @@ export function getAvailableMenuGroups(isAdmin: boolean): MenuGroup[] {
             (item) =>
                 !item.requiredRole ||
                 (item.requiredRole === "ADMIN" && isAdmin),
+            )
+            .filter(
+                (item) => !item.feature || isFeatureEnabled(item.feature),
         );
         if (filteredItems.length === 0) return null;
         return { ...group, items: filteredItems };

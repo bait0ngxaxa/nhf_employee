@@ -6,7 +6,8 @@ import { prisma } from "@/lib/db/prisma";
 import { APP_ROUTES } from "@/lib/ssot/routes";
 import { processOutbox } from "@/lib/services/outbox/processor";
 import { ticketService, type TicketFilters } from "@/lib/services/ticket";
-import { jsonError } from "@/lib/ssot/http";
+import { jsonError, notFound } from "@/lib/ssot/http";
+import { FEATURE_KEYS, isFeatureEnabled } from "@/lib/ssot/features";
 import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
 import { createTicketSchema, ticketFiltersSchema } from "@/lib/validations/ticket";
 
@@ -37,6 +38,10 @@ function parseQueryParams(url: string):
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
     try {
+        if (!isFeatureEnabled(FEATURE_KEYS.itSupport)) {
+            return notFound();
+        }
+
         const auth = await requireApiSession();
         if (!auth.ok) return auth.response;
 
@@ -56,6 +61,10 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
     try {
+        if (!isFeatureEnabled(FEATURE_KEYS.itSupport)) {
+            return notFound();
+        }
+
         const body = await request.json();
         const result = createTicketSchema.safeParse(body);
         if (!result.success) {

@@ -4,7 +4,8 @@ import type { Prisma } from "@prisma/client";
 import { requireApiSession } from "@/lib/auth/api";
 import { prisma } from "@/lib/db/prisma";
 import { getEmployeeIdFromUserId } from "@/lib/services/leave/get-employee-id";
-import { operationFailed } from "@/lib/ssot/http";
+import { notFound, operationFailed } from "@/lib/ssot/http";
+import { FEATURE_KEYS, isFeatureEnabled } from "@/lib/ssot/features";
 import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
 
 const APPROVALS_PAGE_SIZE = 10;
@@ -28,6 +29,10 @@ const createMetadata = (page: number, totalItems: number) => ({
 
 export async function GET(req: Request): Promise<NextResponse> {
     try {
+        if (!isFeatureEnabled(FEATURE_KEYS.leave)) {
+            return notFound();
+        }
+
         const auth = await requireApiSession();
         if (!auth.ok) return auth.response;
 

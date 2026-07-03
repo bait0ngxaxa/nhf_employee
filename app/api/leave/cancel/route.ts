@@ -14,7 +14,8 @@ import {
     getLeaveTypeLabel,
 } from "@/lib/services/leave/notification-format";
 import { processOutbox } from "@/lib/services/outbox/processor";
-import { jsonError } from "@/lib/ssot/http";
+import { jsonError, notFound } from "@/lib/ssot/http";
+import { FEATURE_KEYS, isFeatureEnabled } from "@/lib/ssot/features";
 import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
 import { APP_DASHBOARD_TABS, toDashboardTabPath } from "@/lib/ssot/routes";
 import { leaveCancelSchema } from "@/lib/validations/leave";
@@ -37,6 +38,10 @@ class LeaveCancelError extends Error {
 
 export async function POST(req: Request) {
     try {
+        if (!isFeatureEnabled(FEATURE_KEYS.leave)) {
+            return notFound();
+        }
+
         const auth = await requireApiSession();
         if (!auth.ok) return auth.response;
 

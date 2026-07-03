@@ -4,7 +4,8 @@ import { z } from "zod";
 import { requireAdminSession } from "@/lib/auth/api";
 import { prisma } from "@/lib/db/prisma";
 import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
-import { forbidden } from "@/lib/ssot/http";
+import { forbidden, notFound } from "@/lib/ssot/http";
+import { FEATURE_KEYS, isFeatureEnabled } from "@/lib/ssot/features";
 
 const bulkAssignSchema = z.object({
     assignments: z
@@ -19,6 +20,10 @@ const bulkAssignSchema = z.object({
 
 export async function GET(): Promise<NextResponse> {
     try {
+        if (!isFeatureEnabled(FEATURE_KEYS.leave)) {
+            return notFound();
+        }
+
         const auth = await requireAdminSession({
             unauthorizedResponse: () => forbidden(),
         });
@@ -51,6 +56,10 @@ export async function GET(): Promise<NextResponse> {
 
 export async function PUT(req: Request): Promise<NextResponse> {
     try {
+        if (!isFeatureEnabled(FEATURE_KEYS.leave)) {
+            return notFound();
+        }
+
         const auth = await requireAdminSession({
             unauthorizedResponse: () => forbidden(),
         });

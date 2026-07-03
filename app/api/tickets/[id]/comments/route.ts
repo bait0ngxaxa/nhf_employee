@@ -2,7 +2,8 @@ import { after, type NextRequest, NextResponse } from "next/server";
 
 import { requireApiSession } from "@/lib/auth/api";
 import { prisma } from "@/lib/db/prisma";
-import { jsonError } from "@/lib/ssot/http";
+import { jsonError, notFound } from "@/lib/ssot/http";
+import { FEATURE_KEYS, isFeatureEnabled } from "@/lib/ssot/features";
 import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
 import { isAdminRole } from "@/lib/ssot/permissions";
 import { APP_ROUTES } from "@/lib/ssot/routes";
@@ -73,6 +74,10 @@ export async function POST(
     { params }: { params: Promise<{ id: string }> },
     ): Promise<NextResponse> {
     try {
+        if (!isFeatureEnabled(FEATURE_KEYS.itSupport)) {
+            return notFound();
+        }
+
         const body = await request.json();
         const parsed = createTicketCommentSchema.safeParse(body);
         if (!parsed.success) {

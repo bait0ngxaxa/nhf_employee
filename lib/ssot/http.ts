@@ -35,6 +35,10 @@ export function operationFailed(status = 500, details?: JsonRecord): NextRespons
     return jsonError(COMMON_API_MESSAGES.operationFailed, status, details);
 }
 
+export function notFound(details?: JsonRecord): NextResponse {
+    return jsonError("Not found", 404, details);
+}
+
 export function serverError(details?: JsonRecord): NextResponse {
     return jsonError(COMMON_API_MESSAGES.internalServerError, 500, details);
 }

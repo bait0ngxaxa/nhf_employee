@@ -5,7 +5,8 @@ import { requireApiSession } from "@/lib/auth/api";
 import { prisma } from "@/lib/db/prisma";
 import { processOutbox } from "@/lib/services/outbox/processor";
 import { ticketService, type UpdateTicketData } from "@/lib/services/ticket";
-import { jsonError } from "@/lib/ssot/http";
+import { jsonError, notFound } from "@/lib/ssot/http";
+import { FEATURE_KEYS, isFeatureEnabled } from "@/lib/ssot/features";
 import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
 import { APP_ROUTES } from "@/lib/ssot/routes";
 import { updateTicketSchema } from "@/lib/validations/ticket";
@@ -31,6 +32,10 @@ export async function GET(
     { params }: { params: Promise<{ id: string }> },
 ): Promise<NextResponse> {
     try {
+        if (!isFeatureEnabled(FEATURE_KEYS.itSupport)) {
+            return notFound();
+        }
+
         const auth = await requireApiSession();
         if (!auth.ok) return auth.response;
 
@@ -59,6 +64,10 @@ export async function PATCH(
     { params }: { params: Promise<{ id: string }> },
 ): Promise<NextResponse> {
     try {
+        if (!isFeatureEnabled(FEATURE_KEYS.itSupport)) {
+            return notFound();
+        }
+
         const { ticketId, error } = await parseTicketId(params);
         if (error) return error;
         if (!ticketId) {
@@ -135,6 +144,10 @@ export async function DELETE(
     { params }: { params: Promise<{ id: string }> },
 ): Promise<NextResponse> {
     try {
+        if (!isFeatureEnabled(FEATURE_KEYS.itSupport)) {
+            return notFound();
+        }
+
         const auth = await requireApiSession();
         if (!auth.ok) return auth.response;
 

@@ -13,7 +13,8 @@ import {
 import { getLeaveYearFromDateValue } from "@/lib/services/leave/quota-year";
 import { calculateLeaveDuration, isWorkingDay } from "@/lib/services/leave/utils";
 import { processOutbox } from "@/lib/services/outbox/processor";
-import { jsonError } from "@/lib/ssot/http";
+import { jsonError, notFound } from "@/lib/ssot/http";
+import { FEATURE_KEYS, isFeatureEnabled } from "@/lib/ssot/features";
 import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
 import { leaveRequestSchema } from "@/lib/validations/leave";
 
@@ -39,6 +40,10 @@ class LeaveRequestError extends Error {
 
 export async function POST(req: Request) {
     try {
+        if (!isFeatureEnabled(FEATURE_KEYS.leave)) {
+            return notFound();
+        }
+
         const auth = await requireApiSession();
         if (!auth.ok) return auth.response;
 

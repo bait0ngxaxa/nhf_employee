@@ -1,4 +1,5 @@
 import { type ComponentType } from "react";
+import { type FeatureKey } from "@/lib/ssot/features";
 
 export interface MenuItem {
     id: string;
@@ -6,6 +7,7 @@ export interface MenuItem {
     icon: ComponentType<{ className?: string }>;
     description: string;
     requiredRole?: "ADMIN";
+    feature?: FeatureKey;
     /** Mark module as under development — visible but non-interactive */
     comingSoon?: boolean;
 }

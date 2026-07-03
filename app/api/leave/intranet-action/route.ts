@@ -12,7 +12,8 @@ import {
     type LeaveResultPayload,
 } from "@/lib/services/leave/notification-payloads";
 import { getLeaveYearFromDateValue } from "@/lib/services/leave/quota-year";
-import { jsonError, operationFailed } from "@/lib/ssot/http";
+import { jsonError, notFound, operationFailed } from "@/lib/ssot/http";
+import { FEATURE_KEYS, isFeatureEnabled } from "@/lib/ssot/features";
 import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
 import { leaveActionSchema } from "@/lib/validations/leave";
 
@@ -36,6 +37,10 @@ class LeaveApprovalError extends Error {
 
 export async function POST(req: Request): Promise<NextResponse> {
     try {
+        if (!isFeatureEnabled(FEATURE_KEYS.leave)) {
+            return notFound();
+        }
+
         const auth = await requireApiSession();
         if (!auth.ok) return auth.response;
 

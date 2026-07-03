@@ -5,7 +5,8 @@ import { requireApiSession } from "@/lib/auth/api";
 import { prisma } from "@/lib/db/prisma";
 import { getEmployeeIdFromUserId } from "@/lib/services/leave/get-employee-id";
 import { getCurrentLeaveYear } from "@/lib/services/leave/quota-year";
-import { jsonError } from "@/lib/ssot/http";
+import { jsonError, notFound } from "@/lib/ssot/http";
+import { FEATURE_KEYS, isFeatureEnabled } from "@/lib/ssot/features";
 import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
 
 const LEAVE_PAGINATION_MESSAGES = {
@@ -15,6 +16,10 @@ const LEAVE_PAGINATION_MESSAGES = {
 
 export async function GET(req: Request) {
     try {
+        if (!isFeatureEnabled(FEATURE_KEYS.leave)) {
+            return notFound();
+        }
+
         const auth = await requireApiSession();
         if (!auth.ok) return auth.response;
 

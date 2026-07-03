@@ -18,7 +18,8 @@ import {
 import { getLeaveYearFromDateValue } from "@/lib/services/leave/quota-year";
 import { isAfterLeaveEnd } from "@/lib/services/leave/utils";
 import { processOutbox } from "@/lib/services/outbox/processor";
-import { jsonError, operationFailed } from "@/lib/ssot/http";
+import { jsonError, notFound, operationFailed } from "@/lib/ssot/http";
+import { FEATURE_KEYS, isFeatureEnabled } from "@/lib/ssot/features";
 import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
 import { APP_DASHBOARD_TABS, toDashboardTabPath } from "@/lib/ssot/routes";
 import {
@@ -49,6 +50,10 @@ class LeaveNotTakenError extends Error {
 
 export async function POST(req: Request): Promise<NextResponse> {
     try {
+        if (!isFeatureEnabled(FEATURE_KEYS.leave)) {
+            return notFound();
+        }
+
         const auth = await requireApiSession();
         if (!auth.ok) return auth.response;
 
@@ -171,6 +176,10 @@ export async function POST(req: Request): Promise<NextResponse> {
 
 export async function PUT(req: Request): Promise<NextResponse> {
     try {
+        if (!isFeatureEnabled(FEATURE_KEYS.leave)) {
+            return notFound();
+        }
+
         const auth = await requireApiSession();
         if (!auth.ok) return auth.response;
 

@@ -9,11 +9,16 @@ import {
     getLeaveReportMeta,
     getLeaveReportYears,
 } from "@/lib/services/leave/report-export";
-import { jsonError, operationFailed } from "@/lib/ssot/http";
+import { jsonError, notFound, operationFailed } from "@/lib/ssot/http";
+import { FEATURE_KEYS, isFeatureEnabled } from "@/lib/ssot/features";
 import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
 
 export async function GET(request: NextRequest): Promise<Response> {
     try {
+        if (!isFeatureEnabled(FEATURE_KEYS.leave)) {
+            return notFound();
+        }
+
         const auth = await requireApiSession();
         if (!auth.ok) return auth.response;
 
