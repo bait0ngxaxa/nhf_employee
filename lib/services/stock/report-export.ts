@@ -1,4 +1,5 @@
 import { StockRequestStatus, type Prisma } from "@prisma/client";
+import { createBangkokYearRange, getBangkokYear } from "@/lib/helpers/bangkok-time";
 import { generateFilename } from "@/lib/helpers/date-helpers";
 import { prisma } from "@/lib/db/prisma";
 import { createXlsxDownloadResponse } from "@/lib/server/xlsx";
@@ -46,13 +47,6 @@ const STOCK_REQUEST_REPORT_SELECT = {
     },
 } satisfies Prisma.StockRequestSelect;
 
-function createYearRange(year: number): { startOfYear: Date; endOfYear: Date } {
-    return {
-        startOfYear: new Date(`${year}-01-01T00:00:00.000Z`),
-        endOfYear: new Date(`${year + 1}-01-01T00:00:00.000Z`),
-    };
-}
-
 export async function getStockRequestReportYears(): Promise<number[]> {
     const rows = await prisma.stockRequest.findMany({
         where: {
@@ -64,9 +58,9 @@ export async function getStockRequestReportYears(): Promise<number[]> {
     });
 
     const years = new Set(
-        rows.flatMap((row) => (row.issuedAt ? [row.issuedAt.getFullYear()] : [])),
+        rows.flatMap((row) => (row.issuedAt ? [getBangkokYear(row.issuedAt)] : [])),
     );
-    years.add(new Date().getFullYear());
+    years.add(getBangkokYear(new Date()));
 
     return Array.from(years).sort((left, right) => right - left);
 }
@@ -121,7 +115,7 @@ async function loadStockRequestReportRequests(
 }
 
 function createIssuedRequestWhere(year: number): Prisma.StockRequestWhereInput {
-    const { startOfYear, endOfYear } = createYearRange(year);
+    const { startOfYear, endOfYear } = createBangkokYearRange(year);
     return {
         status: StockRequestStatus.ISSUED,
         issuedAt: { gte: startOfYear, lt: endOfYear },

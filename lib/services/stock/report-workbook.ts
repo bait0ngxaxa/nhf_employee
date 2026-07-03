@@ -1,5 +1,6 @@
 import ExcelJS from "exceljs";
 
+import { toBangkokExcelDate } from "@/lib/helpers/bangkok-time";
 import { finishStockWorksheet } from "@/lib/services/stock/workbook-style";
 
 const SUMMARY_SHEET_NAME = "สรุปการใช้วัสดุ";
@@ -147,7 +148,7 @@ function toCalculationRow(
     item: StockRequestReportItem,
 ): Omit<StockRequestCalculationRow, "sequence"> {
     return {
-        issuedAt: request.issuedAt,
+        issuedAt: toBangkokExcelDate(request.issuedAt),
         requestNumber: request.id,
         projectCode: request.projectCode,
         requesterName: request.requester.name,
@@ -168,7 +169,7 @@ function toDetailRow(
 ): StockRequestDetailRow {
     return {
         sequence,
-        issuedAt: request.issuedAt,
+        issuedAt: toBangkokExcelDate(request.issuedAt),
         requestNumber: request.id,
         projectCode: request.projectCode,
         requesterName: request.requester.name,

@@ -63,6 +63,10 @@ function findRowByCellValue(
     return foundRow;
 }
 
+function bangkokExcelDate(isoDate: string): Date {
+    return new Date(new Date(isoDate).getTime() + 7 * 60 * 60 * 1000);
+}
+
 describe("Stock report export services", () => {
     beforeEach(() => {
         mockReset(prismaMock);
@@ -166,8 +170,8 @@ describe("Stock report export services", () => {
                     request: {
                         status: "ISSUED",
                         issuedAt: {
-                            gte: new Date("2031-01-01T00:00:00.000Z"),
-                            lt: new Date("2032-01-01T00:00:00.000Z"),
+                            gte: new Date("2030-12-31T17:00:00.000Z"),
+                            lt: new Date("2031-12-31T17:00:00.000Z"),
                         },
                     },
                 },
@@ -179,13 +183,16 @@ describe("Stock report export services", () => {
         expect(penSummaryRow?.getCell(6).value).toBe(5);
         expect(penSummaryRow?.getCell(7).value).toBe(2);
         expect(penSummaryRow?.getCell(8).value).toEqual(
-            new Date("2031-02-20T01:02:03.000Z"),
+            bangkokExcelDate("2031-02-20T01:02:03.000Z"),
         );
         expect(paperSummaryRow?.getCell(3).value).toBe("-");
         expect(paperSummaryRow?.getCell(6).value).toBe(5);
         expect(summarySheet?.getRow(1).values).not.toContain("ผู้ขอไม่ซ้ำ");
         expect(summarySheet?.getRow(1).values).not.toContain("เดือนที่ใช้มากสุด");
         expect(detailSheet?.rowCount).toBe(3);
+        expect(detailSheet?.getCell("B2").value).toEqual(
+            bangkokExcelDate("2031-02-20T01:02:03.000Z"),
+        );
         expect(detailSheet?.getCell("H2").value).toBe("ปากกา (สี: แดง) x3 ด้าม");
         expect(detailSheet?.getCell("I2").value).toBe(1);
         expect(detailSheet?.getCell("J2").value).toBe(3);
