@@ -37,6 +37,8 @@ export type LowStockAlertCandidate = {
 export type AdjustStockResult = {
     itemId: number;
     variantId: number;
+    itemName: string;
+    sku: string;
     previousQty: number;
     newQty: number;
     previousMinStock: number;

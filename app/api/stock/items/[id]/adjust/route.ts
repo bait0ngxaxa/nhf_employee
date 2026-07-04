@@ -38,6 +38,8 @@ export async function POST(
         );
         await logStockEvent("STOCK_ADJUST", itemId, auth.user.id, auth.user.email, {
             after: {
+                name: adjustment.itemName,
+                sku: adjustment.sku,
                 type: result.data.type,
                 quantity: result.data.quantity,
                 previousQty: adjustment.previousQty,

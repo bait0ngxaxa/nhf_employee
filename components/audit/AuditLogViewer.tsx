@@ -24,6 +24,7 @@ import {
     AUDIT_ACTION_FILTER_OPTIONS,
     AUDIT_ENTITY_TYPE_OPTIONS,
 } from "@/constants/audit";
+import { formatAuditLogDisplay } from "@/lib/audit-log/display";
 import { formatThaiDateTime } from "@/lib/helpers/date-helpers";
 import { AuditActionBadge } from "./AuditActionBadge";
 
@@ -198,13 +199,13 @@ export function AuditLogViewer({ className }: AuditLogViewerProps) {
                                     เวลา
                                 </th>
                                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                                    การดำเนินการ
+                                    เหตุการณ์
                                 </th>
                                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                                    ผู้ใช้
+                                    ผู้ดำเนินการ
                                 </th>
                                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                                    ประเภทข้อมูล
+                                    ข้อมูลที่เกี่ยวข้อง
                                 </th>
                                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                                     IP Address
@@ -231,40 +232,47 @@ export function AuditLogViewer({ className }: AuditLogViewerProps) {
                                     </td>
                                 </tr>
                             ) : (
-                                filteredLogs.map((log) => (
-                                    <tr
-                                        key={log.id}
-                                        className="hover:bg-gray-50"
-                                    >
-                                        <td className="px-4 py-3 text-sm text-gray-600 whitespace-nowrap">
-                                            {formatThaiDateTime(log.createdAt)}
-                                        </td>
-                                        <td className="px-4 py-3">
-                                            <AuditActionBadge action={log.action} />
-                                        </td>
-                                        <td className="px-4 py-3 text-sm">
-                                            <div className="font-medium text-gray-900">
-                                                {log.user?.name || "-"}
-                                            </div>
-                                            <div className="text-gray-500 text-xs">
-                                                {log.userEmail || "-"}
-                                            </div>
-                                        </td>
-                                        <td className="px-4 py-3 text-sm">
-                                            <span className="text-gray-700">
-                                                {log.entityType}
-                                            </span>
-                                            {log.entityId && (
-                                                <span className="text-gray-400 ml-1">
-                                                    #{log.entityId}
+                                filteredLogs.map((log) => {
+                                    const display = formatAuditLogDisplay(log);
+
+                                    return (
+                                        <tr
+                                            key={log.id}
+                                            className="hover:bg-gray-50"
+                                        >
+                                            <td className="px-4 py-3 text-sm text-gray-600 whitespace-nowrap align-top">
+                                                {formatThaiDateTime(log.createdAt)}
+                                            </td>
+                                            <td className="px-4 py-3 align-top min-w-[320px]">
+                                                <div className="flex flex-col gap-2">
+                                                    <AuditActionBadge
+                                                        action={log.action}
+                                                        className="w-fit"
+                                                    />
+                                                    <p className="max-w-[64ch] text-sm leading-6 text-gray-800">
+                                                        {display.summary}
+                                                    </p>
+                                                </div>
+                                            </td>
+                                            <td className="px-4 py-3 text-sm align-top">
+                                                <div className="font-medium text-gray-900">
+                                                    {log.user?.name || "-"}
+                                                </div>
+                                                <div className="text-gray-600 text-xs">
+                                                    {log.userEmail || "-"}
+                                                </div>
+                                            </td>
+                                            <td className="px-4 py-3 text-sm align-top">
+                                                <span className="text-gray-800">
+                                                    {display.entityReference}
                                                 </span>
-                                            )}
-                                        </td>
-                                        <td className="px-4 py-3 text-sm text-gray-500">
-                                            {log.ipAddress || "-"}
-                                        </td>
-                                    </tr>
-                                ))
+                                            </td>
+                                            <td className="px-4 py-3 text-sm text-gray-600 align-top">
+                                                {log.ipAddress || "-"}
+                                            </td>
+                                        </tr>
+                                    );
+                                })
                             )}
                         </tbody>
                     </table>

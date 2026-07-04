@@ -202,6 +202,8 @@ export async function adjustStock(
         return {
             itemId,
             variantId: defaultVariant.id,
+            itemName: item.name,
+            sku: item.sku,
             previousQty: item.quantity,
             newQty,
             previousMinStock: item.minStock,

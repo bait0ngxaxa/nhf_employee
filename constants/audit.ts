@@ -203,10 +203,14 @@ export const AUDIT_ACTION_FILTER_OPTIONS = [
 
 export const AUDIT_ENTITY_TYPE_OPTIONS = [
     { value: "all", label: "ทั้งหมด" },
-    { value: "User", label: "User" },
-    { value: "Employee", label: "Employee" },
-    { value: "Ticket", label: "Ticket" },
-    { value: "Stock", label: "Stock" },
+    { value: "User", label: "ผู้ใช้ระบบ" },
+    { value: "Employee", label: "พนักงาน" },
+    { value: "Ticket", label: "งานบริการ IT" },
+    { value: "Stock", label: "สต็อก" },
+    { value: "StockItem", label: "วัสดุ" },
+    { value: "StockRequest", label: "คำขอเบิกวัสดุ" },
+    { value: "StockCategory", label: "หมวดหมู่วัสดุ" },
+    { value: "LeaveRequest", label: "คำขอลา" },
 ];
 
 export function getAuditActionLabel(action: string): string {
