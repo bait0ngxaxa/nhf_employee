@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import type { ElementType, ReactElement } from "react";
 import {
     ArrowRight,
     Building2,
@@ -10,18 +11,19 @@ import {
 } from "lucide-react";
 import { redirect } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import { AppLogo } from "@/components/brand/AppLogo";
 import { getApiAuthSession } from "@/lib/auth/server";
 import { APP_ROUTES } from "@/lib/ssot/routes";
 
 export const metadata: Metadata = {
     title: "NHFapp",
-    description: "แอปพลิเคชันภายในองค์กรสำหรับผู้ใช้งาน NHF",
+    description: "แอปพลิเคชันสำหรับผู้ใช้งาน NHF",
 };
 
 interface IntroPoint {
     title: string;
     description: string;
-    icon: React.ElementType;
+    icon: ElementType;
     cardClassName: string;
     iconClassName: string;
 }
@@ -29,7 +31,7 @@ interface IntroPoint {
 const INTRO_POINTS: IntroPoint[] = [
     {
         title: "พื้นที่เดียวขององค์กร",
-        description: "ออกแบบให้เป็นจุดเริ่มต้นสำหรับผู้ใช้งานภายใน NHF",
+        description: "จุดเริ่มต้นสำหรับผู้ใช้งาน NHF",
         icon: Building2,
         cardClassName: "bg-blue-50 ring-blue-100",
         iconClassName: "bg-white text-blue-700 ring-1 ring-blue-200",
@@ -58,25 +60,23 @@ const INTRO_POINTS: IntroPoint[] = [
 ];
 
 const TRUST_POINTS = [
-    "สำหรับผู้ใช้งานภายในมูลนิธิสาธารณสุขแห่งชาติ",
+    "สำหรับผู้ใช้งานของมูลนิธิสาธารณสุขแห่งชาติ",
     "ใช้บัญชีที่ได้รับอนุญาตจากองค์กร",
     "ใช้งานได้ทุกสถานที่ไม่ต้องมี VPN",
 ] as const;
 
-function BrandMark() {
+function BrandMark(): ReactElement {
     return (
         <Link
             href={APP_ROUTES.home}
             className="flex items-center gap-3 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-sky-600 focus-visible:ring-offset-4"
             aria-label="NHFapp หน้าแรก"
         >
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-blue-600 to-cyan-600 text-white">
-                <Building2 className="h-5 w-5" aria-hidden="true" />
-            </div>
+            <AppLogo variant="navbar" priority />
             <div className="leading-tight">
                 <p className="text-base font-bold text-slate-950">NHFapp</p>
                 <p className="text-xs font-medium text-slate-600">
-                    ระบบงานภายในองค์กร
+                    ระบบงาน NHF
                 </p>
             </div>
         </Link>
@@ -117,7 +117,7 @@ function AccessPanel() {
             <div className="flex items-start justify-between gap-4">
                 <div>
                     <p className="text-sm font-semibold text-blue-700">
-                        แอปภายในองค์กร
+                        แอปสำหรับพนักงาน
                     </p>
                     <h2 className="mt-3 text-2xl font-bold leading-tight text-slate-950 text-balance">
                         เริ่มต้นใช้งาน NHFapp
@@ -192,7 +192,7 @@ export default async function Home() {
                                 National Health Foundation
                             </p>
                             <p className="inline-flex rounded-full bg-white/80 px-3 py-1 text-sm font-semibold text-slate-700 ring-1 ring-blue-100">
-                                สำหรับผู้ใช้งานภายในองค์กร
+                                สำหรับผู้ใช้งานของ NHF
                             </p>
                         </div>
                         <h1 className="max-w-4xl text-4xl font-bold leading-tight tracking-tight text-slate-950 text-balance sm:text-5xl">
@@ -200,7 +200,7 @@ export default async function Home() {
                         </h1>
                         <p className="mt-5 max-w-3xl text-base font-medium leading-8 text-slate-700 sm:text-lg">
                             พื้นที่ดิจิทัลของมูลนิธิสาธารณสุขแห่งชาติ
-                            สำหรับการเข้าใช้งานระบบภายใน
+                            สำหรับเริ่มใช้งานระบบงานของ NHF
                         </p>
                     </div>
 
@@ -218,7 +218,7 @@ export default async function Home() {
                             </p>
                         </div>
                         <p className="text-sm font-semibold text-slate-500">
-                            เวอร์ชันสำหรับใช้งานภายในองค์กร
+                            เวอร์ชันสำหรับพนักงานและผู้ดูแลระบบ
                         </p>
                     </div>
                     <IntroPointList />
@@ -228,7 +228,7 @@ export default async function Home() {
             <footer className="border-t border-gray-200/50 bg-white/70">
                 <div className="mx-auto flex max-w-7xl flex-col gap-2 px-4 py-5 text-sm font-medium text-slate-600 sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8">
                     <p>© {new Date().getFullYear()} National Health Foundation</p>
-                    <p>NHFapp สำหรับผู้ใช้งานภายในองค์กร</p>
+                    <p>NHFapp สำหรับผู้ใช้งาน NHF</p>
                 </div>
             </footer>
         </div>

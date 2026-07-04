@@ -107,12 +107,16 @@ function PageNumberList({
                     <Button
                         key={item}
                         type="button"
-                        variant={isCurrentPage ? "default" : "ghost"}
+                        variant="ghost"
                         size="icon-sm"
                         onClick={() => onPageChange(item)}
                         aria-current={isCurrentPage ? "page" : undefined}
                         aria-label={`ไปยังหน้า ${item}`}
-                        className="font-semibold"
+                        className={
+                            isCurrentPage
+                                ? "bg-gradient-to-br from-sky-400 to-indigo-500 font-semibold text-white hover:from-sky-500 hover:to-indigo-600 hover:text-white"
+                                : "font-semibold"
+                        }
                     >
                         {item}
                     </Button>

@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactElement } from "react";
 import { ChevronDown, Home, PanelLeft, PanelLeftClose, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { AppLogo } from "@/components/brand/AppLogo";
 import { cn } from "@/lib/ui/utils";
 import { type MenuGroup, type MenuItem } from "@/types/dashboard";
 import { CollapsedSidebarTooltip } from "@/components/dashboard/layout/CollapsedSidebarTooltip";
@@ -31,6 +32,10 @@ type MenuGroupProps = {
 
 type SidebarHeaderProps = {
     sidebarOpen: boolean;
+    onToggle: () => void;
+};
+
+type CollapsedSidebarToggleButtonProps = {
     onToggle: () => void;
 };
 
@@ -89,7 +94,7 @@ function SidebarMenuItem({
                         className={cn(
                             "flex shrink-0 items-center justify-center rounded-lg transition-[background-color,color] duration-200",
                             indented && sidebarOpen ? "size-5" : "size-7",
-                            isActive ? "bg-primary text-primary-foreground" : "text-sidebar-foreground/60 group-hover/sidebar-item:text-sidebar-accent-foreground",
+                            isActive ? "bg-gradient-to-br from-sky-400 to-indigo-500 text-white" : "text-sidebar-foreground/60 group-hover/sidebar-item:text-sidebar-accent-foreground",
                         )}
                     >
                         <IconComponent aria-hidden="true" className={indented && sidebarOpen ? "size-3.5" : "size-4"} />
@@ -191,46 +196,66 @@ export function useExpandedSidebarGroups(availableMenuGroups: MenuGroup[]): {
     return { expandedGroups, toggleGroup };
 }
 
+function CollapsedSidebarToggleButton({
+    onToggle,
+}: CollapsedSidebarToggleButtonProps): ReactElement {
+    return (
+        <CollapsedSidebarTooltip
+            active
+            label="ขยายเมนู"
+            description="เปิดแถบเมนูด้านข้าง"
+        >
+            <Button
+                type="button"
+                variant="ghost"
+                size="icon-lg"
+                className="group/sidebar-logo relative rounded-[13%] p-0 hover:bg-transparent focus-visible:ring-[3px] focus-visible:ring-sidebar-ring/50"
+                aria-label="ขยายเมนู"
+                aria-expanded={false}
+                onClick={onToggle}
+            >
+                <AppLogo
+                    variant="mark"
+                    priority
+                    className="transition-opacity duration-150 ease-out group-hover/sidebar-logo:opacity-0 group-focus-visible/sidebar-logo:opacity-0"
+                />
+                <span className="absolute inset-0 flex items-center justify-center rounded-[13%] bg-sidebar-accent text-sidebar-foreground opacity-0 shadow-[0_4px_8px_rgba(15,23,42,0.18),0_1px_2px_rgba(15,23,42,0.12)] transition-opacity duration-150 ease-out group-hover/sidebar-logo:opacity-100 group-focus-visible/sidebar-logo:opacity-100">
+                    <PanelLeft aria-hidden="true" className="size-4" />
+                </span>
+            </Button>
+        </CollapsedSidebarTooltip>
+    );
+}
+
 export function SidebarHeader({
     sidebarOpen,
     onToggle,
 }: SidebarHeaderProps): ReactElement {
-    return (
-        <div
-            className={cn(
-                "flex items-center gap-4 transition-[padding] duration-200",
-                sidebarOpen ? "p-6" : "flex-col gap-3 p-4",
-            )}
-        >
-            <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground">
-                <span className="text-lg font-bold">N</span>
+    if (!sidebarOpen) {
+        return (
+            <div className="flex flex-col items-center gap-3 p-4 transition-[padding] duration-200">
+                <CollapsedSidebarToggleButton onToggle={onToggle} />
             </div>
-            {sidebarOpen && (
-                <div className="min-w-0 flex-1">
-                    <h1 className="truncate text-lg font-bold leading-6">NHFapp</h1>
-                </div>
-            )}
-            <CollapsedSidebarTooltip
-                active={!sidebarOpen}
-                label="ขยายเมนู"
-                description="เปิดแถบเมนูด้านข้าง"
+        );
+    }
+
+    return (
+        <div className="flex items-center gap-4 p-6 transition-[padding] duration-200">
+            <AppLogo variant="sidebar" priority />
+            <div className="min-w-0 flex-1">
+                <h1 className="truncate text-lg font-bold leading-6">NHFapp</h1>
+            </div>
+            <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                className="hidden shrink-0 rounded-lg border border-sidebar-border bg-sidebar-accent text-sidebar-foreground hover:bg-accent md:inline-flex"
+                aria-label="ย่อเมนู"
+                aria-expanded={true}
+                onClick={onToggle}
             >
-                <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon-sm"
-                    className="hidden shrink-0 rounded-lg border border-sidebar-border bg-sidebar-accent text-sidebar-foreground hover:bg-accent md:inline-flex"
-                    aria-label={sidebarOpen ? "ย่อเมนู" : "ขยายเมนู"}
-                    aria-expanded={sidebarOpen}
-                    onClick={onToggle}
-                >
-                    {sidebarOpen ? (
-                        <PanelLeftClose aria-hidden="true" className="size-4" />
-                    ) : (
-                        <PanelLeft aria-hidden="true" className="size-4" />
-                    )}
-                </Button>
-            </CollapsedSidebarTooltip>
+                <PanelLeftClose aria-hidden="true" className="size-4" />
+            </Button>
         </div>
     );
 }
