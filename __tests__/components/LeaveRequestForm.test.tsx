@@ -83,6 +83,10 @@ describe("LeaveRequestForm", () => {
             />,
         );
 
+        fireEvent.change(screen.getByLabelText("วันที่ลา"), {
+            target: { value: "2031-01-06" },
+        });
+
         expect(screen.getByLabelText("เหตุผลพิเศษ")).toBeInTheDocument();
         expect(screen.getAllByText(/คำขอนี้เกินสิทธิ์ 1 วัน/).length).toBeGreaterThan(0);
     });

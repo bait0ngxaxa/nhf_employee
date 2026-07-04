@@ -25,7 +25,7 @@ export function DashboardSidebar(): ReactElement {
         <aside
             className={cn(
                 "z-20 flex h-full flex-col overflow-hidden border-r border-sidebar-border bg-sidebar text-sidebar-foreground transition-[width] duration-200",
-                sidebarOpen ? "w-72" : "w-20",
+                sidebarOpen ? "w-64 2xl:w-72" : "w-20",
             )}
             aria-label="แถบนำทางหลัก"
         >

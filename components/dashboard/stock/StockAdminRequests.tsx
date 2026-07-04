@@ -182,7 +182,7 @@ export function StockAdminRequests() {
                     />
 
                     <div className="hidden overflow-x-auto rounded-2xl bg-white shadow-sm ring-1 ring-slate-200 md:block">
-                        <Table className="min-w-[980px] border-separate border-spacing-0">
+                        <Table className="min-w-[1240px] border-separate border-spacing-0">
                             <TableHeader>
                                 <TableRow className="border-b border-slate-200 bg-slate-50 hover:bg-slate-50">
                                     <TableHead className="w-16 border-r border-slate-200 font-semibold text-slate-700">
@@ -194,10 +194,10 @@ export function StockAdminRequests() {
                                     <TableHead className="w-40 border-r border-slate-200 font-semibold text-slate-700">
                                         รหัสโครงการ
                                     </TableHead>
-                                    <TableHead className="border-r border-slate-200 font-semibold text-slate-700">
+                                    <TableHead className="w-56 border-r border-slate-200 font-semibold text-slate-700">
                                         ผู้เบิก
                                     </TableHead>
-                                    <TableHead className="border-r border-slate-200 font-semibold text-slate-700">
+                                    <TableHead className="w-[24rem] border-r border-slate-200 font-semibold text-slate-700">
                                         รายการ
                                     </TableHead>
                                     <TableHead className="w-32 border-r border-slate-200 font-semibold text-slate-700">
@@ -223,7 +223,7 @@ export function StockAdminRequests() {
                                             <TableCell className="border-r border-slate-200 py-4 text-sm font-medium text-slate-700">
                                                 {req.projectCode}
                                             </TableCell>
-                                            <TableCell className="border-r border-slate-200 py-4">
+                                            <TableCell className="w-56 border-r border-slate-200 py-4">
                                                 <div className="flex flex-col">
                                                     <span className="text-sm font-semibold text-slate-800">
                                                         {req.requester.name}
@@ -233,14 +233,14 @@ export function StockAdminRequests() {
                                                     </span>
                                                 </div>
                                             </TableCell>
-                                            <TableCell className="border-r border-slate-200 py-4">
+                                            <TableCell className="w-[24rem] min-w-[24rem] border-r border-slate-200 py-4">
                                                 <div className="space-y-1.5 py-1">
                                                     {req.items.map((ri) => (
                                                         <div
                                                             key={ri.id}
                                                             className="flex flex-wrap items-start gap-x-2 gap-y-0.5 text-sm"
                                                         >
-                                                            <span className="font-medium text-slate-800">
+                                                            <span className="min-w-0 font-medium leading-6 text-slate-800">
                                                                 {getRequestItemDisplayName(ri)}
                                                             </span>
                                                             <span className="shrink-0 rounded-full bg-slate-100/80 px-2 py-0.5 text-xs font-medium text-slate-600">

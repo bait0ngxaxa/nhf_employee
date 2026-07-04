@@ -3,6 +3,7 @@ import { ChevronDown, Home, PanelLeft, PanelLeftClose, User } from "lucide-react
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/ui/utils";
 import { type MenuGroup, type MenuItem } from "@/types/dashboard";
+import { CollapsedSidebarTooltip } from "@/components/dashboard/layout/CollapsedSidebarTooltip";
 
 const HOME_MENU_ITEM: MenuItem = {
     id: "dashboard",
@@ -65,38 +66,44 @@ function SidebarMenuItem({
 
     return (
         <div className="px-2">
-            <Button
-                type="button" variant="ghost" disabled={disabled}
-                aria-current={isActive ? "page" : undefined}
-                aria-label={sidebarOpen ? undefined : itemLabel}
-                title={sidebarOpen ? undefined : itemLabel}
-                className={cn(
-                    "group/sidebar-item h-11 w-full justify-start gap-3 rounded-xl border border-transparent text-sm font-medium transition-[background-color,border-color,color,opacity] duration-200 focus-visible:ring-sidebar-ring/50 focus-visible:ring-[3px]",
-                    isActive ? "border-sidebar-border bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground/75 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-                    !sidebarOpen && "justify-center px-0",
-                    indented && sidebarOpen && "h-10 pl-9",
-                    disabled && "cursor-not-allowed opacity-55",
-                )}
-                onClick={disabled ? undefined : onClick}
+            <CollapsedSidebarTooltip
+                active={!sidebarOpen}
+                label={itemLabel}
+                description={item.description}
             >
-                <span
+                <Button
+                    type="button" variant="ghost" disabled={disabled}
+                    aria-current={isActive ? "page" : undefined}
+                    aria-label={sidebarOpen ? undefined : itemLabel}
+                    title={sidebarOpen ? undefined : itemLabel}
                     className={cn(
-                        "flex shrink-0 items-center justify-center rounded-lg transition-[background-color,color] duration-200",
-                        indented && sidebarOpen ? "size-5" : "size-7",
-                        isActive ? "bg-primary text-primary-foreground" : "text-sidebar-foreground/60 group-hover/sidebar-item:text-sidebar-accent-foreground",
+                        "group/sidebar-item h-11 w-full justify-start gap-3 rounded-xl border border-transparent text-sm font-medium transition-[background-color,border-color,color,opacity] duration-200 focus-visible:ring-sidebar-ring/50 focus-visible:ring-[3px]",
+                        isActive ? "border-sidebar-border bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground/75 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+                        !sidebarOpen && "justify-center px-0",
+                        indented && sidebarOpen && "h-10 pl-9",
+                        disabled && "cursor-not-allowed opacity-55",
                     )}
+                    onClick={disabled ? undefined : onClick}
                 >
-                    <IconComponent aria-hidden="true" className={indented && sidebarOpen ? "size-3.5" : "size-4"} />
-                </span>
-                {sidebarOpen && (
-                    <span className="min-w-0 flex-1 truncate text-left">{item.label}</span>
-                )}
-                {sidebarOpen && disabled && (
-                    <span className="shrink-0 rounded-full bg-secondary px-2 py-0.5 text-xs font-medium text-secondary-foreground">
-                        เร็วๆ นี้
+                    <span
+                        className={cn(
+                            "flex shrink-0 items-center justify-center rounded-lg transition-[background-color,color] duration-200",
+                            indented && sidebarOpen ? "size-5" : "size-7",
+                            isActive ? "bg-primary text-primary-foreground" : "text-sidebar-foreground/60 group-hover/sidebar-item:text-sidebar-accent-foreground",
+                        )}
+                    >
+                        <IconComponent aria-hidden="true" className={indented && sidebarOpen ? "size-3.5" : "size-4"} />
                     </span>
-                )}
-            </Button>
+                    {sidebarOpen && (
+                        <span className="min-w-0 flex-1 truncate text-left">{item.label}</span>
+                    )}
+                    {sidebarOpen && disabled && (
+                        <span className="shrink-0 rounded-full bg-secondary px-2 py-0.5 text-xs font-medium text-secondary-foreground">
+                            เร็วๆ นี้
+                        </span>
+                    )}
+                </Button>
+            </CollapsedSidebarTooltip>
         </div>
     );
 }
@@ -203,21 +210,27 @@ export function SidebarHeader({
                     <h1 className="truncate text-lg font-bold leading-6">NHFapp</h1>
                 </div>
             )}
-            <Button
-                type="button"
-                variant="ghost"
-                size="icon-sm"
-                className="hidden shrink-0 rounded-lg border border-sidebar-border bg-sidebar-accent text-sidebar-foreground hover:bg-accent md:inline-flex"
-                aria-label={sidebarOpen ? "ย่อเมนู" : "ขยายเมนู"}
-                aria-expanded={sidebarOpen}
-                onClick={onToggle}
+            <CollapsedSidebarTooltip
+                active={!sidebarOpen}
+                label="ขยายเมนู"
+                description="เปิดแถบเมนูด้านข้าง"
             >
-                {sidebarOpen ? (
-                    <PanelLeftClose aria-hidden="true" className="size-4" />
-                ) : (
-                    <PanelLeft aria-hidden="true" className="size-4" />
-                )}
-            </Button>
+                <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    className="hidden shrink-0 rounded-lg border border-sidebar-border bg-sidebar-accent text-sidebar-foreground hover:bg-accent md:inline-flex"
+                    aria-label={sidebarOpen ? "ย่อเมนู" : "ขยายเมนู"}
+                    aria-expanded={sidebarOpen}
+                    onClick={onToggle}
+                >
+                    {sidebarOpen ? (
+                        <PanelLeftClose aria-hidden="true" className="size-4" />
+                    ) : (
+                        <PanelLeft aria-hidden="true" className="size-4" />
+                    )}
+                </Button>
+            </CollapsedSidebarTooltip>
         </div>
     );
 }

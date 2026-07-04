@@ -128,7 +128,7 @@ export function NotificationDropdown(): React.ReactElement {
                 >
                     <Bell className="h-5 w-5" aria-hidden="true" />
                     {unreadCount > 0 ? (
-                        <span className="absolute -right-1 -top-1 flex h-[1.125rem] min-w-[1.125rem] items-center justify-center rounded-full bg-slate-950 px-1 text-[0.625rem] font-bold leading-none text-white ring-2 ring-white">
+                        <span className="absolute -right-1.5 -top-1.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-rose-600 px-1.5 text-[0.6875rem] font-bold leading-none text-white ring-2 ring-white">
                             {formatNotificationBadge(unreadCount)}
                         </span>
                     ) : null}
