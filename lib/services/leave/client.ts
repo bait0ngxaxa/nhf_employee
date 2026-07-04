@@ -33,11 +33,11 @@ interface ApproverAssignmentsResponse {
     message: string;
 }
 
-export type LeaveApprovalAction = "APPROVE" | "REJECT";
+export type LeaveDecisionAction = "APPROVE" | "REJECT";
 
-interface LeaveApprovalPayload {
+interface LeaveDecisionPayload {
     leaveId: string;
-    action: LeaveApprovalAction;
+    action: LeaveDecisionAction;
     reason?: string;
 }
 
@@ -93,8 +93,8 @@ export const submitLeaveRequest = async (payload: LeaveRequestValues): Promise<v
     ensureSuccess(response);
 };
 
-export const submitLeaveApprovalAction = async (payload: LeaveApprovalPayload): Promise<void> => {
-    const response = await apiPost(API_ROUTES.leave.intranetAction, payload);
+export const submitLeaveDecision = async (payload: LeaveDecisionPayload): Promise<void> => {
+    const response = await apiPost(API_ROUTES.leave.decision, payload);
     ensureSuccess(response);
 };
 

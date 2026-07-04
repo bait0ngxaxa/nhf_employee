@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import { after, NextResponse } from "next/server";
 
 import { requireApiSession } from "@/lib/auth/api";
@@ -245,10 +246,13 @@ export async function PUT(req: Request): Promise<NextResponse> {
                 },
             });
 
-            await tx.leaveQuota.update({
+            const updatedQuota = await tx.leaveQuota.update({
                 where: { id: quota.id },
-                data: { usedDays: quota.usedDays - leaveRequest.durationDays },
+                data: { usedDays: { decrement: leaveRequest.durationDays } },
             });
+            if (updatedQuota.usedDays < 0) {
+                throw new LeaveNotTakenError(NOT_TAKEN_MESSAGES.quotaNotFound, 409);
+            }
 
             await tx.notification.updateMany({
                 where: {
@@ -281,6 +285,8 @@ export async function PUT(req: Request): Promise<NextResponse> {
             });
 
             return updatedRequest;
+        }, {
+            isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
         });
 
         await logLeaveEvent(

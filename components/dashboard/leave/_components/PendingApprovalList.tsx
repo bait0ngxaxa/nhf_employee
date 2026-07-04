@@ -13,6 +13,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import type { PendingLeave } from "@/hooks/useLeaveApprovals";
+import { formatThaiDateTimeWithTimeWord } from "@/lib/helpers/date-helpers";
 import { LEAVE_THEME_BUTTON_CLASS } from "../leaveTheme";
 
 interface PendingApprovalListProps {
@@ -138,7 +139,7 @@ function PendingApprovalCard({
 
                     <p className="flex items-center gap-1.5 text-xs/5 font-medium text-slate-500">
                         <Clock className="h-3.5 w-3.5" aria-hidden="true" />
-                        ยื่นใบลาเมื่อ {formatSubmittedAt(leave.createdAt)}
+                        ยื่นคำขอเมื่อ {formatThaiDateTimeWithTimeWord(leave.createdAt)}
                     </p>
                 </div>
 
@@ -219,12 +220,3 @@ function formatLeaveDateRange(startDate: string, endDate: string): string {
     return `${start} - ${formatter.format(new Date(endDate))}`;
 }
 
-function formatSubmittedAt(createdAt: string): string {
-    return new Intl.DateTimeFormat("th-TH", {
-        day: "numeric",
-        month: "long",
-        year: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-    }).format(new Date(createdAt));
-}

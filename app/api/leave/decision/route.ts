@@ -1,4 +1,4 @@
-import { NotificationOutboxType } from "@prisma/client";
+import { NotificationOutboxType, Prisma } from "@prisma/client";
 import { after, NextResponse } from "next/server";
 
 import { requireApiSession } from "@/lib/auth/api";
@@ -89,15 +89,11 @@ export async function POST(req: Request): Promise<NextResponse> {
             }
 
             const newStatus = action === "APPROVE" ? "APPROVED" : "REJECTED";
-
-            const updatedRequest = await tx.leaveRequest.update({
-                where: { id: leaveId },
-                data: {
-                    status: newStatus,
-                    approvedAt: new Date(),
-                    rejectReason: action === "REJECT" ? reason : null,
-                },
-            });
+            const updateData: Prisma.LeaveRequestUpdateInput = {
+                status: newStatus,
+                approvedAt: new Date(),
+                rejectReason: action === "REJECT" ? reason : null,
+            };
 
             if (action === "APPROVE") {
                 const quota = await tx.leaveQuota.findFirst({
@@ -126,16 +122,18 @@ export async function POST(req: Request): Promise<NextResponse> {
 
                 await tx.leaveQuota.update({
                     where: { id: quota.id },
-                    data: { usedDays: quota.usedDays + leaveRequest.durationDays },
+                    data: { usedDays: { increment: leaveRequest.durationDays } },
                 });
 
-                if (overQuotaDays > leaveRequest.overQuotaDays) {
-                    await tx.leaveRequest.update({
-                        where: { id: leaveId },
-                        data: { overQuotaDays },
-                    });
+                if (overQuotaDays !== leaveRequest.overQuotaDays) {
+                    updateData.overQuotaDays = overQuotaDays;
                 }
             }
+
+            const updatedRequest = await tx.leaveRequest.update({
+                where: { id: leaveId },
+                data: updateData,
+            });
 
             await tx.notification.updateMany({
                 where: {
@@ -170,6 +168,8 @@ export async function POST(req: Request): Promise<NextResponse> {
             });
 
             return updatedRequest;
+        }, {
+            isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
         });
 
         const auditAction = action === "APPROVE" ? "LEAVE_REQUEST_APPROVE" : "LEAVE_REQUEST_REJECT";

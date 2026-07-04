@@ -1,5 +1,7 @@
+import { Clock } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import type { PendingLeave } from "@/hooks/useLeaveApprovals";
+import { formatThaiDateTimeWithTimeWord } from "@/lib/helpers/date-helpers";
 import { LeaveStatusBadge } from "./LeaveStatusBadge";
 
 interface ApprovalHistoryListProps {
@@ -35,7 +37,7 @@ export function ApprovalHistoryList({ history }: ApprovalHistoryListProps) {
                         <p className="break-words text-sm font-medium text-slate-950">
                             {leave.employee.firstName} {leave.employee.lastName}
                             <span className="ml-2 font-normal text-slate-600">
-                                ยื่นลา{leaveShortLabel(leave.leaveType)}
+                                ยื่นคำขอลา{leaveShortLabel(leave.leaveType)}
                             </span>
                         </p>
                         <p className="mt-1 text-xs text-slate-600">
@@ -53,6 +55,10 @@ export function ApprovalHistoryList({ history }: ApprovalHistoryListProps) {
                                   }).format(new Date(leave.endDate))}`
                                 : ""}
                             ({leave.durationDays} วัน)
+                        </p>
+                        <p className="mt-1 flex items-center gap-1.5 text-xs font-medium text-slate-500">
+                            <Clock className="h-3.5 w-3.5" aria-hidden="true" />
+                            ยื่นคำขอเมื่อ {formatThaiDateTimeWithTimeWord(leave.createdAt)}
                         </p>
                         {leave.status === "NOT_TAKEN" && leave.notTakenReason ? (
                             <p className="mt-2 break-words rounded-md border border-cyan-200 bg-cyan-50 p-2 text-sm leading-6 text-cyan-900">

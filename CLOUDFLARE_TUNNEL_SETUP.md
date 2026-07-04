@@ -8,7 +8,7 @@ Manager คลิกลิงก์ Email
 https://approve.baitongtestdeploy.online/leave/action?token=eyJ...
        ↓
 Cloudflare Tunnel (cloudflared)
-       ↓  (อนุญาตเฉพาะ /leave/action และ /api/leave/action)
+       ↓  (อนุญาตเฉพาะ /leave/action และ /api/leave/decision)
 Intranet Server (192.168.x.x:3000)
        ↓
 Next.js App → ถอด JWT → อัปเดตข้อมูล LeaveRequest
@@ -82,7 +82,7 @@ ingress:
 
     # 2) อนุญาตเฉพาะ API endpoint ของการ Approve
     - hostname: approve.baitongtestdeploy.online
-      path: /api/leave/action*
+      path: /api/leave/decision*
       service: http://localhost:3000
 
     # 3) อนุญาตไฟล์ Static Assets เพื่อให้หน้าเว็บโหลด CSS/JS ได้สมบูรณ์
@@ -170,10 +170,10 @@ curl -I https://approve.baitongtestdeploy.online/api/employees/1
 
 | สิ่งที่ช่วยป้องกัน            | รายละเอียด                                                                                                            |
 | ----------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| **Cloudflare Tunnel Ingress** | เปิดเฉพาะทางเข้าที่จำเป็นคือ `/leave/action` และ `/api/leave/action` เพื่อลดความเสี่ยง                                |
+| **Cloudflare Tunnel Ingress** | เปิดเฉพาะทางเข้าที่จำเป็นคือ `/leave/action` และ `/api/leave/decision` เพื่อลดความเสี่ยง                              |
 | **JWT Magic Link**            | "Token ยืนยันสิทธิ์" จะผูก `leaveId` + `approverId` + `action (approve/reject)` เข้าด้วยกันและถูก Sign ปลอมแปลงไม่ได้ |
 | **Token Expiration**          | Token จะมีอายุตามที่เราเขียนโค้ดกำหนดไว้ ตอนเลยระยะเวลาไปแล้วก็นำมาใช้ไม่ได้                                          |
-| **Strict Action Flow**        | ต่อให้คนอื่นเดาลิงก์มาได้ ระบบก็จะตรวจสอบสถานะใบลาด้วยว่าต้องเป็น "PENDING" เท่านั้น ป้องกันการกดย้ำซ้ำๆ              |
+| **Strict Action Flow**        | ต่อให้คนอื่นเดาลิงก์มาได้ ระบบก็จะตรวจสอบสถานะคำขอลาด้วยว่าต้องเป็น "PENDING" เท่านั้น ป้องกันการกดย้ำซ้ำๆ            |
 | **SSL Enforcement**           | เข้าข่ายผ่านระบบ HTTPS ฟรีและอัตโนมัติ 100% จากทาง Cloudflare เอง                                                     |
 
 _(Optional)_ หากต้องการเพิ่มการป้องกันให้รัดกุมไปอีก สามารถเข้าไปตั้งค่าที่ Cloudflare Dashboard เมนู Zero Trust » Access » Applications ให้บังคับล็อกอินผ่าน Microsoft 365 หรือส่งเลข OTP ไปที่อีเมล `@baitongtestdeploy.online` ก่อนถึงจะเข้าใช้งานลิงก์ดังกล่าวได้

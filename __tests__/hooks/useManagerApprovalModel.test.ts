@@ -4,7 +4,7 @@ import { useManagerApprovalModel } from "@/hooks/leave/useManagerApprovalModel";
 import { useLeaveApprovals } from "@/hooks/useLeaveApprovals";
 import {
     confirmLeaveNotTaken,
-    submitLeaveApprovalAction,
+    submitLeaveDecision,
 } from "@/lib/services/leave/client";
 import { toast } from "sonner";
 
@@ -14,7 +14,7 @@ vi.mock("@/hooks/useLeaveApprovals", () => ({
 
 vi.mock("@/lib/services/leave/client", () => ({
     confirmLeaveNotTaken: vi.fn(),
-    submitLeaveApprovalAction: vi.fn(),
+    submitLeaveDecision: vi.fn(),
 }));
 
 vi.mock("sonner", () => ({
@@ -86,7 +86,7 @@ describe("useManagerApprovalModel", () => {
             mutate,
         });
 
-        vi.mocked(submitLeaveApprovalAction).mockResolvedValue(undefined);
+        vi.mocked(submitLeaveDecision).mockResolvedValue(undefined);
         vi.mocked(confirmLeaveNotTaken).mockResolvedValue(undefined);
     });
 
@@ -97,7 +97,7 @@ describe("useManagerApprovalModel", () => {
             await result.current.approveLeave(pendingLeave);
         });
 
-        expect(submitLeaveApprovalAction).toHaveBeenCalledWith({
+        expect(submitLeaveDecision).toHaveBeenCalledWith({
             leaveId: "leave-1",
             action: "APPROVE",
             reason: undefined,
@@ -129,7 +129,7 @@ describe("useManagerApprovalModel", () => {
         });
 
         expect(result.current.approvalConfirmLeave?.id).toBe("leave-1");
-        expect(submitLeaveApprovalAction).not.toHaveBeenCalled();
+        expect(submitLeaveDecision).not.toHaveBeenCalled();
     });
 
     it("opens reject dialog and clears state when closed", async () => {

@@ -63,7 +63,7 @@ export const API_ROUTES = {
         request: "/api/leave/request",
         notTaken: "/api/leave/not-taken",
         approvers: "/api/leave/approvers",
-        intranetAction: "/api/leave/intranet-action",
+        decision: "/api/leave/decision",
         export: "/api/leave/export",
     },
     auditLogs: {

@@ -198,6 +198,7 @@ describe("/api/leave/not-taken", () => {
         } as Awaited<ReturnType<typeof prisma.leaveRequest.update>>);
         vi.mocked(prisma.leaveQuota.update).mockResolvedValue({
             id: "quota-1",
+            usedDays: 2,
         } as Awaited<ReturnType<typeof prisma.leaveQuota.update>>);
 
         const req = new NextRequest("http://localhost/api/leave/not-taken", {
@@ -216,7 +217,7 @@ describe("/api/leave/not-taken", () => {
         });
         expect(prisma.leaveQuota.update).toHaveBeenCalledWith({
             where: { id: "quota-1" },
-            data: { usedDays: 2 },
+            data: { usedDays: { decrement: 1 } },
         });
         expect(prisma.notification.updateMany).toHaveBeenCalledWith({
             where: {
@@ -232,5 +233,73 @@ describe("/api/leave/not-taken", () => {
                 type: "LEAVE_NOT_TAKEN_CONFIRMED",
             }),
         });
+    });
+
+    it("rejects not-taken confirmation if returning quota would make used days negative", async () => {
+        vi.mocked(prisma.leaveRequest.findUnique).mockResolvedValue({
+            id: "leave-3",
+            employeeId: 10,
+            leaveType: "VACATION",
+            startDate: new Date("2000-02-01T00:00:00.000Z"),
+            endDate: new Date("2000-02-01T00:00:00.000Z"),
+            period: "FULL_DAY",
+            durationDays: 1,
+            reason: "ลาพักร้อน",
+            emergencyReason: null,
+            specialReason: null,
+            overQuotaDays: 0,
+            status: "APPROVED",
+            approverId: 10,
+            approvedAt: new Date("2000-02-01T00:00:00.000Z"),
+            rejectReason: null,
+            notTakenReason: "ไม่ได้ลาเพราะมีงานด่วน",
+            notTakenRequestedAt: new Date("2000-02-02T00:00:00.000Z"),
+            notTakenConfirmedAt: null,
+            notTakenConfirmedById: null,
+            attachmentUrl: null,
+            createdAt: new Date("2000-02-01T00:00:00.000Z"),
+            updatedAt: new Date("2000-02-02T00:00:00.000Z"),
+            employee: {
+                id: 10,
+                firstName: "Employee",
+                lastName: "User",
+                email: "employee@example.com",
+                user: { id: 1 },
+            },
+            approver: {
+                id: 10,
+                firstName: "Manager",
+                lastName: "User",
+                email: "manager@example.com",
+            },
+        } as Awaited<ReturnType<typeof prisma.leaveRequest.findUnique>>);
+        vi.mocked(prisma.leaveQuota.findFirst).mockResolvedValue({
+            id: "quota-1",
+            employeeId: 10,
+            year: 2000,
+            leaveType: "VACATION",
+            totalDays: 6,
+            usedDays: 0.5,
+        });
+        vi.mocked(prisma.leaveRequest.update).mockResolvedValue({
+            id: "leave-3",
+        } as Awaited<ReturnType<typeof prisma.leaveRequest.update>>);
+        vi.mocked(prisma.leaveQuota.update).mockResolvedValue({
+            id: "quota-1",
+            usedDays: -0.5,
+        } as Awaited<ReturnType<typeof prisma.leaveQuota.update>>);
+
+        const req = new NextRequest("http://localhost/api/leave/not-taken", {
+            method: "PUT",
+            body: JSON.stringify({ leaveId: "leave-3" }),
+        });
+
+        const res = await PUT(req);
+
+        expect(res.status).toBe(409);
+        const data = await res.json();
+        expect(data.error).toBe(
+            "ไม่สามารถตรวจสอบสิทธิ์ลาของคำขอนี้ได้ กรุณาติดต่อผู้ดูแลระบบ",
+        );
     });
 });

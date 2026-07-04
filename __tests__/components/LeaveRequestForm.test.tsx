@@ -47,14 +47,14 @@ describe("LeaveRequestForm", () => {
             />,
         );
 
-        expect(screen.getByRole("dialog", { name: "ยื่นใบลา" })).toBeInTheDocument();
+        expect(screen.getByRole("dialog", { name: "ยื่นคำขอลา" })).toBeInTheDocument();
         expect(
             screen.getByText(
                 "กรอกช่วงวันที่และเหตุผลให้ครบถ้วน ระบบจะตรวจเงื่อนไขลาย้อนหลังและการลาเกินสิทธิ์ให้ก่อนส่งคำขอ",
             ),
         ).toBeInTheDocument();
         expect(
-            screen.getByRole("button", { name: "ปิดแบบฟอร์มยื่นใบลา" }),
+            screen.getByRole("button", { name: "ปิดแบบฟอร์มยื่นคำขอลา" }),
         ).toBeInTheDocument();
     });
 

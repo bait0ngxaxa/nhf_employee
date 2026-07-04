@@ -22,7 +22,7 @@ export function ManagerApprovalDashboard() {
         <div className="space-y-6">
             <ApprovalSectionHeader
                 title="รายการรอพิจารณา"
-                description="ใบลาคงค้างของพนักงานในทีมที่รอรับการอนุมัติ"
+                description="คำขอลาคงค้างของพนักงานในทีมที่รอรับการอนุมัติ"
                 count={model.metadata?.pending.totalItems ?? model.pending.length}
                 tone="attention"
             />

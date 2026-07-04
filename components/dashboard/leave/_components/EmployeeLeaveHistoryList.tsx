@@ -1,8 +1,9 @@
-import { CalendarClock, RotateCcw, X } from "lucide-react";
+import { CalendarClock, Clock, RotateCcw, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Pagination } from "@/components/Pagination";
 import type { LeaveRequest } from "@/hooks/useLeaveProfile";
+import { formatThaiDateTimeWithTimeWord } from "@/lib/helpers/date-helpers";
 import { isAfterLeaveEnd } from "@/lib/services/leave/utils";
 import { LeaveStatusBadge } from "./LeaveStatusBadge";
 
@@ -101,6 +102,10 @@ function LeaveHistoryItem({
                         <CalendarClock className="h-4 w-4 text-slate-400" aria-hidden="true" />
                         <span>{formatLeaveDateRange(request.startDate, request.endDate)}</span>
                     </p>
+                    <p className="flex flex-wrap items-center gap-1.5 text-xs/5 font-medium text-slate-500">
+                        <Clock className="h-3.5 w-3.5 text-slate-400" aria-hidden="true" />
+                        <span>ยื่นคำขอเมื่อ {formatThaiDateTimeWithTimeWord(request.createdAt)}</span>
+                    </p>
                     <LeaveNote label="เหตุผล" text={request.reason} />
                     {request.status === "REJECTED" && request.rejectReason ? (
                         <LeaveNote tone="danger" label="เหตุผลที่ไม่อนุมัติ" text={request.rejectReason} />
@@ -177,7 +182,7 @@ function LeaveNote({
 function EmptyLeaveHistory() {
     return (
         <Card className="border-dashed border-slate-300 p-8 text-center shadow-none">
-            <p className="text-base/6 font-semibold text-slate-900">ยังไม่มีประวัติการยื่นใบลา</p>
+            <p className="text-base/6 font-semibold text-slate-900">ยังไม่มีประวัติการยื่นคำขอลา</p>
             <p className="mt-1 text-sm/6 text-slate-500">
                 เมื่อส่งคำขอแล้ว รายการและสถานะจะแสดงที่นี่
             </p>

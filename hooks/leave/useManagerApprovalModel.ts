@@ -7,8 +7,8 @@ import {
 } from "@/hooks/useLeaveApprovals";
 import {
     confirmLeaveNotTaken,
-    submitLeaveApprovalAction,
-    type LeaveApprovalAction,
+    submitLeaveDecision,
+    type LeaveDecisionAction,
 } from "@/lib/services/leave/client";
 
 interface UseManagerApprovalModelResult {
@@ -67,15 +67,15 @@ export function useManagerApprovalModel(): UseManagerApprovalModelResult {
         await mutate();
     };
 
-    const executeAction = async (action: LeaveApprovalAction, leaveId: string, reason?: string): Promise<void> => {
+    const executeAction = async (action: LeaveDecisionAction, leaveId: string, reason?: string): Promise<void> => {
         setIsProcessing(true);
         try {
-            await submitLeaveApprovalAction({ leaveId, action, reason });
+            await submitLeaveDecision({ leaveId, action, reason });
             await refreshFirstPages();
             if (action === "APPROVE") {
-                toast.success("อนุมัติใบลาเรียบร้อยแล้ว");
+                toast.success("อนุมัติคำขอลาเรียบร้อยแล้ว");
             } else {
-                toast.success("ปฏิเสธใบลาเรียบร้อยแล้ว");
+                toast.success("ปฏิเสธคำขอลาเรียบร้อยแล้ว");
             }
             resetRejectDialog();
         } catch (error: unknown) {

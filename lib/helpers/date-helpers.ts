@@ -71,6 +71,28 @@ export function formatThaiDateTime(dateString: string): string {
   return formatDateTime(dateString, 'th-TH');
 }
 
+export function formatThaiDateTimeWithTimeWord(dateString: string): string {
+  if (!dateString) return '-';
+
+  const date = new Date(dateString);
+
+  if (isNaN(date.getTime())) {
+    return '-';
+  }
+
+  const datePart = new Intl.DateTimeFormat('th-TH', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  }).format(date);
+  const timePart = new Intl.DateTimeFormat('th-TH', {
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(date);
+
+  return `${datePart} เวลา ${timePart} น.`;
+}
+
 export function formatThaiTime(dateString: string): string {
   return formatTime(dateString, 'th-TH');
 }

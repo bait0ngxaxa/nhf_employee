@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
     formatDate,
+    formatThaiDateTimeWithTimeWord,
     getRelativeTime,
     isPastDate,
 } from "@/lib/helpers/date-helpers";
@@ -24,6 +25,18 @@ describe("Date Helpers", () => {
 
         it("should return - for invalid date", () => {
             expect(formatDate("invalid")).toBe("-");
+        });
+    });
+
+    describe("formatThaiDateTimeWithTimeWord", () => {
+        it("formats Thai submitted timestamp with explicit time wording", () => {
+            expect(formatThaiDateTimeWithTimeWord("2026-01-01T09:30:00+07:00")).toBe(
+                "1 มกราคม 2569 เวลา 09:30 น.",
+            );
+        });
+
+        it("returns - for invalid submitted timestamp", () => {
+            expect(formatThaiDateTimeWithTimeWord("invalid")).toBe("-");
         });
     });
 

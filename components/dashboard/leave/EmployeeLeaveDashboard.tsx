@@ -31,7 +31,7 @@ export function EmployeeLeaveDashboard() {
                     </p>
                 </div>
                 <Button className={LEAVE_THEME_BUTTON_CLASS} onClick={model.openRequestForm}>
-                    <Plus data-icon="inline-start" /> ยื่นใบลา
+                    <Plus data-icon="inline-start" /> ยื่นคำขอลา
                 </Button>
             </div>
 

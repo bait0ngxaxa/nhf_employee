@@ -70,14 +70,14 @@ export function LeaveRequestForm({ open, onSuccess, onCancel, quotas }: Props) {
                         size="icon-sm"
                         disabled={model.isSubmitting}
                         className="absolute right-4 top-4"
-                        aria-label="ปิดแบบฟอร์มยื่นใบลา"
+                        aria-label="ปิดแบบฟอร์มยื่นคำขอลา"
                     >
                         <X />
                     </Button>
                 </DialogClose>
                 <DialogHeader className="shrink-0 gap-2 border-b border-border bg-muted/30 px-5 py-4 pr-12 text-left sm:px-6">
                     <DialogTitle className="text-lg font-semibold text-foreground">
-                        ยื่นใบลา
+                        ยื่นคำขอลา
                     </DialogTitle>
                     <DialogDescription className="max-w-[64ch] text-sm leading-6 text-muted-foreground">
                         กรอกช่วงวันที่และเหตุผลให้ครบถ้วน ระบบจะตรวจเงื่อนไขลาย้อนหลังและการลาเกินสิทธิ์ให้ก่อนส่งคำขอ
