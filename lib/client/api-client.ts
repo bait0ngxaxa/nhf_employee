@@ -34,6 +34,7 @@ interface RequestConfig extends RequestInit {
     timeoutMs?: number;
     retryCount?: number;
     requestId?: string;
+    skipAuthRefresh?: boolean;
 }
 
 const DEFAULT_TIMEOUT_MS = 15000;
@@ -221,6 +222,7 @@ export async function apiRequest<T>(
         timeoutMs,
         retryCount,
         requestId: customRequestId,
+        skipAuthRefresh,
         ...customConfig
     } = config;
     const method = customConfig.method?.toUpperCase() ?? "GET";
@@ -248,7 +250,7 @@ export async function apiRequest<T>(
             const response = await fetchWithRefresh(endpoint, {
                 ...requestInit,
                 signal,
-            });
+            }, { refreshOnUnauthorized: !skipAuthRefresh });
 
             if (shouldRetry(method, attempt, finalRetryCount) && shouldRetryResponse(response)) {
                 await delay(getRetryDelayMs(attempt));

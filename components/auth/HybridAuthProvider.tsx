@@ -9,6 +9,7 @@ import {
     useRef,
     type ReactNode,
 } from "react";
+import { usePathname } from "next/navigation";
 import useSWR from "swr";
 
 import type { AuthenticatedUser } from "@/lib/auth/types";
@@ -36,9 +37,26 @@ interface HybridAuthProviderProps {
 const HybridAuthContext = createContext<HybridAuthContextValue | null>(null);
 const HYBRID_REFRESH_INTERVAL_MS = 12 * 60 * 1000;
 const HYBRID_VISIBILITY_REFRESH_MIN_AGE_MS = 10 * 60 * 1000;
+const PUBLIC_AUTH_PATHS: ReadonlySet<string> = new Set<string>([
+    APP_ROUTES.home,
+    APP_ROUTES.login,
+    APP_ROUTES.signup,
+    APP_ROUTES.refreshSession,
+    APP_ROUTES.accessDenied,
+    APP_ROUTES.forgotPassword,
+    APP_ROUTES.resetPassword,
+]);
 
-async function fetchCurrentUser(): Promise<AuthenticatedUser | null> {
-    const result = await apiGet<AuthMeResponse>(API_ROUTES.auth.me);
+function shouldBootstrapAuth(pathname: string | null): boolean {
+    return !pathname || !PUBLIC_AUTH_PATHS.has(pathname);
+}
+
+async function fetchCurrentUser(
+    refreshOnUnauthorized: boolean,
+): Promise<AuthenticatedUser | null> {
+    const result = await apiGet<AuthMeResponse>(API_ROUTES.auth.me, {
+        skipAuthRefresh: !refreshOnUnauthorized,
+    });
     if (!result.success) {
         return null;
     }
@@ -46,10 +64,12 @@ async function fetchCurrentUser(): Promise<AuthenticatedUser | null> {
 }
 
 export function HybridAuthProvider({ children }: HybridAuthProviderProps) {
+    const pathname = usePathname();
+    const shouldLoadCurrentUser = shouldBootstrapAuth(pathname);
     const lastRefreshAtRef = useRef(Date.now());
     const { data, isLoading, mutate } = useSWR<AuthenticatedUser | null>(
-        API_ROUTES.auth.me,
-        fetchCurrentUser,
+        shouldLoadCurrentUser ? API_ROUTES.auth.me : null,
+        () => fetchCurrentUser(true),
         {
             revalidateOnFocus: true,
             shouldRetryOnError: false,
@@ -57,7 +77,8 @@ export function HybridAuthProvider({ children }: HybridAuthProviderProps) {
     );
 
     const refreshUser = useCallback(async (): Promise<void> => {
-        await mutate();
+        const user = await fetchCurrentUser(true);
+        await mutate(user, { revalidate: false });
     }, [mutate]);
 
     const signOut = useCallback(async (): Promise<void> => {

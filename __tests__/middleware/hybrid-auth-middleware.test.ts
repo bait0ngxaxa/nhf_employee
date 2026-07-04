@@ -67,6 +67,16 @@ describe("hybrid auth middleware", () => {
         expect(response.status).toBe(200);
     });
 
+    it("redirects root route with only refresh cookie to refresh bridge for dashboard", async () => {
+        const request = buildRequest("http://localhost/", `${HYBRID_REFRESH_COOKIE_NAME}=present`);
+        const response = await middleware(request);
+
+        expect(response.status).toBe(307);
+        expect(response.headers.get("location")).toBe(
+            "http://localhost/auth/refresh?next=%2Fdashboard",
+        );
+    });
+
     it("allows protected route when valid hybrid access token exists", async () => {
         process.env.AUTH_ACCESS_TOKEN_SECRET = "middleware-test-secret";
         const token = await issueAccessToken({

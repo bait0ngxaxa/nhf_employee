@@ -9,6 +9,10 @@ const HYBRID_AUTH_INTERNAL_PATHS: ReadonlySet<string> = new Set<string>([
 
 let refreshInFlight: Promise<boolean> | null = null;
 
+interface FetchWithRefreshOptions {
+    refreshOnUnauthorized?: boolean;
+}
+
 function isHybridInternalPath(url: string): boolean {
     return HYBRID_AUTH_INTERNAL_PATHS.has(url);
 }
@@ -43,10 +47,16 @@ export async function refreshHybridSession(): Promise<boolean> {
 export async function fetchWithRefresh(
     url: string,
     init?: RequestInit,
+    options: FetchWithRefreshOptions = {},
 ): Promise<Response> {
+    const shouldRefresh = options.refreshOnUnauthorized ?? true;
     let response = await fetch(url, init);
 
-    if (response.status === 401 && shouldAttemptHybridRefresh(url)) {
+    if (
+        response.status === 401 &&
+        shouldRefresh &&
+        shouldAttemptHybridRefresh(url)
+    ) {
         const refreshed = await refreshHybridSession();
         if (refreshed) {
             response = await fetch(url, init);

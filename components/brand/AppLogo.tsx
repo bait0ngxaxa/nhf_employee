@@ -28,6 +28,7 @@ const LOGO_VARIANTS: Record<
         frameClassName: "size-10",
     },
 };
+const APP_LOGO_SIZE_PX = 40;
 
 export function AppLogo({
     variant,
@@ -48,6 +49,8 @@ export function AppLogo({
             <Image
                 src={logoImage}
                 alt={APP_LOGO.alt}
+                width={APP_LOGO_SIZE_PX}
+                height={APP_LOGO_SIZE_PX}
                 priority={priority}
                 sizes="40px"
                 className="block h-full w-full object-contain"

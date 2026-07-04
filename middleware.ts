@@ -37,12 +37,12 @@ async function hasValidHybridAccessToken(request: NextRequest): Promise<boolean>
     }
 }
 
-function buildRefreshSessionUrl(request: NextRequest): URL {
+function buildRefreshSessionUrl(
+    request: NextRequest,
+    nextPath = `${request.nextUrl.pathname}${request.nextUrl.search}`,
+): URL {
     const refreshUrl = buildPublicUrl(APP_ROUTES.refreshSession, request);
-    refreshUrl.searchParams.set(
-        "next",
-        `${request.nextUrl.pathname}${request.nextUrl.search}`,
-    );
+    refreshUrl.searchParams.set("next", nextPath);
     return refreshUrl;
 }
 
@@ -53,8 +53,19 @@ export default async function middleware(request: NextRequest): Promise<NextResp
     const isAuthenticated = await hasValidHybridAccessToken(request);
     const hasRefreshToken = Boolean(request.cookies.get(HYBRID_REFRESH_COOKIE_NAME)?.value);
 
-    if (isAuthenticated && (pathname === "/login" || pathname === "/signup")) {
+    if (
+        isAuthenticated &&
+        (pathname === APP_ROUTES.home ||
+            pathname === APP_ROUTES.login ||
+            pathname === APP_ROUTES.signup)
+    ) {
         return NextResponse.redirect(buildPublicUrl("/dashboard", request));
+    }
+
+    if (pathname === APP_ROUTES.home && hasRefreshToken) {
+        return NextResponse.redirect(
+            buildRefreshSessionUrl(request, APP_ROUTES.dashboard),
+        );
     }
 
     if (!isPublicRoute && !isAuthenticated) {
