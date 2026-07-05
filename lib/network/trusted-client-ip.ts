@@ -4,10 +4,7 @@ interface HeaderReader {
     get(name: string): string | null;
 }
 
-const TRUSTED_CLIENT_IP_HEADERS = [
-    "cf-connecting-ip",
-    "true-client-ip",
-] as const;
+const CLOUDFLARE_REAL_IP_HEADER = "cf-connecting-ip";
 
 function normalizeIp(value: string | null): string | null {
     const normalized = value?.trim();
@@ -18,11 +15,5 @@ function normalizeIp(value: string | null): string | null {
 }
 
 export function getTrustedClientIp(headers: HeaderReader): string | null {
-    for (const header of TRUSTED_CLIENT_IP_HEADERS) {
-        const ipAddress = normalizeIp(headers.get(header));
-        if (ipAddress) {
-            return ipAddress;
-        }
-    }
-    return null;
+    return normalizeIp(headers.get(CLOUDFLARE_REAL_IP_HEADER));
 }

@@ -29,6 +29,14 @@ describe("trusted client IP", () => {
         expect(getTrustedClientIp(headers)).toBeNull();
     });
 
+    it("ignores spoofable True-Client-IP without Cloudflare real IP", () => {
+        const headers = buildHeaders({
+            "true-client-ip": "198.51.100.10",
+        });
+
+        expect(getTrustedClientIp(headers)).toBeNull();
+    });
+
     it("rejects comma-separated or invalid IP values", () => {
         const headers = buildHeaders({
             "cf-connecting-ip": "203.0.113.10, 198.51.100.1",
