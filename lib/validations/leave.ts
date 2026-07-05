@@ -9,8 +9,8 @@ import { getLeaveYearFromDateValue } from "@/lib/services/leave/quota-year";
 const LEAVE_VALIDATION_MESSAGES = {
   crossYearRequest: "ไม่สามารถลาข้ามปีได้ กรุณาแยกคำขอเป็นคนละปี",
   rejectReasonRequired: "กรุณาระบุเหตุผลในการไม่อนุมัติ",
-  emergencyReasonRequired: "กรุณาระบุเหตุผลฉุกเฉินสำหรับการลาย้อนหลัง",
-  emergencyBackdateTooOld: `สามารถลาย้อนหลังกรณีฉุกเฉินได้ไม่เกิน ${EMERGENCY_BACKDATE_LIMIT_DAYS} วัน`,
+  emergencyReasonRequired: "กรุณาระบุเหตุผลในการลาย้อนหลัง",
+  emergencyBackdateTooOld: `สามารถยื่นคำขอลาย้อนหลังได้ไม่เกิน ${EMERGENCY_BACKDATE_LIMIT_DAYS} วัน`,
 } as const;
 
 const optionalLongTextSchema = (message: string) =>

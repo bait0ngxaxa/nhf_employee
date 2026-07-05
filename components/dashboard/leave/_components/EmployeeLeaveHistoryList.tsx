@@ -111,7 +111,7 @@ function LeaveHistoryItem({
                         <LeaveNote tone="danger" label="เหตุผลที่ไม่อนุมัติ" text={request.rejectReason} />
                     ) : null}
                     {request.emergencyReason ? (
-                        <LeaveNote tone="info" label="เหตุผลฉุกเฉิน" text={request.emergencyReason} />
+                        <LeaveNote tone="info" label="เหตุผลในการลาย้อนหลัง" text={request.emergencyReason} />
                     ) : null}
                     {request.specialReason ? (
                         <LeaveNote tone="warning" label="เหตุผลพิเศษ" text={request.specialReason} />

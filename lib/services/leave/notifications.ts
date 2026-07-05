@@ -88,11 +88,6 @@ export async function sendLeaveActionNotifications(
     const dashboardLink = getAbsoluteDashboardPath(
         APP_DASHBOARD_TABS.managerApproval,
     );
-    await assertEmailSent(
-        await emailService.sendLeaveActionNotification(payload, dashboardLink),
-        "LEAVE_ACTION",
-    );
-
     await createNotificationOnce({
         userId: payload.approver.userId,
         type: "LEAVE_REQUESTED",
@@ -101,16 +96,16 @@ export async function sendLeaveActionNotifications(
         actionUrl: toDashboardTabPath(APP_DASHBOARD_TABS.managerApproval),
         referenceId: payload.leaveId,
     });
+
+    await assertEmailSent(
+        await emailService.sendLeaveActionNotification(payload, dashboardLink),
+        "LEAVE_ACTION",
+    );
 }
 
 export async function sendLeaveResultNotifications(
     payload: LeaveResultPayload,
 ): Promise<void> {
-    await assertEmailSent(
-        await emailService.sendLeaveResultNotification(payload),
-        "LEAVE_RESULT",
-    );
-
     const isApproved = payload.status === "APPROVED";
     await createNotificationOnce({
         userId: payload.employee.userId,
@@ -124,16 +119,16 @@ export async function sendLeaveResultNotifications(
         actionUrl: toDashboardTabPath(APP_DASHBOARD_TABS.leaveHistory),
         referenceId: payload.leaveId,
     });
+
+    await assertEmailSent(
+        await emailService.sendLeaveResultNotification(payload),
+        "LEAVE_RESULT",
+    );
 }
 
 export async function sendLeaveCancelledNotifications(
     payload: LeaveCancelledPayload,
 ): Promise<void> {
-    await assertEmailSent(
-        await emailService.sendLeaveCancelledNotification(payload),
-        "LEAVE_CANCELLED",
-    );
-
     await createNotificationOnce({
         userId: payload.approver.userId,
         type: "LEAVE_CANCELLED",
@@ -142,16 +137,16 @@ export async function sendLeaveCancelledNotifications(
         actionUrl: toDashboardTabPath(APP_DASHBOARD_TABS.managerApproval),
         referenceId: payload.leaveId,
     });
+
+    await assertEmailSent(
+        await emailService.sendLeaveCancelledNotification(payload),
+        "LEAVE_CANCELLED",
+    );
 }
 
 export async function sendLeaveNotTakenRequestedNotifications(
     payload: LeaveNotTakenRequestedPayload,
 ): Promise<void> {
-    await assertEmailSent(
-        await emailService.sendLeaveNotTakenRequestedNotification(payload),
-        "LEAVE_NOT_TAKEN_REQUESTED",
-    );
-
     await createNotificationOnce({
         userId: payload.approver.userId,
         type: "LEAVE_NOT_TAKEN_REQUESTED",
@@ -160,16 +155,16 @@ export async function sendLeaveNotTakenRequestedNotifications(
         actionUrl: toDashboardTabPath(APP_DASHBOARD_TABS.managerApproval),
         referenceId: payload.leaveId,
     });
+
+    await assertEmailSent(
+        await emailService.sendLeaveNotTakenRequestedNotification(payload),
+        "LEAVE_NOT_TAKEN_REQUESTED",
+    );
 }
 
 export async function sendLeaveNotTakenConfirmedNotifications(
     payload: LeaveNotTakenConfirmedPayload,
 ): Promise<void> {
-    await assertEmailSent(
-        await emailService.sendLeaveNotTakenConfirmedNotification(payload),
-        "LEAVE_NOT_TAKEN_CONFIRMED",
-    );
-
     await createNotificationOnce({
         userId: payload.employee.userId,
         type: "LEAVE_NOT_TAKEN_CONFIRMED",
@@ -178,4 +173,9 @@ export async function sendLeaveNotTakenConfirmedNotifications(
         actionUrl: toDashboardTabPath(APP_DASHBOARD_TABS.leaveHistory),
         referenceId: payload.leaveId,
     });
+
+    await assertEmailSent(
+        await emailService.sendLeaveNotTakenConfirmedNotification(payload),
+        "LEAVE_NOT_TAKEN_CONFIRMED",
+    );
 }

@@ -2,13 +2,11 @@ import { after } from "next/server";
 import { type NextRequest, NextResponse } from "next/server";
 
 import { requireApiSession } from "@/lib/auth/api";
-import { prisma } from "@/lib/db/prisma";
 import { processOutbox } from "@/lib/services/outbox/processor";
 import { ticketService, type UpdateTicketData } from "@/lib/services/ticket";
 import { jsonError, notFound } from "@/lib/ssot/http";
 import { FEATURE_KEYS, isFeatureEnabled } from "@/lib/ssot/features";
 import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
-import { APP_ROUTES } from "@/lib/ssot/routes";
 import { updateTicketSchema } from "@/lib/validations/ticket";
 
 async function parseTicketId(
@@ -104,32 +102,6 @@ export async function PATCH(
             processOutbox().catch((err) =>
                 console.error("Outbox processor failed:", err),
             );
-
-            const ticket = result.ticket;
-            if (!ticket) {
-                return;
-            }
-
-            const currentUserId = Number(auth.user.id);
-            const hasStatusChanged =
-                typeof result.oldStatus === "string" &&
-                ticket.status !== result.oldStatus;
-
-            if (
-                hasStatusChanged &&
-                ticket.reportedById !== currentUserId
-            ) {
-                await prisma.notification.create({
-                    data: {
-                        userId: ticket.reportedById,
-                        type: "TICKET_UPDATED",
-                        title: "สถานะคำขอ IT Support อัปเดต",
-                        message: `คำขอ "${ticket.title}" เปลี่ยนสถานะจาก ${result.oldStatus} เป็น ${ticket.status}`,
-                        actionUrl: `${APP_ROUTES.dashboard}?tab=it-support&ticketId=${ticketId}`,
-                        referenceId: ticketId.toString(),
-                    },
-                });
-            }
         });
 
         return NextResponse.json({ ticket: result.ticket }, { status: 200 });

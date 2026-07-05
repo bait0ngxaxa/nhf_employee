@@ -149,6 +149,9 @@ export function EmailRequestHistory(): ReactElement | null {
                                             สังกัด
                                         </TableHead>
                                         <TableHead className="font-semibold">
+                                            อีเมลตอบกลับ
+                                        </TableHead>
+                                        <TableHead className="font-semibold">
                                             สิทธิ์ระบบ
                                         </TableHead>
                                         <TableHead className="font-semibold">
@@ -180,6 +183,14 @@ export function EmailRequestHistory(): ReactElement | null {
                                             </TableCell>
                                             <TableCell className="max-w-56 align-top [overflow-wrap:anywhere]">
                                                 {request.department}
+                                            </TableCell>
+                                            <TableCell className="max-w-64 align-top [overflow-wrap:anywhere]">
+                                                <a
+                                                    href={`mailto:${request.replyEmail}`}
+                                                    className="font-medium text-primary underline-offset-4 hover:underline"
+                                                >
+                                                    {request.replyEmail}
+                                                </a>
                                             </TableCell>
                                             <TableCell className="max-w-72 align-top">
                                                 <div className="space-y-2">

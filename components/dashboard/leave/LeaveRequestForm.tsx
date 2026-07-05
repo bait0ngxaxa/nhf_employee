@@ -148,7 +148,9 @@ function LeaveExceptionNotice({ model }: { model: LeaveRequestFormModel }) {
             <AlertTitle>รายการนี้ต้องระบุเหตุผลเพิ่มเติม</AlertTitle>
             <AlertDescription className="flex flex-col gap-1 leading-6">
                 {model.needsEmergencyReason ? (
-                    <span>ลาย้อนหลัง: ระบุเหตุผลฉุกเฉินที่ทำให้ยื่นคำขอไม่ทัน</span>
+                    <span>
+                        ลาย้อนหลัง: ระบุเหตุผลในการลาย้อนหลัง เพื่อให้ผู้อนุมัติเห็นว่าทำไมจึงยื่นไม่ทัน
+                    </span>
                 ) : null}
                 {model.needsSpecialReason ? (
                     <span>

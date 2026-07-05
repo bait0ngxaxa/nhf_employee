@@ -210,10 +210,10 @@ function EmergencyReasonField({ model }: { model: LeaveRequestFormModel }) {
             name="emergencyReason"
             render={({ field }) => (
                 <FormItem>
-                    <FormLabel>เหตุผลฉุกเฉิน</FormLabel>
+                    <FormLabel>เหตุผลในการลาย้อนหลัง</FormLabel>
                     <FormControl>
                         <Textarea
-                            placeholder="ระบุเหตุฉุกเฉินที่ทำให้ไม่สามารถยื่นลาตามเวลาปกติ"
+                            placeholder="ระบุเหตุผลที่ทำให้ยื่นคำขอลาหลังวันที่ลา"
                             className="min-h-24 resize-none"
                             rows={4}
                             maxLength={1000}
@@ -222,6 +222,9 @@ function EmergencyReasonField({ model }: { model: LeaveRequestFormModel }) {
                             value={field.value ?? ""}
                         />
                     </FormControl>
+                    <FormDescription>
+                        ใช้เมื่อวันที่ลาเป็นวันที่ผ่านมาแล้ว และต้องให้ผู้อนุมัติพิจารณาเหตุผลประกอบ
+                    </FormDescription>
                     <FormMessage />
                 </FormItem>
             )}

@@ -81,13 +81,24 @@ describe("leave notification delivery", () => {
         vi.mocked(emailService.sendLeaveResultNotification).mockResolvedValue(true);
     });
 
-    it("throws when leave action email delivery returns false", async () => {
+    it("still creates in-app emergency leave notification when action email delivery fails", async () => {
         vi.mocked(emailService.sendLeaveActionNotification).mockResolvedValue(false);
+        const payload = {
+            ...buildActionPayload(),
+            emergencyReason: "ป่วยฉุกเฉินจนยื่นคำขอไม่ทัน",
+        };
 
-        await expect(sendLeaveActionNotifications(buildActionPayload())).rejects.toThrow(
+        await expect(sendLeaveActionNotifications(payload)).rejects.toThrow(
             "LEAVE_ACTION email notification failed",
         );
-        expect(prismaMock.notification.create).not.toHaveBeenCalled();
+        expect(prismaMock.notification.create).toHaveBeenCalledWith({
+            data: expect.objectContaining({
+                type: "LEAVE_REQUESTED",
+                referenceId: "leave-1",
+                userId: 2,
+                message: expect.stringContaining("ลาย้อนหลัง"),
+            }),
+        });
     });
 
     it("creates result notification once and treats duplicate as success", async () => {

@@ -2,8 +2,6 @@ import { after, type NextRequest, NextResponse } from "next/server";
 
 import { requireApiSession } from "@/lib/auth/api";
 import { logTicketEvent } from "@/lib/server/audit";
-import { prisma } from "@/lib/db/prisma";
-import { APP_ROUTES } from "@/lib/ssot/routes";
 import { processOutbox } from "@/lib/services/outbox/processor";
 import { ticketService, type TicketFilters } from "@/lib/services/ticket";
 import { jsonError, notFound } from "@/lib/ssot/http";
@@ -92,29 +90,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
                     status: ticket.status,
                 },
             });
-
-            const admins = await prisma.user.findMany({
-                where: { role: "ADMIN" },
-            });
-
-            if (admins.length > 0) {
-                const reporterName =
-                    ticket.reportedBy.employee?.firstName &&
-                    ticket.reportedBy.employee?.lastName
-                        ? `${ticket.reportedBy.employee.firstName} ${ticket.reportedBy.employee.lastName}`
-                        : ticket.reportedBy.name;
-
-                await prisma.notification.createMany({
-                    data: admins.map((admin) => ({
-                        userId: admin.id,
-                        type: "TICKET_CREATED",
-                        title: "คำขอ IT Support ใหม่",
-                        message: `${reporterName} แจ้ง "${ticket.title}" (ความสำคัญ: ${ticket.priority})`,
-                        actionUrl: `${APP_ROUTES.dashboard}?tab=it-support&ticketId=${ticket.id}`,
-                        referenceId: ticket.id.toString(),
-                    })),
-                });
-            }
         });
 
         return NextResponse.json({ ticket }, { status: 201 });

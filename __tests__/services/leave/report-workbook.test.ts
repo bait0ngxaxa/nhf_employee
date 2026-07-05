@@ -19,6 +19,9 @@ describe("leave report workbook", () => {
         expect(loaded.getWorksheet("สรุปรายคน")?.getCell("A2").value).toBe("สมหญิง รักงาน");
         expect(loaded.getWorksheet("สรุปรายคน")?.getCell("M2").value).toBe(1);
         expect(loaded.getWorksheet("รายละเอียดคำขอลา")?.getCell("K2").value).toBe(1);
+        expect(loaded.getWorksheet("รายละเอียดคำขอลา")?.getCell("N1").value).toBe(
+            "เหตุผลในการลาย้อนหลัง",
+        );
     });
 });
 

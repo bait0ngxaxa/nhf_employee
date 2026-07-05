@@ -1,9 +1,10 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { NotificationOutbox, PrismaClient, NotificationOutboxType } from "@prisma/client";
 import { mockDeep, mockReset } from "vitest-mock-extended";
 import { lineNotificationService } from "@/lib/line";
 import { prisma } from "@/lib/db/prisma";
 import { processOutbox } from "@/lib/services/outbox/processor";
+import { EMAIL_REQUEST_INAPP_RECIPIENTS_ENV } from "@/lib/services/email-request/notifications";
 import {
     sendTicketCreatedNotifications,
     sendTicketUpdatedNotifications,
@@ -42,6 +43,19 @@ vi.mock("@/lib/line", () => ({
 const prismaMock = prisma as unknown as ReturnType<
     typeof mockDeep<PrismaClient>
 >;
+
+const originalEmailRequestInAppRecipients =
+    process.env[EMAIL_REQUEST_INAPP_RECIPIENTS_ENV];
+
+function restoreEmailRequestInAppRecipients(): void {
+    if (originalEmailRequestInAppRecipients === undefined) {
+        delete process.env[EMAIL_REQUEST_INAPP_RECIPIENTS_ENV];
+        return;
+    }
+
+    process.env[EMAIL_REQUEST_INAPP_RECIPIENTS_ENV] =
+        originalEmailRequestInAppRecipients;
+}
 
 function buildNotification(
     id: number,
@@ -91,11 +105,17 @@ function buildLeavePayload() {
 
 describe("processOutbox", () => {
     beforeEach(() => {
+        delete process.env[EMAIL_REQUEST_INAPP_RECIPIENTS_ENV];
         mockReset(prismaMock);
         vi.clearAllMocks();
+        prismaMock.user.findMany.mockResolvedValue(asNever([]));
         prismaMock.notificationOutbox.updateMany.mockResolvedValue(
             asNever({ count: 1 }),
         );
+    });
+
+    afterEach(() => {
+        restoreEmailRequestInAppRecipients();
     });
 
     it("returns early when no pending notifications", async () => {
@@ -183,6 +203,9 @@ describe("processOutbox", () => {
     });
 
     it("processes EMAIL_REQUEST successfully", async () => {
+        vi.mocked(
+            lineNotificationService.sendEmailRequestNotification,
+        ).mockResolvedValue(true);
         prismaMock.notificationOutbox.findMany.mockResolvedValue(
             asNever([
                 buildNotification(
@@ -215,6 +238,81 @@ describe("processOutbox", () => {
                 sharedDriveAccess: [],
             }),
         );
+    });
+
+    it("creates email request in-app notification only for configured recipients before failed LINE delivery", async () => {
+        process.env[EMAIL_REQUEST_INAPP_RECIPIENTS_ENV] =
+            "it-admin@example.com,helpdesk@example.com";
+        vi.mocked(
+            lineNotificationService.sendEmailRequestNotification,
+        ).mockResolvedValue(false);
+        prismaMock.user.findMany.mockResolvedValue(asNever([{ id: 10 }, { id: 11 }]));
+        prismaMock.notification.create.mockResolvedValue(asNever({ id: "n-1" }));
+        prismaMock.notificationOutbox.findMany.mockResolvedValue(
+            asNever([
+                buildNotification(
+                    112,
+                    "EMAIL_REQUEST",
+                    JSON.stringify({
+                        thaiName: "สมชาย ใจดี",
+                        englishName: "Somchai Jaidee",
+                        phone: "123",
+                        position: "IT Officer",
+                        department: "IT",
+                        replyEmail: "somchai@nhf.or.th",
+                        requestedAt: "2026-07-01T03:00:00.000Z",
+                    }),
+                ),
+            ]),
+        );
+
+        const result = await processOutbox();
+
+        expect(result).toEqual({ processed: 0, failed: 1 });
+        expect(prismaMock.user.findMany).toHaveBeenCalledWith({
+            where: {
+                email: {
+                    in: ["it-admin@example.com", "helpdesk@example.com"],
+                },
+                isActive: true,
+                deletedAt: null,
+            },
+            select: { id: true },
+        });
+        expect(prismaMock.user.findMany).not.toHaveBeenCalledWith(
+            expect.objectContaining({ where: { role: "ADMIN" } }),
+        );
+        expect(prismaMock.notification.create).toHaveBeenCalledWith({
+            data: expect.objectContaining({
+                userId: 10,
+                type: "SYSTEM_ALERT",
+                title: "มีคำขออีเมลพนักงานใหม่",
+                referenceId: "somchai@nhf.or.th",
+            }),
+        });
+        expect(prismaMock.notification.create).toHaveBeenCalledWith({
+            data: expect.objectContaining({
+                userId: 11,
+                type: "SYSTEM_ALERT",
+                title: "มีคำขออีเมลพนักงานใหม่",
+                referenceId: "somchai@nhf.or.th",
+            }),
+        });
+        expect(prismaMock.notificationOutbox.updateMany).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: { id: 112, status: "PROCESSING" },
+                data: expect.objectContaining({
+                    status: "FAILED",
+                    error: "LINE email request notification failed",
+                }),
+            }),
+        );
+
+        const inAppOrder = prismaMock.notification.create.mock.invocationCallOrder[0];
+        const lineOrder =
+            vi.mocked(lineNotificationService.sendEmailRequestNotification).mock
+                .invocationCallOrder[0];
+        expect(inAppOrder).toBeLessThan(lineOrder);
     });
 
     it("marks EMAIL_REQUEST failed for invalid shared drive payload", async () => {
@@ -406,6 +504,55 @@ describe("processOutbox", () => {
         );
     });
 
+    it("creates stock request in-app notification before failed LINE delivery", async () => {
+        vi.mocked(
+            lineNotificationService.sendStockRequestNotification,
+        ).mockResolvedValue(false);
+        prismaMock.user.findMany.mockResolvedValue(asNever([{ id: 1 }]));
+        prismaMock.notification.create.mockResolvedValue(asNever({ id: "n-1" }));
+        prismaMock.notificationOutbox.findMany.mockResolvedValue(
+            asNever([
+                buildNotification(
+                    113,
+                    "STOCK_REQUEST_LINE",
+                    JSON.stringify({
+                        requestId: 77,
+                        projectCode: "PRJ-2569/01",
+                        requesterName: "สมชาย",
+                        requestedAt: "2026-07-01T03:00:00.000Z",
+                        itemCount: 1,
+                        totalQuantity: 2,
+                        items: [
+                            {
+                                name: "กระดาษ",
+                                quantity: 2,
+                                unit: "รีม",
+                            },
+                        ],
+                    }),
+                ),
+            ]),
+        );
+
+        const result = await processOutbox();
+
+        expect(result).toEqual({ processed: 0, failed: 1 });
+        expect(prismaMock.notification.create).toHaveBeenCalledWith({
+            data: expect.objectContaining({
+                userId: 1,
+                type: "STOCK_REQUEST_NEW",
+                title: "คำขอเบิกวัสดุใหม่",
+                referenceId: "77",
+            }),
+        });
+
+        const inAppOrder = prismaMock.notification.create.mock.invocationCallOrder[0];
+        const lineOrder =
+            vi.mocked(lineNotificationService.sendStockRequestNotification).mock
+                .invocationCallOrder[0];
+        expect(inAppOrder).toBeLessThan(lineOrder);
+    });
+
     it("processes STOCK_LOW_LINE successfully", async () => {
         vi.mocked(lineNotificationService.sendStockLowNotification).mockResolvedValue(
             true,
@@ -446,6 +593,54 @@ describe("processOutbox", () => {
                 ],
             }),
         );
+    });
+
+    it("creates low stock in-app notification before failed LINE delivery", async () => {
+        vi.mocked(lineNotificationService.sendStockLowNotification).mockResolvedValue(
+            false,
+        );
+        prismaMock.user.findMany.mockResolvedValue(asNever([{ id: 1 }]));
+        prismaMock.notification.create.mockResolvedValue(asNever({ id: "n-1" }));
+        prismaMock.notificationOutbox.findMany.mockResolvedValue(
+            asNever([
+                buildNotification(
+                    114,
+                    "STOCK_LOW_LINE",
+                    JSON.stringify({
+                        alertedAt: "2026-07-01T03:00:00.000Z",
+                        itemCount: 1,
+                        items: [
+                            {
+                                itemId: 10,
+                                name: "ปากกา",
+                                sku: "PEN-001",
+                                quantity: 3,
+                                minStock: 5,
+                                unit: "ด้าม",
+                            },
+                        ],
+                    }),
+                ),
+            ]),
+        );
+
+        const result = await processOutbox();
+
+        expect(result).toEqual({ processed: 0, failed: 1 });
+        expect(prismaMock.notification.create).toHaveBeenCalledWith({
+            data: expect.objectContaining({
+                userId: 1,
+                type: "SYSTEM_ALERT",
+                title: "วัสดุใกล้หมดสต็อก",
+                referenceId: "PEN-001",
+            }),
+        });
+
+        const inAppOrder = prismaMock.notification.create.mock.invocationCallOrder[0];
+        const lineOrder =
+            vi.mocked(lineNotificationService.sendStockLowNotification).mock
+                .invocationCallOrder[0];
+        expect(inAppOrder).toBeLessThan(lineOrder);
     });
 
     it("skips notification when claim fails", async () => {

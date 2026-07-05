@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { POST as submitLeaveRequest } from "@/app/api/leave/request/route";
 import { getApiAuthSession } from "@/lib/auth/server";
 import { prisma } from "@/lib/db/prisma";
@@ -77,6 +77,10 @@ describe("POST /api/leave/request", () => {
     beforeEach(() => {
         vi.clearAllMocks();
         (processOutbox as unknown as { mockResolvedValue: (v: undefined) => void }).mockResolvedValue(undefined);
+    });
+
+    afterEach(() => {
+        vi.useRealTimers();
     });
 
     it("should return 401 if unauthorized", async () => {
@@ -330,6 +334,53 @@ describe("POST /api/leave/request", () => {
                     specialReason: "กรณีพิเศษที่หัวหน้าควรพิจารณา",
                 }),
             });
+        });
+
+        it("should enqueue and process emergency backdated leave notification", async () => {
+            vi.useFakeTimers();
+            vi.setSystemTime(new Date("2030-05-15T12:00:00.000Z"));
+
+            (prisma.employee.findUnique as unknown as { mockResolvedValue: (v: ReturnType<typeof buildEmployeeWithManager>) => void }).mockResolvedValue(buildEmployeeWithManager());
+            (prisma.leaveRequest.findFirst as unknown as { mockResolvedValue: (v: null) => void }).mockResolvedValue(null);
+            (prisma.leaveQuota.findFirst as unknown as { mockResolvedValue: (v: { id: number; totalDays: number; usedDays: number }) => void }).mockResolvedValue({
+                id: 1,
+                totalDays: 10,
+                usedDays: 0,
+            });
+            (prisma.leaveRequest.create as unknown as { mockResolvedValue: (v: { id: string }) => void }).mockResolvedValue({ id: "leave-backdated-1" });
+
+            const req = new NextRequest("http://localhost/api/leave/request", {
+                method: "POST",
+                body: JSON.stringify({
+                    leaveType: "SICK",
+                    startDate: "2030-05-13T00:00:00.000Z",
+                    endDate: "2030-05-13T00:00:00.000Z",
+                    period: "FULL_DAY",
+                    reason: "ลาป่วยฉุกเฉิน",
+                    emergencyReason: "ป่วยฉุกเฉินจนยื่นคำขอไม่ทัน",
+                }),
+            });
+
+            const res = await submitLeaveRequest(req);
+
+            expect(res.status).toBe(201);
+            expect(prisma.leaveRequest.create).toHaveBeenCalledWith({
+                data: expect.objectContaining({
+                    emergencyReason: "ป่วยฉุกเฉินจนยื่นคำขอไม่ทัน",
+                    status: "PENDING",
+                    approverId: 200,
+                }),
+            });
+            const createCall = vi.mocked(prisma.notificationOutbox.create).mock.calls[0]?.[0];
+            const payload = JSON.parse(String(createCall?.data.payload)) as Record<string, unknown>;
+            expect(createCall).toEqual({
+                data: expect.objectContaining({
+                    type: "LEAVE_ACTION",
+                    payload: expect.any(String),
+                }),
+            });
+            expect(payload.emergencyReason).toBe("ป่วยฉุกเฉินจนยื่นคำขอไม่ทัน");
+            expect(processOutbox).toHaveBeenCalled();
         });
 
         it("should throw error if requests overlap", async () => {

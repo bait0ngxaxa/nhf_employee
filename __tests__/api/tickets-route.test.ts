@@ -5,7 +5,6 @@ import { POST as createTicketRoute } from "@/app/api/tickets/route";
 import { getApiAuthSession } from "@/lib/auth/server";
 import { buildUserContext } from "@/lib/auth/context";
 import { ticketService } from "@/lib/services/ticket";
-import { prisma } from "@/lib/db/prisma";
 import { processOutbox } from "@/lib/services/outbox/processor";
 import { logTicketEvent } from "@/lib/server/audit";
 
@@ -34,17 +33,6 @@ vi.mock("@/lib/services/ticket", () => ({
     },
 }));
 
-vi.mock("@/lib/db/prisma", () => ({
-    prisma: {
-        user: {
-            findMany: vi.fn(),
-        },
-        notification: {
-            createMany: vi.fn(),
-        },
-    },
-}));
-
 vi.mock("@/lib/services/outbox/processor", () => ({
     processOutbox: vi.fn(),
 }));
@@ -63,7 +51,7 @@ describe("POST /api/tickets", () => {
         vi.mocked(logTicketEvent).mockResolvedValue(undefined as never);
     });
 
-    it("creates in-app admin notifications with ticket context (not generic text)", async () => {
+    it("processes ticket notification outbox after creating ticket", async () => {
         vi.mocked(getApiAuthSession).mockResolvedValue({
             user: {
                 id: "9",
@@ -92,14 +80,6 @@ describe("POST /api/tickets", () => {
                 },
             },
         } as never);
-        vi.mocked(prisma.user.findMany).mockResolvedValue([
-            { id: 1 },
-            { id: 2 },
-        ] as never);
-        vi.mocked(prisma.notification.createMany).mockResolvedValue({
-            count: 2,
-        } as never);
-
         const request = new NextRequest("http://localhost/api/tickets", {
             method: "POST",
             body: JSON.stringify({
@@ -114,20 +94,18 @@ describe("POST /api/tickets", () => {
         expect(response.status).toBe(201);
         await Promise.resolve();
         await Promise.resolve();
-        expect(prisma.notification.createMany).toHaveBeenCalledTimes(1);
-
-        const createManyCall = vi.mocked(prisma.notification.createMany).mock.calls[0]?.[0];
-        expect(createManyCall).toBeDefined();
-        const firstPayload = Array.isArray(createManyCall?.data)
-            ? createManyCall.data[0]
-            : undefined;
-        expect(firstPayload).toBeDefined();
-        if (!firstPayload) {
-            throw new Error("Expected notification payload");
-        }
-        expect(firstPayload.title).not.toBe("Notification");
-        expect(firstPayload.message).not.toBe("Operation completed");
-        expect(firstPayload.message).toContain("Printer not working");
-        expect(firstPayload.message).toContain("HIGH");
+        expect(processOutbox).toHaveBeenCalledTimes(1);
+        expect(logTicketEvent).toHaveBeenCalledWith(
+            "TICKET_CREATE",
+            123,
+            9,
+            "user@test.com",
+            expect.objectContaining({
+                after: expect.objectContaining({
+                    title: "Printer not working",
+                    priority: "HIGH",
+                }),
+            }),
+        );
     });
 });

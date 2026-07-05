@@ -69,7 +69,7 @@ describe("Ticket notification routes", () => {
         } as never);
     });
 
-    it("sends in-app notification when ticket status changed by another user", async () => {
+    it("processes ticket notification outbox when status changes", async () => {
         vi.mocked(getApiAuthSession).mockResolvedValue({
             user: { id: "1", role: "ADMIN", email: "admin@test.com" },
         } as never);
@@ -88,7 +88,6 @@ describe("Ticket notification routes", () => {
             },
             oldStatus: "OPEN",
         } as never);
-        vi.mocked(prisma.notification.create).mockResolvedValue({} as never);
 
         const req = new NextRequest("http://localhost/api/tickets/44", {
             method: "PATCH",
@@ -101,14 +100,7 @@ describe("Ticket notification routes", () => {
         expect(res.status).toBe(200);
         await Promise.resolve();
         await Promise.resolve();
-        expect(prisma.notification.create).toHaveBeenCalledTimes(1);
-        expect(prisma.notification.create).toHaveBeenCalledWith({
-            data: expect.objectContaining({
-                userId: 9,
-                type: "TICKET_UPDATED",
-                referenceId: "44",
-            }),
-        });
+        expect(processOutbox).toHaveBeenCalledTimes(1);
     });
 
     it("sends in-app notification to reporter when admin adds comment", async () => {

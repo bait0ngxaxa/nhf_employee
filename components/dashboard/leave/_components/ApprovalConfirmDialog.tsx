@@ -33,14 +33,14 @@ export function ApprovalConfirmDialog({
                         ยืนยันการอนุมัติคำขอพิเศษ
                     </DialogTitle>
                     <DialogDescription>
-                        ตรวจสอบเงื่อนไขพิเศษก่อนอนุมัติ เนื่องจากรายการนี้มีผลต่อ audit หรือโควต้า
+                        ตรวจสอบลาย้อนหลังหรือการลาเกินสิทธิ์ก่อนอนุมัติ รายการนี้มีผลต่อบันทึกการใช้งานหรือโควต้า
                     </DialogDescription>
                 </DialogHeader>
                 {leave ? (
                     <div className="space-y-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm leading-6 text-amber-950">
                         {leave.emergencyReason ? (
                             <p className="break-words">
-                                <span className="font-semibold">เหตุผลฉุกเฉิน:</span>{" "}
+                                <span className="font-semibold">เหตุผลในการลาย้อนหลัง:</span>{" "}
                                 {leave.emergencyReason}
                             </p>
                         ) : null}

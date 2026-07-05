@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { LeaveRequestForm } from "@/components/dashboard/leave/LeaveRequestForm";
 import type { LeaveQuota } from "@/hooks/useLeaveProfile";
 import { submitLeaveRequest } from "@/lib/services/leave/client";
@@ -35,6 +35,10 @@ describe("LeaveRequestForm", () => {
     beforeEach(() => {
         vi.clearAllMocks();
         vi.mocked(submitLeaveRequest).mockResolvedValue(undefined);
+    });
+
+    afterEach(() => {
+        vi.useRealTimers();
     });
 
     it("renders the leave request form as an accessible modal dialog", () => {
@@ -89,5 +93,33 @@ describe("LeaveRequestForm", () => {
 
         expect(screen.getByLabelText("เหตุผลพิเศษ")).toBeInTheDocument();
         expect(screen.getAllByText(/คำขอนี้เกินสิทธิ์ 1 วัน/).length).toBeGreaterThan(0);
+    });
+
+    it("uses clear backdated leave copy when the leave date is in the past", () => {
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date("2031-01-10T12:00:00.000Z"));
+
+        render(
+            <LeaveRequestForm
+                open
+                onCancel={onCancel}
+                onSuccess={onSuccess}
+                quotas={[createQuota(10, 0)]}
+            />,
+        );
+
+        fireEvent.change(screen.getByLabelText("วันที่ลา"), {
+            target: { value: "2031-01-08" },
+        });
+
+        expect(
+            screen.getByText(
+                "ลาย้อนหลัง: ระบุเหตุผลในการลาย้อนหลัง เพื่อให้ผู้อนุมัติเห็นว่าทำไมจึงยื่นไม่ทัน",
+            ),
+        ).toBeInTheDocument();
+        expect(screen.getByLabelText("เหตุผลในการลาย้อนหลัง")).toBeInTheDocument();
+        expect(
+            screen.getByPlaceholderText("ระบุเหตุผลที่ทำให้ยื่นคำขอลาหลังวันที่ลา"),
+        ).toBeInTheDocument();
     });
 });

@@ -1,15 +1,24 @@
-﻿import { emailService } from "@/lib/email";
+import { emailService } from "@/lib/email";
 import { lineNotificationService } from "@/lib/line";
+import {
+    createAdminInAppNotificationsOnce,
+    createInAppNotificationOnce,
+} from "@/lib/services/notifications/in-app";
+import { APP_ROUTES } from "@/lib/ssot/routes";
 import type { TicketEmailData } from "@/types/api";
 import type { TicketWithRelations } from "./types";
 
-function buildEmailData(ticket: TicketWithRelations): TicketEmailData {
-    const reportedByName =
-        ticket.reportedBy.employee?.firstName &&
-        ticket.reportedBy.employee?.lastName
-            ? `${ticket.reportedBy.employee.firstName} ${ticket.reportedBy.employee.lastName}`
-            : ticket.reportedBy.name;
+function getUserDisplayName(
+    user: TicketWithRelations["reportedBy"],
+): string {
+    if (user.employee?.firstName && user.employee?.lastName) {
+        return `${user.employee.firstName} ${user.employee.lastName}`;
+    }
 
+    return user.name;
+}
+
+function buildEmailData(ticket: TicketWithRelations): TicketEmailData {
     const assignedToData = ticket.assignedTo
         ? {
               name:
@@ -29,7 +38,7 @@ function buildEmailData(ticket: TicketWithRelations): TicketEmailData {
         priority: ticket.priority,
         status: ticket.status,
         reportedBy: {
-            name: reportedByName,
+            name: getUserDisplayName(ticket.reportedBy),
             email: ticket.reportedBy.email,
             department: ticket.reportedBy.employee?.dept?.name,
         },
@@ -37,6 +46,47 @@ function buildEmailData(ticket: TicketWithRelations): TicketEmailData {
         createdAt: ticket.createdAt.toISOString(),
         updatedAt: ticket.updatedAt?.toISOString(),
     };
+}
+
+function getTicketActionUrl(ticketId: number): string {
+    return `${APP_ROUTES.dashboard}?tab=it-support&ticketId=${ticketId}`;
+}
+
+async function assertDelivery(
+    isSent: boolean,
+    label: string,
+): Promise<void> {
+    if (!isSent) {
+        throw new Error(`${label} notification failed`);
+    }
+}
+
+async function createTicketCreatedInApp(
+    ticket: TicketWithRelations,
+): Promise<void> {
+    await createAdminInAppNotificationsOnce({
+        type: "TICKET_CREATED",
+        title: "คำขอ IT Support ใหม่",
+        message: `${getUserDisplayName(ticket.reportedBy)} แจ้ง "${ticket.title}" (ความสำคัญ: ${ticket.priority})`,
+        actionUrl: getTicketActionUrl(ticket.id),
+        referenceId: ticket.id.toString(),
+        dedupeKeyPrefix: `ticket:${ticket.id}:TICKET_CREATED`,
+    });
+}
+
+async function createTicketUpdatedInApp(
+    ticket: TicketWithRelations,
+    oldStatus: string,
+): Promise<void> {
+    await createInAppNotificationOnce({
+        userId: ticket.reportedById,
+        type: "TICKET_UPDATED",
+        title: "สถานะคำขอ IT Support อัปเดต",
+        message: `คำขอ "${ticket.title}" เปลี่ยนสถานะจาก ${oldStatus} เป็น ${ticket.status}`,
+        actionUrl: getTicketActionUrl(ticket.id),
+        referenceId: ticket.id.toString(),
+        dedupeKey: `ticket:${ticket.reportedById}:TICKET_UPDATED:${ticket.id}:${oldStatus}:${ticket.status}`,
+    });
 }
 
 /**
@@ -47,16 +97,30 @@ export async function sendTicketCreatedNotifications(
     ticket: TicketWithRelations,
 ): Promise<void> {
     const emailData = buildEmailData(ticket);
+    await createTicketCreatedInApp(ticket);
 
     if (ticket.priority === "HIGH" || ticket.priority === "URGENT") {
-        await lineNotificationService.sendITTeamNotification(emailData);
+        await assertDelivery(
+            await lineNotificationService.sendITTeamNotification(emailData),
+            "TICKET_CREATED LINE",
+        );
     } else {
-        await lineNotificationService.sendNewTicketNotification(emailData);
+        await assertDelivery(
+            await lineNotificationService.sendNewTicketNotification(emailData),
+            "TICKET_CREATED LINE",
+        );
     }
 
-    await emailService.sendNewTicketNotification(emailData);
+    await assertDelivery(
+        await emailService.sendNewTicketNotification(emailData),
+        "TICKET_CREATED email",
+    );
+
     if (ticket.priority === "HIGH" || ticket.priority === "URGENT") {
-        await emailService.sendITTeamNotification(emailData);
+        await assertDelivery(
+            await emailService.sendITTeamNotification(emailData),
+            "TICKET_CREATED IT email",
+        );
     }
 }
 
@@ -69,8 +133,14 @@ export async function sendTicketUpdatedNotifications(
     oldStatus: string,
 ): Promise<void> {
     const emailData = buildEmailData(ticket);
+    await createTicketUpdatedInApp(ticket, oldStatus);
 
-    await emailService.sendStatusUpdateNotification(emailData, oldStatus);
-    await lineNotificationService.sendStatusUpdateNotification(emailData);
+    await assertDelivery(
+        await emailService.sendStatusUpdateNotification(emailData, oldStatus),
+        "TICKET_UPDATED email",
+    );
+    await assertDelivery(
+        await lineNotificationService.sendStatusUpdateNotification(emailData),
+        "TICKET_UPDATED LINE",
+    );
 }
-

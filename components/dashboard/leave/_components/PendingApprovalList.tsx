@@ -124,7 +124,7 @@ function PendingApprovalCard({
 
                     {leave.emergencyReason || leave.specialReason || leave.overQuotaDays > 0 ? (
                         <div className="flex flex-wrap gap-2">
-                            {leave.emergencyReason ? <SpecialFlag label="ลาย้อนหลังกรณีฉุกเฉิน" /> : null}
+                            {leave.emergencyReason ? <SpecialFlag label="ลาย้อนหลัง" /> : null}
                             {leave.specialReason || leave.overQuotaDays > 0 ? (
                                 <SpecialFlag
                                     label={

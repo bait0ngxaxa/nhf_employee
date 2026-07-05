@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db/prisma";
+import { createAdminInAppNotificationsOnce } from "@/lib/services/notifications/in-app";
 import {
     sendStockLowNotification,
     sendStockRequestNotification,
@@ -8,6 +9,35 @@ import type {
     StockRequestLineData,
 } from "@/types/api";
 import type { LowStockAlertCandidate } from "./types";
+
+type StockRequestLineSource = {
+    id: number;
+    projectCode: string;
+    note: string | null;
+    createdAt: Date;
+    requester: {
+        name: string;
+        email: string;
+    };
+    items: Array<{
+        quantity: number;
+        item: {
+            name: string;
+            unit: string;
+        };
+        variant: {
+            unit: string;
+            attributeValues: Array<{
+                attributeValue: {
+                    value: string;
+                    attribute: {
+                        name: string;
+                    };
+                };
+            }>;
+        } | null;
+    }>;
+};
 
 /**
  * Notify the requester about issued/cancelled stock requests
@@ -42,22 +72,13 @@ export async function notifyAdminsNewStockRequest(
     requesterName: string,
     projectCode: string,
 ): Promise<void> {
-    const admins = await prisma.user.findMany({
-            where: { role: "ADMIN" },
-            select: { id: true },
-    });
-
-    if (admins.length === 0) return;
-
-    await prisma.notification.createMany({
-            data: admins.map((admin) => ({
-                userId: admin.id,
-                type: "STOCK_REQUEST_NEW",
-                title: "คำขอเบิกวัสดุใหม่",
-                message: `${requesterName} ส่งคำขอเบิกวัสดุ #${requestId} (${projectCode})`,
-                actionUrl: "/dashboard?tab=stock&stockTab=admin-requests",
-                referenceId: String(requestId),
-            })),
+    await createAdminInAppNotificationsOnce({
+        type: "STOCK_REQUEST_NEW",
+        title: "คำขอเบิกวัสดุใหม่",
+        message: `${requesterName} ส่งคำขอเบิกวัสดุ #${requestId} (${projectCode})`,
+        actionUrl: "/dashboard?tab=stock&stockTab=admin-requests",
+        referenceId: String(requestId),
+        dedupeKeyPrefix: `stock:${requestId}:STOCK_REQUEST_NEW`,
     });
 }
 
@@ -82,37 +103,10 @@ function buildVariantLabel(
         .join(", ");
 }
 
-export async function enqueueLineNewStockRequest(
-    stockRequest: {
-        id: number;
-        projectCode: string;
-        note: string | null;
-        createdAt: Date;
-        requester: {
-            name: string;
-            email: string;
-        };
-        items: Array<{
-            quantity: number;
-            item: {
-                name: string;
-                unit: string;
-            };
-            variant: {
-                unit: string;
-                attributeValues: Array<{
-                    attributeValue: {
-                        value: string;
-                        attribute: {
-                            name: string;
-                        };
-                    };
-                }>;
-            } | null;
-        }>;
-    },
-): Promise<void> {
-    const payload: StockRequestLineData = {
+function buildStockRequestLinePayload(
+    stockRequest: StockRequestLineSource,
+): StockRequestLineData {
+    return {
         requestId: stockRequest.id,
         projectCode: stockRequest.projectCode,
         requesterName: stockRequest.requester.name || stockRequest.requester.email,
@@ -132,6 +126,12 @@ export async function enqueueLineNewStockRequest(
                 : undefined,
         })),
     };
+}
+
+export async function enqueueLineNewStockRequest(
+    stockRequest: StockRequestLineSource,
+): Promise<void> {
+    const payload = buildStockRequestLinePayload(stockRequest);
 
     await prisma.notificationOutbox.create({
         data: {
@@ -142,56 +142,11 @@ export async function enqueueLineNewStockRequest(
 }
 
 export async function notifyLineNewStockRequest(
-    stockRequest: {
-        id: number;
-        projectCode: string;
-        note: string | null;
-        createdAt: Date;
-        requester: {
-            name: string;
-            email: string;
-        };
-        items: Array<{
-            quantity: number;
-            item: {
-                name: string;
-                unit: string;
-            };
-            variant: {
-                unit: string;
-                attributeValues: Array<{
-                    attributeValue: {
-                        value: string;
-                        attribute: {
-                            name: string;
-                        };
-                    };
-                }>;
-            } | null;
-        }>;
-    },
+    stockRequest: StockRequestLineSource,
 ): Promise<void> {
-    const payload: StockRequestLineData = {
-        requestId: stockRequest.id,
-        projectCode: stockRequest.projectCode,
-        requesterName: stockRequest.requester.name || stockRequest.requester.email,
-        note: stockRequest.note,
-        requestedAt: stockRequest.createdAt.toISOString(),
-        itemCount: stockRequest.items.length,
-        totalQuantity: stockRequest.items.reduce(
-            (sum, item) => sum + item.quantity,
-            0,
-        ),
-        items: stockRequest.items.map((item) => ({
-            name: item.item.name,
-            quantity: item.quantity,
-            unit: item.variant?.unit ?? item.item.unit,
-            variantLabel: item.variant
-                ? buildVariantLabel(item.variant.attributeValues)
-                : undefined,
-        })),
-    };
+    const payload = buildStockRequestLinePayload(stockRequest);
 
+    await notifyAdminsStockRequestLineInApp(payload);
     const isSent = await sendStockRequestNotification(payload);
 
     if (!isSent) {
@@ -247,11 +202,47 @@ export async function notifyLineLowStockReached(
         })),
     };
 
+    await notifyAdminsLowStockInApp(payload);
     const isSent = await sendStockLowNotification(payload);
 
     if (!isSent) {
         throw new Error("LINE low stock notification failed");
     }
+}
+
+export async function notifyAdminsStockRequestLineInApp(
+    payload: StockRequestLineData,
+): Promise<void> {
+    await createAdminInAppNotificationsOnce({
+        type: "STOCK_REQUEST_NEW",
+        title: "คำขอเบิกวัสดุใหม่",
+        message: `${payload.requesterName} ส่งคำขอเบิกวัสดุ #${payload.requestId} (${payload.projectCode})`,
+        actionUrl: "/dashboard?tab=stock&stockTab=admin-requests",
+        referenceId: String(payload.requestId),
+        dedupeKeyPrefix: `stock:${payload.requestId}:STOCK_REQUEST_NEW`,
+    });
+}
+
+function buildLowStockMessage(payload: StockLowLineData): string {
+    const preview = payload.items
+        .slice(0, 3)
+        .map((item) => `${item.name} (${item.quantity}/${item.minStock} ${item.unit})`)
+        .join(", ");
+
+    return `วัสดุ ${payload.itemCount} รายการถึงหรือต่ำกว่าจุดแจ้งเตือน${preview ? `: ${preview}` : ""}`;
+}
+
+export async function notifyAdminsLowStockInApp(
+    payload: StockLowLineData,
+): Promise<void> {
+    await createAdminInAppNotificationsOnce({
+        type: "SYSTEM_ALERT",
+        title: "วัสดุใกล้หมดสต็อก",
+        message: buildLowStockMessage(payload),
+        actionUrl: "/dashboard?tab=stock&stockTab=inventory",
+        referenceId: payload.items[0]?.sku ?? payload.alertedAt,
+        dedupeKeyPrefix: `stock-low:${payload.alertedAt}`,
+    });
 }
 
 export async function notifyAdminsStockRequestCancelledByRequester(

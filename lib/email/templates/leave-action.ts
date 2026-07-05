@@ -58,7 +58,7 @@ export function generateLeaveActionEmailHTML(
             </tr>
             ${data.emergencyReason ? `
             <tr>
-                <td style="padding: 8px; border-bottom: 1px solid #e9ecef; color: #6c757d;">ลาย้อนหลัง:</td>
+                <td style="padding: 8px; border-bottom: 1px solid #e9ecef; color: #6c757d;">เหตุผลในการลาย้อนหลัง:</td>
                 <td style="padding: 8px; border-bottom: 1px solid #e9ecef;">${emergencyReason}</td>
             </tr>
             ` : ""}

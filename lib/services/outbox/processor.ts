@@ -8,9 +8,15 @@ import {
 } from "@/lib/services/ticket/notifications";
 import type { TicketWithRelations } from "@/lib/services/ticket/types";
 import type {
+    EmailRequestData,
     StockLowLineData,
     StockRequestLineData,
 } from "@/types/api";
+import { createEmailRequestInAppNotification } from "@/lib/services/email-request/notifications";
+import {
+    notifyAdminsLowStockInApp,
+    notifyAdminsStockRequestLineInApp,
+} from "@/lib/services/stock/notifications";
 import {
     parseLeaveActionPayload,
     parseLeaveCancelledPayload,
@@ -46,19 +52,6 @@ type TicketCreatedPayload = {
 type TicketUpdatedPayload = {
     ticketId: number;
     oldStatus: string;
-};
-
-type EmailRequestPayload = {
-    thaiName: string;
-    englishName: string;
-    phone: string;
-    nickname: string;
-    position: string;
-    department: string;
-    replyEmail: string;
-    needsDocumentSystem: boolean;
-    sharedDriveAccess: SharedDriveOption[];
-    requestedAt: string;
 };
 
 type StockRequestLinePayload = StockRequestLineData;
@@ -101,7 +94,7 @@ function parseTicketUpdatedPayload(payload: unknown): TicketUpdatedPayload {
 
 function parseSharedDriveAccess(
     payload: Record<string, unknown>,
-): SharedDriveOption[] {
+): EmailRequestData["sharedDriveAccess"] {
     const value = payload.sharedDriveAccess;
 
     if (value === undefined || value === null) {
@@ -121,7 +114,7 @@ function parseSharedDriveAccess(
     return value as SharedDriveOption[];
 }
 
-function parseEmailRequestPayload(payload: unknown): EmailRequestPayload {
+function parseEmailRequestPayload(payload: unknown): EmailRequestData {
     if (
         !isRecord(payload) ||
         typeof payload.thaiName !== "string" ||
@@ -245,6 +238,15 @@ function parseStockLowLinePayload(payload: unknown): StockLowLinePayload {
     };
 }
 
+async function assertLineSent(
+    isSent: boolean,
+    label: string,
+): Promise<void> {
+    if (!isSent) {
+        throw new Error(`${label} failed`);
+    }
+}
+
 async function markStaleProcessingRows(): Promise<void> {
     const staleBefore = new Date(
         Date.now() - STALE_OUTBOX_PROCESSING_MINUTES * 60_000,
@@ -313,7 +315,13 @@ async function dispatchNotification(notification: NotificationOutbox): Promise<v
         }
         case "EMAIL_REQUEST": {
             const parsedPayload = parseEmailRequestPayload(payload);
-            await lineNotificationService.sendEmailRequestNotification(parsedPayload);
+            await createEmailRequestInAppNotification(parsedPayload);
+            await assertLineSent(
+                await lineNotificationService.sendEmailRequestNotification(
+                    parsedPayload,
+                ),
+                "LINE email request notification",
+            );
             return;
         }
         case "LEAVE_ACTION": {
@@ -358,20 +366,24 @@ async function dispatchNotification(notification: NotificationOutbox): Promise<v
         }
         case "STOCK_REQUEST_LINE": {
             const parsedPayload = parseStockRequestLinePayload(payload);
-            const isSent =
-                await lineNotificationService.sendStockRequestNotification(parsedPayload);
-            if (!isSent) {
-                throw new Error("LINE stock request notification failed");
-            }
+            await notifyAdminsStockRequestLineInApp(parsedPayload);
+            await assertLineSent(
+                await lineNotificationService.sendStockRequestNotification(
+                    parsedPayload,
+                ),
+                "LINE stock request notification",
+            );
             return;
         }
         case "STOCK_LOW_LINE": {
             const parsedPayload = parseStockLowLinePayload(payload);
-            const isSent =
-                await lineNotificationService.sendStockLowNotification(parsedPayload);
-            if (!isSent) {
-                throw new Error("LINE low stock notification failed");
-            }
+            await notifyAdminsLowStockInApp(parsedPayload);
+            await assertLineSent(
+                await lineNotificationService.sendStockLowNotification(
+                    parsedPayload,
+                ),
+                "LINE low stock notification",
+            );
             return;
         }
     }

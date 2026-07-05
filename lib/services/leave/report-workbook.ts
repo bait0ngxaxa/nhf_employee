@@ -180,7 +180,7 @@ function getDetailColumns(): Partial<ExcelJS.Column>[] {
         { header: "วันลาสุทธิที่นับใช้", key: "effectiveDays", width: 20 },
         { header: "วันเกินสิทธิ์", key: "overQuotaDays", width: 14 },
         { header: "เหตุผลการลา", key: "reason", width: 32 },
-        { header: "เหตุผลฉุกเฉิน", key: "emergencyReason", width: 28 },
+        { header: "เหตุผลในการลาย้อนหลัง", key: "emergencyReason", width: 28 },
         { header: "เหตุผลพิเศษ", key: "specialReason", width: 28 },
         { header: "เหตุผลไม่อนุมัติ", key: "rejectReason", width: 28 },
         { header: "โน๊ตไม่ได้ใช้วันลา", key: "notTakenReason", width: 28 },

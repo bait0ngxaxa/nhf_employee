@@ -108,6 +108,7 @@ describe("email template XSS escaping", () => {
             reason: XSS_PAYLOAD,
         }, "https://example.com/dashboard/leave");
 
+        expect(actionHtml).toContain("เหตุผลในการลาย้อนหลัง");
         expectEscapedHtml(actionHtml);
         expectEscapedHtml(resultHtml);
     });
