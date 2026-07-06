@@ -67,6 +67,7 @@ export const API_ROUTES = {
         export: "/api/leave/export",
     },
     auditLogs: {
+        cleanup: "/api/audit-logs/cleanup",
         export: "/api/audit-logs/export",
     },
     uploads: {

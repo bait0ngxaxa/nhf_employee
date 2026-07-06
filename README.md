@@ -99,6 +99,10 @@ npm run check
 
 หากระบบอยู่หลัง reverse proxy หรือ Cloudflare ให้ตั้ง `PUBLIC_APPROVE_URL` เป็น public URL จริงของระบบ เช่น `https://approve.example.com`
 
+## Maintenance
+
+ตั้งค่า cron ภายนอกให้เรียก `POST /api/audit-logs/cleanup` วันละครั้งพร้อม header `x-cleanup-secret` ที่ตรงกับ `AUDIT_LOG_CLEANUP_SECRET` เพื่อให้ระบบลบ `บันทึกการใช้งาน` ที่เก่ากว่า 90 วันออกจากฐานข้อมูล
+
 ## หมายเหตุ
 
 โปรเจกต์นี้พัฒนาสำหรับการใช้งานภายในองค์กร และมีการขยายโมดูลเพิ่มเติมต่อเนื่อง เช่น ระบบลา ระบบสต็อก และระบบแจ้งเตือน
