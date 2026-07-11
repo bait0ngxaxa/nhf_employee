@@ -13,12 +13,9 @@ import {
     HYBRID_REFRESH_COOKIE_NAME,
     clearHybridAuthCookies,
     getClientMetadata,
-    setHybridAccessCookie,
     setHybridAuthCookies,
 } from "@/lib/auth/hybrid/session";
 import { prisma } from "@/lib/db/prisma";
-
-const REFRESH_ROTATION_GRACE_MS = 10_000;
 
 type RefreshTokenStore = Pick<Prisma.TransactionClient, "authRefreshToken">;
 
@@ -84,19 +81,6 @@ async function logRefreshSecurityEvent(input: {
             userAgent: input.userAgent,
         },
     });
-}
-
-function isWithinRotationGrace(input: {
-    lastUsedAt: Date | null;
-    revokedAt: Date | null;
-    now: Date;
-}): boolean {
-    if (!input.lastUsedAt || !input.revokedAt) {
-        return false;
-    }
-
-    const elapsedMs = input.now.getTime() - input.lastUsedAt.getTime();
-    return elapsedMs >= 0 && elapsedMs <= REFRESH_ROTATION_GRACE_MS;
 }
 
 async function hasSuccessorToken(
@@ -166,23 +150,6 @@ async function rotateRefreshTokenAtomically(
     return { status: "rotated", rawToken: nextToken.rawToken };
 }
 
-async function buildAccessOnlyRefreshResponse(input: {
-    userId: number;
-    role: string;
-    familyId: string;
-    tokenVersion: number;
-}): Promise<NextResponse> {
-    const accessToken = await issueAccessToken({
-        userId: input.userId,
-        role: input.role,
-        sessionId: input.familyId,
-        tokenVersion: input.tokenVersion,
-    });
-    const response = NextResponse.json({ success: true });
-    setHybridAccessCookie(response, accessToken);
-    return response;
-}
-
 export const POST = withTrustedMutation(async (request: NextRequest): Promise<NextResponse> => {
     try {
         const metadata = getClientMetadata(request);
@@ -207,25 +174,6 @@ export const POST = withTrustedMutation(async (request: NextRequest): Promise<Ne
 
         const now = new Date();
         if (existingToken.revokedAt) {
-            const isRecentRotation = isWithinRotationGrace({
-                lastUsedAt: existingToken.lastUsedAt,
-                revokedAt: existingToken.revokedAt,
-                now,
-            });
-
-            if (
-                isRecentRotation &&
-                existingToken.user.isActive &&
-                await hasSuccessorToken(existingToken.id)
-            ) {
-                return buildAccessOnlyRefreshResponse({
-                    userId: existingToken.userId,
-                    role: existingToken.user.role,
-                    familyId: existingToken.familyId,
-                    tokenVersion: existingToken.user.tokenVersion ?? 1,
-                });
-            }
-
             await revokeFamily(existingToken.familyId);
             await logRefreshSecurityEvent({
                 userId: existingToken.userId,
@@ -274,12 +222,16 @@ export const POST = withTrustedMutation(async (request: NextRequest): Promise<Ne
         });
 
         if (rotation.status === "alreadyRotated") {
-            return buildAccessOnlyRefreshResponse({
+            await revokeFamily(existingToken.familyId);
+            await logRefreshSecurityEvent({
                 userId: existingToken.userId,
-                role: existingToken.user.role,
+                email: existingToken.user.email,
                 familyId: existingToken.familyId,
-                tokenVersion: existingToken.user.tokenVersion ?? 1,
+                reason: "refresh_token_reuse_or_expired",
+                ipAddress: metadata.ipAddress,
+                userAgent: metadata.userAgent,
             });
+            return unauthorizedResponse();
         }
         if (rotation.status === "invalid") {
             return unauthorizedResponse();

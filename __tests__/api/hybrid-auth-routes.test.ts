@@ -99,7 +99,7 @@ describe("Hybrid auth routes", () => {
         expect(setCookie).toContain("Secure");
     });
 
-    it("refresh returns access token when another request already rotated token", async () => {
+    it("refresh revokes the family when another request already rotated the token", async () => {
         prismaMock.authRefreshToken.findUnique.mockResolvedValue({
             id: "rt1",
             userId: 1,
@@ -118,18 +118,21 @@ describe("Hybrid auth routes", () => {
         const response = await refreshRoute(request);
         const setCookie = response.headers.get("set-cookie") ?? "";
 
-        expect(response.status).toBe(200);
-        expect(prismaMock.authRefreshToken.updateMany).toHaveBeenCalledTimes(1);
+        expect(response.status).toBe(401);
+        expect(prismaMock.authRefreshToken.updateMany).toHaveBeenCalledTimes(2);
         expect(prismaMock.authRefreshToken.updateMany).toHaveBeenCalledWith({
             where: { id: "rt1", revokedAt: null },
             data: { revokedAt: expect.any(Date), lastUsedAt: expect.any(Date) },
         });
         expect(prismaMock.authRefreshToken.create).not.toHaveBeenCalled();
-        expect(setCookie).toContain(`${HYBRID_ACCESS_COOKIE_NAME}=`);
-        expect(setCookie).not.toContain(`${HYBRID_REFRESH_COOKIE_NAME}=`);
+        expect(prismaMock.authRefreshToken.updateMany).toHaveBeenCalledWith({
+            where: { familyId: "family-1", revokedAt: null },
+            data: { revokedAt: expect.any(Date) },
+        });
+        expect(setCookie).toContain(`${HYBRID_ACCESS_COOKIE_NAME}=; Path=/; Max-Age=0`);
     });
 
-    it("refresh treats rotatedFromId unique conflict as an already rotated token", async () => {
+    it("refresh revokes the family when rotation detects an existing successor", async () => {
         prismaMock.authRefreshToken.findUnique.mockResolvedValue({
             id: "rt1",
             userId: 1,
@@ -150,10 +153,13 @@ describe("Hybrid auth routes", () => {
         const response = await refreshRoute(request);
         const setCookie = response.headers.get("set-cookie") ?? "";
 
-        expect(response.status).toBe(200);
+        expect(response.status).toBe(401);
         expect(prismaMock.authRefreshToken.create).toHaveBeenCalledTimes(1);
-        expect(setCookie).toContain(`${HYBRID_ACCESS_COOKIE_NAME}=`);
-        expect(setCookie).not.toContain(`${HYBRID_REFRESH_COOKIE_NAME}=`);
+        expect(prismaMock.authRefreshToken.updateMany).toHaveBeenCalledWith({
+            where: { familyId: "family-1", revokedAt: null },
+            data: { revokedAt: expect.any(Date) },
+        });
+        expect(setCookie).toContain(`${HYBRID_ACCESS_COOKIE_NAME}=; Path=/; Max-Age=0`);
     });
 
     it("refresh revokes family on reused token", async () => {
@@ -181,7 +187,7 @@ describe("Hybrid auth routes", () => {
         });
     });
 
-    it("refresh allows recently rotated token for multi-tab race", async () => {
+    it("refresh revokes the family when a recently rotated token is reused", async () => {
         const now = new Date();
         prismaMock.authRefreshToken.findUnique.mockResolvedValue({
             id: "rt1",
@@ -200,10 +206,13 @@ describe("Hybrid auth routes", () => {
         });
         const response = await refreshRoute(request);
 
-        expect(response.status).toBe(200);
-        expect(prismaMock.authRefreshToken.updateMany).not.toHaveBeenCalled();
+        expect(response.status).toBe(401);
+        expect(prismaMock.authRefreshToken.updateMany).toHaveBeenCalledWith({
+            where: { familyId: "family-1", revokedAt: null },
+            data: { revokedAt: expect.any(Date) },
+        });
         expect(prismaMock.authRefreshToken.create).not.toHaveBeenCalled();
-        expect(response.headers.get("set-cookie")).toContain(`${HYBRID_ACCESS_COOKIE_NAME}=`);
+        expect(response.headers.get("set-cookie")).toContain(`${HYBRID_ACCESS_COOKIE_NAME}=; Path=/; Max-Age=0`);
     });
 
     it("logout revokes current refresh token", async () => {
