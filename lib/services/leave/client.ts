@@ -26,11 +26,12 @@ export interface ApproverEmployeeItem {
 }
 
 interface ApproverAssignmentsPayload {
-    assignments: Array<{ employeeId: number; managerId: number | null }>;
+    assignments: Array<{ employeeId: number; managerId: number | null; transferPendingRequests?: boolean }>;
 }
 
 interface ApproverAssignmentsResponse {
     message: string;
+    transferredLeaveRequestCount?: number;
 }
 
 export type LeaveDecisionAction = "APPROVE" | "REJECT";

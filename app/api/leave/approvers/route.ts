@@ -13,6 +13,7 @@ const bulkAssignSchema = z.object({
             z.object({
                 employeeId: z.number().int().positive(),
                 managerId: z.number().int().positive().nullable(),
+                transferPendingRequests: z.boolean().optional().default(false),
             }),
         )
         .min(1, "At least one assignment required"),
@@ -85,18 +86,25 @@ export async function PUT(req: Request): Promise<NextResponse> {
             );
         }
 
-        await prisma.$transaction(
-            assignments.map(({ employeeId, managerId }) =>
-                prisma.employee.update({
-                    where: { id: employeeId },
-                    data: { managerId },
-                }),
-            ),
-        );
+        const transferredLeaveRequestCount = await prisma.$transaction(async (tx) => {
+            let count = 0;
+            for (const { employeeId, managerId, transferPendingRequests } of assignments) {
+                await tx.employee.update({ where: { id: employeeId }, data: { managerId } });
+                if (transferPendingRequests && managerId) {
+                    const result = await tx.leaveRequest.updateMany({
+                        where: { employeeId, status: "PENDING", approverId: { not: managerId } },
+                        data: { approverId: managerId },
+                    });
+                    count += result.count;
+                }
+            }
+            return count;
+        });
 
         return NextResponse.json({
             success: true,
             message: COMMON_API_MESSAGES.operationCompleted,
+            transferredLeaveRequestCount,
         });
     } catch (error) {
         console.error("Error updating approvers:", error);

@@ -70,7 +70,7 @@ describe("useApproverManagementModel", () => {
         });
 
         expect(saveApproverAssignments).toHaveBeenCalledWith({
-            assignments: [{ employeeId: 1, managerId: null }],
+            assignments: [{ employeeId: 1, managerId: null, transferPendingRequests: false }],
         });
         expect(mutate).toHaveBeenCalledTimes(1);
         await waitFor(() => {
