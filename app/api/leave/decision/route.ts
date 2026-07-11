@@ -12,6 +12,7 @@ import {
     type LeaveResultPayload,
 } from "@/lib/services/leave/notification-payloads";
 import { getLeaveYearFromDateValue } from "@/lib/services/leave/quota-year";
+import { calculateAdditionalOverQuotaDays } from "@/lib/services/leave/over-quota";
 import { jsonError, notFound, operationFailed } from "@/lib/ssot/http";
 import { FEATURE_KEYS, isFeatureEnabled } from "@/lib/ssot/features";
 import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
@@ -95,6 +96,14 @@ export async function POST(req: Request): Promise<NextResponse> {
                 rejectReason: action === "REJECT" ? reason : null,
             };
 
+            const claimedRequest = await tx.leaveRequest.updateMany({
+                where: { id: leaveId, status: "PENDING" },
+                data: updateData,
+            });
+            if (claimedRequest.count !== 1) {
+                throw new LeaveApprovalError(LEAVE_APPROVAL_MESSAGES.alreadyProcessed, 409);
+            }
+
             if (action === "APPROVE") {
                 const quota = await tx.leaveQuota.findFirst({
                     where: {
@@ -111,8 +120,11 @@ export async function POST(req: Request): Promise<NextResponse> {
                     );
                 }
 
-                const remaining = quota.totalDays - quota.usedDays;
-                const overQuotaDays = Math.max(0, leaveRequest.durationDays - remaining);
+                const overQuotaDays = calculateAdditionalOverQuotaDays(
+                    quota.totalDays,
+                    quota.usedDays,
+                    leaveRequest.durationDays,
+                );
                 if (overQuotaDays > 0 && !leaveRequest.specialReason) {
                     throw new LeaveApprovalError(
                         LEAVE_APPROVAL_MESSAGES.specialReasonRequired,
@@ -126,14 +138,14 @@ export async function POST(req: Request): Promise<NextResponse> {
                 });
 
                 if (overQuotaDays !== leaveRequest.overQuotaDays) {
-                    updateData.overQuotaDays = overQuotaDays;
+                    await tx.leaveRequest.updateMany({
+                        where: { id: leaveId, status: "APPROVED" },
+                        data: { overQuotaDays },
+                    });
                 }
             }
 
-            const updatedRequest = await tx.leaveRequest.update({
-                where: { id: leaveId },
-                data: updateData,
-            });
+            const updatedRequest = await tx.leaveRequest.findUniqueOrThrow({ where: { id: leaveId } });
 
             await tx.notification.updateMany({
                 where: {

@@ -4,6 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
 import { leaveRequestSchema, type LeaveRequestValues } from "@/lib/validations/leave";
 import { submitLeaveRequest } from "@/lib/services/leave/client";
+import { calculateAdditionalOverQuotaDays } from "@/lib/services/leave/over-quota";
 import {
     calculateLeaveDuration,
     isPastDate,
@@ -124,7 +125,9 @@ export function useLeaveRequestFormModel({
     const quota = quotas.find((item) => item.leaveType === leaveType);
     const remainingQuota = quota ? quota.totalDays - quota.usedDays : 0;
     const requestedDays = getRequestedDays(startDateValue, endDateValue, periodValue);
-    const overQuotaDays = quota ? Math.max(0, requestedDays - remainingQuota) : 0;
+    const overQuotaDays = quota
+        ? calculateAdditionalOverQuotaDays(quota.totalDays, quota.usedDays, requestedDays)
+        : 0;
     const needsSpecialReason = overQuotaDays > 0;
     const needsEmergencyReason = isValidDateString(startDateValue)
         ? isPastDate(new Date(startDateValue))
@@ -157,7 +160,15 @@ export function useLeaveRequestFormModel({
     };
 
     const submit = async (data: LeaveRequestValues): Promise<void> => {
-        const submitOverQuotaDays = getOverQuotaDays(data, quotas);
+        const submitQuota = quotas.find((item) => item.leaveType === data.leaveType);
+        const submitRequestedDays = getRequestedDays(data.startDate, data.endDate, data.period);
+        const submitOverQuotaDays = submitQuota
+            ? calculateAdditionalOverQuotaDays(
+                submitQuota.totalDays,
+                submitQuota.usedDays,
+                submitRequestedDays,
+            )
+            : 0;
         if (submitOverQuotaDays > 0 && !data.specialReason?.trim()) {
             form.setError("specialReason", {
                 type: "manual",
@@ -222,18 +233,4 @@ function getRequestedDays(
     }
 
     return calculateLeaveDuration(start, end, period);
-}
-
-function getOverQuotaDays(
-    data: LeaveRequestValues,
-    quotas: LeaveQuotaSnapshot[],
-): number {
-    const quota = quotas.find((item) => item.leaveType === data.leaveType);
-    if (!quota) {
-        return 0;
-    }
-
-    const requestedDays = getRequestedDays(data.startDate, data.endDate, data.period);
-    const remainingQuota = quota.totalDays - quota.usedDays;
-    return Math.max(0, requestedDays - remainingQuota);
 }

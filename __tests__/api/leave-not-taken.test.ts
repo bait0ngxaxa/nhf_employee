@@ -41,7 +41,9 @@ vi.mock("@/lib/db/prisma", () => ({
         },
         leaveRequest: {
             findUnique: vi.fn(),
+            findUniqueOrThrow: vi.fn(),
             update: vi.fn(),
+            updateMany: vi.fn(),
         },
         leaveQuota: {
             findFirst: vi.fn(),
@@ -193,9 +195,10 @@ describe("/api/leave/not-taken", () => {
             totalDays: 6,
             usedDays: 3,
         });
-        vi.mocked(prisma.leaveRequest.update).mockResolvedValue({
+        vi.mocked(prisma.leaveRequest.updateMany).mockResolvedValue({ count: 1 });
+        vi.mocked(prisma.leaveRequest.findUniqueOrThrow).mockResolvedValue({
             id: "leave-2",
-        } as Awaited<ReturnType<typeof prisma.leaveRequest.update>>);
+        } as Awaited<ReturnType<typeof prisma.leaveRequest.findUniqueOrThrow>>);
         vi.mocked(prisma.leaveQuota.update).mockResolvedValue({
             id: "quota-1",
             usedDays: 2,
@@ -208,8 +211,8 @@ describe("/api/leave/not-taken", () => {
 
         const res = await PUT(req);
         expect(res.status).toBe(200);
-        expect(prisma.leaveRequest.update).toHaveBeenCalledWith({
-            where: { id: "leave-2" },
+        expect(prisma.leaveRequest.updateMany).toHaveBeenCalledWith({
+            where: expect.objectContaining({ id: "leave-2", status: "APPROVED" }),
             data: expect.objectContaining({
                 status: "NOT_TAKEN",
                 notTakenConfirmedById: 10,
@@ -281,9 +284,7 @@ describe("/api/leave/not-taken", () => {
             totalDays: 6,
             usedDays: 0.5,
         });
-        vi.mocked(prisma.leaveRequest.update).mockResolvedValue({
-            id: "leave-3",
-        } as Awaited<ReturnType<typeof prisma.leaveRequest.update>>);
+        vi.mocked(prisma.leaveRequest.updateMany).mockResolvedValue({ count: 1 });
         vi.mocked(prisma.leaveQuota.update).mockResolvedValue({
             id: "quota-1",
             usedDays: -0.5,

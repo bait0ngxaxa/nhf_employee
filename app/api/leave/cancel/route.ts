@@ -92,10 +92,14 @@ export async function POST(req: Request) {
                 );
             }
 
-            const updatedLeaveRequest = await tx.leaveRequest.update({
-                where: { id: leaveId },
+            const claimedRequest = await tx.leaveRequest.updateMany({
+                where: { id: leaveId, status: "PENDING" },
                 data: { status: "CANCELLED" },
             });
+            if (claimedRequest.count !== 1) {
+                throw new LeaveCancelError(LEAVE_CANCEL_MESSAGES.invalidStatus, 409);
+            }
+            const updatedLeaveRequest = await tx.leaveRequest.findUniqueOrThrow({ where: { id: leaveId } });
 
             const payload: LeaveCancelledPayload = {
                 leaveId,

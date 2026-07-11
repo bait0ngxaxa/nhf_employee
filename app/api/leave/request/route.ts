@@ -5,6 +5,7 @@ import { requireApiSession } from "@/lib/auth/api";
 import { logLeaveEvent } from "@/lib/server/audit";
 import { prisma } from "@/lib/db/prisma";
 import { getEmployeeIdFromUserId } from "@/lib/services/leave/get-employee-id";
+import { calculateAdditionalOverQuotaDays } from "@/lib/services/leave/over-quota";
 import {
     buildConfiguredApproverSnapshot,
     buildLeaveRecipientSnapshot,
@@ -154,8 +155,11 @@ export async function POST(req: Request) {
                 });
             }
 
-            const availableQuota = quota.totalDays - quota.usedDays;
-            const overQuotaDays = Math.max(0, durationDays - availableQuota);
+            const overQuotaDays = calculateAdditionalOverQuotaDays(
+                quota.totalDays,
+                quota.usedDays,
+                durationDays,
+            );
             if (overQuotaDays > 0 && !normalizedSpecialReason) {
                 throw new LeaveRequestError(LEAVE_REQUEST_MESSAGES.specialReasonRequired, 400);
             }

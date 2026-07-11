@@ -39,7 +39,9 @@ vi.mock("@/lib/db/prisma", () => ({
         $transaction: vi.fn(),
         leaveRequest: {
             findUnique: vi.fn(),
+            findUniqueOrThrow: vi.fn(),
             update: vi.fn(),
+            updateMany: vi.fn(),
         },
         leaveQuota: {
             findFirst: vi.fn(),
@@ -126,6 +128,10 @@ describe("POST /api/leave/decision", () => {
         vi.mocked(prisma.leaveRequest.update).mockResolvedValue({
             id: "leave-1",
         } as Awaited<ReturnType<typeof prisma.leaveRequest.update>>);
+        vi.mocked(prisma.leaveRequest.updateMany).mockResolvedValue({ count: 1 });
+        vi.mocked(prisma.leaveRequest.findUniqueOrThrow).mockResolvedValue({
+            id: "leave-1",
+        } as Awaited<ReturnType<typeof prisma.leaveRequest.findUniqueOrThrow>>);
         vi.mocked(prisma.leaveQuota.findFirst).mockResolvedValue({
             id: "quota-1",
             employeeId: 10,
@@ -153,12 +159,128 @@ describe("POST /api/leave/decision", () => {
             where: { id: "quota-1" },
             data: { usedDays: { increment: 1 } },
         });
-        expect(prisma.leaveRequest.update).toHaveBeenCalledWith({
-            where: { id: "leave-1" },
+        expect(prisma.leaveRequest.updateMany).toHaveBeenCalledWith({
+            where: { id: "leave-1", status: "PENDING" },
             data: expect.objectContaining({
                 status: "APPROVED",
-                overQuotaDays: 0,
             }),
         });
+    });
+
+    it("records only the additional over-quota days when quota is already exceeded", async () => {
+        vi.mocked(prisma.leaveRequest.findUnique).mockResolvedValue({
+            id: "leave-already-over-quota",
+            employeeId: 10,
+            leaveType: "VACATION",
+            startDate: new Date("2031-05-05T00:00:00.000Z"),
+            endDate: new Date("2031-05-06T00:00:00.000Z"),
+            period: "FULL_DAY",
+            durationDays: 2,
+            reason: "พักร้อน",
+            emergencyReason: null,
+            specialReason: "อนุมัติกรณีพิเศษ",
+            overQuotaDays: 4,
+            status: "PENDING",
+            approverId: 20,
+            approvedAt: null,
+            rejectReason: null,
+            notTakenReason: null,
+            notTakenRequestedAt: null,
+            notTakenConfirmedAt: null,
+            notTakenConfirmedById: null,
+            attachmentUrl: null,
+            createdAt: new Date("2031-05-01T00:00:00.000Z"),
+            updatedAt: new Date("2031-05-01T00:00:00.000Z"),
+            employee: {
+                id: 10,
+                firstName: "Employee",
+                lastName: "User",
+                email: "employee@example.com",
+                user: { id: 10 },
+            },
+            approver: {
+                id: 20,
+                firstName: "Manager",
+                lastName: "User",
+                email: "manager@example.com",
+            },
+        } as Awaited<ReturnType<typeof prisma.leaveRequest.findUnique>>);
+        vi.mocked(prisma.leaveRequest.updateMany).mockResolvedValue({ count: 1 });
+        vi.mocked(prisma.leaveRequest.findUniqueOrThrow).mockResolvedValue({
+            id: "leave-already-over-quota",
+        } as Awaited<ReturnType<typeof prisma.leaveRequest.findUniqueOrThrow>>);
+        vi.mocked(prisma.leaveQuota.findFirst).mockResolvedValue({
+            id: "quota-1",
+            employeeId: 10,
+            year: 2031,
+            leaveType: "VACATION",
+            totalDays: 10,
+            usedDays: 12,
+        });
+
+        const req = new NextRequest("http://localhost/api/leave/decision", {
+            method: "POST",
+            body: JSON.stringify({ leaveId: "leave-already-over-quota", action: "APPROVE" }),
+        });
+
+        const res = await POST(req);
+
+        expect(res.status).toBe(200);
+        expect(prisma.leaveRequest.updateMany).toHaveBeenLastCalledWith({
+            where: { id: "leave-already-over-quota", status: "APPROVED" },
+            data: { overQuotaDays: 2 },
+        });
+    });
+
+    it("does not consume quota when cancelling wins the pending-state claim", async () => {
+        vi.mocked(prisma.leaveRequest.findUnique).mockResolvedValue({
+            id: "leave-1",
+            employeeId: 10,
+            leaveType: "VACATION",
+            startDate: new Date("2031-05-05T00:00:00.000Z"),
+            endDate: new Date("2031-05-05T00:00:00.000Z"),
+            period: "FULL_DAY",
+            durationDays: 1,
+            reason: "พักร้อน",
+            emergencyReason: null,
+            specialReason: null,
+            overQuotaDays: 0,
+            status: "PENDING",
+            approverId: 20,
+            approvedAt: null,
+            rejectReason: null,
+            notTakenReason: null,
+            notTakenRequestedAt: null,
+            notTakenConfirmedAt: null,
+            notTakenConfirmedById: null,
+            attachmentUrl: null,
+            createdAt: new Date("2031-05-01T00:00:00.000Z"),
+            updatedAt: new Date("2031-05-01T00:00:00.000Z"),
+            employee: {
+                id: 10,
+                firstName: "Employee",
+                lastName: "User",
+                email: "employee@example.com",
+                user: { id: 10 },
+            },
+            approver: {
+                id: 20,
+                firstName: "Manager",
+                lastName: "User",
+                email: "manager@example.com",
+            },
+        } as Awaited<ReturnType<typeof prisma.leaveRequest.findUnique>>);
+        vi.mocked(prisma.leaveRequest.updateMany).mockResolvedValue({ count: 0 });
+
+        const req = new NextRequest("http://localhost/api/leave/decision", {
+            method: "POST",
+            body: JSON.stringify({ leaveId: "leave-1", action: "APPROVE" }),
+        });
+
+        const res = await POST(req);
+
+        expect(res.status).toBe(409);
+        expect(prisma.leaveQuota.findFirst).not.toHaveBeenCalled();
+        expect(prisma.leaveQuota.update).not.toHaveBeenCalled();
     });
 });

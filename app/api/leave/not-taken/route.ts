@@ -225,6 +225,24 @@ export async function PUT(req: Request): Promise<NextResponse> {
                 throw new LeaveNotTakenError(NOT_TAKEN_MESSAGES.forbidden, 403);
             }
 
+            const claimedRequest = await tx.leaveRequest.updateMany({
+                where: {
+                    id: leaveRequest.id,
+                    status: "APPROVED",
+                    approverId: managerId,
+                    notTakenRequestedAt: { not: null },
+                    notTakenConfirmedAt: null,
+                },
+                data: {
+                    status: "NOT_TAKEN",
+                    notTakenConfirmedAt: new Date(),
+                    notTakenConfirmedById: managerId,
+                },
+            });
+            if (claimedRequest.count !== 1) {
+                throw new LeaveNotTakenError(NOT_TAKEN_MESSAGES.confirmNotFound, 409);
+            }
+
             const quota = await tx.leaveQuota.findFirst({
                 where: {
                     employeeId: leaveRequest.employeeId,
@@ -237,15 +255,6 @@ export async function PUT(req: Request): Promise<NextResponse> {
                 throw new LeaveNotTakenError(NOT_TAKEN_MESSAGES.quotaNotFound, 409);
             }
 
-            const updatedRequest = await tx.leaveRequest.update({
-                where: { id: leaveRequest.id },
-                data: {
-                    status: "NOT_TAKEN",
-                    notTakenConfirmedAt: new Date(),
-                    notTakenConfirmedById: managerId,
-                },
-            });
-
             const updatedQuota = await tx.leaveQuota.update({
                 where: { id: quota.id },
                 data: { usedDays: { decrement: leaveRequest.durationDays } },
@@ -253,6 +262,9 @@ export async function PUT(req: Request): Promise<NextResponse> {
             if (updatedQuota.usedDays < 0) {
                 throw new LeaveNotTakenError(NOT_TAKEN_MESSAGES.quotaNotFound, 409);
             }
+            const updatedRequest = await tx.leaveRequest.findUniqueOrThrow({
+                where: { id: leaveRequest.id },
+            });
 
             await tx.notification.updateMany({
                 where: {
