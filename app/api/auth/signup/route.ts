@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
-import { Role } from "@prisma/client";
+import { Prisma, Role } from "@prisma/client";
 
 import { createAuditLog } from "@/lib/server/audit";
 import {
@@ -20,6 +20,13 @@ const SIGNUP_RATE_LIMIT_POLICY = {
     maxAttemptsPerIdentity: 5,
     maxAttemptsPerIp: 25,
 } as const;
+
+function isUniqueConstraintError(error: unknown): boolean {
+    return (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2002"
+    );
+}
 
 export const POST = withTrustedMutation(
     async (request: NextRequest): Promise<NextResponse> => {
@@ -143,6 +150,13 @@ export const POST = withTrustedMutation(
                 { status: 201 },
             );
         } catch (error) {
+            if (isUniqueConstraintError(error)) {
+                return NextResponse.json(
+                    { error: AUTH_SIGNUP_MESSAGES.accountAlreadyRegisteredThai },
+                    { status: 409 },
+                );
+            }
+
             console.error("Signup error:", error);
             return NextResponse.json(
                 { error: AUTH_SIGNUP_MESSAGES.signupFailedThai },

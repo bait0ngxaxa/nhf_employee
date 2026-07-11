@@ -1,6 +1,7 @@
 // @vitest-environment node
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
+import { Prisma } from "@prisma/client";
 import type * as HybridAuthTokensModule from "@/lib/auth/hybrid/tokens";
 
 import { POST as signupRoute } from "@/app/api/auth/signup/route";
@@ -180,6 +181,36 @@ describe("Auth signup route", () => {
                 }),
             }),
         );
+    });
+
+    it("returns a generic conflict when a concurrent signup violates a unique constraint", async () => {
+        prismaMock.user.findUnique.mockResolvedValue(null);
+        prismaMock.employee.findUnique.mockResolvedValue({
+            id: 10,
+            firstName: "สมชาย",
+            lastName: "ใจดี",
+            user: null,
+        });
+        prismaMock.user.create.mockRejectedValue(
+            new Prisma.PrismaClientKnownRequestError("Unique constraint failed", {
+                code: "P2002",
+                clientVersion: "6.19.3",
+                meta: { target: ["email"] },
+            }),
+        );
+
+        const response = await signupRoute(
+            buildRequest({
+                email: "user@thainhf.org",
+                password: "secret1",
+                confirmPassword: "secret1",
+            }),
+        );
+
+        expect(response.status).toBe(409);
+        await expect(response.json()).resolves.toEqual({
+            error: "บัญชีนี้ถูกลงทะเบียนแล้ว",
+        });
     });
 
     it("returns 429 when signup attempts exceed limit", async () => {

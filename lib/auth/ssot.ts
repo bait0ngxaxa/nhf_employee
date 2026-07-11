@@ -85,6 +85,7 @@ export const AUTH_SIGNUP_MESSAGES = {
     passwordMinLengthThai: "รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร",
     emailDomainOnlyThai: "กรุณาใช้อีเมลองค์กร (@thainhf.org) เท่านั้น",
     emailAlreadyUsedThai: "อีเมลนี้ถูกใช้งานแล้ว",
+    accountAlreadyRegisteredThai: "บัญชีนี้ถูกลงทะเบียนแล้ว",
     employeeNotFoundThai: "ไม่พบข้อมูลพนักงานที่ตรงกับอีเมลนี้ กรุณาติดต่อผู้ดูแล",
     rateLimitedThai: "ลองใหม่อีกครั้งภายหลัง",
     signupSuccessThai: "สมัครสมาชิกสำเร็จ",
