@@ -1,3 +1,5 @@
+import { Role } from "@prisma/client";
+
 import { prisma } from "@/lib/db/prisma";
 import { createAdminInAppNotificationsOnce } from "@/lib/services/notifications/in-app";
 import {
@@ -250,7 +252,7 @@ export async function notifyAdminsStockRequestCancelledByRequester(
     requesterName: string,
 ): Promise<void> {
     const admins = await prisma.user.findMany({
-        where: { role: "ADMIN" },
+        where: { role: Role.ADMIN },
         select: { id: true },
     });
 

@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
+import { Role } from "@prisma/client";
 
 import { createAuditLog } from "@/lib/server/audit";
 import {
@@ -91,7 +92,9 @@ export const POST = withTrustedMutation(
 
             const hashedPassword = await bcrypt.hash(password, 12);
             const employeeName = `${matchedEmployee.firstName} ${matchedEmployee.lastName}`;
-            const assignedRole = isBootstrapAdminEmail(email) ? "ADMIN" : "USER";
+            const assignedRole = isBootstrapAdminEmail(email)
+                ? Role.ADMIN
+                : Role.USER;
 
             const user = await prisma.user.create({
                 data: {
@@ -120,7 +123,7 @@ export const POST = withTrustedMutation(
                     },
                     metadata: {
                         source: "signup",
-                        bootstrapAdmin: assignedRole === "ADMIN",
+                        bootstrapAdmin: assignedRole === Role.ADMIN,
                     },
                 },
             });

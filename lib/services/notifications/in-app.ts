@@ -1,4 +1,4 @@
-import { Prisma, type NotificationType } from "@prisma/client";
+import { Prisma, Role, type NotificationType } from "@prisma/client";
 
 import { prisma } from "@/lib/db/prisma";
 
@@ -57,7 +57,7 @@ export async function createAdminInAppNotificationsOnce(
     input: AdminNotificationInput,
 ): Promise<void> {
     const admins = await prisma.user.findMany({
-        where: { role: "ADMIN" },
+        where: { role: Role.ADMIN },
         select: { id: true },
     });
 

@@ -1,4 +1,5 @@
 import { after, type NextRequest, NextResponse } from "next/server";
+import { Role } from "@prisma/client";
 
 import { requireApiSession } from "@/lib/auth/api";
 import { prisma } from "@/lib/db/prisma";
@@ -51,7 +52,7 @@ async function notifyCommentParticipants(
     }
 
     const admins = await prisma.user.findMany({
-        where: { role: "ADMIN" },
+        where: { role: Role.ADMIN },
         select: { id: true },
     });
 
