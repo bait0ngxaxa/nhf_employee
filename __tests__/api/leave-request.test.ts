@@ -143,14 +143,35 @@ describe("POST /api/leave/request", () => {
         expect(data.details).toBeDefined();
     });
 
+    it("should reject timestamp dates for a half-day request before starting a transaction", async () => {
+        (getApiAuthSession as unknown as { mockResolvedValue: (v: { user: { id: string; name: string } }) => void }).mockResolvedValue({ user: mockUser });
+        (getEmployeeIdFromUserId as unknown as { mockResolvedValue: (v: number) => void }).mockResolvedValue(mockEmployeeId);
+
+        const req = new NextRequest("http://localhost/api/leave/request", {
+            method: "POST",
+            body: JSON.stringify({
+                leaveType: "SICK",
+                startDate: "2030-05-10T00:00:00.000Z",
+                endDate: "2030-05-10T12:00:00.000Z",
+                period: "MORNING",
+                reason: "Valid reason",
+            }),
+        });
+
+        const res = await submitLeaveRequest(req);
+
+        expect(res.status).toBe(400);
+        expect(prisma.$transaction).not.toHaveBeenCalled();
+    });
+
     it("should return 400 if half-day period spans multiple days", async () => {
         (getApiAuthSession as unknown as { mockResolvedValue: (v: { user: { id: string; name: string } }) => void }).mockResolvedValue({ user: mockUser });
         (getEmployeeIdFromUserId as unknown as { mockResolvedValue: (v: number) => void }).mockResolvedValue(mockEmployeeId);
 
         const payload = {
             leaveType: "SICK",
-            startDate: "2030-01-01T00:00:00.000Z",
-            endDate: "2030-01-02T00:00:00.000Z",
+            startDate: "2030-01-01",
+            endDate: "2030-01-02",
             period: "MORNING",
             reason: "Sick leave",
         };
@@ -172,8 +193,8 @@ describe("POST /api/leave/request", () => {
 
         const payload = {
             leaveType: "SICK",
-            startDate: "2030-05-10T00:00:00.000Z", // Friday
-            endDate: "2030-05-11T00:00:00.000Z",   // Saturday
+            startDate: "2030-05-10", // Friday
+            endDate: "2030-05-11",   // Saturday
             period: "FULL_DAY",
             reason: "Weekend overlap",
         };
@@ -213,8 +234,8 @@ describe("POST /api/leave/request", () => {
 
         const payload = {
             leaveType: "SICK",
-            startDate: "2030-05-10T00:00:00.000Z", // Friday
-            endDate: "2030-05-13T00:00:00.000Z",   // Monday
+            startDate: "2030-05-10", // Friday
+            endDate: "2030-05-13",   // Monday
             period: "FULL_DAY",
             reason: "Cross weekend",
         };
@@ -236,8 +257,8 @@ describe("POST /api/leave/request", () => {
     describe("Transaction Logic", () => {
         const validPayload = {
             leaveType: "PERSONAL",
-            startDate: "2030-05-10T00:00:00.000Z",
-            endDate: "2030-05-10T00:00:00.000Z",
+            startDate: "2030-05-10",
+            endDate: "2030-05-10",
             period: "FULL_DAY",
             reason: "Personal errand",
         };
@@ -353,8 +374,8 @@ describe("POST /api/leave/request", () => {
                 method: "POST",
                 body: JSON.stringify({
                     leaveType: "SICK",
-                    startDate: "2030-05-13T00:00:00.000Z",
-                    endDate: "2030-05-13T00:00:00.000Z",
+                    startDate: "2030-05-13",
+                    endDate: "2030-05-13",
                     period: "FULL_DAY",
                     reason: "ลาป่วยฉุกเฉิน",
                     emergencyReason: "ป่วยฉุกเฉินจนยื่นคำขอไม่ทัน",

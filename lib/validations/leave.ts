@@ -20,16 +20,23 @@ const optionalLongTextSchema = (message: string) =>
     .optional()
     .refine((value) => !value || value.length >= 5, { message });
 
+const leaveDateSchema = z.iso.date({ error: "รูปแบบวันที่ไม่ถูกต้อง" });
+const leaveReasonSchema = z
+  .string()
+  .trim()
+  .min(5, "กรุณาระบุเหตุผลอย่างน้อย 5 ตัวอักษร")
+  .max(1000, "เหตุผลต้องไม่เกิน 1000 ตัวอักษร");
+
 export const leaveRequestSchema = z.object({
   leaveType: z.enum(["SICK", "PERSONAL", "VACATION"], {
     message: "กรุณาเลือกประเภทการลา",
   }),
-  startDate: z.string().min(1, "กรุณาระบุวันที่เริ่มต้น").refine((val) => !isNaN(Date.parse(val)), "รูปแบบวันที่ไม่ถูกต้อง"),
-  endDate: z.string().min(1, "กรุณาระบุวันที่สิ้นสุด").refine((val) => !isNaN(Date.parse(val)), "รูปแบบวันที่ไม่ถูกต้อง"),
+  startDate: leaveDateSchema,
+  endDate: leaveDateSchema,
   period: z.enum(["FULL_DAY", "MORNING", "AFTERNOON"], {
     message: "กรุณาเลือกช่วงเวลา",
   }),
-  reason: z.string().min(5, "กรุณาระบุเหตุผลอย่างน้อย 5 ตัวอักษร"),
+  reason: leaveReasonSchema,
   emergencyReason: optionalLongTextSchema(LEAVE_VALIDATION_MESSAGES.emergencyReasonRequired),
   specialReason: optionalLongTextSchema("กรุณาระบุเหตุผลพิเศษอย่างน้อย 5 ตัวอักษร"),
 }).refine((data) => {
