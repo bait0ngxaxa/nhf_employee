@@ -240,12 +240,12 @@ export async function createItem(data: CreateStockItemInput) {
     });
 }
 
-export async function updateItem(id: number, data: UpdateItemInput) {
+export async function updateItem(id: number, data: UpdateItemInput, userId: number) {
     const cleanupCandidates = new Set<string>();
     const retainedUploadUrls = new Set<string>();
 
     const updatedItem = await prisma.$transaction((tx) =>
-        updateItemInTransaction(tx, id, data, {
+        updateItemInTransaction(tx, id, data, userId, {
             cleanupCandidates,
             retainedUploadUrls,
         }),

@@ -28,6 +28,9 @@ describe("Stock Service Mutations", () => {
         prismaMock.stockItemVariant.aggregate.mockResolvedValue(
             asNever({ _sum: { quantity: 10, minStock: 5 } }),
         );
+        prismaMock.stockItemVariant.updateMany.mockResolvedValue(
+            asNever({ count: 1 }),
+        );
     });
 
     describe("issueRequest", () => {
@@ -478,7 +481,7 @@ describe("Stock Service Mutations", () => {
     });
 
     describe("updateItem", () => {
-        it("should preserve existing stock when a metadata edit submits stale variant quantities", async () => {
+        it("should adjust existing variants atomically and synchronize the parent quantity", async () => {
             prismaMock.stockItem.findUniqueOrThrow.mockResolvedValue(
                 asNever({
                     id: 25,
@@ -529,22 +532,24 @@ describe("Stock Service Mutations", () => {
                 variants: [
                     {
                         id: 251,
+                        expectedQuantity: 10,
                         sku: "SKU-25-A",
                         unit: "ชิ้น",
-                        quantity: 4,
+                        quantity: 8,
                         minStock: 2,
                         attributes: [{ name: "สี", value: "แดง" }],
                     },
                     {
                         id: 252,
+                        expectedQuantity: 10,
                         sku: "SKU-25-B",
                         unit: "ชิ้น",
-                        quantity: 6,
+                        quantity: 15,
                         minStock: 3,
                         attributes: [{ name: "สี", value: "น้ำเงิน" }],
                     },
                 ],
-            });
+            }, 7);
 
             expect(prismaMock.stockItem.update).toHaveBeenCalledWith(
                 expect.objectContaining({
@@ -552,20 +557,21 @@ describe("Stock Service Mutations", () => {
                     data: expect.not.objectContaining({ quantity: expect.any(Number) }),
                 }),
             );
-            expect(prismaMock.stockItemVariant.update).toHaveBeenNthCalledWith(
+            expect(prismaMock.stockItemVariant.updateMany).toHaveBeenNthCalledWith(
                 1,
                 expect.objectContaining({
-                    where: { id: 251 },
-                    data: expect.not.objectContaining({ quantity: expect.any(Number) }),
+                    where: expect.objectContaining({ id: 251, quantity: 10 }),
+                    data: expect.objectContaining({ quantity: { increment: -2 } }),
                 }),
             );
-            expect(prismaMock.stockItemVariant.update).toHaveBeenNthCalledWith(
+            expect(prismaMock.stockItemVariant.updateMany).toHaveBeenNthCalledWith(
                 2,
                 expect.objectContaining({
-                    where: { id: 252 },
-                    data: expect.not.objectContaining({ quantity: expect.any(Number) }),
+                    where: expect.objectContaining({ id: 252, quantity: 10 }),
+                    data: expect.objectContaining({ quantity: { increment: 5 } }),
                 }),
             );
+            expect(prismaMock.stockTransaction.create).toHaveBeenCalledTimes(2);
             expect(prismaMock.stockItem.update).toHaveBeenNthCalledWith(
                 2,
                 expect.objectContaining({
@@ -628,6 +634,7 @@ describe("Stock Service Mutations", () => {
                 variants: [
                     {
                         id: 261,
+                        expectedQuantity: 2,
                         sku: "SKU-26-A",
                         unit: "ชิ้น",
                         quantity: 2,
@@ -641,7 +648,7 @@ describe("Stock Service Mutations", () => {
                         attributes: [{ name: "สี", value: "เขียว" }],
                     },
                 ],
-            });
+            }, 7);
 
             expect(prismaMock.stockItemVariant.create).toHaveBeenCalledWith(
                 expect.objectContaining({
@@ -671,6 +678,7 @@ describe("Stock Service Mutations", () => {
                 .slice(0, 10)
                 .map((variant) => ({
                     id: variant.id,
+                    expectedQuantity: 1,
                     sku: variant.sku,
                     unit: "ชิ้น",
                     quantity: 1,
@@ -733,7 +741,7 @@ describe("Stock Service Mutations", () => {
                         attributes: [{ name: "ลำดับ", value: "ใหม่" }],
                     },
                 ],
-            });
+            }, 7);
 
             expect(prismaMock.stockItemVariant.create).toHaveBeenCalledWith(
                 expect.objectContaining({

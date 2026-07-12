@@ -61,12 +61,13 @@ export async function updateItemInTransaction(
     tx: StockTxClient,
     itemId: number,
     data: UpdateItemInput,
+    userId: number,
     tracking: UploadUrlTracking,
 ): Promise<StockItemWithDetails> {
     const { variants, ...itemData } = data;
 
     if (variants && variants.length > 0) {
-        return updateItemWithVariants(tx, itemId, itemData, variants, tracking);
+        return updateItemWithVariants(tx, itemId, itemData, variants, userId, tracking);
     }
 
     return updateItemWithoutVariants(tx, itemId, itemData, data, tracking);

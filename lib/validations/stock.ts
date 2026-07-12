@@ -166,6 +166,11 @@ export const createItemSchema = z
 const updateItemVariantSchema = z
     .object({
         id: z.coerce.number().int().positive("กรุณาเลือกรายการย่อย").optional(),
+        expectedQuantity: z.coerce
+            .number()
+            .int("จำนวนคงเหลือเดิมต้องเป็นจำนวนเต็ม")
+            .min(0, "จำนวนคงเหลือเดิมต้องไม่ติดลบ")
+            .optional(),
         sku: z
             .string()
             .max(50, "รหัส SKU ของรายการย่อยต้องไม่เกิน 50 ตัวอักษร")
@@ -191,6 +196,14 @@ const updateItemVariantSchema = z
             .default([]),
     })
     .superRefine((variant, ctx) => {
+        if (variant.id !== undefined && variant.expectedQuantity === undefined) {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                path: ["expectedQuantity"],
+                message: "กรุณาระบุจำนวนคงเหลือเดิมของรายการย่อย",
+            });
+        }
+
         const seen = new Set<string>();
 
         for (let index = 0; index < variant.attributes.length; index += 1) {

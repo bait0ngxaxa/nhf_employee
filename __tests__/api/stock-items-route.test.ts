@@ -74,7 +74,7 @@ describe("Stock Item Routes", () => {
         expect(response.status).toBe(200);
         expect(stockService.updateItem).toHaveBeenCalledWith(42, {
             name: "ปากกาใหม่",
-        });
+        }, 1);
         expect(logStockEvent).toHaveBeenCalledWith(
             "STOCK_ITEM_UPDATE",
             42,
@@ -98,7 +98,7 @@ describe("Stock Item Routes", () => {
         });
 
         expect(response.status).toBe(200);
-        expect(stockService.updateItem).toHaveBeenCalledWith(42, { isActive: false });
+        expect(stockService.updateItem).toHaveBeenCalledWith(42, { isActive: false }, 1);
         expect(logStockEvent).toHaveBeenCalledWith(
             "STOCK_ITEM_DELETE",
             42,

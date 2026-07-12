@@ -32,6 +32,7 @@ type StockItemVariant = NonNullable<StockItem["variants"]>[number];
 type EditableVariant = ReturnType<typeof createEditableVariant>;
 type NormalizedVariant = {
     id?: number;
+    expectedQuantity?: number;
     sku?: string;
     unit: string;
     quantity: number;
@@ -60,6 +61,7 @@ function createEditableVariant(item: StockItem, variant?: StockItemVariant) {
                 ? `existing-${variant.id}`
                 : `new-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
         id: variant?.id,
+        expectedQuantity: variant?.quantity,
         sku: variant?.sku ?? "",
         unit: variant?.unit ?? item.unit,
         quantity: String(variant?.quantity ?? 1),
@@ -97,6 +99,9 @@ function normalizeVariantForUpdate(
 ): NormalizedVariant {
     return {
         ...(variant.id !== undefined && { id: variant.id }),
+        ...(variant.id !== undefined && {
+            expectedQuantity: variant.expectedQuantity,
+        }),
         sku: variant.sku.trim() || undefined,
         unit: variant.unit.trim(),
         quantity: parseVariantNumber(variant.quantity),

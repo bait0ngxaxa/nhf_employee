@@ -184,6 +184,7 @@ describe("Stock Validation", () => {
                 variants: [
                     {
                         id: 1,
+                        expectedQuantity: 0,
                         unit: "ชิ้น",
                         quantity: 0,
                         minStock: 1,

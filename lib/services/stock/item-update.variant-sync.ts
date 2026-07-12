@@ -1,3 +1,4 @@
+import { StockTxType } from "@prisma/client";
 import type { UpdateItemInput } from "@/lib/validations/stock";
 import {
     buildItemInclude,
@@ -169,18 +170,30 @@ async function createSubmittedVariant(
 
 async function updateSubmittedVariant(
     tx: StockTxClient,
+    itemId: number,
     parentSku: string,
     parentImageUrl: string | null,
     variant: SubmittedVariant & { id: number },
     existingVariant: ExistingVariantRecord,
     index: number,
+    userId: number,
     tracking: UploadUrlTracking,
 ): Promise<void> {
     const nextVariantImageUrl =
         variant.imageUrl ?? existingVariant.imageUrl ?? parentImageUrl;
 
-    await tx.stockItemVariant.update({
-        where: { id: variant.id },
+    if (variant.expectedQuantity === undefined) {
+        throw new Error("กรุณาระบุจำนวนคงเหลือเดิมของรายการย่อย");
+    }
+
+    const delta = variant.quantity - variant.expectedQuantity;
+    const updatedVariant = await tx.stockItemVariant.updateMany({
+        where: {
+            id: variant.id,
+            stockItemId: itemId,
+            isActive: true,
+            quantity: variant.expectedQuantity,
+        },
         data: {
             sku:
                 variant.sku?.trim() ||
@@ -189,8 +202,25 @@ async function updateSubmittedVariant(
             unit: variant.unit,
             minStock: variant.minStock,
             imageUrl: nextVariantImageUrl,
+            quantity: { increment: delta },
         },
     });
+    if (updatedVariant.count === 0) {
+        throw new Error("ยอดคงเหลือของรายการย่อยเปลี่ยนแปลงแล้ว กรุณาโหลดข้อมูลใหม่");
+    }
+
+    if (delta !== 0) {
+        await tx.stockTransaction.create({
+            data: {
+                itemId,
+                variantId: variant.id,
+                type: delta > 0 ? StockTxType.IN : StockTxType.OUT,
+                quantity: delta,
+                note: "ปรับยอดจากหน้าแก้ไขสินค้า",
+                performedBy: userId,
+            },
+        });
+    }
 
     trackReplacedUploadUrl(existingVariant.imageUrl, nextVariantImageUrl, tracking);
 
@@ -207,6 +237,7 @@ async function syncSubmittedVariants(
     variants: SubmittedVariant[],
     existingVariantById: Map<number, ExistingVariantRecord>,
     usedSkus: Set<string>,
+    userId: number,
     tracking: UploadUrlTracking,
 ): Promise<Set<number>> {
     const submittedIds = collectSubmittedVariantIds(variants);
@@ -235,11 +266,13 @@ async function syncSubmittedVariants(
 
         await updateSubmittedVariant(
             tx,
+            itemId,
             nextItem.sku,
             nextItem.imageUrl,
             { ...variant, id: variant.id },
             existingVariant,
             index,
+            userId,
             tracking,
         );
     }
@@ -300,6 +333,7 @@ export async function updateItemWithVariants(
     itemId: number,
     itemData: Omit<UpdateItemInput, "variants">,
     variants: SubmittedVariant[],
+    userId: number,
     tracking: UploadUrlTracking,
 ): Promise<StockItemWithDetails> {
     const item = await getItemForVariantUpdate(tx, itemId);
@@ -331,6 +365,7 @@ export async function updateItemWithVariants(
         variants,
         existingVariantById,
         usedSkus,
+        userId,
         tracking,
     );
 

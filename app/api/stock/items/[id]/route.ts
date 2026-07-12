@@ -30,7 +30,7 @@ export async function PATCH(
             });
         }
 
-        const item = await stockService.updateItem(itemId, result.data);
+        const item = await stockService.updateItem(itemId, result.data, auth.user.id);
         await logStockEvent(
             "STOCK_ITEM_UPDATE",
             itemId,
@@ -52,6 +52,9 @@ export async function PATCH(
             message.includes("จำนวนรายการย่อยไม่ตรงกับข้อมูลปัจจุบัน")
         ) {
             return jsonError(message, 400);
+        }
+        if (message.includes("ยอดคงเหลือของรายการย่อยเปลี่ยนแปลงแล้ว")) {
+            return jsonError(message, 409);
         }
 
         if (error instanceof PrismaClientKnownRequestError) {
@@ -80,7 +83,7 @@ export async function DELETE(
         const itemId = Number(id);
         if (isNaN(itemId)) return jsonError("ID ไม่ถูกต้อง", 400);
 
-        const item = await stockService.updateItem(itemId, { isActive: false });
+        const item = await stockService.updateItem(itemId, { isActive: false }, auth.user.id);
         await logStockEvent(
             "STOCK_ITEM_DELETE",
             itemId,
