@@ -110,13 +110,28 @@ export async function POST(req: Request): Promise<NextResponse> {
                 );
             }
 
-            const updatedRequest = await tx.leaveRequest.update({
-                where: { id: leaveRequest.id },
+            const requestedAt = new Date();
+            const claimedRequest = await tx.leaveRequest.updateMany({
+                where: {
+                    id: leaveRequest.id,
+                    employeeId,
+                    status: "APPROVED",
+                    notTakenRequestedAt: null,
+                },
                 data: {
                     notTakenReason: parsed.data.note,
-                    notTakenRequestedAt: new Date(),
+                    notTakenRequestedAt: requestedAt,
                 },
             });
+            if (claimedRequest.count !== 1) {
+                throw new LeaveNotTakenError(NOT_TAKEN_MESSAGES.alreadyRequested, 409);
+            }
+
+            const updatedRequest = {
+                ...leaveRequest,
+                notTakenReason: parsed.data.note,
+                notTakenRequestedAt: requestedAt,
+            };
 
             const payload: LeaveNotTakenRequestedPayload = {
                 leaveId: leaveRequest.id,

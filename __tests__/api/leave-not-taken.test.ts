@@ -115,9 +115,7 @@ describe("/api/leave/not-taken", () => {
                 user: { id: 2, isActive: true },
             },
         } as Awaited<ReturnType<typeof prisma.leaveRequest.findUnique>>);
-        vi.mocked(prisma.leaveRequest.update).mockResolvedValue({
-            id: "leave-1",
-        } as Awaited<ReturnType<typeof prisma.leaveRequest.update>>);
+        vi.mocked(prisma.leaveRequest.updateMany).mockResolvedValue({ count: 1 });
 
         const req = new NextRequest("http://localhost/api/leave/not-taken", {
             method: "POST",
@@ -129,8 +127,13 @@ describe("/api/leave/not-taken", () => {
 
         const res = await POST(req);
         expect(res.status).toBe(200);
-        expect(prisma.leaveRequest.update).toHaveBeenCalledWith({
-            where: { id: "leave-1" },
+        expect(prisma.leaveRequest.updateMany).toHaveBeenCalledWith({
+            where: expect.objectContaining({
+                id: "leave-1",
+                employeeId: 10,
+                status: "APPROVED",
+                notTakenRequestedAt: null,
+            }),
             data: expect.objectContaining({
                 notTakenReason: "ไม่ได้ลาเพราะมีงานด่วน",
                 notTakenRequestedAt: expect.any(Date),
@@ -147,6 +150,59 @@ describe("/api/leave/not-taken", () => {
                 userId: 1,
             }),
         });
+    });
+
+    it("does not create notifications when another request already claimed the leave", async () => {
+        vi.mocked(prisma.leaveRequest.findUnique).mockResolvedValue({
+            id: "leave-duplicate",
+            employeeId: 10,
+            leaveType: "SICK",
+            startDate: new Date("2000-01-01T00:00:00.000Z"),
+            endDate: new Date("2000-01-01T00:00:00.000Z"),
+            period: "FULL_DAY",
+            durationDays: 1,
+            reason: "Not taken",
+            emergencyReason: null,
+            specialReason: null,
+            overQuotaDays: 0,
+            status: "APPROVED",
+            approverId: 20,
+            approvedAt: new Date("2000-01-01T00:00:00.000Z"),
+            rejectReason: null,
+            notTakenReason: null,
+            notTakenRequestedAt: null,
+            notTakenConfirmedAt: null,
+            notTakenConfirmedById: null,
+            attachmentUrl: null,
+            createdAt: new Date("2000-01-01T00:00:00.000Z"),
+            updatedAt: new Date("2000-01-01T00:00:00.000Z"),
+            employee: {
+                id: 10,
+                firstName: "Employee",
+                lastName: "User",
+                email: "employee@example.com",
+                user: { id: 1 },
+            },
+            approver: {
+                id: 20,
+                firstName: "Manager",
+                lastName: "User",
+                email: "manager@example.com",
+                user: { id: 2, isActive: true },
+            },
+        } as Awaited<ReturnType<typeof prisma.leaveRequest.findUnique>>);
+        vi.mocked(prisma.leaveRequest.updateMany).mockResolvedValue({ count: 0 });
+
+        const req = new NextRequest("http://localhost/api/leave/not-taken", {
+            method: "POST",
+            body: JSON.stringify({ leaveId: "leave-duplicate", note: "Already requested" }),
+        });
+
+        const res = await POST(req);
+
+        expect(res.status).toBe(409);
+        expect(prisma.notificationOutbox.create).not.toHaveBeenCalled();
+        expect(prisma.notification.create).not.toHaveBeenCalled();
     });
 
     it("confirms not-taken request and returns quota", async () => {
