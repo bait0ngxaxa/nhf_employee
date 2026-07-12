@@ -198,17 +198,6 @@ export async function createVariantAttributes(
     }
 }
 
-export function summarizeVariantInventory(
-    variants: Array<{ quantity: number; minStock: number; unit: string }>,
-    fallbackUnit: string,
-): { quantity: number; minStock: number; unit: string } {
-    return {
-        quantity: variants.reduce((sum, variant) => sum + variant.quantity, 0),
-        minStock: variants.reduce((sum, variant) => sum + variant.minStock, 0),
-        unit: variants[0]?.unit ?? fallbackUnit,
-    };
-}
-
 export async function variantHasReferences(
     tx: Prisma.TransactionClient,
     variantId: number,

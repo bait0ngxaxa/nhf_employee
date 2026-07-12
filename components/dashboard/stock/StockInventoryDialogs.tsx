@@ -48,10 +48,22 @@ function getTrimmedFormText(
 
 export function AdjustDialog({ item, onClose, onSuccess }: AdjustDialogProps) {
     const activeVariants = item.variants?.filter((variant) => variant.isActive) ?? [];
+    const initialVariant = activeVariants.length === 1 ? activeVariants[0] : undefined;
     const [loading, setLoading] = useState(false);
     const [selectedVariantId, setSelectedVariantId] = useState(
-        activeVariants.length === 1 ? String(activeVariants[0].id) : "",
+        initialVariant ? String(initialVariant.id) : "",
     );
+    const [minStock, setMinStock] = useState(
+        String(initialVariant?.minStock ?? item.minStock),
+    );
+
+    function handleVariantChange(variantId: string): void {
+        setSelectedVariantId(variantId);
+        const selectedVariant = activeVariants.find(
+            (variant) => variant.id === Number(variantId),
+        );
+        setMinStock(String(selectedVariant?.minStock ?? item.minStock));
+    }
 
     async function handleSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
         event.preventDefault();
@@ -107,7 +119,7 @@ export function AdjustDialog({ item, onClose, onSuccess }: AdjustDialogProps) {
                         <AdjustVariantField
                             variants={activeVariants}
                             value={selectedVariantId}
-                            onValueChange={setSelectedVariantId}
+                            onValueChange={handleVariantChange}
                         />
                     )}
                     <DialogNumberField
@@ -120,7 +132,8 @@ export function AdjustDialog({ item, onClose, onSuccess }: AdjustDialogProps) {
                         id="adj-min-stock"
                         name="minStock"
                         label={STOCK_ADMIN_TEXT.minStock}
-                        defaultValue={item.minStock}
+                        value={minStock}
+                        onValueChange={setMinStock}
                     />
                     <DialogActions
                         loading={loading}
@@ -267,7 +280,9 @@ function DialogNumberField(props: {
     id: string;
     name: string;
     label: string;
-    defaultValue: number;
+    defaultValue?: number;
+    value?: string;
+    onValueChange?: (value: string) => void;
 }) {
     return (
         <div className="space-y-1.5">
@@ -279,7 +294,12 @@ function DialogNumberField(props: {
                 name={props.name}
                 type="number"
                 min={1}
-                defaultValue={props.defaultValue}
+                {...(props.value !== undefined
+                    ? {
+                          value: props.value,
+                          onChange: (event) => props.onValueChange?.(event.target.value),
+                      }
+                    : { defaultValue: props.defaultValue })}
                 required
                 className="h-10 focus-visible:ring-blue-500"
             />

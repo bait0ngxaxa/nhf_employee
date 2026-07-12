@@ -25,6 +25,9 @@ describe("Stock Service Mutations", () => {
         prismaMock.stockRequest.updateMany.mockResolvedValue(
             asNever({ count: 1 }),
         );
+        prismaMock.stockItemVariant.aggregate.mockResolvedValue(
+            asNever({ _sum: { quantity: 10, minStock: 5 } }),
+        );
     });
 
     describe("issueRequest", () => {
@@ -475,7 +478,7 @@ describe("Stock Service Mutations", () => {
     });
 
     describe("updateItem", () => {
-        it("should sync parent stock totals from variants", async () => {
+        it("should preserve existing stock when a metadata edit submits stale variant quantities", async () => {
             prismaMock.stockItem.findUniqueOrThrow.mockResolvedValue(
                 asNever({
                     id: 25,
@@ -502,6 +505,9 @@ describe("Stock Service Mutations", () => {
                     }),
                 )
                 .mockResolvedValueOnce(asNever({ id: 25 }));
+            prismaMock.stockItemVariant.aggregate.mockResolvedValue(
+                asNever({ _sum: { quantity: 15, minStock: 5 } }),
+            );
             prismaMock.stockItemVariant.update.mockResolvedValue(asNever({ id: 251 }));
             prismaMock.stockVariantAttributeValue.deleteMany.mockResolvedValue(
                 asNever({ count: 1 }),
@@ -543,31 +549,28 @@ describe("Stock Service Mutations", () => {
             expect(prismaMock.stockItem.update).toHaveBeenCalledWith(
                 expect.objectContaining({
                     where: { id: 25 },
-                    data: expect.objectContaining({
-                        unit: "ชิ้น",
-                        quantity: 10,
-                        minStock: 5,
-                    }),
+                    data: expect.not.objectContaining({ quantity: expect.any(Number) }),
                 }),
             );
             expect(prismaMock.stockItemVariant.update).toHaveBeenNthCalledWith(
                 1,
                 expect.objectContaining({
                     where: { id: 251 },
-                    data: expect.objectContaining({
-                        quantity: 4,
-                        minStock: 2,
-                    }),
+                    data: expect.not.objectContaining({ quantity: expect.any(Number) }),
                 }),
             );
             expect(prismaMock.stockItemVariant.update).toHaveBeenNthCalledWith(
                 2,
                 expect.objectContaining({
                     where: { id: 252 },
-                    data: expect.objectContaining({
-                        quantity: 6,
-                        minStock: 3,
-                    }),
+                    data: expect.not.objectContaining({ quantity: expect.any(Number) }),
+                }),
+            );
+            expect(prismaMock.stockItem.update).toHaveBeenNthCalledWith(
+                2,
+                expect.objectContaining({
+                    where: { id: 25 },
+                    data: { quantity: 15, minStock: 5 },
                 }),
             );
         });

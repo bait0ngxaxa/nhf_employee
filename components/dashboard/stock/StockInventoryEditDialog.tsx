@@ -193,6 +193,9 @@ export function EditItemDialog({
     );
     const hasChanges =
         JSON.stringify(currentSnapshot) !== JSON.stringify(initialSnapshot);
+    const hasVariantChanges =
+        JSON.stringify(currentSnapshot.variants) !==
+        JSON.stringify(initialSnapshot.variants);
 
     async function handleSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
         event.preventDefault();
@@ -217,7 +220,9 @@ export function EditItemDialog({
                     description: currentSnapshot.description,
                     categoryId: currentSnapshot.categoryId,
                     imageUrl: currentSnapshot.imageUrl,
-                    variants: currentSnapshot.variants,
+                    ...(hasVariantChanges && {
+                        variants: currentSnapshot.variants,
+                    }),
                 }),
                 "เกิดข้อผิดพลาด",
             );

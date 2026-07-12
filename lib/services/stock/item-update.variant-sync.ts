@@ -3,7 +3,6 @@ import {
     buildItemInclude,
     createVariantAttributes,
     ensureDefaultVariant,
-    summarizeVariantInventory,
     variantHasReferences,
 } from "./shared";
 import {
@@ -188,7 +187,6 @@ async function updateSubmittedVariant(
                 existingVariant.sku ||
                 `${parentSku}-V${index + 1}`,
             unit: variant.unit,
-            quantity: variant.quantity,
             minStock: variant.minStock,
             imageUrl: nextVariantImageUrl,
         },
@@ -282,6 +280,21 @@ async function handleRemovedVariants(
     }
 }
 
+async function summarizeStoredVariantInventory(
+    tx: StockTxClient,
+    itemId: number,
+): Promise<{ quantity: number; minStock: number }> {
+    const summary = await tx.stockItemVariant.aggregate({
+        where: { stockItemId: itemId, isActive: true },
+        _sum: { quantity: true, minStock: true },
+    });
+
+    return {
+        quantity: summary._sum.quantity ?? 0,
+        minStock: summary._sum.minStock ?? 0,
+    };
+}
+
 export async function updateItemWithVariants(
     tx: StockTxClient,
     itemId: number,
@@ -296,14 +309,11 @@ export async function updateItemWithVariants(
 
     assertSubmittedVariantsExist(variants, existingVariantById);
 
-    const inventorySummary = summarizeVariantInventory(variants, item.unit);
     const nextItem = await tx.stockItem.update({
         where: { id: itemId },
         data: {
             ...itemData,
             unit: variants[0]?.unit ?? item.unit,
-            quantity: inventorySummary.quantity,
-            minStock: inventorySummary.minStock,
         },
         select: {
             id: true,
@@ -325,6 +335,12 @@ export async function updateItemWithVariants(
     );
 
     await handleRemovedVariants(tx, existingVariants, submittedIds, tracking);
+
+    const inventorySummary = await summarizeStoredVariantInventory(tx, itemId);
+    await tx.stockItem.update({
+        where: { id: itemId },
+        data: inventorySummary,
+    });
 
     return tx.stockItem.findUniqueOrThrow({
         where: { id: itemId },
