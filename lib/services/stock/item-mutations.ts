@@ -14,6 +14,7 @@ import {
     generateSku,
 } from "./shared";
 import { updateItemInTransaction } from "./item-update.shared";
+import type { StockTxClient } from "./item-update.types";
 import type {
     AdjustStockResult,
     CreateStockItemInput,
@@ -45,6 +46,120 @@ function buildLowStockAlert(
             unit: item.unit,
         },
     ];
+}
+
+type AdjustmentItem = {
+    id: number;
+    name: string;
+    sku: string;
+    unit: string;
+    quantity: number;
+    minStock: number;
+    imageUrl: string | null;
+    isActive: boolean;
+};
+
+type AdjustmentVariant = {
+    id: number;
+    quantity: number;
+    minStock: number;
+};
+
+async function findAdjustmentVariant(
+    tx: StockTxClient,
+    item: AdjustmentItem,
+    variantId: number | undefined,
+): Promise<AdjustmentVariant> {
+    if (variantId !== undefined) {
+        const variant = await tx.stockItemVariant.findFirst({
+            where: { id: variantId, stockItemId: item.id, isActive: true },
+            select: { id: true, quantity: true, minStock: true },
+        });
+        if (!variant) {
+            throw new Error("ไม่พบรายการย่อยของวัสดุ");
+        }
+        return variant;
+    }
+
+    const activeVariants = await tx.stockItemVariant.findMany({
+        where: { stockItemId: item.id, isActive: true },
+        select: { id: true, quantity: true, minStock: true },
+        orderBy: { id: "asc" },
+    });
+    if (activeVariants.length > 1) {
+        throw new Error("กรุณาเลือกรายการย่อยของวัสดุ");
+    }
+    if (activeVariants.length === 1) {
+        return activeVariants[0];
+    }
+
+    const fallbackVariant = await ensureDefaultVariant(tx, item);
+    return tx.stockItemVariant.findUniqueOrThrow({
+        where: { id: fallbackVariant.id },
+        select: { id: true, quantity: true, minStock: true },
+    });
+}
+
+async function applyStockAdjustment(
+    tx: StockTxClient,
+    item: AdjustmentItem,
+    variant: AdjustmentVariant,
+    input: AdjustStockInput,
+    userId: number,
+): Promise<AdjustStockResult> {
+    const updatedVariant = await tx.stockItemVariant.updateMany({
+        where: {
+            id: variant.id,
+            stockItemId: item.id,
+            isActive: true,
+            minStock: variant.minStock,
+        },
+        data: {
+            quantity: { increment: input.quantity },
+            minStock: input.minStock,
+        },
+    });
+    if (updatedVariant.count === 0) {
+        throw new Error("รายการย่อยของวัสดุถูกปรับปรุงพร้อมกัน กรุณาลองใหม่");
+    }
+
+    const minStockDelta = input.minStock - variant.minStock;
+    const updatedItem = await tx.stockItem.update({
+        where: { id: item.id },
+        data: {
+            quantity: { increment: input.quantity },
+            minStock: { increment: minStockDelta },
+        },
+        select: { quantity: true, minStock: true },
+    });
+    await tx.stockTransaction.create({
+        data: {
+            itemId: item.id,
+            variantId: variant.id,
+            type: input.type as StockTxType,
+            quantity: input.quantity,
+            note: null,
+            performedBy: userId,
+        },
+    });
+
+    const previousQty = updatedItem.quantity - input.quantity;
+    const previousMinStock = updatedItem.minStock - minStockDelta;
+    return {
+        itemId: item.id,
+        variantId: variant.id,
+        itemName: item.name,
+        sku: item.sku,
+        previousQty,
+        newQty: updatedItem.quantity,
+        previousMinStock,
+        newMinStock: updatedItem.minStock,
+        lowStockAlerts: buildLowStockAlert(
+            { ...item, quantity: previousQty },
+            updatedItem.quantity,
+            updatedItem.minStock,
+        ),
+    };
 }
 
 export async function createCategory(data: CreateCategoryInput) {
@@ -164,51 +279,7 @@ export async function adjustStock(
             throw new Error("ไม่พบวัสดุ");
         }
 
-        const newQty = item.quantity + input.quantity;
-        if (newQty < 0) {
-            throw new Error("ยอดคงเหลือต้องไม่ติดลบ");
-        }
-
-        const lowStockAlerts = buildLowStockAlert(item, newQty, input.minStock);
-
-        await tx.stockItem.update({
-            where: { id: itemId },
-            data: {
-                quantity: newQty,
-                minStock: input.minStock,
-            },
-        });
-
-        const defaultVariant = await ensureDefaultVariant(tx, item);
-        await tx.stockItemVariant.update({
-            where: { id: defaultVariant.id },
-            data: {
-                quantity: newQty,
-                minStock: input.minStock,
-            },
-        });
-
-        await tx.stockTransaction.create({
-            data: {
-                itemId,
-                variantId: defaultVariant.id,
-                type: input.type as StockTxType,
-                quantity: input.quantity,
-                note: null,
-                performedBy: userId,
-            },
-        });
-
-        return {
-            itemId,
-            variantId: defaultVariant.id,
-            itemName: item.name,
-            sku: item.sku,
-            previousQty: item.quantity,
-            newQty,
-            previousMinStock: item.minStock,
-            newMinStock: input.minStock,
-            lowStockAlerts,
-        };
+        const variant = await findAdjustmentVariant(tx, item, input.variantId);
+        return applyStockAdjustment(tx, item, variant, input, userId);
     });
 }

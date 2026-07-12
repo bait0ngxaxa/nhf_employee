@@ -9,10 +9,17 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
 import { toast } from "sonner";
 import { apiPost } from "@/lib/client/api-client";
 import { API_ROUTES } from "@/lib/ssot/routes";
-import type { StockItem } from "../context/stock/types";
+import type { StockItem, StockItemVariant } from "../context/stock/types";
 import {
     ensureStockApiSuccess,
     STOCK_ADMIN_TEXT,
@@ -40,12 +47,21 @@ function getTrimmedFormText(
 }
 
 export function AdjustDialog({ item, onClose, onSuccess }: AdjustDialogProps) {
+    const activeVariants = item.variants?.filter((variant) => variant.isActive) ?? [];
     const [loading, setLoading] = useState(false);
+    const [selectedVariantId, setSelectedVariantId] = useState(
+        activeVariants.length === 1 ? String(activeVariants[0].id) : "",
+    );
 
     async function handleSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
         event.preventDefault();
-        setLoading(true);
         const formData = new FormData(event.currentTarget);
+        const variantId = Number(formData.get("variantId"));
+        if (activeVariants.length > 1 && !selectedVariantId) {
+            toast.error("กรุณาเลือกรายการย่อยที่จะรับเข้า");
+            return;
+        }
+        setLoading(true);
 
         try {
             ensureStockApiSuccess(
@@ -53,6 +69,7 @@ export function AdjustDialog({ item, onClose, onSuccess }: AdjustDialogProps) {
                     type: "IN",
                     quantity: Number(formData.get("quantity")),
                     minStock: Number(formData.get("minStock")),
+                    ...(Number.isInteger(variantId) && variantId > 0 && { variantId }),
                 }),
                 STOCK_ADMIN_TEXT.genericError,
             );
@@ -86,6 +103,13 @@ export function AdjustDialog({ item, onClose, onSuccess }: AdjustDialogProps) {
                             {STOCK_ADMIN_TEXT.currentStock}: {item.quantity} {item.unit}
                         </span>
                     </div>
+                    {activeVariants.length > 0 && (
+                        <AdjustVariantField
+                            variants={activeVariants}
+                            value={selectedVariantId}
+                            onValueChange={setSelectedVariantId}
+                        />
+                    )}
                     <DialogNumberField
                         id="adj-qty"
                         name="quantity"
@@ -106,6 +130,37 @@ export function AdjustDialog({ item, onClose, onSuccess }: AdjustDialogProps) {
                 </form>
             </DialogContent>
         </Dialog>
+    );
+}
+
+function AdjustVariantField(props: {
+    variants: StockItemVariant[];
+    value: string;
+    onValueChange: (value: string) => void;
+}) {
+
+    return (
+        <div className="space-y-1.5">
+            <Label className="text-sm font-semibold text-slate-700">
+                รายการย่อยที่จะรับเข้า <span className="text-rose-500">*</span>
+            </Label>
+            <Select
+                name="variantId"
+                value={props.value}
+                onValueChange={props.onValueChange}
+            >
+                <SelectTrigger className="h-10 w-full focus:ring-blue-500">
+                    <SelectValue placeholder="เลือกรายการย่อย" />
+                </SelectTrigger>
+                <SelectContent>
+                    {props.variants.map((variant) => (
+                        <SelectItem key={variant.id} value={String(variant.id)}>
+                            {variant.sku} · คงเหลือ {variant.quantity} {variant.unit}
+                        </SelectItem>
+                    ))}
+                </SelectContent>
+            </Select>
+        </div>
     );
 }
 

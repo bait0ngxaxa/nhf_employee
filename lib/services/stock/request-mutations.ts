@@ -178,10 +178,36 @@ export async function issueRequest(
     adminId: number,
 ): Promise<IssueRequestResult<{ id: number; requestedBy: number }>> {
     return prisma.$transaction(async (tx) => {
+        const issuedAt = new Date();
+        const claimedRequest = await tx.stockRequest.updateMany({
+            where: {
+                id: requestId,
+                status: StockRequestStatus.PENDING_ISSUE,
+            },
+            data: {
+                status: StockRequestStatus.ISSUED,
+                issuedById: adminId,
+                issuedAt,
+                cancelReason: null,
+                cancelledById: null,
+                cancelledAt: null,
+            },
+        });
+
+        if (claimedRequest.count === 0) {
+            const existingRequest = await tx.stockRequest.findUnique({
+                where: { id: requestId },
+                select: { status: true },
+            });
+            if (!existingRequest) {
+                throw new Error("ไม่พบคำขอเบิก");
+            }
+            throw new Error("คำขอนี้ถูกดำเนินการแล้ว");
+        }
+
         const request = await tx.stockRequest.findUnique({
             where: { id: requestId },
             select: {
-                status: true,
                 requestedBy: true,
                 items: {
                     select: {
@@ -195,9 +221,6 @@ export async function issueRequest(
 
         if (!request) {
             throw new Error("ไม่พบคำขอเบิก");
-        }
-        if (request.status !== "PENDING_ISSUE") {
-            throw new Error("คำขอนี้ถูกดำเนินการแล้ว");
         }
 
         const defaultVariantsByItemId = await ensureDefaultVariantsByItemIds(
@@ -308,24 +331,11 @@ export async function issueRequest(
             });
         }
 
-        const updatedRequest = await tx.stockRequest.update({
-            where: { id: requestId },
-            data: {
-                status: "ISSUED",
-                issuedById: adminId,
-                issuedAt: new Date(),
-                cancelReason: null,
-                cancelledById: null,
-                cancelledAt: null,
-            },
-            select: {
-                id: true,
-                requestedBy: true,
-            },
-        });
-
         return {
-            request: updatedRequest,
+            request: {
+                id: requestId,
+                requestedBy: request.requestedBy,
+            },
             lowStockAlerts,
         };
     });
@@ -336,7 +346,7 @@ export async function cancelRequest(
     actorId: number,
     reason?: string | null,
     options: CancelRequestOptions = { isAdmin: false },
-) {
+): Promise<Prisma.StockRequestGetPayload<Record<string, never>>> {
     const request = await prisma.stockRequest.findUnique({
         where: { id: requestId },
         select: { status: true, requestedBy: true },
@@ -352,13 +362,31 @@ export async function cancelRequest(
         throw new Error("ไม่มีสิทธิ์ยกเลิกคำขอนี้");
     }
 
-    return prisma.stockRequest.update({
-        where: { id: requestId },
+    const cancelledRequest = await prisma.stockRequest.updateMany({
+        where: {
+            id: requestId,
+            status: StockRequestStatus.PENDING_ISSUE,
+        },
         data: {
-            status: "CANCELLED",
+            status: StockRequestStatus.CANCELLED,
             cancelReason: reason ?? null,
             cancelledById: actorId,
             cancelledAt: new Date(),
         },
+    });
+
+    if (cancelledRequest.count === 0) {
+        const existingRequest = await prisma.stockRequest.findUnique({
+            where: { id: requestId },
+            select: { id: true },
+        });
+        if (!existingRequest) {
+            throw new Error("ไม่พบคำขอเบิก");
+        }
+        throw new Error("คำขอนี้ถูกดำเนินการแล้ว");
+    }
+
+    return prisma.stockRequest.findUniqueOrThrow({
+        where: { id: requestId },
     });
 }

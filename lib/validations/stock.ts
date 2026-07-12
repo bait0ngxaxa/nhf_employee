@@ -292,6 +292,7 @@ export const updateItemSchema = z
 
 export const adjustStockSchema = z
     .object({
+        variantId: z.coerce.number().int().positive().optional(),
         type: z.literal(StockTxType.IN, {
             message: "รองรับเฉพาะการรับเข้า (IN)",
         }),

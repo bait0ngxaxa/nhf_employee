@@ -69,7 +69,8 @@ export async function POST(
         const message = error instanceof Error ? error.message : "";
         if (
             message.includes("ไม่พบวัสดุ") ||
-            message.includes("ต้องไม่ติดลบ")
+            message.includes("ต้องไม่ติดลบ") ||
+            message.includes("รายการย่อยของวัสดุ")
         ) {
             return jsonError(message, 400);
         }

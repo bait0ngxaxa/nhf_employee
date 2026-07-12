@@ -22,9 +22,38 @@ describe("Stock Service Mutations", () => {
             return callback(prismaMock as unknown as PrismaClient);
         });
         prismaMock.stockItemVariant.findFirst.mockResolvedValue(null as never);
+        prismaMock.stockRequest.updateMany.mockResolvedValue(
+            asNever({ count: 1 }),
+        );
     });
 
     describe("issueRequest", () => {
+        it("should not issue stock when another transaction has already claimed the request", async () => {
+            prismaMock.stockRequest.updateMany.mockResolvedValue(
+                asNever({ count: 0 }),
+            );
+            prismaMock.stockRequest.findUnique.mockResolvedValue(
+                asNever({ status: "ISSUED" }),
+            );
+
+            await expect(stockService.issueRequest(99, 9)).rejects.toThrow(
+                "คำขอนี้ถูกดำเนินการแล้ว",
+            );
+
+            expect(prismaMock.stockRequest.updateMany).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    where: { id: 99, status: "PENDING_ISSUE" },
+                    data: expect.objectContaining({
+                        status: "ISSUED",
+                        issuedById: 9,
+                        issuedAt: expect.any(Date),
+                    }),
+                }),
+            );
+            expect(prismaMock.stockItemVariant.updateMany).not.toHaveBeenCalled();
+            expect(prismaMock.stockTransaction.create).not.toHaveBeenCalled();
+        });
+
         it("should reject when aggregated duplicate items exceed stock", async () => {
             prismaMock.stockRequest.findUnique.mockResolvedValue(
                 asNever({
@@ -188,10 +217,6 @@ describe("Stock Service Mutations", () => {
             prismaMock.stockTransaction.create.mockResolvedValue(
                 asNever({ id: 1 }),
             );
-            prismaMock.stockRequest.update.mockResolvedValue(
-                asNever({ id: 99, status: "ISSUED" }),
-            );
-
             await stockService.issueRequest(99, 9);
 
             expect(prismaMock.stockItemVariant.updateMany).toHaveBeenNthCalledWith(
@@ -208,14 +233,103 @@ describe("Stock Service Mutations", () => {
                     data: { quantity: { decrement: 1 } },
                 }),
             );
-            expect(prismaMock.stockRequest.update).toHaveBeenCalledWith(
+            expect(prismaMock.stockRequest.updateMany).toHaveBeenCalledWith(
                 expect.objectContaining({
+                    where: { id: 99, status: "PENDING_ISSUE" },
                     data: expect.objectContaining({
                         status: "ISSUED",
                         issuedById: 9,
                     }),
                 }),
             );
+        });
+    });
+
+    describe("adjustStock", () => {
+        it("should atomically adjust the selected variant and cached parent aggregate by delta", async () => {
+            prismaMock.stockItem.findUnique.mockResolvedValue(
+                asNever({
+                    id: 10,
+                    name: "หมึกพิมพ์",
+                    sku: "INK-10",
+                    unit: "ตลับ",
+                    quantity: 12,
+                    minStock: 4,
+                    imageUrl: null,
+                    isActive: true,
+                }),
+            );
+            prismaMock.stockItemVariant.findFirst.mockResolvedValue(
+                asNever({ id: 102, quantity: 4, minStock: 2 }),
+            );
+            prismaMock.stockItemVariant.updateMany.mockResolvedValue(
+                asNever({ count: 1 }),
+            );
+            prismaMock.stockItem.update.mockResolvedValue(
+                asNever({ quantity: 15, minStock: 7 }),
+            );
+            prismaMock.stockTransaction.create.mockResolvedValue(asNever({ id: 1 }));
+
+            const result = await stockService.adjustStock(
+                10,
+                { type: "IN", quantity: 3, minStock: 5, variantId: 102 },
+                9,
+            );
+
+            expect(prismaMock.stockItemVariant.updateMany).toHaveBeenCalledWith({
+                where: {
+                    id: 102,
+                    stockItemId: 10,
+                    isActive: true,
+                    minStock: 2,
+                },
+                data: {
+                    quantity: { increment: 3 },
+                    minStock: 5,
+                },
+            });
+            expect(prismaMock.stockItem.update).toHaveBeenCalledWith({
+                where: { id: 10 },
+                data: {
+                    quantity: { increment: 3 },
+                    minStock: { increment: 3 },
+                },
+                select: { quantity: true, minStock: true },
+            });
+            expect(result).toMatchObject({
+                variantId: 102,
+                previousQty: 12,
+                newQty: 15,
+                previousMinStock: 4,
+                newMinStock: 7,
+            });
+        });
+
+        it("should require a selected variant when multiple active variants exist", async () => {
+            prismaMock.stockItem.findUnique.mockResolvedValue(
+                asNever({
+                    id: 10,
+                    name: "หมึกพิมพ์",
+                    sku: "INK-10",
+                    unit: "ตลับ",
+                    quantity: 12,
+                    minStock: 4,
+                    imageUrl: null,
+                    isActive: true,
+                }),
+            );
+            prismaMock.stockItemVariant.findMany.mockResolvedValue(
+                asNever([{ id: 101 }, { id: 102 }]),
+            );
+
+            await expect(
+                stockService.adjustStock(
+                    10,
+                    { type: "IN", quantity: 3, minStock: 5 },
+                    9,
+                ),
+            ).rejects.toThrow("กรุณาเลือกรายการย่อยของวัสดุ");
+            expect(prismaMock.stockItemVariant.updateMany).not.toHaveBeenCalled();
         });
     });
 
@@ -303,19 +417,42 @@ describe("Stock Service Mutations", () => {
     });
 
     describe("cancelRequest", () => {
+        it("should not cancel a request that an issue transaction has already claimed", async () => {
+            prismaMock.stockRequest.findUnique.mockResolvedValue(
+                asNever({ status: "PENDING_ISSUE", requestedBy: 3 }),
+            );
+            prismaMock.stockRequest.updateMany.mockResolvedValue(
+                asNever({ count: 0 }),
+            );
+
+            await expect(
+                stockService.cancelRequest(55, 3, "ผู้เบิกไม่มารับ"),
+            ).rejects.toThrow("คำขอนี้ถูกดำเนินการแล้ว");
+
+            expect(prismaMock.stockRequest.updateMany).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    where: { id: 55, status: "PENDING_ISSUE" },
+                    data: expect.objectContaining({
+                        status: "CANCELLED",
+                        cancelReason: "ผู้เบิกไม่มารับ",
+                        cancelledById: 3,
+                        cancelledAt: expect.any(Date),
+                    }),
+                }),
+            );
+            expect(prismaMock.stockRequest.update).not.toHaveBeenCalled();
+        });
+
         it("should cancel only pending issue requests", async () => {
             prismaMock.stockRequest.findUnique.mockResolvedValue(
                 asNever({ status: "PENDING_ISSUE", requestedBy: 3 }),
             );
-            prismaMock.stockRequest.update.mockResolvedValue(
-                asNever({ id: 55, status: "CANCELLED" }),
-            );
 
             await stockService.cancelRequest(55, 3, "ผู้เบิกไม่มารับ");
 
-            expect(prismaMock.stockRequest.update).toHaveBeenCalledWith(
+            expect(prismaMock.stockRequest.updateMany).toHaveBeenCalledWith(
                 expect.objectContaining({
-                    where: { id: 55 },
+                    where: { id: 55, status: "PENDING_ISSUE" },
                     data: expect.objectContaining({
                         status: "CANCELLED",
                         cancelReason: "ผู้เบิกไม่มารับ",
