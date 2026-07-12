@@ -401,6 +401,38 @@ describe("POST /api/leave/request", () => {
             expect(data.error).toBe("มีคำขอลาในช่วงวันที่นี้อยู่แล้ว");
         });
 
+        it("should retry a write conflict and return overlap conflict", async () => {
+            (prisma.employee.findUnique as unknown as { mockResolvedValue: (v: ReturnType<typeof buildEmployeeWithManager>) => void }).mockResolvedValue(buildEmployeeWithManager());
+            (prisma.leaveRequest.findFirst as unknown as { mockResolvedValue: (v: { id: string; status: string }) => void }).mockResolvedValue({
+                id: "existing-leave-request",
+                status: "PENDING",
+            });
+            (
+                prisma.$transaction as unknown as {
+                    mockRejectedValueOnce: (value: unknown) => {
+                        mockImplementationOnce: (
+                            implementation: (callback: (tx: typeof prisma) => Promise<unknown>) => Promise<unknown>,
+                        ) => void;
+                    };
+                }
+            )
+                .mockRejectedValueOnce({ code: "P2034" })
+                .mockImplementationOnce(async (callback) => callback(prisma));
+
+            const req = new NextRequest("http://localhost/api/leave/request", {
+                method: "POST",
+                body: JSON.stringify(validPayload),
+            });
+            const res = await submitLeaveRequest(req);
+
+            expect(res.status).toBe(409);
+            expect(prisma.$transaction).toHaveBeenCalledTimes(2);
+            expect(prisma.$transaction).toHaveBeenLastCalledWith(
+                expect.any(Function),
+                expect.objectContaining({ isolationLevel: "Serializable" }),
+            );
+        });
+
         it("should complete successfully, creating default quota if none exists", async () => {
             (prisma.employee.findUnique as unknown as { mockResolvedValue: (v: ReturnType<typeof buildEmployeeWithManager>) => void }).mockResolvedValue(buildEmployeeWithManager());
             (prisma.leaveRequest.findFirst as unknown as { mockResolvedValue: (v: null) => void }).mockResolvedValue(null);

@@ -1,4 +1,5 @@
 import { NextResponse, after } from "next/server";
+import { Prisma } from "@prisma/client";
 
 import { DEFAULT_LEAVE_QUOTAS } from "@/constants/leave";
 import { requireApiSession } from "@/lib/auth/api";
@@ -28,6 +29,42 @@ const LEAVE_REQUEST_MESSAGES = {
     halfDayMultiDate: "การลาครึ่งวันต้องเลือกวันลาเพียงวันเดียว",
     specialReasonRequired: "กรุณาระบุเหตุผลพิเศษสำหรับการลาเกินโควต้า",
 } as const;
+
+const MAX_TRANSACTION_RETRIES = 3;
+const RETRY_DELAY_MS = 25;
+
+function isTransactionWriteConflict(error: unknown): boolean {
+    return (
+        typeof error === "object"
+        && error !== null
+        && "code" in error
+        && error.code === "P2034"
+    );
+}
+
+function waitForTransactionRetry(delayMs: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, delayMs));
+}
+
+async function runSerializableTransaction<T>(
+    callback: (tx: Prisma.TransactionClient) => Promise<T>,
+): Promise<T> {
+    for (let attempt = 0; attempt < MAX_TRANSACTION_RETRIES; attempt += 1) {
+        try {
+            return await prisma.$transaction(callback, {
+                isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+            });
+        } catch (error) {
+            if (!isTransactionWriteConflict(error) || attempt === MAX_TRANSACTION_RETRIES - 1) {
+                throw error;
+            }
+
+            await waitForTransactionRetry(RETRY_DELAY_MS * 2 ** attempt);
+        }
+    }
+
+    throw new Error("Transaction retry limit was reached unexpectedly");
+}
 
 class LeaveRequestError extends Error {
     readonly statusCode: number;
@@ -97,7 +134,7 @@ export async function POST(req: Request) {
             return jsonError(LEAVE_REQUEST_MESSAGES.holidayConflict, 400);
         }
 
-        const result = await prisma.$transaction(async (tx) => {
+        const result = await runSerializableTransaction(async (tx) => {
             const employee = await tx.employee.findUnique({
                 where: { id: employeeId },
                 include: {
