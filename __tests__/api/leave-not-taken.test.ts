@@ -32,6 +32,7 @@ vi.mock("@/lib/services/outbox/processor", () => ({
 vi.mock("@/lib/db/prisma", () => ({
     prisma: {
         $transaction: vi.fn(),
+        user: { findUnique: vi.fn() },
         notification: {
             create: vi.fn(),
             updateMany: vi.fn(),
@@ -67,6 +68,10 @@ describe("/api/leave/not-taken", () => {
             },
         });
         vi.mocked(getEmployeeIdFromUserId).mockResolvedValue(10);
+        vi.mocked(prisma.user.findUnique).mockResolvedValue({
+            isActive: true,
+            employee: { id: 10, status: "ACTIVE", deletedAt: null },
+        } as never);
         vi.mocked(processOutbox).mockResolvedValue({ processed: 0, failed: 0 });
         vi.mocked(prisma.$transaction).mockImplementation(async (callback) => {
             if (typeof callback === "function") {

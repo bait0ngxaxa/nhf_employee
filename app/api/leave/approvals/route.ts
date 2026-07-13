@@ -1,10 +1,9 @@
 import { NextResponse } from "next/server";
 import type { Prisma } from "@prisma/client";
 
-import { requireApiSession } from "@/lib/auth/api";
 import { prisma } from "@/lib/db/prisma";
-import { getEmployeeIdFromUserId } from "@/lib/services/leave/get-employee-id";
-import { notFound, operationFailed } from "@/lib/ssot/http";
+import { requireActiveEmployeeSession } from "@/lib/services/leave/active-employee-session";
+import { notFound } from "@/lib/ssot/http";
 import { FEATURE_KEYS, isFeatureEnabled } from "@/lib/ssot/features";
 import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
 
@@ -33,18 +32,10 @@ export async function GET(req: Request): Promise<NextResponse> {
             return notFound();
         }
 
-        const auth = await requireApiSession();
+        const auth = await requireActiveEmployeeSession();
         if (!auth.ok) return auth.response;
 
-        const userId = Number(auth.session.user.id);
-        if (isNaN(userId)) {
-            return NextResponse.json({ error: COMMON_API_MESSAGES.invalidUserId }, { status: 400 });
-        }
-
-        const managerId = await getEmployeeIdFromUserId(userId);
-        if (!managerId) {
-            return operationFailed(404);
-        }
+        const managerId = auth.employeeId;
 
         const employeeInclude = {
             employee: {

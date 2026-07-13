@@ -2,10 +2,9 @@ import { NextResponse, after } from "next/server";
 import { Prisma } from "@prisma/client";
 
 import { DEFAULT_LEAVE_QUOTAS } from "@/constants/leave";
-import { requireApiSession } from "@/lib/auth/api";
 import { logLeaveEvent } from "@/lib/server/audit";
 import { prisma } from "@/lib/db/prisma";
-import { getEmployeeIdFromUserId } from "@/lib/services/leave/get-employee-id";
+import { requireActiveEmployeeSession } from "@/lib/services/leave/active-employee-session";
 import { calculateAdditionalOverQuotaDays } from "@/lib/services/leave/over-quota";
 import {
     buildConfiguredApproverSnapshot,
@@ -82,18 +81,11 @@ export async function POST(req: Request) {
             return notFound();
         }
 
-        const auth = await requireApiSession();
+        const auth = await requireActiveEmployeeSession();
         if (!auth.ok) return auth.response;
 
-        const userId = Number(auth.session.user.id);
-        if (Number.isNaN(userId)) {
-            return jsonError(COMMON_API_MESSAGES.invalidUserId, 400);
-        }
-
-        const employeeId = await getEmployeeIdFromUserId(userId);
-        if (!employeeId) {
-            return jsonError(COMMON_API_MESSAGES.operationFailed, 404);
-        }
+        const userId = auth.user.id;
+        const { employeeId } = auth;
 
         const data = await req.json();
         const parsed = leaveRequestSchema.safeParse(data);

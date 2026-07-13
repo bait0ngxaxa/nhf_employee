@@ -1,9 +1,8 @@
 import { after, NextResponse } from "next/server";
 
-import { requireApiSession } from "@/lib/auth/api";
 import { logLeaveEvent } from "@/lib/server/audit";
 import { prisma } from "@/lib/db/prisma";
-import { getEmployeeIdFromUserId } from "@/lib/services/leave/get-employee-id";
+import { requireActiveEmployeeSession } from "@/lib/services/leave/active-employee-session";
 import {
     buildConfiguredApproverSnapshot,
     buildLeaveRecipientSnapshot,
@@ -42,18 +41,14 @@ export async function POST(req: Request) {
             return notFound();
         }
 
-        const auth = await requireApiSession();
+        const auth = await requireActiveEmployeeSession({
+            employeeProfileNotFoundResponse: () =>
+                jsonError(COMMON_API_MESSAGES.employeeProfileNotFound, 404),
+        });
         if (!auth.ok) return auth.response;
 
-        const userId = Number(auth.session.user.id);
-        if (Number.isNaN(userId)) {
-            return jsonError(COMMON_API_MESSAGES.invalidUserId, 400);
-        }
-
-        const employeeId = await getEmployeeIdFromUserId(userId);
-        if (!employeeId) {
-            return jsonError(COMMON_API_MESSAGES.employeeProfileNotFound, 404);
-        }
+        const userId = auth.user.id;
+        const { employeeId } = auth;
 
         const body = await req.json();
         const parsed = leaveCancelSchema.safeParse(body);

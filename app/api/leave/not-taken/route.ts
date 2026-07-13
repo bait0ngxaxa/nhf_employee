@@ -1,10 +1,9 @@
 import { Prisma } from "@prisma/client";
 import { after, NextResponse } from "next/server";
 
-import { requireApiSession } from "@/lib/auth/api";
 import { prisma } from "@/lib/db/prisma";
 import { logLeaveEvent } from "@/lib/server/audit";
-import { getEmployeeIdFromUserId } from "@/lib/services/leave/get-employee-id";
+import { requireActiveEmployeeSession } from "@/lib/services/leave/active-employee-session";
 import {
     buildConfiguredApproverSnapshot,
     buildLeaveRecipientSnapshot,
@@ -19,7 +18,7 @@ import {
 import { getLeaveYearFromDateValue } from "@/lib/services/leave/quota-year";
 import { isAfterLeaveEnd } from "@/lib/services/leave/utils";
 import { processOutbox } from "@/lib/services/outbox/processor";
-import { jsonError, notFound, operationFailed } from "@/lib/ssot/http";
+import { jsonError, notFound } from "@/lib/ssot/http";
 import { FEATURE_KEYS, isFeatureEnabled } from "@/lib/ssot/features";
 import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
 import { APP_DASHBOARD_TABS, toDashboardTabPath } from "@/lib/ssot/routes";
@@ -55,18 +54,11 @@ export async function POST(req: Request): Promise<NextResponse> {
             return notFound();
         }
 
-        const auth = await requireApiSession();
+        const auth = await requireActiveEmployeeSession();
         if (!auth.ok) return auth.response;
 
-        const userId = Number(auth.session.user.id);
-        if (Number.isNaN(userId)) {
-            return jsonError(COMMON_API_MESSAGES.invalidUserId, 400);
-        }
-
-        const employeeId = await getEmployeeIdFromUserId(userId);
-        if (!employeeId) {
-            return operationFailed(404);
-        }
+        const userId = auth.user.id;
+        const employeeId = auth.employeeId;
 
         const body = await req.json();
         const parsed = leaveNotTakenRequestSchema.safeParse(body);
@@ -196,18 +188,11 @@ export async function PUT(req: Request): Promise<NextResponse> {
             return notFound();
         }
 
-        const auth = await requireApiSession();
+        const auth = await requireActiveEmployeeSession();
         if (!auth.ok) return auth.response;
 
-        const userId = Number(auth.session.user.id);
-        if (Number.isNaN(userId)) {
-            return jsonError(COMMON_API_MESSAGES.invalidUserId, 400);
-        }
-
-        const managerId = await getEmployeeIdFromUserId(userId);
-        if (!managerId) {
-            return operationFailed(404);
-        }
+        const userId = auth.user.id;
+        const managerId = auth.employeeId;
 
         const body = await req.json();
         const parsed = leaveNotTakenConfirmSchema.safeParse(body);

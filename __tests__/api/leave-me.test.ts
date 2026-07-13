@@ -14,6 +14,7 @@ vi.mock("@/lib/services/leave/get-employee-id", () => ({
 
 vi.mock("@/lib/db/prisma", () => ({
     prisma: {
+        user: { findUnique: vi.fn() },
         leaveQuota: {
             findMany: vi.fn(),
             createMany: vi.fn(),
@@ -43,6 +44,10 @@ describe("GET /api/leave/me", () => {
         vi.setSystemTime(new Date("2026-12-31T17:30:00.000Z"));
         vi.mocked(getApiAuthSession).mockResolvedValue(MOCK_SESSION);
         vi.mocked(getEmployeeIdFromUserId).mockResolvedValue(100);
+        vi.mocked(prisma.user.findUnique).mockResolvedValue({
+            isActive: true,
+            employee: { id: 100, status: "ACTIVE", deletedAt: null },
+        } as never);
         vi.mocked(prisma.leaveQuota.findMany).mockResolvedValueOnce([]).mockResolvedValueOnce([]);
         vi.mocked(prisma.leaveQuota.createMany).mockResolvedValue({ count: 3 });
         vi.mocked(prisma.leaveRequest.findMany).mockResolvedValue([]);

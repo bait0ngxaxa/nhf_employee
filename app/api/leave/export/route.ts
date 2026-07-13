@@ -1,8 +1,7 @@
 import { after, type NextRequest, NextResponse } from "next/server";
 
-import { requireApiSession } from "@/lib/auth/api";
 import { logDataExport } from "@/lib/server/audit";
-import { getEmployeeIdFromUserId } from "@/lib/services/leave/get-employee-id";
+import { requireActiveEmployeeSession } from "@/lib/services/leave/active-employee-session";
 import { getCurrentLeaveYear } from "@/lib/services/leave/quota-year";
 import {
     createLeaveReportXlsxResponse,
@@ -11,7 +10,6 @@ import {
 } from "@/lib/services/leave/report-export";
 import { jsonError, notFound, operationFailed } from "@/lib/ssot/http";
 import { FEATURE_KEYS, isFeatureEnabled } from "@/lib/ssot/features";
-import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
 
 export async function GET(request: NextRequest): Promise<Response> {
     try {
@@ -19,21 +17,11 @@ export async function GET(request: NextRequest): Promise<Response> {
             return notFound();
         }
 
-        const auth = await requireApiSession();
+        const auth = await requireActiveEmployeeSession();
         if (!auth.ok) return auth.response;
 
-        const userId = Number(auth.session.user.id);
-        if (Number.isNaN(userId)) {
-            return NextResponse.json(
-                { error: COMMON_API_MESSAGES.invalidUserId },
-                { status: 400 },
-            );
-        }
-
-        const managerId = await getEmployeeIdFromUserId(userId);
-        if (!managerId) {
-            return operationFailed(404);
-        }
+        const userId = auth.user.id;
+        const managerId = auth.employeeId;
 
         const url = new URL(request.url);
         const yearParam = url.searchParams.get("year");

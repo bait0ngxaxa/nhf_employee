@@ -4,6 +4,7 @@ import type * as NextServerModule from "next/server";
 
 import { GET as leaveExportRoute } from "@/app/api/leave/export/route";
 import { getApiAuthSession } from "@/lib/auth/server";
+import { prisma } from "@/lib/db/prisma";
 import { getEmployeeIdFromUserId } from "@/lib/services/leave/get-employee-id";
 import {
     createLeaveReportXlsxResponse,
@@ -30,6 +31,12 @@ vi.mock("@/lib/services/leave/get-employee-id", () => ({
     getEmployeeIdFromUserId: vi.fn(),
 }));
 
+vi.mock("@/lib/db/prisma", () => ({
+    prisma: {
+        user: { findUnique: vi.fn() },
+    },
+}));
+
 vi.mock("@/lib/services/leave/report-export", () => ({
     getLeaveReportYears: vi.fn(),
     getLeaveReportMeta: vi.fn(),
@@ -52,6 +59,10 @@ describe("GET /api/leave/export", () => {
             },
         });
         vi.mocked(getEmployeeIdFromUserId).mockResolvedValue(200);
+        vi.mocked(prisma.user.findUnique).mockResolvedValue({
+            isActive: true,
+            employee: { id: 200, status: "ACTIVE", deletedAt: null },
+        } as never);
     });
 
     it("returns available years for the current team", async () => {

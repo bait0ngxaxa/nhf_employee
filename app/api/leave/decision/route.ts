@@ -1,11 +1,10 @@
 import { NotificationOutboxType, Prisma } from "@prisma/client";
 import { after, NextResponse } from "next/server";
 
-import { requireApiSession } from "@/lib/auth/api";
 import { logLeaveEvent } from "@/lib/server/audit";
 import { prisma } from "@/lib/db/prisma";
 import { processOutbox } from "@/lib/services/outbox/processor";
-import { getEmployeeIdFromUserId } from "@/lib/services/leave/get-employee-id";
+import { requireActiveEmployeeSession } from "@/lib/services/leave/active-employee-session";
 import {
     buildLeaveRecipientSnapshot,
     formatEmployeeName,
@@ -13,7 +12,7 @@ import {
 } from "@/lib/services/leave/notification-payloads";
 import { getLeaveYearFromDateValue } from "@/lib/services/leave/quota-year";
 import { calculateAdditionalOverQuotaDays } from "@/lib/services/leave/over-quota";
-import { jsonError, notFound, operationFailed } from "@/lib/ssot/http";
+import { jsonError, notFound } from "@/lib/ssot/http";
 import { FEATURE_KEYS, isFeatureEnabled } from "@/lib/ssot/features";
 import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
 import { leaveActionSchema } from "@/lib/validations/leave";
@@ -42,18 +41,11 @@ export async function POST(req: Request): Promise<NextResponse> {
             return notFound();
         }
 
-        const auth = await requireApiSession();
+        const auth = await requireActiveEmployeeSession();
         if (!auth.ok) return auth.response;
 
-        const userId = Number(auth.session.user.id);
-        if (isNaN(userId)) {
-            return NextResponse.json({ error: COMMON_API_MESSAGES.invalidUserId }, { status: 400 });
-        }
-
-        const managerId = await getEmployeeIdFromUserId(userId);
-        if (!managerId) {
-            return operationFailed(404);
-        }
+        const userId = auth.user.id;
+        const managerId = auth.employeeId;
 
         const body = await req.json();
         const parsed = leaveActionSchema.safeParse(body);

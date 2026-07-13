@@ -32,6 +32,7 @@ vi.mock("@/lib/services/leave/get-employee-id", () => ({
 vi.mock("@/lib/db/prisma", () => ({
     prisma: {
         $transaction: vi.fn(),
+        user: { findUnique: vi.fn() },
         employee: {
             findUnique: vi.fn(),
         },
@@ -76,6 +77,10 @@ describe("POST /api/leave/request", () => {
 
     beforeEach(() => {
         vi.clearAllMocks();
+        vi.mocked(prisma.user.findUnique).mockResolvedValue({
+            isActive: true,
+            employee: { id: mockEmployeeId, status: "ACTIVE", deletedAt: null },
+        } as never);
         (processOutbox as unknown as { mockResolvedValue: (v: undefined) => void }).mockResolvedValue(undefined);
     });
 
@@ -114,6 +119,10 @@ describe("POST /api/leave/request", () => {
     it("should return 404 if employee not found for the user", async () => {
         (getApiAuthSession as unknown as { mockResolvedValue: (v: { user: { id: string; name: string } }) => void }).mockResolvedValue({ user: mockUser });
         (getEmployeeIdFromUserId as unknown as { mockResolvedValue: (v: null) => void }).mockResolvedValue(null);
+        vi.mocked(prisma.user.findUnique).mockResolvedValue({
+            isActive: true,
+            employee: null,
+        } as never);
 
         const req = new NextRequest("http://localhost/api/leave/request", {
             method: "POST",

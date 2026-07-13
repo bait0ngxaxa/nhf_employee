@@ -1,9 +1,8 @@
 import { NextResponse } from "next/server";
 
 import { ALL_LEAVE_TYPES, DEFAULT_LEAVE_QUOTAS } from "@/constants/leave";
-import { requireApiSession } from "@/lib/auth/api";
 import { prisma } from "@/lib/db/prisma";
-import { getEmployeeIdFromUserId } from "@/lib/services/leave/get-employee-id";
+import { requireActiveEmployeeSession } from "@/lib/services/leave/active-employee-session";
 import { getCurrentLeaveYear } from "@/lib/services/leave/quota-year";
 import { jsonError, notFound } from "@/lib/ssot/http";
 import { FEATURE_KEYS, isFeatureEnabled } from "@/lib/ssot/features";
@@ -20,18 +19,10 @@ export async function GET(req: Request) {
             return notFound();
         }
 
-        const auth = await requireApiSession();
+        const auth = await requireActiveEmployeeSession();
         if (!auth.ok) return auth.response;
 
-        const userId = Number(auth.session.user.id);
-        if (Number.isNaN(userId)) {
-            return jsonError(COMMON_API_MESSAGES.invalidUserId, 400);
-        }
-
-        const employeeId = await getEmployeeIdFromUserId(userId);
-        if (!employeeId) {
-            return jsonError(COMMON_API_MESSAGES.operationFailed, 404);
-        }
+        const { employeeId } = auth;
 
         const currentYear = getCurrentLeaveYear();
         const existingQuotas = await prisma.leaveQuota.findMany({

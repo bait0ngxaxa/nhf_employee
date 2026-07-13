@@ -37,6 +37,9 @@ vi.mock("@/lib/services/outbox/processor", () => ({
 vi.mock("@/lib/db/prisma", () => ({
     prisma: {
         $transaction: vi.fn(),
+        user: {
+            findUnique: vi.fn(),
+        },
         leaveRequest: {
             findUnique: vi.fn(),
             findUniqueOrThrow: vi.fn(),
@@ -77,6 +80,10 @@ describe("POST /api/leave/decision", () => {
             },
         });
         vi.mocked(getEmployeeIdFromUserId).mockResolvedValue(20);
+        vi.mocked(prisma.user.findUnique).mockResolvedValue({
+            isActive: true,
+            employee: { id: 20, status: "ACTIVE", deletedAt: null },
+        } as never);
         vi.mocked(processOutbox).mockResolvedValue({ processed: 0, failed: 0 });
         vi.mocked(logLeaveEvent).mockResolvedValue(undefined);
         vi.mocked(prisma.$transaction).mockImplementation(async (callback) => {
@@ -85,6 +92,37 @@ describe("POST /api/leave/decision", () => {
             }
             return callback;
         });
+    });
+
+    it("rejects an inactive manager before starting the business transaction", async () => {
+        vi.mocked(prisma.user.findUnique).mockResolvedValue({
+            id: 20,
+            isActive: true,
+            employeeId: 20,
+            employee: {
+                id: 20,
+                status: "INACTIVE",
+                deletedAt: null,
+            },
+        } as unknown as Awaited<ReturnType<typeof prisma.user.findUnique>>);
+
+        const req = new NextRequest("http://localhost/api/leave/decision", {
+            method: "POST",
+            body: JSON.stringify({
+                leaveId: "leave-1",
+                action: "REJECT",
+                reason: "ไม่อนุมัติ",
+            }),
+        });
+
+        const res = await POST(req);
+
+        expect(res.status).toBe(403);
+        expect(prisma.$transaction).not.toHaveBeenCalled();
+        expect(prisma.leaveRequest.updateMany).not.toHaveBeenCalled();
+        expect(prisma.leaveQuota.update).not.toHaveBeenCalled();
+        expect(prisma.notificationOutbox.create).not.toHaveBeenCalled();
+        expect(logLeaveEvent).not.toHaveBeenCalled();
     });
 
     it("recalculates over-quota days downward when quota is returned before approval", async () => {
