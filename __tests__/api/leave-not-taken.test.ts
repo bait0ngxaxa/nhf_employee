@@ -117,7 +117,7 @@ describe("/api/leave/not-taken", () => {
                 firstName: "Manager",
                 lastName: "User",
                 email: "manager@example.com",
-                user: { id: 2, isActive: true },
+                user: { id: 2, email: "manager-account@thainhf.org", isActive: true },
             },
         } as Awaited<ReturnType<typeof prisma.leaveRequest.findUnique>>);
         vi.mocked(prisma.leaveRequest.updateMany).mockResolvedValue({ count: 1 });
@@ -193,7 +193,7 @@ describe("/api/leave/not-taken", () => {
                 firstName: "Manager",
                 lastName: "User",
                 email: "manager@example.com",
-                user: { id: 2, isActive: true },
+                user: { id: 2, email: "manager-account@thainhf.org", isActive: true },
             },
         } as Awaited<ReturnType<typeof prisma.leaveRequest.findUnique>>);
         vi.mocked(prisma.leaveRequest.updateMany).mockResolvedValue({ count: 0 });

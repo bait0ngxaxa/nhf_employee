@@ -132,8 +132,6 @@ export async function updateEmployee(
     }
     if (data.departmentId) dataToUpdate.departmentId = data.departmentId;
     if (data.status) dataToUpdate.status = data.status;
-    if (data.managerId !== undefined) dataToUpdate.managerId = data.managerId;
-
     // Handle email update
     if (data.email !== undefined) {
         const emailResult = processEmailForUpdate(data.email);

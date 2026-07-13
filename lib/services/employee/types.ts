@@ -40,7 +40,6 @@ export interface UpdateEmployeeData {
     affiliation?: string | null;
     departmentId?: number;
     status?: EmployeeStatus;
-    managerId?: number | null;
 }
 
 // ==================== CSV Import Types ====================

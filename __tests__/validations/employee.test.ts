@@ -67,5 +67,14 @@ describe("Employee Validation", () => {
             const result = updateEmployeeSchema.safeParse({ email: "" });
             expect(result.success).toBe(true);
         });
+
+        it("strips managerId so generic employee updates cannot bypass approver policy", () => {
+            const result = updateEmployeeSchema.safeParse({ managerId: 20 });
+
+            expect(result.success).toBe(true);
+            if (result.success) {
+                expect(result.data).not.toHaveProperty("managerId");
+            }
+        });
     });
 });

@@ -95,7 +95,7 @@ type EmployeeSnapshotSource = {
 };
 
 type ConfiguredApproverSource = Omit<EmployeeSnapshotSource, "user"> & {
-    user?: { id: number } | null;
+    user?: { id: number; email: string } | null;
 };
 
 export function formatEmployeeName(employee: {
@@ -126,7 +126,7 @@ export function buildConfiguredApproverSnapshot(
     return {
         employeeId: employee.id,
         userId: employee.user.id,
-        email: employee.email,
+        email: employee.user.email,
         name: formatEmployeeName(employee),
     };
 }

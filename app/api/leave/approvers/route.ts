@@ -3,6 +3,10 @@ import { z } from "zod";
 
 import { requireAdminSession } from "@/lib/auth/api";
 import { prisma } from "@/lib/db/prisma";
+import {
+    ApproverAssignmentError,
+    assignLeaveApprovers,
+} from "@/lib/services/leave/approver-assignment";
 import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
 import { forbidden, notFound } from "@/lib/ssot/http";
 import { FEATURE_KEYS, isFeatureEnabled } from "@/lib/ssot/features";
@@ -13,7 +17,7 @@ const bulkAssignSchema = z.object({
             z.object({
                 employeeId: z.number().int().positive(),
                 managerId: z.number().int().positive().nullable(),
-                transferPendingRequests: z.boolean().optional().default(false),
+                transferPendingRequests: z.boolean().optional(),
             }),
         )
         .min(1, "At least one assignment required"),
@@ -76,37 +80,23 @@ export async function PUT(req: Request): Promise<NextResponse> {
             );
         }
 
-        const { assignments } = parsed.data;
-
-        const selfAssign = assignments.find((a) => a.employeeId === a.managerId);
-        if (selfAssign) {
-            return NextResponse.json(
-                { error: COMMON_API_MESSAGES.operationFailed },
-                { status: 400 },
-            );
-        }
-
-        const transferredLeaveRequestCount = await prisma.$transaction(async (tx) => {
-            let count = 0;
-            for (const { employeeId, managerId, transferPendingRequests } of assignments) {
-                await tx.employee.update({ where: { id: employeeId }, data: { managerId } });
-                if (transferPendingRequests && managerId) {
-                    const result = await tx.leaveRequest.updateMany({
-                        where: { employeeId, status: "PENDING", approverId: { not: managerId } },
-                        data: { approverId: managerId },
-                    });
-                    count += result.count;
-                }
-            }
-            return count;
+        const result = await assignLeaveApprovers(parsed.data.assignments, {
+            userId: auth.user.id,
+            email: auth.user.email,
         });
 
         return NextResponse.json({
             success: true,
             message: COMMON_API_MESSAGES.operationCompleted,
-            transferredLeaveRequestCount,
+            transferredLeaveRequestCount: result.transferredLeaveRequestCount,
         });
     } catch (error) {
+        if (error instanceof ApproverAssignmentError) {
+            return NextResponse.json(
+                { error: error.message },
+                { status: error.statusCode },
+            );
+        }
         console.error("Error updating approvers:", error);
         return NextResponse.json(
             { error: COMMON_API_MESSAGES.failedToUpdateApprovers },

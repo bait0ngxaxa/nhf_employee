@@ -62,7 +62,7 @@ describe("POST /api/leave/request", () => {
         firstName: "Manager",
         lastName: "User",
         email: "manager@example.com",
-        user: { id: 2, isActive: true },
+        user: { id: 2, email: "manager-account@thainhf.org", isActive: true },
     };
 
     const buildEmployeeWithManager = () => ({

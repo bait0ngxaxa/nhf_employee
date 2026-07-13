@@ -133,7 +133,7 @@ export async function POST(req: Request) {
                     user: { select: { id: true } },
                     manager: {
                         include: {
-                            user: { select: { id: true, isActive: true } },
+                            user: { select: { id: true, email: true, isActive: true } },
                         },
                     },
                 },

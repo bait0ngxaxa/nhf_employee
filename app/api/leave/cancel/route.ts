@@ -68,7 +68,7 @@ export async function POST(req: Request) {
                     },
                     approver: {
                         include: {
-                            user: { select: { id: true, isActive: true } },
+                            user: { select: { id: true, email: true, isActive: true } },
                         },
                     },
                 },

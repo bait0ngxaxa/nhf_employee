@@ -77,7 +77,7 @@ export async function POST(req: Request): Promise<NextResponse> {
                     },
                     approver: {
                         include: {
-                            user: { select: { id: true, isActive: true } },
+                            user: { select: { id: true, email: true, isActive: true } },
                         },
                     },
                 },

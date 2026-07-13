@@ -125,6 +125,53 @@ describe("POST /api/leave/decision", () => {
         expect(logLeaveEvent).not.toHaveBeenCalled();
     });
 
+    it("rejects the previous approver after a pending request is transferred", async () => {
+        vi.mocked(prisma.leaveRequest.findUnique).mockResolvedValue({
+            id: "leave-transferred",
+            employeeId: 10,
+            leaveType: "VACATION",
+            startDate: new Date("2031-05-05T00:00:00.000Z"),
+            endDate: new Date("2031-05-05T00:00:00.000Z"),
+            period: "FULL_DAY",
+            durationDays: 1,
+            reason: "พักร้อน",
+            emergencyReason: null,
+            specialReason: null,
+            overQuotaDays: 0,
+            status: "PENDING",
+            approverId: 30,
+            employee: {
+                id: 10,
+                firstName: "Employee",
+                lastName: "User",
+                email: "employee@thainhf.org",
+                user: { id: 10 },
+            },
+            approver: {
+                id: 30,
+                firstName: "New",
+                lastName: "Manager",
+                email: "new-manager@thainhf.org",
+            },
+        } as never);
+
+        const req = new NextRequest("http://localhost/api/leave/decision", {
+            method: "POST",
+            body: JSON.stringify({
+                leaveId: "leave-transferred",
+                action: "REJECT",
+                reason: "ไม่อนุมัติ",
+            }),
+        });
+
+        const res = await POST(req);
+
+        expect(res.status).toBe(403);
+        expect(prisma.leaveRequest.updateMany).not.toHaveBeenCalled();
+        expect(prisma.notificationOutbox.create).not.toHaveBeenCalled();
+        expect(logLeaveEvent).not.toHaveBeenCalled();
+    });
+
     it("recalculates over-quota days downward when quota is returned before approval", async () => {
         vi.mocked(prisma.leaveRequest.findUnique).mockResolvedValue({
             id: "leave-1",

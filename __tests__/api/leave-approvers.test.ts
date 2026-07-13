@@ -2,13 +2,30 @@ import { NextRequest } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { PUT } from "@/app/api/leave/approvers/route";
 import { requireAdminSession } from "@/lib/auth/api";
-import { prisma } from "@/lib/db/prisma";
+import {
+    ApproverAssignmentError,
+    assignLeaveApprovers,
+} from "@/lib/services/leave/approver-assignment";
 
 vi.mock("@/lib/auth/api", () => ({ requireAdminSession: vi.fn() }));
+vi.mock("@/lib/services/leave/approver-assignment", () => {
+    class MockApproverAssignmentError extends Error {
+        readonly statusCode: number;
+
+        constructor(message: string, statusCode = 400) {
+            super(message);
+            this.statusCode = statusCode;
+        }
+    }
+    return {
+        ApproverAssignmentError: MockApproverAssignmentError,
+        assignLeaveApprovers: vi.fn(),
+    };
+});
 vi.mock("@/lib/db/prisma", () => ({
     prisma: {
         $transaction: vi.fn(),
-        employee: { update: vi.fn() },
+        employee: { findUnique: vi.fn(), update: vi.fn() },
         leaveRequest: { updateMany: vi.fn() },
     },
 }));
@@ -21,15 +38,15 @@ describe("PUT /api/leave/approvers", () => {
             session: { user: { id: "1", role: "ADMIN" } },
             user: { id: 1, email: "admin@example.com", name: "Admin", role: "ADMIN" },
         });
-        vi.mocked(prisma.$transaction).mockImplementation(async (callback) => {
-            if (typeof callback === "function") return callback(prisma);
-            return callback;
+        vi.mocked(assignLeaveApprovers).mockResolvedValue({
+            transferredLeaveRequestCount: 0,
         });
-        vi.mocked(prisma.employee.update).mockResolvedValue({ id: 10 } as never);
     });
 
     it("transfers only pending requests when the administrator selects transfer", async () => {
-        vi.mocked(prisma.leaveRequest.updateMany).mockResolvedValue({ count: 3 });
+        vi.mocked(assignLeaveApprovers).mockResolvedValue({
+            transferredLeaveRequestCount: 3,
+        });
 
         const response = await PUT(new NextRequest("http://localhost/api/leave/approvers", {
             method: "PUT",
@@ -39,21 +56,43 @@ describe("PUT /api/leave/approvers", () => {
         }));
 
         expect(response.status).toBe(200);
-        expect(prisma.leaveRequest.updateMany).toHaveBeenCalledWith({
-            where: { employeeId: 10, status: "PENDING", approverId: { not: 20 } },
-            data: { approverId: 20 },
-        });
+        expect(assignLeaveApprovers).toHaveBeenCalledWith(
+            [{ employeeId: 10, managerId: 20, transferPendingRequests: true }],
+            { userId: 1, email: "admin@example.com" },
+        );
         expect(await response.json()).toMatchObject({ transferredLeaveRequestCount: 3 });
     });
 
-    it("does not transfer pending requests unless selected", async () => {
+    it("rejects an inactive approver before starting the transaction", async () => {
+        vi.mocked(assignLeaveApprovers).mockRejectedValue(
+            new ApproverAssignmentError("ผู้อนุมัติไม่พร้อมใช้งาน"),
+        );
+
+        const response = await PUT(new NextRequest("http://localhost/api/leave/approvers", {
+            method: "PUT",
+            body: JSON.stringify({
+                assignments: [{ employeeId: 10, managerId: 20, transferPendingRequests: true }],
+            }),
+        }));
+
+        expect(response.status).toBe(400);
+        expect(assignLeaveApprovers).toHaveBeenCalledTimes(1);
+    });
+
+    it("always applies the central transfer policy when the flag is omitted", async () => {
+        vi.mocked(assignLeaveApprovers).mockResolvedValue({
+            transferredLeaveRequestCount: 2,
+        });
         const response = await PUT(new NextRequest("http://localhost/api/leave/approvers", {
             method: "PUT",
             body: JSON.stringify({ assignments: [{ employeeId: 10, managerId: 20 }] }),
         }));
 
         expect(response.status).toBe(200);
-        expect(prisma.leaveRequest.updateMany).not.toHaveBeenCalled();
-        expect(await response.json()).toMatchObject({ transferredLeaveRequestCount: 0 });
+        expect(assignLeaveApprovers).toHaveBeenCalledWith(
+            [{ employeeId: 10, managerId: 20 }],
+            { userId: 1, email: "admin@example.com" },
+        );
+        expect(await response.json()).toMatchObject({ transferredLeaveRequestCount: 2 });
     });
 });
