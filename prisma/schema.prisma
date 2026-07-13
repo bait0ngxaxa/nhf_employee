@@ -202,6 +202,7 @@ enum NotificationOutboxStatus {
   SENT
   FAILED
   DEAD
+  SUPERSEDED
 }
 
 // Audit Log for tracking critical actions per agent.md security standards

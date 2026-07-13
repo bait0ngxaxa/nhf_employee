@@ -4,6 +4,8 @@ import { prisma } from "@/lib/db/prisma";
 import { sendLeaveActionNotifications } from "@/lib/services/leave/notifications";
 import {
     buildConfiguredApproverSnapshot,
+    buildLeaveActionDeliveryIdentity,
+    getLeaveActionDeliveryIdentity,
     type LeaveActionPayload,
 } from "@/lib/services/leave/notification-payloads";
 import {
@@ -42,26 +44,48 @@ export async function resolveCurrentLeaveAction(
         return null;
     }
 
-    return { ...payload, approver: buildConfiguredApproverSnapshot(approver) };
+    const currentIdentity = buildLeaveActionDeliveryIdentity(
+        payload.leaveId,
+        approver.user.id,
+    );
+    if (getLeaveActionDeliveryIdentity(payload) !== currentIdentity) {
+        return null;
+    }
+
+    return {
+        ...payload,
+        deliveryIdentity: currentIdentity,
+        approver: buildConfiguredApproverSnapshot(approver),
+    };
 }
 
 export async function dispatchCurrentLeaveAction(
     notificationId: number,
     payload: LeaveActionPayload,
-): Promise<void> {
-    await prisma.$transaction(async (tx) => {
-        // ผูกการตรวจสิทธิ์กับการส่ง เพื่อให้การโอน commit ได้ก่อน resolve หรือหลังส่งเดิมจบเท่านั้น
-        await tx.$queryRaw<Array<{ id: string }>>`
-            SELECT id FROM leave_requests WHERE id = ${payload.leaveId} FOR UPDATE
-        `;
+): Promise<"SENT" | "SUPERSEDED"> {
+    const currentPayload = await prisma.$transaction(async (tx) => {
         const claimed = await tx.notificationOutbox.findFirst({
             where: { id: notificationId, status: "PROCESSING" },
             select: { id: true },
         });
-        if (!claimed) return;
+        if (!claimed) return null;
 
-        const currentPayload = await resolveCurrentLeaveAction(tx, payload);
-        if (!currentPayload) return;
-        await sendLeaveActionNotifications(currentPayload);
-    }, { timeout: 30_000, maxWait: 5_000 });
+        const resolved = await resolveCurrentLeaveAction(tx, payload);
+        if (resolved) return resolved;
+
+        await tx.notificationOutbox.updateMany({
+            where: { id: notificationId, status: "PROCESSING" },
+            data: {
+                status: "SUPERSEDED",
+                lastError: "Superseded by current leave approver",
+            },
+        });
+        return null;
+    });
+
+    if (!currentPayload) return "SUPERSEDED";
+
+    // SMTP อยู่นอก transaction; transfer ที่เกิดหลัง check จะสร้าง delivery ใหม่เสมอ
+    await sendLeaveActionNotifications(currentPayload);
+    return "SENT";
 }

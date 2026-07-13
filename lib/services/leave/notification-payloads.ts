@@ -34,6 +34,7 @@ const leaveDetailsSchema = z.object({
 const optionalTextSchema = z.string().nullable();
 
 export const leaveActionPayloadSchema = leaveDetailsSchema.extend({
+    deliveryIdentity: z.string().trim().min(1).optional(),
     employee: recipientSchema,
     approver: configuredApproverSchema,
     reason: z.string().trim().min(1),
@@ -129,6 +130,22 @@ export function buildConfiguredApproverSnapshot(
         email: employee.user.email,
         name: formatEmployeeName(employee),
     };
+}
+
+export function buildLeaveActionDeliveryIdentity(
+    leaveId: string,
+    approverUserId: number,
+): string {
+    return `${leaveId}:${approverUserId}`;
+}
+
+export function getLeaveActionDeliveryIdentity(
+    payload: LeaveActionPayload,
+): string {
+    return payload.deliveryIdentity ?? buildLeaveActionDeliveryIdentity(
+        payload.leaveId,
+        payload.approver.userId,
+    );
 }
 
 function parseLeavePayload<T>(

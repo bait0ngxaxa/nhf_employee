@@ -19,6 +19,7 @@ export const OUTBOX_STATUSES = [
     "SENT",
     "FAILED",
     "DEAD",
+    "SUPERSEDED",
 ] as const;
 
 export type OutboxStatus = (typeof OUTBOX_STATUSES)[number];

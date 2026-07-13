@@ -31,9 +31,15 @@ type LeaveEmailEvent =
     | "not-taken-requested"
     | "not-taken-confirmed";
 
-function buildLeaveMessageId(event: LeaveEmailEvent, leaveId: string): string {
+function buildLeaveMessageId(
+    event: LeaveEmailEvent,
+    leaveId: string,
+    recipientIdentity?: string,
+): string {
     const safeLeaveId = leaveId.replace(/[^a-zA-Z0-9._-]/g, "-");
-    return `<nhf-leave-${event}-${safeLeaveId}@notifications.thainhf.org>`;
+    const safeRecipient = recipientIdentity?.replace(/[^a-zA-Z0-9._-]/g, "-");
+    const recipientPart = safeRecipient ? `-${safeRecipient}` : "";
+    return `<nhf-leave-${event}-${safeLeaveId}${recipientPart}@notifications.thainhf.org>`;
 }
 
 function getTransporter(): nodemailer.Transporter {
@@ -243,7 +249,11 @@ export async function sendLeaveActionNotification(
         subject: `[NHF Leave] คำขอลาใหม่จาก ${data.employee.name}`,
         html: generateLeaveActionEmailHTML(data, dashboardLink),
         text: `มีคำขอลาใหม่\nพนักงาน ${data.employee.name} ขอลา ${data.durationDays} วัน\nดูรายละเอียด: ${dashboardLink}`,
-        messageId: buildLeaveMessageId("action", data.leaveId),
+        messageId: buildLeaveMessageId(
+            "action",
+            data.leaveId,
+            String(data.approver.userId),
+        ),
     };
 
     return await sendEmail(emailData);

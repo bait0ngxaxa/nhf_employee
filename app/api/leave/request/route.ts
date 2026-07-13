@@ -8,6 +8,7 @@ import { requireActiveEmployeeSession } from "@/lib/services/leave/active-employ
 import { calculateAdditionalOverQuotaDays } from "@/lib/services/leave/over-quota";
 import {
     buildConfiguredApproverSnapshot,
+    buildLeaveActionDeliveryIdentity,
     buildLeaveRecipientSnapshot,
     type LeaveActionPayload,
 } from "@/lib/services/leave/notification-payloads";
@@ -212,6 +213,10 @@ export async function POST(req: Request) {
 
             const payload: LeaveActionPayload = {
                 leaveId: leaveRequest.id,
+                deliveryIdentity: buildLeaveActionDeliveryIdentity(
+                    leaveRequest.id,
+                    employee.manager.user.id,
+                ),
                 employee: buildLeaveRecipientSnapshot(employee),
                 approver: buildConfiguredApproverSnapshot(employee.manager),
                 leaveType,

@@ -201,11 +201,12 @@ describe("assignLeaveApprovers", () => {
         });
     });
 
-    it("rewrites a claimed outbox instead of notifying both approvers", async () => {
+    it("creates a new outbox when the previous delivery is PROCESSING", async () => {
         const request = pendingRequest("leave-1");
         mockLookup(ACTIVE_APPROVER, [request]);
         vi.mocked(prisma.notificationOutbox.findMany).mockResolvedValue([{
             id: 9,
+            status: "PROCESSING",
             payload: JSON.stringify({ leaveId: "leave-1" }),
         }] as never);
 
@@ -219,38 +220,96 @@ describe("assignLeaveApprovers", () => {
                 status: { in: ["PENDING", "FAILED", "PROCESSING"] },
                 attempts: { lt: 3 },
             },
-            select: { id: true, payload: true },
+            select: { id: true, status: true, payload: true },
             orderBy: { id: "asc" },
         });
-        expect(prisma.notificationOutbox.update).toHaveBeenCalledWith({
-            where: { id: 9 },
-            data: { payload: expect.stringContaining("manager@thainhf.org") },
+        expect(prisma.notificationOutbox.update).not.toHaveBeenCalled();
+        expect(prisma.notificationOutbox.create).toHaveBeenCalledWith({
+            data: {
+                type: "LEAVE_ACTION",
+                payload: expect.stringContaining("manager@thainhf.org"),
+            },
         });
-        expect(prisma.notificationOutbox.create).not.toHaveBeenCalled();
         expect(prisma.notification.updateMany).toHaveBeenCalledWith({
             where: expect.objectContaining({ userId: { not: 200 }, isRead: false }),
             data: { isRead: true },
         });
     });
 
+    it.each(["PENDING", "FAILED"] as const)(
+        "rewrites a %s outbox for the new approver",
+        async (status) => {
+            mockLookup(ACTIVE_APPROVER, [pendingRequest("leave-1")]);
+            vi.mocked(prisma.notificationOutbox.findMany).mockResolvedValue([{
+                id: 9,
+                status,
+                payload: JSON.stringify({ leaveId: "leave-1" }),
+            }] as never);
+
+            await assignLeaveApprovers([
+                { employeeId: 10, managerId: 20, transferPendingRequests: true },
+            ], ACTOR);
+
+            expect(prisma.notificationOutbox.updateMany).toHaveBeenCalledWith({
+                where: {
+                    id: 9,
+                    status: { in: ["PENDING", "FAILED"] },
+                },
+                data: { payload: expect.stringContaining("manager@thainhf.org") },
+            });
+            expect(prisma.notificationOutbox.create).not.toHaveBeenCalled();
+        },
+    );
+
+    it("creates a new outbox when a pending row is claimed before rewrite", async () => {
+        mockLookup(ACTIVE_APPROVER, [pendingRequest("leave-1")]);
+        vi.mocked(prisma.notificationOutbox.findMany).mockResolvedValue([{
+            id: 9,
+            status: "PENDING",
+            payload: JSON.stringify({ leaveId: "leave-1" }),
+        }] as never);
+        vi.mocked(prisma.notificationOutbox.updateMany).mockResolvedValueOnce({
+            count: 0,
+        });
+
+        await assignLeaveApprovers([
+            { employeeId: 10, managerId: 20, transferPendingRequests: true },
+        ], ACTOR);
+
+        expect(prisma.notificationOutbox.updateMany).toHaveBeenCalledWith({
+            where: {
+                id: 9,
+                status: { in: ["PENDING", "FAILED"] },
+            },
+            data: { payload: expect.any(String) },
+        });
+        expect(prisma.notificationOutbox.create).toHaveBeenCalledTimes(1);
+    });
+
     it("supersedes duplicate unsent outboxes for the same request", async () => {
         mockLookup(ACTIVE_APPROVER, [pendingRequest("leave-1")]);
         vi.mocked(prisma.notificationOutbox.findMany).mockResolvedValue([
-            { id: 9, payload: JSON.stringify({ leaveId: "leave-1" }) },
-            { id: 10, payload: JSON.stringify({ leaveId: "leave-1" }) },
+            { id: 9, status: "PENDING", payload: JSON.stringify({ leaveId: "leave-1" }) },
+            { id: 10, status: "FAILED", payload: JSON.stringify({ leaveId: "leave-1" }) },
         ] as never);
 
         await assignLeaveApprovers([
             { employeeId: 10, managerId: 20, transferPendingRequests: true },
         ], ACTOR);
 
-        expect(prisma.notificationOutbox.update).toHaveBeenCalledWith({
-            where: { id: 9 },
+        expect(prisma.notificationOutbox.updateMany).toHaveBeenCalledWith({
+            where: {
+                id: 9,
+                status: { in: ["PENDING", "FAILED"] },
+            },
             data: { payload: expect.stringContaining("manager@thainhf.org") },
         });
         expect(prisma.notificationOutbox.updateMany).toHaveBeenCalledWith({
-            where: { id: { in: [10] } },
-            data: { status: "SENT", lastError: "Superseded by approver transfer" },
+            where: {
+                id: { in: [10] },
+                status: { in: ["PENDING", "FAILED"] },
+            },
+            data: { status: "SUPERSEDED", lastError: "Superseded by approver transfer" },
         });
         expect(prisma.notificationOutbox.create).not.toHaveBeenCalled();
     });

@@ -48,6 +48,8 @@ type OutboxProcessResult = {
     failed: number;
 };
 
+type DispatchOutcome = "SENT" | "SUPERSEDED";
+
 type TicketCreatedPayload = {
     ticketId: number;
 };
@@ -323,7 +325,9 @@ async function getTicketById(ticketId: number): Promise<TicketWithRelations> {
     return ticket as TicketWithRelations;
 }
 
-async function dispatchNotification(notification: NotificationOutbox): Promise<void> {
+async function dispatchNotification(
+    notification: NotificationOutbox,
+): Promise<DispatchOutcome> {
     if (!isOutboxNotificationType(notification.type)) {
         throw new Error(`Unknown notification type: ${notification.type}`);
     }
@@ -335,13 +339,13 @@ async function dispatchNotification(notification: NotificationOutbox): Promise<v
             const parsedPayload = parseTicketCreatedPayload(payload);
             const ticket = await getTicketById(parsedPayload.ticketId);
             await sendTicketCreatedNotifications(ticket);
-            return;
+            return "SENT";
         }
         case "TICKET_UPDATED": {
             const parsedPayload = parseTicketUpdatedPayload(payload);
             const ticket = await getTicketById(parsedPayload.ticketId);
             await sendTicketUpdatedNotifications(ticket, parsedPayload.oldStatus);
-            return;
+            return "SENT";
         }
         case "EMAIL_REQUEST": {
             const parsedPayload = parseEmailRequestPayload(payload);
@@ -352,12 +356,11 @@ async function dispatchNotification(notification: NotificationOutbox): Promise<v
                 ),
                 "LINE email request notification",
             );
-            return;
+            return "SENT";
         }
         case "LEAVE_ACTION": {
             const parsedLeaveAction = parseLeaveActionPayload(payload);
-            await dispatchCurrentLeaveAction(notification.id, parsedLeaveAction);
-            return;
+            return dispatchCurrentLeaveAction(notification.id, parsedLeaveAction);
         }
         case "LEAVE_RESULT": {
             const parsedLeaveResult = parseLeaveResultPayload(payload);
@@ -365,7 +368,7 @@ async function dispatchNotification(notification: NotificationOutbox): Promise<v
                 "../leave/notifications"
             );
             await sendLeaveResultNotifications(parsedLeaveResult);
-            return;
+            return "SENT";
         }
         case "LEAVE_CANCELLED": {
             const parsedLeaveCancelled = parseLeaveCancelledPayload(payload);
@@ -373,7 +376,7 @@ async function dispatchNotification(notification: NotificationOutbox): Promise<v
                 "../leave/notifications"
             );
             await sendLeaveCancelledNotifications(parsedLeaveCancelled);
-            return;
+            return "SENT";
         }
         case "LEAVE_NOT_TAKEN_REQUESTED": {
             const parsedNotTaken = parseLeaveNotTakenRequestedPayload(payload);
@@ -381,7 +384,7 @@ async function dispatchNotification(notification: NotificationOutbox): Promise<v
                 "../leave/notifications"
             );
             await sendLeaveNotTakenRequestedNotifications(parsedNotTaken);
-            return;
+            return "SENT";
         }
         case "LEAVE_NOT_TAKEN_CONFIRMED": {
             const parsedConfirmed = parseLeaveNotTakenConfirmedPayload(payload);
@@ -389,7 +392,7 @@ async function dispatchNotification(notification: NotificationOutbox): Promise<v
                 "../leave/notifications"
             );
             await sendLeaveNotTakenConfirmedNotifications(parsedConfirmed);
-            return;
+            return "SENT";
         }
         case "STOCK_REQUEST_LINE": {
             const parsedPayload = parseStockRequestLinePayload(payload);
@@ -400,7 +403,7 @@ async function dispatchNotification(notification: NotificationOutbox): Promise<v
                 ),
                 "LINE stock request notification",
             );
-            return;
+            return "SENT";
         }
         case "STOCK_LOW_LINE": {
             const parsedPayload = parseStockLowLinePayload(payload);
@@ -411,7 +414,7 @@ async function dispatchNotification(notification: NotificationOutbox): Promise<v
                 ),
                 "LINE low stock notification",
             );
-            return;
+            return "SENT";
         }
     }
 }
@@ -448,15 +451,17 @@ export async function processOutbox(batchSize = 10): Promise<OutboxProcessResult
         }
 
         try {
-            await dispatchNotification(notification);
+            const outcome = await dispatchNotification(notification);
 
-            await prisma.notificationOutbox.updateMany({
-                where: { id: notification.id, status: OUTBOX_STATUS_PROCESSING },
-                data: {
-                    status: OUTBOX_STATUS_SENT,
-                    lastError: null,
-                },
-            });
+            if (outcome === OUTBOX_STATUS_SENT) {
+                await prisma.notificationOutbox.updateMany({
+                    where: { id: notification.id, status: OUTBOX_STATUS_PROCESSING },
+                    data: {
+                        status: OUTBOX_STATUS_SENT,
+                        lastError: null,
+                    },
+                });
+            }
             processedCount++;
         } catch (error) {
             const message =

@@ -2,8 +2,10 @@ import { Prisma } from "@prisma/client";
 
 import { prisma } from "@/lib/db/prisma";
 import { MAX_OUTBOX_ATTEMPTS } from "@/lib/services/outbox/types";
+import { transferLeaveActionNotification } from "@/lib/services/leave/action-outbox";
 import {
     buildConfiguredApproverSnapshot,
+    buildLeaveActionDeliveryIdentity,
     buildLeaveRecipientSnapshot,
     type LeaveActionPayload,
 } from "@/lib/services/leave/notification-payloads";
@@ -45,7 +47,7 @@ const APPROVER_MESSAGES = {
 type TransactionClient = Prisma.TransactionClient;
 type ApproverRecord = Awaited<ReturnType<typeof loadApprovers>>[number];
 type PendingRequest = Awaited<ReturnType<typeof loadPendingRequests>>[number];
-type PendingOutbox = { id: number; payload: string };
+type PendingOutbox = Awaited<ReturnType<typeof loadPendingOutboxes>>[number];
 
 function isUsableAccount(email: string): boolean {
     const normalizedEmail = email.trim().toLowerCase();
@@ -95,10 +97,15 @@ function buildTransferredPayload(
     request: PendingRequest,
     approver: ApproverRecord,
 ): LeaveActionPayload {
+    const approverSnapshot = buildConfiguredApproverSnapshot(approver);
     return {
         leaveId: request.id,
+        deliveryIdentity: buildLeaveActionDeliveryIdentity(
+            request.id,
+            approverSnapshot.userId,
+        ),
         employee: buildLeaveRecipientSnapshot(request.employee),
-        approver: buildConfiguredApproverSnapshot(approver),
+        approver: approverSnapshot,
         leaveType: request.leaveType,
         startDate: request.startDate.toISOString(),
         endDate: request.endDate.toISOString(),
@@ -109,37 +116,6 @@ function buildTransferredPayload(
         specialReason: request.specialReason,
         overQuotaDays: request.overQuotaDays,
     };
-}
-
-async function transferNotification(
-    tx: TransactionClient,
-    request: PendingRequest,
-    approver: ApproverRecord,
-    current: PendingOutbox[],
-): Promise<void> {
-    if (!approver.user) return;
-    const payload = JSON.stringify(buildTransferredPayload(request, approver));
-    await tx.notification.updateMany({
-        where: {
-            type: "LEAVE_REQUESTED",
-            referenceId: request.id,
-            userId: { not: approver.user.id },
-            isRead: false,
-        },
-        data: { isRead: true },
-    });
-    const [primary, ...duplicates] = current;
-    if (primary) {
-        await tx.notificationOutbox.update({ where: { id: primary.id }, data: { payload } });
-        if (duplicates.length > 0) {
-            await tx.notificationOutbox.updateMany({
-                where: { id: { in: duplicates.map(({ id }) => id) } },
-                data: { status: "SENT", lastError: "Superseded by approver transfer" },
-            });
-        }
-        return;
-    }
-    await tx.notificationOutbox.create({ data: { type: "LEAVE_ACTION", payload } });
 }
 
 async function writeAudit(
@@ -193,7 +169,13 @@ async function applyAssignment(context: ApplyAssignmentContext): Promise<number>
             });
             if (transferred.count !== 1) continue;
             transferredIds.push(request.id);
-            await transferNotification(tx, request, approver, outboxMap.get(request.id) ?? []);
+            const payload = buildTransferredPayload(request, approver);
+            await transferLeaveActionNotification(tx, {
+                leaveId: request.id,
+                approverUserId: payload.approver.userId,
+                payload: JSON.stringify(payload),
+                current: outboxMap.get(request.id) ?? [],
+            });
         }
     }
     await writeAudit(tx, assignment, previousManagerId, transferredIds, actor);
@@ -226,6 +208,18 @@ function indexOutboxes(outboxes: PendingOutbox[]): Map<string, PendingOutbox[]> 
     return result;
 }
 
+async function loadPendingOutboxes(tx: TransactionClient) {
+    return tx.notificationOutbox.findMany({
+        where: {
+            type: "LEAVE_ACTION",
+            status: { in: ["PENDING", "FAILED", "PROCESSING"] },
+            attempts: { lt: MAX_OUTBOX_ATTEMPTS },
+        },
+        select: { id: true, status: true, payload: true },
+        orderBy: { id: "asc" },
+    });
+}
+
 export async function assignLeaveApprovers(
     assignments: ApproverAssignment[],
     actor: ApproverAssignmentActor,
@@ -244,15 +238,7 @@ export async function assignLeaveApprovers(
             }),
             loadApprovers(tx, managerIds),
             loadPendingRequests(tx, employeeIds),
-            tx.notificationOutbox.findMany({
-                where: {
-                    type: "LEAVE_ACTION",
-                    status: { in: ["PENDING", "FAILED", "PROCESSING"] },
-                    attempts: { lt: MAX_OUTBOX_ATTEMPTS },
-                },
-                select: { id: true, payload: true },
-                orderBy: { id: "asc" },
-            }),
+            loadPendingOutboxes(tx),
         ]);
         const employeeMap = new Map(employees.map((employee) => [employee.id, employee]));
         const approverMap = new Map(approvers.map((approver) => [approver.id, approver]));

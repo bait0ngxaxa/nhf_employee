@@ -1,5 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { sendEmail, sendNewTicketNotification } from "@/lib/email";
+import {
+    sendEmail,
+    sendLeaveActionNotification,
+    sendNewTicketNotification,
+} from "@/lib/email";
 import type { TicketEmailData } from "@/types/api";
 
 // Mock nodemailer with factory
@@ -115,6 +119,63 @@ describe("Email Service", () => {
             expect(sendMailMock).toHaveBeenCalledWith(
                 expect.objectContaining({ to: "u@t.c" }),
             );
+        });
+    });
+
+    describe("sendLeaveActionNotification", () => {
+        const payload = {
+            leaveId: "leave-1",
+            deliveryIdentity: "leave-1:20",
+            employee: {
+                employeeId: 10,
+                userId: 100,
+                email: "employee@thainhf.org",
+                name: "พนักงาน ทดสอบ",
+            },
+            approver: {
+                employeeId: 20,
+                userId: 200,
+                email: "approver@thainhf.org",
+                name: "ผู้อนุมัติ เดิม",
+            },
+            leaveType: "VACATION" as const,
+            startDate: "2031-05-05T00:00:00.000Z",
+            endDate: "2031-05-05T00:00:00.000Z",
+            period: "FULL_DAY" as const,
+            durationDays: 1,
+            reason: "พักร้อน",
+            emergencyReason: null,
+            specialReason: null,
+            overQuotaDays: 0,
+        };
+
+        it("reuses Message-ID when retrying the same approver", async () => {
+            await sendLeaveActionNotification(payload, "https://example.test");
+            await sendLeaveActionNotification(payload, "https://example.test");
+
+            const firstMessageId = sendMailMock.mock.calls[0][0].messageId;
+            const retryMessageId = sendMailMock.mock.calls[1][0].messageId;
+            expect(retryMessageId).toBe(firstMessageId);
+            expect(firstMessageId).toContain("-200@");
+        });
+
+        it("changes Message-ID when the approver changes", async () => {
+            await sendLeaveActionNotification(payload, "https://example.test");
+            await sendLeaveActionNotification({
+                ...payload,
+                deliveryIdentity: "leave-1:30",
+                approver: {
+                    ...payload.approver,
+                    employeeId: 30,
+                    userId: 300,
+                    email: "new-approver@thainhf.org",
+                },
+            }, "https://example.test");
+
+            const previousMessageId = sendMailMock.mock.calls[0][0].messageId;
+            const nextMessageId = sendMailMock.mock.calls[1][0].messageId;
+            expect(nextMessageId).not.toBe(previousMessageId);
+            expect(nextMessageId).toContain("-300@");
         });
     });
 });
