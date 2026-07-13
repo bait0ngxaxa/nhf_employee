@@ -31,6 +31,7 @@ describe("Stock Service Mutations", () => {
         prismaMock.stockItemVariant.updateMany.mockResolvedValue(
             asNever({ count: 1 }),
         );
+        prismaMock.stockRequestItem.findMany.mockResolvedValue(asNever([]));
     });
 
     describe("issueRequest", () => {
@@ -340,10 +341,115 @@ describe("Stock Service Mutations", () => {
     });
 
     describe("createRequest", () => {
+        it("should accept matching item and variant ids", async () => {
+            prismaMock.stockItemVariant.findMany
+                .mockResolvedValueOnce(asNever([{ id: 501, stockItemId: 50, isActive: true, stockItem: { isActive: true } }]))
+                .mockResolvedValueOnce(asNever([{ id: 501, quantity: 10, unit: "ชิ้น", stockItem: { name: "จอภาพ" } }]));
+            prismaMock.stockRequest.create.mockResolvedValue(asNever({ id: 1 }));
+
+            await stockService.createRequest({
+                projectCode: "PRJ-MATCH",
+                items: [{ itemId: 50, variantId: 501, quantity: 1 }],
+            }, 7);
+
+            expect(prismaMock.stockRequest.create).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    data: expect.objectContaining({
+                        items: { create: [{ itemId: 50, variantId: 501, quantity: 1 }] },
+                    }),
+                }),
+            );
+        });
+
+        it("should reject a variant that belongs to another item", async () => {
+            prismaMock.stockItemVariant.findMany.mockResolvedValueOnce(
+                asNever([{ id: 501, stockItemId: 51, isActive: true, stockItem: { isActive: true } }]),
+            );
+
+            await expect(stockService.createRequest({
+                projectCode: "PRJ-MISMATCH",
+                items: [{ itemId: 50, variantId: 501, quantity: 1 }],
+            }, 7)).rejects.toThrow("รายการย่อยไม่ตรงกับวัสดุที่เลือก");
+
+            expect(prismaMock.stockRequest.create).not.toHaveBeenCalled();
+        });
+
+        it("should reject a missing variant", async () => {
+            prismaMock.stockItemVariant.findMany.mockResolvedValueOnce(asNever([]));
+
+            await expect(stockService.createRequest({
+                projectCode: "PRJ-MISSING",
+                items: [{ itemId: 50, variantId: 999, quantity: 1 }],
+            }, 7)).rejects.toThrow("ไม่พบรายการย่อยที่พร้อมใช้งาน");
+
+            expect(prismaMock.stockRequest.create).not.toHaveBeenCalled();
+        });
+
+        it("should reject an inactive variant", async () => {
+            prismaMock.stockItemVariant.findMany.mockResolvedValueOnce(
+                asNever([{ id: 501, stockItemId: 50, isActive: false, stockItem: { isActive: true } }]),
+            );
+
+            await expect(stockService.createRequest({
+                projectCode: "PRJ-INACTIVE-VARIANT",
+                items: [{ itemId: 50, variantId: 501, quantity: 1 }],
+            }, 7)).rejects.toThrow("ไม่พบรายการย่อยที่พร้อมใช้งาน");
+
+            expect(prismaMock.stockRequest.create).not.toHaveBeenCalled();
+        });
+
+        it("should reject a variant whose item is inactive", async () => {
+            prismaMock.stockItemVariant.findMany.mockResolvedValueOnce(
+                asNever([{ id: 501, stockItemId: 50, isActive: true, stockItem: { isActive: false } }]),
+            );
+
+            await expect(stockService.createRequest({
+                projectCode: "PRJ-INACTIVE-ITEM",
+                items: [{ itemId: 50, variantId: 501, quantity: 1 }],
+            }, 7)).rejects.toThrow("ไม่พบรายการย่อยที่พร้อมใช้งาน");
+
+            expect(prismaMock.stockRequest.create).not.toHaveBeenCalled();
+        });
+
+        it("should keep using the default variant when only itemId is provided", async () => {
+            prismaMock.stockItem.findMany.mockResolvedValue(asNever([{
+                id: 50,
+                sku: "SKU-50",
+                unit: "ชิ้น",
+                quantity: 10,
+                minStock: 1,
+                imageUrl: null,
+                isActive: true,
+            }]));
+            prismaMock.stockItemVariant.findFirst.mockResolvedValue(asNever({ id: 501 }));
+            prismaMock.stockItemVariant.findMany.mockResolvedValueOnce(
+                asNever([{ id: 501, quantity: 10, unit: "ชิ้น", stockItem: { name: "จอภาพ" } }]),
+            );
+            prismaMock.stockRequest.create.mockResolvedValue(asNever({ id: 1 }));
+
+            await stockService.createRequest({
+                projectCode: "PRJ-DEFAULT",
+                items: [{ itemId: 50, quantity: 1 }],
+            }, 7);
+
+            expect(prismaMock.stockRequest.create).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    data: expect.objectContaining({
+                        items: { create: [{ itemId: 50, variantId: 501, quantity: 1 }] },
+                    }),
+                }),
+            );
+        });
+
         it("should reject when available quantity is lower than requested after pending reserve", async () => {
             prismaMock.stockItemVariant.findMany
                 .mockResolvedValueOnce(
-                    asNever([{ id: 301, stockItemId: 30 }]),
+                    asNever([{
+                        id: 301,
+                        stockItemId: 30,
+                        isActive: true,
+                        stockItem: { isActive: true },
+                    }]),
                 )
                 .mockResolvedValueOnce(
                     asNever([
@@ -377,7 +483,12 @@ describe("Stock Service Mutations", () => {
         it("should create request with normalized item and variant ids when stock is available", async () => {
             prismaMock.stockItemVariant.findMany
                 .mockResolvedValueOnce(
-                    asNever([{ id: 401, stockItemId: 40 }]),
+                    asNever([{
+                        id: 401,
+                        stockItemId: 40,
+                        isActive: true,
+                        stockItem: { isActive: true },
+                    }]),
                 )
                 .mockResolvedValueOnce(
                     asNever([
@@ -481,6 +592,80 @@ describe("Stock Service Mutations", () => {
     });
 
     describe("updateItem", () => {
+        it("should reduce an existing variant from 5 to 0 and synchronize the parent", async () => {
+            prismaMock.stockItem.findUniqueOrThrow.mockResolvedValue(
+                asNever({ id: 24, sku: "SKU-24", unit: "ชิ้น", quantity: 5, minStock: 1, imageUrl: null, isActive: true }),
+            );
+            prismaMock.stockItemVariant.findMany.mockResolvedValue(
+                asNever([{ id: 241, sku: "SKU-24-A", imageUrl: null, isActive: true }]),
+            );
+            prismaMock.stockItem.update
+                .mockResolvedValueOnce(asNever({ id: 24, sku: "SKU-24", imageUrl: null }))
+                .mockResolvedValueOnce(asNever({ id: 24 }));
+            prismaMock.stockItemVariant.aggregate.mockResolvedValue(
+                asNever({ _sum: { quantity: 0, minStock: 1 } }),
+            );
+            prismaMock.stockItem.findUnique.mockResolvedValue(
+                asNever({ id: 24, variants: [] }),
+            );
+
+            await stockService.updateItem(24, {
+                variants: [{ id: 241, expectedQuantity: 5, sku: "SKU-24-A", unit: "ชิ้น", quantity: 0, minStock: 1, attributes: [] }],
+            }, 7);
+
+            expect(prismaMock.stockItemVariant.updateMany).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    where: expect.objectContaining({ id: 241, quantity: 5 }),
+                    data: expect.objectContaining({ quantity: { increment: -5 } }),
+                }),
+            );
+            expect(prismaMock.stockTransaction.create).toHaveBeenCalledWith({
+                data: expect.objectContaining({ itemId: 24, variantId: 241, type: "OUT", quantity: -5 }),
+            });
+            expect(prismaMock.stockItem.update).toHaveBeenNthCalledWith(2, {
+                where: { id: 24 },
+                data: { quantity: 0, minStock: 1 },
+            });
+        });
+
+        it("should reject a stale variant update when updateMany changes no rows", async () => {
+            prismaMock.stockItem.findUniqueOrThrow.mockResolvedValue(
+                asNever({ id: 24, sku: "SKU-24", unit: "ชิ้น", quantity: 5, minStock: 1, imageUrl: null, isActive: true }),
+            );
+            prismaMock.stockItemVariant.findMany.mockResolvedValue(
+                asNever([{ id: 241, sku: "SKU-24-A", imageUrl: null, isActive: true }]),
+            );
+            prismaMock.stockItem.update.mockResolvedValueOnce(
+                asNever({ id: 24, sku: "SKU-24", imageUrl: null }),
+            );
+            prismaMock.stockItemVariant.updateMany.mockResolvedValueOnce(asNever({ count: 0 }));
+
+            await expect(stockService.updateItem(24, {
+                variants: [{ id: 241, expectedQuantity: 5, unit: "ชิ้น", quantity: 0, minStock: 1, attributes: [] }],
+            }, 7)).rejects.toThrow("ยอดคงเหลือของรายการย่อยเปลี่ยนแปลงแล้ว");
+
+            expect(prismaMock.stockTransaction.create).not.toHaveBeenCalled();
+            expect(prismaMock.stockItemVariant.aggregate).not.toHaveBeenCalled();
+        });
+
+        it("should not create a stock transaction when the quantity delta is zero", async () => {
+            prismaMock.stockItem.findUniqueOrThrow.mockResolvedValue(
+                asNever({ id: 24, sku: "SKU-24", unit: "ชิ้น", quantity: 5, minStock: 1, imageUrl: null, isActive: true }),
+            );
+            prismaMock.stockItemVariant.findMany.mockResolvedValue(
+                asNever([{ id: 241, sku: "SKU-24-A", imageUrl: null, isActive: true }]),
+            );
+            prismaMock.stockItem.update
+                .mockResolvedValueOnce(asNever({ id: 24, sku: "SKU-24", imageUrl: null }))
+                .mockResolvedValueOnce(asNever({ id: 24 }));
+            prismaMock.stockItem.findUnique.mockResolvedValue(asNever({ id: 24, variants: [] }));
+
+            await stockService.updateItem(24, {
+                variants: [{ id: 241, expectedQuantity: 5, unit: "ชิ้น", quantity: 5, minStock: 1, attributes: [] }],
+            }, 7);
+
+            expect(prismaMock.stockTransaction.create).not.toHaveBeenCalled();
+        });
         it("should adjust existing variants atomically and synchronize the parent quantity", async () => {
             prismaMock.stockItem.findUniqueOrThrow.mockResolvedValue(
                 asNever({
@@ -659,6 +844,7 @@ describe("Stock Service Mutations", () => {
                     }),
                 }),
             );
+            expect(prismaMock.stockTransaction.create).not.toHaveBeenCalled();
             expect(prismaMock.stockItemVariant.update).toHaveBeenCalledWith(
                 expect.objectContaining({
                     where: { id: 262 },

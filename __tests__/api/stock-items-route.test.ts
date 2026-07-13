@@ -84,6 +84,32 @@ describe("Stock Item Routes", () => {
         );
     });
 
+    it("returns 409 when an existing variant was changed by a stale form", async () => {
+        vi.mocked(stockService.updateItem).mockRejectedValue(
+            new Error("ยอดคงเหลือของรายการย่อยเปลี่ยนแปลงแล้ว กรุณาโหลดข้อมูลใหม่"),
+        );
+        const request = new NextRequest("http://localhost/api/stock/items/42", {
+            method: "PATCH",
+            body: JSON.stringify({
+                variants: [{
+                    id: 421,
+                    expectedQuantity: 5,
+                    unit: "ชิ้น",
+                    quantity: 0,
+                    minStock: 1,
+                    attributes: [],
+                }],
+            }),
+        });
+
+        const response = await patchItemRoute(request, {
+            params: Promise.resolve({ id: "42" }),
+        });
+
+        expect(response.status).toBe(409);
+        expect(logStockEvent).not.toHaveBeenCalled();
+    });
+
     it("logs STOCK_ITEM_DELETE after soft-deleting an item", async () => {
         vi.mocked(stockService.updateItem).mockResolvedValue({
             ...updatedItem,

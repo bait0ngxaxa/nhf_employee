@@ -74,13 +74,21 @@ function createEditableVariant(item: StockItem, variant?: StockItemVariant) {
     };
 }
 
-function parseVariantNumber(value: string): number {
+function parseVariantNumber(value: string, minimum: number): number {
     const parsed = Number(value);
-    if (!Number.isFinite(parsed) || parsed < 1) {
-        return 1;
+    if (!Number.isFinite(parsed) || parsed < minimum) {
+        return minimum;
     }
 
     return Math.trunc(parsed);
+}
+
+export function parseVariantQuantity(value: string): number {
+    return parseVariantNumber(value, 0);
+}
+
+export function parseVariantMinStock(value: string): number {
+    return parseVariantNumber(value, 1);
 }
 
 function createEditableVariants(item: StockItem): EditableVariant[] {
@@ -104,8 +112,8 @@ function normalizeVariantForUpdate(
         }),
         sku: variant.sku.trim() || undefined,
         unit: variant.unit.trim(),
-        quantity: parseVariantNumber(variant.quantity),
-        minStock: parseVariantNumber(variant.minStock),
+        quantity: parseVariantQuantity(variant.quantity),
+        minStock: parseVariantMinStock(variant.minStock),
         imageUrl:
             variantsLength === 1
                 ? itemImageUrl.trim() || null
@@ -161,7 +169,7 @@ export function EditItemDialog({
     const totalQuantity = useMemo(
         () =>
             variants.reduce(
-                (sum, variant) => sum + parseVariantNumber(variant.quantity),
+                (sum, variant) => sum + parseVariantQuantity(variant.quantity),
                 0,
             ),
         [variants],
@@ -169,7 +177,7 @@ export function EditItemDialog({
     const totalMinStock = useMemo(
         () =>
             variants.reduce(
-                (sum, variant) => sum + parseVariantNumber(variant.minStock),
+                (sum, variant) => sum + parseVariantMinStock(variant.minStock),
                 0,
             ),
         [variants],

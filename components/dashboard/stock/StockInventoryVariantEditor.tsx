@@ -195,7 +195,7 @@ function VariantCard(props: {
                 <FieldShell label={STOCK_ADMIN_TEXT.initialQuantity}>
                     <Input
                         type="number"
-                        min={1}
+                        min={0}
                         value={variant.quantity}
                         onChange={(event) =>
                             props.onChange({

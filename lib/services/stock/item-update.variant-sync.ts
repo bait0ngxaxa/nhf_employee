@@ -147,6 +147,7 @@ async function createSubmittedVariant(
     usedSkus: Set<string>,
     tracking: UploadUrlTracking,
 ): Promise<void> {
+    // A variant added during item editing follows createItem: its initial quantity is an opening balance.
     const nextVariantImageUrl = variant.imageUrl ?? parentImageUrl;
     const normalizedSku = variant.sku?.trim();
     const nextSku =

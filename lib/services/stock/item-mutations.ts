@@ -207,6 +207,7 @@ export async function createItem(data: CreateStockItemInput) {
             },
         });
 
+        // Initial quantities are opening balances; only later adjustments create ledger entries.
         if (variants.length === 0) {
             await ensureDefaultVariant(tx, item);
         } else {

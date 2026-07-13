@@ -272,9 +272,9 @@ export function normalizeRequestItems(
     defaultVariantsByItemId: Map<number, { id: number }>,
 ): Array<{ itemId: number; variantId: number; quantity: number }> {
     return data.items.map((item) => {
-        const itemId =
-            item.itemId ??
-            (item.variantId ? itemIdByVariantId.get(item.variantId) : undefined);
+        const itemId = item.variantId
+            ? itemIdByVariantId.get(item.variantId)
+            : item.itemId;
         const variantId =
             item.variantId ??
             (itemId ? defaultVariantsByItemId.get(itemId)?.id : undefined);

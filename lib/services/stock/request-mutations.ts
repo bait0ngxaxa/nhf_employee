@@ -16,6 +16,37 @@ import type {
     LowStockAlertCandidate,
 } from "./types";
 
+type RequestedVariant = {
+    id: number;
+    stockItemId: number;
+    isActive: boolean;
+    stockItem: { isActive: boolean };
+};
+
+function validateRequestedVariants(
+    items: CreateRequestInput["items"],
+    variants: RequestedVariant[],
+): Map<number, number> {
+    const variantById = new Map(variants.map((variant) => [variant.id, variant]));
+    const itemIdByVariantId = new Map<number, number>();
+
+    for (const item of items) {
+        if (item.variantId === undefined) continue;
+
+        const variant = variantById.get(item.variantId);
+        if (!variant || !variant.isActive || !variant.stockItem.isActive) {
+            throw new Error("ไม่พบรายการย่อยที่พร้อมใช้งาน");
+        }
+        if (item.itemId !== undefined && item.itemId !== variant.stockItemId) {
+            throw new Error("รายการย่อยไม่ตรงกับวัสดุที่เลือก");
+        }
+
+        itemIdByVariantId.set(variant.id, variant.stockItemId);
+    }
+
+    return itemIdByVariantId;
+}
+
 function buildLowStockAlerts(
     items: Array<{
         id: number;
@@ -62,18 +93,22 @@ export async function createRequest(
                 .map((item) => item.variantId)
                 .filter((variantId): variantId is number => variantId !== undefined);
             const requestedItemIds = data.items
+                .filter((item) => item.variantId === undefined)
                 .map((item) => item.itemId)
                 .filter((itemId): itemId is number => itemId !== undefined);
 
             const variants = requestedVariantIds.length
                 ? await tx.stockItemVariant.findMany({
                       where: { id: { in: requestedVariantIds } },
-                      select: { id: true, stockItemId: true },
+                      select: {
+                          id: true,
+                          stockItemId: true,
+                          isActive: true,
+                          stockItem: { select: { isActive: true } },
+                      },
                   })
                 : [];
-            const itemIdByVariantId = new Map(
-                variants.map((variant) => [variant.id, variant.stockItemId]),
-            );
+            const itemIdByVariantId = validateRequestedVariants(data.items, variants);
             const defaultVariantsByItemId = await ensureDefaultVariantsByItemIds(
                 tx,
                 requestedItemIds,
@@ -99,7 +134,11 @@ export async function createRequest(
             const variantIds = Array.from(requestedQtyByVariantId.keys());
             const [requestedVariants, pendingRequestItems] = await Promise.all([
                 tx.stockItemVariant.findMany({
-                    where: { id: { in: variantIds } },
+                    where: {
+                        id: { in: variantIds },
+                        isActive: true,
+                        stockItem: { isActive: true },
+                    },
                     select: {
                         id: true,
                         quantity: true,
