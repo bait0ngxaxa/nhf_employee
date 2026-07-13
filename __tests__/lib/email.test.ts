@@ -41,7 +41,9 @@ describe("Email Service", () => {
                 text: "t",
             });
             expect(result).toBe(true);
-            expect(sendMailMock).toHaveBeenCalled();
+            expect(sendMailMock).toHaveBeenCalledWith(expect.objectContaining({
+                messageId: undefined,
+            }));
         });
 
         it("should retry on failure", { timeout: 15000 }, async () => {

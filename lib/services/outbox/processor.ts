@@ -24,6 +24,7 @@ import {
     parseLeaveNotTakenRequestedPayload,
     parseLeaveResultPayload,
 } from "@/lib/services/leave/notification-payloads";
+import { dispatchCurrentLeaveAction } from "@/lib/services/leave/current-action-recipient";
 import {
     isSharedDriveOption,
     type SharedDriveOption,
@@ -355,10 +356,7 @@ async function dispatchNotification(notification: NotificationOutbox): Promise<v
         }
         case "LEAVE_ACTION": {
             const parsedLeaveAction = parseLeaveActionPayload(payload);
-            const { sendLeaveActionNotifications } = await import(
-                "../leave/notifications"
-            );
-            await sendLeaveActionNotifications(parsedLeaveAction);
+            await dispatchCurrentLeaveAction(notification.id, parsedLeaveAction);
             return;
         }
         case "LEAVE_RESULT": {
@@ -419,7 +417,8 @@ async function dispatchNotification(notification: NotificationOutbox): Promise<v
 }
 
 /**
- * Process pending notifications in the outbox.
+ * ส่ง outbox แบบ at-least-once: side effect ภายนอกอาจสำเร็จก่อน process ล้ม
+ * และก่อน mark SENT จึงต้องพึ่ง idempotency ของแต่ละ provider เมื่อ retry.
  */
 export async function processOutbox(batchSize = 10): Promise<OutboxProcessResult> {
     await markStaleProcessingRows();

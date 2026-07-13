@@ -24,6 +24,18 @@ import {
 let transporter: nodemailer.Transporter | null = null;
 let isTransporterReady = false;
 
+type LeaveEmailEvent =
+    | "action"
+    | "result"
+    | "cancelled"
+    | "not-taken-requested"
+    | "not-taken-confirmed";
+
+function buildLeaveMessageId(event: LeaveEmailEvent, leaveId: string): string {
+    const safeLeaveId = leaveId.replace(/[^a-zA-Z0-9._-]/g, "-");
+    return `<nhf-leave-${event}-${safeLeaveId}@notifications.thainhf.org>`;
+}
+
 function getTransporter(): nodemailer.Transporter {
     if (!transporter) {
         transporter = nodemailer.createTransport({
@@ -98,6 +110,7 @@ export async function sendEmail(emailData: EmailData): Promise<boolean> {
                     subject: emailData.subject,
                     html: emailData.html,
                     text: emailData.text,
+                    messageId: emailData.messageId,
                 });
 
                 return true;
@@ -230,6 +243,7 @@ export async function sendLeaveActionNotification(
         subject: `[NHF Leave] คำขอลาใหม่จาก ${data.employee.name}`,
         html: generateLeaveActionEmailHTML(data, dashboardLink),
         text: `มีคำขอลาใหม่\nพนักงาน ${data.employee.name} ขอลา ${data.durationDays} วัน\nดูรายละเอียด: ${dashboardLink}`,
+        messageId: buildLeaveMessageId("action", data.leaveId),
     };
 
     return await sendEmail(emailData);
@@ -244,6 +258,7 @@ export async function sendLeaveResultNotification(
         subject: `[NHF Leave] ผลการพิจารณาคำขอลา: ${data.status === "APPROVED" ? "อนุมัติ" : "ไม่อนุมัติ"}`,
         html: generateLeaveResultEmailHTML(data, dashboardUrl),
         text: `ผลการพิจารณาคำขอลา: ${data.status}\nเหตุผล: ${data.reason || "-"}`,
+        messageId: buildLeaveMessageId("result", data.leaveId),
     };
 
     return await sendEmail(emailData);
@@ -265,6 +280,7 @@ export async function sendLeaveCancelledNotification(
             ctaLabel: "ดูรายการอนุมัติ",
         }),
         text: `${data.employee.name} ยกเลิกคำขอลาแล้ว\nดูรายละเอียด: ${dashboardLink}`,
+        messageId: buildLeaveMessageId("cancelled", data.leaveId),
     };
 
     return sendEmail(emailData);
@@ -288,6 +304,7 @@ export async function sendLeaveNotTakenRequestedNotification(
             note: data.note,
         }),
         text: `${data.employee.name} แจ้งไม่ได้ใช้วันลา\nดูรายละเอียด: ${dashboardLink}`,
+        messageId: buildLeaveMessageId("not-taken-requested", data.leaveId),
     };
 
     return sendEmail(emailData);
@@ -312,6 +329,7 @@ export async function sendLeaveNotTakenConfirmedNotification(
             actorName: approverName,
         }),
         text: `ยืนยันไม่ได้ใช้วันลาแล้ว\nผู้อนุมัติ: ${approverName}\nดูรายละเอียด: ${dashboardLink}`,
+        messageId: buildLeaveMessageId("not-taken-confirmed", data.leaveId),
     };
 
     return sendEmail(emailData);

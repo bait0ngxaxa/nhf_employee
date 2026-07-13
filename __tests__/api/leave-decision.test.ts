@@ -39,6 +39,7 @@ vi.mock("@/lib/db/prisma", () => ({
         $transaction: vi.fn(),
         user: {
             findUnique: vi.fn(),
+            findFirst: vi.fn(),
         },
         leaveRequest: {
             findUnique: vi.fn(),
@@ -82,8 +83,10 @@ describe("POST /api/leave/decision", () => {
         vi.mocked(getEmployeeIdFromUserId).mockResolvedValue(20);
         vi.mocked(prisma.user.findUnique).mockResolvedValue({
             isActive: true,
+            deletedAt: null,
             employee: { id: 20, status: "ACTIVE", deletedAt: null },
         } as never);
+        vi.mocked(prisma.user.findFirst).mockResolvedValue({ id: 20 } as never);
         vi.mocked(processOutbox).mockResolvedValue({ processed: 0, failed: 0 });
         vi.mocked(logLeaveEvent).mockResolvedValue(undefined);
         vi.mocked(prisma.$transaction).mockImplementation(async (callback) => {
@@ -172,6 +175,25 @@ describe("POST /api/leave/decision", () => {
         expect(logLeaveEvent).not.toHaveBeenCalled();
     });
 
+    it("rejects when the approver becomes inactive before the transaction", async () => {
+        vi.mocked(prisma.user.findFirst).mockResolvedValue(null);
+
+        const req = new NextRequest("http://localhost/api/leave/decision", {
+            method: "POST",
+            body: JSON.stringify({
+                leaveId: "leave-1",
+                action: "REJECT",
+                reason: "ไม่อนุมัติ",
+            }),
+        });
+
+        const res = await POST(req);
+
+        expect(res.status).toBe(403);
+        expect(prisma.leaveRequest.findUnique).not.toHaveBeenCalled();
+        expect(prisma.leaveRequest.updateMany).not.toHaveBeenCalled();
+    });
+
     it("recalculates over-quota days downward when quota is returned before approval", async () => {
         vi.mocked(prisma.leaveRequest.findUnique).mockResolvedValue({
             id: "leave-1",
@@ -245,7 +267,7 @@ describe("POST /api/leave/decision", () => {
             data: { usedDays: { increment: 1 } },
         });
         expect(prisma.leaveRequest.updateMany).toHaveBeenCalledWith({
-            where: { id: "leave-1", status: "PENDING" },
+            where: { id: "leave-1", status: "PENDING", approverId: 20 },
             data: expect.objectContaining({
                 status: "APPROVED",
             }),

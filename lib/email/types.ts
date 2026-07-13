@@ -3,6 +3,7 @@ export interface EmailData {
     subject: string;
     html: string;
     text?: string;
+    messageId?: string;
 }
 
 export type {

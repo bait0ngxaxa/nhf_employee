@@ -32,7 +32,7 @@ vi.mock("@/lib/services/outbox/processor", () => ({
 vi.mock("@/lib/db/prisma", () => ({
     prisma: {
         $transaction: vi.fn(),
-        user: { findUnique: vi.fn() },
+        user: { findUnique: vi.fn(), findFirst: vi.fn() },
         notification: {
             create: vi.fn(),
             updateMany: vi.fn(),
@@ -70,8 +70,10 @@ describe("/api/leave/not-taken", () => {
         vi.mocked(getEmployeeIdFromUserId).mockResolvedValue(10);
         vi.mocked(prisma.user.findUnique).mockResolvedValue({
             isActive: true,
+            deletedAt: null,
             employee: { id: 10, status: "ACTIVE", deletedAt: null },
         } as never);
+        vi.mocked(prisma.user.findFirst).mockResolvedValue({ id: 1 } as never);
         vi.mocked(processOutbox).mockResolvedValue({ processed: 0, failed: 0 });
         vi.mocked(prisma.$transaction).mockImplementation(async (callback) => {
             if (typeof callback === "function") {
@@ -117,7 +119,14 @@ describe("/api/leave/not-taken", () => {
                 firstName: "Manager",
                 lastName: "User",
                 email: "manager@example.com",
-                user: { id: 2, email: "manager-account@thainhf.org", isActive: true },
+                status: "ACTIVE",
+                deletedAt: null,
+                user: {
+                    id: 2,
+                    email: "manager-account@thainhf.org",
+                    isActive: true,
+                    deletedAt: null,
+                },
             },
         } as Awaited<ReturnType<typeof prisma.leaveRequest.findUnique>>);
         vi.mocked(prisma.leaveRequest.updateMany).mockResolvedValue({ count: 1 });
@@ -193,7 +202,14 @@ describe("/api/leave/not-taken", () => {
                 firstName: "Manager",
                 lastName: "User",
                 email: "manager@example.com",
-                user: { id: 2, email: "manager-account@thainhf.org", isActive: true },
+                status: "ACTIVE",
+                deletedAt: null,
+                user: {
+                    id: 2,
+                    email: "manager-account@thainhf.org",
+                    isActive: true,
+                    deletedAt: null,
+                },
             },
         } as Awaited<ReturnType<typeof prisma.leaveRequest.findUnique>>);
         vi.mocked(prisma.leaveRequest.updateMany).mockResolvedValue({ count: 0 });
@@ -297,6 +313,21 @@ describe("/api/leave/not-taken", () => {
                 type: "LEAVE_NOT_TAKEN_CONFIRMED",
             }),
         });
+    });
+
+    it("rejects confirmation when the approver becomes inactive before the transaction", async () => {
+        vi.mocked(prisma.user.findFirst).mockResolvedValue(null);
+
+        const req = new NextRequest("http://localhost/api/leave/not-taken", {
+            method: "PUT",
+            body: JSON.stringify({ leaveId: "leave-2" }),
+        });
+
+        const res = await PUT(req);
+
+        expect(res.status).toBe(403);
+        expect(prisma.leaveRequest.findUnique).not.toHaveBeenCalled();
+        expect(prisma.leaveQuota.update).not.toHaveBeenCalled();
     });
 
     it("rejects not-taken confirmation if returning quota would make used days negative", async () => {

@@ -79,10 +79,7 @@ describe("PUT /api/leave/approvers", () => {
         expect(assignLeaveApprovers).toHaveBeenCalledTimes(1);
     });
 
-    it("always applies the central transfer policy when the flag is omitted", async () => {
-        vi.mocked(assignLeaveApprovers).mockResolvedValue({
-            transferredLeaveRequestCount: 2,
-        });
+    it("treats an omitted transfer flag as false", async () => {
         const response = await PUT(new NextRequest("http://localhost/api/leave/approvers", {
             method: "PUT",
             body: JSON.stringify({ assignments: [{ employeeId: 10, managerId: 20 }] }),
@@ -90,9 +87,24 @@ describe("PUT /api/leave/approvers", () => {
 
         expect(response.status).toBe(200);
         expect(assignLeaveApprovers).toHaveBeenCalledWith(
-            [{ employeeId: 10, managerId: 20 }],
+            [{ employeeId: 10, managerId: 20, transferPendingRequests: false }],
             { userId: 1, email: "admin@example.com" },
         );
-        expect(await response.json()).toMatchObject({ transferredLeaveRequestCount: 2 });
+        expect(await response.json()).toMatchObject({ transferredLeaveRequestCount: 0 });
+    });
+
+    it("rejects duplicate employee assignments", async () => {
+        const response = await PUT(new NextRequest("http://localhost/api/leave/approvers", {
+            method: "PUT",
+            body: JSON.stringify({
+                assignments: [
+                    { employeeId: 10, managerId: 20, transferPendingRequests: false },
+                    { employeeId: 10, managerId: 30, transferPendingRequests: true },
+                ],
+            }),
+        }));
+
+        expect(response.status).toBe(400);
+        expect(assignLeaveApprovers).not.toHaveBeenCalled();
     });
 });

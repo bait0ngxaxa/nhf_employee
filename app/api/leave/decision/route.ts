@@ -4,7 +4,10 @@ import { after, NextResponse } from "next/server";
 import { logLeaveEvent } from "@/lib/server/audit";
 import { prisma } from "@/lib/db/prisma";
 import { processOutbox } from "@/lib/services/outbox/processor";
-import { requireActiveEmployeeSession } from "@/lib/services/leave/active-employee-session";
+import {
+    isActiveEmployeeInTransaction,
+    requireActiveEmployeeSession,
+} from "@/lib/services/leave/active-employee-session";
 import {
     buildLeaveRecipientSnapshot,
     formatEmployeeName,
@@ -61,6 +64,9 @@ export async function POST(req: Request): Promise<NextResponse> {
         const { leaveId, action, reason } = parsed.data;
 
         const result = await prisma.$transaction(async (tx) => {
+            if (!await isActiveEmployeeInTransaction(tx, userId, managerId)) {
+                throw new LeaveApprovalError(LEAVE_APPROVAL_MESSAGES.forbidden, 403);
+            }
             const leaveRequest = await tx.leaveRequest.findUnique({
                 where: { id: leaveId },
                 include: {
@@ -89,7 +95,7 @@ export async function POST(req: Request): Promise<NextResponse> {
             };
 
             const claimedRequest = await tx.leaveRequest.updateMany({
-                where: { id: leaveId, status: "PENDING" },
+                where: { id: leaveId, status: "PENDING", approverId: managerId },
                 data: updateData,
             });
             if (claimedRequest.count !== 1) {

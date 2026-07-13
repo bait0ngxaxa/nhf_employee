@@ -1,4 +1,4 @@
-import type { Prisma } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 
 import { prisma } from "@/lib/db/prisma";
 import { MAX_OUTBOX_ATTEMPTS } from "@/lib/services/outbox/types";
@@ -7,10 +7,15 @@ import {
     buildLeaveRecipientSnapshot,
     type LeaveActionPayload,
 } from "@/lib/services/leave/notification-payloads";
+import {
+    ACTIVE_LEAVE_APPROVER_USER_SELECT,
+    isActiveLeaveApprover,
+} from "@/lib/services/leave/approver-eligibility";
 
 export type ApproverAssignment = {
     employeeId: number;
     managerId: number | null;
+    transferPendingRequests?: boolean;
 };
 
 export type ApproverAssignmentActor = {
@@ -34,6 +39,7 @@ const APPROVER_MESSAGES = {
     approverUnavailable: "ผู้อนุมัติต้องเป็นพนักงานที่ใช้งานอยู่และมีบัญชีผู้ใช้ที่พร้อมใช้งาน",
     selfAssignment: "ไม่สามารถตั้งตนเองเป็นผู้อนุมัติได้",
     pendingRequestsRequireApprover: "ไม่สามารถยกเลิกผู้อนุมัติขณะที่มีคำขอลารออนุมัติ",
+    duplicateEmployee: "ห้ามกำหนดผู้อนุมัติซ้ำสำหรับพนักงานคนเดียวกัน",
 } as const;
 
 type TransactionClient = Prisma.TransactionClient;
@@ -51,10 +57,7 @@ function validateApprover(approver: ApproverRecord | undefined): ApproverRecord 
         throw new ApproverAssignmentError(APPROVER_MESSAGES.approverNotFound, 404);
     }
     if (
-        approver.status !== "ACTIVE"
-        || approver.deletedAt !== null
-        || !approver.user?.isActive
-        || approver.user.deletedAt !== null
+        !isActiveLeaveApprover(approver)
         || !isUsableAccount(approver.user.email)
     ) {
         throw new ApproverAssignmentError(APPROVER_MESSAGES.approverUnavailable);
@@ -73,7 +76,7 @@ async function loadApprovers(tx: TransactionClient, managerIds: number[]) {
             status: true,
             deletedAt: true,
             user: {
-                select: { id: true, email: true, isActive: true, deletedAt: true },
+                select: ACTIVE_LEAVE_APPROVER_USER_SELECT,
             },
         },
     });
@@ -112,7 +115,7 @@ async function transferNotification(
     tx: TransactionClient,
     request: PendingRequest,
     approver: ApproverRecord,
-    current: PendingOutbox | undefined,
+    current: PendingOutbox[],
 ): Promise<void> {
     if (!approver.user) return;
     const payload = JSON.stringify(buildTransferredPayload(request, approver));
@@ -125,8 +128,15 @@ async function transferNotification(
         },
         data: { isRead: true },
     });
-    if (current) {
-        await tx.notificationOutbox.update({ where: { id: current.id }, data: { payload } });
+    const [primary, ...duplicates] = current;
+    if (primary) {
+        await tx.notificationOutbox.update({ where: { id: primary.id }, data: { payload } });
+        if (duplicates.length > 0) {
+            await tx.notificationOutbox.updateMany({
+                where: { id: { in: duplicates.map(({ id }) => id) } },
+                data: { status: "SENT", lastError: "Superseded by approver transfer" },
+            });
+        }
         return;
     }
     await tx.notificationOutbox.create({ data: { type: "LEAVE_ACTION", payload } });
@@ -162,7 +172,7 @@ type ApplyAssignmentContext = {
     requests: PendingRequest[];
     approver: ApproverRecord | null;
     actor: ApproverAssignmentActor;
-    outboxMap: Map<string, PendingOutbox>;
+    outboxMap: Map<string, PendingOutbox[]>;
 };
 
 async function applyAssignment(context: ApplyAssignmentContext): Promise<number> {
@@ -174,14 +184,16 @@ async function applyAssignment(context: ApplyAssignmentContext): Promise<number>
         where: { id: assignment.employeeId },
         data: { managerId: assignment.managerId },
     });
-    const transferredIds = requests.map((request) => request.id);
-    if (approver && transferredIds.length > 0) {
-        await tx.leaveRequest.updateMany({
-            where: { id: { in: transferredIds }, status: "PENDING" },
-            data: { approverId: approver.id },
-        });
+    const transferredIds: string[] = [];
+    if (approver) {
         for (const request of requests) {
-            await transferNotification(tx, request, approver, outboxMap.get(request.id));
+            const transferred = await tx.leaveRequest.updateMany({
+                where: { id: request.id, status: "PENDING" },
+                data: { approverId: approver.id },
+            });
+            if (transferred.count !== 1) continue;
+            transferredIds.push(request.id);
+            await transferNotification(tx, request, approver, outboxMap.get(request.id) ?? []);
         }
     }
     await writeAudit(tx, assignment, previousManagerId, transferredIds, actor);
@@ -198,12 +210,15 @@ function indexRequests(requests: PendingRequest[]): Map<number, PendingRequest[]
     return result;
 }
 
-function indexOutboxes(outboxes: PendingOutbox[]): Map<string, PendingOutbox> {
-    const result = new Map<string, PendingOutbox>();
+function indexOutboxes(outboxes: PendingOutbox[]): Map<string, PendingOutbox[]> {
+    const result = new Map<string, PendingOutbox[]>();
     for (const outbox of outboxes) {
         try {
             const parsed = JSON.parse(outbox.payload) as { leaveId?: unknown };
-            if (typeof parsed.leaveId === "string") result.set(parsed.leaveId, outbox);
+            if (typeof parsed.leaveId !== "string") continue;
+            const requestOutboxes = result.get(parsed.leaveId) ?? [];
+            requestOutboxes.push(outbox);
+            result.set(parsed.leaveId, requestOutboxes);
         } catch {
             continue;
         }
@@ -215,8 +230,12 @@ export async function assignLeaveApprovers(
     assignments: ApproverAssignment[],
     actor: ApproverAssignmentActor,
 ): Promise<{ transferredLeaveRequestCount: number }> {
+    const employeeIds = assignments.map(({ employeeId }) => employeeId);
+    if (new Set(employeeIds).size !== employeeIds.length) {
+        throw new ApproverAssignmentError(APPROVER_MESSAGES.duplicateEmployee);
+    }
+
     return prisma.$transaction(async (tx) => {
-        const employeeIds = assignments.map(({ employeeId }) => employeeId);
         const managerIds = assignments.flatMap(({ managerId }) => managerId ? [managerId] : []);
         const [employees, approvers, pendingRequests, pendingOutboxes] = await Promise.all([
             tx.employee.findMany({
@@ -228,10 +247,11 @@ export async function assignLeaveApprovers(
             tx.notificationOutbox.findMany({
                 where: {
                     type: "LEAVE_ACTION",
-                    status: { in: ["PENDING", "FAILED"] },
+                    status: { in: ["PENDING", "FAILED", "PROCESSING"] },
                     attempts: { lt: MAX_OUTBOX_ATTEMPTS },
                 },
                 select: { id: true, payload: true },
+                orderBy: { id: "asc" },
             }),
         ]);
         const employeeMap = new Map(employees.map((employee) => [employee.id, employee]));
@@ -243,6 +263,7 @@ export async function assignLeaveApprovers(
         for (const assignment of assignments) {
             const employee = employeeMap.get(assignment.employeeId);
             if (!employee) throw new ApproverAssignmentError(APPROVER_MESSAGES.employeeNotFound, 404);
+            if (employee.managerId === assignment.managerId) continue;
             if (assignment.employeeId === assignment.managerId) {
                 throw new ApproverAssignmentError(APPROVER_MESSAGES.selfAssignment);
             }
@@ -253,12 +274,16 @@ export async function assignLeaveApprovers(
                 tx,
                 assignment,
                 previousManagerId: employee.managerId,
-                requests: requestMap.get(assignment.employeeId) ?? [],
+                requests: assignment.transferPendingRequests
+                    ? requestMap.get(assignment.employeeId) ?? []
+                    : [],
                 approver,
                 actor,
                 outboxMap,
             });
         }
         return { transferredLeaveRequestCount };
+    }, {
+        isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
     });
 }

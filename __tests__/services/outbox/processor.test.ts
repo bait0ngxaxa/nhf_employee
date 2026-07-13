@@ -9,12 +9,14 @@ import { mockDeep, mockReset } from "vitest-mock-extended";
 import { lineNotificationService } from "@/lib/line";
 import { prisma } from "@/lib/db/prisma";
 import { processOutbox } from "@/lib/services/outbox/processor";
+import { assignLeaveApprovers } from "@/lib/services/leave/approver-assignment";
 import { EMAIL_REQUEST_INAPP_RECIPIENTS_ENV } from "@/lib/services/email-request/notifications";
 import {
     sendTicketCreatedNotifications,
     sendTicketUpdatedNotifications,
 } from "@/lib/services/ticket/notifications";
 import {
+    sendLeaveActionNotifications,
     sendLeaveCancelledNotifications,
     sendLeaveNotTakenConfirmedNotifications,
     sendLeaveNotTakenRequestedNotifications,
@@ -105,6 +107,10 @@ function buildLeavePayload() {
         endDate: "2026-07-01T00:00:00.000Z",
         period: "FULL_DAY",
         durationDays: 1,
+        reason: "ลาป่วย",
+        emergencyReason: null,
+        specialReason: null,
+        overQuotaDays: 0,
         note: "ไม่ได้ลาเพราะมีงานด่วน",
     };
 }
@@ -118,6 +124,13 @@ describe("processOutbox", () => {
         prismaMock.notificationOutbox.updateMany.mockResolvedValue(
             asNever({ count: 1 }),
         );
+        prismaMock.notificationOutbox.findFirst.mockResolvedValue(
+            asNever({ id: 1 }),
+        );
+        prismaMock.$queryRaw.mockResolvedValue(asNever([]));
+        prismaMock.$transaction.mockImplementation((async (
+            callback: (tx: typeof prismaMock) => Promise<unknown>,
+        ) => callback(prismaMock)) as never);
     });
 
     afterEach(() => {
@@ -417,6 +430,215 @@ describe("processOutbox", () => {
         expect(sendLeaveCancelledNotifications).toHaveBeenCalledWith(
             expect.objectContaining({ leaveId: "leave-1" }),
         );
+    });
+
+    it("dispatches a claimed leave action only to the current active approver", async () => {
+        prismaMock.notificationOutbox.findMany.mockResolvedValue(asNever([
+            buildNotification(120, "LEAVE_ACTION", JSON.stringify(buildLeavePayload())),
+        ]));
+        prismaMock.leaveRequest.findUnique.mockResolvedValue(asNever({
+            id: "leave-1",
+            status: "PENDING",
+            approverId: 30,
+            approver: {
+                id: 30,
+                firstName: "New",
+                lastName: "Approver",
+                email: "employee-record@example.com",
+                status: "ACTIVE",
+                deletedAt: null,
+                user: {
+                    id: 3,
+                    email: "new-approver@example.com",
+                    isActive: true,
+                    deletedAt: null,
+                },
+            },
+        }));
+
+        const result = await processOutbox();
+
+        expect(result).toEqual({ processed: 1, failed: 0 });
+        expect(sendLeaveActionNotifications).toHaveBeenCalledWith(
+            expect.objectContaining({
+                approver: expect.objectContaining({
+                    employeeId: 30,
+                    userId: 3,
+                    email: "new-approver@example.com",
+                }),
+            }),
+        );
+        expect(sendLeaveActionNotifications).not.toHaveBeenCalledWith(
+            expect.objectContaining({
+                approver: expect.objectContaining({ userId: 2 }),
+            }),
+        );
+        expect(prismaMock.notificationOutbox.findFirst).toHaveBeenCalledWith({
+            where: { id: 120, status: "PROCESSING" },
+            select: { id: true },
+        });
+        const lockOrder = prismaMock.$queryRaw.mock.invocationCallOrder[0];
+        const resolveOrder = prismaMock.leaveRequest.findUnique.mock.invocationCallOrder[0];
+        const sendOrder = vi.mocked(sendLeaveActionNotifications).mock.invocationCallOrder[0];
+        expect(lockOrder).toBeLessThan(resolveOrder);
+        expect(resolveOrder).toBeLessThan(sendOrder);
+    });
+
+    it("does not notify the previous approver when transfer commits after claim", async () => {
+        const candidate = buildNotification(
+            123,
+            "LEAVE_ACTION",
+            JSON.stringify(buildLeavePayload()),
+        );
+        prismaMock.notificationOutbox.findMany
+            .mockResolvedValueOnce(asNever([candidate]))
+            .mockResolvedValueOnce(asNever([{ id: 123, payload: candidate.payload }]));
+        prismaMock.employee.findMany
+            .mockResolvedValueOnce(asNever([{ id: 10, managerId: 20 }]))
+            .mockResolvedValueOnce(asNever([{
+                id: 30,
+                firstName: "New",
+                lastName: "Approver",
+                email: "employee-record@example.com",
+                status: "ACTIVE",
+                deletedAt: null,
+                user: {
+                    id: 3,
+                    email: "new-approver@example.com",
+                    isActive: true,
+                    deletedAt: null,
+                },
+            }]));
+        prismaMock.leaveRequest.findMany.mockResolvedValue(asNever([{
+            id: "leave-1",
+            employeeId: 10,
+            leaveType: "SICK",
+            startDate: new Date("2026-07-01T00:00:00.000Z"),
+            endDate: new Date("2026-07-01T00:00:00.000Z"),
+            period: "FULL_DAY",
+            durationDays: 1,
+            reason: "ลาป่วย",
+            emergencyReason: null,
+            specialReason: null,
+            overQuotaDays: 0,
+            employee: {
+                id: 10,
+                firstName: "Employee",
+                lastName: "User",
+                email: "employee@example.com",
+                user: { id: 1 },
+            },
+        }]));
+        prismaMock.leaveRequest.updateMany.mockResolvedValue(asNever({ count: 1 }));
+        prismaMock.employee.update.mockResolvedValue(asNever({ id: 10 }));
+        prismaMock.notificationOutbox.update.mockResolvedValue(asNever({ id: 123 }));
+        prismaMock.notification.updateMany.mockResolvedValue(asNever({ count: 1 }));
+        prismaMock.auditLog.create.mockResolvedValue(asNever({ id: 1 }));
+        prismaMock.leaveRequest.findUnique.mockResolvedValue(asNever({
+            id: "leave-1",
+            status: "PENDING",
+            approver: {
+                id: 30,
+                firstName: "New",
+                lastName: "Approver",
+                email: "employee-record@example.com",
+                status: "ACTIVE",
+                deletedAt: null,
+                user: {
+                    id: 3,
+                    email: "new-approver@example.com",
+                    isActive: true,
+                    deletedAt: null,
+                },
+            },
+        }));
+
+        let releaseWorkerLock: () => void = () => undefined;
+        let signalClaimed: () => void = () => undefined;
+        const waitForTransfer = new Promise<void>((resolve) => {
+            releaseWorkerLock = resolve;
+        });
+        const workerClaimed = new Promise<void>((resolve) => {
+            signalClaimed = resolve;
+        });
+        prismaMock.$transaction.mockImplementation((async (
+            callback: (tx: typeof prismaMock) => Promise<unknown>,
+            options?: { timeout?: number },
+        ) => {
+            if (options?.timeout) {
+                signalClaimed();
+                await waitForTransfer;
+            }
+            return callback(prismaMock);
+        }) as never);
+
+        const worker = processOutbox();
+        await workerClaimed;
+        await assignLeaveApprovers(
+            [{ employeeId: 10, managerId: 30, transferPendingRequests: true }],
+            { userId: 99, email: "admin@example.com" },
+        );
+        releaseWorkerLock();
+        await worker;
+
+        expect(sendLeaveActionNotifications).toHaveBeenCalledWith(
+            expect.objectContaining({
+                approver: expect.objectContaining({ userId: 3 }),
+            }),
+        );
+        expect(sendLeaveActionNotifications).not.toHaveBeenCalledWith(
+            expect.objectContaining({
+                approver: expect.objectContaining({ userId: 2 }),
+            }),
+        );
+    });
+
+    it("does not notify an approver who lost permission before a worker rerun", async () => {
+        prismaMock.notificationOutbox.findMany.mockResolvedValue(asNever([{
+            ...buildNotification(121, "LEAVE_ACTION", JSON.stringify(buildLeavePayload())),
+            status: "FAILED",
+            attempts: 1,
+        }]));
+        prismaMock.leaveRequest.findUnique.mockResolvedValue(asNever({
+            id: "leave-1",
+            status: "PENDING",
+            approverId: 20,
+            approver: {
+                id: 20,
+                firstName: "Former",
+                lastName: "Approver",
+                email: "former@example.com",
+                status: "INACTIVE",
+                deletedAt: null,
+                user: {
+                    id: 2,
+                    email: "former@example.com",
+                    isActive: false,
+                    deletedAt: null,
+                },
+            },
+        }));
+        const result = await processOutbox();
+
+        expect(result).toEqual({ processed: 1, failed: 0 });
+        expect(sendLeaveActionNotifications).not.toHaveBeenCalled();
+    });
+
+    it("does not dispatch a claimed leave action superseded during transfer", async () => {
+        prismaMock.notificationOutbox.findMany.mockResolvedValue(asNever([
+            buildNotification(122, "LEAVE_ACTION", JSON.stringify(buildLeavePayload())),
+        ]));
+        prismaMock.notificationOutbox.findFirst.mockResolvedValue(null);
+
+        const result = await processOutbox();
+
+        expect(result).toEqual({ processed: 1, failed: 0 });
+        expect(prismaMock.notificationOutbox.findFirst).toHaveBeenCalledWith({
+            where: { id: 122, status: "PROCESSING" },
+            select: { id: true },
+        });
+        expect(prismaMock.leaveRequest.findUnique).not.toHaveBeenCalled();
+        expect(sendLeaveActionNotifications).not.toHaveBeenCalled();
     });
 
     it("processes not-taken leave events successfully", async () => {

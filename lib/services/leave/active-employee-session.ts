@@ -1,3 +1,4 @@
+import type { Prisma } from "@prisma/client";
 import type { NextResponse } from "next/server";
 
 import { requireApiSession, type ApiAuthResult } from "@/lib/auth/api";
@@ -40,6 +41,7 @@ export async function requireActiveEmployeeSession(
         where: { id: auth.user.id },
         select: {
             isActive: true,
+            deletedAt: true,
             employee: {
                 select: {
                     id: true,
@@ -50,7 +52,7 @@ export async function requireActiveEmployeeSession(
         },
     });
 
-    if (!user?.isActive) {
+    if (!user?.isActive || user.deletedAt) {
         return { ok: false, response: forbidden() };
     }
     if (!user.employee) {
@@ -64,4 +66,25 @@ export async function requireActiveEmployeeSession(
     }
 
     return { ...auth, employeeId: user.employee.id };
+}
+
+export async function isActiveEmployeeInTransaction(
+    tx: Prisma.TransactionClient,
+    userId: number,
+    employeeId: number,
+): Promise<boolean> {
+    const user = await tx.user.findFirst({
+        where: {
+            id: userId,
+            employeeId,
+            isActive: true,
+            deletedAt: null,
+            employee: {
+                is: { status: "ACTIVE", deletedAt: null },
+            },
+        },
+        select: { id: true },
+    });
+
+    return user !== null;
 }

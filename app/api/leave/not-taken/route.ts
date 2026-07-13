@@ -3,7 +3,14 @@ import { after, NextResponse } from "next/server";
 
 import { prisma } from "@/lib/db/prisma";
 import { logLeaveEvent } from "@/lib/server/audit";
-import { requireActiveEmployeeSession } from "@/lib/services/leave/active-employee-session";
+import {
+    isActiveEmployeeInTransaction,
+    requireActiveEmployeeSession,
+} from "@/lib/services/leave/active-employee-session";
+import {
+    ACTIVE_LEAVE_APPROVER_USER_SELECT,
+    isActiveLeaveApprover,
+} from "@/lib/services/leave/approver-eligibility";
 import {
     buildConfiguredApproverSnapshot,
     buildLeaveRecipientSnapshot,
@@ -77,7 +84,9 @@ export async function POST(req: Request): Promise<NextResponse> {
                     },
                     approver: {
                         include: {
-                            user: { select: { id: true, email: true, isActive: true } },
+                            user: {
+                                select: ACTIVE_LEAVE_APPROVER_USER_SELECT,
+                            },
                         },
                     },
                 },
@@ -95,7 +104,7 @@ export async function POST(req: Request): Promise<NextResponse> {
             if (leaveRequest.notTakenRequestedAt) {
                 throw new LeaveNotTakenError(NOT_TAKEN_MESSAGES.alreadyRequested, 409);
             }
-            if (!leaveRequest.approver?.user?.id || !leaveRequest.approver.user.isActive) {
+            if (!isActiveLeaveApprover(leaveRequest.approver)) {
                 throw new LeaveNotTakenError(
                     NOT_TAKEN_MESSAGES.approverAccountNotConfigured,
                     400,
@@ -203,6 +212,9 @@ export async function PUT(req: Request): Promise<NextResponse> {
         }
 
         const result = await prisma.$transaction(async (tx) => {
+            if (!await isActiveEmployeeInTransaction(tx, userId, managerId)) {
+                throw new LeaveNotTakenError(NOT_TAKEN_MESSAGES.forbidden, 403);
+            }
             const leaveRequest = await tx.leaveRequest.findUnique({
                 where: { id: parsed.data.leaveId },
                 include: {

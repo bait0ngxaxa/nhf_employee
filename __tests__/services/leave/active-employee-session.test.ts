@@ -39,6 +39,7 @@ describe("requireActiveEmployeeSession", () => {
         vi.mocked(requireApiSession).mockResolvedValue(ACTIVE_AUTH);
         vi.mocked(prisma.user.findUnique).mockResolvedValue({
             isActive: true,
+            deletedAt: null,
             employee: { id: 10, status: "ACTIVE", deletedAt: null },
         } as never);
     });
@@ -70,6 +71,7 @@ describe("requireActiveEmployeeSession", () => {
     it("uses the route contract when the employee profile is missing", async () => {
         vi.mocked(prisma.user.findUnique).mockResolvedValue({
             isActive: true,
+            deletedAt: null,
             employee: null,
         } as never);
 
@@ -106,6 +108,19 @@ describe("requireActiveEmployeeSession", () => {
     it("rejects immediately when the valid session user was deactivated in DB", async () => {
         vi.mocked(prisma.user.findUnique).mockResolvedValue({
             isActive: false,
+            employee: { id: 10, status: "ACTIVE", deletedAt: null },
+        } as never);
+
+        const result = await requireActiveEmployeeSession();
+
+        expect(result.ok).toBe(false);
+        if (!result.ok) expect(result.response.status).toBe(403);
+    });
+
+    it("rejects a soft-deleted user with 403", async () => {
+        vi.mocked(prisma.user.findUnique).mockResolvedValue({
+            isActive: true,
+            deletedAt: new Date(),
             employee: { id: 10, status: "ACTIVE", deletedAt: null },
         } as never);
 

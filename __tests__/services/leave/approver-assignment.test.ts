@@ -15,6 +15,7 @@ vi.mock("@/lib/db/prisma", () => ({
         notificationOutbox: {
             findMany: vi.fn(),
             update: vi.fn(),
+            updateMany: vi.fn(),
             create: vi.fn(),
         },
         auditLog: { create: vi.fn() },
@@ -88,6 +89,7 @@ describe("assignLeaveApprovers", () => {
         vi.mocked(prisma.leaveRequest.updateMany).mockResolvedValue({ count: 1 });
         vi.mocked(prisma.notification.updateMany).mockResolvedValue({ count: 1 });
         vi.mocked(prisma.notificationOutbox.update).mockResolvedValue({ id: 1 } as never);
+        vi.mocked(prisma.notificationOutbox.updateMany).mockResolvedValue({ count: 1 });
         vi.mocked(prisma.notificationOutbox.create).mockResolvedValue({ id: 2 } as never);
         vi.mocked(prisma.auditLog.create).mockResolvedValue({ id: 1 } as never);
     });
@@ -143,17 +145,36 @@ describe("assignLeaveApprovers", () => {
         expect(prisma.employee.update).not.toHaveBeenCalled();
     });
 
-    it("atomically transfers every pending request and targets the account email", async () => {
+    it("does not transfer pending requests when transferPendingRequests is false", async () => {
+        mockLookup(ACTIVE_APPROVER, [pendingRequest("leave-1")]);
+
+        const result = await assignLeaveApprovers(
+            [{ employeeId: 10, managerId: 20, transferPendingRequests: false }],
+            ACTOR,
+        );
+
+        expect(result.transferredLeaveRequestCount).toBe(0);
+        expect(prisma.employee.update).toHaveBeenCalledTimes(1);
+        expect(prisma.leaveRequest.updateMany).not.toHaveBeenCalled();
+        expect(prisma.notificationOutbox.create).not.toHaveBeenCalled();
+    });
+
+    it("atomically transfers every pending request when transferPendingRequests is true", async () => {
         mockLookup(ACTIVE_APPROVER, [pendingRequest("leave-1"), pendingRequest("leave-2")]);
 
         const result = await assignLeaveApprovers(
-            [{ employeeId: 10, managerId: 20 }],
+            [{ employeeId: 10, managerId: 20, transferPendingRequests: true }],
             ACTOR,
         );
 
         expect(result.transferredLeaveRequestCount).toBe(2);
+        expect(prisma.leaveRequest.updateMany).toHaveBeenCalledTimes(2);
         expect(prisma.leaveRequest.updateMany).toHaveBeenCalledWith({
-            where: { id: { in: ["leave-1", "leave-2"] }, status: "PENDING" },
+            where: { id: "leave-1", status: "PENDING" },
+            data: { approverId: 20 },
+        });
+        expect(prisma.leaveRequest.updateMany).toHaveBeenCalledWith({
+            where: { id: "leave-2", status: "PENDING" },
             data: { approverId: 20 },
         });
         expect(prisma.notification.updateMany).toHaveBeenCalledTimes(2);
@@ -180,7 +201,7 @@ describe("assignLeaveApprovers", () => {
         });
     });
 
-    it("rewrites an unsent outbox instead of notifying both approvers", async () => {
+    it("rewrites a claimed outbox instead of notifying both approvers", async () => {
         const request = pendingRequest("leave-1");
         mockLookup(ACTIVE_APPROVER, [request]);
         vi.mocked(prisma.notificationOutbox.findMany).mockResolvedValue([{
@@ -188,8 +209,19 @@ describe("assignLeaveApprovers", () => {
             payload: JSON.stringify({ leaveId: "leave-1" }),
         }] as never);
 
-        await assignLeaveApprovers([{ employeeId: 10, managerId: 20 }], ACTOR);
+        await assignLeaveApprovers([
+            { employeeId: 10, managerId: 20, transferPendingRequests: true },
+        ], ACTOR);
 
+        expect(prisma.notificationOutbox.findMany).toHaveBeenCalledWith({
+            where: {
+                type: "LEAVE_ACTION",
+                status: { in: ["PENDING", "FAILED", "PROCESSING"] },
+                attempts: { lt: 3 },
+            },
+            select: { id: true, payload: true },
+            orderBy: { id: "asc" },
+        });
         expect(prisma.notificationOutbox.update).toHaveBeenCalledWith({
             where: { id: 9 },
             data: { payload: expect.stringContaining("manager@thainhf.org") },
@@ -201,12 +233,54 @@ describe("assignLeaveApprovers", () => {
         });
     });
 
+    it("supersedes duplicate unsent outboxes for the same request", async () => {
+        mockLookup(ACTIVE_APPROVER, [pendingRequest("leave-1")]);
+        vi.mocked(prisma.notificationOutbox.findMany).mockResolvedValue([
+            { id: 9, payload: JSON.stringify({ leaveId: "leave-1" }) },
+            { id: 10, payload: JSON.stringify({ leaveId: "leave-1" }) },
+        ] as never);
+
+        await assignLeaveApprovers([
+            { employeeId: 10, managerId: 20, transferPendingRequests: true },
+        ], ACTOR);
+
+        expect(prisma.notificationOutbox.update).toHaveBeenCalledWith({
+            where: { id: 9 },
+            data: { payload: expect.stringContaining("manager@thainhf.org") },
+        });
+        expect(prisma.notificationOutbox.updateMany).toHaveBeenCalledWith({
+            where: { id: { in: [10] } },
+            data: { status: "SENT", lastError: "Superseded by approver transfer" },
+        });
+        expect(prisma.notificationOutbox.create).not.toHaveBeenCalled();
+    });
+
+    it("skips an unchanged assignment without audit or outbox side effects", async () => {
+        vi.mocked(prisma.employee.findMany)
+            .mockResolvedValueOnce([{ id: 10, managerId: 20 }] as never)
+            .mockResolvedValueOnce([ACTIVE_APPROVER] as never);
+        vi.mocked(prisma.leaveRequest.findMany).mockResolvedValue([
+            pendingRequest("leave-1"),
+        ] as never);
+        vi.mocked(prisma.notificationOutbox.findMany).mockResolvedValue([]);
+
+        const result = await assignLeaveApprovers([
+            { employeeId: 10, managerId: 20, transferPendingRequests: true },
+        ], ACTOR);
+
+        expect(result.transferredLeaveRequestCount).toBe(0);
+        expect(prisma.employee.update).not.toHaveBeenCalled();
+        expect(prisma.leaveRequest.updateMany).not.toHaveBeenCalled();
+        expect(prisma.notificationOutbox.create).not.toHaveBeenCalled();
+        expect(prisma.auditLog.create).not.toHaveBeenCalled();
+    });
+
     it("propagates a transaction failure so the database rolls back all writes", async () => {
         mockLookup(ACTIVE_APPROVER, [pendingRequest("leave-1")]);
         vi.mocked(prisma.auditLog.create).mockRejectedValue(new Error("audit failed"));
 
         await expect(assignLeaveApprovers(
-            [{ employeeId: 10, managerId: 20 }],
+            [{ employeeId: 10, managerId: 20, transferPendingRequests: true }],
             ACTOR,
         )).rejects.toThrow("audit failed");
         expect(prisma.$transaction).toHaveBeenCalledTimes(1);
