@@ -70,4 +70,44 @@ describe("POST /api/leave/cancel", () => {
             where: { id: "leave-1", status: "PENDING" }, data: { status: "CANCELLED" },
         });
     });
+
+    it("rolls back the leave status when creating the outbox fails", async () => {
+        let persistedStatus = "PENDING";
+        vi.mocked(prisma.$transaction).mockImplementation(async (callback) => {
+            if (typeof callback !== "function") return callback;
+            let transactionStatus = persistedStatus;
+            vi.mocked(prisma.leaveRequest.updateMany).mockImplementation(
+                (() => {
+                    transactionStatus = "CANCELLED";
+                    return Promise.resolve({ count: 1 });
+                }) as never,
+            );
+            const result = await callback(prisma);
+            persistedStatus = transactionStatus;
+            return result;
+        });
+        vi.mocked(prisma.leaveRequest.findUnique).mockResolvedValue({
+            id: "leave-2", employeeId: 10, leaveType: "SICK", startDate: new Date(), endDate: new Date(),
+            period: "FULL_DAY", durationDays: 1, reason: "ลาป่วย", emergencyReason: null, specialReason: null,
+            overQuotaDays: 0, status: "PENDING", approverId: 20, approvedAt: null, rejectReason: null,
+            notTakenReason: null, notTakenRequestedAt: null, notTakenConfirmedAt: null, notTakenConfirmedById: null,
+            attachmentUrl: null, createdAt: new Date(), updatedAt: new Date(),
+            employee: { id: 10, firstName: "Employee", lastName: "User", email: "employee@example.com", user: { id: 10 } },
+            approver: { id: 20, firstName: "Manager", lastName: "User", email: "manager@example.com", user: { id: 20, email: "manager@example.com", isActive: true } },
+        } as Awaited<ReturnType<typeof prisma.leaveRequest.findUnique>>);
+        vi.mocked(prisma.leaveRequest.findUniqueOrThrow).mockResolvedValue(
+            { id: "leave-2", status: "CANCELLED" } as Awaited<ReturnType<typeof prisma.leaveRequest.findUniqueOrThrow>>,
+        );
+        vi.mocked(prisma.notification.updateMany).mockResolvedValue({ count: 1 });
+        vi.mocked(prisma.notificationOutbox.create).mockRejectedValue(new Error("outbox unavailable"));
+
+        const response = await POST(new NextRequest("http://localhost/api/leave/cancel", {
+            method: "POST", body: JSON.stringify({ leaveId: "leave-2" }),
+        }));
+
+        expect(response.status).toBe(500);
+        expect(persistedStatus).toBe("PENDING");
+        expect(prisma.notification.create).not.toHaveBeenCalled();
+        expect(processOutbox).not.toHaveBeenCalled();
+    });
 });

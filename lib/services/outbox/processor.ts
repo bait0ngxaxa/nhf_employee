@@ -30,6 +30,7 @@ import {
 } from "@/constants/email-request";
 import {
     MAX_OUTBOX_ATTEMPTS,
+    OUTBOX_RETRY_BASE_DELAY_MS,
     OUTBOX_STATUSES,
     STALE_OUTBOX_PROCESSING_MINUTES,
     isOutboxNotificationType,
@@ -39,6 +40,7 @@ const OUTBOX_STATUS_PENDING = OUTBOX_STATUSES[0];
 const OUTBOX_STATUS_PROCESSING = OUTBOX_STATUSES[1];
 const OUTBOX_STATUS_SENT = OUTBOX_STATUSES[2];
 const OUTBOX_STATUS_FAILED = OUTBOX_STATUSES[3];
+const OUTBOX_STATUS_DEAD = OUTBOX_STATUSES[4];
 
 type OutboxProcessResult = {
     processed: number;
@@ -248,29 +250,49 @@ async function assertLineSent(
 }
 
 async function markStaleProcessingRows(): Promise<void> {
+    const now = new Date();
     const staleBefore = new Date(
-        Date.now() - STALE_OUTBOX_PROCESSING_MINUTES * 60_000,
+        now.getTime() - STALE_OUTBOX_PROCESSING_MINUTES * 60_000,
     );
 
     await prisma.notificationOutbox.updateMany({
         where: {
             status: OUTBOX_STATUS_PROCESSING,
             updatedAt: { lt: staleBefore },
-            attempts: { lt: MAX_OUTBOX_ATTEMPTS },
+            attempts: { gte: MAX_OUTBOX_ATTEMPTS - 1 },
+        },
+        data: {
+            status: OUTBOX_STATUS_DEAD,
+            lastError: "Processing timeout",
+            attempts: { increment: 1 },
+        },
+    });
+
+    await prisma.notificationOutbox.updateMany({
+        where: {
+            status: OUTBOX_STATUS_PROCESSING,
+            updatedAt: { lt: staleBefore },
+            attempts: { lt: MAX_OUTBOX_ATTEMPTS - 1 },
         },
         data: {
             status: OUTBOX_STATUS_FAILED,
-            error: "Processing timeout",
+            lastError: "Processing timeout",
             attempts: { increment: 1 },
+            nextAttemptAt: new Date(now.getTime() + OUTBOX_RETRY_BASE_DELAY_MS),
         },
     });
 }
 
-async function claimNotification(notificationId: number): Promise<boolean> {
+async function claimNotification(
+    notificationId: number,
+    now: Date,
+): Promise<boolean> {
     const claimed = await prisma.notificationOutbox.updateMany({
         where: {
             id: notificationId,
             status: { in: [OUTBOX_STATUS_PENDING, OUTBOX_STATUS_FAILED] },
+            attempts: { lt: MAX_OUTBOX_ATTEMPTS },
+            nextAttemptAt: { lte: now },
         },
         data: {
             status: OUTBOX_STATUS_PROCESSING,
@@ -278,6 +300,13 @@ async function claimNotification(notificationId: number): Promise<boolean> {
     });
 
     return claimed.count === 1;
+}
+
+function getNextAttemptAt(attempts: number, now: Date): Date {
+    const exponent = Math.max(0, attempts - 1);
+    return new Date(
+        now.getTime() + OUTBOX_RETRY_BASE_DELAY_MS * (2 ** exponent),
+    );
 }
 
 async function getTicketById(ticketId: number): Promise<TicketWithRelations> {
@@ -394,11 +423,13 @@ async function dispatchNotification(notification: NotificationOutbox): Promise<v
  */
 export async function processOutbox(batchSize = 10): Promise<OutboxProcessResult> {
     await markStaleProcessingRows();
+    const now = new Date();
 
     const candidates = await prisma.notificationOutbox.findMany({
         where: {
             status: { in: [OUTBOX_STATUS_PENDING, OUTBOX_STATUS_FAILED] },
             attempts: { lt: MAX_OUTBOX_ATTEMPTS },
+            nextAttemptAt: { lte: now },
         },
         take: batchSize,
         orderBy: { createdAt: "asc" },
@@ -412,7 +443,7 @@ export async function processOutbox(batchSize = 10): Promise<OutboxProcessResult
     let failedCount = 0;
 
     for (const notification of candidates) {
-        const isClaimed = await claimNotification(notification.id);
+        const isClaimed = await claimNotification(notification.id, now);
         if (!isClaimed) {
             continue;
         }
@@ -424,25 +455,31 @@ export async function processOutbox(batchSize = 10): Promise<OutboxProcessResult
                 where: { id: notification.id, status: OUTBOX_STATUS_PROCESSING },
                 data: {
                     status: OUTBOX_STATUS_SENT,
-                    error: null,
+                    lastError: null,
                 },
             });
             processedCount++;
         } catch (error) {
             const message =
                 error instanceof Error ? error.message : "Unknown error";
+            const nextAttempts = notification.attempts + 1;
+            const isTerminal = nextAttempts >= MAX_OUTBOX_ATTEMPTS;
 
             console.error(
                 `Error processing notification ${notification.id}:`,
                 error,
             );
 
+            const retryData = isTerminal
+                ? {}
+                : { nextAttemptAt: getNextAttemptAt(nextAttempts, now) };
             await prisma.notificationOutbox.updateMany({
                 where: { id: notification.id, status: OUTBOX_STATUS_PROCESSING },
                 data: {
-                    status: OUTBOX_STATUS_FAILED,
+                    status: isTerminal ? OUTBOX_STATUS_DEAD : OUTBOX_STATUS_FAILED,
                     attempts: { increment: 1 },
-                    error: message,
+                    lastError: message,
+                    ...retryData,
                 },
             });
             failedCount++;

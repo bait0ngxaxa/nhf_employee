@@ -201,6 +201,7 @@ enum NotificationOutboxStatus {
   PROCESSING
   SENT
   FAILED
+  DEAD
 }
 
 // Audit Log for tracking critical actions per agent.md security standards
@@ -315,16 +316,17 @@ model PasswordResetToken {
 
 // Transactional Outbox for reliable notifications (Email & LINE)
 model NotificationOutbox {
-  id        Int                      @id @default(autoincrement())
-  type      NotificationOutboxType
-  payload   String                   @db.Text // JSON string containing notification details
-  status    NotificationOutboxStatus @default(PENDING)
-  attempts  Int                      @default(0)
-  error     String?                  @db.Text
-  createdAt DateTime                 @default(now())
-  updatedAt DateTime                 @updatedAt
+  id            Int                      @id @default(autoincrement())
+  type          NotificationOutboxType
+  payload       String                   @db.Text // JSON string containing notification details
+  status        NotificationOutboxStatus @default(PENDING)
+  attempts      Int                      @default(0)
+  nextAttemptAt DateTime                 @default(now())
+  lastError     String?                  @map("error") @db.Text
+  createdAt     DateTime                 @default(now())
+  updatedAt     DateTime                 @updatedAt
 
-  @@index([status])
+  @@index([status, nextAttemptAt])
   @@index([createdAt])
   @@map("notification_outbox")
 }

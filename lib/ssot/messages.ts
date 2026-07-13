@@ -16,6 +16,7 @@ export const COMMON_API_MESSAGES = {
     employeeProfileNotFound: "Employee profile not found",
     leaveIdRequired: "Leave ID is required",
     cleanupNotConfigured: "Cleanup not configured",
+    outboxWorkerNotConfigured: "Notification outbox worker not configured",
     failedToFetchApprovals: "Failed to fetch approvals",
     failedToFetchApproverData: "Failed to fetch approver data",
     failedToFetchTickets: "Failed to fetch tickets",

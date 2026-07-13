@@ -103,6 +103,14 @@ npm run check
 
 ตั้งค่า cron ภายนอกให้เรียก `POST /api/audit-logs/cleanup` วันละครั้งพร้อม header `x-cleanup-secret` ที่ตรงกับ `AUDIT_LOG_CLEANUP_SECRET` เพื่อให้ระบบลบ `บันทึกการใช้งาน` ที่เก่ากว่า 90 วันออกจากฐานข้อมูล
 
+ตั้งค่า scheduled worker ให้เรียก `POST /api/cron/notification-outbox` ทุก 1 นาที พร้อม header `x-outbox-secret` ที่ตรงกับ `NOTIFICATION_OUTBOX_CRON_SECRET` เพื่อประมวลผล notification outbox โดยไม่ต้องรอ request จากผู้ใช้ ตัวอย่าง crontab:
+
+```cron
+* * * * * curl --fail --silent --show-error --request POST --header "x-outbox-secret: $NOTIFICATION_OUTBOX_CRON_SECRET" "$APP_BASE_URL/api/cron/notification-outbox"
+```
+
+Worker จะลองส่งสูงสุด 3 ครั้ง โดย retry หลังความล้มเหลวครั้งแรกและครั้งที่สองด้วย exponential backoff 1 และ 2 นาที รายการที่ยังล้มเหลวหลังครั้งที่ 3 จะเปลี่ยนเป็น `DEAD` และไม่ถูกส่งซ้ำอัตโนมัติ
+
 ## หมายเหตุ
 
 โปรเจกต์นี้พัฒนาสำหรับการใช้งานภายในองค์กร และมีการขยายโมดูลเพิ่มเติมต่อเนื่อง เช่น ระบบลา ระบบสต็อก และระบบแจ้งเตือน

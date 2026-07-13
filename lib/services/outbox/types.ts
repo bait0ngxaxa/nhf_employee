@@ -18,11 +18,13 @@ export const OUTBOX_STATUSES = [
     "PROCESSING",
     "SENT",
     "FAILED",
+    "DEAD",
 ] as const;
 
 export type OutboxStatus = (typeof OUTBOX_STATUSES)[number];
 
 export const MAX_OUTBOX_ATTEMPTS = 3;
+export const OUTBOX_RETRY_BASE_DELAY_MS = 60_000;
 export const STALE_OUTBOX_PROCESSING_MINUTES = 10;
 
 export function isOutboxNotificationType(

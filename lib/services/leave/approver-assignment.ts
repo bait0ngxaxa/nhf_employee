@@ -1,6 +1,7 @@
 import type { Prisma } from "@prisma/client";
 
 import { prisma } from "@/lib/db/prisma";
+import { MAX_OUTBOX_ATTEMPTS } from "@/lib/services/outbox/types";
 import {
     buildConfiguredApproverSnapshot,
     buildLeaveRecipientSnapshot,
@@ -228,7 +229,7 @@ export async function assignLeaveApprovers(
                 where: {
                     type: "LEAVE_ACTION",
                     status: { in: ["PENDING", "FAILED"] },
-                    attempts: { lt: 5 },
+                    attempts: { lt: MAX_OUTBOX_ATTEMPTS },
                 },
                 select: { id: true, payload: true },
             }),

@@ -96,13 +96,9 @@ export async function POST(req: Request) {
                     startDate: leaveRequest.startDate.toISOString(), endDate: leaveRequest.endDate.toISOString(),
                     period: leaveRequest.period, durationDays: leaveRequest.durationDays,
                 };
-                try {
-                    await tx.notification.updateMany({ where: { userId: payload.approver.userId, type: "LEAVE_REQUESTED", referenceId: leaveId, isRead: false }, data: { isRead: true } });
-                    await tx.notificationOutbox.create({ data: { type: "LEAVE_CANCELLED", payload: JSON.stringify(payload) } });
-                    await tx.notification.create({ data: { userId, type: "LEAVE_CANCELLED", title: "คำขอลาถูกยกเลิกแล้ว", message: `ยกเลิกคำขอ${getLeaveTypeLabel(leaveRequest.leaveType)} ${formatLeaveSummary(payload)} แล้ว`, actionUrl: toDashboardTabPath(APP_DASHBOARD_TABS.leaveHistory), referenceId: leaveId } });
-                } catch (notificationError) {
-                    console.error("Failed to send leave cancellation notifications:", notificationError);
-                }
+                await tx.notification.updateMany({ where: { userId: payload.approver.userId, type: "LEAVE_REQUESTED", referenceId: leaveId, isRead: false }, data: { isRead: true } });
+                await tx.notificationOutbox.create({ data: { type: "LEAVE_CANCELLED", payload: JSON.stringify(payload) } });
+                await tx.notification.create({ data: { userId, type: "LEAVE_CANCELLED", title: "คำขอลาถูกยกเลิกแล้ว", message: `ยกเลิกคำขอ${getLeaveTypeLabel(leaveRequest.leaveType)} ${formatLeaveSummary(payload)} แล้ว`, actionUrl: toDashboardTabPath(APP_DASHBOARD_TABS.leaveHistory), referenceId: leaveId } });
             }
 
             return updatedLeaveRequest;
