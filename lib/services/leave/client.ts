@@ -22,6 +22,7 @@ export interface ApproverEmployeeItem {
     email: string;
     position: string;
     managerId: number | null;
+    canApproveLeave: boolean;
     dept: { name: string } | null;
 }
 
@@ -57,7 +58,7 @@ const DEFAULT_FETCH_ERROR = "ไม่สามารถดึงข้อมู
 
 const ensureSuccess = <T>(response: ApiResponse<T>): T => {
     if (!response.success) {
-        throw new Error(response.errorThai || response.error || DEFAULT_FETCH_ERROR);
+        throw new Error(response.error || response.errorThai || DEFAULT_FETCH_ERROR);
     }
     return response.data;
 };

@@ -65,7 +65,7 @@ function EmployeeRow({
             >
                 <option value={noApproverValue}>- ไม่ระบุ -</option>
                 {allEmployees
-                    .filter((candidate) => candidate.id !== employee.id)
+                    .filter((candidate) => candidate.id !== employee.id && candidate.canApproveLeave)
                     .map((candidate) => (
                         <option key={candidate.id} value={String(candidate.id)}>
                             {formatName(candidate)} {candidate.dept ? `(${candidate.dept.name})` : ""}

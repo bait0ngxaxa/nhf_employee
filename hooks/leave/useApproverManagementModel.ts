@@ -45,7 +45,7 @@ export function useApproverManagementModel() {
             const managerId = getManagerId(employee);
             if (managerId) ids.add(managerId);
         }
-        return employees.filter((employee) => ids.has(employee.id));
+        return employees.filter((employee) => ids.has(employee.id) && employee.canApproveLeave);
     }, [employees, getManagerId]);
 
     const filteredEmployees = useMemo(() => {
@@ -139,9 +139,12 @@ export function useApproverManagementModel() {
             toast.success(APPROVER_SAVE_SUCCESS_MESSAGE);
             setAssignments(new Map());
             await mutate();
-        } catch {
-            setSaveMsg({ type: "err", text: APPROVER_SAVE_ERROR_MESSAGE });
-            toast.error(APPROVER_SAVE_ERROR_MESSAGE);
+        } catch (error) {
+            const message = error instanceof Error && error.message
+                ? error.message
+                : APPROVER_SAVE_ERROR_MESSAGE;
+            setSaveMsg({ type: "err", text: message });
+            toast.error(message);
         } finally {
             setIsSaving(false);
         }

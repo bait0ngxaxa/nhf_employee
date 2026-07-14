@@ -1,7 +1,5 @@
-import { Prisma } from "@prisma/client";
 import { after, NextResponse } from "next/server";
 
-import { prisma } from "@/lib/db/prisma";
 import { logLeaveEvent } from "@/lib/server/audit";
 import {
     isActiveEmployeeInTransaction,
@@ -25,6 +23,7 @@ import {
 import { getLeaveYearFromDateValue } from "@/lib/services/leave/quota-year";
 import { isAfterLeaveEnd } from "@/lib/services/leave/utils";
 import { processOutbox } from "@/lib/services/outbox/processor";
+import { runSerializableTransaction } from "@/lib/services/leave/transaction";
 import { jsonError, notFound } from "@/lib/ssot/http";
 import { FEATURE_KEYS, isFeatureEnabled } from "@/lib/ssot/features";
 import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
@@ -42,7 +41,7 @@ const NOT_TAKEN_MESSAGES = {
     alreadyRequested: "คำขอนี้ถูกแจ้งว่าไม่ได้ใช้วันลาแล้ว",
     forbidden: "คุณไม่มีสิทธิ์ดำเนินการกับคำขอนี้",
     quotaNotFound: "ไม่สามารถตรวจสอบสิทธิ์ลาของคำขอนี้ได้ กรุณาติดต่อผู้ดูแลระบบ",
-    approverAccountNotConfigured: "ผู้อนุมัติยังไม่มีบัญชีผู้ใช้ในระบบ",
+    originalApproverRecoveryRequired: "ผู้อนุมัติเดิมพ้นสภาพหรือไม่พร้อมใช้งาน กรุณาติดต่อผู้ดูแลระบบเพื่อดำเนินการกู้คืนคำขอนี้",
 } as const;
 
 class LeaveNotTakenError extends Error {
@@ -75,7 +74,11 @@ export async function POST(req: Request): Promise<NextResponse> {
             });
         }
 
-        const result = await prisma.$transaction(async (tx) => {
+        const result = await runSerializableTransaction(async (tx) => {
+            if (!await isActiveEmployeeInTransaction(tx, userId, employeeId)) {
+                throw new LeaveNotTakenError(NOT_TAKEN_MESSAGES.forbidden, 403);
+            }
+
             const leaveRequest = await tx.leaveRequest.findUnique({
                 where: { id: parsed.data.leaveId },
                 include: {
@@ -106,7 +109,7 @@ export async function POST(req: Request): Promise<NextResponse> {
             }
             if (!isActiveLeaveApprover(leaveRequest.approver)) {
                 throw new LeaveNotTakenError(
-                    NOT_TAKEN_MESSAGES.approverAccountNotConfigured,
+                    NOT_TAKEN_MESSAGES.originalApproverRecoveryRequired,
                     400,
                 );
             }
@@ -211,7 +214,7 @@ export async function PUT(req: Request): Promise<NextResponse> {
             });
         }
 
-        const result = await prisma.$transaction(async (tx) => {
+        const result = await runSerializableTransaction(async (tx) => {
             if (!await isActiveEmployeeInTransaction(tx, userId, managerId)) {
                 throw new LeaveNotTakenError(NOT_TAKEN_MESSAGES.forbidden, 403);
             }
@@ -221,7 +224,11 @@ export async function PUT(req: Request): Promise<NextResponse> {
                     employee: {
                         include: { user: { select: { id: true } } },
                     },
-                    approver: true,
+                    approver: {
+                        include: {
+                            user: { select: ACTIVE_LEAVE_APPROVER_USER_SELECT },
+                        },
+                    },
                 },
             });
 
@@ -232,6 +239,15 @@ export async function PUT(req: Request): Promise<NextResponse> {
                 || leaveRequest.notTakenConfirmedAt
             ) {
                 throw new LeaveNotTakenError(NOT_TAKEN_MESSAGES.confirmNotFound, 404);
+            }
+            if (leaveRequest.employeeId === managerId) {
+                throw new LeaveNotTakenError(NOT_TAKEN_MESSAGES.forbidden, 403);
+            }
+            if (!isActiveLeaveApprover(leaveRequest.approver)) {
+                throw new LeaveNotTakenError(
+                    NOT_TAKEN_MESSAGES.originalApproverRecoveryRequired,
+                    409,
+                );
             }
             if (leaveRequest.approverId !== managerId) {
                 throw new LeaveNotTakenError(NOT_TAKEN_MESSAGES.forbidden, 403);
@@ -309,8 +325,6 @@ export async function PUT(req: Request): Promise<NextResponse> {
             });
 
             return updatedRequest;
-        }, {
-            isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
         });
 
         await logLeaveEvent(

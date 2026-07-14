@@ -7,6 +7,7 @@ import {
     ApproverAssignmentError,
     assignLeaveApprovers,
 } from "@/lib/services/leave/approver-assignment";
+import { isActiveLeaveApprover } from "@/lib/services/leave/approver-eligibility";
 import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
 import { forbidden, notFound } from "@/lib/ssot/http";
 import { FEATURE_KEYS, isFeatureEnabled } from "@/lib/ssot/features";
@@ -55,13 +56,31 @@ export async function GET(): Promise<NextResponse> {
                 nickname: true,
                 email: true,
                 position: true,
+                status: true,
+                deletedAt: true,
                 managerId: true,
                 dept: { select: { name: true } },
+                user: {
+                    select: {
+                        id: true,
+                        email: true,
+                        isActive: true,
+                        deletedAt: true,
+                    },
+                },
             },
             orderBy: [{ firstName: "asc" }, { lastName: "asc" }],
         });
 
-        return NextResponse.json({ employees });
+        return NextResponse.json({
+            employees: employees.map(({ user, ...employee }) => ({
+                ...employee,
+                canApproveLeave: isActiveLeaveApprover({
+                    ...employee,
+                    user,
+                }),
+            })),
+        });
     } catch (error) {
         console.error("Error fetching approver data:", error);
         return NextResponse.json(

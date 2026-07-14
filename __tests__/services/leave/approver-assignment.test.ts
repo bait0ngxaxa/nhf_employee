@@ -54,7 +54,7 @@ describe("assignLeaveApprovers", () => {
             ACTOR,
         )).rejects.toMatchObject({
             statusCode: 409,
-            message: "พนักงานมีคำขอลารออนุมัติ กรุณาให้พนักงานยกเลิกคำขอก่อนเปลี่ยนผู้อนุมัติ",
+            message: expect.stringContaining("กรุณาให้พนักงานยกเลิกคำขอก่อนเปลี่ยนผู้อนุมัติ"),
         });
         expect(prisma.employee.update).not.toHaveBeenCalled();
     });
@@ -70,5 +70,35 @@ describe("assignLeaveApprovers", () => {
             where: { id: 10 },
             data: { managerId: 20 },
         });
+    });
+
+    it("does not write an audit entry for a no-op assignment", async () => {
+        vi.mocked(prisma.employee.findMany)
+            .mockResolvedValueOnce([{ id: 10, firstName: "A", lastName: "One", managerId: 20 }] as never)
+            .mockResolvedValueOnce([ACTIVE_APPROVER] as never);
+        vi.mocked(prisma.leaveRequest.findMany).mockResolvedValue([]);
+
+        await expect(assignLeaveApprovers(
+            [{ employeeId: 10, managerId: 20 }],
+            ACTOR,
+        )).resolves.toBeUndefined();
+
+        expect(prisma.employee.update).not.toHaveBeenCalled();
+        expect(prisma.auditLog.create).not.toHaveBeenCalled();
+    });
+
+    it("blocks self-assignment before any write", async () => {
+        vi.mocked(prisma.employee.findMany)
+            .mockResolvedValueOnce([{ id: 10, firstName: "A", lastName: "One", managerId: 20 }] as never)
+            .mockResolvedValueOnce([] as never);
+        vi.mocked(prisma.leaveRequest.findMany).mockResolvedValue([]);
+
+        await expect(assignLeaveApprovers(
+            [{ employeeId: 10, managerId: 10 }],
+            ACTOR,
+        )).rejects.toMatchObject({ statusCode: 400 });
+
+        expect(prisma.employee.update).not.toHaveBeenCalled();
+        expect(prisma.auditLog.create).not.toHaveBeenCalled();
     });
 });

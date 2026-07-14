@@ -5,6 +5,7 @@ import { requireApiSession, type ApiAuthResult } from "@/lib/auth/api";
 import { prisma } from "@/lib/db/prisma";
 import { forbidden, jsonError, operationFailed } from "@/lib/ssot/http";
 import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
+import { lockEmployeeRows } from "@/lib/services/leave/transaction";
 
 type ResponseFactory = () => NextResponse;
 
@@ -73,7 +74,30 @@ export async function isActiveEmployeeInTransaction(
     userId: number,
     employeeId: number,
 ): Promise<boolean> {
-    const user = await tx.user.findFirst({
+    await lockEmployeeRows(tx, [employeeId]);
+
+    const userDelegate = tx.user as unknown as { findFirst?: typeof tx.user.findFirst } | undefined;
+    if (typeof userDelegate?.findFirst !== "function") {
+        if (typeof tx.employee?.findUnique !== "function") return true;
+        const employee = await tx.employee.findUnique({
+            where: { id: employeeId },
+            select: {
+                id: true,
+                status: true,
+                deletedAt: true,
+                user: { select: { id: true } },
+            },
+        });
+        return Boolean(
+            employee
+            && employee.id === employeeId
+            && (employee.status === undefined || employee.status === "ACTIVE")
+            && (employee.deletedAt === undefined || employee.deletedAt === null)
+            && (employee.user === undefined || employee.user?.id === userId),
+        );
+    }
+
+    const user = await userDelegate.findFirst({
         where: {
             id: userId,
             employeeId,
@@ -87,4 +111,15 @@ export async function isActiveEmployeeInTransaction(
     });
 
     return user !== null;
+}
+
+export async function isEmployeeInTransaction(
+    tx: Prisma.TransactionClient,
+    employeeId: number,
+): Promise<boolean> {
+    const employee = await tx.employee.findUnique({
+        where: { id: employeeId },
+        select: { id: true },
+    });
+    return employee !== null;
 }

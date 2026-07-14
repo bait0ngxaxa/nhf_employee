@@ -69,6 +69,14 @@ describe("POST /api/leave/cancel", () => {
         expect(prisma.leaveRequest.updateMany).toHaveBeenCalledWith({
             where: { id: "leave-1", status: "PENDING" }, data: { status: "CANCELLED" },
         });
+        expect(prisma.notification.create).toHaveBeenCalledWith({
+            data: expect.objectContaining({
+                userId: 10,
+                type: "LEAVE_CANCELLED",
+                referenceId: "leave-1",
+            }),
+        });
+        expect(prisma.notificationOutbox.create).not.toHaveBeenCalled();
     });
 
     it("rolls back the leave status when creating the outbox fails", async () => {
@@ -93,7 +101,7 @@ describe("POST /api/leave/cancel", () => {
             notTakenReason: null, notTakenRequestedAt: null, notTakenConfirmedAt: null, notTakenConfirmedById: null,
             attachmentUrl: null, createdAt: new Date(), updatedAt: new Date(),
             employee: { id: 10, firstName: "Employee", lastName: "User", email: "employee@example.com", user: { id: 10 } },
-            approver: { id: 20, firstName: "Manager", lastName: "User", email: "manager@example.com", user: { id: 20, email: "manager@example.com", isActive: true } },
+             approver: { id: 20, firstName: "Manager", lastName: "User", email: "manager@example.com", status: "ACTIVE", deletedAt: null, user: { id: 20, email: "manager@example.com", isActive: true, deletedAt: null } },
         } as Awaited<ReturnType<typeof prisma.leaveRequest.findUnique>>);
         vi.mocked(prisma.leaveRequest.findUniqueOrThrow).mockResolvedValue(
             { id: "leave-2", status: "CANCELLED" } as Awaited<ReturnType<typeof prisma.leaveRequest.findUniqueOrThrow>>,
@@ -107,7 +115,13 @@ describe("POST /api/leave/cancel", () => {
 
         expect(response.status).toBe(500);
         expect(persistedStatus).toBe("PENDING");
-        expect(prisma.notification.create).not.toHaveBeenCalled();
+        expect(prisma.notification.create).toHaveBeenCalledWith({
+            data: expect.objectContaining({
+                type: "LEAVE_CANCELLED",
+                userId: 10,
+                referenceId: "leave-2",
+            }),
+        });
         expect(processOutbox).not.toHaveBeenCalled();
     });
 });

@@ -227,6 +227,11 @@ describe("/api/leave/not-taken", () => {
     });
 
     it("confirms not-taken request and returns quota", async () => {
+        vi.mocked(prisma.user.findUnique).mockResolvedValue({
+            isActive: true,
+            deletedAt: null,
+            employee: { id: 20, status: "ACTIVE", deletedAt: null },
+        } as never);
         vi.mocked(prisma.leaveRequest.findUnique).mockResolvedValue({
             id: "leave-2",
             employeeId: 10,
@@ -240,7 +245,7 @@ describe("/api/leave/not-taken", () => {
             specialReason: null,
             overQuotaDays: 0,
             status: "APPROVED",
-            approverId: 10,
+            approverId: 20,
             approvedAt: new Date("2000-02-01T00:00:00.000Z"),
             rejectReason: null,
             notTakenReason: "ไม่ได้ลาเพราะมีงานด่วน",
@@ -258,10 +263,13 @@ describe("/api/leave/not-taken", () => {
                 user: { id: 1 },
             },
             approver: {
-                id: 10,
+                id: 20,
                 firstName: "Manager",
                 lastName: "User",
                 email: "manager@example.com",
+                status: "ACTIVE",
+                deletedAt: null,
+                user: { id: 2, email: "manager@example.com", isActive: true, deletedAt: null },
             },
         } as Awaited<ReturnType<typeof prisma.leaveRequest.findUnique>>);
         vi.mocked(prisma.leaveQuota.findFirst).mockResolvedValue({
@@ -292,7 +300,7 @@ describe("/api/leave/not-taken", () => {
             where: expect.objectContaining({ id: "leave-2", status: "APPROVED" }),
             data: expect.objectContaining({
                 status: "NOT_TAKEN",
-                notTakenConfirmedById: 10,
+                notTakenConfirmedById: 20,
             }),
         });
         expect(prisma.leaveQuota.update).toHaveBeenCalledWith({
@@ -331,6 +339,11 @@ describe("/api/leave/not-taken", () => {
     });
 
     it("rejects not-taken confirmation if returning quota would make used days negative", async () => {
+        vi.mocked(prisma.user.findUnique).mockResolvedValue({
+            isActive: true,
+            deletedAt: null,
+            employee: { id: 20, status: "ACTIVE", deletedAt: null },
+        } as never);
         vi.mocked(prisma.leaveRequest.findUnique).mockResolvedValue({
             id: "leave-3",
             employeeId: 10,
@@ -344,7 +357,7 @@ describe("/api/leave/not-taken", () => {
             specialReason: null,
             overQuotaDays: 0,
             status: "APPROVED",
-            approverId: 10,
+            approverId: 20,
             approvedAt: new Date("2000-02-01T00:00:00.000Z"),
             rejectReason: null,
             notTakenReason: "ไม่ได้ลาเพราะมีงานด่วน",
@@ -362,10 +375,13 @@ describe("/api/leave/not-taken", () => {
                 user: { id: 1 },
             },
             approver: {
-                id: 10,
+                id: 20,
                 firstName: "Manager",
                 lastName: "User",
                 email: "manager@example.com",
+                status: "ACTIVE",
+                deletedAt: null,
+                user: { id: 2, email: "manager@example.com", isActive: true, deletedAt: null },
             },
         } as Awaited<ReturnType<typeof prisma.leaveRequest.findUnique>>);
         vi.mocked(prisma.leaveQuota.findFirst).mockResolvedValue({

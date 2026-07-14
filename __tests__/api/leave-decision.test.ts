@@ -128,9 +128,9 @@ describe("POST /api/leave/decision", () => {
         expect(logLeaveEvent).not.toHaveBeenCalled();
     });
 
-    it("rejects the previous approver after a pending request is transferred", async () => {
+    it("rejects an approver who is not recorded on the pending request", async () => {
         vi.mocked(prisma.leaveRequest.findUnique).mockResolvedValue({
-            id: "leave-transferred",
+            id: "leave-original-approver",
             employeeId: 10,
             leaveType: "VACATION",
             startDate: new Date("2031-05-05T00:00:00.000Z"),
@@ -161,7 +161,7 @@ describe("POST /api/leave/decision", () => {
         const req = new NextRequest("http://localhost/api/leave/decision", {
             method: "POST",
             body: JSON.stringify({
-                leaveId: "leave-transferred",
+                leaveId: "leave-original-approver",
                 action: "REJECT",
                 reason: "ไม่อนุมัติ",
             }),

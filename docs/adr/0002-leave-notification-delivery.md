@@ -1,5 +1,11 @@
 # ส่งอีเมลแจ้งเตือนการลาผ่าน outbox และสร้าง confirmation ในระบบทันที
 
+## นโยบายผู้อนุมัติคำขอลา
+
+ห้ามเปลี่ยนผู้อนุมัติของคำขอลาที่มีสถานะ `PENDING` เด็ดขาด พนักงานต้องยกเลิกคำขอเดิมให้สำเร็จก่อน จากนั้นผู้ดูแลระบบจึงเปลี่ยนผู้อนุมัติได้ และพนักงานต้องส่งคำขอใหม่ คำขอที่อนุมัติแล้วคง `approverId` เดิมไว้ การจัดการผู้อนุมัติทั่วไปห้ามแก้ค่า `approverId` ของคำขอเหล่านั้น
+
+หากผู้อนุมัติเดิมของคำขอที่อนุมัติแล้วพ้นสภาพ ให้ผู้ดูแลระบบตรวจสอบและกู้คืน Employee ให้เป็น `ACTIVE`, ไม่ถูก soft-delete, มี User ที่ active และไม่ถูก soft-delete พร้อมอีเมลใช้งานได้ จากนั้นให้ผู้อนุมัติเดิมเป็นผู้ยืนยันรายการไม่ได้ใช้วันลาเดิม หากไม่สามารถกู้คืนได้ ให้ผู้ดูแลระบบดำเนินการตามขั้นตอนกู้คืนข้อมูลที่ได้รับอนุมัติและเก็บ audit เพิ่มเติม ห้ามเปลี่ยนผู้อนุมัติผ่านหน้าจอจัดการทั่วไป
+
 เหตุการณ์แจ้งเตือนการลาที่มีอีเมลต้องถูกบันทึกลง outbox ก่อน แล้วให้ processor ส่งอีเมลและสร้าง in-app notification ให้ผู้รับหลักภายหลัง ส่วน confirmation ในระบบที่ส่งกลับถึงผู้กระทำเหตุการณ์เองให้สร้างใน transaction ของ action นั้นได้ทันที เพราะเป็นข้อมูลภายในระบบและควรเกิดพร้อมการเปลี่ยนสถานะ
 
 เราเลือกแนวทางนี้แทนการส่งอีเมลตรงจาก route เพราะอีเมลเป็น external side effect ที่อาจล้มเหลวหรือช้าได้ จึงควร retry แยกจาก transaction ธุรกิจ ในขณะเดียวกัน confirmation ภายในระบบไม่ควรถูกรอด้วย SMTP และไม่ควรถูก retry ซ้ำจนเกิดการแจ้งเตือนซ้ำโดยไม่จำเป็น
@@ -14,9 +20,9 @@
 
 เมื่อเหตุการณ์ทำให้งานค้างของผู้อนุมัติสิ้นสุด เช่น อนุมัติ, ไม่อนุมัติ, ยกเลิกคำขอ, หรือยืนยันไม่ได้ใช้วันลา ให้ mark in-app notification เดิมเป็นอ่านแล้วแทนการลบ เพื่อรักษาประวัติแต่ไม่ทำให้ตัวนับแจ้งเตือนค้างอยู่ การส่งคำขอลาใหม่ไม่ต้องสร้าง self notification ให้พนักงาน เพราะผู้ส่งเห็นผลลัพธ์ในหน้าจอและประวัติของตนเองทันที
 
-Outbox payload ของเหตุการณ์การลาต้องเก็บ snapshot ของผู้รับหลักและข้อมูลที่ใช้แสดงผล ณ ตอนเกิดเหตุการณ์ สำหรับ `LEAVE_ACTION` ให้กำหนด delivery identity เป็น `leaveId:approverUserId` และห้ามเปลี่ยน identity ของ row หลัง worker claim แล้ว การโอนผู้อนุมัติ rewrite payload เดิมได้เฉพาะ row สถานะ `PENDING` หรือ `FAILED`; ถ้ามีเฉพาะ row `PROCESSING` ต้องสร้าง outbox ใหม่สำหรับผู้อนุมัติใหม่ ส่วน row `PENDING`/`FAILED` ซ้ำที่ไม่ใช่ canonical ให้ปิดเป็น `SUPERSEDED`
+Outbox payload ของเหตุการณ์การลาต้องเก็บ snapshot ของผู้รับหลักและข้อมูลที่ใช้แสดงผล ณ ตอนเกิดเหตุการณ์ สำหรับ `LEAVE_ACTION` ให้กำหนด delivery identity เป็น `leaveId:approverUserId` และคง identity ของ row หลัง worker claim แล้ว stale หรือ legacy outbox ที่ identity ไม่ตรงต้องถูกปิดเป็น `SUPERSEDED`
 
-ก่อน dispatch `LEAVE_ACTION` ทุกครั้ง processor ต้องยืนยันว่า outbox ยังเป็น `PROCESSING`, คำขอยังรออนุมัติ, ผู้อนุมัติปัจจุบันยัง active และไม่ถูก soft-delete และ delivery identity ตรงกับ `approverUserId` ปัจจุบัน หากไม่ตรงให้ mark row เป็น `SUPERSEDED` และไม่ส่ง snapshot เก่า การตรวจนี้ทำใน transaction สั้น ๆ แล้ว commit ก่อนเรียก SMTP เพื่อลดเวลาถือ DB lock หาก transfer เกิดหลังการตรวจแต่ก่อน SMTP row เดิมอาจส่งสำเร็จได้ตาม at-least-once semantics แต่ transfer จะเห็น row เดิมเป็น `PROCESSING` และสร้าง delivery ใหม่เสมอ จึงไม่ทำให้ผู้อนุมัติใหม่พลาด notification หาก processor พบว่า in-app notification เดิมมีอยู่แล้วจากการ dedupe หรือ unique constraint ให้ถือว่าส่วน in-app สำเร็จแบบ no-op ไม่ทำให้ outbox failed
+ก่อน dispatch `LEAVE_ACTION` ทุกครั้ง processor ต้องยืนยันว่า outbox ยังเป็น `PROCESSING`, คำขอยังรออนุมัติ, ผู้อนุมัติปัจจุบันยัง eligible และ delivery identity ตรงกับ `approverUserId` ปัจจุบัน หากไม่ตรงให้ mark row เป็น `SUPERSEDED` และไม่ส่ง snapshot เก่า การตรวจและการสร้าง `LEAVE_REQUESTED` in-app ทำใน transaction เดียวกัน แล้ว commit ก่อนเรียก SMTP หาก processor พบว่า in-app notification เดิมมีอยู่แล้วจากการ dedupe หรือ unique constraint ให้ถือว่าส่วน in-app สำเร็จแบบ no-op ไม่ทำให้ outbox failed
 
 ผลการส่งอีเมลที่ไม่สำเร็จต้องทำให้ outbox failed และ retry แม้ email service จะคืนค่า `false` แทนการ throw error เพราะ outbox มีหน้าที่รับประกัน delivery ของช่องทางอีเมล ส่วน in-app notification ที่ถูกสร้างสำเร็จไปแล้วต้องไม่ซ้ำในรอบ retry
 

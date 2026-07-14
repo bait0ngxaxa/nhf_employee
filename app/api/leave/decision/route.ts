@@ -1,9 +1,10 @@
-import { NotificationOutboxType, Prisma } from "@prisma/client";
+import { NotificationOutboxType } from "@prisma/client";
+import type { Prisma } from "@prisma/client";
 import { after, NextResponse } from "next/server";
 
 import { logLeaveEvent } from "@/lib/server/audit";
-import { prisma } from "@/lib/db/prisma";
 import { processOutbox } from "@/lib/services/outbox/processor";
+import { runSerializableTransaction } from "@/lib/services/leave/transaction";
 import {
     isActiveEmployeeInTransaction,
     requireActiveEmployeeSession,
@@ -63,7 +64,7 @@ export async function POST(req: Request): Promise<NextResponse> {
         }
         const { leaveId, action, reason } = parsed.data;
 
-        const result = await prisma.$transaction(async (tx) => {
+        const result = await runSerializableTransaction(async (tx) => {
             if (!await isActiveEmployeeInTransaction(tx, userId, managerId)) {
                 throw new LeaveApprovalError(LEAVE_APPROVAL_MESSAGES.forbidden, 403);
             }
@@ -82,6 +83,9 @@ export async function POST(req: Request): Promise<NextResponse> {
             }
             if (leaveRequest.status !== "PENDING") {
                 throw new LeaveApprovalError(LEAVE_APPROVAL_MESSAGES.alreadyProcessed, 409);
+            }
+            if (leaveRequest.employeeId === managerId) {
+                throw new LeaveApprovalError(LEAVE_APPROVAL_MESSAGES.forbidden, 403);
             }
             if (leaveRequest.approverId !== managerId) {
                 throw new LeaveApprovalError(LEAVE_APPROVAL_MESSAGES.forbidden, 403);
@@ -178,8 +182,6 @@ export async function POST(req: Request): Promise<NextResponse> {
             });
 
             return updatedRequest;
-        }, {
-            isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
         });
 
         const auditAction = action === "APPROVE" ? "LEAVE_REQUEST_APPROVE" : "LEAVE_REQUEST_REJECT";

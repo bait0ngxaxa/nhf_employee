@@ -3,7 +3,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { requireApiSession } from "@/lib/auth/api";
 import { prisma } from "@/lib/db/prisma";
-import { requireActiveEmployeeSession } from "@/lib/services/leave/active-employee-session";
+import {
+    isActiveEmployeeInTransaction,
+    requireActiveEmployeeSession,
+} from "@/lib/services/leave/active-employee-session";
 
 vi.mock("@/lib/auth/api", () => ({
     requireApiSession: vi.fn(),
@@ -128,5 +131,21 @@ describe("requireActiveEmployeeSession", () => {
 
         expect(result.ok).toBe(false);
         if (!result.ok) expect(result.response.status).toBe(403);
+    });
+
+    it("locks and checks the employee inside the transaction", async () => {
+        const tx = {
+            $queryRaw: vi.fn().mockResolvedValue([{ id: 10 }]),
+            user: {
+                findFirst: vi.fn().mockResolvedValue({ id: 10 }),
+            },
+        } as unknown as {
+            $queryRaw: ReturnType<typeof vi.fn>;
+            user: { findFirst: ReturnType<typeof vi.fn> };
+        };
+
+        await expect(isActiveEmployeeInTransaction(tx as never, 10, 10)).resolves.toBe(true);
+        expect(tx.$queryRaw).toHaveBeenCalledTimes(1);
+        expect(tx.user.findFirst).toHaveBeenCalledTimes(1);
     });
 });

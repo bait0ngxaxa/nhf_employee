@@ -35,7 +35,7 @@ describe("PUT /api/leave/approvers", () => {
         vi.mocked(assignLeaveApprovers).mockResolvedValue(undefined);
     });
 
-    it("passes assignments without the removed transfer flag", async () => {
+    it("accepts the assignment payload without legacy fields", async () => {
         const response = await PUT(new NextRequest("http://localhost/api/leave/approvers", {
             method: "PUT",
             body: JSON.stringify({ assignments: [{ employeeId: 10, managerId: 20 }] }),

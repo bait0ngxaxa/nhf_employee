@@ -38,11 +38,13 @@
 
 ## ผู้รับและ Snapshot
 
-ผู้อนุมัติที่ตั้งค่าแล้วต้องมีทั้งความสัมพันธ์ผู้อนุมัติในข้อมูลพนักงานและบัญชีผู้ใช้ที่ active เพื่อรับ in-app และดำเนินการอนุมัติได้
+ผู้อนุมัติที่ตั้งค่าแล้วต้องเป็น Employee `ACTIVE` และไม่ถูก soft-delete มี User ที่ active และไม่ถูก soft-delete และมีอีเมลที่ผ่าน validation และไม่ลงท้ายด้วย `@temp.local` เพื่อรับ in-app และดำเนินการอนุมัติได้
 
 Outbox payload ต้องเก็บ snapshot ของผู้รับหลัก ณ ตอนเกิดเหตุการณ์ เช่น email, user id, employee id และชื่อที่ใช้แสดงผล เพื่อไม่ให้การเปลี่ยนผู้อนุมัติภายหลังทำให้ notification เก่าไปผิดคน
 
 ถ้าพนักงานมีอีเมลแต่ไม่มี user account สำหรับ in-app ให้ส่งอีเมลตามปกติและข้าม in-app โดยไม่ทำให้ outbox ล้ม เงื่อนไขนี้ไม่ควรเกิดกับผู้อนุมัติที่ตั้งค่าแล้ว
+
+การสร้าง `LEAVE_REQUESTED` in-app ของ worker ต้องอยู่ใน transaction เดียวกับการ lock และตรวจว่าคำขอยังเป็น `PENDING` เพื่อไม่ให้เกิด unread notification หลัง cancellation commit
 
 ## Payload และ Formatting
 

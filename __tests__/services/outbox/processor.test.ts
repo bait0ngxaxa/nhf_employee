@@ -31,6 +31,7 @@ vi.mock("@/lib/services/ticket/notifications", () => ({
 }));
 
 vi.mock("@/lib/services/leave/notifications", () => ({
+    createLeaveActionInAppNotification: vi.fn(),
     sendLeaveActionNotifications: vi.fn(),
     sendLeaveResultNotifications: vi.fn(),
     sendLeaveCancelledNotifications: vi.fn(),
@@ -463,13 +464,13 @@ describe("processOutbox", () => {
             where: { id: 120, status: "PROCESSING" },
             select: { id: true },
         });
-        expect(prismaMock.notificationOutbox.updateMany).toHaveBeenCalledWith({
-            where: { id: 120, status: "PROCESSING" },
-            data: {
-                status: "SUPERSEDED",
-                lastError: "Superseded by current leave approver",
-            },
-        });
+            expect(prismaMock.notificationOutbox.updateMany).toHaveBeenCalledWith({
+                where: { id: 120, status: "PROCESSING" },
+                data: {
+                    status: "SUPERSEDED",
+                    lastError: "Superseded by stale leave-action delivery",
+                },
+            });
     });
 
     it("dispatches a claimed leave action when its recipient identity is current", async () => {
@@ -505,8 +506,16 @@ describe("processOutbox", () => {
                     email: "current-approver@example.com",
                 }),
             }),
+            { createInApp: false },
         );
-        expect(prismaMock.$queryRaw).not.toHaveBeenCalled();
+        const { createLeaveActionInAppNotification } = await import(
+            "@/lib/services/leave/notifications"
+        );
+        expect(createLeaveActionInAppNotification).toHaveBeenCalledWith(
+            prismaMock,
+            expect.objectContaining({ leaveId: "leave-1" }),
+        );
+        expect(prismaMock.$queryRaw).toHaveBeenCalled();
         const transactionOrder = prismaMock.$transaction.mock.invocationCallOrder[0];
         const sendOrder = vi.mocked(sendLeaveActionNotifications).mock.invocationCallOrder[0];
         expect(transactionOrder).toBeLessThan(sendOrder);
@@ -543,7 +552,7 @@ describe("processOutbox", () => {
         expect(sendLeaveActionNotifications).not.toHaveBeenCalled();
     });
 
-    it("does not dispatch a claimed leave action superseded during transfer", async () => {
+    it("does not dispatch a claimed leave action that was already superseded", async () => {
         prismaMock.notificationOutbox.findMany.mockResolvedValue(asNever([
             buildNotification(122, "LEAVE_ACTION", JSON.stringify(buildLeavePayload())),
         ]));

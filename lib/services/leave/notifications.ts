@@ -30,6 +30,8 @@ type LeaveNotificationInput = {
     referenceId: string;
 };
 
+type NotificationClient = Pick<Prisma.TransactionClient, "notification">;
+
 function isUniqueConstraintError(error: unknown): boolean {
     return (
         error instanceof Prisma.PrismaClientKnownRequestError &&
@@ -50,7 +52,8 @@ function buildDedupeKey(input: LeaveNotificationInput): string {
     return `leave:${input.userId}:${input.type}:${input.referenceId}`;
 }
 
-async function createNotificationOnce(
+async function createNotificationOnceWithClient(
+    client: NotificationClient,
     input: LeaveNotificationInput,
 ): Promise<void> {
     if (!input.userId) {
@@ -59,7 +62,7 @@ async function createNotificationOnce(
 
     const { userId, ...data } = input;
     try {
-        await prisma.notification.create({
+        await client.notification.create({
             data: { ...data, userId, dedupeKey: buildDedupeKey(input) },
         });
     } catch (error) {
@@ -68,6 +71,10 @@ async function createNotificationOnce(
         }
         throw error;
     }
+}
+
+async function createNotificationOnce(input: LeaveNotificationInput): Promise<void> {
+    await createNotificationOnceWithClient(prisma, input);
 }
 
 function getAbsoluteDashboardPath(tab: string): string {
@@ -82,13 +89,11 @@ function buildLeaveActionMessage(data: LeaveActionPayload): string {
     return `${data.employee.name} ส่งคำขอ${buildLeaveMessage(data)}${formatLeaveFlagSummary(data)}`;
 }
 
-export async function sendLeaveActionNotifications(
+export async function createLeaveActionInAppNotification(
+    tx: Prisma.TransactionClient,
     payload: LeaveActionPayload,
 ): Promise<void> {
-    const dashboardLink = getAbsoluteDashboardPath(
-        APP_DASHBOARD_TABS.managerApproval,
-    );
-    await createNotificationOnce({
+    await createNotificationOnceWithClient(tx, {
         userId: payload.approver.userId,
         type: "LEAVE_REQUESTED",
         title: "มีคำขอลาใหม่รออนุมัติ",
@@ -96,6 +101,18 @@ export async function sendLeaveActionNotifications(
         actionUrl: toDashboardTabPath(APP_DASHBOARD_TABS.managerApproval),
         referenceId: payload.leaveId,
     });
+}
+
+export async function sendLeaveActionNotifications(
+    payload: LeaveActionPayload,
+    options: { createInApp?: boolean } = {},
+): Promise<void> {
+    const dashboardLink = getAbsoluteDashboardPath(
+        APP_DASHBOARD_TABS.managerApproval,
+    );
+    if (options.createInApp !== false) {
+        await createLeaveActionInAppNotification(prisma, payload);
+    }
 
     await assertEmailSent(
         await emailService.sendLeaveActionNotification(payload, dashboardLink),

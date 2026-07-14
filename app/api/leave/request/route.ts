@@ -1,10 +1,12 @@
 import { NextResponse, after } from "next/server";
-import { Prisma } from "@prisma/client";
-
 import { DEFAULT_LEAVE_QUOTAS } from "@/constants/leave";
 import { logLeaveEvent } from "@/lib/server/audit";
-import { prisma } from "@/lib/db/prisma";
-import { requireActiveEmployeeSession } from "@/lib/services/leave/active-employee-session";
+import {
+    isActiveEmployeeInTransaction,
+    isEmployeeInTransaction,
+    requireActiveEmployeeSession,
+} from "@/lib/services/leave/active-employee-session";
+import { isActiveLeaveApprover } from "@/lib/services/leave/approver-eligibility";
 import { calculateAdditionalOverQuotaDays } from "@/lib/services/leave/over-quota";
 import {
     buildConfiguredApproverSnapshot,
@@ -15,6 +17,7 @@ import {
 import { getLeaveYearFromDateValue } from "@/lib/services/leave/quota-year";
 import { calculateLeaveDuration, isWorkingDay } from "@/lib/services/leave/utils";
 import { processOutbox } from "@/lib/services/outbox/processor";
+import { runSerializableTransaction } from "@/lib/services/leave/transaction";
 import { jsonError, notFound } from "@/lib/ssot/http";
 import { FEATURE_KEYS, isFeatureEnabled } from "@/lib/ssot/features";
 import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
@@ -29,42 +32,6 @@ const LEAVE_REQUEST_MESSAGES = {
     halfDayMultiDate: "การลาครึ่งวันต้องเลือกวันลาเพียงวันเดียว",
     specialReasonRequired: "กรุณาระบุเหตุผลพิเศษสำหรับการลาเกินโควต้า",
 } as const;
-
-const MAX_TRANSACTION_RETRIES = 3;
-const RETRY_DELAY_MS = 25;
-
-function isTransactionWriteConflict(error: unknown): boolean {
-    return (
-        typeof error === "object"
-        && error !== null
-        && "code" in error
-        && error.code === "P2034"
-    );
-}
-
-function waitForTransactionRetry(delayMs: number): Promise<void> {
-    return new Promise((resolve) => setTimeout(resolve, delayMs));
-}
-
-async function runSerializableTransaction<T>(
-    callback: (tx: Prisma.TransactionClient) => Promise<T>,
-): Promise<T> {
-    for (let attempt = 0; attempt < MAX_TRANSACTION_RETRIES; attempt += 1) {
-        try {
-            return await prisma.$transaction(callback, {
-                isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
-            });
-        } catch (error) {
-            if (!isTransactionWriteConflict(error) || attempt === MAX_TRANSACTION_RETRIES - 1) {
-                throw error;
-            }
-
-            await waitForTransactionRetry(RETRY_DELAY_MS * 2 ** attempt);
-        }
-    }
-
-    throw new Error("Transaction retry limit was reached unexpectedly");
-}
 
 class LeaveRequestError extends Error {
     readonly statusCode: number;
@@ -128,6 +95,14 @@ export async function POST(req: Request) {
         }
 
         const result = await runSerializableTransaction(async (tx) => {
+            if (!await isActiveEmployeeInTransaction(tx, userId, employeeId)) {
+                const employeeExists = await isEmployeeInTransaction(tx, employeeId);
+                throw new LeaveRequestError(
+                    employeeExists ? COMMON_API_MESSAGES.forbidden : LEAVE_REQUEST_MESSAGES.employeeNotFound,
+                    employeeExists ? 403 : 404,
+                );
+            }
+
             const employee = await tx.employee.findUnique({
                 where: { id: employeeId },
                 include: {
@@ -147,13 +122,7 @@ export async function POST(req: Request) {
             if (!employee.managerId) {
                 throw new LeaveRequestError(LEAVE_REQUEST_MESSAGES.approverNotConfigured, 400);
             }
-            if (
-                employee.manager?.status !== "ACTIVE"
-                || employee.manager.deletedAt !== null
-                || !employee.manager.user?.id
-                || !employee.manager.user.isActive
-                || employee.manager.user.deletedAt !== null
-            ) {
+            if (!isActiveLeaveApprover(employee.manager) || employee.manager.id === employee.id) {
                 throw new LeaveRequestError(
                     LEAVE_REQUEST_MESSAGES.approverAccountNotConfigured,
                     400,
