@@ -28,7 +28,6 @@ export function useApproverManagementModel() {
     const employees = useMemo(() => data ?? [], [data]);
     const [assignments, setAssignments] = useState<Map<number, number | null>>(new Map());
     const [isSaving, setIsSaving] = useState(false);
-    const [transferPendingRequests, setTransferPendingRequests] = useState(false);
     const [search, setSearch] = useState("");
     const [filterApprover, setFilterApprover] = useState("all");
     const [currentPage, setCurrentPage] = useState(1);
@@ -133,7 +132,6 @@ export function useApproverManagementModel() {
             const payload = Array.from(assignments.entries()).map(([employeeId, managerId]) => ({
                 employeeId,
                 managerId,
-                transferPendingRequests,
             }));
 
             await saveApproverAssignments({ assignments: payload });
@@ -161,8 +159,6 @@ export function useApproverManagementModel() {
         itemsPerPage: APPROVER_ITEMS_PER_PAGE,
         assignments,
         isSaving,
-        transferPendingRequests,
-        setTransferPendingRequests,
         isLoading,
         fetchError,
         search,

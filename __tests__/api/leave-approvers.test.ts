@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
 import { PUT } from "@/app/api/leave/approvers/route";
 import { requireAdminSession } from "@/lib/auth/api";
 import {
@@ -22,13 +23,6 @@ vi.mock("@/lib/services/leave/approver-assignment", () => {
         assignLeaveApprovers: vi.fn(),
     };
 });
-vi.mock("@/lib/db/prisma", () => ({
-    prisma: {
-        $transaction: vi.fn(),
-        employee: { findUnique: vi.fn(), update: vi.fn() },
-        leaveRequest: { updateMany: vi.fn() },
-    },
-}));
 
 describe("PUT /api/leave/approvers", () => {
     beforeEach(() => {
@@ -38,48 +32,10 @@ describe("PUT /api/leave/approvers", () => {
             session: { user: { id: "1", role: "ADMIN" } },
             user: { id: 1, email: "admin@example.com", name: "Admin", role: "ADMIN" },
         });
-        vi.mocked(assignLeaveApprovers).mockResolvedValue({
-            transferredLeaveRequestCount: 0,
-        });
+        vi.mocked(assignLeaveApprovers).mockResolvedValue(undefined);
     });
 
-    it("transfers only pending requests when the administrator selects transfer", async () => {
-        vi.mocked(assignLeaveApprovers).mockResolvedValue({
-            transferredLeaveRequestCount: 3,
-        });
-
-        const response = await PUT(new NextRequest("http://localhost/api/leave/approvers", {
-            method: "PUT",
-            body: JSON.stringify({
-                assignments: [{ employeeId: 10, managerId: 20, transferPendingRequests: true }],
-            }),
-        }));
-
-        expect(response.status).toBe(200);
-        expect(assignLeaveApprovers).toHaveBeenCalledWith(
-            [{ employeeId: 10, managerId: 20, transferPendingRequests: true }],
-            { userId: 1, email: "admin@example.com" },
-        );
-        expect(await response.json()).toMatchObject({ transferredLeaveRequestCount: 3 });
-    });
-
-    it("rejects an inactive approver before starting the transaction", async () => {
-        vi.mocked(assignLeaveApprovers).mockRejectedValue(
-            new ApproverAssignmentError("ผู้อนุมัติไม่พร้อมใช้งาน"),
-        );
-
-        const response = await PUT(new NextRequest("http://localhost/api/leave/approvers", {
-            method: "PUT",
-            body: JSON.stringify({
-                assignments: [{ employeeId: 10, managerId: 20, transferPendingRequests: true }],
-            }),
-        }));
-
-        expect(response.status).toBe(400);
-        expect(assignLeaveApprovers).toHaveBeenCalledTimes(1);
-    });
-
-    it("treats an omitted transfer flag as false", async () => {
+    it("passes assignments without the removed transfer flag", async () => {
         const response = await PUT(new NextRequest("http://localhost/api/leave/approvers", {
             method: "PUT",
             body: JSON.stringify({ assignments: [{ employeeId: 10, managerId: 20 }] }),
@@ -87,24 +43,24 @@ describe("PUT /api/leave/approvers", () => {
 
         expect(response.status).toBe(200);
         expect(assignLeaveApprovers).toHaveBeenCalledWith(
-            [{ employeeId: 10, managerId: 20, transferPendingRequests: false }],
+            [{ employeeId: 10, managerId: 20 }],
             { userId: 1, email: "admin@example.com" },
         );
-        expect(await response.json()).toMatchObject({ transferredLeaveRequestCount: 0 });
     });
 
-    it("rejects duplicate employee assignments", async () => {
+    it("returns the pending-request conflict from the service", async () => {
+        vi.mocked(assignLeaveApprovers).mockRejectedValue(
+            new ApproverAssignmentError(
+                "พนักงานมีคำขอลารออนุมัติ กรุณาให้พนักงานยกเลิกคำขอก่อนเปลี่ยนผู้อนุมัติ",
+                409,
+            ),
+        );
+
         const response = await PUT(new NextRequest("http://localhost/api/leave/approvers", {
             method: "PUT",
-            body: JSON.stringify({
-                assignments: [
-                    { employeeId: 10, managerId: 20, transferPendingRequests: false },
-                    { employeeId: 10, managerId: 30, transferPendingRequests: true },
-                ],
-            }),
+            body: JSON.stringify({ assignments: [{ employeeId: 10, managerId: 20 }] }),
         }));
 
-        expect(response.status).toBe(400);
-        expect(assignLeaveApprovers).not.toHaveBeenCalled();
+        expect(response.status).toBe(409);
     });
 });

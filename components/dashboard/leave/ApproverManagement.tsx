@@ -136,16 +136,6 @@ export function ApproverManagement() {
                             <p className="text-xs text-slate-600">
                                 กดบันทึกเพื่ออัปเดตผู้อนุมัติลา
                             </p>
-                            <label className="mt-2 flex items-center gap-2 text-xs text-slate-700">
-                                <input
-                                    type="checkbox"
-                                    checked={model.transferPendingRequests}
-                                    disabled={model.isSaving}
-                                    onChange={(event) => model.setTransferPendingRequests(event.target.checked)}
-                                    className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-600"
-                                />
-                                โอนคำขอที่ยังรออนุมัติไปยังผู้อนุมัติใหม่ด้วย
-                            </label>
                         </div>
                         <Button
                             onClick={model.handleSave}

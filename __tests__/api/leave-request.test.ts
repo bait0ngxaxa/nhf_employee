@@ -62,7 +62,14 @@ describe("POST /api/leave/request", () => {
         firstName: "Manager",
         lastName: "User",
         email: "manager@example.com",
-        user: { id: 2, email: "manager-account@thainhf.org", isActive: true },
+        status: "ACTIVE",
+        deletedAt: null,
+        user: {
+            id: 2,
+            email: "manager-account@thainhf.org",
+            isActive: true,
+            deletedAt: null,
+        },
     };
 
     const buildEmployeeWithManager = () => ({
@@ -316,6 +323,31 @@ describe("POST /api/leave/request", () => {
             expect(res.status).toBe(400);
             const data = await res.json();
             expect(data.error).toBe("ยังไม่ได้ตั้งค่าผู้อนุมัติ");
+        });
+
+        it.each([
+            ["inactive", { status: "INACTIVE" }],
+            ["deleted", { deletedAt: new Date("2030-01-01T00:00:00.000Z") }],
+        ])("rejects a %s manager even when its user account is active", async (_label, state) => {
+            (prisma.employee.findUnique as unknown as {
+                mockResolvedValue: (value: ReturnType<typeof buildEmployeeWithManager>) => void;
+            }).mockResolvedValue({
+                ...buildEmployeeWithManager(),
+                manager: { ...mockManager, ...state },
+            } as never);
+
+            const req = new NextRequest("http://localhost/api/leave/request", {
+                method: "POST",
+                body: JSON.stringify(validPayload),
+            });
+
+            const res = await submitLeaveRequest(req);
+
+            expect(res.status).toBe(400);
+            await expect(res.json()).resolves.toMatchObject({
+                error: "ผู้อนุมัติยังไม่มีบัญชีผู้ใช้ในระบบ",
+            });
+            expect(prisma.leaveRequest.create).not.toHaveBeenCalled();
         });
 
         it("should throw error if insufficient quota", async () => {

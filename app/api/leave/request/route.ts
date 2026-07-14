@@ -134,7 +134,7 @@ export async function POST(req: Request) {
                     user: { select: { id: true } },
                     manager: {
                         include: {
-                            user: { select: { id: true, email: true, isActive: true } },
+                            user: { select: { id: true, email: true, isActive: true, deletedAt: true } },
                         },
                     },
                 },
@@ -147,7 +147,13 @@ export async function POST(req: Request) {
             if (!employee.managerId) {
                 throw new LeaveRequestError(LEAVE_REQUEST_MESSAGES.approverNotConfigured, 400);
             }
-            if (!employee.manager?.user?.id || !employee.manager.user.isActive) {
+            if (
+                employee.manager?.status !== "ACTIVE"
+                || employee.manager.deletedAt !== null
+                || !employee.manager.user?.id
+                || !employee.manager.user.isActive
+                || employee.manager.user.deletedAt !== null
+            ) {
                 throw new LeaveRequestError(
                     LEAVE_REQUEST_MESSAGES.approverAccountNotConfigured,
                     400,

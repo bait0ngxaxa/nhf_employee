@@ -17,7 +17,6 @@ const bulkAssignSchema = z.object({
             z.object({
                 employeeId: z.number().int().positive(),
                 managerId: z.number().int().positive().nullable(),
-                transferPendingRequests: z.boolean().default(false),
             }),
         )
         .min(1, "At least one assignment required")
@@ -93,7 +92,7 @@ export async function PUT(req: Request): Promise<NextResponse> {
             );
         }
 
-        const result = await assignLeaveApprovers(parsed.data.assignments, {
+        await assignLeaveApprovers(parsed.data.assignments, {
             userId: auth.user.id,
             email: auth.user.email,
         });
@@ -101,7 +100,6 @@ export async function PUT(req: Request): Promise<NextResponse> {
         return NextResponse.json({
             success: true,
             message: COMMON_API_MESSAGES.operationCompleted,
-            transferredLeaveRequestCount: result.transferredLeaveRequestCount,
         });
     } catch (error) {
         if (error instanceof ApproverAssignmentError) {
