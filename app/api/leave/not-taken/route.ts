@@ -243,14 +243,14 @@ export async function PUT(req: Request): Promise<NextResponse> {
             if (leaveRequest.employeeId === managerId) {
                 throw new LeaveNotTakenError(NOT_TAKEN_MESSAGES.forbidden, 403);
             }
+            if (leaveRequest.approverId !== managerId) {
+                throw new LeaveNotTakenError(NOT_TAKEN_MESSAGES.forbidden, 403);
+            }
             if (!isActiveLeaveApprover(leaveRequest.approver)) {
                 throw new LeaveNotTakenError(
                     NOT_TAKEN_MESSAGES.originalApproverRecoveryRequired,
                     409,
                 );
-            }
-            if (leaveRequest.approverId !== managerId) {
-                throw new LeaveNotTakenError(NOT_TAKEN_MESSAGES.forbidden, 403);
             }
 
             const claimedRequest = await tx.leaveRequest.updateMany({

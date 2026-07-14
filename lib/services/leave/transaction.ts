@@ -53,10 +53,6 @@ export async function lockEmployeeRows(
     const sortedEmployeeIds = [...new Set(employeeIds)].sort((left, right) => left - right);
     if (sortedEmployeeIds.length === 0) return;
 
-    if (typeof tx.$queryRaw !== "function") {
-        return;
-    }
-
     await tx.$queryRaw`
         SELECT id
         FROM employees
@@ -70,10 +66,6 @@ export async function lockLeaveRequestRow(
     tx: Prisma.TransactionClient,
     leaveId: string,
 ): Promise<void> {
-    if (typeof tx.$queryRaw !== "function") {
-        return;
-    }
-
     await tx.$queryRaw`
         SELECT id
         FROM leave_requests

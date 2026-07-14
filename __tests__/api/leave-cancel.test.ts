@@ -20,7 +20,8 @@ vi.mock("@/lib/server/audit", () => ({ logLeaveEvent: vi.fn() }));
 vi.mock("@/lib/db/prisma", () => ({
     prisma: {
         $transaction: vi.fn(),
-        user: { findUnique: vi.fn() },
+        $queryRaw: vi.fn(),
+        user: { findUnique: vi.fn(), findFirst: vi.fn() },
         leaveRequest: { findUnique: vi.fn(), updateMany: vi.fn(), findUniqueOrThrow: vi.fn() },
         notification: { updateMany: vi.fn(), create: vi.fn() },
         notificationOutbox: { create: vi.fn() },
@@ -40,6 +41,8 @@ describe("POST /api/leave/cancel", () => {
             isActive: true,
             employee: { id: 10, status: "ACTIVE", deletedAt: null },
         } as never);
+        vi.mocked(prisma.user.findFirst).mockResolvedValue({ id: 10 } as never);
+        vi.mocked(prisma.$queryRaw).mockResolvedValue([] as never);
         vi.mocked(logLeaveEvent).mockResolvedValue(undefined);
         vi.mocked(processOutbox).mockResolvedValue({ processed: 0, failed: 0 });
         vi.mocked(prisma.$transaction).mockImplementation(async (callback) => {

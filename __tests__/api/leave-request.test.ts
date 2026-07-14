@@ -32,7 +32,8 @@ vi.mock("@/lib/services/leave/get-employee-id", () => ({
 vi.mock("@/lib/db/prisma", () => ({
     prisma: {
         $transaction: vi.fn(),
-        user: { findUnique: vi.fn() },
+        $queryRaw: vi.fn(),
+        user: { findUnique: vi.fn(), findFirst: vi.fn() },
         employee: {
             findUnique: vi.fn(),
         },
@@ -88,6 +89,8 @@ describe("POST /api/leave/request", () => {
             isActive: true,
             employee: { id: mockEmployeeId, status: "ACTIVE", deletedAt: null },
         } as never);
+        vi.mocked(prisma.user.findFirst).mockResolvedValue({ id: 1 } as never);
+        vi.mocked(prisma.$queryRaw).mockResolvedValue([] as never);
         (processOutbox as unknown as { mockResolvedValue: (v: undefined) => void }).mockResolvedValue(undefined);
     });
 

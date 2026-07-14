@@ -81,14 +81,14 @@ export async function POST(req: Request): Promise<NextResponse> {
             if (!leaveRequest) {
                 throw new LeaveApprovalError(LEAVE_APPROVAL_MESSAGES.requestNotFound, 404);
             }
-            if (leaveRequest.status !== "PENDING") {
-                throw new LeaveApprovalError(LEAVE_APPROVAL_MESSAGES.alreadyProcessed, 409);
-            }
             if (leaveRequest.employeeId === managerId) {
                 throw new LeaveApprovalError(LEAVE_APPROVAL_MESSAGES.forbidden, 403);
             }
             if (leaveRequest.approverId !== managerId) {
                 throw new LeaveApprovalError(LEAVE_APPROVAL_MESSAGES.forbidden, 403);
+            }
+            if (leaveRequest.status !== "PENDING") {
+                throw new LeaveApprovalError(LEAVE_APPROVAL_MESSAGES.alreadyProcessed, 409);
             }
 
             const newStatus = action === "APPROVE" ? "APPROVED" : "REJECTED";

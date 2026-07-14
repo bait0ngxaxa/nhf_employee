@@ -1,6 +1,7 @@
 import { renderHook, act, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import useSWR from "swr";
+import { toast } from "sonner";
 import { useApproverManagementModel } from "@/hooks/leave/useApproverManagementModel";
 import { saveApproverAssignments } from "@/lib/services/leave/client";
 
@@ -9,6 +10,14 @@ vi.mock("swr");
 vi.mock("@/lib/services/leave/client", () => ({
     saveApproverAssignments: vi.fn(),
     fetchApproverEmployees: vi.fn(),
+}));
+
+vi.mock("sonner", () => ({
+    toast: {
+        info: vi.fn(),
+        success: vi.fn(),
+        error: vi.fn(),
+    },
 }));
 
 describe("useApproverManagementModel", () => {
@@ -93,6 +102,25 @@ describe("useApproverManagementModel", () => {
         });
 
         expect(result.current.saveMsg?.type).toBe("err");
+    });
+
+    it("preserves unsaved assignments and shows the backend conflict message", async () => {
+        const message = "พนักงานที่มีคำขอลารออนุมัติ: 10 (Employee Name) กรุณาให้พนักงานยกเลิกคำขอก่อนเปลี่ยนผู้อนุมัติ รายการทั้งหมดไม่ได้บันทึก";
+        vi.mocked(saveApproverAssignments).mockRejectedValue(new Error(message));
+        const { result } = renderHook(() => useApproverManagementModel());
+
+        act(() => {
+            result.current.handleAssign(1, "");
+        });
+
+        await act(async () => {
+            await result.current.handleSave();
+        });
+
+        expect(result.current.saveMsg).toEqual({ type: "err", text: message });
+        expect(toast.error).toHaveBeenCalledWith(message);
+        expect(result.current.assignments).toEqual(new Map([[1, null]]));
+        expect(mutate).not.toHaveBeenCalled();
     });
 });
 

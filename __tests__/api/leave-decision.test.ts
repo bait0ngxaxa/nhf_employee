@@ -37,6 +37,7 @@ vi.mock("@/lib/services/outbox/processor", () => ({
 vi.mock("@/lib/db/prisma", () => ({
     prisma: {
         $transaction: vi.fn(),
+        $queryRaw: vi.fn(),
         user: {
             findUnique: vi.fn(),
             findFirst: vi.fn(),
@@ -87,6 +88,7 @@ describe("POST /api/leave/decision", () => {
             employee: { id: 20, status: "ACTIVE", deletedAt: null },
         } as never);
         vi.mocked(prisma.user.findFirst).mockResolvedValue({ id: 20 } as never);
+        vi.mocked(prisma.$queryRaw).mockResolvedValue([] as never);
         vi.mocked(processOutbox).mockResolvedValue({ processed: 0, failed: 0 });
         vi.mocked(logLeaveEvent).mockResolvedValue(undefined);
         vi.mocked(prisma.$transaction).mockImplementation(async (callback) => {
@@ -173,6 +175,30 @@ describe("POST /api/leave/decision", () => {
         expect(prisma.leaveRequest.updateMany).not.toHaveBeenCalled();
         expect(prisma.notificationOutbox.create).not.toHaveBeenCalled();
         expect(logLeaveEvent).not.toHaveBeenCalled();
+    });
+
+    it("returns 403 instead of disclosing a processed request to a non-approver", async () => {
+        vi.mocked(prisma.leaveRequest.findUnique).mockResolvedValue({
+            id: "leave-processed-other-approver",
+            employeeId: 10,
+            status: "APPROVED",
+            approverId: 30,
+            employee: { id: 10 },
+            approver: { id: 30 },
+        } as never);
+
+        const response = await POST(new NextRequest("http://localhost/api/leave/decision", {
+            method: "POST",
+            body: JSON.stringify({
+                leaveId: "leave-processed-other-approver",
+                action: "REJECT",
+                reason: "ไม่อนุมัติ",
+            }),
+        }));
+
+        expect(response.status).toBe(403);
+        expect(await response.json()).toEqual({ error: "คุณไม่มีสิทธิ์อนุมัติคำขอนี้" });
+        expect(prisma.leaveRequest.updateMany).not.toHaveBeenCalled();
     });
 
     it("rejects when the approver becomes inactive before the transaction", async () => {

@@ -32,6 +32,7 @@ vi.mock("@/lib/services/outbox/processor", () => ({
 vi.mock("@/lib/db/prisma", () => ({
     prisma: {
         $transaction: vi.fn(),
+        $queryRaw: vi.fn(),
         user: { findUnique: vi.fn(), findFirst: vi.fn() },
         notification: {
             create: vi.fn(),
@@ -74,6 +75,7 @@ describe("/api/leave/not-taken", () => {
             employee: { id: 10, status: "ACTIVE", deletedAt: null },
         } as never);
         vi.mocked(prisma.user.findFirst).mockResolvedValue({ id: 1 } as never);
+        vi.mocked(prisma.$queryRaw).mockResolvedValue([] as never);
         vi.mocked(processOutbox).mockResolvedValue({ processed: 0, failed: 0 });
         vi.mocked(prisma.$transaction).mockImplementation(async (callback) => {
             if (typeof callback === "function") {
@@ -335,6 +337,43 @@ describe("/api/leave/not-taken", () => {
 
         expect(res.status).toBe(403);
         expect(prisma.leaveRequest.findUnique).not.toHaveBeenCalled();
+        expect(prisma.leaveQuota.update).not.toHaveBeenCalled();
+    });
+
+    it("returns 403 to a non-approver without revealing original approver recovery", async () => {
+        vi.mocked(prisma.user.findUnique).mockResolvedValue({
+            isActive: true,
+            deletedAt: null,
+            employee: { id: 30, status: "ACTIVE", deletedAt: null },
+        } as never);
+        vi.mocked(prisma.user.findFirst).mockResolvedValue({ id: 30 } as never);
+        vi.mocked(prisma.leaveRequest.findUnique).mockResolvedValue({
+            id: "leave-recovery",
+            employeeId: 10,
+            status: "APPROVED",
+            approverId: 20,
+            endDate: new Date("2000-02-01T00:00:00.000Z"),
+            notTakenRequestedAt: new Date("2000-02-02T00:00:00.000Z"),
+            notTakenConfirmedAt: null,
+            employee: { id: 10, firstName: "Employee", lastName: "User", user: { id: 1 } },
+            approver: {
+                id: 20,
+                firstName: "Former",
+                lastName: "Manager",
+                email: "former@example.com",
+                status: "INACTIVE",
+                deletedAt: null,
+                user: null,
+            },
+        } as never);
+
+        const response = await PUT(new NextRequest("http://localhost/api/leave/not-taken", {
+            method: "PUT",
+            body: JSON.stringify({ leaveId: "leave-recovery" }),
+        }));
+
+        expect(response.status).toBe(403);
+        expect(await response.json()).toEqual({ error: "คุณไม่มีสิทธิ์ดำเนินการกับคำขอนี้" });
         expect(prisma.leaveQuota.update).not.toHaveBeenCalled();
     });
 

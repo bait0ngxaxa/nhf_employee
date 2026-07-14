@@ -19,7 +19,10 @@ import {
     getLeaveTypeLabel,
 } from "@/lib/services/leave/notification-format";
 import { processOutbox } from "@/lib/services/outbox/processor";
-import { runSerializableTransaction } from "@/lib/services/leave/transaction";
+import {
+    lockLeaveRequestRow,
+    runSerializableTransaction,
+} from "@/lib/services/leave/transaction";
 import { jsonError, notFound } from "@/lib/ssot/http";
 import { FEATURE_KEYS, isFeatureEnabled } from "@/lib/ssot/features";
 import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
@@ -70,6 +73,7 @@ export async function POST(req: Request) {
                 throw new LeaveCancelError(COMMON_API_MESSAGES.forbidden, 403);
             }
 
+            await lockLeaveRequestRow(tx, leaveId);
             const leaveRequest = await tx.leaveRequest.findUnique({
                 where: { id: leaveId },
                 include: {

@@ -76,28 +76,7 @@ export async function isActiveEmployeeInTransaction(
 ): Promise<boolean> {
     await lockEmployeeRows(tx, [employeeId]);
 
-    const userDelegate = tx.user as unknown as { findFirst?: typeof tx.user.findFirst } | undefined;
-    if (typeof userDelegate?.findFirst !== "function") {
-        if (typeof tx.employee?.findUnique !== "function") return true;
-        const employee = await tx.employee.findUnique({
-            where: { id: employeeId },
-            select: {
-                id: true,
-                status: true,
-                deletedAt: true,
-                user: { select: { id: true } },
-            },
-        });
-        return Boolean(
-            employee
-            && employee.id === employeeId
-            && (employee.status === undefined || employee.status === "ACTIVE")
-            && (employee.deletedAt === undefined || employee.deletedAt === null)
-            && (employee.user === undefined || employee.user?.id === userId),
-        );
-    }
-
-    const user = await userDelegate.findFirst({
+    const user = await tx.user.findFirst({
         where: {
             id: userId,
             employeeId,
