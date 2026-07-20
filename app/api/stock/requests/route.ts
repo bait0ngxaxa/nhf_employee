@@ -8,11 +8,6 @@ import {
     createRequestSchema,
     stockRequestsFilterSchema,
 } from "@/lib/validations/stock";
-import { logStockEvent } from "@/lib/server/audit";
-import {
-    enqueueLineNewStockRequest,
-    notifyAdminsNewStockRequest,
-} from "@/lib/services/stock/notifications";
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
     try {
@@ -56,7 +51,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         const auth = await requireApiSession();
         if (!auth.ok) return auth.response;
 
-        const { session, user } = auth;
+        const { user } = auth;
 
         const body = await request.json();
         const result = createRequestSchema.safeParse(body);
@@ -66,46 +61,16 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
             });
         }
 
-        const stockRequest = await stockService.createRequest(
-            result.data,
-            user.id,
-        );
-        await logStockEvent("STOCK_REQUEST_CREATE", stockRequest.id, user.id, user.email, {
-            after: {
-                itemCount: result.data.items.length,
-                projectCode: result.data.projectCode,
-            },
+        const stockRequest = await stockService.createRequest(result.data, {
+            id: user.id,
+            email: user.email,
+            name: user.name ?? user.email,
         });
 
-        // Notify admins of the new request
-        const requesterName = session.user?.name ?? user.email;
-        try {
-            await notifyAdminsNewStockRequest(
-                stockRequest.id,
-                requesterName,
-                stockRequest.projectCode,
+        after(() => {
+            processOutbox().catch((error) =>
+                console.error("Outbox processor failed:", error),
             );
-        } catch (notificationError) {
-            console.error("Error sending stock request notification:", {
-                requestId: stockRequest.id,
-                requesterId: user.id,
-                error: notificationError,
-            });
-        }
-
-        after(async () => {
-            try {
-                await enqueueLineNewStockRequest(stockRequest);
-                processOutbox().catch((err) =>
-                    console.error("Outbox processor failed:", err),
-                );
-            } catch (lineNotificationError) {
-                console.error("Error queueing LINE stock notification:", {
-                    requestId: stockRequest.id,
-                    requesterId: user.id,
-                    error: lineNotificationError,
-                });
-            }
         });
 
         return NextResponse.json({ request: stockRequest }, { status: 201 });

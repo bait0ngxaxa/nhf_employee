@@ -4,8 +4,6 @@ import { jsonError, serverError } from "@/lib/ssot/http";
 import { stockService } from "@/lib/services/stock";
 import { processOutbox } from "@/lib/services/outbox/processor";
 import { adjustStockSchema } from "@/lib/validations/stock";
-import { logStockEvent } from "@/lib/server/audit";
-import { enqueueLineLowStockReached } from "@/lib/services/stock/notifications";
 
 interface RouteParams {
     params: Promise<{ id: string }>;
@@ -31,37 +29,16 @@ export async function POST(
             });
         }
 
-        const adjustment = await stockService.adjustStock(
-            itemId,
-            result.data,
-            auth.user.id,
-        );
-        await logStockEvent("STOCK_ADJUST", itemId, auth.user.id, auth.user.email, {
-            after: {
-                name: adjustment.itemName,
-                sku: adjustment.sku,
-                type: result.data.type,
-                quantity: result.data.quantity,
-                previousQty: adjustment.previousQty,
-                newQty: adjustment.newQty,
-                previousMinStock: adjustment.previousMinStock,
-                newMinStock: adjustment.newMinStock,
-            },
+        const adjustment = await stockService.adjustStock(itemId, result.data, {
+            id: auth.user.id,
+            email: auth.user.email,
+            name: auth.user.name ?? auth.user.email,
         });
 
-        after(async () => {
-            try {
-                await enqueueLineLowStockReached(adjustment.lowStockAlerts);
-                processOutbox().catch((err) =>
-                    console.error("Outbox processor failed:", err),
-                );
-            } catch (notificationError) {
-                console.error("Error queueing low stock notification:", {
-                    itemId,
-                    actorId: auth.user.id,
-                    error: notificationError,
-                });
-            }
+        after(() => {
+            processOutbox().catch((error) =>
+                console.error("Outbox processor failed:", error),
+            );
         });
 
         return NextResponse.json({ adjustment });

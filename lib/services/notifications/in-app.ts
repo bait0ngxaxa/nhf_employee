@@ -2,6 +2,11 @@ import { Prisma, Role, type NotificationType } from "@prisma/client";
 
 import { prisma } from "@/lib/db/prisma";
 
+type InAppNotificationClient = Pick<
+    Prisma.TransactionClient,
+    "notification" | "user"
+>;
+
 export type InAppNotificationInput = {
     userId: number | null | undefined;
     type: NotificationType;
@@ -28,13 +33,14 @@ function isUniqueConstraintError(error: unknown): boolean {
 
 export async function createInAppNotificationOnce(
     input: InAppNotificationInput,
+    client: InAppNotificationClient = prisma,
 ): Promise<void> {
     if (!input.userId) {
         return;
     }
 
     try {
-        await prisma.notification.create({
+        await client.notification.create({
             data: {
                 userId: input.userId,
                 type: input.type,
@@ -55,8 +61,9 @@ export async function createInAppNotificationOnce(
 
 export async function createAdminInAppNotificationsOnce(
     input: AdminNotificationInput,
+    client: InAppNotificationClient = prisma,
 ): Promise<void> {
-    const admins = await prisma.user.findMany({
+    const admins = await client.user.findMany({
         where: { role: Role.ADMIN },
         select: { id: true },
     });
@@ -67,7 +74,7 @@ export async function createAdminInAppNotificationsOnce(
                 ...input,
                 userId: admin.id,
                 dedupeKey: `${input.dedupeKeyPrefix}:${admin.id}`,
-            }),
+            }, client),
         ),
     );
 }

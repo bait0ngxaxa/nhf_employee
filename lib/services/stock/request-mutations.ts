@@ -1,5 +1,13 @@
 import { Prisma, StockRequestStatus } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
+import { createStockCommandAudit } from "./command-audit";
+import {
+    enqueueLineNewStockRequest,
+    notifyAdminsNewStockRequest,
+    notifyAdminsStockRequestCancelledByRequester,
+    notifyStockRequestResult,
+    persistLowStockNotifications,
+} from "./notifications";
 import type {
     CreateRequestInput,
 } from "@/lib/validations/stock";
@@ -14,6 +22,7 @@ import type {
     CancelRequestOptions,
     IssueRequestResult,
     LowStockAlertCandidate,
+    StockCommandActor,
 } from "./types";
 
 type RequestedVariant = {
@@ -85,7 +94,7 @@ function buildLowStockAlerts(
 
 export async function createRequest(
     data: CreateRequestInput,
-    userId: number,
+    actor: StockCommandActor,
 ) {
     return prisma.$transaction(
         async (tx) => {
@@ -194,9 +203,9 @@ export async function createRequest(
                 }
             }
 
-            return tx.stockRequest.create({
+            const stockRequest = await tx.stockRequest.create({
                 data: {
-                    requestedBy: userId,
+                    requestedBy: actor.id,
                     projectCode: data.projectCode,
                     note: data.note ?? null,
                     items: {
@@ -205,6 +214,28 @@ export async function createRequest(
                 },
                 include: buildRequestInclude(),
             });
+
+            await createStockCommandAudit(
+                tx,
+                "STOCK_REQUEST_CREATE",
+                stockRequest.id,
+                actor,
+                {
+                    after: {
+                        itemCount: data.items.length,
+                        projectCode: data.projectCode,
+                    },
+                },
+            );
+            await notifyAdminsNewStockRequest(
+                stockRequest.id,
+                actor.name,
+                stockRequest.projectCode,
+                tx,
+            );
+            await enqueueLineNewStockRequest(stockRequest, tx);
+
+            return stockRequest;
         },
         {
             isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
@@ -214,7 +245,7 @@ export async function createRequest(
 
 export async function issueRequest(
     requestId: number,
-    adminId: number,
+    actor: StockCommandActor,
 ): Promise<IssueRequestResult<{ id: number; requestedBy: number }>> {
     return prisma.$transaction(async (tx) => {
         const issuedAt = new Date();
@@ -225,7 +256,7 @@ export async function issueRequest(
             },
             data: {
                 status: StockRequestStatus.ISSUED,
-                issuedById: adminId,
+                issuedById: actor.id,
                 issuedAt,
                 cancelReason: null,
                 cancelledById: null,
@@ -365,10 +396,25 @@ export async function issueRequest(
                     type: "OUT",
                     quantity: -requestItem.quantity,
                     note: `จ่ายตามคำขอ #${requestId}`,
-                    performedBy: adminId,
+                    performedBy: actor.id,
                 },
             });
         }
+
+        await createStockCommandAudit(
+            tx,
+            "STOCK_REQUEST_ISSUE",
+            requestId,
+            actor,
+        );
+        await notifyStockRequestResult(
+            requestId,
+            request.requestedBy,
+            true,
+            undefined,
+            tx,
+        );
+        await persistLowStockNotifications(lowStockAlerts, tx);
 
         return {
             request: {
@@ -382,50 +428,75 @@ export async function issueRequest(
 
 export async function cancelRequest(
     requestId: number,
-    actorId: number,
+    actor: StockCommandActor,
     reason?: string | null,
     options: CancelRequestOptions = { isAdmin: false },
 ): Promise<Prisma.StockRequestGetPayload<Record<string, never>>> {
-    const request = await prisma.stockRequest.findUnique({
-        where: { id: requestId },
-        select: { status: true, requestedBy: true },
-    });
-
-    if (!request) {
-        throw new Error("ไม่พบคำขอเบิก");
-    }
-    if (request.status !== "PENDING_ISSUE") {
-        throw new Error("คำขอนี้ถูกดำเนินการแล้ว");
-    }
-    if (!options.isAdmin && request.requestedBy !== actorId) {
-        throw new Error("ไม่มีสิทธิ์ยกเลิกคำขอนี้");
-    }
-
-    const cancelledRequest = await prisma.stockRequest.updateMany({
-        where: {
-            id: requestId,
-            status: StockRequestStatus.PENDING_ISSUE,
-        },
-        data: {
-            status: StockRequestStatus.CANCELLED,
-            cancelReason: reason ?? null,
-            cancelledById: actorId,
-            cancelledAt: new Date(),
-        },
-    });
-
-    if (cancelledRequest.count === 0) {
-        const existingRequest = await prisma.stockRequest.findUnique({
+    return prisma.$transaction(async (tx) => {
+        const request = await tx.stockRequest.findUnique({
             where: { id: requestId },
-            select: { id: true },
+            select: { status: true, requestedBy: true },
         });
-        if (!existingRequest) {
+
+        if (!request) {
             throw new Error("ไม่พบคำขอเบิก");
         }
-        throw new Error("คำขอนี้ถูกดำเนินการแล้ว");
-    }
+        if (request.status !== "PENDING_ISSUE") {
+            throw new Error("คำขอนี้ถูกดำเนินการแล้ว");
+        }
+        if (!options.isAdmin && request.requestedBy !== actor.id) {
+            throw new Error("ไม่มีสิทธิ์ยกเลิกคำขอนี้");
+        }
 
-    return prisma.stockRequest.findUniqueOrThrow({
-        where: { id: requestId },
+        const cancelledRequest = await tx.stockRequest.updateMany({
+            where: {
+                id: requestId,
+                status: StockRequestStatus.PENDING_ISSUE,
+            },
+            data: {
+                status: StockRequestStatus.CANCELLED,
+                cancelReason: reason ?? null,
+                cancelledById: actor.id,
+                cancelledAt: new Date(),
+            },
+        });
+
+        if (cancelledRequest.count === 0) {
+            const existingRequest = await tx.stockRequest.findUnique({
+                where: { id: requestId },
+                select: { id: true },
+            });
+            if (!existingRequest) {
+                throw new Error("ไม่พบคำขอเบิก");
+            }
+            throw new Error("คำขอนี้ถูกดำเนินการแล้ว");
+        }
+
+        const updated = await tx.stockRequest.findUniqueOrThrow({
+            where: { id: requestId },
+        });
+        await createStockCommandAudit(
+            tx,
+            "STOCK_REQUEST_CANCEL",
+            requestId,
+            actor,
+            { metadata: { reason: reason ?? null } },
+        );
+        await notifyStockRequestResult(
+            requestId,
+            updated.requestedBy,
+            false,
+            reason,
+            tx,
+        );
+        if (!options.isAdmin) {
+            await notifyAdminsStockRequestCancelledByRequester(
+                requestId,
+                actor.name,
+                tx,
+            );
+        }
+
+        return updated;
     });
 }

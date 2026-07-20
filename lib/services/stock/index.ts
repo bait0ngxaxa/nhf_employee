@@ -1,6 +1,7 @@
 export type {
     CancelRequestOptions,
     CreateStockItemInput,
+    StockCommandActor,
     ItemVariantSeed,
     PendingRequestItemRecord,
 } from "./types";

@@ -1,4 +1,4 @@
-import { Role } from "@prisma/client";
+import { type Prisma, Role } from "@prisma/client";
 
 import { prisma } from "@/lib/db/prisma";
 import { createAdminInAppNotificationsOnce } from "@/lib/services/notifications/in-app";
@@ -11,6 +11,11 @@ import type {
     StockRequestLineData,
 } from "@/types/api";
 import type { LowStockAlertCandidate } from "./types";
+
+type StockNotificationClient = Pick<
+    Prisma.TransactionClient,
+    "notification" | "notificationOutbox" | "user"
+>;
 
 type StockRequestLineSource = {
     id: number;
@@ -49,8 +54,9 @@ export async function notifyStockRequestResult(
     requestedByUserId: number,
     isIssued: boolean,
     cancelReason?: string | null,
+    client: StockNotificationClient = prisma,
 ): Promise<void> {
-    await prisma.notification.create({
+    await client.notification.create({
         data: {
             userId: requestedByUserId,
             type: isIssued ? "STOCK_ISSUED" : "STOCK_CANCELLED",
@@ -73,6 +79,7 @@ export async function notifyAdminsNewStockRequest(
     requestId: number,
     requesterName: string,
     projectCode: string,
+    client: StockNotificationClient = prisma,
 ): Promise<void> {
     await createAdminInAppNotificationsOnce({
         type: "STOCK_REQUEST_NEW",
@@ -81,7 +88,7 @@ export async function notifyAdminsNewStockRequest(
         actionUrl: "/dashboard?tab=stock&stockTab=admin-requests",
         referenceId: String(requestId),
         dedupeKeyPrefix: `stock:${requestId}:STOCK_REQUEST_NEW`,
-    });
+    }, client);
 }
 
 function buildVariantLabel(
@@ -132,10 +139,11 @@ function buildStockRequestLinePayload(
 
 export async function enqueueLineNewStockRequest(
     stockRequest: StockRequestLineSource,
+    client: StockNotificationClient = prisma,
 ): Promise<void> {
     const payload = buildStockRequestLinePayload(stockRequest);
 
-    await prisma.notificationOutbox.create({
+    await client.notificationOutbox.create({
         data: {
             type: "STOCK_REQUEST_LINE",
             payload: JSON.stringify(payload),
@@ -156,27 +164,27 @@ export async function notifyLineNewStockRequest(
     }
 }
 
+function buildLowStockLinePayload(
+    alerts: LowStockAlertCandidate[],
+): StockLowLineData {
+    return {
+        alertedAt: new Date().toISOString(),
+        itemCount: alerts.length,
+        items: alerts.map((alert) => ({ ...alert })),
+    };
+}
+
 export async function enqueueLineLowStockReached(
     alerts: LowStockAlertCandidate[],
+    client: StockNotificationClient = prisma,
 ): Promise<void> {
     if (alerts.length === 0) {
         return;
     }
 
-    const payload: StockLowLineData = {
-        alertedAt: new Date().toISOString(),
-        itemCount: alerts.length,
-        items: alerts.map((alert) => ({
-            itemId: alert.itemId,
-            name: alert.name,
-            sku: alert.sku,
-            quantity: alert.quantity,
-            minStock: alert.minStock,
-            unit: alert.unit,
-        })),
-    };
+    const payload = buildLowStockLinePayload(alerts);
 
-    await prisma.notificationOutbox.create({
+    await client.notificationOutbox.create({
         data: {
             type: "STOCK_LOW_LINE",
             payload: JSON.stringify(payload),
@@ -191,18 +199,7 @@ export async function notifyLineLowStockReached(
         return;
     }
 
-    const payload: StockLowLineData = {
-        alertedAt: new Date().toISOString(),
-        itemCount: alerts.length,
-        items: alerts.map((alert) => ({
-            itemId: alert.itemId,
-            name: alert.name,
-            sku: alert.sku,
-            quantity: alert.quantity,
-            minStock: alert.minStock,
-            unit: alert.unit,
-        })),
-    };
+    const payload = buildLowStockLinePayload(alerts);
 
     await notifyAdminsLowStockInApp(payload);
     const isSent = await sendStockLowNotification(payload);
@@ -214,6 +211,7 @@ export async function notifyLineLowStockReached(
 
 export async function notifyAdminsStockRequestLineInApp(
     payload: StockRequestLineData,
+    client: StockNotificationClient = prisma,
 ): Promise<void> {
     await createAdminInAppNotificationsOnce({
         type: "STOCK_REQUEST_NEW",
@@ -222,7 +220,7 @@ export async function notifyAdminsStockRequestLineInApp(
         actionUrl: "/dashboard?tab=stock&stockTab=admin-requests",
         referenceId: String(payload.requestId),
         dedupeKeyPrefix: `stock:${payload.requestId}:STOCK_REQUEST_NEW`,
-    });
+    }, client);
 }
 
 function buildLowStockMessage(payload: StockLowLineData): string {
@@ -236,6 +234,7 @@ function buildLowStockMessage(payload: StockLowLineData): string {
 
 export async function notifyAdminsLowStockInApp(
     payload: StockLowLineData,
+    client: StockNotificationClient = prisma,
 ): Promise<void> {
     await createAdminInAppNotificationsOnce({
         type: "SYSTEM_ALERT",
@@ -244,21 +243,39 @@ export async function notifyAdminsLowStockInApp(
         actionUrl: "/dashboard?tab=stock&stockTab=inventory",
         referenceId: payload.items[0]?.sku ?? payload.alertedAt,
         dedupeKeyPrefix: `stock-low:${payload.alertedAt}`,
+    }, client);
+}
+
+export async function persistLowStockNotifications(
+    alerts: LowStockAlertCandidate[],
+    client: StockNotificationClient,
+): Promise<void> {
+    if (alerts.length === 0) return;
+
+    const payload = buildLowStockLinePayload(alerts);
+
+    await notifyAdminsLowStockInApp(payload, client);
+    await client.notificationOutbox.create({
+        data: {
+            type: "STOCK_LOW_LINE",
+            payload: JSON.stringify(payload),
+        },
     });
 }
 
 export async function notifyAdminsStockRequestCancelledByRequester(
     requestId: number,
     requesterName: string,
+    client: StockNotificationClient = prisma,
 ): Promise<void> {
-    const admins = await prisma.user.findMany({
+    const admins = await client.user.findMany({
         where: { role: Role.ADMIN },
         select: { id: true },
     });
 
     if (admins.length === 0) return;
 
-    await prisma.notification.createMany({
+    await client.notification.createMany({
         data: admins.map((admin) => ({
             userId: admin.id,
             type: "STOCK_CANCELLED",

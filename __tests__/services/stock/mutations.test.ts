@@ -14,6 +14,18 @@ function asNever<T>(value: T): never {
     return value as unknown as never;
 }
 
+function commandActor(id: number): {
+    id: number;
+    email: string;
+    name: string;
+} {
+    return {
+        id,
+        email: "user-" + id + "@example.com",
+        name: "ผู้ใช้ " + id,
+    };
+}
+
 describe("Stock Service Mutations", () => {
     beforeEach(() => {
         mockReset(prismaMock);
@@ -32,6 +44,10 @@ describe("Stock Service Mutations", () => {
             asNever({ count: 1 }),
         );
         prismaMock.stockRequestItem.findMany.mockResolvedValue(asNever([]));
+        prismaMock.user.findMany.mockResolvedValue(asNever([]));
+        prismaMock.stockRequest.findUniqueOrThrow.mockResolvedValue(
+            asNever({ id: 55, requestedBy: 3 }),
+        );
     });
 
     describe("issueRequest", () => {
@@ -43,7 +59,7 @@ describe("Stock Service Mutations", () => {
                 asNever({ status: "ISSUED" }),
             );
 
-            await expect(stockService.issueRequest(99, 9)).rejects.toThrow(
+            await expect(stockService.issueRequest(99, commandActor(9))).rejects.toThrow(
                 "คำขอนี้ถูกดำเนินการแล้ว",
             );
 
@@ -65,6 +81,7 @@ describe("Stock Service Mutations", () => {
             prismaMock.stockRequest.findUnique.mockResolvedValue(
                 asNever({
                     status: "PENDING_ISSUE",
+                    requestedBy: 3,
                     items: [
                         { itemId: 10, variantId: null, quantity: 3 },
                         { itemId: 10, variantId: null, quantity: 3 },
@@ -99,7 +116,7 @@ describe("Stock Service Mutations", () => {
                 ]),
             );
 
-            await expect(stockService.issueRequest(77, 5)).rejects.toThrow(
+            await expect(stockService.issueRequest(77, commandActor(5))).rejects.toThrow(
                 "มีไม่เพียงพอ",
             );
             expect(prismaMock.stockItemVariant.updateMany).not.toHaveBeenCalled();
@@ -150,7 +167,7 @@ describe("Stock Service Mutations", () => {
                 }),
             );
 
-            await expect(stockService.issueRequest(88, 9)).rejects.toThrow(
+            await expect(stockService.issueRequest(88, commandActor(9))).rejects.toThrow(
                 "มีไม่เพียงพอ",
             );
             expect(prismaMock.stockItemVariant.updateMany).toHaveBeenCalledWith(
@@ -167,6 +184,7 @@ describe("Stock Service Mutations", () => {
             prismaMock.stockRequest.findUnique.mockResolvedValue(
                 asNever({
                     status: "PENDING_ISSUE",
+                    requestedBy: 3,
                     items: [
                         { itemId: 10, variantId: null, quantity: 2 },
                         { itemId: 10, variantId: null, quantity: 3 },
@@ -178,10 +196,11 @@ describe("Stock Service Mutations", () => {
                 asNever([
                     {
                         id: 10,
+                        name: "ปากกา",
                         sku: "SKU-10",
                         unit: "ด้าม",
-                        quantity: 20,
-                        minStock: 1,
+                        quantity: 6,
+                        minStock: 5,
                         imageUrl: null,
                         isActive: true,
                     },
@@ -224,7 +243,7 @@ describe("Stock Service Mutations", () => {
             prismaMock.stockTransaction.create.mockResolvedValue(
                 asNever({ id: 1 }),
             );
-            await stockService.issueRequest(99, 9);
+            await stockService.issueRequest(99, commandActor(9));
 
             expect(prismaMock.stockItemVariant.updateMany).toHaveBeenNthCalledWith(
                 1,
@@ -246,6 +265,29 @@ describe("Stock Service Mutations", () => {
                     data: expect.objectContaining({
                         status: "ISSUED",
                         issuedById: 9,
+                    }),
+                }),
+            );
+            expect(prismaMock.auditLog.create).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    data: expect.objectContaining({
+                        action: "STOCK_REQUEST_ISSUE",
+                        entityId: 99,
+                    }),
+                }),
+            );
+            expect(prismaMock.notification.create).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    data: expect.objectContaining({
+                        userId: 3,
+                        type: "STOCK_ISSUED",
+                    }),
+                }),
+            );
+            expect(prismaMock.notificationOutbox.create).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    data: expect.objectContaining({
+                        type: "STOCK_LOW_LINE",
                     }),
                 }),
             );
@@ -280,7 +322,7 @@ describe("Stock Service Mutations", () => {
             const result = await stockService.adjustStock(
                 10,
                 { type: "IN", quantity: 3, minStock: 5, variantId: 102 },
-                9,
+                commandActor(9),
             );
 
             expect(prismaMock.stockItemVariant.updateMany).toHaveBeenCalledWith({
@@ -333,7 +375,7 @@ describe("Stock Service Mutations", () => {
                 stockService.adjustStock(
                     10,
                     { type: "IN", quantity: 3, minStock: 5 },
-                    9,
+                    commandActor(9),
                 ),
             ).rejects.toThrow("กรุณาเลือกรายการย่อยของวัสดุ");
             expect(prismaMock.stockItemVariant.updateMany).not.toHaveBeenCalled();
@@ -341,21 +383,52 @@ describe("Stock Service Mutations", () => {
     });
 
     describe("createRequest", () => {
-        it("should accept matching item and variant ids", async () => {
+        it("should persist request, audit, in-app notification, and outbox atomically", async () => {
+            prismaMock.user.findMany.mockResolvedValue(asNever([{ id: 1 }]));
             prismaMock.stockItemVariant.findMany
                 .mockResolvedValueOnce(asNever([{ id: 501, stockItemId: 50, isActive: true, stockItem: { isActive: true } }]))
                 .mockResolvedValueOnce(asNever([{ id: 501, quantity: 10, unit: "ชิ้น", stockItem: { name: "จอภาพ" } }]));
-            prismaMock.stockRequest.create.mockResolvedValue(asNever({ id: 1 }));
+            prismaMock.stockRequest.create.mockResolvedValue(asNever({
+                id: 1,
+                projectCode: "PRJ-MATCH",
+                note: null,
+                createdAt: new Date("2026-01-01T00:00:00.000Z"),
+                requester: { name: "ผู้ใช้ 7", email: "user-7@example.com" },
+                items: [],
+            }));
 
             await stockService.createRequest({
                 projectCode: "PRJ-MATCH",
                 items: [{ itemId: 50, variantId: 501, quantity: 1 }],
-            }, 7);
+            }, commandActor(7));
 
             expect(prismaMock.stockRequest.create).toHaveBeenCalledWith(
                 expect.objectContaining({
                     data: expect.objectContaining({
                         items: { create: [{ itemId: 50, variantId: 501, quantity: 1 }] },
+                    }),
+                }),
+            );
+            expect(prismaMock.auditLog.create).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    data: expect.objectContaining({
+                        action: "STOCK_REQUEST_CREATE",
+                        entityId: 1,
+                    }),
+                }),
+            );
+            expect(prismaMock.notification.create).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    data: expect.objectContaining({
+                        userId: 1,
+                        type: "STOCK_REQUEST_NEW",
+                    }),
+                }),
+            );
+            expect(prismaMock.notificationOutbox.create).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    data: expect.objectContaining({
+                        type: "STOCK_REQUEST_LINE",
                     }),
                 }),
             );
@@ -369,7 +442,7 @@ describe("Stock Service Mutations", () => {
             await expect(stockService.createRequest({
                 projectCode: "PRJ-MISMATCH",
                 items: [{ itemId: 50, variantId: 501, quantity: 1 }],
-            }, 7)).rejects.toThrow("รายการย่อยไม่ตรงกับวัสดุที่เลือก");
+            }, commandActor(7))).rejects.toThrow("รายการย่อยไม่ตรงกับวัสดุที่เลือก");
 
             expect(prismaMock.stockRequest.create).not.toHaveBeenCalled();
         });
@@ -380,7 +453,7 @@ describe("Stock Service Mutations", () => {
             await expect(stockService.createRequest({
                 projectCode: "PRJ-MISSING",
                 items: [{ itemId: 50, variantId: 999, quantity: 1 }],
-            }, 7)).rejects.toThrow("ไม่พบรายการย่อยที่พร้อมใช้งาน");
+            }, commandActor(7))).rejects.toThrow("ไม่พบรายการย่อยที่พร้อมใช้งาน");
 
             expect(prismaMock.stockRequest.create).not.toHaveBeenCalled();
         });
@@ -393,7 +466,7 @@ describe("Stock Service Mutations", () => {
             await expect(stockService.createRequest({
                 projectCode: "PRJ-INACTIVE-VARIANT",
                 items: [{ itemId: 50, variantId: 501, quantity: 1 }],
-            }, 7)).rejects.toThrow("ไม่พบรายการย่อยที่พร้อมใช้งาน");
+            }, commandActor(7))).rejects.toThrow("ไม่พบรายการย่อยที่พร้อมใช้งาน");
 
             expect(prismaMock.stockRequest.create).not.toHaveBeenCalled();
         });
@@ -406,7 +479,7 @@ describe("Stock Service Mutations", () => {
             await expect(stockService.createRequest({
                 projectCode: "PRJ-INACTIVE-ITEM",
                 items: [{ itemId: 50, variantId: 501, quantity: 1 }],
-            }, 7)).rejects.toThrow("ไม่พบรายการย่อยที่พร้อมใช้งาน");
+            }, commandActor(7))).rejects.toThrow("ไม่พบรายการย่อยที่พร้อมใช้งาน");
 
             expect(prismaMock.stockRequest.create).not.toHaveBeenCalled();
         });
@@ -425,12 +498,19 @@ describe("Stock Service Mutations", () => {
             prismaMock.stockItemVariant.findMany.mockResolvedValueOnce(
                 asNever([{ id: 501, quantity: 10, unit: "ชิ้น", stockItem: { name: "จอภาพ" } }]),
             );
-            prismaMock.stockRequest.create.mockResolvedValue(asNever({ id: 1 }));
+            prismaMock.stockRequest.create.mockResolvedValue(asNever({
+                id: 1,
+                projectCode: "PRJ-DEFAULT",
+                note: null,
+                createdAt: new Date("2026-01-01T00:00:00.000Z"),
+                requester: { name: "ผู้ใช้ 7", email: "user-7@example.com" },
+                items: [],
+            }));
 
             await stockService.createRequest({
                 projectCode: "PRJ-DEFAULT",
                 items: [{ itemId: 50, quantity: 1 }],
-            }, 7);
+            }, commandActor(7));
 
             expect(prismaMock.stockRequest.create).toHaveBeenCalledWith(
                 expect.objectContaining({
@@ -473,7 +553,7 @@ describe("Stock Service Mutations", () => {
                         projectCode: "PRJ-2569/01",
                         items: [{ variantId: 301, quantity: 3 }],
                     },
-                    7,
+                    commandActor(7),
                 ),
             ).rejects.toThrow("มีไม่เพียงพอสำหรับเบิก");
 
@@ -506,7 +586,15 @@ describe("Stock Service Mutations", () => {
                 ]),
             );
             prismaMock.stockRequest.create.mockResolvedValue(
-                asNever({ id: 123, status: "PENDING_ISSUE" }),
+                asNever({
+                    id: 123,
+                    status: "PENDING_ISSUE",
+                    projectCode: "PRJ-2569/02",
+                    note: "ทดสอบเบิก",
+                    createdAt: new Date("2026-01-01T00:00:00.000Z"),
+                    requester: { name: "ผู้ใช้ 9", email: "user-9@example.com" },
+                    items: [],
+                }),
             );
 
             await stockService.createRequest(
@@ -515,7 +603,7 @@ describe("Stock Service Mutations", () => {
                     items: [{ variantId: 401, quantity: 3 }],
                     note: "ทดสอบเบิก",
                 },
-                9,
+                commandActor(9),
             );
 
             expect(prismaMock.stockRequest.create).toHaveBeenCalledWith(
@@ -543,7 +631,7 @@ describe("Stock Service Mutations", () => {
             );
 
             await expect(
-                stockService.cancelRequest(55, 3, "ผู้เบิกไม่มารับ"),
+                stockService.cancelRequest(55, commandActor(3), "ผู้เบิกไม่มารับ"),
             ).rejects.toThrow("คำขอนี้ถูกดำเนินการแล้ว");
 
             expect(prismaMock.stockRequest.updateMany).toHaveBeenCalledWith(
@@ -565,7 +653,7 @@ describe("Stock Service Mutations", () => {
                 asNever({ status: "PENDING_ISSUE", requestedBy: 3 }),
             );
 
-            await stockService.cancelRequest(55, 3, "ผู้เบิกไม่มารับ");
+            await stockService.cancelRequest(55, commandActor(3), "ผู้เบิกไม่มารับ");
 
             expect(prismaMock.stockRequest.updateMany).toHaveBeenCalledWith(
                 expect.objectContaining({
@@ -577,6 +665,22 @@ describe("Stock Service Mutations", () => {
                     }),
                 }),
             );
+            expect(prismaMock.auditLog.create).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    data: expect.objectContaining({
+                        action: "STOCK_REQUEST_CANCEL",
+                        entityId: 55,
+                    }),
+                }),
+            );
+            expect(prismaMock.notification.create).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    data: expect.objectContaining({
+                        userId: 3,
+                        type: "STOCK_CANCELLED",
+                    }),
+                }),
+            );
         });
 
         it("should reject when non-admin tries to cancel another user's request", async () => {
@@ -585,7 +689,7 @@ describe("Stock Service Mutations", () => {
             );
 
             await expect(
-                stockService.cancelRequest(55, 3, null, { isAdmin: false }),
+                stockService.cancelRequest(55, commandActor(3), null, { isAdmin: false }),
             ).rejects.toThrow("ไม่มีสิทธิ์ยกเลิกคำขอนี้");
             expect(prismaMock.stockRequest.update).not.toHaveBeenCalled();
         });

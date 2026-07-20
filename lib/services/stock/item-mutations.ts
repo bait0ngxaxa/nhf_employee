@@ -1,5 +1,7 @@
 import { type StockTxType } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
+import { createStockCommandAudit } from "./command-audit";
+import { persistLowStockNotifications } from "./notifications";
 import type {
     AdjustStockInput,
     CreateCategoryInput,
@@ -19,6 +21,7 @@ import type {
     AdjustStockResult,
     CreateStockItemInput,
     LowStockAlertCandidate,
+    StockCommandActor,
 } from "./types";
 
 function buildLowStockAlert(
@@ -259,7 +262,7 @@ export async function updateItem(id: number, data: UpdateItemInput, userId: numb
 export async function adjustStock(
     itemId: number,
     input: AdjustStockInput,
-    userId: number,
+    actor: StockCommandActor,
 ): Promise<AdjustStockResult> {
     return prisma.$transaction(async (tx) => {
         const item = await tx.stockItem.findUnique({
@@ -281,6 +284,33 @@ export async function adjustStock(
         }
 
         const variant = await findAdjustmentVariant(tx, item, input.variantId);
-        return applyStockAdjustment(tx, item, variant, input, userId);
+        const adjustment = await applyStockAdjustment(
+            tx,
+            item,
+            variant,
+            input,
+            actor.id,
+        );
+        await createStockCommandAudit(
+            tx,
+            "STOCK_ADJUST",
+            itemId,
+            actor,
+            {
+                after: {
+                    name: adjustment.itemName,
+                    sku: adjustment.sku,
+                    type: input.type,
+                    quantity: input.quantity,
+                    previousQty: adjustment.previousQty,
+                    newQty: adjustment.newQty,
+                    previousMinStock: adjustment.previousMinStock,
+                    newMinStock: adjustment.newMinStock,
+                },
+            },
+        );
+        await persistLowStockNotifications(adjustment.lowStockAlerts, tx);
+
+        return adjustment;
     });
 }

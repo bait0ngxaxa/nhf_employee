@@ -19,6 +19,12 @@ export type CancelRequestOptions = {
     isAdmin: boolean;
 };
 
+export type StockCommandActor = {
+    id: number;
+    email: string;
+    name: string;
+};
+
 export type PendingRequestItemRecord = {
     itemId: number;
     variantId: number | null;

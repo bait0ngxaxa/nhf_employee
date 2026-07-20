@@ -1,10 +1,9 @@
-import { type NextRequest, NextResponse } from "next/server";
+import { after, type NextRequest, NextResponse } from "next/server";
 import { requireAdminSession } from "@/lib/auth/api";
 import { jsonError, serverError } from "@/lib/ssot/http";
 import { stockService } from "@/lib/services/stock";
-import { logStockEvent } from "@/lib/server/audit";
-import { notifyStockRequestResult } from "@/lib/services/stock/notifications";
 import { stockReviewActionSchema } from "@/lib/validations/stock";
+import { processOutbox } from "@/lib/services/outbox/processor";
 
 interface RouteParams {
     params: Promise<{ id: string }>;
@@ -32,24 +31,17 @@ export async function POST(
         const { action } = parsed.data;
 
         if (action === "approve" || action === "issue") {
-            const issuedResult = await stockService.issueRequest(requestId, auth.user.id);
-            const updatedRequest = issuedResult.request;
-            await logStockEvent("STOCK_REQUEST_ISSUE", requestId, auth.user.id, auth.user.email);
-            try {
-                await notifyStockRequestResult(
-                    requestId,
-                    updatedRequest.requestedBy,
-                    true,
+            const issuedResult = await stockService.issueRequest(requestId, {
+                id: auth.user.id,
+                email: auth.user.email,
+                name: auth.user.name ?? auth.user.email,
+            });
+            after(() => {
+                processOutbox().catch((error) =>
+                    console.error("Outbox processor failed:", error),
                 );
-            } catch (notificationError) {
-                console.error("Error sending stock issued notification:", {
-                    requestId,
-                    issuerId: auth.user.id,
-                    requesterId: updatedRequest.requestedBy,
-                    error: notificationError,
-                });
-            }
-            return NextResponse.json({ request: updatedRequest });
+            });
+            return NextResponse.json({ request: issuedResult.request });
         }
 
         if (action !== "reject" && action !== "cancel") {
@@ -60,27 +52,14 @@ export async function POST(
             parsed.data.cancelReason ?? parsed.data.rejectReason ?? null;
         const updated = await stockService.cancelRequest(
             requestId,
-            auth.user.id,
+            {
+                id: auth.user.id,
+                email: auth.user.email,
+                name: auth.user.name ?? auth.user.email,
+            },
             cancelReason,
+            { isAdmin: true },
         );
-        await logStockEvent("STOCK_REQUEST_CANCEL", requestId, auth.user.id, auth.user.email, {
-            metadata: { reason: cancelReason },
-        });
-        try {
-            await notifyStockRequestResult(
-                requestId,
-                updated.requestedBy,
-                false,
-                cancelReason,
-            );
-        } catch (notificationError) {
-            console.error("Error sending stock cancellation notification:", {
-                requestId,
-                cancellerId: auth.user.id,
-                requesterId: updated.requestedBy,
-                error: notificationError,
-            });
-        }
         return NextResponse.json({ request: updated });
     } catch (error) {
         const message = error instanceof Error ? error.message : "";

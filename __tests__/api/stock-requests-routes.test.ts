@@ -9,14 +9,6 @@ import { buildUserContext } from "@/lib/auth/context";
 import { isAdminRole } from "@/lib/ssot/permissions";
 import { stockService } from "@/lib/services/stock";
 import { processOutbox } from "@/lib/services/outbox/processor";
-import { logStockEvent } from "@/lib/server/audit";
-import {
-    enqueueLineLowStockReached,
-    enqueueLineNewStockRequest,
-    notifyAdminsNewStockRequest,
-    notifyAdminsStockRequestCancelledByRequester,
-    notifyStockRequestResult,
-} from "@/lib/services/stock/notifications";
 
 vi.mock("next/server", async (importOriginal) => {
     const actual = await importOriginal<typeof NextServerModule>();
@@ -51,18 +43,6 @@ vi.mock("@/lib/services/stock", () => ({
 
 vi.mock("@/lib/services/outbox/processor", () => ({
     processOutbox: vi.fn(),
-}));
-
-vi.mock("@/lib/server/audit", () => ({
-    logStockEvent: vi.fn(),
-}));
-
-vi.mock("@/lib/services/stock/notifications", () => ({
-    notifyAdminsNewStockRequest: vi.fn(),
-    enqueueLineNewStockRequest: vi.fn(),
-    notifyStockRequestResult: vi.fn(),
-    enqueueLineLowStockReached: vi.fn(),
-    notifyAdminsStockRequestCancelledByRequester: vi.fn(),
 }));
 
 describe("Stock Request Routes", () => {
@@ -147,7 +127,7 @@ describe("Stock Request Routes", () => {
             expect(stockService.createRequest).not.toHaveBeenCalled();
         });
 
-        it("should create request and enqueue line notification", async () => {
+        it("should create request and only wake the outbox processor", async () => {
             vi.mocked(getApiAuthSession).mockResolvedValue({
                 user: { id: "3", email: "user@test.com", name: "User", role: "USER" },
             } as never);
@@ -176,22 +156,13 @@ describe("Stock Request Routes", () => {
                 expect.objectContaining({
                     projectCode: "PRJ-2569/01",
                 }),
-                3,
+                {
+                    id: 3,
+                    email: "user@test.com",
+                    name: "User",
+                },
             );
-            expect(notifyAdminsNewStockRequest).toHaveBeenCalledWith(
-                7001,
-                "User",
-                "PRJ-2569/01",
-            );
-            expect(enqueueLineNewStockRequest).toHaveBeenCalledTimes(1);
             expect(processOutbox).toHaveBeenCalledTimes(1);
-            expect(logStockEvent).toHaveBeenCalledWith(
-                "STOCK_REQUEST_CREATE",
-                7001,
-                3,
-                "user@test.com",
-                expect.any(Object),
-            );
         });
     });
 
@@ -223,7 +194,7 @@ describe("Stock Request Routes", () => {
             expect(stockService.issueRequest).not.toHaveBeenCalled();
         });
 
-        it("should issue request and enqueue low-stock line notification", async () => {
+        it("should issue request and only wake the outbox processor", async () => {
             vi.mocked(getApiAuthSession).mockResolvedValue({
                 user: { id: "1", email: "admin@test.com", role: "ADMIN" },
             } as never);
@@ -260,9 +231,11 @@ describe("Stock Request Routes", () => {
             });
 
             expect(response.status).toBe(200);
-            expect(stockService.issueRequest).toHaveBeenCalledWith(77, 1);
-            expect(notifyStockRequestResult).toHaveBeenCalledWith(77, 3, true);
-            expect(enqueueLineLowStockReached).toHaveBeenCalledTimes(1);
+            expect(stockService.issueRequest).toHaveBeenCalledWith(77, {
+                id: 1,
+                email: "admin@test.com",
+                name: "Admin",
+            });
             expect(processOutbox).toHaveBeenCalledTimes(1);
         });
     });
@@ -298,19 +271,13 @@ describe("Stock Request Routes", () => {
             expect(response.status).toBe(200);
             expect(stockService.cancelRequest).toHaveBeenCalledWith(
                 55,
-                5,
+                {
+                    id: 5,
+                    email: "user@test.com",
+                    name: "Somchai",
+                },
                 "ทดสอบยกเลิก",
                 { isAdmin: false },
-            );
-            expect(notifyStockRequestResult).toHaveBeenCalledWith(
-                55,
-                3,
-                false,
-                "ทดสอบยกเลิก",
-            );
-            expect(notifyAdminsStockRequestCancelledByRequester).toHaveBeenCalledWith(
-                55,
-                "Somchai",
             );
         });
     });

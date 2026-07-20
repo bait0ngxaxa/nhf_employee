@@ -4,11 +4,6 @@ import { isAdminRole } from "@/lib/ssot/permissions";
 import { jsonError, serverError } from "@/lib/ssot/http";
 import { stockService } from "@/lib/services/stock";
 import { cancelRequestSchema } from "@/lib/validations/stock";
-import { logStockEvent } from "@/lib/server/audit";
-import {
-    notifyAdminsStockRequestCancelledByRequester,
-    notifyStockRequestResult,
-} from "@/lib/services/stock/notifications";
 
 interface RouteParams {
     params: Promise<{ id: string }>;
@@ -41,35 +36,14 @@ export async function POST(
 
         const updated = await stockService.cancelRequest(
             requestId,
-            user.id,
+            {
+                id: user.id,
+                email: user.email,
+                name: user.name ?? user.email,
+            },
             parsed.data.cancelReason,
             { isAdmin },
         );
-        await logStockEvent("STOCK_REQUEST_CANCEL", requestId, user.id, user.email, {
-            metadata: { reason: parsed.data.cancelReason },
-        });
-
-        try {
-            await notifyStockRequestResult(
-                requestId,
-                updated.requestedBy,
-                false,
-                parsed.data.cancelReason,
-            );
-            if (!isAdmin) {
-                await notifyAdminsStockRequestCancelledByRequester(
-                    requestId,
-                    user.name ?? user.email,
-                );
-            }
-        } catch (notificationError) {
-            console.error("Error sending stock cancellation notification:", {
-                requestId,
-                cancellerId: user.id,
-                requesterId: updated.requestedBy,
-                error: notificationError,
-            });
-        }
 
         return NextResponse.json({ request: updated });
     } catch (error) {
