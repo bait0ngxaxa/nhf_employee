@@ -19,10 +19,8 @@ import {
     getLeaveTypeLabel,
 } from "@/lib/services/leave/notification-format";
 import { processOutbox } from "@/lib/services/outbox/processor";
-import {
-    lockLeaveRequestRow,
-    runSerializableTransaction,
-} from "@/lib/services/leave/transaction";
+import { runSerializableTransaction } from "@/lib/db/transaction";
+import { lockLeaveRequestRow } from "@/lib/services/leave/transaction";
 import { jsonError, notFound } from "@/lib/ssot/http";
 import { FEATURE_KEYS, isFeatureEnabled } from "@/lib/ssot/features";
 import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";

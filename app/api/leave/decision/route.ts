@@ -4,7 +4,7 @@ import { after, NextResponse } from "next/server";
 
 import { logLeaveEvent } from "@/lib/server/audit";
 import { processOutbox } from "@/lib/services/outbox/processor";
-import { runSerializableTransaction } from "@/lib/services/leave/transaction";
+import { runSerializableTransaction } from "@/lib/db/transaction";
 import {
     isActiveEmployeeInTransaction,
     requireActiveEmployeeSession,

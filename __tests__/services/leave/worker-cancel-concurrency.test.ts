@@ -3,7 +3,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { emailService } from "@/lib/email";
 import { prisma } from "@/lib/db/prisma";
 import { dispatchCurrentLeaveAction } from "@/lib/services/leave/current-action-recipient";
-import { lockLeaveRequestRow, runSerializableTransaction } from "@/lib/services/leave/transaction";
+import { runSerializableTransaction } from "@/lib/db/transaction";
+import { lockLeaveRequestRow } from "@/lib/services/leave/transaction";
 import type { LeaveActionPayload } from "@/lib/services/leave/notification-payloads";
 
 vi.mock("@/lib/db/prisma", () => ({

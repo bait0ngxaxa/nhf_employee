@@ -1,7 +1,5 @@
 import { Prisma } from "@prisma/client";
 
-export { runSerializableTransaction } from "@/lib/db/transaction";
-
 export async function lockEmployeeRows(
     tx: Prisma.TransactionClient,
     employeeIds: readonly number[],

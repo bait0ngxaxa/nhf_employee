@@ -23,7 +23,7 @@ import {
 import { getLeaveYearFromDateValue } from "@/lib/services/leave/quota-year";
 import { isAfterLeaveEnd } from "@/lib/services/leave/utils";
 import { processOutbox } from "@/lib/services/outbox/processor";
-import { runSerializableTransaction } from "@/lib/services/leave/transaction";
+import { runSerializableTransaction } from "@/lib/db/transaction";
 import { jsonError, notFound } from "@/lib/ssot/http";
 import { FEATURE_KEYS, isFeatureEnabled } from "@/lib/ssot/features";
 import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";

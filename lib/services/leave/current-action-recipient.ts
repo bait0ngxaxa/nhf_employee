@@ -14,10 +14,8 @@ import {
     ACTIVE_LEAVE_APPROVER_USER_SELECT,
     isActiveLeaveApprover,
 } from "@/lib/services/leave/approver-eligibility";
-import {
-    lockLeaveRequestRow,
-    runSerializableTransaction,
-} from "@/lib/services/leave/transaction";
+import { runSerializableTransaction } from "@/lib/db/transaction";
+import { lockLeaveRequestRow } from "@/lib/services/leave/transaction";
 
 export async function resolveCurrentLeaveAction(
     tx: Prisma.TransactionClient,

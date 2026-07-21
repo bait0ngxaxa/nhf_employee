@@ -15,6 +15,20 @@ export function hasPrismaErrorCode(error: unknown, code: string): boolean {
     );
 }
 
+export function isRetryableTransactionError(error: unknown): boolean {
+    return hasPrismaErrorCode(error, "P2034");
+}
+
+function getRetryDelayMs(attempt: number): number {
+    const exponentialDelayMs = Math.min(
+        RETRY_MAX_DELAY_MS,
+        RETRY_BASE_DELAY_MS * 2 ** attempt,
+    );
+    const jitterLimitMs = Math.floor(exponentialDelayMs * 0.2);
+    const jitterMs = Math.round(Math.random() * jitterLimitMs);
+    return Math.min(RETRY_MAX_DELAY_MS, exponentialDelayMs + jitterMs);
+}
+
 function waitForRetry(delayMs: number): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, delayMs));
 }
@@ -29,15 +43,11 @@ export async function runSerializableTransaction<T>(
             });
         } catch (error) {
             const isFinalAttempt = attempt === MAX_TRANSACTION_RETRIES - 1;
-            if (!hasPrismaErrorCode(error, "P2034") || isFinalAttempt) {
+            if (!isRetryableTransactionError(error) || isFinalAttempt) {
                 throw error;
             }
 
-            const delayMs = Math.min(
-                RETRY_MAX_DELAY_MS,
-                RETRY_BASE_DELAY_MS * 2 ** attempt,
-            );
-            await waitForRetry(delayMs);
+            await waitForRetry(getRetryDelayMs(attempt));
         }
     }
 

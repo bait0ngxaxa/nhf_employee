@@ -6,7 +6,7 @@ import {
 } from "@/lib/services/leave/active-employee-session";
 import { assignLeaveApprovers } from "@/lib/services/leave/approver-assignment";
 import { buildLeaveActionDeliveryIdentity } from "@/lib/services/leave/notification-payloads";
-import { runSerializableTransaction } from "@/lib/services/leave/transaction";
+import { runSerializableTransaction } from "@/lib/db/transaction";
 
 vi.mock("@/lib/db/prisma", () => ({
     prisma: {

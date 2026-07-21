@@ -4,7 +4,8 @@ import {
     ACTIVE_LEAVE_APPROVER_USER_SELECT,
     isActiveLeaveApprover,
 } from "@/lib/services/leave/approver-eligibility";
-import { lockEmployeeRows, runSerializableTransaction } from "@/lib/services/leave/transaction";
+import { runSerializableTransaction } from "@/lib/db/transaction";
+import { lockEmployeeRows } from "@/lib/services/leave/transaction";
 
 export type ApproverAssignment = {
     employeeId: number;
