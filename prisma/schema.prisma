@@ -558,8 +558,10 @@ model StockTransaction {
 
 model StockRequest {
   id            Int                @id @default(autoincrement())
-  requestedBy   Int
-  projectCode   String             @db.VarChar(100)
+  requestedBy    Int
+  idempotencyKey String             @db.VarChar(255)
+  requestHash    String             @db.Char(64)
+  projectCode    String             @db.VarChar(100)
   status        StockRequestStatus @default(PENDING_ISSUE)
   note          String?            @db.Text
   issuedById    Int?               @map("reviewedBy")
@@ -574,6 +576,7 @@ model StockRequest {
   canceller     User?              @relation("StockCanceller", fields: [cancelledById], references: [id])
   items         StockRequestItem[]
 
+  @@unique([requestedBy, idempotencyKey])
   @@index([requestedBy])
   @@index([projectCode])
   @@index([status])

@@ -263,7 +263,7 @@ export function buildRequestInclude() {
                 },
             },
         },
-    };
+    } as const;
 }
 
 export function normalizeRequestItems(

@@ -3,9 +3,14 @@ import { requireApiSession } from "@/lib/auth/api";
 import { isAdminRole } from "@/lib/ssot/permissions";
 import { jsonError, serverError } from "@/lib/ssot/http";
 import { stockService } from "@/lib/services/stock";
+import {
+    omitStockRequestIdempotency,
+    StockRequestIdempotencyConflictError,
+} from "@/lib/services/stock/request-idempotency";
 import { processOutbox } from "@/lib/services/outbox/processor";
 import {
     createRequestSchema,
+    idempotencyKeySchema,
     stockRequestsFilterSchema,
 } from "@/lib/validations/stock";
 
@@ -48,11 +53,6 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
     try {
-        const auth = await requireApiSession();
-        if (!auth.ok) return auth.response;
-
-        const { user } = auth;
-
         const body = await request.json();
         const result = createRequestSchema.safeParse(body);
         if (!result.success) {
@@ -61,20 +61,44 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
             });
         }
 
-        const stockRequest = await stockService.createRequest(result.data, {
-            id: user.id,
-            email: user.email,
-            name: user.name ?? user.email,
-        });
+        const parsedIdempotencyKey = idempotencyKeySchema.safeParse(
+            request.headers.get("Idempotency-Key"),
+        );
+        if (!parsedIdempotencyKey.success) {
+            return jsonError("กรุณาระบุ Idempotency-Key ที่ถูกต้อง", 400);
+        }
 
-        after(() => {
-            processOutbox().catch((error) =>
-                console.error("Outbox processor failed:", error),
-            );
-        });
+        const auth = await requireApiSession();
+        if (!auth.ok) return auth.response;
 
-        return NextResponse.json({ request: stockRequest }, { status: 201 });
+        const { user } = auth;
+
+        const creation = await stockService.createRequest(
+            result.data,
+            {
+                id: user.id,
+                email: user.email,
+                name: user.name ?? user.email,
+            },
+            { idempotencyKey: parsedIdempotencyKey.data },
+        );
+
+        if (!creation.replayed) {
+            after(() => {
+                processOutbox().catch((error) =>
+                    console.error("Outbox processor failed:", error),
+                );
+            });
+        }
+
+        return NextResponse.json(
+            { request: omitStockRequestIdempotency(creation.request) },
+            { status: creation.replayed ? 200 : 201 },
+        );
     } catch (error) {
+        if (error instanceof StockRequestIdempotencyConflictError) {
+            return jsonError(error.message, 409);
+        }
         const message = error instanceof Error ? error.message : "";
         if (
             message.includes("กรุณาเลือก") ||

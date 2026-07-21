@@ -8,6 +8,7 @@ import { getApiAuthSession } from "@/lib/auth/server";
 import { buildUserContext } from "@/lib/auth/context";
 import { isAdminRole } from "@/lib/ssot/permissions";
 import { stockService } from "@/lib/services/stock";
+import { StockRequestIdempotencyConflictError } from "@/lib/services/stock/request-idempotency";
 import { processOutbox } from "@/lib/services/outbox/processor";
 
 vi.mock("next/server", async (importOriginal) => {
@@ -138,12 +139,16 @@ describe("Stock Request Routes", () => {
                 name: "User",
             });
             vi.mocked(stockService.createRequest).mockResolvedValue({
-                id: 7001,
-                projectCode: "PRJ-2569/01",
+                request: {
+                    id: 7001,
+                    projectCode: "PRJ-2569/01",
+                },
+                replayed: false,
             } as never);
 
             const request = new NextRequest("http://localhost/api/stock/requests", {
                 method: "POST",
+                headers: { "Idempotency-Key": "stock-request-7001" },
                 body: JSON.stringify({
                     projectCode: "prj-2569/01",
                     items: [{ itemId: 10, quantity: 1 }],
@@ -161,8 +166,100 @@ describe("Stock Request Routes", () => {
                     email: "user@test.com",
                     name: "User",
                 },
+                { idempotencyKey: "stock-request-7001" },
             );
             expect(processOutbox).toHaveBeenCalledTimes(1);
+        });
+
+        it("should require an Idempotency-Key for a valid payload", async () => {
+            vi.mocked(getApiAuthSession).mockResolvedValue({
+                user: { id: "3", email: "user@test.com", role: "USER" },
+            } as never);
+            vi.mocked(buildUserContext).mockReturnValue({
+                id: 3,
+                email: "user@test.com",
+                role: "USER",
+                name: "User",
+            });
+
+            const request = new NextRequest("http://localhost/api/stock/requests", {
+                method: "POST",
+                body: JSON.stringify({
+                    projectCode: "PRJ-2569/01",
+                    items: [{ itemId: 10, quantity: 1 }],
+                }),
+            });
+            const response = await postRequestsRoute(request);
+
+            expect(response.status).toBe(400);
+            expect(stockService.createRequest).not.toHaveBeenCalled();
+        });
+
+        it("should return the original request without waking the outbox on replay", async () => {
+            vi.mocked(getApiAuthSession).mockResolvedValue({
+                user: { id: "3", email: "user@test.com", role: "USER" },
+            } as never);
+            vi.mocked(buildUserContext).mockReturnValue({
+                id: 3,
+                email: "user@test.com",
+                role: "USER",
+                name: "User",
+            });
+            vi.mocked(stockService.createRequest).mockResolvedValue({
+                request: {
+                    id: 7001,
+                    projectCode: "PRJ-2569/01",
+                    idempotencyKey: "stock-request-7001",
+                    requestHash: "payload-hash",
+                },
+                replayed: true,
+            } as never);
+
+            const response = await postRequestsRoute(
+                new NextRequest("http://localhost/api/stock/requests", {
+                    method: "POST",
+                    headers: { "Idempotency-Key": "stock-request-7001" },
+                    body: JSON.stringify({
+                        projectCode: "PRJ-2569/01",
+                        items: [{ itemId: 10, quantity: 1 }],
+                    }),
+                }),
+            );
+
+            expect(response.status).toBe(200);
+            expect(await response.json()).toEqual({
+                request: { id: 7001, projectCode: "PRJ-2569/01" },
+            });
+            expect(processOutbox).not.toHaveBeenCalled();
+        });
+
+        it("should return 409 when a key is reused with a different payload", async () => {
+            vi.mocked(getApiAuthSession).mockResolvedValue({
+                user: { id: "3", email: "user@test.com", role: "USER" },
+            } as never);
+            vi.mocked(buildUserContext).mockReturnValue({
+                id: 3,
+                email: "user@test.com",
+                role: "USER",
+                name: "User",
+            });
+            vi.mocked(stockService.createRequest).mockRejectedValue(
+                new StockRequestIdempotencyConflictError(),
+            );
+
+            const response = await postRequestsRoute(
+                new NextRequest("http://localhost/api/stock/requests", {
+                    method: "POST",
+                    headers: { "Idempotency-Key": "stock-request-7001" },
+                    body: JSON.stringify({
+                        projectCode: "DIFFERENT",
+                        items: [{ itemId: 10, quantity: 1 }],
+                    }),
+                }),
+            );
+
+            expect(response.status).toBe(409);
+            expect(processOutbox).not.toHaveBeenCalled();
         });
     });
 

@@ -26,6 +26,10 @@ function commandActor(id: number): {
     };
 }
 
+function requestOptions(): { idempotencyKey: string } {
+    return { idempotencyKey: "stock-request-test-key" };
+}
+
 describe("Stock Service Mutations", () => {
     beforeEach(() => {
         mockReset(prismaMock);
@@ -383,6 +387,115 @@ describe("Stock Service Mutations", () => {
     });
 
     describe("createRequest", () => {
+        const replayPayload = {
+            projectCode: "PRJ-REPLAY",
+            items: [{ itemId: 50, variantId: 501, quantity: 1 }],
+        };
+        const replayRequestHash =
+            "754a463c6c01837c67a1b6ee5d3d9b9e36d2f6ff0f8adc3ef38fe76e265e6e57";
+
+        it("should return the original request for the same key and payload", async () => {
+            prismaMock.stockRequest.findUnique.mockResolvedValue(asNever({
+                id: 91,
+                requestHash: replayRequestHash,
+                projectCode: "PRJ-REPLAY",
+                items: [],
+            }));
+
+            const result = await stockService.createRequest(
+                replayPayload,
+                commandActor(7),
+                requestOptions(),
+            );
+
+            expect(result).toEqual({
+                request: expect.objectContaining({ id: 91 }),
+                replayed: true,
+            });
+            expect(prismaMock.stockRequest.create).not.toHaveBeenCalled();
+            expect(prismaMock.auditLog.create).not.toHaveBeenCalled();
+            expect(prismaMock.notification.create).not.toHaveBeenCalled();
+            expect(prismaMock.notificationOutbox.create).not.toHaveBeenCalled();
+        });
+
+        it("should reject a reused key when its payload hash differs", async () => {
+            prismaMock.stockRequest.findUnique.mockResolvedValue(asNever({
+                id: 91,
+                requestHash: "different-request-hash",
+                projectCode: "PRJ-OLD",
+                items: [],
+            }));
+
+            await expect(
+                stockService.createRequest(
+                    replayPayload,
+                    commandActor(7),
+                    requestOptions(),
+                ),
+            ).rejects.toThrow("Idempotency-Key นี้ถูกใช้กับข้อมูลคำขออื่นแล้ว");
+
+            expect(prismaMock.stockRequest.create).not.toHaveBeenCalled();
+        });
+
+        it("should recover the winning request after a concurrent unique conflict", async () => {
+            const existingRequest = {
+                id: 91,
+                requestHash: replayRequestHash,
+                projectCode: "PRJ-REPLAY",
+                items: [],
+            };
+            prismaMock.stockRequest.findUnique
+                .mockResolvedValueOnce(null)
+                .mockResolvedValueOnce(asNever(existingRequest));
+            prismaMock.stockItemVariant.findMany
+                .mockResolvedValueOnce(asNever([{
+                    id: 501,
+                    stockItemId: 50,
+                    isActive: true,
+                    stockItem: { isActive: true },
+                }]))
+                .mockResolvedValueOnce(asNever([{
+                    id: 501,
+                    quantity: 10,
+                    unit: "ชิ้น",
+                    stockItem: { name: "จอภาพ" },
+                }]));
+            prismaMock.stockRequest.create.mockRejectedValue({ code: "P2002" });
+
+            const result = await stockService.createRequest(
+                replayPayload,
+                commandActor(7),
+                requestOptions(),
+            );
+
+            expect(result).toEqual({
+                request: existingRequest,
+                replayed: true,
+            });
+            expect(prismaMock.auditLog.create).not.toHaveBeenCalled();
+        });
+
+        it("should retry a serialization conflict and then replay the winner", async () => {
+            prismaMock.$transaction.mockRejectedValueOnce({ code: "P2034" });
+            prismaMock.stockRequest.findUnique.mockResolvedValue(asNever({
+                id: 92,
+                requestHash: replayRequestHash,
+                projectCode: "PRJ-REPLAY",
+                items: [],
+            }));
+
+            const result = await stockService.createRequest(
+                replayPayload,
+                commandActor(7),
+                requestOptions(),
+            );
+
+            expect(result.replayed).toBe(true);
+            expect(result.request.id).toBe(92);
+            expect(prismaMock.$transaction).toHaveBeenCalledTimes(2);
+            expect(prismaMock.stockRequest.create).not.toHaveBeenCalled();
+        });
+
         it("should persist request, audit, in-app notification, and outbox atomically", async () => {
             prismaMock.user.findMany.mockResolvedValue(asNever([{ id: 1 }]));
             prismaMock.stockItemVariant.findMany
@@ -400,7 +513,7 @@ describe("Stock Service Mutations", () => {
             await stockService.createRequest({
                 projectCode: "PRJ-MATCH",
                 items: [{ itemId: 50, variantId: 501, quantity: 1 }],
-            }, commandActor(7));
+            }, commandActor(7), requestOptions());
 
             expect(prismaMock.stockRequest.create).toHaveBeenCalledWith(
                 expect.objectContaining({
@@ -442,7 +555,7 @@ describe("Stock Service Mutations", () => {
             await expect(stockService.createRequest({
                 projectCode: "PRJ-MISMATCH",
                 items: [{ itemId: 50, variantId: 501, quantity: 1 }],
-            }, commandActor(7))).rejects.toThrow("รายการย่อยไม่ตรงกับวัสดุที่เลือก");
+            }, commandActor(7), requestOptions())).rejects.toThrow("รายการย่อยไม่ตรงกับวัสดุที่เลือก");
 
             expect(prismaMock.stockRequest.create).not.toHaveBeenCalled();
         });
@@ -453,7 +566,7 @@ describe("Stock Service Mutations", () => {
             await expect(stockService.createRequest({
                 projectCode: "PRJ-MISSING",
                 items: [{ itemId: 50, variantId: 999, quantity: 1 }],
-            }, commandActor(7))).rejects.toThrow("ไม่พบรายการย่อยที่พร้อมใช้งาน");
+            }, commandActor(7), requestOptions())).rejects.toThrow("ไม่พบรายการย่อยที่พร้อมใช้งาน");
 
             expect(prismaMock.stockRequest.create).not.toHaveBeenCalled();
         });
@@ -466,7 +579,7 @@ describe("Stock Service Mutations", () => {
             await expect(stockService.createRequest({
                 projectCode: "PRJ-INACTIVE-VARIANT",
                 items: [{ itemId: 50, variantId: 501, quantity: 1 }],
-            }, commandActor(7))).rejects.toThrow("ไม่พบรายการย่อยที่พร้อมใช้งาน");
+            }, commandActor(7), requestOptions())).rejects.toThrow("ไม่พบรายการย่อยที่พร้อมใช้งาน");
 
             expect(prismaMock.stockRequest.create).not.toHaveBeenCalled();
         });
@@ -479,7 +592,7 @@ describe("Stock Service Mutations", () => {
             await expect(stockService.createRequest({
                 projectCode: "PRJ-INACTIVE-ITEM",
                 items: [{ itemId: 50, variantId: 501, quantity: 1 }],
-            }, commandActor(7))).rejects.toThrow("ไม่พบรายการย่อยที่พร้อมใช้งาน");
+            }, commandActor(7), requestOptions())).rejects.toThrow("ไม่พบรายการย่อยที่พร้อมใช้งาน");
 
             expect(prismaMock.stockRequest.create).not.toHaveBeenCalled();
         });
@@ -510,7 +623,7 @@ describe("Stock Service Mutations", () => {
             await stockService.createRequest({
                 projectCode: "PRJ-DEFAULT",
                 items: [{ itemId: 50, quantity: 1 }],
-            }, commandActor(7));
+            }, commandActor(7), requestOptions());
 
             expect(prismaMock.stockRequest.create).toHaveBeenCalledWith(
                 expect.objectContaining({
@@ -554,6 +667,7 @@ describe("Stock Service Mutations", () => {
                         items: [{ variantId: 301, quantity: 3 }],
                     },
                     commandActor(7),
+                    requestOptions(),
                 ),
             ).rejects.toThrow("มีไม่เพียงพอสำหรับเบิก");
 
@@ -604,6 +718,7 @@ describe("Stock Service Mutations", () => {
                     note: "ทดสอบเบิก",
                 },
                 commandActor(9),
+                requestOptions(),
             );
 
             expect(prismaMock.stockRequest.create).toHaveBeenCalledWith(

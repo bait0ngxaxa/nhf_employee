@@ -1,9 +1,19 @@
-import { Prisma, StockRequestStatus } from "@prisma/client";
+import { StockRequestStatus, type Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
+import {
+    hasPrismaErrorCode,
+    runSerializableTransaction,
+} from "@/lib/db/transaction";
 import { createStockCommandAudit } from "./command-audit";
 import {
-    enqueueLineNewStockRequest,
-    notifyAdminsNewStockRequest,
+    createNewStockRequest,
+    type StockRequestWithDetails,
+} from "./request-creation";
+import {
+    assertMatchingRequestHash,
+    createStockRequestHash,
+} from "./request-idempotency";
+import {
     notifyAdminsStockRequestCancelledByRequester,
     notifyStockRequestResult,
     persistLowStockNotifications,
@@ -13,10 +23,7 @@ import type {
 } from "@/lib/validations/stock";
 import {
     buildRequestInclude,
-    buildReservedQuantityMaps,
     ensureDefaultVariantsByItemIds,
-    getAvailableQuantity,
-    normalizeRequestItems,
 } from "./shared";
 import type {
     CancelRequestOptions,
@@ -25,36 +32,14 @@ import type {
     StockCommandActor,
 } from "./types";
 
-type RequestedVariant = {
-    id: number;
-    stockItemId: number;
-    isActive: boolean;
-    stockItem: { isActive: boolean };
+export type CreateStockRequestResult = {
+    request: StockRequestWithDetails;
+    replayed: boolean;
 };
 
-function validateRequestedVariants(
-    items: CreateRequestInput["items"],
-    variants: RequestedVariant[],
-): Map<number, number> {
-    const variantById = new Map(variants.map((variant) => [variant.id, variant]));
-    const itemIdByVariantId = new Map<number, number>();
-
-    for (const item of items) {
-        if (item.variantId === undefined) continue;
-
-        const variant = variantById.get(item.variantId);
-        if (!variant || !variant.isActive || !variant.stockItem.isActive) {
-            throw new Error("ไม่พบรายการย่อยที่พร้อมใช้งาน");
-        }
-        if (item.itemId !== undefined && item.itemId !== variant.stockItemId) {
-            throw new Error("รายการย่อยไม่ตรงกับวัสดุที่เลือก");
-        }
-
-        itemIdByVariantId.set(variant.id, variant.stockItemId);
-    }
-
-    return itemIdByVariantId;
-}
+type CreateRequestOptions = {
+    idempotencyKey: string;
+};
 
 function buildLowStockAlerts(
     items: Array<{
@@ -95,152 +80,53 @@ function buildLowStockAlerts(
 export async function createRequest(
     data: CreateRequestInput,
     actor: StockCommandActor,
-) {
-    return prisma.$transaction(
-        async (tx) => {
-            const requestedVariantIds = data.items
-                .map((item) => item.variantId)
-                .filter((variantId): variantId is number => variantId !== undefined);
-            const requestedItemIds = data.items
-                .filter((item) => item.variantId === undefined)
-                .map((item) => item.itemId)
-                .filter((itemId): itemId is number => itemId !== undefined);
+    options: CreateRequestOptions,
+): Promise<CreateStockRequestResult> {
+    const requestHash = createStockRequestHash(data);
+    const idempotencyWhere = {
+        requestedBy_idempotencyKey: {
+            requestedBy: actor.id,
+            idempotencyKey: options.idempotencyKey,
+        },
+    };
 
-            const variants = requestedVariantIds.length
-                ? await tx.stockItemVariant.findMany({
-                      where: { id: { in: requestedVariantIds } },
-                      select: {
-                          id: true,
-                          stockItemId: true,
-                          isActive: true,
-                          stockItem: { select: { isActive: true } },
-                      },
-                  })
-                : [];
-            const itemIdByVariantId = validateRequestedVariants(data.items, variants);
-            const defaultVariantsByItemId = await ensureDefaultVariantsByItemIds(
-                tx,
-                requestedItemIds,
-            );
-            const normalizedItems = normalizeRequestItems(
-                data,
-                itemIdByVariantId,
-                defaultVariantsByItemId,
-            );
-            const requestedQtyByVariantId = new Map<
-                number,
-                { itemId: number; quantity: number }
-            >();
-
-            for (const item of normalizedItems) {
-                const existing = requestedQtyByVariantId.get(item.variantId);
-                requestedQtyByVariantId.set(item.variantId, {
-                    itemId: item.itemId,
-                    quantity: (existing?.quantity ?? 0) + item.quantity,
-                });
-            }
-
-            const variantIds = Array.from(requestedQtyByVariantId.keys());
-            const [requestedVariants, pendingRequestItems] = await Promise.all([
-                tx.stockItemVariant.findMany({
-                    where: {
-                        id: { in: variantIds },
-                        isActive: true,
-                        stockItem: { isActive: true },
-                    },
-                    select: {
-                        id: true,
-                        quantity: true,
-                        unit: true,
-                        stockItem: { select: { name: true } },
-                    },
-                }),
-                tx.stockRequestItem.findMany({
-                    where: {
-                        itemId: {
-                            in: Array.from(
-                                new Set(normalizedItems.map((item) => item.itemId)),
-                            ),
-                        },
-                        request: { status: StockRequestStatus.PENDING_ISSUE },
-                    },
-                    select: {
-                        itemId: true,
-                        variantId: true,
-                        quantity: true,
-                    },
-                }),
-            ]);
-            const defaultVariantIdByItemId = new Map(
-                Array.from(defaultVariantsByItemId.entries()).map(
-                    ([itemId, variant]) => [itemId, variant.id] as const,
-                ),
-            );
-            const { reservedByVariantId } = buildReservedQuantityMaps(
-                pendingRequestItems,
-                defaultVariantIdByItemId,
-            );
-            const requestedVariantById = new Map(
-                requestedVariants.map((variant) => [variant.id, variant]),
-            );
-
-            for (const [variantId, requestItem] of requestedQtyByVariantId) {
-                const variant = requestedVariantById.get(variantId);
-                if (!variant) {
-                    throw new Error("กรุณาเลือกรายการวัสดุ");
-                }
-
-                const reservedQuantity = reservedByVariantId.get(variantId) ?? 0;
-                const availableQuantity = getAvailableQuantity(
-                    variant.quantity,
-                    reservedQuantity,
-                );
-
-                if (availableQuantity < requestItem.quantity) {
-                    throw new Error(
-                        `${variant.stockItem.name} มีไม่เพียงพอสำหรับเบิก (พร้อมเบิก: ${availableQuantity} ${variant.unit})`,
-                    );
-                }
-            }
-
-            const stockRequest = await tx.stockRequest.create({
-                data: {
-                    requestedBy: actor.id,
-                    projectCode: data.projectCode,
-                    note: data.note ?? null,
-                    items: {
-                        create: normalizedItems,
-                    },
-                },
+    try {
+        return await runSerializableTransaction(async (tx) => {
+            const existingRequest = await tx.stockRequest.findUnique({
+                where: idempotencyWhere,
                 include: buildRequestInclude(),
             });
+            if (existingRequest) {
+                return {
+                    request: assertMatchingRequestHash(existingRequest, requestHash),
+                    replayed: true,
+                };
+            }
 
-            await createStockCommandAudit(
-                tx,
-                "STOCK_REQUEST_CREATE",
-                stockRequest.id,
-                actor,
-                {
-                    after: {
-                        itemCount: data.items.length,
-                        projectCode: data.projectCode,
-                    },
-                },
-            );
-            await notifyAdminsNewStockRequest(
-                stockRequest.id,
-                actor.name,
-                stockRequest.projectCode,
-                tx,
-            );
-            await enqueueLineNewStockRequest(stockRequest, tx);
+            const request = await createNewStockRequest(tx, data, actor, {
+                idempotencyKey: options.idempotencyKey,
+                requestHash,
+            });
+            return { request, replayed: false };
+        });
+    } catch (error) {
+        if (!hasPrismaErrorCode(error, "P2002")) {
+            throw error;
+        }
 
-            return stockRequest;
-        },
-        {
-            isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
-        },
-    );
+        const existingRequest = await prisma.stockRequest.findUnique({
+            where: idempotencyWhere,
+            include: buildRequestInclude(),
+        });
+        if (!existingRequest) {
+            throw error;
+        }
+
+        return {
+            request: assertMatchingRequestHash(existingRequest, requestHash),
+            replayed: true,
+        };
+    }
 }
 
 export async function issueRequest(

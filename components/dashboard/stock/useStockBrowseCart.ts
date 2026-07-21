@@ -16,12 +16,20 @@ import {
     getVariantAvailableQuantity,
 } from "./stockVariant.shared";
 import { normalizeStockProjectCode } from "./stockBrowseCart.shared";
+import {
+    buildStockRequestPayload,
+    createPayloadSignature,
+    parsePendingIdempotency,
+    type PendingRequestIdempotency,
+    useStockRequestIdempotency,
+} from "./stockRequestSubmission";
 
 const STOCK_BROWSE_CART_STORAGE_KEY_PREFIX = "stock:browse-cart:v1:user:";
 
 interface PersistedStockBrowseCartState {
     projectCode: string;
     cartItems: PersistedStockBrowseCartItem[];
+    pendingIdempotency?: PendingRequestIdempotency | null;
 }
 
 interface PersistedStockBrowseCartItem {
@@ -152,14 +160,18 @@ function parsePersistedStockBrowseCartState(
         const projectCode = typeof rawProjectCode === "string"
             ? normalizeStockProjectCode(rawProjectCode)
             : "";
+        const pendingIdempotency = parsePendingIdempotency(
+            typedParsed.pendingIdempotency,
+        );
 
         if (!Array.isArray(rawCartItems)) {
-            return { projectCode, cartItems: [] };
+            return { projectCode, cartItems: [], pendingIdempotency };
         }
 
         return {
             projectCode,
             cartItems: rawCartItems.filter(isPersistedBrowseCartItem),
+            pendingIdempotency,
         };
     } catch {
         return null;
@@ -245,11 +257,18 @@ export function useStockBrowseCart({
     const [submitting, setSubmitting] = useState(false);
     const [recentlyAddedItemId, setRecentlyAddedItemId] = useState<number | null>(null);
     const [hydratedStorageKey, setHydratedStorageKey] = useState<string | null>(null);
+    const {
+        clear: clearIdempotency,
+        getOrCreate: getOrCreateIdempotency,
+        reconcile: reconcileIdempotency,
+        restore: restoreIdempotency,
+    } = useStockRequestIdempotency();
 
     const storageKey = useMemo(() => buildStorageKey(userId), [userId]);
 
     useEffect(() => {
         if (!storageKey) {
+            restoreIdempotency(null);
             setCart(new Map());
             setProjectCode("");
             setHydratedStorageKey(null);
@@ -259,29 +278,40 @@ export function useStockBrowseCart({
         const persistedState = readPersistedCart(storageKey);
 
         if (persistedState) {
+            restoreIdempotency(persistedState.pendingIdempotency ?? null);
             setCart(hydratePersistedCart(persistedState));
             setProjectCode(persistedState.projectCode);
         } else {
+            restoreIdempotency(null);
             setCart(new Map());
             setProjectCode("");
         }
 
         setHydratedStorageKey(storageKey);
-    }, [storageKey]);
+    }, [restoreIdempotency, storageKey]);
 
     useEffect(() => {
         if (!storageKey || hydratedStorageKey !== storageKey) {
             return;
         }
 
-        writePersistedCart(
-            storageKey,
-            {
-                projectCode,
-                cartItems: serializeCartItems(cart),
-            },
+        const payloadSignature = createPayloadSignature(
+            buildStockRequestPayload(projectCode, cart),
         );
-    }, [cart, hydratedStorageKey, projectCode, storageKey]);
+        const currentIdempotency = reconcileIdempotency(payloadSignature);
+
+        writePersistedCart(storageKey, {
+            projectCode,
+            cartItems: serializeCartItems(cart),
+            pendingIdempotency: currentIdempotency,
+        });
+    }, [
+        cart,
+        hydratedStorageKey,
+        projectCode,
+        reconcileIdempotency,
+        storageKey,
+    ]);
 
     useEffect(() => {
         if (recentlyAddedItemId === null) {
@@ -394,6 +424,7 @@ export function useStockBrowseCart({
     }
 
     function clearCart(): void {
+        clearIdempotency();
         setCart(new Map());
         setProjectCode("");
     }
@@ -417,20 +448,34 @@ export function useStockBrowseCart({
             return;
         }
 
+        const payload = buildStockRequestPayload(normalizedProjectCode, cart);
+        const payloadSignature = createPayloadSignature(payload);
+        const idempotency = getOrCreateIdempotency(payloadSignature);
+        if (storageKey) {
+            writePersistedCart(storageKey, {
+                projectCode,
+                cartItems: serializeCartItems(cart),
+                pendingIdempotency: idempotency,
+            });
+        }
+
         setSubmitting(true);
         try {
             ensureStockApiSuccess(
-                await apiPost(API_ROUTES.stock.requests, {
-                    projectCode: normalizedProjectCode,
-                    items: Array.from(cart.values()).map((cartItem) => ({
-                        itemId: cartItem.item.id,
-                        variantId: cartItem.variant.id,
-                        quantity: cartItem.qty,
-                    })),
+                await apiPost(API_ROUTES.stock.requests, payload, {
+                    headers: { "Idempotency-Key": idempotency.key },
                 }),
                 "เกิดข้อผิดพลาด",
             );
 
+            clearIdempotency();
+            if (storageKey) {
+                writePersistedCart(storageKey, {
+                    projectCode: "",
+                    cartItems: [],
+                    pendingIdempotency: null,
+                });
+            }
             toast.success("ส่งคำขอเบิกวัสดุเรียบร้อยแล้ว");
             setCart(new Map());
             setProjectCode("");
