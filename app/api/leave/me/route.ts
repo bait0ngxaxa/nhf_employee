@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 
 import { ALL_LEAVE_TYPES, DEFAULT_LEAVE_QUOTAS } from "@/constants/leave";
+import { requireActiveWorkforceSession } from "@/lib/auth/workforce";
 import { prisma } from "@/lib/db/prisma";
-import { requireActiveEmployeeSession } from "@/lib/services/leave/active-employee-session";
 import { getCurrentLeaveYear } from "@/lib/services/leave/quota-year";
 import { jsonError, notFound } from "@/lib/ssot/http";
 import { FEATURE_KEYS, isFeatureEnabled } from "@/lib/ssot/features";
@@ -19,7 +19,7 @@ export async function GET(req: Request) {
             return notFound();
         }
 
-        const auth = await requireActiveEmployeeSession();
+        const auth = await requireActiveWorkforceSession();
         if (!auth.ok) return auth.response;
 
         const { employeeId } = auth;

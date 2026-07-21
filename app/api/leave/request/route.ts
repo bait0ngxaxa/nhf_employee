@@ -1,10 +1,10 @@
 import { NextResponse, after } from "next/server";
 import { DEFAULT_LEAVE_QUOTAS } from "@/constants/leave";
+import { requireActiveWorkforceSession } from "@/lib/auth/workforce";
 import { logLeaveEvent } from "@/lib/server/audit";
 import {
     isActiveEmployeeInTransaction,
     isEmployeeInTransaction,
-    requireActiveEmployeeSession,
 } from "@/lib/services/leave/active-employee-session";
 import { isActiveLeaveApprover } from "@/lib/services/leave/approver-eligibility";
 import { calculateAdditionalOverQuotaDays } from "@/lib/services/leave/over-quota";
@@ -49,7 +49,7 @@ export async function POST(req: Request) {
             return notFound();
         }
 
-        const auth = await requireActiveEmployeeSession();
+        const auth = await requireActiveWorkforceSession();
         if (!auth.ok) return auth.response;
 
         const userId = auth.user.id;

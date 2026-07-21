@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { requireAdminSession, requireApiSession } from "@/lib/auth/api";
+import { requireAdminSession } from "@/lib/auth/api";
+import { requireActiveWorkforceOrAdminSession } from "@/lib/auth/workforce";
 import { jsonError, serverError } from "@/lib/ssot/http";
 import { stockService } from "@/lib/services/stock";
 import { createItemSchema, stockItemsFilterSchema } from "@/lib/validations/stock";
@@ -7,7 +8,7 @@ import { logStockEvent } from "@/lib/server/audit";
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
     try {
-        const auth = await requireApiSession();
+        const auth = await requireActiveWorkforceOrAdminSession();
         if (!auth.ok) return auth.response;
 
         const { searchParams } = new URL(request.url);

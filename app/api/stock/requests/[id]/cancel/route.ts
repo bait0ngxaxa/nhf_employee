@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { requireApiSession } from "@/lib/auth/api";
+import { requireActiveWorkforceOrAdminSession } from "@/lib/auth/workforce";
 import { isAdminRole } from "@/lib/ssot/permissions";
 import { jsonError, serverError } from "@/lib/ssot/http";
 import { executeCancelStockRequest } from "@/lib/server/stock-request-commands";
@@ -14,7 +14,7 @@ export async function POST(
     { params }: RouteParams,
 ): Promise<NextResponse> {
     try {
-        const auth = await requireApiSession();
+        const auth = await requireActiveWorkforceOrAdminSession();
         if (!auth.ok) return auth.response;
 
         const { user } = auth;

@@ -1,9 +1,9 @@
 import { after, NextResponse } from "next/server";
 
+import { requireActiveWorkforceSession } from "@/lib/auth/workforce";
 import { logLeaveEvent } from "@/lib/server/audit";
 import {
     isActiveEmployeeInTransaction,
-    requireActiveEmployeeSession,
 } from "@/lib/services/leave/active-employee-session";
 import {
     ACTIVE_LEAVE_APPROVER_USER_SELECT,
@@ -60,7 +60,7 @@ export async function POST(req: Request): Promise<NextResponse> {
             return notFound();
         }
 
-        const auth = await requireActiveEmployeeSession();
+        const auth = await requireActiveWorkforceSession();
         if (!auth.ok) return auth.response;
 
         const userId = auth.user.id;
@@ -200,7 +200,7 @@ export async function PUT(req: Request): Promise<NextResponse> {
             return notFound();
         }
 
-        const auth = await requireActiveEmployeeSession();
+        const auth = await requireActiveWorkforceSession();
         if (!auth.ok) return auth.response;
 
         const userId = auth.user.id;

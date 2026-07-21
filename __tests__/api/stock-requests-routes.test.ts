@@ -5,8 +5,11 @@ import { GET as getRequestsRoute, POST as postRequestsRoute } from "@/app/api/st
 import { POST as issueRequestRoute } from "@/app/api/stock/requests/[id]/issue/route";
 import { POST as cancelRequestRoute } from "@/app/api/stock/requests/[id]/cancel/route";
 import { POST as reviewRequestRoute } from "@/app/api/stock/requests/[id]/review/route";
+import { GET as getItemsRoute } from "@/app/api/stock/items/route";
+import { GET as getCategoriesRoute } from "@/app/api/stock/categories/route";
 import { getApiAuthSession } from "@/lib/auth/server";
 import { buildUserContext } from "@/lib/auth/context";
+import { prisma } from "@/lib/db/prisma";
 import { isAdminRole } from "@/lib/ssot/permissions";
 import { stockService } from "@/lib/services/stock";
 import { StockRequestIdempotencyConflictError } from "@/lib/services/stock/request-idempotency";
@@ -30,6 +33,12 @@ vi.mock("@/lib/auth/context", () => ({
     buildUserContext: vi.fn(),
 }));
 
+vi.mock("@/lib/db/prisma", () => ({
+    prisma: {
+        user: { findUnique: vi.fn() },
+    },
+}));
+
 vi.mock("@/lib/ssot/permissions", () => ({
     isAdminRole: vi.fn(),
 }));
@@ -40,6 +49,8 @@ vi.mock("@/lib/services/stock", () => ({
         createRequest: vi.fn(),
         issueRequest: vi.fn(),
         cancelRequest: vi.fn(),
+        getItems: vi.fn(),
+        getCategories: vi.fn(),
     },
 }));
 
@@ -53,6 +64,11 @@ describe("Stock Request Routes", () => {
         vi.mocked(processOutbox).mockResolvedValue({
             processed: 0,
             failed: 0,
+        } as never);
+        vi.mocked(prisma.user.findUnique).mockResolvedValue({
+            isActive: true,
+            deletedAt: null,
+            employee: { id: 10, status: "ACTIVE", deletedAt: null },
         } as never);
     });
 
@@ -68,6 +84,38 @@ describe("Stock Request Routes", () => {
             expect(response.status).toBe(401);
         });
 
+        it.each([
+            ["INACTIVE", null],
+            ["SUSPENDED", null],
+            ["ACTIVE", new Date("2026-01-01")],
+        ] as const)(
+            "should reject a %s or soft-deleted employee before browsing stock",
+            async (status, deletedAt) => {
+                vi.mocked(getApiAuthSession).mockResolvedValue({
+                    user: { id: "3", email: "user@test.com", role: "USER" },
+                } as never);
+                vi.mocked(buildUserContext).mockReturnValue({
+                    id: 3,
+                    email: "user@test.com",
+                    role: "USER",
+                    name: "User",
+                });
+                vi.mocked(isAdminRole).mockReturnValue(false);
+                vi.mocked(prisma.user.findUnique).mockResolvedValue({
+                    isActive: true,
+                    deletedAt: null,
+                    employee: { id: 10, status, deletedAt },
+                } as never);
+
+                const response = await getRequestsRoute(
+                    new NextRequest("http://localhost/api/stock/requests"),
+                );
+
+                expect(response.status).toBe(403);
+                expect(stockService.getRequests).not.toHaveBeenCalled();
+            },
+        );
+
         it("should pass admin scope all and search to service", async () => {
             vi.mocked(getApiAuthSession).mockResolvedValue({
                 user: { id: "1", email: "admin@test.com", role: "ADMIN" },
@@ -79,6 +127,11 @@ describe("Stock Request Routes", () => {
                 name: "Admin",
             });
             vi.mocked(isAdminRole).mockReturnValue(true);
+            vi.mocked(prisma.user.findUnique).mockResolvedValue({
+                isActive: true,
+                deletedAt: null,
+                employee: null,
+            } as never);
             vi.mocked(stockService.getRequests).mockResolvedValue({
                 requests: [],
                 total: 0,
@@ -105,6 +158,77 @@ describe("Stock Request Routes", () => {
                 "all",
             );
         });
+    });
+
+    describe("Stock employee workforce access", () => {
+        const protectedActions: ReadonlyArray<
+            readonly [string, () => Promise<Response>]
+        > = [
+            [
+                "request creation",
+                () => postRequestsRoute(new NextRequest(
+                    "http://localhost/api/stock/requests",
+                    {
+                        method: "POST",
+                        headers: { "Idempotency-Key": "inactive-employee" },
+                        body: JSON.stringify({
+                            projectCode: "PRJ-2569/01",
+                            items: [{ itemId: 10, quantity: 1 }],
+                        }),
+                    },
+                )),
+            ],
+            [
+                "request cancellation",
+                () => cancelRequestRoute(
+                    new NextRequest(
+                        "http://localhost/api/stock/requests/55/cancel",
+                        { method: "POST" },
+                    ),
+                    { params: Promise.resolve({ id: "55" }) },
+                ),
+            ],
+            [
+                "item browsing",
+                () => getItemsRoute(new NextRequest(
+                    "http://localhost/api/stock/items",
+                )),
+            ],
+            ["category browsing", () => getCategoriesRoute()],
+        ];
+
+        it.each(protectedActions)(
+            "should reject a suspended employee before %s",
+            async (_label, invokeRoute) => {
+                vi.mocked(getApiAuthSession).mockResolvedValue({
+                    user: { id: "3", email: "user@test.com", role: "USER" },
+                } as never);
+                vi.mocked(buildUserContext).mockReturnValue({
+                    id: 3,
+                    email: "user@test.com",
+                    role: "USER",
+                    name: "User",
+                });
+                vi.mocked(isAdminRole).mockReturnValue(false);
+                vi.mocked(prisma.user.findUnique).mockResolvedValue({
+                    isActive: true,
+                    deletedAt: null,
+                    employee: {
+                        id: 10,
+                        status: "SUSPENDED",
+                        deletedAt: null,
+                    },
+                } as never);
+
+                const response = await invokeRoute();
+
+                expect(response.status).toBe(403);
+                expect(stockService.createRequest).not.toHaveBeenCalled();
+                expect(stockService.cancelRequest).not.toHaveBeenCalled();
+                expect(stockService.getItems).not.toHaveBeenCalled();
+                expect(stockService.getCategories).not.toHaveBeenCalled();
+            },
+        );
     });
 
     describe("POST /api/stock/requests", () => {

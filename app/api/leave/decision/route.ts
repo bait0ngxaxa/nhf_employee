@@ -2,13 +2,11 @@ import { NotificationOutboxType } from "@prisma/client";
 import type { Prisma } from "@prisma/client";
 import { after, NextResponse } from "next/server";
 
+import { requireActiveWorkforceSession } from "@/lib/auth/workforce";
 import { logLeaveEvent } from "@/lib/server/audit";
 import { processOutbox } from "@/lib/services/outbox/processor";
 import { runSerializableTransaction } from "@/lib/db/transaction";
-import {
-    isActiveEmployeeInTransaction,
-    requireActiveEmployeeSession,
-} from "@/lib/services/leave/active-employee-session";
+import { isActiveEmployeeInTransaction } from "@/lib/services/leave/active-employee-session";
 import {
     buildLeaveRecipientSnapshot,
     formatEmployeeName,
@@ -45,7 +43,7 @@ export async function POST(req: Request): Promise<NextResponse> {
             return notFound();
         }
 
-        const auth = await requireActiveEmployeeSession();
+        const auth = await requireActiveWorkforceSession();
         if (!auth.ok) return auth.response;
 
         const userId = auth.user.id;

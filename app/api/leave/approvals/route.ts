@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import type { Prisma } from "@prisma/client";
 
+import { requireActiveWorkforceSession } from "@/lib/auth/workforce";
 import { prisma } from "@/lib/db/prisma";
-import { requireActiveEmployeeSession } from "@/lib/services/leave/active-employee-session";
 import { notFound } from "@/lib/ssot/http";
 import { FEATURE_KEYS, isFeatureEnabled } from "@/lib/ssot/features";
 import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
@@ -32,7 +32,7 @@ export async function GET(req: Request): Promise<NextResponse> {
             return notFound();
         }
 
-        const auth = await requireActiveEmployeeSession();
+        const auth = await requireActiveWorkforceSession();
         if (!auth.ok) return auth.response;
 
         const managerId = auth.employeeId;

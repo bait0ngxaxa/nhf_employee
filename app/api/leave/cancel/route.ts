@@ -1,10 +1,8 @@
 import { after, NextResponse } from "next/server";
 
+import { requireActiveWorkforceSession } from "@/lib/auth/workforce";
 import { logLeaveEvent } from "@/lib/server/audit";
-import {
-    isActiveEmployeeInTransaction,
-    requireActiveEmployeeSession,
-} from "@/lib/services/leave/active-employee-session";
+import { isActiveEmployeeInTransaction } from "@/lib/services/leave/active-employee-session";
 import {
     ACTIVE_LEAVE_APPROVER_USER_SELECT,
     isActiveLeaveApprover,
@@ -48,7 +46,7 @@ export async function POST(req: Request) {
             return notFound();
         }
 
-        const auth = await requireActiveEmployeeSession({
+        const auth = await requireActiveWorkforceSession({
             employeeProfileNotFoundResponse: () =>
                 jsonError(COMMON_API_MESSAGES.employeeProfileNotFound, 404),
         });
