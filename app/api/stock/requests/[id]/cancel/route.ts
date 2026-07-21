@@ -2,7 +2,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import { requireApiSession } from "@/lib/auth/api";
 import { isAdminRole } from "@/lib/ssot/permissions";
 import { jsonError, serverError } from "@/lib/ssot/http";
-import { stockService } from "@/lib/services/stock";
+import { executeCancelStockRequest } from "@/lib/server/stock-request-commands";
 import { cancelRequestSchema } from "@/lib/validations/stock";
 
 interface RouteParams {
@@ -34,16 +34,16 @@ export async function POST(
             });
         }
 
-        const updated = await stockService.cancelRequest(
+        const updated = await executeCancelStockRequest({
             requestId,
-            {
+            actor: {
                 id: user.id,
                 email: user.email,
                 name: user.name ?? user.email,
             },
-            parsed.data.cancelReason,
-            { isAdmin },
-        );
+            reason: parsed.data.cancelReason,
+            options: { isAdmin },
+        });
 
         return NextResponse.json({ request: updated });
     } catch (error) {

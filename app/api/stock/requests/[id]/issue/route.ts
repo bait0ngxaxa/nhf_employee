@@ -1,8 +1,7 @@
-import { after, type NextRequest, NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 import { requireAdminSession } from "@/lib/auth/api";
 import { jsonError, serverError } from "@/lib/ssot/http";
-import { stockService } from "@/lib/services/stock";
-import { processOutbox } from "@/lib/services/outbox/processor";
+import { executeIssueStockRequest } from "@/lib/server/stock-request-commands";
 import { issueRequestSchema } from "@/lib/validations/stock";
 
 interface RouteParams {
@@ -31,17 +30,13 @@ export async function POST(
             });
         }
 
-        const issuedResult = await stockService.issueRequest(requestId, {
-            id: auth.user.id,
-            email: auth.user.email,
-            name: auth.user.name ?? auth.user.email,
-        });
-        const updated = issuedResult.request;
-
-        after(() => {
-            processOutbox().catch((error) =>
-                console.error("Outbox processor failed:", error),
-            );
+        const updated = await executeIssueStockRequest({
+            requestId,
+            actor: {
+                id: auth.user.id,
+                email: auth.user.email,
+                name: auth.user.name ?? auth.user.email,
+            },
         });
 
         return NextResponse.json({ request: updated });

@@ -1,9 +1,11 @@
-import { after, type NextRequest, NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 import { requireAdminSession } from "@/lib/auth/api";
 import { jsonError, serverError } from "@/lib/ssot/http";
-import { stockService } from "@/lib/services/stock";
+import {
+    executeCancelStockRequest,
+    executeIssueStockRequest,
+} from "@/lib/server/stock-request-commands";
 import { stockReviewActionSchema } from "@/lib/validations/stock";
-import { processOutbox } from "@/lib/services/outbox/processor";
 
 interface RouteParams {
     params: Promise<{ id: string }>;
@@ -31,17 +33,15 @@ export async function POST(
         const { action } = parsed.data;
 
         if (action === "approve" || action === "issue") {
-            const issuedResult = await stockService.issueRequest(requestId, {
-                id: auth.user.id,
-                email: auth.user.email,
-                name: auth.user.name ?? auth.user.email,
+            const issuedRequest = await executeIssueStockRequest({
+                requestId,
+                actor: {
+                    id: auth.user.id,
+                    email: auth.user.email,
+                    name: auth.user.name ?? auth.user.email,
+                },
             });
-            after(() => {
-                processOutbox().catch((error) =>
-                    console.error("Outbox processor failed:", error),
-                );
-            });
-            return NextResponse.json({ request: issuedResult.request });
+            return NextResponse.json({ request: issuedRequest });
         }
 
         if (action !== "reject" && action !== "cancel") {
@@ -50,16 +50,16 @@ export async function POST(
 
         const cancelReason =
             parsed.data.cancelReason ?? parsed.data.rejectReason ?? null;
-        const updated = await stockService.cancelRequest(
+        const updated = await executeCancelStockRequest({
             requestId,
-            {
+            actor: {
                 id: auth.user.id,
                 email: auth.user.email,
                 name: auth.user.name ?? auth.user.email,
             },
-            cancelReason,
-            { isAdmin: true },
-        );
+            reason: cancelReason,
+            options: { isAdmin: true },
+        });
         return NextResponse.json({ request: updated });
     } catch (error) {
         const message = error instanceof Error ? error.message : "";

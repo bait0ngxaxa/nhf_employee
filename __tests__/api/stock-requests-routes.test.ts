@@ -4,6 +4,7 @@ import type * as NextServerModule from "next/server";
 import { GET as getRequestsRoute, POST as postRequestsRoute } from "@/app/api/stock/requests/route";
 import { POST as issueRequestRoute } from "@/app/api/stock/requests/[id]/issue/route";
 import { POST as cancelRequestRoute } from "@/app/api/stock/requests/[id]/cancel/route";
+import { POST as reviewRequestRoute } from "@/app/api/stock/requests/[id]/review/route";
 import { getApiAuthSession } from "@/lib/auth/server";
 import { buildUserContext } from "@/lib/auth/context";
 import { isAdminRole } from "@/lib/ssot/permissions";
@@ -334,6 +335,95 @@ describe("Stock Request Routes", () => {
                 name: "Admin",
             });
             expect(processOutbox).toHaveBeenCalledTimes(1);
+        });
+    });
+
+    describe("POST /api/stock/requests/[id]/review", () => {
+        it("should delegate issue actions and wake the low-stock outbox processor", async () => {
+            vi.mocked(getApiAuthSession).mockResolvedValue({
+                user: { id: "1", email: "admin@test.com", role: "ADMIN" },
+            } as never);
+            vi.mocked(buildUserContext).mockReturnValue({
+                id: 1,
+                email: "admin@test.com",
+                role: "ADMIN",
+                name: "Admin",
+            });
+            vi.mocked(isAdminRole).mockReturnValue(true);
+            vi.mocked(stockService.issueRequest).mockResolvedValue({
+                request: { id: 77, requestedBy: 3 },
+                lowStockAlerts: [{
+                    itemId: 10,
+                    name: "ปากกา",
+                    sku: "PEN-001",
+                    quantity: 3,
+                    minStock: 5,
+                    unit: "ด้าม",
+                }],
+            } as never);
+
+            const response = await reviewRequestRoute(
+                new NextRequest(
+                    "http://localhost/api/stock/requests/77/review",
+                    {
+                        method: "POST",
+                        body: JSON.stringify({ action: "issue" }),
+                    },
+                ),
+                { params: Promise.resolve({ id: "77" }) },
+            );
+
+            expect(response.status).toBe(200);
+            expect(stockService.issueRequest).toHaveBeenCalledWith(77, {
+                id: 1,
+                email: "admin@test.com",
+                name: "Admin",
+            });
+            expect(processOutbox).toHaveBeenCalledTimes(1);
+        });
+
+        it("should delegate cancel actions with admin authorization", async () => {
+            vi.mocked(getApiAuthSession).mockResolvedValue({
+                user: { id: "1", email: "admin@test.com", role: "ADMIN" },
+            } as never);
+            vi.mocked(buildUserContext).mockReturnValue({
+                id: 1,
+                email: "admin@test.com",
+                role: "ADMIN",
+                name: "Admin",
+            });
+            vi.mocked(isAdminRole).mockReturnValue(true);
+            vi.mocked(stockService.cancelRequest).mockResolvedValue({
+                id: 77,
+                requestedBy: 3,
+            } as never);
+
+            const response = await reviewRequestRoute(
+                new NextRequest(
+                    "http://localhost/api/stock/requests/77/review",
+                    {
+                        method: "POST",
+                        body: JSON.stringify({
+                            action: "reject",
+                            rejectReason: "ไม่อนุมัติ",
+                        }),
+                    },
+                ),
+                { params: Promise.resolve({ id: "77" }) },
+            );
+
+            expect(response.status).toBe(200);
+            expect(stockService.cancelRequest).toHaveBeenCalledWith(
+                77,
+                {
+                    id: 1,
+                    email: "admin@test.com",
+                    name: "Admin",
+                },
+                "ไม่อนุมัติ",
+                { isAdmin: true },
+            );
+            expect(processOutbox).not.toHaveBeenCalled();
         });
     });
 
