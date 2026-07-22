@@ -1,5 +1,7 @@
 import { type Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
+import { runSerializableTransaction } from "@/lib/db/transaction";
+import { lockStockInventoryRows } from "./locks";
 import {
     deleteLocalUploadByUrl,
     isManagedUploadUrl,
@@ -67,6 +69,8 @@ export async function ensureDefaultVariantsByItemIds(
         return new Map();
     }
 
+    await lockStockInventoryRows(tx, uniqueItemIds);
+
     const items = await tx.stockItem.findMany({
         where: { id: { in: uniqueItemIds } },
         select: {
@@ -89,7 +93,7 @@ export async function ensureDefaultVariantsByItemIds(
 }
 
 export async function ensureItemVariantsExist(itemIds: number[]): Promise<void> {
-    await prisma.$transaction(async (tx) => {
+    await runSerializableTransaction(async (tx) => {
         await ensureDefaultVariantsByItemIds(tx, itemIds);
     });
 }

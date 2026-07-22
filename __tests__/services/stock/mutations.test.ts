@@ -378,7 +378,7 @@ describe("Stock Service Mutations", () => {
             );
         });
 
-        it("should retry P2034 and lock variants and items in ascending ID order", async () => {
+        it("should retry P2034 and lock parent items before variants", async () => {
             prismaMock.stockRequest.findUnique.mockResolvedValue(
                 asNever({
                     requestedBy: 3,
@@ -461,6 +461,17 @@ describe("Stock Service Mutations", () => {
                 },
             );
             expect(prismaMock.$transaction).toHaveBeenCalledTimes(2);
+
+            const itemLockOrder = prismaMock.$queryRaw.mock.invocationCallOrder[0];
+            const variantLockOrder = prismaMock.$queryRaw.mock.invocationCallOrder[1];
+            const firstVariantWriteOrder =
+                prismaMock.stockItemVariant.updateMany.mock.invocationCallOrder[0];
+            const firstItemWriteOrder =
+                prismaMock.stockItem.update.mock.invocationCallOrder[0];
+
+            expect(itemLockOrder).toBeLessThan(variantLockOrder);
+            expect(variantLockOrder).toBeLessThan(firstVariantWriteOrder);
+            expect(firstVariantWriteOrder).toBeLessThan(firstItemWriteOrder);
         });
     });
 
@@ -549,6 +560,48 @@ describe("Stock Service Mutations", () => {
                 ),
             ).rejects.toThrow("กรุณาเลือกรายการย่อยของวัสดุ");
             expect(prismaMock.stockItemVariant.updateMany).not.toHaveBeenCalled();
+        });
+
+        it("should retry P2034 and preserve the parent-before-variant lock hierarchy", async () => {
+            prismaMock.$transaction.mockRejectedValueOnce({ code: "P2034" });
+            prismaMock.stockItem.findUnique.mockResolvedValue(
+                asNever({
+                    id: 10,
+                    name: "หมึกพิมพ์",
+                    sku: "INK-10",
+                    unit: "ตลับ",
+                    quantity: 12,
+                    minStock: 4,
+                    imageUrl: null,
+                    isActive: true,
+                }),
+            );
+            prismaMock.stockItemVariant.findFirst.mockResolvedValue(
+                asNever({ id: 102, quantity: 4, minStock: 2 }),
+            );
+            prismaMock.stockItem.update.mockResolvedValue(
+                asNever({ quantity: 15, minStock: 7 }),
+            );
+
+            await stockService.adjustStock(
+                10,
+                { type: "IN", quantity: 3, minStock: 5, variantId: 102 },
+                commandActor(9),
+            );
+
+            expect(prismaMock.$transaction).toHaveBeenCalledTimes(2);
+            expect(prismaMock.$transaction).toHaveBeenLastCalledWith(
+                expect.any(Function),
+                {
+                    isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+                },
+            );
+            expect(prismaMock.$queryRaw.mock.invocationCallOrder[0]).toBeLessThan(
+                prismaMock.$queryRaw.mock.invocationCallOrder[1],
+            );
+            expect(prismaMock.$queryRaw.mock.invocationCallOrder[1]).toBeLessThan(
+                prismaMock.stockItemVariant.updateMany.mock.invocationCallOrder[0],
+            );
         });
     });
 
@@ -1010,6 +1063,61 @@ describe("Stock Service Mutations", () => {
     });
 
     describe("updateItem", () => {
+        it("should retry P2034 and lock the parent before its variants", async () => {
+            prismaMock.$transaction.mockRejectedValueOnce({ code: "P2034" });
+            prismaMock.stockItem.findUniqueOrThrow.mockResolvedValue(
+                asNever({
+                    id: 24,
+                    sku: "SKU-24",
+                    unit: "ชิ้น",
+                    quantity: 5,
+                    minStock: 1,
+                    imageUrl: null,
+                    isActive: true,
+                }),
+            );
+            prismaMock.stockItemVariant.findMany.mockResolvedValue(
+                asNever([{ id: 241, sku: "SKU-24-A", imageUrl: null, isActive: true }]),
+            );
+            prismaMock.stockItem.update
+                .mockResolvedValueOnce(
+                    asNever({ id: 24, sku: "SKU-24", imageUrl: null }),
+                )
+                .mockResolvedValueOnce(asNever({ id: 24 }));
+            prismaMock.stockItem.findUnique.mockResolvedValue(
+                asNever({ id: 24, variants: [] }),
+            );
+
+            await stockService.updateItem(24, {
+                variants: [{
+                    id: 241,
+                    expectedQuantity: 5,
+                    sku: "SKU-24-A",
+                    unit: "ชิ้น",
+                    quantity: 5,
+                    minStock: 1,
+                    attributes: [],
+                }],
+            }, commandActor(7));
+
+            expect(prismaMock.$transaction).toHaveBeenCalledTimes(2);
+            expect(prismaMock.$transaction).toHaveBeenLastCalledWith(
+                expect.any(Function),
+                {
+                    isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+                },
+            );
+            expect(prismaMock.$queryRaw.mock.invocationCallOrder[0]).toBeLessThan(
+                prismaMock.$queryRaw.mock.invocationCallOrder[1],
+            );
+            expect(prismaMock.$queryRaw.mock.invocationCallOrder[1]).toBeLessThan(
+                prismaMock.stockItem.update.mock.invocationCallOrder[0],
+            );
+            expect(prismaMock.stockItem.update.mock.invocationCallOrder[0]).toBeLessThan(
+                prismaMock.stockItemVariant.updateMany.mock.invocationCallOrder[0],
+            );
+        });
+
         it("should reduce an existing variant from 5 to 0 and synchronize the parent", async () => {
             prismaMock.stockItem.findUniqueOrThrow.mockResolvedValue(
                 asNever({ id: 24, sku: "SKU-24", unit: "ชิ้น", quantity: 5, minStock: 1, imageUrl: null, isActive: true }),

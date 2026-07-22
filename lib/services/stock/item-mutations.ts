@@ -1,5 +1,6 @@
 import { type StockTxType } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
+import { runSerializableTransaction } from "@/lib/db/transaction";
 import { createStockCommandAudit } from "./command-audit";
 import { persistLowStockNotifications } from "./notifications";
 import type {
@@ -23,6 +24,7 @@ import type {
     LowStockAlertCandidate,
     StockCommandActor,
 } from "./types";
+import { lockStockInventoryRows } from "./locks";
 
 function buildLowStockAlert(
     item: {
@@ -284,10 +286,10 @@ export async function updateItem(
     actor: StockCommandActor,
     auditAction: "STOCK_ITEM_UPDATE" | "STOCK_ITEM_DELETE" = "STOCK_ITEM_UPDATE",
 ) {
-    const cleanupCandidates = new Set<string>();
-    const retainedUploadUrls = new Set<string>();
-
-    const updatedItem = await prisma.$transaction(async (tx) => {
+    const result = await runSerializableTransaction(async (tx) => {
+        await lockStockInventoryRows(tx, [id]);
+        const cleanupCandidates = new Set<string>();
+        const retainedUploadUrls = new Set<string>();
         const item = await updateItemInTransaction(tx, id, data, actor.id, {
             cleanupCandidates,
             retainedUploadUrls,
@@ -299,11 +301,14 @@ export async function updateItem(
                 isActive: item.isActive,
             },
         });
-        return item;
+        return { item, cleanupCandidates, retainedUploadUrls };
     });
 
-    await cleanupUnusedUploadUrls(cleanupCandidates, retainedUploadUrls);
-    return updatedItem;
+    await cleanupUnusedUploadUrls(
+        result.cleanupCandidates,
+        result.retainedUploadUrls,
+    );
+    return result.item;
 }
 
 export async function adjustStock(
@@ -311,7 +316,8 @@ export async function adjustStock(
     input: AdjustStockInput,
     actor: StockCommandActor,
 ): Promise<AdjustStockResult> {
-    return prisma.$transaction(async (tx) => {
+    return runSerializableTransaction(async (tx) => {
+        await lockStockInventoryRows(tx, [itemId]);
         const item = await tx.stockItem.findUnique({
             where: { id: itemId },
             select: {
