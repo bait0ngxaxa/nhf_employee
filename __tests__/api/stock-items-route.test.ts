@@ -8,7 +8,6 @@ import { getApiAuthSession } from "@/lib/auth/server";
 import { buildUserContext } from "@/lib/auth/context";
 import { isAdminRole } from "@/lib/ssot/permissions";
 import { stockService } from "@/lib/services/stock";
-import { logStockEvent } from "@/lib/server/audit";
 
 vi.mock("@/lib/auth/server", () => ({
     getApiAuthSession: vi.fn(),
@@ -26,10 +25,6 @@ vi.mock("@/lib/services/stock", () => ({
     stockService: {
         updateItem: vi.fn(),
     },
-}));
-
-vi.mock("@/lib/server/audit", () => ({
-    logStockEvent: vi.fn(),
 }));
 
 const adminSession = {
@@ -60,10 +55,11 @@ describe("Stock Item Routes", () => {
         mockAdmin();
     });
 
-    it("logs STOCK_ITEM_UPDATE after updating an item", async () => {
+    it("passes request audit context when updating an item", async () => {
         vi.mocked(stockService.updateItem).mockResolvedValue(updatedItem as never);
         const request = new NextRequest("http://localhost/api/stock/items/42", {
             method: "PATCH",
+            headers: { "user-agent": "stock-route-test" },
             body: JSON.stringify({ name: "ปากกาใหม่" }),
         });
 
@@ -72,15 +68,15 @@ describe("Stock Item Routes", () => {
         });
 
         expect(response.status).toBe(200);
-        expect(stockService.updateItem).toHaveBeenCalledWith(42, {
-            name: "ปากกาใหม่",
-        }, 1);
-        expect(logStockEvent).toHaveBeenCalledWith(
-            "STOCK_ITEM_UPDATE",
+        expect(stockService.updateItem).toHaveBeenCalledWith(
             42,
-            1,
-            "admin@test.com",
-            { after: { name: "ปากกาใหม่", sku: "PEN-002", isActive: true } },
+            { name: "ปากกาใหม่" },
+            expect.objectContaining({
+                id: 1,
+                email: "admin@test.com",
+                name: "Admin",
+                userAgent: "stock-route-test",
+            }),
         );
     });
 
@@ -107,10 +103,9 @@ describe("Stock Item Routes", () => {
         });
 
         expect(response.status).toBe(409);
-        expect(logStockEvent).not.toHaveBeenCalled();
     });
 
-    it("logs STOCK_ITEM_DELETE after soft-deleting an item", async () => {
+    it("selects the atomic delete audit action when soft-deleting an item", async () => {
         vi.mocked(stockService.updateItem).mockResolvedValue({
             ...updatedItem,
             isActive: false,
@@ -124,13 +119,15 @@ describe("Stock Item Routes", () => {
         });
 
         expect(response.status).toBe(200);
-        expect(stockService.updateItem).toHaveBeenCalledWith(42, { isActive: false }, 1);
-        expect(logStockEvent).toHaveBeenCalledWith(
-            "STOCK_ITEM_DELETE",
+        expect(stockService.updateItem).toHaveBeenCalledWith(
             42,
-            1,
-            "admin@test.com",
-            { after: { name: "ปากกาใหม่", sku: "PEN-002", isActive: false } },
+            { isActive: false },
+            expect.objectContaining({
+                id: 1,
+                email: "admin@test.com",
+                name: "Admin",
+            }),
+            "STOCK_ITEM_DELETE",
         );
     });
 });

@@ -12,6 +12,7 @@ import {
 } from "@/lib/services/stock/request-idempotency";
 import { processOutbox } from "@/lib/services/outbox/processor";
 import { WorkforceAuthorizationError } from "@/lib/auth/workforce-transaction";
+import { createStockCommandActor } from "@/lib/server/stock-command-actor";
 import {
     createRequestSchema,
     idempotencyKeySchema,
@@ -77,13 +78,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
         const { user } = auth;
 
+        const actor = createStockCommandActor(user, request.headers);
         const creation = await stockService.createRequest(
             result.data,
-            {
-                id: user.id,
-                email: user.email,
-                name: user.name ?? user.email,
-            },
+            actor,
             { idempotencyKey: parsedIdempotencyKey.data },
         );
 

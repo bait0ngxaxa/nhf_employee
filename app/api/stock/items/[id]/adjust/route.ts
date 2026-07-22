@@ -4,6 +4,7 @@ import { jsonError, serverError } from "@/lib/ssot/http";
 import { stockService } from "@/lib/services/stock";
 import { processOutbox } from "@/lib/services/outbox/processor";
 import { adjustStockSchema } from "@/lib/validations/stock";
+import { createStockCommandActor } from "@/lib/server/stock-command-actor";
 
 interface RouteParams {
     params: Promise<{ id: string }>;
@@ -29,11 +30,8 @@ export async function POST(
             });
         }
 
-        const adjustment = await stockService.adjustStock(itemId, result.data, {
-            id: auth.user.id,
-            email: auth.user.email,
-            name: auth.user.name ?? auth.user.email,
-        });
+        const actor = createStockCommandActor(auth.user, request.headers);
+        const adjustment = await stockService.adjustStock(itemId, result.data, actor);
 
         after(() => {
             processOutbox().catch((error) =>

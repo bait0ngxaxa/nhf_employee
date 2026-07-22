@@ -4,7 +4,7 @@ import { requireActiveWorkforceOrAdminSession } from "@/lib/auth/workforce";
 import { jsonError, serverError } from "@/lib/ssot/http";
 import { stockService } from "@/lib/services/stock";
 import { createCategorySchema } from "@/lib/validations/stock";
-import { logStockEvent } from "@/lib/server/audit";
+import { createStockCommandActor } from "@/lib/server/stock-command-actor";
 
 export async function GET(): Promise<NextResponse> {
     try {
@@ -32,10 +32,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
             });
         }
 
-        const category = await stockService.createCategory(result.data);
-        await logStockEvent("STOCK_CATEGORY_CREATE", category.id, auth.user.id, auth.user.email, {
-            after: { name: result.data.name },
-        });
+        const actor = createStockCommandActor(auth.user, request.headers);
+        const category = await stockService.createCategory(result.data, actor);
         return NextResponse.json({ category }, { status: 201 });
     } catch (error) {
         const message = error instanceof Error ? error.message : "";
@@ -58,8 +56,8 @@ export async function DELETE(request: NextRequest): Promise<NextResponse> {
             return jsonError("กรุณาระบุ id หมวดหมู่", 400);
         }
 
-        await stockService.deleteCategory(id);
-        await logStockEvent("STOCK_CATEGORY_DELETE", id, auth.user.id, auth.user.email);
+        const actor = createStockCommandActor(auth.user, request.headers);
+        await stockService.deleteCategory(id, actor);
         return NextResponse.json({ success: true });
     } catch (error) {
         const message = error instanceof Error ? error.message : "";

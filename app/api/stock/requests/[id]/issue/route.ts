@@ -3,6 +3,7 @@ import { requireAdminSession } from "@/lib/auth/api";
 import { jsonError, serverError } from "@/lib/ssot/http";
 import { executeIssueStockRequest } from "@/lib/server/stock-request-commands";
 import { issueRequestSchema } from "@/lib/validations/stock";
+import { createStockCommandActor } from "@/lib/server/stock-command-actor";
 
 interface RouteParams {
     params: Promise<{ id: string }>;
@@ -32,11 +33,7 @@ export async function POST(
 
         const updated = await executeIssueStockRequest({
             requestId,
-            actor: {
-                id: auth.user.id,
-                email: auth.user.email,
-                name: auth.user.name ?? auth.user.email,
-            },
+            actor: createStockCommandActor(auth.user, request.headers),
         });
 
         return NextResponse.json({ request: updated });

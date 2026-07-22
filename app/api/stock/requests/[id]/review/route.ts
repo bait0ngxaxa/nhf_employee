@@ -6,6 +6,7 @@ import {
     executeIssueStockRequest,
 } from "@/lib/server/stock-request-commands";
 import { stockReviewActionSchema } from "@/lib/validations/stock";
+import { createStockCommandActor } from "@/lib/server/stock-command-actor";
 
 interface RouteParams {
     params: Promise<{ id: string }>;
@@ -35,11 +36,7 @@ export async function POST(
         if (action === "approve" || action === "issue") {
             const issuedRequest = await executeIssueStockRequest({
                 requestId,
-                actor: {
-                    id: auth.user.id,
-                    email: auth.user.email,
-                    name: auth.user.name ?? auth.user.email,
-                },
+                actor: createStockCommandActor(auth.user, request.headers),
             });
             return NextResponse.json({ request: issuedRequest });
         }
@@ -52,11 +49,7 @@ export async function POST(
             parsed.data.cancelReason ?? parsed.data.rejectReason ?? null;
         const updated = await executeCancelStockRequest({
             requestId,
-            actor: {
-                id: auth.user.id,
-                email: auth.user.email,
-                name: auth.user.name ?? auth.user.email,
-            },
+            actor: createStockCommandActor(auth.user, request.headers),
             reason: cancelReason,
             options: { isAdmin: true },
         });

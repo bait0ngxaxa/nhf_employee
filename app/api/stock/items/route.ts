@@ -4,7 +4,7 @@ import { requireActiveWorkforceOrAdminSession } from "@/lib/auth/workforce";
 import { jsonError, serverError } from "@/lib/ssot/http";
 import { stockService } from "@/lib/services/stock";
 import { createItemSchema, stockItemsFilterSchema } from "@/lib/validations/stock";
-import { logStockEvent } from "@/lib/server/audit";
+import { createStockCommandActor } from "@/lib/server/stock-command-actor";
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
     try {
@@ -47,10 +47,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
             });
         }
 
-        const item = await stockService.createItem(result.data);
-        await logStockEvent("STOCK_ITEM_CREATE", item.id, auth.user.id, auth.user.email, {
-            after: { name: item.name, sku: item.sku },
-        });
+        const actor = createStockCommandActor(auth.user, request.headers);
+        const item = await stockService.createItem(result.data, actor);
         return NextResponse.json({ item }, { status: 201 });
     } catch (error) {
         const message = error instanceof Error ? error.message : "";

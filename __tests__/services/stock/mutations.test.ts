@@ -18,11 +18,15 @@ function commandActor(id: number): {
     id: number;
     email: string;
     name: string;
+    ipAddress: string;
+    userAgent: string;
 } {
     return {
         id,
         email: "user-" + id + "@example.com",
         name: "ผู้ใช้ " + id,
+        ipAddress: "192.0.2." + id,
+        userAgent: "stock-service-test",
     };
 }
 
@@ -293,6 +297,8 @@ describe("Stock Service Mutations", () => {
                     data: expect.objectContaining({
                         action: "STOCK_REQUEST_ISSUE",
                         entityId: 99,
+                        ipAddress: "192.0.2.9",
+                        userAgent: "stock-service-test",
                     }),
                 }),
             );
@@ -1023,7 +1029,7 @@ describe("Stock Service Mutations", () => {
 
             await stockService.updateItem(24, {
                 variants: [{ id: 241, expectedQuantity: 5, sku: "SKU-24-A", unit: "ชิ้น", quantity: 0, minStock: 1, attributes: [] }],
-            }, 7);
+            }, commandActor(7));
 
             expect(prismaMock.stockItemVariant.updateMany).toHaveBeenCalledWith(
                 expect.objectContaining({
@@ -1054,7 +1060,7 @@ describe("Stock Service Mutations", () => {
 
             await expect(stockService.updateItem(24, {
                 variants: [{ id: 241, expectedQuantity: 5, unit: "ชิ้น", quantity: 0, minStock: 1, attributes: [] }],
-            }, 7)).rejects.toThrow("ยอดคงเหลือของรายการย่อยเปลี่ยนแปลงแล้ว");
+            }, commandActor(7))).rejects.toThrow("ยอดคงเหลือของรายการย่อยเปลี่ยนแปลงแล้ว");
 
             expect(prismaMock.stockTransaction.create).not.toHaveBeenCalled();
             expect(prismaMock.stockItemVariant.aggregate).not.toHaveBeenCalled();
@@ -1074,7 +1080,7 @@ describe("Stock Service Mutations", () => {
 
             await stockService.updateItem(24, {
                 variants: [{ id: 241, expectedQuantity: 5, unit: "ชิ้น", quantity: 5, minStock: 1, attributes: [] }],
-            }, 7);
+            }, commandActor(7));
 
             expect(prismaMock.stockTransaction.create).not.toHaveBeenCalled();
         });
@@ -1146,7 +1152,7 @@ describe("Stock Service Mutations", () => {
                         attributes: [{ name: "สี", value: "น้ำเงิน" }],
                     },
                 ],
-            }, 7);
+            }, commandActor(7));
 
             expect(prismaMock.stockItem.update).toHaveBeenCalledWith(
                 expect.objectContaining({
@@ -1245,7 +1251,7 @@ describe("Stock Service Mutations", () => {
                         attributes: [{ name: "สี", value: "เขียว" }],
                     },
                 ],
-            }, 7);
+            }, commandActor(7));
 
             expect(prismaMock.stockItemVariant.create).toHaveBeenCalledWith(
                 expect.objectContaining({
@@ -1339,7 +1345,7 @@ describe("Stock Service Mutations", () => {
                         attributes: [{ name: "ลำดับ", value: "ใหม่" }],
                     },
                 ],
-            }, 7);
+            }, commandActor(7));
 
             expect(prismaMock.stockItemVariant.create).toHaveBeenCalledWith(
                 expect.objectContaining({

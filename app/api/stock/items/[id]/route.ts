@@ -4,7 +4,7 @@ import { requireAdminSession } from "@/lib/auth/api";
 import { jsonError, serverError } from "@/lib/ssot/http";
 import { stockService } from "@/lib/services/stock";
 import { updateItemSchema } from "@/lib/validations/stock";
-import { logStockEvent } from "@/lib/server/audit";
+import { createStockCommandActor } from "@/lib/server/stock-command-actor";
 
 interface RouteParams {
     params: Promise<{ id: string }>;
@@ -30,20 +30,8 @@ export async function PATCH(
             });
         }
 
-        const item = await stockService.updateItem(itemId, result.data, auth.user.id);
-        await logStockEvent(
-            "STOCK_ITEM_UPDATE",
-            itemId,
-            auth.user.id,
-            auth.user.email,
-            {
-                after: {
-                    name: item.name,
-                    sku: item.sku,
-                    isActive: item.isActive,
-                },
-            },
-        );
+        const actor = createStockCommandActor(auth.user, request.headers);
+        const item = await stockService.updateItem(itemId, result.data, actor);
         return NextResponse.json({ item });
     } catch (error) {
         const message = error instanceof Error ? error.message : "";
@@ -72,7 +60,7 @@ export async function PATCH(
 }
 
 export async function DELETE(
-    _request: NextRequest,
+    request: NextRequest,
     { params }: RouteParams,
 ): Promise<NextResponse> {
     try {
@@ -83,19 +71,12 @@ export async function DELETE(
         const itemId = Number(id);
         if (isNaN(itemId)) return jsonError("ID ไม่ถูกต้อง", 400);
 
-        const item = await stockService.updateItem(itemId, { isActive: false }, auth.user.id);
-        await logStockEvent(
-            "STOCK_ITEM_DELETE",
+        const actor = createStockCommandActor(auth.user, request.headers);
+        await stockService.updateItem(
             itemId,
-            auth.user.id,
-            auth.user.email,
-            {
-                after: {
-                    name: item.name,
-                    sku: item.sku,
-                    isActive: item.isActive,
-                },
-            },
+            { isActive: false },
+            actor,
+            "STOCK_ITEM_DELETE",
         );
         return NextResponse.json({ success: true });
     } catch (error) {

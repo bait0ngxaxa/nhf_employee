@@ -24,6 +24,8 @@ export type StockCommandActor = {
     id: number;
     email: string;
     name: string;
+    ipAddress?: string;
+    userAgent?: string;
 };
 
 export type PendingRequestItemRecord = {

@@ -5,6 +5,7 @@ import { jsonError, serverError } from "@/lib/ssot/http";
 import { executeCancelStockRequest } from "@/lib/server/stock-request-commands";
 import { cancelRequestSchema } from "@/lib/validations/stock";
 import { WorkforceAuthorizationError } from "@/lib/auth/workforce-transaction";
+import { createStockCommandActor } from "@/lib/server/stock-command-actor";
 
 interface RouteParams {
     params: Promise<{ id: string }>;
@@ -37,11 +38,7 @@ export async function POST(
 
         const updated = await executeCancelStockRequest({
             requestId,
-            actor: {
-                id: user.id,
-                email: user.email,
-                name: user.name ?? user.email,
-            },
+            actor: createStockCommandActor(user, request.headers),
             reason: parsed.data.cancelReason,
             options: { isAdmin },
         });

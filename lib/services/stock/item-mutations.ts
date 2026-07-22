@@ -165,15 +165,41 @@ async function applyStockAdjustment(
     };
 }
 
-export async function createCategory(data: CreateCategoryInput) {
-    return prisma.stockCategory.create({ data });
+export async function createCategory(
+    data: CreateCategoryInput,
+    actor: StockCommandActor,
+) {
+    return prisma.$transaction(async (tx) => {
+        const category = await tx.stockCategory.create({ data });
+        await createStockCommandAudit(
+            tx,
+            "STOCK_CATEGORY_CREATE",
+            category.id,
+            actor,
+            { after: { name: category.name } },
+        );
+        return category;
+    });
 }
 
-export async function deleteCategory(id: number) {
-    return prisma.stockCategory.delete({ where: { id } });
+export async function deleteCategory(id: number, actor: StockCommandActor) {
+    return prisma.$transaction(async (tx) => {
+        const category = await tx.stockCategory.delete({ where: { id } });
+        await createStockCommandAudit(
+            tx,
+            "STOCK_CATEGORY_DELETE",
+            id,
+            actor,
+            { before: { name: category.name } },
+        );
+        return category;
+    });
 }
 
-export async function createItem(data: CreateStockItemInput) {
+export async function createItem(
+    data: CreateStockItemInput,
+    actor: StockCommandActor,
+) {
     const categoryId = data.categoryId ?? (await ensureDefaultCategoryId());
     const sku = data.sku?.trim() ? data.sku.trim() : generateSku();
     const variants = data.variants ?? [];
@@ -237,23 +263,44 @@ export async function createItem(data: CreateStockItemInput) {
             }
         }
 
-        return tx.stockItem.findUniqueOrThrow({
+        const createdItem = await tx.stockItem.findUniqueOrThrow({
             where: { id: item.id },
             include: buildItemInclude(),
         });
+        await createStockCommandAudit(
+            tx,
+            "STOCK_ITEM_CREATE",
+            item.id,
+            actor,
+            { after: { name: createdItem.name, sku: createdItem.sku } },
+        );
+        return createdItem;
     });
 }
 
-export async function updateItem(id: number, data: UpdateItemInput, userId: number) {
+export async function updateItem(
+    id: number,
+    data: UpdateItemInput,
+    actor: StockCommandActor,
+    auditAction: "STOCK_ITEM_UPDATE" | "STOCK_ITEM_DELETE" = "STOCK_ITEM_UPDATE",
+) {
     const cleanupCandidates = new Set<string>();
     const retainedUploadUrls = new Set<string>();
 
-    const updatedItem = await prisma.$transaction((tx) =>
-        updateItemInTransaction(tx, id, data, userId, {
+    const updatedItem = await prisma.$transaction(async (tx) => {
+        const item = await updateItemInTransaction(tx, id, data, actor.id, {
             cleanupCandidates,
             retainedUploadUrls,
-        }),
-    );
+        });
+        await createStockCommandAudit(tx, auditAction, id, actor, {
+            after: {
+                name: item.name,
+                sku: item.sku,
+                isActive: item.isActive,
+            },
+        });
+        return item;
+    });
 
     await cleanupUnusedUploadUrls(cleanupCandidates, retainedUploadUrls);
     return updatedItem;
