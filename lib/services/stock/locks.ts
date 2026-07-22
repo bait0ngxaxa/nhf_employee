@@ -29,7 +29,7 @@ export async function lockStockInventoryRows(
     await tx.$queryRaw`
         SELECT id
         FROM stock_item_variants
-        WHERE "stockItemId" IN (${Prisma.join(sortedItemIds)})
+        WHERE \`stockItemId\` IN (${Prisma.join(sortedItemIds)})
         ORDER BY id
         FOR UPDATE
     `;
