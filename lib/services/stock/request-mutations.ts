@@ -266,11 +266,6 @@ export async function issueRequest(
                 minStock: true,
             },
         });
-        const aggregateLowStockAlerts = buildLowStockAlerts(
-            items,
-            requestedQtyByItemId,
-        );
-
         const variants = await tx.stockItemVariant.findMany({
             where: { id: { in: Array.from(requestedQtyByVariantId.keys()) } },
             select: {
@@ -293,8 +288,14 @@ export async function issueRequest(
                 },
             },
         });
+        const itemIdsWithVariants = new Set(
+            variants.map((variant) => variant.stockItemId),
+        );
+        const legacyItems = items.filter(
+            (item) => !itemIdsWithVariants.has(item.id),
+        );
         const lowStockAlerts = [
-            ...aggregateLowStockAlerts,
+            ...buildLowStockAlerts(legacyItems, requestedQtyByItemId),
             ...buildVariantLowStockAlerts(variants, requestedQtyByVariantId),
         ];
         const variantById = new Map(variants.map((variant) => [variant.id, variant]));

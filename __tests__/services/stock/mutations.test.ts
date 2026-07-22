@@ -243,8 +243,8 @@ describe("Stock Service Mutations", () => {
                         stockItemId: 10,
                         sku: "SKU-101",
                         unit: "ด้าม",
-                        quantity: 20,
-                        minStock: 0,
+                        quantity: 6,
+                        minStock: 5,
                         stockItem: { name: "ปากกา" },
                         attributeValues: [],
                     },
@@ -373,6 +373,60 @@ describe("Stock Service Mutations", () => {
                     data: expect.objectContaining({
                         type: "STOCK_LOW_LINE",
                         payload: expect.stringContaining('"variantId":101'),
+                    }),
+                }),
+            );
+        });
+
+        it("should not duplicate a low-stock alert for a single-variant item", async () => {
+            prismaMock.stockRequest.findUnique.mockResolvedValue(
+                asNever({
+                    requestedBy: 3,
+                    items: [{ itemId: 10, variantId: 101, quantity: 1 }],
+                }),
+            );
+            prismaMock.stockItem.findMany.mockResolvedValue(
+                asNever([{
+                    id: 10,
+                    name: "ปากกา",
+                    sku: "PEN-001",
+                    unit: "ด้าม",
+                    quantity: 6,
+                    minStock: 5,
+                }]),
+            );
+            prismaMock.stockItemVariant.findMany.mockResolvedValue(
+                asNever([{
+                    id: 101,
+                    stockItemId: 10,
+                    sku: "PEN-001",
+                    unit: "ด้าม",
+                    quantity: 6,
+                    minStock: 5,
+                    stockItem: { name: "ปากกา" },
+                    attributeValues: [],
+                }]),
+            );
+            prismaMock.stockItem.update.mockResolvedValue(asNever({ id: 10 }));
+            prismaMock.stockTransaction.create.mockResolvedValue(asNever({ id: 1 }));
+
+            const result = await stockService.issueRequest(99, commandActor(9));
+
+            expect(result.lowStockAlerts).toEqual([{
+                itemId: 10,
+                variantId: 101,
+                itemName: "ปากกา",
+                variantSku: "PEN-001",
+                variantLabel: "PEN-001",
+                quantity: 5,
+                minStock: 5,
+                unit: "ด้าม",
+            }]);
+            expect(prismaMock.notificationOutbox.create).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    data: expect.objectContaining({
+                        type: "STOCK_LOW_LINE",
+                        payload: expect.stringContaining('"itemCount":1'),
                     }),
                 }),
             );
