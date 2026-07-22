@@ -26,6 +26,8 @@ export type StockCommandActor = {
     name: string;
     ipAddress?: string;
     userAgent?: string;
+    requestId?: string;
+    correlationId?: string;
 };
 
 export type PendingRequestItemRecord = {

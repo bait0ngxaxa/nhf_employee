@@ -103,4 +103,27 @@ describe("formatAuditLogDisplay", () => {
         expect(result.summary).not.toContain("OUT");
         expect(result.summary).not.toContain("IN");
     });
+
+    it("formats detailed stock entity types and adjustment before/after values", () => {
+        const adjustment = formatAuditLogDisplay({
+            action: "STOCK_ADJUST",
+            entityType: "StockAdjustment",
+            entityId: 701,
+            details: {
+                before: { quantity: 12, minStock: 4 },
+                after: { name: "หมึกพิมพ์", quantity: 15, minStock: 7 },
+                metadata: { adjustmentQuantity: 3, adjustmentType: "IN" },
+            },
+        });
+        const variant = formatAuditLogDisplay({
+            action: "STOCK_ITEM_UPDATE",
+            entityType: "StockVariant",
+            entityId: 102,
+            details: null,
+        });
+
+        expect(adjustment.entityReference).toBe("รายการปรับยอดสต็อก #701");
+        expect(adjustment.summary).toContain("เพิ่ม 3 จาก 12 เป็น 15");
+        expect(variant.entityReference).toBe("รายการย่อยวัสดุ #102");
+    });
 });

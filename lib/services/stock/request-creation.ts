@@ -14,6 +14,7 @@ import {
     normalizeRequestItems,
 } from "./shared";
 import type { StockCommandActor } from "./types";
+import { createIdempotencyKeyAuditHash } from "./request-idempotency";
 
 export type StockRequestWithDetails = Prisma.StockRequestGetPayload<{
     include: ReturnType<typeof buildRequestInclude>;
@@ -236,8 +237,19 @@ async function persistRequest(
 
     await createStockCommandAudit(tx, "STOCK_REQUEST_CREATE", request.id, actor, {
         after: {
+            status: request.status,
             itemCount: data.items.length,
             projectCode: data.projectCode,
+        },
+        metadata: {
+            stockRequestId: request.id,
+            projectCode: data.projectCode,
+            variantIds: Array.from(new Set(items.map((item) => item.variantId))).sort(
+                (left, right) => left - right,
+            ),
+            idempotencyKeyHash: createIdempotencyKeyAuditHash(
+                identity.idempotencyKey,
+            ),
         },
     });
     await notifyAdminsNewStockRequest(

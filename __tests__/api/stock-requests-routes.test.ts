@@ -274,7 +274,11 @@ describe("Stock Request Routes", () => {
 
             const request = new NextRequest("http://localhost/api/stock/requests", {
                 method: "POST",
-                headers: { "Idempotency-Key": "stock-request-7001" },
+                headers: {
+                    "Idempotency-Key": "stock-request-7001",
+                    "X-Request-Id": "req-stock-7001",
+                    "X-Correlation-Id": "corr-stock-7001",
+                },
                 body: JSON.stringify({
                     projectCode: "prj-2569/01",
                     items: [{ itemId: 10, quantity: 1 }],
@@ -287,11 +291,13 @@ describe("Stock Request Routes", () => {
                 expect.objectContaining({
                     projectCode: "PRJ-2569/01",
                 }),
-                {
+                expect.objectContaining({
                     id: 3,
                     email: "user@test.com",
                     name: "User",
-                },
+                    requestId: "req-stock-7001",
+                    correlationId: "corr-stock-7001",
+                }),
                 { idempotencyKey: "stock-request-7001" },
             );
             expect(processOutbox).toHaveBeenCalledTimes(1);
@@ -483,11 +489,13 @@ describe("Stock Request Routes", () => {
             });
 
             expect(response.status).toBe(200);
-            expect(stockService.issueRequest).toHaveBeenCalledWith(77, {
+            expect(stockService.issueRequest).toHaveBeenCalledWith(77, expect.objectContaining({
                 id: 1,
                 email: "admin@test.com",
                 name: "Admin",
-            });
+                requestId: expect.any(String),
+                correlationId: expect.any(String),
+            }));
             expect(processOutbox).toHaveBeenCalledTimes(1);
         });
     });
@@ -528,11 +536,13 @@ describe("Stock Request Routes", () => {
             );
 
             expect(response.status).toBe(200);
-            expect(stockService.issueRequest).toHaveBeenCalledWith(77, {
+            expect(stockService.issueRequest).toHaveBeenCalledWith(77, expect.objectContaining({
                 id: 1,
                 email: "admin@test.com",
                 name: "Admin",
-            });
+                requestId: expect.any(String),
+                correlationId: expect.any(String),
+            }));
             expect(processOutbox).toHaveBeenCalledTimes(1);
         });
 
@@ -569,11 +579,13 @@ describe("Stock Request Routes", () => {
             expect(response.status).toBe(200);
             expect(stockService.cancelRequest).toHaveBeenCalledWith(
                 77,
-                {
+                expect.objectContaining({
                     id: 1,
                     email: "admin@test.com",
                     name: "Admin",
-                },
+                    requestId: expect.any(String),
+                    correlationId: expect.any(String),
+                }),
                 "ไม่อนุมัติ",
                 { isAdmin: true },
             );
@@ -612,11 +624,13 @@ describe("Stock Request Routes", () => {
             expect(response.status).toBe(200);
             expect(stockService.cancelRequest).toHaveBeenCalledWith(
                 55,
-                {
+                expect.objectContaining({
                     id: 5,
                     email: "user@test.com",
                     name: "Somchai",
-                },
+                    requestId: expect.any(String),
+                    correlationId: expect.any(String),
+                }),
                 "ทดสอบยกเลิก",
                 { isAdmin: false },
             );

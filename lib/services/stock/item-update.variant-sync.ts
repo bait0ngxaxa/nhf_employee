@@ -211,7 +211,7 @@ async function updateSubmittedVariant(
     }
 
     if (delta !== 0) {
-        await tx.stockTransaction.create({
+        const transaction = await tx.stockTransaction.create({
             data: {
                 itemId,
                 variantId: variant.id,
@@ -220,7 +220,13 @@ async function updateSubmittedVariant(
                 note: "ปรับยอดจากหน้าแก้ไขสินค้า",
                 performedBy: userId,
             },
+            select: { id: true },
         });
+        const transactionIds = tracking.transactionIdsByVariantId.get(variant.id) ?? [];
+        tracking.transactionIdsByVariantId.set(
+            variant.id,
+            [...transactionIds, transaction.id],
+        );
     }
 
     trackReplacedUploadUrl(existingVariant.imageUrl, nextVariantImageUrl, tracking);

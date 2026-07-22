@@ -213,6 +213,7 @@ export async function issueRequest(
             where: { id: requestId },
             select: {
                 requestedBy: true,
+                projectCode: true,
                 items: {
                     select: {
                         itemId: true,
@@ -298,6 +299,7 @@ export async function issueRequest(
             ...buildLowStockAlerts(legacyItems, requestedQtyByItemId),
             ...buildVariantLowStockAlerts(variants, requestedQtyByVariantId),
         ];
+        const itemById = new Map(items.map((item) => [item.id, item]));
         const variantById = new Map(variants.map((variant) => [variant.id, variant]));
         const requestedVariantEntries = Array.from(
             requestedQtyByVariantId.entries(),
@@ -352,8 +354,9 @@ export async function issueRequest(
             });
         }
 
+        const transactionIds: number[] = [];
         for (const [variantId, requestItem] of requestedVariantEntries) {
-            await tx.stockTransaction.create({
+            const transaction = await tx.stockTransaction.create({
                 data: {
                     itemId: requestItem.itemId,
                     variantId,
@@ -362,7 +365,9 @@ export async function issueRequest(
                     note: `จ่ายตามคำขอ #${requestId}`,
                     performedBy: actor.id,
                 },
+                select: { id: true },
             });
+            transactionIds.push(transaction.id);
         }
 
         await createStockCommandAudit(
@@ -370,6 +375,41 @@ export async function issueRequest(
             "STOCK_REQUEST_ISSUE",
             requestId,
             actor,
+            {
+                before: { status: StockRequestStatus.PENDING_ISSUE },
+                after: { status: StockRequestStatus.ISSUED },
+                metadata: {
+                    stockRequestId: requestId,
+                    projectCode: request.projectCode,
+                    variantIds: requestedVariantEntries.map(([variantId]) => variantId),
+                    transactionIds,
+                    lines: requestedVariantEntries.map(
+                        ([variantId, requestItem]) => {
+                            const item = itemById.get(requestItem.itemId);
+                            const variant = variantById.get(variantId);
+                            const itemDecrement = requestedQtyByItemId.get(
+                                requestItem.itemId,
+                            ) ?? 0;
+
+                            return {
+                                itemId: requestItem.itemId,
+                                variantId,
+                                quantity: requestItem.quantity,
+                                itemQuantityBefore: item?.quantity,
+                                itemQuantityAfter:
+                                    item === undefined
+                                        ? undefined
+                                        : item.quantity - itemDecrement,
+                                variantQuantityBefore: variant?.quantity,
+                                variantQuantityAfter:
+                                    variant === undefined
+                                        ? undefined
+                                        : variant.quantity - requestItem.quantity,
+                            };
+                        },
+                    ),
+                },
+            },
         );
         await notifyStockRequestResult(
             requestId,
@@ -403,7 +443,7 @@ export async function cancelRequest(
 
         const request = await tx.stockRequest.findUnique({
             where: { id: requestId },
-            select: { status: true, requestedBy: true },
+            select: { status: true, requestedBy: true, projectCode: true },
         });
 
         if (!request) {
@@ -448,7 +488,15 @@ export async function cancelRequest(
             "STOCK_REQUEST_CANCEL",
             requestId,
             actor,
-            { metadata: { reason: reason ?? null } },
+            {
+                before: { status: request.status },
+                after: { status: StockRequestStatus.CANCELLED },
+                metadata: {
+                    stockRequestId: requestId,
+                    projectCode: request.projectCode,
+                    reason: reason ?? null,
+                },
+            },
         );
         await notifyStockRequestResult(
             requestId,

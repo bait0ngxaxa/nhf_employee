@@ -44,6 +44,10 @@ export function createStockRequestHash(data: CreateRequestInput): string {
     return createHash("sha256").update(canonicalPayload).digest("hex");
 }
 
+export function createIdempotencyKeyAuditHash(idempotencyKey: string): string {
+    return createHash("sha256").update(idempotencyKey).digest("hex").slice(0, 12);
+}
+
 export function assertMatchingRequestHash<T>(
     request: T & { requestHash: string },
     requestHash: string,

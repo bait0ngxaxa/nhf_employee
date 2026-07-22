@@ -29,7 +29,9 @@ const ENTITY_LABELS: Record<string, string> = {
     Stock: "สต็อก",
     StockCategory: "หมวดหมู่วัสดุ",
     StockItem: "วัสดุ",
+    StockVariant: "รายการย่อยวัสดุ",
     StockRequest: "คำขอเบิกวัสดุ",
+    StockAdjustment: "รายการปรับยอดสต็อก",
     LeaveRequest: "คำขอลา",
     Leave: "คำขอลา",
 };
@@ -168,10 +170,16 @@ function isLeavePeriod(value: string | null): value is LeavePeriodValue {
     return value === "FULL_DAY" || value === "MORNING" || value === "AFTERNOON";
 }
 
-function formatStockAdjustment(after: Record<string, unknown>): string | null {
-    const previousQty = getNumber(after, "previousQty");
-    const newQty = getNumber(after, "newQty");
-    const quantity = getNumber(after, "quantity");
+function formatStockAdjustment(
+    before: Record<string, unknown>,
+    after: Record<string, unknown>,
+    metadata: Record<string, unknown>,
+): string | null {
+    const previousQty = getNumber(before, "quantity")
+        ?? getNumber(after, "previousQty");
+    const newQty = getNumber(after, "newQty") ?? getNumber(after, "quantity");
+    const quantity = getNumber(metadata, "adjustmentQuantity")
+        ?? getNumber(after, "quantity");
     if (previousQty === null || newQty === null || quantity === null) return null;
 
     const typeLabel = quantity >= 0 ? "เพิ่ม" : "ลด";
@@ -210,7 +218,9 @@ function buildActionSummary(input: AuditLogDisplayInput): string {
     const name = getDisplayName(after) ?? getDisplayName(before);
     const changes = getChangedFields(before, after);
 
-    if (input.action === "STOCK_ADJUST") return formatStockAdjustment(after) ?? "ปรับยอดสต็อก";
+    if (input.action === "STOCK_ADJUST") {
+        return formatStockAdjustment(before, after, metadata) ?? "ปรับยอดสต็อก";
+    }
     if (input.action === "DATA_EXPORT") {
         return formatDataExportSummary(input.entityType, metadata)
             ?? getAuditActionLabel(input.action);

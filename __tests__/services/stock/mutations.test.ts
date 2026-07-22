@@ -20,6 +20,8 @@ function commandActor(id: number): {
     name: string;
     ipAddress: string;
     userAgent: string;
+    requestId: string;
+    correlationId: string;
 } {
     return {
         id,
@@ -27,6 +29,8 @@ function commandActor(id: number): {
         name: "ผู้ใช้ " + id,
         ipAddress: "192.0.2." + id,
         userAgent: "stock-service-test",
+        requestId: `req-${id}`,
+        correlationId: `corr-${id}`,
     };
 }
 
@@ -51,6 +55,7 @@ describe("Stock Service Mutations", () => {
         prismaMock.stockItemVariant.updateMany.mockResolvedValue(
             asNever({ count: 1 }),
         );
+        prismaMock.stockTransaction.create.mockResolvedValue(asNever({ id: 1 }));
         prismaMock.stockRequestItem.findMany.mockResolvedValue(asNever([]));
         prismaMock.user.findMany.mockResolvedValue(asNever([]));
         prismaMock.user.findUnique.mockResolvedValue(
@@ -60,6 +65,93 @@ describe("Stock Service Mutations", () => {
         prismaMock.stockRequest.findUniqueOrThrow.mockResolvedValue(
             asNever({ id: 55, requestedBy: 3 }),
         );
+    });
+
+    describe("audit entity routing", () => {
+        it("should audit category commands as StockCategory", async () => {
+            prismaMock.stockCategory.create.mockResolvedValue(
+                asNever({ id: 41, name: "อุปกรณ์สำนักงาน" }),
+            );
+
+            await stockService.createCategory(
+                { name: "อุปกรณ์สำนักงาน" },
+                commandActor(2),
+            );
+
+            expect(prismaMock.auditLog.create).toHaveBeenCalledWith({
+                data: expect.objectContaining({
+                    action: "STOCK_CATEGORY_CREATE",
+                    entityType: "StockCategory",
+                    entityId: 41,
+                    details: expect.stringContaining('"requestId":"req-2"'),
+                }),
+            });
+        });
+
+        it("should create separate StockItem and StockVariant audit records", async () => {
+            prismaMock.stockItem.create.mockResolvedValue(asNever({
+                id: 51,
+                sku: "PEN-51",
+                unit: "ด้าม",
+                quantity: 4,
+                minStock: 1,
+                imageUrl: null,
+                isActive: true,
+            }));
+            prismaMock.stockItemVariant.create.mockResolvedValue(
+                asNever({ id: 511 }),
+            );
+            prismaMock.stockItem.findUniqueOrThrow.mockResolvedValue(asNever({
+                id: 51,
+                name: "ปากกา",
+                sku: "PEN-51",
+                unit: "ด้าม",
+                quantity: 4,
+                minStock: 1,
+                imageUrl: null,
+                isActive: true,
+                variants: [{
+                    id: 511,
+                    sku: "PEN-51-BLUE",
+                    unit: "ด้าม",
+                    quantity: 4,
+                    minStock: 1,
+                    imageUrl: null,
+                    isActive: true,
+                    attributeValues: [],
+                }],
+            }));
+
+            await stockService.createItem({
+                name: "ปากกา",
+                sku: "PEN-51",
+                categoryId: 4,
+                variants: [{
+                    sku: "PEN-51-BLUE",
+                    unit: "ด้าม",
+                    quantity: 4,
+                    minStock: 1,
+                    attributes: [],
+                }],
+            }, commandActor(2));
+
+            expect(prismaMock.auditLog.create).toHaveBeenCalledTimes(2);
+            expect(prismaMock.auditLog.create).toHaveBeenNthCalledWith(1, {
+                data: expect.objectContaining({
+                    action: "STOCK_ITEM_CREATE",
+                    entityType: "StockItem",
+                    entityId: 51,
+                }),
+            });
+            expect(prismaMock.auditLog.create).toHaveBeenNthCalledWith(2, {
+                data: expect.objectContaining({
+                    action: "STOCK_ITEM_CREATE",
+                    entityType: "StockVariant",
+                    entityId: 511,
+                    details: expect.stringContaining('"itemId":51'),
+                }),
+            });
+        });
     });
 
     describe("issueRequest", () => {
@@ -203,6 +295,7 @@ describe("Stock Service Mutations", () => {
                 asNever({
                     status: "PENDING_ISSUE",
                     requestedBy: 3,
+                    projectCode: "PRJ-ISSUE",
                     items: [
                         { itemId: 10, variantId: null, quantity: 2 },
                         { itemId: 10, variantId: null, quantity: 3 },
@@ -264,9 +357,9 @@ describe("Stock Service Mutations", () => {
                 asNever({ count: 1 }),
             );
             prismaMock.stockItem.update.mockResolvedValue(asNever({ id: 10 }));
-            prismaMock.stockTransaction.create.mockResolvedValue(
-                asNever({ id: 1 }),
-            );
+            prismaMock.stockTransaction.create
+                .mockResolvedValueOnce(asNever({ id: 801 }))
+                .mockResolvedValueOnce(asNever({ id: 802 }));
             await stockService.issueRequest(99, commandActor(9));
 
             expect(prismaMock.stockItemVariant.updateMany).toHaveBeenNthCalledWith(
@@ -296,12 +389,53 @@ describe("Stock Service Mutations", () => {
                 expect.objectContaining({
                     data: expect.objectContaining({
                         action: "STOCK_REQUEST_ISSUE",
+                        entityType: "StockRequest",
                         entityId: 99,
                         ipAddress: "192.0.2.9",
                         userAgent: "stock-service-test",
+                        details: expect.any(String),
                     }),
                 }),
             );
+            const auditDetails = JSON.parse(
+                prismaMock.auditLog.create.mock.calls[0][0].data.details as string,
+            ) as {
+                before: Record<string, unknown>;
+                after: Record<string, unknown>;
+                metadata: Record<string, unknown>;
+            };
+            expect(auditDetails).toEqual({
+                before: { status: "PENDING_ISSUE" },
+                after: { status: "ISSUED" },
+                metadata: expect.objectContaining({
+                    stockRequestId: 99,
+                    projectCode: "PRJ-ISSUE",
+                    variantIds: [101, 121],
+                    transactionIds: [801, 802],
+                    lines: [
+                        {
+                            itemId: 10,
+                            variantId: 101,
+                            quantity: 5,
+                            itemQuantityBefore: 6,
+                            itemQuantityAfter: 1,
+                            variantQuantityBefore: 6,
+                            variantQuantityAfter: 1,
+                        },
+                        {
+                            itemId: 12,
+                            variantId: 121,
+                            quantity: 1,
+                            itemQuantityBefore: 7,
+                            itemQuantityAfter: 6,
+                            variantQuantityBefore: 7,
+                            variantQuantityAfter: 6,
+                        },
+                    ],
+                    requestId: "req-9",
+                    correlationId: "corr-9",
+                }),
+            });
             expect(prismaMock.notification.create).toHaveBeenCalledWith(
                 expect.objectContaining({
                     data: expect.objectContaining({
@@ -552,7 +686,7 @@ describe("Stock Service Mutations", () => {
             prismaMock.stockItem.update.mockResolvedValue(
                 asNever({ quantity: 15, minStock: 7 }),
             );
-            prismaMock.stockTransaction.create.mockResolvedValue(asNever({ id: 1 }));
+            prismaMock.stockTransaction.create.mockResolvedValue(asNever({ id: 701 }));
 
             const result = await stockService.adjustStock(
                 10,
@@ -586,6 +720,32 @@ describe("Stock Service Mutations", () => {
                 newQty: 15,
                 previousMinStock: 4,
                 newMinStock: 7,
+            });
+            expect(prismaMock.auditLog.create).toHaveBeenCalledWith({
+                data: expect.objectContaining({
+                    action: "STOCK_ADJUST",
+                    entityType: "StockAdjustment",
+                    entityId: 701,
+                    details: expect.any(String),
+                }),
+            });
+            const auditDetails = JSON.parse(
+                prismaMock.auditLog.create.mock.calls[0][0].data.details as string,
+            ) as {
+                before: Record<string, unknown>;
+                after: Record<string, unknown>;
+                metadata: Record<string, unknown>;
+            };
+            expect(auditDetails).toEqual({
+                before: expect.objectContaining({ quantity: 12, minStock: 4 }),
+                after: expect.objectContaining({ quantity: 15, minStock: 7 }),
+                metadata: expect.objectContaining({
+                    itemId: 10,
+                    variantId: 102,
+                    transactionIds: [701],
+                    requestId: "req-9",
+                    correlationId: "corr-9",
+                }),
             });
         });
 
@@ -815,9 +975,25 @@ describe("Stock Service Mutations", () => {
                 expect.objectContaining({
                     data: expect.objectContaining({
                         action: "STOCK_REQUEST_CREATE",
+                        entityType: "StockRequest",
                         entityId: 1,
+                        details: expect.any(String),
                     }),
                 }),
+            );
+            const auditDetails = JSON.parse(
+                prismaMock.auditLog.create.mock.calls[0][0].data.details as string,
+            ) as { metadata: Record<string, unknown> };
+            expect(auditDetails.metadata).toEqual(expect.objectContaining({
+                stockRequestId: 1,
+                projectCode: "PRJ-MATCH",
+                variantIds: [501],
+                requestId: "req-7",
+                correlationId: "corr-7",
+                idempotencyKeyHash: expect.stringMatching(/^[a-f0-9]{12}$/),
+            }));
+            expect(auditDetails.metadata.idempotencyKeyHash).not.toBe(
+                requestOptions().idempotencyKey,
             );
             expect(prismaMock.notification.create).toHaveBeenCalledWith(
                 expect.objectContaining({
@@ -1071,7 +1247,19 @@ describe("Stock Service Mutations", () => {
 
         it("should cancel only pending issue requests", async () => {
             prismaMock.stockRequest.findUnique.mockResolvedValue(
-                asNever({ status: "PENDING_ISSUE", requestedBy: 3 }),
+                asNever({
+                    status: "PENDING_ISSUE",
+                    requestedBy: 3,
+                    projectCode: "PRJ-CANCEL",
+                }),
+            );
+            prismaMock.stockRequest.findUniqueOrThrow.mockResolvedValue(
+                asNever({
+                    id: 55,
+                    requestedBy: 3,
+                    status: "CANCELLED",
+                    projectCode: "PRJ-CANCEL",
+                }),
             );
 
             await stockService.cancelRequest(55, commandActor(3), "ผู้เบิกไม่มารับ");
@@ -1090,10 +1278,30 @@ describe("Stock Service Mutations", () => {
                 expect.objectContaining({
                     data: expect.objectContaining({
                         action: "STOCK_REQUEST_CANCEL",
+                        entityType: "StockRequest",
                         entityId: 55,
+                        details: expect.any(String),
                     }),
                 }),
             );
+            const auditDetails = JSON.parse(
+                prismaMock.auditLog.create.mock.calls[0][0].data.details as string,
+            ) as {
+                before: Record<string, unknown>;
+                after: Record<string, unknown>;
+                metadata: Record<string, unknown>;
+            };
+            expect(auditDetails).toEqual({
+                before: { status: "PENDING_ISSUE" },
+                after: { status: "CANCELLED" },
+                metadata: expect.objectContaining({
+                    stockRequestId: 55,
+                    projectCode: "PRJ-CANCEL",
+                    reason: "ผู้เบิกไม่มารับ",
+                    requestId: "req-3",
+                    correlationId: "corr-3",
+                }),
+            });
             expect(prismaMock.notification.create).toHaveBeenCalledWith(
                 expect.objectContaining({
                     data: expect.objectContaining({
@@ -1173,9 +1381,58 @@ describe("Stock Service Mutations", () => {
         });
 
         it("should reduce an existing variant from 5 to 0 and synchronize the parent", async () => {
-            prismaMock.stockItem.findUniqueOrThrow.mockResolvedValue(
-                asNever({ id: 24, sku: "SKU-24", unit: "ชิ้น", quantity: 5, minStock: 1, imageUrl: null, isActive: true }),
-            );
+            prismaMock.stockItem.findUniqueOrThrow
+                .mockResolvedValueOnce(asNever({
+                    id: 24,
+                    name: "ปากกา",
+                    description: null,
+                    sku: "SKU-24",
+                    unit: "ชิ้น",
+                    quantity: 5,
+                    minStock: 1,
+                    imageUrl: null,
+                    categoryId: 4,
+                    isActive: true,
+                    variants: [{
+                        id: 241,
+                        sku: "SKU-24-A",
+                        unit: "ชิ้น",
+                        quantity: 5,
+                        minStock: 1,
+                        imageUrl: null,
+                        isActive: true,
+                    }],
+                }))
+                .mockResolvedValueOnce(asNever({
+                    id: 24,
+                    sku: "SKU-24",
+                    unit: "ชิ้น",
+                    quantity: 5,
+                    minStock: 1,
+                    imageUrl: null,
+                    isActive: true,
+                }))
+                .mockResolvedValueOnce(asNever({
+                    id: 24,
+                    name: "ปากกา",
+                    description: null,
+                    sku: "SKU-24",
+                    unit: "ชิ้น",
+                    quantity: 0,
+                    minStock: 1,
+                    imageUrl: null,
+                    categoryId: 4,
+                    isActive: true,
+                    variants: [{
+                        id: 241,
+                        sku: "SKU-24-A",
+                        unit: "ชิ้น",
+                        quantity: 0,
+                        minStock: 1,
+                        imageUrl: null,
+                        isActive: true,
+                    }],
+                }));
             prismaMock.stockItemVariant.findMany.mockResolvedValue(
                 asNever([{ id: 241, sku: "SKU-24-A", imageUrl: null, isActive: true }]),
             );
@@ -1188,6 +1445,7 @@ describe("Stock Service Mutations", () => {
             prismaMock.stockItem.findUnique.mockResolvedValue(
                 asNever({ id: 24, variants: [] }),
             );
+            prismaMock.stockTransaction.create.mockResolvedValue(asNever({ id: 901 }));
 
             await stockService.updateItem(24, {
                 variants: [{ id: 241, expectedQuantity: 5, sku: "SKU-24-A", unit: "ชิ้น", quantity: 0, minStock: 1, attributes: [] }],
@@ -1201,10 +1459,19 @@ describe("Stock Service Mutations", () => {
             );
             expect(prismaMock.stockTransaction.create).toHaveBeenCalledWith({
                 data: expect.objectContaining({ itemId: 24, variantId: 241, type: "OUT", quantity: -5 }),
+                select: { id: true },
             });
             expect(prismaMock.stockItem.update).toHaveBeenNthCalledWith(2, {
                 where: { id: 24 },
                 data: { quantity: 0, minStock: 1 },
+            });
+            expect(prismaMock.auditLog.create).toHaveBeenCalledTimes(2);
+            expect(prismaMock.auditLog.create).toHaveBeenNthCalledWith(2, {
+                data: expect.objectContaining({
+                    entityType: "StockVariant",
+                    entityId: 241,
+                    details: expect.stringContaining('"transactionIds":[901]'),
+                }),
             });
         });
 

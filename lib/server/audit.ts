@@ -2,6 +2,10 @@ import { prisma } from "@/lib/db/prisma";
 import { getTrustedClientIp } from "@/lib/network/trusted-client-ip";
 import { type AuditAction } from "@prisma/client";
 import { headers } from "next/headers";
+import {
+    getStockAuditEntityType,
+    type StockAuditAction,
+} from "@/lib/audit-log/stock-entity";
 
 /**
  * Audit log details interface
@@ -237,16 +241,7 @@ export async function logLeaveEvent(
  * Create audit log for stock management events
  */
 export async function logStockEvent(
-    action:
-        | "STOCK_ITEM_CREATE"
-        | "STOCK_ITEM_UPDATE"
-        | "STOCK_ITEM_DELETE"
-        | "STOCK_ADJUST"
-        | "STOCK_CATEGORY_CREATE"
-        | "STOCK_CATEGORY_DELETE"
-        | "STOCK_REQUEST_CREATE"
-        | "STOCK_REQUEST_ISSUE"
-        | "STOCK_REQUEST_CANCEL",
+    action: StockAuditAction,
     entityId: number,
     userId: number,
     userEmail: string,
@@ -254,7 +249,7 @@ export async function logStockEvent(
 ): Promise<void> {
     await createAuditLog({
         action,
-        entityType: "Stock",
+        entityType: getStockAuditEntityType(action),
         entityId,
         userId,
         userEmail,

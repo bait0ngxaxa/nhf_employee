@@ -7,6 +7,7 @@ export type SubmittedVariant = NonNullable<UpdateItemInput["variants"]>[number];
 export type UploadUrlTracking = {
     cleanupCandidates: Set<string>;
     retainedUploadUrls: Set<string>;
+    transactionIdsByVariantId: Map<number, number[]>;
 };
 
 export type ExistingItemRecord = {
