@@ -113,9 +113,12 @@ describe("Stock Service Mutations", () => {
                     {
                         id: 101,
                         stockItemId: 10,
+                        sku: "SKU-101",
                         unit: "ด้าม",
                         quantity: 5,
+                        minStock: 0,
                         stockItem: { name: "ปากกา" },
+                        attributeValues: [],
                     },
                 ]),
             );
@@ -154,9 +157,12 @@ describe("Stock Service Mutations", () => {
                     {
                         id: 111,
                         stockItemId: 11,
+                        sku: "SKU-111",
                         unit: "รีม",
                         quantity: 10,
+                        minStock: 0,
                         stockItem: { name: "กระดาษ" },
+                        attributeValues: [],
                     },
                 ]),
             );
@@ -227,16 +233,22 @@ describe("Stock Service Mutations", () => {
                     {
                         id: 101,
                         stockItemId: 10,
+                        sku: "SKU-101",
                         unit: "ด้าม",
                         quantity: 20,
+                        minStock: 0,
                         stockItem: { name: "ปากกา" },
+                        attributeValues: [],
                     },
                     {
                         id: 121,
                         stockItemId: 12,
+                        sku: "SKU-121",
                         unit: "เล่ม",
                         quantity: 7,
+                        minStock: 0,
                         stockItem: { name: "สมุด" },
+                        attributeValues: [],
                     },
                 ]),
             );
@@ -297,6 +309,65 @@ describe("Stock Service Mutations", () => {
             );
         });
 
+        it("should alert for a variant crossing its threshold while aggregate stock stays high", async () => {
+            prismaMock.stockRequest.findUnique.mockResolvedValue(
+                asNever({
+                    requestedBy: 3,
+                    items: [{ itemId: 10, variantId: 101, quantity: 5 }],
+                }),
+            );
+            prismaMock.stockItem.findMany.mockResolvedValue(
+                asNever([{
+                    id: 10,
+                    name: "หมึกพิมพ์",
+                    sku: "INK",
+                    unit: "ตลับ",
+                    quantity: 106,
+                    minStock: 10,
+                }]),
+            );
+            prismaMock.stockItemVariant.findMany.mockResolvedValue(
+                asNever([{
+                    id: 101,
+                    stockItemId: 10,
+                    sku: "INK-BLACK",
+                    unit: "ตลับ",
+                    quantity: 6,
+                    minStock: 5,
+                    stockItem: { name: "หมึกพิมพ์" },
+                    attributeValues: [{
+                        attributeValue: {
+                            value: "ดำ",
+                            attribute: { name: "สี" },
+                        },
+                    }],
+                }]),
+            );
+            prismaMock.stockItem.update.mockResolvedValue(asNever({ id: 10 }));
+            prismaMock.stockTransaction.create.mockResolvedValue(asNever({ id: 1 }));
+
+            const result = await stockService.issueRequest(99, commandActor(9));
+
+            expect(result.lowStockAlerts).toEqual([{
+                itemId: 10,
+                variantId: 101,
+                itemName: "หมึกพิมพ์",
+                variantSku: "INK-BLACK",
+                variantLabel: "สี: ดำ",
+                quantity: 1,
+                minStock: 5,
+                unit: "ตลับ",
+            }]);
+            expect(prismaMock.notificationOutbox.create).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    data: expect.objectContaining({
+                        type: "STOCK_LOW_LINE",
+                        payload: expect.stringContaining('"variantId":101'),
+                    }),
+                }),
+            );
+        });
+
         it("should retry P2034 and lock variants and items in ascending ID order", async () => {
             prismaMock.stockRequest.findUnique.mockResolvedValue(
                 asNever({
@@ -332,16 +403,22 @@ describe("Stock Service Mutations", () => {
                     {
                         id: 200,
                         stockItemId: 10,
+                        sku: "SKU-200",
                         unit: "ด้าม",
                         quantity: 10,
+                        minStock: 0,
                         stockItem: { name: "ปากกา" },
+                        attributeValues: [],
                     },
                     {
                         id: 100,
                         stockItemId: 20,
+                        sku: "SKU-100",
                         unit: "รีม",
                         quantity: 10,
+                        minStock: 0,
                         stockItem: { name: "กระดาษ" },
+                        attributeValues: [],
                     },
                 ]),
             );

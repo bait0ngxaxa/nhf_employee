@@ -178,13 +178,37 @@ function parseStockLowItems(items: unknown[]): StockLowLinePayload["items"] {
         if (
             !isRecord(item) ||
             typeof item.itemId !== "number" ||
-            typeof item.name !== "string" ||
-            typeof item.sku !== "string" ||
             typeof item.quantity !== "number" ||
             typeof item.minStock !== "number" ||
             typeof item.unit !== "string"
         ) {
             throw new Error(`Invalid STOCK_LOW_LINE payload item at index ${index}`);
+        }
+
+        if ("variantId" in item) {
+            if (
+                typeof item.variantId !== "number" ||
+                typeof item.itemName !== "string" ||
+                typeof item.variantSku !== "string" ||
+                typeof item.variantLabel !== "string"
+            ) {
+                throw new Error(`Invalid STOCK_LOW_LINE variant item at index ${index}`);
+            }
+
+            return {
+                itemId: item.itemId,
+                variantId: item.variantId,
+                itemName: item.itemName,
+                variantSku: item.variantSku,
+                variantLabel: item.variantLabel,
+                quantity: item.quantity,
+                minStock: item.minStock,
+                unit: item.unit,
+            };
+        }
+
+        if (typeof item.name !== "string" || typeof item.sku !== "string") {
+            throw new Error(`Invalid STOCK_LOW_LINE aggregate item at index ${index}`);
         }
 
         return {

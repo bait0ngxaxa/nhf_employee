@@ -14,6 +14,7 @@ import {
     createStockRequestHash,
 } from "./request-idempotency";
 import {
+    buildVariantLabel,
     notifyAdminsStockRequestCancelledByRequester,
     notifyStockRequestResult,
     persistLowStockNotifications,
@@ -74,6 +75,50 @@ function buildLowStockAlerts(
                 unit: item.unit,
             },
         ];
+    });
+}
+
+function buildVariantLowStockAlerts(
+    variants: Array<{
+        id: number;
+        stockItemId: number;
+        sku: string;
+        unit: string;
+        quantity: number;
+        minStock: number;
+        stockItem: { name: string };
+        attributeValues: Array<{
+            attributeValue: {
+                value: string;
+                attribute: { name: string };
+            };
+        }>;
+    }>,
+    decrementedByVariantId: Map<number, { quantity: number }>,
+): LowStockAlertCandidate[] {
+    return variants.flatMap((variant) => {
+        const decrementedQuantity =
+            decrementedByVariantId.get(variant.id)?.quantity ?? 0;
+        const nextQuantity = variant.quantity - decrementedQuantity;
+
+        if (
+            decrementedQuantity <= 0 ||
+            variant.quantity <= variant.minStock ||
+            nextQuantity > variant.minStock
+        ) {
+            return [];
+        }
+
+        return [{
+            itemId: variant.stockItemId,
+            variantId: variant.id,
+            itemName: variant.stockItem.name,
+            variantSku: variant.sku,
+            variantLabel: buildVariantLabel(variant.attributeValues) ?? variant.sku,
+            quantity: nextQuantity,
+            minStock: variant.minStock,
+            unit: variant.unit,
+        }];
     });
 }
 
@@ -218,18 +263,37 @@ export async function issueRequest(
                 minStock: true,
             },
         });
-        const lowStockAlerts = buildLowStockAlerts(items, requestedQtyByItemId);
+        const aggregateLowStockAlerts = buildLowStockAlerts(
+            items,
+            requestedQtyByItemId,
+        );
 
         const variants = await tx.stockItemVariant.findMany({
             where: { id: { in: Array.from(requestedQtyByVariantId.keys()) } },
             select: {
                 id: true,
                 stockItemId: true,
+                sku: true,
                 unit: true,
                 quantity: true,
+                minStock: true,
                 stockItem: { select: { name: true } },
+                attributeValues: {
+                    select: {
+                        attributeValue: {
+                            select: {
+                                value: true,
+                                attribute: { select: { name: true } },
+                            },
+                        },
+                    },
+                },
             },
         });
+        const lowStockAlerts = [
+            ...aggregateLowStockAlerts,
+            ...buildVariantLowStockAlerts(variants, requestedQtyByVariantId),
+        ];
         const variantById = new Map(variants.map((variant) => [variant.id, variant]));
         const requestedVariantEntries = Array.from(
             requestedQtyByVariantId.entries(),

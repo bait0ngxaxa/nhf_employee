@@ -1,4 +1,5 @@
 import type { CreateItemInput } from "@/lib/validations/stock";
+import type { StockLowLineItemData } from "@/types/api";
 
 export type CreateStockItemInput = Omit<CreateItemInput, "sku" | "categoryId"> & {
     sku?: string;
@@ -31,14 +32,7 @@ export type PendingRequestItemRecord = {
     quantity: number;
 };
 
-export type LowStockAlertCandidate = {
-    itemId: number;
-    name: string;
-    sku: string;
-    quantity: number;
-    minStock: number;
-    unit: string;
-};
+export type LowStockAlertCandidate = StockLowLineItemData;
 
 export type AdjustStockResult = {
     itemId: number;

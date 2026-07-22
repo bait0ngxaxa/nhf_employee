@@ -91,7 +91,7 @@ export async function notifyAdminsNewStockRequest(
     }, client);
 }
 
-function buildVariantLabel(
+export function buildVariantLabel(
     attributeValues: Array<{
         attributeValue: {
             value: string;
@@ -226,7 +226,12 @@ export async function notifyAdminsStockRequestLineInApp(
 function buildLowStockMessage(payload: StockLowLineData): string {
     const preview = payload.items
         .slice(0, 3)
-        .map((item) => `${item.name} (${item.quantity}/${item.minStock} ${item.unit})`)
+        .map((item) => {
+            const name = "variantId" in item
+                ? `${item.itemName} (${item.variantLabel})`
+                : item.name;
+            return `${name} (${item.quantity}/${item.minStock} ${item.unit})`;
+        })
         .join(", ");
 
     return `วัสดุ ${payload.itemCount} รายการถึงหรือต่ำกว่าจุดแจ้งเตือน${preview ? `: ${preview}` : ""}`;
@@ -241,7 +246,11 @@ export async function notifyAdminsLowStockInApp(
         title: "วัสดุใกล้หมดสต็อก",
         message: buildLowStockMessage(payload),
         actionUrl: "/dashboard?tab=stock&stockTab=inventory",
-        referenceId: payload.items[0]?.sku ?? payload.alertedAt,
+        referenceId: payload.items[0]
+            ? ("variantId" in payload.items[0]
+                ? payload.items[0].variantSku
+                : payload.items[0].sku)
+            : payload.alertedAt,
         dedupeKeyPrefix: `stock-low:${payload.alertedAt}`,
     }, client);
 }

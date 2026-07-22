@@ -5,6 +5,7 @@ import { prisma } from "@/lib/db/prisma";
 import {
     enqueueLineLowStockReached,
     enqueueLineNewStockRequest,
+    notifyAdminsLowStockInApp,
 } from "@/lib/services/stock/notifications";
 
 vi.mock("@/lib/db/prisma", () => ({
@@ -121,5 +122,57 @@ describe("Stock Notifications", () => {
                 expect.objectContaining({ sku: "PAPER-001" }),
             ]),
         );
+    });
+
+    it("should preserve variant identity in low stock line payload", async () => {
+        await enqueueLineLowStockReached([{
+            itemId: 10,
+            variantId: 101,
+            itemName: "หมึกพิมพ์",
+            variantSku: "INK-BLACK",
+            variantLabel: "สี: ดำ",
+            quantity: 1,
+            minStock: 5,
+            unit: "ตลับ",
+        }]);
+
+        const createCall = prismaMock.notificationOutbox.create.mock.calls[0]?.[0];
+        const payload = JSON.parse(createCall?.data.payload ?? "{}") as {
+            items: Array<Record<string, unknown>>;
+        };
+
+        expect(payload.items[0]).toEqual(expect.objectContaining({
+            variantId: 101,
+            itemName: "หมึกพิมพ์",
+            variantSku: "INK-BLACK",
+            variantLabel: "สี: ดำ",
+        }));
+    });
+
+    it("should include variant identity in the in-app low stock message", async () => {
+        prismaMock.user.findMany.mockResolvedValue(asNever([{ id: 7 }]));
+        prismaMock.notification.create.mockResolvedValue(asNever({ id: "notice-1" }));
+
+        await notifyAdminsLowStockInApp({
+            alertedAt: "2026-07-22T03:00:00.000Z",
+            itemCount: 1,
+            items: [{
+                itemId: 10,
+                variantId: 101,
+                itemName: "หมึกพิมพ์",
+                variantSku: "INK-BLACK",
+                variantLabel: "สี: ดำ",
+                quantity: 1,
+                minStock: 5,
+                unit: "ตลับ",
+            }],
+        });
+
+        expect(prismaMock.notification.create).toHaveBeenCalledWith({
+            data: expect.objectContaining({
+                message: "วัสดุ 1 รายการถึงหรือต่ำกว่าจุดแจ้งเตือน: หมึกพิมพ์ (สี: ดำ) (1/5 ตลับ)",
+                referenceId: "INK-BLACK",
+            }),
+        });
     });
 });

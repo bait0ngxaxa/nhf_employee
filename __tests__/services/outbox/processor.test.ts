@@ -751,6 +751,46 @@ describe("processOutbox", () => {
         );
     });
 
+    it("processes variant STOCK_LOW_LINE payload successfully", async () => {
+        vi.mocked(lineNotificationService.sendStockLowNotification).mockResolvedValue(
+            true,
+        );
+        prismaMock.notificationOutbox.findMany.mockResolvedValue(
+            asNever([
+                buildNotification(
+                    116,
+                    "STOCK_LOW_LINE",
+                    JSON.stringify({
+                        alertedAt: new Date().toISOString(),
+                        itemCount: 1,
+                        items: [{
+                            itemId: 10,
+                            variantId: 101,
+                            itemName: "หมึกพิมพ์",
+                            variantSku: "INK-BLACK",
+                            variantLabel: "สี: ดำ",
+                            quantity: 1,
+                            minStock: 5,
+                            unit: "ตลับ",
+                        }],
+                    }),
+                ),
+            ]),
+        );
+
+        const result = await processOutbox();
+
+        expect(result).toEqual({ processed: 1, failed: 0 });
+        expect(lineNotificationService.sendStockLowNotification).toHaveBeenCalledWith(
+            expect.objectContaining({
+                items: [expect.objectContaining({
+                    variantId: 101,
+                    variantSku: "INK-BLACK",
+                })],
+            }),
+        );
+    });
+
     it("creates low stock in-app notification before failed LINE delivery", async () => {
         vi.mocked(lineNotificationService.sendStockLowNotification).mockResolvedValue(
             false,

@@ -6,7 +6,11 @@ import { formatDate } from "../helpers";
 
 function buildItemsPreview(items: StockLowLineData["items"]): string {
     const previewItems = items.slice(0, 3).map((item) => {
-        return `${item.name} (${item.sku})\nคงเหลือ ${item.quantity} ${item.unit} | จุดสั่งซื้อ ${item.minStock}`;
+        const name = "variantId" in item
+            ? `${item.itemName} (${item.variantLabel})`
+            : item.name;
+        const sku = "variantId" in item ? item.variantSku : item.sku;
+        return `${name} (${sku})\nคงเหลือ ${item.quantity} ${item.unit} | จุดสั่งซื้อ ${item.minStock}`;
     });
 
     if (items.length > 3) {
@@ -18,7 +22,11 @@ function buildItemsPreview(items: StockLowLineData["items"]): string {
 
 function getAltText(data: StockLowLineData): string {
     if (data.itemCount === 1) {
-        return `สต็อกต่ำถึงจุดสั่งซื้อ: ${data.items[0]?.name ?? ""}`;
+        const item = data.items[0];
+        const name = item
+            ? ("variantId" in item ? item.itemName : item.name)
+            : "";
+        return `สต็อกต่ำถึงจุดสั่งซื้อ: ${name}`;
     }
 
     return `มี ${data.itemCount} รายการสต็อกต่ำถึงจุดสั่งซื้อ`;

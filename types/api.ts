@@ -79,7 +79,7 @@ export interface StockRequestLineData {
   items: StockRequestLineItemData[];
 }
 
-export interface StockLowLineItemData {
+export interface AggregateStockLowLineItemData {
   itemId: number;
   name: string;
   sku: string;
@@ -87,6 +87,21 @@ export interface StockLowLineItemData {
   minStock: number;
   unit: string;
 }
+
+export interface VariantStockLowLineItemData {
+  itemId: number;
+  variantId: number;
+  itemName: string;
+  variantSku: string;
+  variantLabel: string;
+  quantity: number;
+  minStock: number;
+  unit: string;
+}
+
+export type StockLowLineItemData =
+  | AggregateStockLowLineItemData
+  | VariantStockLowLineItemData;
 
 export interface StockLowLineData {
   alertedAt: string;
