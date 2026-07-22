@@ -4,6 +4,7 @@ import { isAdminRole } from "@/lib/ssot/permissions";
 import { jsonError, serverError } from "@/lib/ssot/http";
 import { executeCancelStockRequest } from "@/lib/server/stock-request-commands";
 import { cancelRequestSchema } from "@/lib/validations/stock";
+import { WorkforceAuthorizationError } from "@/lib/auth/workforce-transaction";
 
 interface RouteParams {
     params: Promise<{ id: string }>;
@@ -47,6 +48,9 @@ export async function POST(
 
         return NextResponse.json({ request: updated });
     } catch (error) {
+        if (error instanceof WorkforceAuthorizationError) {
+            return jsonError(error.message, 403);
+        }
         const message = error instanceof Error ? error.message : "";
         if (
             message.includes("ไม่พบ") ||

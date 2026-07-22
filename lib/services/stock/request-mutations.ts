@@ -1,5 +1,6 @@
 import { StockRequestStatus, type Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
+import { assertActiveWorkforceInTransaction } from "@/lib/auth/workforce-transaction";
 import {
     hasPrismaErrorCode,
     runSerializableTransaction,
@@ -137,6 +138,8 @@ export async function createRequest(
 
     try {
         return await runSerializableTransaction(async (tx) => {
+            await assertActiveWorkforceInTransaction(tx, actor.id);
+
             const existingRequest = await tx.stockRequest.findUnique({
                 where: idempotencyWhere,
                 include: buildRequestInclude(),
@@ -392,7 +395,11 @@ export async function cancelRequest(
     reason?: string | null,
     options: CancelRequestOptions = { isAdmin: false },
 ): Promise<Prisma.StockRequestGetPayload<Record<string, never>>> {
-    return prisma.$transaction(async (tx) => {
+    return runSerializableTransaction(async (tx) => {
+        if (!options.isAdmin) {
+            await assertActiveWorkforceInTransaction(tx, actor.id);
+        }
+
         const request = await tx.stockRequest.findUnique({
             where: { id: requestId },
             select: { status: true, requestedBy: true },

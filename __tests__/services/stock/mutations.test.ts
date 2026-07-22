@@ -49,6 +49,10 @@ describe("Stock Service Mutations", () => {
         );
         prismaMock.stockRequestItem.findMany.mockResolvedValue(asNever([]));
         prismaMock.user.findMany.mockResolvedValue(asNever([]));
+        prismaMock.user.findUnique.mockResolvedValue(
+            asNever({ employeeId: 100 }),
+        );
+        prismaMock.user.findFirst.mockResolvedValue(asNever({ id: 7 }));
         prismaMock.stockRequest.findUniqueOrThrow.mockResolvedValue(
             asNever({ id: 55, requestedBy: 3 }),
         );
@@ -550,6 +554,22 @@ describe("Stock Service Mutations", () => {
         const replayRequestHash =
             "754a463c6c01837c67a1b6ee5d3d9b9e36d2f6ff0f8adc3ef38fe76e265e6e57";
 
+        it("should reject when workforce becomes inactive before the transaction", async () => {
+            prismaMock.user.findFirst.mockResolvedValue(null);
+
+            await expect(
+                stockService.createRequest(
+                    replayPayload,
+                    commandActor(7),
+                    requestOptions(),
+                ),
+            ).rejects.toThrow("ไม่มีสิทธิ์ดำเนินการสำหรับสถานะพนักงานปัจจุบัน");
+
+            expect(prismaMock.$queryRaw).toHaveBeenCalledTimes(2);
+            expect(prismaMock.stockRequest.findUnique).not.toHaveBeenCalled();
+            expect(prismaMock.stockRequest.create).not.toHaveBeenCalled();
+        });
+
         it("should return the original request for the same key and payload", async () => {
             prismaMock.stockRequest.findUnique.mockResolvedValue(asNever({
                 id: 91,
@@ -893,6 +913,23 @@ describe("Stock Service Mutations", () => {
     });
 
     describe("cancelRequest", () => {
+        it("should reject user cancellation when workforce becomes inactive", async () => {
+            prismaMock.user.findFirst.mockResolvedValue(null);
+
+            await expect(
+                stockService.cancelRequest(
+                    55,
+                    commandActor(3),
+                    "ผู้เบิกไม่มารับ",
+                    { isAdmin: false },
+                ),
+            ).rejects.toThrow("ไม่มีสิทธิ์ดำเนินการสำหรับสถานะพนักงานปัจจุบัน");
+
+            expect(prismaMock.$queryRaw).toHaveBeenCalledTimes(2);
+            expect(prismaMock.stockRequest.findUnique).not.toHaveBeenCalled();
+            expect(prismaMock.stockRequest.updateMany).not.toHaveBeenCalled();
+        });
+
         it("should not cancel a request that an issue transaction has already claimed", async () => {
             prismaMock.stockRequest.findUnique.mockResolvedValue(
                 asNever({ status: "PENDING_ISSUE", requestedBy: 3 }),

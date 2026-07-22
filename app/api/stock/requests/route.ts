@@ -11,6 +11,7 @@ import {
     StockRequestIdempotencyConflictError,
 } from "@/lib/services/stock/request-idempotency";
 import { processOutbox } from "@/lib/services/outbox/processor";
+import { WorkforceAuthorizationError } from "@/lib/auth/workforce-transaction";
 import {
     createRequestSchema,
     idempotencyKeySchema,
@@ -99,6 +100,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
             { status: creation.replayed ? 200 : 201 },
         );
     } catch (error) {
+        if (error instanceof WorkforceAuthorizationError) {
+            return jsonError(error.message, 403);
+        }
         if (error instanceof StockRequestIdempotencyConflictError) {
             return jsonError(error.message, 409);
         }

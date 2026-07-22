@@ -14,6 +14,7 @@ import { isAdminRole } from "@/lib/ssot/permissions";
 import { stockService } from "@/lib/services/stock";
 import { StockRequestIdempotencyConflictError } from "@/lib/services/stock/request-idempotency";
 import { processOutbox } from "@/lib/services/outbox/processor";
+import { WorkforceAuthorizationError } from "@/lib/auth/workforce-transaction";
 
 vi.mock("next/server", async (importOriginal) => {
     const actual = await importOriginal<typeof NextServerModule>();
@@ -294,6 +295,35 @@ describe("Stock Request Routes", () => {
                 { idempotencyKey: "stock-request-7001" },
             );
             expect(processOutbox).toHaveBeenCalledTimes(1);
+        });
+
+        it("should return 403 when workforce becomes inactive inside transaction", async () => {
+            vi.mocked(getApiAuthSession).mockResolvedValue({
+                user: { id: "3", email: "user@test.com", name: "User", role: "USER" },
+            } as never);
+            vi.mocked(buildUserContext).mockReturnValue({
+                id: 3,
+                email: "user@test.com",
+                role: "USER",
+                name: "User",
+            });
+            vi.mocked(stockService.createRequest).mockRejectedValue(
+                new WorkforceAuthorizationError(),
+            );
+
+            const response = await postRequestsRoute(
+                new NextRequest("http://localhost/api/stock/requests", {
+                    method: "POST",
+                    headers: { "Idempotency-Key": "stock-request-7001" },
+                    body: JSON.stringify({
+                        projectCode: "PRJ-2569/01",
+                        items: [{ itemId: 10, quantity: 1 }],
+                    }),
+                }),
+            );
+
+            expect(response.status).toBe(403);
+            expect(processOutbox).not.toHaveBeenCalled();
         });
 
         it("should require an Idempotency-Key for a valid payload", async () => {
@@ -590,6 +620,35 @@ describe("Stock Request Routes", () => {
                 "ทดสอบยกเลิก",
                 { isAdmin: false },
             );
+        });
+
+        it("should return 403 when workforce becomes inactive inside transaction", async () => {
+            vi.mocked(getApiAuthSession).mockResolvedValue({
+                user: { id: "5", email: "user@test.com", role: "USER" },
+            } as never);
+            vi.mocked(buildUserContext).mockReturnValue({
+                id: 5,
+                email: "user@test.com",
+                role: "USER",
+                name: "Somchai",
+            });
+            vi.mocked(isAdminRole).mockReturnValue(false);
+            vi.mocked(stockService.cancelRequest).mockRejectedValue(
+                new WorkforceAuthorizationError(),
+            );
+
+            const response = await cancelRequestRoute(
+                new NextRequest(
+                    "http://localhost/api/stock/requests/55/cancel",
+                    {
+                        method: "POST",
+                        body: JSON.stringify({ cancelReason: "ทดสอบยกเลิก" }),
+                    },
+                ),
+                { params: Promise.resolve({ id: "55" }) },
+            );
+
+            expect(response.status).toBe(403);
         });
     });
 });
