@@ -133,7 +133,7 @@ export async function issueRequest(
     requestId: number,
     actor: StockCommandActor,
 ): Promise<IssueRequestResult<{ id: number; requestedBy: number }>> {
-    return prisma.$transaction(async (tx) => {
+    return runSerializableTransaction(async (tx) => {
         const issuedAt = new Date();
         const claimedRequest = await tx.stockRequest.updateMany({
             where: {
@@ -231,8 +231,14 @@ export async function issueRequest(
             },
         });
         const variantById = new Map(variants.map((variant) => [variant.id, variant]));
+        const requestedVariantEntries = Array.from(
+            requestedQtyByVariantId.entries(),
+        ).sort(([leftVariantId], [rightVariantId]) => leftVariantId - rightVariantId);
+        const requestedItemEntries = Array.from(
+            requestedQtyByItemId.entries(),
+        ).sort(([leftItemId], [rightItemId]) => leftItemId - rightItemId);
 
-        for (const [variantId, requestItem] of requestedQtyByVariantId) {
+        for (const [variantId, requestItem] of requestedVariantEntries) {
             const variant = variantById.get(variantId);
             if (!variant) {
                 throw new Error("ไม่พบรายการย่อยของวัสดุ");
@@ -244,7 +250,7 @@ export async function issueRequest(
             }
         }
 
-        for (const [variantId, requestItem] of requestedQtyByVariantId) {
+        for (const [variantId, requestItem] of requestedVariantEntries) {
             const updatedVariant = await tx.stockItemVariant.updateMany({
                 where: {
                     id: variantId,
@@ -269,12 +275,16 @@ export async function issueRequest(
                     `${variant.stockItem.name} มีไม่เพียงพอ (คงเหลือ: ${variant.quantity} ${variant.unit})`,
                 );
             }
+        }
 
+        for (const [itemId, quantity] of requestedItemEntries) {
             await tx.stockItem.update({
-                where: { id: requestItem.itemId },
-                data: { quantity: { decrement: requestItem.quantity } },
+                where: { id: itemId },
+                data: { quantity: { decrement: quantity } },
             });
+        }
 
+        for (const [variantId, requestItem] of requestedVariantEntries) {
             await tx.stockTransaction.create({
                 data: {
                     itemId: requestItem.itemId,

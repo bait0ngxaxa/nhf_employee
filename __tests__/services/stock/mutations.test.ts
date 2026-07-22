@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { PrismaClient } from "@prisma/client";
+import { Prisma, type PrismaClient } from "@prisma/client";
 import { mockDeep, mockReset } from "vitest-mock-extended";
 import { prisma } from "@/lib/db/prisma";
 import { stockService } from "@/lib/services/stock";
@@ -295,6 +295,85 @@ describe("Stock Service Mutations", () => {
                     }),
                 }),
             );
+        });
+
+        it("should retry P2034 and lock variants and items in ascending ID order", async () => {
+            prismaMock.stockRequest.findUnique.mockResolvedValue(
+                asNever({
+                    requestedBy: 3,
+                    items: [
+                        { itemId: 10, variantId: 200, quantity: 2 },
+                        { itemId: 20, variantId: 100, quantity: 3 },
+                    ],
+                }),
+            );
+            prismaMock.stockItem.findMany.mockResolvedValue(
+                asNever([
+                    {
+                        id: 20,
+                        name: "กระดาษ",
+                        sku: "PAPER-20",
+                        unit: "รีม",
+                        quantity: 10,
+                        minStock: 1,
+                    },
+                    {
+                        id: 10,
+                        name: "ปากกา",
+                        sku: "PEN-10",
+                        unit: "ด้าม",
+                        quantity: 10,
+                        minStock: 1,
+                    },
+                ]),
+            );
+            prismaMock.stockItemVariant.findMany.mockResolvedValue(
+                asNever([
+                    {
+                        id: 200,
+                        stockItemId: 10,
+                        unit: "ด้าม",
+                        quantity: 10,
+                        stockItem: { name: "ปากกา" },
+                    },
+                    {
+                        id: 100,
+                        stockItemId: 20,
+                        unit: "รีม",
+                        quantity: 10,
+                        stockItem: { name: "กระดาษ" },
+                    },
+                ]),
+            );
+            prismaMock.stockItem.update.mockResolvedValue(asNever({ id: 10 }));
+            prismaMock.stockTransaction.create.mockResolvedValue(asNever({ id: 1 }));
+            prismaMock.$transaction.mockRejectedValueOnce({ code: "P2034" });
+
+            await stockService.issueRequest(99, commandActor(9));
+
+            expect(prismaMock.stockItemVariant.updateMany).toHaveBeenNthCalledWith(
+                1,
+                expect.objectContaining({ where: { id: 100, quantity: { gte: 3 } } }),
+            );
+            expect(prismaMock.stockItemVariant.updateMany).toHaveBeenNthCalledWith(
+                2,
+                expect.objectContaining({ where: { id: 200, quantity: { gte: 2 } } }),
+            );
+            expect(prismaMock.stockItem.update).toHaveBeenNthCalledWith(1, {
+                where: { id: 10 },
+                data: { quantity: { decrement: 2 } },
+            });
+            expect(prismaMock.stockItem.update).toHaveBeenNthCalledWith(2, {
+                where: { id: 20 },
+                data: { quantity: { decrement: 3 } },
+            });
+            expect(prismaMock.$transaction).toHaveBeenCalledWith(
+                expect.any(Function),
+                {
+                    isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+                },
+            );
+            expect(prismaMock.$transaction).toHaveBeenCalledTimes(2);
         });
     });
 
