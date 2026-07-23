@@ -12,6 +12,6 @@ export default defineConfig({
             "@": resolve(__dirname, "./"),
         },
         // Optional: excluding e2e or other folders
-        exclude: ["node_modules", ".next", ".git"],
+        exclude: ["node_modules", ".next", ".git", "__tests__/integration/**"],
     },
 });

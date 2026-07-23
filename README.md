@@ -2,6 +2,21 @@
 
 ระบบจัดการข้อมูลพนักงานและงานบริการด้านไอทีสำหรับมูลนิธิสาธารณสุขแห่งชาติ (National Health Foundation - NHF)
 
+## MySQL Integration Tests
+
+ชุดทดสอบ concurrency ของสต็อกใช้ MySQL 8 จริงและฐานข้อมูลแยกจากฐานพัฒนา
+
+```powershell
+Copy-Item integration.env.example integration.env
+# แก้รหัสผ่านใน integration.env ก่อนรัน
+docker compose --env-file integration.env -f docker-compose.integration.yml up -d --wait --force-recreate
+npm run test:integration:mysql
+docker compose --env-file integration.env -f docker-compose.integration.yml down
+```
+
+คำสั่งทดสอบจะรัน Prisma migrations ก่อนเสมอ และปฏิเสธ URL ที่ชื่อฐานข้อมูลไม่ได้ลงท้ายด้วย
+`_integration` หรือ `_test` เพื่อป้องกันการล้างข้อมูลผิดฐาน
+
 ## ภาพรวม
 
 ระบบนี้รวมงานหลัก 2 ส่วนไว้ในที่เดียว

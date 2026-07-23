@@ -14,7 +14,8 @@
     "test": "vitest",
     "test:run": "vitest run",
     "test:watch": "vitest --watch",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "test:integration:mysql": "node scripts/run-mysql-integration-tests.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
@@ -62,6 +63,7 @@
     "eslint": "^9.39.2",
     "eslint-config-next": "^15.5.2",
     "jsdom": "^27.4.0",
+    "mysql2": "^3.23.1",
     "prisma": "^6.19.3",
     "tailwindcss": "^4",
     "tsx": "^4.20.5",
