@@ -93,11 +93,11 @@ describe("/api/leave/not-taken", () => {
             startDate: new Date("2000-01-01T00:00:00.000Z"),
             endDate: new Date("2000-01-01T00:00:00.000Z"),
             period: "FULL_DAY",
-            durationDays: 1,
+            durationHalfDays: 2,
             reason: "ลาป่วย",
             emergencyReason: null,
             specialReason: null,
-            overQuotaDays: 0,
+            overQuotaHalfDays: 0,
             status: "APPROVED",
             approverId: 20,
             approvedAt: new Date("2000-01-01T00:00:00.000Z"),
@@ -176,11 +176,11 @@ describe("/api/leave/not-taken", () => {
             startDate: new Date("2000-01-01T00:00:00.000Z"),
             endDate: new Date("2000-01-01T00:00:00.000Z"),
             period: "FULL_DAY",
-            durationDays: 1,
+            durationHalfDays: 2,
             reason: "Not taken",
             emergencyReason: null,
             specialReason: null,
-            overQuotaDays: 0,
+            overQuotaHalfDays: 0,
             status: "APPROVED",
             approverId: 20,
             approvedAt: new Date("2000-01-01T00:00:00.000Z"),
@@ -241,11 +241,11 @@ describe("/api/leave/not-taken", () => {
             startDate: new Date("2000-02-01T00:00:00.000Z"),
             endDate: new Date("2000-02-01T00:00:00.000Z"),
             period: "FULL_DAY",
-            durationDays: 1,
+            durationHalfDays: 2,
             reason: "ลาพักร้อน",
             emergencyReason: null,
             specialReason: null,
-            overQuotaDays: 0,
+            overQuotaHalfDays: 0,
             status: "APPROVED",
             approverId: 20,
             approvedAt: new Date("2000-02-01T00:00:00.000Z"),
@@ -279,16 +279,18 @@ describe("/api/leave/not-taken", () => {
             employeeId: 10,
             year: 2000,
             leaveType: "VACATION",
-            totalDays: 6,
-            usedDays: 3,
+            totalHalfDays: 12,
+            usedHalfDays: 6,
         });
         vi.mocked(prisma.leaveRequest.updateMany).mockResolvedValue({ count: 1 });
         vi.mocked(prisma.leaveRequest.findUniqueOrThrow).mockResolvedValue({
             id: "leave-2",
+            durationHalfDays: 2,
+            overQuotaHalfDays: 0,
         } as Awaited<ReturnType<typeof prisma.leaveRequest.findUniqueOrThrow>>);
         vi.mocked(prisma.leaveQuota.update).mockResolvedValue({
             id: "quota-1",
-            usedDays: 2,
+            usedHalfDays: 4,
         } as Awaited<ReturnType<typeof prisma.leaveQuota.update>>);
 
         const req = new NextRequest("http://localhost/api/leave/not-taken", {
@@ -307,7 +309,7 @@ describe("/api/leave/not-taken", () => {
         });
         expect(prisma.leaveQuota.update).toHaveBeenCalledWith({
             where: { id: "quota-1" },
-            data: { usedDays: { decrement: 1 } },
+            data: { usedHalfDays: { decrement: 2 } },
         });
         expect(prisma.notification.updateMany).toHaveBeenCalledWith({
             where: {
@@ -390,11 +392,11 @@ describe("/api/leave/not-taken", () => {
             startDate: new Date("2000-02-01T00:00:00.000Z"),
             endDate: new Date("2000-02-01T00:00:00.000Z"),
             period: "FULL_DAY",
-            durationDays: 1,
+            durationHalfDays: 2,
             reason: "ลาพักร้อน",
             emergencyReason: null,
             specialReason: null,
-            overQuotaDays: 0,
+            overQuotaHalfDays: 0,
             status: "APPROVED",
             approverId: 20,
             approvedAt: new Date("2000-02-01T00:00:00.000Z"),
@@ -428,13 +430,13 @@ describe("/api/leave/not-taken", () => {
             employeeId: 10,
             year: 2000,
             leaveType: "VACATION",
-            totalDays: 6,
-            usedDays: 0.5,
+            totalHalfDays: 12,
+            usedHalfDays: 1,
         });
         vi.mocked(prisma.leaveRequest.updateMany).mockResolvedValue({ count: 1 });
         vi.mocked(prisma.leaveQuota.update).mockResolvedValue({
             id: "quota-1",
-            usedDays: -0.5,
+            usedHalfDays: -1,
         } as Awaited<ReturnType<typeof prisma.leaveQuota.update>>);
 
         const req = new NextRequest("http://localhost/api/leave/not-taken", {

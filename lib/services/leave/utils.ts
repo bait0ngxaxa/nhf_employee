@@ -62,3 +62,15 @@ export function calculateLeaveDuration(
     }
     return workingDays === 0 ? 0 : 0.5;
 }
+
+export function calculateLeaveDurationHalfDays(
+    startDate: Date,
+    endDate: Date,
+    period: LeavePeriodValue,
+): number {
+    const workingDays = getWorkingDays(startDate, endDate);
+    if (period === "FULL_DAY") {
+        return workingDays * 2;
+    }
+    return workingDays === 0 ? 0 : 1;
+}

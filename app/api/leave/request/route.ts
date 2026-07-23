@@ -1,5 +1,5 @@
 import { NextResponse, after } from "next/server";
-import { DEFAULT_LEAVE_QUOTAS } from "@/constants/leave";
+import { DEFAULT_LEAVE_QUOTA_HALF_DAYS } from "@/constants/leave";
 import { requireActiveWorkforceSession } from "@/lib/auth/workforce";
 import { logLeaveEvent } from "@/lib/server/audit";
 import {
@@ -7,7 +7,8 @@ import {
     isEmployeeInTransaction,
 } from "@/lib/services/leave/active-employee-session";
 import { isActiveLeaveApprover } from "@/lib/services/leave/approver-eligibility";
-import { calculateAdditionalOverQuotaDays } from "@/lib/services/leave/over-quota";
+import { halfDaysToDays, toLeaveRequestDays } from "@/lib/services/leave/half-days";
+import { calculateAdditionalOverQuotaHalfDays } from "@/lib/services/leave/over-quota";
 import {
     buildConfiguredApproverSnapshot,
     buildLeaveActionDeliveryIdentity,
@@ -15,7 +16,7 @@ import {
     type LeaveActionPayload,
 } from "@/lib/services/leave/notification-payloads";
 import { getLeaveYearFromDateValue } from "@/lib/services/leave/quota-year";
-import { calculateLeaveDuration, isWorkingDay } from "@/lib/services/leave/utils";
+import { calculateLeaveDurationHalfDays, isWorkingDay } from "@/lib/services/leave/utils";
 import { processOutbox } from "@/lib/services/outbox/processor";
 import { runSerializableTransaction } from "@/lib/db/transaction";
 import { jsonError, notFound } from "@/lib/ssot/http";
@@ -82,13 +83,14 @@ export async function POST(req: Request) {
 
         const start = new Date(startDate);
         const end = new Date(endDate);
-        const durationDays = calculateLeaveDuration(start, end, period);
+        const durationHalfDays = calculateLeaveDurationHalfDays(start, end, period);
+        const durationDays = halfDaysToDays(durationHalfDays);
 
         if (period !== "FULL_DAY") {
-            if (durationDays === 0) {
+            if (durationHalfDays === 0) {
                 return jsonError(LEAVE_REQUEST_MESSAGES.holidayConflict, 400);
             }
-        } else if (durationDays === 0) {
+        } else if (durationHalfDays === 0) {
             return jsonError(LEAVE_REQUEST_MESSAGES.holidayConflict, 400);
         } else if (!isWorkingDay(start) || !isWorkingDay(end)) {
             return jsonError(LEAVE_REQUEST_MESSAGES.holidayConflict, 400);
@@ -154,17 +156,18 @@ export async function POST(req: Request) {
                         employeeId,
                         year: currentYear,
                         leaveType,
-                        totalDays: DEFAULT_LEAVE_QUOTAS[leaveType],
-                        usedDays: 0,
+                        totalHalfDays: DEFAULT_LEAVE_QUOTA_HALF_DAYS[leaveType],
+                        usedHalfDays: 0,
                     },
                 });
             }
 
-            const overQuotaDays = calculateAdditionalOverQuotaDays(
-                quota.totalDays,
-                quota.usedDays,
-                durationDays,
+            const overQuotaHalfDays = calculateAdditionalOverQuotaHalfDays(
+                quota.totalHalfDays,
+                quota.usedHalfDays,
+                durationHalfDays,
             );
+            const overQuotaDays = halfDaysToDays(overQuotaHalfDays);
             if (overQuotaDays > 0 && !normalizedSpecialReason) {
                 throw new LeaveRequestError(LEAVE_REQUEST_MESSAGES.specialReasonRequired, 400);
             }
@@ -176,11 +179,11 @@ export async function POST(req: Request) {
                     startDate: new Date(startDate),
                     endDate: new Date(endDate),
                     period,
-                    durationDays,
+                    durationHalfDays,
                     reason,
                     emergencyReason: normalizedEmergencyReason,
                     specialReason: normalizedSpecialReason,
-                    overQuotaDays,
+                    overQuotaHalfDays,
                     status: "PENDING",
                     approverId: employee.managerId,
                 },
@@ -234,7 +237,10 @@ export async function POST(req: Request) {
             },
         }).catch((err) => console.error("Failed to log audit event:", err));
 
-        return NextResponse.json({ success: true, data: result }, { status: 201 });
+        return NextResponse.json(
+            { success: true, data: toLeaveRequestDays(result) },
+            { status: 201 },
+        );
     } catch (error) {
         console.error("Leave request error:", error);
         if (error instanceof LeaveRequestError) {

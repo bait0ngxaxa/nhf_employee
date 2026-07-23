@@ -13,7 +13,8 @@ import {
     type LeaveResultPayload,
 } from "@/lib/services/leave/notification-payloads";
 import { getLeaveYearFromDateValue } from "@/lib/services/leave/quota-year";
-import { calculateAdditionalOverQuotaDays } from "@/lib/services/leave/over-quota";
+import { halfDaysToDays, toLeaveRequestDays } from "@/lib/services/leave/half-days";
+import { calculateAdditionalOverQuotaHalfDays } from "@/lib/services/leave/over-quota";
 import { jsonError, notFound } from "@/lib/ssot/http";
 import { FEATURE_KEYS, isFeatureEnabled } from "@/lib/ssot/features";
 import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
@@ -120,12 +121,12 @@ export async function POST(req: Request): Promise<NextResponse> {
                     );
                 }
 
-                const overQuotaDays = calculateAdditionalOverQuotaDays(
-                    quota.totalDays,
-                    quota.usedDays,
-                    leaveRequest.durationDays,
+                const overQuotaHalfDays = calculateAdditionalOverQuotaHalfDays(
+                    quota.totalHalfDays,
+                    quota.usedHalfDays,
+                    leaveRequest.durationHalfDays,
                 );
-                if (overQuotaDays > 0 && !leaveRequest.specialReason) {
+                if (overQuotaHalfDays > 0 && !leaveRequest.specialReason) {
                     throw new LeaveApprovalError(
                         LEAVE_APPROVAL_MESSAGES.specialReasonRequired,
                         409,
@@ -134,13 +135,15 @@ export async function POST(req: Request): Promise<NextResponse> {
 
                 await tx.leaveQuota.update({
                     where: { id: quota.id },
-                    data: { usedDays: { increment: leaveRequest.durationDays } },
+                    data: {
+                        usedHalfDays: { increment: leaveRequest.durationHalfDays },
+                    },
                 });
 
-                if (overQuotaDays !== leaveRequest.overQuotaDays) {
+                if (overQuotaHalfDays !== leaveRequest.overQuotaHalfDays) {
                     await tx.leaveRequest.updateMany({
                         where: { id: leaveId, status: "APPROVED" },
-                        data: { overQuotaDays },
+                        data: { overQuotaHalfDays },
                     });
                 }
             }
@@ -167,7 +170,7 @@ export async function POST(req: Request): Promise<NextResponse> {
                 startDate: leaveRequest.startDate.toISOString(),
                 endDate: leaveRequest.endDate.toISOString(),
                 period: leaveRequest.period,
-                durationDays: leaveRequest.durationDays,
+                durationDays: halfDaysToDays(leaveRequest.durationHalfDays),
                 status: newStatus,
                 reason: action === "REJECT" ? reason ?? null : null,
             };
@@ -198,7 +201,7 @@ export async function POST(req: Request): Promise<NextResponse> {
             );
         });
 
-        return NextResponse.json({ success: true, data: result });
+        return NextResponse.json({ success: true, data: toLeaveRequestDays(result) });
     } catch (error) {
         console.error("Intranet Leave Approval Error:", error);
         if (error instanceof LeaveApprovalError) {

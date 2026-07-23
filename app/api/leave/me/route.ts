@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
 
-import { ALL_LEAVE_TYPES, DEFAULT_LEAVE_QUOTAS } from "@/constants/leave";
+import { ALL_LEAVE_TYPES, DEFAULT_LEAVE_QUOTA_HALF_DAYS } from "@/constants/leave";
 import { requireActiveWorkforceSession } from "@/lib/auth/workforce";
 import { prisma } from "@/lib/db/prisma";
 import { getCurrentLeaveYear } from "@/lib/services/leave/quota-year";
+import { toLeaveQuotaDays, toLeaveRequestDays } from "@/lib/services/leave/half-days";
 import { jsonError, notFound } from "@/lib/ssot/http";
 import { FEATURE_KEYS, isFeatureEnabled } from "@/lib/ssot/features";
 import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
@@ -38,8 +39,8 @@ export async function GET(req: Request) {
                     employeeId,
                     year: currentYear,
                     leaveType,
-                    totalDays: DEFAULT_LEAVE_QUOTAS[leaveType],
-                    usedDays: 0,
+                    totalHalfDays: DEFAULT_LEAVE_QUOTA_HALF_DAYS[leaveType],
+                    usedHalfDays: 0,
                 })),
                 skipDuplicates: true,
             });
@@ -83,8 +84,8 @@ export async function GET(req: Request) {
         ]);
 
         return NextResponse.json({
-            quotas,
-            history,
+            quotas: quotas.map(toLeaveQuotaDays),
+            history: history.map(toLeaveRequestDays),
             metadata: {
                 currentPage: page,
                 totalPages: Math.ceil(totalCount / limit),

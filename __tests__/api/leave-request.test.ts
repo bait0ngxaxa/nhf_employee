@@ -244,12 +244,16 @@ describe("POST /api/leave/request", () => {
 
         (prisma.employee.findUnique as unknown as { mockResolvedValue: (v: ReturnType<typeof buildEmployeeWithManager>) => void }).mockResolvedValue(buildEmployeeWithManager());
         (prisma.leaveRequest.findFirst as unknown as { mockResolvedValue: (v: null) => void }).mockResolvedValue(null);
-        (prisma.leaveQuota.findFirst as unknown as { mockResolvedValue: (v: { id: number; totalDays: number; usedDays: number }) => void }).mockResolvedValue({
+        (prisma.leaveQuota.findFirst as unknown as { mockResolvedValue: (v: { id: number; totalHalfDays: number; usedHalfDays: number }) => void }).mockResolvedValue({
             id: 1,
-            totalDays: 10,
-            usedDays: 0,
+            totalHalfDays: 20,
+            usedHalfDays: 0,
         });
-        (prisma.leaveRequest.create as unknown as { mockResolvedValue: (v: { id: number }) => void }).mockResolvedValue({ id: 123 });
+        (prisma.leaveRequest.create as unknown as { mockResolvedValue: (v: { id: number; durationHalfDays: number; overQuotaHalfDays: number }) => void }).mockResolvedValue({
+            id: 123,
+            durationHalfDays: 4,
+            overQuotaHalfDays: 0,
+        });
 
         const payload = {
             leaveType: "SICK",
@@ -268,7 +272,7 @@ describe("POST /api/leave/request", () => {
         expect(res.status).toBe(201);
         expect(prisma.leaveRequest.create).toHaveBeenCalledWith({
             data: expect.objectContaining({
-                durationDays: 2,
+                durationHalfDays: 4,
             }),
         });
     });
@@ -356,10 +360,10 @@ describe("POST /api/leave/request", () => {
         it("should throw error if insufficient quota", async () => {
             (prisma.employee.findUnique as unknown as { mockResolvedValue: (v: ReturnType<typeof buildEmployeeWithManager>) => void }).mockResolvedValue(buildEmployeeWithManager());
             (prisma.leaveRequest.findFirst as unknown as { mockResolvedValue: (v: null) => void }).mockResolvedValue(null);
-            (prisma.leaveQuota.findFirst as unknown as { mockResolvedValue: (v: { id: number; totalDays: number; usedDays: number }) => void }).mockResolvedValue({
+            (prisma.leaveQuota.findFirst as unknown as { mockResolvedValue: (v: { id: number; totalHalfDays: number; usedHalfDays: number }) => void }).mockResolvedValue({
                 id: 1,
-                totalDays: 6,
-                usedDays: 6,
+                totalHalfDays: 12,
+                usedHalfDays: 12,
             });
 
             const req = new NextRequest("http://localhost/api/leave/request", {
@@ -376,12 +380,16 @@ describe("POST /api/leave/request", () => {
         it("should allow insufficient quota with special reason", async () => {
             (prisma.employee.findUnique as unknown as { mockResolvedValue: (v: ReturnType<typeof buildEmployeeWithManager>) => void }).mockResolvedValue(buildEmployeeWithManager());
             (prisma.leaveRequest.findFirst as unknown as { mockResolvedValue: (v: null) => void }).mockResolvedValue(null);
-            (prisma.leaveQuota.findFirst as unknown as { mockResolvedValue: (v: { id: number; totalDays: number; usedDays: number }) => void }).mockResolvedValue({
+            (prisma.leaveQuota.findFirst as unknown as { mockResolvedValue: (v: { id: number; totalHalfDays: number; usedHalfDays: number }) => void }).mockResolvedValue({
                 id: 1,
-                totalDays: 6,
-                usedDays: 6,
+                totalHalfDays: 12,
+                usedHalfDays: 12,
             });
-            (prisma.leaveRequest.create as unknown as { mockResolvedValue: (v: { id: number }) => void }).mockResolvedValue({ id: 123 });
+            (prisma.leaveRequest.create as unknown as { mockResolvedValue: (v: { id: number; durationHalfDays: number; overQuotaHalfDays: number }) => void }).mockResolvedValue({
+                id: 123,
+                durationHalfDays: 2,
+                overQuotaHalfDays: 2,
+            });
 
             const req = new NextRequest("http://localhost/api/leave/request", {
                 method: "POST",
@@ -395,7 +403,7 @@ describe("POST /api/leave/request", () => {
             expect(res.status).toBe(201);
             expect(prisma.leaveRequest.create).toHaveBeenCalledWith({
                 data: expect.objectContaining({
-                    overQuotaDays: 1,
+                    overQuotaHalfDays: 2,
                     specialReason: "กรณีพิเศษที่หัวหน้าควรพิจารณา",
                 }),
             });
@@ -407,12 +415,16 @@ describe("POST /api/leave/request", () => {
 
             (prisma.employee.findUnique as unknown as { mockResolvedValue: (v: ReturnType<typeof buildEmployeeWithManager>) => void }).mockResolvedValue(buildEmployeeWithManager());
             (prisma.leaveRequest.findFirst as unknown as { mockResolvedValue: (v: null) => void }).mockResolvedValue(null);
-            (prisma.leaveQuota.findFirst as unknown as { mockResolvedValue: (v: { id: number; totalDays: number; usedDays: number }) => void }).mockResolvedValue({
+            (prisma.leaveQuota.findFirst as unknown as { mockResolvedValue: (v: { id: number; totalHalfDays: number; usedHalfDays: number }) => void }).mockResolvedValue({
                 id: 1,
-                totalDays: 10,
-                usedDays: 0,
+                totalHalfDays: 20,
+                usedHalfDays: 0,
             });
-            (prisma.leaveRequest.create as unknown as { mockResolvedValue: (v: { id: string }) => void }).mockResolvedValue({ id: "leave-backdated-1" });
+            (prisma.leaveRequest.create as unknown as { mockResolvedValue: (v: { id: string; durationHalfDays: number; overQuotaHalfDays: number }) => void }).mockResolvedValue({
+                id: "leave-backdated-1",
+                durationHalfDays: 2,
+                overQuotaHalfDays: 0,
+            });
 
             const req = new NextRequest("http://localhost/api/leave/request", {
                 method: "POST",
@@ -502,14 +514,18 @@ describe("POST /api/leave/request", () => {
             (prisma.employee.findUnique as unknown as { mockResolvedValue: (v: ReturnType<typeof buildEmployeeWithManager>) => void }).mockResolvedValue(buildEmployeeWithManager());
             (prisma.leaveRequest.findFirst as unknown as { mockResolvedValue: (v: null) => void }).mockResolvedValue(null);
             (prisma.leaveQuota.findFirst as unknown as { mockResolvedValue: (v: null) => void }).mockResolvedValue(null);
-            (prisma.leaveQuota.create as unknown as { mockResolvedValue: (v: { id: number; totalDays: number; usedDays: number }) => void }).mockResolvedValue({
+            (prisma.leaveQuota.create as unknown as { mockResolvedValue: (v: { id: number; totalHalfDays: number; usedHalfDays: number }) => void }).mockResolvedValue({
                 id: 1,
-                totalDays: 10,
-                usedDays: 0,
+                totalHalfDays: 20,
+                usedHalfDays: 0,
             });
 
-            const mockCreatedRequest = { id: 999 };
-            (prisma.leaveRequest.create as unknown as { mockResolvedValue: (v: { id: number }) => void }).mockResolvedValue(
+            const mockCreatedRequest = {
+                id: 999,
+                durationHalfDays: 2,
+                overQuotaHalfDays: 0,
+            };
+            (prisma.leaveRequest.create as unknown as { mockResolvedValue: (v: typeof mockCreatedRequest) => void }).mockResolvedValue(
                 mockCreatedRequest,
             );
 
@@ -522,15 +538,19 @@ describe("POST /api/leave/request", () => {
             expect(res.status).toBe(201);
             const data = await res.json();
             expect(data.success).toBe(true);
-            expect(data.data).toEqual(mockCreatedRequest);
+            expect(data.data).toEqual({
+                id: mockCreatedRequest.id,
+                durationDays: 1,
+                overQuotaDays: 0,
+            });
 
             expect(prisma.leaveQuota.create).toHaveBeenCalledWith({
                 data: {
                     employeeId: mockEmployeeId,
                     year: 2030,
                     leaveType: "PERSONAL",
-                    totalDays: 10,
-                    usedDays: 0,
+                    totalHalfDays: 20,
+                    usedHalfDays: 0,
                 },
             });
             expect(prisma.leaveRequest.create).toHaveBeenCalledWith({
@@ -538,7 +558,7 @@ describe("POST /api/leave/request", () => {
                     employeeId: mockEmployeeId,
                     leaveType: "PERSONAL",
                     period: "FULL_DAY",
-                    durationDays: 1,
+                    durationHalfDays: 2,
                     reason: "Personal errand",
                     status: "PENDING",
                     approverId: 200,

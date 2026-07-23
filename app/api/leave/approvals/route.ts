@@ -6,6 +6,7 @@ import { prisma } from "@/lib/db/prisma";
 import { notFound } from "@/lib/ssot/http";
 import { FEATURE_KEYS, isFeatureEnabled } from "@/lib/ssot/features";
 import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
+import { toLeaveRequestDays } from "@/lib/services/leave/half-days";
 
 const APPROVALS_PAGE_SIZE = 10;
 const APPROVALS_PAGINATION_MESSAGES = {
@@ -130,9 +131,9 @@ export async function GET(req: Request): Promise<NextResponse> {
         ]);
 
         return NextResponse.json({
-            pending: pendingApprovals,
-            notTakenPending,
-            history: approvalHistory,
+            pending: pendingApprovals.map(toLeaveRequestDays),
+            notTakenPending: notTakenPending.map(toLeaveRequestDays),
+            history: approvalHistory.map(toLeaveRequestDays),
             metadata: {
                 pending: createMetadata(pendingPage, pendingCount),
                 notTakenPending: createMetadata(notTakenPage, notTakenCount),

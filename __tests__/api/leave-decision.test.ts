@@ -138,11 +138,11 @@ describe("POST /api/leave/decision", () => {
             startDate: new Date("2031-05-05T00:00:00.000Z"),
             endDate: new Date("2031-05-05T00:00:00.000Z"),
             period: "FULL_DAY",
-            durationDays: 1,
+            durationHalfDays: 2,
             reason: "พักร้อน",
             emergencyReason: null,
             specialReason: null,
-            overQuotaDays: 0,
+            overQuotaHalfDays: 0,
             status: "PENDING",
             approverId: 30,
             employee: {
@@ -228,11 +228,11 @@ describe("POST /api/leave/decision", () => {
             startDate: new Date("2031-05-05T00:00:00.000Z"),
             endDate: new Date("2031-05-05T00:00:00.000Z"),
             period: "FULL_DAY",
-            durationDays: 1,
+            durationHalfDays: 2,
             reason: "พักร้อน",
             emergencyReason: null,
             specialReason: "หัวหน้าอนุมัติกรณีพิเศษ",
-            overQuotaDays: 1,
+            overQuotaHalfDays: 2,
             status: "PENDING",
             approverId: 20,
             approvedAt: null,
@@ -264,14 +264,16 @@ describe("POST /api/leave/decision", () => {
         vi.mocked(prisma.leaveRequest.updateMany).mockResolvedValue({ count: 1 });
         vi.mocked(prisma.leaveRequest.findUniqueOrThrow).mockResolvedValue({
             id: "leave-1",
+            durationHalfDays: 2,
+            overQuotaHalfDays: 0,
         } as Awaited<ReturnType<typeof prisma.leaveRequest.findUniqueOrThrow>>);
         vi.mocked(prisma.leaveQuota.findFirst).mockResolvedValue({
             id: "quota-1",
             employeeId: 10,
             year: 2031,
             leaveType: "VACATION",
-            totalDays: 6,
-            usedDays: 5,
+            totalHalfDays: 12,
+            usedHalfDays: 10,
         });
         vi.mocked(prisma.leaveQuota.update).mockResolvedValue({
             id: "quota-1",
@@ -290,7 +292,7 @@ describe("POST /api/leave/decision", () => {
         expect(res.status).toBe(200);
         expect(prisma.leaveQuota.update).toHaveBeenCalledWith({
             where: { id: "quota-1" },
-            data: { usedDays: { increment: 1 } },
+            data: { usedHalfDays: { increment: 2 } },
         });
         expect(prisma.leaveRequest.updateMany).toHaveBeenCalledWith({
             where: { id: "leave-1", status: "PENDING", approverId: 20 },
@@ -308,11 +310,11 @@ describe("POST /api/leave/decision", () => {
             startDate: new Date("2031-05-05T00:00:00.000Z"),
             endDate: new Date("2031-05-06T00:00:00.000Z"),
             period: "FULL_DAY",
-            durationDays: 2,
+            durationHalfDays: 4,
             reason: "พักร้อน",
             emergencyReason: null,
             specialReason: "อนุมัติกรณีพิเศษ",
-            overQuotaDays: 4,
+            overQuotaHalfDays: 8,
             status: "PENDING",
             approverId: 20,
             approvedAt: null,
@@ -341,14 +343,16 @@ describe("POST /api/leave/decision", () => {
         vi.mocked(prisma.leaveRequest.updateMany).mockResolvedValue({ count: 1 });
         vi.mocked(prisma.leaveRequest.findUniqueOrThrow).mockResolvedValue({
             id: "leave-already-over-quota",
+            durationHalfDays: 4,
+            overQuotaHalfDays: 4,
         } as Awaited<ReturnType<typeof prisma.leaveRequest.findUniqueOrThrow>>);
         vi.mocked(prisma.leaveQuota.findFirst).mockResolvedValue({
             id: "quota-1",
             employeeId: 10,
             year: 2031,
             leaveType: "VACATION",
-            totalDays: 10,
-            usedDays: 12,
+            totalHalfDays: 20,
+            usedHalfDays: 24,
         });
 
         const req = new NextRequest("http://localhost/api/leave/decision", {
@@ -361,7 +365,7 @@ describe("POST /api/leave/decision", () => {
         expect(res.status).toBe(200);
         expect(prisma.leaveRequest.updateMany).toHaveBeenLastCalledWith({
             where: { id: "leave-already-over-quota", status: "APPROVED" },
-            data: { overQuotaDays: 2 },
+            data: { overQuotaHalfDays: 4 },
         });
     });
 
@@ -373,11 +377,11 @@ describe("POST /api/leave/decision", () => {
             startDate: new Date("2031-05-05T00:00:00.000Z"),
             endDate: new Date("2031-05-05T00:00:00.000Z"),
             period: "FULL_DAY",
-            durationDays: 1,
+            durationHalfDays: 2,
             reason: "พักร้อน",
             emergencyReason: null,
             specialReason: null,
-            overQuotaDays: 0,
+            overQuotaHalfDays: 0,
             status: "PENDING",
             approverId: 20,
             approvedAt: null,

@@ -54,15 +54,19 @@ describe("POST /api/leave/cancel", () => {
     it("cancels a pending request even when its former approver has no account", async () => {
         vi.mocked(prisma.leaveRequest.findUnique).mockResolvedValue({
             id: "leave-1", employeeId: 10, leaveType: "SICK", startDate: new Date(), endDate: new Date(),
-            period: "FULL_DAY", durationDays: 1, reason: "ลาป่วย", emergencyReason: null, specialReason: null,
-            overQuotaDays: 0, status: "PENDING", approverId: 20, approvedAt: null, rejectReason: null,
+            period: "FULL_DAY", durationHalfDays: 2, reason: "ลาป่วย", emergencyReason: null, specialReason: null,
+            overQuotaHalfDays: 0, status: "PENDING", approverId: 20, approvedAt: null, rejectReason: null,
             notTakenReason: null, notTakenRequestedAt: null, notTakenConfirmedAt: null, notTakenConfirmedById: null,
             attachmentUrl: null, createdAt: new Date(), updatedAt: new Date(),
             employee: { id: 10, firstName: "Employee", lastName: "User", email: "employee@example.com", user: { id: 10 } },
             approver: null,
         } as Awaited<ReturnType<typeof prisma.leaveRequest.findUnique>>);
         vi.mocked(prisma.leaveRequest.updateMany).mockResolvedValue({ count: 1 });
-        vi.mocked(prisma.leaveRequest.findUniqueOrThrow).mockResolvedValue({ id: "leave-1" } as Awaited<ReturnType<typeof prisma.leaveRequest.findUniqueOrThrow>>);
+        vi.mocked(prisma.leaveRequest.findUniqueOrThrow).mockResolvedValue({
+            id: "leave-1",
+            durationHalfDays: 2,
+            overQuotaHalfDays: 0,
+        } as Awaited<ReturnType<typeof prisma.leaveRequest.findUniqueOrThrow>>);
 
         const response = await POST(new NextRequest("http://localhost/api/leave/cancel", {
             method: "POST", body: JSON.stringify({ leaveId: "leave-1" }),
@@ -99,15 +103,20 @@ describe("POST /api/leave/cancel", () => {
         });
         vi.mocked(prisma.leaveRequest.findUnique).mockResolvedValue({
             id: "leave-2", employeeId: 10, leaveType: "SICK", startDate: new Date(), endDate: new Date(),
-            period: "FULL_DAY", durationDays: 1, reason: "ลาป่วย", emergencyReason: null, specialReason: null,
-            overQuotaDays: 0, status: "PENDING", approverId: 20, approvedAt: null, rejectReason: null,
+            period: "FULL_DAY", durationHalfDays: 2, reason: "ลาป่วย", emergencyReason: null, specialReason: null,
+            overQuotaHalfDays: 0, status: "PENDING", approverId: 20, approvedAt: null, rejectReason: null,
             notTakenReason: null, notTakenRequestedAt: null, notTakenConfirmedAt: null, notTakenConfirmedById: null,
             attachmentUrl: null, createdAt: new Date(), updatedAt: new Date(),
             employee: { id: 10, firstName: "Employee", lastName: "User", email: "employee@example.com", user: { id: 10 } },
              approver: { id: 20, firstName: "Manager", lastName: "User", email: "manager@example.com", status: "ACTIVE", deletedAt: null, user: { id: 20, email: "manager@example.com", isActive: true, deletedAt: null } },
         } as Awaited<ReturnType<typeof prisma.leaveRequest.findUnique>>);
         vi.mocked(prisma.leaveRequest.findUniqueOrThrow).mockResolvedValue(
-            { id: "leave-2", status: "CANCELLED" } as Awaited<ReturnType<typeof prisma.leaveRequest.findUniqueOrThrow>>,
+            {
+                id: "leave-2",
+                status: "CANCELLED",
+                durationHalfDays: 2,
+                overQuotaHalfDays: 0,
+            } as Awaited<ReturnType<typeof prisma.leaveRequest.findUniqueOrThrow>>,
         );
         vi.mocked(prisma.notification.updateMany).mockResolvedValue({ count: 1 });
         vi.mocked(prisma.notificationOutbox.create).mockRejectedValue(new Error("outbox unavailable"));

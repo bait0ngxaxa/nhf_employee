@@ -10,6 +10,7 @@ import {
     getCurrentLeaveYear,
     getLeaveYearFromDateValue,
 } from "@/lib/services/leave/quota-year";
+import { toLeaveQuotaDays, toLeaveRequestDays } from "@/lib/services/leave/half-days";
 
 export type LeaveReportMeta = {
     year: number;
@@ -100,7 +101,7 @@ async function loadLeaveReportEmployees(
     year: number,
 ): Promise<LeaveReportEmployee[]> {
     const { startOfYear, endOfYear } = createYearRange(year);
-    return prisma.employee.findMany({
+    const employees = await prisma.employee.findMany({
         where: {
             managerId,
             status: EmployeeStatus.ACTIVE,
@@ -115,7 +116,11 @@ async function loadLeaveReportEmployees(
             dept: { select: { name: true } },
             leaveQuotas: {
                 where: { year },
-                select: { leaveType: true, totalDays: true },
+                select: {
+                    leaveType: true,
+                    totalHalfDays: true,
+                    usedHalfDays: true,
+                },
             },
             leaveRequests: {
                 where: {
@@ -128,11 +133,11 @@ async function loadLeaveReportEmployees(
                     startDate: true,
                     endDate: true,
                     period: true,
-                    durationDays: true,
+                    durationHalfDays: true,
                     reason: true,
                     emergencyReason: true,
                     specialReason: true,
-                    overQuotaDays: true,
+                    overQuotaHalfDays: true,
                     status: true,
                     rejectReason: true,
                     notTakenReason: true,
@@ -141,6 +146,12 @@ async function loadLeaveReportEmployees(
             },
         },
     });
+
+    return employees.map((employee) => ({
+        ...employee,
+        leaveQuotas: employee.leaveQuotas.map(toLeaveQuotaDays),
+        leaveRequests: employee.leaveRequests.map(toLeaveRequestDays),
+    }));
 }
 
 function createYearRange(year: number): { startOfYear: Date; endOfYear: Date } {

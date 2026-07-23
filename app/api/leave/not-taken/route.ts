@@ -32,6 +32,7 @@ import {
     leaveNotTakenConfirmSchema,
     leaveNotTakenRequestSchema,
 } from "@/lib/validations/leave";
+import { halfDaysToDays, toLeaveRequestDays } from "@/lib/services/leave/half-days";
 
 const NOT_TAKEN_MESSAGES = {
     requestNotFound: "ไม่พบคำขอลาที่แจ้งไม่ได้ใช้วันลาได้",
@@ -145,7 +146,7 @@ export async function POST(req: Request): Promise<NextResponse> {
                 startDate: leaveRequest.startDate.toISOString(),
                 endDate: leaveRequest.endDate.toISOString(),
                 period: leaveRequest.period,
-                durationDays: leaveRequest.durationDays,
+                durationDays: halfDaysToDays(leaveRequest.durationHalfDays),
                 note: parsed.data.note,
             };
 
@@ -184,7 +185,7 @@ export async function POST(req: Request): Promise<NextResponse> {
             );
         });
 
-        return NextResponse.json({ success: true, data: result });
+        return NextResponse.json({ success: true, data: toLeaveRequestDays(result) });
     } catch (error) {
         console.error("Leave not-taken request error:", error);
         if (error instanceof LeaveNotTakenError) {
@@ -285,9 +286,11 @@ export async function PUT(req: Request): Promise<NextResponse> {
 
             const updatedQuota = await tx.leaveQuota.update({
                 where: { id: quota.id },
-                data: { usedDays: { decrement: leaveRequest.durationDays } },
+                data: {
+                    usedHalfDays: { decrement: leaveRequest.durationHalfDays },
+                },
             });
-            if (updatedQuota.usedDays < 0) {
+            if (updatedQuota.usedHalfDays < 0) {
                 throw new LeaveNotTakenError(NOT_TAKEN_MESSAGES.quotaNotFound, 409);
             }
             const updatedRequest = await tx.leaveRequest.findUniqueOrThrow({
@@ -314,7 +317,7 @@ export async function PUT(req: Request): Promise<NextResponse> {
                 startDate: leaveRequest.startDate.toISOString(),
                 endDate: leaveRequest.endDate.toISOString(),
                 period: leaveRequest.period,
-                durationDays: leaveRequest.durationDays,
+                durationDays: halfDaysToDays(leaveRequest.durationHalfDays),
             };
 
             await tx.notificationOutbox.create({
@@ -341,7 +344,7 @@ export async function PUT(req: Request): Promise<NextResponse> {
             );
         });
 
-        return NextResponse.json({ success: true, data: result });
+        return NextResponse.json({ success: true, data: toLeaveRequestDays(result) });
     } catch (error) {
         console.error("Leave not-taken confirm error:", error);
         if (error instanceof LeaveNotTakenError) {

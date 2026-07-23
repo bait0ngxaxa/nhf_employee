@@ -372,12 +372,12 @@ enum NotificationType {
 // ==========================================
 
 model LeaveQuota {
-  id         String    @id @default(cuid())
-  employeeId Int
-  year       Int // ปี ค.ศ. (เช่น 2026)
-  leaveType  LeaveType
-  totalDays  Float // โควตาทั้งหมด (ป่วย=30, กิจ=10, พักร้อน=6)
-  usedDays   Float     @default(0) // วันที่ใช้ไปแล้ว (ทศนิยมได้ เช่น 0.5)
+  id            String    @id @default(cuid())
+  employeeId    Int
+  year          Int // ปี ค.ศ. (เช่น 2026)
+  leaveType     LeaveType
+  totalHalfDays Int // โควตาทั้งหมด หน่วยครึ่งวัน (1 = ครึ่งวัน, 2 = หนึ่งวัน)
+  usedHalfDays  Int       @default(0) // โควตาที่ใช้แล้ว หน่วยครึ่งวัน
 
   employee Employee @relation(fields: [employeeId], references: [id])
 
@@ -392,11 +392,11 @@ model LeaveRequest {
   startDate    DateTime
   endDate      DateTime
   period       LeavePeriod @default(FULL_DAY)
-  durationDays Float // จำนวนวันลาสุทธิ (เช่น 1.5 วัน)
+  durationHalfDays Int // ระยะเวลาลาสุทธิ หน่วยครึ่งวัน (เช่น 3 = 1.5 วัน)
   reason       String      @db.Text
   emergencyReason String? @db.Text // เหตุผลฉุกเฉินเมื่อยื่นลาย้อนหลัง
   specialReason   String? @db.Text // เหตุผลพิเศษเมื่อขอลาเกินโควต้า
-  overQuotaDays   Float   @default(0) // จำนวนวันที่เกินโควต้าตอนยื่นคำขอ
+  overQuotaHalfDays Int   @default(0) // จำนวนที่เกินโควต้าตอนยื่นคำขอ หน่วยครึ่งวัน
 
   status LeaveStatus @default(PENDING)
 

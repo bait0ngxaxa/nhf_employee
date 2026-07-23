@@ -24,6 +24,7 @@ import { FEATURE_KEYS, isFeatureEnabled } from "@/lib/ssot/features";
 import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
 import { APP_DASHBOARD_TABS, toDashboardTabPath } from "@/lib/ssot/routes";
 import { leaveCancelSchema } from "@/lib/validations/leave";
+import { halfDaysToDays, toLeaveRequestDays } from "@/lib/services/leave/half-days";
 
 const LEAVE_CANCEL_MESSAGES = {
     notFound: "ไม่พบคำขอลาที่ยกเลิกได้",
@@ -121,7 +122,7 @@ export async function POST(req: Request) {
                         startDate: leaveRequest.startDate.toISOString(),
                         endDate: leaveRequest.endDate.toISOString(),
                         period: leaveRequest.period,
-                        durationDays: leaveRequest.durationDays,
+                        durationDays: halfDaysToDays(leaveRequest.durationHalfDays),
                     })} แล้ว`,
                     actionUrl: toDashboardTabPath(APP_DASHBOARD_TABS.leaveHistory),
                     referenceId: leaveId,
@@ -134,7 +135,8 @@ export async function POST(req: Request) {
                     leaveId, employee: buildLeaveRecipientSnapshot(leaveRequest.employee),
                     approver: buildConfiguredApproverSnapshot(leaveRequest.approver), leaveType: leaveRequest.leaveType,
                     startDate: leaveRequest.startDate.toISOString(), endDate: leaveRequest.endDate.toISOString(),
-                    period: leaveRequest.period, durationDays: leaveRequest.durationDays,
+                    period: leaveRequest.period,
+                    durationDays: halfDaysToDays(leaveRequest.durationHalfDays),
                 };
                 await tx.notificationOutbox.create({ data: { type: "LEAVE_CANCELLED", payload: JSON.stringify(payload) } });
             }
@@ -152,7 +154,7 @@ export async function POST(req: Request) {
             );
         });
 
-        return NextResponse.json({ success: true, data: result });
+        return NextResponse.json({ success: true, data: toLeaveRequestDays(result) });
     } catch (error) {
         console.error("Cancel leave error:", error);
         if (error instanceof LeaveCancelError) {
