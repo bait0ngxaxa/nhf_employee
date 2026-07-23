@@ -5,6 +5,7 @@ import { stockService } from "@/lib/services/stock";
 import { processOutbox } from "@/lib/services/outbox/processor";
 import { adjustStockSchema } from "@/lib/validations/stock";
 import { createStockCommandActor } from "@/lib/server/stock-command-actor";
+import { enforceMutationRateLimit } from "@/lib/security/mutation-rate-limit";
 
 interface RouteParams {
     params: Promise<{ id: string }>;
@@ -15,6 +16,12 @@ export async function POST(
     { params }: RouteParams,
 ): Promise<NextResponse> {
     try {
+        const rateLimitResponse = enforceMutationRateLimit(
+            request,
+            "stock-adjust",
+        );
+        if (rateLimitResponse) return rateLimitResponse;
+
         const auth = await requireAdminSession();
         if (!auth.ok) return auth.response;
 

@@ -16,6 +16,7 @@ import {
     setHybridAuthCookies,
 } from "@/lib/auth/hybrid/session";
 import { prisma } from "@/lib/db/prisma";
+import { enforceMutationRateLimit } from "@/lib/security/mutation-rate-limit";
 
 type RefreshTokenStore = Pick<Prisma.TransactionClient, "authRefreshToken">;
 
@@ -152,6 +153,9 @@ async function rotateRefreshTokenAtomically(
 
 export const POST = withTrustedMutation(async (request: NextRequest): Promise<NextResponse> => {
     try {
+        const rateLimitResponse = enforceMutationRateLimit(request, "auth-refresh");
+        if (rateLimitResponse) return rateLimitResponse;
+
         const metadata = getClientMetadata(request);
         const refreshToken = request.cookies.get(HYBRID_REFRESH_COOKIE_NAME)?.value;
         if (!refreshToken) {

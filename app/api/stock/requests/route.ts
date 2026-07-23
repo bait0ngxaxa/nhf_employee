@@ -18,6 +18,7 @@ import {
     idempotencyKeySchema,
     stockRequestsFilterSchema,
 } from "@/lib/validations/stock";
+import { enforceMutationRateLimit } from "@/lib/security/mutation-rate-limit";
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
     try {
@@ -58,6 +59,12 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
     try {
+        const rateLimitResponse = enforceMutationRateLimit(
+            request,
+            "stock-request-create",
+        );
+        if (rateLimitResponse) return rateLimitResponse;
+
         const body = await request.json();
         const result = createRequestSchema.safeParse(body);
         if (!result.success) {

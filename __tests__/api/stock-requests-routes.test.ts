@@ -15,6 +15,11 @@ import { stockService } from "@/lib/services/stock";
 import { StockRequestIdempotencyConflictError } from "@/lib/services/stock/request-idempotency";
 import { processOutbox } from "@/lib/services/outbox/processor";
 import { WorkforceAuthorizationError } from "@/lib/auth/workforce-transaction";
+import {
+    enforceMutationRateLimit,
+    MUTATION_RATE_LIMIT_POLICIES,
+    resetMutationRateLimit,
+} from "@/lib/security/mutation-rate-limit";
 
 vi.mock("next/server", async (importOriginal) => {
     const actual = await importOriginal<typeof NextServerModule>();
@@ -62,6 +67,7 @@ vi.mock("@/lib/services/outbox/processor", () => ({
 describe("Stock Request Routes", () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        resetMutationRateLimit();
         vi.mocked(processOutbox).mockResolvedValue({
             processed: 0,
             failed: 0,
@@ -233,6 +239,36 @@ describe("Stock Request Routes", () => {
     });
 
     describe("POST /api/stock/requests", () => {
+        it("should rate limit before parsing or authentication", async () => {
+            const headers = { "cf-connecting-ip": "203.0.113.20" };
+            const policy =
+                MUTATION_RATE_LIMIT_POLICIES["stock-request-create"];
+            const prefillRequest = new NextRequest(
+                "http://localhost/api/stock/requests",
+                { method: "POST", headers },
+            );
+
+            for (let index = 0; index < policy.maxRequests; index += 1) {
+                enforceMutationRateLimit(
+                    prefillRequest,
+                    "stock-request-create",
+                );
+            }
+
+            const response = await postRequestsRoute(
+                new NextRequest("http://localhost/api/stock/requests", {
+                    method: "POST",
+                    headers,
+                    body: "{invalid-json",
+                }),
+            );
+
+            expect(response.status).toBe(429);
+            expect(response.headers.get("Retry-After")).toBe("60");
+            expect(getApiAuthSession).not.toHaveBeenCalled();
+            expect(stockService.createRequest).not.toHaveBeenCalled();
+        });
+
         it("should reject invalid request payload", async () => {
             vi.mocked(getApiAuthSession).mockResolvedValue({
                 user: { id: "3", email: "user@test.com", role: "USER" },

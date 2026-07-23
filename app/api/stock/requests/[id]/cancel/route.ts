@@ -6,6 +6,7 @@ import { executeCancelStockRequest } from "@/lib/server/stock-request-commands";
 import { cancelRequestSchema } from "@/lib/validations/stock";
 import { WorkforceAuthorizationError } from "@/lib/auth/workforce-transaction";
 import { createStockCommandActor } from "@/lib/server/stock-command-actor";
+import { enforceMutationRateLimit } from "@/lib/security/mutation-rate-limit";
 
 interface RouteParams {
     params: Promise<{ id: string }>;
@@ -16,6 +17,12 @@ export async function POST(
     { params }: RouteParams,
 ): Promise<NextResponse> {
     try {
+        const rateLimitResponse = enforceMutationRateLimit(
+            request,
+            "stock-request-cancel",
+        );
+        if (rateLimitResponse) return rateLimitResponse;
+
         const auth = await requireActiveWorkforceOrAdminSession();
         if (!auth.ok) return auth.response;
 

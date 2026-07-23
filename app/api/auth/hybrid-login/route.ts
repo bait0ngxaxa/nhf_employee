@@ -9,6 +9,7 @@ import { logAuthEvent } from "@/lib/server/audit";
 import { setHybridAuthCookies, getClientMetadata } from "@/lib/auth/hybrid/session";
 import { buildRefreshTokenRecord, issueAccessToken } from "@/lib/auth/hybrid/tokens";
 import { prisma } from "@/lib/db/prisma";
+import { enforceMutationRateLimit } from "@/lib/security/mutation-rate-limit";
 
 const hybridLoginSchema = z.object({
     email: z.string().email(),
@@ -23,6 +24,9 @@ const LOGIN_RATE_LIMIT_POLICY = {
 
 export const POST = withTrustedMutation(async (request: NextRequest): Promise<NextResponse> => {
     try {
+        const rateLimitResponse = enforceMutationRateLimit(request, "auth-login");
+        if (rateLimitResponse) return rateLimitResponse;
+
         const body = await request.json();
         const parsed = hybridLoginSchema.safeParse(body);
 
