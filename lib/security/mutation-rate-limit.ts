@@ -12,7 +12,7 @@ interface MutationRateLimitPolicy {
     maxRequests: number;
 }
 
-export type MutationRateLimitScope =
+export type PreAuthRateLimitScope =
     | "auth-login"
     | "auth-refresh"
     | "stock-adjust"
@@ -20,14 +20,29 @@ export type MutationRateLimitScope =
     | "stock-request-create"
     | "stock-request-issue";
 
-export const MUTATION_RATE_LIMIT_POLICIES = {
-    "auth-login": { windowMs: 15 * 60 * 1000, maxRequests: 40 },
+export type AuthenticatedMutationRateLimitScope = Exclude<
+    PreAuthRateLimitScope,
+    "auth-login" | "auth-refresh"
+>;
+
+export const PRE_AUTH_IP_RATE_LIMIT_POLICIES = {
+    "auth-login": { windowMs: 15 * 60 * 1000, maxRequests: 300 },
     "auth-refresh": { windowMs: 15 * 60 * 1000, maxRequests: 120 },
+    "stock-adjust": { windowMs: 15 * 60 * 1000, maxRequests: 300 },
+    "stock-request-cancel": { windowMs: 15 * 60 * 1000, maxRequests: 300 },
+    "stock-request-create": { windowMs: 15 * 60 * 1000, maxRequests: 300 },
+    "stock-request-issue": { windowMs: 15 * 60 * 1000, maxRequests: 300 },
+} as const satisfies Record<PreAuthRateLimitScope, MutationRateLimitPolicy>;
+
+export const AUTHENTICATED_MUTATION_RATE_LIMIT_POLICIES = {
     "stock-adjust": { windowMs: 60 * 1000, maxRequests: 30 },
     "stock-request-cancel": { windowMs: 60 * 1000, maxRequests: 20 },
     "stock-request-create": { windowMs: 60 * 1000, maxRequests: 10 },
     "stock-request-issue": { windowMs: 60 * 1000, maxRequests: 30 },
-} as const satisfies Record<MutationRateLimitScope, MutationRateLimitPolicy>;
+} as const satisfies Record<
+    AuthenticatedMutationRateLimitScope,
+    MutationRateLimitPolicy
+>;
 
 const rateLimitEntries = new Map<string, RateLimitEntry>();
 const UNKNOWN_CLIENT = "unknown";
@@ -35,9 +50,19 @@ const CLEANUP_INTERVAL_MS = 60 * 1000;
 const MAX_RATE_LIMIT_ENTRIES = 50_000;
 let lastCleanupAt = 0;
 
-function buildKey(request: NextRequest, scope: MutationRateLimitScope): string {
+function buildPreAuthIpKey(
+    request: NextRequest,
+    scope: PreAuthRateLimitScope,
+): string {
     const clientIp = getTrustedClientIp(request.headers) ?? UNKNOWN_CLIENT;
-    return `${scope}:ip:${clientIp}`;
+    return `pre-auth:${scope}:ip:${clientIp}`;
+}
+
+function buildAuthenticatedPrincipalKey(
+    scope: AuthenticatedMutationRateLimitScope,
+    userId: string | number,
+): string {
+    return `${scope}:user:${String(userId)}`;
 }
 
 function consume(
@@ -89,28 +114,56 @@ function consume(
     return { limited: false, retryAfterSeconds: 0 };
 }
 
-export function enforceMutationRateLimit(
-    request: NextRequest,
-    scope: MutationRateLimitScope,
-): NextResponse | null {
-    const policy = MUTATION_RATE_LIMIT_POLICIES[scope];
-    const result = consume(buildKey(request, scope), policy, Date.now());
-    if (!result.limited) {
-        return null;
-    }
-
+function createRateLimitResponse(
+    policy: MutationRateLimitPolicy,
+    retryAfterSeconds: number,
+): NextResponse {
     return NextResponse.json(
         { error: "มีคำขอมากเกินไป กรุณาลองใหม่ภายหลัง" },
         {
             status: 429,
             headers: {
                 "Cache-Control": "no-store",
-                "Retry-After": String(result.retryAfterSeconds),
+                "Retry-After": String(retryAfterSeconds),
                 "X-RateLimit-Limit": String(policy.maxRequests),
                 "X-RateLimit-Remaining": "0",
             },
         },
     );
+}
+
+export function enforcePreAuthIpRateLimit(
+    request: NextRequest,
+    scope: PreAuthRateLimitScope,
+): NextResponse | null {
+    const policy = PRE_AUTH_IP_RATE_LIMIT_POLICIES[scope];
+    const result = consume(
+        buildPreAuthIpKey(request, scope),
+        policy,
+        Date.now(),
+    );
+    if (!result.limited) {
+        return null;
+    }
+
+    return createRateLimitResponse(policy, result.retryAfterSeconds);
+}
+
+export function enforceAuthenticatedMutationRateLimit(
+    scope: AuthenticatedMutationRateLimitScope,
+    userId: string | number,
+): NextResponse | null {
+    const policy = AUTHENTICATED_MUTATION_RATE_LIMIT_POLICIES[scope];
+    const result = consume(
+        buildAuthenticatedPrincipalKey(scope, userId),
+        policy,
+        Date.now(),
+    );
+    if (!result.limited) {
+        return null;
+    }
+
+    return createRateLimitResponse(policy, result.retryAfterSeconds);
 }
 
 export function resetMutationRateLimit(): void {

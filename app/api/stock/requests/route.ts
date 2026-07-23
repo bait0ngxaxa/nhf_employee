@@ -18,7 +18,10 @@ import {
     idempotencyKeySchema,
     stockRequestsFilterSchema,
 } from "@/lib/validations/stock";
-import { enforceMutationRateLimit } from "@/lib/security/mutation-rate-limit";
+import {
+    enforceAuthenticatedMutationRateLimit,
+    enforcePreAuthIpRateLimit,
+} from "@/lib/security/mutation-rate-limit";
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
     try {
@@ -59,11 +62,11 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
     try {
-        const rateLimitResponse = enforceMutationRateLimit(
+        const preAuthRateLimitResponse = enforcePreAuthIpRateLimit(
             request,
             "stock-request-create",
         );
-        if (rateLimitResponse) return rateLimitResponse;
+        if (preAuthRateLimitResponse) return preAuthRateLimitResponse;
 
         const body = await request.json();
         const result = createRequestSchema.safeParse(body);
@@ -84,6 +87,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         if (!auth.ok) return auth.response;
 
         const { user } = auth;
+        const principalRateLimitResponse =
+            enforceAuthenticatedMutationRateLimit(
+                "stock-request-create",
+                user.id,
+            );
+        if (principalRateLimitResponse) return principalRateLimitResponse;
 
         const actor = createStockCommandActor(user, request.headers);
         const creation = await stockService.createRequest(

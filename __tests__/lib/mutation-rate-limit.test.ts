@@ -2,8 +2,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 
 import {
-    enforceMutationRateLimit,
-    MUTATION_RATE_LIMIT_POLICIES,
+    AUTHENTICATED_MUTATION_RATE_LIMIT_POLICIES,
+    enforceAuthenticatedMutationRateLimit,
+    enforcePreAuthIpRateLimit,
+    PRE_AUTH_IP_RATE_LIMIT_POLICIES,
     resetMutationRateLimit,
 } from "@/lib/security/mutation-rate-limit";
 
@@ -20,23 +22,24 @@ describe("mutation rate limit", () => {
         vi.useRealTimers();
     });
 
-    it("blocks new idempotency keys from the same client after the create limit", async () => {
+    it("blocks a pre-auth flood from the same IP before authentication", async () => {
         const request = createRequest("203.0.113.10");
-        const policy = MUTATION_RATE_LIMIT_POLICIES["stock-request-create"];
+        const policy =
+            PRE_AUTH_IP_RATE_LIMIT_POLICIES["stock-request-create"];
 
         for (let index = 0; index < policy.maxRequests; index += 1) {
             expect(
-                enforceMutationRateLimit(request, "stock-request-create"),
+                enforcePreAuthIpRateLimit(request, "stock-request-create"),
             ).toBeNull();
         }
 
-        const response = enforceMutationRateLimit(
+        const response = enforcePreAuthIpRateLimit(
             request,
             "stock-request-create",
         );
 
         expect(response?.status).toBe(429);
-        expect(response?.headers.get("Retry-After")).toBe("60");
+        expect(response?.headers.get("Retry-After")).toBe("900");
         expect(response?.headers.get("X-RateLimit-Limit")).toBe(
             String(policy.maxRequests),
         );
@@ -45,43 +48,81 @@ describe("mutation rate limit", () => {
         });
     });
 
-    it("keeps scopes and trusted client IPs isolated", () => {
+    it("keeps pre-auth scopes and trusted client IPs isolated", () => {
         const firstClient = createRequest("203.0.113.10");
         const secondClient = createRequest("203.0.113.11");
-        const policy = MUTATION_RATE_LIMIT_POLICIES["stock-request-create"];
+        const policy =
+            PRE_AUTH_IP_RATE_LIMIT_POLICIES["stock-request-create"];
 
         for (let index = 0; index < policy.maxRequests; index += 1) {
-            enforceMutationRateLimit(firstClient, "stock-request-create");
+            enforcePreAuthIpRateLimit(firstClient, "stock-request-create");
         }
 
         expect(
-            enforceMutationRateLimit(firstClient, "stock-request-create"),
+            enforcePreAuthIpRateLimit(firstClient, "stock-request-create"),
         ).not.toBeNull();
         expect(
-            enforceMutationRateLimit(secondClient, "stock-request-create"),
+            enforcePreAuthIpRateLimit(secondClient, "stock-request-create"),
         ).toBeNull();
         expect(
-            enforceMutationRateLimit(firstClient, "stock-request-cancel"),
+            enforcePreAuthIpRateLimit(firstClient, "stock-request-cancel"),
         ).toBeNull();
     });
 
-    it("allows requests again after the fixed window expires", () => {
+    it.each([
+        ["stock-request-create", 10],
+        ["stock-request-issue", 30],
+        ["stock-adjust", 30],
+    ] as const)(
+        "does not share the %s authenticated quota between users behind the same IP",
+        (scope, expectedLimit) => {
+            const policy =
+                AUTHENTICATED_MUTATION_RATE_LIMIT_POLICIES[scope];
+            expect(policy.maxRequests).toBe(expectedLimit);
+
+            for (let index = 0; index < policy.maxRequests; index += 1) {
+                expect(
+                    enforceAuthenticatedMutationRateLimit(scope, 101),
+                ).toBeNull();
+            }
+
+            expect(
+                enforceAuthenticatedMutationRateLimit(scope, 101),
+            ).not.toBeNull();
+            expect(
+                enforceAuthenticatedMutationRateLimit(scope, 102),
+            ).toBeNull();
+        },
+    );
+
+    it("allows authenticated requests again after the fixed window expires", () => {
         vi.useFakeTimers();
         vi.setSystemTime(new Date("2026-07-23T00:00:00.000Z"));
-        const request = createRequest("203.0.113.10");
-        const policy = MUTATION_RATE_LIMIT_POLICIES["stock-request-create"];
+        const policy =
+            AUTHENTICATED_MUTATION_RATE_LIMIT_POLICIES[
+                "stock-request-create"
+            ];
 
         for (let index = 0; index < policy.maxRequests; index += 1) {
-            enforceMutationRateLimit(request, "stock-request-create");
+            enforceAuthenticatedMutationRateLimit(
+                "stock-request-create",
+                101,
+            );
         }
         expect(
-            enforceMutationRateLimit(request, "stock-request-create"),
+            enforceAuthenticatedMutationRateLimit(
+                "stock-request-create",
+                101,
+            ),
         ).not.toBeNull();
 
         vi.advanceTimersByTime(policy.windowMs);
 
         expect(
-            enforceMutationRateLimit(request, "stock-request-create"),
+            enforceAuthenticatedMutationRateLimit(
+                "stock-request-create",
+                101,
+            ),
         ).toBeNull();
     });
 });

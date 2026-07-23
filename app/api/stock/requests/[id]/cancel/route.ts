@@ -6,7 +6,10 @@ import { executeCancelStockRequest } from "@/lib/server/stock-request-commands";
 import { cancelRequestSchema } from "@/lib/validations/stock";
 import { WorkforceAuthorizationError } from "@/lib/auth/workforce-transaction";
 import { createStockCommandActor } from "@/lib/server/stock-command-actor";
-import { enforceMutationRateLimit } from "@/lib/security/mutation-rate-limit";
+import {
+    enforceAuthenticatedMutationRateLimit,
+    enforcePreAuthIpRateLimit,
+} from "@/lib/security/mutation-rate-limit";
 
 interface RouteParams {
     params: Promise<{ id: string }>;
@@ -17,16 +20,23 @@ export async function POST(
     { params }: RouteParams,
 ): Promise<NextResponse> {
     try {
-        const rateLimitResponse = enforceMutationRateLimit(
+        const preAuthRateLimitResponse = enforcePreAuthIpRateLimit(
             request,
             "stock-request-cancel",
         );
-        if (rateLimitResponse) return rateLimitResponse;
+        if (preAuthRateLimitResponse) return preAuthRateLimitResponse;
 
         const auth = await requireActiveWorkforceOrAdminSession();
         if (!auth.ok) return auth.response;
 
         const { user } = auth;
+        const principalRateLimitResponse =
+            enforceAuthenticatedMutationRateLimit(
+                "stock-request-cancel",
+                user.id,
+            );
+        if (principalRateLimitResponse) return principalRateLimitResponse;
+
         const isAdmin = isAdminRole(user.role);
 
         const { id } = await params;

@@ -16,8 +16,8 @@ import { StockRequestIdempotencyConflictError } from "@/lib/services/stock/reque
 import { processOutbox } from "@/lib/services/outbox/processor";
 import { WorkforceAuthorizationError } from "@/lib/auth/workforce-transaction";
 import {
-    enforceMutationRateLimit,
-    MUTATION_RATE_LIMIT_POLICIES,
+    enforcePreAuthIpRateLimit,
+    PRE_AUTH_IP_RATE_LIMIT_POLICIES,
     resetMutationRateLimit,
 } from "@/lib/security/mutation-rate-limit";
 
@@ -242,14 +242,14 @@ describe("Stock Request Routes", () => {
         it("should rate limit before parsing or authentication", async () => {
             const headers = { "cf-connecting-ip": "203.0.113.20" };
             const policy =
-                MUTATION_RATE_LIMIT_POLICIES["stock-request-create"];
+                PRE_AUTH_IP_RATE_LIMIT_POLICIES["stock-request-create"];
             const prefillRequest = new NextRequest(
                 "http://localhost/api/stock/requests",
                 { method: "POST", headers },
             );
 
             for (let index = 0; index < policy.maxRequests; index += 1) {
-                enforceMutationRateLimit(
+                enforcePreAuthIpRateLimit(
                     prefillRequest,
                     "stock-request-create",
                 );
@@ -264,7 +264,7 @@ describe("Stock Request Routes", () => {
             );
 
             expect(response.status).toBe(429);
-            expect(response.headers.get("Retry-After")).toBe("60");
+            expect(response.headers.get("Retry-After")).toBe("900");
             expect(getApiAuthSession).not.toHaveBeenCalled();
             expect(stockService.createRequest).not.toHaveBeenCalled();
         });

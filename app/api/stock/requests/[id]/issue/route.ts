@@ -4,7 +4,10 @@ import { jsonError, serverError } from "@/lib/ssot/http";
 import { executeIssueStockRequest } from "@/lib/server/stock-request-commands";
 import { issueRequestSchema } from "@/lib/validations/stock";
 import { createStockCommandActor } from "@/lib/server/stock-command-actor";
-import { enforceMutationRateLimit } from "@/lib/security/mutation-rate-limit";
+import {
+    enforceAuthenticatedMutationRateLimit,
+    enforcePreAuthIpRateLimit,
+} from "@/lib/security/mutation-rate-limit";
 
 interface RouteParams {
     params: Promise<{ id: string }>;
@@ -15,14 +18,21 @@ export async function POST(
     { params }: RouteParams,
 ): Promise<NextResponse> {
     try {
-        const rateLimitResponse = enforceMutationRateLimit(
+        const preAuthRateLimitResponse = enforcePreAuthIpRateLimit(
             request,
             "stock-request-issue",
         );
-        if (rateLimitResponse) return rateLimitResponse;
+        if (preAuthRateLimitResponse) return preAuthRateLimitResponse;
 
         const auth = await requireAdminSession();
         if (!auth.ok) return auth.response;
+
+        const principalRateLimitResponse =
+            enforceAuthenticatedMutationRateLimit(
+                "stock-request-issue",
+                auth.user.id,
+            );
+        if (principalRateLimitResponse) return principalRateLimitResponse;
 
         const { id } = await params;
         const requestId = Number(id);
