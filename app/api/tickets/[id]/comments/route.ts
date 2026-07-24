@@ -1,75 +1,19 @@
 import { after, type NextRequest, NextResponse } from "next/server";
-import { Role } from "@prisma/client";
 
 import { requireApiSession } from "@/lib/auth/api";
 import { prisma } from "@/lib/db/prisma";
 import { createTicketCommandActor } from "@/lib/server/ticket-command-actor";
+import { processOutbox } from "@/lib/services/outbox/processor";
 import { createTicketAudit } from "@/lib/services/ticket/audit";
+import {
+    enqueueTicketCommentOutbox,
+    getTicketCommentRecipientIds,
+} from "@/lib/services/ticket/outbox";
 import { jsonError, notFound } from "@/lib/ssot/http";
 import { FEATURE_KEYS, isFeatureEnabled } from "@/lib/ssot/features";
 import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
 import { isAdminRole } from "@/lib/ssot/permissions";
-import { APP_ROUTES } from "@/lib/ssot/routes";
 import { createTicketCommentSchema } from "@/lib/validations/ticket";
-
-async function notifyCommentParticipants(
-    ticket: { id: number; title: string; reportedById: number; assignedToId: number | null },
-    commentAuthorId: number,
-    commentAuthorName: string,
-    isAdmin: boolean,
-    isOwner: boolean,
-): Promise<void> {
-    const actionUrl = `${APP_ROUTES.dashboard}?tab=it-support&ticketId=${ticket.id}`;
-    const referenceId = ticket.id.toString();
-
-    if (isAdmin && ticket.reportedById !== commentAuthorId) {
-        await prisma.notification.create({
-            data: {
-                userId: ticket.reportedById,
-                type: "NEW_COMMENT",
-                title: "มีความคิดเห็นใหม่ในคำขอ IT Support",
-                message: `${commentAuthorName} แสดงความคิดเห็นในคำขอ "${ticket.title}"`,
-                actionUrl,
-                referenceId,
-            },
-        });
-        return;
-    }
-
-    if (!isOwner) return;
-
-    if (ticket.assignedToId) {
-        await prisma.notification.create({
-            data: {
-                userId: ticket.assignedToId,
-                type: "NEW_COMMENT",
-                title: "ผู้แจ้งเพิ่มความคิดเห็นในคำขอ IT Support",
-                message: `${commentAuthorName} แสดงความคิดเห็นในคำขอ "${ticket.title}"`,
-                actionUrl,
-                referenceId,
-            },
-        });
-        return;
-    }
-
-    const admins = await prisma.user.findMany({
-        where: { role: Role.ADMIN },
-        select: { id: true },
-    });
-
-    if (admins.length > 0) {
-        await prisma.notification.createMany({
-            data: admins.map((admin) => ({
-                userId: admin.id,
-                type: "NEW_COMMENT" as const,
-                title: "ผู้แจ้งเพิ่มความคิดเห็นในคำขอ IT Support",
-                message: `${commentAuthorName} แสดงความคิดเห็นในคำขอ "${ticket.title}"`,
-                actionUrl,
-                referenceId,
-            })),
-        });
-    }
-}
 
 export async function POST(
     request: NextRequest,
@@ -148,12 +92,34 @@ export async function POST(
                 },
             );
 
+            const commentAuthorName =
+                comment.author.employee?.firstName
+                && comment.author.employee?.lastName
+                    ? `${comment.author.employee.firstName} ${comment.author.employee.lastName}`
+                    : comment.author.name;
+            const recipientIds = await getTicketCommentRecipientIds(
+                tx,
+                {
+                    reportedById: ticket.reportedById,
+                    assignedToId: ticket.assignedToId,
+                    actorId: actor.id,
+                    isAdmin,
+                    isOwner,
+                },
+            );
+            await enqueueTicketCommentOutbox(tx, {
+                ticketId,
+                commentId: comment.id,
+                recipientIds,
+                authorId: actor.id,
+                authorName: commentAuthorName,
+                ticketTitle: ticket.title,
+                authorIsOwner: isOwner,
+            });
+
             return {
                 outcome: "created" as const,
-                ticket,
                 comment,
-                isAdmin,
-                isOwner,
             };
         });
 
@@ -164,25 +130,11 @@ export async function POST(
             return jsonError(COMMON_API_MESSAGES.accessDenied, 403);
         }
 
-        const commentAuthorName =
-            result.comment.author.employee?.firstName
-            && result.comment.author.employee?.lastName
-                ? `${result.comment.author.employee.firstName} ${result.comment.author.employee.lastName}`
-                : result.comment.author.name;
-
-        after(async () => {
-            try {
-                await notifyCommentParticipants(
-                    result.ticket,
-                    actor.id,
-                    commentAuthorName,
-                    result.isAdmin,
-                    result.isOwner,
-                );
-            } catch (err) {
-                console.error("Comment notification failed:", err);
-            }
-        });
+        after(() =>
+            processOutbox().catch((error) => {
+                console.error("Outbox processor failed:", error);
+            }),
+        );
 
         return NextResponse.json({ comment: result.comment }, { status: 201 });
     } catch (error) {

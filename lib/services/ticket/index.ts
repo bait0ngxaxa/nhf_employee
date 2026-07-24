@@ -24,10 +24,6 @@ import {
     deleteTicket,
     checkPermissions,
 } from "./mutations";
-import {
-    sendTicketCreatedNotifications,
-    sendTicketUpdatedNotifications,
-} from "./notifications";
 
 /**
  * Ticket Service Object
@@ -45,10 +41,6 @@ export const ticketService = {
     updateTicket,
     deleteTicket,
     checkPermissions,
-
-    // Notification operations
-    sendTicketCreatedNotifications,
-    sendTicketUpdatedNotifications,
 };
 
 // Also export individual functions for tree-shaking
@@ -63,7 +55,4 @@ export {
     updateTicket,
     deleteTicket,
     checkPermissions,
-    // Notifications
-    sendTicketCreatedNotifications,
-    sendTicketUpdatedNotifications,
 };

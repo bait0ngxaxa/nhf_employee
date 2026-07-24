@@ -169,13 +169,15 @@ export async function sendEmail(emailData: EmailData): Promise<boolean> {
 }
 
 export async function sendNewTicketNotification(
-    ticketData: TicketEmailData
+    ticketData: TicketEmailData,
+    messageId?: string,
 ): Promise<boolean> {
     const ticketUrl = `${getPublicOrigin()}/dashboard/it-issues`;
     const emailData: EmailData = {
         to: ticketData.reportedBy.email,
         subject: `[NHF IT] Ticket #${ticketData.ticketId} ถูกสร้างแล้ว - ${ticketData.title}`,
         html: generateNewTicketEmailHTML(ticketData, ticketUrl),
+        messageId,
         text: `Ticket #${ticketData.ticketId} ถูกสร้างแล้ว\n\nหัวข้อ: ${
             ticketData.title
         }\nคำอธิบาย: ${ticketData.description}\nสถานะ: ${getTicketStatusLabel(
@@ -190,7 +192,8 @@ export async function sendNewTicketNotification(
 
 export async function sendStatusUpdateNotification(
     ticketData: TicketEmailData,
-    oldStatus: string
+    oldStatus: string,
+    messageId?: string,
 ): Promise<boolean> {
     const ticketUrl = `${getPublicOrigin()}/dashboard/it-issues`;
     const emailData: EmailData = {
@@ -199,6 +202,7 @@ export async function sendStatusUpdateNotification(
             ticketData.ticketId
         } - ${getTicketStatusLabel(ticketData.status)}`,
         html: generateStatusUpdateEmailHTML(ticketData, oldStatus, ticketUrl),
+        messageId,
         text: `สถานะ Ticket #${
             ticketData.ticketId
         } ได้รับการอัพเดท\n\nหัวข้อ: ${
@@ -214,7 +218,8 @@ export async function sendStatusUpdateNotification(
 }
 
 export async function sendITTeamNotification(
-    ticketData: TicketEmailData
+    ticketData: TicketEmailData,
+    messageId?: string,
 ): Promise<boolean> {
     const itTeamEmail = process.env.IT_TEAM_EMAIL;
     if (!itTeamEmail) {
@@ -228,6 +233,7 @@ export async function sendITTeamNotification(
             ticketData.priority === "URGENT" ? "เร่งด่วน" : "ความสำคัญสูง"
         } #${ticketData.ticketId} - ${ticketData.title}`,
         html: generateNewTicketEmailHTML(ticketData, ticketUrl),
+        messageId,
         text: `Ticket ใหม่ที่ต้องให้ความสำคัญ\n\nTicket #${
             ticketData.ticketId
         }\nหัวข้อ: ${ticketData.title}\nผู้แจ้ง: ${

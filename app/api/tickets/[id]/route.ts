@@ -103,11 +103,11 @@ export async function PATCH(
             return jsonError(result.error, result.status || 500);
         }
 
-        after(async () => {
-            processOutbox().catch((err) =>
-                console.error("Outbox processor failed:", err),
-            );
-        });
+        after(() =>
+            processOutbox().catch((error) => {
+                console.error("Outbox processor failed:", error);
+            }),
+        );
 
         return NextResponse.json({ ticket: result.ticket }, { status: 200 });
     } catch (error) {

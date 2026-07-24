@@ -120,6 +120,27 @@ describe("Email Service", () => {
                 expect.objectContaining({ to: "u@t.c" }),
             );
         });
+
+        it("reuses the provider Message-ID supplied by the outbox", async () => {
+            const ticketData: TicketEmailData = {
+                ticketId: 1,
+                title: "Issue",
+                description: "Desc",
+                category: "HARDWARE",
+                status: "OPEN",
+                priority: "HIGH",
+                reportedBy: { email: "u@t.c", name: "User" },
+                createdAt: new Date().toISOString(),
+            };
+            const messageId =
+                "<nhf-123e4567-e89b-52d3-a456-426614174000@notifications.thainhf.org>";
+
+            await sendNewTicketNotification(ticketData, messageId);
+
+            expect(sendMailMock).toHaveBeenCalledWith(
+                expect.objectContaining({ messageId }),
+            );
+        });
     });
 
     describe("sendLeaveActionNotification", () => {

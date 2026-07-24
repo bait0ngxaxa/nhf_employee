@@ -24,7 +24,8 @@ const getConfig = () => ({
 
 export async function sendLineMessage(
     userId: string,
-    message: LineFlexMessage
+    message: LineFlexMessage,
+    retryKey?: string,
 ): Promise<boolean> {
     const { channelAccessToken } = getConfig();
 
@@ -33,14 +34,17 @@ export async function sendLineMessage(
     }
 
     try {
+        const headers: Record<string, string> = {
+            Authorization: `Bearer ${channelAccessToken}`,
+            "Content-Type": "application/json",
+        };
+        if (retryKey) headers["X-Line-Retry-Key"] = retryKey;
+
         const response = await fetch(
             "https://api.line.me/v2/bot/message/push",
             {
                 method: "POST",
-                headers: {
-                    Authorization: `Bearer ${channelAccessToken}`,
-                    "Content-Type": "application/json",
-                },
+                headers,
                 body: JSON.stringify({
                     to: userId,
                     messages: [message],
@@ -48,7 +52,7 @@ export async function sendLineMessage(
             }
         );
 
-        if (response.ok) {
+        if (response.ok || (retryKey !== undefined && response.status === 409)) {
             return true;
         } else {
             const errorText = await response.text();
@@ -66,7 +70,8 @@ export async function sendLineMessage(
 }
 
 export async function sendLineBroadcast(
-    message: LineFlexMessage
+    message: LineFlexMessage,
+    retryKey?: string,
 ): Promise<boolean> {
     const { channelAccessToken } = getConfig();
 
@@ -75,21 +80,24 @@ export async function sendLineBroadcast(
     }
 
     try {
+        const headers: Record<string, string> = {
+            Authorization: `Bearer ${channelAccessToken}`,
+            "Content-Type": "application/json",
+        };
+        if (retryKey) headers["X-Line-Retry-Key"] = retryKey;
+
         const response = await fetch(
             "https://api.line.me/v2/bot/message/broadcast",
             {
                 method: "POST",
-                headers: {
-                    Authorization: `Bearer ${channelAccessToken}`,
-                    "Content-Type": "application/json",
-                },
+                headers,
                 body: JSON.stringify({
                     messages: [message],
                 }),
             }
         );
 
-        if (response.ok) {
+        if (response.ok || (retryKey !== undefined && response.status === 409)) {
             return true;
         } else {
             const errorText = await response.text();
@@ -181,19 +189,21 @@ export async function sendLineWebhook(data: LineWebhookData): Promise<boolean> {
 }
 
 async function sendToITTeamOrBroadcast(
-    flexMessage: LineFlexMessage
+    flexMessage: LineFlexMessage,
+    retryKey?: string,
 ): Promise<boolean> {
     const { itTeamUserId } = getConfig();
 
     if (itTeamUserId) {
-        return await sendLineMessage(itTeamUserId, flexMessage);
+        return await sendLineMessage(itTeamUserId, flexMessage, retryKey);
     } else {
-        return await sendLineBroadcast(flexMessage);
+        return await sendLineBroadcast(flexMessage, retryKey);
     }
 }
 
 export async function sendNewTicketNotification(
-    ticketData: TicketEmailData
+    ticketData: TicketEmailData,
+    retryKey?: string,
 ): Promise<boolean> {
     const { baseUrl } = getConfig();
     const lineData: LineNotificationData = { ...ticketData };
@@ -203,11 +213,12 @@ export async function sendNewTicketNotification(
         baseUrl
     );
 
-    return await sendToITTeamOrBroadcast(flexMessage);
+    return await sendToITTeamOrBroadcast(flexMessage, retryKey);
 }
 
 export async function sendStatusUpdateNotification(
-    ticketData: TicketEmailData
+    ticketData: TicketEmailData,
+    retryKey?: string,
 ): Promise<boolean> {
     const { baseUrl } = getConfig();
     const lineData: LineNotificationData = { ...ticketData };
@@ -217,17 +228,18 @@ export async function sendStatusUpdateNotification(
         baseUrl
     );
 
-    return await sendToITTeamOrBroadcast(flexMessage);
+    return await sendToITTeamOrBroadcast(flexMessage, retryKey);
 }
 
 export async function sendITTeamNotification(
-    ticketData: TicketEmailData
+    ticketData: TicketEmailData,
+    retryKey?: string,
 ): Promise<boolean> {
     const { baseUrl } = getConfig();
     const lineData: LineNotificationData = { ...ticketData };
     const flexMessage = generateTicketFlexMessage(lineData, "it_team", baseUrl);
 
-    return await sendToITTeamOrBroadcast(flexMessage);
+    return await sendToITTeamOrBroadcast(flexMessage, retryKey);
 }
 
 export async function sendEmailRequestNotification(

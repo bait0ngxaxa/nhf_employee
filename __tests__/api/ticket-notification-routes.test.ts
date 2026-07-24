@@ -13,12 +13,16 @@ import { processOutbox } from "@/lib/services/outbox/processor";
 import { prisma } from "@/lib/db/prisma";
 import { isAdminRole } from "@/lib/ssot/permissions";
 
+const { afterResults } = vi.hoisted(() => ({
+    afterResults: [] as Array<void | Promise<void>>,
+}));
+
 vi.mock("next/server", async (importOriginal) => {
     const actual = await importOriginal<typeof NextServerModule>();
     return {
         ...actual,
         after: vi.fn((callback: () => void | Promise<void>) => {
-            void callback();
+            afterResults.push(callback());
         }),
     };
 });
@@ -56,6 +60,9 @@ vi.mock("@/lib/db/prisma", () => ({
             create: vi.fn(),
             createMany: vi.fn(),
         },
+        notificationOutbox: {
+            createMany: vi.fn(),
+        },
         ticket: {
             findFirst: vi.fn(),
         },
@@ -71,6 +78,7 @@ vi.mock("@/lib/db/prisma", () => ({
 describe("Ticket notification routes", () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        afterResults.length = 0;
         vi.mocked(prisma.$transaction).mockImplementation(
             async (callback) => callback(prisma as never),
         );
@@ -112,6 +120,7 @@ describe("Ticket notification routes", () => {
         await Promise.resolve();
         await Promise.resolve();
         expect(processOutbox).toHaveBeenCalledTimes(1);
+        expect(afterResults.at(-1)).toBeInstanceOf(Promise);
     });
 
     it("returns 409 and skips outbox processing on concurrent update", async () => {
@@ -196,7 +205,7 @@ describe("Ticket notification routes", () => {
         );
     });
 
-    it("sends in-app notification to reporter when admin adds comment", async () => {
+    it("enqueues reporter comment notification atomically", async () => {
         vi.mocked(getApiAuthSession).mockResolvedValue({
             user: { id: "1", role: "ADMIN", email: "admin@test.com" },
         } as never);
@@ -232,13 +241,25 @@ describe("Ticket notification routes", () => {
         expect(res.status).toBe(201);
         await Promise.resolve();
         await Promise.resolve();
-        expect(prisma.notification.create).toHaveBeenCalledWith({
-            data: expect.objectContaining({
-                userId: 9,
-                type: "NEW_COMMENT",
-                referenceId: "55",
-            }),
+        expect(prisma.notificationOutbox.createMany).toHaveBeenCalledWith({
+            data: [{
+                type: "TICKET_COMMENT_IN_APP",
+                payload: JSON.stringify({
+                    ticketId: 55,
+                    commentId: 3001,
+                    recipientId: 9,
+                    authorId: 1,
+                    authorName: "Admin",
+                    ticketTitle: "VPN issue",
+                    authorIsOwner: false,
+                }),
+                eventKey: "ticket:55:comment:3001:in-app:user:9",
+            }],
+            skipDuplicates: true,
         });
+        expect(prisma.notification.create).not.toHaveBeenCalled();
+        expect(processOutbox).toHaveBeenCalledTimes(1);
+        expect(afterResults.at(-1)).toBeInstanceOf(Promise);
         expect(prisma.auditLog.create).toHaveBeenCalledWith(
             expect.objectContaining({
                 data: expect.objectContaining({

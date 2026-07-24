@@ -1,5 +1,4 @@
 import { prisma } from "@/lib/db/prisma";
-import { OUTBOX_NOTIFICATION_TYPES } from "@/lib/services/outbox/types";
 import { type EmailRequestData } from "@/types/api";
 import type {
     CreateEmailRequestData,
@@ -46,7 +45,7 @@ export async function createEmailRequest(
 
         await tx.notificationOutbox.create({
             data: {
-                type: OUTBOX_NOTIFICATION_TYPES[2],
+                type: "EMAIL_REQUEST",
                 payload: JSON.stringify(notificationData),
             },
         });

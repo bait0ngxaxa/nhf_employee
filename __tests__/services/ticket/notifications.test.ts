@@ -6,8 +6,10 @@ import { emailService } from "@/lib/email";
 import { lineNotificationService } from "@/lib/line";
 import { prisma } from "@/lib/db/prisma";
 import {
-    sendTicketCreatedNotifications,
-    sendTicketUpdatedNotifications,
+    sendTicketCreatedInAppNotification,
+    sendTicketCreatedLineNotification,
+    sendTicketUpdatedInAppNotification,
+    sendTicketUpdatedReporterEmailNotification,
 } from "@/lib/services/ticket/notifications";
 import type { TicketWithRelations } from "@/lib/services/ticket/types";
 
@@ -79,10 +81,11 @@ describe("ticket notification delivery", () => {
         vi.mocked(lineNotificationService.sendStatusUpdateNotification).mockResolvedValue(true);
     });
 
-    it("creates in-app ticket notification before failed LINE delivery", async () => {
+    it("keeps created in-app delivery independent from failed LINE delivery", async () => {
         vi.mocked(lineNotificationService.sendITTeamNotification).mockResolvedValue(false);
 
-        await expect(sendTicketCreatedNotifications(buildTicket())).rejects.toThrow(
+        await sendTicketCreatedInAppNotification(buildTicket(), "created-in-app");
+        await expect(sendTicketCreatedLineNotification(buildTicket())).rejects.toThrow(
             "TICKET_CREATED LINE notification failed",
         );
 
@@ -95,20 +98,21 @@ describe("ticket notification delivery", () => {
             }),
         });
 
-        const inAppOrder = prismaMock.notification.create.mock.invocationCallOrder[0];
-        const lineOrder =
-            vi.mocked(lineNotificationService.sendITTeamNotification).mock
-                .invocationCallOrder[0];
-        expect(inAppOrder).toBeLessThan(lineOrder);
+        expect(emailService.sendNewTicketNotification).not.toHaveBeenCalled();
     });
 
-    it("creates in-app status notification before failed email delivery", async () => {
+    it("keeps status in-app delivery independent from failed email delivery", async () => {
         vi.mocked(emailService.sendStatusUpdateNotification).mockResolvedValue(false);
         const ticket = { ...buildTicket(), status: "IN_PROGRESS" as const };
 
+        await sendTicketUpdatedInAppNotification(
+            ticket,
+            "OPEN",
+            "updated-in-app",
+        );
         await expect(
-            sendTicketUpdatedNotifications(ticket, "OPEN"),
-        ).rejects.toThrow("TICKET_UPDATED email notification failed");
+            sendTicketUpdatedReporterEmailNotification(ticket, "OPEN"),
+        ).rejects.toThrow("TICKET_UPDATED reporter email notification failed");
 
         expect(prismaMock.notification.create).toHaveBeenCalledWith({
             data: expect.objectContaining({
@@ -119,10 +123,8 @@ describe("ticket notification delivery", () => {
             }),
         });
 
-        const inAppOrder = prismaMock.notification.create.mock.invocationCallOrder[0];
-        const emailOrder =
-            vi.mocked(emailService.sendStatusUpdateNotification).mock
-                .invocationCallOrder[0];
-        expect(inAppOrder).toBeLessThan(emailOrder);
+        expect(
+            lineNotificationService.sendStatusUpdateNotification,
+        ).not.toHaveBeenCalled();
     });
 });

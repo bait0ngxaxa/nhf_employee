@@ -46,6 +46,7 @@ describe("Ticket Mutations", () => {
                 asNever({
                     id: 1,
                     ...data,
+                    reportedById: 1,
                 }),
             );
 
@@ -64,14 +65,26 @@ describe("Ticket Mutations", () => {
                     }),
                 }),
             );
-            expect(prismaMock.notificationOutbox.create).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    data: {
-                        type: "TICKET_CREATED",
+            expect(prismaMock.notificationOutbox.createMany).toHaveBeenCalledWith({
+                data: [
+                    {
+                        type: "TICKET_CREATED_IN_APP",
                         payload: JSON.stringify({ ticketId: 1 }),
+                        eventKey: "ticket:1:created:in-app:admins",
                     },
-                }),
-            );
+                    {
+                        type: "TICKET_CREATED_LINE",
+                        payload: JSON.stringify({ ticketId: 1 }),
+                        eventKey: "ticket:1:created:line:it",
+                    },
+                    {
+                        type: "TICKET_CREATED_EMAIL_REPORTER",
+                        payload: JSON.stringify({ ticketId: 1 }),
+                        eventKey: "ticket:1:created:email:reporter:1",
+                    },
+                ],
+                skipDuplicates: true,
+            });
             expect(prismaMock.auditLog.create).toHaveBeenCalledWith(
                 expect.objectContaining({
                     data: expect.objectContaining({
@@ -125,6 +138,38 @@ describe("Ticket Mutations", () => {
             );
         });
 
+        it("enqueues urgent IT email as a separate destination", async () => {
+            const data = {
+                title: "Server down",
+                description: "Production is unavailable",
+                category: "NETWORK" as const,
+                priority: "URGENT" as const,
+            };
+            prismaMock.ticket.create.mockResolvedValue(asNever({
+                id: 2,
+                ...data,
+                reportedById: 7,
+            }));
+
+            await createTicket(data, {
+                id: 7,
+                role: "USER",
+                email: "reporter@test.com",
+            });
+
+            expect(prismaMock.notificationOutbox.createMany).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    data: expect.arrayContaining([
+                        {
+                            type: "TICKET_CREATED_EMAIL_IT",
+                            payload: JSON.stringify({ ticketId: 2 }),
+                            eventKey: "ticket:2:created:email:it",
+                        },
+                    ]),
+                }),
+            );
+        });
+
         it("should NOT allow owner to update status", async () => {
             prismaMock.ticket.findFirst.mockResolvedValue(
                 asNever(existingTicket),
@@ -167,17 +212,41 @@ describe("Ticket Mutations", () => {
                     }),
                 }),
             );
-            expect(prismaMock.notificationOutbox.create).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    data: {
-                        type: "TICKET_UPDATED",
+            expect(prismaMock.notificationOutbox.createMany).toHaveBeenCalledWith({
+                data: [
+                    {
+                        type: "TICKET_UPDATED_IN_APP_REPORTER",
                         payload: JSON.stringify({
                             ticketId: 1,
                             oldStatus: "OPEN",
                         }),
+                        eventKey: expect.stringMatching(
+                            /^ticket:1:status:.+:in-app:reporter:10$/,
+                        ),
                     },
-                }),
-            );
+                    {
+                        type: "TICKET_UPDATED_EMAIL_REPORTER",
+                        payload: JSON.stringify({
+                            ticketId: 1,
+                            oldStatus: "OPEN",
+                        }),
+                        eventKey: expect.stringMatching(
+                            /^ticket:1:status:.+:email:reporter:10$/,
+                        ),
+                    },
+                    {
+                        type: "TICKET_UPDATED_LINE",
+                        payload: JSON.stringify({
+                            ticketId: 1,
+                            oldStatus: "OPEN",
+                        }),
+                        eventKey: expect.stringMatching(
+                            /^ticket:1:status:.+:line:it$/,
+                        ),
+                    },
+                ],
+                skipDuplicates: true,
+            });
             expect(prismaMock.auditLog.create).toHaveBeenCalledWith(
                 expect.objectContaining({
                     data: expect.objectContaining({

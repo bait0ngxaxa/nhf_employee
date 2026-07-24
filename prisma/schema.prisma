@@ -194,6 +194,14 @@ enum TicketStatus {
 enum NotificationOutboxType {
   TICKET_CREATED
   TICKET_UPDATED
+  TICKET_CREATED_IN_APP
+  TICKET_CREATED_LINE
+  TICKET_CREATED_EMAIL_REPORTER
+  TICKET_CREATED_EMAIL_IT
+  TICKET_UPDATED_IN_APP_REPORTER
+  TICKET_UPDATED_EMAIL_REPORTER
+  TICKET_UPDATED_LINE
+  TICKET_COMMENT_IN_APP
   EMAIL_REQUEST
   LEAVE_ACTION
   LEAVE_RESULT
@@ -328,6 +336,7 @@ model PasswordResetToken {
 model NotificationOutbox {
   id            Int                      @id @default(autoincrement())
   type          NotificationOutboxType
+  eventKey      String?                  @unique @db.VarChar(191)
   payload       String                   @db.Text // JSON string containing notification details
   status        NotificationOutboxStatus @default(PENDING)
   attempts      Int                      @default(0)

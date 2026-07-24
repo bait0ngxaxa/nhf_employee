@@ -74,6 +74,31 @@ describe("LINE Notification Service", () => {
             const result = await sendLineMessage("user1", flexMessage);
             expect(result).toBe(false);
         });
+
+        it("uses retry key and accepts duplicate acknowledgement", async () => {
+            const retryKey = "123e4567-e89b-52d3-a456-426614174000";
+            fetchMock.mockResolvedValue({
+                ok: false,
+                text: async () => "",
+                status: 409,
+            });
+
+            const result = await sendLineMessage(
+                "user1",
+                flexMessage,
+                retryKey,
+            );
+
+            expect(result).toBe(true);
+            expect(fetchMock).toHaveBeenCalledWith(
+                "https://api.line.me/v2/bot/message/push",
+                expect.objectContaining({
+                    headers: expect.objectContaining({
+                        "X-Line-Retry-Key": retryKey,
+                    }),
+                }),
+            );
+        });
     });
 
     describe("sendLineBroadcast", () => {

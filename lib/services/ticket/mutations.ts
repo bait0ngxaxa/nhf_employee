@@ -1,4 +1,3 @@
-import { OUTBOX_NOTIFICATION_TYPES } from "@/lib/services/outbox/types";
 import { prisma } from "@/lib/db/prisma";
 import { isAdminRole } from "@/lib/ssot/permissions";
 import { TICKET_WITH_USERS_INCLUDE } from "./constants";
@@ -7,6 +6,10 @@ import {
     isTicketStatusTransitionAllowed,
 } from "./status-transitions";
 import { auditTicketUpdate, createTicketAudit } from "./audit";
+import {
+    enqueueTicketCreatedOutbox,
+    enqueueTicketUpdatedOutbox,
+} from "./outbox";
 import type {
     CreateTicketData,
     UpdateTicketData,
@@ -94,13 +97,7 @@ export async function createTicket(
             include: TICKET_WITH_USERS_INCLUDE,
         });
 
-        // Add to outbox for LINE/Email notifications
-        await tx.notificationOutbox.create({
-            data: {
-                type: OUTBOX_NOTIFICATION_TYPES[0],
-                payload: JSON.stringify({ ticketId: newTicket.id }),
-            },
-        });
+        await enqueueTicketCreatedOutbox(tx, newTicket);
 
         await createTicketAudit(
             tx,
@@ -198,15 +195,11 @@ export async function updateTicket(
             updateFields.status &&
             updateFields.status !== existingTicket.status
         ) {
-            await tx.notificationOutbox.create({
-                data: {
-                    type: OUTBOX_NOTIFICATION_TYPES[1],
-                    payload: JSON.stringify({
-                        ticketId: updatedTicket.id,
-                        oldStatus: existingTicket.status,
-                    }),
-                },
-            });
+            await enqueueTicketUpdatedOutbox(
+                tx,
+                updatedTicket,
+                existingTicket.status,
+            );
         }
 
         return updatedTicket;

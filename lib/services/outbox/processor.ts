@@ -1,12 +1,7 @@
 import type { NotificationOutbox } from "@prisma/client";
 import { lineNotificationService } from "@/lib/line";
 import { prisma } from "@/lib/db/prisma";
-import { TICKET_WITH_USERS_INCLUDE } from "@/lib/services/ticket/constants";
-import {
-    sendTicketCreatedNotifications,
-    sendTicketUpdatedNotifications,
-} from "@/lib/services/ticket/notifications";
-import type { TicketWithRelations } from "@/lib/services/ticket/types";
+import { dispatchTicketOutbox } from "@/lib/services/ticket/outbox-dispatch";
 import type {
     EmailRequestData,
     StockLowLineData,
@@ -50,15 +45,6 @@ type OutboxProcessResult = {
 
 type DispatchOutcome = "SENT" | "SUPERSEDED";
 
-type TicketCreatedPayload = {
-    ticketId: number;
-};
-
-type TicketUpdatedPayload = {
-    ticketId: number;
-    oldStatus: string;
-};
-
 type StockRequestLinePayload = StockRequestLineData;
 type StockLowLinePayload = StockLowLineData;
 
@@ -72,29 +58,6 @@ function parsePayload(payload: string): unknown {
     } catch {
         throw new Error("Invalid payload JSON");
     }
-}
-
-function parseTicketCreatedPayload(payload: unknown): TicketCreatedPayload {
-    if (!isRecord(payload) || typeof payload.ticketId !== "number") {
-        throw new Error("Invalid TICKET_CREATED payload");
-    }
-
-    return { ticketId: payload.ticketId };
-}
-
-function parseTicketUpdatedPayload(payload: unknown): TicketUpdatedPayload {
-    if (
-        !isRecord(payload) ||
-        typeof payload.ticketId !== "number" ||
-        typeof payload.oldStatus !== "string"
-    ) {
-        throw new Error("Invalid TICKET_UPDATED payload");
-    }
-
-    return {
-        ticketId: payload.ticketId,
-        oldStatus: payload.oldStatus,
-    };
 }
 
 function parseSharedDriveAccess(
@@ -336,19 +299,6 @@ function getNextAttemptAt(attempts: number, now: Date): Date {
     );
 }
 
-async function getTicketById(ticketId: number): Promise<TicketWithRelations> {
-    const ticket = await prisma.ticket.findUnique({
-        where: { id: ticketId, deletedAt: null },
-        include: TICKET_WITH_USERS_INCLUDE,
-    });
-
-    if (!ticket) {
-        throw new Error(`Ticket not found: ${ticketId}`);
-    }
-
-    return ticket as TicketWithRelations;
-}
-
 async function dispatchNotification(
     notification: NotificationOutbox,
 ): Promise<DispatchOutcome> {
@@ -357,20 +307,10 @@ async function dispatchNotification(
     }
 
     const payload = parsePayload(notification.payload);
+    const ticketOutcome = await dispatchTicketOutbox(notification, payload);
+    if (ticketOutcome) return ticketOutcome;
 
     switch (notification.type) {
-        case "TICKET_CREATED": {
-            const parsedPayload = parseTicketCreatedPayload(payload);
-            const ticket = await getTicketById(parsedPayload.ticketId);
-            await sendTicketCreatedNotifications(ticket);
-            return "SENT";
-        }
-        case "TICKET_UPDATED": {
-            const parsedPayload = parseTicketUpdatedPayload(payload);
-            const ticket = await getTicketById(parsedPayload.ticketId);
-            await sendTicketUpdatedNotifications(ticket, parsedPayload.oldStatus);
-            return "SENT";
-        }
         case "EMAIL_REQUEST": {
             const parsedPayload = parseEmailRequestPayload(payload);
             await createEmailRequestInAppNotification(parsedPayload);
@@ -440,6 +380,8 @@ async function dispatchNotification(
             );
             return "SENT";
         }
+        default:
+            throw new Error(`Unhandled notification type: ${notification.type}`);
     }
 }
 
@@ -477,15 +419,16 @@ export async function processOutbox(batchSize = 10): Promise<OutboxProcessResult
         try {
             const outcome = await dispatchNotification(notification);
 
-            if (outcome === OUTBOX_STATUS_SENT) {
-                await prisma.notificationOutbox.updateMany({
-                    where: { id: notification.id, status: OUTBOX_STATUS_PROCESSING },
-                    data: {
-                        status: OUTBOX_STATUS_SENT,
-                        lastError: null,
-                    },
-                });
-            }
+            await prisma.notificationOutbox.updateMany({
+                where: { id: notification.id, status: OUTBOX_STATUS_PROCESSING },
+                data: {
+                    status: outcome,
+                    lastError:
+                        outcome === OUTBOX_STATUS_SENT
+                            ? null
+                            : "Superseded legacy bundled ticket notification",
+                },
+            });
             processedCount++;
         } catch (error) {
             const message =

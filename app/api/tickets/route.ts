@@ -78,12 +78,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         const actor = createTicketCommandActor(auth.user, request.headers);
         const ticket = await ticketService.createTicket(result.data, actor);
 
-        after(async () => {
-            processOutbox().catch((err) =>
-                console.error("Outbox processor failed:", err),
-            );
-
-        });
+        after(() =>
+            processOutbox().catch((error) => {
+                console.error("Outbox processor failed:", error);
+            }),
+        );
 
         return NextResponse.json({ ticket }, { status: 201 });
     } catch (error) {
