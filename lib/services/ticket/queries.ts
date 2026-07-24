@@ -1,4 +1,5 @@
 import { cache } from "react";
+import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
 import { isAdminRole } from "@/lib/ssot/permissions";
 import {
@@ -20,8 +21,8 @@ import type {
 function buildWhereClause(
     filters: TicketFilters,
     user: UserContext,
-): Record<string, unknown> {
-    const where: Record<string, unknown> = {};
+): Prisma.TicketWhereInput {
+    const where: Prisma.TicketWhereInput = {};
 
     // Role-based filtering - non-admins only see their own tickets
     if (!isAdminRole(user.role)) {
@@ -37,13 +38,11 @@ function buildWhereClause(
             {
                 title: {
                     contains: filters.search.trim(),
-                    mode: "insensitive",
                 },
             },
             {
                 description: {
                     contains: filters.search.trim(),
-                    mode: "insensitive",
                 },
             },
         ];

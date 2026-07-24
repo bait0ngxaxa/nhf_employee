@@ -66,6 +66,30 @@ describe("Ticket Queries", () => {
                 }),
             );
         });
+
+        it("should use MySQL-compatible search filters", async () => {
+            const user = { id: 1, role: "ADMIN", email: "" };
+            prismaMock.ticket.findMany.mockResolvedValue([]);
+            prismaMock.ticket.count.mockResolvedValue(0);
+
+            await getTickets(
+                { page: 1, limit: 10, search: " printer " },
+                user,
+            );
+
+            const expectedWhere = {
+                OR: [
+                    { title: { contains: "printer" } },
+                    { description: { contains: "printer" } },
+                ],
+            };
+            expect(prismaMock.ticket.findMany).toHaveBeenCalledWith(
+                expect.objectContaining({ where: expectedWhere }),
+            );
+            expect(prismaMock.ticket.count).toHaveBeenCalledWith({
+                where: expectedWhere,
+            });
+        });
     });
 
     describe("getTicketById", () => {
