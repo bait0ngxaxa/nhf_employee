@@ -72,6 +72,7 @@ describe("mutation rate limit", () => {
     it.each([
         ["stock-request-create", 10],
         ["stock-request-issue", 30],
+        ["stock-request-cancel", 20],
         ["stock-adjust", 30],
     ] as const)(
         "does not share the %s authenticated quota between users behind the same IP",

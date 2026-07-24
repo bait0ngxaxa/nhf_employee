@@ -27,7 +27,7 @@ export type AuthenticatedMutationRateLimitScope = Exclude<
 
 export const PRE_AUTH_IP_RATE_LIMIT_POLICIES = {
     "auth-login": { windowMs: 15 * 60 * 1000, maxRequests: 300 },
-    "auth-refresh": { windowMs: 15 * 60 * 1000, maxRequests: 120 },
+    "auth-refresh": { windowMs: 15 * 60 * 1000, maxRequests: 300 },
     "stock-adjust": { windowMs: 15 * 60 * 1000, maxRequests: 300 },
     "stock-request-cancel": { windowMs: 15 * 60 * 1000, maxRequests: 300 },
     "stock-request-create": { windowMs: 15 * 60 * 1000, maxRequests: 300 },
