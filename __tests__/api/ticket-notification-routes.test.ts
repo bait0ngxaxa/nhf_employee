@@ -1,7 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 import type * as NextServerModule from "next/server";
-import { PATCH as patchTicketRoute } from "@/app/api/tickets/[id]/route";
+import {
+    DELETE as deleteTicketRoute,
+    PATCH as patchTicketRoute,
+} from "@/app/api/tickets/[id]/route";
 import { POST as postTicketCommentRoute } from "@/app/api/tickets/[id]/comments/route";
 import { getApiAuthSession } from "@/lib/auth/server";
 import { buildUserContext } from "@/lib/auth/context";
@@ -30,6 +33,7 @@ vi.mock("@/lib/auth/context", () => ({
 
 vi.mock("@/lib/services/ticket", () => ({
     ticketService: {
+        deleteTicket: vi.fn(),
         updateTicket: vi.fn(),
     },
 }));
@@ -44,12 +48,16 @@ vi.mock("@/lib/ssot/permissions", () => ({
 
 vi.mock("@/lib/db/prisma", () => ({
     prisma: {
+        $transaction: vi.fn(),
+        auditLog: {
+            create: vi.fn(),
+        },
         notification: {
             create: vi.fn(),
             createMany: vi.fn(),
         },
         ticket: {
-            findUnique: vi.fn(),
+            findFirst: vi.fn(),
         },
         ticketComment: {
             create: vi.fn(),
@@ -63,6 +71,9 @@ vi.mock("@/lib/db/prisma", () => ({
 describe("Ticket notification routes", () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        vi.mocked(prisma.$transaction).mockImplementation(
+            async (callback) => callback(prisma as never),
+        );
         vi.mocked(processOutbox).mockResolvedValue({
             processed: 0,
             failed: 0,
@@ -134,12 +145,63 @@ describe("Ticket notification routes", () => {
         expect(processOutbox).not.toHaveBeenCalled();
     });
 
+    it("requires a delete reason and passes request metadata to soft delete", async () => {
+        vi.mocked(getApiAuthSession).mockResolvedValue({
+            user: { id: "1", role: "ADMIN", email: "admin@test.com" },
+        } as never);
+        vi.mocked(buildUserContext).mockReturnValue({
+            id: 1,
+            role: "ADMIN",
+            email: "admin@test.com",
+            name: "Admin",
+        });
+        vi.mocked(ticketService.deleteTicket).mockResolvedValue({
+            success: true,
+        });
+
+        const invalidRequest = new NextRequest(
+            "http://localhost/api/tickets/44",
+            {
+                method: "DELETE",
+                body: JSON.stringify({}),
+            },
+        );
+        const invalidResponse = await deleteTicketRoute(invalidRequest, {
+            params: Promise.resolve({ id: "44" }),
+        });
+        expect(invalidResponse.status).toBe(400);
+        expect(ticketService.deleteTicket).not.toHaveBeenCalled();
+
+        const validRequest = new NextRequest(
+            "http://localhost/api/tickets/44",
+            {
+                method: "DELETE",
+                headers: { "x-request-id": "req-delete-44" },
+                body: JSON.stringify({ reason: "ข้อมูลซ้ำ" }),
+            },
+        );
+        const validResponse = await deleteTicketRoute(validRequest, {
+            params: Promise.resolve({ id: "44" }),
+        });
+
+        expect(validResponse.status).toBe(200);
+        expect(ticketService.deleteTicket).toHaveBeenCalledWith(
+            44,
+            "ข้อมูลซ้ำ",
+            expect.objectContaining({
+                id: 1,
+                email: "admin@test.com",
+                requestId: "req-delete-44",
+            }),
+        );
+    });
+
     it("sends in-app notification to reporter when admin adds comment", async () => {
         vi.mocked(getApiAuthSession).mockResolvedValue({
             user: { id: "1", role: "ADMIN", email: "admin@test.com" },
         } as never);
         vi.mocked(isAdminRole).mockReturnValue(true);
-        vi.mocked(prisma.ticket.findUnique).mockResolvedValue({
+        vi.mocked(prisma.ticket.findFirst).mockResolvedValue({
             id: 55,
             title: "VPN issue",
             reportedById: 9,
@@ -177,6 +239,15 @@ describe("Ticket notification routes", () => {
                 referenceId: "55",
             }),
         });
+        expect(prisma.auditLog.create).toHaveBeenCalledWith(
+            expect.objectContaining({
+                data: expect.objectContaining({
+                    action: "TICKET_COMMENT",
+                    entityId: 55,
+                    userId: 1,
+                }),
+            }),
+        );
     });
 
     it("denies a non-admin assignee who is not the ticket owner", async () => {
@@ -184,7 +255,7 @@ describe("Ticket notification routes", () => {
             user: { id: "7", role: "USER", email: "assignee@test.com" },
         } as never);
         vi.mocked(isAdminRole).mockReturnValue(false);
-        vi.mocked(prisma.ticket.findUnique).mockResolvedValue({
+        vi.mocked(prisma.ticket.findFirst).mockResolvedValue({
             id: 55,
             title: "VPN issue",
             reportedById: 9,

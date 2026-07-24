@@ -1,7 +1,7 @@
 import { after, type NextRequest, NextResponse } from "next/server";
 
 import { requireApiSession } from "@/lib/auth/api";
-import { logTicketEvent } from "@/lib/server/audit";
+import { createTicketCommandActor } from "@/lib/server/ticket-command-actor";
 import { processOutbox } from "@/lib/services/outbox/processor";
 import { ticketService, type TicketFilters } from "@/lib/services/ticket";
 import { jsonError, notFound } from "@/lib/ssot/http";
@@ -75,21 +75,14 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         const auth = await requireApiSession();
         if (!auth.ok) return auth.response;
 
-        const ticket = await ticketService.createTicket(result.data, auth.user.id);
+        const actor = createTicketCommandActor(auth.user, request.headers);
+        const ticket = await ticketService.createTicket(result.data, actor);
 
         after(async () => {
             processOutbox().catch((err) =>
                 console.error("Outbox processor failed:", err),
             );
 
-            await logTicketEvent("TICKET_CREATE", ticket.id, auth.user.id, auth.user.email, {
-                after: {
-                    title: ticket.title,
-                    category: ticket.category,
-                    priority: ticket.priority,
-                    status: ticket.status,
-                },
-            });
         });
 
         return NextResponse.json({ ticket }, { status: 201 });

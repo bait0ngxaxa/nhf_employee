@@ -22,7 +22,7 @@ function buildWhereClause(
     filters: TicketFilters,
     user: UserContext,
 ): Prisma.TicketWhereInput {
-    const where: Prisma.TicketWhereInput = {};
+    const where: Prisma.TicketWhereInput = { deletedAt: null };
 
     // Role-based filtering - non-admins only see their own tickets
     if (!isAdminRole(user.role)) {
@@ -110,8 +110,8 @@ export const getTicketById = cache(
         error?: string;
         status?: number;
     }> => {
-        const ticket = await prisma.ticket.findUnique({
-            where: { id: ticketId },
+        const ticket = await prisma.ticket.findFirst({
+            where: { id: ticketId, deletedAt: null },
             include: TICKET_DETAIL_INCLUDE,
         });
 
@@ -157,7 +157,7 @@ export async function recordTicketView(
  */
 export async function ticketExists(ticketId: number): Promise<boolean> {
     const count = await prisma.ticket.count({
-        where: { id: ticketId },
+        where: { id: ticketId, deletedAt: null },
     });
     return count > 0;
 }

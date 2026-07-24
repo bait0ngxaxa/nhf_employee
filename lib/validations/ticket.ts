@@ -95,8 +95,17 @@ export const createTicketCommentSchema = z.object({
         .max(5000, "ความคิดเห็นต้องไม่เกิน 5000 ตัวอักษร"),
 });
 
+export const deleteTicketSchema = z.object({
+    reason: z
+        .string({ message: "กรุณาระบุเหตุผลในการลบ Ticket" })
+        .trim()
+        .min(3, "เหตุผลในการลบต้องมีอย่างน้อย 3 ตัวอักษร")
+        .max(500, "เหตุผลในการลบต้องไม่เกิน 500 ตัวอักษร"),
+});
+
 // Inferred types for use in API routes
 export type TicketFiltersInput = z.infer<typeof ticketFiltersSchema>;
 export type CreateTicketInput = z.infer<typeof createTicketSchema>;
 export type UpdateTicketInput = z.infer<typeof updateTicketSchema>;
 export type CreateTicketCommentInput = z.infer<typeof createTicketCommentSchema>;
+export type DeleteTicketInput = z.infer<typeof deleteTicketSchema>;

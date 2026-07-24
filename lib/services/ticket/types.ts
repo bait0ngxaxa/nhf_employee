@@ -24,6 +24,10 @@ export interface UserContext {
     id: number;
     role: string;
     email: string;
+    ipAddress?: string;
+    userAgent?: string;
+    requestId?: string;
+    correlationId?: string;
 }
 
 /** Data for creating a new ticket - uses Prisma enum types */

@@ -23,6 +23,7 @@ model User {
   ticketViews            TicketView[]
   assignedTickets        Ticket[]           @relation("AssignedTickets")
   reportedTickets        Ticket[]           @relation("ReportedTickets")
+  deletedTickets         Ticket[]           @relation("DeletedTickets")
   employee               Employee?          @relation(fields: [employeeId], references: [id])
   auditLogs              AuditLog[]
   emailRequests          EmailRequest[]
@@ -115,14 +116,19 @@ model Ticket {
   resolvedAt   DateTime?
   closedAt     DateTime?
   cancelledAt  DateTime?
+  deletedAt    DateTime?
+  deletedById  Int?
+  deleteReason String?         @db.VarChar(500)
   reportedById Int
   assignedToId Int?
   comments     TicketComment[]
   views        TicketView[]
   assignedTo   User?           @relation("AssignedTickets", fields: [assignedToId], references: [id])
   reportedBy   User            @relation("ReportedTickets", fields: [reportedById], references: [id])
+  deletedBy    User?           @relation("DeletedTickets", fields: [deletedById], references: [id], onDelete: SetNull)
 
   @@index([assignedToId], map: "tickets_assignedToId_fkey")
+  @@index([deletedById], map: "tickets_deletedById_fkey")
   @@index([reportedById], map: "tickets_reportedById_fkey")
   @@map("tickets")
 }
@@ -249,6 +255,7 @@ enum AuditAction {
   TICKET_STATUS_CHANGE
   TICKET_ASSIGN
   TICKET_COMMENT
+  TICKET_DELETE
 
   // Leave management
   LEAVE_REQUEST_CREATE

@@ -338,7 +338,7 @@ function getNextAttemptAt(attempts: number, now: Date): Date {
 
 async function getTicketById(ticketId: number): Promise<TicketWithRelations> {
     const ticket = await prisma.ticket.findUnique({
-        where: { id: ticketId },
+        where: { id: ticketId, deletedAt: null },
         include: TICKET_WITH_USERS_INCLUDE,
     });
 

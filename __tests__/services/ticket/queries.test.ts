@@ -78,6 +78,7 @@ describe("Ticket Queries", () => {
             );
 
             const expectedWhere = {
+                deletedAt: null,
                 OR: [
                     { title: { contains: "printer" } },
                     { description: { contains: "printer" } },
@@ -96,7 +97,7 @@ describe("Ticket Queries", () => {
         const mockTicket = { id: 1, reportedById: 2, title: "Test" };
 
         it("should deny access if user is not owner and not admin", async () => {
-            prismaMock.ticket.findUnique.mockResolvedValue(mockTicket as never);
+            prismaMock.ticket.findFirst.mockResolvedValue(mockTicket as never);
             const user = { id: 3, role: "USER", email: "" }; // Not 2 (owner)
 
             const result = await getTicketById(1, user);
@@ -106,7 +107,7 @@ describe("Ticket Queries", () => {
         });
 
         it("should allow access if user is owner", async () => {
-            prismaMock.ticket.findUnique.mockResolvedValue(mockTicket as never);
+            prismaMock.ticket.findFirst.mockResolvedValue(mockTicket as never);
             const user = { id: 2, role: "USER", email: "" };
 
             const result = await getTicketById(1, user);
@@ -115,7 +116,7 @@ describe("Ticket Queries", () => {
         });
 
         it("should allow access if user is admin", async () => {
-            prismaMock.ticket.findUnique.mockResolvedValue(mockTicket as never);
+            prismaMock.ticket.findFirst.mockResolvedValue(mockTicket as never);
             const user = { id: 99, role: "ADMIN", email: "" };
 
             const result = await getTicketById(1, user);

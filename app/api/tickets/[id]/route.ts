@@ -2,12 +2,16 @@ import { after } from "next/server";
 import { type NextRequest, NextResponse } from "next/server";
 
 import { requireApiSession } from "@/lib/auth/api";
+import { createTicketCommandActor } from "@/lib/server/ticket-command-actor";
 import { processOutbox } from "@/lib/services/outbox/processor";
 import { ticketService, type UpdateTicketData } from "@/lib/services/ticket";
 import { jsonError, notFound } from "@/lib/ssot/http";
 import { FEATURE_KEYS, isFeatureEnabled } from "@/lib/ssot/features";
 import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
-import { updateTicketSchema } from "@/lib/validations/ticket";
+import {
+    deleteTicketSchema,
+    updateTicketSchema,
+} from "@/lib/validations/ticket";
 
 async function parseTicketId(
     params: Promise<{ id: string }>,
@@ -93,7 +97,8 @@ export async function PATCH(
             assignedToId: validationResult.data.assignedToId,
         };
 
-        const result = await ticketService.updateTicket(ticketId, updateData, auth.user);
+        const actor = createTicketCommandActor(auth.user, request.headers);
+        const result = await ticketService.updateTicket(ticketId, updateData, actor);
         if (result.error) {
             return jsonError(result.error, result.status || 500);
         }
@@ -112,7 +117,7 @@ export async function PATCH(
 }
 
 export async function DELETE(
-    _request: NextRequest,
+    request: NextRequest,
     { params }: { params: Promise<{ id: string }> },
 ): Promise<NextResponse> {
     try {
@@ -129,7 +134,20 @@ export async function DELETE(
             return jsonError(COMMON_API_MESSAGES.invalidTicketId, 400);
         }
 
-        const result = await ticketService.deleteTicket(ticketId, auth.user);
+        const body: unknown = await request.json().catch(() => null);
+        const validation = deleteTicketSchema.safeParse(body);
+        if (!validation.success) {
+            return jsonError(COMMON_API_MESSAGES.invalidInput, 400, {
+                details: validation.error.flatten().fieldErrors,
+            });
+        }
+
+        const actor = createTicketCommandActor(auth.user, request.headers);
+        const result = await ticketService.deleteTicket(
+            ticketId,
+            validation.data.reason,
+            actor,
+        );
 
         if (!result.success) {
             return jsonError(result.error || COMMON_API_MESSAGES.operationFailed, result.status || 500);

@@ -6,7 +6,6 @@ import { getApiAuthSession } from "@/lib/auth/server";
 import { buildUserContext } from "@/lib/auth/context";
 import { ticketService } from "@/lib/services/ticket";
 import { processOutbox } from "@/lib/services/outbox/processor";
-import { logTicketEvent } from "@/lib/server/audit";
 
 vi.mock("next/server", async (importOriginal) => {
     const actual = await importOriginal<typeof NextServerModule>();
@@ -37,10 +36,6 @@ vi.mock("@/lib/services/outbox/processor", () => ({
     processOutbox: vi.fn(),
 }));
 
-vi.mock("@/lib/server/audit", () => ({
-    logTicketEvent: vi.fn(),
-}));
-
 describe("POST /api/tickets", () => {
     beforeEach(() => {
         vi.clearAllMocks();
@@ -48,7 +43,6 @@ describe("POST /api/tickets", () => {
             processed: 0,
             failed: 0,
         } as never);
-        vi.mocked(logTicketEvent).mockResolvedValue(undefined as never);
     });
 
     it("processes ticket notification outbox after creating ticket", async () => {
@@ -95,16 +89,15 @@ describe("POST /api/tickets", () => {
         await Promise.resolve();
         await Promise.resolve();
         expect(processOutbox).toHaveBeenCalledTimes(1);
-        expect(logTicketEvent).toHaveBeenCalledWith(
-            "TICKET_CREATE",
-            123,
-            9,
-            "user@test.com",
+        expect(ticketService.createTicket).toHaveBeenCalledWith(
             expect.objectContaining({
-                after: expect.objectContaining({
-                    title: "Printer not working",
-                    priority: "HIGH",
-                }),
+                title: "Printer not working",
+                priority: "HIGH",
+            }),
+            expect.objectContaining({
+                id: 9,
+                email: "user@test.com",
+                requestId: expect.any(String),
             }),
         );
     });

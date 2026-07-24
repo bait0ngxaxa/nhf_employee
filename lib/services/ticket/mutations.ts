@@ -6,6 +6,7 @@ import {
     buildTicketStatusUpdate,
     isTicketStatusTransitionAllowed,
 } from "./status-transitions";
+import { auditTicketUpdate, createTicketAudit } from "./audit";
 import type {
     CreateTicketData,
     UpdateTicketData,
@@ -79,7 +80,7 @@ function buildUpdateFields(
  */
 export async function createTicket(
     data: CreateTicketData,
-    userId: number,
+    actor: UserContext,
 ): Promise<TicketWithRelations> {
     const ticket = await prisma.$transaction(async (tx) => {
         const newTicket = await tx.ticket.create({
@@ -88,7 +89,7 @@ export async function createTicket(
                 description: data.description,
                 category: data.category,
                 priority: data.priority,
-                reportedById: userId,
+                reportedById: actor.id,
             },
             include: TICKET_WITH_USERS_INCLUDE,
         });
@@ -100,6 +101,23 @@ export async function createTicket(
                 payload: JSON.stringify({ ticketId: newTicket.id }),
             },
         });
+
+        await createTicketAudit(
+            tx,
+            "TICKET_CREATE",
+            newTicket.id,
+            actor,
+            {
+                after: {
+                    title: newTicket.title,
+                    description: newTicket.description,
+                    category: newTicket.category,
+                    priority: newTicket.priority,
+                    status: newTicket.status,
+                    reportedById: newTicket.reportedById,
+                },
+            },
+        );
 
         return newTicket;
     });
@@ -125,8 +143,8 @@ export async function updateTicket(
     status?: number;
 }> {
     // Fetch existing ticket
-    const existingTicket = await prisma.ticket.findUnique({
-        where: { id: ticketId },
+    const existingTicket = await prisma.ticket.findFirst({
+        where: { id: ticketId, deletedAt: null },
     });
 
     if (!existingTicket) {
@@ -159,6 +177,7 @@ export async function updateTicket(
                 id: ticketId,
                 status: existingTicket.status,
                 updatedAt: existingTicket.updatedAt,
+                deletedAt: null,
             },
             data: updateFields,
         });
@@ -167,10 +186,12 @@ export async function updateTicket(
             return null;
         }
 
-        const updatedTicket = await tx.ticket.findUniqueOrThrow({
-            where: { id: ticketId },
+        const updatedTicket = await tx.ticket.findFirstOrThrow({
+            where: { id: ticketId, deletedAt: null },
             include: TICKET_WITH_USERS_INCLUDE,
         });
+
+        await auditTicketUpdate(tx, existingTicket, updatedTicket, user);
 
         // Add to outbox only if status was changed
         if (
@@ -212,6 +233,7 @@ export async function updateTicket(
  */
 export async function deleteTicket(
     ticketId: number,
+    deleteReason: string,
     user: UserContext,
 ): Promise<{ success: boolean; error?: string; status?: number }> {
     // Admin only check
@@ -220,18 +242,58 @@ export async function deleteTicket(
     }
 
     // Check if ticket exists
-    const existingTicket = await prisma.ticket.findUnique({
-        where: { id: ticketId },
+    const existingTicket = await prisma.ticket.findFirst({
+        where: { id: ticketId, deletedAt: null },
     });
 
     if (!existingTicket) {
         return { success: false, error: "Ticket not found", status: 404 };
     }
 
-    // Delete ticket (comments will be deleted due to CASCADE)
-    await prisma.ticket.delete({
-        where: { id: ticketId },
+    const deletedAt = new Date();
+    const deleted = await prisma.$transaction(async (tx) => {
+        const result = await tx.ticket.updateMany({
+            where: {
+                id: ticketId,
+                deletedAt: null,
+                updatedAt: existingTicket.updatedAt,
+            },
+            data: {
+                deletedAt,
+                deletedById: user.id,
+                deleteReason,
+            },
+        });
+
+        if (result.count === 0) return false;
+
+        await createTicketAudit(tx, "TICKET_DELETE", ticketId, user, {
+            before: {
+                title: existingTicket.title,
+                description: existingTicket.description,
+                category: existingTicket.category,
+                priority: existingTicket.priority,
+                status: existingTicket.status,
+                assignedToId: existingTicket.assignedToId,
+                deletedAt: existingTicket.deletedAt,
+            },
+            after: {
+                deletedAt,
+                deletedById: user.id,
+                deleteReason,
+            },
+        });
+
+        return true;
     });
+
+    if (!deleted) {
+        return {
+            success: false,
+            error: TICKET_UPDATE_CONFLICT_MESSAGE,
+            status: 409,
+        };
+    }
 
     return { success: true };
 }

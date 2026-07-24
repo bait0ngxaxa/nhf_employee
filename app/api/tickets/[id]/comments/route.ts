@@ -3,6 +3,8 @@ import { Role } from "@prisma/client";
 
 import { requireApiSession } from "@/lib/auth/api";
 import { prisma } from "@/lib/db/prisma";
+import { createTicketCommandActor } from "@/lib/server/ticket-command-actor";
+import { createTicketAudit } from "@/lib/services/ticket/audit";
 import { jsonError, notFound } from "@/lib/ssot/http";
 import { FEATURE_KEYS, isFeatureEnabled } from "@/lib/ssot/features";
 import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
@@ -95,67 +97,94 @@ export async function POST(
             return jsonError(COMMON_API_MESSAGES.invalidTicketId, 400);
         }
 
-        const currentUserId = parseInt(auth.session.user.id, 10);
-        if (Number.isNaN(currentUserId)) {
-            return jsonError(COMMON_API_MESSAGES.invalidUserSession, 400);
-        }
+        const actor = createTicketCommandActor(auth.user, request.headers);
+        const result = await prisma.$transaction(async (tx) => {
+            const ticket = await tx.ticket.findFirst({
+                where: { id: ticketId, deletedAt: null },
+            });
+            if (!ticket) return { outcome: "not_found" as const };
 
-        const ticket = await prisma.ticket.findUnique({ where: { id: ticketId } });
-        if (!ticket) {
-            return jsonError(COMMON_API_MESSAGES.ticketNotFound, 404);
-        }
+            const isOwner = ticket.reportedById === actor.id;
+            const isAdmin = isAdminRole(actor.role);
+            if (!isOwner && !isAdmin) {
+                return { outcome: "forbidden" as const };
+            }
 
-        const isOwner = ticket.reportedById === currentUserId;
-        const isAdmin = isAdminRole(auth.session.user.role);
-
-        if (!isOwner && !isAdmin) {
-            return jsonError(COMMON_API_MESSAGES.accessDenied, 403);
-        }
-
-        const comment = await prisma.ticketComment.create({
-            data: {
-                content: parsed.data.content,
-                ticketId,
-                authorId: currentUserId,
-            },
-            include: {
-                author: {
-                    select: {
-                        id: true,
-                        name: true,
-                        email: true,
-                        role: true,
-                        employee: {
-                            select: {
-                                firstName: true,
-                                lastName: true,
+            const comment = await tx.ticketComment.create({
+                data: {
+                    content: parsed.data.content,
+                    ticketId,
+                    authorId: actor.id,
+                },
+                include: {
+                    author: {
+                        select: {
+                            id: true,
+                            name: true,
+                            email: true,
+                            role: true,
+                            employee: {
+                                select: {
+                                    firstName: true,
+                                    lastName: true,
+                                },
                             },
                         },
                     },
                 },
-            },
+            });
+
+            await createTicketAudit(
+                tx,
+                "TICKET_COMMENT",
+                ticketId,
+                actor,
+                {
+                    after: {
+                        commentId: comment.id,
+                        content: comment.content,
+                        authorId: actor.id,
+                    },
+                },
+            );
+
+            return {
+                outcome: "created" as const,
+                ticket,
+                comment,
+                isAdmin,
+                isOwner,
+            };
         });
 
+        if (result.outcome === "not_found") {
+            return jsonError(COMMON_API_MESSAGES.ticketNotFound, 404);
+        }
+        if (result.outcome === "forbidden") {
+            return jsonError(COMMON_API_MESSAGES.accessDenied, 403);
+        }
+
         const commentAuthorName =
-            comment.author.employee?.firstName && comment.author.employee?.lastName
-                ? `${comment.author.employee.firstName} ${comment.author.employee.lastName}`
-                : comment.author.name;
+            result.comment.author.employee?.firstName
+            && result.comment.author.employee?.lastName
+                ? `${result.comment.author.employee.firstName} ${result.comment.author.employee.lastName}`
+                : result.comment.author.name;
 
         after(async () => {
             try {
                 await notifyCommentParticipants(
-                    ticket,
-                    currentUserId,
+                    result.ticket,
+                    actor.id,
                     commentAuthorName,
-                    isAdmin,
-                    isOwner,
+                    result.isAdmin,
+                    result.isOwner,
                 );
             } catch (err) {
                 console.error("Comment notification failed:", err);
             }
         });
 
-        return NextResponse.json({ comment }, { status: 201 });
+        return NextResponse.json({ comment: result.comment }, { status: 201 });
     } catch (error) {
         console.error("Error creating comment:", error);
         return jsonError(COMMON_API_MESSAGES.failedToCreateComment, 500);

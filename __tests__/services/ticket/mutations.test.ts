@@ -49,7 +49,12 @@ describe("Ticket Mutations", () => {
                 }),
             );
 
-            await createTicket(data, 1);
+            await createTicket(data, {
+                id: 1,
+                role: "USER",
+                email: "user@test.com",
+                requestId: "req-create",
+            });
 
             expect(prismaMock.ticket.create).toHaveBeenCalledWith(
                 expect.objectContaining({
@@ -65,6 +70,15 @@ describe("Ticket Mutations", () => {
                         type: "TICKET_CREATED",
                         payload: JSON.stringify({ ticketId: 1 }),
                     },
+                }),
+            );
+            expect(prismaMock.auditLog.create).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    data: expect.objectContaining({
+                        action: "TICKET_CREATE",
+                        entityId: 1,
+                        userId: 1,
+                    }),
                 }),
             );
         });
@@ -83,11 +97,11 @@ describe("Ticket Mutations", () => {
         };
 
         it("should allow owner to update title if OPEN", async () => {
-            prismaMock.ticket.findUnique.mockResolvedValue(
+            prismaMock.ticket.findFirst.mockResolvedValue(
                 asNever(existingTicket),
             );
             prismaMock.ticket.updateMany.mockResolvedValue({ count: 1 });
-            prismaMock.ticket.findUniqueOrThrow.mockResolvedValue(
+            prismaMock.ticket.findFirstOrThrow.mockResolvedValue(
                 asNever({
                     ...existingTicket,
                     title: "New",
@@ -105,17 +119,18 @@ describe("Ticket Mutations", () => {
                         id: 1,
                         status: "OPEN",
                         updatedAt: existingTicket.updatedAt,
+                        deletedAt: null,
                     },
                 }),
             );
         });
 
         it("should NOT allow owner to update status", async () => {
-            prismaMock.ticket.findUnique.mockResolvedValue(
+            prismaMock.ticket.findFirst.mockResolvedValue(
                 asNever(existingTicket),
             );
             prismaMock.ticket.updateMany.mockResolvedValue({ count: 1 });
-            prismaMock.ticket.findUniqueOrThrow.mockResolvedValue(
+            prismaMock.ticket.findFirstOrThrow.mockResolvedValue(
                 asNever(existingTicket),
             );
 
@@ -130,11 +145,11 @@ describe("Ticket Mutations", () => {
         });
 
         it("should allow admin to update status and enqueue outbox", async () => {
-            prismaMock.ticket.findUnique.mockResolvedValue(
+            prismaMock.ticket.findFirst.mockResolvedValue(
                 asNever(existingTicket),
             );
             prismaMock.ticket.updateMany.mockResolvedValue({ count: 1 });
-            prismaMock.ticket.findUniqueOrThrow.mockResolvedValue(
+            prismaMock.ticket.findFirstOrThrow.mockResolvedValue(
                 asNever({
                     ...existingTicket,
                     status: "RESOLVED",
@@ -163,10 +178,19 @@ describe("Ticket Mutations", () => {
                     },
                 }),
             );
+            expect(prismaMock.auditLog.create).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    data: expect.objectContaining({
+                        action: "TICKET_STATUS_CHANGE",
+                        entityId: 1,
+                        userId: 99,
+                    }),
+                }),
+            );
         });
 
         it("should return 409 when optimistic lock detects a concurrent update", async () => {
-            prismaMock.ticket.findUnique.mockResolvedValue(
+            prismaMock.ticket.findFirst.mockResolvedValue(
                 asNever(existingTicket),
             );
             prismaMock.ticket.updateMany.mockResolvedValue({ count: 0 });
@@ -187,12 +211,12 @@ describe("Ticket Mutations", () => {
                 prismaMock.notificationOutbox.create,
             ).not.toHaveBeenCalled();
             expect(
-                prismaMock.ticket.findUniqueOrThrow,
+                prismaMock.ticket.findFirstOrThrow,
             ).not.toHaveBeenCalled();
         });
 
         it("should reject an invalid status transition with 409", async () => {
-            prismaMock.ticket.findUnique.mockResolvedValue(
+            prismaMock.ticket.findFirst.mockResolvedValue(
                 asNever({
                     ...existingTicket,
                     status: "CLOSED",
@@ -220,17 +244,48 @@ describe("Ticket Mutations", () => {
     describe("deleteTicket", () => {
         it("should deny non-admin", async () => {
             const user = { id: 1, role: "USER", email: "" };
-            const result = await deleteTicket(1, user);
+            const result = await deleteTicket(1, "ข้อมูลทดสอบ", user);
             expect(result.success).toBe(false);
             expect(result.error).toContain("Unauthorized");
         });
 
         it("should allow admin", async () => {
-            prismaMock.ticket.findUnique.mockResolvedValue(asNever({ id: 1 }));
+            prismaMock.ticket.findFirst.mockResolvedValue(
+                asNever({
+                    id: 1,
+                    title: "T",
+                    description: "D",
+                    category: "HARDWARE",
+                    priority: "LOW",
+                    status: "OPEN",
+                    assignedToId: null,
+                    deletedAt: null,
+                    updatedAt: new Date("2026-07-24T01:00:00.000Z"),
+                }),
+            );
+            prismaMock.ticket.updateMany.mockResolvedValue({ count: 1 });
             const user = { id: 99, role: "ADMIN", email: "" };
-            const result = await deleteTicket(1, user);
+            const result = await deleteTicket(1, "ลบข้อมูลทดสอบ", user);
             expect(result.success).toBe(true);
-            expect(prismaMock.ticket.delete).toHaveBeenCalled();
+            expect(prismaMock.ticket.updateMany).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    data: expect.objectContaining({
+                        deletedAt: expect.any(Date),
+                        deletedById: 99,
+                        deleteReason: "ลบข้อมูลทดสอบ",
+                    }),
+                }),
+            );
+            expect(prismaMock.ticket.delete).not.toHaveBeenCalled();
+            expect(prismaMock.auditLog.create).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    data: expect.objectContaining({
+                        action: "TICKET_DELETE",
+                        entityId: 1,
+                        userId: 99,
+                    }),
+                }),
+            );
         });
     });
 });

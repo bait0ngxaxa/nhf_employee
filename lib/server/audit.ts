@@ -168,7 +168,8 @@ export async function logTicketEvent(
         | "TICKET_UPDATE"
         | "TICKET_STATUS_CHANGE"
         | "TICKET_ASSIGN"
-        | "TICKET_COMMENT",
+        | "TICKET_COMMENT"
+        | "TICKET_DELETE",
     entityId: number,
     userId: number,
     userEmail: string,
