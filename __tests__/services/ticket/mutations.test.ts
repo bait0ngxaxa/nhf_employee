@@ -76,13 +76,18 @@ describe("Ticket Mutations", () => {
             reportedById: 10,
             status: "OPEN",
             priority: "LOW",
+            resolvedAt: null,
+            closedAt: null,
+            cancelledAt: null,
+            updatedAt: new Date("2026-07-24T01:00:00.000Z"),
         };
 
         it("should allow owner to update title if OPEN", async () => {
             prismaMock.ticket.findUnique.mockResolvedValue(
                 asNever(existingTicket),
             );
-            prismaMock.ticket.update.mockResolvedValue(
+            prismaMock.ticket.updateMany.mockResolvedValue({ count: 1 });
+            prismaMock.ticket.findUniqueOrThrow.mockResolvedValue(
                 asNever({
                     ...existingTicket,
                     title: "New",
@@ -93,9 +98,14 @@ describe("Ticket Mutations", () => {
             const result = await updateTicket(1, { title: "New" }, user);
 
             expect(result.ticket).toBeDefined();
-            expect(prismaMock.ticket.update).toHaveBeenCalledWith(
+            expect(prismaMock.ticket.updateMany).toHaveBeenCalledWith(
                 expect.objectContaining({
                     data: { title: "New" },
+                    where: {
+                        id: 1,
+                        status: "OPEN",
+                        updatedAt: existingTicket.updatedAt,
+                    },
                 }),
             );
         });
@@ -104,12 +114,15 @@ describe("Ticket Mutations", () => {
             prismaMock.ticket.findUnique.mockResolvedValue(
                 asNever(existingTicket),
             );
-            prismaMock.ticket.update.mockResolvedValue(asNever(existingTicket));
+            prismaMock.ticket.updateMany.mockResolvedValue({ count: 1 });
+            prismaMock.ticket.findUniqueOrThrow.mockResolvedValue(
+                asNever(existingTicket),
+            );
 
             const user = { id: 10, role: "USER", email: "" };
             await updateTicket(1, { status: "RESOLVED" }, user);
 
-            expect(prismaMock.ticket.update).toHaveBeenCalledWith(
+            expect(prismaMock.ticket.updateMany).toHaveBeenCalledWith(
                 expect.objectContaining({
                     data: expect.not.objectContaining({ status: "RESOLVED" }),
                 }),
@@ -120,7 +133,8 @@ describe("Ticket Mutations", () => {
             prismaMock.ticket.findUnique.mockResolvedValue(
                 asNever(existingTicket),
             );
-            prismaMock.ticket.update.mockResolvedValue(
+            prismaMock.ticket.updateMany.mockResolvedValue({ count: 1 });
+            prismaMock.ticket.findUniqueOrThrow.mockResolvedValue(
                 asNever({
                     ...existingTicket,
                     status: "RESOLVED",
@@ -130,9 +144,12 @@ describe("Ticket Mutations", () => {
             const user = { id: 99, role: "ADMIN", email: "" };
             await updateTicket(1, { status: "RESOLVED" }, user);
 
-            expect(prismaMock.ticket.update).toHaveBeenCalledWith(
+            expect(prismaMock.ticket.updateMany).toHaveBeenCalledWith(
                 expect.objectContaining({
-                    data: expect.objectContaining({ status: "RESOLVED" }),
+                    data: expect.objectContaining({
+                        status: "RESOLVED",
+                        resolvedAt: expect.any(Date),
+                    }),
                 }),
             );
             expect(prismaMock.notificationOutbox.create).toHaveBeenCalledWith(
@@ -146,6 +163,57 @@ describe("Ticket Mutations", () => {
                     },
                 }),
             );
+        });
+
+        it("should return 409 when optimistic lock detects a concurrent update", async () => {
+            prismaMock.ticket.findUnique.mockResolvedValue(
+                asNever(existingTicket),
+            );
+            prismaMock.ticket.updateMany.mockResolvedValue({ count: 0 });
+
+            const user = { id: 99, role: "ADMIN", email: "" };
+            const result = await updateTicket(
+                1,
+                { status: "IN_PROGRESS" },
+                user,
+            );
+
+            expect(result).toEqual({
+                ticket: null,
+                error: "Ticket was updated by another user",
+                status: 409,
+            });
+            expect(
+                prismaMock.notificationOutbox.create,
+            ).not.toHaveBeenCalled();
+            expect(
+                prismaMock.ticket.findUniqueOrThrow,
+            ).not.toHaveBeenCalled();
+        });
+
+        it("should reject an invalid status transition with 409", async () => {
+            prismaMock.ticket.findUnique.mockResolvedValue(
+                asNever({
+                    ...existingTicket,
+                    status: "CLOSED",
+                    resolvedAt: new Date("2026-07-23T01:00:00.000Z"),
+                    closedAt: new Date("2026-07-23T02:00:00.000Z"),
+                }),
+            );
+
+            const user = { id: 99, role: "ADMIN", email: "" };
+            const result = await updateTicket(
+                1,
+                { status: "RESOLVED" },
+                user,
+            );
+
+            expect(result).toEqual({
+                ticket: null,
+                error: "Invalid ticket status transition",
+                status: 409,
+            });
+            expect(prismaMock.$transaction).not.toHaveBeenCalled();
         });
     });
 

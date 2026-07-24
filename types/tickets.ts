@@ -12,6 +12,8 @@ export interface Ticket {
   createdAt: string;
   updatedAt: string;
   resolvedAt?: string | null;
+  closedAt?: string | null;
+  cancelledAt?: string | null;
   reportedById: number;
   assignedToId?: number | null;
   reportedBy: {

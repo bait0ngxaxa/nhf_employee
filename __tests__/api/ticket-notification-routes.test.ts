@@ -103,6 +103,37 @@ describe("Ticket notification routes", () => {
         expect(processOutbox).toHaveBeenCalledTimes(1);
     });
 
+    it("returns 409 and skips outbox processing on concurrent update", async () => {
+        vi.mocked(getApiAuthSession).mockResolvedValue({
+            user: { id: "1", role: "ADMIN", email: "admin@test.com" },
+        } as never);
+        vi.mocked(buildUserContext).mockReturnValue({
+            id: 1,
+            role: "ADMIN",
+            email: "admin@test.com",
+            name: "Admin",
+        });
+        vi.mocked(ticketService.updateTicket).mockResolvedValue({
+            ticket: null,
+            error: "Ticket was updated by another user",
+            status: 409,
+        });
+
+        const req = new NextRequest("http://localhost/api/tickets/44", {
+            method: "PATCH",
+            body: JSON.stringify({ status: "IN_PROGRESS" }),
+        });
+        const res = await patchTicketRoute(req, {
+            params: Promise.resolve({ id: "44" }),
+        });
+
+        expect(res.status).toBe(409);
+        expect(await res.json()).toMatchObject({
+            error: "Ticket was updated by another user",
+        });
+        expect(processOutbox).not.toHaveBeenCalled();
+    });
+
     it("sends in-app notification to reporter when admin adds comment", async () => {
         vi.mocked(getApiAuthSession).mockResolvedValue({
             user: { id: "1", role: "ADMIN", email: "admin@test.com" },

@@ -2,6 +2,10 @@ import { OUTBOX_NOTIFICATION_TYPES } from "@/lib/services/outbox/types";
 import { prisma } from "@/lib/db/prisma";
 import { isAdminRole } from "@/lib/ssot/permissions";
 import { TICKET_WITH_USERS_INCLUDE } from "./constants";
+import {
+    buildTicketStatusUpdate,
+    isTicketStatusTransitionAllowed,
+} from "./status-transitions";
 import type {
     CreateTicketData,
     UpdateTicketData,
@@ -9,7 +13,11 @@ import type {
     TicketWithRelations,
     PermissionCheck,
 } from "./types";
-import type { Ticket } from "@prisma/client";
+import type { Prisma, Ticket } from "@prisma/client";
+
+const TICKET_UPDATE_CONFLICT_MESSAGE =
+    "Ticket was updated by another user";
+const INVALID_TICKET_TRANSITION_MESSAGE = "Invalid ticket status transition";
 
 /**
  * Check user permissions for a ticket
@@ -32,22 +40,25 @@ function buildUpdateFields(
     data: UpdateTicketData,
     existingTicket: Ticket,
     permissions: PermissionCheck,
-): Record<string, unknown> {
-    const updateFields: Record<string, unknown> = {};
+): Prisma.TicketUncheckedUpdateManyInput {
+    const updateFields: Prisma.TicketUncheckedUpdateManyInput = {};
 
     // Only admins can change status, assignments, and priority
     if (permissions.isAdmin) {
-        if (data.status) updateFields.status = data.status;
         if (data.assignedToId !== undefined) {
             updateFields.assignedToId = data.assignedToId;
         }
         if (data.priority) updateFields.priority = data.priority;
 
-        // Handle resolvedAt timestamp
-        if (data.status === "RESOLVED") {
-            updateFields.resolvedAt = new Date();
-        } else if (data.status && existingTicket.resolvedAt) {
-            updateFields.resolvedAt = null;
+        if (data.status) {
+            Object.assign(
+                updateFields,
+                buildTicketStatusUpdate(
+                    existingTicket.status,
+                    data.status,
+                    new Date(),
+                ),
+            );
         }
     }
 
@@ -128,13 +139,36 @@ export async function updateTicket(
         return { ticket: null, error: "Access denied", status: 403 };
     }
 
-    // Build and apply updates within transaction
+    if (
+        permissions.isAdmin
+        && data.status
+        && !isTicketStatusTransitionAllowed(existingTicket.status, data.status)
+    ) {
+        return {
+            ticket: null,
+            error: INVALID_TICKET_TRANSITION_MESSAGE,
+            status: 409,
+        };
+    }
+
     const updateFields = buildUpdateFields(data, existingTicket, permissions);
 
     const result = await prisma.$transaction(async (tx) => {
-        const updatedTicket = await tx.ticket.update({
-            where: { id: ticketId },
+        const updateResult = await tx.ticket.updateMany({
+            where: {
+                id: ticketId,
+                status: existingTicket.status,
+                updatedAt: existingTicket.updatedAt,
+            },
             data: updateFields,
+        });
+
+        if (updateResult.count === 0) {
+            return null;
+        }
+
+        const updatedTicket = await tx.ticket.findUniqueOrThrow({
+            where: { id: ticketId },
             include: TICKET_WITH_USERS_INCLUDE,
         });
 
@@ -156,6 +190,14 @@ export async function updateTicket(
 
         return updatedTicket;
     });
+
+    if (!result) {
+        return {
+            ticket: null,
+            error: TICKET_UPDATE_CONFLICT_MESSAGE,
+            status: 409,
+        };
+    }
 
     return {
         ticket: result as TicketWithRelations,

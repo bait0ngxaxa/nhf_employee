@@ -30,7 +30,9 @@ interface TicketDetailData {
     status: string;
     createdAt: string;
     updatedAt: string;
-    resolvedAt?: string;
+    resolvedAt?: string | null;
+    closedAt?: string | null;
+    cancelledAt?: string | null;
     reportedBy: {
         id: number;
         name: string;

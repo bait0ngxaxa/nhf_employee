@@ -2,11 +2,20 @@ import {
     Role,
     TicketCategory,
     TicketPriority,
+    TicketStatus,
 } from "@prisma/client";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import {
+    afterAll,
+    beforeAll,
+    beforeEach,
+    describe,
+    expect,
+    it,
+} from "vitest";
 
 import { prisma } from "@/lib/db/prisma";
 import { getTickets } from "@/lib/services/ticket/queries";
+import { updateTicket } from "@/lib/services/ticket/mutations";
 
 const TEST_EMAIL = "ticket-search-integration@example.com";
 
@@ -27,6 +36,8 @@ function assertDedicatedDatabase(): void {
 }
 
 async function cleanTicketSearchFixture(): Promise<void> {
+    await prisma.notificationOutbox.deleteMany();
+
     const user = await prisma.user.findUnique({
         where: { email: TEST_EMAIL },
         select: { id: true },
@@ -41,6 +52,9 @@ describe.sequential("ticket search with real MySQL", () => {
     beforeAll(async () => {
         assertDedicatedDatabase();
         await prisma.$connect();
+    });
+
+    beforeEach(async () => {
         await cleanTicketSearchFixture();
     });
 
@@ -76,5 +90,85 @@ describe.sequential("ticket search with real MySQL", () => {
         expect(result.pagination.total).toBe(1);
         expect(result.tickets).toHaveLength(1);
         expect(result.tickets[0]?.title).toBe("Office PRINTER is offline");
+    });
+
+    it("เก็บ resolvedAt เมื่อเปลี่ยนจาก RESOLVED เป็น CLOSED", async () => {
+        const user = await prisma.user.create({
+            data: {
+                email: TEST_EMAIL,
+                name: "Ticket Lifecycle Integration",
+                password: "integration-test-only",
+                role: Role.ADMIN,
+            },
+        });
+        const ticket = await prisma.ticket.create({
+            data: {
+                title: "Lifecycle test",
+                description: "ตรวจสอบ lifecycle timestamps",
+                category: TicketCategory.SOFTWARE,
+                priority: TicketPriority.HIGH,
+                reportedById: user.id,
+            },
+        });
+        const actor = { id: user.id, role: user.role, email: user.email };
+
+        const resolved = await updateTicket(
+            ticket.id,
+            { status: TicketStatus.RESOLVED },
+            actor,
+        );
+        const resolvedAt = resolved.ticket?.resolvedAt;
+        expect(resolvedAt).toBeInstanceOf(Date);
+
+        const closed = await updateTicket(
+            ticket.id,
+            { status: TicketStatus.CLOSED },
+            actor,
+        );
+
+        expect(closed.ticket?.resolvedAt).toEqual(resolvedAt);
+        expect(closed.ticket?.closedAt).toBeInstanceOf(Date);
+        expect(closed.ticket?.cancelledAt).toBeNull();
+    });
+
+    it("ให้ optimistic locking ยอมรับ writer เดียวต่อ snapshot", async () => {
+        const user = await prisma.user.create({
+            data: {
+                email: TEST_EMAIL,
+                name: "Ticket OCC Integration",
+                password: "integration-test-only",
+                role: Role.ADMIN,
+            },
+        });
+        const ticket = await prisma.ticket.create({
+            data: {
+                title: "OCC test",
+                description: "ตรวจสอบ concurrent update",
+                category: TicketCategory.SOFTWARE,
+                priority: TicketPriority.HIGH,
+                reportedById: user.id,
+            },
+        });
+
+        const [first, second] = await Promise.all([
+            prisma.ticket.updateMany({
+                where: {
+                    id: ticket.id,
+                    status: ticket.status,
+                    updatedAt: ticket.updatedAt,
+                },
+                data: { status: TicketStatus.RESOLVED },
+            }),
+            prisma.ticket.updateMany({
+                where: {
+                    id: ticket.id,
+                    status: ticket.status,
+                    updatedAt: ticket.updatedAt,
+                },
+                data: { status: TicketStatus.IN_PROGRESS },
+            }),
+        ]);
+
+        expect(first.count + second.count).toBe(1);
     });
 });

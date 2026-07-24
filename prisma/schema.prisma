@@ -113,6 +113,8 @@ model Ticket {
   createdAt    DateTime        @default(now())
   updatedAt    DateTime        @updatedAt
   resolvedAt   DateTime?
+  closedAt     DateTime?
+  cancelledAt  DateTime?
   reportedById Int
   assignedToId Int?
   comments     TicketComment[]
