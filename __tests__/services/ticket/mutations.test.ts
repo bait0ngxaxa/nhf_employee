@@ -387,6 +387,65 @@ describe("Ticket Mutations", () => {
             );
         });
 
+        it("should assign only to an active non-deleted admin", async () => {
+            prismaMock.ticket.findFirst.mockResolvedValue(
+                asNever(existingTicket),
+            );
+            prismaMock.user.findFirst.mockResolvedValue(asNever({ id: 77 }));
+            prismaMock.ticket.updateMany.mockResolvedValue({ count: 1 });
+            prismaMock.ticket.findFirstOrThrow.mockResolvedValue(
+                asNever({
+                    ...existingTicket,
+                    assignedToId: 77,
+                }),
+            );
+
+            const user = { id: 99, role: "ADMIN", email: "" };
+            const result = await updateTicket(
+                1,
+                { assignedToId: 77 },
+                user,
+            );
+
+            expect(prismaMock.user.findFirst).toHaveBeenCalledWith({
+                where: {
+                    id: 77,
+                    role: "ADMIN",
+                    isActive: true,
+                    deletedAt: null,
+                },
+                select: { id: true },
+            });
+            expect(result.ticket).toBeDefined();
+            expect(prismaMock.ticket.updateMany).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    data: { assignedToId: 77 },
+                }),
+            );
+        });
+
+        it("should reject an assignee who is not an active admin", async () => {
+            prismaMock.ticket.findFirst.mockResolvedValue(
+                asNever(existingTicket),
+            );
+            prismaMock.user.findFirst.mockResolvedValue(null);
+
+            const user = { id: 99, role: "ADMIN", email: "" };
+            const result = await updateTicket(
+                1,
+                { assignedToId: 77 },
+                user,
+            );
+
+            expect(result).toEqual({
+                ticket: null,
+                error: "Assignee must be an active admin",
+                status: 422,
+            });
+            expect(prismaMock.ticket.updateMany).not.toHaveBeenCalled();
+            expect(prismaMock.auditLog.create).not.toHaveBeenCalled();
+        });
+
         it("should return 409 when optimistic lock detects a concurrent update", async () => {
             prismaMock.ticket.findFirst.mockResolvedValue(
                 asNever(existingTicket),

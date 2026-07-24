@@ -31,6 +31,8 @@ import type { Prisma, Ticket } from "@prisma/client";
 const TICKET_UPDATE_CONFLICT_MESSAGE =
     "Ticket was updated by another user";
 const INVALID_TICKET_TRANSITION_MESSAGE = "Invalid ticket status transition";
+const INVALID_TICKET_ASSIGNEE_MESSAGE =
+    "Assignee must be an active admin";
 const TICKET_CREATE_OPERATION = "TICKET_CREATE";
 
 type CreateTicketOptions = {
@@ -262,6 +264,26 @@ export async function updateTicket(
     const updateFields = buildUpdateFields(data, existingTicket, permissions);
 
     const result = await prisma.$transaction(async (tx) => {
+        if (
+            permissions.isAdmin
+            && data.assignedToId !== undefined
+            && data.assignedToId !== null
+        ) {
+            const assignee = await tx.user.findFirst({
+                where: {
+                    id: data.assignedToId,
+                    role: "ADMIN",
+                    isActive: true,
+                    deletedAt: null,
+                },
+                select: { id: true },
+            });
+
+            if (!assignee) {
+                return { kind: "invalid-assignee" } as const;
+            }
+        }
+
         const updateResult = await tx.ticket.updateMany({
             where: {
                 id: ticketId,
@@ -273,7 +295,7 @@ export async function updateTicket(
         });
 
         if (updateResult.count === 0) {
-            return null;
+            return { kind: "conflict" } as const;
         }
 
         const updatedTicket = await tx.ticket.findFirstOrThrow({
@@ -295,10 +317,18 @@ export async function updateTicket(
             );
         }
 
-        return updatedTicket;
+        return { kind: "updated", ticket: updatedTicket } as const;
     });
 
-    if (!result) {
+    if (result.kind === "invalid-assignee") {
+        return {
+            ticket: null,
+            error: INVALID_TICKET_ASSIGNEE_MESSAGE,
+            status: 422,
+        };
+    }
+
+    if (result.kind === "conflict") {
         return {
             ticket: null,
             error: TICKET_UPDATE_CONFLICT_MESSAGE,
@@ -307,7 +337,7 @@ export async function updateTicket(
     }
 
     return {
-        ticket: result as TicketWithRelations,
+        ticket: result.ticket as TicketWithRelations,
         oldStatus: existingTicket.status,
     };
 }

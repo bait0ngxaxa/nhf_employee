@@ -64,7 +64,11 @@ export async function createAdminInAppNotificationsOnce(
     client: InAppNotificationClient = prisma,
 ): Promise<void> {
     const admins = await client.user.findMany({
-        where: { role: Role.ADMIN },
+        where: {
+            role: Role.ADMIN,
+            isActive: true,
+            deletedAt: null,
+        },
         select: { id: true },
     });
 

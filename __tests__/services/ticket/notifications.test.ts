@@ -97,6 +97,14 @@ describe("ticket notification delivery", () => {
                 title: "คำขอ IT Support ใหม่",
             }),
         });
+        expect(prismaMock.user.findMany).toHaveBeenCalledWith({
+            where: {
+                role: "ADMIN",
+                isActive: true,
+                deletedAt: null,
+            },
+            select: { id: true },
+        });
 
         expect(emailService.sendNewTicketNotification).not.toHaveBeenCalled();
     });
