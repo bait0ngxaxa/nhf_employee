@@ -16,6 +16,7 @@ import { StockRequestIdempotencyConflictError } from "@/lib/services/stock/reque
 import { processOutbox } from "@/lib/services/outbox/processor";
 import { WorkforceAuthorizationError } from "@/lib/auth/workforce-transaction";
 import {
+    AUTHENTICATED_MUTATION_RATE_LIMIT_POLICIES,
     enforcePreAuthIpRateLimit,
     PRE_AUTH_IP_RATE_LIMIT_POLICIES,
     resetMutationRateLimit,
@@ -626,6 +627,105 @@ describe("Stock Request Routes", () => {
                 { isAdmin: true },
             );
             expect(processOutbox).not.toHaveBeenCalled();
+        });
+
+        it("should apply the cancel quota to reject compatibility actions", async () => {
+            vi.mocked(getApiAuthSession).mockResolvedValue({
+                user: { id: "1", email: "admin@test.com", role: "ADMIN" },
+            } as never);
+            vi.mocked(buildUserContext).mockReturnValue({
+                id: 1,
+                email: "admin@test.com",
+                role: "ADMIN",
+                name: "Admin",
+            });
+            vi.mocked(isAdminRole).mockReturnValue(true);
+            vi.mocked(stockService.cancelRequest).mockResolvedValue({
+                id: 77,
+                requestedBy: 3,
+            } as never);
+
+            const policy =
+                AUTHENTICATED_MUTATION_RATE_LIMIT_POLICIES[
+                    "stock-request-cancel"
+                ];
+            const invokeReject = (): Promise<Response> =>
+                reviewRequestRoute(
+                    new NextRequest(
+                        "http://localhost/api/stock/requests/77/review",
+                        {
+                            method: "POST",
+                            body: JSON.stringify({
+                                action: "reject",
+                                rejectReason: "ไม่อนุมัติ",
+                            }),
+                        },
+                    ),
+                    { params: Promise.resolve({ id: "77" }) },
+                );
+
+            for (let index = 0; index < policy.maxRequests; index += 1) {
+                const response = await invokeReject();
+                expect(response.status).toBe(200);
+            }
+
+            const limitedResponse = await invokeReject();
+
+            expect(limitedResponse.status).toBe(429);
+            expect(limitedResponse.headers.get("X-RateLimit-Limit")).toBe(
+                String(policy.maxRequests),
+            );
+            expect(stockService.cancelRequest).toHaveBeenCalledTimes(
+                policy.maxRequests,
+            );
+        });
+
+        it("should apply the cancel IP quota to reject compatibility actions", async () => {
+            vi.mocked(getApiAuthSession).mockResolvedValue({
+                user: { id: "1", email: "admin@test.com", role: "ADMIN" },
+            } as never);
+            vi.mocked(buildUserContext).mockReturnValue({
+                id: 1,
+                email: "admin@test.com",
+                role: "ADMIN",
+                name: "Admin",
+            });
+            vi.mocked(isAdminRole).mockReturnValue(true);
+
+            const headers = { "cf-connecting-ip": "203.0.113.21" };
+            const policy =
+                PRE_AUTH_IP_RATE_LIMIT_POLICIES["stock-request-cancel"];
+            const prefillRequest = new NextRequest(
+                "http://localhost/api/stock/requests/77/review",
+                { method: "POST", headers },
+            );
+            for (let index = 0; index < policy.maxRequests; index += 1) {
+                enforcePreAuthIpRateLimit(
+                    prefillRequest,
+                    "stock-request-cancel",
+                );
+            }
+
+            const response = await reviewRequestRoute(
+                new NextRequest(
+                    "http://localhost/api/stock/requests/77/review",
+                    {
+                        method: "POST",
+                        headers,
+                        body: JSON.stringify({
+                            action: "reject",
+                            rejectReason: "ไม่อนุมัติ",
+                        }),
+                    },
+                ),
+                { params: Promise.resolve({ id: "77" }) },
+            );
+
+            expect(response.status).toBe(429);
+            expect(response.headers.get("X-RateLimit-Limit")).toBe(
+                String(policy.maxRequests),
+            );
+            expect(stockService.cancelRequest).not.toHaveBeenCalled();
         });
     });
 

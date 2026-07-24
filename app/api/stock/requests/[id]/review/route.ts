@@ -21,25 +21,8 @@ export async function POST(
     { params }: RouteParams,
 ): Promise<NextResponse> {
     try {
-        const preAuthRateLimitResponse = enforcePreAuthIpRateLimit(
-            request,
-            "stock-request-issue",
-        );
-        if (preAuthRateLimitResponse) return preAuthRateLimitResponse;
-
         const auth = await requireAdminSession();
         if (!auth.ok) return auth.response;
-
-        const principalRateLimitResponse =
-            enforceAuthenticatedMutationRateLimit(
-                "stock-request-issue",
-                auth.user.id,
-            );
-        if (principalRateLimitResponse) return principalRateLimitResponse;
-
-        const { id } = await params;
-        const requestId = Number(id);
-        if (isNaN(requestId)) return jsonError("ID ไม่ถูกต้อง", 400);
 
         const body = await request.json();
         const parsed = stockReviewActionSchema.safeParse(body);
@@ -49,6 +32,27 @@ export async function POST(
             });
         }
         const { action } = parsed.data;
+        const rateLimitScope =
+            action === "approve" || action === "issue"
+                ? "stock-request-issue"
+                : "stock-request-cancel";
+
+        const preAuthRateLimitResponse = enforcePreAuthIpRateLimit(
+            request,
+            rateLimitScope,
+        );
+        if (preAuthRateLimitResponse) return preAuthRateLimitResponse;
+
+        const principalRateLimitResponse =
+            enforceAuthenticatedMutationRateLimit(
+                rateLimitScope,
+                auth.user.id,
+            );
+        if (principalRateLimitResponse) return principalRateLimitResponse;
+
+        const { id } = await params;
+        const requestId = Number(id);
+        if (isNaN(requestId)) return jsonError("ID ไม่ถูกต้อง", 400);
 
         if (action === "approve" || action === "issue") {
             const issuedRequest = await executeIssueStockRequest({
