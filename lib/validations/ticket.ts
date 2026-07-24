@@ -95,6 +95,8 @@ export const createTicketCommentSchema = z.object({
         .max(5000, "ความคิดเห็นต้องไม่เกิน 5000 ตัวอักษร"),
 });
 
+export const ticketIdParamSchema = z.coerce.number().int().positive();
+
 export const deleteTicketSchema = z.object({
     reason: z
         .string({ message: "กรุณาระบุเหตุผลในการลบ Ticket" })

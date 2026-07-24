@@ -74,6 +74,10 @@ describe("mutation rate limit", () => {
         ["stock-request-issue", 30],
         ["stock-request-cancel", 20],
         ["stock-adjust", 30],
+        ["ticket-create", 10],
+        ["ticket-update", 30],
+        ["ticket-comment", 20],
+        ["ticket-delete", 10],
     ] as const)(
         "does not share the %s authenticated quota between users behind the same IP",
         (scope, expectedLimit) => {

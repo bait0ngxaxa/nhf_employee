@@ -1,7 +1,8 @@
-import { renderHook } from "@testing-library/react";
+import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useTicketDetail } from "@/hooks/useTicketDetail";
+import { apiPost } from "@/lib/client/api-client";
 
 interface MockUser {
     id: string;
@@ -38,7 +39,9 @@ vi.mock("@/lib/client/api-client", () => ({
 
 describe("useTicketDetail comment permissions", () => {
     beforeEach(() => {
+        vi.clearAllMocks();
         hookMocks.user = { id: "7", role: "USER" };
+        vi.spyOn(window, "alert").mockImplementation(() => undefined);
     });
 
     it("does not allow a non-admin assignee who is not the owner", () => {
@@ -63,5 +66,29 @@ describe("useTicketDetail comment permissions", () => {
         const { result } = renderHook(() => useTicketDetail(55));
 
         expect(result.current.canComment).toBe(true);
+    });
+
+    it("reuses the comment Idempotency-Key after a failed request", async () => {
+        hookMocks.user = { id: "9", role: "USER" };
+        vi.mocked(apiPost).mockResolvedValue({
+            success: false,
+            error: "timeout",
+        } as never);
+        const { result } = renderHook(() => useTicketDetail(55));
+
+        act(() => result.current.setNewComment("ตรวจสอบแล้ว"));
+        await act(() => result.current.handleAddComment());
+        await act(() => result.current.handleAddComment());
+
+        const firstHeaders = new Headers(
+            vi.mocked(apiPost).mock.calls[0]?.[2]?.headers,
+        );
+        const retryHeaders = new Headers(
+            vi.mocked(apiPost).mock.calls[1]?.[2]?.headers,
+        );
+        expect(firstHeaders.get("Idempotency-Key")).toBeTruthy();
+        expect(retryHeaders.get("Idempotency-Key")).toBe(
+            firstHeaders.get("Idempotency-Key"),
+        );
     });
 });

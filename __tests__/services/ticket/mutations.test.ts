@@ -7,6 +7,7 @@ import {
     updateTicket,
     deleteTicket,
 } from "@/lib/services/ticket/mutations";
+import { TicketIdempotencyConflictError } from "@/lib/services/ticket/idempotency";
 
 vi.mock("@/lib/db/prisma", () => ({
     prisma: mockDeep<PrismaClient>(),
@@ -55,7 +56,7 @@ describe("Ticket Mutations", () => {
                 role: "USER",
                 email: "user@test.com",
                 requestId: "req-create",
-            });
+            }, { idempotencyKey: "ticket-create-1" });
 
             expect(prismaMock.ticket.create).toHaveBeenCalledWith(
                 expect.objectContaining({
@@ -94,6 +95,166 @@ describe("Ticket Mutations", () => {
                     }),
                 }),
             );
+            expect(
+                prismaMock.ticketMutationIdempotency.create,
+            ).toHaveBeenCalledWith({
+                data: expect.objectContaining({
+                    userId: 1,
+                    idempotencyKey: "ticket-create-1",
+                    operation: "TICKET_CREATE",
+                    resourceId: 1,
+                }),
+            });
+        });
+
+        it("replays an existing ticket without duplicate side effects", async () => {
+            prismaMock.ticketMutationIdempotency.findUnique.mockResolvedValue(
+                asNever({
+                    userId: 1,
+                    idempotencyKey: "ticket-create-1",
+                    operation: "TICKET_CREATE",
+                    requestHash:
+                        "cbec02636d3a8ad889a77e09bf77ac52d2216449065270ad78ea9c1fc2091fb1",
+                    resourceId: 1,
+                }),
+            );
+            prismaMock.ticket.findUnique.mockResolvedValue(asNever({ id: 1 }));
+
+            const result = await createTicket({
+                title: "T",
+                description: "D",
+                category: "HARDWARE",
+                priority: "LOW",
+            }, {
+                id: 1,
+                role: "USER",
+                email: "user@test.com",
+            }, { idempotencyKey: "ticket-create-1" });
+
+            expect(result).toMatchObject({
+                replayed: true,
+                ticket: { id: 1 },
+            });
+            expect(prismaMock.ticket.create).not.toHaveBeenCalled();
+            expect(prismaMock.notificationOutbox.createMany).not.toHaveBeenCalled();
+        });
+
+        it("rejects a reused key with a different ticket payload", async () => {
+            prismaMock.ticketMutationIdempotency.findUnique.mockResolvedValue(
+                asNever({
+                    userId: 1,
+                    idempotencyKey: "ticket-create-1",
+                    operation: "TICKET_CREATE",
+                    requestHash: "different",
+                    resourceId: 1,
+                }),
+            );
+
+            await expect(createTicket({
+                title: "Different",
+                description: "D",
+                category: "HARDWARE",
+                priority: "LOW",
+            }, {
+                id: 1,
+                role: "USER",
+                email: "user@test.com",
+            }, { idempotencyKey: "ticket-create-1" })).rejects.toBeInstanceOf(
+                TicketIdempotencyConflictError,
+            );
+        });
+
+        it("replays the winner when concurrent creates hit the unique key", async () => {
+            const record = {
+                userId: 1,
+                idempotencyKey: "ticket-create-race",
+                operation: "TICKET_CREATE",
+                requestHash:
+                    "cbec02636d3a8ad889a77e09bf77ac52d2216449065270ad78ea9c1fc2091fb1",
+                resourceId: 99,
+            };
+            prismaMock.ticketMutationIdempotency.findUnique
+                .mockResolvedValueOnce(null)
+                .mockResolvedValueOnce(asNever(record));
+            prismaMock.ticket.create.mockResolvedValue(asNever({
+                id: 100,
+                title: "T",
+                description: "D",
+                category: "HARDWARE",
+                priority: "LOW",
+                reportedById: 1,
+            }));
+            prismaMock.ticketMutationIdempotency.create.mockRejectedValue(
+                { code: "P2002" },
+            );
+            prismaMock.ticket.findUnique.mockResolvedValue(asNever({ id: 99 }));
+
+            const result = await createTicket({
+                title: "T",
+                description: "D",
+                category: "HARDWARE",
+                priority: "LOW",
+            }, {
+                id: 1,
+                role: "USER",
+                email: "user@test.com",
+            }, { idempotencyKey: "ticket-create-race" });
+
+            expect(result).toMatchObject({
+                replayed: true,
+                ticket: { id: 99 },
+            });
+        });
+
+        it("enqueues urgent IT email as a separate destination", async () => {
+            const data = {
+                title: "Server down",
+                description: "Production is unavailable",
+                category: "NETWORK" as const,
+                priority: "URGENT" as const,
+            };
+            prismaMock.ticket.create.mockResolvedValue(asNever({
+                id: 2,
+                ...data,
+                reportedById: 7,
+            }));
+
+            await createTicket(data, {
+                id: 7,
+                role: "ADMIN",
+                email: "reporter@test.com",
+            }, { idempotencyKey: "ticket-create-2" });
+
+            expect(prismaMock.notificationOutbox.createMany).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    data: expect.arrayContaining([
+                        {
+                            type: "TICKET_CREATED_EMAIL_IT",
+                            payload: JSON.stringify({ ticketId: 2 }),
+                            eventKey: "ticket:2:created:email:it",
+                        },
+                    ]),
+                }),
+            );
+        });
+
+        it("rejects URGENT priority from a non-admin caller", async () => {
+            await expect(createTicket({
+                title: "Server down",
+                description: "Production is unavailable",
+                category: "NETWORK",
+                priority: "URGENT",
+            }, {
+                id: 7,
+                role: "USER",
+                email: "reporter@test.com",
+            }, {
+                idempotencyKey: "ticket-create-urgent-user",
+            })).rejects.toThrow(
+                "เฉพาะผู้ดูแลระบบเท่านั้นที่กำหนดระดับเร่งด่วนได้",
+            );
+
+            expect(prismaMock.$transaction).not.toHaveBeenCalled();
         });
     });
 
@@ -134,38 +295,6 @@ describe("Ticket Mutations", () => {
                         updatedAt: existingTicket.updatedAt,
                         deletedAt: null,
                     },
-                }),
-            );
-        });
-
-        it("enqueues urgent IT email as a separate destination", async () => {
-            const data = {
-                title: "Server down",
-                description: "Production is unavailable",
-                category: "NETWORK" as const,
-                priority: "URGENT" as const,
-            };
-            prismaMock.ticket.create.mockResolvedValue(asNever({
-                id: 2,
-                ...data,
-                reportedById: 7,
-            }));
-
-            await createTicket(data, {
-                id: 7,
-                role: "USER",
-                email: "reporter@test.com",
-            });
-
-            expect(prismaMock.notificationOutbox.createMany).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    data: expect.arrayContaining([
-                        {
-                            type: "TICKET_CREATED_EMAIL_IT",
-                            payload: JSON.stringify({ ticketId: 2 }),
-                            eventKey: "ticket:2:created:email:it",
-                        },
-                    ]),
                 }),
             );
         });

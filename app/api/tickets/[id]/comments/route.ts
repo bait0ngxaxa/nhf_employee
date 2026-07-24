@@ -1,28 +1,37 @@
 import { after, type NextRequest, NextResponse } from "next/server";
 
 import { requireApiSession } from "@/lib/auth/api";
-import { prisma } from "@/lib/db/prisma";
 import { createTicketCommandActor } from "@/lib/server/ticket-command-actor";
-import { processOutbox } from "@/lib/services/outbox/processor";
-import { createTicketAudit } from "@/lib/services/ticket/audit";
 import {
-    enqueueTicketCommentOutbox,
-    getTicketCommentRecipientIds,
-} from "@/lib/services/ticket/outbox";
+    enforceAuthenticatedMutationRateLimit,
+    enforcePreAuthIpRateLimit,
+} from "@/lib/security/mutation-rate-limit";
+import { processOutbox } from "@/lib/services/outbox/processor";
+import { ticketService } from "@/lib/services/ticket";
+import { TicketIdempotencyConflictError } from "@/lib/services/ticket/idempotency";
 import { jsonError, notFound } from "@/lib/ssot/http";
 import { FEATURE_KEYS, isFeatureEnabled } from "@/lib/ssot/features";
 import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
-import { isAdminRole } from "@/lib/ssot/permissions";
-import { createTicketCommentSchema } from "@/lib/validations/ticket";
+import { idempotencyKeySchema } from "@/lib/validations/idempotency";
+import {
+    createTicketCommentSchema,
+    ticketIdParamSchema,
+} from "@/lib/validations/ticket";
 
 export async function POST(
     request: NextRequest,
     { params }: { params: Promise<{ id: string }> },
-    ): Promise<NextResponse> {
+): Promise<NextResponse> {
     try {
         if (!isFeatureEnabled(FEATURE_KEYS.itSupport)) {
             return notFound();
         }
+
+        const preAuthRateLimitResponse = enforcePreAuthIpRateLimit(
+            request,
+            "ticket-comment",
+        );
+        if (preAuthRateLimitResponse) return preAuthRateLimitResponse;
 
         const body = await request.json();
         const parsed = createTicketCommentSchema.safeParse(body);
@@ -32,96 +41,36 @@ export async function POST(
             });
         }
 
-        const auth = await requireApiSession();
-        if (!auth.ok) return auth.response;
+        const parsedIdempotencyKey = idempotencyKeySchema.safeParse(
+            request.headers.get("Idempotency-Key"),
+        );
+        if (!parsedIdempotencyKey.success) {
+            return jsonError("กรุณาระบุ Idempotency-Key ที่ถูกต้อง", 400);
+        }
 
         const resolvedParams = await params;
-        const ticketId = parseInt(resolvedParams.id, 10);
-        if (Number.isNaN(ticketId)) {
+        const parsedTicketId = ticketIdParamSchema.safeParse(resolvedParams.id);
+        if (!parsedTicketId.success) {
             return jsonError(COMMON_API_MESSAGES.invalidTicketId, 400);
         }
 
+        const auth = await requireApiSession();
+        if (!auth.ok) return auth.response;
+
+        const principalRateLimitResponse =
+            enforceAuthenticatedMutationRateLimit(
+                "ticket-comment",
+                auth.user.id,
+            );
+        if (principalRateLimitResponse) return principalRateLimitResponse;
+
         const actor = createTicketCommandActor(auth.user, request.headers);
-        const result = await prisma.$transaction(async (tx) => {
-            const ticket = await tx.ticket.findFirst({
-                where: { id: ticketId, deletedAt: null },
-            });
-            if (!ticket) return { outcome: "not_found" as const };
-
-            const isOwner = ticket.reportedById === actor.id;
-            const isAdmin = isAdminRole(actor.role);
-            if (!isOwner && !isAdmin) {
-                return { outcome: "forbidden" as const };
-            }
-
-            const comment = await tx.ticketComment.create({
-                data: {
-                    content: parsed.data.content,
-                    ticketId,
-                    authorId: actor.id,
-                },
-                include: {
-                    author: {
-                        select: {
-                            id: true,
-                            name: true,
-                            email: true,
-                            role: true,
-                            employee: {
-                                select: {
-                                    firstName: true,
-                                    lastName: true,
-                                },
-                            },
-                        },
-                    },
-                },
-            });
-
-            await createTicketAudit(
-                tx,
-                "TICKET_COMMENT",
-                ticketId,
-                actor,
-                {
-                    after: {
-                        commentId: comment.id,
-                        content: comment.content,
-                        authorId: actor.id,
-                    },
-                },
-            );
-
-            const commentAuthorName =
-                comment.author.employee?.firstName
-                && comment.author.employee?.lastName
-                    ? `${comment.author.employee.firstName} ${comment.author.employee.lastName}`
-                    : comment.author.name;
-            const recipientIds = await getTicketCommentRecipientIds(
-                tx,
-                {
-                    reportedById: ticket.reportedById,
-                    assignedToId: ticket.assignedToId,
-                    actorId: actor.id,
-                    isAdmin,
-                    isOwner,
-                },
-            );
-            await enqueueTicketCommentOutbox(tx, {
-                ticketId,
-                commentId: comment.id,
-                recipientIds,
-                authorId: actor.id,
-                authorName: commentAuthorName,
-                ticketTitle: ticket.title,
-                authorIsOwner: isOwner,
-            });
-
-            return {
-                outcome: "created" as const,
-                comment,
-            };
-        });
+        const result = await ticketService.createTicketComment(
+            parsedTicketId.data,
+            parsed.data,
+            actor,
+            { idempotencyKey: parsedIdempotencyKey.data },
+        );
 
         if (result.outcome === "not_found") {
             return jsonError(COMMON_API_MESSAGES.ticketNotFound, 404);
@@ -130,14 +79,22 @@ export async function POST(
             return jsonError(COMMON_API_MESSAGES.accessDenied, 403);
         }
 
-        after(() =>
-            processOutbox().catch((error) => {
-                console.error("Outbox processor failed:", error);
-            }),
-        );
+        if (!result.replayed) {
+            after(() =>
+                processOutbox().catch((error) => {
+                    console.error("Outbox processor failed:", error);
+                }),
+            );
+        }
 
-        return NextResponse.json({ comment: result.comment }, { status: 201 });
+        return NextResponse.json(
+            { comment: result.comment },
+            { status: result.replayed ? 200 : 201 },
+        );
     } catch (error) {
+        if (error instanceof TicketIdempotencyConflictError) {
+            return jsonError(error.message, 409);
+        }
         console.error("Error creating comment:", error);
         return jsonError(COMMON_API_MESSAGES.failedToCreateComment, 500);
     }

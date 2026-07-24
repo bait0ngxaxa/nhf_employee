@@ -24,6 +24,7 @@ import {
     deleteTicket,
     checkPermissions,
 } from "./mutations";
+import { createTicketComment } from "./comments";
 
 /**
  * Ticket Service Object
@@ -41,6 +42,7 @@ export const ticketService = {
     updateTicket,
     deleteTicket,
     checkPermissions,
+    createTicketComment,
 };
 
 // Also export individual functions for tree-shaking
@@ -55,4 +57,5 @@ export {
     updateTicket,
     deleteTicket,
     checkPermissions,
+    createTicketComment,
 };

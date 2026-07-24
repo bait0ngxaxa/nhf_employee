@@ -1,5 +1,10 @@
 import { prisma } from "@/lib/db/prisma";
+import {
+    hasPrismaErrorCode,
+    runSerializableTransaction,
+} from "@/lib/db/transaction";
 import { isAdminRole } from "@/lib/ssot/permissions";
+import { assertCanCreateTicketWithPriority } from "@/lib/ssot/ticket-priority-policy";
 import { TICKET_WITH_USERS_INCLUDE } from "./constants";
 import {
     buildTicketStatusUpdate,
@@ -10,6 +15,10 @@ import {
     enqueueTicketCreatedOutbox,
     enqueueTicketUpdatedOutbox,
 } from "./outbox";
+import {
+    assertMatchingTicketIdempotency,
+    createTicketRequestHash,
+} from "./idempotency";
 import type {
     CreateTicketData,
     UpdateTicketData,
@@ -22,6 +31,99 @@ import type { Prisma, Ticket } from "@prisma/client";
 const TICKET_UPDATE_CONFLICT_MESSAGE =
     "Ticket was updated by another user";
 const INVALID_TICKET_TRANSITION_MESSAGE = "Invalid ticket status transition";
+const TICKET_CREATE_OPERATION = "TICKET_CREATE";
+
+type CreateTicketOptions = {
+    idempotencyKey: string;
+};
+
+type CreateTicketResult = {
+    ticket: TicketWithRelations;
+    replayed: boolean;
+};
+
+type CreateTicketCommand = {
+    data: CreateTicketData;
+    actor: UserContext;
+    idempotencyKey: string;
+    requestHash: string;
+};
+
+type TicketReplayClient = Pick<
+    Prisma.TransactionClient,
+    "ticket" | "ticketMutationIdempotency"
+>;
+
+async function findReplayedTicket(
+    client: TicketReplayClient,
+    actorId: number,
+    idempotencyKey: string,
+    requestHash: string,
+): Promise<TicketWithRelations | null> {
+    const record = await client.ticketMutationIdempotency.findUnique({
+        where: {
+            userId_idempotencyKey: { userId: actorId, idempotencyKey },
+        },
+    });
+    if (!record) return null;
+
+    assertMatchingTicketIdempotency(
+        record,
+        TICKET_CREATE_OPERATION,
+        requestHash,
+    );
+    const ticket = await client.ticket.findUnique({
+        where: { id: record.resourceId },
+        include: TICKET_WITH_USERS_INCLUDE,
+    });
+    if (!ticket) {
+        throw new Error("Idempotent ticket resource was not found");
+    }
+    return ticket as TicketWithRelations;
+}
+
+async function createTicketInTransaction(
+    tx: Prisma.TransactionClient,
+    command: CreateTicketCommand,
+): Promise<CreateTicketResult> {
+    const { actor, data, idempotencyKey, requestHash } = command;
+    const replayedTicket = await findReplayedTicket(
+        tx,
+        actor.id,
+        idempotencyKey,
+        requestHash,
+    );
+    if (replayedTicket) {
+        return { ticket: replayedTicket, replayed: true };
+    }
+
+    const newTicket = await tx.ticket.create({
+        data: { ...data, reportedById: actor.id },
+        include: TICKET_WITH_USERS_INCLUDE,
+    });
+    await enqueueTicketCreatedOutbox(tx, newTicket);
+    await createTicketAudit(tx, "TICKET_CREATE", newTicket.id, actor, {
+        after: {
+            title: newTicket.title,
+            description: newTicket.description,
+            category: newTicket.category,
+            priority: newTicket.priority,
+            status: newTicket.status,
+            reportedById: newTicket.reportedById,
+        },
+    });
+    await tx.ticketMutationIdempotency.create({
+        data: {
+            userId: actor.id,
+            idempotencyKey,
+            operation: TICKET_CREATE_OPERATION,
+            requestHash,
+            resourceId: newTicket.id,
+        },
+    });
+
+    return { ticket: newTicket as TicketWithRelations, replayed: false };
+}
 
 /**
  * Check user permissions for a ticket
@@ -84,42 +186,33 @@ function buildUpdateFields(
 export async function createTicket(
     data: CreateTicketData,
     actor: UserContext,
-): Promise<TicketWithRelations> {
-    const ticket = await prisma.$transaction(async (tx) => {
-        const newTicket = await tx.ticket.create({
-            data: {
-                title: data.title,
-                description: data.description,
-                category: data.category,
-                priority: data.priority,
-                reportedById: actor.id,
-            },
-            include: TICKET_WITH_USERS_INCLUDE,
-        });
+    options: CreateTicketOptions,
+): Promise<CreateTicketResult> {
+    assertCanCreateTicketWithPriority(data.priority, actor.role);
+    const requestHash = createTicketRequestHash(data);
+    const command = {
+        data,
+        actor,
+        idempotencyKey: options.idempotencyKey,
+        requestHash,
+    };
 
-        await enqueueTicketCreatedOutbox(tx, newTicket);
-
-        await createTicketAudit(
-            tx,
-            "TICKET_CREATE",
-            newTicket.id,
-            actor,
-            {
-                after: {
-                    title: newTicket.title,
-                    description: newTicket.description,
-                    category: newTicket.category,
-                    priority: newTicket.priority,
-                    status: newTicket.status,
-                    reportedById: newTicket.reportedById,
-                },
-            },
+    try {
+        return await runSerializableTransaction((tx) =>
+            createTicketInTransaction(tx, command),
         );
+    } catch (error) {
+        if (!hasPrismaErrorCode(error, "P2002")) throw error;
 
-        return newTicket;
-    });
-
-    return ticket as TicketWithRelations;
+        const ticket = await findReplayedTicket(
+            prisma,
+            actor.id,
+            options.idempotencyKey,
+            requestHash,
+        );
+        if (!ticket) throw error;
+        return { ticket, replayed: true };
+    }
 }
 
 /**

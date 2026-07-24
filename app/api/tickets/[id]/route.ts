@@ -3,6 +3,10 @@ import { type NextRequest, NextResponse } from "next/server";
 
 import { requireApiSession } from "@/lib/auth/api";
 import { createTicketCommandActor } from "@/lib/server/ticket-command-actor";
+import {
+    enforceAuthenticatedMutationRateLimit,
+    enforcePreAuthIpRateLimit,
+} from "@/lib/security/mutation-rate-limit";
 import { processOutbox } from "@/lib/services/outbox/processor";
 import { ticketService, type UpdateTicketData } from "@/lib/services/ticket";
 import { jsonError, notFound } from "@/lib/ssot/http";
@@ -10,6 +14,7 @@ import { FEATURE_KEYS, isFeatureEnabled } from "@/lib/ssot/features";
 import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
 import {
     deleteTicketSchema,
+    ticketIdParamSchema,
     updateTicketSchema,
 } from "@/lib/validations/ticket";
 
@@ -17,16 +22,16 @@ async function parseTicketId(
     params: Promise<{ id: string }>,
 ): Promise<{ ticketId: number | null; error?: NextResponse }> {
     const resolvedParams = await params;
-    const ticketId = parseInt(resolvedParams.id, 10);
+    const parsedTicketId = ticketIdParamSchema.safeParse(resolvedParams.id);
 
-    if (Number.isNaN(ticketId)) {
+    if (!parsedTicketId.success) {
         return {
             ticketId: null,
             error: jsonError(COMMON_API_MESSAGES.invalidTicketId, 400),
         };
     }
 
-    return { ticketId };
+    return { ticketId: parsedTicketId.data };
 }
 
 export async function GET(
@@ -70,6 +75,12 @@ export async function PATCH(
             return notFound();
         }
 
+        const preAuthRateLimitResponse = enforcePreAuthIpRateLimit(
+            request,
+            "ticket-update",
+        );
+        if (preAuthRateLimitResponse) return preAuthRateLimitResponse;
+
         const { ticketId, error } = await parseTicketId(params);
         if (error) return error;
         if (!ticketId) {
@@ -87,6 +98,13 @@ export async function PATCH(
 
         const auth = await requireApiSession();
         if (!auth.ok) return auth.response;
+
+        const principalRateLimitResponse =
+            enforceAuthenticatedMutationRateLimit(
+                "ticket-update",
+                auth.user.id,
+            );
+        if (principalRateLimitResponse) return principalRateLimitResponse;
 
         const updateData: UpdateTicketData = {
             title: validationResult.data.title,
@@ -125,8 +143,11 @@ export async function DELETE(
             return notFound();
         }
 
-        const auth = await requireApiSession();
-        if (!auth.ok) return auth.response;
+        const preAuthRateLimitResponse = enforcePreAuthIpRateLimit(
+            request,
+            "ticket-delete",
+        );
+        if (preAuthRateLimitResponse) return preAuthRateLimitResponse;
 
         const { ticketId, error } = await parseTicketId(params);
         if (error) return error;
@@ -141,6 +162,16 @@ export async function DELETE(
                 details: validation.error.flatten().fieldErrors,
             });
         }
+
+        const auth = await requireApiSession();
+        if (!auth.ok) return auth.response;
+
+        const principalRateLimitResponse =
+            enforceAuthenticatedMutationRateLimit(
+                "ticket-delete",
+                auth.user.id,
+            );
+        if (principalRateLimitResponse) return principalRateLimitResponse;
 
         const actor = createTicketCommandActor(auth.user, request.headers);
         const result = await ticketService.deleteTicket(

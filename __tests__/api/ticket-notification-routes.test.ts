@@ -10,8 +10,10 @@ import { getApiAuthSession } from "@/lib/auth/server";
 import { buildUserContext } from "@/lib/auth/context";
 import { ticketService } from "@/lib/services/ticket";
 import { processOutbox } from "@/lib/services/outbox/processor";
-import { prisma } from "@/lib/db/prisma";
-import { isAdminRole } from "@/lib/ssot/permissions";
+import {
+    enforceAuthenticatedMutationRateLimit,
+    enforcePreAuthIpRateLimit,
+} from "@/lib/security/mutation-rate-limit";
 
 const { afterResults } = vi.hoisted(() => ({
     afterResults: [] as Array<void | Promise<void>>,
@@ -39,6 +41,7 @@ vi.mock("@/lib/services/ticket", () => ({
     ticketService: {
         deleteTicket: vi.fn(),
         updateTicket: vi.fn(),
+        createTicketComment: vi.fn(),
     },
 }));
 
@@ -46,42 +49,15 @@ vi.mock("@/lib/services/outbox/processor", () => ({
     processOutbox: vi.fn(),
 }));
 
-vi.mock("@/lib/ssot/permissions", () => ({
-    isAdminRole: vi.fn(),
-}));
-
-vi.mock("@/lib/db/prisma", () => ({
-    prisma: {
-        $transaction: vi.fn(),
-        auditLog: {
-            create: vi.fn(),
-        },
-        notification: {
-            create: vi.fn(),
-            createMany: vi.fn(),
-        },
-        notificationOutbox: {
-            createMany: vi.fn(),
-        },
-        ticket: {
-            findFirst: vi.fn(),
-        },
-        ticketComment: {
-            create: vi.fn(),
-        },
-        user: {
-            findMany: vi.fn(),
-        },
-    },
+vi.mock("@/lib/security/mutation-rate-limit", () => ({
+    enforceAuthenticatedMutationRateLimit: vi.fn(),
+    enforcePreAuthIpRateLimit: vi.fn(),
 }));
 
 describe("Ticket notification routes", () => {
     beforeEach(() => {
         vi.clearAllMocks();
         afterResults.length = 0;
-        vi.mocked(prisma.$transaction).mockImplementation(
-            async (callback) => callback(prisma as never),
-        );
         vi.mocked(processOutbox).mockResolvedValue({
             processed: 0,
             failed: 0,
@@ -121,6 +97,14 @@ describe("Ticket notification routes", () => {
         await Promise.resolve();
         expect(processOutbox).toHaveBeenCalledTimes(1);
         expect(afterResults.at(-1)).toBeInstanceOf(Promise);
+        expect(enforcePreAuthIpRateLimit).toHaveBeenCalledWith(
+            req,
+            "ticket-update",
+        );
+        expect(enforceAuthenticatedMutationRateLimit).toHaveBeenCalledWith(
+            "ticket-update",
+            1,
+        );
     });
 
     it("returns 409 and skips outbox processing on concurrent update", async () => {
@@ -203,35 +187,32 @@ describe("Ticket notification routes", () => {
                 requestId: "req-delete-44",
             }),
         );
+        expect(enforcePreAuthIpRateLimit).toHaveBeenCalledWith(
+            validRequest,
+            "ticket-delete",
+        );
+        expect(enforceAuthenticatedMutationRateLimit).toHaveBeenCalledWith(
+            "ticket-delete",
+            1,
+        );
     });
 
     it("enqueues reporter comment notification atomically", async () => {
         vi.mocked(getApiAuthSession).mockResolvedValue({
             user: { id: "1", role: "ADMIN", email: "admin@test.com" },
         } as never);
-        vi.mocked(isAdminRole).mockReturnValue(true);
-        vi.mocked(prisma.ticket.findFirst).mockResolvedValue({
-            id: 55,
-            title: "VPN issue",
-            reportedById: 9,
-            assignedToId: null,
-        } as never);
-        vi.mocked(prisma.ticketComment.create).mockResolvedValue({
-            id: 3001,
-            content: "Checking this issue",
-            createdAt: new Date(),
-            author: {
-                id: 1,
-                name: "Admin",
-                email: "admin@test.com",
-                role: "ADMIN",
-                employee: null,
+        vi.mocked(ticketService.createTicketComment).mockResolvedValue({
+            outcome: "created",
+            replayed: false,
+            comment: {
+                id: 3001,
+                content: "Checking this issue",
             },
         } as never);
-        vi.mocked(prisma.notification.create).mockResolvedValue({} as never);
 
         const req = new NextRequest("http://localhost/api/tickets/55/comments", {
             method: "POST",
+            headers: { "Idempotency-Key": "ticket-comment-3001" },
             body: JSON.stringify({ content: "Checking this issue" }),
         });
         const res = await postTicketCommentRoute(req, {
@@ -241,50 +222,98 @@ describe("Ticket notification routes", () => {
         expect(res.status).toBe(201);
         await Promise.resolve();
         await Promise.resolve();
-        expect(prisma.notificationOutbox.createMany).toHaveBeenCalledWith({
-            data: [{
-                type: "TICKET_COMMENT_IN_APP",
-                payload: JSON.stringify({
-                    ticketId: 55,
-                    commentId: 3001,
-                    recipientId: 9,
-                    authorId: 1,
-                    authorName: "Admin",
-                    ticketTitle: "VPN issue",
-                    authorIsOwner: false,
-                }),
-                eventKey: "ticket:55:comment:3001:in-app:user:9",
-            }],
-            skipDuplicates: true,
-        });
-        expect(prisma.notification.create).not.toHaveBeenCalled();
+        expect(ticketService.createTicketComment).toHaveBeenCalledWith(
+            55,
+            { content: "Checking this issue" },
+            expect.objectContaining({ id: 1 }),
+            { idempotencyKey: "ticket-comment-3001" },
+        );
+        expect(enforcePreAuthIpRateLimit).toHaveBeenCalledWith(
+            req,
+            "ticket-comment",
+        );
+        expect(enforceAuthenticatedMutationRateLimit).toHaveBeenCalledWith(
+            "ticket-comment",
+            1,
+        );
         expect(processOutbox).toHaveBeenCalledTimes(1);
         expect(afterResults.at(-1)).toBeInstanceOf(Promise);
-        expect(prisma.auditLog.create).toHaveBeenCalledWith(
-            expect.objectContaining({
-                data: expect.objectContaining({
-                    action: "TICKET_COMMENT",
-                    entityId: 55,
-                    userId: 1,
-                }),
-            }),
+    });
+
+    it("replays a comment without waking the outbox processor", async () => {
+        vi.mocked(getApiAuthSession).mockResolvedValue({
+            user: { id: "1", role: "ADMIN", email: "admin@test.com" },
+        } as never);
+        vi.mocked(ticketService.createTicketComment).mockResolvedValue({
+            outcome: "created",
+            replayed: true,
+            comment: { id: 3001, content: "Checking this issue" },
+        } as never);
+        const request = new NextRequest(
+            "http://localhost/api/tickets/55/comments",
+            {
+                method: "POST",
+                headers: { "Idempotency-Key": "ticket-comment-3001" },
+                body: JSON.stringify({ content: "Checking this issue" }),
+            },
         );
+
+        const response = await postTicketCommentRoute(request, {
+            params: Promise.resolve({ id: "55" }),
+        });
+
+        expect(response.status).toBe(200);
+        expect(processOutbox).not.toHaveBeenCalled();
+    });
+
+    it("requires an Idempotency-Key for comments", async () => {
+        const request = new NextRequest(
+            "http://localhost/api/tickets/55/comments",
+            {
+                method: "POST",
+                body: JSON.stringify({ content: "Checking this issue" }),
+            },
+        );
+
+        const response = await postTicketCommentRoute(request, {
+            params: Promise.resolve({ id: "55" }),
+        });
+
+        expect(response.status).toBe(400);
+        expect(ticketService.createTicketComment).not.toHaveBeenCalled();
+    });
+
+    it("rejects an invalid comment ticket id before authentication", async () => {
+        const request = new NextRequest(
+            "http://localhost/api/tickets/55junk/comments",
+            {
+                method: "POST",
+                headers: { "Idempotency-Key": "ticket-comment-invalid-id" },
+                body: JSON.stringify({ content: "Checking this issue" }),
+            },
+        );
+
+        const response = await postTicketCommentRoute(request, {
+            params: Promise.resolve({ id: "55junk" }),
+        });
+
+        expect(response.status).toBe(400);
+        expect(getApiAuthSession).not.toHaveBeenCalled();
+        expect(ticketService.createTicketComment).not.toHaveBeenCalled();
     });
 
     it("denies a non-admin assignee who is not the ticket owner", async () => {
         vi.mocked(getApiAuthSession).mockResolvedValue({
             user: { id: "7", role: "USER", email: "assignee@test.com" },
         } as never);
-        vi.mocked(isAdminRole).mockReturnValue(false);
-        vi.mocked(prisma.ticket.findFirst).mockResolvedValue({
-            id: 55,
-            title: "VPN issue",
-            reportedById: 9,
-            assignedToId: 7,
-        } as never);
+        vi.mocked(ticketService.createTicketComment).mockResolvedValue({
+            outcome: "forbidden",
+            replayed: false,
+        });
 
         const req = new NextRequest("http://localhost/api/tickets/55/comments", {
             method: "POST",
+            headers: { "Idempotency-Key": "ticket-comment-denied" },
             body: JSON.stringify({ content: "Checking this issue" }),
         });
         const res = await postTicketCommentRoute(req, {
@@ -292,7 +321,6 @@ describe("Ticket notification routes", () => {
         });
 
         expect(res.status).toBe(403);
-        expect(prisma.ticketComment.create).not.toHaveBeenCalled();
-        expect(prisma.notification.create).not.toHaveBeenCalled();
+        expect(ticketService.createTicketComment).toHaveBeenCalled();
     });
 });

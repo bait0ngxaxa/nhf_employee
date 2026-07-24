@@ -33,6 +33,7 @@ model User {
   stockRequests          StockRequest[]     @relation("StockRequester")
   stockIssuedRequests    StockRequest[]     @relation("StockIssuer")
   stockCancelledRequests StockRequest[]     @relation("StockCanceller")
+  ticketMutationIdempotencies TicketMutationIdempotency[]
 
   @@map("users")
 }
@@ -189,6 +190,26 @@ enum TicketStatus {
   RESOLVED
   CLOSED
   CANCELLED
+}
+
+model TicketMutationIdempotency {
+  id             String                     @id @default(cuid())
+  userId         Int
+  idempotencyKey String                     @db.VarChar(255)
+  operation      TicketIdempotencyOperation
+  requestHash    String                     @db.Char(64)
+  resourceId     Int
+  createdAt      DateTime                   @default(now())
+  user           User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, idempotencyKey])
+  @@index([createdAt])
+  @@map("ticket_mutation_idempotency")
+}
+
+enum TicketIdempotencyOperation {
+  TICKET_CREATE
+  TICKET_COMMENT
 }
 
 enum NotificationOutboxType {

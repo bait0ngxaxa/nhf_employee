@@ -2,11 +2,18 @@ import { after, type NextRequest, NextResponse } from "next/server";
 
 import { requireApiSession } from "@/lib/auth/api";
 import { createTicketCommandActor } from "@/lib/server/ticket-command-actor";
+import {
+    enforceAuthenticatedMutationRateLimit,
+    enforcePreAuthIpRateLimit,
+} from "@/lib/security/mutation-rate-limit";
 import { processOutbox } from "@/lib/services/outbox/processor";
 import { ticketService, type TicketFilters } from "@/lib/services/ticket";
+import { TicketIdempotencyConflictError } from "@/lib/services/ticket/idempotency";
 import { jsonError, notFound } from "@/lib/ssot/http";
 import { FEATURE_KEYS, isFeatureEnabled } from "@/lib/ssot/features";
 import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
+import { TicketPriorityForbiddenError } from "@/lib/ssot/ticket-priority-policy";
+import { idempotencyKeySchema } from "@/lib/validations/idempotency";
 import { createTicketSchema, ticketFiltersSchema } from "@/lib/validations/ticket";
 
 function parseQueryParams(url: string):
@@ -63,6 +70,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
             return notFound();
         }
 
+        const preAuthRateLimitResponse = enforcePreAuthIpRateLimit(
+            request,
+            "ticket-create",
+        );
+        if (preAuthRateLimitResponse) return preAuthRateLimitResponse;
+
         const body = await request.json();
         const result = createTicketSchema.safeParse(body);
         if (!result.success) {
@@ -72,20 +85,49 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
             });
         }
 
+        const parsedIdempotencyKey = idempotencyKeySchema.safeParse(
+            request.headers.get("Idempotency-Key"),
+        );
+        if (!parsedIdempotencyKey.success) {
+            return jsonError("กรุณาระบุ Idempotency-Key ที่ถูกต้อง", 400);
+        }
+
         const auth = await requireApiSession();
         if (!auth.ok) return auth.response;
 
-        const actor = createTicketCommandActor(auth.user, request.headers);
-        const ticket = await ticketService.createTicket(result.data, actor);
+        const principalRateLimitResponse =
+            enforceAuthenticatedMutationRateLimit(
+                "ticket-create",
+                auth.user.id,
+            );
+        if (principalRateLimitResponse) return principalRateLimitResponse;
 
-        after(() =>
-            processOutbox().catch((error) => {
-                console.error("Outbox processor failed:", error);
-            }),
+        const actor = createTicketCommandActor(auth.user, request.headers);
+        const creation = await ticketService.createTicket(
+            result.data,
+            actor,
+            { idempotencyKey: parsedIdempotencyKey.data },
         );
 
-        return NextResponse.json({ ticket }, { status: 201 });
+        if (!creation.replayed) {
+            after(() =>
+                processOutbox().catch((error) => {
+                    console.error("Outbox processor failed:", error);
+                }),
+            );
+        }
+
+        return NextResponse.json(
+            { ticket: creation.ticket },
+            { status: creation.replayed ? 200 : 201 },
+        );
     } catch (error) {
+        if (error instanceof TicketPriorityForbiddenError) {
+            return jsonError(error.message, 403);
+        }
+        if (error instanceof TicketIdempotencyConflictError) {
+            return jsonError(error.message, 409);
+        }
         console.error("Error creating ticket:", error);
         return jsonError(COMMON_API_MESSAGES.failedToCreateTicket, 500);
     }

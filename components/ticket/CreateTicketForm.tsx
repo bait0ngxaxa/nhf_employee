@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -13,6 +13,8 @@ import { TICKET_CATEGORIES, TICKET_PRIORITIES } from '@/constants/tickets';
 import { apiPost } from "@/lib/client/api-client";
 import { Loader2 } from "lucide-react";
 import { useAuth } from "@/components/auth/HybridAuthProvider";
+import { createIdempotencyKey } from "@/lib/client/idempotency-key";
+import { canCreateTicketWithPriority } from "@/lib/ssot/ticket-priority-policy";
 
 export default function CreateTicketForm({ isOpen, onClose, onTicketCreated }: CreateTicketFormProps) {
   const { user } = useAuth();
@@ -24,6 +26,10 @@ export default function CreateTicketForm({ isOpen, onClose, onTicketCreated }: C
   });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const idempotencyRef = useRef<{
+    payload: string;
+    key: string;
+  } | null>(null);
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({
@@ -45,7 +51,22 @@ export default function CreateTicketForm({ isOpen, onClose, onTicketCreated }: C
     setError('');
 
     try {
-      const response = await apiPost<{ ticket: { id: string } }>('/api/tickets', formData);
+      const payload = JSON.stringify(formData);
+      if (idempotencyRef.current?.payload !== payload) {
+        idempotencyRef.current = {
+          payload,
+          key: createIdempotencyKey(),
+        };
+      }
+      const response = await apiPost<{ ticket: { id: string } }>(
+        '/api/tickets',
+        formData,
+        {
+          headers: {
+            "Idempotency-Key": idempotencyRef.current.key,
+          },
+        },
+      );
 
       if (!response.success) {
         throw new Error(response.error || 'เกิดข้อผิดพลาด');
@@ -63,6 +84,7 @@ export default function CreateTicketForm({ isOpen, onClose, onTicketCreated }: C
         category: '',
         priority: 'MEDIUM'
       });
+      idempotencyRef.current = null;
 
       // Close the dialog immediately
       onClose();
@@ -153,7 +175,12 @@ export default function CreateTicketForm({ isOpen, onClose, onTicketCreated }: C
                   <SelectValue placeholder="เลือกระดับความสำคัญ" />
                 </SelectTrigger>
                 <SelectContent>
-                  {TICKET_PRIORITIES.map((priority) => (
+                  {TICKET_PRIORITIES
+                    .filter(
+                      (priority) =>
+                        canCreateTicketWithPriority(priority.value, user.role),
+                    )
+                    .map((priority) => (
                     <SelectItem key={priority.value} value={priority.value}>
                       {priority.label}
                     </SelectItem>

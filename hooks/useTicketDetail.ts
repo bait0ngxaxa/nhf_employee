@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import useSWR from "swr";
 import { apiPost, apiPatch } from "@/lib/client/api-client";
 import { useAuth } from "@/components/auth/HybridAuthProvider";
+import { createIdempotencyKey } from "@/lib/client/idempotency-key";
 
 interface Comment {
     id: number;
@@ -83,6 +84,11 @@ export function useTicketDetail(
     const [commentLoading, setCommentLoading] = useState(false);
     const [updateLoading, setUpdateLoading] = useState(false);
     const [statusUpdate, setStatusUpdate] = useState("");
+    const commentIdempotencyRef = useRef<{
+        ticketId: number;
+        content: string;
+        key: string;
+    } | null>(null);
 
     const swrKey = ticketId ? `/api/tickets/${ticketId}` : null;
     const { data, error: swrError, mutate, isLoading } = useSWR(swrKey);
@@ -100,15 +106,34 @@ export function useTicketDetail(
         try {
             setCommentLoading(true);
 
-            const result = await apiPost(`/api/tickets/${ticketId}/comments`, {
-                content: newComment,
-            });
+            const content = newComment.trim();
+            const previousRequest = commentIdempotencyRef.current;
+            const idempotencyRequest =
+                previousRequest?.ticketId === ticketId
+                && previousRequest.content === content
+                    ? previousRequest
+                    : {
+                    ticketId,
+                    content,
+                    key: createIdempotencyKey(),
+                };
+            commentIdempotencyRef.current = idempotencyRequest;
+            const result = await apiPost(
+                `/api/tickets/${ticketId}/comments`,
+                { content },
+                {
+                    headers: {
+                        "Idempotency-Key": idempotencyRequest.key,
+                    },
+                },
+            );
 
             if (!result.success) {
                 throw new Error(result.error);
             }
 
             setNewComment("");
+            commentIdempotencyRef.current = null;
             mutate(); // Refresh data
         } catch (err: unknown) {
             const errorMessage =

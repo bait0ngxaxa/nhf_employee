@@ -18,7 +18,11 @@ export type PreAuthRateLimitScope =
     | "stock-adjust"
     | "stock-request-cancel"
     | "stock-request-create"
-    | "stock-request-issue";
+    | "stock-request-issue"
+    | "ticket-comment"
+    | "ticket-create"
+    | "ticket-delete"
+    | "ticket-update";
 
 export type AuthenticatedMutationRateLimitScope = Exclude<
     PreAuthRateLimitScope,
@@ -32,6 +36,10 @@ export const PRE_AUTH_IP_RATE_LIMIT_POLICIES = {
     "stock-request-cancel": { windowMs: 15 * 60 * 1000, maxRequests: 300 },
     "stock-request-create": { windowMs: 15 * 60 * 1000, maxRequests: 300 },
     "stock-request-issue": { windowMs: 15 * 60 * 1000, maxRequests: 300 },
+    "ticket-comment": { windowMs: 15 * 60 * 1000, maxRequests: 180 },
+    "ticket-create": { windowMs: 15 * 60 * 1000, maxRequests: 60 },
+    "ticket-delete": { windowMs: 15 * 60 * 1000, maxRequests: 60 },
+    "ticket-update": { windowMs: 15 * 60 * 1000, maxRequests: 300 },
 } as const satisfies Record<PreAuthRateLimitScope, MutationRateLimitPolicy>;
 
 export const AUTHENTICATED_MUTATION_RATE_LIMIT_POLICIES = {
@@ -39,6 +47,10 @@ export const AUTHENTICATED_MUTATION_RATE_LIMIT_POLICIES = {
     "stock-request-cancel": { windowMs: 60 * 1000, maxRequests: 20 },
     "stock-request-create": { windowMs: 60 * 1000, maxRequests: 10 },
     "stock-request-issue": { windowMs: 60 * 1000, maxRequests: 30 },
+    "ticket-comment": { windowMs: 60 * 1000, maxRequests: 20 },
+    "ticket-create": { windowMs: 60 * 1000, maxRequests: 10 },
+    "ticket-delete": { windowMs: 60 * 1000, maxRequests: 10 },
+    "ticket-update": { windowMs: 60 * 1000, maxRequests: 30 },
 } as const satisfies Record<
     AuthenticatedMutationRateLimitScope,
     MutationRateLimitPolicy
