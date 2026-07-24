@@ -15,13 +15,12 @@ async function notifyCommentParticipants(
     commentAuthorId: number,
     commentAuthorName: string,
     isAdmin: boolean,
-    isAssigned: boolean,
     isOwner: boolean,
 ): Promise<void> {
     const actionUrl = `${APP_ROUTES.dashboard}?tab=it-support&ticketId=${ticket.id}`;
     const referenceId = ticket.id.toString();
 
-    if ((isAdmin || isAssigned) && ticket.reportedById !== commentAuthorId) {
+    if (isAdmin && ticket.reportedById !== commentAuthorId) {
         await prisma.notification.create({
             data: {
                 userId: ticket.reportedById,
@@ -108,9 +107,8 @@ export async function POST(
 
         const isOwner = ticket.reportedById === currentUserId;
         const isAdmin = isAdminRole(auth.session.user.role);
-        const isAssigned = ticket.assignedToId === currentUserId;
 
-        if (!isOwner && !isAdmin && !isAssigned) {
+        if (!isOwner && !isAdmin) {
             return jsonError(COMMON_API_MESSAGES.accessDenied, 403);
         }
 
@@ -150,7 +148,6 @@ export async function POST(
                     currentUserId,
                     commentAuthorName,
                     isAdmin,
-                    isAssigned,
                     isOwner,
                 );
             } catch (err) {

@@ -154,10 +154,7 @@ export function useTicketDetail(
     const isAdmin = user?.role === "ADMIN";
     const isOwner =
         ticket && user && ticket.reportedBy.id === parseInt(user.id, 10);
-    const canComment =
-        isAdmin ||
-        isOwner ||
-        ticket?.assignedTo?.id === parseInt(user?.id || "", 10);
+    const canComment = isAdmin || isOwner;
 
     return {
         ticket,

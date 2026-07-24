@@ -178,4 +178,29 @@ describe("Ticket notification routes", () => {
             }),
         });
     });
+
+    it("denies a non-admin assignee who is not the ticket owner", async () => {
+        vi.mocked(getApiAuthSession).mockResolvedValue({
+            user: { id: "7", role: "USER", email: "assignee@test.com" },
+        } as never);
+        vi.mocked(isAdminRole).mockReturnValue(false);
+        vi.mocked(prisma.ticket.findUnique).mockResolvedValue({
+            id: 55,
+            title: "VPN issue",
+            reportedById: 9,
+            assignedToId: 7,
+        } as never);
+
+        const req = new NextRequest("http://localhost/api/tickets/55/comments", {
+            method: "POST",
+            body: JSON.stringify({ content: "Checking this issue" }),
+        });
+        const res = await postTicketCommentRoute(req, {
+            params: Promise.resolve({ id: "55" }),
+        });
+
+        expect(res.status).toBe(403);
+        expect(prisma.ticketComment.create).not.toHaveBeenCalled();
+        expect(prisma.notification.create).not.toHaveBeenCalled();
+    });
 });
