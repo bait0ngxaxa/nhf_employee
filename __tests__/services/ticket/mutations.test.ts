@@ -326,12 +326,39 @@ describe("Ticket Mutations", () => {
             prismaMock.ticket.findFirstOrThrow.mockResolvedValue(
                 asNever({
                     ...existingTicket,
+                    title: "Test Ticket",
+                    description: "desc",
+                    category: "HARDWARE",
                     status: "RESOLVED",
+                    createdAt: new Date("2026-07-24T00:00:00.000Z"),
+                    reportedBy: {
+                        id: 10,
+                        name: "Reporter",
+                        email: "reporter@example.com",
+                        employee: null,
+                    },
+                    assignedTo: null,
                 }),
             );
 
             const user = { id: 99, role: "ADMIN", email: "" };
             await updateTicket(1, { status: "RESOLVED" }, user);
+            const expectedPayload = JSON.stringify({
+                ticketId: 1,
+                oldStatus: "OPEN",
+                newStatus: "RESOLVED",
+                title: "Test Ticket",
+                description: "desc",
+                category: "HARDWARE",
+                priority: "LOW",
+                reportedBy: {
+                    id: 10,
+                    email: "reporter@example.com",
+                    name: "Reporter",
+                },
+                createdAt: "2026-07-24T00:00:00.000Z",
+                occurredAt: "2026-07-24T01:00:00.000Z",
+            });
 
             expect(prismaMock.ticket.updateMany).toHaveBeenCalledWith(
                 expect.objectContaining({
@@ -345,30 +372,21 @@ describe("Ticket Mutations", () => {
                 data: [
                     {
                         type: "TICKET_UPDATED_IN_APP_REPORTER",
-                        payload: JSON.stringify({
-                            ticketId: 1,
-                            oldStatus: "OPEN",
-                        }),
+                        payload: expectedPayload,
                         eventKey: expect.stringMatching(
                             /^ticket:1:status:.+:in-app:reporter:10$/,
                         ),
                     },
                     {
                         type: "TICKET_UPDATED_EMAIL_REPORTER",
-                        payload: JSON.stringify({
-                            ticketId: 1,
-                            oldStatus: "OPEN",
-                        }),
+                        payload: expectedPayload,
                         eventKey: expect.stringMatching(
                             /^ticket:1:status:.+:email:reporter:10$/,
                         ),
                     },
                     {
                         type: "TICKET_UPDATED_LINE",
-                        payload: JSON.stringify({
-                            ticketId: 1,
-                            oldStatus: "OPEN",
-                        }),
+                        payload: expectedPayload,
                         eventKey: expect.stringMatching(
                             /^ticket:1:status:.+:line:it$/,
                         ),

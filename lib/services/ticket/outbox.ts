@@ -1,4 +1,8 @@
 import { Role, type Prisma, type Ticket } from "@prisma/client";
+import {
+    buildTicketUpdatedNotificationSnapshot,
+} from "./update-notification-snapshot";
+import type { TicketWithRelations } from "./types";
 
 type TicketOutboxSnapshot = Pick<
     Ticket,
@@ -63,10 +67,12 @@ export async function enqueueTicketCreatedOutbox(
 
 export async function enqueueTicketUpdatedOutbox(
     tx: Prisma.TransactionClient,
-    ticket: TicketOutboxSnapshot,
-    oldStatus: string,
+    ticket: TicketWithRelations,
+    oldStatus: Ticket["status"],
 ): Promise<void> {
-    const payload = JSON.stringify({ ticketId: ticket.id, oldStatus });
+    const payload = JSON.stringify(
+        buildTicketUpdatedNotificationSnapshot(ticket, oldStatus),
+    );
     const eventPrefix = `ticket:${ticket.id}:status:${ticket.updatedAt.toISOString()}`;
 
     await tx.notificationOutbox.createMany({

@@ -11,6 +11,10 @@ import {
 import { APP_ROUTES } from "@/lib/ssot/routes";
 import type { TicketEmailData } from "@/types/api";
 import type { TicketWithRelations } from "./types";
+import {
+    toTicketEmailData,
+    type TicketUpdatedNotificationSnapshot,
+} from "./update-notification-snapshot";
 
 function getUserDisplayName(
     user: TicketWithRelations["reportedBy"],
@@ -79,17 +83,16 @@ export async function sendTicketCreatedInAppNotification(
     });
 }
 export async function sendTicketUpdatedInAppNotification(
-    ticket: TicketWithRelations,
-    oldStatus: string,
-    eventKey = `ticket:${ticket.reportedById}:TICKET_UPDATED:${ticket.id}:${oldStatus}:${ticket.status}`,
+    snapshot: TicketUpdatedNotificationSnapshot,
+    eventKey = `ticket:${snapshot.reportedBy.id}:TICKET_UPDATED:${snapshot.ticketId}:${snapshot.oldStatus}:${snapshot.newStatus}`,
 ): Promise<void> {
     await createInAppNotificationOnce({
-        userId: ticket.reportedById,
+        userId: snapshot.reportedBy.id,
         type: "TICKET_UPDATED",
         title: "สถานะคำขอ IT Support อัปเดต",
-        message: `คำขอ "${ticket.title}" เปลี่ยนสถานะจาก ${oldStatus} เป็น ${ticket.status}`,
-        actionUrl: getTicketActionUrl(ticket.id),
-        referenceId: ticket.id.toString(),
+        message: `คำขอ "${snapshot.title}" เปลี่ยนสถานะจาก ${snapshot.oldStatus} เป็น ${snapshot.newStatus}`,
+        actionUrl: getTicketActionUrl(snapshot.ticketId),
+        referenceId: snapshot.ticketId.toString(),
         dedupeKey: eventKey,
     });
 }
@@ -140,14 +143,13 @@ export async function sendTicketCreatedITEmailNotification(
 }
 
 export async function sendTicketUpdatedReporterEmailNotification(
-    ticket: TicketWithRelations,
-    oldStatus: string,
+    snapshot: TicketUpdatedNotificationSnapshot,
     eventKey?: string,
 ): Promise<void> {
     await assertDelivery(
         await emailService.sendStatusUpdateNotification(
-            buildEmailData(ticket),
-            oldStatus,
+            toTicketEmailData(snapshot),
+            snapshot.oldStatus,
             eventKey ? createEmailMessageId(eventKey) : undefined,
         ),
         "TICKET_UPDATED reporter email",
@@ -155,12 +157,12 @@ export async function sendTicketUpdatedReporterEmailNotification(
 }
 
 export async function sendTicketUpdatedLineNotification(
-    ticket: TicketWithRelations,
+    snapshot: TicketUpdatedNotificationSnapshot,
     eventKey?: string,
 ): Promise<void> {
     await assertDelivery(
         await lineNotificationService.sendStatusUpdateNotification(
-            buildEmailData(ticket),
+            toTicketEmailData(snapshot),
             eventKey ? createLineRetryKey(eventKey) : undefined,
         ),
         "TICKET_UPDATED LINE",

@@ -12,6 +12,9 @@ import {
     sendTicketUpdatedReporterEmailNotification,
 } from "@/lib/services/ticket/notifications";
 import type { TicketWithRelations } from "@/lib/services/ticket/types";
+import {
+    buildTicketUpdatedNotificationSnapshot,
+} from "@/lib/services/ticket/update-notification-snapshot";
 
 vi.mock("@/lib/db/prisma", () => ({
     prisma: mockDeep<PrismaClient>(),
@@ -112,14 +115,17 @@ describe("ticket notification delivery", () => {
     it("keeps status in-app delivery independent from failed email delivery", async () => {
         vi.mocked(emailService.sendStatusUpdateNotification).mockResolvedValue(false);
         const ticket = { ...buildTicket(), status: "IN_PROGRESS" as const };
-
-        await sendTicketUpdatedInAppNotification(
+        const snapshot = buildTicketUpdatedNotificationSnapshot(
             ticket,
             "OPEN",
+        );
+
+        await sendTicketUpdatedInAppNotification(
+            snapshot,
             "updated-in-app",
         );
         await expect(
-            sendTicketUpdatedReporterEmailNotification(ticket, "OPEN"),
+            sendTicketUpdatedReporterEmailNotification(snapshot),
         ).rejects.toThrow("TICKET_UPDATED reporter email notification failed");
 
         expect(prismaMock.notification.create).toHaveBeenCalledWith({

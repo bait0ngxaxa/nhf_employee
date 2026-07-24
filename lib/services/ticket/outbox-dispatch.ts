@@ -14,11 +14,9 @@ import {
     type TicketCommentNotificationData,
 } from "@/lib/services/ticket/notifications";
 import type { TicketWithRelations } from "@/lib/services/ticket/types";
-
-type TicketUpdatedPayload = {
-    ticketId: number;
-    oldStatus: string;
-};
+import {
+    parseTicketUpdatedNotificationSnapshot,
+} from "@/lib/services/ticket/update-notification-snapshot";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
     return typeof value === "object" && value !== null;
@@ -38,15 +36,13 @@ function parseTicketId(payload: unknown, type: string): number {
     return payload.ticketId;
 }
 
-function parseTicketUpdatedPayload(payload: unknown): TicketUpdatedPayload {
-    if (
-        !isRecord(payload)
-        || typeof payload.ticketId !== "number"
-        || typeof payload.oldStatus !== "string"
-    ) {
-        throw new Error("Invalid ticket updated payload");
-    }
-    return { ticketId: payload.ticketId, oldStatus: payload.oldStatus };
+function isLegacyTicketUpdatedPayload(payload: unknown): boolean {
+    return (
+        isRecord(payload)
+        && typeof payload.ticketId === "number"
+        && typeof payload.oldStatus === "string"
+        && !("newStatus" in payload)
+    );
 }
 
 function parseTicketCommentPayload(
@@ -118,7 +114,7 @@ async function dispatchCreated(
 async function dispatchUpdated(
     notification: NotificationOutbox,
     payload: unknown,
-): Promise<"SENT" | null> {
+): Promise<"SENT" | "SUPERSEDED" | null> {
     if (
         notification.type !== "TICKET_UPDATED_IN_APP_REPORTER"
         && notification.type !== "TICKET_UPDATED_EMAIL_REPORTER"
@@ -126,20 +122,21 @@ async function dispatchUpdated(
     ) {
         return null;
     }
-    const parsed = parseTicketUpdatedPayload(payload);
-    const ticket = await getTicket(parsed.ticketId);
+    if (isLegacyTicketUpdatedPayload(payload)) {
+        return "SUPERSEDED";
+    }
+    const snapshot = parseTicketUpdatedNotificationSnapshot(payload);
     const eventKey = requireEventKey(notification);
 
     if (notification.type === "TICKET_UPDATED_IN_APP_REPORTER") {
-        await sendTicketUpdatedInAppNotification(ticket, parsed.oldStatus, eventKey);
+        await sendTicketUpdatedInAppNotification(snapshot, eventKey);
     } else if (notification.type === "TICKET_UPDATED_EMAIL_REPORTER") {
         await sendTicketUpdatedReporterEmailNotification(
-            ticket,
-            parsed.oldStatus,
+            snapshot,
             eventKey,
         );
     } else if (notification.type === "TICKET_UPDATED_LINE") {
-        await sendTicketUpdatedLineNotification(ticket, eventKey);
+        await sendTicketUpdatedLineNotification(snapshot, eventKey);
     } else {
         return null;
     }

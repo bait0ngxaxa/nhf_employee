@@ -17,6 +17,9 @@ import {
     sendTicketCreatedReporterEmailNotification,
     sendTicketUpdatedReporterEmailNotification,
 } from "@/lib/services/ticket/notifications";
+import type {
+    TicketUpdatedNotificationSnapshot,
+} from "@/lib/services/ticket/update-notification-snapshot";
 import {
     sendLeaveActionNotifications,
     sendLeaveCancelledNotifications,
@@ -95,6 +98,25 @@ function buildNotification(
 
 function asNever<T>(value: T): never {
     return value as unknown as never;
+}
+
+function buildTicketUpdatedSnapshot(): TicketUpdatedNotificationSnapshot {
+    return {
+        ticketId: 1,
+        oldStatus: "OPEN",
+        newStatus: "IN_PROGRESS",
+        title: "Test Ticket",
+        description: "desc",
+        category: "HARDWARE",
+        priority: "LOW",
+        reportedBy: {
+            id: 1,
+            name: "U",
+            email: "u@test.com",
+        },
+        createdAt: "2026-07-24T01:00:00.000Z",
+        occurredAt: "2026-07-24T02:00:00.000Z",
+    };
 }
 
 function buildLeavePayload() {
@@ -201,43 +223,54 @@ describe("processOutbox", () => {
         );
     });
 
-    it("processes only the requested ticket-updated provider", async () => {
+    it("dispatches the immutable status snapshot without reading current ticket state", async () => {
         prismaMock.notificationOutbox.findMany.mockResolvedValue(
             asNever([
                 buildNotification(
                     101,
                     "TICKET_UPDATED_EMAIL_REPORTER",
-                    JSON.stringify({ ticketId: 1, oldStatus: "OPEN" }),
+                    JSON.stringify(buildTicketUpdatedSnapshot()),
                     "ticket:1:status:v1:email:reporter:1",
                 ),
             ]),
-        );
-        prismaMock.ticket.findUnique.mockResolvedValue(
-            asNever({
-                id: 1,
-                title: "Test Ticket",
-                description: "desc",
-                category: "HARDWARE",
-                priority: "LOW",
-                status: "RESOLVED",
-                reportedById: 1,
-                assignedToId: null,
-                resolution: null,
-                resolvedAt: null,
-                createdAt: new Date(),
-                updatedAt: new Date(),
-                reportedBy: { id: 1, name: "U", email: "u@test.com", employee: null },
-                assignedTo: null,
-            }),
         );
 
         const result = await processOutbox();
 
         expect(result).toEqual({ processed: 1, failed: 0 });
         expect(sendTicketUpdatedReporterEmailNotification).toHaveBeenCalledWith(
-            expect.objectContaining({ id: 1 }),
-            "OPEN",
+            expect.objectContaining({
+                ticketId: 1,
+                oldStatus: "OPEN",
+                newStatus: "IN_PROGRESS",
+            }),
             "ticket:1:status:v1:email:reporter:1",
+        );
+        expect(prismaMock.ticket.findUnique).not.toHaveBeenCalled();
+    });
+
+    it("supersedes legacy status events that cannot be delivered accurately", async () => {
+        prismaMock.notificationOutbox.findMany.mockResolvedValue(
+            asNever([
+                buildNotification(
+                    102,
+                    "TICKET_UPDATED_EMAIL_REPORTER",
+                    JSON.stringify({ ticketId: 1, oldStatus: "OPEN" }),
+                    "ticket:1:status:legacy:email:reporter:1",
+                ),
+            ]),
+        );
+
+        const result = await processOutbox();
+
+        expect(result).toEqual({ processed: 1, failed: 0 });
+        expect(sendTicketUpdatedReporterEmailNotification).not.toHaveBeenCalled();
+        expect(prismaMock.ticket.findUnique).not.toHaveBeenCalled();
+        expect(prismaMock.notificationOutbox.updateMany).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: { id: 102, status: "PROCESSING" },
+                data: expect.objectContaining({ status: "SUPERSEDED" }),
+            }),
         );
     });
 
