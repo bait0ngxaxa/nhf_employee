@@ -12,7 +12,7 @@ import {
     assertLeaveRequestBodySize,
     parseLeaveRequestInput,
 } from "@/lib/services/leave/request-input";
-import { toLeaveAttachmentSummary } from "@/lib/services/leave/create-request-prisma";
+import { toLeaveAttachmentSummary } from "@/lib/services/leave/attachment-summary";
 import { toLeaveRequestDays } from "@/lib/services/leave/half-days";
 import { processOutbox } from "@/lib/services/outbox/processor";
 import { FEATURE_KEYS, isFeatureEnabled } from "@/lib/ssot/features";

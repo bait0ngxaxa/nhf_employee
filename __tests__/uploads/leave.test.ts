@@ -30,7 +30,9 @@ function createFile(
     };
 }
 
-async function createImage(format: "jpeg" | "png" | "webp"): Promise<Buffer> {
+async function createImage(
+    format: "jpeg" | "png" | "webp" | "gif" | "tiff",
+): Promise<Buffer> {
     const image = sharp({
         create: {
             width: 32,
@@ -114,6 +116,31 @@ describe("private leave attachment storage", () => {
             }),
         ).rejects.toThrow("รองรับเฉพาะไฟล์ JPG, PNG และ WEBP");
     });
+
+    it.each([
+        ["GIF", "gif", "image/jpeg", "fake.gif"],
+        ["SVG", "svg", "image/png", "fake.svg"],
+        ["TIFF", "tiff", "image/webp", "fake.tiff"],
+    ] as const)(
+        "rejects a %s file when the declared MIME type is allowed",
+        async (_label, actualFormat, declaredType, name) => {
+            const storage = createLeaveAttachmentStorage(storageRoot);
+            const source =
+                actualFormat === "svg"
+                    ? Buffer.from(
+                          '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="24"><rect width="32" height="24" fill="blue"/></svg>',
+                          "utf8",
+                      )
+                    : await createImage(actualFormat);
+
+            await expect(
+                storage.save({
+                    leaveRequestId: "leave-request-1",
+                    files: [createFile(name, declaredType, source)],
+                }),
+            ).rejects.toThrow(`ไฟล์ "${name}" ต้องเป็น JPG, PNG หรือ WEBP`);
+        },
+    );
 
     it("rejects a file larger than the per-file limit", async () => {
         const storage = createLeaveAttachmentStorage(storageRoot);

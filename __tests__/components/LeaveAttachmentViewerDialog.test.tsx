@@ -28,6 +28,18 @@ const attachments: LeaveAttachmentSummary[] = [
     },
 ];
 
+const threeAttachments: LeaveAttachmentSummary[] = [
+    ...attachments,
+    {
+        id: "attachment-3",
+        contentType: "image/webp",
+        sizeBytes: 23_456,
+        width: 1200,
+        height: 1200,
+        viewUrl: "/api/leave/attachments/attachment-3",
+    },
+];
+
 describe("LeaveAttachmentViewerDialog", () => {
     beforeEach(() => {
         vi.clearAllMocks();
@@ -103,6 +115,34 @@ describe("LeaveAttachmentViewerDialog", () => {
         expect(
             screen.getByAltText("หลักฐานประกอบคำขอลา รูปที่ 2 จาก 2"),
         ).toBeInTheDocument();
+    });
+
+    it("loads the active image and prefetches only the next image", async () => {
+        render(
+            <LeaveAttachmentViewerDialog
+                open
+                attachments={threeAttachments}
+                onOpenChange={vi.fn()}
+            />,
+        );
+
+        await screen.findByAltText("หลักฐานประกอบคำขอลา รูปที่ 1 จาก 3");
+        await waitFor(() =>
+            expect(fetchLeaveAttachmentImage).toHaveBeenCalledTimes(2),
+        );
+        expect(
+            vi.mocked(fetchLeaveAttachmentImage).mock.calls.map(([id]) => id),
+        ).toEqual(["attachment-1", "attachment-2"]);
+
+        fireEvent.click(screen.getByRole("button", { name: "ดูรูปถัดไป" }));
+        await screen.findByAltText("หลักฐานประกอบคำขอลา รูปที่ 2 จาก 3");
+        await waitFor(() =>
+            expect(fetchLeaveAttachmentImage).toHaveBeenCalledTimes(3),
+        );
+        expect(fetchLeaveAttachmentImage).toHaveBeenLastCalledWith(
+            "attachment-3",
+            expect.any(AbortSignal),
+        );
     });
 
     it("shows a general error when the private image cannot be opened", async () => {

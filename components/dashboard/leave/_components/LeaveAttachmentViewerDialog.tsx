@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
     ChevronLeft,
     ChevronRight,
@@ -42,6 +42,10 @@ export function LeaveAttachmentViewerDialog({
 }: LeaveAttachmentViewerDialogProps): React.JSX.Element | null {
     const [activeIndex, setActiveIndex] = useState(0);
     const [imageStates, setImageStates] = useState<Record<string, PrivateImageState>>({});
+    const imageStatesRef = useRef<Record<string, PrivateImageState>>({});
+    const pendingLoadsRef = useRef<Set<string>>(new Set());
+    const objectUrlsRef = useRef<Set<string>>(new Set());
+    const loadControllerRef = useRef<AbortController | null>(null);
     const attachmentCount = attachments.length;
     const safeActiveIndex = Math.min(activeIndex, Math.max(attachmentCount - 1, 0));
     const activeAttachment = attachments[safeActiveIndex];
@@ -61,10 +65,55 @@ export function LeaveAttachmentViewerDialog({
         }
 
         const controller = new AbortController();
-        const createdObjectUrls: string[] = [];
+        const pendingLoads = pendingLoadsRef.current;
+        const objectUrls = objectUrlsRef.current;
+        loadControllerRef.current = controller;
+        pendingLoads.clear();
+        imageStatesRef.current = {};
+        setImageStates({});
 
-        for (const attachment of attachments) {
-            async function loadPrivateImage(): Promise<void> {
+        return () => {
+            controller.abort();
+            if (loadControllerRef.current === controller) {
+                loadControllerRef.current = null;
+            }
+            pendingLoads.clear();
+            for (const objectUrl of objectUrls) {
+                URL.revokeObjectURL(objectUrl);
+            }
+            objectUrls.clear();
+            imageStatesRef.current = {};
+        };
+    }, [attachments, open]);
+
+    useEffect(() => {
+        const controller = loadControllerRef.current;
+        if (!open || !controller || attachmentCount === 0) {
+            return;
+        }
+
+        const indexesToLoad = new Set([safeActiveIndex]);
+        if (attachmentCount > 1) {
+            indexesToLoad.add((safeActiveIndex + 1) % attachmentCount);
+        }
+
+        for (const index of indexesToLoad) {
+            const attachment = attachments[index];
+            if (!attachment) {
+                continue;
+            }
+
+            const requestKey = `${attachment.id}:${attachment.viewUrl}`;
+            const currentState = imageStatesRef.current[attachment.id];
+            if (
+                currentState?.viewUrl === attachment.viewUrl ||
+                pendingLoadsRef.current.has(requestKey)
+            ) {
+                continue;
+            }
+
+            pendingLoadsRef.current.add(requestKey);
+            void (async (): Promise<void> => {
                 try {
                     const blob = await fetchLeaveAttachmentImage(
                         attachment.id,
@@ -75,39 +124,43 @@ export function LeaveAttachmentViewerDialog({
                     }
 
                     const objectUrl = URL.createObjectURL(blob);
-                    createdObjectUrls.push(objectUrl);
+                    objectUrlsRef.current.add(objectUrl);
+                    const nextState: PrivateImageState = {
+                        viewUrl: attachment.viewUrl,
+                        status: "loaded",
+                        objectUrl,
+                    };
+                    imageStatesRef.current = {
+                        ...imageStatesRef.current,
+                        [attachment.id]: nextState,
+                    };
                     setImageStates((current) => ({
                         ...current,
-                        [attachment.id]: {
-                            viewUrl: attachment.viewUrl,
-                            status: "loaded",
-                            objectUrl,
-                        },
+                        [attachment.id]: nextState,
                     }));
                 } catch {
                     if (controller.signal.aborted) {
                         return;
                     }
+
+                    const nextState: PrivateImageState = {
+                        viewUrl: attachment.viewUrl,
+                        status: "error",
+                    };
+                    imageStatesRef.current = {
+                        ...imageStatesRef.current,
+                        [attachment.id]: nextState,
+                    };
                     setImageStates((current) => ({
                         ...current,
-                        [attachment.id]: {
-                            viewUrl: attachment.viewUrl,
-                            status: "error",
-                        },
+                        [attachment.id]: nextState,
                     }));
+                } finally {
+                    pendingLoadsRef.current.delete(requestKey);
                 }
-            }
-
-            void loadPrivateImage();
+            })();
         }
-
-        return () => {
-            controller.abort();
-            for (const objectUrl of createdObjectUrls) {
-                URL.revokeObjectURL(objectUrl);
-            }
-        };
-    }, [attachments, open]);
+    }, [attachmentCount, attachments, open, safeActiveIndex]);
 
     useEffect(() => {
         if (!open || attachmentCount <= 1) {
@@ -143,7 +196,9 @@ export function LeaveAttachmentViewerDialog({
 
     function handleOpenChange(nextOpen: boolean): void {
         if (!nextOpen) {
+            loadControllerRef.current?.abort();
             setActiveIndex(0);
+            imageStatesRef.current = {};
             setImageStates({});
         }
         onOpenChange(nextOpen);

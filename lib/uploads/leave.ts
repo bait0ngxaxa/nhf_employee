@@ -4,6 +4,7 @@ import path from "node:path";
 import sharp from "sharp";
 
 import {
+    LEAVE_ATTACHMENT_ACCEPTED_FORMATS,
     LEAVE_ATTACHMENT_MAX_HEIGHT,
     LEAVE_ATTACHMENT_MAX_INPUT_PIXELS,
     LEAVE_ATTACHMENT_MAX_WIDTH,
@@ -17,6 +18,9 @@ import {
 const DEFAULT_PRIVATE_UPLOAD_ROOT = path.join(process.cwd(), ".uploads", "private");
 const SAFE_LEAVE_REQUEST_ID = /^[A-Za-z0-9_-]{1,64}$/;
 const SAFE_STORAGE_KEY = /^leave\/[A-Za-z0-9_-]{1,64}\/[a-f0-9]{32}\.webp$/;
+const ALLOWED_INPUT_FORMATS: ReadonlySet<string> = new Set(
+    LEAVE_ATTACHMENT_ACCEPTED_FORMATS,
+);
 
 export {
     LeaveAttachmentValidationError,
@@ -80,6 +84,12 @@ async function transformFile(file: LeaveAttachmentSource): Promise<{
             sequentialRead: true,
         });
         const metadata = await metadataImage.metadata();
+
+        if (!metadata.format || !ALLOWED_INPUT_FORMATS.has(metadata.format)) {
+            throw new LeaveAttachmentValidationError(
+                `ไฟล์ "${file.name}" ต้องเป็น JPG, PNG หรือ WEBP`,
+            );
+        }
 
         if (
             !metadata.width ||

@@ -1,5 +1,10 @@
 import type { Prisma } from "@prisma/client";
 
+import {
+    leaveAttachmentSummaryOrderBy,
+    leaveAttachmentSummarySelect,
+} from "@/lib/services/leave/attachment-summary";
+
 export const EMPLOYEE_INCLUDE = {
     user: { select: { id: true } },
     manager: {
@@ -18,13 +23,8 @@ export const EMPLOYEE_INCLUDE = {
 
 export const LEAVE_REQUEST_INCLUDE = {
     attachments: {
-        select: {
-            id: true,
-            contentType: true,
-            sizeBytes: true,
-            width: true,
-            height: true,
-        },
+        select: leaveAttachmentSummarySelect,
+        orderBy: leaveAttachmentSummaryOrderBy,
     },
 } as const satisfies Prisma.LeaveRequestInclude;
 
@@ -41,25 +41,3 @@ export type EligibleEmployee = EmployeeWithManager & {
 export type CreatedLeaveRequest = Prisma.LeaveRequestGetPayload<{
     include: typeof LEAVE_REQUEST_INCLUDE;
 }>;
-
-type CreatedLeaveAttachment = CreatedLeaveRequest["attachments"][number];
-
-export interface LeaveAttachmentSummary {
-    id: string;
-    contentType: string;
-    sizeBytes: number;
-    width: number | null;
-    height: number | null;
-}
-
-export function toLeaveAttachmentSummary(
-    attachment: CreatedLeaveAttachment,
-): LeaveAttachmentSummary {
-    return {
-        id: attachment.id,
-        contentType: attachment.contentType,
-        sizeBytes: attachment.sizeBytes,
-        width: attachment.width,
-        height: attachment.height,
-    };
-}

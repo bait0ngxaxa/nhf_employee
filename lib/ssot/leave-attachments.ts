@@ -20,6 +20,12 @@ export const LEAVE_ATTACHMENT_ACCEPTED_TYPES = [
     "image/webp",
 ] as const;
 
+export const LEAVE_ATTACHMENT_ACCEPTED_FORMATS = [
+    "jpeg",
+    "png",
+    "webp",
+] as const;
+
 export const LEAVE_ATTACHMENT_MAX_WIDTH = 2400;
 
 export const LEAVE_ATTACHMENT_MAX_HEIGHT = 2400;

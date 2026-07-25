@@ -645,6 +645,7 @@ describe("POST /api/leave/request", () => {
             sizeBytes: 512,
             width: 32,
             height: 24,
+            viewUrl: "/api/leave/attachments/attachment-1",
         };
 
         function createMultipartRequest(files: readonly File[] = []): NextRequest {
@@ -794,6 +795,7 @@ describe("POST /api/leave/request", () => {
                 ...attachmentSummary,
                 id: "attachment-2",
                 sizeBytes: 768,
+                viewUrl: "/api/leave/attachments/attachment-2",
             };
             arrangeSuccessfulCreation([attachmentSummary, secondSummary]);
             uploadMocks.save.mockResolvedValue([
