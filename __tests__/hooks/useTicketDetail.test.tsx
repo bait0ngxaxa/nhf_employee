@@ -1,5 +1,6 @@
 import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import useSWR from "swr";
 
 import { useTicketDetail } from "@/hooks/useTicketDetail";
 import { apiPost } from "@/lib/client/api-client";
@@ -24,12 +25,12 @@ vi.mock("@/components/auth/HybridAuthProvider", () => ({
 }));
 
 vi.mock("swr", () => ({
-    default: () => ({
+    default: vi.fn(() => ({
         data: { ticket: hookMocks.ticket },
         error: undefined,
         mutate: vi.fn(),
         isLoading: false,
-    }),
+    })),
 }));
 
 vi.mock("@/lib/client/api-client", () => ({
@@ -47,6 +48,7 @@ describe("useTicketDetail comment permissions", () => {
     it("does not allow a non-admin assignee who is not the owner", () => {
         const { result } = renderHook(() => useTicketDetail(55));
 
+        expect(useSWR).toHaveBeenCalledWith("/api/tickets/55");
         expect(result.current.isOwner).toBe(false);
         expect(result.current.canComment).toBe(false);
     });

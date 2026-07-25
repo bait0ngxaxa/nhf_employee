@@ -22,7 +22,7 @@ export const TicketTabs = memo(function TicketTabs() {
     const {
         activeTab,
         setActiveTab,
-        selectedTicket,
+        selectedTicketId,
         setShowCreateModal,
         handleTicketSelect,
         handleBackToList,
@@ -46,7 +46,7 @@ export const TicketTabs = memo(function TicketTabs() {
                         <List className="h-4 w-4 shrink-0" />
                         <span>รายการ Tickets</span>
                     </TabsTrigger>
-                    {selectedTicket && (
+                    {selectedTicketId !== null && (
                         <TabsTrigger
                             value="detail"
                             className="flex-1 flex items-center justify-center gap-2 rounded-full px-6 py-2.5 data-[state=active]:bg-white data-[state=active]:text-indigo-600 data-[state=active]:shadow-sm data-[state=active]:ring-1 data-[state=active]:ring-indigo-100 transition-[color,background-color,box-shadow] text-gray-600 hover:text-gray-900 font-medium whitespace-nowrap"
@@ -92,11 +92,11 @@ export const TicketTabs = memo(function TicketTabs() {
                 </Card>
             </TabsContent>
 
-            {selectedTicket && (
+            {selectedTicketId !== null && (
                 <TabsContent value="detail" className="mt-0 focus-visible:outline-none">
                     <div className="bg-gradient-to-br from-white/95 via-slate-50/95 to-indigo-50/85 rounded-2xl shadow-[0_24px_64px_-40px_rgba(30,41,59,0.52)] ring-1 ring-indigo-100/80 p-1">
                         <TicketDetail
-                            ticketId={selectedTicket?.id ?? 0}
+                            ticketId={selectedTicketId}
                             onBack={handleBackToList}
                             onTicketUpdated={handleTicketUpdated}
                         />

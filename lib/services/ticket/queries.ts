@@ -13,6 +13,7 @@ import type {
     PaginatedTicketsResult,
     TicketWithRelations,
     TicketListItem,
+    TicketStatsResult,
 } from "./types";
 
 /**
@@ -93,6 +94,73 @@ export const getTickets = cache(
         };
     },
 );
+
+/**
+ * Get aggregate statistics across the full ticket access scope.
+ */
+export async function getTicketStats(
+    user: UserContext,
+): Promise<TicketStatsResult> {
+    const accessWhere: Prisma.TicketWhereInput = {
+        deletedAt: null,
+        ...(!isAdminRole(user.role) ? { reportedById: user.id } : {}),
+    };
+    const newTicketThreshold = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const userTicketWhere: Prisma.TicketWhereInput = {
+        deletedAt: null,
+        ...(isAdminRole(user.role)
+            ? { assignedToId: user.id }
+            : { reportedById: user.id }),
+    };
+
+    const [
+        total,
+        statusGroups,
+        priorityGroups,
+        userTickets,
+        newTickets,
+    ] = await Promise.all([
+        prisma.ticket.count({ where: accessWhere }),
+        prisma.ticket.groupBy({
+            by: ["status"],
+            where: accessWhere,
+            _count: { _all: true },
+        }),
+        prisma.ticket.groupBy({
+            by: ["priority"],
+            where: accessWhere,
+            _count: { _all: true },
+        }),
+        prisma.ticket.count({ where: userTicketWhere }),
+        prisma.ticket.count({
+            where: {
+                ...accessWhere,
+                createdAt: { gte: newTicketThreshold },
+                views: { none: { userId: user.id } },
+            },
+        }),
+    ]);
+
+    const statusCounts = new Map(
+        statusGroups.map((group) => [group.status, group._count._all]),
+    );
+    const priorityCounts = new Map(
+        priorityGroups.map((group) => [group.priority, group._count._all]),
+    );
+
+    return {
+        total,
+        open: statusCounts.get("OPEN") ?? 0,
+        inProgress: statusCounts.get("IN_PROGRESS") ?? 0,
+        resolved: statusCounts.get("RESOLVED") ?? 0,
+        closed: statusCounts.get("CLOSED") ?? 0,
+        cancelled: statusCounts.get("CANCELLED") ?? 0,
+        highPriority: priorityCounts.get("HIGH") ?? 0,
+        urgentPriority: priorityCounts.get("URGENT") ?? 0,
+        userTickets,
+        newTickets,
+    };
+}
 
 /**
  * Get single ticket by ID with full details

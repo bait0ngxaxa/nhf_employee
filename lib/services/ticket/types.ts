@@ -122,6 +122,20 @@ export interface PaginatedTicketsResult {
     };
 }
 
+/** Aggregate ticket statistics within the current user's access scope */
+export interface TicketStatsResult {
+    total: number;
+    open: number;
+    inProgress: number;
+    resolved: number;
+    closed: number;
+    cancelled: number;
+    highPriority: number;
+    urgentPriority: number;
+    userTickets: number;
+    newTickets: number;
+}
+
 // ==================== Service Result Types ====================
 
 /** Generic service result wrapper */

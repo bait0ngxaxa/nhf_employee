@@ -17,18 +17,6 @@ interface ITSupportProviderProps {
     children: ReactNode;
 }
 
-const checkIsNewTicket = (
-    createdAt: string,
-    views: { viewedAt: string }[] = [],
-) => {
-    const now = new Date();
-    const ticketDate = new Date(createdAt);
-    const hoursDiff = (now.getTime() - ticketDate.getTime()) / (1000 * 60 * 60);
-    const isRecent = hoursDiff <= 24;
-    const hasBeenViewed = views.length > 0;
-    return isRecent && !hasBeenViewed;
-};
-
 const defaultStats: TicketStats = {
     total: 0,
     open: 0,
@@ -50,15 +38,19 @@ export function ITSupportProvider({ children }: ITSupportProviderProps) {
     const searchParams = useSearchParams();
     const searchParamsString = searchParams.toString();
     const [activeTab, setActiveTab] = useState("tickets");
-    const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
+    const [selectedTicketId, setSelectedTicketId] = useState<number | null>(null);
     const [refreshTrigger, setRefreshTrigger] = useState(0);
     const [showCreateModal, setShowCreateModal] = useState(false);
     const shouldIgnoreUrlTicketSyncRef = useRef(false);
 
     const isAdmin = isAdminRole(session?.user?.role);
 
-    const { data, mutate, isLoading } = useSWR<{ tickets: Ticket[] }>(
-        session ? `${API_ROUTES.tickets.list}?limit=100` : null,
+    const {
+        data: statsData,
+        mutate: mutateStats,
+        isLoading: statsLoading,
+    } = useSWR<{ stats: TicketStats }>(
+        session ? API_ROUTES.tickets.stats : null,
     );
 
     const syncTicketIdToUrl = useCallback(
@@ -107,80 +99,44 @@ export function ITSupportProvider({ children }: ITSupportProviderProps) {
             return;
         }
 
-        const ticketFromList = data?.tickets?.find((ticket) => ticket.id === ticketId);
-        if (!ticketFromList) {
-            return;
-        }
-
-        if (selectedTicket?.id !== ticketId) {
-            setSelectedTicket(ticketFromList);
+        if (selectedTicketId !== ticketId) {
+            setSelectedTicketId(ticketId);
         }
         if (activeTab !== "detail") {
             setActiveTab("detail");
         }
-    }, [activeTab, data?.tickets, searchParamsString, selectedTicket?.id]);
+    }, [activeTab, searchParamsString, selectedTicketId]);
 
-    const ticketStats = useMemo<TicketStats>(() => {
-        if (!data?.tickets) return defaultStats;
-
-        const tickets = data.tickets;
-
-        return {
-            total: tickets.length,
-            open: tickets.filter((t) => t.status === "OPEN").length,
-            inProgress: tickets.filter((t) => t.status === "IN_PROGRESS")
-                .length,
-            resolved: tickets.filter((t) => t.status === "RESOLVED").length,
-            closed: tickets.filter((t) => t.status === "CLOSED").length,
-            cancelled: tickets.filter((t) => t.status === "CANCELLED").length,
-            highPriority: tickets.filter((t) => t.priority === "HIGH").length,
-            urgentPriority: tickets.filter((t) => t.priority === "URGENT")
-                .length,
-            newTickets: tickets.filter((t) =>
-                checkIsNewTicket(t.createdAt, t.views),
-            ).length,
-            userTickets: isAdmin
-                ? tickets.filter(
-                      (t) =>
-                          t.assignedTo?.id ===
-                          parseInt(user?.id || "0", 10),
-                  ).length
-                : tickets.filter(
-                      (t) =>
-                          t.reportedBy.id ===
-                          parseInt(user?.id || "0", 10),
-                  ).length,
-        };
-    }, [data, isAdmin, user?.id]);
+    const ticketStats = statsData?.stats ?? defaultStats;
 
     const handleTicketCreated = useCallback(() => {
-        mutate();
+        void mutateStats();
         setRefreshTrigger((prev) => prev + 1);
         setShowCreateModal(false);
         setActiveTab("tickets");
-        setSelectedTicket(null);
+        setSelectedTicketId(null);
         syncTicketIdToUrl(null);
-    }, [mutate, syncTicketIdToUrl]);
+    }, [mutateStats, syncTicketIdToUrl]);
 
     const handleTicketSelect = useCallback((ticket: Ticket) => {
         shouldIgnoreUrlTicketSyncRef.current = false;
-        setSelectedTicket(ticket);
+        setSelectedTicketId(ticket.id);
         setActiveTab("detail");
         syncTicketIdToUrl(ticket.id);
     }, [syncTicketIdToUrl]);
 
     const handleTicketUpdated = useCallback(() => {
         shouldIgnoreUrlTicketSyncRef.current = true;
-        mutate();
+        void mutateStats();
         setRefreshTrigger((prev) => prev + 1);
-        setSelectedTicket(null);
+        setSelectedTicketId(null);
         setActiveTab("tickets");
         syncTicketIdToUrl(null);
-    }, [mutate, syncTicketIdToUrl]);
+    }, [mutateStats, syncTicketIdToUrl]);
 
     const handleBackToList = useCallback(() => {
         shouldIgnoreUrlTicketSyncRef.current = true;
-        setSelectedTicket(null);
+        setSelectedTicketId(null);
         setActiveTab("tickets");
         syncTicketIdToUrl(null);
     }, [syncTicketIdToUrl]);
@@ -190,7 +146,7 @@ export function ITSupportProvider({ children }: ITSupportProviderProps) {
             session,
             isAdmin,
             ticketStats,
-            statsLoading: isLoading,
+            statsLoading,
             refreshTrigger,
             handleTicketCreated,
             handleTicketUpdated,
@@ -199,7 +155,7 @@ export function ITSupportProvider({ children }: ITSupportProviderProps) {
             session,
             isAdmin,
             ticketStats,
-            isLoading,
+            statsLoading,
             refreshTrigger,
             handleTicketCreated,
             handleTicketUpdated,
@@ -210,7 +166,7 @@ export function ITSupportProvider({ children }: ITSupportProviderProps) {
         () => ({
             activeTab,
             setActiveTab,
-            selectedTicket,
+            selectedTicketId,
             showCreateModal,
             setShowCreateModal,
             handleTicketSelect,
@@ -219,7 +175,7 @@ export function ITSupportProvider({ children }: ITSupportProviderProps) {
         [
             activeTab,
             setActiveTab,
-            selectedTicket,
+            selectedTicketId,
             showCreateModal,
             setShowCreateModal,
             handleTicketSelect,

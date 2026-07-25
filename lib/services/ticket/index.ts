@@ -7,6 +7,7 @@ export type {
     TicketWithRelations,
     TicketListItem,
     PaginatedTicketsResult,
+    TicketStatsResult,
     PermissionCheck,
     ServiceResult,
 } from "./types";
@@ -14,6 +15,7 @@ export type {
 // Import service functions
 import {
     getTickets,
+    getTicketStats,
     getTicketById,
     recordTicketView,
     ticketExists,
@@ -33,6 +35,7 @@ import { createTicketComment } from "./comments";
 export const ticketService = {
     // Query operations
     getTickets,
+    getTicketStats,
     getTicketById,
     recordTicketView,
     ticketExists,
@@ -49,6 +52,7 @@ export const ticketService = {
 export {
     // Queries
     getTickets,
+    getTicketStats,
     getTicketById,
     recordTicketView,
     ticketExists,

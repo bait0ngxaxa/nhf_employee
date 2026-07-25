@@ -20,7 +20,7 @@ export interface ITSupportUIContextValue {
     // Tabs & Navigation State
     activeTab: string;
     setActiveTab: (tab: string) => void;
-    selectedTicket: Ticket | null;
+    selectedTicketId: number | null;
 
     // Modal State
     showCreateModal: boolean;

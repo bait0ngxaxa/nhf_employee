@@ -1,4 +1,5 @@
 import { type TicketCategoryValue, type TicketPriorityValue, type TicketStatusValue } from '@/constants/tickets';
+import type { TicketStatsResult } from "@/lib/services/ticket/types";
 
 export type { TicketCategoryValue, TicketPriorityValue, TicketStatusValue };
 
@@ -66,18 +67,7 @@ export interface Comment {
   };
 }
 
-export interface TicketStats {
-  total: number;
-  open: number;
-  inProgress: number;
-  resolved: number;
-  closed: number;
-  cancelled: number;
-  highPriority: number;
-  urgentPriority: number;
-  userTickets?: number;
-  newTickets?: number;
-}
+export type TicketStats = TicketStatsResult;
 
 export interface CreateTicketFormProps {
   isOpen: boolean;

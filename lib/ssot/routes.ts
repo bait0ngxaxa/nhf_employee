@@ -48,6 +48,7 @@ export const API_ROUTES = {
     },
     tickets: {
         list: "/api/tickets",
+        stats: "/api/tickets/stats",
         byId: (id: number | string): string => `/api/tickets/${id}`,
     },
     notifications: {
