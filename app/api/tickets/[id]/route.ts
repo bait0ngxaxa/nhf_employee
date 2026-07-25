@@ -58,7 +58,13 @@ export async function GET(
             return jsonError(result.error, result.status || 500);
         }
 
-        await ticketService.recordTicketView(ticketId, auth.user.id);
+        after(async () => {
+            try {
+                await ticketService.recordTicketView(ticketId, auth.user.id);
+            } catch (error) {
+                console.error("Failed to record ticket view:", error);
+            }
+        });
         return NextResponse.json({ ticket: result.ticket }, { status: 200 });
     } catch (error) {
         console.error("Error fetching ticket:", error);

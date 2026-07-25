@@ -3,6 +3,7 @@ import { NextRequest } from "next/server";
 import type * as NextServerModule from "next/server";
 import {
     DELETE as deleteTicketRoute,
+    GET as getTicketRoute,
     PATCH as patchTicketRoute,
 } from "@/app/api/tickets/[id]/route";
 import { POST as postTicketCommentRoute } from "@/app/api/tickets/[id]/comments/route";
@@ -40,6 +41,8 @@ vi.mock("@/lib/auth/context", () => ({
 vi.mock("@/lib/services/ticket", () => ({
     ticketService: {
         deleteTicket: vi.fn(),
+        getTicketById: vi.fn(),
+        recordTicketView: vi.fn(),
         updateTicket: vi.fn(),
         createTicketComment: vi.fn(),
     },
@@ -105,6 +108,48 @@ describe("Ticket notification routes", () => {
             "ticket-update",
             1,
         );
+    });
+
+    it("returns ticket detail when best-effort view tracking fails", async () => {
+        vi.mocked(getApiAuthSession).mockResolvedValue({
+            user: { id: "7", role: "USER", email: "user@test.com" },
+        } as never);
+        vi.mocked(buildUserContext).mockReturnValue({
+            id: 7,
+            role: "USER",
+            email: "user@test.com",
+            name: "User",
+        });
+        vi.mocked(ticketService.getTicketById).mockResolvedValue({
+            ticket: {
+                id: 44,
+                title: "Printer broken",
+                reportedById: 7,
+            },
+        } as never);
+        vi.mocked(ticketService.recordTicketView).mockRejectedValue(
+            new Error("Tracking database unavailable"),
+        );
+        const consoleError = vi
+            .spyOn(console, "error")
+            .mockImplementation(() => undefined);
+
+        const response = await getTicketRoute(
+            new NextRequest("http://localhost/api/tickets/44"),
+            { params: Promise.resolve({ id: "44" }) },
+        );
+
+        expect(response.status).toBe(200);
+        expect(await response.json()).toEqual({
+            ticket: expect.objectContaining({ id: 44 }),
+        });
+        await Promise.all(afterResults);
+        expect(ticketService.recordTicketView).toHaveBeenCalledWith(44, 7);
+        expect(consoleError).toHaveBeenCalledWith(
+            "Failed to record ticket view:",
+            expect.any(Error),
+        );
+        consoleError.mockRestore();
     });
 
     it("returns 409 and skips outbox processing on concurrent update", async () => {
