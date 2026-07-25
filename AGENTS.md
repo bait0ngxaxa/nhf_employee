@@ -1,49 +1,137 @@
-# AI Coding Agent Rules Summary (AGENTS.md)
+# AGENTS.md
 
-## !!!ให้ความสำคัญกับ encoding ภาษาไทย ห้ามทำเพี้ยน ห้ามแก้ไข ห้ามให้เกิด mojibake เด็ดขาด!!!
-- **เมื่อใช้ script powershell ระบุ -Encoding UTF8 เสมอ
-- **ห้ามเปลี่ยนเป็นภาษาอังกฤษโดยไม่ได้รับอนุญาต ให้คงภาษาไทยเดิมไว้
-- **อ้างอิง docs เสมอ context7 MCP หรือ fetch docs ofiicial
-- **รัน lint, typecheck, test ใหม่หรือ test suite เมื่อต้องการเช็ค regression พอ ไม่ต้องพยายาม build หรือรัน dev server
-- **ใช้ skills impeccable สำหรับงาน UI/UX design
- 
-## Use Graphify first, then verify with actual files before editing.
+## 1. Priorities and Scope
 
-# Coding Rules
+* ลำดับความสำคัญ: **Correctness > Security > Maintainability > Performance > Speed**
+* ทำการแก้ไขให้น้อยที่สุดเท่าที่จำเป็น และสอดคล้องกับ architecture เดิม
+* อ่านโค้ดที่เกี่ยวข้องก่อนแก้ไข ห้ามคาดเดา behavior จากชื่อไฟล์หรือชื่อฟังก์ชัน
+* ห้ามแก้ไฟล์นอก scope, rewrite โค้ดโดยไม่จำเป็น หรือ revert การเปลี่ยนแปลงเดิมของผู้ใช้
+* งานปรับ UI/style ต้องไม่เปลี่ยน business logic เว้นแต่ได้รับคำสั่งโดยตรง
 
-## 1. Behavior & Code Quality
+## 2. Thai Text and Encoding
 
-- **Priority:** Correctness > Security > Performance > Maintainability > Speed
-- **Strict Rules:** Generate complete code (no `//...` placeholders), prioritize reuse over rewriting, treat logic as read-only during style changes.
-- **Principles:** SRP, DRY, KISS, Early returns, prefer Immutability and Pure functions.
+* **ห้ามทำข้อความภาษาไทยเพี้ยน สูญหาย ถูกแปล หรือเกิด mojibake เด็ดขาด**
+* รักษา encoding, BOM และ line endings เดิมของไฟล์
+* ไฟล์ข้อความใหม่ให้ใช้ **UTF-8 without BOM** เว้นแต่ repository กำหนดไว้ต่างออกไป
+* เมื่อใช้ PowerShell ต้องระบุ encoding ทุกครั้งที่อ่านหรือเขียน เช่น:
 
-## 2. Type Safety & Security
+```powershell
+Get-Content -Raw -Encoding UTF8
+Set-Content -Encoding utf8NoBOM
+```
 
-- **Type Safety:** ZERO `any` (use `unknown` + type guards). Always define return types.
-- **Security (OWASP):** NO hardcoded secrets. Prevent injection via parameterized queries ONLY.
-- **Validation & Errors:** Validate ALL inputs at the boundary using schemas. NEVER expose stack traces or internal errors to clients.
+* ห้ามเขียนทับไฟล์ภาษาไทยผ่านคำสั่งที่ใช้ default encoding
+* ตรวจ `git diff` หลังแก้ไขเพื่อค้นหาอักขระเพี้ยน เช่น `�`, ข้อความไทยผิดรูป หรือการเปลี่ยน encoding ทั้งไฟล์
+* ห้ามเปลี่ยนข้อความภาษาไทยเป็นภาษาอังกฤษโดยไม่ได้รับอนุญาต
 
-## 3. Architecture & SSOT
+## 3. Documentation and Repository Context
 
-- **SSOT (Single Source of Truth):** Types, constants, validation, and business logic must have exactly one authoritative source.
-- **Dependency Flow:** `UI → Hooks → Services → Data Layer` (never reverse).
-- **Server Mutation Order:** 1. Rate Limit 2. Input Validate 3. Auth Check 4. Access Control 5. Business Logic 6. Cache Revalidate 7. Return Result
+* ตรวจ project instructions, types, tests, schemas และ implementation เดิมก่อนสร้างของใหม่
+* ใช้ implementation และ conventions ภายใน repository เป็นแหล่งอ้างอิงแรก
+* เมื่อต้องใช้ API หรือ behavior จาก library ภายนอก ให้ตรวจเอกสารล่าสุดผ่าน **Context7 MCP** หรือ official documentation
+* ห้ามเดา API, configuration option, framework behavior หรือ package version
+* หากเอกสารไม่ชัดเจน ให้ระบุ assumption และเลือกแนวทางที่มีผลกระทบน้อยที่สุด
+* งาน UI/UX ต้องใช้ **Impeccable skill** และปฏิบัติตาม design system เดิมของโปรเจกต์
 
-## 4. API & Database
+## 4. Code Quality and Type Safety
 
-- **API:** Versioned endpoints, cursor-based pagination for large datasets, idempotent mutations.
-- **Database:** No `SELECT *`. Use transactions for multi-step ops. Production schema changes via migrations ONLY.
+* ส่งมอบ implementation ที่สมบูรณ์ ห้ามใช้ placeholder เช่น `// ...`, pseudo-code หรือฟังก์ชันว่าง
+* เน้น reuse ก่อนสร้าง abstraction หรือ implementation ใหม่
+* ใช้หลัก SRP, DRY, KISS, early return และ pure functions เมื่อเหมาะสม
+* หลีกเลี่ยง mutation โดยไม่จำเป็น
+* First-party code ที่แก้ไขใหม่ต้องไม่มี `any`
+* ใช้ `unknown` ร่วมกับ schema validation หรือ type guard
+* กำหนด return type ให้ฟังก์ชันที่ export, service, hook, action และ API handler
+* จัดการ `null` และ `undefined` อย่างชัดเจน ห้ามใช้ non-null assertion โดยไม่มีหลักฐานรองรับ
+* ห้ามเปลี่ยน generated code หรือ vendor code เพื่อหลบ type error
 
-## 5. Performance, Algorithms & Testing
+## 5. Validation, Security and Errors
 
-- **Big O Notation:** Avoid time complexities worse than $O(n \log n)$ (e.g., nested loops $O(n^2)$). Prefer Hash Maps/Sets for $O(1)$ lookups over Array traversals $O(n)$ to optimize Time/Space complexity.
-- **Performance:** Parallel fetching (`Promise.all`), dynamic imports, multi-layer caching (CDN, App, DB).
-- **Testing:** Test behavior, not implementation. Cover Unit (business logic), Integration (critical paths), and E2E (happy + error paths).
+* Validate input ทุกจุดที่ข้อมูลเข้าสู่ระบบ เช่น API, server action, form, webhook และ environment variables
+* ใช้ schema เป็น Single Source of Truth และ derive types จาก schema เมื่อทำได้
+* ตรวจ authentication และ authorization ฝั่ง server ทุก mutation
+* ห้ามเชื่อ role, owner ID หรือ permission ที่ส่งมาจาก client
+* ห้าม hardcode secrets, credentials, tokens หรือ sensitive configuration
+* ห้ามส่ง stack trace, SQL error, internal path หรือ implementation detail กลับไปยัง client
+* Client-facing errors ต้องปลอดภัยและเข้าใจได้ ส่วนรายละเอียดทางเทคนิคให้บันทึกใน server logs
 
-## 6. Defensive Coding & Git
+ลำดับมาตรฐานสำหรับ server mutation:
 
-- **Defensive:** Handle `null/undefined` explicitly, re-verify roles server-side on every mutation, use exponential backoff for retries.
+1. Request size / abuse protection / rate limit
+2. Authentication
+3. Input parsing and schema validation
+4. Resource-level authorization
+5. Business rules
+6. Transactional persistence
+7. Cache invalidation or revalidation
+8. Sanitized response
 
+## 6. Architecture and Single Source of Truth
 
+* Types, constants, validation schemas และ business rules ต้องมี authoritative source เพียงจุดเดียว
+* Dependency direction:
 
+```text
+UI → Hooks → Services → Data Layer
+```
 
+* Layer ด้านล่างห้าม import จาก layer ด้านบน
+* UI ห้ามเข้าถึง database หรือ persistence implementation โดยตรง
+* Business logic ที่ใช้หลาย entry points ต้องอยู่ใน service/domain layer ไม่ duplicate ใน route หรือ component
+* หลีกเลี่ยง circular dependencies และ hidden side effects
+
+## 7. API and Database
+
+* Public API ที่ต้องรองรับระยะยาวควรใช้ versioned endpoints
+* Dataset ที่สามารถเติบโตมากให้ใช้ cursor-based pagination
+* Mutation ที่อาจถูก retry, duplicate submission หรือมีผลกระทบสำคัญต้องออกแบบ idempotency semantics ให้ชัดเจน
+* ห้ามประกอบ SQL จาก user input ด้วย string concatenation
+* ใช้ parameterized queries หรือ ORM query APIs เท่านั้น
+* Raw SQL ห้ามใช้ `SELECT *`; เลือกเฉพาะ field ที่ต้องใช้
+* ใช้ transaction เมื่อหลาย operation ต้องสำเร็จหรือล้มเหลวพร้อมกัน
+* Production schema changes ต้องผ่าน migration เท่านั้น
+* ตรวจ uniqueness, foreign keys และ concurrency constraints ที่ database layer เมื่อเป็น business invariant
+
+## 8. Performance and Reliability
+
+* หลีกเลี่ยง accidental `O(n²)`, N+1 queries และ repeated database/network calls
+* ใช้ `Map` หรือ `Set` เมื่อมี repeated lookup และข้อมูลมีขนาดที่เหมาะสม
+* ใช้ `Promise.all` เฉพาะ operation ที่เป็นอิสระต่อกันและรองรับ concurrent execution
+* ห้าม parallelize operation ที่มี dependency, transaction order หรือ shared mutable state
+* ใช้ caching เมื่อกำหนด owner, TTL, invalidation และ consistency behavior ได้ชัดเจน
+* ใช้ dynamic import เฉพาะ dependency ที่มีขนาดใหญ่ ไม่จำเป็นต่อ initial path และให้ประโยชน์ที่ตรวจสอบได้
+* Retry เฉพาะ transient failures และ operation ที่ปลอดภัยต่อการ retry
+* Retry ต้องมีจำนวนครั้งสูงสุด, exponential backoff และ jitter
+* อย่า optimize จากการคาดเดาในเส้นทางที่ไม่ใช่ hot path
+
+## 9. Testing and Verification
+
+ให้รันเฉพาะ checks ที่เกี่ยวข้องกับการเปลี่ยนแปลง:
+
+1. Lint
+2. Typecheck
+3. Targeted tests
+4. Test suite ที่กว้างขึ้นเมื่อความเสี่ยงต่อ regression สูง
+
+* ใช้ scripts ที่ repository กำหนดไว้เป็นหลัก
+* ไม่ต้อง build หรือรัน dev server เว้นแต่ผู้ใช้สั่ง, ต้อง reproduce ปัญหา หรือไม่มีวิธีตรวจสอบอื่น
+* Tests ต้องตรวจ behavior ไม่ผูกกับ implementation detail
+* Unit tests สำหรับ business rules และ pure logic
+* Integration tests สำหรับ database, authorization และ critical mutations
+* E2E tests สำหรับ critical user flows ทั้ง happy path และ error path
+* ห้ามแก้ test เพียงเพื่อให้ผ่านโดยไม่ตรวจว่า behavior ที่คาดหวังยังถูกต้อง
+* หากรันคำสั่งใดไม่ได้ ต้องระบุคำสั่ง สาเหตุ และสิ่งที่ยังไม่ได้ verify
+
+## 10. Git and Delivery
+
+* ตรวจ `git status` และ `git diff` ก่อนและหลังแก้ไข
+* ห้ามใช้ destructive Git commands, force push หรือ reset งานของผู้ใช้โดยไม่ได้รับอนุญาต
+* ห้ามเปลี่ยน lockfile, generated files หรือ format ทั้ง repository หากไม่จำเป็นต่อ task
+* รักษา diff ให้เล็ก อ่านง่าย และแยก concern ชัดเจน
+* ก่อนจบงานให้สรุป:
+
+  * ไฟล์ที่แก้ไข
+  * Behavior ที่เปลี่ยน
+  * Security หรือ architecture decisions ที่สำคัญ
+  * Commands และ tests ที่รันพร้อมผลลัพธ์
+  * ข้อจำกัด assumption หรือความเสี่ยงที่ยังเหลือ
