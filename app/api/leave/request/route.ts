@@ -9,6 +9,7 @@ import {
 } from "@/lib/services/leave/create-request";
 import {
     LeaveRequestInputError,
+    assertLeaveRequestBodySize,
     parseLeaveRequestInput,
 } from "@/lib/services/leave/request-input";
 import { toLeaveAttachmentSummary } from "@/lib/services/leave/create-request-prisma";
@@ -80,6 +81,14 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     );
     if (preAuthRateLimitResponse) {
         return preAuthRateLimitResponse;
+    }
+
+    // Reject oversized bodies before authentication; the parser repeats this
+    // guard so it remains safe when used by another entry point.
+    try {
+        assertLeaveRequestBodySize(request);
+    } catch (error) {
+        return createErrorResponse(error);
     }
 
     const auth = await requireActiveWorkforceSession();

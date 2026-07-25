@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 
 import { parseLeaveRequestInput } from "@/lib/services/leave/request-input";
 import type { LeaveRequestInputError } from "@/lib/services/leave/request-input";
+import { LEAVE_ATTACHMENT_MAX_REQUEST_BYTES } from "@/lib/ssot/leave-attachments";
 
 const VALID_PAYLOAD = {
     leaveType: "PERSONAL",
@@ -115,6 +116,35 @@ describe("parseLeaveRequestInput", () => {
         await expect(parseLeaveRequestInput(request)).rejects.toMatchObject({
             statusCode: 415,
             message: "Content-Type ไม่รองรับ",
+        });
+    });
+
+    it("rejects a declared multipart body above the request limit before buffering it", async () => {
+        const request = new Request("http://localhost/api/leave/request", {
+            method: "POST",
+            headers: {
+                "Content-Type": "multipart/form-data; boundary=test",
+                "Content-Length": String(LEAVE_ATTACHMENT_MAX_REQUEST_BYTES + 1),
+            },
+        });
+
+        await expect(parseLeaveRequestInput(request)).rejects.toMatchObject({
+            statusCode: 413,
+            message: "คำขอมีขนาดใหญ่เกินไป",
+        });
+    });
+
+    it("returns a safe validation error when multipart parsing fails", async () => {
+        const request = {
+            headers: new Headers({ "Content-Type": "multipart/form-data" }),
+            formData: async (): Promise<FormData> => {
+                throw new Error("multipart parser failed");
+            },
+        } as unknown as Request;
+
+        await expect(parseLeaveRequestInput(request)).rejects.toMatchObject({
+            statusCode: 400,
+            message: "Invalid input",
         });
     });
 });

@@ -6,6 +6,22 @@ interface RouteParams {
     params: Promise<{ path: string[] }>;
 }
 
+function isSafePublicUploadPath(segments: readonly string[]): boolean {
+    if (segments[0]?.toLowerCase() === "private") {
+        return false;
+    }
+
+    return segments.every(
+        (segment) =>
+            segment.length > 0
+            && segment !== "."
+            && segment !== ".."
+            && !segment.includes("/")
+            && !segment.includes("\\")
+            && !segment.includes("\0"),
+    );
+}
+
 function getContentType(filePath: string): string {
     const extension = path.extname(filePath).toLowerCase();
 
@@ -29,7 +45,11 @@ export async function GET(
     try {
         const { path: segments } = await params;
 
-        if (!segments || segments.length === 0) {
+        if (
+            !segments
+            || segments.length === 0
+            || !isSafePublicUploadPath(segments)
+        ) {
             return NextResponse.json({ error: "ไม่พบไฟล์" }, { status: 404 });
         }
 

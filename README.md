@@ -98,6 +98,7 @@ npm run dev
 | `AUTH_ACCESS_TOKEN_SECRET` | secret สำหรับเซ็น access token ต้องเป็นค่าสุ่มยาวอย่างน้อย 32 ตัวอักษร |
 | `AUTH_CLEANUP_SECRET` | secret ของ `POST /api/auth/cleanup` |
 | `AUDIT_LOG_CLEANUP_SECRET` | secret ของ `POST /api/audit-logs/cleanup` |
+| `LEAVE_ATTACHMENT_CLEANUP_SECRET` | secret ของ `POST /api/leave/attachments/cleanup` |
 | `NOTIFICATION_OUTBOX_CRON_SECRET` | secret ของ `POST /api/cron/notification-outbox` |
 | `PUBLIC_APPROVE_URL` | origin แบบ HTTPS ของระบบ เช่น `https://approve.example.com` ห้ามเป็น localhost ใน production |
 | `MYSQL_ROOT_PASSWORD` | รหัสผ่าน root ที่ใช้ตอนสร้าง MySQL container |
@@ -166,6 +167,15 @@ Webhook route ของแอปคือ `/api/line/webhook`
 - user ที่รัน Node.js ต้องมีสิทธิ์อ่าน/เขียน directory นี้
 - ต้องรวม `.uploads/` ในแผน backup
 - ถ้ารันหลาย app instances ต้องใช้ shared filesystem หรือเปลี่ยนไปใช้ object storage ก่อน scale out
+
+หลักฐานการลาถูกเก็บแยกเป็น private files ใต้ `.uploads/private/leave/<leaveRequestId>/` และอ่านได้ผ่าน
+`/api/leave/attachments/<attachmentId>` หลังตรวจสิทธิ์ทุกครั้งเท่านั้น ระบบไม่สร้าง public URL และห้ามเพิ่ม
+`.uploads/private` เป็น Nginx static location
+
+- ให้สร้าง directory ด้วย owner/group เดียวกับ process user ของ Node.js และ permission ที่ไม่เปิดให้ web server หรือผู้ใช้ทั่วไปอ่านโดยตรง
+- ต้อง backup `.uploads/private/leave/` คู่กับตาราง `leave_attachments` และฐานข้อมูล เพื่อให้ metadata กับไฟล์สอดคล้องกัน
+- การติดตั้งแบบหลาย instance ต้อง mount shared filesystem ที่มี locking/permission เดียวกัน หรือย้าย storage service ไป object storage ก่อน scale out
+- multipart request ถูกจำกัดที่ reverse proxy `client_max_body_size 25m;` (ไฟล์รวมสูงสุด 20 MB และมี overhead)
 
 ## Production Deployment
 
@@ -286,6 +296,9 @@ sudo systemctl reload nginx
 
 > รายการ Cloudflare IP ใน `cloudflare-real-ip.conf` ต้องตรวจเทียบกับรายการทางการเป็นระยะ และ origin firewall ควรอนุญาตเฉพาะ Cloudflare หรือ tunnel ที่ใช้งาน
 
+ตัวอย่าง Nginx ต้องคง `client_max_body_size 25m;` สำหรับคำขอลาที่มีหลักฐาน และต้องไม่มี `location` ที่ expose
+`.uploads/private` เป็น static file หรือ alias
+
 ## Scheduled Maintenance
 
 ตั้ง external scheduler ให้เรียก endpoints ต่อไปนี้ด้วย `POST`
@@ -314,6 +327,18 @@ Worker ส่งซ้ำสูงสุด 3 ครั้ง โดย backoff 
 
 ตั้ง `APP_BASE_URL` เป็นค่าเดียวกับ `PUBLIC_APPROVE_URL`
 
+### Leave attachment orphan cleanup — วันละครั้ง
+
+รัน dry-run ก่อนในช่วง rollout แล้วจึงรันจริงด้วย secret ที่แยกจาก secret อื่น:
+
+```cron
+45 2 * * * curl --fail --silent --show-error --request POST --header "x-cleanup-secret: $LEAVE_ATTACHMENT_CLEANUP_SECRET" "$APP_BASE_URL/api/leave/attachments/cleanup?dryRun=true"
+0 3 * * * curl --fail --silent --show-error --request POST --header "x-cleanup-secret: $LEAVE_ATTACHMENT_CLEANUP_SECRET" "$APP_BASE_URL/api/leave/attachments/cleanup"
+```
+
+งานนี้ scan เฉพาะ private leave directory, เทียบ `storageKey` กับฐานข้อมูล และลบเฉพาะไฟล์ที่เก่ากว่า safety
+window 24 ชั่วโมง จึงไม่ควรลบไฟล์ที่อยู่ระหว่าง request; endpoint ต้องมี header secret เสมอและไม่คืนชื่อไฟล์หรือ path
+
 ## Deployment Checklist
 
 - [ ] `.env` ไม่อยู่ใน Git และ secrets ไม่ใช้ค่าตัวอย่าง
@@ -326,7 +351,9 @@ Worker ส่งซ้ำสูงสุด 3 ครั้ง โดย backoff 
 - [ ] process supervisor รัน Next.js ด้วย non-root user
 - [ ] `.uploads/` เป็น persistent storage และมี backup
 - [ ] Nginx `nginx -t` ผ่านและส่ง forwarded headers ครบ
-- [ ] scheduler ทั้ง 3 endpoints ทำงานและเก็บ secrets อย่างปลอดภัย
+- [ ] scheduler ทั้ง 4 endpoints ทำงานและเก็บ secrets อย่างปลอดภัย
+- [ ] ทดสอบ dry-run ของ leave attachment cleanup และตรวจ disk usage/permission
+- [ ] backup ฐานข้อมูลและ `.uploads/private/leave/` สำเร็จก่อน migration และเก็บไว้นอกเครื่องเดียวกับ app
 - [ ] ทดสอบ login, refresh session, upload รูป, Email/LINE และหน้า feature ที่เปิด
 
 ## การอัปเดตเวอร์ชัน
@@ -345,9 +372,13 @@ npm run build
 ## Rollback และ Backup
 
 - ก่อน deploy ให้สำรอง MySQL และ `.uploads/` พร้อมกันเพื่อให้ข้อมูลอ้างอิงไฟล์ตรงกัน
+- สำรอง `.uploads/private/leave/` พร้อมตาราง `leave_attachments`; ขั้นตอน restore ให้ restore database และ directory จาก snapshot เวลาเดียวกัน แล้วตรวจจำนวน metadata/file ก่อนเปิด traffic
 - rollback application ได้ด้วยการนำ source/build รุ่นก่อนกลับมารัน
 - Prisma migrations ใน repository ออกแบบให้เดินหน้า การย้อน schema ต้องทำเป็น migration ใหม่และทดสอบกับสำเนาข้อมูลก่อน
+- migration เพิ่ม `leave_attachments` เป็น additive และไม่ลบ `attachmentUrl`; หากต้อง rollback application หลัง migration ให้คงตาราง/ไฟล์ไว้ เพราะรุ่นเก่าจะไม่อ่านข้อมูลใหม่ แล้ว deploy forward migration ที่ผ่านการทดสอบแทนการลบตาราง
 - การลบ Compose named volume เป็น destructive operation และไม่ใช่ขั้นตอน rollback
+
+รายละเอียด permission, restore, cleanup และแผนจัดการ `attachmentUrl` อยู่ใน [Leave attachment deployment runbook](./docs/leave-attachments-deployment.md)
 
 ## MySQL Integration Tests
 

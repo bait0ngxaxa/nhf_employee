@@ -133,6 +133,21 @@ describe("POST /api/leave/request", () => {
         expect(data.error).toBe("Unauthorized");
     });
 
+    it("rejects an oversized request before authenticating", async () => {
+        const req = new NextRequest("http://localhost/api/leave/request", {
+            method: "POST",
+            headers: {
+                "Content-Type": "multipart/form-data; boundary=test",
+                "Content-Length": String(25_000_001),
+            },
+        });
+
+        const res = await submitLeaveRequest(req);
+
+        expect(res.status).toBe(413);
+        expect(getApiAuthSession).not.toHaveBeenCalled();
+    });
+
     it("should return 400 if user ID is invalid", async () => {
         (getApiAuthSession as unknown as { mockResolvedValue: (v: { user: { id: string } }) => void }).mockResolvedValue({
             user: { id: "not-a-number" },
@@ -760,6 +775,10 @@ describe("POST /api/leave/request", () => {
                 String(auditCall?.data.details),
             ) as { metadata?: Record<string, unknown> };
             expect(auditDetails.metadata?.attachmentCount).toBe(1);
+            expect(Object.keys(auditDetails.metadata ?? {}).sort()).toEqual([
+                "attachmentCount",
+                "leaveRequestId",
+            ]);
             expect(String(auditCall?.data.details)).not.toContain("storageKey");
             expect(String(auditCall?.data.details)).not.toContain("proof.jpg");
         });

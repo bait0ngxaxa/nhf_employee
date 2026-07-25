@@ -119,8 +119,14 @@ export function createLeaveAttachmentStorage(
                 const transformed = await transformFile(file);
                 const storageKey = createStorageKey(input.leaveRequestId);
                 const targetPath = resolveStoragePath(rootDirectory, storageKey);
-                await mkdir(path.dirname(targetPath), { recursive: true });
-                await writeFile(targetPath, transformed.data, { flag: "wx" });
+                await mkdir(path.dirname(targetPath), {
+                    recursive: true,
+                    mode: 0o750,
+                });
+                await writeFile(targetPath, transformed.data, {
+                    flag: "wx",
+                    mode: 0o640,
+                });
                 stored.push({
                     storageKey,
                     originalName: file.name,

@@ -1,4 +1,5 @@
 import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
+import { LEAVE_ATTACHMENT_MAX_REQUEST_BYTES } from "@/lib/ssot/leave-attachments";
 import {
     validateLeaveAttachments,
     type LeaveAttachmentSource,
@@ -87,6 +88,21 @@ async function parseMultipartRequest(
     return { payload, attachments };
 }
 
+export function assertLeaveRequestBodySize(request: Request): void {
+    const rawContentLength = request.headers.get("content-length");
+    if (!rawContentLength) {
+        return;
+    }
+
+    const contentLength = Number(rawContentLength);
+    if (
+        Number.isSafeInteger(contentLength)
+        && contentLength > LEAVE_ATTACHMENT_MAX_REQUEST_BYTES
+    ) {
+        throw new LeaveRequestInputError("คำขอมีขนาดใหญ่เกินไป", 413);
+    }
+}
+
 function getMediaType(request: Request): string {
     return request.headers.get("content-type")
         ?.split(";", 1)[0]
@@ -106,6 +122,7 @@ export async function parseLeaveRequestInput(
         return parseJsonRequest(request);
     }
     if (mediaType === MULTIPART_CONTENT_TYPE) {
+        assertLeaveRequestBodySize(request);
         return parseMultipartRequest(request);
     }
     throw new LeaveRequestInputError("Content-Type ไม่รองรับ", 415);

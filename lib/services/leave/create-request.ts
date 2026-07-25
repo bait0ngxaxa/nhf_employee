@@ -260,10 +260,6 @@ export async function createLeaveRequest(
         id: input.id,
         userId: input.userId,
         userEmail: input.userEmail,
-        payload: input.payload,
-        durationDays: prepared.durationDays,
-        emergencyReason: prepared.emergencyReason,
-        specialReason: prepared.specialReason,
         attachmentCount: input.attachments.length,
     });
     return result;
