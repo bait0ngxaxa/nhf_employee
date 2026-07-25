@@ -24,6 +24,8 @@ export const LEAVE_ATTACHMENT_MAX_WIDTH = 2400;
 
 export const LEAVE_ATTACHMENT_MAX_HEIGHT = 2400;
 
+export const LEAVE_ATTACHMENT_MAX_INPUT_PIXELS = 40_000_000;
+
 export const LEAVE_ATTACHMENT_WEBP_QUALITY = 88;
 
 // Files are eligible for orphan cleanup only after this safety window. It keeps

@@ -11,6 +11,7 @@ import {
 import {
     LEAVE_ATTACHMENT_MAX_BYTES,
     LEAVE_ATTACHMENT_MAX_FILES,
+    LEAVE_ATTACHMENT_MAX_INPUT_PIXELS,
 } from "@/lib/ssot/leave-attachments";
 
 function createFile(
@@ -40,6 +41,25 @@ async function createImage(format: "jpeg" | "png" | "webp"): Promise<Buffer> {
     });
 
     return image[format]().toBuffer();
+}
+
+async function createCompressedImageWithDimensions(
+    width: number,
+    height: number,
+): Promise<Buffer> {
+    const source = await createImage("jpeg");
+    const markerIndex = source.findIndex(
+        (byte, index) => byte === 0xff && source[index + 1] === 0xc0,
+    );
+
+    if (markerIndex < 0) {
+        throw new Error("JPEG SOF marker not found");
+    }
+
+    const image = Buffer.from(source);
+    image.writeUInt16BE(height, markerIndex + 5);
+    image.writeUInt16BE(width, markerIndex + 7);
+    return image;
 }
 
 describe("private leave attachment storage", () => {
@@ -150,6 +170,24 @@ describe("private leave attachment storage", () => {
                 files: [createFile("invalid.jpg", "image/jpeg", invalidImage)],
             }),
         ).rejects.toThrow('ไฟล์ "invalid.jpg" ไม่ใช่รูปภาพที่ถูกต้อง');
+    });
+
+    it("rejects compressed images that exceed the input pixel limit", async () => {
+        const storage = createLeaveAttachmentStorage(storageRoot);
+        const width = 6401;
+        const height = Math.ceil(LEAVE_ATTACHMENT_MAX_INPUT_PIXELS / width);
+        const oversizedImage = await createCompressedImageWithDimensions(
+            width,
+            height,
+        );
+
+        expect(oversizedImage.byteLength).toBeLessThan(LEAVE_ATTACHMENT_MAX_BYTES);
+        await expect(
+            storage.save({
+                leaveRequestId: "leave-request-1",
+                files: [createFile("oversized.jpg", "image/jpeg", oversizedImage)],
+            }),
+        ).rejects.toThrow('ไฟล์ "oversized.jpg" มีความละเอียดสูงเกินไป');
     });
 
     it("rejects path traversal in leave request IDs and storage keys", async () => {

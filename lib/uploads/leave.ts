@@ -5,6 +5,7 @@ import sharp from "sharp";
 
 import {
     LEAVE_ATTACHMENT_MAX_HEIGHT,
+    LEAVE_ATTACHMENT_MAX_INPUT_PIXELS,
     LEAVE_ATTACHMENT_MAX_WIDTH,
     LEAVE_ATTACHMENT_WEBP_QUALITY,
 } from "@/lib/ssot/leave-attachments";
@@ -74,7 +75,28 @@ async function transformFile(file: LeaveAttachmentSource): Promise<{
 }> {
     try {
         const sourceBuffer = Buffer.from(await file.arrayBuffer());
-        const transformed = await sharp(sourceBuffer)
+        const metadataImage = sharp(sourceBuffer, {
+            failOn: "warning",
+            sequentialRead: true,
+        });
+        const metadata = await metadataImage.metadata();
+
+        if (
+            !metadata.width ||
+            !metadata.height ||
+            metadata.width * metadata.height > LEAVE_ATTACHMENT_MAX_INPUT_PIXELS
+        ) {
+            throw new LeaveAttachmentValidationError(
+                `ไฟล์ "${file.name}" มีความละเอียดสูงเกินไป`,
+            );
+        }
+
+        const image = sharp(sourceBuffer, {
+            limitInputPixels: LEAVE_ATTACHMENT_MAX_INPUT_PIXELS,
+            failOn: "warning",
+            sequentialRead: true,
+        });
+        const transformed = await image
             .rotate()
             .resize(LEAVE_ATTACHMENT_MAX_WIDTH, LEAVE_ATTACHMENT_MAX_HEIGHT, {
                 fit: "inside",
@@ -92,7 +114,11 @@ async function transformFile(file: LeaveAttachmentSource): Promise<{
             width: transformed.info.width,
             height: transformed.info.height,
         };
-    } catch {
+    } catch (error) {
+        if (error instanceof LeaveAttachmentValidationError) {
+            throw error;
+        }
+
         throw new LeaveAttachmentValidationError(
             `ไฟล์ "${file.name}" ไม่ใช่รูปภาพที่ถูกต้อง`,
         );
