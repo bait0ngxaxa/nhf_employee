@@ -79,6 +79,12 @@ const leaveIdSchema = z
   .trim()
   .min(1, "ไม่พบรหัสคำขอลา");
 
+export const leaveAttachmentIdParamSchema = z
+  .string()
+  .min(1)
+  .max(64)
+  .regex(/^[A-Za-z0-9_-]+$/);
+
 const emptyToNull = (value: unknown): unknown => {
   if (typeof value !== "string") {
     return value;

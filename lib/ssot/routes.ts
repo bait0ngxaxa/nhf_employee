@@ -66,6 +66,8 @@ export const API_ROUTES = {
         approvers: "/api/leave/approvers",
         decision: "/api/leave/decision",
         export: "/api/leave/export",
+        attachmentById: (id: string): string =>
+            `/api/leave/attachments/${id}`,
     },
     auditLogs: {
         cleanup: "/api/audit-logs/cleanup",
