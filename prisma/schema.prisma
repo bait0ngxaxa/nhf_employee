@@ -8,31 +8,31 @@ datasource db {
 }
 
 model User {
-  id                     Int                @id @default(autoincrement())
-  email                  String             @unique
-  name                   String
-  password               String
-  role                   Role               @default(USER)
-  tokenVersion           Int                @default(1)
-  createdAt              DateTime           @default(now())
-  updatedAt              DateTime           @updatedAt
-  employeeId             Int?               @unique
-  isActive               Boolean            @default(true)
-  deletedAt              DateTime?
-  comments               TicketComment[]
-  ticketViews            TicketView[]
-  assignedTickets        Ticket[]           @relation("AssignedTickets")
-  reportedTickets        Ticket[]           @relation("ReportedTickets")
-  deletedTickets         Ticket[]           @relation("DeletedTickets")
-  employee               Employee?          @relation(fields: [employeeId], references: [id])
-  auditLogs              AuditLog[]
-  emailRequests          EmailRequest[]
-  notifications          Notification[]
-  refreshTokens          AuthRefreshToken[]
-  stockTransactions      StockTransaction[]
-  stockRequests          StockRequest[]     @relation("StockRequester")
-  stockIssuedRequests    StockRequest[]     @relation("StockIssuer")
-  stockCancelledRequests StockRequest[]     @relation("StockCanceller")
+  id                          Int                         @id @default(autoincrement())
+  email                       String                      @unique
+  name                        String
+  password                    String
+  role                        Role                        @default(USER)
+  tokenVersion                Int                         @default(1)
+  createdAt                   DateTime                    @default(now())
+  updatedAt                   DateTime                    @updatedAt
+  employeeId                  Int?                        @unique
+  isActive                    Boolean                     @default(true)
+  deletedAt                   DateTime?
+  comments                    TicketComment[]
+  ticketViews                 TicketView[]
+  assignedTickets             Ticket[]                    @relation("AssignedTickets")
+  reportedTickets             Ticket[]                    @relation("ReportedTickets")
+  deletedTickets              Ticket[]                    @relation("DeletedTickets")
+  employee                    Employee?                   @relation(fields: [employeeId], references: [id])
+  auditLogs                   AuditLog[]
+  emailRequests               EmailRequest[]
+  notifications               Notification[]
+  refreshTokens               AuthRefreshToken[]
+  stockTransactions           StockTransaction[]
+  stockRequests               StockRequest[]              @relation("StockRequester")
+  stockIssuedRequests         StockRequest[]              @relation("StockIssuer")
+  stockCancelledRequests      StockRequest[]              @relation("StockCanceller")
   ticketMutationIdempotencies TicketMutationIdempotency[]
 
   @@map("users")
@@ -402,8 +402,8 @@ enum NotificationType {
   LEAVE_NOT_TAKEN_REQUESTED
   LEAVE_NOT_TAKEN_CONFIRMED
   STOCK_REQUEST_NEW
-  STOCK_ISSUED      @map("STOCK_APPROVED")
-  STOCK_CANCELLED   @map("STOCK_REJECTED")
+  STOCK_ISSUED              @map("STOCK_APPROVED")
+  STOCK_CANCELLED           @map("STOCK_REJECTED")
 }
 
 // ==========================================
@@ -425,42 +425,60 @@ model LeaveQuota {
 }
 
 model LeaveRequest {
-  id           String      @id @default(cuid())
-  employeeId   Int
-  leaveType    LeaveType
-  startDate    DateTime
-  endDate      DateTime
-  period       LeavePeriod @default(FULL_DAY)
-  durationHalfDays Int // ระยะเวลาลาสุทธิ หน่วยครึ่งวัน (เช่น 3 = 1.5 วัน)
-  reason       String      @db.Text
-  emergencyReason String? @db.Text // เหตุผลฉุกเฉินเมื่อยื่นลาย้อนหลัง
-  specialReason   String? @db.Text // เหตุผลพิเศษเมื่อขอลาเกินโควต้า
-  overQuotaHalfDays Int   @default(0) // จำนวนที่เกินโควต้าตอนยื่นคำขอ หน่วยครึ่งวัน
+  id                String      @id @default(cuid())
+  employeeId        Int
+  leaveType         LeaveType
+  startDate         DateTime
+  endDate           DateTime
+  period            LeavePeriod @default(FULL_DAY)
+  durationHalfDays  Int // ระยะเวลาลาสุทธิ หน่วยครึ่งวัน (เช่น 3 = 1.5 วัน)
+  reason            String      @db.Text
+  emergencyReason   String?     @db.Text // เหตุผลฉุกเฉินเมื่อยื่นลาย้อนหลัง
+  specialReason     String?     @db.Text // เหตุผลพิเศษเมื่อขอลาเกินโควต้า
+  overQuotaHalfDays Int         @default(0) // จำนวนที่เกินโควต้าตอนยื่นคำขอ หน่วยครึ่งวัน
 
   status LeaveStatus @default(PENDING)
 
   // ผู้อนุมัติ
-  approverId   Int? // หัวหน้าที่ต้องอนุมัติตอนนั้น (ดึงจาก managerId ของพนักงาน)
-  approvedAt   DateTime? // เวลาที่กดอนุมัติ/ปฏิเสธ
-  rejectReason String?   @db.Text // เหตุผลที่ปฏิเสธ (ถ้ามี)
+  approverId            Int? // หัวหน้าที่ต้องอนุมัติตอนนั้น (ดึงจาก managerId ของพนักงาน)
+  approvedAt            DateTime? // เวลาที่กดอนุมัติ/ปฏิเสธ
+  rejectReason          String?   @db.Text // เหตุผลที่ปฏิเสธ (ถ้ามี)
   notTakenReason        String?   @db.Text // โน๊ตเมื่ออนุมัติแล้วแต่ไม่ได้ใช้วันลา
   notTakenRequestedAt   DateTime?
   notTakenConfirmedAt   DateTime?
   notTakenConfirmedById Int?
 
-  attachmentUrl String? @db.Text // เผื่อต้องแนบใบรับรองแพทย์
+  // ฟิลด์ legacy สำหรับข้อมูลเดิม รอ migration cleanup ในเฟสถัดไป
+  attachmentUrl String? @db.Text
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  employee Employee  @relation("LeaveRequester", fields: [employeeId], references: [id])
-  approver Employee? @relation("LeaveApprover", fields: [approverId], references: [id])
+  employee    Employee          @relation("LeaveRequester", fields: [employeeId], references: [id])
+  approver    Employee?         @relation("LeaveApprover", fields: [approverId], references: [id])
+  attachments LeaveAttachment[]
 
   @@index([employeeId])
   @@index([approverId])
   @@index([status])
   @@index([notTakenRequestedAt])
   @@map("leave_requests")
+}
+
+model LeaveAttachment {
+  id             String       @id @default(cuid())
+  leaveRequestId String
+  storageKey     String       @unique
+  originalName   String       @db.VarChar(255)
+  contentType    String       @db.VarChar(64)
+  sizeBytes      Int
+  width          Int
+  height         Int
+  createdAt      DateTime     @default(now())
+  leaveRequest   LeaveRequest @relation(fields: [leaveRequestId], references: [id], onDelete: Cascade)
+
+  @@index([leaveRequestId])
+  @@map("leave_attachments")
 }
 
 enum LeaveType {
@@ -596,24 +614,24 @@ model StockTransaction {
 }
 
 model StockRequest {
-  id            Int                @id @default(autoincrement())
+  id             Int                @id @default(autoincrement())
   requestedBy    Int
   idempotencyKey String             @db.VarChar(255)
   requestHash    String             @db.Char(64)
   projectCode    String             @db.VarChar(100)
-  status        StockRequestStatus @default(PENDING_ISSUE)
-  note          String?            @db.Text
-  issuedById    Int?               @map("reviewedBy")
-  issuedAt      DateTime?          @map("reviewedAt")
-  cancelReason  String?            @map("rejectReason") @db.Text
-  cancelledById Int?
-  cancelledAt   DateTime?
-  createdAt     DateTime           @default(now())
-  updatedAt     DateTime           @updatedAt
-  requester     User               @relation("StockRequester", fields: [requestedBy], references: [id])
-  issuer        User?              @relation("StockIssuer", fields: [issuedById], references: [id])
-  canceller     User?              @relation("StockCanceller", fields: [cancelledById], references: [id])
-  items         StockRequestItem[]
+  status         StockRequestStatus @default(PENDING_ISSUE)
+  note           String?            @db.Text
+  issuedById     Int?               @map("reviewedBy")
+  issuedAt       DateTime?          @map("reviewedAt")
+  cancelReason   String?            @map("rejectReason") @db.Text
+  cancelledById  Int?
+  cancelledAt    DateTime?
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+  requester      User               @relation("StockRequester", fields: [requestedBy], references: [id])
+  issuer         User?              @relation("StockIssuer", fields: [issuedById], references: [id])
+  canceller      User?              @relation("StockCanceller", fields: [cancelledById], references: [id])
+  items          StockRequestItem[]
 
   @@unique([requestedBy, idempotencyKey])
   @@index([requestedBy])

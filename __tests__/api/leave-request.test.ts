@@ -1,11 +1,21 @@
+// @vitest-environment node
+
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { POST as submitLeaveRequest } from "@/app/api/leave/request/route";
 import { getApiAuthSession } from "@/lib/auth/server";
 import { prisma } from "@/lib/db/prisma";
 import { getEmployeeIdFromUserId } from "@/lib/services/leave/get-employee-id";
 import { processOutbox } from "@/lib/services/outbox/processor";
+import { LeaveAttachmentValidationError } from "@/lib/uploads/leave";
+import { LEAVE_ATTACHMENT_MAX_BYTES } from "@/lib/ssot/leave-attachments";
+import { resetMutationRateLimit } from "@/lib/security/mutation-rate-limit";
 import { NextRequest } from "next/server";
 import type * as NextServerModule from "next/server";
+
+const uploadMocks = vi.hoisted(() => ({
+    save: vi.fn(),
+    delete: vi.fn(),
+}));
 
 vi.mock("next/server", async (importOriginal) => {
     const actual = await importOriginal<typeof NextServerModule>();
@@ -28,6 +38,15 @@ vi.mock("@/lib/services/outbox/processor", () => ({
 vi.mock("@/lib/services/leave/get-employee-id", () => ({
     getEmployeeIdFromUserId: vi.fn(),
 }));
+
+vi.mock("@/lib/uploads/leave", async (importOriginal) => {
+    const actual = await importOriginal();
+    return {
+        ...(actual as Record<string, unknown>),
+        saveLeaveAttachments: uploadMocks.save,
+        deleteLeaveAttachment: uploadMocks.delete,
+    };
+});
 
 vi.mock("@/lib/db/prisma", () => ({
     prisma: {
@@ -85,12 +104,15 @@ describe("POST /api/leave/request", () => {
 
     beforeEach(() => {
         vi.clearAllMocks();
+        resetMutationRateLimit();
         vi.mocked(prisma.user.findUnique).mockResolvedValue({
             isActive: true,
             employee: { id: mockEmployeeId, status: "ACTIVE", deletedAt: null },
         } as never);
         vi.mocked(prisma.user.findFirst).mockResolvedValue({ id: 1 } as never);
         vi.mocked(prisma.$queryRaw).mockResolvedValue([] as never);
+        uploadMocks.save.mockResolvedValue([]);
+        uploadMocks.delete.mockResolvedValue(undefined);
         (processOutbox as unknown as { mockResolvedValue: (v: undefined) => void }).mockResolvedValue(undefined);
     });
 
@@ -270,11 +292,13 @@ describe("POST /api/leave/request", () => {
 
         const res = await submitLeaveRequest(req);
         expect(res.status).toBe(201);
-        expect(prisma.leaveRequest.create).toHaveBeenCalledWith({
-            data: expect.objectContaining({
-                durationHalfDays: 4,
+        expect(prisma.leaveRequest.create).toHaveBeenCalledWith(
+            expect.objectContaining({
+                data: expect.objectContaining({
+                    durationHalfDays: 4,
+                }),
             }),
-        });
+        );
     });
 
     describe("Transaction Logic", () => {
@@ -305,6 +329,7 @@ describe("POST /api/leave/request", () => {
 
             const req = new NextRequest("http://localhost/api/leave/request", {
                 method: "POST",
+                headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(validPayload),
             });
 
@@ -323,6 +348,7 @@ describe("POST /api/leave/request", () => {
 
             const req = new NextRequest("http://localhost/api/leave/request", {
                 method: "POST",
+                headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(validPayload),
             });
 
@@ -401,12 +427,14 @@ describe("POST /api/leave/request", () => {
 
             const res = await submitLeaveRequest(req);
             expect(res.status).toBe(201);
-            expect(prisma.leaveRequest.create).toHaveBeenCalledWith({
-                data: expect.objectContaining({
-                    overQuotaHalfDays: 2,
-                    specialReason: "กรณีพิเศษที่หัวหน้าควรพิจารณา",
+            expect(prisma.leaveRequest.create).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    data: expect.objectContaining({
+                        overQuotaHalfDays: 2,
+                        specialReason: "กรณีพิเศษที่หัวหน้าควรพิจารณา",
+                    }),
                 }),
-            });
+            );
         });
 
         it("should enqueue and process emergency backdated leave notification", async () => {
@@ -441,13 +469,15 @@ describe("POST /api/leave/request", () => {
             const res = await submitLeaveRequest(req);
 
             expect(res.status).toBe(201);
-            expect(prisma.leaveRequest.create).toHaveBeenCalledWith({
-                data: expect.objectContaining({
-                    emergencyReason: "ป่วยฉุกเฉินจนยื่นคำขอไม่ทัน",
-                    status: "PENDING",
-                    approverId: 200,
+            expect(prisma.leaveRequest.create).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    data: expect.objectContaining({
+                        emergencyReason: "ป่วยฉุกเฉินจนยื่นคำขอไม่ทัน",
+                        status: "PENDING",
+                        approverId: 200,
+                    }),
                 }),
-            });
+            );
             const createCall = vi.mocked(prisma.notificationOutbox.create).mock.calls[0]?.[0];
             const payload = JSON.parse(String(createCall?.data.payload)) as Record<string, unknown>;
             expect(createCall).toEqual({
@@ -531,6 +561,7 @@ describe("POST /api/leave/request", () => {
 
             const req = new NextRequest("http://localhost/api/leave/request", {
                 method: "POST",
+                headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(validPayload),
             });
 
@@ -542,6 +573,7 @@ describe("POST /api/leave/request", () => {
                 id: mockCreatedRequest.id,
                 durationDays: 1,
                 overQuotaDays: 0,
+                attachments: [],
             });
 
             expect(prisma.leaveQuota.create).toHaveBeenCalledWith({
@@ -553,17 +585,19 @@ describe("POST /api/leave/request", () => {
                     usedHalfDays: 0,
                 },
             });
-            expect(prisma.leaveRequest.create).toHaveBeenCalledWith({
-                data: expect.objectContaining({
-                    employeeId: mockEmployeeId,
-                    leaveType: "PERSONAL",
-                    period: "FULL_DAY",
-                    durationHalfDays: 2,
-                    reason: "Personal errand",
-                    status: "PENDING",
-                    approverId: 200,
+            expect(prisma.leaveRequest.create).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    data: expect.objectContaining({
+                        employeeId: mockEmployeeId,
+                        leaveType: "PERSONAL",
+                        period: "FULL_DAY",
+                        durationHalfDays: 2,
+                        reason: "Personal errand",
+                        status: "PENDING",
+                        approverId: 200,
+                    }),
                 }),
-            });
+            );
 
             expect(prisma.notificationOutbox.create).toHaveBeenCalledWith({
                 data: expect.objectContaining({
@@ -571,6 +605,326 @@ describe("POST /api/leave/request", () => {
                 }),
             });
             expect(processOutbox).toHaveBeenCalled();
+        });
+    });
+
+    describe("multipart attachments", () => {
+        const validPayload = {
+            leaveType: "PERSONAL",
+            startDate: "2030-05-10",
+            endDate: "2030-05-10",
+            period: "FULL_DAY",
+            reason: "ไปทำธุระส่วนตัว",
+        };
+        const storedAttachment = {
+            storageKey: "leave/leave-request-1/0123456789abcdef0123456789abcdef.webp",
+            originalName: "proof.jpg",
+            contentType: "image/webp" as const,
+            sizeBytes: 512,
+            width: 32,
+            height: 24,
+        };
+        const attachmentSummary = {
+            id: "attachment-1",
+            contentType: "image/webp",
+            sizeBytes: 512,
+            width: 32,
+            height: 24,
+        };
+
+        function createMultipartRequest(files: readonly File[] = []): NextRequest {
+            const formData = new FormData();
+            formData.set("payload", JSON.stringify(validPayload));
+            for (const file of files) {
+                formData.append("attachments", file);
+            }
+            return new NextRequest("http://localhost/api/leave/request", {
+                method: "POST",
+                body: formData,
+            });
+        }
+
+        function arrangeSuccessfulCreation(
+            attachments: readonly typeof attachmentSummary[] = [],
+        ): void {
+            (getApiAuthSession as unknown as {
+                mockResolvedValue: (value: { user: { id: string; name: string } }) => void;
+            }).mockResolvedValue({ user: mockUser });
+            (
+                prisma.$transaction as unknown as {
+                    mockImplementation: (
+                        implementation: (callback: (tx: typeof prisma) => Promise<unknown>) => Promise<unknown>,
+                    ) => void;
+                }
+            ).mockImplementation(async (callback) => callback(prisma));
+            vi.mocked(prisma.employee.findUnique).mockResolvedValue(
+                buildEmployeeWithManager() as never,
+            );
+            vi.mocked(prisma.leaveRequest.findFirst).mockResolvedValue(null);
+            vi.mocked(prisma.leaveQuota.findFirst).mockResolvedValue({
+                id: "quota-1",
+                totalHalfDays: 20,
+                usedHalfDays: 0,
+            } as never);
+            vi.mocked(prisma.leaveRequest.create).mockResolvedValue({
+                id: "leave-request-1",
+                durationHalfDays: 2,
+                overQuotaHalfDays: 0,
+                attachments,
+            } as never);
+        }
+
+        it("accepts a multipart request without files", async () => {
+            arrangeSuccessfulCreation();
+
+            const response = await submitLeaveRequest(createMultipartRequest());
+
+            expect(response.status).toBe(201);
+            expect(uploadMocks.save).toHaveBeenCalledWith({
+                leaveRequestId: expect.any(String),
+                files: [],
+            });
+        });
+
+        it("finishes file processing before starting the transaction", async () => {
+            arrangeSuccessfulCreation();
+            let finishUpload: ((attachments: typeof storedAttachment[]) => void)
+                | undefined;
+            uploadMocks.save.mockImplementation(
+                () => new Promise((resolve) => {
+                    finishUpload = resolve;
+                }),
+            );
+
+            const responsePromise = submitLeaveRequest(createMultipartRequest());
+            await vi.waitFor(() => expect(uploadMocks.save).toHaveBeenCalled());
+            expect(prisma.$transaction).not.toHaveBeenCalled();
+
+            finishUpload?.([]);
+            const response = await responsePromise;
+
+            expect(response.status).toBe(201);
+            expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+        });
+
+        it("creates attachment records and omits storage keys from the response", async () => {
+            arrangeSuccessfulCreation([attachmentSummary]);
+            uploadMocks.save.mockImplementation(
+                async (input: { leaveRequestId: string }) => [{
+                    ...storedAttachment,
+                    storageKey:
+                        `leave/${input.leaveRequestId}/0123456789abcdef0123456789abcdef.webp`,
+                }],
+            );
+            const file = new File(["valid image"], "proof.jpg", {
+                type: "image/jpeg",
+            });
+
+            const response = await submitLeaveRequest(createMultipartRequest([file]));
+            const body = await response.json();
+            const saveInput = uploadMocks.save.mock.calls[0]?.[0] as {
+                leaveRequestId: string;
+            };
+            const dynamicStoredAttachment = {
+                ...storedAttachment,
+                storageKey:
+                    `leave/${saveInput.leaveRequestId}/0123456789abcdef0123456789abcdef.webp`,
+            };
+            const createCall = vi.mocked(prisma.leaveRequest.create).mock.calls[0]?.[0];
+            const createData = createCall?.data as {
+                id: string;
+                attachments: { create: typeof dynamicStoredAttachment[] };
+            };
+
+            expect(response.status).toBe(201);
+            expect(createData.id).toBe(saveInput.leaveRequestId);
+            expect(createData.attachments.create).toEqual([
+                dynamicStoredAttachment,
+            ]);
+            expect(dynamicStoredAttachment.storageKey).toContain(
+                `leave/${createData.id}/`,
+            );
+            expect(prisma.notificationOutbox.create).toHaveBeenCalled();
+            expect(body.data.attachments).toEqual([attachmentSummary]);
+            expect(JSON.stringify(body)).not.toContain("storageKey");
+            expect(JSON.stringify(body)).not.toContain(
+                dynamicStoredAttachment.storageKey,
+            );
+
+            const outboxCall = vi.mocked(prisma.notificationOutbox.create).mock.calls[0]?.[0];
+            expect(String(outboxCall?.data.payload)).not.toContain("storageKey");
+            expect(String(outboxCall?.data.payload)).not.toContain("proof.jpg");
+
+            const auditCall = vi.mocked(prisma.auditLog.create).mock.calls[0]?.[0];
+            const auditDetails = JSON.parse(
+                String(auditCall?.data.details),
+            ) as { metadata?: Record<string, unknown> };
+            expect(auditDetails.metadata?.attachmentCount).toBe(1);
+            expect(String(auditCall?.data.details)).not.toContain("storageKey");
+            expect(String(auditCall?.data.details)).not.toContain("proof.jpg");
+        });
+
+        it("stores multiple attachment records in the same request", async () => {
+            const secondStoredAttachment = {
+                ...storedAttachment,
+                storageKey: "leave/leave-request-1/fedcba9876543210fedcba9876543210.webp",
+                originalName: "second.png",
+                sizeBytes: 768,
+            };
+            const secondSummary = {
+                ...attachmentSummary,
+                id: "attachment-2",
+                sizeBytes: 768,
+            };
+            arrangeSuccessfulCreation([attachmentSummary, secondSummary]);
+            uploadMocks.save.mockResolvedValue([
+                storedAttachment,
+                secondStoredAttachment,
+            ]);
+            const files = [
+                new File(["first"], "proof.jpg", { type: "image/jpeg" }),
+                new File(["second"], "second.png", { type: "image/png" }),
+            ];
+
+            const response = await submitLeaveRequest(createMultipartRequest(files));
+            const body = await response.json();
+
+            expect(response.status).toBe(201);
+            expect(prisma.leaveRequest.create).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    data: expect.objectContaining({
+                        attachments: {
+                            create: [storedAttachment, secondStoredAttachment],
+                        },
+                    }),
+                }),
+            );
+            expect(body.data.attachments).toEqual([
+                attachmentSummary,
+                secondSummary,
+            ]);
+        });
+
+        it("rejects more than three attachments before processing files", async () => {
+            arrangeSuccessfulCreation();
+            const files = Array.from(
+                { length: 4 },
+                (_, index) => new File(
+                    [`file-${index}`],
+                    `proof-${index}.jpg`,
+                    { type: "image/jpeg" },
+                ),
+            );
+
+            const response = await submitLeaveRequest(createMultipartRequest(files));
+
+            expect(response.status).toBe(400);
+            expect(uploadMocks.save).not.toHaveBeenCalled();
+        });
+
+        it("rejects an attachment larger than eight megabytes", async () => {
+            arrangeSuccessfulCreation();
+            const file = new File(
+                [new Uint8Array(LEAVE_ATTACHMENT_MAX_BYTES + 1)],
+                "large.jpg",
+                { type: "image/jpeg" },
+            );
+
+            const response = await submitLeaveRequest(createMultipartRequest([file]));
+
+            expect(response.status).toBe(400);
+            expect(uploadMocks.save).not.toHaveBeenCalled();
+        });
+
+        it("cleans up stored files when business validation fails", async () => {
+            arrangeSuccessfulCreation();
+            uploadMocks.save.mockResolvedValue([storedAttachment]);
+            vi.mocked(prisma.employee.findUnique).mockResolvedValue({
+                id: mockEmployeeId,
+                managerId: null,
+                manager: null,
+            } as never);
+            const file = new File(["valid image"], "proof.jpg", {
+                type: "image/jpeg",
+            });
+
+            const response = await submitLeaveRequest(createMultipartRequest([file]));
+
+            expect(response.status).toBe(400);
+            expect(uploadMocks.delete).toHaveBeenCalledWith(storedAttachment.storageKey);
+        });
+
+        it("cleans up stored files when the database transaction fails", async () => {
+            arrangeSuccessfulCreation();
+            uploadMocks.save.mockResolvedValue([storedAttachment]);
+            vi.mocked(prisma.$transaction).mockRejectedValue(
+                new Error("database unavailable"),
+            );
+            const file = new File(["valid image"], "proof.jpg", {
+                type: "image/jpeg",
+            });
+
+            const response = await submitLeaveRequest(createMultipartRequest([file]));
+
+            expect(response.status).toBe(500);
+            expect(uploadMocks.delete).toHaveBeenCalledWith(storedAttachment.storageKey);
+        });
+
+        it("attempts every cleanup without masking the business error", async () => {
+            const secondStoredAttachment = {
+                ...storedAttachment,
+                storageKey: "leave/leave-request-1/fedcba9876543210fedcba9876543210.webp",
+            };
+            arrangeSuccessfulCreation();
+            uploadMocks.save.mockResolvedValue([
+                storedAttachment,
+                secondStoredAttachment,
+            ]);
+            uploadMocks.delete.mockImplementation(async (storageKey: string) => {
+                if (storageKey === storedAttachment.storageKey) {
+                    throw new Error("cleanup failed");
+                }
+            });
+            vi.mocked(prisma.employee.findUnique).mockResolvedValue({
+                id: mockEmployeeId,
+                managerId: null,
+                manager: null,
+            } as never);
+            const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+            const response = await submitLeaveRequest(createMultipartRequest([
+                new File(["first"], "proof.jpg", { type: "image/jpeg" }),
+                new File(["second"], "second.png", { type: "image/png" }),
+            ]));
+
+            expect(response.status).toBe(400);
+            await expect(response.json()).resolves.toMatchObject({
+                error: "ยังไม่ได้ตั้งค่าผู้อนุมัติ",
+            });
+            expect(uploadMocks.delete).toHaveBeenCalledWith(storedAttachment.storageKey);
+            expect(uploadMocks.delete).toHaveBeenCalledWith(
+                secondStoredAttachment.storageKey,
+            );
+            consoleError.mockRestore();
+        });
+
+        it("returns a validation error when image decoding fails", async () => {
+            arrangeSuccessfulCreation();
+            uploadMocks.save.mockRejectedValue(
+                new LeaveAttachmentValidationError(
+                    'ไฟล์ "invalid.jpg" ไม่ใช่รูปภาพที่ถูกต้อง',
+                ),
+            );
+            const file = new File(["not an image"], "invalid.jpg", {
+                type: "image/jpeg",
+            });
+
+            const response = await submitLeaveRequest(createMultipartRequest([file]));
+
+            expect(response.status).toBe(400);
+            await expect(response.json()).resolves.toMatchObject({
+                error: 'ไฟล์ "invalid.jpg" ไม่ใช่รูปภาพที่ถูกต้อง',
+            });
         });
     });
 });

@@ -1,251 +1,134 @@
-import { NextResponse, after } from "next/server";
-import { DEFAULT_LEAVE_QUOTA_HALF_DAYS } from "@/constants/leave";
+import { randomUUID } from "node:crypto";
+import { NextResponse, after, type NextRequest } from "next/server";
+
 import { requireActiveWorkforceSession } from "@/lib/auth/workforce";
-import { logLeaveEvent } from "@/lib/server/audit";
 import {
-    isActiveEmployeeInTransaction,
-    isEmployeeInTransaction,
-} from "@/lib/services/leave/active-employee-session";
-import { isActiveLeaveApprover } from "@/lib/services/leave/approver-eligibility";
-import { halfDaysToDays, toLeaveRequestDays } from "@/lib/services/leave/half-days";
-import { calculateAdditionalOverQuotaHalfDays } from "@/lib/services/leave/over-quota";
+    createLeaveRequest,
+    LeaveRequestError,
+    type CreatedLeaveRequest,
+} from "@/lib/services/leave/create-request";
 import {
-    buildConfiguredApproverSnapshot,
-    buildLeaveActionDeliveryIdentity,
-    buildLeaveRecipientSnapshot,
-    type LeaveActionPayload,
-} from "@/lib/services/leave/notification-payloads";
-import { getLeaveYearFromDateValue } from "@/lib/services/leave/quota-year";
-import { calculateLeaveDurationHalfDays, isWorkingDay } from "@/lib/services/leave/utils";
+    LeaveRequestInputError,
+    parseLeaveRequestInput,
+} from "@/lib/services/leave/request-input";
+import { toLeaveAttachmentSummary } from "@/lib/services/leave/create-request-prisma";
+import { toLeaveRequestDays } from "@/lib/services/leave/half-days";
 import { processOutbox } from "@/lib/services/outbox/processor";
-import { runSerializableTransaction } from "@/lib/db/transaction";
-import { jsonError, notFound } from "@/lib/ssot/http";
 import { FEATURE_KEYS, isFeatureEnabled } from "@/lib/ssot/features";
+import { jsonError, notFound } from "@/lib/ssot/http";
 import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
-import { leaveRequestSchema } from "@/lib/validations/leave";
+import {
+    enforceAuthenticatedMutationRateLimit,
+    enforcePreAuthIpRateLimit,
+} from "@/lib/security/mutation-rate-limit";
+import {
+    deleteLeaveAttachment,
+    LeaveAttachmentValidationError,
+    saveLeaveAttachments,
+    type StoredLeaveAttachment,
+} from "@/lib/uploads/leave";
 
-const LEAVE_REQUEST_MESSAGES = {
-    holidayConflict: "วันที่ลาตรงกับวันหยุด",
-    approverNotConfigured: "ยังไม่ได้ตั้งค่าผู้อนุมัติ",
-    approverAccountNotConfigured: "ผู้อนุมัติยังไม่มีบัญชีผู้ใช้ในระบบ",
-    overlapConflict: "มีคำขอลาในช่วงวันที่นี้อยู่แล้ว",
-    employeeNotFound: "ไม่พบข้อมูลพนักงาน",
-    halfDayMultiDate: "การลาครึ่งวันต้องเลือกวันลาเพียงวันเดียว",
-    specialReasonRequired: "กรุณาระบุเหตุผลพิเศษสำหรับการลาเกินโควต้า",
-} as const;
-
-class LeaveRequestError extends Error {
-    readonly statusCode: number;
-
-    constructor(message: string, statusCode: number) {
-        super(message);
-        this.name = "LeaveRequestError";
-        this.statusCode = statusCode;
+async function cleanupAttachments(
+    attachments: readonly StoredLeaveAttachment[],
+): Promise<void> {
+    const results = await Promise.allSettled(
+        attachments.map(({ storageKey }) => deleteLeaveAttachment(storageKey)),
+    );
+    const failedCleanupCount = results.filter(
+        (result) => result.status === "rejected",
+    ).length;
+    if (failedCleanupCount > 0) {
+        console.error("ลบไฟล์หลักฐานของคำขอลาที่ไม่สำเร็จไม่ครบ", {
+            failedCleanupCount,
+        });
     }
 }
 
-export async function POST(req: Request) {
+function createErrorResponse(error: unknown): NextResponse {
+    if (error instanceof LeaveRequestInputError) {
+        return jsonError(error.message, error.statusCode, error.details);
+    }
+    if (error instanceof LeaveAttachmentValidationError) {
+        return jsonError(error.message, 400);
+    }
+    if (error instanceof LeaveRequestError) {
+        return jsonError(error.message, error.statusCode);
+    }
+
+    console.error("สร้างคำขอลาไม่สำเร็จ", {
+        errorType: error instanceof Error ? error.name : "UnknownError",
+    });
+    return jsonError(COMMON_API_MESSAGES.failedToSubmitLeaveRequest, 500);
+}
+
+function createResponseData(result: CreatedLeaveRequest): Record<string, unknown> {
+    const converted = toLeaveRequestDays(result);
+    return {
+        ...converted,
+        attachments: (result.attachments ?? []).map(toLeaveAttachmentSummary),
+    };
+}
+
+export async function POST(request: NextRequest): Promise<NextResponse> {
+    if (!isFeatureEnabled(FEATURE_KEYS.leave)) {
+        return notFound();
+    }
+
+    const preAuthRateLimitResponse = enforcePreAuthIpRateLimit(
+        request,
+        "leave-request-create",
+    );
+    if (preAuthRateLimitResponse) {
+        return preAuthRateLimitResponse;
+    }
+
+    const auth = await requireActiveWorkforceSession();
+    if (!auth.ok) {
+        return auth.response;
+    }
+    const principalRateLimitResponse = enforceAuthenticatedMutationRateLimit(
+        "leave-request-create",
+        auth.user.id,
+    );
+    if (principalRateLimitResponse) {
+        return principalRateLimitResponse;
+    }
+
+    let storedAttachments: StoredLeaveAttachment[] = [];
+    let transactionCommitted = false;
     try {
-        if (!isFeatureEnabled(FEATURE_KEYS.leave)) {
-            return notFound();
-        }
-
-        const auth = await requireActiveWorkforceSession();
-        if (!auth.ok) return auth.response;
-
-        const userId = auth.user.id;
-        const { employeeId } = auth;
-
-        const data = await req.json();
-        const parsed = leaveRequestSchema.safeParse(data);
-        if (!parsed.success) {
-            return jsonError(COMMON_API_MESSAGES.invalidInput, 400, {
-                details: parsed.error.format(),
-            });
-        }
-
-        const {
-            leaveType,
-            startDate,
-            endDate,
-            period,
-            reason,
-            emergencyReason,
-            specialReason,
-        } = parsed.data;
-        const normalizedEmergencyReason = emergencyReason?.trim() ? emergencyReason.trim() : null;
-        const normalizedSpecialReason = specialReason?.trim() ? specialReason.trim() : null;
-        const currentYear = getLeaveYearFromDateValue(startDate);
-
-        if (period !== "FULL_DAY" && startDate !== endDate) {
-            return jsonError(LEAVE_REQUEST_MESSAGES.halfDayMultiDate, 400);
-        }
-
-        const start = new Date(startDate);
-        const end = new Date(endDate);
-        const durationHalfDays = calculateLeaveDurationHalfDays(start, end, period);
-        const durationDays = halfDaysToDays(durationHalfDays);
-
-        if (period !== "FULL_DAY") {
-            if (durationHalfDays === 0) {
-                return jsonError(LEAVE_REQUEST_MESSAGES.holidayConflict, 400);
-            }
-        } else if (durationHalfDays === 0) {
-            return jsonError(LEAVE_REQUEST_MESSAGES.holidayConflict, 400);
-        } else if (!isWorkingDay(start) || !isWorkingDay(end)) {
-            return jsonError(LEAVE_REQUEST_MESSAGES.holidayConflict, 400);
-        }
-
-        const result = await runSerializableTransaction(async (tx) => {
-            if (!await isActiveEmployeeInTransaction(tx, userId, employeeId)) {
-                const employeeExists = await isEmployeeInTransaction(tx, employeeId);
-                throw new LeaveRequestError(
-                    employeeExists ? COMMON_API_MESSAGES.forbidden : LEAVE_REQUEST_MESSAGES.employeeNotFound,
-                    employeeExists ? 403 : 404,
-                );
-            }
-
-            const employee = await tx.employee.findUnique({
-                where: { id: employeeId },
-                include: {
-                    user: { select: { id: true } },
-                    manager: {
-                        include: {
-                            user: { select: { id: true, email: true, isActive: true, deletedAt: true } },
-                        },
-                    },
-                },
-            });
-
-            if (!employee) {
-                throw new LeaveRequestError(LEAVE_REQUEST_MESSAGES.employeeNotFound, 404);
-            }
-
-            if (!employee.managerId) {
-                throw new LeaveRequestError(LEAVE_REQUEST_MESSAGES.approverNotConfigured, 400);
-            }
-            if (!isActiveLeaveApprover(employee.manager) || employee.manager.id === employee.id) {
-                throw new LeaveRequestError(
-                    LEAVE_REQUEST_MESSAGES.approverAccountNotConfigured,
-                    400,
-                );
-            }
-
-            const overlappingRequests = await tx.leaveRequest.findFirst({
-                where: {
-                    employeeId,
-                    status: { in: ["PENDING", "APPROVED"] },
-                    AND: [
-                        { startDate: { lte: new Date(endDate) } },
-                        { endDate: { gte: new Date(startDate) } },
-                    ],
-                },
-            });
-
-            if (overlappingRequests) {
-                throw new LeaveRequestError(LEAVE_REQUEST_MESSAGES.overlapConflict, 409);
-            }
-
-            let quota = await tx.leaveQuota.findFirst({
-                where: { employeeId, year: currentYear, leaveType },
-            });
-
-            if (!quota) {
-                quota = await tx.leaveQuota.create({
-                    data: {
-                        employeeId,
-                        year: currentYear,
-                        leaveType,
-                        totalHalfDays: DEFAULT_LEAVE_QUOTA_HALF_DAYS[leaveType],
-                        usedHalfDays: 0,
-                    },
-                });
-            }
-
-            const overQuotaHalfDays = calculateAdditionalOverQuotaHalfDays(
-                quota.totalHalfDays,
-                quota.usedHalfDays,
-                durationHalfDays,
-            );
-            const overQuotaDays = halfDaysToDays(overQuotaHalfDays);
-            if (overQuotaDays > 0 && !normalizedSpecialReason) {
-                throw new LeaveRequestError(LEAVE_REQUEST_MESSAGES.specialReasonRequired, 400);
-            }
-
-            const leaveRequest = await tx.leaveRequest.create({
-                data: {
-                    employeeId,
-                    leaveType,
-                    startDate: new Date(startDate),
-                    endDate: new Date(endDate),
-                    period,
-                    durationHalfDays,
-                    reason,
-                    emergencyReason: normalizedEmergencyReason,
-                    specialReason: normalizedSpecialReason,
-                    overQuotaHalfDays,
-                    status: "PENDING",
-                    approverId: employee.managerId,
-                },
-            });
-
-            const payload: LeaveActionPayload = {
-                leaveId: leaveRequest.id,
-                deliveryIdentity: buildLeaveActionDeliveryIdentity(
-                    leaveRequest.id,
-                    employee.manager.user.id,
-                ),
-                employee: buildLeaveRecipientSnapshot(employee),
-                approver: buildConfiguredApproverSnapshot(employee.manager),
-                leaveType,
-                startDate: start.toISOString(),
-                endDate: end.toISOString(),
-                period,
-                durationDays,
-                reason,
-                emergencyReason: normalizedEmergencyReason,
-                specialReason: normalizedSpecialReason,
-                overQuotaDays,
-            };
-
-            await tx.notificationOutbox.create({
-                data: {
-                    type: "LEAVE_ACTION",
-                    payload: JSON.stringify(payload),
-                },
-            });
-
-            return leaveRequest;
+        const input = await parseLeaveRequestInput(request);
+        const leaveRequestId = randomUUID();
+        storedAttachments = await saveLeaveAttachments({
+            leaveRequestId,
+            files: input.attachments,
         });
+        const result = await createLeaveRequest({
+            id: leaveRequestId,
+            userId: auth.user.id,
+            userEmail: auth.user.email,
+            employeeId: auth.employeeId,
+            payload: input.payload,
+            attachments: storedAttachments,
+        });
+        transactionCommitted = true;
 
         after(() => {
-            processOutbox().catch((err) =>
-                console.error("Failed to process outbox in background:", err),
+            processOutbox().catch((error: unknown) =>
+                console.error("ประมวลผล outbox หลังสร้างคำขอลาไม่สำเร็จ", {
+                    errorType: error instanceof Error ? error.name : "UnknownError",
+                }),
             );
         });
 
-        await logLeaveEvent("LEAVE_REQUEST_CREATE", result.id, userId, auth.user.email, {
-            metadata: {
-                leaveType,
-                period,
-                durationDays,
-                startDate,
-                endDate,
-                reason,
-                emergencyReason: normalizedEmergencyReason,
-                specialReason: normalizedSpecialReason,
-            },
-        }).catch((err) => console.error("Failed to log audit event:", err));
-
         return NextResponse.json(
-            { success: true, data: toLeaveRequestDays(result) },
+            { success: true, data: createResponseData(result) },
             { status: 201 },
         );
     } catch (error) {
-        console.error("Leave request error:", error);
-        if (error instanceof LeaveRequestError) {
-            return jsonError(error.message, error.statusCode);
+        if (!transactionCommitted && storedAttachments.length > 0) {
+            await cleanupAttachments(storedAttachments);
         }
-        return jsonError(COMMON_API_MESSAGES.failedToSubmitLeaveRequest, 500);
+        return createErrorResponse(error);
     }
 }

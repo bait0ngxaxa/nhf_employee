@@ -70,6 +70,7 @@ describe("mutation rate limit", () => {
     });
 
     it.each([
+        ["leave-request-create", 10],
         ["stock-request-create", 10],
         ["stock-request-issue", 30],
         ["stock-request-cancel", 20],

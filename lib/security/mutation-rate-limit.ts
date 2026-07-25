@@ -15,6 +15,7 @@ interface MutationRateLimitPolicy {
 export type PreAuthRateLimitScope =
     | "auth-login"
     | "auth-refresh"
+    | "leave-request-create"
     | "stock-adjust"
     | "stock-request-cancel"
     | "stock-request-create"
@@ -32,6 +33,7 @@ export type AuthenticatedMutationRateLimitScope = Exclude<
 export const PRE_AUTH_IP_RATE_LIMIT_POLICIES = {
     "auth-login": { windowMs: 15 * 60 * 1000, maxRequests: 300 },
     "auth-refresh": { windowMs: 15 * 60 * 1000, maxRequests: 300 },
+    "leave-request-create": { windowMs: 15 * 60 * 1000, maxRequests: 60 },
     "stock-adjust": { windowMs: 15 * 60 * 1000, maxRequests: 300 },
     "stock-request-cancel": { windowMs: 15 * 60 * 1000, maxRequests: 300 },
     "stock-request-create": { windowMs: 15 * 60 * 1000, maxRequests: 300 },
@@ -43,6 +45,7 @@ export const PRE_AUTH_IP_RATE_LIMIT_POLICIES = {
 } as const satisfies Record<PreAuthRateLimitScope, MutationRateLimitPolicy>;
 
 export const AUTHENTICATED_MUTATION_RATE_LIMIT_POLICIES = {
+    "leave-request-create": { windowMs: 60 * 1000, maxRequests: 10 },
     "stock-adjust": { windowMs: 60 * 1000, maxRequests: 30 },
     "stock-request-cancel": { windowMs: 60 * 1000, maxRequests: 20 },
     "stock-request-create": { windowMs: 60 * 1000, maxRequests: 10 },
