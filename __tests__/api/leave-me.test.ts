@@ -79,4 +79,73 @@ describe("GET /api/leave/me", () => {
             skipDuplicates: true,
         });
     });
+
+    it("returns private attachment summaries without storage metadata", async () => {
+        vi.mocked(prisma.leaveRequest.findMany).mockResolvedValue([
+            {
+                id: "leave-1",
+                employeeId: 100,
+                leaveType: "SICK",
+                startDate: new Date("2027-01-04T00:00:00.000Z"),
+                endDate: new Date("2027-01-04T00:00:00.000Z"),
+                period: "FULL_DAY",
+                durationHalfDays: 2,
+                reason: "พักรักษาตัว",
+                emergencyReason: null,
+                specialReason: null,
+                overQuotaHalfDays: 0,
+                status: "PENDING",
+                approverId: 200,
+                approvedAt: null,
+                rejectReason: null,
+                notTakenReason: null,
+                notTakenRequestedAt: null,
+                notTakenConfirmedAt: null,
+                notTakenConfirmedById: null,
+                attachmentUrl: null,
+                createdAt: new Date("2027-01-01T00:00:00.000Z"),
+                updatedAt: new Date("2027-01-01T00:00:00.000Z"),
+                approver: null,
+                attachments: [
+                    {
+                        id: "attachment-1",
+                        contentType: "image/webp",
+                        sizeBytes: 12_345,
+                        width: 1200,
+                        height: 800,
+                    },
+                ],
+            },
+        ] as never);
+        vi.mocked(prisma.leaveRequest.count).mockResolvedValue(1);
+
+        const response = await getLeaveProfile(
+            new Request("http://localhost/api/leave/me?page=1&limit=10"),
+        );
+        const body = await response.json();
+
+        expect(body.history[0].attachments).toEqual([
+            {
+                id: "attachment-1",
+                contentType: "image/webp",
+                sizeBytes: 12_345,
+                width: 1200,
+                height: 800,
+                viewUrl: "/api/leave/attachments/attachment-1",
+            },
+        ]);
+        expect(JSON.stringify(body)).not.toContain("storageKey");
+        expect(prisma.leaveRequest.findMany).toHaveBeenCalledWith(
+            expect.objectContaining({
+                skip: 0,
+                take: 10,
+                orderBy: { createdAt: "desc" },
+                include: expect.objectContaining({
+                    attachments: expect.objectContaining({
+                        orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+                    }),
+                }),
+            }),
+        );
+    });
 });

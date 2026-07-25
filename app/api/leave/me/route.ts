@@ -5,6 +5,11 @@ import { requireActiveWorkforceSession } from "@/lib/auth/workforce";
 import { prisma } from "@/lib/db/prisma";
 import { getCurrentLeaveYear } from "@/lib/services/leave/quota-year";
 import { toLeaveQuotaDays, toLeaveRequestDays } from "@/lib/services/leave/half-days";
+import {
+    leaveAttachmentSummaryOrderBy,
+    leaveAttachmentSummarySelect,
+    withLeaveAttachmentSummaries,
+} from "@/lib/services/leave/attachment-summary";
 import { jsonError, notFound } from "@/lib/ssot/http";
 import { FEATURE_KEYS, isFeatureEnabled } from "@/lib/ssot/features";
 import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
@@ -78,6 +83,10 @@ export async function GET(req: Request) {
                             nickname: true,
                         },
                     },
+                    attachments: {
+                        select: leaveAttachmentSummarySelect,
+                        orderBy: leaveAttachmentSummaryOrderBy,
+                    },
                 },
             }),
             prisma.leaveRequest.count({ where: { employeeId } }),
@@ -85,7 +94,9 @@ export async function GET(req: Request) {
 
         return NextResponse.json({
             quotas: quotas.map(toLeaveQuotaDays),
-            history: history.map(toLeaveRequestDays),
+            history: history.map((request) =>
+                toLeaveRequestDays(withLeaveAttachmentSummaries(request)),
+            ),
             metadata: {
                 currentPage: page,
                 totalPages: Math.ceil(totalCount / limit),

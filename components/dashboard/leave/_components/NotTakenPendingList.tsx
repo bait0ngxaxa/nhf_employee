@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import type { PendingLeave } from "@/hooks/useLeaveApprovals";
 import { LEAVE_THEME_BUTTON_CLASS } from "../leaveTheme";
+import { LeaveAttachmentViewerButton } from "./LeaveAttachmentViewerButton";
 
 interface NotTakenPendingListProps {
     items: PendingLeave[];
@@ -53,14 +54,17 @@ export function NotTakenPendingList({
                                 </p>
                             ) : null}
                         </div>
-                        <Button
-                            disabled={isProcessing}
-                            className={`md:shrink-0 ${LEAVE_THEME_BUTTON_CLASS}`}
-                            onClick={() => onConfirm(leave.id)}
-                        >
-                            <RotateCcw className="h-4 w-4" aria-hidden="true" />
-                            ยืนยันคืนโควต้า
-                        </Button>
+                        <div className="flex flex-col gap-2 sm:flex-row md:shrink-0">
+                            <LeaveAttachmentViewerButton attachments={leave.attachments} />
+                            <Button
+                                disabled={isProcessing}
+                                className={LEAVE_THEME_BUTTON_CLASS}
+                                onClick={() => onConfirm(leave.id)}
+                            >
+                                <RotateCcw className="h-4 w-4" aria-hidden="true" />
+                                ยืนยันคืนโควต้า
+                            </Button>
+                        </div>
                     </div>
                 </Card>
             ))}

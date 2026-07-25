@@ -1,6 +1,7 @@
 import useSWR from "swr";
 import { apiGet } from "@/lib/client/api-client";
 import { API_ROUTES } from "@/lib/ssot/routes";
+import type { LeaveAttachmentSummary } from "@/lib/types/leave";
 
 const fetcher = async <T,>(url: string): Promise<T> => {
     const res = await apiGet<T>(url);
@@ -25,6 +26,7 @@ export interface PendingLeave {
     notTakenRequestedAt: string | null;
     notTakenConfirmedAt: string | null;
     createdAt: string;
+    attachments: LeaveAttachmentSummary[];
     employee: {
         firstName: string;
         lastName: string;

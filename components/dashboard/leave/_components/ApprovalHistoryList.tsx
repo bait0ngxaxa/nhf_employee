@@ -2,6 +2,7 @@ import { Clock } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import type { PendingLeave } from "@/hooks/useLeaveApprovals";
 import { formatThaiDateTimeWithTimeWord } from "@/lib/helpers/date-helpers";
+import { LeaveAttachmentViewerButton } from "./LeaveAttachmentViewerButton";
 import { LeaveStatusBadge } from "./LeaveStatusBadge";
 
 interface ApprovalHistoryListProps {
@@ -66,8 +67,9 @@ export function ApprovalHistoryList({ history }: ApprovalHistoryListProps) {
                             </p>
                         ) : null}
                     </div>
-                    <div className="md:shrink-0">
+                    <div className="flex flex-wrap items-center gap-2 md:shrink-0 md:justify-end">
                         <LeaveStatusBadge status={leave.status} />
+                        <LeaveAttachmentViewerButton attachments={leave.attachments} />
                     </div>
                 </Card>
             ))}

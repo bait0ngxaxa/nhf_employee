@@ -15,6 +15,7 @@ import { Card } from "@/components/ui/card";
 import type { PendingLeave } from "@/hooks/useLeaveApprovals";
 import { formatThaiDateTimeWithTimeWord } from "@/lib/helpers/date-helpers";
 import { LEAVE_THEME_BUTTON_CLASS } from "../leaveTheme";
+import { LeaveAttachmentViewerButton } from "./LeaveAttachmentViewerButton";
 
 interface PendingApprovalListProps {
     pending: PendingLeave[];
@@ -144,6 +145,10 @@ function PendingApprovalCard({
                 </div>
 
                 <div className="flex flex-col gap-2 sm:flex-row lg:w-40 lg:flex-col">
+                    <LeaveAttachmentViewerButton
+                        attachments={leave.attachments}
+                        className="w-full"
+                    />
                     <Button
                         onClick={() => onApprove(leave)}
                         disabled={isProcessing}

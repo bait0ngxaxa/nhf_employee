@@ -7,6 +7,11 @@ import { notFound } from "@/lib/ssot/http";
 import { FEATURE_KEYS, isFeatureEnabled } from "@/lib/ssot/features";
 import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
 import { toLeaveRequestDays } from "@/lib/services/leave/half-days";
+import {
+    leaveAttachmentSummaryOrderBy,
+    leaveAttachmentSummarySelect,
+    withLeaveAttachmentSummaries,
+} from "@/lib/services/leave/attachment-summary";
 
 const APPROVALS_PAGE_SIZE = 10;
 const APPROVALS_PAGINATION_MESSAGES = {
@@ -38,7 +43,7 @@ export async function GET(req: Request): Promise<NextResponse> {
 
         const managerId = auth.employeeId;
 
-        const employeeInclude = {
+        const requestInclude = {
             employee: {
                 select: {
                     firstName: true,
@@ -52,6 +57,10 @@ export async function GET(req: Request): Promise<NextResponse> {
                         },
                     },
                 },
+            },
+            attachments: {
+                select: leaveAttachmentSummarySelect,
+                orderBy: leaveAttachmentSummaryOrderBy,
             },
         } as const;
 
@@ -105,7 +114,7 @@ export async function GET(req: Request): Promise<NextResponse> {
                 orderBy: {
                     createdAt: "asc",
                 },
-                include: employeeInclude,
+                include: requestInclude,
             }),
             prisma.leaveRequest.count({ where: pendingWhere }),
             prisma.leaveRequest.findMany({
@@ -115,7 +124,7 @@ export async function GET(req: Request): Promise<NextResponse> {
                 orderBy: {
                     notTakenRequestedAt: "asc",
                 },
-                include: employeeInclude,
+                include: requestInclude,
             }),
             prisma.leaveRequest.count({ where: notTakenWhere }),
             prisma.leaveRequest.findMany({
@@ -125,15 +134,21 @@ export async function GET(req: Request): Promise<NextResponse> {
                 orderBy: {
                     updatedAt: "desc",
                 },
-                include: employeeInclude,
+                include: requestInclude,
             }),
             prisma.leaveRequest.count({ where: historyWhere }),
         ]);
 
         return NextResponse.json({
-            pending: pendingApprovals.map(toLeaveRequestDays),
-            notTakenPending: notTakenPending.map(toLeaveRequestDays),
-            history: approvalHistory.map(toLeaveRequestDays),
+            pending: pendingApprovals.map((request) =>
+                toLeaveRequestDays(withLeaveAttachmentSummaries(request)),
+            ),
+            notTakenPending: notTakenPending.map((request) =>
+                toLeaveRequestDays(withLeaveAttachmentSummaries(request)),
+            ),
+            history: approvalHistory.map((request) =>
+                toLeaveRequestDays(withLeaveAttachmentSummaries(request)),
+            ),
             metadata: {
                 pending: createMetadata(pendingPage, pendingCount),
                 notTakenPending: createMetadata(notTakenPage, notTakenCount),

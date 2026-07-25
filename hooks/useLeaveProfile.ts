@@ -3,6 +3,7 @@ import { apiPost } from "@/lib/client/api-client";
 import { apiGet } from "@/lib/client/api-client";
 import { API_ROUTES } from "@/lib/ssot/routes";
 import { submitLeaveNotTakenRequest } from "@/lib/services/leave/client";
+import type { LeaveAttachmentSummary } from "@/lib/types/leave";
 
 const fetcher = async <T,>(url: string): Promise<T> => {
     const res = await apiGet<T>(url);
@@ -41,7 +42,7 @@ export interface LeaveRequest {
     notTakenRequestedAt: string | null;
     notTakenConfirmedAt: string | null;
     notTakenConfirmedById: number | null;
-    attachmentUrl: string | null;
+    attachments: LeaveAttachmentSummary[];
     createdAt: string;
     updatedAt: string;
     approver?: {

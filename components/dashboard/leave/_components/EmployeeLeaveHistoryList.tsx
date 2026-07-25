@@ -5,6 +5,7 @@ import { Pagination } from "@/components/Pagination";
 import type { LeaveRequest } from "@/hooks/useLeaveProfile";
 import { formatThaiDateTimeWithTimeWord } from "@/lib/helpers/date-helpers";
 import { isAfterLeaveEnd } from "@/lib/services/leave/utils";
+import { LeaveAttachmentViewerButton } from "./LeaveAttachmentViewerButton";
 import { LeaveStatusBadge } from "./LeaveStatusBadge";
 
 interface LeaveHistoryMetadata {
@@ -125,6 +126,7 @@ function LeaveHistoryItem({
                 </div>
                 <div className="flex flex-wrap items-center gap-2 lg:justify-end">
                     <LeaveStatusBadge status={request.status} />
+                    <LeaveAttachmentViewerButton attachments={request.attachments} />
                     {request.status === "PENDING" ? (
                         <Button
                             variant="outline"

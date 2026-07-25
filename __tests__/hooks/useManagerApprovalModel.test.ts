@@ -43,6 +43,7 @@ describe("useManagerApprovalModel", () => {
         notTakenRequestedAt: null,
         notTakenConfirmedAt: null,
         createdAt: "2030-01-01",
+        attachments: [],
         employee: {
             firstName: "A",
             lastName: "B",

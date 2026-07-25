@@ -1,4 +1,5 @@
 import { apiGet, apiPost, apiPut, type ApiResponse } from "@/lib/client/api-client";
+import { fetchWithRefresh } from "@/lib/auth/client";
 import { triggerDownload } from "@/lib/helpers/download";
 import { API_ROUTES } from "@/lib/ssot/routes";
 import type { LeaveRequestValues } from "@/lib/validations/leave";
@@ -107,6 +108,29 @@ export const submitLeaveRequest = async (
         formData,
     );
     ensureSuccess(response);
+};
+
+export const fetchLeaveAttachmentImage = async (
+    attachmentId: string,
+    signal?: AbortSignal,
+): Promise<Blob> => {
+    const response = await fetchWithRefresh(
+        API_ROUTES.leave.attachmentById(attachmentId),
+        {
+            cache: "no-store",
+            credentials: "include",
+            ...(signal ? { signal } : {}),
+        },
+    );
+    if (!response.ok) {
+        throw new Error("Private attachment request failed");
+    }
+
+    const blob = await response.blob();
+    if (blob.type !== "image/webp") {
+        throw new Error("Unexpected private attachment content type");
+    }
+    return blob;
 };
 
 export const submitLeaveDecision = async (payload: LeaveDecisionPayload): Promise<void> => {
