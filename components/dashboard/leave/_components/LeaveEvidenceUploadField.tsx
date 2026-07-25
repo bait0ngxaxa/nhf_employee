@@ -114,13 +114,13 @@ export function LeaveEvidenceUploadField({
                     htmlFor={inputId}
                     className="text-sm font-medium text-foreground"
                 >
-                    หลักฐานประกอบ{" "}
+                    ไฟล์แนบประกอบคำขอลา{" "}
                     <span className="font-normal text-muted-foreground">
                         (ไม่บังคับ)
                     </span>
                 </label>
                 <span className="text-xs font-medium text-muted-foreground">
-                    {attachments.length}/{LEAVE_ATTACHMENT_MAX_FILES} รูป
+                    {attachments.length}/{LEAVE_ATTACHMENT_MAX_FILES} ไฟล์
                 </span>
             </div>
 
@@ -135,7 +135,7 @@ export function LeaveEvidenceUploadField({
                     multiple
                     accept={LEAVE_ATTACHMENT_ACCEPTED_TYPES.join(",")}
                     disabled={pickerDisabled}
-                    aria-label="เลือกหลักฐานประกอบการลา"
+                    aria-label="เลือกไฟล์รูปภาพประกอบคำขอลา"
                     aria-describedby={describedBy}
                     className="sr-only"
                     onChange={handleFileChange}
@@ -151,7 +151,7 @@ export function LeaveEvidenceUploadField({
                                 <div className="relative aspect-[4/3] bg-muted">
                                     <Image
                                         src={url}
-                                        alt={`ตัวอย่างหลักฐาน ${file.name}`}
+                                        alt={`ตัวอย่างรูปภาพ ${file.name}`}
                                         fill
                                         sizes="(max-width: 640px) 100vw, 320px"
                                         unoptimized
@@ -175,7 +175,7 @@ export function LeaveEvidenceUploadField({
                                         variant="ghost"
                                         size="icon-sm"
                                         disabled={disabled}
-                                        aria-label={`ลบหลักฐาน ${file.name}`}
+                                        aria-label={`ลบไฟล์แนบ ${file.name}`}
                                         onClick={() => removeAttachment(index)}
                                         className="text-destructive hover:bg-destructive/10 hover:text-destructive"
                                     >
@@ -187,7 +187,7 @@ export function LeaveEvidenceUploadField({
                     </div>
                 ) : (
                     <div className="py-2 text-center text-sm text-muted-foreground">
-                        ยังไม่ได้แนบหลักฐาน
+                        ยังไม่มีไฟล์แนบ
                     </div>
                 )}
 
@@ -201,8 +201,8 @@ export function LeaveEvidenceUploadField({
                     >
                         <ImagePlus aria-hidden="true" />
                         {attachments.length > 0
-                            ? "เพิ่มรูปหลักฐาน"
-                            : "เลือกรูปหลักฐาน"}
+                            ? "เพิ่มรูปภาพ"
+                            : "เลือกรูปภาพ"}
                     </Button>
                     <p
                         id={descriptionId}
@@ -220,7 +220,7 @@ export function LeaveEvidenceUploadField({
                     className="mt-0.5 size-4 shrink-0 text-primary"
                 />
                 <p>
-                    ไฟล์เป็นข้อมูลส่วนบุคคลและใช้ประกอบการพิจารณาคำขอลาเท่านั้น
+                    ไฟล์แนบเป็นข้อมูลส่วนบุคคลและใช้ประกอบการพิจารณาคำขอลาเท่านั้น
                 </p>
             </div>
 

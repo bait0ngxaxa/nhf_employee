@@ -33,7 +33,7 @@ function EvidenceHarness({
                 }
             />
             <button type="button" onClick={() => setAttachments([])}>
-                รีเซ็ตหลักฐาน
+                รีเซ็ตไฟล์แนบ
             </button>
         </>
     );
@@ -69,16 +69,16 @@ describe("LeaveEvidenceUploadField", () => {
         });
 
         fireEvent.change(
-            screen.getByLabelText("เลือกหลักฐานประกอบการลา"),
+            screen.getByLabelText("เลือกไฟล์รูปภาพประกอบคำขอลา"),
             { target: { files: [file] } },
         );
 
         expect(
-            await screen.findByAltText("ตัวอย่างหลักฐาน proof.jpg"),
+            await screen.findByAltText("ตัวอย่างรูปภาพ proof.jpg"),
         ).toBeInTheDocument();
         expect(screen.getByText("proof.jpg")).toBeInTheDocument();
         expect(screen.getByText("2 KB")).toBeInTheDocument();
-        expect(screen.getByText("1/3 รูป")).toBeInTheDocument();
+        expect(screen.getByText("1/3 ไฟล์")).toBeInTheDocument();
         expect(createObjectURL).toHaveBeenCalledTimes(1);
     });
 
@@ -90,17 +90,17 @@ describe("LeaveEvidenceUploadField", () => {
         ];
 
         fireEvent.change(
-            screen.getByLabelText("เลือกหลักฐานประกอบการลา"),
+            screen.getByLabelText("เลือกไฟล์รูปภาพประกอบคำขอลา"),
             { target: { files } },
         );
 
         expect(
-            await screen.findByAltText("ตัวอย่างหลักฐาน first.jpg"),
+            await screen.findByAltText("ตัวอย่างรูปภาพ first.jpg"),
         ).toBeInTheDocument();
         expect(
-            screen.getByAltText("ตัวอย่างหลักฐาน second.png"),
+            screen.getByAltText("ตัวอย่างรูปภาพ second.png"),
         ).toBeInTheDocument();
-        expect(screen.getByText("2/3 รูป")).toBeInTheDocument();
+        expect(screen.getByText("2/3 ไฟล์")).toBeInTheDocument();
     });
 
     it("removes an image and revokes only its object URL", async () => {
@@ -108,17 +108,17 @@ describe("LeaveEvidenceUploadField", () => {
             type: "image/webp",
         });
         render(<EvidenceHarness initialAttachments={[file]} />);
-        await screen.findByAltText("ตัวอย่างหลักฐาน proof.webp");
+        await screen.findByAltText("ตัวอย่างรูปภาพ proof.webp");
 
         fireEvent.click(
             screen.getByRole("button", {
-                name: "ลบหลักฐาน proof.webp",
+                name: "ลบไฟล์แนบ proof.webp",
             }),
         );
 
         await waitFor(() =>
             expect(
-                screen.queryByAltText("ตัวอย่างหลักฐาน proof.webp"),
+                screen.queryByAltText("ตัวอย่างรูปภาพ proof.webp"),
             ).not.toBeInTheDocument(),
         );
         expect(revokeObjectURL).toHaveBeenCalledTimes(1);
@@ -132,10 +132,10 @@ describe("LeaveEvidenceUploadField", () => {
         const { unmount } = render(
             <EvidenceHarness initialAttachments={files} />,
         );
-        await screen.findByAltText("ตัวอย่างหลักฐาน first.jpg");
+        await screen.findByAltText("ตัวอย่างรูปภาพ first.jpg");
 
         fireEvent.click(
-            screen.getByRole("button", { name: "รีเซ็ตหลักฐาน" }),
+            screen.getByRole("button", { name: "รีเซ็ตไฟล์แนบ" }),
         );
 
         await waitFor(() =>
@@ -143,7 +143,7 @@ describe("LeaveEvidenceUploadField", () => {
         );
 
         fireEvent.change(
-            screen.getByLabelText("เลือกหลักฐานประกอบการลา"),
+            screen.getByLabelText("เลือกไฟล์รูปภาพประกอบคำขอลา"),
             {
                 target: {
                     files: [
@@ -154,7 +154,7 @@ describe("LeaveEvidenceUploadField", () => {
                 },
             },
         );
-        await screen.findByAltText("ตัวอย่างหลักฐาน third.webp");
+        await screen.findByAltText("ตัวอย่างรูปภาพ third.webp");
         unmount();
 
         expect(revokeObjectURL).toHaveBeenCalledTimes(3);
@@ -168,28 +168,28 @@ describe("LeaveEvidenceUploadField", () => {
             <EvidenceHarness
                 initialAttachments={[file]}
                 disabled
-                error="แนบหลักฐานได้สูงสุด 3 รูป"
+                error="แนบไฟล์ได้สูงสุด 3 ไฟล์"
             />,
         );
-        await screen.findByAltText("ตัวอย่างหลักฐาน proof.jpg");
+        await screen.findByAltText("ตัวอย่างรูปภาพ proof.jpg");
 
         expect(screen.getByRole("alert")).toHaveTextContent(
-            "แนบหลักฐานได้สูงสุด 3 รูป",
+            "แนบไฟล์ได้สูงสุด 3 ไฟล์",
         );
         expect(
-            screen.getByLabelText("เลือกหลักฐานประกอบการลา"),
+            screen.getByLabelText("เลือกไฟล์รูปภาพประกอบคำขอลา"),
         ).toBeDisabled();
         expect(
-            screen.getByRole("button", { name: "เพิ่มรูปหลักฐาน" }),
+            screen.getByRole("button", { name: "เพิ่มรูปภาพ" }),
         ).toBeDisabled();
         expect(
-            screen.getByRole("button", { name: "ลบหลักฐาน proof.jpg" }),
+            screen.getByRole("button", { name: "ลบไฟล์แนบ proof.jpg" }),
         ).toBeDisabled();
     });
 
     it("explains that evidence is optional private information", () => {
         render(<EvidenceHarness />);
-        const input = screen.getByLabelText("เลือกหลักฐานประกอบการลา");
+        const input = screen.getByLabelText("เลือกไฟล์รูปภาพประกอบคำขอลา");
 
         expect(screen.getByText(/ไม่บังคับ/)).toBeInTheDocument();
         expect(input).toHaveAttribute(
@@ -199,7 +199,7 @@ describe("LeaveEvidenceUploadField", () => {
         expect(input).toHaveAttribute("multiple");
         expect(
             screen.getByText(
-                "ไฟล์เป็นข้อมูลส่วนบุคคลและใช้ประกอบการพิจารณาคำขอลาเท่านั้น",
+                "ไฟล์แนบเป็นข้อมูลส่วนบุคคลและใช้ประกอบการพิจารณาคำขอลาเท่านั้น",
             ),
         ).toBeInTheDocument();
     });

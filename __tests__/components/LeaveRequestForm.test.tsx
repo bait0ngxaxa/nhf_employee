@@ -178,10 +178,10 @@ describe("LeaveRequestForm", () => {
             type: "image/jpeg",
         });
         fireEvent.change(
-            screen.getByLabelText("เลือกหลักฐานประกอบการลา"),
+            screen.getByLabelText("เลือกไฟล์รูปภาพประกอบคำขอลา"),
             { target: { files: [file] } },
         );
-        await screen.findByAltText("ตัวอย่างหลักฐาน proof.jpg");
+        await screen.findByAltText("ตัวอย่างรูปภาพ proof.jpg");
         fireEvent.change(screen.getByLabelText("เหตุผลการลา"), {
             target: { value: "พักรักษาตัวตามคำแนะนำแพทย์" },
         });
@@ -212,7 +212,7 @@ describe("LeaveRequestForm", () => {
             type: "image/png",
         });
         fireEvent.change(
-            screen.getByLabelText("เลือกหลักฐานประกอบการลา"),
+            screen.getByLabelText("เลือกไฟล์รูปภาพประกอบคำขอลา"),
             { target: { files: [file] } },
         );
         fireEvent.change(screen.getByLabelText("เหตุผลการลา"), {
@@ -223,7 +223,7 @@ describe("LeaveRequestForm", () => {
 
         await screen.findByText("ระบบไม่พร้อมใช้งาน");
         expect(
-            screen.getByAltText("ตัวอย่างหลักฐาน proof.png"),
+            screen.getByAltText("ตัวอย่างรูปภาพ proof.png"),
         ).toBeInTheDocument();
         expect(revokeObjectURL).not.toHaveBeenCalled();
     });
@@ -241,10 +241,10 @@ describe("LeaveRequestForm", () => {
             type: "image/webp",
         });
         fireEvent.change(
-            screen.getByLabelText("เลือกหลักฐานประกอบการลา"),
+            screen.getByLabelText("เลือกไฟล์รูปภาพประกอบคำขอลา"),
             { target: { files: [file] } },
         );
-        await screen.findByAltText("ตัวอย่างหลักฐาน proof.webp");
+        await screen.findByAltText("ตัวอย่างรูปภาพ proof.webp");
         fireEvent.change(screen.getByLabelText("เหตุผลการลา"), {
             target: { value: "พักรักษาตัวตามคำแนะนำแพทย์" },
         });
@@ -253,7 +253,7 @@ describe("LeaveRequestForm", () => {
 
         await waitFor(() =>
             expect(
-                screen.queryByAltText("ตัวอย่างหลักฐาน proof.webp"),
+                screen.queryByAltText("ตัวอย่างรูปภาพ proof.webp"),
             ).not.toBeInTheDocument(),
         );
         expect(revokeObjectURL).toHaveBeenCalledWith(
@@ -274,16 +274,16 @@ describe("LeaveRequestForm", () => {
             type: "image/jpeg",
         });
         fireEvent.change(
-            screen.getByLabelText("เลือกหลักฐานประกอบการลา"),
+            screen.getByLabelText("เลือกไฟล์รูปภาพประกอบคำขอลา"),
             { target: { files: [file] } },
         );
-        await screen.findByAltText("ตัวอย่างหลักฐาน proof.jpg");
+        await screen.findByAltText("ตัวอย่างรูปภาพ proof.jpg");
 
         fireEvent.click(screen.getByRole("button", { name: "ยกเลิก" }));
 
         await waitFor(() =>
             expect(
-                screen.queryByAltText("ตัวอย่างหลักฐาน proof.jpg"),
+                screen.queryByAltText("ตัวอย่างรูปภาพ proof.jpg"),
             ).not.toBeInTheDocument(),
         );
         expect(revokeObjectURL).toHaveBeenCalledWith(

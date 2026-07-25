@@ -173,7 +173,7 @@ export function useLeaveRequestFormModel({
             setAttachmentError(
                 error instanceof LeaveAttachmentValidationError
                     ? error.message
-                    : "ไม่สามารถตรวจสอบไฟล์หลักฐานได้",
+                    : "ไม่สามารถตรวจสอบไฟล์แนบได้",
             );
             return;
         }

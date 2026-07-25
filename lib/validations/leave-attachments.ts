@@ -27,7 +27,7 @@ export function validateLeaveAttachments(
 ): void {
     if (files.length > LEAVE_ATTACHMENT_MAX_FILES) {
         throw new LeaveAttachmentValidationError(
-            `แนบหลักฐานได้สูงสุด ${LEAVE_ATTACHMENT_MAX_FILES} ไฟล์`,
+            `แนบไฟล์ได้สูงสุด ${LEAVE_ATTACHMENT_MAX_FILES} ไฟล์`,
         );
     }
 
@@ -50,7 +50,7 @@ export function validateLeaveAttachments(
         }
         if (file.size > LEAVE_ATTACHMENT_MAX_BYTES) {
             throw new LeaveAttachmentValidationError(
-                `ไฟล์หลักฐานแต่ละไฟล์ต้องมีขนาดไม่เกิน ${LEAVE_ATTACHMENT_MAX_MB} MB`,
+                `ไฟล์รูปภาพแต่ละไฟล์ต้องมีขนาดไม่เกิน ${LEAVE_ATTACHMENT_MAX_MB} MB`,
             );
         }
         totalBytes += file.size;
@@ -58,7 +58,7 @@ export function validateLeaveAttachments(
 
     if (totalBytes > LEAVE_ATTACHMENT_MAX_TOTAL_BYTES) {
         throw new LeaveAttachmentValidationError(
-            `ไฟล์หลักฐานรวมต้องมีขนาดไม่เกิน ${LEAVE_ATTACHMENT_MAX_TOTAL_MB} MB`,
+            `ไฟล์รูปภาพรวมต้องมีขนาดไม่เกิน ${LEAVE_ATTACHMENT_MAX_TOTAL_MB} MB`,
         );
     }
 }

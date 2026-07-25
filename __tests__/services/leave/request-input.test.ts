@@ -102,7 +102,7 @@ describe("parseLeaveRequestInput", () => {
 
         await expect(parseLeaveRequestInput(request)).rejects.toMatchObject({
             statusCode: 400,
-            message: "ไฟล์หลักฐานไม่ถูกต้อง",
+            message: "ไฟล์แนบไม่ถูกต้อง",
         });
     });
 

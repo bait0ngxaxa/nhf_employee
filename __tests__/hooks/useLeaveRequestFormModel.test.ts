@@ -119,7 +119,7 @@ describe("useLeaveRequestFormModel", () => {
 
         expect(result.current.attachments).toEqual([]);
         expect(result.current.attachmentError).toBe(
-            "แนบหลักฐานได้สูงสุด 3 ไฟล์",
+            "แนบไฟล์ได้สูงสุด 3 ไฟล์",
         );
     });
 
@@ -155,7 +155,7 @@ describe("useLeaveRequestFormModel", () => {
 
         expect(result.current.attachments).toEqual([]);
         expect(result.current.attachmentError).toBe(
-            "ไฟล์หลักฐานแต่ละไฟล์ต้องมีขนาดไม่เกิน 8 MB",
+            "ไฟล์รูปภาพแต่ละไฟล์ต้องมีขนาดไม่เกิน 8 MB",
         );
     });
 
@@ -178,7 +178,7 @@ describe("useLeaveRequestFormModel", () => {
 
         expect(result.current.attachments).toEqual([]);
         expect(result.current.attachmentError).toBe(
-            "ไฟล์หลักฐานรวมต้องมีขนาดไม่เกิน 20 MB",
+            "ไฟล์รูปภาพรวมต้องมีขนาดไม่เกิน 20 MB",
         );
     });
 

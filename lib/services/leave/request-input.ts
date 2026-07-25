@@ -79,7 +79,7 @@ async function parseMultipartRequest(
 
     const rawAttachments = formData.getAll("attachments");
     if (rawAttachments.some((entry) => typeof entry === "string")) {
-        throw new LeaveRequestInputError("ไฟล์หลักฐานไม่ถูกต้อง", 400);
+        throw new LeaveRequestInputError("ไฟล์แนบไม่ถูกต้อง", 400);
     }
 
     const payload = parsePayload(parseJsonString(rawPayload));
