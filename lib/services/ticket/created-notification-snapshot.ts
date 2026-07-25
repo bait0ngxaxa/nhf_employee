@@ -14,55 +14,50 @@ import {
 } from "./notification-snapshot-common";
 import type { TicketWithRelations } from "./types";
 
-export const ticketUpdatedNotificationSnapshotSchema = z.object({
+export const ticketCreatedNotificationSnapshotSchema = z.object({
     ticketId: z.number().int().positive(),
-    oldStatus: z.nativeEnum(TicketStatus),
-    newStatus: z.nativeEnum(TicketStatus),
     title: z.string().min(1),
     description: z.string(),
-    category: z.nativeEnum(TicketCategory),
-    priority: z.nativeEnum(TicketPriority),
+    category: z.enum(TicketCategory),
+    priority: z.enum(TicketPriority),
+    status: z.enum(TicketStatus),
     reportedBy: ticketNotificationUserSchema,
-    assignedTo: assignedTicketNotificationUserSchema.optional(),
-    createdAt: z.string().datetime(),
-    occurredAt: z.string().datetime(),
+    assignedTo: assignedTicketNotificationUserSchema.nullable(),
+    createdAt: z.iso.datetime(),
 });
 
-export type TicketUpdatedNotificationSnapshot = z.infer<
-    typeof ticketUpdatedNotificationSnapshotSchema
+export type TicketCreatedNotificationSnapshot = z.infer<
+    typeof ticketCreatedNotificationSnapshotSchema
 >;
 
-export function buildTicketUpdatedNotificationSnapshot(
+export function buildTicketCreatedNotificationSnapshot(
     ticket: TicketWithRelations,
-    oldStatus: TicketStatus,
-): TicketUpdatedNotificationSnapshot {
+): TicketCreatedNotificationSnapshot {
     return {
         ticketId: ticket.id,
-        oldStatus,
-        newStatus: ticket.status,
         title: ticket.title,
         description: ticket.description,
         category: ticket.category,
         priority: ticket.priority,
+        status: ticket.status,
         reportedBy: buildTicketNotificationReportedBy(ticket),
-        assignedTo: buildTicketNotificationAssignedTo(ticket),
+        assignedTo: buildTicketNotificationAssignedTo(ticket) ?? null,
         createdAt: ticket.createdAt.toISOString(),
-        occurredAt: ticket.updatedAt.toISOString(),
     };
 }
 
-export function parseTicketUpdatedNotificationSnapshot(
+export function parseTicketCreatedNotificationSnapshot(
     payload: unknown,
-): TicketUpdatedNotificationSnapshot {
-    const result = ticketUpdatedNotificationSnapshotSchema.safeParse(payload);
+): TicketCreatedNotificationSnapshot {
+    const result = ticketCreatedNotificationSnapshotSchema.safeParse(payload);
     if (!result.success) {
-        throw new Error("Invalid ticket updated payload");
+        throw new Error("Invalid ticket created payload");
     }
     return result.data;
 }
 
-export function toTicketEmailData(
-    snapshot: TicketUpdatedNotificationSnapshot,
+export function toTicketCreatedEmailData(
+    snapshot: TicketCreatedNotificationSnapshot,
 ): TicketEmailData {
     return {
         ticketId: snapshot.ticketId,
@@ -70,10 +65,9 @@ export function toTicketEmailData(
         description: snapshot.description,
         category: snapshot.category,
         priority: snapshot.priority,
-        status: snapshot.newStatus,
+        status: snapshot.status,
         reportedBy: snapshot.reportedBy,
-        assignedTo: snapshot.assignedTo,
+        assignedTo: snapshot.assignedTo ?? undefined,
         createdAt: snapshot.createdAt,
-        updatedAt: snapshot.occurredAt,
     };
 }

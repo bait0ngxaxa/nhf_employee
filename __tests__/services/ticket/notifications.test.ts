@@ -13,6 +13,9 @@ import {
 } from "@/lib/services/ticket/notifications";
 import type { TicketWithRelations } from "@/lib/services/ticket/types";
 import {
+    buildTicketCreatedNotificationSnapshot,
+} from "@/lib/services/ticket/created-notification-snapshot";
+import {
     buildTicketUpdatedNotificationSnapshot,
 } from "@/lib/services/ticket/update-notification-snapshot";
 
@@ -86,9 +89,10 @@ describe("ticket notification delivery", () => {
 
     it("keeps created in-app delivery independent from failed LINE delivery", async () => {
         vi.mocked(lineNotificationService.sendITTeamNotification).mockResolvedValue(false);
+        const snapshot = buildTicketCreatedNotificationSnapshot(buildTicket());
 
-        await sendTicketCreatedInAppNotification(buildTicket(), "created-in-app");
-        await expect(sendTicketCreatedLineNotification(buildTicket())).rejects.toThrow(
+        await sendTicketCreatedInAppNotification(snapshot, "created-in-app");
+        await expect(sendTicketCreatedLineNotification(snapshot)).rejects.toThrow(
             "TICKET_CREATED LINE notification failed",
         );
 

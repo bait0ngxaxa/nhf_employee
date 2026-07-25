@@ -9,52 +9,14 @@ import {
     createLineRetryKey,
 } from "@/lib/services/outbox/provider-key";
 import { APP_ROUTES } from "@/lib/ssot/routes";
-import type { TicketEmailData } from "@/types/api";
-import type { TicketWithRelations } from "./types";
+import {
+    toTicketCreatedEmailData,
+    type TicketCreatedNotificationSnapshot,
+} from "./created-notification-snapshot";
 import {
     toTicketEmailData,
     type TicketUpdatedNotificationSnapshot,
 } from "./update-notification-snapshot";
-
-function getUserDisplayName(
-    user: TicketWithRelations["reportedBy"],
-): string {
-    if (user.employee?.firstName && user.employee?.lastName) {
-        return `${user.employee.firstName} ${user.employee.lastName}`;
-    }
-
-    return user.name;
-}
-
-function buildEmailData(ticket: TicketWithRelations): TicketEmailData {
-    const assignedToData = ticket.assignedTo
-        ? {
-              name:
-                  ticket.assignedTo.employee?.firstName &&
-                  ticket.assignedTo.employee?.lastName
-                      ? `${ticket.assignedTo.employee.firstName} ${ticket.assignedTo.employee.lastName}`
-                      : ticket.assignedTo.name,
-              email: ticket.assignedTo.email,
-          }
-        : undefined;
-
-    return {
-        ticketId: ticket.id,
-        title: ticket.title,
-        description: ticket.description,
-        category: ticket.category,
-        priority: ticket.priority,
-        status: ticket.status,
-        reportedBy: {
-            name: getUserDisplayName(ticket.reportedBy),
-            email: ticket.reportedBy.email,
-            department: ticket.reportedBy.employee?.dept?.name,
-        },
-        assignedTo: assignedToData,
-        createdAt: ticket.createdAt.toISOString(),
-        updatedAt: ticket.updatedAt?.toISOString(),
-    };
-}
 
 function getTicketActionUrl(ticketId: number): string {
     return `${APP_ROUTES.dashboard}?tab=it-support&ticketId=${ticketId}`;
@@ -70,15 +32,15 @@ async function assertDelivery(
 }
 
 export async function sendTicketCreatedInAppNotification(
-    ticket: TicketWithRelations,
-    eventKey = `ticket:${ticket.id}:TICKET_CREATED`,
+    snapshot: TicketCreatedNotificationSnapshot,
+    eventKey = `ticket:${snapshot.ticketId}:TICKET_CREATED`,
 ): Promise<void> {
     await createAdminInAppNotificationsOnce({
         type: "TICKET_CREATED",
         title: "คำขอ IT Support ใหม่",
-        message: `${getUserDisplayName(ticket.reportedBy)} แจ้ง "${ticket.title}" (ความสำคัญ: ${ticket.priority})`,
-        actionUrl: getTicketActionUrl(ticket.id),
-        referenceId: ticket.id.toString(),
+        message: `${snapshot.reportedBy.name} แจ้ง "${snapshot.title}" (ความสำคัญ: ${snapshot.priority})`,
+        actionUrl: getTicketActionUrl(snapshot.ticketId),
+        referenceId: snapshot.ticketId.toString(),
         dedupeKeyPrefix: eventKey,
     });
 }
@@ -97,12 +59,12 @@ export async function sendTicketUpdatedInAppNotification(
     });
 }
 export async function sendTicketCreatedLineNotification(
-    ticket: TicketWithRelations,
+    snapshot: TicketCreatedNotificationSnapshot,
     eventKey?: string,
 ): Promise<void> {
-    const emailData = buildEmailData(ticket);
+    const emailData = toTicketCreatedEmailData(snapshot);
     const isPriorityTicket =
-        ticket.priority === "HIGH" || ticket.priority === "URGENT";
+        snapshot.priority === "HIGH" || snapshot.priority === "URGENT";
     const isSent = isPriorityTicket
         ? await lineNotificationService.sendITTeamNotification(
             emailData,
@@ -117,12 +79,12 @@ export async function sendTicketCreatedLineNotification(
 }
 
 export async function sendTicketCreatedReporterEmailNotification(
-    ticket: TicketWithRelations,
+    snapshot: TicketCreatedNotificationSnapshot,
     eventKey?: string,
 ): Promise<void> {
     await assertDelivery(
         await emailService.sendNewTicketNotification(
-            buildEmailData(ticket),
+            toTicketCreatedEmailData(snapshot),
             eventKey ? createEmailMessageId(eventKey) : undefined,
         ),
         "TICKET_CREATED reporter email",
@@ -130,12 +92,12 @@ export async function sendTicketCreatedReporterEmailNotification(
 }
 
 export async function sendTicketCreatedITEmailNotification(
-    ticket: TicketWithRelations,
+    snapshot: TicketCreatedNotificationSnapshot,
     eventKey?: string,
 ): Promise<void> {
     await assertDelivery(
         await emailService.sendITTeamNotification(
-            buildEmailData(ticket),
+            toTicketCreatedEmailData(snapshot),
             eventKey ? createEmailMessageId(eventKey) : undefined,
         ),
         "TICKET_CREATED IT email",

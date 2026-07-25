@@ -18,6 +18,9 @@ import {
     sendTicketUpdatedReporterEmailNotification,
 } from "@/lib/services/ticket/notifications";
 import type {
+    TicketCreatedNotificationSnapshot,
+} from "@/lib/services/ticket/created-notification-snapshot";
+import type {
     TicketUpdatedNotificationSnapshot,
 } from "@/lib/services/ticket/update-notification-snapshot";
 import {
@@ -119,6 +122,24 @@ function buildTicketUpdatedSnapshot(): TicketUpdatedNotificationSnapshot {
     };
 }
 
+function buildTicketCreatedSnapshot(): TicketCreatedNotificationSnapshot {
+    return {
+        ticketId: 1,
+        title: "Test Ticket",
+        description: "desc",
+        category: "HARDWARE",
+        priority: "LOW",
+        status: "OPEN",
+        reportedBy: {
+            id: 1,
+            name: "U",
+            email: "u@test.com",
+        },
+        assignedTo: null,
+        createdAt: "2026-07-24T01:00:00.000Z",
+    };
+}
+
 function buildLeavePayload() {
     return {
         leaveId: "leave-1",
@@ -185,36 +206,22 @@ describe("processOutbox", () => {
                 buildNotification(
                     100,
                     "TICKET_CREATED_EMAIL_REPORTER",
-                    JSON.stringify({ ticketId: 1 }),
+                    JSON.stringify(buildTicketCreatedSnapshot()),
                     "ticket:1:created:email:reporter:1",
                 ),
             ]),
         );
-        prismaMock.ticket.findUnique.mockResolvedValue(
-            asNever({
-                id: 1,
-                title: "Test Ticket",
-                description: "desc",
-                category: "HARDWARE",
-                priority: "LOW",
-                status: "OPEN",
-                reportedById: 1,
-                assignedToId: null,
-                resolution: null,
-                resolvedAt: null,
-                createdAt: new Date(),
-                updatedAt: new Date(),
-                reportedBy: { id: 1, name: "U", email: "u@test.com", employee: null },
-                assignedTo: null,
-            }),
-        );
-
         const result = await processOutbox();
 
         expect(result).toEqual({ processed: 1, failed: 0 });
         expect(sendTicketCreatedReporterEmailNotification).toHaveBeenCalledTimes(1);
+        expect(sendTicketCreatedReporterEmailNotification).toHaveBeenCalledWith(
+            buildTicketCreatedSnapshot(),
+            "ticket:1:created:email:reporter:1",
+        );
         expect(sendTicketCreatedLineNotification).not.toHaveBeenCalled();
         expect(sendTicketCreatedInAppNotification).not.toHaveBeenCalled();
+        expect(prismaMock.ticket.findUnique).not.toHaveBeenCalled();
         expect(prismaMock.notificationOutbox.updateMany).toHaveBeenCalledWith(
             expect.objectContaining({
                 where: { id: 100, status: "PROCESSING" },
@@ -249,6 +256,31 @@ describe("processOutbox", () => {
         expect(prismaMock.ticket.findUnique).not.toHaveBeenCalled();
     });
 
+    it("supersedes legacy created events that cannot be delivered accurately", async () => {
+        prismaMock.notificationOutbox.findMany.mockResolvedValue(
+            asNever([
+                buildNotification(
+                    123,
+                    "TICKET_CREATED_EMAIL_REPORTER",
+                    JSON.stringify({ ticketId: 1 }),
+                    "ticket:1:created:email:reporter:1",
+                ),
+            ]),
+        );
+
+        const result = await processOutbox();
+
+        expect(result).toEqual({ processed: 1, failed: 0 });
+        expect(sendTicketCreatedReporterEmailNotification).not.toHaveBeenCalled();
+        expect(prismaMock.ticket.findUnique).not.toHaveBeenCalled();
+        expect(prismaMock.notificationOutbox.updateMany).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: { id: 123, status: "PROCESSING" },
+                data: expect.objectContaining({ status: "SUPERSEDED" }),
+            }),
+        );
+    });
+
     it("supersedes legacy status events that cannot be delivered accurately", async () => {
         prismaMock.notificationOutbox.findMany.mockResolvedValue(
             asNever([
@@ -275,7 +307,7 @@ describe("processOutbox", () => {
     });
 
     it("retries failed ticket email without sending LINE again", async () => {
-        const payload = JSON.stringify({ ticketId: 1 });
+        const payload = JSON.stringify(buildTicketCreatedSnapshot());
         const lineEvent = buildNotification(
             121,
             "TICKET_CREATED_LINE",
@@ -293,10 +325,6 @@ describe("processOutbox", () => {
             .mockResolvedValueOnce(asNever([
                 { ...emailEvent, status: "FAILED", attempts: 1 },
             ]));
-        prismaMock.ticket.findUnique.mockResolvedValue(asNever({
-            id: 1,
-            reportedById: 1,
-        }));
         vi.mocked(sendTicketCreatedReporterEmailNotification)
             .mockRejectedValueOnce(new Error("SMTP unavailable"))
             .mockResolvedValueOnce();
@@ -495,28 +523,10 @@ describe("processOutbox", () => {
                 buildNotification(
                     103,
                     "TICKET_CREATED_EMAIL_REPORTER",
-                    JSON.stringify({ ticketId: 1 }),
+                    JSON.stringify(buildTicketCreatedSnapshot()),
                     "ticket:1:created:email:reporter:1",
                 ),
             ]),
-        );
-        prismaMock.ticket.findUnique.mockResolvedValue(
-            asNever({
-                id: 1,
-                title: "Test Ticket",
-                description: "desc",
-                category: "HARDWARE",
-                priority: "LOW",
-                status: "OPEN",
-                reportedById: 1,
-                assignedToId: null,
-                resolution: null,
-                resolvedAt: null,
-                createdAt: new Date(),
-                updatedAt: new Date(),
-                reportedBy: { id: 1, name: "U", email: "u@test.com", employee: null },
-                assignedTo: null,
-            }),
         );
         vi.mocked(sendTicketCreatedReporterEmailNotification).mockRejectedValue(
             new Error("Network failure"),
@@ -968,7 +978,7 @@ describe("processOutbox", () => {
                 buildNotification(
                     104,
                     "TICKET_CREATED_LINE",
-                    JSON.stringify({ ticketId: 1 }),
+                    JSON.stringify(buildTicketCreatedSnapshot()),
                     "ticket:1:created:line:it",
                 ),
             ]),
@@ -1011,12 +1021,11 @@ describe("processOutbox", () => {
                 buildNotification(
                     115,
                     "TICKET_CREATED_EMAIL_REPORTER",
-                    JSON.stringify({ ticketId: 1 }),
+                    JSON.stringify(buildTicketCreatedSnapshot()),
                     "ticket:1:created:email:reporter:1",
                 ),
             ]),
         );
-        prismaMock.ticket.findUnique.mockResolvedValue(asNever({ id: 1 }));
         vi.mocked(sendTicketCreatedReporterEmailNotification).mockRejectedValue(
             new Error("SMTP unavailable"),
         );
@@ -1070,14 +1079,13 @@ describe("processOutbox", () => {
                     ...buildNotification(
                         116,
                         "TICKET_CREATED_EMAIL_REPORTER",
-                        JSON.stringify({ ticketId: 1 }),
+                        JSON.stringify(buildTicketCreatedSnapshot()),
                         "ticket:1:created:email:reporter:1",
                     ),
                     attempts: 2,
                 },
             ]),
         );
-        prismaMock.ticket.findUnique.mockResolvedValue(asNever({ id: 1 }));
         vi.mocked(sendTicketCreatedReporterEmailNotification).mockRejectedValue(
             new Error("Permanent failure"),
         );

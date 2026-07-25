@@ -1,13 +1,11 @@
 import { Role, type Prisma, type Ticket } from "@prisma/client";
 import {
+    buildTicketCreatedNotificationSnapshot,
+} from "./created-notification-snapshot";
+import {
     buildTicketUpdatedNotificationSnapshot,
 } from "./update-notification-snapshot";
 import type { TicketWithRelations } from "./types";
-
-type TicketOutboxSnapshot = Pick<
-    Ticket,
-    "id" | "priority" | "reportedById" | "updatedAt"
->;
 
 type TicketCommentOutboxInput = {
     ticketId: number;
@@ -27,15 +25,13 @@ type TicketCommentRecipientInput = {
     isOwner: boolean;
 };
 
-function ticketPayload(ticketId: number): string {
-    return JSON.stringify({ ticketId });
-}
-
 export async function enqueueTicketCreatedOutbox(
     tx: Prisma.TransactionClient,
-    ticket: TicketOutboxSnapshot,
+    ticket: TicketWithRelations,
 ): Promise<void> {
-    const payload = ticketPayload(ticket.id);
+    const payload = JSON.stringify(
+        buildTicketCreatedNotificationSnapshot(ticket),
+    );
     const data: Prisma.NotificationOutboxCreateManyInput[] = [
         {
             type: "TICKET_CREATED_IN_APP",

@@ -1,7 +1,8 @@
 import type { NotificationOutbox } from "@prisma/client";
 
-import { prisma } from "@/lib/db/prisma";
-import { TICKET_WITH_USERS_INCLUDE } from "@/lib/services/ticket/constants";
+import {
+    parseTicketCreatedNotificationSnapshot,
+} from "@/lib/services/ticket/created-notification-snapshot";
 import {
     sendTicketCommentInAppNotification,
     sendTicketCreatedITEmailNotification,
@@ -13,7 +14,6 @@ import {
     sendTicketUpdatedReporterEmailNotification,
     type TicketCommentNotificationData,
 } from "@/lib/services/ticket/notifications";
-import type { TicketWithRelations } from "@/lib/services/ticket/types";
 import {
     parseTicketUpdatedNotificationSnapshot,
 } from "@/lib/services/ticket/update-notification-snapshot";
@@ -29,13 +29,13 @@ function requireEventKey(notification: NotificationOutbox): string {
     return notification.eventKey;
 }
 
-function parseTicketId(payload: unknown, type: string): number {
-    if (!isRecord(payload) || typeof payload.ticketId !== "number") {
-        throw new Error(`Invalid ${type} payload`);
-    }
-    return payload.ticketId;
+function isLegacyTicketCreatedPayload(payload: unknown): boolean {
+    return (
+        isRecord(payload)
+        && typeof payload.ticketId === "number"
+        && !("title" in payload)
+    );
 }
-
 function isLegacyTicketUpdatedPayload(payload: unknown): boolean {
     return (
         isRecord(payload)
@@ -71,19 +71,10 @@ function parseTicketCommentPayload(
     };
 }
 
-async function getTicket(ticketId: number): Promise<TicketWithRelations> {
-    const ticket = await prisma.ticket.findUnique({
-        where: { id: ticketId, deletedAt: null },
-        include: TICKET_WITH_USERS_INCLUDE,
-    });
-    if (!ticket) throw new Error(`Ticket not found: ${ticketId}`);
-    return ticket as TicketWithRelations;
-}
-
 async function dispatchCreated(
     notification: NotificationOutbox,
     payload: unknown,
-): Promise<"SENT" | null> {
+): Promise<"SENT" | "SUPERSEDED" | null> {
     if (
         notification.type !== "TICKET_CREATED_IN_APP"
         && notification.type !== "TICKET_CREATED_LINE"
@@ -92,19 +83,20 @@ async function dispatchCreated(
     ) {
         return null;
     }
+    if (isLegacyTicketCreatedPayload(payload)) {
+        return "SUPERSEDED";
+    }
     const eventKey = requireEventKey(notification);
-    const ticket = await getTicket(
-        parseTicketId(payload, notification.type),
-    );
+    const snapshot = parseTicketCreatedNotificationSnapshot(payload);
 
     if (notification.type === "TICKET_CREATED_IN_APP") {
-        await sendTicketCreatedInAppNotification(ticket, eventKey);
+        await sendTicketCreatedInAppNotification(snapshot, eventKey);
     } else if (notification.type === "TICKET_CREATED_LINE") {
-        await sendTicketCreatedLineNotification(ticket, eventKey);
+        await sendTicketCreatedLineNotification(snapshot, eventKey);
     } else if (notification.type === "TICKET_CREATED_EMAIL_REPORTER") {
-        await sendTicketCreatedReporterEmailNotification(ticket, eventKey);
+        await sendTicketCreatedReporterEmailNotification(snapshot, eventKey);
     } else if (notification.type === "TICKET_CREATED_EMAIL_IT") {
-        await sendTicketCreatedITEmailNotification(ticket, eventKey);
+        await sendTicketCreatedITEmailNotification(snapshot, eventKey);
     } else {
         return null;
     }

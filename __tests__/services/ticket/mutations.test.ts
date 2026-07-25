@@ -8,6 +8,7 @@ import {
     deleteTicket,
 } from "@/lib/services/ticket/mutations";
 import { TicketIdempotencyConflictError } from "@/lib/services/ticket/idempotency";
+import type { TicketWithRelations } from "@/lib/services/ticket/types";
 
 vi.mock("@/lib/db/prisma", () => ({
     prisma: mockDeep<PrismaClient>(),
@@ -19,6 +20,32 @@ const prismaMock = prisma as unknown as ReturnType<
 
 function asNever<T>(value: T): never {
     return value as unknown as never;
+}
+
+function buildCreatedTicket(
+    overrides: Partial<TicketWithRelations> = {},
+): TicketWithRelations {
+    return {
+        id: 1,
+        title: "T",
+        description: "D",
+        category: "HARDWARE",
+        priority: "LOW",
+        status: "OPEN",
+        reportedById: 1,
+        assignedToId: null,
+        resolvedAt: null,
+        createdAt: new Date("2026-07-25T01:00:00.000Z"),
+        updatedAt: new Date("2026-07-25T01:00:00.000Z"),
+        reportedBy: {
+            id: 1,
+            name: "ผู้แจ้ง",
+            email: "user@test.com",
+            employee: null,
+        },
+        assignedTo: null,
+        ...overrides,
+    } as TicketWithRelations;
 }
 
 describe("Ticket Mutations", () => {
@@ -44,11 +71,7 @@ describe("Ticket Mutations", () => {
             };
 
             prismaMock.ticket.create.mockResolvedValue(
-                asNever({
-                    id: 1,
-                    ...data,
-                    reportedById: 1,
-                }),
+                asNever(buildCreatedTicket(data)),
             );
 
             await createTicket(data, {
@@ -66,21 +89,36 @@ describe("Ticket Mutations", () => {
                     }),
                 }),
             );
+            const payload = JSON.stringify({
+                ticketId: 1,
+                title: "T",
+                description: "D",
+                category: "HARDWARE",
+                priority: "LOW",
+                status: "OPEN",
+                reportedBy: {
+                    id: 1,
+                    email: "user@test.com",
+                    name: "ผู้แจ้ง",
+                },
+                assignedTo: null,
+                createdAt: "2026-07-25T01:00:00.000Z",
+            });
             expect(prismaMock.notificationOutbox.createMany).toHaveBeenCalledWith({
                 data: [
                     {
                         type: "TICKET_CREATED_IN_APP",
-                        payload: JSON.stringify({ ticketId: 1 }),
+                        payload,
                         eventKey: "ticket:1:created:in-app:admins",
                     },
                     {
                         type: "TICKET_CREATED_LINE",
-                        payload: JSON.stringify({ ticketId: 1 }),
+                        payload,
                         eventKey: "ticket:1:created:line:it",
                     },
                     {
                         type: "TICKET_CREATED_EMAIL_REPORTER",
-                        payload: JSON.stringify({ ticketId: 1 }),
+                        payload,
                         eventKey: "ticket:1:created:email:reporter:1",
                     },
                 ],
@@ -176,14 +214,9 @@ describe("Ticket Mutations", () => {
             prismaMock.ticketMutationIdempotency.findUnique
                 .mockResolvedValueOnce(null)
                 .mockResolvedValueOnce(asNever(record));
-            prismaMock.ticket.create.mockResolvedValue(asNever({
-                id: 100,
-                title: "T",
-                description: "D",
-                category: "HARDWARE",
-                priority: "LOW",
-                reportedById: 1,
-            }));
+            prismaMock.ticket.create.mockResolvedValue(
+                asNever(buildCreatedTicket({ id: 100 })),
+            );
             prismaMock.ticketMutationIdempotency.create.mockRejectedValue(
                 { code: "P2002" },
             );
@@ -213,11 +246,18 @@ describe("Ticket Mutations", () => {
                 category: "NETWORK" as const,
                 priority: "URGENT" as const,
             };
-            prismaMock.ticket.create.mockResolvedValue(asNever({
+            const urgentTicket = buildCreatedTicket({
                 id: 2,
                 ...data,
                 reportedById: 7,
-            }));
+                reportedBy: {
+                    id: 7,
+                    name: "Reporter",
+                    email: "reporter@test.com",
+                    employee: null,
+                },
+            });
+            prismaMock.ticket.create.mockResolvedValue(asNever(urgentTicket));
 
             await createTicket(data, {
                 id: 7,
@@ -230,7 +270,21 @@ describe("Ticket Mutations", () => {
                     data: expect.arrayContaining([
                         {
                             type: "TICKET_CREATED_EMAIL_IT",
-                            payload: JSON.stringify({ ticketId: 2 }),
+                            payload: JSON.stringify({
+                                ticketId: 2,
+                                title: "Server down",
+                                description: "Production is unavailable",
+                                category: "NETWORK",
+                                priority: "URGENT",
+                                status: "OPEN",
+                                reportedBy: {
+                                    id: 7,
+                                    email: "reporter@test.com",
+                                    name: "Reporter",
+                                },
+                                assignedTo: null,
+                                createdAt: "2026-07-25T01:00:00.000Z",
+                            }),
                             eventKey: "ticket:2:created:email:it",
                         },
                     ]),
