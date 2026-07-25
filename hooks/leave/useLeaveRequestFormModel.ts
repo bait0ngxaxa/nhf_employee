@@ -1,10 +1,14 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useForm, type UseFormReturn } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
 import { leaveRequestSchema, type LeaveRequestValues } from "@/lib/validations/leave";
 import { submitLeaveRequest } from "@/lib/services/leave/client";
 import { calculateAdditionalOverQuotaDays } from "@/lib/services/leave/over-quota";
+import {
+    LeaveAttachmentValidationError,
+    validateLeaveAttachments,
+} from "@/lib/validations/leave-attachments";
 import {
     calculateLeaveDuration,
     isPastDate,
@@ -28,6 +32,8 @@ interface UseLeaveRequestFormModelResult {
     form: UseFormReturn<LeaveRequestValues>;
     isSubmitting: boolean;
     errorMsg: string | null;
+    attachments: File[];
+    attachmentError: string | null;
     isMultiDay: boolean;
     startDateValue: string;
     needsEmergencyReason: boolean;
@@ -36,6 +42,9 @@ interface UseLeaveRequestFormModelResult {
     overQuotaDays: number;
     remainingQuota: number;
     submit: (data: LeaveRequestValues) => Promise<void>;
+    addAttachments: (files: readonly File[]) => void;
+    removeAttachment: (index: number) => void;
+    clearAttachments: () => void;
     resetForm: () => void;
     switchToSingleDay: () => void;
     switchToMultiDay: () => void;
@@ -110,7 +119,10 @@ export function useLeaveRequestFormModel({
 }: UseLeaveRequestFormModelArgs): UseLeaveRequestFormModelResult {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [errorMsg, setErrorMsg] = useState<string | null>(null);
+    const [attachments, setAttachments] = useState<File[]>([]);
+    const [attachmentError, setAttachmentError] = useState<string | null>(null);
     const [isMultiDay, setIsMultiDay] = useState(false);
+    const submittingRef = useRef(false);
 
     const form = useForm<LeaveRequestValues>({
         resolver: zodResolver(leaveRequestSchema),
@@ -153,13 +165,47 @@ export function useLeaveRequestFormModel({
         }
     };
 
+    const addAttachments = (files: readonly File[]): void => {
+        const nextAttachments = [...attachments, ...files];
+        try {
+            validateLeaveAttachments(nextAttachments);
+        } catch (error) {
+            setAttachmentError(
+                error instanceof LeaveAttachmentValidationError
+                    ? error.message
+                    : "ไม่สามารถตรวจสอบไฟล์หลักฐานได้",
+            );
+            return;
+        }
+
+        setAttachments(nextAttachments);
+        setAttachmentError(null);
+    };
+
+    const removeAttachment = (index: number): void => {
+        setAttachments((current) =>
+            current.filter((_, currentIndex) => currentIndex !== index),
+        );
+        setAttachmentError(null);
+    };
+
+    const clearAttachments = (): void => {
+        setAttachments([]);
+        setAttachmentError(null);
+    };
+
     const resetForm = (): void => {
         form.reset(createDefaultLeaveRequestValues());
+        clearAttachments();
         setErrorMsg(null);
         setIsMultiDay(false);
     };
 
     const submit = async (data: LeaveRequestValues): Promise<void> => {
+        if (submittingRef.current) {
+            return;
+        }
+
         const submitQuota = quotas.find((item) => item.leaveType === data.leaveType);
         const submitRequestedDays = getRequestedDays(data.startDate, data.endDate, data.period);
         const submitOverQuotaDays = submitQuota
@@ -177,19 +223,37 @@ export function useLeaveRequestFormModel({
             return;
         }
 
+        submittingRef.current = true;
         setIsSubmitting(true);
         setErrorMsg(null);
         try {
-            await submitLeaveRequest(data);
-            toast.success(LEAVE_REQUEST_MESSAGES.success);
-            await onSuccess();
+            try {
+                await submitLeaveRequest(data, attachments);
+            } catch (error) {
+                const rawMessage =
+                    error instanceof Error && error.message
+                        ? error.message
+                        : "";
+                const message = normalizeLeaveRequestErrorMessage(rawMessage);
+                setErrorMsg(message);
+                toast.error(message);
+                return;
+            }
+
             resetForm();
-        } catch (error) {
-            const rawMessage = error instanceof Error && error.message ? error.message : "";
-            const message = normalizeLeaveRequestErrorMessage(rawMessage);
-            setErrorMsg(message);
-            toast.error(message);
+            toast.success(LEAVE_REQUEST_MESSAGES.success);
+            try {
+                await onSuccess();
+            } catch (error) {
+                console.error("รีเฟรชข้อมูลหลังส่งคำขอลาไม่สำเร็จ", {
+                    errorType:
+                        error instanceof Error
+                            ? error.name
+                            : "UnknownError",
+                });
+            }
         } finally {
+            submittingRef.current = false;
             setIsSubmitting(false);
         }
     };
@@ -198,6 +262,8 @@ export function useLeaveRequestFormModel({
         form,
         isSubmitting,
         errorMsg,
+        attachments,
+        attachmentError,
         isMultiDay,
         startDateValue,
         needsEmergencyReason,
@@ -206,6 +272,9 @@ export function useLeaveRequestFormModel({
         overQuotaDays,
         remainingQuota,
         submit,
+        addAttachments,
+        removeAttachment,
+        clearAttachments,
         resetForm,
         switchToSingleDay,
         switchToMultiDay,

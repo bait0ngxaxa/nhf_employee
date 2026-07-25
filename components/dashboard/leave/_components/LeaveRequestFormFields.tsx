@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import type { useLeaveRequestFormModel } from "@/hooks/leave/useLeaveRequestFormModel";
 import { cn } from "@/lib/ui/utils";
+import { LeaveEvidenceUploadField } from "./LeaveEvidenceUploadField";
 
 type LeaveRequestFormModel = ReturnType<typeof useLeaveRequestFormModel>;
 
@@ -26,6 +27,13 @@ export function LeaveDialogFields({ model }: { model: LeaveRequestFormModel }) {
             <LeaveReasonField model={model} />
             {model.needsEmergencyReason ? <EmergencyReasonField model={model} /> : null}
             {model.needsSpecialReason ? <SpecialReasonField model={model} /> : null}
+            <LeaveEvidenceUploadField
+                attachments={model.attachments}
+                attachmentError={model.attachmentError}
+                disabled={model.isSubmitting}
+                addAttachments={model.addAttachments}
+                removeAttachment={model.removeAttachment}
+            />
         </div>
     );
 }

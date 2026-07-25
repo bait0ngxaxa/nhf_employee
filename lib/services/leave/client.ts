@@ -92,8 +92,20 @@ export const saveApproverAssignments = async (
     return ensureSuccess(response);
 };
 
-export const submitLeaveRequest = async (payload: LeaveRequestValues): Promise<void> => {
-    const response = await apiPost<unknown>(API_ROUTES.leave.request, payload);
+export const submitLeaveRequest = async (
+    payload: LeaveRequestValues,
+    attachments: readonly File[],
+): Promise<void> => {
+    const formData = new FormData();
+    formData.set("payload", JSON.stringify(payload));
+    for (const attachment of attachments) {
+        formData.append("attachments", attachment);
+    }
+
+    const response = await apiPost<unknown>(
+        API_ROUTES.leave.request,
+        formData,
+    );
     ensureSuccess(response);
 };
 

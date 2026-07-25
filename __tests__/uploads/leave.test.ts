@@ -111,7 +111,7 @@ describe("private leave attachment storage", () => {
                     ),
                 ],
             }),
-        ).rejects.toThrow("ไฟล์หลักฐานแต่ละไฟล์ต้องมีขนาดไม่เกิน 8MB");
+        ).rejects.toThrow("ไฟล์หลักฐานแต่ละไฟล์ต้องมีขนาดไม่เกิน 8 MB");
     });
 
     it("rejects more files than the request limit", async () => {
@@ -137,7 +137,7 @@ describe("private leave attachment storage", () => {
 
         await expect(
             storage.save({ leaveRequestId: "leave-request-1", files }),
-        ).rejects.toThrow("ไฟล์หลักฐานรวมต้องมีขนาดไม่เกิน 20MB");
+        ).rejects.toThrow("ไฟล์หลักฐานรวมต้องมีขนาดไม่เกิน 20 MB");
     });
 
     it("rejects a declared image that Sharp cannot decode", async () => {

@@ -4,29 +4,23 @@ import path from "node:path";
 import sharp from "sharp";
 
 import {
-    LEAVE_ATTACHMENT_ACCEPTED_TYPES,
-    LEAVE_ATTACHMENT_MAX_BYTES,
-    LEAVE_ATTACHMENT_MAX_FILES,
     LEAVE_ATTACHMENT_MAX_HEIGHT,
-    LEAVE_ATTACHMENT_MAX_MB,
-    LEAVE_ATTACHMENT_MAX_TOTAL_BYTES,
-    LEAVE_ATTACHMENT_MAX_TOTAL_MB,
     LEAVE_ATTACHMENT_MAX_WIDTH,
     LEAVE_ATTACHMENT_WEBP_QUALITY,
-    type LeaveAttachmentAcceptedType,
 } from "@/lib/ssot/leave-attachments";
+import {
+    LeaveAttachmentValidationError,
+    validateLeaveAttachments,
+} from "@/lib/validations/leave-attachments";
 
 const DEFAULT_PRIVATE_UPLOAD_ROOT = path.join(process.cwd(), ".uploads", "private");
 const SAFE_LEAVE_REQUEST_ID = /^[A-Za-z0-9_-]{1,64}$/;
 const SAFE_STORAGE_KEY = /^leave\/[A-Za-z0-9_-]{1,64}\/[a-f0-9]{32}\.webp$/;
-const MAX_ORIGINAL_NAME_LENGTH = 255;
 
-export class LeaveAttachmentValidationError extends Error {
-    constructor(message: string) {
-        super(message);
-        this.name = "LeaveAttachmentValidationError";
-    }
-}
+export {
+    LeaveAttachmentValidationError,
+    validateLeaveAttachments,
+} from "@/lib/validations/leave-attachments";
 
 export interface LeaveAttachmentSource {
     readonly name: string;
@@ -53,50 +47,9 @@ export interface LeaveAttachmentStorageService {
     delete(storageKey: string): Promise<void>;
 }
 
-function isAcceptedType(contentType: string): contentType is LeaveAttachmentAcceptedType {
-    return LEAVE_ATTACHMENT_ACCEPTED_TYPES.some((type) => type === contentType);
-}
-
 function validateLeaveRequestId(leaveRequestId: string): void {
     if (!SAFE_LEAVE_REQUEST_ID.test(leaveRequestId)) {
         throw new LeaveAttachmentValidationError("รหัสคำขอลาไม่ถูกต้อง");
-    }
-}
-
-export function validateLeaveAttachments(
-    files: readonly LeaveAttachmentSource[],
-): void {
-    if (files.length > LEAVE_ATTACHMENT_MAX_FILES) {
-        throw new LeaveAttachmentValidationError(
-            `แนบหลักฐานได้สูงสุด ${LEAVE_ATTACHMENT_MAX_FILES} ไฟล์`,
-        );
-    }
-
-    let totalBytes = 0;
-    for (const file of files) {
-        if (!file.name || file.name.length > MAX_ORIGINAL_NAME_LENGTH) {
-            throw new LeaveAttachmentValidationError("ชื่อไฟล์ไม่ถูกต้อง");
-        }
-        if (!isAcceptedType(file.type)) {
-            throw new LeaveAttachmentValidationError(
-                "รองรับเฉพาะไฟล์ JPG, PNG และ WEBP",
-            );
-        }
-        if (!Number.isSafeInteger(file.size) || file.size < 0) {
-            throw new LeaveAttachmentValidationError("ขนาดไฟล์ไม่ถูกต้อง");
-        }
-        if (file.size > LEAVE_ATTACHMENT_MAX_BYTES) {
-            throw new LeaveAttachmentValidationError(
-                `ไฟล์หลักฐานแต่ละไฟล์ต้องมีขนาดไม่เกิน ${LEAVE_ATTACHMENT_MAX_MB}MB`,
-            );
-        }
-        totalBytes += file.size;
-    }
-
-    if (totalBytes > LEAVE_ATTACHMENT_MAX_TOTAL_BYTES) {
-        throw new LeaveAttachmentValidationError(
-            `ไฟล์หลักฐานรวมต้องมีขนาดไม่เกิน ${LEAVE_ATTACHMENT_MAX_TOTAL_MB}MB`,
-        );
     }
 }
 

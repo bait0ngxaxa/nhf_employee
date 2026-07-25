@@ -1,4 +1,9 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import {
+    fireEvent,
+    render,
+    screen,
+    waitFor,
+} from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { LeaveRequestForm } from "@/components/dashboard/leave/LeaveRequestForm";
 import type { LeaveQuota } from "@/hooks/useLeaveProfile";
@@ -31,14 +36,26 @@ function createQuota(totalDays: number, usedDays: number): LeaveQuota {
 describe("LeaveRequestForm", () => {
     const onCancel = vi.fn();
     const onSuccess = vi.fn();
+    const createObjectURL = vi.fn(() => "blob:leave-evidence");
+    const revokeObjectURL = vi.fn();
 
     beforeEach(() => {
         vi.clearAllMocks();
         vi.mocked(submitLeaveRequest).mockResolvedValue(undefined);
+        Object.defineProperty(URL, "createObjectURL", {
+            configurable: true,
+            value: createObjectURL,
+        });
+        Object.defineProperty(URL, "revokeObjectURL", {
+            configurable: true,
+            value: revokeObjectURL,
+        });
     });
 
     afterEach(() => {
         vi.useRealTimers();
+        Reflect.deleteProperty(URL, "createObjectURL");
+        Reflect.deleteProperty(URL, "revokeObjectURL");
     });
 
     it("renders the leave request form as an accessible modal dialog", () => {
@@ -121,5 +138,156 @@ describe("LeaveRequestForm", () => {
         expect(
             screen.getByPlaceholderText("ระบุเหตุผลที่ทำให้ยื่นคำขอลาหลังวันที่ลา"),
         ).toBeInTheDocument();
+    });
+
+    it("submits a leave request without attachments", async () => {
+        render(
+            <LeaveRequestForm
+                open
+                onCancel={onCancel}
+                onSuccess={onSuccess}
+                quotas={[createQuota(10, 0)]}
+            />,
+        );
+        fireEvent.change(screen.getByLabelText("เหตุผลการลา"), {
+            target: { value: "พักรักษาตัวตามคำแนะนำแพทย์" },
+        });
+
+        fireEvent.click(screen.getByRole("button", { name: "ส่งคำขอลา" }));
+
+        await waitFor(() =>
+            expect(submitLeaveRequest).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    reason: "พักรักษาตัวตามคำแนะนำแพทย์",
+                }),
+                [],
+            ),
+        );
+    });
+
+    it("submits selected evidence with the leave request", async () => {
+        render(
+            <LeaveRequestForm
+                open
+                onCancel={onCancel}
+                onSuccess={onSuccess}
+                quotas={[createQuota(10, 0)]}
+            />,
+        );
+        const file = new File(["image"], "proof.jpg", {
+            type: "image/jpeg",
+        });
+        fireEvent.change(
+            screen.getByLabelText("เลือกหลักฐานประกอบการลา"),
+            { target: { files: [file] } },
+        );
+        await screen.findByAltText("ตัวอย่างหลักฐาน proof.jpg");
+        fireEvent.change(screen.getByLabelText("เหตุผลการลา"), {
+            target: { value: "พักรักษาตัวตามคำแนะนำแพทย์" },
+        });
+
+        fireEvent.click(screen.getByRole("button", { name: "ส่งคำขอลา" }));
+
+        await waitFor(() =>
+            expect(submitLeaveRequest).toHaveBeenCalledWith(
+                expect.any(Object),
+                [file],
+            ),
+        );
+    });
+
+    it("keeps selected evidence visible after submission fails", async () => {
+        vi.mocked(submitLeaveRequest).mockRejectedValue(
+            new Error("ระบบไม่พร้อมใช้งาน"),
+        );
+        render(
+            <LeaveRequestForm
+                open
+                onCancel={onCancel}
+                onSuccess={onSuccess}
+                quotas={[createQuota(10, 0)]}
+            />,
+        );
+        const file = new File(["image"], "proof.png", {
+            type: "image/png",
+        });
+        fireEvent.change(
+            screen.getByLabelText("เลือกหลักฐานประกอบการลา"),
+            { target: { files: [file] } },
+        );
+        fireEvent.change(screen.getByLabelText("เหตุผลการลา"), {
+            target: { value: "พักรักษาตัวตามคำแนะนำแพทย์" },
+        });
+
+        fireEvent.click(screen.getByRole("button", { name: "ส่งคำขอลา" }));
+
+        await screen.findByText("ระบบไม่พร้อมใช้งาน");
+        expect(
+            screen.getByAltText("ตัวอย่างหลักฐาน proof.png"),
+        ).toBeInTheDocument();
+        expect(revokeObjectURL).not.toHaveBeenCalled();
+    });
+
+    it("clears evidence and revokes its preview after submission succeeds", async () => {
+        render(
+            <LeaveRequestForm
+                open
+                onCancel={onCancel}
+                onSuccess={onSuccess}
+                quotas={[createQuota(10, 0)]}
+            />,
+        );
+        const file = new File(["image"], "proof.webp", {
+            type: "image/webp",
+        });
+        fireEvent.change(
+            screen.getByLabelText("เลือกหลักฐานประกอบการลา"),
+            { target: { files: [file] } },
+        );
+        await screen.findByAltText("ตัวอย่างหลักฐาน proof.webp");
+        fireEvent.change(screen.getByLabelText("เหตุผลการลา"), {
+            target: { value: "พักรักษาตัวตามคำแนะนำแพทย์" },
+        });
+
+        fireEvent.click(screen.getByRole("button", { name: "ส่งคำขอลา" }));
+
+        await waitFor(() =>
+            expect(
+                screen.queryByAltText("ตัวอย่างหลักฐาน proof.webp"),
+            ).not.toBeInTheDocument(),
+        );
+        expect(revokeObjectURL).toHaveBeenCalledWith(
+            "blob:leave-evidence",
+        );
+    });
+
+    it("resets evidence and revokes its preview when the dialog is cancelled", async () => {
+        render(
+            <LeaveRequestForm
+                open
+                onCancel={onCancel}
+                onSuccess={onSuccess}
+                quotas={[createQuota(10, 0)]}
+            />,
+        );
+        const file = new File(["image"], "proof.jpg", {
+            type: "image/jpeg",
+        });
+        fireEvent.change(
+            screen.getByLabelText("เลือกหลักฐานประกอบการลา"),
+            { target: { files: [file] } },
+        );
+        await screen.findByAltText("ตัวอย่างหลักฐาน proof.jpg");
+
+        fireEvent.click(screen.getByRole("button", { name: "ยกเลิก" }));
+
+        await waitFor(() =>
+            expect(
+                screen.queryByAltText("ตัวอย่างหลักฐาน proof.jpg"),
+            ).not.toBeInTheDocument(),
+        );
+        expect(revokeObjectURL).toHaveBeenCalledWith(
+            "blob:leave-evidence",
+        );
     });
 });

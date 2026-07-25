@@ -3,6 +3,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { toast } from "sonner";
 import { useLeaveRequestFormModel } from "@/hooks/leave/useLeaveRequestFormModel";
 import { submitLeaveRequest } from "@/lib/services/leave/client";
+import {
+    LEAVE_ATTACHMENT_MAX_BYTES,
+    LEAVE_ATTACHMENT_MAX_FILES,
+} from "@/lib/ssot/leave-attachments";
 
 vi.mock("@/lib/services/leave/client", () => ({
     submitLeaveRequest: vi.fn(),
@@ -61,10 +65,14 @@ describe("useLeaveRequestFormModel", () => {
 
     it("resets multi-day state and clears form values", () => {
         const { result } = renderHook(() => useLeaveRequestFormModel({ onSuccess }));
+        const attachment = new File(["image"], "proof.jpg", {
+            type: "image/jpeg",
+        });
 
         act(() => {
             result.current.switchToMultiDay();
             result.current.form.setValue("reason", "ต้องลาพักผ่อน");
+            result.current.addAttachments([attachment]);
             result.current.resetForm();
         });
 
@@ -72,25 +80,251 @@ describe("useLeaveRequestFormModel", () => {
         expect(result.current.form.getValues("leaveType")).toBe("SICK");
         expect(result.current.form.getValues("reason")).toBe("");
         expect(result.current.errorMsg).toBeNull();
+        expect(result.current.attachments).toEqual([]);
+    });
+
+    it("stores valid attachments separately and removes one by index", () => {
+        const { result } = renderHook(() => useLeaveRequestFormModel({ onSuccess }));
+        const first = new File(["first"], "first.jpg", { type: "image/jpeg" });
+        const second = new File(["second"], "second.png", { type: "image/png" });
+
+        act(() => {
+            result.current.addAttachments([first, second]);
+        });
+
+        expect(result.current.attachments).toEqual([first, second]);
+        expect(result.current.form.getValues()).not.toHaveProperty("attachments");
+
+        act(() => {
+            result.current.removeAttachment(0);
+        });
+
+        expect(result.current.attachments).toEqual([second]);
+        expect(result.current.attachmentError).toBeNull();
+    });
+
+    it("rejects attachments beyond the maximum count", () => {
+        const { result } = renderHook(() => useLeaveRequestFormModel({ onSuccess }));
+        const files = Array.from(
+            { length: LEAVE_ATTACHMENT_MAX_FILES + 1 },
+            (_, index) =>
+                new File(["image"], `proof-${index}.jpg`, {
+                    type: "image/jpeg",
+                }),
+        );
+
+        act(() => {
+            result.current.addAttachments(files);
+        });
+
+        expect(result.current.attachments).toEqual([]);
+        expect(result.current.attachmentError).toBe(
+            "แนบหลักฐานได้สูงสุด 3 ไฟล์",
+        );
+    });
+
+    it("rejects an unsupported attachment MIME type", () => {
+        const { result } = renderHook(() => useLeaveRequestFormModel({ onSuccess }));
+
+        act(() => {
+            result.current.addAttachments([
+                new File(["document"], "proof.pdf", {
+                    type: "application/pdf",
+                }),
+            ]);
+        });
+
+        expect(result.current.attachments).toEqual([]);
+        expect(result.current.attachmentError).toBe(
+            "รองรับเฉพาะไฟล์ JPG, PNG และ WEBP",
+        );
+    });
+
+    it("rejects an attachment larger than the per-file limit", () => {
+        const { result } = renderHook(() => useLeaveRequestFormModel({ onSuccess }));
+
+        act(() => {
+            result.current.addAttachments([
+                new File(
+                    [new Uint8Array(LEAVE_ATTACHMENT_MAX_BYTES + 1)],
+                    "large.jpg",
+                    { type: "image/jpeg" },
+                ),
+            ]);
+        });
+
+        expect(result.current.attachments).toEqual([]);
+        expect(result.current.attachmentError).toBe(
+            "ไฟล์หลักฐานแต่ละไฟล์ต้องมีขนาดไม่เกิน 8 MB",
+        );
+    });
+
+    it("rejects attachments beyond the combined size limit", () => {
+        const { result } = renderHook(() => useLeaveRequestFormModel({ onSuccess }));
+        const sevenMegabytes = 7 * 1024 * 1024;
+        const files = Array.from(
+            { length: 3 },
+            (_, index) =>
+                new File(
+                    [new Uint8Array(sevenMegabytes)],
+                    `proof-${index}.webp`,
+                    { type: "image/webp" },
+                ),
+        );
+
+        act(() => {
+            result.current.addAttachments(files);
+        });
+
+        expect(result.current.attachments).toEqual([]);
+        expect(result.current.attachmentError).toBe(
+            "ไฟล์หลักฐานรวมต้องมีขนาดไม่เกิน 20 MB",
+        );
     });
 
     it("submits leave request successfully", async () => {
         const { result } = renderHook(() => useLeaveRequestFormModel({ onSuccess }));
+        const payload = {
+            leaveType: "SICK" as const,
+            startDate: "2031-01-01",
+            endDate: "2031-01-01",
+            period: "FULL_DAY" as const,
+            reason: "test",
+        };
 
+        await act(async () => {
+            await result.current.submit(payload);
+        });
+
+        expect(submitLeaveRequest).toHaveBeenCalledTimes(1);
+        expect(submitLeaveRequest).toHaveBeenCalledWith(payload, []);
+        expect(onSuccess).toHaveBeenCalledTimes(1);
+        expect(toast.success).toHaveBeenCalledTimes(1);
+        expect(result.current.errorMsg).toBeNull();
+    });
+
+    it("keeps attachments when submission fails so the user can retry", async () => {
+        vi.mocked(submitLeaveRequest).mockRejectedValue(
+            new Error("ระบบไม่พร้อมใช้งาน"),
+        );
+        const { result } = renderHook(() => useLeaveRequestFormModel({ onSuccess }));
+        const attachment = new File(["image"], "proof.jpg", {
+            type: "image/jpeg",
+        });
+
+        act(() => {
+            result.current.addAttachments([attachment]);
+        });
         await act(async () => {
             await result.current.submit({
                 leaveType: "SICK",
                 startDate: "2031-01-01",
                 endDate: "2031-01-01",
                 period: "FULL_DAY",
-                reason: "test",
+                reason: "พักรักษาตัว",
+            });
+        });
+
+        expect(submitLeaveRequest).toHaveBeenCalledWith(
+            expect.any(Object),
+            [attachment],
+        );
+        expect(result.current.attachments).toEqual([attachment]);
+    });
+
+    it("clears attachments only after a successful submission", async () => {
+        const { result } = renderHook(() => useLeaveRequestFormModel({ onSuccess }));
+        const attachment = new File(["image"], "proof.webp", {
+            type: "image/webp",
+        });
+
+        act(() => {
+            result.current.addAttachments([attachment]);
+        });
+        await act(async () => {
+            await result.current.submit({
+                leaveType: "SICK",
+                startDate: "2031-01-01",
+                endDate: "2031-01-01",
+                period: "FULL_DAY",
+                reason: "พักรักษาตัว",
+            });
+        });
+
+        expect(submitLeaveRequest).toHaveBeenCalledWith(
+            expect.any(Object),
+            [attachment],
+        );
+        expect(result.current.attachments).toEqual([]);
+    });
+
+    it("does not offer a retry when refresh fails after the request succeeds", async () => {
+        const refreshAfterSuccess = vi
+            .fn()
+            .mockRejectedValue(new Error("refresh failed"));
+        const consoleError = vi
+            .spyOn(console, "error")
+            .mockImplementation(() => undefined);
+        const { result } = renderHook(() =>
+            useLeaveRequestFormModel({ onSuccess: refreshAfterSuccess }),
+        );
+        const attachment = new File(["image"], "proof.jpg", {
+            type: "image/jpeg",
+        });
+
+        act(() => {
+            result.current.addAttachments([attachment]);
+        });
+        await act(async () => {
+            await result.current.submit({
+                leaveType: "SICK",
+                startDate: "2031-01-01",
+                endDate: "2031-01-01",
+                period: "FULL_DAY",
+                reason: "พักรักษาตัว",
             });
         });
 
         expect(submitLeaveRequest).toHaveBeenCalledTimes(1);
-        expect(onSuccess).toHaveBeenCalledTimes(1);
-        expect(toast.success).toHaveBeenCalledTimes(1);
+        expect(refreshAfterSuccess).toHaveBeenCalledTimes(1);
+        expect(result.current.attachments).toEqual([]);
         expect(result.current.errorMsg).toBeNull();
+        expect(toast.success).toHaveBeenCalledTimes(1);
+        expect(toast.error).not.toHaveBeenCalled();
+        consoleError.mockRestore();
+    });
+
+    it("prevents a second submission while the first is pending", async () => {
+        let finishSubmission: (() => void) | undefined;
+        vi.mocked(submitLeaveRequest).mockImplementation(
+            () =>
+                new Promise<void>((resolve) => {
+                    finishSubmission = resolve;
+                }),
+        );
+        const { result } = renderHook(() => useLeaveRequestFormModel({ onSuccess }));
+        const payload = {
+            leaveType: "SICK" as const,
+            startDate: "2031-01-01",
+            endDate: "2031-01-01",
+            period: "FULL_DAY" as const,
+            reason: "พักรักษาตัว",
+        };
+        let firstSubmission: Promise<void> | undefined;
+        let secondSubmission: Promise<void> | undefined;
+
+        await act(async () => {
+            firstSubmission = result.current.submit(payload);
+            secondSubmission = result.current.submit(payload);
+            await Promise.resolve();
+        });
+
+        expect(submitLeaveRequest).toHaveBeenCalledTimes(1);
+
+        await act(async () => {
+            finishSubmission?.();
+            await Promise.all([firstSubmission, secondSubmission]);
+        });
     });
 
     it("sets generic error state when submit fails with unknown message", async () => {
