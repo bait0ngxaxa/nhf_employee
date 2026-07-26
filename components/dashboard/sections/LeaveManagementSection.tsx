@@ -20,6 +20,7 @@ interface LeaveManagementSectionProps {
 export function LeaveManagementSection({ defaultTab = "my-leave" }: LeaveManagementSectionProps) {
     const { user } = useDashboardDataContext();
     const isManager = user?.isManager === true;
+    const canViewLeaveReports = user?.canViewLeaveReports === true;
     const isAdmin = isAdminRole(user?.role);
     const showApprovalTab = isManager;
 
@@ -37,8 +38,8 @@ export function LeaveManagementSection({ defaultTab = "my-leave" }: LeaveManagem
         setIsMounted(true);
     }, []);
 
-    const tabs = getLeaveTabs(showApprovalTab, isAdmin);
-    const hasTabs = showApprovalTab || isAdmin;
+    const tabs = getLeaveTabs(showApprovalTab, canViewLeaveReports, isAdmin);
+    const hasTabs = showApprovalTab || canViewLeaveReports || isAdmin;
     const activeTabIsVisible = tabs.some((tab) => tab.value === activeTab && tab.visible !== false);
     const safeActiveTab = activeTabIsVisible ? activeTab : "my-leave";
 
@@ -74,6 +75,7 @@ export function LeaveManagementSection({ defaultTab = "my-leave" }: LeaveManagem
 
 function getLeaveTabs(
     showApprovalTab: boolean,
+    canViewLeaveReports: boolean,
     isAdmin: boolean,
 ): SectionTabItem[] {
     return [
@@ -95,7 +97,7 @@ function getLeaveTabs(
             label: "รีพอร์ต",
             icon: BarChart3,
             content: <LeaveReportsDashboard />,
-            visible: showApprovalTab,
+            visible: canViewLeaveReports,
         },
         {
             value: "approver-settings",

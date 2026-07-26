@@ -31,6 +31,7 @@ describe("LeaveReportsDashboard", () => {
         });
         vi.mocked(fetchLeaveExportMeta).mockResolvedValue({
             year: 2031,
+            scope: "approver-history",
             employeeCount: 2,
             requestCount: 5,
             maxRows: 3000,
@@ -40,7 +41,7 @@ describe("LeaveReportsDashboard", () => {
 
         await waitFor(() => {
             expect(fetchLeaveExportYears).toHaveBeenCalledTimes(1);
-            expect(fetchLeaveExportMeta).toHaveBeenCalledWith(2031);
+            expect(fetchLeaveExportMeta).toHaveBeenCalledWith(2031, "approver-history");
         });
 
         expect(screen.getByRole("combobox", { name: "เลือกปีรีพอร์ตการลา" })).toHaveTextContent(
@@ -58,7 +59,7 @@ describe("LeaveReportsDashboard", () => {
         );
 
         await waitFor(() => {
-            expect(downloadLeaveExportFile).toHaveBeenCalledWith(2031);
+            expect(downloadLeaveExportFile).toHaveBeenCalledWith(2031, "approver-history");
         });
     });
 });

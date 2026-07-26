@@ -19,6 +19,7 @@ async function findActiveUser(userId: number) {
                 include: {
                     dept: { select: { name: true } },
                     subordinates: { select: { id: true }, take: 1 },
+                    approvals: { select: { id: true }, take: 1 },
                 },
             },
         },
@@ -34,6 +35,9 @@ function toApiAuthSession(user: SessionUser): ApiAuthSession {
             name: user.name,
             department: user.employee?.dept?.name,
             isManager: (user.employee?.subordinates?.length ?? 0) > 0,
+            canViewLeaveReports:
+                (user.employee?.subordinates?.length ?? 0) > 0
+                || (user.employee?.approvals?.length ?? 0) > 0,
         },
     };
 }

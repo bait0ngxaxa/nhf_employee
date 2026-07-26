@@ -65,7 +65,7 @@ describe("GET /api/leave/export", () => {
         } as never);
     });
 
-    it("returns available years for the current team", async () => {
+    it("returns available years for approver history by default", async () => {
         vi.mocked(getLeaveReportYears).mockResolvedValue([2031, 2030]);
 
         const response = await leaveExportRoute(
@@ -74,13 +74,14 @@ describe("GET /api/leave/export", () => {
         const data = await response.json();
 
         expect(response.status).toBe(200);
-        expect(getLeaveReportYears).toHaveBeenCalledWith(200);
+        expect(getLeaveReportYears).toHaveBeenCalledWith(200, "approver-history");
         expect(data.years).toEqual([2031, 2030]);
     });
 
     it("returns employee and request counts for report meta", async () => {
         vi.mocked(getLeaveReportMeta).mockResolvedValue({
             year: 2031,
+            scope: "approver-history",
             employeeCount: 2,
             requestCount: 0,
             maxRows: 3000,
@@ -94,6 +95,7 @@ describe("GET /api/leave/export", () => {
         expect(response.status).toBe(200);
         expect(data).toEqual({
             year: 2031,
+            scope: "approver-history",
             employeeCount: 2,
             requestCount: 0,
             maxRows: 3000,
@@ -103,6 +105,7 @@ describe("GET /api/leave/export", () => {
     it("exports xlsx and logs audit metadata", async () => {
         vi.mocked(getLeaveReportMeta).mockResolvedValue({
             year: 2031,
+            scope: "approver-history",
             employeeCount: 2,
             requestCount: 5,
             maxRows: 3000,
@@ -121,7 +124,11 @@ describe("GET /api/leave/export", () => {
         );
 
         expect(response.status).toBe(200);
-        expect(createLeaveReportXlsxResponse).toHaveBeenCalledWith(200, 2031);
+        expect(createLeaveReportXlsxResponse).toHaveBeenCalledWith(
+            200,
+            2031,
+            "approver-history",
+        );
         expect(logDataExport).toHaveBeenCalledWith(
             "LeaveRequest",
             1,
@@ -130,9 +137,37 @@ describe("GET /api/leave/export", () => {
                 metadata: expect.objectContaining({
                     recordCount: 5,
                     employeeCount: 2,
-                    filters: { year: 2031, format: "xlsx" },
+                    filters: { year: 2031, format: "xlsx", scope: "approver-history" },
                 }),
             }),
         );
+    });
+
+    it("uses the authenticated employee for scope authorization", async () => {
+        vi.mocked(getLeaveReportMeta).mockResolvedValue({
+            year: 2031,
+            scope: "approver-history",
+            employeeCount: 0,
+            requestCount: 0,
+            maxRows: 3000,
+        });
+
+        const response = await leaveExportRoute(
+            new NextRequest(
+                "http://localhost/api/leave/export?metaOnly=1&year=2031&scope=approver-history&managerId=999&approverId=999",
+            ),
+        );
+
+        expect(response.status).toBe(200);
+        expect(getLeaveReportMeta).toHaveBeenCalledWith(200, 2031, "approver-history");
+    });
+
+    it("rejects an unknown report scope", async () => {
+        const response = await leaveExportRoute(
+            new NextRequest("http://localhost/api/leave/export?scope=someone-else&metaOnly=1"),
+        );
+
+        expect(response.status).toBe(400);
+        expect(getLeaveReportMeta).not.toHaveBeenCalled();
     });
 });

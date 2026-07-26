@@ -10,6 +10,7 @@ import {
 } from "@/lib/services/leave/report-export";
 import { jsonError, notFound, operationFailed } from "@/lib/ssot/http";
 import { FEATURE_KEYS, isFeatureEnabled } from "@/lib/ssot/features";
+import { leaveReportScopeSchema } from "@/lib/validations/leave-report";
 
 export async function GET(request: NextRequest): Promise<Response> {
     try {
@@ -21,7 +22,7 @@ export async function GET(request: NextRequest): Promise<Response> {
         if (!auth.ok) return auth.response;
 
         const userId = auth.user.id;
-        const managerId = auth.employeeId;
+        const currentEmployeeId = auth.employeeId;
 
         const url = new URL(request.url);
         const yearParam = url.searchParams.get("year");
@@ -29,9 +30,14 @@ export async function GET(request: NextRequest): Promise<Response> {
         const metaOnly = url.searchParams.get("metaOnly") === "1";
         const format = url.searchParams.get("format");
         const year = yearParam ? Number.parseInt(yearParam, 10) : getCurrentLeaveYear();
+        const scopeResult = leaveReportScopeSchema.safeParse(url.searchParams.get("scope") ?? undefined);
+        if (!scopeResult.success) {
+            return jsonError("ประเภทรีพอร์ตการลาไม่ถูกต้อง", 400);
+        }
+        const scope = scopeResult.data;
 
         if (yearsOnly) {
-            const years = await getLeaveReportYears(managerId);
+            const years = await getLeaveReportYears(currentEmployeeId, scope);
             return NextResponse.json({ years });
         }
 
@@ -39,7 +45,7 @@ export async function GET(request: NextRequest): Promise<Response> {
             return jsonError("ปีที่ต้องการส่งออกไม่ถูกต้อง", 400);
         }
 
-        const meta = await getLeaveReportMeta(managerId, year);
+        const meta = await getLeaveReportMeta(currentEmployeeId, year, scope);
         if (metaOnly || !format) {
             return NextResponse.json(meta);
         }
@@ -59,7 +65,7 @@ export async function GET(request: NextRequest): Promise<Response> {
             );
         }
 
-        const response = await createLeaveReportXlsxResponse(managerId, year);
+        const response = await createLeaveReportXlsxResponse(currentEmployeeId, year, scope);
         after(async () => {
             try {
                 await logDataExport("LeaveRequest", userId, auth.user.email, {
@@ -67,7 +73,7 @@ export async function GET(request: NextRequest): Promise<Response> {
                         entityType: "LeaveRequest",
                         recordCount: meta.requestCount,
                         employeeCount: meta.employeeCount,
-                        filters: { year, format: "xlsx" },
+                        filters: { year, format: "xlsx", scope },
                         exportedAt: new Date().toISOString(),
                     },
                 });

@@ -5,16 +5,28 @@ import { BarChart3, CalendarRange } from "lucide-react";
 import { toast } from "sonner";
 import { YearlyReportExportPanel } from "@/components/dashboard/shared/YearlyReportExportPanel";
 import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
+import {
     downloadLeaveExportFile,
     fetchLeaveExportMeta,
     fetchLeaveExportYears,
     type LeaveExportMetaResponse,
 } from "@/lib/services/leave/client";
 import { getCurrentLeaveYear } from "@/lib/services/leave/quota-year";
+import {
+    DEFAULT_LEAVE_REPORT_SCOPE,
+    type LeaveReportScope,
+} from "@/lib/validations/leave-report";
 import { LEAVE_THEME_BUTTON_CLASS } from "./leaveTheme";
 
 export function LeaveReportsDashboard() {
     const currentYear = getCurrentLeaveYear();
+    const [scope, setScope] = useState<LeaveReportScope>(DEFAULT_LEAVE_REPORT_SCOPE);
     const [availableYears, setAvailableYears] = useState<number[]>([currentYear]);
     const [selectedYear, setSelectedYear] = useState(currentYear);
     const [isLoadingYears, setIsLoadingYears] = useState(true);
@@ -28,7 +40,7 @@ export function LeaveReportsDashboard() {
         async function loadYears(): Promise<void> {
             setIsLoadingYears(true);
             try {
-                const data = await fetchLeaveExportYears();
+                const data = await fetchLeaveExportYears(scope);
                 if (isCancelled) {
                     return;
                 }
@@ -54,7 +66,7 @@ export function LeaveReportsDashboard() {
         return () => {
             isCancelled = true;
         };
-    }, [currentYear]);
+    }, [currentYear, scope]);
 
     useEffect(() => {
         let isCancelled = false;
@@ -62,7 +74,7 @@ export function LeaveReportsDashboard() {
         async function loadMeta(): Promise<void> {
             setIsLoadingMeta(true);
             try {
-                const data = await fetchLeaveExportMeta(selectedYear);
+                const data = await fetchLeaveExportMeta(selectedYear, scope);
                 if (!isCancelled) {
                     setMeta(data);
                 }
@@ -83,7 +95,7 @@ export function LeaveReportsDashboard() {
         return () => {
             isCancelled = true;
         };
-    }, [selectedYear]);
+    }, [scope, selectedYear]);
 
     const isDisabled =
         isLoadingYears ||
@@ -96,10 +108,10 @@ export function LeaveReportsDashboard() {
     async function handleExport(): Promise<void> {
         setIsExporting(true);
         try {
-            const exportMeta = await fetchLeaveExportMeta(selectedYear);
+            const exportMeta = await fetchLeaveExportMeta(selectedYear, scope);
 
             if (exportMeta.employeeCount === 0) {
-                toast.error("ไม่มีพนักงานในทีมสำหรับรายงาน");
+                toast.error(getEmptyReportMessage(scope));
                 return;
             }
 
@@ -110,7 +122,7 @@ export function LeaveReportsDashboard() {
                 return;
             }
 
-            downloadLeaveExportFile(selectedYear);
+            downloadLeaveExportFile(selectedYear, scope);
             toast.success("เริ่มดาวน์โหลดไฟล์แล้ว", {
                 description: `กำลังส่งออกรายงานพนักงาน ${exportMeta.employeeCount} คน / คำขอ ${exportMeta.requestCount} รายการ (ปี ${selectedYear})`,
             });
@@ -136,13 +148,41 @@ export function LeaveReportsDashboard() {
                 buttonClassName={`h-11 ${LEAVE_THEME_BUTTON_CLASS}`}
                 exportLabel="ดาวน์โหลด Excel"
                 badge={
-                    <div className="inline-flex items-center gap-2 rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-medium text-sky-800">
-                        <BarChart3 className="h-3.5 w-3.5" aria-hidden="true" />
-                        รีพอร์ตผู้จัดการ
+                    <div className="space-y-3">
+                        <div className="inline-flex items-center gap-2 rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-medium text-sky-800">
+                            <BarChart3 className="h-3.5 w-3.5" aria-hidden="true" />
+                            {getScopeLabel(scope)}
+                        </div>
+                        <div className="space-y-1.5">
+                            <label
+                                className="text-sm font-semibold text-slate-700"
+                                htmlFor="leave-report-scope"
+                            >
+                                ประเภทรีพอร์ต
+                            </label>
+                            <Select
+                                value={scope}
+                                onValueChange={(value) => setScope(value as LeaveReportScope)}
+                                disabled={isExporting}
+                            >
+                                <SelectTrigger
+                                    id="leave-report-scope"
+                                    className="h-10 w-full max-w-sm bg-white"
+                                >
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="approver-history">
+                                        ประวัติการอนุมัติของฉัน
+                                    </SelectItem>
+                                    <SelectItem value="current-team">ทีมปัจจุบัน</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
                     </div>
                 }
                 title="รายงานสรุปการลารายปี"
-                description="ดาวน์โหลด Excel สรุปรายคนและรายละเอียดคำขอลาของทีมตามปีที่เลือก"
+                description={getScopeDescription(scope)}
                 stats={[
                     {
                         icon: <CalendarRange className="h-4 w-4" aria-hidden="true" />,
@@ -158,7 +198,7 @@ export function LeaveReportsDashboard() {
                     },
                     {
                         label: "สถานะการส่งออก",
-                        value: resolveExportState(meta, isLoadingMeta, isExporting),
+                        value: resolveExportState(meta, isLoadingMeta, isExporting, scope),
                     },
                 ]}
             />
@@ -170,6 +210,7 @@ function resolveExportState(
     meta: LeaveExportMetaResponse | null,
     isLoadingMeta: boolean,
     isExporting: boolean,
+    scope: LeaveReportScope,
 ): string {
     if (isExporting) {
         return "กำลังเริ่มดาวน์โหลด";
@@ -180,7 +221,9 @@ function resolveExportState(
     }
 
     if (!meta || meta.employeeCount === 0) {
-        return "ไม่มีพนักงานในทีม";
+        return scope === "approver-history"
+            ? "ไม่มีประวัติการอนุมัติ"
+            : "ไม่มีพนักงานในทีม";
     }
 
     if (meta.requestCount > meta.maxRows) {
@@ -188,4 +231,20 @@ function resolveExportState(
     }
 
     return "พร้อมดาวน์โหลด";
+}
+
+function getScopeLabel(scope: LeaveReportScope): string {
+    return scope === "approver-history" ? "ประวัติการอนุมัติ" : "ทีมปัจจุบัน";
+}
+
+function getScopeDescription(scope: LeaveReportScope): string {
+    return scope === "approver-history"
+        ? "ดาวน์โหลด Excel คำขอลาที่คุณเป็นผู้อนุมัติ โดยไม่เปลี่ยนตามหัวหน้าหรือสถานะปัจจุบันของพนักงาน"
+        : "ดาวน์โหลด Excel สรุปรายคนและรายละเอียดคำขอลาของพนักงานที่อยู่ในทีมปัจจุบันตามปีที่เลือก";
+}
+
+function getEmptyReportMessage(scope: LeaveReportScope): string {
+    return scope === "approver-history"
+        ? "ไม่มีประวัติการอนุมัติสำหรับรายงาน"
+        : "ไม่มีพนักงานในทีมสำหรับรายงาน";
 }

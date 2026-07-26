@@ -5,6 +5,7 @@ export interface AuthenticatedUser {
     name?: string | null;
     department?: string;
     isManager?: boolean;
+    canViewLeaveReports?: boolean;
 }
 
 export interface HybridAuthSession {

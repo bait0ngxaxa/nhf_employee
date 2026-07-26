@@ -4,6 +4,10 @@ import { createIdempotencyKey } from "@/lib/client/idempotency-key";
 import { triggerDownload } from "@/lib/helpers/download";
 import { API_ROUTES } from "@/lib/ssot/routes";
 import type { LeaveRequestValues } from "@/lib/validations/leave";
+import {
+    DEFAULT_LEAVE_REPORT_SCOPE,
+    type LeaveReportScope,
+} from "@/lib/validations/leave-report";
 
 export interface LeaveExportYearsResponse {
     years: number[];
@@ -11,6 +15,7 @@ export interface LeaveExportYearsResponse {
 
 export interface LeaveExportMetaResponse {
     year: number;
+    scope: LeaveReportScope;
     employeeCount: number;
     requestCount: number;
     maxRows: number;
@@ -65,8 +70,12 @@ const ensureSuccess = <T>(response: ApiResponse<T>): T => {
     return response.data;
 };
 
-export const fetchLeaveExportYears = async (): Promise<LeaveExportYearsResponse> => {
-    const response = await apiGet<LeaveExportYearsResponse>(`${API_ROUTES.leave.export}?yearsOnly=1`);
+export const fetchLeaveExportYears = async (
+    scope: LeaveReportScope = DEFAULT_LEAVE_REPORT_SCOPE,
+): Promise<LeaveExportYearsResponse> => {
+    const response = await apiGet<LeaveExportYearsResponse>(
+        `${API_ROUTES.leave.export}?yearsOnly=1&scope=${scope}`,
+    );
     return ensureSuccess(response);
 };
 
@@ -76,15 +85,21 @@ export const fetchApproverEmployees = async (): Promise<ApproverEmployeeItem[]> 
     return data.employees;
 };
 
-export const fetchLeaveExportMeta = async (year: number): Promise<LeaveExportMetaResponse> => {
+export const fetchLeaveExportMeta = async (
+    year: number,
+    scope: LeaveReportScope = DEFAULT_LEAVE_REPORT_SCOPE,
+): Promise<LeaveExportMetaResponse> => {
     const response = await apiGet<LeaveExportMetaResponse>(
-        `${API_ROUTES.leave.export}?year=${year}&metaOnly=1`,
+        `${API_ROUTES.leave.export}?year=${year}&metaOnly=1&scope=${scope}`,
     );
     return ensureSuccess(response);
 };
 
-export const downloadLeaveExportFile = (year: number): void => {
-    triggerDownload(`${API_ROUTES.leave.export}?year=${year}&format=xlsx`);
+export const downloadLeaveExportFile = (
+    year: number,
+    scope: LeaveReportScope = DEFAULT_LEAVE_REPORT_SCOPE,
+): void => {
+    triggerDownload(`${API_ROUTES.leave.export}?year=${year}&format=xlsx&scope=${scope}`);
 };
 
 export const saveApproverAssignments = async (
