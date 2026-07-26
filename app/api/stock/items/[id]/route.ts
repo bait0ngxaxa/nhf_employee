@@ -37,9 +37,10 @@ export async function PATCH(
         const message = error instanceof Error ? error.message : "";
         if (
             message.includes("พบรายการย่อยไม่ถูกต้อง") ||
-            message.includes("จำนวนรายการย่อยไม่ตรงกับข้อมูลปัจจุบัน")
+            message.includes("จำนวนรายการย่อยไม่ตรงกับข้อมูลปัจจุบัน") ||
+            message.includes("คำขอรอจ่าย")
         ) {
-            return jsonError(message, 400);
+            return jsonError(message, message.includes("คำขอรอจ่าย") ? 409 : 400);
         }
         if (message.includes("ยอดคงเหลือของรายการย่อยเปลี่ยนแปลงแล้ว")) {
             return jsonError(message, 409);
@@ -80,6 +81,10 @@ export async function DELETE(
         );
         return NextResponse.json({ success: true });
     } catch (error) {
+        const message = error instanceof Error ? error.message : "";
+        if (message.includes("คำขอรอจ่าย")) {
+            return jsonError(message, 409);
+        }
         if (error instanceof PrismaClientKnownRequestError && error.code === "P2025") {
             return jsonError("ไม่พบรายการวัสดุ", 404);
         }

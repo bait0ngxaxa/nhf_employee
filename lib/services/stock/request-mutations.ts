@@ -265,6 +265,7 @@ export async function issueRequest(
                 unit: true,
                 quantity: true,
                 minStock: true,
+                isActive: true,
             },
         });
         const variants = await tx.stockItemVariant.findMany({
@@ -276,7 +277,8 @@ export async function issueRequest(
                 unit: true,
                 quantity: true,
                 minStock: true,
-                stockItem: { select: { name: true } },
+                isActive: true,
+                stockItem: { select: { name: true, isActive: true } },
                 attributeValues: {
                     select: {
                         attributeValue: {
@@ -307,6 +309,23 @@ export async function issueRequest(
         const requestedItemEntries = Array.from(
             requestedQtyByItemId.entries(),
         ).sort(([leftItemId], [rightItemId]) => leftItemId - rightItemId);
+
+        for (const [variantId, requestItem] of requestedVariantEntries) {
+            const variant = variantById.get(variantId);
+            const item = itemById.get(requestItem.itemId);
+            if (
+                !variant ||
+                !item ||
+                variant.stockItemId !== requestItem.itemId ||
+                item.isActive === false ||
+                variant.isActive === false ||
+                variant.stockItem.isActive === false
+            ) {
+                throw new Error(
+                    "ไม่สามารถจ่ายคำขอที่อ้างถึงวัสดุหรือรายการย่อยที่ปิดใช้งานแล้ว",
+                );
+            }
+        }
 
         for (const [variantId, requestItem] of requestedVariantEntries) {
             const variant = variantById.get(variantId);

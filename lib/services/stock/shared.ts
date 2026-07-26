@@ -1,4 +1,4 @@
-import { type Prisma } from "@prisma/client";
+import { StockRequestStatus, type Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
 import { runSerializableTransaction } from "@/lib/db/transaction";
 import { lockStockInventoryRows } from "./locks";
@@ -205,7 +205,7 @@ export async function createVariantAttributes(
 export async function variantHasReferences(
     tx: Prisma.TransactionClient,
     variantId: number,
-) {
+): Promise<boolean> {
     const [transaction, requestItem] = await Promise.all([
         tx.stockTransaction.findFirst({
             where: { variantId },
@@ -218,6 +218,43 @@ export async function variantHasReferences(
     ]);
 
     return Boolean(transaction || requestItem);
+}
+
+export async function assertNoPendingStockRequestsForItem(
+    tx: Prisma.TransactionClient,
+    itemId: number,
+): Promise<void> {
+    const pendingRequestItem = await tx.stockRequestItem.findFirst({
+        where: {
+            itemId,
+            request: { status: StockRequestStatus.PENDING_ISSUE },
+        },
+        select: { id: true },
+    });
+
+    if (pendingRequestItem) {
+        throw new Error("ไม่สามารถปิดใช้งานวัสดุที่มีคำขอรอจ่ายอยู่");
+    }
+}
+
+export async function assertNoPendingStockRequestsForVariants(
+    tx: Prisma.TransactionClient,
+    variantIds: readonly number[],
+): Promise<void> {
+    const uniqueVariantIds = Array.from(new Set(variantIds));
+    if (uniqueVariantIds.length === 0) return;
+
+    const pendingRequestItem = await tx.stockRequestItem.findFirst({
+        where: {
+            variantId: { in: uniqueVariantIds },
+            request: { status: StockRequestStatus.PENDING_ISSUE },
+        },
+        select: { id: true },
+    });
+
+    if (pendingRequestItem) {
+        throw new Error("ไม่สามารถปิดใช้งานรายการย่อยที่มีคำขอรอจ่ายอยู่");
+    }
 }
 
 export async function cleanupUnusedUploadUrls(

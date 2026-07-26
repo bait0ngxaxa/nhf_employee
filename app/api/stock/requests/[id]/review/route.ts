@@ -77,6 +77,9 @@ export async function POST(
         return NextResponse.json({ request: updated });
     } catch (error) {
         const message = error instanceof Error ? error.message : "";
+        if (message.includes("ปิดใช้งานแล้ว")) {
+            return jsonError(message, 409);
+        }
         if (
             message.includes("ไม่พบ") ||
             message.includes("ดำเนินการแล้ว") ||

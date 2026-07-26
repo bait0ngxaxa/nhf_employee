@@ -1,6 +1,7 @@
 import { StockTxType } from "@prisma/client";
 import type { UpdateItemInput } from "@/lib/validations/stock";
 import {
+    assertNoPendingStockRequestsForVariants,
     buildItemInclude,
     createVariantAttributes,
     ensureDefaultVariant,
@@ -295,6 +296,11 @@ async function handleRemovedVariants(
 ): Promise<void> {
     const removedVariants = existingVariants.filter(
         (variant) => !submittedIds.has(variant.id),
+    );
+
+    await assertNoPendingStockRequestsForVariants(
+        tx,
+        removedVariants.map((variant) => variant.id),
     );
 
     for (const removedVariant of removedVariants) {

@@ -1,5 +1,6 @@
 import type { UpdateItemInput } from "@/lib/validations/stock";
 import {
+    assertNoPendingStockRequestsForItem,
     buildItemInclude,
     ensureDefaultVariant,
 } from "./shared";
@@ -65,6 +66,10 @@ export async function updateItemInTransaction(
     tracking: UploadUrlTracking,
 ): Promise<StockItemWithDetails> {
     const { variants, ...itemData } = data;
+
+    if (itemData.isActive === false) {
+        await assertNoPendingStockRequestsForItem(tx, itemId);
+    }
 
     if (variants && variants.length > 0) {
         return updateItemWithVariants(tx, itemId, itemData, variants, userId, tracking);
