@@ -12,6 +12,7 @@ import {
     buildItemInclude,
     buildReservedQuantityMaps,
     getAvailableQuantity,
+    assertPersistedVariantsForRead,
 } from "./shared";
 import type { PendingRequestItemRecord } from "./types";
 
@@ -47,6 +48,7 @@ async function loadItemsWithVariants(): Promise<LoadedStockBalanceItem[]> {
         include: buildItemInclude(),
         orderBy: { name: "asc" },
     });
+    await assertPersistedVariantsForRead(items);
 
     return items;
 }

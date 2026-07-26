@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { requireAdminSession } from "@/lib/auth/api";
-import { jsonError } from "@/lib/ssot/http";
+import { jsonError, serverError } from "@/lib/ssot/http";
 import {
     createStockBalanceReportXlsxResponse,
     getStockBalanceReportMeta,
@@ -11,6 +11,7 @@ import {
     getStockRequestReportYears,
 } from "@/lib/services/stock/report-export";
 import { stockReportExportQuerySchema } from "@/lib/validations/stock";
+import { StockInvariantViolationError } from "@/lib/services/stock/shared";
 
 export async function GET(request: NextRequest): Promise<Response> {
     try {
@@ -85,6 +86,10 @@ export async function GET(request: NextRequest): Promise<Response> {
         return createStockRequestReportXlsxResponse(resolvedYear);
     } catch (error) {
         console.error("Stock export error:", error);
+
+        if (error instanceof StockInvariantViolationError) {
+            return serverError();
+        }
 
         if (error instanceof Error) {
             return jsonError(error.message, 400);

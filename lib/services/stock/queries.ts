@@ -9,6 +9,7 @@ import {
     buildRequestInclude,
     buildReservedQuantityMaps,
     getAvailableQuantity,
+    assertPersistedVariantsForRead,
 } from "./shared";
 
 export async function getCategories() {
@@ -39,6 +40,7 @@ export async function getItems(filters: StockItemsFilter) {
         skip: (page - 1) * limit,
         take: limit,
     });
+    await assertPersistedVariantsForRead(items);
     const total = await prisma.stockItem.count({ where });
 
     const itemIds = items.map((item) => item.id);
@@ -96,10 +98,14 @@ export async function getItems(filters: StockItemsFilter) {
 }
 
 export async function getItemById(id: number) {
-    return prisma.stockItem.findUnique({
+    const item = await prisma.stockItem.findUnique({
         where: { id },
         include: buildItemInclude(),
     });
+    if (item) {
+        await assertPersistedVariantsForRead([item]);
+    }
+    return item;
 }
 
 export async function getRequests(

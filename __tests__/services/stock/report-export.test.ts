@@ -292,4 +292,66 @@ describe("Stock report export services", () => {
         expect(prismaMock.stockTransaction.create).not.toHaveBeenCalled();
         expect(prismaMock.auditLog.create).not.toHaveBeenCalled();
     });
+
+    it("should reject a balance item with no persisted variant without writing", async () => {
+        prismaMock.stockItem.count.mockResolvedValue(asNever(1));
+        prismaMock.stockItem.findMany.mockResolvedValue(asNever([{
+            id: 3,
+            name: "สมุด",
+            sku: "NOTEBOOK-003",
+            unit: "เล่ม",
+            quantity: 8,
+            minStock: 1,
+            imageUrl: null,
+            isActive: true,
+            categoryId: 10,
+            category: { name: "เครื่องเขียน" },
+            variants: [],
+        }]));
+        prismaMock.stockItemVariant.findMany.mockResolvedValue(asNever([]));
+        const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+        try {
+            await expect(createStockBalanceReportXlsxResponse()).rejects.toThrow(
+                "ข้อมูลวัสดุไม่สอดคล้อง",
+            );
+            expect(prismaMock.stockItemVariant.create).not.toHaveBeenCalled();
+            expect(prismaMock.stockTransaction.create).not.toHaveBeenCalled();
+            expect(prismaMock.auditLog.create).not.toHaveBeenCalled();
+            expect(consoleError).toHaveBeenCalledWith(
+                "Stock invariant violation: item has no variant",
+                { itemId: 3, sku: "NOTEBOOK-003" },
+            );
+        } finally {
+            consoleError.mockRestore();
+        }
+    });
+
+    it("should export an item with only inactive persisted variants without writing", async () => {
+        prismaMock.stockItem.count.mockResolvedValue(asNever(1));
+        prismaMock.stockItem.findMany.mockResolvedValue(asNever([{
+            id: 4,
+            name: "วัสดุที่ปิดใช้งาน",
+            sku: "INACTIVE-004",
+            unit: "ชิ้น",
+            quantity: 8,
+            minStock: 1,
+            imageUrl: null,
+            isActive: true,
+            categoryId: 10,
+            category: { name: "เครื่องเขียน" },
+            variants: [],
+        }]));
+        prismaMock.stockItemVariant.findMany.mockResolvedValue(asNever([
+            { stockItemId: 4 },
+        ]));
+        prismaMock.stockRequestItem.findMany.mockResolvedValue(asNever([]));
+
+        const response = await createStockBalanceReportXlsxResponse();
+
+        expect(response.status).toBe(200);
+        expect(prismaMock.stockItemVariant.create).not.toHaveBeenCalled();
+        expect(prismaMock.stockTransaction.create).not.toHaveBeenCalled();
+        expect(prismaMock.auditLog.create).not.toHaveBeenCalled();
+    });
 });

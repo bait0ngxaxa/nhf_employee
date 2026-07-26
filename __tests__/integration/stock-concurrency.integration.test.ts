@@ -12,7 +12,6 @@ import { prisma } from "@/lib/db/prisma";
 import { runSerializableTransaction } from "@/lib/db/transaction";
 import { stockService } from "@/lib/services/stock";
 import { lockStockInventoryRows } from "@/lib/services/stock/locks";
-import { repairLegacyStockItemVariants } from "@/lib/services/stock/legacy-repair";
 import {
     createRollbackTrigger,
     dropRollbackTrigger,
@@ -170,53 +169,6 @@ describe.sequential("stock mutations with real MySQL", () => {
         });
         expect(await prisma.auditLog.count()).toBe(1);
         expect(await prisma.notification.count()).toBe(1);
-    });
-
-    it("ซ่อม legacy variant พร้อมกันแล้วสร้าง variant และ opening ledger เพียงครั้งเดียว", async () => {
-        const admin = await prisma.user.create({
-            data: {
-                email: "legacy-repair-admin@integration.test",
-                name: "ผู้ดูแลซ่อม legacy",
-                password: "integration-test-only",
-                role: "ADMIN",
-            },
-        });
-        const category = await prisma.stockCategory.create({
-            data: { name: "หมวดซ่อม legacy" },
-        });
-        const item = await prisma.stockItem.create({
-            data: {
-                name: "วัสดุ legacy",
-                sku: "LEGACY-REPAIR-ITEM",
-                unit: "ชิ้น",
-                quantity: 8,
-                minStock: 1,
-                categoryId: category.id,
-            },
-        });
-        const actor = {
-            id: admin.id,
-            email: admin.email,
-            name: admin.name,
-            authority: "ADMIN" as const,
-            userAgent: "mysql-integration-test",
-        };
-
-        const results = await Promise.all([
-            repairLegacyStockItemVariants(actor, [item.id], { dryRun: false }),
-            repairLegacyStockItemVariants(actor, [item.id], { dryRun: false }),
-        ]);
-
-        expect(results.map((result) => result.summary.repaired).sort()).toEqual([0, 1]);
-        expect(await prisma.stockItemVariant.count({ where: { stockItemId: item.id } })).toBe(1);
-        expect(await prisma.stockTransaction.count({
-            where: { itemId: item.id, type: StockTxType.OPENING_BALANCE },
-        })).toBe(1);
-        expect(await prisma.auditLog.count({ where: { entityId: item.id } })).toBe(1);
-        expect(await prisma.stockTransaction.findFirstOrThrow({
-            where: { itemId: item.id, type: StockTxType.OPENING_BALANCE },
-            select: { performedBy: true },
-        })).toEqual({ performedBy: admin.id });
     });
 
     it("ปิดแล้วเปิดวัสดุเดิมจะสลับ lifecycle ของ variant เดิมโดยไม่สร้างซ้ำ", async () => {

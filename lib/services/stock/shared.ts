@@ -1,4 +1,5 @@
 import { StockRequestStatus, type Prisma } from "@prisma/client";
+import { prisma } from "@/lib/db/prisma";
 import {
     deleteLocalUploadByUrl,
     isManagedUploadUrl,
@@ -15,7 +16,7 @@ export function generateSku(): string {
     return `SKU-${time}-${rand}`;
 }
 
-/** Resolve existing active defaults for commands without creating legacy data. */
+/** Resolve existing active defaults for commands without creating variants. */
 export async function loadActiveDefaultVariantsByItemIds(
     tx: Prisma.TransactionClient,
     itemIds: number[],
@@ -42,6 +43,56 @@ export async function loadActiveDefaultVariantsByItemIds(
     }
 
     return defaultVariants;
+}
+
+export class StockInvariantViolationError extends Error {
+    constructor() {
+        super("ข้อมูลวัสดุไม่สอดคล้อง: ไม่พบรายการย่อยของวัสดุ");
+        this.name = "StockInvariantViolationError";
+    }
+}
+
+export async function assertPersistedVariantsForRead(
+    items: ReadonlyArray<{
+        id: number;
+        sku: string;
+        variants: ReadonlyArray<unknown>;
+    }>,
+): Promise<void> {
+    const itemsWithoutActiveVariants = items.filter(
+        (item) => item.variants.length === 0,
+    );
+    if (itemsWithoutActiveVariants.length === 0) {
+        return;
+    }
+
+    const persistedVariants = await prisma.stockItemVariant.findMany({
+        where: {
+            stockItemId: {
+                in: itemsWithoutActiveVariants.map((item) => item.id),
+            },
+        },
+        select: { stockItemId: true },
+    });
+    const itemIdsWithPersistedVariants = new Set(
+        persistedVariants.map((variant) => variant.stockItemId),
+    );
+    const itemsWithoutPersistedVariants = itemsWithoutActiveVariants.filter(
+        (item) => !itemIdsWithPersistedVariants.has(item.id),
+    );
+
+    if (itemsWithoutPersistedVariants.length === 0) {
+        return;
+    }
+
+    for (const item of itemsWithoutPersistedVariants) {
+        console.error("Stock invariant violation: item has no variant", {
+            itemId: item.id,
+            sku: item.sku,
+        });
+    }
+
+    throw new StockInvariantViolationError();
 }
 
 // This include is a presentation view. An empty active list does not mean that
