@@ -21,16 +21,12 @@ function canonicalizeAttachments(
 ): Array<{
     originalName: string;
     contentType: string;
-    sizeBytes: number;
-    width: number;
-    height: number;
+    contentSha256: string;
 }> {
     return attachments.map((attachment) => ({
         originalName: attachment.originalName,
         contentType: attachment.contentType,
-        sizeBytes: attachment.sizeBytes,
-        width: attachment.width,
-        height: attachment.height,
+        contentSha256: attachment.contentSha256,
     }));
 }
 

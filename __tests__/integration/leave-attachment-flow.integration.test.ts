@@ -1,4 +1,8 @@
 import {
+    createHash,
+    randomUUID,
+} from "node:crypto";
+import {
     LeavePeriod,
     LeaveStatus,
     LeaveType,
@@ -26,6 +30,7 @@ import { resetMutationRateLimit } from "@/lib/security/mutation-rate-limit";
 import {
     createLeaveAttachmentStorage,
     LeaveAttachmentValidationError,
+    type StoredLeaveAttachment,
 } from "@/lib/uploads/leave";
 import type * as LeaveUploadsModule from "@/lib/uploads/leave";
 
@@ -79,14 +84,7 @@ type Fixture = {
     adminUserId: number;
 };
 
-type StoredFile = {
-    storageKey: string;
-    originalName: string;
-    contentType: "image/webp";
-    sizeBytes: number;
-    width: number;
-    height: number;
-};
+type StoredFile = StoredLeaveAttachment;
 
 function assertDedicatedDatabase(): void {
     const rawUrl = process.env.DATABASE_URL;
@@ -239,7 +237,10 @@ function mockUserSession(
     });
 }
 
-function createMultipartRequest(files: readonly File[] = []): NextRequest {
+function createMultipartRequest(
+    files: readonly File[] = [],
+    idempotencyKey: string = randomUUID(),
+): NextRequest {
     const formData = new FormData();
     formData.set("payload", JSON.stringify({
         leaveType: "PERSONAL",
@@ -251,6 +252,7 @@ function createMultipartRequest(files: readonly File[] = []): NextRequest {
     files.forEach((file) => formData.append("attachments", file));
     return new NextRequest("http://localhost/api/leave/request", {
         method: "POST",
+        headers: { "Idempotency-Key": idempotencyKey },
         body: formData,
     });
 }
@@ -266,18 +268,21 @@ function createFiles(count: number): File[] {
     );
 }
 
-function createStoredFiles(
+async function createStoredFiles(
     leaveRequestId: string,
     files: readonly File[],
-): StoredFile[] {
-    return files.map((file, index) => ({
+): Promise<StoredFile[]> {
+    return Promise.all(files.map(async (file, index) => ({
         storageKey: `leave/${leaveRequestId}/${String(index + 1).padStart(32, "0")}.webp`,
         originalName: file.name,
         contentType: "image/webp",
+        contentSha256: createHash("sha256")
+            .update(Buffer.from(await file.arrayBuffer()))
+            .digest("hex"),
         sizeBytes: file.size,
         width: 32,
         height: 24,
-    }));
+    })));
 }
 
 async function submit(files: readonly File[] = []): Promise<{
@@ -535,6 +540,7 @@ describe.sequential("leave attachment flow with real MySQL", () => {
             storageKey: conflictKey,
             originalName: "new.jpg",
             contentType: "image/webp",
+            contentSha256: "0".repeat(64),
             sizeBytes: 1,
             width: 1,
             height: 1,

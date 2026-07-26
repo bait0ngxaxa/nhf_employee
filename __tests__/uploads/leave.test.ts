@@ -1,4 +1,5 @@
 import { mkdtemp, rm } from "node:fs/promises";
+import { createHash } from "node:crypto";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import sharp from "sharp";
@@ -103,6 +104,9 @@ describe("private leave attachment storage", () => {
         const metadata = await sharp(savedBuffer).metadata();
         expect(metadata.format).toBe("webp");
         expect(stored?.sizeBytes).toBe(savedBuffer.byteLength);
+        expect(stored?.contentSha256).toBe(
+            createHash("sha256").update(savedBuffer).digest("hex"),
+        );
     });
 
     it("rejects an unsupported MIME type", async () => {

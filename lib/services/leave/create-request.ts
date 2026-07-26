@@ -277,7 +277,14 @@ async function createInTransaction(
     await assertNoOverlap(tx, input.employeeId, prepared.start, prepared.end);
     const quota = await getOrCreateQuota(tx, input, prepared);
     const overQuotaHalfDays = getOverQuotaHalfDays(quota, prepared);
-    const attachmentData = input.attachments.map((attachment) => ({ ...attachment }));
+    const attachmentData = input.attachments.map((attachment) => ({
+        storageKey: attachment.storageKey,
+        originalName: attachment.originalName,
+        contentType: attachment.contentType,
+        sizeBytes: attachment.sizeBytes,
+        width: attachment.width,
+        height: attachment.height,
+    }));
 
     const leaveRequest = await tx.leaveRequest.create({
         data: {

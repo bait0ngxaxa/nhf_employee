@@ -1,4 +1,4 @@
-import crypto from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import sharp from "sharp";
@@ -38,6 +38,7 @@ export interface StoredLeaveAttachment {
     storageKey: string;
     originalName: string;
     contentType: "image/webp";
+    contentSha256: string;
     sizeBytes: number;
     width: number;
     height: number;
@@ -74,6 +75,7 @@ function resolveStoragePath(rootDirectory: string, storageKey: string): string {
 
 async function transformFile(file: LeaveAttachmentSource): Promise<{
     data: Buffer;
+    contentSha256: string;
     width: number;
     height: number;
 }> {
@@ -121,6 +123,9 @@ async function transformFile(file: LeaveAttachmentSource): Promise<{
 
         return {
             data: transformed.data,
+            contentSha256: createHash("sha256")
+                .update(transformed.data)
+                .digest("hex"),
             width: transformed.info.width,
             height: transformed.info.height,
         };
@@ -136,7 +141,7 @@ async function transformFile(file: LeaveAttachmentSource): Promise<{
 }
 
 function createStorageKey(leaveRequestId: string): string {
-    return `leave/${leaveRequestId}/${crypto.randomBytes(16).toString("hex")}.webp`;
+    return `leave/${leaveRequestId}/${randomBytes(16).toString("hex")}.webp`;
 }
 
 export function createLeaveAttachmentStorage(
@@ -167,6 +172,7 @@ export function createLeaveAttachmentStorage(
                     storageKey,
                     originalName: file.name,
                     contentType: "image/webp",
+                    contentSha256: transformed.contentSha256,
                     sizeBytes: transformed.data.byteLength,
                     width: transformed.width,
                     height: transformed.height,
