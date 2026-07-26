@@ -1,4 +1,8 @@
-import { StockRequestStatus, type Prisma } from "@prisma/client";
+import {
+    StockReferenceType,
+    StockRequestStatus,
+    type Prisma,
+} from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
 import { assertActiveWorkforceInTransaction } from "@/lib/auth/workforce-transaction";
 import {
@@ -216,6 +220,7 @@ export async function issueRequest(
                 projectCode: true,
                 items: {
                     select: {
+                        id: true,
                         itemId: true,
                         variantId: true,
                         quantity: true,
@@ -233,21 +238,24 @@ export async function issueRequest(
             request.items.map((item) => item.itemId),
             actor.id,
         );
-        const requestedQtyByVariantId = new Map<
-            number,
-            { itemId: number; quantity: number }
-        >();
-        const requestedQtyByItemId = new Map<number, number>();
-
-        for (const requestItem of request.items) {
+        const resolvedRequestItems = request.items.map((requestItem) => {
             const variantId =
                 requestItem.variantId ?? defaultVariantsByItemId.get(requestItem.itemId)?.id;
             if (!variantId) {
                 throw new Error("ไม่พบรายการย่อยของวัสดุ");
             }
 
-            const existing = requestedQtyByVariantId.get(variantId);
-            requestedQtyByVariantId.set(variantId, {
+            return { ...requestItem, variantId };
+        });
+        const requestedQtyByVariantId = new Map<
+            number,
+            { itemId: number; quantity: number }
+        >();
+        const requestedQtyByItemId = new Map<number, number>();
+
+        for (const requestItem of resolvedRequestItems) {
+            const existing = requestedQtyByVariantId.get(requestItem.variantId);
+            requestedQtyByVariantId.set(requestItem.variantId, {
                 itemId: requestItem.itemId,
                 quantity: (existing?.quantity ?? 0) + requestItem.quantity,
             });
@@ -375,15 +383,19 @@ export async function issueRequest(
         }
 
         const transactionIds: number[] = [];
-        for (const [variantId, requestItem] of requestedVariantEntries) {
+        for (const requestItem of resolvedRequestItems) {
             const transaction = await tx.stockTransaction.create({
                 data: {
                     itemId: requestItem.itemId,
-                    variantId,
+                    variantId: requestItem.variantId,
                     type: "OUT",
                     quantity: -requestItem.quantity,
                     note: `จ่ายตามคำขอ #${requestId}`,
                     performedBy: actor.id,
+                    stockRequestId: requestId,
+                    stockRequestItemId: requestItem.id,
+                    referenceType: StockReferenceType.STOCK_REQUEST,
+                    referenceId: String(requestId),
                 },
                 select: { id: true },
             });

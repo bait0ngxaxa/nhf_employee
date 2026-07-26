@@ -396,9 +396,9 @@ describe("Stock Service Mutations", () => {
                     requestedBy: 3,
                     projectCode: "PRJ-ISSUE",
                     items: [
-                        { itemId: 10, variantId: null, quantity: 2 },
-                        { itemId: 10, variantId: null, quantity: 3 },
-                        { itemId: 12, variantId: null, quantity: 1 },
+                        { id: 1001, itemId: 10, variantId: null, quantity: 2 },
+                        { id: 1002, itemId: 10, variantId: null, quantity: 3 },
+                        { id: 1003, itemId: 12, variantId: null, quantity: 1 },
                     ],
                 }),
             );
@@ -460,7 +460,8 @@ describe("Stock Service Mutations", () => {
                 .mockResolvedValueOnce(asNever({ id: 701 }))
                 .mockResolvedValueOnce(asNever({ id: 702 }))
                 .mockResolvedValueOnce(asNever({ id: 801 }))
-                .mockResolvedValueOnce(asNever({ id: 802 }));
+                .mockResolvedValueOnce(asNever({ id: 802 }))
+                .mockResolvedValueOnce(asNever({ id: 803 }));
             await stockService.issueRequest(99, commandActor(9));
 
             expect(prismaMock.stockItemVariant.updateMany).toHaveBeenNthCalledWith(
@@ -486,6 +487,51 @@ describe("Stock Service Mutations", () => {
                     }),
                 }),
             );
+            expect(prismaMock.stockTransaction.create).toHaveBeenNthCalledWith(3, {
+                data: {
+                    itemId: 10,
+                    variantId: 101,
+                    type: "OUT",
+                    quantity: -2,
+                    note: "จ่ายตามคำขอ #99",
+                    performedBy: 9,
+                    stockRequestId: 99,
+                    stockRequestItemId: 1001,
+                    referenceType: "STOCK_REQUEST",
+                    referenceId: "99",
+                },
+                select: { id: true },
+            });
+            expect(prismaMock.stockTransaction.create).toHaveBeenNthCalledWith(4, {
+                data: {
+                    itemId: 10,
+                    variantId: 101,
+                    type: "OUT",
+                    quantity: -3,
+                    note: "จ่ายตามคำขอ #99",
+                    performedBy: 9,
+                    stockRequestId: 99,
+                    stockRequestItemId: 1002,
+                    referenceType: "STOCK_REQUEST",
+                    referenceId: "99",
+                },
+                select: { id: true },
+            });
+            expect(prismaMock.stockTransaction.create).toHaveBeenNthCalledWith(5, {
+                data: {
+                    itemId: 12,
+                    variantId: 121,
+                    type: "OUT",
+                    quantity: -1,
+                    note: "จ่ายตามคำขอ #99",
+                    performedBy: 9,
+                    stockRequestId: 99,
+                    stockRequestItemId: 1003,
+                    referenceType: "STOCK_REQUEST",
+                    referenceId: "99",
+                },
+                select: { id: true },
+            });
             expect(prismaMock.auditLog.create).toHaveBeenCalledWith(
                 expect.objectContaining({
                     data: expect.objectContaining({
@@ -512,7 +558,7 @@ describe("Stock Service Mutations", () => {
                     stockRequestId: 99,
                     projectCode: "PRJ-ISSUE",
                     variantIds: [101, 121],
-                    transactionIds: [801, 802],
+                    transactionIds: [801, 802, 803],
                     lines: [
                         {
                             itemId: 10,

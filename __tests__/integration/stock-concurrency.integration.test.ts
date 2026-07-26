@@ -1,6 +1,7 @@
 import {
     Prisma,
     PrismaClient,
+    StockReferenceType,
     StockRequestStatus,
     StockTxType,
 } from "@prisma/client";
@@ -145,6 +146,27 @@ describe.sequential("stock mutations with real MySQL", () => {
         expect(inventory.item.quantity).toBe(7);
         expect(inventory.variant.quantity).toBe(7);
         expect(await prisma.stockTransaction.count()).toBe(1);
+        const requestItem = await prisma.stockRequestItem.findFirstOrThrow({
+            where: { requestId: fixture.request.id },
+            select: { id: true },
+        });
+        const transaction = await prisma.stockTransaction.findFirstOrThrow({
+            where: { stockRequestId: fixture.request.id },
+            select: {
+                stockRequestId: true,
+                stockRequestItemId: true,
+                referenceType: true,
+                referenceId: true,
+                quantity: true,
+            },
+        });
+        expect(transaction).toEqual({
+            stockRequestId: fixture.request.id,
+            stockRequestItemId: requestItem.id,
+            referenceType: StockReferenceType.STOCK_REQUEST,
+            referenceId: String(fixture.request.id),
+            quantity: -fixture.requestedQuantity,
+        });
         expect(await prisma.auditLog.count()).toBe(1);
         expect(await prisma.notification.count()).toBe(1);
     });

@@ -595,21 +595,30 @@ model StockVariantAttributeValue {
 }
 
 model StockTransaction {
-  id          Int               @id @default(autoincrement())
-  itemId      Int
-  variantId   Int?
-  type        StockTxType
-  quantity    Int // บวก=เพิ่ม, ลบ=ลด
-  note        String?           @db.Text
-  performedBy Int
-  createdAt   DateTime          @default(now())
-  item        StockItem         @relation(fields: [itemId], references: [id])
-  variant     StockItemVariant? @relation(fields: [variantId], references: [id])
-  user        User              @relation(fields: [performedBy], references: [id])
+  id               Int                @id @default(autoincrement())
+  itemId           Int
+  variantId        Int?
+  type             StockTxType
+  quantity         Int // บวก=เพิ่ม, ลบ=ลด
+  note             String?            @db.Text
+  performedBy      Int
+  stockRequestId   Int?
+  stockRequestItemId Int?
+  referenceType    StockReferenceType?
+  referenceId      String?
+  createdAt        DateTime           @default(now())
+  item             StockItem          @relation(fields: [itemId], references: [id])
+  variant          StockItemVariant?  @relation(fields: [variantId], references: [id])
+  user             User               @relation(fields: [performedBy], references: [id])
+  stockRequest     StockRequest?      @relation(fields: [stockRequestId], references: [id], onDelete: SetNull)
+  stockRequestItem StockRequestItem?  @relation(fields: [stockRequestItemId], references: [id], onDelete: SetNull)
 
   @@index([itemId])
   @@index([variantId])
   @@index([performedBy])
+  @@index([stockRequestId])
+  @@index([stockRequestItemId])
+  @@index([referenceType, referenceId])
   @@map("stock_transactions")
 }
 
@@ -632,6 +641,7 @@ model StockRequest {
   issuer         User?              @relation("StockIssuer", fields: [issuedById], references: [id])
   canceller      User?              @relation("StockCanceller", fields: [cancelledById], references: [id])
   items          StockRequestItem[]
+  transactions   StockTransaction[]
 
   @@unique([requestedBy, idempotencyKey])
   @@index([requestedBy])
@@ -651,6 +661,7 @@ model StockRequestItem {
   request   StockRequest      @relation(fields: [requestId], references: [id], onDelete: Cascade)
   item      StockItem         @relation(fields: [itemId], references: [id])
   variant   StockItemVariant? @relation(fields: [variantId], references: [id])
+  transactions StockTransaction[]
 
   @@index([requestId])
   @@index([itemId])
@@ -663,6 +674,10 @@ enum StockTxType {
   OUT // เบิกออก (เมื่ออนุมัติ)
   ADJUST // ปรับยอดคงเหลือ
   OPENING_BALANCE // ยอดตั้งต้น
+}
+
+enum StockReferenceType {
+  STOCK_REQUEST
 }
 
 enum StockRequestStatus {
