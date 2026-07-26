@@ -4,6 +4,7 @@ export interface EmailData {
     html: string;
     text?: string;
     messageId?: string;
+    fromName?: string;
 }
 
 export type {

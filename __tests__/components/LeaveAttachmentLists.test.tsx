@@ -102,7 +102,7 @@ describe("leave attachment list controls", () => {
         );
 
         expect(
-            screen.queryByRole("button", { name: /ดูหลักฐาน/ }),
+            screen.queryByRole("button", { name: /ไฟล์แนบ/ }),
         ).not.toBeInTheDocument();
     });
 
@@ -124,13 +124,13 @@ describe("leave attachment list controls", () => {
         );
 
         expect(
-            screen.queryByAltText("หลักฐานประกอบคำขอลา รูปที่ 1 จาก 1"),
+            screen.queryByAltText("ไฟล์แนบคำขอลา รูปที่ 1 จาก 1"),
         ).not.toBeInTheDocument();
         fireEvent.click(
-            screen.getByRole("button", { name: "ดูหลักฐาน 1 รูป" }),
+            screen.getByRole("button", { name: "ไฟล์แนบ 1 รูป" }),
         );
         expect(
-            screen.getByRole("dialog", { name: "หลักฐานประกอบคำขอลา" }),
+            screen.getByRole("dialog", { name: "ไฟล์แนบคำขอลา" }),
         ).toBeInTheDocument();
     });
 
@@ -145,7 +145,7 @@ describe("leave attachment list controls", () => {
         );
 
         const evidenceButton = screen.getByRole("button", {
-            name: "ดูหลักฐาน 2 รูป",
+            name: "ไฟล์แนบ 2 รูป",
         });
         const approveButton = screen.getByRole("button", { name: "อนุมัติ" });
 
@@ -154,7 +154,7 @@ describe("leave attachment list controls", () => {
             & Node.DOCUMENT_POSITION_FOLLOWING,
         ).toBeTruthy();
         expect(
-            screen.queryByAltText("หลักฐานประกอบคำขอลา รูปที่ 1 จาก 2"),
+            screen.queryByAltText("ไฟล์แนบคำขอลา รูปที่ 1 จาก 2"),
         ).not.toBeInTheDocument();
     });
 
@@ -167,10 +167,10 @@ describe("leave attachment list controls", () => {
         render(<ApprovalHistoryList history={[historyLeave]} />);
 
         fireEvent.click(
-            screen.getByRole("button", { name: "ดูหลักฐาน 2 รูป" }),
+            screen.getByRole("button", { name: "ไฟล์แนบ 2 รูป" }),
         );
         expect(
-            screen.getByRole("dialog", { name: "หลักฐานประกอบคำขอลา" }),
+            screen.getByRole("dialog", { name: "ไฟล์แนบคำขอลา" }),
         ).toBeInTheDocument();
     });
 
@@ -191,7 +191,7 @@ describe("leave attachment list controls", () => {
         );
 
         const evidenceButton = screen.getByRole("button", {
-            name: "ดูหลักฐาน 2 รูป",
+            name: "ไฟล์แนบ 2 รูป",
         });
         const confirmButton = screen.getByRole("button", {
             name: "ยืนยันคืนโควต้า",

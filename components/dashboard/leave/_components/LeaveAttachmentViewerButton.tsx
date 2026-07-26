@@ -36,7 +36,7 @@ export function LeaveAttachmentViewerButton({
                 onClick={() => setOpen(true)}
             >
                 <Images className="h-4 w-4" aria-hidden="true" />
-                ดูหลักฐาน {attachments.length} รูป
+                ไฟล์แนบ {attachments.length} รูป
             </Button>
             <LeaveAttachmentViewerDialog
                 open={open}

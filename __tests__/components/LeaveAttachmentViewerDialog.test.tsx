@@ -71,15 +71,15 @@ describe("LeaveAttachmentViewerDialog", () => {
         );
 
         expect(
-            screen.getByRole("dialog", { name: "หลักฐานประกอบคำขอลา" }),
+            screen.getByRole("dialog", { name: "ไฟล์แนบคำขอลา" }),
         ).toBeInTheDocument();
-        expect(screen.getByText("กำลังโหลดหลักฐาน…")).toBeInTheDocument();
+        expect(screen.getByText("กำลังโหลดไฟล์แนบ…")).toBeInTheDocument();
 
         expect(
-            await screen.findByAltText("หลักฐานประกอบคำขอลา รูปที่ 1 จาก 2"),
+            await screen.findByAltText("ไฟล์แนบคำขอลา รูปที่ 1 จาก 2"),
         ).toBeInTheDocument();
         expect(
-            screen.getByRole("link", { name: "เปิดหลักฐานในแท็บใหม่" })
+            screen.getByRole("link", { name: "เปิดไฟล์แนบในแท็บใหม่" })
                 .getAttribute("href"),
         ).toMatch(/^blob:/);
         expect(fetchLeaveAttachmentImage).toHaveBeenCalledWith(
@@ -87,7 +87,7 @@ describe("LeaveAttachmentViewerDialog", () => {
             expect.any(AbortSignal),
         );
         await waitFor(() =>
-            expect(screen.queryByText("กำลังโหลดหลักฐาน…")).not.toBeInTheDocument(),
+            expect(screen.queryByText("กำลังโหลดไฟล์แนบ…")).not.toBeInTheDocument(),
         );
     });
 
@@ -100,20 +100,20 @@ describe("LeaveAttachmentViewerDialog", () => {
             />,
         );
 
-        await screen.findByAltText("หลักฐานประกอบคำขอลา รูปที่ 1 จาก 2");
+        await screen.findByAltText("ไฟล์แนบคำขอลา รูปที่ 1 จาก 2");
         fireEvent.click(screen.getByRole("button", { name: "ดูรูปถัดไป" }));
         expect(
-            await screen.findByAltText("หลักฐานประกอบคำขอลา รูปที่ 2 จาก 2"),
+            await screen.findByAltText("ไฟล์แนบคำขอลา รูปที่ 2 จาก 2"),
         ).toBeInTheDocument();
 
         fireEvent.keyDown(document, { key: "ArrowLeft" });
         expect(
-            screen.getByAltText("หลักฐานประกอบคำขอลา รูปที่ 1 จาก 2"),
+            screen.getByAltText("ไฟล์แนบคำขอลา รูปที่ 1 จาก 2"),
         ).toBeInTheDocument();
 
-        fireEvent.click(screen.getByRole("button", { name: "ดูหลักฐานรูปที่ 2" }));
+        fireEvent.click(screen.getByRole("button", { name: "ดูไฟล์แนบรูปที่ 2" }));
         expect(
-            screen.getByAltText("หลักฐานประกอบคำขอลา รูปที่ 2 จาก 2"),
+            screen.getByAltText("ไฟล์แนบคำขอลา รูปที่ 2 จาก 2"),
         ).toBeInTheDocument();
     });
 
@@ -126,7 +126,7 @@ describe("LeaveAttachmentViewerDialog", () => {
             />,
         );
 
-        await screen.findByAltText("หลักฐานประกอบคำขอลา รูปที่ 1 จาก 3");
+        await screen.findByAltText("ไฟล์แนบคำขอลา รูปที่ 1 จาก 3");
         await waitFor(() =>
             expect(fetchLeaveAttachmentImage).toHaveBeenCalledTimes(2),
         );
@@ -135,7 +135,7 @@ describe("LeaveAttachmentViewerDialog", () => {
         ).toEqual(["attachment-1", "attachment-2"]);
 
         fireEvent.click(screen.getByRole("button", { name: "ดูรูปถัดไป" }));
-        await screen.findByAltText("หลักฐานประกอบคำขอลา รูปที่ 2 จาก 3");
+        await screen.findByAltText("ไฟล์แนบคำขอลา รูปที่ 2 จาก 3");
         await waitFor(() =>
             expect(fetchLeaveAttachmentImage).toHaveBeenCalledTimes(3),
         );
@@ -158,7 +158,7 @@ describe("LeaveAttachmentViewerDialog", () => {
         );
 
         expect(
-            await screen.findByText("ไม่สามารถเปิดหลักฐานได้ กรุณาลองใหม่ภายหลัง"),
+            await screen.findByText("ไม่สามารถเปิดไฟล์แนบได้ กรุณาลองใหม่ภายหลัง"),
         ).toBeInTheDocument();
         expect(screen.queryByText(/storage|path|key/i)).not.toBeInTheDocument();
     });
@@ -171,7 +171,7 @@ describe("LeaveAttachmentViewerDialog", () => {
                 onOpenChange={vi.fn()}
             />,
         );
-        await screen.findByAltText("หลักฐานประกอบคำขอลา รูปที่ 1 จาก 1");
+        await screen.findByAltText("ไฟล์แนบคำขอลา รูปที่ 1 จาก 1");
 
         unmount();
 

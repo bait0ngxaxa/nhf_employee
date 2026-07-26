@@ -23,6 +23,8 @@ import {
 
 let transporter: nodemailer.Transporter | null = null;
 let isTransporterReady = false;
+const DEFAULT_EMAIL_FROM_NAME = "NHF IT Support";
+const LEAVE_EMAIL_FROM_NAME = "ระบบลา NHFapp";
 
 type LeaveEmailEvent =
     | "action"
@@ -111,7 +113,7 @@ export async function sendEmail(emailData: EmailData): Promise<boolean> {
                 attempt++;
 
                 await getTransporter().sendMail({
-                    from: `"NHF IT Support" <${process.env.SMTP_USER}>`,
+                    from: `"${emailData.fromName ?? DEFAULT_EMAIL_FROM_NAME}" <${process.env.SMTP_USER}>`,
                     to: emailData.to,
                     subject: emailData.subject,
                     html: emailData.html,
@@ -166,6 +168,10 @@ export async function sendEmail(emailData: EmailData): Promise<boolean> {
         console.error("❌ Unexpected error in sendEmail:", error);
         return false;
     }
+}
+
+function sendLeaveEmail(emailData: EmailData): Promise<boolean> {
+    return sendEmail({ ...emailData, fromName: LEAVE_EMAIL_FROM_NAME });
 }
 
 export async function sendNewTicketNotification(
@@ -262,7 +268,7 @@ export async function sendLeaveActionNotification(
         ),
     };
 
-    return await sendEmail(emailData);
+    return await sendLeaveEmail(emailData);
 }
 
 export async function sendLeaveResultNotification(
@@ -277,7 +283,7 @@ export async function sendLeaveResultNotification(
         messageId: buildLeaveMessageId("result", data.leaveId),
     };
 
-    return await sendEmail(emailData);
+    return await sendLeaveEmail(emailData);
 }
 
 export async function sendLeaveCancelledNotification(
@@ -299,7 +305,7 @@ export async function sendLeaveCancelledNotification(
         messageId: buildLeaveMessageId("cancelled", data.leaveId),
     };
 
-    return sendEmail(emailData);
+    return sendLeaveEmail(emailData);
 }
 
 export async function sendLeaveNotTakenRequestedNotification(
@@ -323,7 +329,7 @@ export async function sendLeaveNotTakenRequestedNotification(
         messageId: buildLeaveMessageId("not-taken-requested", data.leaveId),
     };
 
-    return sendEmail(emailData);
+    return sendLeaveEmail(emailData);
 }
 
 export async function sendLeaveNotTakenConfirmedNotification(
@@ -348,7 +354,7 @@ export async function sendLeaveNotTakenConfirmedNotification(
         messageId: buildLeaveMessageId("not-taken-confirmed", data.leaveId),
     };
 
-    return sendEmail(emailData);
+    return sendLeaveEmail(emailData);
 }
 
 export const emailService = {

@@ -46,6 +46,7 @@ describe("Email Service", () => {
             });
             expect(result).toBe(true);
             expect(sendMailMock).toHaveBeenCalledWith(expect.objectContaining({
+                from: '"NHF IT Support" <user>',
                 messageId: undefined,
             }));
         });
@@ -174,6 +175,11 @@ describe("Email Service", () => {
             await sendLeaveActionNotification(payload, "https://example.test");
             await sendLeaveActionNotification(payload, "https://example.test");
 
+            expect(sendMailMock).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    from: '"ระบบลา NHFapp" <user>',
+                }),
+            );
             const firstMessageId = sendMailMock.mock.calls[0][0].messageId;
             const retryMessageId = sendMailMock.mock.calls[1][0].messageId;
             expect(retryMessageId).toBe(firstMessageId);

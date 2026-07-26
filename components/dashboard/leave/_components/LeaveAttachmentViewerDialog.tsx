@@ -212,7 +212,7 @@ export function LeaveAttachmentViewerDialog({
             >
                 <DialogHeader className="border-b border-slate-200 px-5 py-4 pr-14 text-left">
                     <DialogTitle className="text-lg/7 text-slate-950">
-                        หลักฐานประกอบคำขอลา
+                        ไฟล์แนบคำขอลา
                     </DialogTitle>
                     <DialogDescription className="text-sm/6 text-slate-600">
                         รูปที่ {safeActiveIndex + 1} จาก {attachmentCount}
@@ -225,7 +225,7 @@ export function LeaveAttachmentViewerDialog({
                         variant="ghost"
                         size="icon"
                         className="absolute right-3 top-3 text-slate-600"
-                        aria-label="ปิดหน้าต่างหลักฐาน"
+                        aria-label="ปิดหน้าต่างไฟล์แนบ"
                     >
                         <X className="h-5 w-5" aria-hidden="true" />
                     </Button>
@@ -237,7 +237,7 @@ export function LeaveAttachmentViewerDialog({
                             <Image
                                 key={activeAttachment.id}
                                 src={activeImageUrl}
-                                alt={`หลักฐานประกอบคำขอลา รูปที่ ${safeActiveIndex + 1} จาก ${attachmentCount}`}
+                                alt={`ไฟล์แนบคำขอลา รูปที่ ${safeActiveIndex + 1} จาก ${attachmentCount}`}
                                 fill
                                 unoptimized
                                 priority
@@ -252,7 +252,7 @@ export function LeaveAttachmentViewerDialog({
                                 role="status"
                             >
                                 <div className="h-8 w-8 animate-pulse rounded-full bg-slate-700 motion-reduce:animate-none" />
-                                <span className="text-sm">กำลังโหลดหลักฐาน…</span>
+                                <span className="text-sm">กำลังโหลดไฟล์แนบ…</span>
                             </div>
                         ) : null}
 
@@ -263,7 +263,7 @@ export function LeaveAttachmentViewerDialog({
                             >
                                 <FileImage className="h-9 w-9 text-slate-400" aria-hidden="true" />
                                 <p className="text-sm/6">
-                                    ไม่สามารถเปิดหลักฐานได้ กรุณาลองใหม่ภายหลัง
+                                    ไม่สามารถเปิดไฟล์แนบได้ กรุณาลองใหม่ภายหลัง
                                 </p>
                             </div>
                         ) : null}
@@ -299,7 +299,7 @@ export function LeaveAttachmentViewerDialog({
                             <div
                                 className="flex gap-2 overflow-x-auto pb-1"
                                 role="group"
-                                aria-label="รูปหลักฐานทั้งหมด"
+                                aria-label="ไฟล์แนบทั้งหมด"
                             >
                                 {attachments.map((attachment, index) => {
                                     const thumbnailUrl =
@@ -315,7 +315,7 @@ export function LeaveAttachmentViewerDialog({
                                                     ? "border-indigo-600"
                                                     : "border-transparent hover:border-slate-400",
                                             )}
-                                            aria-label={`ดูหลักฐานรูปที่ ${index + 1}`}
+                                            aria-label={`ดูไฟล์แนบรูปที่ ${index + 1}`}
                                             aria-current={index === safeActiveIndex ? "true" : undefined}
                                             onClick={() => setActiveIndex(index)}
                                         >
@@ -339,7 +339,7 @@ export function LeaveAttachmentViewerDialog({
                                 })}
                             </div>
                         ) : (
-                            <span className="text-sm text-slate-500">มีหลักฐาน 1 รูป</span>
+                            <span className="text-sm text-slate-500">มีไฟล์แนบ 1 รูป</span>
                         )}
 
                         {activeImageUrl ? (
@@ -350,13 +350,13 @@ export function LeaveAttachmentViewerDialog({
                                     rel="noopener noreferrer"
                                 >
                                     <ExternalLink className="h-4 w-4" aria-hidden="true" />
-                                    เปิดหลักฐานในแท็บใหม่
+                                    เปิดไฟล์แนบในแท็บใหม่
                                 </a>
                             </Button>
                         ) : (
                             <Button variant="outline" size="sm" disabled>
                                 <ExternalLink className="h-4 w-4" aria-hidden="true" />
-                                เปิดหลักฐานในแท็บใหม่
+                                เปิดไฟล์แนบในแท็บใหม่
                             </Button>
                         )}
                     </div>
