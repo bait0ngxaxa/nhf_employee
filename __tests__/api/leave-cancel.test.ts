@@ -312,6 +312,52 @@ describe("POST /api/leave/cancel", () => {
         });
     });
 
+    it("rejects confirmation after the leave has started without returning quota", async () => {
+        vi.mocked(requireApiSession).mockResolvedValue({
+            ok: true,
+            session: { user: { id: "20", email: "manager@example.com", name: "Manager", role: "USER" } },
+            user: { id: 20, email: "manager@example.com", name: "Manager", role: "USER" },
+        });
+        vi.mocked(prisma.user.findUnique).mockResolvedValue({
+            isActive: true,
+            deletedAt: null,
+            employee: { id: 20, status: "ACTIVE", deletedAt: null },
+        } as never);
+        vi.mocked(prisma.leaveRequest.findUnique).mockResolvedValue({
+            id: "leave-expired-confirm",
+            employeeId: 10,
+            startDate: new Date("2000-01-10T00:00:00.000Z"),
+            status: "CANCELLATION_REQUESTED",
+            approverId: 20,
+            cancellationRequestedAt: new Date("1999-12-20T00:00:00.000Z"),
+            cancellationConfirmedAt: null,
+            approver: {
+                status: "ACTIVE",
+                deletedAt: null,
+                user: {
+                    id: 20,
+                    email: "manager@example.com",
+                    isActive: true,
+                    deletedAt: null,
+                },
+            },
+        } as never);
+
+        const response = await PUT(new NextRequest("http://localhost/api/leave/cancel", {
+            method: "PUT",
+            body: JSON.stringify({ leaveId: "leave-expired-confirm" }),
+        }));
+
+        expect(response.status).toBe(409);
+        await expect(response.json()).resolves.toEqual({
+            error: "ไม่สามารถยืนยันการยกเลิกได้ เนื่องจากวันลาเริ่มแล้ว",
+        });
+        expect(prisma.leaveRequest.updateMany).not.toHaveBeenCalled();
+        expect(prisma.leaveQuota.findFirst).not.toHaveBeenCalled();
+        expect(prisma.leaveQuota.update).not.toHaveBeenCalled();
+        expect(prisma.notificationOutbox.create).not.toHaveBeenCalled();
+    });
+
     it("does not allow an admin to confirm approved leave cancellation", async () => {
         vi.mocked(requireApiSession).mockResolvedValue({
             ok: true,

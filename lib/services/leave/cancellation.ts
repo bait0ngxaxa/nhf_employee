@@ -33,6 +33,7 @@ export const LEAVE_CANCELLATION_MESSAGES = {
     invalidStatus: "คำขอนี้ไม่สามารถขอยกเลิกได้แล้ว",
     tooLate: "ขอยกเลิกวันลาได้ก่อนวันลาเริ่มเท่านั้น",
     alreadyRequested: "คำขอนี้อยู่ระหว่างรอการยืนยันยกเลิก",
+    confirmationTooLate: "ไม่สามารถยืนยันการยกเลิกได้ เนื่องจากวันลาเริ่มแล้ว",
     forbidden: "คุณไม่มีสิทธิ์ดำเนินการกับคำขอนี้",
     quotaNotFound: "ไม่สามารถตรวจสอบสิทธิ์ลาของคำขอนี้ได้ กรุณาติดต่อผู้ดูแลระบบ",
 } as const;
@@ -230,6 +231,12 @@ export async function confirmLeaveCancellation(
         }
         if (!isActiveLeaveApprover(leaveRequest.approver)) {
             throw new LeaveCancellationError(LEAVE_CANCELLATION_MESSAGES.forbidden, 403);
+        }
+        if (!isBeforeLeaveStart(leaveRequest.startDate)) {
+            throw new LeaveCancellationError(
+                LEAVE_CANCELLATION_MESSAGES.confirmationTooLate,
+                409,
+            );
         }
 
         const confirmedAt = new Date();

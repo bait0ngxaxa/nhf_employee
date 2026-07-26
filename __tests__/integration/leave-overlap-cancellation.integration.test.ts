@@ -5,6 +5,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { prisma } from "@/lib/db/prisma";
 import {
     cancelLeaveRequest,
+    confirmLeaveCancellation,
 } from "@/lib/services/leave/cancellation";
 import {
     createLeaveRequest,
@@ -23,6 +24,8 @@ const LEAVE_PAYLOAD = {
 } satisfies LeaveRequestValues;
 
 type Fixture = {
+    approverEmployeeId: number;
+    approverUserId: number;
     employeeId: number;
     employeeUserId: number;
     employeeUserEmail: string;
@@ -144,7 +147,7 @@ async function createFixture(): Promise<Fixture> {
             employeeId: employee.id,
         },
     });
-    await prisma.user.create({
+    const approverUser = await prisma.user.create({
         data: {
             email: "leave-cancel-overlap-approver-user@integration.test",
             name: "Cancellation Approver",
@@ -154,6 +157,8 @@ async function createFixture(): Promise<Fixture> {
     });
 
     return {
+        approverEmployeeId: approver.id,
+        approverUserId: approverUser.id,
         employeeId: employee.id,
         employeeUserId: employeeUser.id,
         employeeUserEmail: employeeUser.email,
@@ -241,5 +246,81 @@ describe.sequential("leave overlap after cancellation request with real MySQL", 
             status: LeaveStatus.CANCELLATION_REQUESTED,
             cancellationConfirmedAt: null,
         }]);
+    });
+
+    it("does not confirm cancellation or return quota after the leave has started", async () => {
+        const originalLeaveId = await createRequest(
+            fixture,
+            "leave-cancel-expired-original",
+        );
+        await prisma.leaveRequest.update({
+            where: { id: originalLeaveId },
+            data: {
+                status: LeaveStatus.APPROVED,
+                approvedAt: new Date(),
+            },
+        });
+        await prisma.leaveQuota.create({
+            data: {
+                employeeId: fixture.employeeId,
+                year: 2000,
+                leaveType: "PERSONAL",
+                totalHalfDays: 20,
+                usedHalfDays: 2,
+            },
+        });
+
+        await expect(
+            cancelLeaveRequest(
+                {
+                    userId: fixture.employeeUserId,
+                    employeeId: fixture.employeeId,
+                },
+                originalLeaveId,
+                "เปลี่ยนแผนการเดินทาง",
+            ),
+        ).resolves.toMatchObject({ kind: "CANCELLATION_REQUESTED" });
+
+        const expiredDate = new Date("2000-01-10T00:00:00.000Z");
+        await prisma.leaveRequest.update({
+            where: { id: originalLeaveId },
+            data: { startDate: expiredDate, endDate: expiredDate },
+        });
+
+        await expect(
+            confirmLeaveCancellation(
+                {
+                    userId: fixture.approverUserId,
+                    employeeId: fixture.approverEmployeeId,
+                    role: "USER",
+                },
+                originalLeaveId,
+            ),
+        ).rejects.toMatchObject({
+            message: "ไม่สามารถยืนยันการยกเลิกได้ เนื่องจากวันลาเริ่มแล้ว",
+            statusCode: 409,
+        });
+
+        await expect(
+            prisma.leaveRequest.findUniqueOrThrow({
+                where: { id: originalLeaveId },
+                select: { status: true, cancellationConfirmedAt: true },
+            }),
+        ).resolves.toEqual({
+            status: LeaveStatus.CANCELLATION_REQUESTED,
+            cancellationConfirmedAt: null,
+        });
+        await expect(
+            prisma.leaveQuota.findUniqueOrThrow({
+                where: {
+                    employeeId_year_leaveType: {
+                        employeeId: fixture.employeeId,
+                        year: 2000,
+                        leaveType: "PERSONAL",
+                    },
+                },
+                select: { usedHalfDays: true },
+            }),
+        ).resolves.toEqual({ usedHalfDays: 2 });
     });
 });
