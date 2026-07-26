@@ -4,6 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
 import { leaveRequestSchema, type LeaveRequestValues } from "@/lib/validations/leave";
 import { submitLeaveRequest } from "@/lib/services/leave/client";
+import { createIdempotencyKey } from "@/lib/client/idempotency-key";
 import { calculateAdditionalOverQuotaDays } from "@/lib/services/leave/over-quota";
 import {
     LeaveAttachmentValidationError,
@@ -123,6 +124,7 @@ export function useLeaveRequestFormModel({
     const [attachmentError, setAttachmentError] = useState<string | null>(null);
     const [isMultiDay, setIsMultiDay] = useState(false);
     const submittingRef = useRef(false);
+    const idempotencyRef = useRef<{ payloadSignature: string; key: string } | null>(null);
 
     const form = useForm<LeaveRequestValues>({
         resolver: zodResolver(leaveRequestSchema),
@@ -199,6 +201,7 @@ export function useLeaveRequestFormModel({
         clearAttachments();
         setErrorMsg(null);
         setIsMultiDay(false);
+        idempotencyRef.current = null;
     };
 
     const submit = async (data: LeaveRequestValues): Promise<void> => {
@@ -226,9 +229,26 @@ export function useLeaveRequestFormModel({
         submittingRef.current = true;
         setIsSubmitting(true);
         setErrorMsg(null);
+        const payloadSignature = JSON.stringify({
+            payload: data,
+            attachments: attachments.map((attachment) => ({
+                name: attachment.name,
+                type: attachment.type,
+                size: attachment.size,
+                lastModified: attachment.lastModified,
+            })),
+        });
+        const idempotencyRequest =
+            idempotencyRef.current?.payloadSignature === payloadSignature
+                ? idempotencyRef.current
+                : {
+                    payloadSignature,
+                    key: createIdempotencyKey(),
+                };
+        idempotencyRef.current = idempotencyRequest;
         try {
             try {
-                await submitLeaveRequest(data, attachments);
+                await submitLeaveRequest(data, attachments, idempotencyRequest.key);
             } catch (error) {
                 const rawMessage =
                     error instanceof Error && error.message

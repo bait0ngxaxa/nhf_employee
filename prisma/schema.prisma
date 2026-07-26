@@ -34,6 +34,7 @@ model User {
   stockIssuedRequests         StockRequest[]              @relation("StockIssuer")
   stockCancelledRequests      StockRequest[]              @relation("StockCanceller")
   ticketMutationIdempotencies TicketMutationIdempotency[]
+  leaveRequestIdempotencies    LeaveRequestIdempotency[]
 
   @@map("users")
 }
@@ -467,6 +468,7 @@ model LeaveRequest {
   employee    Employee          @relation("LeaveRequester", fields: [employeeId], references: [id])
   approver    Employee?         @relation("LeaveApprover", fields: [approverId], references: [id])
   attachments LeaveAttachment[]
+  idempotency LeaveRequestIdempotency?
 
   @@index([employeeId])
   @@index([approverId])
@@ -474,6 +476,22 @@ model LeaveRequest {
   @@index([notTakenRequestedAt])
   @@index([cancellationRequestedAt])
   @@map("leave_requests")
+}
+
+model LeaveRequestIdempotency {
+  id             String      @id @default(cuid())
+  userId         Int
+  idempotencyKey String      @db.VarChar(255)
+  requestHash    String      @db.Char(64)
+  leaveRequestId String      @unique
+  createdAt      DateTime    @default(now())
+
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  leaveRequest LeaveRequest @relation(fields: [leaveRequestId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, idempotencyKey])
+  @@index([createdAt])
+  @@map("leave_request_idempotency")
 }
 
 model LeaveAttachment {

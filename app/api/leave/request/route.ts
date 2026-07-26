@@ -5,8 +5,12 @@ import { requireActiveWorkforceSession } from "@/lib/auth/workforce";
 import {
     createLeaveRequest,
     LeaveRequestError,
+    LeaveRequestIdempotencyConflictError,
     type CreatedLeaveRequest,
 } from "@/lib/services/leave/create-request";
+import {
+    LEAVE_REQUEST_IDEMPOTENCY_CONFLICT_CODE,
+} from "@/lib/services/leave/idempotency";
 import {
     LeaveRequestInputError,
     assertLeaveRequestBodySize,
@@ -18,6 +22,7 @@ import { processOutbox } from "@/lib/services/outbox/processor";
 import { FEATURE_KEYS, isFeatureEnabled } from "@/lib/ssot/features";
 import { jsonError, notFound } from "@/lib/ssot/http";
 import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
+import { idempotencyKeySchema } from "@/lib/validations/idempotency";
 import {
     enforceAuthenticatedMutationRateLimit,
     enforcePreAuthIpRateLimit,
@@ -51,6 +56,11 @@ function createErrorResponse(error: unknown): NextResponse {
     }
     if (error instanceof LeaveAttachmentValidationError) {
         return jsonError(error.message, 400);
+    }
+    if (error instanceof LeaveRequestIdempotencyConflictError) {
+        return jsonError(error.message, 409, {
+            code: LEAVE_REQUEST_IDEMPOTENCY_CONFLICT_CODE,
+        });
     }
     if (error instanceof LeaveRequestError) {
         return jsonError(error.message, error.statusCode);
@@ -107,6 +117,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     let transactionCommitted = false;
     try {
         const input = await parseLeaveRequestInput(request);
+        const parsedIdempotencyKey = idempotencyKeySchema.safeParse(
+            request.headers.get("Idempotency-Key"),
+        );
+        if (!parsedIdempotencyKey.success) {
+            return jsonError("กรุณาระบุ Idempotency-Key ที่ถูกต้อง", 400);
+        }
         const leaveRequestId = randomUUID();
         storedAttachments = await saveLeaveAttachments({
             leaveRequestId,
@@ -117,22 +133,27 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
             userId: auth.user.id,
             userEmail: auth.user.email,
             employeeId: auth.employeeId,
+            idempotencyKey: parsedIdempotencyKey.data,
             payload: input.payload,
             attachments: storedAttachments,
         });
         transactionCommitted = true;
 
-        after(() => {
-            processOutbox().catch((error: unknown) =>
-                console.error("ประมวลผล outbox หลังสร้างคำขอลาไม่สำเร็จ", {
-                    errorType: error instanceof Error ? error.name : "UnknownError",
-                }),
-            );
-        });
+        if (result.replayed) {
+            await cleanupAttachments(storedAttachments);
+        } else {
+            after(() => {
+                processOutbox().catch((error: unknown) =>
+                    console.error("ประมวลผล outbox หลังสร้างคำขอลาไม่สำเร็จ", {
+                        errorType: error instanceof Error ? error.name : "UnknownError",
+                    }),
+                );
+            });
+        }
 
         return NextResponse.json(
-            { success: true, data: createResponseData(result) },
-            { status: 201 },
+            { success: true, data: createResponseData(result.request) },
+            { status: result.replayed ? 200 : 201 },
         );
     } catch (error) {
         if (!transactionCommitted && storedAttachments.length > 0) {

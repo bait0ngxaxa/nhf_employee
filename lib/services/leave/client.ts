@@ -1,5 +1,6 @@
 import { apiGet, apiPost, apiPut, type ApiResponse } from "@/lib/client/api-client";
 import { fetchWithRefresh } from "@/lib/auth/client";
+import { createIdempotencyKey } from "@/lib/client/idempotency-key";
 import { triggerDownload } from "@/lib/helpers/download";
 import { API_ROUTES } from "@/lib/ssot/routes";
 import type { LeaveRequestValues } from "@/lib/validations/leave";
@@ -96,6 +97,7 @@ export const saveApproverAssignments = async (
 export const submitLeaveRequest = async (
     payload: LeaveRequestValues,
     attachments: readonly File[],
+    idempotencyKey: string = createIdempotencyKey(),
 ): Promise<void> => {
     const formData = new FormData();
     formData.set("payload", JSON.stringify(payload));
@@ -106,6 +108,7 @@ export const submitLeaveRequest = async (
     const response = await apiPost<unknown>(
         API_ROUTES.leave.request,
         formData,
+        { headers: { "Idempotency-Key": idempotencyKey } },
     );
     ensureSuccess(response);
 };

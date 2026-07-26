@@ -197,7 +197,11 @@ describe("useLeaveRequestFormModel", () => {
         });
 
         expect(submitLeaveRequest).toHaveBeenCalledTimes(1);
-        expect(submitLeaveRequest).toHaveBeenCalledWith(payload, []);
+        expect(submitLeaveRequest).toHaveBeenCalledWith(
+            payload,
+            [],
+            expect.any(String),
+        );
         expect(onSuccess).toHaveBeenCalledTimes(1);
         expect(toast.success).toHaveBeenCalledTimes(1);
         expect(result.current.errorMsg).toBeNull();
@@ -228,6 +232,20 @@ describe("useLeaveRequestFormModel", () => {
         expect(submitLeaveRequest).toHaveBeenCalledWith(
             expect.any(Object),
             [attachment],
+            expect.any(String),
+        );
+        const firstIdempotencyKey = vi.mocked(submitLeaveRequest).mock.calls[0]?.[2];
+        await act(async () => {
+            await result.current.submit({
+                leaveType: "SICK",
+                startDate: "2031-01-01",
+                endDate: "2031-01-01",
+                period: "FULL_DAY",
+                reason: "พักรักษาตัว",
+            });
+        });
+        expect(vi.mocked(submitLeaveRequest).mock.calls[1]?.[2]).toBe(
+            firstIdempotencyKey,
         );
         expect(result.current.attachments).toEqual([attachment]);
     });
@@ -254,6 +272,7 @@ describe("useLeaveRequestFormModel", () => {
         expect(submitLeaveRequest).toHaveBeenCalledWith(
             expect.any(Object),
             [attachment],
+            expect.any(String),
         );
         expect(result.current.attachments).toEqual([]);
     });

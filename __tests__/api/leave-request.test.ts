@@ -9,6 +9,7 @@ import { processOutbox } from "@/lib/services/outbox/processor";
 import { LeaveAttachmentValidationError } from "@/lib/uploads/leave";
 import { LEAVE_ATTACHMENT_MAX_BYTES } from "@/lib/ssot/leave-attachments";
 import { resetMutationRateLimit } from "@/lib/security/mutation-rate-limit";
+import { createLeaveRequestHash } from "@/lib/services/leave/idempotency";
 import { NextRequest } from "next/server";
 import type * as NextServerModule from "next/server";
 
@@ -64,6 +65,11 @@ vi.mock("@/lib/db/prisma", () => ({
         leaveRequest: {
             create: vi.fn(),
             findFirst: vi.fn(),
+            findUnique: vi.fn(),
+        },
+        leaveRequestIdempotency: {
+            create: vi.fn(),
+            findUnique: vi.fn(),
         },
         notificationOutbox: {
             create: vi.fn(),
@@ -75,6 +81,7 @@ vi.mock("@/lib/db/prisma", () => ({
 }));
 
 describe("POST /api/leave/request", () => {
+    const testIdempotencyKey = "leave-request-test-key";
     const mockUser = { id: "1", name: "Test User" };
     const mockEmployeeId = 100;
     const mockManager = {
@@ -102,6 +109,19 @@ describe("POST /api/leave/request", () => {
         manager: mockManager,
     });
 
+    function createLeaveRequestRequest(
+        init: ConstructorParameters<typeof NextRequest>[1] = {},
+    ): NextRequest {
+        const headers = new Headers(init.headers);
+        if (!headers.has("Idempotency-Key")) {
+            headers.set("Idempotency-Key", testIdempotencyKey);
+        }
+        return new NextRequest(
+            "http://localhost/api/leave/request",
+            { ...init, headers },
+        );
+    }
+
     beforeEach(() => {
         vi.clearAllMocks();
         resetMutationRateLimit();
@@ -111,6 +131,7 @@ describe("POST /api/leave/request", () => {
         } as never);
         vi.mocked(prisma.user.findFirst).mockResolvedValue({ id: 1 } as never);
         vi.mocked(prisma.$queryRaw).mockResolvedValue([] as never);
+        vi.mocked(prisma.leaveRequestIdempotency.findUnique).mockResolvedValue(null);
         uploadMocks.save.mockResolvedValue([]);
         uploadMocks.delete.mockResolvedValue(undefined);
         (processOutbox as unknown as { mockResolvedValue: (v: undefined) => void }).mockResolvedValue(undefined);
@@ -122,7 +143,7 @@ describe("POST /api/leave/request", () => {
 
     it("should return 401 if unauthorized", async () => {
         (getApiAuthSession as unknown as { mockResolvedValue: (v: null) => void }).mockResolvedValue(null);
-        const req = new NextRequest("http://localhost/api/leave/request", {
+        const req = createLeaveRequestRequest({
             method: "POST",
             body: JSON.stringify({}),
         });
@@ -133,8 +154,33 @@ describe("POST /api/leave/request", () => {
         expect(data.error).toBe("Unauthorized");
     });
 
-    it("rejects an oversized request before authenticating", async () => {
+    it("requires an Idempotency-Key for a valid leave payload", async () => {
+        (getApiAuthSession as unknown as { mockResolvedValue: (v: { user: { id: string; name: string } }) => void }).mockResolvedValue({ user: mockUser });
+        (getEmployeeIdFromUserId as unknown as { mockResolvedValue: (v: number) => void }).mockResolvedValue(mockEmployeeId);
+
         const req = new NextRequest("http://localhost/api/leave/request", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                leaveType: "PERSONAL",
+                startDate: "2030-05-10",
+                endDate: "2030-05-10",
+                period: "FULL_DAY",
+                reason: "Personal errand",
+            }),
+        });
+
+        const res = await submitLeaveRequest(req);
+
+        expect(res.status).toBe(400);
+        expect(await res.json()).toEqual({
+            error: "กรุณาระบุ Idempotency-Key ที่ถูกต้อง",
+        });
+        expect(prisma.$transaction).not.toHaveBeenCalled();
+    });
+
+    it("rejects an oversized request before authenticating", async () => {
+        const req = createLeaveRequestRequest({
             method: "POST",
             headers: {
                 "Content-Type": "multipart/form-data; boundary=test",
@@ -152,7 +198,7 @@ describe("POST /api/leave/request", () => {
         (getApiAuthSession as unknown as { mockResolvedValue: (v: { user: { id: string } }) => void }).mockResolvedValue({
             user: { id: "not-a-number" },
         });
-        const req = new NextRequest("http://localhost/api/leave/request", {
+        const req = createLeaveRequestRequest({
             method: "POST",
             body: JSON.stringify({}),
         });
@@ -171,7 +217,7 @@ describe("POST /api/leave/request", () => {
             employee: null,
         } as never);
 
-        const req = new NextRequest("http://localhost/api/leave/request", {
+        const req = createLeaveRequestRequest({
             method: "POST",
             body: JSON.stringify({}),
         });
@@ -187,7 +233,7 @@ describe("POST /api/leave/request", () => {
         (getApiAuthSession as unknown as { mockResolvedValue: (v: { user: { id: string; name: string } }) => void }).mockResolvedValue({ user: mockUser });
         (getEmployeeIdFromUserId as unknown as { mockResolvedValue: (v: number) => void }).mockResolvedValue(mockEmployeeId);
 
-        const req = new NextRequest("http://localhost/api/leave/request", {
+        const req = createLeaveRequestRequest({
             method: "POST",
             body: JSON.stringify({ leaveType: "INVALID" }),
         });
@@ -203,7 +249,7 @@ describe("POST /api/leave/request", () => {
         (getApiAuthSession as unknown as { mockResolvedValue: (v: { user: { id: string; name: string } }) => void }).mockResolvedValue({ user: mockUser });
         (getEmployeeIdFromUserId as unknown as { mockResolvedValue: (v: number) => void }).mockResolvedValue(mockEmployeeId);
 
-        const req = new NextRequest("http://localhost/api/leave/request", {
+        const req = createLeaveRequestRequest({
             method: "POST",
             body: JSON.stringify({
                 leaveType: "SICK",
@@ -232,7 +278,7 @@ describe("POST /api/leave/request", () => {
             reason: "Sick leave",
         };
 
-        const req = new NextRequest("http://localhost/api/leave/request", {
+        const req = createLeaveRequestRequest({
             method: "POST",
             body: JSON.stringify(payload),
         });
@@ -255,7 +301,7 @@ describe("POST /api/leave/request", () => {
             reason: "Weekend overlap",
         };
 
-        const req = new NextRequest("http://localhost/api/leave/request", {
+        const req = createLeaveRequestRequest({
             method: "POST",
             body: JSON.stringify(payload),
         });
@@ -300,7 +346,7 @@ describe("POST /api/leave/request", () => {
             reason: "Cross weekend",
         };
 
-        const req = new NextRequest("http://localhost/api/leave/request", {
+        const req = createLeaveRequestRequest({
             method: "POST",
             body: JSON.stringify(payload),
         });
@@ -342,7 +388,7 @@ describe("POST /api/leave/request", () => {
         it("should throw error if employee record not found in transaction", async () => {
             (prisma.employee.findUnique as unknown as { mockResolvedValue: (v: null) => void }).mockResolvedValue(null);
 
-            const req = new NextRequest("http://localhost/api/leave/request", {
+            const req = createLeaveRequestRequest({
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(validPayload),
@@ -361,7 +407,7 @@ describe("POST /api/leave/request", () => {
                 manager: null,
             });
 
-            const req = new NextRequest("http://localhost/api/leave/request", {
+            const req = createLeaveRequestRequest({
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(validPayload),
@@ -384,7 +430,7 @@ describe("POST /api/leave/request", () => {
                 manager: { ...mockManager, ...state },
             } as never);
 
-            const req = new NextRequest("http://localhost/api/leave/request", {
+            const req = createLeaveRequestRequest({
                 method: "POST",
                 body: JSON.stringify(validPayload),
             });
@@ -407,7 +453,7 @@ describe("POST /api/leave/request", () => {
                 usedHalfDays: 12,
             });
 
-            const req = new NextRequest("http://localhost/api/leave/request", {
+            const req = createLeaveRequestRequest({
                 method: "POST",
                 body: JSON.stringify(validPayload),
             });
@@ -432,7 +478,7 @@ describe("POST /api/leave/request", () => {
                 overQuotaHalfDays: 2,
             });
 
-            const req = new NextRequest("http://localhost/api/leave/request", {
+            const req = createLeaveRequestRequest({
                 method: "POST",
                 body: JSON.stringify({
                     ...validPayload,
@@ -469,7 +515,7 @@ describe("POST /api/leave/request", () => {
                 overQuotaHalfDays: 0,
             });
 
-            const req = new NextRequest("http://localhost/api/leave/request", {
+            const req = createLeaveRequestRequest({
                 method: "POST",
                 body: JSON.stringify({
                     leaveType: "SICK",
@@ -512,7 +558,7 @@ describe("POST /api/leave/request", () => {
                 status: "APPROVED",
             });
 
-            const req = new NextRequest("http://localhost/api/leave/request", {
+            const req = createLeaveRequestRequest({
                 method: "POST",
                 body: JSON.stringify(validPayload),
             });
@@ -521,6 +567,71 @@ describe("POST /api/leave/request", () => {
             expect(res.status).toBe(409);
             const data = await res.json();
             expect(data.error).toBe("มีคำขอลาในช่วงวันที่นี้อยู่แล้ว");
+        });
+
+        it("should replay the original request for the same key and payload", async () => {
+            const replayedRequest = {
+                id: "leave-request-replayed",
+                durationHalfDays: 2,
+                overQuotaHalfDays: 0,
+                attachments: [],
+            };
+            vi.mocked(prisma.leaveRequestIdempotency.findUnique).mockResolvedValue({
+                requestHash: createLeaveRequestHash(validPayload as never),
+                leaveRequest: replayedRequest,
+            } as never);
+
+            const req = createLeaveRequestRequest({
+                method: "POST",
+                headers: { "Idempotency-Key": testIdempotencyKey },
+                body: JSON.stringify(validPayload),
+            });
+
+            const res = await submitLeaveRequest(req);
+
+            expect(res.status).toBe(200);
+            expect(await res.json()).toEqual({
+                success: true,
+                data: {
+                    id: replayedRequest.id,
+                    durationDays: 1,
+                    overQuotaDays: 0,
+                    attachments: [],
+                },
+            });
+            expect(prisma.leaveRequest.create).not.toHaveBeenCalled();
+            expect(prisma.leaveRequestIdempotency.create).not.toHaveBeenCalled();
+            expect(prisma.notificationOutbox.create).not.toHaveBeenCalled();
+            expect(processOutbox).not.toHaveBeenCalled();
+            expect(prisma.auditLog.create).not.toHaveBeenCalled();
+        });
+
+        it("should reject a reused key when the payload hash differs", async () => {
+            vi.mocked(prisma.leaveRequestIdempotency.findUnique).mockResolvedValue({
+                requestHash: "different-request-hash",
+                leaveRequest: {
+                    id: "leave-request-existing",
+                    durationHalfDays: 2,
+                    overQuotaHalfDays: 0,
+                    attachments: [],
+                },
+            } as never);
+
+            const req = createLeaveRequestRequest({
+                method: "POST",
+                headers: { "Idempotency-Key": testIdempotencyKey },
+                body: JSON.stringify(validPayload),
+            });
+
+            const res = await submitLeaveRequest(req);
+
+            expect(res.status).toBe(409);
+            expect(await res.json()).toEqual({
+                error: "Idempotency-Key นี้ถูกใช้กับข้อมูลคำขออื่นแล้ว",
+                code: "IDEMPOTENCY_CONFLICT",
+            });
+            expect(prisma.leaveRequest.create).not.toHaveBeenCalled();
+            expect(prisma.leaveRequestIdempotency.create).not.toHaveBeenCalled();
         });
 
         it("should retry a write conflict and return overlap conflict", async () => {
@@ -541,7 +652,7 @@ describe("POST /api/leave/request", () => {
                 .mockRejectedValueOnce({ code: "P2034" })
                 .mockImplementationOnce(async (callback) => callback(prisma));
 
-            const req = new NextRequest("http://localhost/api/leave/request", {
+            const req = createLeaveRequestRequest({
                 method: "POST",
                 body: JSON.stringify(validPayload),
             });
@@ -574,7 +685,7 @@ describe("POST /api/leave/request", () => {
                 mockCreatedRequest,
             );
 
-            const req = new NextRequest("http://localhost/api/leave/request", {
+            const req = createLeaveRequestRequest({
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(validPayload),
@@ -619,6 +730,14 @@ describe("POST /api/leave/request", () => {
                     type: "LEAVE_ACTION",
                 }),
             });
+            expect(prisma.leaveRequestIdempotency.create).toHaveBeenCalledWith({
+                data: {
+                    userId: 1,
+                    idempotencyKey: testIdempotencyKey,
+                    requestHash: expect.any(String),
+                    leaveRequestId: mockCreatedRequest.id,
+                },
+            });
             expect(processOutbox).toHaveBeenCalled();
         });
     });
@@ -654,7 +773,7 @@ describe("POST /api/leave/request", () => {
             for (const file of files) {
                 formData.append("attachments", file);
             }
-            return new NextRequest("http://localhost/api/leave/request", {
+            return createLeaveRequestRequest({
                 method: "POST",
                 body: formData,
             });

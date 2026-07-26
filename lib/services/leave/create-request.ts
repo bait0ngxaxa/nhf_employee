@@ -1,7 +1,11 @@
 import type { Prisma } from "@prisma/client";
 
 import { DEFAULT_LEAVE_QUOTA_HALF_DAYS } from "@/constants/leave";
-import { runSerializableTransaction } from "@/lib/db/transaction";
+import { prisma } from "@/lib/db/prisma";
+import {
+    hasPrismaErrorCode,
+    runSerializableTransaction,
+} from "@/lib/db/transaction";
 import {
     isActiveEmployeeInTransaction,
     isEmployeeInTransaction,
@@ -31,6 +35,10 @@ import { calculateLeaveDurationHalfDays, isWorkingDay } from "@/lib/services/lea
 import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
 import type { StoredLeaveAttachment } from "@/lib/uploads/leave";
 import type { LeaveRequestValues } from "@/lib/validations/leave";
+import {
+    assertMatchingLeaveRequestHash,
+    createLeaveRequestHash,
+} from "@/lib/services/leave/idempotency";
 
 interface PreparedLeaveRequest {
     payload: LeaveRequestValues;
@@ -48,8 +56,14 @@ export interface CreateLeaveRequestInput {
     userId: number;
     userEmail: string;
     employeeId: number;
+    idempotencyKey: string;
     payload: LeaveRequestValues;
     attachments: readonly StoredLeaveAttachment[];
+}
+
+export interface CreatedLeaveRequestResult {
+    request: CreatedLeaveRequest;
+    replayed: boolean;
 }
 
 function prepareLeaveRequest(payload: LeaveRequestValues): PreparedLeaveRequest {
@@ -80,10 +94,10 @@ function prepareLeaveRequest(payload: LeaveRequestValues): PreparedLeaveRequest 
     };
 }
 
-async function getEligibleEmployee(
+async function assertActiveRequester(
     tx: Prisma.TransactionClient,
     input: CreateLeaveRequestInput,
-): Promise<EligibleEmployee> {
+): Promise<void> {
     if (!await isActiveEmployeeInTransaction(tx, input.userId, input.employeeId)) {
         const employeeExists = await isEmployeeInTransaction(tx, input.employeeId);
         throw new LeaveRequestError(
@@ -93,7 +107,12 @@ async function getEligibleEmployee(
             employeeExists ? 403 : 404,
         );
     }
+}
 
+async function getEligibleEmployee(
+    tx: Prisma.TransactionClient,
+    input: CreateLeaveRequestInput,
+): Promise<EligibleEmployee> {
     const employee = await tx.employee.findUnique({
         where: { id: input.employeeId },
         include: EMPLOYEE_INCLUDE,
@@ -118,6 +137,35 @@ async function getEligibleEmployee(
         );
     }
     return { ...employee, manager };
+}
+
+type LeaveRequestIdempotencyClient = Pick<
+    Prisma.TransactionClient,
+    "leaveRequestIdempotency"
+>;
+
+async function findReplayedLeaveRequest(
+    client: LeaveRequestIdempotencyClient,
+    input: CreateLeaveRequestInput,
+    requestHash: string,
+): Promise<CreatedLeaveRequest | null> {
+    const record = await client.leaveRequestIdempotency.findUnique({
+        where: {
+            userId_idempotencyKey: {
+                userId: input.userId,
+                idempotencyKey: input.idempotencyKey,
+            },
+        },
+        include: {
+            leaveRequest: { include: LEAVE_REQUEST_INCLUDE },
+        },
+    });
+    if (!record) {
+        return null;
+    }
+
+    assertMatchingLeaveRequestHash(record, requestHash);
+    return record.leaveRequest;
 }
 
 async function assertNoOverlap(
@@ -217,7 +265,14 @@ async function createInTransaction(
     tx: Prisma.TransactionClient,
     input: CreateLeaveRequestInput,
     prepared: PreparedLeaveRequest,
-): Promise<CreatedLeaveRequest> {
+    requestHash: string,
+): Promise<CreatedLeaveRequestResult> {
+    await assertActiveRequester(tx, input);
+    const replayedRequest = await findReplayedLeaveRequest(tx, input, requestHash);
+    if (replayedRequest) {
+        return { request: replayedRequest, replayed: true };
+    }
+
     const employee = await getEligibleEmployee(tx, input);
     await assertNoOverlap(tx, input.employeeId, prepared.start, prepared.end);
     const quota = await getOrCreateQuota(tx, input, prepared);
@@ -246,24 +301,58 @@ async function createInTransaction(
         include: LEAVE_REQUEST_INCLUDE,
     });
     await enqueueLeaveNotification(tx, input, prepared, employee, overQuotaHalfDays);
-    return leaveRequest;
+    await tx.leaveRequestIdempotency.create({
+        data: {
+            userId: input.userId,
+            idempotencyKey: input.idempotencyKey,
+            requestHash,
+            leaveRequestId: leaveRequest.id,
+        },
+    });
+    return { request: leaveRequest, replayed: false };
 }
 
 export async function createLeaveRequest(
     input: CreateLeaveRequestInput,
-): Promise<CreatedLeaveRequest> {
+): Promise<CreatedLeaveRequestResult> {
     const prepared = prepareLeaveRequest(input.payload);
-    const result = await runSerializableTransaction((tx) =>
-        createInTransaction(tx, input, prepared),
-    );
-    await auditCreatedLeaveRequest({
-        id: input.id,
-        userId: input.userId,
-        userEmail: input.userEmail,
-        attachmentCount: input.attachments.length,
-    });
+    const requestHash = createLeaveRequestHash(input.payload, input.attachments);
+    let result: CreatedLeaveRequestResult;
+    try {
+        result = await runSerializableTransaction((tx) =>
+            createInTransaction(tx, input, prepared, requestHash),
+        );
+    } catch (error) {
+        if (!hasPrismaErrorCode(error, "P2002")) {
+            throw error;
+        }
+
+        const replayedRequest = await findReplayedLeaveRequest(
+            prisma,
+            input,
+            requestHash,
+        );
+        if (!replayedRequest) {
+            throw error;
+        }
+        result = { request: replayedRequest, replayed: true };
+    }
+
+    if (!result.replayed) {
+        await auditCreatedLeaveRequest({
+            id: input.id,
+            userId: input.userId,
+            userEmail: input.userEmail,
+            attachmentCount: input.attachments.length,
+        });
+    }
     return result;
 }
 
 export { LeaveRequestError } from "@/lib/services/leave/create-request-errors";
-export type { CreatedLeaveRequest } from "@/lib/services/leave/create-request-prisma";
+export {
+    LeaveRequestIdempotencyConflictError,
+} from "@/lib/services/leave/idempotency";
+export type {
+    CreatedLeaveRequest,
+} from "@/lib/services/leave/create-request-prisma";

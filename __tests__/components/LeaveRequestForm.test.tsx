@@ -161,6 +161,7 @@ describe("LeaveRequestForm", () => {
                     reason: "พักรักษาตัวตามคำแนะนำแพทย์",
                 }),
                 [],
+                expect.any(String),
             ),
         );
     });
@@ -192,6 +193,7 @@ describe("LeaveRequestForm", () => {
             expect(submitLeaveRequest).toHaveBeenCalledWith(
                 expect.any(Object),
                 [file],
+                expect.any(String),
             ),
         );
     });

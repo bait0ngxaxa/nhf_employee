@@ -39,11 +39,14 @@ describe("submitLeaveRequest", () => {
     });
 
     it("submits multipart payload without attachments", async () => {
-        await submitLeaveRequest(PAYLOAD, []);
+        await submitLeaveRequest(PAYLOAD, [], "leave-client-key");
 
-        const [endpoint, data] = vi.mocked(apiPost).mock.calls[0] ?? [];
+        const [endpoint, data, config] = vi.mocked(apiPost).mock.calls[0] ?? [];
         expect(endpoint).toBe(API_ROUTES.leave.request);
         expect(data).toBeInstanceOf(FormData);
+        expect(config).toEqual({
+            headers: { "Idempotency-Key": "leave-client-key" },
+        });
 
         const formData = data as FormData;
         expect(formData.get("payload")).toBe(JSON.stringify(PAYLOAD));
@@ -56,7 +59,7 @@ describe("submitLeaveRequest", () => {
             new File(["second"], "หลักฐาน.png", { type: "image/png" }),
         ];
 
-        await submitLeaveRequest(PAYLOAD, files);
+        await submitLeaveRequest(PAYLOAD, files, "leave-client-key");
 
         const data = vi.mocked(apiPost).mock.calls[0]?.[1];
         expect(data).toBeInstanceOf(FormData);
