@@ -16,6 +16,7 @@ export type PreAuthRateLimitScope =
     | "auth-login"
     | "auth-refresh"
     | "leave-request-create"
+    | "leave-cancel"
     | "stock-adjust"
     | "stock-request-cancel"
     | "stock-request-create"
@@ -34,6 +35,7 @@ export const PRE_AUTH_IP_RATE_LIMIT_POLICIES = {
     "auth-login": { windowMs: 15 * 60 * 1000, maxRequests: 300 },
     "auth-refresh": { windowMs: 15 * 60 * 1000, maxRequests: 300 },
     "leave-request-create": { windowMs: 15 * 60 * 1000, maxRequests: 60 },
+    "leave-cancel": { windowMs: 15 * 60 * 1000, maxRequests: 120 },
     "stock-adjust": { windowMs: 15 * 60 * 1000, maxRequests: 300 },
     "stock-request-cancel": { windowMs: 15 * 60 * 1000, maxRequests: 300 },
     "stock-request-create": { windowMs: 15 * 60 * 1000, maxRequests: 300 },
@@ -46,6 +48,7 @@ export const PRE_AUTH_IP_RATE_LIMIT_POLICIES = {
 
 export const AUTHENTICATED_MUTATION_RATE_LIMIT_POLICIES = {
     "leave-request-create": { windowMs: 60 * 1000, maxRequests: 10 },
+    "leave-cancel": { windowMs: 60 * 1000, maxRequests: 20 },
     "stock-adjust": { windowMs: 60 * 1000, maxRequests: 30 },
     "stock-request-cancel": { windowMs: 60 * 1000, maxRequests: 20 },
     "stock-request-create": { windowMs: 60 * 1000, maxRequests: 10 },

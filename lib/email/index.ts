@@ -6,7 +6,9 @@ import {
 } from "@/lib/helpers/ticket-helpers";
 import { type EmailData, type LeaveActionPayload, type LeaveResultPayload } from "./types";
 import type {
+    LeaveCancelledAfterApprovalPayload,
     LeaveCancelledPayload,
+    LeaveCancellationRequestedPayload,
     LeaveNotTakenConfirmedPayload,
     LeaveNotTakenRequestedPayload,
 } from "./types";
@@ -20,6 +22,7 @@ import {
     APP_DASHBOARD_TABS,
     toDashboardTabPath,
 } from "@/lib/ssot/routes";
+import { getLeaveTypeLabel } from "@/lib/services/leave/notification-format";
 
 let transporter: nodemailer.Transporter | null = null;
 let isTransporterReady = false;
@@ -30,6 +33,8 @@ type LeaveEmailEvent =
     | "action"
     | "result"
     | "cancelled"
+    | "cancellation-requested"
+    | "cancelled-after-approval"
     | "not-taken-requested"
     | "not-taken-confirmed";
 
@@ -308,6 +313,62 @@ export async function sendLeaveCancelledNotification(
     return sendLeaveEmail(emailData);
 }
 
+export async function sendLeaveCancellationRequestedNotification(
+    data: LeaveCancellationRequestedPayload,
+): Promise<boolean> {
+    const dashboardLink = `${getPublicOrigin()}${toDashboardTabPath(APP_DASHBOARD_TABS.managerApproval)}`;
+    const emailData: EmailData = {
+        to: data.approver.email,
+        subject: `[NHF Leave] มีคำขอยกเลิกวันลาจาก ${data.employee.name}`,
+        html: generateLeaveEventEmailHTML({
+            ...data,
+            title: "มีคำขอยกเลิกวันลารอยืนยัน",
+            intro: `${data.employee.name} ขอยกเลิก${getLeaveTypeLabel(data.leaveType)}ที่อนุมัติแล้ว`,
+            employeeName: data.employee.name,
+            dashboardLink,
+            ctaLabel: "ตรวจสอบและยืนยัน",
+            noteLabel: "เหตุผลการขอยกเลิก",
+            note: data.note,
+        }),
+        text: `${data.employee.name} ขอยกเลิกคำขอลาที่อนุมัติแล้ว\nดูรายละเอียด: ${dashboardLink}`,
+        messageId: buildLeaveMessageId(
+            "cancellation-requested",
+            data.leaveId,
+            String(data.approver.userId),
+        ),
+    };
+
+    return sendLeaveEmail(emailData);
+}
+
+export async function sendLeaveCancelledAfterApprovalNotification(
+    data: LeaveCancelledAfterApprovalPayload,
+): Promise<boolean> {
+    const dashboardLink = `${getPublicOrigin()}${toDashboardTabPath(APP_DASHBOARD_TABS.leaveHistory)}`;
+    const approverName = data.approverName ?? "ผู้ยืนยัน";
+    const emailData: EmailData = {
+        to: data.employee.email,
+        subject: "[NHF Leave] ยกเลิกวันลาที่อนุมัติแล้วเรียบร้อย",
+        html: generateLeaveEventEmailHTML({
+            ...data,
+            title: "ยกเลิกวันลาที่อนุมัติแล้วเรียบร้อย",
+            intro: "คำขอยกเลิกวันลาที่อนุมัติแล้วได้รับการยืนยัน",
+            employeeName: data.employee.name,
+            dashboardLink,
+            ctaLabel: "ดูประวัติการลา",
+            actorLabel: "ผู้ยืนยัน",
+            actorName: approverName,
+        }),
+        text: `ยกเลิกวันลาที่อนุมัติแล้วเรียบร้อย\nผู้ยืนยัน: ${approverName}\nดูรายละเอียด: ${dashboardLink}`,
+        messageId: buildLeaveMessageId(
+            "cancelled-after-approval",
+            data.leaveId,
+        ),
+    };
+
+    return sendLeaveEmail(emailData);
+}
+
 export async function sendLeaveNotTakenRequestedNotification(
     data: LeaveNotTakenRequestedPayload,
 ): Promise<boolean> {
@@ -365,6 +426,8 @@ export const emailService = {
     sendLeaveActionNotification,
     sendLeaveResultNotification,
     sendLeaveCancelledNotification,
+    sendLeaveCancellationRequestedNotification,
+    sendLeaveCancelledAfterApprovalNotification,
     sendLeaveNotTakenRequestedNotification,
     sendLeaveNotTakenConfirmedNotification,
 };

@@ -152,3 +152,22 @@ export const confirmLeaveNotTaken = async (
     ensureSuccess(response);
 };
 
+export interface LeaveCancellationPayload {
+    leaveId: string;
+    reason?: string;
+}
+
+export const requestLeaveCancellation = async (
+    payload: LeaveCancellationPayload,
+): Promise<void> => {
+    const response = await apiPost(API_ROUTES.leave.cancel, payload);
+    ensureSuccess(response);
+};
+
+export const confirmLeaveCancellation = async (
+    payload: Pick<LeaveCancellationPayload, "leaveId">,
+): Promise<void> => {
+    const response = await apiPut(API_ROUTES.leave.cancel, payload);
+    ensureSuccess(response);
+};
+

@@ -10,6 +10,8 @@ export interface EmailData {
 export type {
     LeaveActionPayload,
     LeaveCancelledPayload,
+    LeaveCancellationRequestedPayload,
+    LeaveCancelledAfterApprovalPayload,
     LeaveNotTakenConfirmedPayload,
     LeaveNotTakenRequestedPayload,
     LeaveResultPayload,

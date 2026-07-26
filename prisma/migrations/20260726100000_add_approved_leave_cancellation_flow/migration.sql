@@ -1,0 +1,104 @@
+ALTER TABLE `leave_requests`
+    ADD COLUMN `cancellationReason` TEXT NULL,
+    ADD COLUMN `cancellationRequestedAt` DATETIME(3) NULL,
+    ADD COLUMN `cancellationConfirmedAt` DATETIME(3) NULL,
+    ADD COLUMN `cancellationConfirmedById` INTEGER NULL,
+    MODIFY `status` ENUM(
+        'PENDING',
+        'APPROVED',
+        'REJECTED',
+        'CANCELLED',
+        'NOT_TAKEN',
+        'CANCELLATION_REQUESTED',
+        'CANCELLED_AFTER_APPROVAL'
+    ) NOT NULL DEFAULT 'PENDING';
+
+CREATE INDEX `leave_requests_cancellationRequestedAt_idx`
+    ON `leave_requests`(`cancellationRequestedAt`);
+
+ALTER TABLE `notification_outbox`
+    MODIFY `type` ENUM(
+        'TICKET_CREATED',
+        'TICKET_UPDATED',
+        'TICKET_CREATED_IN_APP',
+        'TICKET_CREATED_LINE',
+        'TICKET_CREATED_EMAIL_REPORTER',
+        'TICKET_CREATED_EMAIL_IT',
+        'TICKET_UPDATED_IN_APP_REPORTER',
+        'TICKET_UPDATED_EMAIL_REPORTER',
+        'TICKET_UPDATED_LINE',
+        'TICKET_COMMENT_IN_APP',
+        'EMAIL_REQUEST',
+        'LEAVE_ACTION',
+        'LEAVE_RESULT',
+        'LEAVE_CANCELLED',
+        'LEAVE_CANCELLATION_REQUESTED',
+        'LEAVE_CANCELLED_AFTER_APPROVAL',
+        'LEAVE_NOT_TAKEN_REQUESTED',
+        'LEAVE_NOT_TAKEN_CONFIRMED',
+        'STOCK_REQUEST_LINE',
+        'STOCK_LOW_LINE'
+    ) NOT NULL;
+
+ALTER TABLE `notifications`
+    MODIFY `type` ENUM(
+        'TICKET_CREATED',
+        'NEW_COMMENT',
+        'TICKET_UPDATED',
+        'SYSTEM_ALERT',
+        'LEAVE_REQUESTED',
+        'LEAVE_APPROVED',
+        'LEAVE_REJECTED',
+        'LEAVE_CANCELLED',
+        'LEAVE_CANCELLATION_REQUESTED',
+        'LEAVE_CANCELLED_AFTER_APPROVAL',
+        'LEAVE_NOT_TAKEN_REQUESTED',
+        'LEAVE_NOT_TAKEN_CONFIRMED',
+        'STOCK_REQUEST_NEW',
+        'STOCK_APPROVED',
+        'STOCK_REJECTED'
+    ) NOT NULL;
+
+ALTER TABLE `audit_logs`
+    MODIFY `action` ENUM(
+        'LOGIN_SUCCESS',
+        'LOGIN_FAILED',
+        'LOGOUT',
+        'PASSWORD_CHANGE',
+        'PASSWORD_RESET',
+        'EMPLOYEE_CREATE',
+        'EMPLOYEE_UPDATE',
+        'EMPLOYEE_DELETE',
+        'EMPLOYEE_STATUS_CHANGE',
+        'EMPLOYEE_IMPORT',
+        'TICKET_CREATE',
+        'TICKET_UPDATE',
+        'TICKET_STATUS_CHANGE',
+        'TICKET_ASSIGN',
+        'TICKET_COMMENT',
+        'TICKET_DELETE',
+        'LEAVE_REQUEST_CREATE',
+        'LEAVE_REQUEST_APPROVE',
+        'LEAVE_REQUEST_REJECT',
+        'LEAVE_REQUEST_CANCEL',
+        'LEAVE_REQUEST_CANCELLATION_REQUEST',
+        'LEAVE_REQUEST_CANCELLATION_CONFIRM',
+        'LEAVE_REQUEST_NOT_TAKEN_REQUEST',
+        'LEAVE_REQUEST_NOT_TAKEN_CONFIRM',
+        'USER_CREATE',
+        'USER_UPDATE',
+        'USER_DELETE',
+        'USER_ROLE_CHANGE',
+        'STOCK_ITEM_CREATE',
+        'STOCK_ITEM_UPDATE',
+        'STOCK_ITEM_DELETE',
+        'STOCK_ADJUST',
+        'STOCK_REQUEST_CREATE',
+        'STOCK_REQUEST_APPROVE',
+        'STOCK_REQUEST_REJECT',
+        'STOCK_CATEGORY_CREATE',
+        'STOCK_CATEGORY_DELETE',
+        'SETTINGS_UPDATE',
+        'DATA_EXPORT',
+        'EMAIL_REQUEST'
+    ) NOT NULL;

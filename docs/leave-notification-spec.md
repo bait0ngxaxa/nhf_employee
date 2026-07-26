@@ -25,6 +25,8 @@
 | ยกเลิกคำขอที่ยังรออนุมัติ | พนักงาน | ผู้อนุมัติ | Email + in-app | In-app ถึงพนักงาน | ผู้อนุมัติไป `managerApproval`, พนักงานไป `leaveHistory` |
 | แจ้งไม่ได้ใช้วันลา | พนักงาน | ผู้อนุมัติ | Email + in-app | In-app ถึงพนักงาน | ผู้อนุมัติไป `managerApproval`, พนักงานไป `leaveHistory` |
 | ยืนยันไม่ได้ใช้วันลา | ผู้อนุมัติ | พนักงาน | Email + in-app | ไม่มี | `leaveHistory` |
+| ขอยกเลิกวันลาที่อนุมัติแล้ว | พนักงาน | ผู้อนุมัติ | Email + in-app | In-app ถึงพนักงาน | ผู้อนุมัติไป `managerApproval`, พนักงานไป `leaveHistory` |
+| ยืนยันยกเลิกวันลาที่อนุมัติแล้ว | ผู้อนุมัติ | พนักงาน | Email + in-app | ไม่มี | `leaveHistory` |
 
 ## Type Mapping
 
@@ -36,7 +38,8 @@
 เพิ่ม type ใหม่เฉพาะ event ใหม่:
 
 - Outbox: `LEAVE_CANCELLED`, `LEAVE_NOT_TAKEN_REQUESTED`, `LEAVE_NOT_TAKEN_CONFIRMED`
-- In-app: `LEAVE_CANCELLED`, `LEAVE_NOT_TAKEN_REQUESTED`, `LEAVE_NOT_TAKEN_CONFIRMED`
+- Outbox: `LEAVE_CANCELLATION_REQUESTED`, `LEAVE_CANCELLED_AFTER_APPROVAL`
+- In-app: `LEAVE_CANCELLED`, `LEAVE_NOT_TAKEN_REQUESTED`, `LEAVE_NOT_TAKEN_CONFIRMED`, `LEAVE_CANCELLATION_REQUESTED`, `LEAVE_CANCELLED_AFTER_APPROVAL`
 
 `SYSTEM_ALERT` ไม่ใช้กับ workflow การลา
 
@@ -81,6 +84,8 @@ Payload ควรเก็บข้อมูลดิบที่ parse ได�
 - อนุมัติหรือไม่อนุมัติคำขอลา: mark `LEAVE_REQUESTED` ของผู้อนุมัติเป็นอ่านแล้ว
 - พนักงานยกเลิกคำขอ: mark `LEAVE_REQUESTED` ของผู้อนุมัติเป็นอ่านแล้ว แล้วสร้าง `LEAVE_CANCELLED`
 - ผู้อนุมัติยืนยันไม่ได้ใช้วันลา: mark `LEAVE_NOT_TAKEN_REQUESTED` ของผู้อนุมัติเป็นอ่านแล้ว แล้วสร้าง `LEAVE_NOT_TAKEN_CONFIRMED` ถึงพนักงาน
+- พนักงานขอยกเลิกวันลาที่อนุมัติแล้ว: mark `LEAVE_APPROVED` ของพนักงานและ `LEAVE_REQUESTED` ของผู้อนุมัติเป็นอ่านแล้ว แล้วสร้าง `LEAVE_CANCELLATION_REQUESTED`
+- ผู้อนุมัติยืนยันยกเลิก: mark `LEAVE_CANCELLATION_REQUESTED` ของผู้อนุมัติเป็นอ่านแล้ว แล้วสร้าง `LEAVE_CANCELLED_AFTER_APPROVAL` ถึงพนักงาน
 
 ถ้าหา notification เดิมไม่เจอ ไม่ถือเป็น error ของ action ธุรกิจ
 

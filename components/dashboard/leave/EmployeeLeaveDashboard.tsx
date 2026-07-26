@@ -73,8 +73,11 @@ export function EmployeeLeaveDashboard() {
             </div>
 
             <CancelLeaveDialog
-                open={model.cancelConfirmId !== null}
+                open={model.cancelConfirmRequest !== null}
                 isSubmitting={model.isSubmitting}
+                requiresApproval={model.cancelConfirmRequest?.status === "APPROVED"}
+                reason={model.cancelReason}
+                onReasonChange={model.setCancelReason}
                 onOpenChange={(open) => {
                     if (!open) {
                         model.closeCancelDialog();

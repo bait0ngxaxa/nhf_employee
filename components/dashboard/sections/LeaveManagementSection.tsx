@@ -72,7 +72,10 @@ export function LeaveManagementSection({ defaultTab = "my-leave" }: LeaveManagem
     );
 }
 
-function getLeaveTabs(showApprovalTab: boolean, isAdmin: boolean): SectionTabItem[] {
+function getLeaveTabs(
+    showApprovalTab: boolean,
+    isAdmin: boolean,
+): SectionTabItem[] {
     return [
         {
             value: "my-leave",

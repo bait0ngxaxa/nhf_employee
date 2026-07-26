@@ -40,6 +40,18 @@ const REQUEST_STATUS_META: Record<string, RequestStatusMeta> = {
         iconClass: "text-cyan-500",
         icon: Ban,
     },
+    CANCELLATION_REQUESTED: {
+        label: "รอยืนยันยกเลิก",
+        colorClass: "bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100",
+        iconClass: "text-amber-500",
+        icon: Clock3,
+    },
+    CANCELLED_AFTER_APPROVAL: {
+        label: "ยกเลิกหลังอนุมัติ",
+        colorClass: "bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100",
+        iconClass: "text-slate-500",
+        icon: Ban,
+    },
     PENDING_ISSUE: {
         label: "รอจ่าย",
         colorClass: "bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100",

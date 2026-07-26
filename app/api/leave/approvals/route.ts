@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import type { Prisma } from "@prisma/client";
 
 import { requireActiveWorkforceSession } from "@/lib/auth/workforce";
+import { isAdminRole } from "@/lib/ssot/permissions";
 import { prisma } from "@/lib/db/prisma";
 import { notFound } from "@/lib/ssot/http";
 import { FEATURE_KEYS, isFeatureEnabled } from "@/lib/ssot/features";
@@ -18,7 +19,7 @@ const APPROVALS_PAGINATION_MESSAGES = {
     invalidPage: "หมายเลขหน้าต้องเป็นจำนวนเต็มที่มากกว่าหรือเท่ากับ 1",
 } as const;
 
-type ApprovalPageKey = "pendingPage" | "notTakenPage" | "historyPage";
+type ApprovalPageKey = "pendingPage" | "notTakenPage" | "historyPage" | "cancellationPage";
 
 const parsePage = (url: URL, key: ApprovalPageKey): number | null => {
     const page = Number.parseInt(url.searchParams.get(key) || "1", 10);
@@ -40,6 +41,12 @@ export async function GET(req: Request): Promise<NextResponse> {
 
         const auth = await requireActiveWorkforceSession();
         if (!auth.ok) return auth.response;
+        if (isAdminRole(auth.user.role)) {
+            return NextResponse.json(
+                { error: COMMON_API_MESSAGES.forbidden },
+                { status: 403 },
+            );
+        }
 
         const managerId = auth.employeeId;
 
@@ -68,7 +75,8 @@ export async function GET(req: Request): Promise<NextResponse> {
         const pendingPage = parsePage(url, "pendingPage");
         const notTakenPage = parsePage(url, "notTakenPage");
         const historyPage = parsePage(url, "historyPage");
-        if (!pendingPage || !notTakenPage || !historyPage) {
+        const cancellationPage = parsePage(url, "cancellationPage");
+        if (!pendingPage || !notTakenPage || !historyPage || !cancellationPage) {
             return NextResponse.json(
                 { error: APPROVALS_PAGINATION_MESSAGES.invalidPage },
                 { status: 400 },
@@ -88,7 +96,7 @@ export async function GET(req: Request): Promise<NextResponse> {
         const historyWhere: Prisma.LeaveRequestWhereInput = {
             approverId: managerId,
             OR: [
-                { status: { in: ["REJECTED", "NOT_TAKEN"] } },
+                { status: { in: ["REJECTED", "NOT_TAKEN", "CANCELLED_AFTER_APPROVAL"] } },
                 {
                     status: "APPROVED",
                     OR: [
@@ -98,6 +106,10 @@ export async function GET(req: Request): Promise<NextResponse> {
                 },
             ],
         };
+        const cancellationWhere: Prisma.LeaveRequestWhereInput = {
+            approverId: managerId,
+            status: "CANCELLATION_REQUESTED",
+        };
 
         const [
             pendingApprovals,
@@ -106,6 +118,8 @@ export async function GET(req: Request): Promise<NextResponse> {
             notTakenCount,
             approvalHistory,
             historyCount,
+            cancellationPending,
+            cancellationCount,
         ] = await Promise.all([
             prisma.leaveRequest.findMany({
                 where: pendingWhere,
@@ -137,6 +151,14 @@ export async function GET(req: Request): Promise<NextResponse> {
                 include: requestInclude,
             }),
             prisma.leaveRequest.count({ where: historyWhere }),
+            prisma.leaveRequest.findMany({
+                where: cancellationWhere,
+                skip: (cancellationPage - 1) * APPROVALS_PAGE_SIZE,
+                take: APPROVALS_PAGE_SIZE,
+                orderBy: { cancellationRequestedAt: "asc" },
+                include: requestInclude,
+            }),
+            prisma.leaveRequest.count({ where: cancellationWhere }),
         ]);
 
         return NextResponse.json({
@@ -149,10 +171,14 @@ export async function GET(req: Request): Promise<NextResponse> {
             history: approvalHistory.map((request) =>
                 toLeaveRequestDays(withLeaveAttachmentSummaries(request)),
             ),
+            cancellationPending: cancellationPending.map((request) =>
+                toLeaveRequestDays(withLeaveAttachmentSummaries(request)),
+            ),
             metadata: {
                 pending: createMetadata(pendingPage, pendingCount),
                 notTakenPending: createMetadata(notTakenPage, notTakenCount),
                 history: createMetadata(historyPage, historyCount),
+                cancellationPending: createMetadata(cancellationPage, cancellationCount),
             },
         });
     } catch (error) {

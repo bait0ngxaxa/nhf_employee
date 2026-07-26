@@ -25,6 +25,8 @@ const REPORT_STATUSES: LeaveStatus[] = [
     "REJECTED",
     "CANCELLED",
     "NOT_TAKEN",
+    "CANCELLATION_REQUESTED",
+    "CANCELLED_AFTER_APPROVAL",
 ];
 
 export async function getLeaveReportYears(managerId: number): Promise<number[]> {

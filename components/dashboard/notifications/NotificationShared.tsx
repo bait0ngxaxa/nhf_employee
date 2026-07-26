@@ -97,6 +97,7 @@ export function NotificationIcon({
         case "STOCK_ISSUED":
         case "LEAVE_APPROVED":
         case "LEAVE_NOT_TAKEN_CONFIRMED":
+        case "LEAVE_CANCELLED_AFTER_APPROVAL":
             return <Check className={cn("text-emerald-500", className)} />;
         case "STOCK_CANCELLED":
         case "LEAVE_REJECTED":
@@ -104,6 +105,7 @@ export function NotificationIcon({
             return <XCircle className={cn("text-rose-500", className)} />;
         case "LEAVE_REQUESTED":
         case "LEAVE_NOT_TAKEN_REQUESTED":
+        case "LEAVE_CANCELLATION_REQUESTED":
             return <Bell className={cn("text-sky-500", className)} />;
         case "NEW_COMMENT":
             return <MessageSquare className={cn("text-sky-500", className)} />;

@@ -52,7 +52,7 @@ function buildSummaryRow(employee: LeaveReportEmployee): LeaveSummaryRow {
         totalRemaining: totalQuota - totalUsed,
         overQuotaDays: sumApprovedOverQuotaDays(employee.leaveRequests),
         pendingDays: pending.days,
-        approvedRequestCount: countStatus(employee.leaveRequests, "APPROVED"),
+        approvedRequestCount: countQuotaConsumingRequests(employee.leaveRequests),
         pendingRequestCount: pending.count,
         inactiveRequestCount: countInactiveRequests(employee.leaveRequests),
         notTakenCount: countStatus(employee.leaveRequests, "NOT_TAKEN"),
@@ -73,7 +73,10 @@ function buildDetailRows(employee: LeaveReportEmployee): LeaveDetailRow[] {
         status: LEAVE_STATUS_TH[request.status] ?? request.status,
         requestedDays: request.durationDays,
         effectiveDays: getEffectiveLeaveDays(request),
-        overQuotaDays: request.status === "APPROVED" ? request.overQuotaDays : 0,
+        overQuotaDays:
+            request.status === "APPROVED" || request.status === "CANCELLATION_REQUESTED"
+                ? request.overQuotaDays
+                : 0,
         reason: request.reason,
         emergencyReason: request.emergencyReason ?? "-",
         specialReason: request.specialReason ?? "-",
@@ -146,7 +149,7 @@ function getQuotaTotals(quotas: LeaveReportQuota[]): LeaveTypeTotals {
 function getApprovedUsedTotals(requests: LeaveReportRequest[]): LeaveTypeTotals {
     const totals = createEmptyLeaveTypeTotals();
     for (const request of requests) {
-        if (request.status === "APPROVED") {
+        if (request.status === "APPROVED" || request.status === "CANCELLATION_REQUESTED") {
             totals[request.leaveType] += request.durationDays;
         }
     }
@@ -179,7 +182,7 @@ function sumLeaveTypeTotals(totals: LeaveTypeTotals): number {
 
 function sumApprovedOverQuotaDays(requests: LeaveReportRequest[]): number {
     return requests.reduce(
-        (sum, request) => sum + (request.status === "APPROVED" ? request.overQuotaDays : 0),
+        (sum, request) => sum + (isQuotaConsumingStatus(request.status) ? request.overQuotaDays : 0),
         0,
     );
 }
@@ -189,19 +192,33 @@ function countStatus(requests: LeaveReportRequest[], status: LeaveStatus): numbe
 }
 
 function countInactiveRequests(requests: LeaveReportRequest[]): number {
-    return requests.filter((request) => ["REJECTED", "CANCELLED"].includes(request.status)).length;
+    return requests.filter(
+        (request) => ["REJECTED", "CANCELLED", "CANCELLED_AFTER_APPROVAL"].includes(request.status),
+    ).length;
 }
 
 function findLatestApprovedDate(requests: LeaveReportRequest[]): Date | null {
     const approvedDates = requests
-        .filter((request) => request.status === "APPROVED")
+        .filter((request) => request.status === "APPROVED" || request.status === "CANCELLATION_REQUESTED")
         .map((request) => request.startDate.getTime());
 
     return approvedDates.length > 0 ? new Date(Math.max(...approvedDates)) : null;
 }
 
 function getEffectiveLeaveDays(request: LeaveReportRequest): number {
-    return request.status === "APPROVED" ? request.durationDays : 0;
+    return isQuotaConsumingStatus(request.status)
+        ? request.durationDays
+        : 0;
+}
+
+function countQuotaConsumingRequests(requests: LeaveReportRequest[]): number {
+    return requests.filter(
+        (request) => isQuotaConsumingStatus(request.status),
+    ).length;
+}
+
+function isQuotaConsumingStatus(status: LeaveStatus): boolean {
+    return status === "APPROVED" || status === "CANCELLATION_REQUESTED";
 }
 
 function compareEmployees(left: LeaveReportEmployee, right: LeaveReportEmployee): number {

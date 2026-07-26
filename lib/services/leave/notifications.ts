@@ -13,7 +13,9 @@ import {
 } from "@/lib/services/leave/notification-format";
 import type {
     LeaveActionPayload,
+    LeaveCancelledAfterApprovalPayload,
     LeaveCancelledPayload,
+    LeaveCancellationRequestedPayload,
     LeaveNotTakenConfirmedPayload,
     LeaveNotTakenRequestedPayload,
     LeaveNotificationPayload,
@@ -158,6 +160,42 @@ export async function sendLeaveCancelledNotifications(
     await assertEmailSent(
         await emailService.sendLeaveCancelledNotification(payload),
         "LEAVE_CANCELLED",
+    );
+}
+
+export async function sendLeaveCancellationRequestedNotifications(
+    payload: LeaveCancellationRequestedPayload,
+): Promise<void> {
+    await createNotificationOnce({
+        userId: payload.approver.userId,
+        type: "LEAVE_CANCELLATION_REQUESTED",
+        title: "มีคำขอยกเลิกวันลารอยืนยัน",
+        message: `${payload.employee.name} ขอ${buildLeaveMessage(payload)}ที่อนุมัติแล้ว`,
+        actionUrl: toDashboardTabPath(APP_DASHBOARD_TABS.managerApproval),
+        referenceId: payload.leaveId,
+    });
+
+    await assertEmailSent(
+        await emailService.sendLeaveCancellationRequestedNotification(payload),
+        "LEAVE_CANCELLATION_REQUESTED",
+    );
+}
+
+export async function sendLeaveCancelledAfterApprovalNotifications(
+    payload: LeaveCancelledAfterApprovalPayload,
+): Promise<void> {
+    await createNotificationOnce({
+        userId: payload.employee.userId,
+        type: "LEAVE_CANCELLED_AFTER_APPROVAL",
+        title: "ยกเลิกวันลาที่อนุมัติแล้วเรียบร้อย",
+        message: `${payload.approverName ?? "ผู้ยืนยัน"} ยืนยันการยกเลิก${buildLeaveMessage(payload)}แล้ว`,
+        actionUrl: toDashboardTabPath(APP_DASHBOARD_TABS.leaveHistory),
+        referenceId: payload.leaveId,
+    });
+
+    await assertEmailSent(
+        await emailService.sendLeaveCancelledAfterApprovalNotification(payload),
+        "LEAVE_CANCELLED_AFTER_APPROVAL",
     );
 }
 

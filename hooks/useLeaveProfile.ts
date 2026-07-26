@@ -2,7 +2,10 @@ import useSWR from "swr";
 import { apiPost } from "@/lib/client/api-client";
 import { apiGet } from "@/lib/client/api-client";
 import { API_ROUTES } from "@/lib/ssot/routes";
-import { submitLeaveNotTakenRequest } from "@/lib/services/leave/client";
+import {
+    requestLeaveCancellation,
+    submitLeaveNotTakenRequest,
+} from "@/lib/services/leave/client";
 import type { LeaveAttachmentSummary } from "@/lib/types/leave";
 
 const fetcher = async <T,>(url: string): Promise<T> => {
@@ -34,7 +37,14 @@ export interface LeaveRequest {
     emergencyReason: string | null;
     specialReason: string | null;
     overQuotaDays: number;
-    status: "PENDING" | "APPROVED" | "REJECTED" | "CANCELLED" | "NOT_TAKEN";
+    status:
+        | "PENDING"
+        | "APPROVED"
+        | "REJECTED"
+        | "CANCELLED"
+        | "NOT_TAKEN"
+        | "CANCELLATION_REQUESTED"
+        | "CANCELLED_AFTER_APPROVAL";
     approverId: number | null;
     approvedAt: string | null;
     rejectReason: string | null;
@@ -42,6 +52,10 @@ export interface LeaveRequest {
     notTakenRequestedAt: string | null;
     notTakenConfirmedAt: string | null;
     notTakenConfirmedById: number | null;
+    cancellationReason: string | null;
+    cancellationRequestedAt: string | null;
+    cancellationConfirmedAt: string | null;
+    cancellationConfirmedById: number | null;
     attachments: LeaveAttachmentSummary[];
     createdAt: string;
     updatedAt: string;
@@ -100,6 +114,15 @@ export function useLeaveProfile(page: number = 1) {
         return true;
     };
 
+    const requestApprovedCancellation = async (
+        leaveId: string,
+        reason?: string,
+    ): Promise<boolean> => {
+        await requestLeaveCancellation({ leaveId, reason });
+        await mutate();
+        return true;
+    };
+
     return {
         quotas: data?.quotas || [],
         history: data?.history || [],
@@ -108,6 +131,7 @@ export function useLeaveProfile(page: number = 1) {
         error,
         mutate,
         cancelLeave,
+        requestApprovedCancellation,
         requestNotTaken,
     };
 }

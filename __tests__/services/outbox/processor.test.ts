@@ -25,6 +25,8 @@ import type {
 } from "@/lib/services/ticket/update-notification-snapshot";
 import {
     sendLeaveActionNotifications,
+    sendLeaveCancellationRequestedNotifications,
+    sendLeaveCancelledAfterApprovalNotifications,
     sendLeaveCancelledNotifications,
     sendLeaveNotTakenConfirmedNotifications,
     sendLeaveNotTakenRequestedNotifications,
@@ -48,6 +50,8 @@ vi.mock("@/lib/services/ticket/notifications", () => ({
 vi.mock("@/lib/services/leave/notifications", () => ({
     createLeaveActionInAppNotification: vi.fn(),
     sendLeaveActionNotifications: vi.fn(),
+    sendLeaveCancellationRequestedNotifications: vi.fn(),
+    sendLeaveCancelledAfterApprovalNotifications: vi.fn(),
     sendLeaveResultNotifications: vi.fn(),
     sendLeaveCancelledNotifications: vi.fn(),
     sendLeaveNotTakenRequestedNotifications: vi.fn(),
@@ -724,6 +728,30 @@ describe("processOutbox", () => {
         expect(result).toEqual({ processed: 2, failed: 0 });
         expect(sendLeaveNotTakenRequestedNotifications).toHaveBeenCalledTimes(1);
         expect(sendLeaveNotTakenConfirmedNotifications).toHaveBeenCalledTimes(1);
+    });
+
+    it("processes approved-leave cancellation events successfully", async () => {
+        const payload = buildLeavePayload();
+        prismaMock.notificationOutbox.findMany.mockResolvedValue(
+            asNever([
+                buildNotification(
+                    130,
+                    "LEAVE_CANCELLATION_REQUESTED",
+                    JSON.stringify(payload),
+                ),
+                buildNotification(
+                    131,
+                    "LEAVE_CANCELLED_AFTER_APPROVAL",
+                    JSON.stringify(payload),
+                ),
+            ]),
+        );
+
+        const result = await processOutbox();
+
+        expect(result).toEqual({ processed: 2, failed: 0 });
+        expect(sendLeaveCancellationRequestedNotifications).toHaveBeenCalledTimes(1);
+        expect(sendLeaveCancelledAfterApprovalNotifications).toHaveBeenCalledTimes(1);
     });
 
     it("marks leave event failed for invalid payload", async () => {

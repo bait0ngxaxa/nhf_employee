@@ -227,6 +227,8 @@ enum NotificationOutboxType {
   LEAVE_ACTION
   LEAVE_RESULT
   LEAVE_CANCELLED
+  LEAVE_CANCELLATION_REQUESTED
+  LEAVE_CANCELLED_AFTER_APPROVAL
   LEAVE_NOT_TAKEN_REQUESTED
   LEAVE_NOT_TAKEN_CONFIRMED
   STOCK_REQUEST_LINE
@@ -291,6 +293,8 @@ enum AuditAction {
   LEAVE_REQUEST_APPROVE
   LEAVE_REQUEST_REJECT
   LEAVE_REQUEST_CANCEL
+  LEAVE_REQUEST_CANCELLATION_REQUEST
+  LEAVE_REQUEST_CANCELLATION_CONFIRM
   LEAVE_REQUEST_NOT_TAKEN_REQUEST
   LEAVE_REQUEST_NOT_TAKEN_CONFIRM
 
@@ -399,6 +403,8 @@ enum NotificationType {
   LEAVE_APPROVED
   LEAVE_REJECTED
   LEAVE_CANCELLED
+  LEAVE_CANCELLATION_REQUESTED
+  LEAVE_CANCELLED_AFTER_APPROVAL
   LEAVE_NOT_TAKEN_REQUESTED
   LEAVE_NOT_TAKEN_CONFIRMED
   STOCK_REQUEST_NEW
@@ -447,6 +453,10 @@ model LeaveRequest {
   notTakenRequestedAt   DateTime?
   notTakenConfirmedAt   DateTime?
   notTakenConfirmedById Int?
+  cancellationReason    String?   @db.Text // เหตุผลที่ขอยกเลิกหลังอนุมัติ
+  cancellationRequestedAt DateTime?
+  cancellationConfirmedAt DateTime?
+  cancellationConfirmedById Int? // User ID ของผู้อนุมัติที่ยืนยัน
 
   // ฟิลด์ legacy สำหรับข้อมูลเดิม รอ migration cleanup ในเฟสถัดไป
   attachmentUrl String? @db.Text
@@ -462,6 +472,7 @@ model LeaveRequest {
   @@index([approverId])
   @@index([status])
   @@index([notTakenRequestedAt])
+  @@index([cancellationRequestedAt])
   @@map("leave_requests")
 }
 
@@ -499,6 +510,8 @@ enum LeaveStatus {
   REJECTED // ปฏิเสธ
   CANCELLED // ยกเลิกโดยพนักงาน
   NOT_TAKEN // อนุมัติแล้วแต่ไม่ได้ใช้วันลา
+  CANCELLATION_REQUESTED // พนักงานขอยกเลิกคำขอที่อนุมัติแล้ว
+  CANCELLED_AFTER_APPROVAL // ยกเลิกคำขอหลังได้รับอนุมัติแล้ว
 }
 
 // ==========================================

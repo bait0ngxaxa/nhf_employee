@@ -10,6 +10,7 @@ import { ApprovalHistoryList } from "./_components/ApprovalHistoryList";
 import { RejectLeaveDialog } from "./_components/RejectLeaveDialog";
 import { ApprovalConfirmDialog } from "./_components/ApprovalConfirmDialog";
 import { NotTakenPendingList } from "./_components/NotTakenPendingList";
+import { CancellationPendingList } from "./_components/CancellationPendingList";
 
 export function ManagerApprovalDashboard() {
     const model = useManagerApprovalModel();
@@ -55,6 +56,24 @@ export function ManagerApprovalDashboard() {
                 <ApprovalPagination
                     metadata={model.metadata?.notTakenPending}
                     onPageChange={model.setNotTakenPage}
+                />
+            </div>
+
+            <div className="space-y-3 pt-2">
+                <ApprovalSectionHeader
+                    title="รายการรอยืนยันยกเลิกวันลา"
+                    description="คำขอยกเลิกวันลาที่อนุมัติแล้ว เมื่อยืนยันระบบจะคืนโควต้าในรายการเดียวกัน"
+                    count={model.metadata?.cancellationPending.totalItems ?? model.cancellationPending.length}
+                    tone="attention"
+                />
+                <CancellationPendingList
+                    items={model.cancellationPending}
+                    isProcessing={model.isProcessing}
+                    onConfirm={model.confirmCancellation}
+                />
+                <ApprovalPagination
+                    metadata={model.metadata?.cancellationPending}
+                    onPageChange={model.setCancellationPage}
                 />
             </div>
 

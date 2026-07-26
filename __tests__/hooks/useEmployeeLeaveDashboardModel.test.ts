@@ -18,7 +18,36 @@ vi.mock("sonner", () => ({
 describe("useEmployeeLeaveDashboardModel", () => {
     const mutate = vi.fn();
     const cancelLeave = vi.fn();
+    const requestApprovedCancellation = vi.fn();
     const requestNotTaken = vi.fn();
+    const pendingLeave = {
+        id: "leave-2",
+        employeeId: 10,
+        leaveType: "SICK" as const,
+        startDate: "2030-01-01T00:00:00.000Z",
+        endDate: "2030-01-01T00:00:00.000Z",
+        period: "FULL_DAY" as const,
+        durationDays: 1,
+        reason: "ลาป่วย",
+        emergencyReason: null,
+        specialReason: null,
+        overQuotaDays: 0,
+        status: "PENDING" as const,
+        approverId: 20,
+        approvedAt: null,
+        rejectReason: null,
+        notTakenReason: null,
+        notTakenRequestedAt: null,
+        notTakenConfirmedAt: null,
+        notTakenConfirmedById: null,
+        cancellationReason: null,
+        cancellationRequestedAt: null,
+        cancellationConfirmedAt: null,
+        cancellationConfirmedById: null,
+        attachments: [],
+        createdAt: "2029-12-01T00:00:00.000Z",
+        updatedAt: "2029-12-01T00:00:00.000Z",
+    };
 
     beforeEach(() => {
         vi.clearAllMocks();
@@ -34,6 +63,7 @@ describe("useEmployeeLeaveDashboardModel", () => {
             error: null,
             mutate,
             cancelLeave,
+            requestApprovedCancellation,
             requestNotTaken,
         });
     });
@@ -64,13 +94,13 @@ describe("useEmployeeLeaveDashboardModel", () => {
         cancelLeave.mockResolvedValue(true);
         const { result } = renderHook(() => useEmployeeLeaveDashboardModel());
 
-        act(() => result.current.openCancelDialog("leave-2"));
+        act(() => result.current.openCancelDialog(pendingLeave));
         await act(async () => {
             await result.current.confirmCancelLeave();
         });
 
         expect(cancelLeave).toHaveBeenCalledWith("leave-2");
-        expect(result.current.cancelConfirmId).toBeNull();
+        expect(result.current.cancelConfirmRequest).toBeNull();
         expect(toast.success).toHaveBeenCalledTimes(1);
     });
 

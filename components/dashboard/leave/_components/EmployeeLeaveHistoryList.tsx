@@ -4,7 +4,7 @@ import { Card } from "@/components/ui/card";
 import { Pagination } from "@/components/Pagination";
 import type { LeaveRequest } from "@/hooks/useLeaveProfile";
 import { formatThaiDateTimeWithTimeWord } from "@/lib/helpers/date-helpers";
-import { isAfterLeaveEnd } from "@/lib/services/leave/utils";
+import { isAfterLeaveEnd, isBeforeLeaveStart } from "@/lib/services/leave/utils";
 import { LeaveAttachmentViewerButton } from "./LeaveAttachmentViewerButton";
 import { LeaveStatusBadge } from "./LeaveStatusBadge";
 
@@ -19,7 +19,7 @@ interface EmployeeLeaveHistoryListProps {
     history: LeaveRequest[];
     metadata?: LeaveHistoryMetadata;
     isSubmitting: boolean;
-    onCancelRequest: (leaveId: string) => void;
+    onCancelRequest: (request: LeaveRequest) => void;
     onNotTakenRequest: (leaveId: string) => void;
     onPageChange: (page: number) => void;
 }
@@ -84,7 +84,7 @@ function LeaveHistoryItem({
 }: {
     request: LeaveRequest;
     isSubmitting: boolean;
-    onCancelRequest: (leaveId: string) => void;
+    onCancelRequest: (request: LeaveRequest) => void;
     onNotTakenRequest: (leaveId: string) => void;
 }) {
     return (
@@ -120,6 +120,13 @@ function LeaveHistoryItem({
                     {request.notTakenRequestedAt && request.status === "APPROVED" ? (
                         <LeaveNote tone="info" label="รอหัวหน้ายืนยันไม่ได้ใช้วันลา" text={request.notTakenReason ?? "-"} />
                     ) : null}
+                    {request.cancellationRequestedAt && request.status === "CANCELLATION_REQUESTED" ? (
+                        <LeaveNote
+                            tone="warning"
+                            label="รอผู้อนุมัติยืนยันยกเลิกวันลา"
+                            text={request.cancellationReason ?? "รอการยืนยัน"}
+                        />
+                    ) : null}
                     {request.status === "NOT_TAKEN" && request.notTakenReason ? (
                         <LeaveNote tone="info" label="ไม่ได้ใช้วันลา" text={request.notTakenReason} />
                     ) : null}
@@ -127,16 +134,16 @@ function LeaveHistoryItem({
                 <div className="flex flex-wrap items-center gap-2 lg:justify-end">
                     <LeaveStatusBadge status={request.status} />
                     <LeaveAttachmentViewerButton attachments={request.attachments} />
-                    {request.status === "PENDING" ? (
+                    {request.status === "PENDING" || canRequestApprovedCancellation(request) ? (
                         <Button
                             variant="outline"
                             size="sm"
                             className="border-rose-200 text-rose-700 hover:bg-rose-50 hover:text-rose-800"
                             disabled={isSubmitting}
-                            onClick={() => onCancelRequest(request.id)}
+                            onClick={() => onCancelRequest(request)}
                         >
                             <X className="h-4 w-4" aria-hidden="true" />
-                            ยกเลิก
+                            {request.status === "PENDING" ? "ยกเลิก" : "ขอยกเลิก"}
                         </Button>
                     ) : null}
                     {canRequestNotTaken(request) ? (
@@ -213,4 +220,8 @@ function canRequestNotTaken(request: LeaveRequest): boolean {
         && !request.notTakenRequestedAt
         && isAfterLeaveEnd(new Date(request.endDate))
     );
+}
+
+function canRequestApprovedCancellation(request: LeaveRequest): boolean {
+    return request.status === "APPROVED" && isBeforeLeaveStart(new Date(request.startDate));
 }

@@ -236,6 +236,8 @@ export const LEAVE_STATUS_TH: Record<string, string> = {
     REJECTED: "ไม่อนุมัติ",
     CANCELLED: "ยกเลิก",
     NOT_TAKEN: "ไม่ได้ใช้วันลา",
+    CANCELLATION_REQUESTED: "รอยืนยันยกเลิก",
+    CANCELLED_AFTER_APPROVAL: "ยกเลิกหลังอนุมัติ",
 };
 
 /**

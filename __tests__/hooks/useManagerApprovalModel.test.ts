@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useManagerApprovalModel } from "@/hooks/leave/useManagerApprovalModel";
 import { useLeaveApprovals } from "@/hooks/useLeaveApprovals";
 import {
+    confirmLeaveCancellation,
     confirmLeaveNotTaken,
     submitLeaveDecision,
 } from "@/lib/services/leave/client";
@@ -13,6 +14,7 @@ vi.mock("@/hooks/useLeaveApprovals", () => ({
 }));
 
 vi.mock("@/lib/services/leave/client", () => ({
+    confirmLeaveCancellation: vi.fn(),
     confirmLeaveNotTaken: vi.fn(),
     submitLeaveDecision: vi.fn(),
 }));
@@ -42,6 +44,10 @@ describe("useManagerApprovalModel", () => {
         notTakenReason: null,
         notTakenRequestedAt: null,
         notTakenConfirmedAt: null,
+        cancellationReason: null,
+        cancellationRequestedAt: null,
+        cancellationConfirmedAt: null,
+        cancellationConfirmedById: null,
         createdAt: "2030-01-01",
         attachments: [],
         employee: {
@@ -62,6 +68,7 @@ describe("useManagerApprovalModel", () => {
             pending: [pendingLeave],
             notTakenPending: [],
             history: [],
+            cancellationPending: [],
             metadata: {
                 pending: {
                     currentPage: 1,
@@ -81,6 +88,12 @@ describe("useManagerApprovalModel", () => {
                     totalItems: 0,
                     itemsPerPage: 10,
                 },
+                cancellationPending: {
+                    currentPage: 1,
+                    totalPages: 1,
+                    totalItems: 0,
+                    itemsPerPage: 10,
+                },
             },
             isLoading: false,
             isError: null,
@@ -89,6 +102,7 @@ describe("useManagerApprovalModel", () => {
 
         vi.mocked(submitLeaveDecision).mockResolvedValue(undefined);
         vi.mocked(confirmLeaveNotTaken).mockResolvedValue(undefined);
+        vi.mocked(confirmLeaveCancellation).mockResolvedValue(undefined);
     });
 
     it("approves leave and refreshes list", async () => {
@@ -114,6 +128,7 @@ describe("useManagerApprovalModel", () => {
             pendingPage: 1,
             notTakenPage: 1,
             historyPage: 1,
+            cancellationPage: 1,
         });
     });
 

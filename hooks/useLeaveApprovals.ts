@@ -21,7 +21,18 @@ export interface PendingLeave {
     emergencyReason: string | null;
     specialReason: string | null;
     overQuotaDays: number;
-    status: "PENDING" | "APPROVED" | "REJECTED" | "CANCELLED" | "NOT_TAKEN";
+    status:
+        | "PENDING"
+        | "APPROVED"
+        | "REJECTED"
+        | "CANCELLED"
+        | "NOT_TAKEN"
+        | "CANCELLATION_REQUESTED"
+        | "CANCELLED_AFTER_APPROVAL";
+    cancellationReason: string | null;
+    cancellationRequestedAt: string | null;
+    cancellationConfirmedAt: string | null;
+    cancellationConfirmedById: number | null;
     notTakenReason: string | null;
     notTakenRequestedAt: string | null;
     notTakenConfirmedAt: string | null;
@@ -50,10 +61,12 @@ export interface LeaveApprovalsResponse {
     pending: PendingLeave[];
     notTakenPending: PendingLeave[];
     history: PendingLeave[];
+    cancellationPending: PendingLeave[];
     metadata: {
         pending: LeaveApprovalPaginationMetadata;
         notTakenPending: LeaveApprovalPaginationMetadata;
         history: LeaveApprovalPaginationMetadata;
+        cancellationPending: LeaveApprovalPaginationMetadata;
     };
 }
 
@@ -61,15 +74,17 @@ interface UseLeaveApprovalsPages {
     pendingPage: number;
     notTakenPage: number;
     historyPage: number;
+    cancellationPage: number;
 }
 
 export function useLeaveApprovals({
     pendingPage,
     notTakenPage,
     historyPage,
+    cancellationPage,
 }: UseLeaveApprovalsPages) {
     const { data, error, isLoading, mutate } = useSWR<LeaveApprovalsResponse>(
-        `${API_ROUTES.leave.approvals}?pendingPage=${pendingPage}&notTakenPage=${notTakenPage}&historyPage=${historyPage}`,
+        `${API_ROUTES.leave.approvals}?pendingPage=${pendingPage}&notTakenPage=${notTakenPage}&historyPage=${historyPage}&cancellationPage=${cancellationPage}`,
         fetcher,
         {
             revalidateOnFocus: false,
@@ -83,6 +98,7 @@ export function useLeaveApprovals({
         pending: data?.pending || [],
         notTakenPending: data?.notTakenPending || [],
         history: data?.history || [],
+        cancellationPending: data?.cancellationPending || [],
         metadata: data?.metadata,
         isLoading,
         isError: error,

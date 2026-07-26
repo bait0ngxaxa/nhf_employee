@@ -14,6 +14,8 @@ import {
 } from "@/lib/services/stock/notifications";
 import {
     parseLeaveActionPayload,
+    parseLeaveCancellationRequestedPayload,
+    parseLeaveCancelledAfterApprovalPayload,
     parseLeaveCancelledPayload,
     parseLeaveNotTakenConfirmedPayload,
     parseLeaveNotTakenRequestedPayload,
@@ -340,6 +342,22 @@ async function dispatchNotification(
                 "../leave/notifications"
             );
             await sendLeaveCancelledNotifications(parsedLeaveCancelled);
+            return "SENT";
+        }
+        case "LEAVE_CANCELLATION_REQUESTED": {
+            const parsedCancellationRequested = parseLeaveCancellationRequestedPayload(payload);
+            const { sendLeaveCancellationRequestedNotifications } = await import(
+                "../leave/notifications"
+            );
+            await sendLeaveCancellationRequestedNotifications(parsedCancellationRequested);
+            return "SENT";
+        }
+        case "LEAVE_CANCELLED_AFTER_APPROVAL": {
+            const parsedCancelledAfterApproval = parseLeaveCancelledAfterApprovalPayload(payload);
+            const { sendLeaveCancelledAfterApprovalNotifications } = await import(
+                "../leave/notifications"
+            );
+            await sendLeaveCancelledAfterApprovalNotifications(parsedCancelledAfterApproval);
             return "SENT";
         }
         case "LEAVE_NOT_TAKEN_REQUESTED": {

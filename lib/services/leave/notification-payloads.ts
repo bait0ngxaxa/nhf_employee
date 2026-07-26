@@ -55,6 +55,17 @@ export const leaveCancelledPayloadSchema = leaveDetailsSchema.extend({
     approver: configuredApproverSchema,
 });
 
+export const leaveCancellationRequestedPayloadSchema = leaveDetailsSchema.extend({
+    employee: recipientSchema,
+    approver: configuredApproverSchema,
+    note: z.string().trim().min(1),
+});
+
+export const leaveCancelledAfterApprovalPayloadSchema = leaveDetailsSchema.extend({
+    employee: recipientSchema,
+    approverName: z.string().trim().min(1).nullable(),
+});
+
 export const leaveNotTakenRequestedPayloadSchema = leaveDetailsSchema.extend({
     employee: recipientSchema,
     approver: configuredApproverSchema,
@@ -73,6 +84,12 @@ export type LeaveConfiguredApprover = LeaveNotificationRecipient & {
 export type LeaveActionPayload = z.infer<typeof leaveActionPayloadSchema>;
 export type LeaveResultPayload = z.infer<typeof leaveResultPayloadSchema>;
 export type LeaveCancelledPayload = z.infer<typeof leaveCancelledPayloadSchema>;
+export type LeaveCancellationRequestedPayload = z.infer<
+    typeof leaveCancellationRequestedPayloadSchema
+>;
+export type LeaveCancelledAfterApprovalPayload = z.infer<
+    typeof leaveCancelledAfterApprovalPayloadSchema
+>;
 export type LeaveNotTakenRequestedPayload = z.infer<
     typeof leaveNotTakenRequestedPayloadSchema
 >;
@@ -84,6 +101,8 @@ export type LeaveNotificationPayload =
     | LeaveActionPayload
     | LeaveResultPayload
     | LeaveCancelledPayload
+    | LeaveCancellationRequestedPayload
+    | LeaveCancelledAfterApprovalPayload
     | LeaveNotTakenRequestedPayload
     | LeaveNotTakenConfirmedPayload;
 
@@ -176,6 +195,26 @@ export function parseLeaveCancelledPayload(
         leaveCancelledPayloadSchema,
         payload,
         "LEAVE_CANCELLED",
+    );
+}
+
+export function parseLeaveCancellationRequestedPayload(
+    payload: unknown,
+): LeaveCancellationRequestedPayload {
+    return parseLeavePayload(
+        leaveCancellationRequestedPayloadSchema,
+        payload,
+        "LEAVE_CANCELLATION_REQUESTED",
+    );
+}
+
+export function parseLeaveCancelledAfterApprovalPayload(
+    payload: unknown,
+): LeaveCancelledAfterApprovalPayload {
+    return parseLeavePayload(
+        leaveCancelledAfterApprovalPayloadSchema,
+        payload,
+        "LEAVE_CANCELLED_AFTER_APPROVAL",
     );
 }
 

@@ -212,6 +212,8 @@ export async function logLeaveEvent(
         | "LEAVE_REQUEST_APPROVE"
         | "LEAVE_REQUEST_REJECT"
         | "LEAVE_REQUEST_CANCEL"
+        | "LEAVE_REQUEST_CANCELLATION_REQUEST"
+        | "LEAVE_REQUEST_CANCELLATION_CONFIRM"
         | "LEAVE_REQUEST_NOT_TAKEN_REQUEST"
         | "LEAVE_REQUEST_NOT_TAKEN_CONFIRM",
     entityId: string, // Leave request ID is a CUID (string)

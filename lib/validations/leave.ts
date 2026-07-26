@@ -96,6 +96,10 @@ const emptyToNull = (value: unknown): unknown => {
 
 export const leaveCancelSchema = z.object({
   leaveId: leaveIdSchema,
+  reason: z.preprocess(
+    (value) => typeof value === "string" && value.trim() === "" ? undefined : value,
+    optionalLongTextSchema("กรุณาระบุเหตุผลอย่างน้อย 5 ตัวอักษร"),
+  ),
 });
 
 export const leaveNotTakenRequestSchema = z.object({

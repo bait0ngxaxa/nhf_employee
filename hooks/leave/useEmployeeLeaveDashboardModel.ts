@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { toast } from "sonner";
-import { useLeaveProfile } from "@/hooks/useLeaveProfile";
+import { useLeaveProfile, type LeaveRequest } from "@/hooks/useLeaveProfile";
 
 export function useEmployeeLeaveDashboardModel() {
     const [isRequestFormOpen, setIsRequestFormOpen] = useState(false);
     const [page, setPage] = useState(1);
     const [isSubmitting, setIsSubmitting] = useState(false);
-    const [cancelConfirmId, setCancelConfirmId] = useState<string | null>(null);
+    const [cancelConfirmRequest, setCancelConfirmRequest] = useState<LeaveRequest | null>(null);
+    const [cancelReason, setCancelReason] = useState("");
     const [notTakenRequestId, setNotTakenRequestId] = useState<string | null>(null);
     const [notTakenNote, setNotTakenNote] = useState("");
     const {
@@ -16,6 +17,7 @@ export function useEmployeeLeaveDashboardModel() {
         isLoading,
         mutate,
         cancelLeave,
+        requestApprovedCancellation,
         requestNotTaken,
     } = useLeaveProfile(page);
 
@@ -35,12 +37,14 @@ export function useEmployeeLeaveDashboardModel() {
         setIsRequestFormOpen(false);
     };
 
-    const openCancelDialog = (leaveId: string): void => {
-        setCancelConfirmId(leaveId);
+    const openCancelDialog = (request: LeaveRequest): void => {
+        setCancelConfirmRequest(request);
+        setCancelReason("");
     };
 
     const closeCancelDialog = (): void => {
-        setCancelConfirmId(null);
+        setCancelConfirmRequest(null);
+        setCancelReason("");
     };
 
     const openNotTakenDialog = (leaveId: string): void => {
@@ -54,14 +58,19 @@ export function useEmployeeLeaveDashboardModel() {
     };
 
     const confirmCancelLeave = async (): Promise<void> => {
-        if (!cancelConfirmId) {
+        if (!cancelConfirmRequest) {
             return;
         }
 
         try {
             setIsSubmitting(true);
-            await cancelLeave(cancelConfirmId);
-            toast.success("ยกเลิกคำขอลาเรียบร้อยแล้ว");
+            if (cancelConfirmRequest.status === "PENDING") {
+                await cancelLeave(cancelConfirmRequest.id);
+                toast.success("ยกเลิกคำขอลาเรียบร้อยแล้ว");
+            } else {
+                await requestApprovedCancellation(cancelConfirmRequest.id, cancelReason);
+                toast.success("ส่งคำขอยกเลิกวันลาแล้ว รอผู้อนุมัติยืนยัน");
+            }
         } catch (error: unknown) {
             toast.error(
                 error instanceof Error && error.message
@@ -70,7 +79,7 @@ export function useEmployeeLeaveDashboardModel() {
             );
         } finally {
             setIsSubmitting(false);
-            setCancelConfirmId(null);
+            closeCancelDialog();
         }
     };
 
@@ -103,7 +112,8 @@ export function useEmployeeLeaveDashboardModel() {
         metadata,
         page,
         isSubmitting,
-        cancelConfirmId,
+        cancelConfirmRequest,
+        cancelReason,
         notTakenRequestId,
         notTakenNote,
         sickQuota: getQuota("SICK"),
@@ -115,6 +125,7 @@ export function useEmployeeLeaveDashboardModel() {
         onRequestSuccess,
         openCancelDialog,
         closeCancelDialog,
+        setCancelReason,
         confirmCancelLeave,
         openNotTakenDialog,
         closeNotTakenDialog,

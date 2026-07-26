@@ -18,6 +18,7 @@ import { calculateAdditionalOverQuotaHalfDays } from "@/lib/services/leave/over-
 import { jsonError, notFound } from "@/lib/ssot/http";
 import { FEATURE_KEYS, isFeatureEnabled } from "@/lib/ssot/features";
 import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
+import { isAdminRole } from "@/lib/ssot/permissions";
 import { leaveActionSchema } from "@/lib/validations/leave";
 
 const LEAVE_APPROVAL_MESSAGES = {
@@ -46,6 +47,9 @@ export async function POST(req: Request): Promise<NextResponse> {
 
         const auth = await requireActiveWorkforceSession();
         if (!auth.ok) return auth.response;
+        if (isAdminRole(auth.user.role)) {
+            return jsonError(COMMON_API_MESSAGES.forbidden, 403);
+        }
 
         const userId = auth.user.id;
         const managerId = auth.employeeId;

@@ -27,6 +27,7 @@ import { runSerializableTransaction } from "@/lib/db/transaction";
 import { jsonError, notFound } from "@/lib/ssot/http";
 import { FEATURE_KEYS, isFeatureEnabled } from "@/lib/ssot/features";
 import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
+import { isAdminRole } from "@/lib/ssot/permissions";
 import { APP_DASHBOARD_TABS, toDashboardTabPath } from "@/lib/ssot/routes";
 import {
     leaveNotTakenConfirmSchema,
@@ -203,6 +204,9 @@ export async function PUT(req: Request): Promise<NextResponse> {
 
         const auth = await requireActiveWorkforceSession();
         if (!auth.ok) return auth.response;
+        if (isAdminRole(auth.user.role)) {
+            return jsonError(COMMON_API_MESSAGES.forbidden, 403);
+        }
 
         const userId = auth.user.id;
         const managerId = auth.employeeId;

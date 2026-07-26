@@ -19,6 +19,10 @@ export function isPastDate(date: Date, today: Date = new Date()): boolean {
     return getStartOfDay(date) < getStartOfDay(today);
 }
 
+export function isBeforeLeaveStart(date: Date, today: Date = new Date()): boolean {
+    return getStartOfDay(date) > getStartOfDay(today);
+}
+
 export function isAfterLeaveEnd(endDate: Date, today: Date = new Date()): boolean {
     return getStartOfDay(today) > getStartOfDay(endDate);
 }
