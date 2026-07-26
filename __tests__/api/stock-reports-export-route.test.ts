@@ -1,6 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
-import type * as NextServerModule from "next/server";
 import { GET as stockReportsExportRoute } from "@/app/api/stock/reports/export/route";
 import { getApiAuthSession } from "@/lib/auth/server";
 import { isAdminRole } from "@/lib/ssot/permissions";
@@ -13,17 +12,6 @@ import {
     getStockRequestReportMeta,
     getStockRequestReportYears,
 } from "@/lib/services/stock/report-export";
-import { logDataExport } from "@/lib/server/audit";
-
-vi.mock("next/server", async (importOriginal) => {
-    const actual = await importOriginal<typeof NextServerModule>();
-    return {
-        ...actual,
-        after: vi.fn((callback: () => void | Promise<void>) => {
-            void callback();
-        }),
-    };
-});
 
 vi.mock("@/lib/auth/server", () => ({
     getApiAuthSession: vi.fn(),
@@ -42,10 +30,6 @@ vi.mock("@/lib/services/stock/report-export", () => ({
     getStockRequestReportYears: vi.fn(),
     getStockRequestReportMeta: vi.fn(),
     createStockRequestReportXlsxResponse: vi.fn(),
-}));
-
-vi.mock("@/lib/server/audit", () => ({
-    logDataExport: vi.fn(),
 }));
 
 describe("GET /api/stock/reports/export", () => {
@@ -91,7 +75,7 @@ describe("GET /api/stock/reports/export", () => {
         });
     });
 
-    it("exports current stock balances and logs audit", async () => {
+    it("exports current stock balances without a database audit write", async () => {
         vi.mocked(getStockBalanceReportMeta).mockResolvedValue({
             count: 15,
             maxRows: 5000,
@@ -107,21 +91,9 @@ describe("GET /api/stock/reports/export", () => {
 
         expect(response.status).toBe(200);
         expect(createStockBalanceReportXlsxResponse).toHaveBeenCalledTimes(1);
-        expect(logDataExport).toHaveBeenCalledWith(
-            "StockItem",
-            1,
-            "admin@test.com",
-            expect.objectContaining({
-                metadata: expect.objectContaining({
-                    entityType: "StockItem",
-                    recordCount: 15,
-                    filters: { reportType: "balances", format: "xlsx" },
-                }),
-            }),
-        );
     });
 
-    it("exports the selected year and logs audit", async () => {
+    it("exports the selected year without a database audit write", async () => {
         vi.mocked(getStockRequestReportMeta).mockResolvedValue({
             count: 3,
             maxRows: 5000,
@@ -137,17 +109,5 @@ describe("GET /api/stock/reports/export", () => {
 
         expect(response.status).toBe(200);
         expect(createStockRequestReportXlsxResponse).toHaveBeenCalledWith(2031);
-        expect(logDataExport).toHaveBeenCalledWith(
-            "StockRequest",
-            1,
-            "admin@test.com",
-            expect.objectContaining({
-                metadata: expect.objectContaining({
-                    entityType: "StockRequest",
-                    recordCount: 3,
-                    filters: { year: 2031, format: "xlsx" },
-                }),
-            }),
-        );
     });
 });

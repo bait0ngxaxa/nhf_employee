@@ -1,8 +1,6 @@
-import { after, type NextRequest, NextResponse } from "next/server";
-import { logDataExport } from "@/lib/server/audit";
+import { type NextRequest, NextResponse } from "next/server";
 import { requireAdminSession } from "@/lib/auth/api";
 import { jsonError } from "@/lib/ssot/http";
-import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
 import {
     createStockBalanceReportXlsxResponse,
     getStockBalanceReportMeta,
@@ -19,14 +17,6 @@ export async function GET(request: NextRequest): Promise<Response> {
         const auth = await requireAdminSession();
         if (!auth.ok) return auth.response;
 
-        const userId = Number(auth.session.user.id);
-        if (Number.isNaN(userId)) {
-            return NextResponse.json(
-                { error: COMMON_API_MESSAGES.invalidUserId },
-                { status: 400 },
-            );
-        }
-
         const { searchParams } = new URL(request.url);
         const parsedQuery = stockReportExportQuerySchema.safeParse({
             year: searchParams.get("year") ?? undefined,
@@ -42,7 +32,7 @@ export async function GET(request: NextRequest): Promise<Response> {
             });
         }
 
-        const { year, yearsOnly, metaOnly, reportType, format } = parsedQuery.data;
+        const { year, yearsOnly, metaOnly, reportType } = parsedQuery.data;
         const resolvedYear = year ?? new Date().getFullYear();
 
         if (reportType === "balances") {
@@ -67,24 +57,7 @@ export async function GET(request: NextRequest): Promise<Response> {
                 );
             }
 
-            const response = await createStockBalanceReportXlsxResponse(userId);
-
-            after(async () => {
-                try {
-                    await logDataExport("StockItem", userId, auth.user.email, {
-                        metadata: {
-                            entityType: "StockItem",
-                            recordCount: meta.count,
-                            filters: { reportType, format },
-                            exportedAt: new Date().toISOString(),
-                        },
-                    });
-                } catch (error) {
-                    console.error("Failed to log stock export audit:", error);
-                }
-            });
-
-            return response;
+            return createStockBalanceReportXlsxResponse();
         }
 
         if (yearsOnly) {
@@ -109,24 +82,7 @@ export async function GET(request: NextRequest): Promise<Response> {
             );
         }
 
-        const response = await createStockRequestReportXlsxResponse(resolvedYear);
-
-        after(async () => {
-            try {
-                await logDataExport("StockRequest", userId, auth.user.email, {
-                    metadata: {
-                        entityType: "StockRequest",
-                        recordCount: meta.count,
-                        filters: { year: resolvedYear, format },
-                        exportedAt: new Date().toISOString(),
-                    },
-                });
-            } catch (error) {
-                console.error("Failed to log stock export audit:", error);
-            }
-        });
-
-        return response;
+        return createStockRequestReportXlsxResponse(resolvedYear);
     } catch (error) {
         console.error("Stock export error:", error);
 

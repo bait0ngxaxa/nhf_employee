@@ -8,23 +8,17 @@ import {
     buildItemInclude,
     buildRequestInclude,
     buildReservedQuantityMaps,
-    ensureDefaultCategoryId,
-    ensureItemVariantsExist,
     getAvailableQuantity,
 } from "./shared";
 
 export async function getCategories() {
-    await ensureDefaultCategoryId();
     return prisma.stockCategory.findMany({
         orderBy: { name: "asc" },
         include: { _count: { select: { items: true } } },
     });
 }
 
-export async function getItems(
-    filters: StockItemsFilter,
-    performedBy: number,
-) {
+export async function getItems(filters: StockItemsFilter) {
     const { categoryId, search, activeOnly, page, limit } = filters;
     const where = {
         ...(categoryId !== undefined && { categoryId }),
@@ -38,7 +32,7 @@ export async function getItems(
         }),
     };
 
-    let items = await prisma.stockItem.findMany({
+    const items = await prisma.stockItem.findMany({
         where,
         include: buildItemInclude(),
         orderBy: { name: "asc" },
@@ -46,20 +40,6 @@ export async function getItems(
         take: limit,
     });
     const total = await prisma.stockItem.count({ where });
-
-    const missingVariantItemIds = items
-        .filter((item) => item.variants.length === 0)
-        .map((item) => item.id);
-    if (missingVariantItemIds.length > 0) {
-        await ensureItemVariantsExist(missingVariantItemIds, performedBy);
-        items = await prisma.stockItem.findMany({
-            where,
-            include: buildItemInclude(),
-            orderBy: { name: "asc" },
-            skip: (page - 1) * limit,
-            take: limit,
-        });
-    }
 
     const itemIds = items.map((item) => item.id);
     const pendingRequestItems =
@@ -115,21 +95,11 @@ export async function getItems(
     };
 }
 
-export async function getItemById(id: number, performedBy: number) {
-    let item = await prisma.stockItem.findUnique({
+export async function getItemById(id: number) {
+    return prisma.stockItem.findUnique({
         where: { id },
         include: buildItemInclude(),
     });
-
-    if (item && item.variants.length === 0) {
-        await ensureItemVariantsExist([item.id], performedBy);
-        item = await prisma.stockItem.findUnique({
-            where: { id },
-            include: buildItemInclude(),
-        });
-    }
-
-    return item;
 }
 
 export async function getRequests(

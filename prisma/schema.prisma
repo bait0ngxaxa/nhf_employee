@@ -637,6 +637,7 @@ model StockTransaction {
   stockRequestItemId Int?
   referenceType    StockReferenceType?
   referenceId      String?
+  openingBalanceKey String? @unique
   createdAt        DateTime           @default(now())
   item             StockItem          @relation(fields: [itemId], references: [id])
   variant          StockItemVariant?  @relation(fields: [variantId], references: [id])

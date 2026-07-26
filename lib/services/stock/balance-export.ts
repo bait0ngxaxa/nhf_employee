@@ -11,7 +11,6 @@ import {
 import {
     buildItemInclude,
     buildReservedQuantityMaps,
-    ensureItemVariantsExist,
     getAvailableQuantity,
 } from "./shared";
 import type { PendingRequestItemRecord } from "./types";
@@ -27,8 +26,8 @@ type LoadedStockBalanceItem = Omit<
     variants: LoadedStockBalanceVariant[];
 };
 
-async function loadActiveStockItems(performedBy: number): Promise<StockBalanceItem[]> {
-    const items = await loadItemsWithVariants(performedBy);
+async function loadActiveStockItems(): Promise<StockBalanceItem[]> {
+    const items = await loadItemsWithVariants();
     const pendingRequestItems = await loadPendingRequestItems(
         items.map((item) => item.id),
     );
@@ -42,27 +41,12 @@ async function loadActiveStockItems(performedBy: number): Promise<StockBalanceIt
     );
 }
 
-async function loadItemsWithVariants(
-    performedBy: number,
-): Promise<LoadedStockBalanceItem[]> {
-    let items = await prisma.stockItem.findMany({
+async function loadItemsWithVariants(): Promise<LoadedStockBalanceItem[]> {
+    const items = await prisma.stockItem.findMany({
         where: { isActive: true },
         include: buildItemInclude(),
         orderBy: { name: "asc" },
     });
-
-    const missingVariantItemIds = items
-        .filter((item) => item.variants.length === 0)
-        .map((item) => item.id);
-
-    if (missingVariantItemIds.length > 0) {
-        await ensureItemVariantsExist(missingVariantItemIds, performedBy);
-        items = await prisma.stockItem.findMany({
-            where: { isActive: true },
-            include: buildItemInclude(),
-            orderBy: { name: "asc" },
-        });
-    }
 
     return items;
 }
@@ -151,7 +135,6 @@ export async function getStockBalanceReportMeta(): Promise<{
 }
 
 export async function createStockBalanceReportXlsxResponse(
-    performedBy: number,
 ): Promise<Response> {
     const meta = await getStockBalanceReportMeta();
     if (meta.count > meta.maxRows) {
@@ -160,7 +143,7 @@ export async function createStockBalanceReportXlsxResponse(
         );
     }
 
-    const items = await loadActiveStockItems(performedBy);
+    const items = await loadActiveStockItems();
     const workbook = createStockBalanceReportWorkbook(items);
     const filename = generateFilename("ยอดคงเหลือสต๊อกปัจจุบัน", "xlsx");
 

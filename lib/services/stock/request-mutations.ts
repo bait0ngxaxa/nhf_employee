@@ -29,8 +29,9 @@ import type {
 } from "@/lib/validations/stock";
 import {
     buildRequestInclude,
-    ensureDefaultVariantsByItemIds,
+    loadActiveDefaultVariantsByItemIds,
 } from "./shared";
+import { lockStockInventoryRows } from "./locks";
 import type {
     CancelRequestOptions,
     IssueRequestResult,
@@ -233,11 +234,16 @@ export async function issueRequest(
             throw new Error("ไม่พบคำขอเบิก");
         }
 
-        const defaultVariantsByItemId = await ensureDefaultVariantsByItemIds(
+        await lockStockInventoryRows(
             tx,
             request.items.map((item) => item.itemId),
-            actor.id,
         );
+        const itemsWithoutVariant = request.items
+            .filter((item) => item.variantId === null)
+            .map((item) => item.itemId);
+        const defaultVariantsByItemId = itemsWithoutVariant.length > 0
+            ? await loadActiveDefaultVariantsByItemIds(tx, itemsWithoutVariant)
+            : new Map<number, { id: number }>();
         const resolvedRequestItems = request.items.map((requestItem) => {
             const variantId =
                 requestItem.variantId ?? defaultVariantsByItemId.get(requestItem.itemId)?.id;

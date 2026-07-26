@@ -56,6 +56,7 @@ describe("Stock Service Mutations", () => {
             asNever({ count: 1 }),
         );
         prismaMock.stockTransaction.create.mockResolvedValue(asNever({ id: 1 }));
+        prismaMock.stockTransaction.upsert.mockResolvedValue(asNever({ id: 1 }));
         prismaMock.stockRequestItem.findMany.mockResolvedValue(asNever([]));
         prismaMock.user.findMany.mockResolvedValue(asNever([]));
         prismaMock.user.findUnique.mockResolvedValue(
@@ -151,14 +152,17 @@ describe("Stock Service Mutations", () => {
                     details: expect.stringContaining('"itemId":51'),
                 }),
             });
-            expect(prismaMock.stockTransaction.create).toHaveBeenCalledWith({
-                data: {
+            expect(prismaMock.stockTransaction.upsert).toHaveBeenCalledWith({
+                where: { openingBalanceKey: "stock-variant:511" },
+                update: {},
+                create: {
                     itemId: 51,
                     variantId: 511,
                     type: "OPENING_BALANCE",
                     quantity: 4,
                     note: "ยอดตั้งต้นสต็อก",
                     performedBy: 2,
+                    openingBalanceKey: "stock-variant:511",
                 },
                 select: { id: true },
             });
@@ -457,8 +461,6 @@ describe("Stock Service Mutations", () => {
             );
             prismaMock.stockItem.update.mockResolvedValue(asNever({ id: 10 }));
             prismaMock.stockTransaction.create
-                .mockResolvedValueOnce(asNever({ id: 701 }))
-                .mockResolvedValueOnce(asNever({ id: 702 }))
                 .mockResolvedValueOnce(asNever({ id: 801 }))
                 .mockResolvedValueOnce(asNever({ id: 802 }))
                 .mockResolvedValueOnce(asNever({ id: 803 }));
@@ -487,7 +489,7 @@ describe("Stock Service Mutations", () => {
                     }),
                 }),
             );
-            expect(prismaMock.stockTransaction.create).toHaveBeenNthCalledWith(3, {
+            expect(prismaMock.stockTransaction.create).toHaveBeenNthCalledWith(1, {
                 data: {
                     itemId: 10,
                     variantId: 101,
@@ -502,7 +504,7 @@ describe("Stock Service Mutations", () => {
                 },
                 select: { id: true },
             });
-            expect(prismaMock.stockTransaction.create).toHaveBeenNthCalledWith(4, {
+            expect(prismaMock.stockTransaction.create).toHaveBeenNthCalledWith(2, {
                 data: {
                     itemId: 10,
                     variantId: 101,
@@ -517,7 +519,7 @@ describe("Stock Service Mutations", () => {
                 },
                 select: { id: true },
             });
-            expect(prismaMock.stockTransaction.create).toHaveBeenNthCalledWith(5, {
+            expect(prismaMock.stockTransaction.create).toHaveBeenNthCalledWith(3, {
                 data: {
                     itemId: 12,
                     variantId: 121,
@@ -1228,10 +1230,11 @@ describe("Stock Service Mutations", () => {
                 imageUrl: null,
                 isActive: true,
             }]));
-            prismaMock.stockItemVariant.findFirst.mockResolvedValue(asNever({ id: 501 }));
-            prismaMock.stockItemVariant.findMany.mockResolvedValueOnce(
-                asNever([{ id: 501, quantity: 10, unit: "ชิ้น", stockItem: { name: "จอภาพ" } }]),
-            );
+            prismaMock.stockItemVariant.findMany
+                .mockResolvedValueOnce(asNever([{ id: 501, stockItemId: 50 }]))
+                .mockResolvedValueOnce(
+                    asNever([{ id: 501, quantity: 10, unit: "ชิ้น", stockItem: { name: "จอภาพ" } }]),
+                );
             prismaMock.stockRequest.create.mockResolvedValue(asNever({
                 id: 1,
                 projectCode: "PRJ-DEFAULT",
@@ -1933,14 +1936,17 @@ describe("Stock Service Mutations", () => {
                     }),
                 }),
             );
-            expect(prismaMock.stockTransaction.create).toHaveBeenCalledWith({
-                data: {
+            expect(prismaMock.stockTransaction.upsert).toHaveBeenCalledWith({
+                where: { openingBalanceKey: "stock-variant:263" },
+                update: {},
+                create: {
                     itemId: 26,
                     variantId: 263,
                     type: "OPENING_BALANCE",
                     quantity: 4,
                     note: "ยอดตั้งต้นสต็อก",
                     performedBy: 7,
+                    openingBalanceKey: "stock-variant:263",
                 },
                 select: { id: true },
             });

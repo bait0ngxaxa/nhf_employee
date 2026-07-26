@@ -1,23 +1,13 @@
-import { StockRequestStatus, StockTxType, type Prisma } from "@prisma/client";
-import { prisma } from "@/lib/db/prisma";
-import { runSerializableTransaction } from "@/lib/db/transaction";
-import { lockStockInventoryRows } from "./locks";
+import { StockRequestStatus, type Prisma } from "@prisma/client";
 import {
     deleteLocalUploadByUrl,
     isManagedUploadUrl,
 } from "@/lib/uploads/local";
-import {
-    DEFAULT_STOCK_CATEGORY_NAME,
-    STOCK_OPENING_BALANCE_NOTE,
-} from "./constants";
 import type {
     CreateItemInput,
     CreateRequestInput,
 } from "@/lib/validations/stock";
-import type {
-    ItemVariantSeed,
-    PendingRequestItemRecord,
-} from "./types";
+import type { PendingRequestItemRecord } from "./types";
 
 export function generateSku(): string {
     const time = Date.now().toString(36).toUpperCase();
@@ -25,119 +15,38 @@ export function generateSku(): string {
     return `SKU-${time}-${rand}`;
 }
 
-export async function ensureDefaultCategoryId(): Promise<number> {
-    const category = await prisma.stockCategory.upsert({
-        where: { name: DEFAULT_STOCK_CATEGORY_NAME },
-        update: {},
-        create: { name: DEFAULT_STOCK_CATEGORY_NAME },
-        select: { id: true },
-    });
-    return category.id;
-}
-
-export async function createStockOpeningBalanceTransaction(
-    tx: Prisma.TransactionClient,
-    itemId: number,
-    variantId: number,
-    quantity: number,
-    performedBy: number,
-): Promise<number> {
-    const transaction = await tx.stockTransaction.create({
-        data: {
-            itemId,
-            variantId,
-            type: StockTxType.OPENING_BALANCE,
-            quantity,
-            note: STOCK_OPENING_BALANCE_NOTE,
-            performedBy,
-        },
-        select: { id: true },
-    });
-
-    return transaction.id;
-}
-
-export async function ensureDefaultVariant(
-    tx: Prisma.TransactionClient,
-    item: ItemVariantSeed,
-    performedBy: number,
-): Promise<{ id: number }> {
-    const existingVariant = await tx.stockItemVariant.findFirst({
-        where: { stockItemId: item.id, isActive: true },
-        orderBy: { id: "asc" },
-        select: { id: true },
-    });
-
-    if (existingVariant) {
-        return existingVariant;
-    }
-
-    const variant = await tx.stockItemVariant.create({
-        data: {
-            stockItemId: item.id,
-            sku: item.sku,
-            unit: item.unit,
-            quantity: item.quantity,
-            minStock: item.minStock,
-            imageUrl: item.imageUrl,
-            isActive: item.isActive,
-        },
-        select: { id: true },
-    });
-
-    await createStockOpeningBalanceTransaction(
-        tx,
-        item.id,
-        variant.id,
-        item.quantity,
-        performedBy,
-    );
-
-    return variant;
-}
-
-export async function ensureDefaultVariantsByItemIds(
+/** Resolve existing active defaults for commands without creating legacy data. */
+export async function loadActiveDefaultVariantsByItemIds(
     tx: Prisma.TransactionClient,
     itemIds: number[],
-    performedBy: number,
 ): Promise<Map<number, { id: number }>> {
     const uniqueItemIds = Array.from(new Set(itemIds));
     if (uniqueItemIds.length === 0) {
         return new Map();
     }
 
-    await lockStockInventoryRows(tx, uniqueItemIds);
-
-    const items = await tx.stockItem.findMany({
-        where: { id: { in: uniqueItemIds } },
+    const variants = await tx.stockItemVariant.findMany({
+        where: { stockItemId: { in: uniqueItemIds }, isActive: true },
         select: {
             id: true,
-            sku: true,
-            unit: true,
-            quantity: true,
-            minStock: true,
-            imageUrl: true,
-            isActive: true,
+            stockItemId: true,
         },
+        orderBy: { id: "asc" },
     });
 
-    const variants = new Map<number, { id: number }>();
-    for (const item of items) {
-        variants.set(item.id, await ensureDefaultVariant(tx, item, performedBy));
+    const defaultVariants = new Map<number, { id: number }>();
+    for (const variant of variants) {
+        if (!defaultVariants.has(variant.stockItemId)) {
+            defaultVariants.set(variant.stockItemId, { id: variant.id });
+        }
     }
 
-    return variants;
+    return defaultVariants;
 }
 
-export async function ensureItemVariantsExist(
-    itemIds: number[],
-    performedBy: number,
-): Promise<void> {
-    await runSerializableTransaction(async (tx) => {
-        await ensureDefaultVariantsByItemIds(tx, itemIds, performedBy);
-    });
-}
-
+// This include is a presentation view. An empty active list does not mean that
+// the parent has no persisted variants; callers that need that distinction must
+// query variants without the isActive filter.
 export function buildItemInclude() {
     return {
         category: { select: { id: true, name: true } },

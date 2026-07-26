@@ -2,7 +2,6 @@ import type { UpdateItemInput } from "@/lib/validations/stock";
 import {
     assertNoPendingStockRequestsForItem,
     buildItemInclude,
-    ensureDefaultVariant,
 } from "./shared";
 import { updateItemWithVariants } from "./item-update.variant-sync";
 import {
@@ -17,7 +16,6 @@ async function updateItemWithoutVariants(
     itemId: number,
     itemData: Omit<UpdateItemInput, "variants">,
     originalData: UpdateItemInput,
-    performedBy: number,
     tracking: UploadUrlTracking,
 ): Promise<StockItemWithDetails> {
     const currentItem = await tx.stockItem.findUniqueOrThrow({
@@ -41,17 +39,31 @@ async function updateItemWithoutVariants(
 
     trackReplacedUploadUrl(currentItem.imageUrl, nextItem.imageUrl, tracking);
 
-    const defaultVariant = await ensureDefaultVariant(tx, nextItem, performedBy);
-    await tx.stockItemVariant.update({
-        where: { id: defaultVariant.id },
-        data: {
-            ...(originalData.sku !== undefined && { sku: nextItem.sku }),
-            ...(originalData.unit !== undefined && { unit: nextItem.unit }),
-            ...(originalData.minStock !== undefined && { minStock: nextItem.minStock }),
-            ...(originalData.imageUrl !== undefined && { imageUrl: nextItem.imageUrl }),
-            ...(originalData.isActive !== undefined && { isActive: nextItem.isActive }),
-        },
+    const existingVariants = await tx.stockItemVariant.findMany({
+        where: { stockItemId: itemId },
+        select: { id: true },
+        orderBy: { id: "asc" },
     });
+    const defaultVariant = existingVariants[0];
+
+    if (defaultVariant) {
+        await tx.stockItemVariant.update({
+            where: { id: defaultVariant.id },
+            data: {
+                ...(originalData.sku !== undefined && { sku: nextItem.sku }),
+                ...(originalData.unit !== undefined && { unit: nextItem.unit }),
+                ...(originalData.minStock !== undefined && { minStock: nextItem.minStock }),
+                ...(originalData.imageUrl !== undefined && { imageUrl: nextItem.imageUrl }),
+            },
+        });
+    }
+
+    if (originalData.isActive !== undefined) {
+        await tx.stockItemVariant.updateMany({
+            where: { stockItemId: itemId },
+            data: { isActive: nextItem.isActive },
+        });
+    }
 
     return tx.stockItem.findUniqueOrThrow({
         where: { id: itemId },
@@ -76,5 +88,5 @@ export async function updateItemInTransaction(
         return updateItemWithVariants(tx, itemId, itemData, variants, userId, tracking);
     }
 
-    return updateItemWithoutVariants(tx, itemId, itemData, data, userId, tracking);
+    return updateItemWithoutVariants(tx, itemId, itemData, data, tracking);
 }

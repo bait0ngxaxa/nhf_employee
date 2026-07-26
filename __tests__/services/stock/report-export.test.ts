@@ -5,24 +5,10 @@ import { mockDeep, mockReset } from "vitest-mock-extended";
 import { prisma } from "@/lib/db/prisma";
 import { createStockBalanceReportXlsxResponse } from "@/lib/services/stock/balance-export";
 import { createStockRequestReportXlsxResponse } from "@/lib/services/stock/report-export";
-import { ensureItemVariantsExist } from "@/lib/services/stock/shared";
-import type * as StockSharedModule from "@/lib/services/stock/shared";
 
 vi.mock("@/lib/db/prisma", () => ({
     prisma: mockDeep<PrismaClient>(),
 }));
-
-vi.mock("@/lib/services/stock/shared", async () => {
-    const actual =
-        await vi.importActual<typeof StockSharedModule>(
-            "@/lib/services/stock/shared",
-        );
-
-    return {
-        ...actual,
-        ensureItemVariantsExist: vi.fn(),
-    };
-});
 
 const prismaMock = prisma as unknown as ReturnType<typeof mockDeep<PrismaClient>>;
 
@@ -70,7 +56,6 @@ function bangkokExcelDate(isoDate: string): Date {
 describe("Stock report export services", () => {
     beforeEach(() => {
         mockReset(prismaMock);
-        vi.mocked(ensureItemVariantsExist).mockReset();
     });
 
     it("should export stock request xlsx with summary and detail sheets", async () => {
@@ -268,7 +253,7 @@ describe("Stock report export services", () => {
             ]),
         );
 
-        const response = await createStockBalanceReportXlsxResponse(7);
+        const response = await createStockBalanceReportXlsxResponse();
         const workbook = await loadWorkbook(response);
         const balanceSheet = workbook.getWorksheet("ยอดคงเหลือจริง");
         const redVariantRow = findRowByCellValue(balanceSheet, 3, "สี: ดำ");
@@ -302,5 +287,9 @@ describe("Stock report export services", () => {
         expect(workbookText).not.toContain("ภาพรวมวัสดุ");
         expect(workbookText).not.toContain("SKU");
         expect(workbookText).not.toContain("[");
+        expect(prismaMock.stockItemVariant.create).not.toHaveBeenCalled();
+        expect(prismaMock.stockItemVariant.update).not.toHaveBeenCalled();
+        expect(prismaMock.stockTransaction.create).not.toHaveBeenCalled();
+        expect(prismaMock.auditLog.create).not.toHaveBeenCalled();
     });
 });

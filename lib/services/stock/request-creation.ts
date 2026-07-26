@@ -9,8 +9,8 @@ import {
 import {
     buildRequestInclude,
     buildReservedQuantityMaps,
-    ensureDefaultVariantsByItemIds,
     getAvailableQuantity,
+    loadActiveDefaultVariantsByItemIds,
     normalizeRequestItems,
 } from "./shared";
 import type { StockCommandActor } from "./types";
@@ -89,7 +89,6 @@ function validateRequestedVariants(
 async function normalizeRequestedItems(
     tx: Prisma.TransactionClient,
     data: CreateRequestInput,
-    performedBy: number,
 ): Promise<NormalizedRequestContext> {
     const variantIds = data.items
         .map((item) => item.variantId)
@@ -110,11 +109,7 @@ async function normalizeRequestedItems(
           })
         : [];
     const itemIdByVariantId = validateRequestedVariants(data.items, variants);
-    const defaultVariantsByItemId = await ensureDefaultVariantsByItemIds(
-        tx,
-        itemIds,
-        performedBy,
-    );
+    const defaultVariantsByItemId = await loadActiveDefaultVariantsByItemIds(tx, itemIds);
 
     return {
         items: normalizeRequestItems(
@@ -274,7 +269,7 @@ export async function createNewStockRequest(
     actor: StockCommandActor,
     identity: StockRequestIdentity,
 ): Promise<StockRequestWithDetails> {
-    const context = await normalizeRequestedItems(tx, data, actor.id);
+    const context = await normalizeRequestedItems(tx, data);
     const requestedByVariantId = buildRequestedQuantities(context.items);
     const availability = await loadAvailability(
         tx,

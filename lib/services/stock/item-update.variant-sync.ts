@@ -4,10 +4,9 @@ import {
     assertNoPendingStockRequestsForVariants,
     buildItemInclude,
     createVariantAttributes,
-    createStockOpeningBalanceTransaction,
-    ensureDefaultVariant,
     variantHasReferences,
 } from "./shared";
+import { createStockOpeningBalanceTransaction } from "./write-helpers";
 import {
     type ExistingItemRecord,
     type ExistingVariantRecord,
@@ -42,26 +41,7 @@ async function getItemForVariantUpdate(
 async function getExistingVariants(
     tx: StockTxClient,
     itemId: number,
-    item: ExistingItemRecord,
-    performedBy: number,
 ): Promise<ExistingVariantRecord[]> {
-    const existingVariants = await tx.stockItemVariant.findMany({
-        where: { stockItemId: itemId },
-        select: {
-            id: true,
-            sku: true,
-            imageUrl: true,
-            isActive: true,
-        },
-        orderBy: { id: "asc" },
-    });
-
-    if (existingVariants.length > 0) {
-        return existingVariants;
-    }
-
-    await ensureDefaultVariant(tx, item, performedBy);
-
     return tx.stockItemVariant.findMany({
         where: { stockItemId: itemId },
         select: {
@@ -145,6 +125,7 @@ async function createSubmittedVariant(
     itemId: number,
     parentSku: string,
     parentImageUrl: string | null,
+    parentIsActive: boolean,
     variant: SubmittedVariant,
     index: number,
     usedSkus: Set<string>,
@@ -164,7 +145,7 @@ async function createSubmittedVariant(
             quantity: variant.quantity,
             minStock: variant.minStock,
             imageUrl: nextVariantImageUrl,
-            isActive: true,
+            isActive: parentIsActive,
         },
         select: { id: true },
     });
@@ -252,7 +233,7 @@ async function updateSubmittedVariant(
 async function syncSubmittedVariants(
     tx: StockTxClient,
     itemId: number,
-    nextItem: Pick<ExistingItemRecord, "sku" | "imageUrl">,
+    nextItem: Pick<ExistingItemRecord, "sku" | "imageUrl" | "isActive">,
     variants: SubmittedVariant[],
     existingVariantById: Map<number, ExistingVariantRecord>,
     usedSkus: Set<string>,
@@ -270,6 +251,7 @@ async function syncSubmittedVariants(
                 itemId,
                 nextItem.sku,
                 nextItem.imageUrl,
+                nextItem.isActive,
                 variant,
                 index,
                 usedSkus,
@@ -362,7 +344,7 @@ export async function updateItemWithVariants(
     tracking: UploadUrlTracking,
 ): Promise<StockItemWithDetails> {
     const item = await getItemForVariantUpdate(tx, itemId);
-    const existingVariants = await getExistingVariants(tx, itemId, item, userId);
+    const existingVariants = await getExistingVariants(tx, itemId);
     const existingVariantById = createExistingVariantMap(existingVariants);
     const usedSkus = collectUsedVariantSkus(existingVariants, variants);
 
@@ -378,6 +360,7 @@ export async function updateItemWithVariants(
             id: true,
             sku: true,
             imageUrl: true,
+            isActive: true,
         },
     });
 
@@ -395,6 +378,18 @@ export async function updateItemWithVariants(
     );
 
     await handleRemovedVariants(tx, existingVariants, submittedIds, tracking);
+
+    if (nextItem.isActive) {
+        await tx.stockItemVariant.updateMany({
+            where: { stockItemId: itemId, id: { in: Array.from(submittedIds) } },
+            data: { isActive: true },
+        });
+    } else {
+        await tx.stockItemVariant.updateMany({
+            where: { stockItemId: itemId },
+            data: { isActive: false },
+        });
+    }
 
     const inventorySummary = await summarizeStoredVariantInventory(tx, itemId);
     await tx.stockItem.update({

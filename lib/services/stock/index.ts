@@ -6,6 +6,14 @@ export type {
     PendingRequestItemRecord,
 } from "./types";
 
+export type {
+    LegacyRepairItemResult,
+    LegacyRepairResult,
+    LegacyRepairStatus,
+    LegacyRepairSummary,
+    StockRepairActor,
+} from "./legacy-repair";
+
 import {
     getCategories,
     getItems,
@@ -22,6 +30,7 @@ import {
     issueRequest,
     cancelRequest,
 } from "./mutations";
+import { repairLegacyStockItemVariants } from "./legacy-repair";
 
 export const stockService = {
     getCategories,
@@ -36,6 +45,7 @@ export const stockService = {
     createRequest,
     issueRequest,
     cancelRequest,
+    repairLegacyStockItemVariants,
 };
 
 export {
@@ -51,4 +61,5 @@ export {
     createRequest,
     issueRequest,
     cancelRequest,
+    repairLegacyStockItemVariants,
 };

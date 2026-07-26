@@ -14,12 +14,14 @@ import type {
 import {
     buildItemInclude,
     cleanupUnusedUploadUrls,
-    createStockOpeningBalanceTransaction,
     createVariantAttributes,
-    ensureDefaultCategoryId,
-    ensureDefaultVariant,
     generateSku,
 } from "./shared";
+import {
+    createDefaultVariantForNewItem,
+    createStockOpeningBalanceTransaction,
+    ensureDefaultCategoryId,
+} from "./write-helpers";
 import { updateItemInTransaction } from "./item-update.shared";
 import type { StockTxClient } from "./item-update.types";
 import type {
@@ -191,7 +193,6 @@ async function findAdjustmentVariant(
     tx: StockTxClient,
     item: AdjustmentItem,
     variantId: number | undefined,
-    performedBy: number,
 ): Promise<AdjustmentVariant> {
     if (variantId !== undefined) {
         const variant = await tx.stockItemVariant.findFirst({
@@ -216,11 +217,7 @@ async function findAdjustmentVariant(
         return activeVariants[0];
     }
 
-    const fallbackVariant = await ensureDefaultVariant(tx, item, performedBy);
-    return tx.stockItemVariant.findUniqueOrThrow({
-        where: { id: fallbackVariant.id },
-        select: { id: true, quantity: true, minStock: true },
-    });
+    throw new Error("ไม่พบรายการย่อยของวัสดุ กรุณาซ่อมข้อมูลรายการย่อยก่อนใช้งาน");
 }
 
 async function applyStockAdjustment(
@@ -360,7 +357,7 @@ export async function createItem(
 
         // Initial quantities are opening balances and are recorded in the stock ledger.
         if (variants.length === 0) {
-            await ensureDefaultVariant(tx, item, actor.id);
+            await createDefaultVariantForNewItem(tx, item, actor.id);
         } else {
             for (let index = 0; index < variants.length; index += 1) {
                 const variant = variants[index];
@@ -504,7 +501,6 @@ export async function adjustStock(
             tx,
             item,
             input.variantId,
-            actor.id,
         );
         const adjustment = await applyStockAdjustment(
             tx,

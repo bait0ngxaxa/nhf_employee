@@ -2,25 +2,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "@prisma/client";
 import { mockDeep, mockReset } from "vitest-mock-extended";
 import { prisma } from "@/lib/db/prisma";
-import { getItems, getRequests } from "@/lib/services/stock/queries";
-import { ensureItemVariantsExist } from "@/lib/services/stock/shared";
-import type * as StockSharedModule from "@/lib/services/stock/shared";
+import { getCategories, getItemById, getItems, getRequests } from "@/lib/services/stock/queries";
 
 vi.mock("@/lib/db/prisma", () => ({
     prisma: mockDeep<PrismaClient>(),
 }));
-
-vi.mock("@/lib/services/stock/shared", async () => {
-    const actual =
-        await vi.importActual<typeof StockSharedModule>(
-            "@/lib/services/stock/shared",
-        );
-
-    return {
-        ...actual,
-        ensureItemVariantsExist: vi.fn(),
-    };
-});
 
 const prismaMock = prisma as unknown as ReturnType<typeof mockDeep<PrismaClient>>;
 
@@ -31,7 +17,6 @@ function asNever<T>(value: T): never {
 describe("Stock Queries", () => {
     beforeEach(() => {
         mockReset(prismaMock);
-        vi.mocked(ensureItemVariantsExist).mockReset();
     });
 
     describe("getItems", () => {
@@ -114,7 +99,7 @@ describe("Stock Queries", () => {
                 page: 1,
                 limit: 20,
                 activeOnly: true,
-            }, 7);
+            });
 
             expect(result.total).toBe(2);
             expect(result.items).toHaveLength(2);
@@ -147,71 +132,75 @@ describe("Stock Queries", () => {
                     }),
                 ]),
             );
+            expect(prismaMock.stockItemVariant.create).not.toHaveBeenCalled();
+            expect(prismaMock.stockItemVariant.update).not.toHaveBeenCalled();
+            expect(prismaMock.stockTransaction.create).not.toHaveBeenCalled();
+            expect(prismaMock.auditLog.create).not.toHaveBeenCalled();
         });
 
-        it("should create missing default variants and refetch items", async () => {
-            prismaMock.stockItem.findMany
-                .mockResolvedValueOnce(
-                    asNever([
-                        {
-                            id: 3,
-                            name: "Notebook",
-                            sku: "ITEM-3",
-                            quantity: 8,
-                            unit: "เล่ม",
-                            minStock: 1,
-                            imageUrl: null,
-                            isActive: true,
-                            categoryId: 1,
-                            category: { id: 1, name: "General" },
-                            variants: [],
-                        },
-                    ]),
-                )
-                .mockResolvedValueOnce(
-                    asNever([
-                        {
-                            id: 3,
-                            name: "Notebook",
-                            sku: "ITEM-3",
-                            quantity: 8,
-                            unit: "เล่ม",
-                            minStock: 1,
-                            imageUrl: null,
-                            isActive: true,
-                            categoryId: 1,
-                            category: { id: 1, name: "General" },
-                            variants: [
-                                {
-                                    id: 31,
-                                    stockItemId: 3,
-                                    sku: "ITEM-3",
-                                    quantity: 8,
-                                    unit: "เล่ม",
-                                    minStock: 1,
-                                    imageUrl: null,
-                                    isActive: true,
-                                    attributeValues: [],
-                                },
-                            ],
-                        },
-                    ]),
-                );
+        it("should return a legacy item without creating a variant or ledger", async () => {
+            prismaMock.stockItem.findMany.mockResolvedValue(asNever([
+                {
+                    id: 3,
+                    name: "Notebook",
+                    sku: "ITEM-3",
+                    quantity: 8,
+                    unit: "เล่ม",
+                    minStock: 1,
+                    imageUrl: null,
+                    isActive: true,
+                    categoryId: 1,
+                    category: { id: 1, name: "General" },
+                    variants: [],
+                },
+            ]));
             prismaMock.stockItem.count.mockResolvedValue(asNever(1));
             prismaMock.stockRequestItem.findMany.mockResolvedValue(asNever([]));
 
             const result = await getItems({
                 page: 1,
                 limit: 20,
-            }, 7);
-
-            expect(vi.mocked(ensureItemVariantsExist)).toHaveBeenCalledWith([3], 7);
-            expect(prismaMock.stockItem.findMany).toHaveBeenCalledTimes(2);
-            expect(result.items[0]?.variants[0]).toMatchObject({
-                id: 31,
-                availableQuantity: 8,
-                reservedQuantity: 0,
             });
+
+            expect(prismaMock.stockItem.findMany).toHaveBeenCalledTimes(1);
+            expect(prismaMock.stockItemVariant.create).not.toHaveBeenCalled();
+            expect(prismaMock.stockTransaction.create).not.toHaveBeenCalled();
+            expect(result.items[0]?.variants).toEqual([]);
+        });
+    });
+
+    describe("read-only detail and categories", () => {
+        it("should return item detail without repairing missing variants", async () => {
+            prismaMock.stockItem.findUnique.mockResolvedValue(asNever({
+                id: 3,
+                name: "Notebook",
+                sku: "ITEM-3",
+                quantity: 8,
+                unit: "เล่ม",
+                minStock: 1,
+                imageUrl: null,
+                isActive: true,
+                categoryId: 1,
+                category: { id: 1, name: "General" },
+                variants: [],
+            }));
+
+            const result = await getItemById(3);
+
+            expect(result?.variants).toEqual([]);
+            expect(prismaMock.stockItem.findUnique).toHaveBeenCalledTimes(1);
+            expect(prismaMock.stockItemVariant.create).not.toHaveBeenCalled();
+            expect(prismaMock.stockTransaction.create).not.toHaveBeenCalled();
+            expect(prismaMock.auditLog.create).not.toHaveBeenCalled();
+        });
+
+        it("should list categories without creating the default category", async () => {
+            prismaMock.stockCategory.findMany.mockResolvedValue(asNever([]));
+
+            await expect(getCategories()).resolves.toEqual([]);
+
+            expect(prismaMock.stockCategory.upsert).not.toHaveBeenCalled();
+            expect(prismaMock.stockCategory.findMany).toHaveBeenCalledTimes(1);
         });
     });
 
