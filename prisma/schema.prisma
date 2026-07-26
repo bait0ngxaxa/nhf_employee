@@ -662,6 +662,7 @@ enum StockTxType {
   IN // รับเข้าสต็อก
   OUT // เบิกออก (เมื่ออนุมัติ)
   ADJUST // ปรับยอดคงเหลือ
+  OPENING_BALANCE // ยอดตั้งต้น
 }
 
 enum StockRequestStatus {

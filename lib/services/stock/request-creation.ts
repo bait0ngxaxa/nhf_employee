@@ -89,6 +89,7 @@ function validateRequestedVariants(
 async function normalizeRequestedItems(
     tx: Prisma.TransactionClient,
     data: CreateRequestInput,
+    performedBy: number,
 ): Promise<NormalizedRequestContext> {
     const variantIds = data.items
         .map((item) => item.variantId)
@@ -109,7 +110,11 @@ async function normalizeRequestedItems(
           })
         : [];
     const itemIdByVariantId = validateRequestedVariants(data.items, variants);
-    const defaultVariantsByItemId = await ensureDefaultVariantsByItemIds(tx, itemIds);
+    const defaultVariantsByItemId = await ensureDefaultVariantsByItemIds(
+        tx,
+        itemIds,
+        performedBy,
+    );
 
     return {
         items: normalizeRequestItems(
@@ -269,7 +274,7 @@ export async function createNewStockRequest(
     actor: StockCommandActor,
     identity: StockRequestIdentity,
 ): Promise<StockRequestWithDetails> {
-    const context = await normalizeRequestedItems(tx, data);
+    const context = await normalizeRequestedItems(tx, data, actor.id);
     const requestedByVariantId = buildRequestedQuantities(context.items);
     const availability = await loadAvailability(
         tx,

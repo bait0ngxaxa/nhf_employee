@@ -14,6 +14,7 @@ import type {
 import {
     buildItemInclude,
     cleanupUnusedUploadUrls,
+    createStockOpeningBalanceTransaction,
     createVariantAttributes,
     ensureDefaultCategoryId,
     ensureDefaultVariant,
@@ -190,6 +191,7 @@ async function findAdjustmentVariant(
     tx: StockTxClient,
     item: AdjustmentItem,
     variantId: number | undefined,
+    performedBy: number,
 ): Promise<AdjustmentVariant> {
     if (variantId !== undefined) {
         const variant = await tx.stockItemVariant.findFirst({
@@ -214,7 +216,7 @@ async function findAdjustmentVariant(
         return activeVariants[0];
     }
 
-    const fallbackVariant = await ensureDefaultVariant(tx, item);
+    const fallbackVariant = await ensureDefaultVariant(tx, item, performedBy);
     return tx.stockItemVariant.findUniqueOrThrow({
         where: { id: fallbackVariant.id },
         select: { id: true, quantity: true, minStock: true },
@@ -356,9 +358,9 @@ export async function createItem(
             },
         });
 
-        // Initial quantities are opening balances; only later adjustments create ledger entries.
+        // Initial quantities are opening balances and are recorded in the stock ledger.
         if (variants.length === 0) {
-            await ensureDefaultVariant(tx, item);
+            await ensureDefaultVariant(tx, item, actor.id);
         } else {
             for (let index = 0; index < variants.length; index += 1) {
                 const variant = variants[index];
@@ -374,6 +376,14 @@ export async function createItem(
                     },
                     select: { id: true },
                 });
+
+                await createStockOpeningBalanceTransaction(
+                    tx,
+                    item.id,
+                    variantRecord.id,
+                    variant.quantity,
+                    actor.id,
+                );
 
                 await createVariantAttributes(
                     tx,
@@ -490,7 +500,12 @@ export async function adjustStock(
             throw new Error("ไม่พบวัสดุ");
         }
 
-        const variant = await findAdjustmentVariant(tx, item, input.variantId);
+        const variant = await findAdjustmentVariant(
+            tx,
+            item,
+            input.variantId,
+            actor.id,
+        );
         const adjustment = await applyStockAdjustment(
             tx,
             item,

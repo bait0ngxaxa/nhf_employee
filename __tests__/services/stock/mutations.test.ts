@@ -151,6 +151,17 @@ describe("Stock Service Mutations", () => {
                     details: expect.stringContaining('"itemId":51'),
                 }),
             });
+            expect(prismaMock.stockTransaction.create).toHaveBeenCalledWith({
+                data: {
+                    itemId: 51,
+                    variantId: 511,
+                    type: "OPENING_BALANCE",
+                    quantity: 4,
+                    note: "ยอดตั้งต้นสต็อก",
+                    performedBy: 2,
+                },
+                select: { id: true },
+            });
         });
     });
 
@@ -446,6 +457,8 @@ describe("Stock Service Mutations", () => {
             );
             prismaMock.stockItem.update.mockResolvedValue(asNever({ id: 10 }));
             prismaMock.stockTransaction.create
+                .mockResolvedValueOnce(asNever({ id: 701 }))
+                .mockResolvedValueOnce(asNever({ id: 702 }))
                 .mockResolvedValueOnce(asNever({ id: 801 }))
                 .mockResolvedValueOnce(asNever({ id: 802 }));
             await stockService.issueRequest(99, commandActor(9));
@@ -575,6 +588,9 @@ describe("Stock Service Mutations", () => {
                     }],
                 }]),
             );
+            prismaMock.stockItemVariant.findFirst.mockResolvedValue(
+                asNever({ id: 101 }),
+            );
             prismaMock.stockItem.update.mockResolvedValue(asNever({ id: 10 }));
             prismaMock.stockTransaction.create.mockResolvedValue(asNever({ id: 1 }));
 
@@ -628,6 +644,9 @@ describe("Stock Service Mutations", () => {
                     stockItem: { name: "ปากกา" },
                     attributeValues: [],
                 }]),
+            );
+            prismaMock.stockItemVariant.findFirst.mockResolvedValue(
+                asNever({ id: 101 }),
             );
             prismaMock.stockItem.update.mockResolvedValue(asNever({ id: 10 }));
             prismaMock.stockTransaction.create.mockResolvedValue(asNever({ id: 1 }));
@@ -707,6 +726,9 @@ describe("Stock Service Mutations", () => {
                         attributeValues: [],
                     },
                 ]),
+            );
+            prismaMock.stockItemVariant.findFirst.mockResolvedValue(
+                asNever({ id: 200 }),
             );
             prismaMock.stockItem.update.mockResolvedValue(asNever({ id: 10 }));
             prismaMock.stockTransaction.create.mockResolvedValue(asNever({ id: 1 }));
@@ -1865,7 +1887,17 @@ describe("Stock Service Mutations", () => {
                     }),
                 }),
             );
-            expect(prismaMock.stockTransaction.create).not.toHaveBeenCalled();
+            expect(prismaMock.stockTransaction.create).toHaveBeenCalledWith({
+                data: {
+                    itemId: 26,
+                    variantId: 263,
+                    type: "OPENING_BALANCE",
+                    quantity: 4,
+                    note: "ยอดตั้งต้นสต็อก",
+                    performedBy: 7,
+                },
+                select: { id: true },
+            });
             expect(prismaMock.stockItemVariant.update).toHaveBeenCalledWith(
                 expect.objectContaining({
                     where: { id: 262 },

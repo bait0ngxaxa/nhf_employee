@@ -26,7 +26,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
             });
         }
 
-        const result = await stockService.getItems(parsed.data);
+        const result = await stockService.getItems(parsed.data, auth.user.id);
         return NextResponse.json(result);
     } catch (error) {
         console.error("Error fetching stock items:", error);

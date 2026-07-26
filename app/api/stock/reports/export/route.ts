@@ -67,7 +67,7 @@ export async function GET(request: NextRequest): Promise<Response> {
                 );
             }
 
-            const response = await createStockBalanceReportXlsxResponse();
+            const response = await createStockBalanceReportXlsxResponse(userId);
 
             after(async () => {
                 try {

@@ -17,6 +17,7 @@ async function updateItemWithoutVariants(
     itemId: number,
     itemData: Omit<UpdateItemInput, "variants">,
     originalData: UpdateItemInput,
+    performedBy: number,
     tracking: UploadUrlTracking,
 ): Promise<StockItemWithDetails> {
     const currentItem = await tx.stockItem.findUniqueOrThrow({
@@ -40,7 +41,7 @@ async function updateItemWithoutVariants(
 
     trackReplacedUploadUrl(currentItem.imageUrl, nextItem.imageUrl, tracking);
 
-    const defaultVariant = await ensureDefaultVariant(tx, nextItem);
+    const defaultVariant = await ensureDefaultVariant(tx, nextItem, performedBy);
     await tx.stockItemVariant.update({
         where: { id: defaultVariant.id },
         data: {
@@ -75,5 +76,5 @@ export async function updateItemInTransaction(
         return updateItemWithVariants(tx, itemId, itemData, variants, userId, tracking);
     }
 
-    return updateItemWithoutVariants(tx, itemId, itemData, data, tracking);
+    return updateItemWithoutVariants(tx, itemId, itemData, data, userId, tracking);
 }

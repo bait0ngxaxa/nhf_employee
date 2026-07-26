@@ -1,4 +1,4 @@
-import { StockRequestStatus, type Prisma } from "@prisma/client";
+import { StockRequestStatus, StockTxType, type Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
 import { runSerializableTransaction } from "@/lib/db/transaction";
 import { lockStockInventoryRows } from "./locks";
@@ -6,7 +6,10 @@ import {
     deleteLocalUploadByUrl,
     isManagedUploadUrl,
 } from "@/lib/uploads/local";
-import { DEFAULT_STOCK_CATEGORY_NAME } from "./constants";
+import {
+    DEFAULT_STOCK_CATEGORY_NAME,
+    STOCK_OPENING_BALANCE_NOTE,
+} from "./constants";
 import type {
     CreateItemInput,
     CreateRequestInput,
@@ -32,9 +35,32 @@ export async function ensureDefaultCategoryId(): Promise<number> {
     return category.id;
 }
 
+export async function createStockOpeningBalanceTransaction(
+    tx: Prisma.TransactionClient,
+    itemId: number,
+    variantId: number,
+    quantity: number,
+    performedBy: number,
+): Promise<number> {
+    const transaction = await tx.stockTransaction.create({
+        data: {
+            itemId,
+            variantId,
+            type: StockTxType.OPENING_BALANCE,
+            quantity,
+            note: STOCK_OPENING_BALANCE_NOTE,
+            performedBy,
+        },
+        select: { id: true },
+    });
+
+    return transaction.id;
+}
+
 export async function ensureDefaultVariant(
     tx: Prisma.TransactionClient,
     item: ItemVariantSeed,
+    performedBy: number,
 ): Promise<{ id: number }> {
     const existingVariant = await tx.stockItemVariant.findFirst({
         where: { stockItemId: item.id, isActive: true },
@@ -46,7 +72,7 @@ export async function ensureDefaultVariant(
         return existingVariant;
     }
 
-    return tx.stockItemVariant.create({
+    const variant = await tx.stockItemVariant.create({
         data: {
             stockItemId: item.id,
             sku: item.sku,
@@ -58,11 +84,22 @@ export async function ensureDefaultVariant(
         },
         select: { id: true },
     });
+
+    await createStockOpeningBalanceTransaction(
+        tx,
+        item.id,
+        variant.id,
+        item.quantity,
+        performedBy,
+    );
+
+    return variant;
 }
 
 export async function ensureDefaultVariantsByItemIds(
     tx: Prisma.TransactionClient,
     itemIds: number[],
+    performedBy: number,
 ): Promise<Map<number, { id: number }>> {
     const uniqueItemIds = Array.from(new Set(itemIds));
     if (uniqueItemIds.length === 0) {
@@ -86,15 +123,18 @@ export async function ensureDefaultVariantsByItemIds(
 
     const variants = new Map<number, { id: number }>();
     for (const item of items) {
-        variants.set(item.id, await ensureDefaultVariant(tx, item));
+        variants.set(item.id, await ensureDefaultVariant(tx, item, performedBy));
     }
 
     return variants;
 }
 
-export async function ensureItemVariantsExist(itemIds: number[]): Promise<void> {
+export async function ensureItemVariantsExist(
+    itemIds: number[],
+    performedBy: number,
+): Promise<void> {
     await runSerializableTransaction(async (tx) => {
-        await ensureDefaultVariantsByItemIds(tx, itemIds);
+        await ensureDefaultVariantsByItemIds(tx, itemIds, performedBy);
     });
 }
 

@@ -231,6 +231,7 @@ export async function issueRequest(
         const defaultVariantsByItemId = await ensureDefaultVariantsByItemIds(
             tx,
             request.items.map((item) => item.itemId),
+            actor.id,
         );
         const requestedQtyByVariantId = new Map<
             number,

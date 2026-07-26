@@ -268,7 +268,7 @@ describe("Stock report export services", () => {
             ]),
         );
 
-        const response = await createStockBalanceReportXlsxResponse();
+        const response = await createStockBalanceReportXlsxResponse(7);
         const workbook = await loadWorkbook(response);
         const balanceSheet = workbook.getWorksheet("ยอดคงเหลือจริง");
         const redVariantRow = findRowByCellValue(balanceSheet, 3, "สี: ดำ");

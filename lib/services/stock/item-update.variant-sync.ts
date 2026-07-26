@@ -4,6 +4,7 @@ import {
     assertNoPendingStockRequestsForVariants,
     buildItemInclude,
     createVariantAttributes,
+    createStockOpeningBalanceTransaction,
     ensureDefaultVariant,
     variantHasReferences,
 } from "./shared";
@@ -42,6 +43,7 @@ async function getExistingVariants(
     tx: StockTxClient,
     itemId: number,
     item: ExistingItemRecord,
+    performedBy: number,
 ): Promise<ExistingVariantRecord[]> {
     const existingVariants = await tx.stockItemVariant.findMany({
         where: { stockItemId: itemId },
@@ -58,7 +60,7 @@ async function getExistingVariants(
         return existingVariants;
     }
 
-    await ensureDefaultVariant(tx, item);
+    await ensureDefaultVariant(tx, item, performedBy);
 
     return tx.stockItemVariant.findMany({
         where: { stockItemId: itemId },
@@ -146,6 +148,7 @@ async function createSubmittedVariant(
     variant: SubmittedVariant,
     index: number,
     usedSkus: Set<string>,
+    performedBy: number,
     tracking: UploadUrlTracking,
 ): Promise<void> {
     // A variant added during item editing follows createItem: its initial quantity is an opening balance.
@@ -165,6 +168,14 @@ async function createSubmittedVariant(
         },
         select: { id: true },
     });
+
+    await createStockOpeningBalanceTransaction(
+        tx,
+        itemId,
+        createdVariant.id,
+        variant.quantity,
+        performedBy,
+    );
 
     await createVariantAttributes(tx, createdVariant.id, variant.attributes);
     trackUploadUrl(nextVariantImageUrl, tracking.retainedUploadUrls);
@@ -262,6 +273,7 @@ async function syncSubmittedVariants(
                 variant,
                 index,
                 usedSkus,
+                userId,
                 tracking,
             );
             continue;
@@ -350,7 +362,7 @@ export async function updateItemWithVariants(
     tracking: UploadUrlTracking,
 ): Promise<StockItemWithDetails> {
     const item = await getItemForVariantUpdate(tx, itemId);
-    const existingVariants = await getExistingVariants(tx, itemId, item);
+    const existingVariants = await getExistingVariants(tx, itemId, item, userId);
     const existingVariantById = createExistingVariantMap(existingVariants);
     const usedSkus = collectUsedVariantSkus(existingVariants, variants);
 

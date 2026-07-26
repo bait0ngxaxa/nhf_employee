@@ -27,8 +27,8 @@ type LoadedStockBalanceItem = Omit<
     variants: LoadedStockBalanceVariant[];
 };
 
-async function loadActiveStockItems(): Promise<StockBalanceItem[]> {
-    const items = await loadItemsWithVariants();
+async function loadActiveStockItems(performedBy: number): Promise<StockBalanceItem[]> {
+    const items = await loadItemsWithVariants(performedBy);
     const pendingRequestItems = await loadPendingRequestItems(
         items.map((item) => item.id),
     );
@@ -42,7 +42,9 @@ async function loadActiveStockItems(): Promise<StockBalanceItem[]> {
     );
 }
 
-async function loadItemsWithVariants(): Promise<LoadedStockBalanceItem[]> {
+async function loadItemsWithVariants(
+    performedBy: number,
+): Promise<LoadedStockBalanceItem[]> {
     let items = await prisma.stockItem.findMany({
         where: { isActive: true },
         include: buildItemInclude(),
@@ -54,7 +56,7 @@ async function loadItemsWithVariants(): Promise<LoadedStockBalanceItem[]> {
         .map((item) => item.id);
 
     if (missingVariantItemIds.length > 0) {
-        await ensureItemVariantsExist(missingVariantItemIds);
+        await ensureItemVariantsExist(missingVariantItemIds, performedBy);
         items = await prisma.stockItem.findMany({
             where: { isActive: true },
             include: buildItemInclude(),
@@ -148,7 +150,9 @@ export async function getStockBalanceReportMeta(): Promise<{
     };
 }
 
-export async function createStockBalanceReportXlsxResponse(): Promise<Response> {
+export async function createStockBalanceReportXlsxResponse(
+    performedBy: number,
+): Promise<Response> {
     const meta = await getStockBalanceReportMeta();
     if (meta.count > meta.maxRows) {
         throw new Error(
@@ -156,7 +160,7 @@ export async function createStockBalanceReportXlsxResponse(): Promise<Response> 
         );
     }
 
-    const items = await loadActiveStockItems();
+    const items = await loadActiveStockItems(performedBy);
     const workbook = createStockBalanceReportWorkbook(items);
     const filename = generateFilename("ยอดคงเหลือสต๊อกปัจจุบัน", "xlsx");
 

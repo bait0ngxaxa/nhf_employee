@@ -114,7 +114,7 @@ describe("Stock Queries", () => {
                 page: 1,
                 limit: 20,
                 activeOnly: true,
-            });
+            }, 7);
 
             expect(result.total).toBe(2);
             expect(result.items).toHaveLength(2);
@@ -203,9 +203,9 @@ describe("Stock Queries", () => {
             const result = await getItems({
                 page: 1,
                 limit: 20,
-            });
+            }, 7);
 
-            expect(vi.mocked(ensureItemVariantsExist)).toHaveBeenCalledWith([3]);
+            expect(vi.mocked(ensureItemVariantsExist)).toHaveBeenCalledWith([3], 7);
             expect(prismaMock.stockItem.findMany).toHaveBeenCalledTimes(2);
             expect(result.items[0]?.variants[0]).toMatchObject({
                 id: 31,

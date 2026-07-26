@@ -21,7 +21,10 @@ export async function getCategories() {
     });
 }
 
-export async function getItems(filters: StockItemsFilter) {
+export async function getItems(
+    filters: StockItemsFilter,
+    performedBy: number,
+) {
     const { categoryId, search, activeOnly, page, limit } = filters;
     const where = {
         ...(categoryId !== undefined && { categoryId }),
@@ -48,7 +51,7 @@ export async function getItems(filters: StockItemsFilter) {
         .filter((item) => item.variants.length === 0)
         .map((item) => item.id);
     if (missingVariantItemIds.length > 0) {
-        await ensureItemVariantsExist(missingVariantItemIds);
+        await ensureItemVariantsExist(missingVariantItemIds, performedBy);
         items = await prisma.stockItem.findMany({
             where,
             include: buildItemInclude(),
@@ -112,14 +115,14 @@ export async function getItems(filters: StockItemsFilter) {
     };
 }
 
-export async function getItemById(id: number) {
+export async function getItemById(id: number, performedBy: number) {
     let item = await prisma.stockItem.findUnique({
         where: { id },
         include: buildItemInclude(),
     });
 
     if (item && item.variants.length === 0) {
-        await ensureItemVariantsExist([item.id]);
+        await ensureItemVariantsExist([item.id], performedBy);
         item = await prisma.stockItem.findUnique({
             where: { id },
             include: buildItemInclude(),
