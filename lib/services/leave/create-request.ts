@@ -177,7 +177,7 @@ async function assertNoOverlap(
     const overlap = await tx.leaveRequest.findFirst({
         where: {
             employeeId,
-            status: { in: ["PENDING", "APPROVED"] },
+            status: { in: ["PENDING", "APPROVED", "CANCELLATION_REQUESTED"] },
             AND: [
                 { startDate: { lte: end } },
                 { endDate: { gte: start } },
