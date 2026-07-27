@@ -8,6 +8,7 @@ import {
 import {
     confirmLeaveCancellation,
     confirmLeaveNotTaken,
+    rejectLeaveCancellation,
     submitLeaveDecision,
     type LeaveDecisionAction,
 } from "@/lib/services/leave/client";
@@ -41,6 +42,7 @@ interface UseManagerApprovalModelResult {
     confirmApproveLeave: () => Promise<void>;
     confirmNotTaken: (leaveId: string) => Promise<void>;
     confirmCancellation: (leaveId: string) => Promise<void>;
+    rejectCancellation: (leaveId: string) => Promise<void>;
     rejectLeave: () => Promise<void>;
 }
 
@@ -149,6 +151,23 @@ export function useManagerApprovalModel(): UseManagerApprovalModelResult {
         }
     };
 
+    const rejectCancellation = async (leaveId: string): Promise<void> => {
+        setIsProcessing(true);
+        try {
+            await rejectLeaveCancellation({ leaveId });
+            await refreshFirstPages();
+            toast.success("ปิดคำขอยกเลิกแล้ว คำขอลายังคงอนุมัติ");
+        } catch (error: unknown) {
+            toast.error(
+                error instanceof Error && error.message
+                    ? error.message
+                    : "เกิดข้อผิดพลาดในการปิดคำขอยกเลิก",
+            );
+        } finally {
+            setIsProcessing(false);
+        }
+    };
+
     return {
         pending,
         notTakenPending,
@@ -176,6 +195,7 @@ export function useManagerApprovalModel(): UseManagerApprovalModelResult {
         confirmApproveLeave,
         confirmNotTaken,
         confirmCancellation,
+        rejectCancellation,
         rejectLeave: async () => {
             if (!selectedLeave) return;
             await executeAction("REJECT", selectedLeave.id, rejectReason);

@@ -62,7 +62,7 @@ export function ManagerApprovalDashboard() {
             <div className="space-y-3 pt-2">
                 <ApprovalSectionHeader
                     title="รายการรอยืนยันยกเลิกวันลา"
-                    description="คำขอยกเลิกวันลาที่อนุมัติแล้ว เมื่อยืนยันระบบจะคืนโควต้าในรายการเดียวกัน"
+                    description="ยืนยันเพื่อยกเลิกและคืนโควต้า หรือปิดคำขอเพื่อคงสถานะอนุมัติเดิม"
                     count={model.metadata?.cancellationPending.totalItems ?? model.cancellationPending.length}
                     tone="attention"
                 />
@@ -70,6 +70,7 @@ export function ManagerApprovalDashboard() {
                     items={model.cancellationPending}
                     isProcessing={model.isProcessing}
                     onConfirm={model.confirmCancellation}
+                    onReject={model.rejectCancellation}
                 />
                 <ApprovalPagination
                     metadata={model.metadata?.cancellationPending}

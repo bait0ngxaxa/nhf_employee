@@ -5,6 +5,7 @@ import { useLeaveApprovals } from "@/hooks/useLeaveApprovals";
 import {
     confirmLeaveCancellation,
     confirmLeaveNotTaken,
+    rejectLeaveCancellation,
     submitLeaveDecision,
 } from "@/lib/services/leave/client";
 import { toast } from "sonner";
@@ -16,6 +17,7 @@ vi.mock("@/hooks/useLeaveApprovals", () => ({
 vi.mock("@/lib/services/leave/client", () => ({
     confirmLeaveCancellation: vi.fn(),
     confirmLeaveNotTaken: vi.fn(),
+    rejectLeaveCancellation: vi.fn(),
     submitLeaveDecision: vi.fn(),
 }));
 
@@ -103,6 +105,7 @@ describe("useManagerApprovalModel", () => {
         vi.mocked(submitLeaveDecision).mockResolvedValue(undefined);
         vi.mocked(confirmLeaveNotTaken).mockResolvedValue(undefined);
         vi.mocked(confirmLeaveCancellation).mockResolvedValue(undefined);
+        vi.mocked(rejectLeaveCancellation).mockResolvedValue(undefined);
     });
 
     it("approves leave and refreshes list", async () => {
@@ -168,5 +171,19 @@ describe("useManagerApprovalModel", () => {
             expect(result.current.selectedLeave).toBeNull();
             expect(result.current.rejectReason).toBe("");
         });
+    });
+
+    it("rejects a cancellation request and refreshes the approval lists", async () => {
+        const { result } = renderHook(() => useManagerApprovalModel());
+
+        await act(async () => {
+            await result.current.rejectCancellation("leave-cancellation");
+        });
+
+        expect(rejectLeaveCancellation).toHaveBeenCalledWith({ leaveId: "leave-cancellation" });
+        expect(mutate).toHaveBeenCalledTimes(1);
+        expect(toast.success).toHaveBeenCalledWith(
+            "ปิดคำขอยกเลิกแล้ว คำขอลายังคงอนุมัติ",
+        );
     });
 });

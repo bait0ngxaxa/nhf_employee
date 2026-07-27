@@ -7,12 +7,16 @@ import {
     cancelLeaveRequest,
     confirmLeaveCancellation,
     LeaveCancellationError,
+    rejectLeaveCancellation,
 } from "@/lib/services/leave/cancellation";
 import { processOutbox } from "@/lib/services/outbox/processor";
 import { jsonError, notFound } from "@/lib/ssot/http";
 import { FEATURE_KEYS, isFeatureEnabled } from "@/lib/ssot/features";
 import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
-import { leaveCancelSchema } from "@/lib/validations/leave";
+import {
+    leaveCancelSchema,
+    leaveCancellationDecisionSchema,
+} from "@/lib/validations/leave";
 import { toLeaveRequestDays } from "@/lib/services/leave/half-days";
 import {
     enforceAuthenticatedMutationRateLimit,
@@ -104,28 +108,35 @@ export async function PUT(req: NextRequest): Promise<NextResponse> {
         if (principalRateLimitResponse) return principalRateLimitResponse;
 
         const body = await req.json();
-        const parsed = leaveCancelSchema.safeParse(body);
+        const parsed = leaveCancellationDecisionSchema.safeParse(body);
         if (!parsed.success) {
             return jsonError(COMMON_API_MESSAGES.invalidInput, 400, {
                 details: parsed.error.flatten().fieldErrors,
             });
         }
 
-        const result = await confirmLeaveCancellation(
-            {
-                userId: auth.user.id,
-                employeeId: auth.employeeId,
-                role: auth.user.role,
-            },
-            parsed.data.leaveId,
-        );
+        const actor = {
+            userId: auth.user.id,
+            employeeId: auth.employeeId,
+            role: auth.user.role,
+        };
+        const result = parsed.data.action === "REJECT"
+            ? await rejectLeaveCancellation(actor, parsed.data.leaveId)
+            : await confirmLeaveCancellation(actor, parsed.data.leaveId);
 
         await logLeaveEvent(
             "LEAVE_REQUEST_CANCELLATION_CONFIRM",
             parsed.data.leaveId,
             auth.user.id,
             auth.user.email,
-            { after: { status: result.request.status } },
+            {
+                before: { status: "CANCELLATION_REQUESTED" },
+                after: { status: result.request.status },
+                metadata: {
+                    leaveId: parsed.data.leaveId,
+                    decision: parsed.data.action,
+                },
+            },
         ).catch((error: unknown) => console.error("Failed to log leave cancellation confirmation:", error));
 
         after(() => {
@@ -139,7 +150,7 @@ export async function PUT(req: NextRequest): Promise<NextResponse> {
             data: toLeaveRequestDays(result.request),
         });
     } catch (error: unknown) {
-        console.error("Confirm leave cancellation error:", error);
+        console.error("Leave cancellation decision error:", error);
         if (error instanceof LeaveCancellationError) {
             return jsonError(error.message, error.statusCode);
         }

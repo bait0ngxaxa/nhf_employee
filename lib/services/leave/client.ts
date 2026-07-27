@@ -3,7 +3,10 @@ import { fetchWithRefresh } from "@/lib/auth/client";
 import { createIdempotencyKey } from "@/lib/client/idempotency-key";
 import { triggerDownload } from "@/lib/helpers/download";
 import { API_ROUTES } from "@/lib/ssot/routes";
-import type { LeaveRequestValues } from "@/lib/validations/leave";
+import type {
+    LeaveCancellationDecisionValues,
+    LeaveRequestValues,
+} from "@/lib/validations/leave";
 import {
     DEFAULT_LEAVE_REPORT_SCOPE,
     type LeaveReportScope,
@@ -175,6 +178,13 @@ export interface LeaveCancellationPayload {
     reason?: string;
 }
 
+export type LeaveCancellationDecisionAction = LeaveCancellationDecisionValues["action"];
+
+export interface LeaveCancellationDecisionPayload {
+    leaveId: string;
+    action: LeaveCancellationDecisionAction;
+}
+
 export const requestLeaveCancellation = async (
     payload: LeaveCancellationPayload,
 ): Promise<void> => {
@@ -185,7 +195,20 @@ export const requestLeaveCancellation = async (
 export const confirmLeaveCancellation = async (
     payload: Pick<LeaveCancellationPayload, "leaveId">,
 ): Promise<void> => {
-    const response = await apiPut(API_ROUTES.leave.cancel, payload);
+    const response = await apiPut(API_ROUTES.leave.cancel, {
+        ...payload,
+        action: "CONFIRM",
+    });
+    ensureSuccess(response);
+};
+
+export const rejectLeaveCancellation = async (
+    payload: Pick<LeaveCancellationDecisionPayload, "leaveId">,
+): Promise<void> => {
+    const response = await apiPut(API_ROUTES.leave.cancel, {
+        ...payload,
+        action: "REJECT",
+    });
     ensureSuccess(response);
 };
 

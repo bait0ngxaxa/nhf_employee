@@ -6,6 +6,7 @@ import { prisma } from "@/lib/db/prisma";
 import {
     cancelLeaveRequest,
     confirmLeaveCancellation,
+    rejectLeaveCancellation,
 } from "@/lib/services/leave/cancellation";
 import {
     createLeaveRequest,
@@ -181,7 +182,7 @@ async function createRequest(
     return result.request.id;
 }
 
-describe.sequential("leave overlap after cancellation request with real MySQL", () => {
+describe.sequential("leave cancellation lifecycle with real MySQL", () => {
     let fixture: Fixture;
 
     beforeAll(async () => {
@@ -248,7 +249,7 @@ describe.sequential("leave overlap after cancellation request with real MySQL", 
         }]);
     });
 
-    it("does not confirm cancellation or return quota after the leave has started", async () => {
+    it("can reject a late cancellation without returning quota", async () => {
         const originalLeaveId = await createRequest(
             fixture,
             "leave-cancel-expired-original",
@@ -302,12 +303,26 @@ describe.sequential("leave overlap after cancellation request with real MySQL", 
         });
 
         await expect(
+            rejectLeaveCancellation(
+                {
+                    userId: fixture.approverUserId,
+                    employeeId: fixture.approverEmployeeId,
+                    role: "USER",
+                },
+                originalLeaveId,
+            ),
+        ).resolves.toMatchObject({
+            kind: "CANCELLATION_REJECTED",
+            request: { status: LeaveStatus.APPROVED },
+        });
+
+        await expect(
             prisma.leaveRequest.findUniqueOrThrow({
                 where: { id: originalLeaveId },
                 select: { status: true, cancellationConfirmedAt: true },
             }),
         ).resolves.toEqual({
-            status: LeaveStatus.CANCELLATION_REQUESTED,
+            status: LeaveStatus.APPROVED,
             cancellationConfirmedAt: null,
         });
         await expect(
@@ -322,5 +337,102 @@ describe.sequential("leave overlap after cancellation request with real MySQL", 
                 select: { usedHalfDays: true },
             }),
         ).resolves.toEqual({ usedHalfDays: 2 });
+    });
+
+    it("allows only one concurrent cancellation decision to win", async () => {
+        const originalLeaveId = await createRequest(
+            fixture,
+            "leave-cancel-concurrent-decision",
+        );
+        await prisma.leaveRequest.update({
+            where: { id: originalLeaveId },
+            data: {
+                status: LeaveStatus.APPROVED,
+                approvedAt: new Date(),
+            },
+        });
+        await prisma.leaveQuota.update({
+            where: {
+                employeeId_year_leaveType: {
+                    employeeId: fixture.employeeId,
+                    year: 2031,
+                    leaveType: "PERSONAL",
+                },
+            },
+            data: { usedHalfDays: 2 },
+        });
+
+        await expect(
+            cancelLeaveRequest(
+                {
+                    userId: fixture.employeeUserId,
+                    employeeId: fixture.employeeId,
+                },
+                originalLeaveId,
+                "เปลี่ยนแผนการเดินทาง",
+            ),
+        ).resolves.toMatchObject({ kind: "CANCELLATION_REQUESTED" });
+
+        const outcomes = await Promise.allSettled([
+            confirmLeaveCancellation(
+                {
+                    userId: fixture.approverUserId,
+                    employeeId: fixture.approverEmployeeId,
+                    role: "USER",
+                },
+                originalLeaveId,
+            ),
+            rejectLeaveCancellation(
+                {
+                    userId: fixture.approverUserId,
+                    employeeId: fixture.approverEmployeeId,
+                    role: "USER",
+                },
+                originalLeaveId,
+            ),
+        ]);
+
+        expect(outcomes.filter((outcome) => outcome.status === "fulfilled")).toHaveLength(1);
+        const request = await prisma.leaveRequest.findUniqueOrThrow({
+            where: { id: originalLeaveId },
+            select: { status: true },
+        });
+        const quota = await prisma.leaveQuota.findUniqueOrThrow({
+            where: {
+                employeeId_year_leaveType: {
+                    employeeId: fixture.employeeId,
+                    year: 2031,
+                    leaveType: "PERSONAL",
+                },
+            },
+            select: { usedHalfDays: true },
+        });
+        const actionOutbox = await prisma.notificationOutbox.findMany({
+            where: {
+                payload: { contains: originalLeaveId },
+                type: {
+                    in: ["LEAVE_CANCELLED_AFTER_APPROVAL"],
+                },
+            },
+            select: { type: true },
+        });
+        const rejectionNotifications = await prisma.notification.findMany({
+            where: {
+                referenceId: originalLeaveId,
+                type: "SYSTEM_ALERT",
+            },
+            select: { id: true },
+        });
+
+        if (request.status === LeaveStatus.CANCELLED_AFTER_APPROVAL) {
+            expect(quota.usedHalfDays).toBe(0);
+            expect(actionOutbox).toHaveLength(1);
+            expect(rejectionNotifications).toHaveLength(0);
+        } else {
+            expect(request.status).toBe(LeaveStatus.APPROVED);
+            expect(quota.usedHalfDays).toBe(2);
+            expect(actionOutbox).toHaveLength(0);
+            expect(rejectionNotifications).toHaveLength(1);
+        }
     });
 });

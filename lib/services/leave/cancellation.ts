@@ -69,7 +69,11 @@ type LeaveCancellationScalars = Omit<
 
 export type LeaveCancellationResult = {
     request: LeaveCancellationRequest;
-    kind: "PENDING_CANCELLED" | "CANCELLATION_REQUESTED" | "CANCELLED_AFTER_APPROVAL";
+    kind:
+        | "PENDING_CANCELLED"
+        | "CANCELLATION_REQUESTED"
+        | "CANCELLED_AFTER_APPROVAL"
+        | "CANCELLATION_REJECTED";
 };
 
 type EmployeeActor = {
@@ -193,45 +197,18 @@ export async function cancelLeaveRequest(
     });
 }
 
-type ConfirmCancellationActor = {
+type CancellationDecisionActor = {
     userId: number;
     employeeId: number;
     role: string;
 };
 
 export async function confirmLeaveCancellation(
-    actor: ConfirmCancellationActor,
+    actor: CancellationDecisionActor,
     leaveId: string,
 ): Promise<LeaveCancellationResult> {
     return runSerializableTransaction(async (tx) => {
-        if (isAdminRole(actor.role)) {
-            throw new LeaveCancellationError(LEAVE_CANCELLATION_MESSAGES.forbidden, 403);
-        }
-
-        if (!await isActiveEmployeeInTransaction(tx, actor.userId, actor.employeeId)) {
-            throw new LeaveCancellationError(LEAVE_CANCELLATION_MESSAGES.forbidden, 403);
-        }
-
-        await lockLeaveRequestRow(tx, leaveId);
-        const leaveRequest = await tx.leaveRequest.findUnique({
-            where: { id: leaveId },
-            include: CANCELLATION_REQUEST_INCLUDE,
-        });
-
-        if (
-            !leaveRequest
-            || leaveRequest.status !== "CANCELLATION_REQUESTED"
-            || !leaveRequest.cancellationRequestedAt
-            || leaveRequest.cancellationConfirmedAt
-        ) {
-            throw new LeaveCancellationError(LEAVE_CANCELLATION_MESSAGES.invalidStatus, 409);
-        }
-        if (leaveRequest.approverId !== actor.employeeId) {
-            throw new LeaveCancellationError(LEAVE_CANCELLATION_MESSAGES.forbidden, 403);
-        }
-        if (!isActiveLeaveApprover(leaveRequest.approver)) {
-            throw new LeaveCancellationError(LEAVE_CANCELLATION_MESSAGES.forbidden, 403);
-        }
+        const leaveRequest = await getCancellationDecisionRequest(tx, actor, leaveId);
         if (!isBeforeLeaveStart(leaveRequest.startDate)) {
             throw new LeaveCancellationError(
                 LEAVE_CANCELLATION_MESSAGES.confirmationTooLate,
@@ -244,6 +221,7 @@ export async function confirmLeaveCancellation(
             where: {
                 id: leaveId,
                 status: "CANCELLATION_REQUESTED",
+                approverId: actor.employeeId,
                 cancellationRequestedAt: { not: null },
                 cancellationConfirmedAt: null,
             },
@@ -319,6 +297,80 @@ export async function confirmLeaveCancellation(
     });
 }
 
+export async function rejectLeaveCancellation(
+    actor: CancellationDecisionActor,
+    leaveId: string,
+): Promise<LeaveCancellationResult> {
+    return runSerializableTransaction(async (tx) => {
+        const leaveRequest = await getCancellationDecisionRequest(tx, actor, leaveId);
+
+        const claimedRequest = await tx.leaveRequest.updateMany({
+            where: {
+                id: leaveId,
+                status: "CANCELLATION_REQUESTED",
+                approverId: actor.employeeId,
+                cancellationRequestedAt: { not: null },
+                cancellationConfirmedAt: null,
+            },
+            data: {
+                status: "APPROVED",
+            },
+        });
+        if (claimedRequest.count !== 1) {
+            throw new LeaveCancellationError(LEAVE_CANCELLATION_MESSAGES.invalidStatus, 409);
+        }
+
+        await markCancellationNotificationsRead(tx, leaveRequest);
+        await createCancellationRejectedNotification(tx, leaveRequest);
+
+        const updatedRequest = await tx.leaveRequest.findUniqueOrThrow({ where: { id: leaveId } });
+        return {
+            request: withCancellationInclude(updatedRequest, leaveRequest),
+            kind: "CANCELLATION_REJECTED",
+        };
+    });
+}
+
+async function getCancellationDecisionRequest(
+    tx: Prisma.TransactionClient,
+    actor: CancellationDecisionActor,
+    leaveId: string,
+): Promise<LeaveCancellationRequest> {
+    if (isAdminRole(actor.role)) {
+        throw new LeaveCancellationError(LEAVE_CANCELLATION_MESSAGES.forbidden, 403);
+    }
+
+    if (!await isActiveEmployeeInTransaction(tx, actor.userId, actor.employeeId)) {
+        throw new LeaveCancellationError(LEAVE_CANCELLATION_MESSAGES.forbidden, 403);
+    }
+
+    await lockLeaveRequestRow(tx, leaveId);
+    const leaveRequest = await tx.leaveRequest.findUnique({
+        where: { id: leaveId },
+        include: CANCELLATION_REQUEST_INCLUDE,
+    });
+
+    if (
+        !leaveRequest
+        || leaveRequest.status !== "CANCELLATION_REQUESTED"
+        || !leaveRequest.cancellationRequestedAt
+        || leaveRequest.cancellationConfirmedAt
+    ) {
+        throw new LeaveCancellationError(LEAVE_CANCELLATION_MESSAGES.invalidStatus, 409);
+    }
+    if (
+        leaveRequest.employeeId === actor.employeeId
+        || leaveRequest.approverId !== actor.employeeId
+    ) {
+        throw new LeaveCancellationError(LEAVE_CANCELLATION_MESSAGES.forbidden, 403);
+    }
+    if (!isActiveLeaveApprover(leaveRequest.approver)) {
+        throw new LeaveCancellationError(LEAVE_CANCELLATION_MESSAGES.forbidden, 403);
+    }
+
+    return leaveRequest;
+}
+
 async function markPendingApprovalNotificationsRead(
     tx: Prisma.TransactionClient,
     leaveRequest: LeaveCancellationRequest,
@@ -353,6 +405,24 @@ async function markApprovedNotificationsRead(
     });
 
     await markPendingApprovalNotificationsRead(tx, leaveRequest);
+}
+
+async function markCancellationNotificationsRead(
+    tx: Prisma.TransactionClient,
+    leaveRequest: LeaveCancellationRequest,
+): Promise<void> {
+    const approverUserId = leaveRequest.approver?.user?.id;
+    if (!approverUserId) return;
+
+    await tx.notification.updateMany({
+        where: {
+            userId: approverUserId,
+            type: "LEAVE_CANCELLATION_REQUESTED",
+            referenceId: leaveRequest.id,
+            isRead: false,
+        },
+        data: { isRead: true },
+    });
 }
 
 async function createSelfCancelledNotification(
@@ -392,6 +462,31 @@ async function createCancellationRequestedNotification(
             actionUrl: toDashboardTabPath(APP_DASHBOARD_TABS.leaveHistory),
             referenceId: leaveRequest.id,
             dedupeKey: `leave:${userId}:LEAVE_CANCELLATION_REQUESTED:${leaveRequest.id}`,
+        },
+    });
+}
+
+async function createCancellationRejectedNotification(
+    tx: Prisma.TransactionClient,
+    leaveRequest: LeaveCancellationRequest,
+): Promise<void> {
+    const employeeUserId = leaveRequest.employee.user?.id;
+    if (!employeeUserId) return;
+
+    await tx.notification.create({
+        data: {
+            userId: employeeUserId,
+            type: "SYSTEM_ALERT",
+            title: "คำขอยกเลิกวันลาไม่ได้รับการอนุมัติ",
+            message: `คำขอลา${getLeaveTypeLabel(leaveRequest.leaveType)} ${formatLeaveSummary({
+                startDate: leaveRequest.startDate.toISOString(),
+                endDate: leaveRequest.endDate.toISOString(),
+                period: leaveRequest.period,
+                durationDays: halfDaysToDays(leaveRequest.durationHalfDays),
+            })} ยังคงมีสถานะอนุมัติ`,
+            actionUrl: toDashboardTabPath(APP_DASHBOARD_TABS.leaveHistory),
+            referenceId: leaveRequest.id,
+            dedupeKey: `leave:${employeeUserId}:LEAVE_CANCELLATION_REJECTED:${leaveRequest.id}`,
         },
     });
 }

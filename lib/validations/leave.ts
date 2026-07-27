@@ -102,6 +102,11 @@ export const leaveCancelSchema = z.object({
   ),
 });
 
+export const leaveCancellationDecisionSchema = z.object({
+  leaveId: leaveIdSchema,
+  action: z.enum(["CONFIRM", "REJECT"]).default("CONFIRM"),
+});
+
 export const leaveNotTakenRequestSchema = z.object({
   leaveId: leaveIdSchema,
   note: z.string().trim().min(5, "กรุณาระบุโน๊ตอย่างน้อย 5 ตัวอักษร").max(1000, "โน๊ตต้องไม่เกิน 1000 ตัวอักษร"),
@@ -132,6 +137,9 @@ export const leaveActionSchema = z.object({
 
 export type LeaveRequestValues = z.infer<typeof leaveRequestSchema>;
 export type LeaveCancelValues = z.infer<typeof leaveCancelSchema>;
+export type LeaveCancellationDecisionValues = z.infer<
+  typeof leaveCancellationDecisionSchema
+>;
 export type LeaveNotTakenRequestValues = z.infer<typeof leaveNotTakenRequestSchema>;
 export type LeaveNotTakenConfirmValues = z.infer<typeof leaveNotTakenConfirmSchema>;
 export type LeaveActionValues = z.infer<typeof leaveActionSchema>;
