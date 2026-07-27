@@ -223,5 +223,9 @@ function canRequestNotTaken(request: LeaveRequest): boolean {
 }
 
 function canRequestApprovedCancellation(request: LeaveRequest): boolean {
-    return request.status === "APPROVED" && isBeforeLeaveStart(new Date(request.startDate));
+    return (
+        request.status === "APPROVED"
+        && !request.cancellationRequestedAt
+        && isBeforeLeaveStart(new Date(request.startDate))
+    );
 }
