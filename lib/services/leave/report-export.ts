@@ -95,8 +95,13 @@ export async function createLeaveReportXlsxResponse(
     const employees = scope === "approver-history"
         ? await loadApproverHistoryReportEmployees(currentEmployeeId, year)
         : await loadCurrentTeamReportEmployees(currentEmployeeId, year);
-    const workbook = createLeaveReportWorkbook(employees);
-    const filename = generateFilename(`รายงานสรุปการลา_ปี-${year}`, "xlsx");
+    const workbook = createLeaveReportWorkbook(employees, {
+        includeSummarySheet: scope === "current-team",
+    });
+    const reportName = scope === "approver-history"
+        ? "ประวัติการอนุมัติการลา"
+        : "รายงานสรุปการลา";
+    const filename = generateFilename(`${reportName}_ปี-${year}`, "xlsx");
     return createXlsxDownloadResponse(filename, workbook);
 }
 

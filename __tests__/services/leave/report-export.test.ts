@@ -132,7 +132,31 @@ describe("leave report export queries", () => {
         );
     });
 
-    it("reconciles approver-history metadata with detail rows in the workbook", async () => {
+    it("exports current-team reports with summary and detail sheets", async () => {
+        const historicalRequest = createHistoricalRequest(101, 301);
+        const { employee: employeeProfile, ...request } = historicalRequest;
+        vi.mocked(prisma.employee.findMany).mockResolvedValue([
+            {
+                ...employeeProfile,
+                leaveRequests: [request],
+            },
+        ] as never);
+
+        const response = await createLeaveReportXlsxResponse(101, 2031, "current-team");
+        const workbook = new ExcelJS.Workbook();
+        await workbook.xlsx.load(await response.arrayBuffer());
+
+        expect(workbook.worksheets.map((sheet) => sheet.name)).toEqual([
+            "สรุปรายคน",
+            "รายละเอียดคำขอลา",
+        ]);
+        expect(workbook.getWorksheet("สรุปรายคน")?.getCell("D2").value).toBe(30);
+        expect(workbook.getWorksheet("สรุปรายคน")?.getCell("E2").value).toBe(1);
+        expect(workbook.getWorksheet("สรุปรายคน")?.getCell("F2").value).toBe(29);
+        expect(getDecodedFilename(response)).toContain("รายงานสรุปการลา_ปี-2031");
+    });
+
+    it("exports approver-history as detail-only and uses a history filename", async () => {
         const firstRequest = createHistoricalRequest(101, 301, "leave-1");
         const secondRequest = createHistoricalRequest(101, 301, "leave-2");
         vi.mocked(prisma.leaveRequest.findMany).mockResolvedValue([
@@ -150,10 +174,23 @@ describe("leave report export queries", () => {
         await workbook.xlsx.load(await response.arrayBuffer());
 
         expect(meta).toEqual({ employeeCount: 1, requestCount: 2 });
-        expect(workbook.getWorksheet("สรุปรายคน")?.rowCount).toBe(meta.employeeCount + 2);
+        expect(workbook.getWorksheet("สรุปรายคน")).toBeUndefined();
         expect(workbook.getWorksheet("รายละเอียดคำขอลา")?.rowCount).toBe(meta.requestCount + 1);
+        expect(workbook.getWorksheet("รายละเอียดคำขอลา")?.getCell("B1").value).toBe(
+            "ชื่อ-นามสกุล",
+        );
+        expect(workbook.getWorksheet("รายละเอียดคำขอลา")?.getCell("J1").value).toBe(
+            "จำนวนวันตามคำขอ",
+        );
+        expect(getDecodedFilename(response)).toContain("ประวัติการอนุมัติการลา_ปี-2031");
     });
 });
+
+function getDecodedFilename(response: Response): string {
+    const contentDisposition = response.headers.get("Content-Disposition");
+    const encodedFilename = contentDisposition?.match(/filename\*=UTF-8''([^;]+)/)?.[1];
+    return encodedFilename ? decodeURIComponent(encodedFilename) : "";
+}
 
 function createHistoricalRequest(
     approverId: number,

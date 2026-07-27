@@ -12,15 +12,23 @@ const DETAIL_SHEET_NAME = "รายละเอียดคำขอลา";
 const NUMBER_FORMAT = "0.#";
 const DATE_FORMAT = "dd/mm/yyyy";
 
+export interface CreateLeaveReportWorkbookOptions {
+    includeSummarySheet?: boolean;
+}
+
 export function createLeaveReportWorkbook(
     employees: LeaveReportEmployee[],
+    options: CreateLeaveReportWorkbookOptions = {},
 ): ExcelJS.Workbook {
     const workbook = new ExcelJS.Workbook();
     const rows = buildLeaveReportRows(employees);
+    const includeSummarySheet = options.includeSummarySheet ?? true;
 
     workbook.creator = "NHF Employee";
     workbook.created = new Date();
-    addSummarySheet(workbook, rows.summaryRows);
+    if (includeSummarySheet) {
+        addSummarySheet(workbook, rows.summaryRows);
+    }
     addDetailSheet(workbook, rows.detailRows);
 
     return workbook;

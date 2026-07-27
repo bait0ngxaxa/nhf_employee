@@ -239,7 +239,7 @@ function getScopeLabel(scope: LeaveReportScope): string {
 
 function getScopeDescription(scope: LeaveReportScope): string {
     return scope === "approver-history"
-        ? "ดาวน์โหลด Excel คำขอลาที่คุณเป็นผู้อนุมัติ โดยไม่เปลี่ยนตามหัวหน้าหรือสถานะปัจจุบันของพนักงาน"
+        ? "ดาวน์โหลดรายละเอียดคำขอลาที่คุณเป็นผู้อนุมัติ โดยไม่แสดงสรุปโควต้าหรือยอดคงเหลือของพนักงาน"
         : "ดาวน์โหลด Excel สรุปรายคนและรายละเอียดคำขอลาของพนักงานที่อยู่ในทีมปัจจุบันตามปีที่เลือก";
 }
 

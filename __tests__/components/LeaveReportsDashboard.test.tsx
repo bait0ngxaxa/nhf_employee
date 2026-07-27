@@ -53,6 +53,11 @@ describe("LeaveReportsDashboard", () => {
                 screen.getByRole("button", { name: "ดาวน์โหลด Excel" }),
             ).toBeEnabled();
         });
+        expect(
+            screen.getByText(
+                "ดาวน์โหลดรายละเอียดคำขอลาที่คุณเป็นผู้อนุมัติ โดยไม่แสดงสรุปโควต้าหรือยอดคงเหลือของพนักงาน",
+            ),
+        ).toBeInTheDocument();
 
         fireEvent.click(
             screen.getByRole("button", { name: "ดาวน์โหลด Excel" }),
