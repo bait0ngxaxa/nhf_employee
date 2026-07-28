@@ -866,6 +866,62 @@ describe("Stock Service Mutations", () => {
     });
 
     describe("adjustStock", () => {
+        it("should alert when the adjusted variant crosses its threshold while parent stock stays high", async () => {
+            prismaMock.stockItem.findUnique.mockResolvedValue(asNever({
+                id: 10,
+                name: "หมึกพิมพ์",
+                sku: "INK-10",
+                unit: "ตลับ",
+                quantity: 100,
+                minStock: 20,
+                imageUrl: null,
+                isActive: true,
+            }));
+            prismaMock.stockItemVariant.findFirst.mockResolvedValue(asNever({
+                id: 102,
+                sku: "INK-BLACK",
+                unit: "ตลับ",
+                quantity: 6,
+                minStock: 2,
+                attributeValues: [{
+                    attributeValue: {
+                        value: "ดำ",
+                        attribute: { name: "สี" },
+                    },
+                }],
+            }));
+            prismaMock.stockItemVariant.updateMany.mockResolvedValue(
+                asNever({ count: 1 }),
+            );
+            prismaMock.stockItem.update.mockResolvedValue(
+                asNever({ quantity: 101, minStock: 28 }),
+            );
+            prismaMock.stockTransaction.create.mockResolvedValue(asNever({ id: 702 }));
+
+            const result = await stockService.adjustStock(
+                10,
+                { type: "IN", quantity: 1, minStock: 10, variantId: 102 },
+                commandActor(9),
+            );
+
+            expect(result.lowStockAlerts).toEqual([{
+                itemId: 10,
+                name: "หมึกพิมพ์",
+                sku: "INK-10",
+                quantity: 7,
+                minStock: 10,
+                unit: "ตลับ",
+            }]);
+            expect(prismaMock.notificationOutbox.create).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    data: expect.objectContaining({
+                        type: "STOCK_LOW_LINE",
+                        payload: expect.stringContaining('"variantId":102'),
+                    }),
+                }),
+            );
+        });
+
         it("should atomically adjust the selected variant and cached parent aggregate by delta", async () => {
             prismaMock.stockItem.findUnique.mockResolvedValue(
                 asNever({

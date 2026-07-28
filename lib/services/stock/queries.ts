@@ -5,6 +5,7 @@ import type {
     StockRequestsFilter,
 } from "@/lib/validations/stock";
 import { buildResolvedDefaultVariantIds } from "./default-variant-shadow";
+import { resolveStockItemReadQuantity } from "./inventory-quantity-read";
 import {
     buildItemInclude,
     buildRequestInclude,
@@ -69,11 +70,13 @@ export async function getItems(filters: StockItemsFilter) {
     return {
         items: items.map((item) => {
             const reservedQuantity = reservedByItemId.get(item.id) ?? 0;
+            const quantity = resolveStockItemReadQuantity(item);
 
             return {
                 ...item,
+                quantity,
                 reservedQuantity,
-                availableQuantity: getAvailableQuantity(item.quantity, reservedQuantity),
+                availableQuantity: getAvailableQuantity(quantity, reservedQuantity),
                 variants: item.variants.map((variant) => {
                     const variantReservedQuantity =
                         reservedByVariantId.get(variant.id) ?? 0;
@@ -103,6 +106,10 @@ export async function getItemById(id: number) {
     if (item) {
         await assertPersistedVariantsForRead([item]);
         buildResolvedDefaultVariantIds([item]);
+        return {
+            ...item,
+            quantity: resolveStockItemReadQuantity(item),
+        };
     }
     return item;
 }

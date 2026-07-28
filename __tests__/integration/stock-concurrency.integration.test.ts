@@ -6,7 +6,7 @@ import {
     StockTxType,
 } from "@prisma/client";
 import type { StockItem, StockItemVariant } from "@prisma/client";
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { prisma } from "@/lib/db/prisma";
 import { runSerializableTransaction } from "@/lib/db/transaction";
@@ -68,9 +68,32 @@ async function withExplicitDefaultReads<T>(
     }
 }
 
+async function withVariantInventoryReads<T>(
+    enabled: boolean,
+    operation: () => Promise<T>,
+): Promise<T> {
+    const previousFlag = process.env.STOCK_VARIANT_INVENTORY_READ_ENABLED;
+    process.env.STOCK_VARIANT_INVENTORY_READ_ENABLED =
+        enabled ? "true" : "false";
+    try {
+        return await operation();
+    } finally {
+        if (previousFlag === undefined) {
+            delete process.env.STOCK_VARIANT_INVENTORY_READ_ENABLED;
+        } else {
+            process.env.STOCK_VARIANT_INVENTORY_READ_ENABLED = previousFlag;
+        }
+    }
+}
+
+let previousVariantInventoryReadFlag: string | undefined;
+
 describe.sequential("stock mutations with real MySQL", () => {
     beforeAll(async () => {
         assertDedicatedDatabase();
+        previousVariantInventoryReadFlag =
+            process.env.STOCK_VARIANT_INVENTORY_READ_ENABLED;
+        process.env.STOCK_VARIANT_INVENTORY_READ_ENABLED = "true";
         await prisma.$connect();
     });
 
@@ -79,10 +102,68 @@ describe.sequential("stock mutations with real MySQL", () => {
         await cleanIntegrationDatabase(prisma);
     });
 
+    it("switches item quantity reads to active variants with a reversible flag", async () => {
+        const fixture = await createStockFixture(prisma, {
+            suffix: "variant-read",
+        });
+        await prisma.stockItem.update({
+            where: { id: fixture.item.id },
+            data: { quantity: 99 },
+        });
+        const consoleWarn = vi.spyOn(console, "warn")
+            .mockImplementation(() => undefined);
+
+        try {
+            const legacyDetail = await withVariantInventoryReads(
+                false,
+                () => stockService.getItemById(fixture.item.id),
+            );
+            const variantDetail = await withVariantInventoryReads(
+                true,
+                () => stockService.getItemById(fixture.item.id),
+            );
+            const variantList = await withVariantInventoryReads(
+                true,
+                () => stockService.getItems({
+                    page: 1,
+                    limit: 20,
+                    activeOnly: true,
+                }),
+            );
+
+            expect(legacyDetail?.quantity).toBe(99);
+            expect(variantDetail?.quantity).toBe(10);
+            expect(variantList.items[0]).toMatchObject({
+                id: fixture.item.id,
+                quantity: 10,
+                reservedQuantity: 3,
+                availableQuantity: 7,
+            });
+            expect(consoleWarn).toHaveBeenCalledWith(
+                "Stock inventory quantity shadow mismatch",
+                expect.objectContaining({
+                    itemId: fixture.item.id,
+                    parentQuantity: 99,
+                    variantQuantity: 10,
+                    difference: 89,
+                    classification: "MISMATCH",
+                }),
+            );
+        } finally {
+            consoleWarn.mockRestore();
+        }
+    });
+
     afterAll(async () => {
         await dropRollbackTrigger();
         await cleanIntegrationDatabase(prisma);
         await prisma.$disconnect();
+        if (previousVariantInventoryReadFlag === undefined) {
+            delete process.env.STOCK_VARIANT_INVENTORY_READ_ENABLED;
+        } else {
+            process.env.STOCK_VARIANT_INVENTORY_READ_ENABLED =
+                previousVariantInventoryReadFlag;
+        }
     });
 
     it("สร้างวัสดุหนึ่ง variant พร้อม parent aggregate และ opening balance", async () => {
@@ -604,9 +685,16 @@ describe.sequential("stock mutations with real MySQL", () => {
             minStock: 8,
         });
 
-        const result = await stockService.issueRequest(
-            fixture.request.id,
-            fixture.issuerActor,
+        const result = await withVariantInventoryReads(
+            true,
+            () => stockService.issueRequest(
+                fixture.request.id,
+                fixture.issuerActor,
+            ),
+        );
+        const visibleItem = await withVariantInventoryReads(
+            true,
+            () => stockService.getItemById(fixture.item.id),
         );
         const inventory = await readInventory(fixture);
         const request = await prisma.stockRequest.findUniqueOrThrow({
@@ -626,6 +714,7 @@ describe.sequential("stock mutations with real MySQL", () => {
         expect(request.status).toBe(StockRequestStatus.ISSUED);
         expect(inventory.item.quantity).toBe(7);
         expect(inventory.variant.quantity).toBe(7);
+        expect(visibleItem?.quantity).toBe(7);
         expect(transaction).toMatchObject({
             itemId: fixture.item.id,
             variantId: fixture.variant.id,
@@ -642,6 +731,84 @@ describe.sequential("stock mutations with real MySQL", () => {
         expect(await prisma.notificationOutbox.count({
             where: { type: "STOCK_LOW_LINE" },
         })).toBe(1);
+    });
+
+    it("ปรับจุดสั่งซื้อแล้วแจ้งเตือนจาก variant แม้ parent aggregate ยังสูง", async () => {
+        const fixture = await createStockFixture(prisma, {
+            suffix: "ADJUST-VARIANT-LOW",
+            quantity: 100,
+            minStock: 20,
+        });
+        const secondVariant = await prisma.stockItemVariant.create({
+            data: {
+                stockItemId: fixture.item.id,
+                sku: "ADJUST-VARIANT-LOW-SECOND",
+                unit: "ชิ้น",
+                quantity: 100,
+                minStock: 20,
+            },
+        });
+        await prisma.stockItem.update({
+            where: { id: fixture.item.id },
+            data: {
+                quantity: 200,
+                minStock: 40,
+            },
+        });
+
+        const result = await stockService.adjustStock(
+            fixture.item.id,
+            {
+                variantId: fixture.variant.id,
+                type: StockTxType.IN,
+                quantity: 1,
+                minStock: 110,
+            },
+            fixture.issuerActor,
+        );
+        const inventory = await prisma.stockItem.findUniqueOrThrow({
+            where: { id: fixture.item.id },
+            select: {
+                quantity: true,
+                minStock: true,
+                variants: {
+                    select: { id: true, quantity: true, minStock: true },
+                    orderBy: { id: "asc" },
+                },
+            },
+        });
+
+        expect(result.lowStockAlerts).toEqual([{
+            itemId: fixture.item.id,
+            name: fixture.item.name,
+            sku: fixture.item.sku,
+            quantity: 101,
+            minStock: 110,
+            unit: fixture.variant.unit,
+        }]);
+        expect(inventory).toEqual({
+            quantity: 201,
+            minStock: 130,
+            variants: [
+                {
+                    id: fixture.variant.id,
+                    quantity: 101,
+                    minStock: 110,
+                },
+                {
+                    id: secondVariant.id,
+                    quantity: 100,
+                    minStock: 20,
+                },
+            ],
+        });
+        expect(await prisma.notificationOutbox.count({
+            where: { type: "STOCK_LOW_LINE" },
+        })).toBe(1);
+        expect((await prisma.notificationOutbox.findFirstOrThrow({
+            where: { type: "STOCK_LOW_LINE" },
+            select: { payload: true },
+        })).payload).toContain(`"variantId":${fixture.variant.id}`);
     });
 
     it("ไม่เปลี่ยน inventory, ledger หรือ request เมื่อ stock ไม่เพียงพอ", async () => {

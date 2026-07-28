@@ -14,12 +14,123 @@ function asNever<T>(value: T): never {
     return value as unknown as never;
 }
 
+async function withVariantInventoryReads<T>(
+    enabled: boolean,
+    operation: () => Promise<T>,
+): Promise<T> {
+    const previousFlag = process.env.STOCK_VARIANT_INVENTORY_READ_ENABLED;
+    process.env.STOCK_VARIANT_INVENTORY_READ_ENABLED =
+        enabled ? "true" : "false";
+    try {
+        return await operation();
+    } finally {
+        if (previousFlag === undefined) {
+            delete process.env.STOCK_VARIANT_INVENTORY_READ_ENABLED;
+        } else {
+            process.env.STOCK_VARIANT_INVENTORY_READ_ENABLED = previousFlag;
+        }
+    }
+}
+
 describe("Stock Queries", () => {
     beforeEach(() => {
         mockReset(prismaMock);
     });
 
     describe("getItems", () => {
+        it("uses summed active variant quantity when variant reads are enabled", async () => {
+            prismaMock.stockItem.findMany.mockResolvedValue(asNever([{
+                id: 1,
+                name: "Mouse",
+                sku: "ITEM-1",
+                quantity: 99,
+                unit: "ชิ้น",
+                minStock: 3,
+                imageUrl: null,
+                isActive: true,
+                categoryId: 1,
+                defaultVariantId: 11,
+                category: { id: 1, name: "General" },
+                variants: [
+                    {
+                        id: 11,
+                        quantity: 4,
+                        isActive: true,
+                        attributeValues: [],
+                    },
+                    {
+                        id: 12,
+                        quantity: 6,
+                        isActive: true,
+                        attributeValues: [],
+                    },
+                ],
+            }]));
+            prismaMock.stockItem.count.mockResolvedValue(asNever(1));
+            prismaMock.stockRequestItem.findMany.mockResolvedValue(asNever([
+                { itemId: 1, variantId: 11, quantity: 3 },
+            ]));
+            const consoleWarn = vi.spyOn(console, "warn")
+                .mockImplementation(() => undefined);
+
+            try {
+                const result = await withVariantInventoryReads(
+                    true,
+                    () => getItems({ page: 1, limit: 20 }),
+                );
+
+                expect(result.items[0]).toMatchObject({
+                    id: 1,
+                    quantity: 10,
+                    reservedQuantity: 3,
+                    availableQuantity: 7,
+                });
+            } finally {
+                consoleWarn.mockRestore();
+            }
+        });
+
+        it("keeps parent quantity when variant reads are disabled", async () => {
+            prismaMock.stockItem.findMany.mockResolvedValue(asNever([{
+                id: 1,
+                name: "Mouse",
+                sku: "ITEM-1",
+                quantity: 99,
+                unit: "ชิ้น",
+                minStock: 3,
+                imageUrl: null,
+                isActive: true,
+                categoryId: 1,
+                defaultVariantId: 11,
+                category: { id: 1, name: "General" },
+                variants: [{
+                    id: 11,
+                    quantity: 10,
+                    isActive: true,
+                    attributeValues: [],
+                }],
+            }]));
+            prismaMock.stockItem.count.mockResolvedValue(asNever(1));
+            prismaMock.stockRequestItem.findMany.mockResolvedValue(asNever([]));
+            const consoleWarn = vi.spyOn(console, "warn")
+                .mockImplementation(() => undefined);
+
+            try {
+                const result = await withVariantInventoryReads(
+                    false,
+                    () => getItems({ page: 1, limit: 20 }),
+                );
+
+                expect(result.items[0]).toMatchObject({
+                    id: 1,
+                    quantity: 99,
+                    availableQuantity: 99,
+                });
+            } finally {
+                consoleWarn.mockRestore();
+            }
+        });
+
         it("should append reserved and available quantities for items and variants", async () => {
             prismaMock.stockItem.findMany.mockResolvedValue(
                 asNever([
@@ -209,6 +320,49 @@ describe("Stock Queries", () => {
     });
 
     describe("read-only detail and categories", () => {
+        it("uses summed active variant quantity for item detail when enabled", async () => {
+            prismaMock.stockItem.findUnique.mockResolvedValue(asNever({
+                id: 5,
+                name: "Keyboard",
+                sku: "ITEM-5",
+                quantity: 50,
+                unit: "ชิ้น",
+                minStock: 2,
+                imageUrl: null,
+                isActive: true,
+                categoryId: 1,
+                defaultVariantId: 51,
+                category: { id: 1, name: "General" },
+                variants: [
+                    {
+                        id: 51,
+                        quantity: 7,
+                        isActive: true,
+                        attributeValues: [],
+                    },
+                    {
+                        id: 52,
+                        quantity: 8,
+                        isActive: true,
+                        attributeValues: [],
+                    },
+                ],
+            }));
+            const consoleWarn = vi.spyOn(console, "warn")
+                .mockImplementation(() => undefined);
+
+            try {
+                const result = await withVariantInventoryReads(
+                    true,
+                    () => getItemById(5),
+                );
+
+                expect(result?.quantity).toBe(15);
+            } finally {
+                consoleWarn.mockRestore();
+            }
+        });
+
         it("should reject item detail with no persisted variant without writing", async () => {
             prismaMock.stockItem.findUnique.mockResolvedValue(asNever({
                 id: 3,

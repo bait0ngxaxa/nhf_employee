@@ -5,7 +5,10 @@ import {
     createStockCommandAudit,
     createStockVariantAudit,
 } from "./command-audit";
-import { persistLowStockNotifications } from "./notifications";
+import {
+    buildVariantLabel,
+    persistLowStockNotifications,
+} from "./notifications";
 import type {
     AdjustStockInput,
     CreateCategoryInput,
@@ -33,29 +36,34 @@ import type {
 import { lockStockInventoryRows } from "./locks";
 import { setStockItemDefaultVariantIfUnset } from "./default-variant-writer";
 
-function buildLowStockAlert(
-    item: {
-        id: number;
-        name: string;
-        sku: string;
-        unit: string;
-        quantity: number;
-    },
+type VariantLowStockAlertCandidate = Extract<
+    LowStockAlertCandidate,
+    { variantId: number }
+>;
+
+function buildVariantLowStockAlert(
+    item: Pick<AdjustmentItem, "id" | "name">,
+    variant: AdjustmentVariant,
     nextQuantity: number,
     nextMinStock: number,
-): LowStockAlertCandidate[] {
-    if (item.quantity <= nextMinStock || nextQuantity > nextMinStock) {
+): VariantLowStockAlertCandidate[] {
+    const wasLowStock = variant.quantity <= variant.minStock;
+    const isLowStock = nextQuantity <= nextMinStock;
+    if (wasLowStock || !isLowStock) {
         return [];
     }
 
     return [
         {
             itemId: item.id,
-            name: item.name,
-            sku: item.sku,
+            variantId: variant.id,
+            itemName: item.name,
+            variantSku: variant.sku,
+            variantLabel:
+                buildVariantLabel(variant.attributeValues) ?? variant.sku,
             quantity: nextQuantity,
             minStock: nextMinStock,
-            unit: item.unit,
+            unit: variant.unit,
         },
     ];
 }
@@ -73,12 +81,21 @@ type AdjustmentItem = {
 
 type AdjustmentVariant = {
     id: number;
+    sku: string;
+    unit: string;
     quantity: number;
     minStock: number;
+    attributeValues: Array<{
+        attributeValue: {
+            value: string;
+            attribute: { name: string };
+        };
+    }>;
 };
 
 type AppliedStockAdjustment = AdjustStockResult & {
     transactionId: number;
+    notificationAlerts: VariantLowStockAlertCandidate[];
 };
 
 type AuditableStockVariant = {
@@ -198,7 +215,23 @@ async function findAdjustmentVariant(
     if (variantId !== undefined) {
         const variant = await tx.stockItemVariant.findFirst({
             where: { id: variantId, stockItemId: item.id, isActive: true },
-            select: { id: true, quantity: true, minStock: true },
+            select: {
+                id: true,
+                sku: true,
+                unit: true,
+                quantity: true,
+                minStock: true,
+                attributeValues: {
+                    select: {
+                        attributeValue: {
+                            select: {
+                                value: true,
+                                attribute: { select: { name: true } },
+                            },
+                        },
+                    },
+                },
+            },
         });
         if (!variant) {
             throw new Error("ไม่พบรายการย่อยของวัสดุ");
@@ -208,7 +241,23 @@ async function findAdjustmentVariant(
 
     const activeVariants = await tx.stockItemVariant.findMany({
         where: { stockItemId: item.id, isActive: true },
-        select: { id: true, quantity: true, minStock: true },
+        select: {
+            id: true,
+            sku: true,
+            unit: true,
+            quantity: true,
+            minStock: true,
+            attributeValues: {
+                select: {
+                    attributeValue: {
+                        select: {
+                            value: true,
+                            attribute: { select: { name: true } },
+                        },
+                    },
+                },
+            },
+        },
         orderBy: { id: "asc" },
     });
     if (activeVariants.length > 1) {
@@ -267,6 +316,12 @@ async function applyStockAdjustment(
 
     const previousQty = updatedItem.quantity - input.quantity;
     const previousMinStock = updatedItem.minStock - minStockDelta;
+    const notificationAlerts = buildVariantLowStockAlert(
+        item,
+        variant,
+        variant.quantity + input.quantity,
+        input.minStock,
+    );
     return {
         itemId: item.id,
         variantId: variant.id,
@@ -276,11 +331,15 @@ async function applyStockAdjustment(
         newQty: updatedItem.quantity,
         previousMinStock,
         newMinStock: updatedItem.minStock,
-        lowStockAlerts: buildLowStockAlert(
-            { ...item, quantity: previousQty },
-            updatedItem.quantity,
-            updatedItem.minStock,
-        ),
+        lowStockAlerts: notificationAlerts.map((alert) => ({
+            itemId: alert.itemId,
+            name: item.name,
+            sku: item.sku,
+            quantity: alert.quantity,
+            minStock: alert.minStock,
+            unit: alert.unit,
+        })),
+        notificationAlerts,
         transactionId: transaction.id,
     };
 }
@@ -553,9 +612,13 @@ export async function adjustStock(
                 },
             },
         );
-        await persistLowStockNotifications(adjustment.lowStockAlerts, tx);
+        await persistLowStockNotifications(adjustment.notificationAlerts, tx);
 
-        const { transactionId: _transactionId, ...result } = adjustment;
+        const {
+            transactionId: _transactionId,
+            notificationAlerts: _notificationAlerts,
+            ...result
+        } = adjustment;
         return result;
     });
 }
