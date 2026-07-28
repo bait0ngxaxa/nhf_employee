@@ -49,6 +49,7 @@ async function getExistingVariants(
             id: true,
             sku: true,
             imageUrl: true,
+            quantity: true,
             isActive: true,
         },
         orderBy: LEGACY_DEFAULT_VARIANT_ORDER_BY,
@@ -299,6 +300,12 @@ async function handleRemovedVariants(
     );
 
     for (const removedVariant of removedVariants) {
+        if (removedVariant.quantity !== 0) {
+            throw new Error(
+                "ไม่สามารถปิดรายการย่อยที่ยังมียอดคงเหลือ กรุณาปรับยอดเป็นศูนย์ก่อน",
+            );
+        }
+
         const hasReferences = await variantHasReferences(tx, removedVariant.id);
         if (hasReferences) {
             await tx.stockItemVariant.update({

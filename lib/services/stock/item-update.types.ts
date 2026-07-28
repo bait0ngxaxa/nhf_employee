@@ -22,6 +22,7 @@ export type ExistingVariantRecord = {
     id: number;
     sku: string;
     imageUrl: string | null;
+    quantity: number;
     isActive: boolean;
 };
 

@@ -38,9 +38,16 @@ export async function PATCH(
         if (
             message.includes("พบรายการย่อยไม่ถูกต้อง") ||
             message.includes("จำนวนรายการย่อยไม่ตรงกับข้อมูลปัจจุบัน") ||
-            message.includes("คำขอรอจ่าย")
+            message.includes("คำขอรอจ่าย") ||
+            message.includes("ไม่สามารถปิดรายการย่อยที่ยังมียอดคงเหลือ")
         ) {
-            return jsonError(message, message.includes("คำขอรอจ่าย") ? 409 : 400);
+            return jsonError(
+                message,
+                message.includes("คำขอรอจ่าย")
+                    || message.includes("ไม่สามารถปิดรายการย่อยที่ยังมียอดคงเหลือ")
+                    ? 409
+                    : 400,
+            );
         }
         if (message.includes("ยอดคงเหลือของรายการย่อยเปลี่ยนแปลงแล้ว")) {
             return jsonError(message, 409);

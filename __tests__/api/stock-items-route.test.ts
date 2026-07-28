@@ -105,6 +105,24 @@ describe("Stock Item Routes", () => {
         expect(response.status).toBe(409);
     });
 
+    it("returns 409 when closing a variant with remaining quantity", async () => {
+        vi.mocked(stockService.updateItem).mockRejectedValue(
+            new Error(
+                "ไม่สามารถปิดรายการย่อยที่ยังมียอดคงเหลือ กรุณาปรับยอดเป็นศูนย์ก่อน",
+            ),
+        );
+        const request = new NextRequest("http://localhost/api/stock/items/42", {
+            method: "PATCH",
+            body: JSON.stringify({ name: "ปากกาใหม่" }),
+        });
+
+        const response = await patchItemRoute(request, {
+            params: Promise.resolve({ id: "42" }),
+        });
+
+        expect(response.status).toBe(409);
+    });
+
     it("selects the atomic delete audit action when soft-deleting an item", async () => {
         vi.mocked(stockService.updateItem).mockResolvedValue({
             ...updatedItem,

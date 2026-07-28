@@ -2003,8 +2003,8 @@ describe("Stock Service Mutations", () => {
             );
             prismaMock.stockItemVariant.findMany.mockResolvedValue(
                 asNever([
-                    { id: 261, sku: "SKU-26-A", imageUrl: null, isActive: true },
-                    { id: 262, sku: "SKU-26-B", imageUrl: null, isActive: true },
+                    { id: 261, sku: "SKU-26-A", imageUrl: null, quantity: 2, isActive: true },
+                    { id: 262, sku: "SKU-26-B", imageUrl: null, quantity: 0, isActive: true },
                 ]),
             );
             prismaMock.stockItem.update
@@ -2094,6 +2094,7 @@ describe("Stock Service Mutations", () => {
                 id: 270 + index,
                 sku: `SKU-27-V${index + 1}`,
                 imageUrl: null,
+                quantity: index === 10 ? 0 : 1,
                 isActive: index < 10,
             }));
             const submittedVariants = existingVariants

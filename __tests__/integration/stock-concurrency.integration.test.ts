@@ -68,6 +68,34 @@ async function withExplicitDefaultReads<T>(
     }
 }
 
+async function createTwoVariantStockItem(
+    fixture: StockFixture,
+    suffix: string,
+    removedQuantity: number,
+): Promise<Awaited<ReturnType<typeof stockService.createItem>>> {
+    return stockService.createItem({
+        name: `วัสดุทดสอบปิดรายการย่อย ${suffix}`,
+        sku: `CLOSE-VARIANT-${suffix}-ITEM`,
+        categoryId: fixture.category.id,
+        variants: [
+            {
+                sku: `CLOSE-VARIANT-${suffix}-REMOVED`,
+                unit: "ชิ้น",
+                quantity: removedQuantity,
+                minStock: 1,
+                attributes: [{ name: "แบบ", value: "ปิด" }],
+            },
+            {
+                sku: `CLOSE-VARIANT-${suffix}-REMAINING`,
+                unit: "ชิ้น",
+                quantity: 3,
+                minStock: 1,
+                attributes: [{ name: "แบบ", value: "คงไว้" }],
+            },
+        ],
+    }, fixture.issuerActor);
+}
+
 describe.sequential("stock mutations with real MySQL", () => {
     beforeAll(async () => {
         assertDedicatedDatabase();
@@ -389,6 +417,123 @@ describe.sequential("stock mutations with real MySQL", () => {
         })).toBe(0);
     });
 
+    it("ปฏิเสธการปิด variant ที่ยังมียอดคงเหลือ", async () => {
+        const fixture = await createStockFixture(prisma, {
+            suffix: "CLOSE-POSITIVE",
+        });
+        await prisma.stockRequest.delete({ where: { id: fixture.request.id } });
+        const created = await createTwoVariantStockItem(
+            fixture,
+            "POSITIVE",
+            7,
+        );
+        const removedVariant = created.variants[0];
+        const remainingVariant = created.variants[1];
+        if (!removedVariant || !remainingVariant) {
+            throw new Error("สร้างรายการย่อยสำหรับ integration test ไม่ครบ");
+        }
+
+        await expect(stockService.updateItem(created.id, {
+            variants: [{
+                id: remainingVariant.id,
+                expectedQuantity: remainingVariant.quantity,
+                sku: remainingVariant.sku,
+                unit: remainingVariant.unit,
+                quantity: remainingVariant.quantity,
+                minStock: remainingVariant.minStock,
+                attributes: [{ name: "แบบ", value: "คงไว้" }],
+            }],
+        }, fixture.issuerActor)).rejects.toThrow(
+            "ไม่สามารถปิดรายการย่อยที่ยังมียอดคงเหลือ กรุณาปรับยอดเป็นศูนย์ก่อน",
+        );
+
+        expect(await prisma.stockItemVariant.findUniqueOrThrow({
+            where: { id: removedVariant.id },
+            select: { quantity: true, isActive: true },
+        })).toEqual({ quantity: 7, isActive: true });
+        expect((await stockService.getItemById(created.id))?.quantity).toBe(10);
+    });
+
+    it("ปิด variant ที่ยอดคงเหลือเป็นศูนย์ได้", async () => {
+        const fixture = await createStockFixture(prisma, {
+            suffix: "CLOSE-ZERO",
+        });
+        await prisma.stockRequest.delete({ where: { id: fixture.request.id } });
+        const created = await createTwoVariantStockItem(fixture, "ZERO", 0);
+        const removedVariant = created.variants[0];
+        const remainingVariant = created.variants[1];
+        if (!removedVariant || !remainingVariant) {
+            throw new Error("สร้างรายการย่อยสำหรับ integration test ไม่ครบ");
+        }
+
+        const updated = await stockService.updateItem(created.id, {
+            variants: [{
+                id: remainingVariant.id,
+                expectedQuantity: remainingVariant.quantity,
+                sku: remainingVariant.sku,
+                unit: remainingVariant.unit,
+                quantity: remainingVariant.quantity,
+                minStock: remainingVariant.minStock,
+                attributes: [{ name: "แบบ", value: "คงไว้" }],
+            }],
+        }, fixture.issuerActor);
+
+        expect(updated.quantity).toBe(3);
+        expect(updated.variants.map((variant) => variant.id)).toEqual([
+            remainingVariant.id,
+        ]);
+        expect(await prisma.stockItemVariant.findUniqueOrThrow({
+            where: { id: removedVariant.id },
+            select: { quantity: true, isActive: true },
+        })).toEqual({ quantity: 0, isActive: false });
+    });
+
+    it("ปฏิเสธการปิด variant ที่มีคำขอรอจ่าย", async () => {
+        const fixture = await createStockFixture(prisma, {
+            suffix: "CLOSE-PENDING",
+        });
+        const created = await createTwoVariantStockItem(fixture, "PENDING", 0);
+        const removedVariant = created.variants[0];
+        const remainingVariant = created.variants[1];
+        if (!removedVariant || !remainingVariant) {
+            throw new Error("สร้างรายการย่อยสำหรับ integration test ไม่ครบ");
+        }
+
+        await prisma.stockRequest.create({
+            data: {
+                requestedBy: fixture.requester.id,
+                idempotencyKey: "close-pending-request",
+                requestHash: "0".repeat(64),
+                projectCode: "CLOSE-PENDING-PROJECT",
+                status: StockRequestStatus.PENDING_ISSUE,
+                items: {
+                    create: {
+                        itemId: created.id,
+                        variantId: removedVariant.id,
+                        quantity: 1,
+                    },
+                },
+            },
+        });
+
+        await expect(stockService.updateItem(created.id, {
+            variants: [{
+                id: remainingVariant.id,
+                expectedQuantity: remainingVariant.quantity,
+                sku: remainingVariant.sku,
+                unit: remainingVariant.unit,
+                quantity: remainingVariant.quantity,
+                minStock: remainingVariant.minStock,
+                attributes: [{ name: "แบบ", value: "คงไว้" }],
+            }],
+        }, fixture.issuerActor)).rejects.toThrow("คำขอรอจ่าย");
+
+        expect(await prisma.stockItemVariant.findUniqueOrThrow({
+            where: { id: removedVariant.id },
+            select: { quantity: true, isActive: true },
+        })).toEqual({ quantity: 0, isActive: true });
+    });
+
     it("ย้าย explicit default เมื่อ default variant ถูกปิดใช้งาน", async () => {
         const fixture = await createStockFixture(prisma, {
             suffix: "DEFAULT-LIFECYCLE",
@@ -415,6 +560,33 @@ describe.sequential("stock mutations with real MySQL", () => {
             ],
         }, fixture.issuerActor);
         const [removedDefault, remainingVariant] = created.variants;
+
+        if (!removedDefault || !remainingVariant) {
+            throw new Error("สร้างรายการย่อยสำหรับ integration test ไม่ครบ");
+        }
+
+        await stockService.updateItem(created.id, {
+            variants: [
+                {
+                    id: removedDefault.id,
+                    expectedQuantity: removedDefault.quantity,
+                    sku: removedDefault.sku,
+                    unit: removedDefault.unit,
+                    quantity: 0,
+                    minStock: removedDefault.minStock,
+                    attributes: [{ name: "แบบ", value: "A" }],
+                },
+                {
+                    id: remainingVariant.id,
+                    expectedQuantity: remainingVariant.quantity,
+                    sku: remainingVariant.sku,
+                    unit: remainingVariant.unit,
+                    quantity: remainingVariant.quantity,
+                    minStock: remainingVariant.minStock,
+                    attributes: [{ name: "แบบ", value: "B" }],
+                },
+            ],
+        }, fixture.issuerActor);
 
         const updated = await stockService.updateItem(created.id, {
             variants: [{
