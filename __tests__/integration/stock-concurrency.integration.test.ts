@@ -19,6 +19,7 @@ import {
     InvalidStockDefaultVariantError,
     setStockItemDefaultVariantIfUnset,
 } from "@/lib/services/stock/default-variant-writer";
+import { createNewStockRequest } from "@/lib/services/stock/request-creation";
 import { lockStockInventoryRows } from "@/lib/services/stock/locks";
 import { createStockOpeningBalanceTransaction } from "@/lib/services/stock/write-helpers";
 import {
@@ -49,6 +50,22 @@ async function readInventory(
         prisma.stockItemVariant.findUniqueOrThrow({ where: { id: fixture.variant.id } }),
     ]);
     return { item, variant };
+}
+
+async function withExplicitDefaultReads<T>(
+    operation: () => Promise<T>,
+): Promise<T> {
+    const previousFlag = process.env.STOCK_EXPLICIT_DEFAULT_READ_ENABLED;
+    process.env.STOCK_EXPLICIT_DEFAULT_READ_ENABLED = "true";
+    try {
+        return await operation();
+    } finally {
+        if (previousFlag === undefined) {
+            delete process.env.STOCK_EXPLICIT_DEFAULT_READ_ENABLED;
+        } else {
+            process.env.STOCK_EXPLICIT_DEFAULT_READ_ENABLED = previousFlag;
+        }
+    }
 }
 
 describe.sequential("stock mutations with real MySQL", () => {
@@ -86,6 +103,7 @@ describe.sequential("stock mutations with real MySQL", () => {
         expect(created.quantity).toBe(6);
         expect(created.minStock).toBe(2);
         expect(created.variants).toHaveLength(1);
+        expect(created.defaultVariantId).toBe(created.variants[0]?.id);
         expect(created.variants[0]).toMatchObject({
             sku: "CREATE-ONE-VARIANT",
             quantity: 6,
@@ -303,6 +321,7 @@ describe.sequential("stock mutations with real MySQL", () => {
 
         expect(created.quantity).toBe(11);
         expect(created.minStock).toBe(3);
+        expect(created.defaultVariantId).toBe(created.variants[0]?.id);
         expect(created.variants.map((variant) => ({
             sku: variant.sku,
             quantity: variant.quantity,
@@ -334,6 +353,249 @@ describe.sequential("stock mutations with real MySQL", () => {
         expect(await prisma.stockItem.count({
             where: { sku: "CREATE-MULTI-DUPLICATE-PARENT" },
         })).toBe(0);
+    });
+
+    it("ย้าย explicit default เมื่อ default variant ถูกปิดใช้งาน", async () => {
+        const fixture = await createStockFixture(prisma, {
+            suffix: "DEFAULT-LIFECYCLE",
+        });
+        const created = await stockService.createItem({
+            name: "วัสดุทดสอบ default lifecycle",
+            sku: "DEFAULT-LIFECYCLE-ITEM",
+            categoryId: fixture.category.id,
+            variants: [
+                {
+                    sku: "DEFAULT-LIFECYCLE-A",
+                    unit: "ชิ้น",
+                    quantity: 3,
+                    minStock: 1,
+                    attributes: [{ name: "แบบ", value: "A" }],
+                },
+                {
+                    sku: "DEFAULT-LIFECYCLE-B",
+                    unit: "ชิ้น",
+                    quantity: 4,
+                    minStock: 1,
+                    attributes: [{ name: "แบบ", value: "B" }],
+                },
+            ],
+        }, fixture.issuerActor);
+        const [removedDefault, remainingVariant] = created.variants;
+
+        const updated = await stockService.updateItem(created.id, {
+            variants: [{
+                id: remainingVariant.id,
+                expectedQuantity: remainingVariant.quantity,
+                sku: remainingVariant.sku,
+                unit: remainingVariant.unit,
+                quantity: remainingVariant.quantity,
+                minStock: remainingVariant.minStock,
+                attributes: [{ name: "แบบ", value: "B" }],
+            }],
+        }, fixture.issuerActor);
+
+        expect(updated.defaultVariantId).toBe(remainingVariant.id);
+        expect((await prisma.stockItemVariant.findUniqueOrThrow({
+            where: { id: removedDefault.id },
+            select: { isActive: true },
+        })).isActive).toBe(false);
+    });
+
+    it("ใช้ explicit default ตอนแก้ parent โดยไม่ส่ง variants เมื่อเปิด flag", async () => {
+        const fixture = await createStockFixture(prisma, {
+            suffix: "DEFAULT-UPDATE",
+        });
+        const created = await stockService.createItem({
+            name: "วัสดุทดสอบ explicit update",
+            sku: "DEFAULT-UPDATE-ITEM",
+            categoryId: fixture.category.id,
+            variants: [
+                {
+                    sku: "DEFAULT-UPDATE-A",
+                    unit: "ชิ้น",
+                    quantity: 3,
+                    minStock: 1,
+                    attributes: [{ name: "แบบ", value: "A" }],
+                },
+                {
+                    sku: "DEFAULT-UPDATE-B",
+                    unit: "ชิ้น",
+                    quantity: 4,
+                    minStock: 1,
+                    attributes: [{ name: "แบบ", value: "B" }],
+                },
+            ],
+        }, fixture.issuerActor);
+        const [legacyDefault, explicitDefault] = created.variants;
+        await prisma.stockItem.update({
+            where: { id: created.id },
+            data: { defaultVariantId: explicitDefault.id },
+        });
+        const previousFlag =
+            process.env.STOCK_EXPLICIT_DEFAULT_READ_ENABLED;
+        process.env.STOCK_EXPLICIT_DEFAULT_READ_ENABLED = "true";
+
+        try {
+            await stockService.updateItem(
+                created.id,
+                { minStock: 5 },
+                fixture.issuerActor,
+            );
+            expect(await prisma.stockItemVariant.findMany({
+                where: { id: { in: [legacyDefault.id, explicitDefault.id] } },
+                orderBy: { id: "asc" },
+                select: { id: true, minStock: true },
+            })).toEqual([
+                { id: legacyDefault.id, minStock: 1 },
+                { id: explicitDefault.id, minStock: 5 },
+            ]);
+
+            await prisma.stockItemVariant.updateMany({
+                where: { id: { in: [legacyDefault.id, explicitDefault.id] } },
+                data: { minStock: 1 },
+            });
+            await prisma.stockItemVariant.update({
+                where: { id: legacyDefault.id },
+                data: { isActive: false },
+            });
+            await prisma.stockItem.update({
+                where: { id: created.id },
+                data: { defaultVariantId: null },
+            });
+
+            await stockService.updateItem(
+                created.id,
+                { minStock: 6 },
+                fixture.issuerActor,
+            );
+            expect(await prisma.stockItemVariant.findMany({
+                where: { id: { in: [legacyDefault.id, explicitDefault.id] } },
+                orderBy: { id: "asc" },
+                select: { id: true, minStock: true },
+            })).toEqual([
+                { id: legacyDefault.id, minStock: 1 },
+                { id: explicitDefault.id, minStock: 6 },
+            ]);
+        } finally {
+            if (previousFlag === undefined) {
+                delete process.env.STOCK_EXPLICIT_DEFAULT_READ_ENABLED;
+            } else {
+                process.env.STOCK_EXPLICIT_DEFAULT_READ_ENABLED = previousFlag;
+            }
+        }
+    });
+
+    it("ใช้ explicit default ใน request creation และ legacy issue เมื่อเปิด flag", async () => {
+        const fixture = await createStockFixture(prisma, {
+            suffix: "DEFAULT-REQUEST",
+        });
+        await prisma.stockRequest.delete({ where: { id: fixture.request.id } });
+        const explicitVariant = await prisma.stockItemVariant.create({
+            data: {
+                stockItemId: fixture.item.id,
+                sku: "DEFAULT-REQUEST-EXPLICIT",
+                unit: "ชิ้น",
+                quantity: fixture.quantity,
+                minStock: fixture.minStock,
+            },
+        });
+        await prisma.stockItem.update({
+            where: { id: fixture.item.id },
+            data: { defaultVariantId: explicitVariant.id },
+        });
+
+        await withExplicitDefaultReads(async () => {
+            const request = await prisma.$transaction((tx) =>
+                createNewStockRequest(
+                    tx,
+                    {
+                        projectCode: "DEFAULT-REQUEST-PROJECT",
+                        items: [{
+                            itemId: fixture.item.id,
+                            quantity: 2,
+                        }],
+                    },
+                    fixture.requesterActor,
+                    {
+                        idempotencyKey: "default-request-explicit",
+                        requestHash: "1".repeat(64),
+                    },
+                ),
+            );
+            const requestItem = request.items[0];
+            if (!requestItem) {
+                throw new Error("ไม่พบรายการคำขอทดสอบ");
+            }
+            expect(requestItem.variantId).toBe(explicitVariant.id);
+
+            await prisma.stockRequestItem.update({
+                where: { id: requestItem.id },
+                data: { variantId: null },
+            });
+            await stockService.issueRequest(
+                request.id,
+                fixture.issuerActor,
+            );
+
+            expect((await prisma.stockItemVariant.findUniqueOrThrow({
+                where: { id: fixture.variant.id },
+                select: { quantity: true },
+            })).quantity).toBe(fixture.quantity);
+            expect((await prisma.stockItemVariant.findUniqueOrThrow({
+                where: { id: explicitVariant.id },
+                select: { quantity: true },
+            })).quantity).toBe(fixture.quantity - 2);
+            expect(await prisma.stockTransaction.findFirst({
+                where: {
+                    stockRequestId: request.id,
+                    type: StockTxType.OUT,
+                },
+                select: { variantId: true },
+            })).toEqual({ variantId: explicitVariant.id });
+        });
+    });
+
+    it("fallback ไป lowest active เมื่อ explicit default ใช้งานไม่ได้", async () => {
+        const fixture = await createStockFixture(prisma, {
+            suffix: "DEFAULT-FALLBACK",
+        });
+        await prisma.stockRequest.delete({ where: { id: fixture.request.id } });
+        const inactiveExplicit = await prisma.stockItemVariant.create({
+            data: {
+                stockItemId: fixture.item.id,
+                sku: "DEFAULT-FALLBACK-INACTIVE",
+                unit: "ชิ้น",
+                quantity: fixture.quantity,
+                minStock: fixture.minStock,
+                isActive: false,
+            },
+        });
+        await prisma.stockItem.update({
+            where: { id: fixture.item.id },
+            data: { defaultVariantId: inactiveExplicit.id },
+        });
+
+        await withExplicitDefaultReads(async () => {
+            const request = await prisma.$transaction((tx) =>
+                createNewStockRequest(
+                    tx,
+                    {
+                        projectCode: "DEFAULT-FALLBACK-PROJECT",
+                        items: [{
+                            itemId: fixture.item.id,
+                            quantity: 1,
+                        }],
+                    },
+                    fixture.requesterActor,
+                    {
+                        idempotencyKey: "default-request-fallback",
+                        requestHash: "2".repeat(64),
+                    },
+                ),
+            );
+
+            expect(request.items[0]?.variantId).toBe(fixture.variant.id);
+        });
     });
 
     it("จ่ายคำขอแล้วลด parent และ variant พร้อมบันทึก ledger, audit และ outbox", async () => {
@@ -637,13 +899,22 @@ describe.sequential("stock mutations with real MySQL", () => {
         expect(await prisma.stockItemVariant.count({
             where: { stockItemId: fixture.item.id, isActive: true },
         })).toBe(0);
+        expect((await prisma.stockItem.findUniqueOrThrow({
+            where: { id: fixture.item.id },
+            select: { defaultVariantId: true },
+        })).defaultVariantId).toBeNull();
 
         const afterReactivation = await stockService.updateItem(
             fixture.item.id,
-            { isActive: true },
+            {
+                isActive: true,
+                minStock: 7,
+            },
             fixture.issuerActor,
         );
         expect(afterReactivation.variants).toHaveLength(1);
+        expect(afterReactivation.defaultVariantId).toBe(fixture.variant.id);
+        expect(afterReactivation.variants[0]?.minStock).toBe(7);
         expect(await prisma.stockItemVariant.count({
             where: { stockItemId: fixture.item.id },
         })).toBe(1);

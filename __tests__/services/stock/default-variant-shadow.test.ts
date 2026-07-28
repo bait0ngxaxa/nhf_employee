@@ -4,8 +4,10 @@ import { mockDeep } from "vitest-mock-extended";
 
 import {
     buildDefaultVariantShadowComparison,
-    buildObservedLegacyDefaultVariantIds,
+    buildResolvedDefaultVariantIds,
+    isExplicitDefaultVariantReadEnabled,
     reportDefaultVariantShadowComparison,
+    resolveDefaultVariantId,
 } from "@/lib/services/stock/default-variant-shadow";
 import { loadActiveDefaultVariantsByItemIds } from "@/lib/services/stock/shared";
 
@@ -14,6 +16,46 @@ function asNever<T>(value: T): never {
 }
 
 describe("default variant runtime shadow comparison", () => {
+    it("keeps explicit reads disabled unless the server flag is explicitly true", () => {
+        expect(isExplicitDefaultVariantReadEnabled(undefined)).toBe(false);
+        expect(isExplicitDefaultVariantReadEnabled("false")).toBe(false);
+        expect(isExplicitDefaultVariantReadEnabled("invalid")).toBe(false);
+        expect(isExplicitDefaultVariantReadEnabled("true")).toBe(true);
+        expect(isExplicitDefaultVariantReadEnabled("1")).toBe(true);
+    });
+
+    it("switches to a valid explicit default only when the read flag is enabled", () => {
+        const input = {
+            legacyDefaultVariantId: 101,
+            explicitDefaultVariantId: 102,
+            explicitDefaultIsUsable: true,
+        };
+
+        expect(resolveDefaultVariantId({
+            ...input,
+            explicitReadEnabled: false,
+        })).toBe(101);
+        expect(resolveDefaultVariantId({
+            ...input,
+            explicitReadEnabled: true,
+        })).toBe(102);
+    });
+
+    it("falls back to legacy when the explicit default is missing or inactive", () => {
+        expect(resolveDefaultVariantId({
+            legacyDefaultVariantId: 101,
+            explicitDefaultVariantId: 102,
+            explicitDefaultIsUsable: false,
+            explicitReadEnabled: true,
+        })).toBe(101);
+        expect(resolveDefaultVariantId({
+            legacyDefaultVariantId: 101,
+            explicitDefaultVariantId: null,
+            explicitDefaultIsUsable: false,
+            explicitReadEnabled: true,
+        })).toBe(101);
+    });
+
     it("classifies matching explicit and legacy defaults", () => {
         expect(buildDefaultVariantShadowComparison({
             itemId: 10,
@@ -78,14 +120,14 @@ describe("default variant runtime shadow comparison", () => {
     it("builds legacy default IDs for read models while shadowing explicit IDs", () => {
         const warn = vi.fn();
 
-        const defaults = buildObservedLegacyDefaultVariantIds([{
+        const defaults = buildResolvedDefaultVariantIds([{
             id: 10,
             defaultVariantId: 102,
             variants: [
                 { id: 102, isActive: true },
                 { id: 101, isActive: true },
             ],
-        }], warn);
+        }], warn, false);
 
         expect(defaults).toEqual(new Map([[10, 101]]));
         expect(warn).toHaveBeenCalledWith(
@@ -97,6 +139,19 @@ describe("default variant runtime shadow comparison", () => {
                 classification: "MISMATCH",
             }),
         );
+    });
+
+    it("uses the explicit default in read models only when enabled and active", () => {
+        const defaults = buildResolvedDefaultVariantIds([{
+            id: 10,
+            defaultVariantId: 102,
+            variants: [
+                { id: 101, isActive: true },
+                { id: 102, isActive: true },
+            ],
+        }], vi.fn(), true);
+
+        expect(defaults).toEqual(new Map([[10, 102]]));
     });
 
     it("keeps returning the legacy lowest active ID while observing explicit mismatch", async () => {
@@ -118,7 +173,11 @@ describe("default variant runtime shadow comparison", () => {
         }]));
         const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
 
-        const defaults = await loadActiveDefaultVariantsByItemIds(tx, [10]);
+        const defaults = await loadActiveDefaultVariantsByItemIds(
+            tx,
+            [10],
+            { explicitReadEnabled: false },
+        );
 
         expect(defaults.get(10)).toEqual({ id: 101 });
         expect(warn).toHaveBeenCalledWith(
@@ -130,6 +189,29 @@ describe("default variant runtime shadow comparison", () => {
                 classification: "MISMATCH",
             }),
         );
+        warn.mockRestore();
+    });
+
+    it("returns a valid explicit default when runtime reads are enabled", async () => {
+        const tx = mockDeep<Prisma.TransactionClient>();
+        tx.stockItemVariant.findMany.mockResolvedValue(asNever([
+            { id: 101, stockItemId: 10 },
+            { id: 102, stockItemId: 10 },
+        ]));
+        tx.stockItem.findMany.mockResolvedValue(asNever([{
+            id: 10,
+            defaultVariantId: 102,
+            defaultVariant: { stockItemId: 10 },
+        }]));
+        const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+
+        const defaults = await loadActiveDefaultVariantsByItemIds(
+            tx,
+            [10],
+            { explicitReadEnabled: true },
+        );
+
+        expect(defaults.get(10)).toEqual({ id: 102 });
         warn.mockRestore();
     });
 

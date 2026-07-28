@@ -102,6 +102,9 @@ describe("Stock Service Mutations", () => {
             prismaMock.stockItemVariant.create.mockResolvedValue(
                 asNever({ id: 511 }),
             );
+            prismaMock.stockItem.updateMany.mockResolvedValue(
+                asNever({ count: 1 }),
+            );
             prismaMock.stockItem.findUniqueOrThrow.mockResolvedValue(asNever({
                 id: 51,
                 name: "ปากกา",
@@ -1752,7 +1755,7 @@ describe("Stock Service Mutations", () => {
                 data: expect.objectContaining({ itemId: 24, variantId: 241, type: "OUT", quantity: -5 }),
                 select: { id: true },
             });
-            expect(prismaMock.stockItem.update).toHaveBeenNthCalledWith(2, {
+            expect(prismaMock.stockItem.update).toHaveBeenCalledWith({
                 where: { id: 24 },
                 data: { quantity: 0, minStock: 1 },
             });
@@ -1895,8 +1898,7 @@ describe("Stock Service Mutations", () => {
                 }),
             );
             expect(prismaMock.stockTransaction.create).toHaveBeenCalledTimes(2);
-            expect(prismaMock.stockItem.update).toHaveBeenNthCalledWith(
-                2,
+            expect(prismaMock.stockItem.update).toHaveBeenCalledWith(
                 expect.objectContaining({
                     where: { id: 25 },
                     data: { quantity: 15, minStock: 5 },

@@ -4,7 +4,7 @@ import type {
     StockItemsFilter,
     StockRequestsFilter,
 } from "@/lib/validations/stock";
-import { buildObservedLegacyDefaultVariantIds } from "./default-variant-shadow";
+import { buildResolvedDefaultVariantIds } from "./default-variant-shadow";
 import {
     buildItemInclude,
     buildRequestInclude,
@@ -60,7 +60,7 @@ export async function getItems(filters: StockItemsFilter) {
               })
             : [];
     const defaultVariantIdByItemId =
-        buildObservedLegacyDefaultVariantIds(items);
+        buildResolvedDefaultVariantIds(items);
     const { reservedByItemId, reservedByVariantId } = buildReservedQuantityMaps(
         pendingRequestItems,
         defaultVariantIdByItemId,
@@ -102,7 +102,7 @@ export async function getItemById(id: number) {
     });
     if (item) {
         await assertPersistedVariantsForRead([item]);
-        buildObservedLegacyDefaultVariantIds([item]);
+        buildResolvedDefaultVariantIds([item]);
     }
     return item;
 }

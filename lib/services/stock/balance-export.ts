@@ -8,7 +8,7 @@ import {
     type StockBalanceVariant,
     type StockBalanceItem,
 } from "@/lib/services/stock/balance-workbook";
-import { buildObservedLegacyDefaultVariantIds } from "@/lib/services/stock/default-variant-shadow";
+import { buildResolvedDefaultVariantIds } from "@/lib/services/stock/default-variant-shadow";
 import {
     buildItemInclude,
     buildReservedQuantityMaps,
@@ -38,7 +38,7 @@ async function loadActiveStockItems(): Promise<StockBalanceItem[]> {
     );
     const { reservedByItemId, reservedByVariantId } = buildReservedQuantityMaps(
         pendingRequestItems,
-        buildObservedLegacyDefaultVariantIds(items),
+        buildResolvedDefaultVariantIds(items),
     );
 
     return items.map((item) =>

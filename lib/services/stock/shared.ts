@@ -9,10 +9,15 @@ import type {
     CreateRequestInput,
 } from "@/lib/validations/stock";
 import type { PendingRequestItemRecord } from "./types";
-import { selectLegacyDefaultVariantId } from "./legacy-default-variant";
+import {
+    LEGACY_DEFAULT_VARIANT_ORDER_BY,
+    selectLegacyDefaultVariantId,
+} from "./legacy-default-variant";
 import {
     buildDefaultVariantShadowComparison,
+    isExplicitDefaultVariantReadEnabled,
     reportDefaultVariantShadowComparison,
+    resolveDefaultVariantId,
 } from "./default-variant-shadow";
 
 export function generateSku(): string {
@@ -25,6 +30,7 @@ export function generateSku(): string {
 export async function loadActiveDefaultVariantsByItemIds(
     tx: Prisma.TransactionClient,
     itemIds: number[],
+    options: { explicitReadEnabled?: boolean } = {},
 ): Promise<Map<number, { id: number }>> {
     const uniqueItemIds = Array.from(new Set(itemIds));
     if (uniqueItemIds.length === 0) {
@@ -37,7 +43,7 @@ export async function loadActiveDefaultVariantsByItemIds(
             id: true,
             stockItemId: true,
         },
-        orderBy: { id: "asc" },
+        orderBy: LEGACY_DEFAULT_VARIANT_ORDER_BY,
     });
     const explicitDefaultItems = await tx.stockItem.findMany({
         where: { id: { in: uniqueItemIds } },
@@ -73,24 +79,37 @@ export async function loadActiveDefaultVariantsByItemIds(
 
     const defaultVariants = new Map<number, { id: number }>();
     for (const itemId of uniqueItemIds) {
-        const defaultVariantId = selectLegacyDefaultVariantId(
-            variantsByItemId.get(itemId) ?? [],
+        const activeVariants = variantsByItemId.get(itemId) ?? [];
+        const legacyDefaultVariantId = selectLegacyDefaultVariantId(
+            activeVariants,
         );
-        if (defaultVariantId !== null) {
-            defaultVariants.set(itemId, { id: defaultVariantId });
-        }
-
         const explicitDefault = explicitDefaultsByItemId.get(itemId);
         if (explicitDefault) {
             reportDefaultVariantShadowComparison(
                 buildDefaultVariantShadowComparison({
                     itemId,
-                    legacyDefaultVariantId: defaultVariantId,
+                    legacyDefaultVariantId,
                     explicitDefaultVariantId: explicitDefault.id,
                     explicitDefaultVariantStockItemId:
                         explicitDefault.stockItemId,
                 }),
             );
+        }
+        const resolvedDefaultVariantId = resolveDefaultVariantId({
+            legacyDefaultVariantId,
+            explicitDefaultVariantId: explicitDefault?.id ?? null,
+            explicitDefaultIsUsable: explicitDefault?.id !== null
+                && explicitDefault?.id !== undefined
+                && explicitDefault.stockItemId === itemId
+                && activeVariants.some(
+                    (variant) => variant.id === explicitDefault.id,
+                ),
+            explicitReadEnabled:
+                options.explicitReadEnabled
+                ?? isExplicitDefaultVariantReadEnabled(),
+        });
+        if (resolvedDefaultVariantId !== null) {
+            defaultVariants.set(itemId, { id: resolvedDefaultVariantId });
         }
     }
 

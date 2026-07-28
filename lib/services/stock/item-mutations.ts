@@ -31,6 +31,7 @@ import type {
     StockCommandActor,
 } from "./types";
 import { lockStockInventoryRows } from "./locks";
+import { setStockItemDefaultVariantIfUnset } from "./default-variant-writer";
 
 function buildLowStockAlert(
     item: {
@@ -355,9 +356,16 @@ export async function createItem(
             },
         });
 
+        const createdVariantIds: number[] = [];
+
         // Initial quantities are opening balances and are recorded in the stock ledger.
         if (variants.length === 0) {
-            await createDefaultVariantForNewItem(tx, item, actor.id);
+            const variant = await createDefaultVariantForNewItem(
+                tx,
+                item,
+                actor.id,
+            );
+            createdVariantIds.push(variant.id);
         } else {
             for (let index = 0; index < variants.length; index += 1) {
                 const variant = variants[index];
@@ -373,6 +381,7 @@ export async function createItem(
                     },
                     select: { id: true },
                 });
+                createdVariantIds.push(variantRecord.id);
 
                 await createStockOpeningBalanceTransaction(
                     tx,
@@ -389,6 +398,12 @@ export async function createItem(
                 );
             }
         }
+        const defaultVariantId = Math.min(...createdVariantIds);
+        await setStockItemDefaultVariantIfUnset(
+            tx,
+            item.id,
+            defaultVariantId,
+        );
 
         const createdItem = await tx.stockItem.findUniqueOrThrow({
             where: { id: item.id },

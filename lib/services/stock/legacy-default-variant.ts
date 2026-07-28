@@ -1,3 +1,5 @@
+export const LEGACY_DEFAULT_VARIANT_ORDER_BY = { id: "asc" } as const;
+
 export function selectLegacyDefaultVariantId(
     variants: ReadonlyArray<{ id: number; isActive: boolean }>,
 ): number | null {

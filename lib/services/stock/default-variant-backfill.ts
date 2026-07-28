@@ -2,7 +2,10 @@ import { Prisma } from "@prisma/client";
 
 import { prisma } from "@/lib/db/prisma";
 import { runSerializableTransaction } from "@/lib/db/transaction";
-import { selectLegacyDefaultVariantId } from "@/lib/services/stock/legacy-default-variant";
+import {
+    LEGACY_DEFAULT_VARIANT_ORDER_BY,
+    selectLegacyDefaultVariantId,
+} from "@/lib/services/stock/legacy-default-variant";
 import { lockStockInventoryRows } from "@/lib/services/stock/locks";
 import { loadActiveDefaultVariantsByItemIds } from "@/lib/services/stock/shared";
 import { setStockItemDefaultVariantIfUnset } from "@/lib/services/stock/default-variant-writer";
@@ -181,7 +184,7 @@ export async function loadDefaultVariantBackfillReport(): Promise<
                             stockItemId: true,
                             isActive: true,
                         },
-                        orderBy: { id: "asc" },
+                        orderBy: LEGACY_DEFAULT_VARIANT_ORDER_BY,
                     },
                 },
                 orderBy: { id: "asc" },

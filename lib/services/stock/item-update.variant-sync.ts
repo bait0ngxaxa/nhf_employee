@@ -7,6 +7,8 @@ import {
     variantHasReferences,
 } from "./shared";
 import { createStockOpeningBalanceTransaction } from "./write-helpers";
+import { reconcileStockItemDefaultVariant } from "./default-variant-writer";
+import { LEGACY_DEFAULT_VARIANT_ORDER_BY } from "./legacy-default-variant";
 import {
     type ExistingItemRecord,
     type ExistingVariantRecord,
@@ -50,7 +52,7 @@ async function getExistingVariants(
             imageUrl: true,
             isActive: true,
         },
-        orderBy: { id: "asc" },
+        orderBy: LEGACY_DEFAULT_VARIANT_ORDER_BY,
     });
 }
 
@@ -390,6 +392,7 @@ export async function updateItemWithVariants(
             data: { isActive: false },
         });
     }
+    await reconcileStockItemDefaultVariant(tx, itemId);
 
     const inventorySummary = await summarizeStoredVariantInventory(tx, itemId);
     await tx.stockItem.update({

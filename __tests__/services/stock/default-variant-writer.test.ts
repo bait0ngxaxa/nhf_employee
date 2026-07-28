@@ -4,6 +4,7 @@ import { mockDeep } from "vitest-mock-extended";
 
 import {
     InvalidStockDefaultVariantError,
+    reconcileStockItemDefaultVariant,
     setStockItemDefaultVariantIfUnset,
 } from "@/lib/services/stock/default-variant-writer";
 
@@ -12,6 +13,60 @@ function asNever<T>(value: T): never {
 }
 
 describe("explicit default variant writer", () => {
+    it("preserves an active same-item explicit default", async () => {
+        const tx = mockDeep<Prisma.TransactionClient>();
+        tx.stockItem.findUnique.mockResolvedValue(asNever({
+            defaultVariantId: 102,
+            defaultVariant: {
+                stockItemId: 10,
+                isActive: true,
+            },
+        }));
+
+        await expect(
+            reconcileStockItemDefaultVariant(tx, 10),
+        ).resolves.toBe(102);
+        expect(tx.stockItemVariant.findFirst).not.toHaveBeenCalled();
+        expect(tx.stockItem.updateMany).not.toHaveBeenCalled();
+    });
+
+    it("replaces an inactive explicit default with the lowest active variant", async () => {
+        const tx = mockDeep<Prisma.TransactionClient>();
+        tx.stockItem.findUnique.mockResolvedValue(asNever({
+            defaultVariantId: 102,
+            defaultVariant: {
+                stockItemId: 10,
+                isActive: false,
+            },
+        }));
+        tx.stockItemVariant.findFirst.mockResolvedValue(asNever({ id: 103 }));
+        tx.stockItem.updateMany.mockResolvedValue(asNever({ count: 1 }));
+
+        await expect(
+            reconcileStockItemDefaultVariant(tx, 10),
+        ).resolves.toBe(103);
+    });
+
+    it("clears the explicit default when no active variant remains", async () => {
+        const tx = mockDeep<Prisma.TransactionClient>();
+        tx.stockItem.findUnique.mockResolvedValue(asNever({
+            defaultVariantId: 102,
+            defaultVariant: {
+                stockItemId: 10,
+                isActive: false,
+            },
+        }));
+        tx.stockItemVariant.findFirst.mockResolvedValue(null);
+
+        await expect(
+            reconcileStockItemDefaultVariant(tx, 10),
+        ).resolves.toBeNull();
+        expect(tx.stockItem.update).toHaveBeenCalledWith({
+            where: { id: 10 },
+            data: { defaultVariantId: null },
+        });
+    });
+
     it("sets an active variant owned by the item", async () => {
         const tx = mockDeep<Prisma.TransactionClient>();
         tx.stockItem.updateMany.mockResolvedValue(asNever({ count: 1 }));
