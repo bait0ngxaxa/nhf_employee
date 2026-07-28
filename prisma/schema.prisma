@@ -557,13 +557,15 @@ model StockItem {
   quantity     Int                @default(0)
   minStock     Int                @default(0)
   categoryId   Int
+  defaultVariantId Int?           @unique
   isActive     Boolean            @default(true)
   createdAt    DateTime           @default(now())
   updatedAt    DateTime           @updatedAt
   category     StockCategory      @relation(fields: [categoryId], references: [id])
+  defaultVariant StockItemVariant? @relation("StockItemDefaultVariant", fields: [defaultVariantId], references: [id], onDelete: SetNull)
   transactions StockTransaction[]
   requestItems StockRequestItem[]
-  variants     StockItemVariant[]
+  variants     StockItemVariant[] @relation("StockItemVariants")
 
   @@index([categoryId])
   @@map("stock_items")
@@ -580,7 +582,8 @@ model StockItemVariant {
   isActive        Boolean                      @default(true)
   createdAt       DateTime                     @default(now())
   updatedAt       DateTime                     @updatedAt
-  stockItem       StockItem                    @relation(fields: [stockItemId], references: [id], onDelete: Cascade)
+  stockItem       StockItem                    @relation("StockItemVariants", fields: [stockItemId], references: [id], onDelete: Cascade)
+  defaultForItem  StockItem?                   @relation("StockItemDefaultVariant")
   transactions    StockTransaction[]
   requestItems    StockRequestItem[]
   attributeValues StockVariantAttributeValue[]

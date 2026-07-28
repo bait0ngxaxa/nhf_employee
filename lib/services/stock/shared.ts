@@ -9,6 +9,7 @@ import type {
     CreateRequestInput,
 } from "@/lib/validations/stock";
 import type { PendingRequestItemRecord } from "./types";
+import { selectLegacyDefaultVariantId } from "./legacy-default-variant";
 
 export function generateSku(): string {
     const time = Date.now().toString(36).toUpperCase();
@@ -35,10 +36,23 @@ export async function loadActiveDefaultVariantsByItemIds(
         orderBy: { id: "asc" },
     });
 
-    const defaultVariants = new Map<number, { id: number }>();
+    const variantsByItemId = new Map<
+        number,
+        Array<{ id: number; isActive: boolean }>
+    >();
     for (const variant of variants) {
-        if (!defaultVariants.has(variant.stockItemId)) {
-            defaultVariants.set(variant.stockItemId, { id: variant.id });
+        const itemVariants = variantsByItemId.get(variant.stockItemId) ?? [];
+        itemVariants.push({ id: variant.id, isActive: true });
+        variantsByItemId.set(variant.stockItemId, itemVariants);
+    }
+
+    const defaultVariants = new Map<number, { id: number }>();
+    for (const itemId of uniqueItemIds) {
+        const defaultVariantId = selectLegacyDefaultVariantId(
+            variantsByItemId.get(itemId) ?? [],
+        );
+        if (defaultVariantId !== null) {
+            defaultVariants.set(itemId, { id: defaultVariantId });
         }
     }
 
