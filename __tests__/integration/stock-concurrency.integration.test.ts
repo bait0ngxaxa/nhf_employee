@@ -607,6 +607,77 @@ describe.sequential("stock mutations with real MySQL", () => {
         })).isActive).toBe(false);
     });
 
+    it("ไม่ชุบชีวิต variant ที่ปิดไว้เมื่อปิดและเปิด parent", async () => {
+        const fixture = await createStockFixture(prisma, {
+            suffix: "PARENT-LIFECYCLE",
+        });
+        const created = await stockService.createItem({
+            name: "วัสดุทดสอบ parent lifecycle",
+            sku: "PARENT-LIFECYCLE-ITEM",
+            categoryId: fixture.category.id,
+            variants: [
+                {
+                    sku: "PARENT-LIFECYCLE-B",
+                    unit: "ชิ้น",
+                    quantity: 4,
+                    minStock: 1,
+                    attributes: [{ name: "แบบ", value: "B" }],
+                },
+                {
+                    sku: "PARENT-LIFECYCLE-A",
+                    unit: "ชิ้น",
+                    quantity: 3,
+                    minStock: 1,
+                    attributes: [{ name: "แบบ", value: "A" }],
+                },
+            ],
+        }, fixture.issuerActor);
+        const [inactiveVariant, activeDefaultVariant] = created.variants;
+        if (!inactiveVariant || !activeDefaultVariant) {
+            throw new Error("สร้างรายการย่อยสำหรับ integration test ไม่ครบ");
+        }
+
+        await prisma.stockItemVariant.update({
+            where: { id: inactiveVariant.id },
+            data: { isActive: false },
+        });
+        await prisma.stockItem.update({
+            where: { id: created.id },
+            data: { defaultVariantId: activeDefaultVariant.id },
+        });
+
+        await stockService.updateItem(
+            created.id,
+            { isActive: false },
+            fixture.issuerActor,
+        );
+        await stockService.updateItem(
+            created.id,
+            { isActive: true },
+            fixture.issuerActor,
+        );
+
+        const lifecycleState = await prisma.stockItem.findUniqueOrThrow({
+            where: { id: created.id },
+            select: {
+                isActive: true,
+                defaultVariantId: true,
+                variants: {
+                    orderBy: { id: "asc" },
+                    select: { id: true, isActive: true },
+                },
+            },
+        });
+        expect(lifecycleState).toEqual({
+            isActive: true,
+            defaultVariantId: activeDefaultVariant.id,
+            variants: [
+                { id: inactiveVariant.id, isActive: false },
+                { id: activeDefaultVariant.id, isActive: true },
+            ],
+        });
+    });
+
     it("ใช้ explicit default ตอนแก้ parent โดยไม่ส่ง variants เมื่อเปิด flag", async () => {
         const fixture = await createStockFixture(prisma, {
             suffix: "DEFAULT-UPDATE",
@@ -1169,7 +1240,7 @@ describe.sequential("stock mutations with real MySQL", () => {
         expect(await prisma.notification.count()).toBe(1);
     });
 
-    it("ปิดแล้วเปิดวัสดุเดิมจะสลับ lifecycle ของ variant เดิมโดยไม่สร้างซ้ำ", async () => {
+    it("ปิดแล้วเปิดวัสดุเดิมจะคง lifecycle และ default ของ variant เดิม", async () => {
         const fixture = await createStockFixture(prisma, { suffix: "REACTIVATE" });
         await prisma.stockRequest.delete({ where: { id: fixture.request.id } });
 
@@ -1181,11 +1252,11 @@ describe.sequential("stock mutations with real MySQL", () => {
         );
         expect(await prisma.stockItemVariant.count({
             where: { stockItemId: fixture.item.id, isActive: true },
-        })).toBe(0);
+        })).toBe(1);
         expect((await prisma.stockItem.findUniqueOrThrow({
             where: { id: fixture.item.id },
             select: { defaultVariantId: true },
-        })).defaultVariantId).toBeNull();
+        })).defaultVariantId).toBe(fixture.variant.id);
 
         const afterReactivation = await stockService.updateItem(
             fixture.item.id,

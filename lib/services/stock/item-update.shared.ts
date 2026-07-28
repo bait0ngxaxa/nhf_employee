@@ -59,19 +59,12 @@ async function updateItemWithoutVariants(
         },
         orderBy: LEGACY_DEFAULT_VARIANT_ORDER_BY,
     });
-    const variantsForDefaultResolution =
-        nextItem.isActive && originalData.isActive !== true
-            ? existingVariants
-            : existingVariants.map((variant) => ({
-                ...variant,
-                isActive: true,
-            }));
     const defaultVariantId = resolveDefaultVariantId({
         legacyDefaultVariantId:
-            selectLegacyDefaultVariantId(variantsForDefaultResolution),
+            selectLegacyDefaultVariantId(existingVariants),
         explicitDefaultVariantId: currentItem.defaultVariantId,
         explicitDefaultIsUsable: currentItem.defaultVariantId !== null
-            && variantsForDefaultResolution.some(
+            && existingVariants.some(
                 (variant) =>
                     variant.id === currentItem.defaultVariantId
                     && variant.isActive,
@@ -96,12 +89,6 @@ async function updateItemWithoutVariants(
         });
     }
 
-    if (originalData.isActive !== undefined) {
-        await tx.stockItemVariant.updateMany({
-            where: { stockItemId: itemId },
-            data: { isActive: nextItem.isActive },
-        });
-    }
     await reconcileStockItemDefaultVariant(tx, itemId);
 
     const updatedItem = await tx.stockItem.findUniqueOrThrow({
