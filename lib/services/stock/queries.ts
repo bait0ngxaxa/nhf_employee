@@ -60,11 +60,9 @@ export async function getItems(filters: StockItemsFilter) {
                   },
               })
             : [];
-    const defaultVariantIdByItemId =
-        buildResolvedDefaultVariantIds(items);
+    buildResolvedDefaultVariantIds(items);
     const { reservedByItemId, reservedByVariantId } = buildReservedQuantityMaps(
         pendingRequestItems,
-        defaultVariantIdByItemId,
     );
 
     return {

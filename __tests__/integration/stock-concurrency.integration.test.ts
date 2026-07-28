@@ -691,7 +691,7 @@ describe.sequential("stock mutations with real MySQL", () => {
         }
     });
 
-    it("ใช้ explicit default ใน request creation และ legacy issue เมื่อเปิด flag", async () => {
+    it("เก็บ resolved default variant ตอนสร้างคำขอก่อนจ่าย แม้ default เปลี่ยนภายหลัง", async () => {
         const fixture = await createStockFixture(prisma, {
             suffix: "DEFAULT-REQUEST",
         });
@@ -734,9 +734,9 @@ describe.sequential("stock mutations with real MySQL", () => {
             }
             expect(requestItem.variantId).toBe(explicitVariant.id);
 
-            await prisma.stockRequestItem.update({
-                where: { id: requestItem.id },
-                data: { variantId: null },
+            await prisma.stockItem.update({
+                where: { id: fixture.item.id },
+                data: { defaultVariantId: fixture.variant.id },
             });
             await stockService.issueRequest(
                 request.id,
@@ -993,35 +993,26 @@ describe.sequential("stock mutations with real MySQL", () => {
         })).status).toBe(StockRequestStatus.PENDING_ISSUE);
     });
 
-    it("legacy request ที่ไม่มี variant ใช้ active variant ID ต่ำที่สุด", async () => {
+    it("ปฏิเสธการจ่ายคำขอ pending ที่ไม่มี variant snapshot", async () => {
         const fixture = await createStockFixture(prisma, { suffix: "LEGACY-DEFAULT" });
-        const laterVariant = await prisma.stockItemVariant.create({
-            data: {
-                stockItemId: fixture.item.id,
-                sku: "LEGACY-DEFAULT-LATER",
-                unit: "ชิ้น",
-                quantity: 20,
-                minStock: 2,
-            },
-        });
         await prisma.stockRequestItem.updateMany({
             where: { requestId: fixture.request.id },
             data: { variantId: null },
         });
 
-        // Characterization only: Phase 1 preserves the legacy lowest-active-ID fallback.
-        await stockService.issueRequest(fixture.request.id, fixture.issuerActor);
+        await expect(
+            stockService.issueRequest(fixture.request.id, fixture.issuerActor),
+        ).rejects.toThrow("ยังไม่ได้ระบุ");
 
-        const transaction = await prisma.stockTransaction.findFirstOrThrow({
-            where: { stockRequestId: fixture.request.id },
-        });
-        expect(transaction.variantId).toBe(fixture.variant.id);
         expect((await prisma.stockItemVariant.findUniqueOrThrow({
             where: { id: fixture.variant.id },
-        })).quantity).toBe(7);
-        expect((await prisma.stockItemVariant.findUniqueOrThrow({
-            where: { id: laterVariant.id },
-        })).quantity).toBe(20);
+        })).quantity).toBe(10);
+        expect((await prisma.stockRequest.findUniqueOrThrow({
+            where: { id: fixture.request.id },
+        })).status).toBe(StockRequestStatus.PENDING_ISSUE);
+        expect(await prisma.stockTransaction.count({
+            where: { stockRequestId: fixture.request.id },
+        })).toBe(0);
     });
 
     it("ปฏิเสธ request item ที่อ้าง variant ของอีก item ภายใน issue transaction", async () => {

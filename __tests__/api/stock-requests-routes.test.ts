@@ -535,6 +535,41 @@ describe("Stock Request Routes", () => {
             }));
             expect(processOutbox).toHaveBeenCalledTimes(1);
         });
+
+        it("should return a conflict when a pending request lacks a variant snapshot", async () => {
+            vi.mocked(getApiAuthSession).mockResolvedValue({
+                user: { id: "1", email: "admin@test.com", role: "ADMIN" },
+            } as never);
+            vi.mocked(buildUserContext).mockReturnValue({
+                id: 1,
+                email: "admin@test.com",
+                role: "ADMIN",
+                name: "Admin",
+            });
+            vi.mocked(isAdminRole).mockReturnValue(true);
+            vi.mocked(stockService.issueRequest).mockRejectedValue(
+                new Error(
+                    "คำขอรอจ่ายมีรายการย่อยที่ยังไม่ได้ระบุ กรุณาสร้างคำขอใหม่",
+                ),
+            );
+
+            const response = await issueRequestRoute(
+                new NextRequest(
+                    "http://localhost/api/stock/requests/77/issue",
+                    {
+                        method: "POST",
+                        body: JSON.stringify({}),
+                    },
+                ),
+                { params: Promise.resolve({ id: "77" }) },
+            );
+
+            expect(response.status).toBe(409);
+            expect(await response.json()).toEqual({
+                error: "คำขอรอจ่ายมีรายการย่อยที่ยังไม่ได้ระบุ กรุณาสร้างคำขอใหม่",
+            });
+            expect(processOutbox).not.toHaveBeenCalled();
+        });
     });
 
     describe("POST /api/stock/requests/[id]/review", () => {

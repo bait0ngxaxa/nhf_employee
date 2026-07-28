@@ -180,6 +180,24 @@ describe("Stock Service Mutations", () => {
     });
 
     describe("issueRequest", () => {
+        it("should reject issuing a pending request without a variant snapshot", async () => {
+            prismaMock.stockRequest.findUnique.mockResolvedValue(
+                asNever({
+                    requestedBy: 3,
+                    projectCode: "PRJ-MISSING-VARIANT",
+                    items: [{ itemId: 10, variantId: null, quantity: 1 }],
+                }),
+            );
+
+            await expect(
+                stockService.issueRequest(99, commandActor(9)),
+            ).rejects.toThrow("ยังไม่ได้ระบุ");
+
+            expect(prismaMock.stockItemVariant.updateMany).not.toHaveBeenCalled();
+            expect(prismaMock.stockItem.update).not.toHaveBeenCalled();
+            expect(prismaMock.stockTransaction.create).not.toHaveBeenCalled();
+        });
+
         it("should not issue stock when another transaction has already claimed the request", async () => {
             prismaMock.stockRequest.updateMany.mockResolvedValue(
                 asNever({ count: 0 }),
@@ -341,8 +359,8 @@ describe("Stock Service Mutations", () => {
                     status: "PENDING_ISSUE",
                     requestedBy: 3,
                     items: [
-                        { itemId: 10, variantId: null, quantity: 3 },
-                        { itemId: 10, variantId: null, quantity: 3 },
+                        { itemId: 10, variantId: 101, quantity: 3 },
+                        { itemId: 10, variantId: 101, quantity: 3 },
                     ],
                 }),
             );
@@ -387,7 +405,7 @@ describe("Stock Service Mutations", () => {
             prismaMock.stockRequest.findUnique.mockResolvedValue(
                 asNever({
                     status: "PENDING_ISSUE",
-                    items: [{ itemId: 11, variantId: null, quantity: 2 }],
+                    items: [{ itemId: 11, variantId: 111, quantity: 2 }],
                 }),
             );
             prismaMock.stockItem.findMany.mockResolvedValue(
@@ -451,9 +469,9 @@ describe("Stock Service Mutations", () => {
                     requestedBy: 3,
                     projectCode: "PRJ-ISSUE",
                     items: [
-                        { id: 1001, itemId: 10, variantId: null, quantity: 2 },
-                        { id: 1002, itemId: 10, variantId: null, quantity: 3 },
-                        { id: 1003, itemId: 12, variantId: null, quantity: 1 },
+                        { id: 1001, itemId: 10, variantId: 101, quantity: 2 },
+                        { id: 1002, itemId: 10, variantId: 101, quantity: 3 },
+                        { id: 1003, itemId: 12, variantId: 121, quantity: 1 },
                     ],
                 }),
             );

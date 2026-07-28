@@ -29,7 +29,6 @@ import type {
 } from "@/lib/validations/stock";
 import {
     buildRequestInclude,
-    loadActiveDefaultVariantsByItemIds,
 } from "./shared";
 import { lockStockInventoryRows } from "./locks";
 import type {
@@ -198,32 +197,27 @@ export async function issueRequest(
             throw new Error("ไม่พบคำขอเบิก");
         }
 
-        await lockStockInventoryRows(
-            tx,
-            request.items.map((item) => item.itemId),
-        );
-        const itemsWithoutVariant = request.items
-            .filter((item) => item.variantId === null)
-            .map((item) => item.itemId);
-        const defaultVariantsByItemId = itemsWithoutVariant.length > 0
-            ? await loadActiveDefaultVariantsByItemIds(tx, itemsWithoutVariant)
-            : new Map<number, { id: number }>();
-        const resolvedRequestItems = request.items.map((requestItem) => {
-            const variantId =
-                requestItem.variantId ?? defaultVariantsByItemId.get(requestItem.itemId)?.id;
-            if (!variantId) {
-                throw new Error("ไม่พบรายการย่อยของวัสดุ");
+        const validatedRequestItems = request.items.map((requestItem) => {
+            const { variantId } = requestItem;
+            if (variantId === null) {
+                throw new Error(
+                    "คำขอรอจ่ายมีรายการย่อยที่ยังไม่ได้ระบุ กรุณาสร้างคำขอใหม่",
+                );
             }
 
             return { ...requestItem, variantId };
         });
+        await lockStockInventoryRows(
+            tx,
+            validatedRequestItems.map((item) => item.itemId),
+        );
         const requestedQtyByVariantId = new Map<
             number,
             { itemId: number; quantity: number }
         >();
         const requestedQtyByItemId = new Map<number, number>();
 
-        for (const requestItem of resolvedRequestItems) {
+        for (const requestItem of validatedRequestItems) {
             const existing = requestedQtyByVariantId.get(requestItem.variantId);
             requestedQtyByVariantId.set(requestItem.variantId, {
                 itemId: requestItem.itemId,
@@ -330,7 +324,7 @@ export async function issueRequest(
         }
 
         const transactionIds: number[] = [];
-        for (const requestItem of resolvedRequestItems) {
+        for (const requestItem of validatedRequestItems) {
             const transaction = await tx.stockTransaction.create({
                 data: {
                     itemId: requestItem.itemId,

@@ -38,9 +38,9 @@ async function loadActiveStockItems(): Promise<StockBalanceItem[]> {
     const pendingRequestItems = await loadPendingRequestItems(
         items.map((item) => item.id),
     );
+    buildResolvedDefaultVariantIds(items);
     const { reservedByItemId, reservedByVariantId } = buildReservedQuantityMaps(
         pendingRequestItems,
-        buildResolvedDefaultVariantIds(items),
     );
 
     return items.map((item) =>

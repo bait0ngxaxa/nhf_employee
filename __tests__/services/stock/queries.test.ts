@@ -98,7 +98,7 @@ describe("Stock Queries", () => {
             });
         });
 
-        it("should append reserved and available quantities for items and variants", async () => {
+        it("should ignore pending requests without a variant snapshot", async () => {
             prismaMock.stockItem.findMany.mockResolvedValue(
                 asNever([
                     {
@@ -183,13 +183,13 @@ describe("Stock Queries", () => {
             expect(result.items).toHaveLength(2);
             expect(result.items[0]).toMatchObject({
                 id: 1,
-                reservedQuantity: 4,
-                availableQuantity: 6,
+                reservedQuantity: 0,
+                availableQuantity: 10,
             });
             expect(result.items[0]?.variants[0]).toMatchObject({
                 id: 11,
-                reservedQuantity: 4,
-                availableQuantity: 6,
+                reservedQuantity: 0,
+                availableQuantity: 10,
             });
             expect(result.items[1]).toMatchObject({
                 id: 2,

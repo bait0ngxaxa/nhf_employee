@@ -56,7 +56,10 @@ export async function POST(
         return NextResponse.json({ request: updated });
     } catch (error) {
         const message = error instanceof Error ? error.message : "";
-        if (message.includes("ปิดใช้งานแล้ว")) {
+        if (
+            message.includes("ปิดใช้งานแล้ว") ||
+            message.includes("ยังไม่ได้ระบุ")
+        ) {
             return jsonError(message, 409);
         }
         if (

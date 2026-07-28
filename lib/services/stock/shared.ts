@@ -198,7 +198,6 @@ export function appendReservedQuantity(
 
 export function buildReservedQuantityMaps(
     requestItems: PendingRequestItemRecord[],
-    defaultVariantIdByItemId: Map<number, number>,
 ): {
     reservedByItemId: Map<number, number>;
     reservedByVariantId: Map<number, number>;
@@ -207,21 +206,19 @@ export function buildReservedQuantityMaps(
     const reservedByVariantId = new Map<number, number>();
 
     for (const requestItem of requestItems) {
+        if (requestItem.variantId === null) {
+            continue;
+        }
+
         appendReservedQuantity(
             reservedByItemId,
             requestItem.itemId,
             requestItem.quantity,
         );
 
-        const variantId =
-            requestItem.variantId ?? defaultVariantIdByItemId.get(requestItem.itemId);
-        if (!variantId) {
-            continue;
-        }
-
         appendReservedQuantity(
             reservedByVariantId,
-            variantId,
+            requestItem.variantId,
             requestItem.quantity,
         );
     }

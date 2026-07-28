@@ -189,15 +189,7 @@ function assertStockAvailable(
         quantity: number;
     }>,
 ): void {
-    const defaultVariantIdByItemId = new Map(
-        Array.from(context.defaultVariantsByItemId.entries()).map(
-            ([itemId, variant]) => [itemId, variant.id] as const,
-        ),
-    );
-    const { reservedByVariantId } = buildReservedQuantityMaps(
-        pendingItems,
-        defaultVariantIdByItemId,
-    );
+    const { reservedByVariantId } = buildReservedQuantityMaps(pendingItems);
     const variantById = new Map(variants.map((variant) => [variant.id, variant]));
 
     for (const [variantId, requested] of requestedByVariantId) {
