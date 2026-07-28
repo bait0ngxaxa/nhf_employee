@@ -4,6 +4,7 @@ import type {
     StockItemsFilter,
     StockRequestsFilter,
 } from "@/lib/validations/stock";
+import { buildObservedLegacyDefaultVariantIds } from "./default-variant-shadow";
 import {
     buildItemInclude,
     buildRequestInclude,
@@ -58,11 +59,8 @@ export async function getItems(filters: StockItemsFilter) {
                   },
               })
             : [];
-    const defaultVariantIdByItemId = new Map(
-        items
-            .map((item) => [item.id, item.variants[0]?.id] as const)
-            .filter((entry): entry is readonly [number, number] => entry[1] !== undefined),
-    );
+    const defaultVariantIdByItemId =
+        buildObservedLegacyDefaultVariantIds(items);
     const { reservedByItemId, reservedByVariantId } = buildReservedQuantityMaps(
         pendingRequestItems,
         defaultVariantIdByItemId,
@@ -104,6 +102,7 @@ export async function getItemById(id: number) {
     });
     if (item) {
         await assertPersistedVariantsForRead([item]);
+        buildObservedLegacyDefaultVariantIds([item]);
     }
     return item;
 }

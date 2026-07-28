@@ -5,6 +5,7 @@ import { runSerializableTransaction } from "@/lib/db/transaction";
 import { selectLegacyDefaultVariantId } from "@/lib/services/stock/legacy-default-variant";
 import { lockStockInventoryRows } from "@/lib/services/stock/locks";
 import { loadActiveDefaultVariantsByItemIds } from "@/lib/services/stock/shared";
+import { setStockItemDefaultVariantIfUnset } from "@/lib/services/stock/default-variant-writer";
 
 const BACKFILL_PAGE_SIZE = 500;
 const READ_TRANSACTION_MAX_WAIT_MS = 10_000;
@@ -237,11 +238,11 @@ async function applyDefaultVariantForItem(itemId: number): Promise<boolean> {
             return false;
         }
 
-        const updated = await tx.stockItem.updateMany({
-            where: { id: itemId, defaultVariantId: null },
-            data: { defaultVariantId: legacyDefaultVariant.id },
-        });
-        return updated.count === 1;
+        return setStockItemDefaultVariantIfUnset(
+            tx,
+            itemId,
+            legacyDefaultVariant.id,
+        );
     });
 }
 

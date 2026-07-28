@@ -10,6 +10,10 @@ import type {
 } from "@/lib/validations/stock";
 import type { PendingRequestItemRecord } from "./types";
 import { selectLegacyDefaultVariantId } from "./legacy-default-variant";
+import {
+    buildDefaultVariantShadowComparison,
+    reportDefaultVariantShadowComparison,
+} from "./default-variant-shadow";
 
 export function generateSku(): string {
     const time = Date.now().toString(36).toUpperCase();
@@ -35,15 +39,36 @@ export async function loadActiveDefaultVariantsByItemIds(
         },
         orderBy: { id: "asc" },
     });
+    const explicitDefaultItems = await tx.stockItem.findMany({
+        where: { id: { in: uniqueItemIds } },
+        select: {
+            id: true,
+            defaultVariantId: true,
+            defaultVariant: {
+                select: { stockItemId: true },
+            },
+        },
+    });
 
     const variantsByItemId = new Map<
         number,
         Array<{ id: number; isActive: boolean }>
     >();
+    const explicitDefaultsByItemId = new Map<number, {
+        id: number | null;
+        stockItemId: number | null;
+    }>();
     for (const variant of variants) {
         const itemVariants = variantsByItemId.get(variant.stockItemId) ?? [];
         itemVariants.push({ id: variant.id, isActive: true });
         variantsByItemId.set(variant.stockItemId, itemVariants);
+    }
+    for (const item of explicitDefaultItems) {
+        if (!("defaultVariantId" in item)) continue;
+        explicitDefaultsByItemId.set(item.id, {
+            id: item.defaultVariantId,
+            stockItemId: item.defaultVariant?.stockItemId ?? null,
+        });
     }
 
     const defaultVariants = new Map<number, { id: number }>();
@@ -53,6 +78,19 @@ export async function loadActiveDefaultVariantsByItemIds(
         );
         if (defaultVariantId !== null) {
             defaultVariants.set(itemId, { id: defaultVariantId });
+        }
+
+        const explicitDefault = explicitDefaultsByItemId.get(itemId);
+        if (explicitDefault) {
+            reportDefaultVariantShadowComparison(
+                buildDefaultVariantShadowComparison({
+                    itemId,
+                    legacyDefaultVariantId: defaultVariantId,
+                    explicitDefaultVariantId: explicitDefault.id,
+                    explicitDefaultVariantStockItemId:
+                        explicitDefault.stockItemId,
+                }),
+            );
         }
     }
 

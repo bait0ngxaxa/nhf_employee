@@ -15,6 +15,10 @@ import {
     applyDefaultVariantBackfill,
     loadDefaultVariantBackfillReport,
 } from "@/lib/services/stock/default-variant-backfill";
+import {
+    InvalidStockDefaultVariantError,
+    setStockItemDefaultVariantIfUnset,
+} from "@/lib/services/stock/default-variant-writer";
 import { lockStockInventoryRows } from "@/lib/services/stock/locks";
 import { createStockOpeningBalanceTransaction } from "@/lib/services/stock/write-helpers";
 import {
@@ -142,6 +146,56 @@ describe.sequential("stock mutations with real MySQL", () => {
             where: { id: fixture.item.id },
             select: { defaultVariantId: true },
         })).defaultVariantId).toBeNull();
+    });
+
+    it("explicit default writer บังคับ same-item active variant", async () => {
+        const first = await createStockFixture(prisma, {
+            suffix: "DEFAULT-OWNER-A",
+        });
+        const second = await createStockFixture(prisma, {
+            suffix: "DEFAULT-OWNER-B",
+        });
+
+        await expect(prisma.$transaction((tx) =>
+            setStockItemDefaultVariantIfUnset(
+                tx,
+                first.item.id,
+                second.variant.id,
+            ),
+        )).rejects.toBeInstanceOf(InvalidStockDefaultVariantError);
+
+        expect((await prisma.stockItem.findUniqueOrThrow({
+            where: { id: first.item.id },
+            select: { defaultVariantId: true },
+        })).defaultVariantId).toBeNull();
+
+        await prisma.stockItemVariant.update({
+            where: { id: first.variant.id },
+            data: { isActive: false },
+        });
+        await expect(prisma.$transaction((tx) =>
+            setStockItemDefaultVariantIfUnset(
+                tx,
+                first.item.id,
+                first.variant.id,
+            ),
+        )).rejects.toBeInstanceOf(InvalidStockDefaultVariantError);
+
+        await prisma.stockItemVariant.update({
+            where: { id: first.variant.id },
+            data: { isActive: true },
+        });
+        await expect(prisma.$transaction((tx) =>
+            setStockItemDefaultVariantIfUnset(
+                tx,
+                first.item.id,
+                first.variant.id,
+            ),
+        )).resolves.toBe(true);
+        expect((await prisma.stockItem.findUniqueOrThrow({
+            where: { id: first.item.id },
+            select: { defaultVariantId: true },
+        })).defaultVariantId).toBe(first.variant.id);
     });
 
     it("default variant apply เลือก lowest active ID และรันซ้ำได้โดยไม่ overwrite", async () => {

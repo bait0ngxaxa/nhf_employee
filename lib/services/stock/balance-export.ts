@@ -8,6 +8,7 @@ import {
     type StockBalanceVariant,
     type StockBalanceItem,
 } from "@/lib/services/stock/balance-workbook";
+import { buildObservedLegacyDefaultVariantIds } from "@/lib/services/stock/default-variant-shadow";
 import {
     buildItemInclude,
     buildReservedQuantityMaps,
@@ -19,11 +20,14 @@ import type { PendingRequestItemRecord } from "./types";
 type LoadedStockBalanceVariant = Omit<
     StockBalanceVariant,
     "reservedQuantity" | "availableQuantity"
->;
+> & {
+    isActive: boolean;
+};
 type LoadedStockBalanceItem = Omit<
     StockBalanceItem,
     "reservedQuantity" | "availableQuantity" | "variants"
 > & {
+    defaultVariantId: number | null;
     variants: LoadedStockBalanceVariant[];
 };
 
@@ -34,7 +38,7 @@ async function loadActiveStockItems(): Promise<StockBalanceItem[]> {
     );
     const { reservedByItemId, reservedByVariantId } = buildReservedQuantityMaps(
         pendingRequestItems,
-        buildDefaultVariantIdByItemId(items),
+        buildObservedLegacyDefaultVariantIds(items),
     );
 
     return items.map((item) =>
@@ -71,16 +75,6 @@ async function loadPendingRequestItems(
             quantity: true,
         },
     });
-}
-
-function buildDefaultVariantIdByItemId(
-    items: LoadedStockBalanceItem[],
-): Map<number, number> {
-    return new Map(
-        items
-            .map((item) => [item.id, item.variants[0]?.id] as const)
-            .filter((entry): entry is readonly [number, number] => entry[1] !== undefined),
-    );
 }
 
 function toStockBalanceItem(
