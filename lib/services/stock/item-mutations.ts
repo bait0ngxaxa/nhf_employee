@@ -572,6 +572,9 @@ export async function adjustStock(
         if (!item) {
             throw new Error("ไม่พบวัสดุ");
         }
+        if (!item.isActive) {
+            throw new Error("ไม่สามารถปรับสต็อกของวัสดุที่ปิดใช้งานแล้ว");
+        }
 
         const variant = await findAdjustmentVariant(
             tx,

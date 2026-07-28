@@ -61,6 +61,7 @@ export async function POST(
         const message = error instanceof Error ? error.message : "";
         if (
             message.includes("ไม่พบวัสดุ") ||
+            message.includes("ไม่สามารถปรับสต็อกของวัสดุที่ปิดใช้งานแล้ว") ||
             message.includes("ต้องไม่ติดลบ") ||
             message.includes("รายการย่อยของวัสดุ")
         ) {

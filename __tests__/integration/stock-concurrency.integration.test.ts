@@ -1007,6 +1007,36 @@ describe.sequential("stock mutations with real MySQL", () => {
         })).payload).toContain(`"variantId":${fixture.variant.id}`);
     });
 
+    it("ไม่ปรับ stock เมื่อ parent ปิดใช้งาน", async () => {
+        const fixture = await createStockFixture(prisma, {
+            suffix: "ADJUST-INACTIVE-PARENT",
+        });
+        await prisma.stockItem.update({
+            where: { id: fixture.item.id },
+            data: { isActive: false },
+        });
+
+        await expect(
+            stockService.adjustStock(
+                fixture.item.id,
+                {
+                    variantId: fixture.variant.id,
+                    type: StockTxType.IN,
+                    quantity: 1,
+                    minStock: fixture.minStock,
+                },
+                fixture.issuerActor,
+            ),
+        ).rejects.toThrow("ไม่สามารถปรับสต็อกของวัสดุที่ปิดใช้งานแล้ว");
+
+        const inventory = await readInventory(fixture);
+        expect(inventory.item.quantity).toBe(fixture.quantity);
+        expect(inventory.variant.quantity).toBe(fixture.quantity);
+        expect(await prisma.stockTransaction.count()).toBe(0);
+        expect(await prisma.auditLog.count()).toBe(0);
+        expect(await prisma.notificationOutbox.count()).toBe(0);
+    });
+
     it("ไม่เปลี่ยน inventory, ledger หรือ request เมื่อ stock ไม่เพียงพอ", async () => {
         const fixture = await createStockFixture(prisma, {
             suffix: "INSUFFICIENT",
