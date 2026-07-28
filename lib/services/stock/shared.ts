@@ -117,8 +117,10 @@ export async function loadActiveDefaultVariantsByItemIds(
 }
 
 export class StockInvariantViolationError extends Error {
-    constructor() {
-        super("ข้อมูลวัสดุไม่สอดคล้อง: ไม่พบรายการย่อยของวัสดุ");
+    constructor(
+        message = "ข้อมูลวัสดุไม่สอดคล้อง: ไม่พบรายการย่อยของวัสดุ",
+    ) {
+        super(message);
         this.name = "StockInvariantViolationError";
     }
 }
@@ -207,7 +209,9 @@ export function buildReservedQuantityMaps(
 
     for (const requestItem of requestItems) {
         if (requestItem.variantId === null) {
-            continue;
+            throw new StockInvariantViolationError(
+                "พบคำขอรอจ่ายที่ไม่มี variant snapshot",
+            );
         }
 
         appendReservedQuantity(

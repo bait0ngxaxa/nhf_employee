@@ -20,6 +20,7 @@ import {
     setStockItemDefaultVariantIfUnset,
 } from "@/lib/services/stock/default-variant-writer";
 import { createNewStockRequest } from "@/lib/services/stock/request-creation";
+import { StockInvariantViolationError } from "@/lib/services/stock/shared";
 import { lockStockInventoryRows } from "@/lib/services/stock/locks";
 import { createStockOpeningBalanceTransaction } from "@/lib/services/stock/write-helpers";
 import {
@@ -830,6 +831,39 @@ describe.sequential("stock mutations with real MySQL", () => {
                 select: { variantId: true },
             })).toEqual({ variantId: explicitVariant.id });
         });
+    });
+
+    it("ไม่สร้างคำขอใหม่เมื่อ pending request ไม่มี variant snapshot", async () => {
+        const fixture = await createStockFixture(prisma, {
+            suffix: "PENDING-NULL-RESERVATION",
+        });
+        await prisma.stockRequestItem.updateMany({
+            where: { requestId: fixture.request.id },
+            data: { variantId: null },
+        });
+
+        await expect(
+            prisma.$transaction((tx) =>
+                createNewStockRequest(
+                    tx,
+                    {
+                        projectCode: "PENDING-NULL-RESERVATION-PROJECT",
+                        items: [{
+                            itemId: fixture.item.id,
+                            variantId: fixture.variant.id,
+                            quantity: 1,
+                        }],
+                    },
+                    fixture.requesterActor,
+                    {
+                        idempotencyKey: "pending-null-reservation",
+                        requestHash: "3".repeat(64),
+                    },
+                ),
+            ),
+        ).rejects.toBeInstanceOf(StockInvariantViolationError);
+
+        expect(await prisma.stockRequest.count()).toBe(1);
     });
 
     it("fallback ไป lowest active เมื่อ explicit default ใช้งานไม่ได้", async () => {

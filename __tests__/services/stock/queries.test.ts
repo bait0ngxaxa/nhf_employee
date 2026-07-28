@@ -3,6 +3,7 @@ import type { PrismaClient } from "@prisma/client";
 import { mockDeep, mockReset } from "vitest-mock-extended";
 import { prisma } from "@/lib/db/prisma";
 import { getCategories, getItemById, getItems, getRequests } from "@/lib/services/stock/queries";
+import { StockInvariantViolationError } from "@/lib/services/stock/shared";
 
 vi.mock("@/lib/db/prisma", () => ({
     prisma: mockDeep<PrismaClient>(),
@@ -98,7 +99,73 @@ describe("Stock Queries", () => {
             });
         });
 
-        it("should ignore pending requests without a variant snapshot", async () => {
+        it("aggregates pending reservations by item and variant", async () => {
+            prismaMock.stockItem.findMany.mockResolvedValue(asNever([{
+                id: 1,
+                name: "Keyboard",
+                sku: "ITEM-1",
+                quantity: 12,
+                unit: "ชิ้น",
+                minStock: 2,
+                imageUrl: null,
+                isActive: true,
+                categoryId: 1,
+                category: { id: 1, name: "General" },
+                variants: [
+                    {
+                        id: 11,
+                        stockItemId: 1,
+                        sku: "ITEM-1-BLACK",
+                        quantity: 5,
+                        unit: "ชิ้น",
+                        minStock: 1,
+                        imageUrl: null,
+                        isActive: true,
+                        attributeValues: [],
+                    },
+                    {
+                        id: 12,
+                        stockItemId: 1,
+                        sku: "ITEM-1-WHITE",
+                        quantity: 7,
+                        unit: "ชิ้น",
+                        minStock: 1,
+                        imageUrl: null,
+                        isActive: true,
+                        attributeValues: [],
+                    },
+                ],
+            }]));
+            prismaMock.stockItem.count.mockResolvedValue(asNever(1));
+            prismaMock.stockRequestItem.findMany.mockResolvedValue(asNever([
+                { itemId: 1, variantId: 11, quantity: 3 },
+                { itemId: 1, variantId: 12, quantity: 2 },
+            ]));
+
+            const result = await getItems({ page: 1, limit: 20 });
+
+            expect(result.items[0]).toMatchObject({
+                id: 1,
+                reservedQuantity: 5,
+                availableQuantity: 7,
+            });
+            expect(result.items[0]?.variants).toEqual(
+                expect.arrayContaining([
+                    expect.objectContaining({
+                        id: 11,
+                        reservedQuantity: 3,
+                        availableQuantity: 2,
+                    }),
+                    expect.objectContaining({
+                        id: 12,
+                        reservedQuantity: 2,
+                        availableQuantity: 5,
+                    }),
+                ]),
+            );
+        });
+
+        it("should reject pending requests without a variant snapshot", async () => {
             prismaMock.stockItem.findMany.mockResolvedValue(
                 asNever([
                     {
@@ -126,90 +193,20 @@ describe("Stock Queries", () => {
                             },
                         ],
                     },
-                    {
-                        id: 2,
-                        name: "Keyboard",
-                        sku: "ITEM-2",
-                        quantity: 12,
-                        unit: "ชิ้น",
-                        minStock: 2,
-                        imageUrl: null,
-                        isActive: true,
-                        categoryId: 1,
-                        category: { id: 1, name: "General" },
-                        variants: [
-                            {
-                                id: 21,
-                                stockItemId: 2,
-                                sku: "ITEM-2-BLACK",
-                                quantity: 5,
-                                unit: "ชิ้น",
-                                minStock: 1,
-                                imageUrl: null,
-                                isActive: true,
-                                attributeValues: [],
-                            },
-                            {
-                                id: 22,
-                                stockItemId: 2,
-                                sku: "ITEM-2-WHITE",
-                                quantity: 7,
-                                unit: "ชิ้น",
-                                minStock: 1,
-                                imageUrl: null,
-                                isActive: true,
-                                attributeValues: [],
-                            },
-                        ],
-                    },
                 ]),
             );
-            prismaMock.stockItem.count.mockResolvedValue(asNever(2));
+            prismaMock.stockItem.count.mockResolvedValue(asNever(1));
             prismaMock.stockRequestItem.findMany.mockResolvedValue(
                 asNever([
                     { itemId: 1, variantId: null, quantity: 4 },
-                    { itemId: 2, variantId: 21, quantity: 3 },
-                    { itemId: 2, variantId: 22, quantity: 2 },
                 ]),
             );
 
-            const result = await getItems({
+            await expect(getItems({
                 page: 1,
                 limit: 20,
                 activeOnly: true,
-            });
-
-            expect(result.total).toBe(2);
-            expect(result.items).toHaveLength(2);
-            expect(result.items[0]).toMatchObject({
-                id: 1,
-                reservedQuantity: 0,
-                availableQuantity: 10,
-            });
-            expect(result.items[0]?.variants[0]).toMatchObject({
-                id: 11,
-                reservedQuantity: 0,
-                availableQuantity: 10,
-            });
-            expect(result.items[1]).toMatchObject({
-                id: 2,
-                reservedQuantity: 5,
-                availableQuantity: 7,
-            });
-            expect(result.items[1]?.variants).toEqual(
-                expect.arrayContaining([
-                    expect.objectContaining({
-                        id: 21,
-                        reservedQuantity: 3,
-                        availableQuantity: 2,
-                    }),
-                    expect.objectContaining({
-                        id: 22,
-                        reservedQuantity: 2,
-                        availableQuantity: 5,
-                    }),
-                ]),
-            );
+            })).rejects.toBeInstanceOf(StockInvariantViolationError);
             expect(prismaMock.stockItemVariant.create).not.toHaveBeenCalled();
             expect(prismaMock.stockItemVariant.update).not.toHaveBeenCalled();
             expect(prismaMock.stockTransaction.create).not.toHaveBeenCalled();
