@@ -5,7 +5,7 @@ import type {
     StockRequestsFilter,
 } from "@/lib/validations/stock";
 import { buildResolvedDefaultVariantIds } from "./default-variant-shadow";
-import { resolveStockItemReadQuantity } from "./inventory-quantity-read";
+import { summarizeVariantInventory } from "./inventory-quantity-read";
 import {
     buildItemInclude,
     buildRequestInclude,
@@ -70,13 +70,16 @@ export async function getItems(filters: StockItemsFilter) {
     return {
         items: items.map((item) => {
             const reservedQuantity = reservedByItemId.get(item.id) ?? 0;
-            const quantity = resolveStockItemReadQuantity(item);
+            const inventory = summarizeVariantInventory(item.variants);
 
             return {
                 ...item,
-                quantity,
+                ...inventory,
                 reservedQuantity,
-                availableQuantity: getAvailableQuantity(quantity, reservedQuantity),
+                availableQuantity: getAvailableQuantity(
+                    inventory.quantity,
+                    reservedQuantity,
+                ),
                 variants: item.variants.map((variant) => {
                     const variantReservedQuantity =
                         reservedByVariantId.get(variant.id) ?? 0;
@@ -108,7 +111,7 @@ export async function getItemById(id: number) {
         buildResolvedDefaultVariantIds([item]);
         return {
             ...item,
-            quantity: resolveStockItemReadQuantity(item),
+            ...summarizeVariantInventory(item.variants),
         };
     }
     return item;

@@ -14,8 +14,6 @@ export type ExistingItemRecord = {
     id: number;
     sku: string;
     unit: string;
-    quantity: number;
-    minStock: number;
     imageUrl: string | null;
     isActive: boolean;
 };

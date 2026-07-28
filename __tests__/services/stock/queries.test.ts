@@ -14,31 +14,13 @@ function asNever<T>(value: T): never {
     return value as unknown as never;
 }
 
-async function withVariantInventoryReads<T>(
-    enabled: boolean,
-    operation: () => Promise<T>,
-): Promise<T> {
-    const previousFlag = process.env.STOCK_VARIANT_INVENTORY_READ_ENABLED;
-    process.env.STOCK_VARIANT_INVENTORY_READ_ENABLED =
-        enabled ? "true" : "false";
-    try {
-        return await operation();
-    } finally {
-        if (previousFlag === undefined) {
-            delete process.env.STOCK_VARIANT_INVENTORY_READ_ENABLED;
-        } else {
-            process.env.STOCK_VARIANT_INVENTORY_READ_ENABLED = previousFlag;
-        }
-    }
-}
-
 describe("Stock Queries", () => {
     beforeEach(() => {
         mockReset(prismaMock);
     });
 
     describe("getItems", () => {
-        it("uses summed active variant quantity when variant reads are enabled", async () => {
+        it("uses summed active variant inventory", async () => {
             prismaMock.stockItem.findMany.mockResolvedValue(asNever([{
                 id: 1,
                 name: "Mouse",
@@ -55,12 +37,14 @@ describe("Stock Queries", () => {
                     {
                         id: 11,
                         quantity: 4,
+                        minStock: 2,
                         isActive: true,
                         attributeValues: [],
                     },
                     {
                         id: 12,
                         quantity: 6,
+                        minStock: 3,
                         isActive: true,
                         attributeValues: [],
                     },
@@ -70,34 +54,25 @@ describe("Stock Queries", () => {
             prismaMock.stockRequestItem.findMany.mockResolvedValue(asNever([
                 { itemId: 1, variantId: 11, quantity: 3 },
             ]));
-            const consoleWarn = vi.spyOn(console, "warn")
-                .mockImplementation(() => undefined);
+            const result = await getItems({ page: 1, limit: 20 });
 
-            try {
-                const result = await withVariantInventoryReads(
-                    true,
-                    () => getItems({ page: 1, limit: 20 }),
-                );
-
-                expect(result.items[0]).toMatchObject({
-                    id: 1,
-                    quantity: 10,
-                    reservedQuantity: 3,
-                    availableQuantity: 7,
-                });
-            } finally {
-                consoleWarn.mockRestore();
-            }
+            expect(result.items[0]).toMatchObject({
+                id: 1,
+                quantity: 10,
+                minStock: 5,
+                reservedQuantity: 3,
+                availableQuantity: 7,
+            });
         });
 
-        it("keeps parent quantity when variant reads are disabled", async () => {
+        it("ignores legacy parent inventory", async () => {
             prismaMock.stockItem.findMany.mockResolvedValue(asNever([{
                 id: 1,
                 name: "Mouse",
                 sku: "ITEM-1",
                 quantity: 99,
                 unit: "ชิ้น",
-                minStock: 3,
+                minStock: 99,
                 imageUrl: null,
                 isActive: true,
                 categoryId: 1,
@@ -106,29 +81,21 @@ describe("Stock Queries", () => {
                 variants: [{
                     id: 11,
                     quantity: 10,
+                    minStock: 5,
                     isActive: true,
                     attributeValues: [],
                 }],
             }]));
             prismaMock.stockItem.count.mockResolvedValue(asNever(1));
             prismaMock.stockRequestItem.findMany.mockResolvedValue(asNever([]));
-            const consoleWarn = vi.spyOn(console, "warn")
-                .mockImplementation(() => undefined);
+            const result = await getItems({ page: 1, limit: 20 });
 
-            try {
-                const result = await withVariantInventoryReads(
-                    false,
-                    () => getItems({ page: 1, limit: 20 }),
-                );
-
-                expect(result.items[0]).toMatchObject({
-                    id: 1,
-                    quantity: 99,
-                    availableQuantity: 99,
-                });
-            } finally {
-                consoleWarn.mockRestore();
-            }
+            expect(result.items[0]).toMatchObject({
+                id: 1,
+                quantity: 10,
+                minStock: 5,
+                availableQuantity: 10,
+            });
         });
 
         it("should append reserved and available quantities for items and variants", async () => {
@@ -337,30 +304,23 @@ describe("Stock Queries", () => {
                     {
                         id: 51,
                         quantity: 7,
+                        minStock: 2,
                         isActive: true,
                         attributeValues: [],
                     },
                     {
                         id: 52,
                         quantity: 8,
+                        minStock: 3,
                         isActive: true,
                         attributeValues: [],
                     },
                 ],
             }));
-            const consoleWarn = vi.spyOn(console, "warn")
-                .mockImplementation(() => undefined);
+            const result = await getItemById(5);
 
-            try {
-                const result = await withVariantInventoryReads(
-                    true,
-                    () => getItemById(5),
-                );
-
-                expect(result?.quantity).toBe(15);
-            } finally {
-                consoleWarn.mockRestore();
-            }
+            expect(result?.quantity).toBe(15);
+            expect(result?.minStock).toBe(5);
         });
 
         it("should reject item detail with no persisted variant without writing", async () => {

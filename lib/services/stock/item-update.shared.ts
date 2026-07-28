@@ -19,6 +19,7 @@ import {
     LEGACY_DEFAULT_VARIANT_ORDER_BY,
     selectLegacyDefaultVariantId,
 } from "./legacy-default-variant";
+import { withVariantInventorySummary } from "./inventory-quantity-read";
 
 async function updateItemWithoutVariants(
     tx: StockTxClient,
@@ -27,6 +28,7 @@ async function updateItemWithoutVariants(
     originalData: UpdateItemInput,
     tracking: UploadUrlTracking,
 ): Promise<StockItemWithDetails> {
+    const { minStock: _minStock, ...parentData } = itemData;
     const currentItem = await tx.stockItem.findUniqueOrThrow({
         where: { id: itemId },
         select: {
@@ -37,13 +39,11 @@ async function updateItemWithoutVariants(
 
     const nextItem = await tx.stockItem.update({
         where: { id: itemId },
-        data: itemData,
+        data: parentData,
         select: {
             id: true,
             sku: true,
             unit: true,
-            quantity: true,
-            minStock: true,
             imageUrl: true,
             isActive: true,
         },
@@ -88,7 +88,9 @@ async function updateItemWithoutVariants(
             data: {
                 ...(originalData.sku !== undefined && { sku: nextItem.sku }),
                 ...(originalData.unit !== undefined && { unit: nextItem.unit }),
-                ...(originalData.minStock !== undefined && { minStock: nextItem.minStock }),
+                ...(originalData.minStock !== undefined && {
+                    minStock: originalData.minStock,
+                }),
                 ...(originalData.imageUrl !== undefined && { imageUrl: nextItem.imageUrl }),
             },
         });
@@ -102,10 +104,11 @@ async function updateItemWithoutVariants(
     }
     await reconcileStockItemDefaultVariant(tx, itemId);
 
-    return tx.stockItem.findUniqueOrThrow({
+    const updatedItem = await tx.stockItem.findUniqueOrThrow({
         where: { id: itemId },
         include: buildItemInclude(),
     });
+    return withVariantInventorySummary(updatedItem);
 }
 
 export async function updateItemInTransaction(

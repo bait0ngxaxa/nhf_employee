@@ -35,6 +35,10 @@ import type {
 } from "./types";
 import { lockStockInventoryRows } from "./locks";
 import { setStockItemDefaultVariantIfUnset } from "./default-variant-writer";
+import {
+    summarizeVariantInventory,
+    withVariantInventorySummary,
+} from "./inventory-quantity-read";
 
 type VariantLowStockAlertCandidate = Extract<
     LowStockAlertCandidate,
@@ -73,8 +77,6 @@ type AdjustmentItem = {
     name: string;
     sku: string;
     unit: string;
-    quantity: number;
-    minStock: number;
     imageUrl: string | null;
     isActive: boolean;
 };
@@ -129,13 +131,14 @@ type AuditableStockItem = {
 };
 
 function createItemAuditSnapshot(item: AuditableStockItem): Record<string, unknown> {
+    const inventory = summarizeVariantInventory(item.variants ?? []);
+
     return {
         name: item.name,
         description: item.description,
         sku: item.sku,
         unit: item.unit,
-        quantity: item.quantity,
-        minStock: item.minStock,
+        ...inventory,
         imageUrl: item.imageUrl,
         categoryId: item.categoryId,
         isActive: item.isActive,
@@ -277,6 +280,10 @@ async function applyStockAdjustment(
     input: AdjustStockInput,
     userId: number,
 ): Promise<AppliedStockAdjustment> {
+    const inventoryBefore = await tx.stockItemVariant.aggregate({
+        where: { stockItemId: item.id, isActive: true },
+        _sum: { quantity: true, minStock: true },
+    });
     const updatedVariant = await tx.stockItemVariant.updateMany({
         where: {
             id: variant.id,
@@ -293,15 +300,6 @@ async function applyStockAdjustment(
         throw new Error("รายการย่อยของวัสดุถูกปรับปรุงพร้อมกัน กรุณาลองใหม่");
     }
 
-    const minStockDelta = input.minStock - variant.minStock;
-    const updatedItem = await tx.stockItem.update({
-        where: { id: item.id },
-        data: {
-            quantity: { increment: input.quantity },
-            minStock: { increment: minStockDelta },
-        },
-        select: { quantity: true, minStock: true },
-    });
     const transaction = await tx.stockTransaction.create({
         data: {
             itemId: item.id,
@@ -314,12 +312,16 @@ async function applyStockAdjustment(
         select: { id: true },
     });
 
-    const previousQty = updatedItem.quantity - input.quantity;
-    const previousMinStock = updatedItem.minStock - minStockDelta;
+    const previousQty = inventoryBefore._sum.quantity ?? 0;
+    const previousMinStock = inventoryBefore._sum.minStock ?? 0;
+    const newQty = previousQty + input.quantity;
+    const newMinStock =
+        previousMinStock - variant.minStock + input.minStock;
+    const variantQuantity = variant.quantity + input.quantity;
     const notificationAlerts = buildVariantLowStockAlert(
         item,
         variant,
-        variant.quantity + input.quantity,
+        variantQuantity,
         input.minStock,
     );
     return {
@@ -328,9 +330,9 @@ async function applyStockAdjustment(
         itemName: item.name,
         sku: item.sku,
         previousQty,
-        newQty: updatedItem.quantity,
+        newQty,
         previousMinStock,
-        newMinStock: updatedItem.minStock,
+        newMinStock,
         lowStockAlerts: notificationAlerts.map((alert) => ({
             itemId: alert.itemId,
             name: item.name,
@@ -400,16 +402,12 @@ export async function createItem(
                 imageUrl: data.imageUrl ?? null,
                 sku,
                 unit: fallbackUnit,
-                quantity: totalQuantity,
-                minStock: totalMinStock,
                 categoryId,
             },
             select: {
                 id: true,
                 sku: true,
                 unit: true,
-                quantity: true,
-                minStock: true,
                 imageUrl: true,
                 isActive: true,
             },
@@ -421,7 +419,11 @@ export async function createItem(
         if (variants.length === 0) {
             const variant = await createDefaultVariantForNewItem(
                 tx,
-                item,
+                {
+                    ...item,
+                    quantity: totalQuantity,
+                    minStock: totalMinStock,
+                },
                 actor.id,
             );
             createdVariantIds.push(variant.id);
@@ -464,10 +466,12 @@ export async function createItem(
             defaultVariantId,
         );
 
-        const createdItem = await tx.stockItem.findUniqueOrThrow({
-            where: { id: item.id },
-            include: buildItemInclude(),
-        });
+        const createdItem = withVariantInventorySummary(
+            await tx.stockItem.findUniqueOrThrow({
+                where: { id: item.id },
+                include: buildItemInclude(),
+            }),
+        );
         await createStockCommandAudit(
             tx,
             "STOCK_ITEM_CREATE",
@@ -560,8 +564,6 @@ export async function adjustStock(
                 name: true,
                 sku: true,
                 unit: true,
-                quantity: true,
-                minStock: true,
                 imageUrl: true,
                 isActive: true,
             },

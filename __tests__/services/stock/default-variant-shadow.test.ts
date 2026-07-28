@@ -16,8 +16,8 @@ function asNever<T>(value: T): never {
 }
 
 describe("default variant runtime shadow comparison", () => {
-    it("keeps explicit reads disabled unless the server flag is explicitly true", () => {
-        expect(isExplicitDefaultVariantReadEnabled(undefined)).toBe(false);
+    it("parses explicit default read flag values", () => {
+        expect(isExplicitDefaultVariantReadEnabled("")).toBe(false);
         expect(isExplicitDefaultVariantReadEnabled("false")).toBe(false);
         expect(isExplicitDefaultVariantReadEnabled("invalid")).toBe(false);
         expect(isExplicitDefaultVariantReadEnabled("true")).toBe(true);

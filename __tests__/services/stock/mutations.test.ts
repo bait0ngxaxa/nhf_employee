@@ -38,6 +38,13 @@ function requestOptions(): { idempotencyKey: string } {
     return { idempotencyKey: "stock-request-test-key" };
 }
 
+function expectNoParentInventoryUpdate(): void {
+    for (const [args] of prismaMock.stockItem.update.mock.calls) {
+        expect(args.data).not.toHaveProperty("quantity");
+        expect(args.data).not.toHaveProperty("minStock");
+    }
+}
+
 describe("Stock Service Mutations", () => {
     beforeEach(() => {
         mockReset(prismaMock);
@@ -524,6 +531,7 @@ describe("Stock Service Mutations", () => {
                     data: { quantity: { decrement: 1 } },
                 }),
             );
+            expect(prismaMock.stockItem.update).not.toHaveBeenCalled();
             expect(prismaMock.stockRequest.updateMany).toHaveBeenCalledWith(
                 expect.objectContaining({
                     where: { id: 99, status: "PENDING_ISSUE" },
@@ -610,8 +618,6 @@ describe("Stock Service Mutations", () => {
                             itemId: 10,
                             variantId: 101,
                             quantity: 5,
-                            itemQuantityBefore: 6,
-                            itemQuantityAfter: 1,
                             variantQuantityBefore: 6,
                             variantQuantityAfter: 1,
                         },
@@ -619,8 +625,6 @@ describe("Stock Service Mutations", () => {
                             itemId: 12,
                             variantId: 121,
                             quantity: 1,
-                            itemQuantityBefore: 7,
-                            itemQuantityAfter: 6,
                             variantQuantityBefore: 7,
                             variantQuantityAfter: 6,
                         },
@@ -836,14 +840,7 @@ describe("Stock Service Mutations", () => {
                 2,
                 expect.objectContaining({ where: { id: 200, quantity: { gte: 2 } } }),
             );
-            expect(prismaMock.stockItem.update).toHaveBeenNthCalledWith(1, {
-                where: { id: 10 },
-                data: { quantity: { decrement: 2 } },
-            });
-            expect(prismaMock.stockItem.update).toHaveBeenNthCalledWith(2, {
-                where: { id: 20 },
-                data: { quantity: { decrement: 3 } },
-            });
+            expect(prismaMock.stockItem.update).not.toHaveBeenCalled();
             expect(prismaMock.$transaction).toHaveBeenCalledWith(
                 expect.any(Function),
                 {
@@ -856,12 +853,9 @@ describe("Stock Service Mutations", () => {
             const variantLockOrder = prismaMock.$queryRaw.mock.invocationCallOrder[1];
             const firstVariantWriteOrder =
                 prismaMock.stockItemVariant.updateMany.mock.invocationCallOrder[0];
-            const firstItemWriteOrder =
-                prismaMock.stockItem.update.mock.invocationCallOrder[0];
 
             expect(itemLockOrder).toBeLessThan(variantLockOrder);
             expect(variantLockOrder).toBeLessThan(firstVariantWriteOrder);
-            expect(firstVariantWriteOrder).toBeLessThan(firstItemWriteOrder);
         });
     });
 
@@ -893,6 +887,9 @@ describe("Stock Service Mutations", () => {
             prismaMock.stockItemVariant.updateMany.mockResolvedValue(
                 asNever({ count: 1 }),
             );
+            prismaMock.stockItemVariant.aggregate.mockResolvedValue(
+                asNever({ _sum: { quantity: 100, minStock: 20 } }),
+            );
             prismaMock.stockItem.update.mockResolvedValue(
                 asNever({ quantity: 101, minStock: 28 }),
             );
@@ -922,7 +919,7 @@ describe("Stock Service Mutations", () => {
             );
         });
 
-        it("should atomically adjust the selected variant and cached parent aggregate by delta", async () => {
+        it("should atomically adjust only the selected variant inventory", async () => {
             prismaMock.stockItem.findUnique.mockResolvedValue(
                 asNever({
                     id: 10,
@@ -940,6 +937,9 @@ describe("Stock Service Mutations", () => {
             );
             prismaMock.stockItemVariant.updateMany.mockResolvedValue(
                 asNever({ count: 1 }),
+            );
+            prismaMock.stockItemVariant.aggregate.mockResolvedValue(
+                asNever({ _sum: { quantity: 12, minStock: 4 } }),
             );
             prismaMock.stockItem.update.mockResolvedValue(
                 asNever({ quantity: 15, minStock: 7 }),
@@ -964,14 +964,7 @@ describe("Stock Service Mutations", () => {
                     minStock: 5,
                 },
             });
-            expect(prismaMock.stockItem.update).toHaveBeenCalledWith({
-                where: { id: 10 },
-                data: {
-                    quantity: { increment: 3 },
-                    minStock: { increment: 3 },
-                },
-                select: { quantity: true, minStock: true },
-            });
+            expect(prismaMock.stockItem.update).not.toHaveBeenCalled();
             expect(result).toMatchObject({
                 variantId: 102,
                 previousQty: 12,
@@ -995,8 +988,18 @@ describe("Stock Service Mutations", () => {
                 metadata: Record<string, unknown>;
             };
             expect(auditDetails).toEqual({
-                before: expect.objectContaining({ quantity: 12, minStock: 4 }),
-                after: expect.objectContaining({ quantity: 15, minStock: 7 }),
+                before: expect.objectContaining({
+                    quantity: 12,
+                    minStock: 4,
+                    variantQuantity: 4,
+                    variantMinStock: 2,
+                }),
+                after: expect.objectContaining({
+                    quantity: 15,
+                    minStock: 7,
+                    variantQuantity: 7,
+                    variantMinStock: 5,
+                }),
                 metadata: expect.objectContaining({
                     itemId: 10,
                     variantId: 102,
@@ -1050,6 +1053,9 @@ describe("Stock Service Mutations", () => {
             );
             prismaMock.stockItemVariant.findFirst.mockResolvedValue(
                 asNever({ id: 102, quantity: 4, minStock: 2 }),
+            );
+            prismaMock.stockItemVariant.aggregate.mockResolvedValue(
+                asNever({ _sum: { quantity: 12, minStock: 4 } }),
             );
             prismaMock.stockItem.update.mockResolvedValue(
                 asNever({ quantity: 15, minStock: 7 }),
@@ -1686,6 +1692,7 @@ describe("Stock Service Mutations", () => {
                     minStock: 1,
                     imageUrl: null,
                     isActive: true,
+                    variants: [{ id: 241, quantity: 5, minStock: 1 }],
                 }),
             );
             prismaMock.stockItemVariant.findMany.mockResolvedValue(
@@ -1730,7 +1737,7 @@ describe("Stock Service Mutations", () => {
             );
         });
 
-        it("should reduce an existing variant from 5 to 0 and synchronize the parent", async () => {
+        it("should reduce an existing variant from 5 to 0 without writing parent inventory", async () => {
             prismaMock.stockItem.findUniqueOrThrow
                 .mockResolvedValueOnce(asNever({
                     id: 24,
@@ -1811,10 +1818,8 @@ describe("Stock Service Mutations", () => {
                 data: expect.objectContaining({ itemId: 24, variantId: 241, type: "OUT", quantity: -5 }),
                 select: { id: true },
             });
-            expect(prismaMock.stockItem.update).toHaveBeenCalledWith({
-                where: { id: 24 },
-                data: { quantity: 0, minStock: 1 },
-            });
+            expect(prismaMock.stockItemVariant.aggregate).not.toHaveBeenCalled();
+            expectNoParentInventoryUpdate();
             expect(prismaMock.auditLog.create).toHaveBeenCalledTimes(2);
             expect(prismaMock.auditLog.create).toHaveBeenNthCalledWith(2, {
                 data: expect.objectContaining({
@@ -1827,7 +1832,16 @@ describe("Stock Service Mutations", () => {
 
         it("should reject a stale variant update when updateMany changes no rows", async () => {
             prismaMock.stockItem.findUniqueOrThrow.mockResolvedValue(
-                asNever({ id: 24, sku: "SKU-24", unit: "ชิ้น", quantity: 5, minStock: 1, imageUrl: null, isActive: true }),
+                asNever({
+                    id: 24,
+                    sku: "SKU-24",
+                    unit: "ชิ้น",
+                    quantity: 5,
+                    minStock: 1,
+                    imageUrl: null,
+                    isActive: true,
+                    variants: [{ id: 241, quantity: 5, minStock: 1 }],
+                }),
             );
             prismaMock.stockItemVariant.findMany.mockResolvedValue(
                 asNever([{ id: 241, sku: "SKU-24-A", imageUrl: null, isActive: true }]),
@@ -1847,7 +1861,16 @@ describe("Stock Service Mutations", () => {
 
         it("should not create a stock transaction when the quantity delta is zero", async () => {
             prismaMock.stockItem.findUniqueOrThrow.mockResolvedValue(
-                asNever({ id: 24, sku: "SKU-24", unit: "ชิ้น", quantity: 5, minStock: 1, imageUrl: null, isActive: true }),
+                asNever({
+                    id: 24,
+                    sku: "SKU-24",
+                    unit: "ชิ้น",
+                    quantity: 5,
+                    minStock: 1,
+                    imageUrl: null,
+                    isActive: true,
+                    variants: [{ id: 241, quantity: 5, minStock: 1 }],
+                }),
             );
             prismaMock.stockItemVariant.findMany.mockResolvedValue(
                 asNever([{ id: 241, sku: "SKU-24-A", imageUrl: null, isActive: true }]),
@@ -1863,7 +1886,7 @@ describe("Stock Service Mutations", () => {
 
             expect(prismaMock.stockTransaction.create).not.toHaveBeenCalled();
         });
-        it("should adjust existing variants atomically and synchronize the parent quantity", async () => {
+        it("should adjust existing variants without synchronizing parent inventory", async () => {
             prismaMock.stockItem.findUniqueOrThrow.mockResolvedValue(
                 asNever({
                     id: 25,
@@ -1873,6 +1896,10 @@ describe("Stock Service Mutations", () => {
                     minStock: 3,
                     imageUrl: null,
                     isActive: true,
+                    variants: [
+                        { id: 251, quantity: 8, minStock: 2 },
+                        { id: 252, quantity: 15, minStock: 3 },
+                    ],
                 }),
             );
             prismaMock.stockItemVariant.findMany.mockResolvedValue(
@@ -1954,12 +1981,8 @@ describe("Stock Service Mutations", () => {
                 }),
             );
             expect(prismaMock.stockTransaction.create).toHaveBeenCalledTimes(2);
-            expect(prismaMock.stockItem.update).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    where: { id: 25 },
-                    data: { quantity: 15, minStock: 5 },
-                }),
-            );
+            expect(prismaMock.stockItemVariant.aggregate).not.toHaveBeenCalled();
+            expectNoParentInventoryUpdate();
         });
 
         it("should create new variants and soft-delete removed referenced variants", async () => {
@@ -1972,6 +1995,10 @@ describe("Stock Service Mutations", () => {
                     minStock: 2,
                     imageUrl: null,
                     isActive: true,
+                    variants: [
+                        { id: 261, quantity: 2, minStock: 1 },
+                        { id: 263, quantity: 4, minStock: 2 },
+                    ],
                 }),
             );
             prismaMock.stockItemVariant.findMany.mockResolvedValue(
@@ -2090,6 +2117,14 @@ describe("Stock Service Mutations", () => {
                     minStock: 1,
                     imageUrl: null,
                     isActive: true,
+                    variants: [
+                        ...submittedVariants.map((variant) => ({
+                            id: variant.id,
+                            quantity: variant.quantity,
+                            minStock: variant.minStock,
+                        })),
+                        { id: 281, quantity: 1, minStock: 1 },
+                    ],
                 }),
             );
             prismaMock.stockItemVariant.findMany.mockResolvedValue(

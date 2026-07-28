@@ -48,42 +48,6 @@ type CreateRequestOptions = {
     idempotencyKey: string;
 };
 
-function buildLowStockAlerts(
-    items: Array<{
-        id: number;
-        name: string;
-        sku: string;
-        unit: string;
-        quantity: number;
-        minStock: number;
-    }>,
-    decrementedByItemId: Map<number, number>,
-): LowStockAlertCandidate[] {
-    return items.flatMap((item) => {
-        const decrementedQuantity = decrementedByItemId.get(item.id) ?? 0;
-        const nextQuantity = item.quantity - decrementedQuantity;
-
-        if (
-            decrementedQuantity <= 0 ||
-            item.quantity <= item.minStock ||
-            nextQuantity > item.minStock
-        ) {
-            return [];
-        }
-
-        return [
-            {
-                itemId: item.id,
-                name: item.name,
-                sku: item.sku,
-                quantity: nextQuantity,
-                minStock: item.minStock,
-                unit: item.unit,
-            },
-        ];
-    });
-}
-
 function buildVariantLowStockAlerts(
     variants: Array<{
         id: number;
@@ -275,11 +239,6 @@ export async function issueRequest(
             where: { id: { in: Array.from(requestedQtyByItemId.keys()) } },
             select: {
                 id: true,
-                name: true,
-                sku: true,
-                unit: true,
-                quantity: true,
-                minStock: true,
                 isActive: true,
             },
         });
@@ -306,24 +265,13 @@ export async function issueRequest(
                 },
             },
         });
-        const itemIdsWithVariants = new Set(
-            variants.map((variant) => variant.stockItemId),
-        );
-        const legacyItems = items.filter(
-            (item) => !itemIdsWithVariants.has(item.id),
-        );
-        const lowStockAlerts = [
-            ...buildLowStockAlerts(legacyItems, requestedQtyByItemId),
-            ...buildVariantLowStockAlerts(variants, requestedQtyByVariantId),
-        ];
+        const lowStockAlerts =
+            buildVariantLowStockAlerts(variants, requestedQtyByVariantId);
         const itemById = new Map(items.map((item) => [item.id, item]));
         const variantById = new Map(variants.map((variant) => [variant.id, variant]));
         const requestedVariantEntries = Array.from(
             requestedQtyByVariantId.entries(),
         ).sort(([leftVariantId], [rightVariantId]) => leftVariantId - rightVariantId);
-        const requestedItemEntries = Array.from(
-            requestedQtyByItemId.entries(),
-        ).sort(([leftItemId], [rightItemId]) => leftItemId - rightItemId);
 
         for (const [variantId, requestItem] of requestedVariantEntries) {
             const variant = variantById.get(variantId);
@@ -381,13 +329,6 @@ export async function issueRequest(
             }
         }
 
-        for (const [itemId, quantity] of requestedItemEntries) {
-            await tx.stockItem.update({
-                where: { id: itemId },
-                data: { quantity: { decrement: quantity } },
-            });
-        }
-
         const transactionIds: number[] = [];
         for (const requestItem of resolvedRequestItems) {
             const transaction = await tx.stockTransaction.create({
@@ -423,21 +364,12 @@ export async function issueRequest(
                     transactionIds,
                     lines: requestedVariantEntries.map(
                         ([variantId, requestItem]) => {
-                            const item = itemById.get(requestItem.itemId);
                             const variant = variantById.get(variantId);
-                            const itemDecrement = requestedQtyByItemId.get(
-                                requestItem.itemId,
-                            ) ?? 0;
 
                             return {
                                 itemId: requestItem.itemId,
                                 variantId,
                                 quantity: requestItem.quantity,
-                                itemQuantityBefore: item?.quantity,
-                                itemQuantityAfter:
-                                    item === undefined
-                                        ? undefined
-                                        : item.quantity - itemDecrement,
                                 variantQuantityBefore: variant?.quantity,
                                 variantQuantityAfter:
                                     variant === undefined

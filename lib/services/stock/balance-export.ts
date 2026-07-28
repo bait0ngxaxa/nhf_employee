@@ -9,7 +9,7 @@ import {
     type StockBalanceItem,
 } from "@/lib/services/stock/balance-workbook";
 import { buildResolvedDefaultVariantIds } from "@/lib/services/stock/default-variant-shadow";
-import { resolveStockItemReadQuantity } from "@/lib/services/stock/inventory-quantity-read";
+import { summarizeVariantInventory } from "@/lib/services/stock/inventory-quantity-read";
 import {
     buildItemInclude,
     buildReservedQuantityMaps,
@@ -85,13 +85,16 @@ function toStockBalanceItem(
     reservedByVariantId: Map<number, number>,
 ): StockBalanceItem {
     const reservedQuantity = reservedByItemId.get(item.id) ?? 0;
-    const totalQuantity = getTotalQuantity(item);
+    const inventory = summarizeVariantInventory(item.variants);
 
     return {
         ...item,
-        quantity: totalQuantity,
+        ...inventory,
         reservedQuantity,
-        availableQuantity: getAvailableQuantity(totalQuantity, reservedQuantity),
+        availableQuantity: getAvailableQuantity(
+            inventory.quantity,
+            reservedQuantity,
+        ),
         variants: item.variants.map((variant) =>
             toStockBalanceVariant(variant, reservedByVariantId),
         ),
@@ -109,15 +112,6 @@ function toStockBalanceVariant(
         reservedQuantity,
         availableQuantity: getAvailableQuantity(variant.quantity, reservedQuantity),
     };
-}
-
-function getTotalQuantity(item: LoadedStockBalanceItem): number {
-    // Preserve the Phase 4 export fallback when the read flag is disabled.
-    const legacyQuantity = item.variants.length === 0
-        ? item.quantity
-        : item.variants.reduce((sum, variant) => sum + variant.quantity, 0);
-
-    return resolveStockItemReadQuantity(item, { legacyQuantity });
 }
 
 export async function getStockBalanceReportMeta(): Promise<{

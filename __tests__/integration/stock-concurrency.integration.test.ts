@@ -6,7 +6,7 @@ import {
     StockTxType,
 } from "@prisma/client";
 import type { StockItem, StockItemVariant } from "@prisma/client";
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { prisma } from "@/lib/db/prisma";
 import { runSerializableTransaction } from "@/lib/db/transaction";
@@ -68,32 +68,9 @@ async function withExplicitDefaultReads<T>(
     }
 }
 
-async function withVariantInventoryReads<T>(
-    enabled: boolean,
-    operation: () => Promise<T>,
-): Promise<T> {
-    const previousFlag = process.env.STOCK_VARIANT_INVENTORY_READ_ENABLED;
-    process.env.STOCK_VARIANT_INVENTORY_READ_ENABLED =
-        enabled ? "true" : "false";
-    try {
-        return await operation();
-    } finally {
-        if (previousFlag === undefined) {
-            delete process.env.STOCK_VARIANT_INVENTORY_READ_ENABLED;
-        } else {
-            process.env.STOCK_VARIANT_INVENTORY_READ_ENABLED = previousFlag;
-        }
-    }
-}
-
-let previousVariantInventoryReadFlag: string | undefined;
-
 describe.sequential("stock mutations with real MySQL", () => {
     beforeAll(async () => {
         assertDedicatedDatabase();
-        previousVariantInventoryReadFlag =
-            process.env.STOCK_VARIANT_INVENTORY_READ_ENABLED;
-        process.env.STOCK_VARIANT_INVENTORY_READ_ENABLED = "true";
         await prisma.$connect();
     });
 
@@ -102,7 +79,7 @@ describe.sequential("stock mutations with real MySQL", () => {
         await cleanIntegrationDatabase(prisma);
     });
 
-    it("switches item quantity reads to active variants with a reversible flag", async () => {
+    it("reads item inventory permanently from active variants", async () => {
         const fixture = await createStockFixture(prisma, {
             suffix: "variant-read",
         });
@@ -110,63 +87,31 @@ describe.sequential("stock mutations with real MySQL", () => {
             where: { id: fixture.item.id },
             data: { quantity: 99 },
         });
-        const consoleWarn = vi.spyOn(console, "warn")
-            .mockImplementation(() => undefined);
+        const variantDetail = await stockService.getItemById(fixture.item.id);
+        const variantList = await stockService.getItems({
+            page: 1,
+            limit: 20,
+            activeOnly: true,
+        });
 
-        try {
-            const legacyDetail = await withVariantInventoryReads(
-                false,
-                () => stockService.getItemById(fixture.item.id),
-            );
-            const variantDetail = await withVariantInventoryReads(
-                true,
-                () => stockService.getItemById(fixture.item.id),
-            );
-            const variantList = await withVariantInventoryReads(
-                true,
-                () => stockService.getItems({
-                    page: 1,
-                    limit: 20,
-                    activeOnly: true,
-                }),
-            );
-
-            expect(legacyDetail?.quantity).toBe(99);
-            expect(variantDetail?.quantity).toBe(10);
-            expect(variantList.items[0]).toMatchObject({
-                id: fixture.item.id,
-                quantity: 10,
-                reservedQuantity: 3,
-                availableQuantity: 7,
-            });
-            expect(consoleWarn).toHaveBeenCalledWith(
-                "Stock inventory quantity shadow mismatch",
-                expect.objectContaining({
-                    itemId: fixture.item.id,
-                    parentQuantity: 99,
-                    variantQuantity: 10,
-                    difference: 89,
-                    classification: "MISMATCH",
-                }),
-            );
-        } finally {
-            consoleWarn.mockRestore();
-        }
+        expect(variantDetail?.quantity).toBe(10);
+        expect(variantDetail?.minStock).toBe(fixture.minStock);
+        expect(variantList.items[0]).toMatchObject({
+            id: fixture.item.id,
+            quantity: 10,
+            minStock: fixture.minStock,
+            reservedQuantity: 3,
+            availableQuantity: 7,
+        });
     });
 
     afterAll(async () => {
         await dropRollbackTrigger();
         await cleanIntegrationDatabase(prisma);
         await prisma.$disconnect();
-        if (previousVariantInventoryReadFlag === undefined) {
-            delete process.env.STOCK_VARIANT_INVENTORY_READ_ENABLED;
-        } else {
-            process.env.STOCK_VARIANT_INVENTORY_READ_ENABLED =
-                previousVariantInventoryReadFlag;
-        }
     });
 
-    it("สร้างวัสดุหนึ่ง variant พร้อม parent aggregate และ opening balance", async () => {
+    it("สร้างวัสดุหนึ่ง variant โดย parent inventory คงค่า compatibility default", async () => {
         const fixture = await createStockFixture(prisma, { suffix: "CREATE-ONE" });
         const created = await stockService.createItem({
             name: "ปากกาสำหรับทดสอบการสร้าง",
@@ -190,6 +135,10 @@ describe.sequential("stock mutations with real MySQL", () => {
             quantity: 6,
             minStock: 2,
         });
+        expect(await prisma.stockItem.findUniqueOrThrow({
+            where: { id: created.id },
+            select: { quantity: true, minStock: true },
+        })).toEqual({ quantity: 0, minStock: 0 });
 
         const variantId = created.variants[0].id;
         const openingBalance = await prisma.stockTransaction.findUniqueOrThrow({
@@ -376,7 +325,7 @@ describe.sequential("stock mutations with real MySQL", () => {
         });
     });
 
-    it("สร้างวัสดุหลาย variant พร้อม aggregate, ledger ราย variant และ SKU uniqueness", async () => {
+    it("สร้างวัสดุหลาย variant พร้อม derived aggregate, ledger ราย variant และ SKU uniqueness", async () => {
         const fixture = await createStockFixture(prisma, { suffix: "CREATE-MULTI" });
         const created = await stockService.createItem({
             name: "หมึกพิมพ์หลายสี",
@@ -410,6 +359,10 @@ describe.sequential("stock mutations with real MySQL", () => {
             { sku: "CREATE-MULTI-BLACK", quantity: 4 },
             { sku: "CREATE-MULTI-CYAN", quantity: 7 },
         ]);
+        expect(await prisma.stockItem.findUniqueOrThrow({
+            where: { id: created.id },
+            select: { quantity: true, minStock: true },
+        })).toEqual({ quantity: 0, minStock: 0 });
         expect(await prisma.stockTransaction.findMany({
             where: { itemId: created.id, type: StockTxType.OPENING_BALANCE },
             orderBy: { variantId: "asc" },
@@ -679,23 +632,17 @@ describe.sequential("stock mutations with real MySQL", () => {
         });
     });
 
-    it("จ่ายคำขอแล้วลด parent และ variant พร้อมบันทึก ledger, audit และ outbox", async () => {
+    it("จ่ายคำขอแล้วลดเฉพาะ variant พร้อมบันทึก ledger, audit และ outbox", async () => {
         const fixture = await createStockFixture(prisma, {
             suffix: "ISSUE-FLOW",
             minStock: 8,
         });
 
-        const result = await withVariantInventoryReads(
-            true,
-            () => stockService.issueRequest(
-                fixture.request.id,
-                fixture.issuerActor,
-            ),
+        const result = await stockService.issueRequest(
+            fixture.request.id,
+            fixture.issuerActor,
         );
-        const visibleItem = await withVariantInventoryReads(
-            true,
-            () => stockService.getItemById(fixture.item.id),
-        );
+        const visibleItem = await stockService.getItemById(fixture.item.id);
         const inventory = await readInventory(fixture);
         const request = await prisma.stockRequest.findUniqueOrThrow({
             where: { id: fixture.request.id },
@@ -712,7 +659,7 @@ describe.sequential("stock mutations with real MySQL", () => {
             requestedBy: fixture.requester.id,
         });
         expect(request.status).toBe(StockRequestStatus.ISSUED);
-        expect(inventory.item.quantity).toBe(7);
+        expect(inventory.item.quantity).toBe(10);
         expect(inventory.variant.quantity).toBe(7);
         expect(visibleItem?.quantity).toBe(7);
         expect(transaction).toMatchObject({
@@ -786,9 +733,15 @@ describe.sequential("stock mutations with real MySQL", () => {
             minStock: 110,
             unit: fixture.variant.unit,
         }]);
+        expect(result).toMatchObject({
+            previousQty: 200,
+            newQty: 201,
+            previousMinStock: 40,
+            newMinStock: 130,
+        });
         expect(inventory).toEqual({
-            quantity: 201,
-            minStock: 130,
+            quantity: 200,
+            minStock: 40,
             variants: [
                 {
                     id: fixture.variant.id,
@@ -1025,7 +978,7 @@ describe.sequential("stock mutations with real MySQL", () => {
         expect(results.filter((result) => result.status === "rejected")).toHaveLength(1);
 
         const inventory = await readInventory(fixture);
-        expect(inventory.item.quantity).toBe(7);
+        expect(inventory.item.quantity).toBe(10);
         expect(inventory.variant.quantity).toBe(7);
         expect(await prisma.stockTransaction.count()).toBe(1);
         const requestItem = await prisma.stockRequestItem.findFirstOrThrow({
@@ -1107,7 +1060,7 @@ describe.sequential("stock mutations with real MySQL", () => {
         ]);
 
         const inventory = await readInventory(fixture);
-        expect(inventory.item.quantity).toBe(12);
+        expect(inventory.item.quantity).toBe(10);
         expect(inventory.variant.quantity).toBe(12);
         expect(await prisma.stockTransaction.count()).toBe(2);
         expect(await prisma.auditLog.count()).toBe(2);
@@ -1136,8 +1089,8 @@ describe.sequential("stock mutations with real MySQL", () => {
 
         const updateSucceeded = results[1]?.status === "fulfilled";
         const inventory = await readInventory(fixture);
-        expect(inventory.item.quantity).toBe(updateSucceeded ? 11 : 7);
-        expect(inventory.variant.quantity).toBe(inventory.item.quantity);
+        expect(inventory.item.quantity).toBe(10);
+        expect(inventory.variant.quantity).toBe(updateSucceeded ? 11 : 7);
         expect(await prisma.stockTransaction.count()).toBe(updateSucceeded ? 2 : 1);
     });
 
@@ -1164,8 +1117,8 @@ describe.sequential("stock mutations with real MySQL", () => {
         expect(results.filter((result) => result.status === "rejected")).toHaveLength(1);
 
         const inventory = await readInventory(fixture);
-        expect([12, 15]).toContain(inventory.item.quantity);
-        expect(inventory.variant.quantity).toBe(inventory.item.quantity);
+        expect(inventory.item.quantity).toBe(10);
+        expect([12, 15]).toContain(inventory.variant.quantity);
         expect(await prisma.stockTransaction.count()).toBe(1);
     });
 

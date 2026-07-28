@@ -9,6 +9,7 @@ import {
 import { createStockOpeningBalanceTransaction } from "./write-helpers";
 import { reconcileStockItemDefaultVariant } from "./default-variant-writer";
 import { LEGACY_DEFAULT_VARIANT_ORDER_BY } from "./legacy-default-variant";
+import { withVariantInventorySummary } from "./inventory-quantity-read";
 import {
     type ExistingItemRecord,
     type ExistingVariantRecord,
@@ -32,8 +33,6 @@ async function getItemForVariantUpdate(
             id: true,
             sku: true,
             unit: true,
-            quantity: true,
-            minStock: true,
             imageUrl: true,
             isActive: true,
         },
@@ -322,21 +321,6 @@ async function handleRemovedVariants(
     }
 }
 
-async function summarizeStoredVariantInventory(
-    tx: StockTxClient,
-    itemId: number,
-): Promise<{ quantity: number; minStock: number }> {
-    const summary = await tx.stockItemVariant.aggregate({
-        where: { stockItemId: itemId, isActive: true },
-        _sum: { quantity: true, minStock: true },
-    });
-
-    return {
-        quantity: summary._sum.quantity ?? 0,
-        minStock: summary._sum.minStock ?? 0,
-    };
-}
-
 export async function updateItemWithVariants(
     tx: StockTxClient,
     itemId: number,
@@ -345,6 +329,7 @@ export async function updateItemWithVariants(
     userId: number,
     tracking: UploadUrlTracking,
 ): Promise<StockItemWithDetails> {
+    const { minStock: _minStock, ...parentData } = itemData;
     const item = await getItemForVariantUpdate(tx, itemId);
     const existingVariants = await getExistingVariants(tx, itemId);
     const existingVariantById = createExistingVariantMap(existingVariants);
@@ -355,7 +340,7 @@ export async function updateItemWithVariants(
     const nextItem = await tx.stockItem.update({
         where: { id: itemId },
         data: {
-            ...itemData,
+            ...parentData,
             unit: variants[0]?.unit ?? item.unit,
         },
         select: {
@@ -394,14 +379,9 @@ export async function updateItemWithVariants(
     }
     await reconcileStockItemDefaultVariant(tx, itemId);
 
-    const inventorySummary = await summarizeStoredVariantInventory(tx, itemId);
-    await tx.stockItem.update({
-        where: { id: itemId },
-        data: inventorySummary,
-    });
-
-    return tx.stockItem.findUniqueOrThrow({
+    const updatedItem = await tx.stockItem.findUniqueOrThrow({
         where: { id: itemId },
         include: buildItemInclude(),
     });
+    return withVariantInventorySummary(updatedItem);
 }

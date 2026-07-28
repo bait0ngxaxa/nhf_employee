@@ -23,22 +23,6 @@ async function loadWorkbook(response: Response): Promise<ExcelJS.Workbook> {
     return workbook;
 }
 
-async function withVariantInventoryReads<T>(
-    operation: () => Promise<T>,
-): Promise<T> {
-    const previousFlag = process.env.STOCK_VARIANT_INVENTORY_READ_ENABLED;
-    process.env.STOCK_VARIANT_INVENTORY_READ_ENABLED = "true";
-    try {
-        return await operation();
-    } finally {
-        if (previousFlag === undefined) {
-            delete process.env.STOCK_VARIANT_INVENTORY_READ_ENABLED;
-        } else {
-            process.env.STOCK_VARIANT_INVENTORY_READ_ENABLED = previousFlag;
-        }
-    }
-}
-
 function collectWorkbookText(workbook: ExcelJS.Workbook): string {
     const values: string[] = [];
     workbook.eachSheet((sheet) => {
@@ -343,7 +327,7 @@ describe("Stock report export services", () => {
         }
     });
 
-    it("should export an item with only inactive persisted variants without writing", async () => {
+    it("should export zero active inventory when all persisted variants are inactive", async () => {
         prismaMock.stockItem.count.mockResolvedValue(asNever(1));
         prismaMock.stockItem.findMany.mockResolvedValue(asNever([{
             id: 4,
@@ -368,14 +352,14 @@ describe("Stock report export services", () => {
         const balanceSheet = workbook.getWorksheet("ยอดคงเหลือจริง");
 
         expect(response.status).toBe(200);
-        expect(balanceSheet?.getCell("E2").value).toBe(8);
-        expect(balanceSheet?.getCell("G2").value).toBe(8);
+        expect(balanceSheet?.getCell("E2").value).toBe(0);
+        expect(balanceSheet?.getCell("G2").value).toBe(0);
         expect(prismaMock.stockItemVariant.create).not.toHaveBeenCalled();
         expect(prismaMock.stockTransaction.create).not.toHaveBeenCalled();
         expect(prismaMock.auditLog.create).not.toHaveBeenCalled();
     });
 
-    it("should not use parent quantity for balance export when variant reads are enabled", async () => {
+    it("should not use parent quantity for balance export", async () => {
         prismaMock.stockItem.count.mockResolvedValue(asNever(1));
         prismaMock.stockItem.findMany.mockResolvedValue(asNever([{
             id: 4,
@@ -394,20 +378,11 @@ describe("Stock report export services", () => {
             { stockItemId: 4 },
         ]));
         prismaMock.stockRequestItem.findMany.mockResolvedValue(asNever([]));
-        const consoleWarn = vi.spyOn(console, "warn")
-            .mockImplementation(() => undefined);
+        const response = await createStockBalanceReportXlsxResponse();
+        const workbook = await loadWorkbook(response);
+        const balanceSheet = workbook.getWorksheet("ยอดคงเหลือจริง");
 
-        try {
-            const response = await withVariantInventoryReads(
-                () => createStockBalanceReportXlsxResponse(),
-            );
-            const workbook = await loadWorkbook(response);
-            const balanceSheet = workbook.getWorksheet("ยอดคงเหลือจริง");
-
-            expect(balanceSheet?.getCell("E2").value).toBe(0);
-            expect(balanceSheet?.getCell("G2").value).toBe(0);
-        } finally {
-            consoleWarn.mockRestore();
-        }
+        expect(balanceSheet?.getCell("E2").value).toBe(0);
+        expect(balanceSheet?.getCell("G2").value).toBe(0);
     });
 });
