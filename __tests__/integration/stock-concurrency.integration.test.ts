@@ -12,6 +12,7 @@ import { prisma } from "@/lib/db/prisma";
 import { runSerializableTransaction } from "@/lib/db/transaction";
 import { stockService } from "@/lib/services/stock";
 import { lockStockInventoryRows } from "@/lib/services/stock/locks";
+import { createStockOpeningBalanceTransaction } from "@/lib/services/stock/write-helpers";
 import {
     createRollbackTrigger,
     dropRollbackTrigger,
@@ -57,6 +58,304 @@ describe.sequential("stock mutations with real MySQL", () => {
         await dropRollbackTrigger();
         await cleanIntegrationDatabase(prisma);
         await prisma.$disconnect();
+    });
+
+    it("สร้างวัสดุหนึ่ง variant พร้อม parent aggregate และ opening balance", async () => {
+        const fixture = await createStockFixture(prisma, { suffix: "CREATE-ONE" });
+        const created = await stockService.createItem({
+            name: "ปากกาสำหรับทดสอบการสร้าง",
+            sku: "CREATE-ONE-ITEM",
+            categoryId: fixture.category.id,
+            variants: [{
+                sku: "CREATE-ONE-VARIANT",
+                unit: "ด้าม",
+                quantity: 6,
+                minStock: 2,
+                attributes: [],
+            }],
+        }, fixture.issuerActor);
+
+        expect(created.quantity).toBe(6);
+        expect(created.minStock).toBe(2);
+        expect(created.variants).toHaveLength(1);
+        expect(created.variants[0]).toMatchObject({
+            sku: "CREATE-ONE-VARIANT",
+            quantity: 6,
+            minStock: 2,
+        });
+
+        const variantId = created.variants[0].id;
+        const openingBalance = await prisma.stockTransaction.findUniqueOrThrow({
+            where: { openingBalanceKey: `stock-variant:${variantId}` },
+        });
+        expect(openingBalance).toMatchObject({
+            itemId: created.id,
+            variantId,
+            type: StockTxType.OPENING_BALANCE,
+            quantity: 6,
+        });
+
+    });
+
+    it("openingBalanceKey ป้องกัน helper สร้าง opening balance ซ้ำ", async () => {
+        const fixture = await createStockFixture(prisma, { suffix: "OPENING-KEY" });
+
+        await prisma.$transaction(async (tx) => {
+            await createStockOpeningBalanceTransaction(
+                tx,
+                fixture.item.id,
+                fixture.variant.id,
+                fixture.quantity,
+                fixture.issuer.id,
+            );
+            await createStockOpeningBalanceTransaction(
+                tx,
+                fixture.item.id,
+                fixture.variant.id,
+                fixture.quantity,
+                fixture.issuer.id,
+            );
+        });
+        expect(await prisma.stockTransaction.count({
+            where: {
+                openingBalanceKey: `stock-variant:${fixture.variant.id}`,
+            },
+        })).toBe(1);
+    });
+
+    it("สร้างวัสดุหลาย variant พร้อม aggregate, ledger ราย variant และ SKU uniqueness", async () => {
+        const fixture = await createStockFixture(prisma, { suffix: "CREATE-MULTI" });
+        const created = await stockService.createItem({
+            name: "หมึกพิมพ์หลายสี",
+            sku: "CREATE-MULTI-ITEM",
+            categoryId: fixture.category.id,
+            variants: [
+                {
+                    sku: "CREATE-MULTI-BLACK",
+                    unit: "ตลับ",
+                    quantity: 4,
+                    minStock: 1,
+                    attributes: [{ name: "สี", value: "ดำ" }],
+                },
+                {
+                    sku: "CREATE-MULTI-CYAN",
+                    unit: "ตลับ",
+                    quantity: 7,
+                    minStock: 2,
+                    attributes: [{ name: "สี", value: "ฟ้า" }],
+                },
+            ],
+        }, fixture.issuerActor);
+
+        expect(created.quantity).toBe(11);
+        expect(created.minStock).toBe(3);
+        expect(created.variants.map((variant) => ({
+            sku: variant.sku,
+            quantity: variant.quantity,
+        }))).toEqual([
+            { sku: "CREATE-MULTI-BLACK", quantity: 4 },
+            { sku: "CREATE-MULTI-CYAN", quantity: 7 },
+        ]);
+        expect(await prisma.stockTransaction.findMany({
+            where: { itemId: created.id, type: StockTxType.OPENING_BALANCE },
+            orderBy: { variantId: "asc" },
+            select: { variantId: true, quantity: true },
+        })).toEqual(created.variants.map((variant) => ({
+            variantId: variant.id,
+            quantity: variant.quantity,
+        })));
+
+        await expect(stockService.createItem({
+            name: "วัสดุ SKU ซ้ำ",
+            sku: "CREATE-MULTI-DUPLICATE-PARENT",
+            categoryId: fixture.category.id,
+            variants: [{
+                sku: "CREATE-MULTI-BLACK",
+                unit: "ตลับ",
+                quantity: 1,
+                minStock: 1,
+                attributes: [],
+            }],
+        }, fixture.issuerActor)).rejects.toBeDefined();
+        expect(await prisma.stockItem.count({
+            where: { sku: "CREATE-MULTI-DUPLICATE-PARENT" },
+        })).toBe(0);
+    });
+
+    it("จ่ายคำขอแล้วลด parent และ variant พร้อมบันทึก ledger, audit และ outbox", async () => {
+        const fixture = await createStockFixture(prisma, {
+            suffix: "ISSUE-FLOW",
+            minStock: 8,
+        });
+
+        const result = await stockService.issueRequest(
+            fixture.request.id,
+            fixture.issuerActor,
+        );
+        const inventory = await readInventory(fixture);
+        const request = await prisma.stockRequest.findUniqueOrThrow({
+            where: { id: fixture.request.id },
+        });
+        const requestItem = await prisma.stockRequestItem.findFirstOrThrow({
+            where: { requestId: fixture.request.id },
+        });
+        const transaction = await prisma.stockTransaction.findFirstOrThrow({
+            where: { stockRequestId: fixture.request.id },
+        });
+
+        expect(result.request).toEqual({
+            id: fixture.request.id,
+            requestedBy: fixture.requester.id,
+        });
+        expect(request.status).toBe(StockRequestStatus.ISSUED);
+        expect(inventory.item.quantity).toBe(7);
+        expect(inventory.variant.quantity).toBe(7);
+        expect(transaction).toMatchObject({
+            itemId: fixture.item.id,
+            variantId: fixture.variant.id,
+            type: StockTxType.OUT,
+            quantity: -fixture.requestedQuantity,
+            stockRequestId: fixture.request.id,
+            stockRequestItemId: requestItem.id,
+            referenceType: StockReferenceType.STOCK_REQUEST,
+            referenceId: String(fixture.request.id),
+        });
+        expect(await prisma.auditLog.count({
+            where: { action: "STOCK_REQUEST_ISSUE", entityId: fixture.request.id },
+        })).toBe(1);
+        expect(await prisma.notificationOutbox.count({
+            where: { type: "STOCK_LOW_LINE" },
+        })).toBe(1);
+    });
+
+    it("ไม่เปลี่ยน inventory, ledger หรือ request เมื่อ stock ไม่เพียงพอ", async () => {
+        const fixture = await createStockFixture(prisma, {
+            suffix: "INSUFFICIENT",
+            requestedQuantity: 11,
+        });
+
+        await expect(
+            stockService.issueRequest(fixture.request.id, fixture.issuerActor),
+        ).rejects.toThrow("มีไม่เพียงพอ");
+
+        const inventory = await readInventory(fixture);
+        const request = await prisma.stockRequest.findUniqueOrThrow({
+            where: { id: fixture.request.id },
+        });
+        expect(inventory.item.quantity).toBe(10);
+        expect(inventory.variant.quantity).toBe(10);
+        expect(request.status).toBe(StockRequestStatus.PENDING_ISSUE);
+        expect(await prisma.stockTransaction.count({
+            where: { stockRequestId: fixture.request.id, type: StockTxType.OUT },
+        })).toBe(0);
+    });
+
+    it("ไม่จ่ายคำขอเมื่อ variant ปิดใช้งาน", async () => {
+        const fixture = await createStockFixture(prisma, { suffix: "INACTIVE-VARIANT" });
+        await prisma.stockItemVariant.update({
+            where: { id: fixture.variant.id },
+            data: { isActive: false },
+        });
+
+        await expect(
+            stockService.issueRequest(fixture.request.id, fixture.issuerActor),
+        ).rejects.toThrow("ปิดใช้งานแล้ว");
+        expect((await readInventory(fixture)).item.quantity).toBe(10);
+        expect((await readInventory(fixture)).variant.quantity).toBe(10);
+        expect((await prisma.stockRequest.findUniqueOrThrow({
+            where: { id: fixture.request.id },
+        })).status).toBe(StockRequestStatus.PENDING_ISSUE);
+    });
+
+    it("ไม่จ่ายคำขอเมื่อ parent item ปิดใช้งานแม้ variant ยัง active", async () => {
+        const fixture = await createStockFixture(prisma, { suffix: "INACTIVE-PARENT" });
+        await prisma.stockItem.update({
+            where: { id: fixture.item.id },
+            data: { isActive: false },
+        });
+
+        await expect(
+            stockService.issueRequest(fixture.request.id, fixture.issuerActor),
+        ).rejects.toThrow("ปิดใช้งานแล้ว");
+        const inventory = await readInventory(fixture);
+        expect(inventory.item.quantity).toBe(10);
+        expect(inventory.variant.quantity).toBe(10);
+        expect((await prisma.stockRequest.findUniqueOrThrow({
+            where: { id: fixture.request.id },
+        })).status).toBe(StockRequestStatus.PENDING_ISSUE);
+    });
+
+    it("legacy request ที่ไม่มี variant ใช้ active variant ID ต่ำที่สุด", async () => {
+        const fixture = await createStockFixture(prisma, { suffix: "LEGACY-DEFAULT" });
+        const laterVariant = await prisma.stockItemVariant.create({
+            data: {
+                stockItemId: fixture.item.id,
+                sku: "LEGACY-DEFAULT-LATER",
+                unit: "ชิ้น",
+                quantity: 20,
+                minStock: 2,
+            },
+        });
+        await prisma.stockRequestItem.updateMany({
+            where: { requestId: fixture.request.id },
+            data: { variantId: null },
+        });
+
+        // Characterization only: Phase 1 preserves the legacy lowest-active-ID fallback.
+        await stockService.issueRequest(fixture.request.id, fixture.issuerActor);
+
+        const transaction = await prisma.stockTransaction.findFirstOrThrow({
+            where: { stockRequestId: fixture.request.id },
+        });
+        expect(transaction.variantId).toBe(fixture.variant.id);
+        expect((await prisma.stockItemVariant.findUniqueOrThrow({
+            where: { id: fixture.variant.id },
+        })).quantity).toBe(7);
+        expect((await prisma.stockItemVariant.findUniqueOrThrow({
+            where: { id: laterVariant.id },
+        })).quantity).toBe(20);
+    });
+
+    it("ปฏิเสธ request item ที่อ้าง variant ของอีก item ภายใน issue transaction", async () => {
+        const fixture = await createStockFixture(prisma, { suffix: "CROSS-ITEM" });
+        const otherItem = await prisma.stockItem.create({
+            data: {
+                name: "วัสดุอีกชิ้น",
+                sku: "CROSS-ITEM-OTHER",
+                unit: "ชิ้น",
+                quantity: 5,
+                minStock: 1,
+                categoryId: fixture.category.id,
+            },
+        });
+        const otherVariant = await prisma.stockItemVariant.create({
+            data: {
+                stockItemId: otherItem.id,
+                sku: "CROSS-ITEM-OTHER-VARIANT",
+                unit: "ชิ้น",
+                quantity: 5,
+                minStock: 1,
+            },
+        });
+        await prisma.stockRequestItem.updateMany({
+            where: { requestId: fixture.request.id },
+            data: { variantId: otherVariant.id },
+        });
+
+        await expect(
+            stockService.issueRequest(fixture.request.id, fixture.issuerActor),
+        ).rejects.toThrow("ปิดใช้งานแล้ว");
+
+        expect((await readInventory(fixture)).item.quantity).toBe(10);
+        expect((await prisma.stockItem.findUniqueOrThrow({
+            where: { id: otherItem.id },
+        })).quantity).toBe(5);
+        expect((await prisma.stockRequest.findUniqueOrThrow({
+            where: { id: fixture.request.id },
+        })).status).toBe(StockRequestStatus.PENDING_ISSUE);
+        expect(await prisma.stockTransaction.count({
+            where: { stockRequestId: fixture.request.id },
+        })).toBe(0);
     });
 
     it("ใช้ Serializable จริง และ FOR UPDATE กันคำสั่งแก้สต็อกจนกว่าจะปล่อย lock", async () => {

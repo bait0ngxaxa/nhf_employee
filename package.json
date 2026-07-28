@@ -15,7 +15,9 @@
     "test:run": "vitest run",
     "test:watch": "vitest --watch",
     "test:coverage": "vitest run --coverage",
-    "test:integration:mysql": "node scripts/run-mysql-integration-tests.mjs"
+    "test:integration:mysql": "node scripts/run-mysql-integration-tests.mjs",
+    "stock:audit": "tsx scripts/stock-inventory-audit.ts",
+    "stock:audit:strict": "tsx scripts/stock-inventory-audit.ts --fail-on-error"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
