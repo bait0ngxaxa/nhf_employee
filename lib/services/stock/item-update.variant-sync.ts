@@ -127,7 +127,6 @@ async function createSubmittedVariant(
     itemId: number,
     parentSku: string,
     parentImageUrl: string | null,
-    parentIsActive: boolean,
     variant: SubmittedVariant,
     index: number,
     usedSkus: Set<string>,
@@ -147,7 +146,7 @@ async function createSubmittedVariant(
             quantity: variant.quantity,
             minStock: variant.minStock,
             imageUrl: nextVariantImageUrl,
-            isActive: parentIsActive,
+            isActive: true,
         },
         select: { id: true },
     });
@@ -253,7 +252,6 @@ async function syncSubmittedVariants(
                 itemId,
                 nextItem.sku,
                 nextItem.imageUrl,
-                nextItem.isActive,
                 variant,
                 index,
                 usedSkus,
@@ -373,15 +371,10 @@ export async function updateItemWithVariants(
 
     await handleRemovedVariants(tx, existingVariants, submittedIds, tracking);
 
-    if (nextItem.isActive) {
+    if (submittedIds.size > 0) {
         await tx.stockItemVariant.updateMany({
             where: { stockItemId: itemId, id: { in: Array.from(submittedIds) } },
             data: { isActive: true },
-        });
-    } else {
-        await tx.stockItemVariant.updateMany({
-            where: { stockItemId: itemId },
-            data: { isActive: false },
         });
     }
     await reconcileStockItemDefaultVariant(tx, itemId);

@@ -679,6 +679,323 @@ describe.sequential("stock mutations with real MySQL", () => {
         });
     });
 
+    it("ปิด parent พร้อมส่ง variants แล้วคง lifecycle ของ submitted และ inactive variant", async () => {
+        const fixture = await createStockFixture(prisma, {
+            suffix: "PARENT-SUBMITTED-VARIANTS",
+        });
+        const created = await stockService.createItem({
+            name: "วัสดุทดสอบ parent พร้อมรายการย่อย",
+            sku: "PARENT-SUBMITTED-VARIANTS-ITEM",
+            categoryId: fixture.category.id,
+            variants: [
+                {
+                    sku: "PARENT-SUBMITTED-VARIANTS-A",
+                    unit: "ชิ้น",
+                    quantity: 4,
+                    minStock: 1,
+                    attributes: [{ name: "แบบ", value: "A" }],
+                },
+                {
+                    sku: "PARENT-SUBMITTED-VARIANTS-B",
+                    unit: "ชิ้น",
+                    quantity: 0,
+                    minStock: 1,
+                    attributes: [{ name: "แบบ", value: "B" }],
+                },
+            ],
+        }, fixture.issuerActor);
+        const [variantA, variantB] = created.variants;
+        if (!variantA || !variantB) {
+            throw new Error("สร้างรายการย่อยสำหรับ integration test ไม่ครบ");
+        }
+
+        await prisma.stockItemVariant.update({
+            where: { id: variantB.id },
+            data: { isActive: false },
+        });
+        await prisma.stockItem.update({
+            where: { id: created.id },
+            data: { defaultVariantId: variantA.id },
+        });
+        const transactionCountBeforeClose = await prisma.stockTransaction.count({
+            where: { itemId: created.id },
+        });
+
+        await stockService.updateItem(
+            created.id,
+            {
+                isActive: false,
+                variants: [{
+                    id: variantA.id,
+                    expectedQuantity: variantA.quantity,
+                    sku: variantA.sku,
+                    unit: variantA.unit,
+                    quantity: variantA.quantity,
+                    minStock: variantA.minStock,
+                    attributes: [{ name: "แบบ", value: "A" }],
+                }],
+            },
+            fixture.issuerActor,
+        );
+
+        const afterClose = await prisma.stockItem.findUniqueOrThrow({
+            where: { id: created.id },
+            select: {
+                isActive: true,
+                defaultVariantId: true,
+                variants: {
+                    orderBy: { id: "asc" },
+                    select: { id: true, quantity: true, isActive: true },
+                },
+            },
+        });
+        expect(afterClose).toEqual({
+            isActive: false,
+            defaultVariantId: variantA.id,
+            variants: [
+                { id: variantA.id, quantity: 4, isActive: true },
+                { id: variantB.id, quantity: 0, isActive: false },
+            ],
+        });
+        expect(await prisma.stockTransaction.count({
+            where: { itemId: created.id },
+        })).toBe(transactionCountBeforeClose);
+
+        await stockService.updateItem(
+            created.id,
+            { isActive: true },
+            fixture.issuerActor,
+        );
+
+        const afterOpen = await prisma.stockItem.findUniqueOrThrow({
+            where: { id: created.id },
+            select: {
+                isActive: true,
+                defaultVariantId: true,
+                variants: {
+                    orderBy: { id: "asc" },
+                    select: { id: true, quantity: true, isActive: true },
+                },
+            },
+        });
+        expect(afterOpen).toEqual({
+            isActive: true,
+            defaultVariantId: variantA.id,
+            variants: [
+                { id: variantA.id, quantity: 4, isActive: true },
+                { id: variantB.id, quantity: 0, isActive: false },
+            ],
+        });
+        expect((await stockService.getItemById(created.id))?.quantity).toBe(4);
+    });
+
+    it("เพิ่ม variant ขณะ parent ปิดแล้วเปิดกลับโดยไม่สร้าง opening balance ซ้ำ", async () => {
+        const fixture = await createStockFixture(prisma, {
+            suffix: "ADD-INACTIVE-PARENT",
+        });
+        const created = await stockService.createItem({
+            name: "วัสดุทดสอบเพิ่มรายการย่อยขณะ parent ปิด",
+            sku: "ADD-INACTIVE-PARENT-ITEM",
+            categoryId: fixture.category.id,
+            variants: [{
+                sku: "ADD-INACTIVE-PARENT-EXISTING",
+                unit: "ชิ้น",
+                quantity: 2,
+                minStock: 1,
+                attributes: [{ name: "แบบ", value: "เดิม" }],
+            }],
+        }, fixture.issuerActor);
+        const existingVariant = created.variants[0];
+        if (!existingVariant) {
+            throw new Error("สร้างรายการย่อยสำหรับ integration test ไม่ครบ");
+        }
+
+        await stockService.updateItem(
+            created.id,
+            { isActive: false },
+            fixture.issuerActor,
+        );
+        const openingBalanceCountBeforeAdd = await prisma.stockTransaction.count({
+            where: { itemId: created.id, type: StockTxType.OPENING_BALANCE },
+        });
+
+        await stockService.updateItem(
+            created.id,
+            {
+                isActive: false,
+                variants: [
+                    {
+                        id: existingVariant.id,
+                        expectedQuantity: existingVariant.quantity,
+                        sku: existingVariant.sku,
+                        unit: existingVariant.unit,
+                        quantity: existingVariant.quantity,
+                        minStock: existingVariant.minStock,
+                        attributes: [{ name: "แบบ", value: "เดิม" }],
+                    },
+                    {
+                        sku: "ADD-INACTIVE-PARENT-NEW",
+                        unit: "ชิ้น",
+                        quantity: 5,
+                        minStock: 2,
+                        attributes: [{ name: "แบบ", value: "ใหม่" }],
+                    },
+                ],
+            },
+            fixture.issuerActor,
+        );
+
+        const newVariant = await prisma.stockItemVariant.findUniqueOrThrow({
+            where: { sku: "ADD-INACTIVE-PARENT-NEW" },
+            select: { id: true, quantity: true, isActive: true },
+        });
+        expect(newVariant).toEqual({
+            id: newVariant.id,
+            quantity: 5,
+            isActive: true,
+        });
+        expect(await prisma.stockTransaction.count({
+            where: { itemId: created.id, type: StockTxType.OPENING_BALANCE },
+        })).toBe(openingBalanceCountBeforeAdd + 1);
+        expect(await prisma.stockTransaction.count({
+            where: {
+                itemId: created.id,
+                variantId: newVariant.id,
+                type: StockTxType.OPENING_BALANCE,
+            },
+        })).toBe(1);
+
+        await stockService.updateItem(
+            created.id,
+            { isActive: true },
+            fixture.issuerActor,
+        );
+
+        const afterOpen = await prisma.stockItem.findUniqueOrThrow({
+            where: { id: created.id },
+            select: {
+                isActive: true,
+                defaultVariantId: true,
+                variants: {
+                    orderBy: { id: "asc" },
+                    select: { id: true, quantity: true, isActive: true },
+                },
+            },
+        });
+        expect(afterOpen).toMatchObject({
+            isActive: true,
+            defaultVariantId: existingVariant.id,
+            variants: [
+                { id: existingVariant.id, quantity: 2, isActive: true },
+                { id: newVariant.id, quantity: 5, isActive: true },
+            ],
+        });
+        expect(afterOpen.variants).toHaveLength(2);
+        expect((await stockService.getItemById(created.id))?.quantity).toBe(7);
+        expect(await prisma.stockTransaction.count({
+            where: { itemId: created.id, type: StockTxType.OPENING_BALANCE },
+        })).toBe(openingBalanceCountBeforeAdd + 1);
+        expect(await prisma.stockItemVariant.count({
+            where: { stockItemId: created.id },
+        })).toBe(2);
+    });
+
+    it("variant ที่ถอดออกแล้วไม่กลับมา active หลังปิดและเปิด parent", async () => {
+        const fixture = await createStockFixture(prisma, {
+            suffix: "REMOVED-VARIANT-LIFECYCLE",
+        });
+        const created = await stockService.createItem({
+            name: "วัสดุทดสอบ lifecycle รายการย่อยที่ถอดออก",
+            sku: "REMOVED-VARIANT-LIFECYCLE-ITEM",
+            categoryId: fixture.category.id,
+            variants: [
+                {
+                    sku: "REMOVED-VARIANT-LIFECYCLE-A",
+                    unit: "ชิ้น",
+                    quantity: 3,
+                    minStock: 1,
+                    attributes: [{ name: "แบบ", value: "A" }],
+                },
+                {
+                    sku: "REMOVED-VARIANT-LIFECYCLE-B",
+                    unit: "ชิ้น",
+                    quantity: 0,
+                    minStock: 1,
+                    attributes: [{ name: "แบบ", value: "B" }],
+                },
+            ],
+        }, fixture.issuerActor);
+        const [variantA, variantB] = created.variants;
+        if (!variantA || !variantB) {
+            throw new Error("สร้างรายการย่อยสำหรับ integration test ไม่ครบ");
+        }
+
+        await stockService.updateItem(
+            created.id,
+            {
+                variants: [{
+                    id: variantA.id,
+                    expectedQuantity: variantA.quantity,
+                    sku: variantA.sku,
+                    unit: variantA.unit,
+                    quantity: variantA.quantity,
+                    minStock: variantA.minStock,
+                    attributes: [{ name: "แบบ", value: "A" }],
+                }],
+            },
+            fixture.issuerActor,
+        );
+        expect((await prisma.stockItemVariant.findUniqueOrThrow({
+            where: { id: variantB.id },
+            select: { isActive: true },
+        })).isActive).toBe(false);
+
+        await stockService.updateItem(
+            created.id,
+            {
+                isActive: false,
+                variants: [{
+                    id: variantA.id,
+                    expectedQuantity: variantA.quantity,
+                    sku: variantA.sku,
+                    unit: variantA.unit,
+                    quantity: variantA.quantity,
+                    minStock: variantA.minStock,
+                    attributes: [{ name: "แบบ", value: "A" }],
+                }],
+            },
+            fixture.issuerActor,
+        );
+        await stockService.updateItem(
+            created.id,
+            { isActive: true },
+            fixture.issuerActor,
+        );
+
+        const lifecycleState = await prisma.stockItem.findUniqueOrThrow({
+            where: { id: created.id },
+            select: {
+                isActive: true,
+                defaultVariantId: true,
+                variants: {
+                    orderBy: { id: "asc" },
+                    select: { id: true, isActive: true },
+                },
+            },
+        });
+        expect(lifecycleState).toEqual({
+            isActive: true,
+            defaultVariantId: variantA.id,
+            variants: [
+                { id: variantA.id, isActive: true },
+                { id: variantB.id, isActive: false },
+            ],
+        });
+        expect((await stockService.getItemById(created.id))?.variants.map(
+            (variant) => variant.id,
+        )).toEqual([variantA.id]);
+    });
+
     it("ใช้ explicit default ตอนแก้ parent โดยไม่ส่ง variants เมื่อเปิด flag", async () => {
         const fixture = await createStockFixture(prisma, {
             suffix: "DEFAULT-UPDATE",

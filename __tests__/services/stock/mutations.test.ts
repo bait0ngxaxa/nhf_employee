@@ -2012,7 +2012,7 @@ describe("Stock Service Mutations", () => {
                     quantity: 8,
                     minStock: 2,
                     imageUrl: null,
-                    isActive: true,
+                    isActive: false,
                     variants: [
                         { id: 261, quantity: 2, minStock: 1 },
                         { id: 263, quantity: 4, minStock: 2 },
@@ -2031,6 +2031,7 @@ describe("Stock Service Mutations", () => {
                         id: 26,
                         sku: "SKU-26",
                         imageUrl: null,
+                        isActive: false,
                     }),
                 )
                 .mockResolvedValueOnce(asNever({ id: 26 }));
@@ -2057,6 +2058,7 @@ describe("Stock Service Mutations", () => {
             );
 
             await stockService.updateItem(26, {
+                isActive: false,
                 variants: [
                     {
                         id: 261,
@@ -2082,6 +2084,7 @@ describe("Stock Service Mutations", () => {
                         stockItemId: 26,
                         quantity: 4,
                         minStock: 2,
+                        isActive: true,
                     }),
                 }),
             );
@@ -2102,6 +2105,12 @@ describe("Stock Service Mutations", () => {
             expect(prismaMock.stockItemVariant.update).toHaveBeenCalledWith(
                 expect.objectContaining({
                     where: { id: 262 },
+                    data: { isActive: false },
+                }),
+            );
+            expect(prismaMock.stockItemVariant.updateMany).not.toHaveBeenCalledWith(
+                expect.objectContaining({
+                    where: { stockItemId: 26 },
                     data: { isActive: false },
                 }),
             );
