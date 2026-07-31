@@ -31,6 +31,7 @@ interface UseLeaveRequestFormModelArgs {
 
 interface UseLeaveRequestFormModelResult {
     form: UseFormReturn<LeaveRequestValues>;
+    isDirty: boolean;
     isSubmitting: boolean;
     errorMsg: string | null;
     attachments: File[];
@@ -130,6 +131,7 @@ export function useLeaveRequestFormModel({
         resolver: zodResolver(leaveRequestSchema),
         defaultValues: createDefaultLeaveRequestValues(),
     });
+    const isDirty = form.formState.isDirty || attachments.length > 0;
 
     const leaveType = form.watch("leaveType");
     const startDateValue = form.watch("startDate");
@@ -280,6 +282,7 @@ export function useLeaveRequestFormModel({
 
     return {
         form,
+        isDirty,
         isSubmitting,
         errorMsg,
         attachments,

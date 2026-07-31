@@ -1,12 +1,14 @@
 "use client";
 
-import { AlertCircle, Loader2, X } from "lucide-react";
+import { AlertCircle, Loader2 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import {
+    AsyncFormDialog,
+    AsyncFormDialogClose,
+    AsyncFormDialogContent,
+} from "@/components/ui/async-form-dialog";
 import { Button } from "@/components/ui/button";
 import {
-    Dialog,
-    DialogClose,
-    DialogContent,
     DialogDescription,
     DialogFooter,
     DialogHeader,
@@ -31,50 +33,23 @@ type LeaveRequestFormModel = ReturnType<typeof useLeaveRequestFormModel>;
 export function LeaveRequestForm({ open, onSuccess, onCancel, quotas }: Props) {
     const model = useLeaveRequestFormModel({ onSuccess, quotas });
 
-    const closeDialog = (): void => {
-        if (model.isSubmitting) {
-            return;
-        }
-
-        model.resetForm();
-        onCancel();
-    };
-
     return (
-        <Dialog
+        <AsyncFormDialog
             open={open}
-            onOpenChange={(nextOpen) => {
-                if (!nextOpen) {
-                    closeDialog();
-                }
-            }}
+            busy={model.isSubmitting}
+            dirty={model.isDirty}
+            onClose={onCancel}
+            onDiscard={model.resetForm}
         >
-            <DialogContent
-                showCloseButton={false}
+            <AsyncFormDialogContent
                 className="flex max-h-[calc(100vh-2rem)] flex-col overflow-hidden rounded-xl p-0 sm:max-w-[720px]"
-                onEscapeKeyDown={(event) => {
-                    if (model.isSubmitting) {
-                        event.preventDefault();
-                    }
-                }}
-                onInteractOutside={(event) => {
-                    if (model.isSubmitting) {
-                        event.preventDefault();
-                    }
-                }}
             >
-                <DialogClose asChild>
-                    <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon-sm"
-                        disabled={model.isSubmitting}
-                        className="absolute right-4 top-4"
-                        aria-label="ปิดแบบฟอร์มยื่นคำขอลา"
-                    >
-                        <X />
-                    </Button>
-                </DialogClose>
+                <AsyncFormDialogClose
+                    variant="ghost"
+                    size="icon-sm"
+                    className="absolute right-4 top-4"
+                    aria-label="ปิดแบบฟอร์มยื่นคำขอลา"
+                />
                 <DialogHeader className="shrink-0 gap-2 border-b border-border bg-muted/30 px-5 py-4 pr-12 text-left sm:px-6">
                     <DialogTitle className="text-lg font-semibold text-foreground">
                         ยื่นคำขอลา
@@ -98,29 +73,31 @@ export function LeaveRequestForm({ open, onSuccess, onCancel, quotas }: Props) {
                         </div>
                         <Separator />
                         <DialogFooter className="shrink-0 gap-2 px-5 py-4 sm:px-6">
-                            <Button
-                                type="button"
+                            <AsyncFormDialogClose
                                 variant="outline"
-                                disabled={model.isSubmitting}
-                                onClick={closeDialog}
                             >
                                 ยกเลิก
-                            </Button>
+                            </AsyncFormDialogClose>
                             <Button
                                 type="submit"
                                 className={LEAVE_THEME_BUTTON_CLASS}
                                 disabled={model.isSubmitting}
+                                aria-busy={model.isSubmitting}
                             >
                                 {model.isSubmitting ? (
-                                    <Loader2 data-icon="inline-start" className="animate-spin" />
+                                    <Loader2
+                                        data-icon="inline-start"
+                                        className="animate-spin"
+                                        aria-hidden="true"
+                                    />
                                 ) : null}
                                 {model.isSubmitting ? "กำลังส่งคำขอ" : "ส่งคำขอลา"}
                             </Button>
                         </DialogFooter>
                     </form>
                 </Form>
-            </DialogContent>
-        </Dialog>
+            </AsyncFormDialogContent>
+        </AsyncFormDialog>
     );
 }
 

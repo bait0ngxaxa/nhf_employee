@@ -1,4 +1,6 @@
+import { useState, type ReactElement } from "react";
 import {
+    act,
     fireEvent,
     render,
     screen,
@@ -263,7 +265,7 @@ describe("LeaveRequestForm", () => {
         );
     });
 
-    it("resets evidence and revokes its preview when the dialog is cancelled", async () => {
+    it("confirms before discarding evidence and revokes its preview after confirmation", async () => {
         render(
             <LeaveRequestForm
                 open
@@ -283,6 +285,24 @@ describe("LeaveRequestForm", () => {
 
         fireEvent.click(screen.getByRole("button", { name: "ยกเลิก" }));
 
+        expect(
+            screen.getByRole("alertdialog", {
+                name: "ทิ้งข้อมูลที่กรอกไว้?",
+            }),
+        ).toBeInTheDocument();
+        expect(
+            screen.getByAltText("ตัวอย่างรูปภาพ proof.jpg"),
+        ).toBeInTheDocument();
+        expect(onCancel).not.toHaveBeenCalled();
+
+        fireEvent.click(screen.getByRole("button", { name: "แก้ไขต่อ" }));
+        expect(
+            screen.getByAltText("ตัวอย่างรูปภาพ proof.jpg"),
+        ).toBeInTheDocument();
+
+        fireEvent.click(screen.getByRole("button", { name: "ยกเลิก" }));
+        fireEvent.click(screen.getByRole("button", { name: "ทิ้งข้อมูล" }));
+
         await waitFor(() =>
             expect(
                 screen.queryByAltText("ตัวอย่างรูปภาพ proof.jpg"),
@@ -291,5 +311,118 @@ describe("LeaveRequestForm", () => {
         expect(revokeObjectURL).toHaveBeenCalledWith(
             "blob:leave-evidence",
         );
+        expect(onCancel).toHaveBeenCalledTimes(1);
+    });
+
+    it("asks before discarding dirty fields after a backdrop interaction", async () => {
+        render(
+            <LeaveRequestForm
+                open
+                onCancel={onCancel}
+                onSuccess={onSuccess}
+                quotas={[createQuota(10, 0)]}
+            />,
+        );
+        fireEvent.change(screen.getByLabelText("เหตุผลการลา"), {
+            target: { value: "พักรักษาตัวตามคำแนะนำแพทย์" },
+        });
+
+        await waitForDismissLayer();
+        fireBackdropPointerDown();
+
+        expect(
+            screen.getByRole("alertdialog", {
+                name: "ทิ้งข้อมูลที่กรอกไว้?",
+            }),
+        ).toBeInTheDocument();
+        expect(onCancel).not.toHaveBeenCalled();
+
+        fireEvent.click(screen.getByRole("button", { name: "แก้ไขต่อ" }));
+        expect(screen.getByLabelText("เหตุผลการลา")).toHaveValue(
+            "พักรักษาตัวตามคำแนะนำแพทย์",
+        );
+    });
+
+    it("blocks Escape, backdrop, and close controls while submitting", async () => {
+        vi.mocked(submitLeaveRequest).mockReturnValue(
+            new Promise<never>(() => undefined),
+        );
+        render(
+            <LeaveRequestForm
+                open
+                onCancel={onCancel}
+                onSuccess={onSuccess}
+                quotas={[createQuota(10, 0)]}
+            />,
+        );
+        fireEvent.change(screen.getByLabelText("เหตุผลการลา"), {
+            target: { value: "พักรักษาตัวตามคำแนะนำแพทย์" },
+        });
+        fireEvent.click(screen.getByRole("button", { name: "ส่งคำขอลา" }));
+
+        await waitFor(() =>
+            expect(submitLeaveRequest).toHaveBeenCalledTimes(1),
+        );
+        expect(
+            screen.getByRole("button", { name: "ปิดแบบฟอร์มยื่นคำขอลา" }),
+        ).toBeDisabled();
+
+        fireEvent.keyDown(document, { key: "Escape" });
+        fireBackdropPointerDown();
+        fireEvent.click(screen.getByRole("button", { name: "ยกเลิก" }));
+
+        expect(onCancel).not.toHaveBeenCalled();
+        expect(
+            screen.getByRole("dialog", { name: "ยื่นคำขอลา" }),
+        ).toBeInTheDocument();
+        expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    });
+
+    it("returns focus to the button that opened the form", async () => {
+        render(<LeaveRequestFormHarness />);
+        const trigger = screen.getByRole("button", {
+            name: "เปิดแบบฟอร์มยื่นคำขอลา",
+        });
+
+        fireEvent.click(trigger);
+        fireEvent.click(screen.getByRole("button", { name: "ยกเลิก" }));
+
+        await waitFor(() => expect(trigger).toHaveFocus());
+        expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     });
 });
+
+function LeaveRequestFormHarness(): ReactElement {
+    const [open, setOpen] = useState(false);
+
+    return (
+        <>
+            <button type="button" onClick={() => setOpen(true)}>
+                เปิดแบบฟอร์มยื่นคำขอลา
+            </button>
+            <LeaveRequestForm
+                open={open}
+                onCancel={() => setOpen(false)}
+                onSuccess={() => undefined}
+                quotas={[createQuota(10, 0)]}
+            />
+        </>
+    );
+}
+
+function fireBackdropPointerDown(): void {
+    const overlay = document.querySelector('[data-slot="dialog-overlay"]');
+    if (!(overlay instanceof HTMLElement)) {
+        throw new Error("Dialog overlay not found");
+    }
+
+    fireEvent.pointerDown(overlay, { button: 0, pointerType: "mouse" });
+}
+
+async function waitForDismissLayer(): Promise<void> {
+    await act(async () => {
+        await new Promise<void>((resolve) => {
+            window.setTimeout(resolve, 0);
+        });
+    });
+}

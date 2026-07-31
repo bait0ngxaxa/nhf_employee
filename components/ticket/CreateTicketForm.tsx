@@ -1,12 +1,22 @@
 "use client";
 
-import { useRef, useState } from 'react';
+import {
+  useRef,
+  useState,
+  type FormEvent,
+  type ReactElement,
+} from 'react';
+import {
+  AsyncFormDialog,
+  AsyncFormDialogClose,
+  AsyncFormDialogContent,
+} from '@/components/ui/async-form-dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { toast } from "sonner";
 import { type CreateTicketFormProps, type TicketFormData } from '@/types/tickets';
 import { TICKET_CATEGORIES, TICKET_PRIORITIES } from '@/constants/tickets';
@@ -16,22 +26,44 @@ import { useAuth } from "@/components/auth/HybridAuthProvider";
 import { createIdempotencyKey } from "@/lib/client/idempotency-key";
 import { canCreateTicketWithPriority } from "@/lib/ssot/ticket-priority-policy";
 
-export default function CreateTicketForm({ isOpen, onClose, onTicketCreated }: CreateTicketFormProps) {
+const INITIAL_TICKET_FORM_DATA: TicketFormData = {
+  title: '',
+  description: '',
+  category: '',
+  priority: 'MEDIUM',
+};
+
+export default function CreateTicketForm({
+  isOpen,
+  onClose,
+  onTicketCreated,
+}: CreateTicketFormProps): ReactElement {
   const { user } = useAuth();
-  const [formData, setFormData] = useState<TicketFormData>({
-    title: '',
-    description: '',
-    category: '',
-    priority: 'MEDIUM'
-  });
+  const [formData, setFormData] = useState<TicketFormData>(
+    INITIAL_TICKET_FORM_DATA,
+  );
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const idempotencyRef = useRef<{
     payload: string;
     key: string;
   } | null>(null);
+  const isDirty =
+    formData.title !== INITIAL_TICKET_FORM_DATA.title ||
+    formData.description !== INITIAL_TICKET_FORM_DATA.description ||
+    formData.category !== INITIAL_TICKET_FORM_DATA.category ||
+    formData.priority !== INITIAL_TICKET_FORM_DATA.priority;
 
-  const handleInputChange = (field: string, value: string) => {
+  const resetForm = (): void => {
+    setFormData(INITIAL_TICKET_FORM_DATA);
+    setError('');
+    idempotencyRef.current = null;
+  };
+
+  const handleInputChange = (
+    field: keyof TicketFormData,
+    value: string,
+  ): void => {
     setFormData(prev => ({
       ...prev,
       [field]: value
@@ -39,7 +71,7 @@ export default function CreateTicketForm({ isOpen, onClose, onTicketCreated }: C
     setError('');
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>): Promise<void> => {
     e.preventDefault();
     
     if (!formData.title.trim() || !formData.description.trim() || !formData.category) {
@@ -77,14 +109,7 @@ export default function CreateTicketForm({ isOpen, onClose, onTicketCreated }: C
         description: `คำร้องแจ้งปัญหา "${formData.title}" ได้รับการบันทึกเรียบร้อยแล้ว หมายเลขที่ติดตาม: #${response.data.ticket.id}`,
       });
       
-      // Reset form
-      setFormData({
-        title: '',
-        description: '',
-        category: '',
-        priority: 'MEDIUM'
-      });
-      idempotencyRef.current = null;
+      resetForm();
 
       // Close the dialog immediately
       onClose();
@@ -106,20 +131,49 @@ export default function CreateTicketForm({ isOpen, onClose, onTicketCreated }: C
 
   if (!user) {
     return (
-      <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent className="sm:max-w-md">
+      <AsyncFormDialog
+        open={isOpen}
+        busy={isLoading}
+        dirty={isDirty}
+        onClose={onClose}
+        onDiscard={resetForm}
+      >
+        <AsyncFormDialogContent className="sm:max-w-md">
+          <AsyncFormDialogClose
+            variant="ghost"
+            size="icon-sm"
+            className="absolute right-4 top-4"
+            aria-label="ปิดหน้าต่างแจ้งปัญหาไอที"
+          />
+          <DialogHeader className="sr-only">
+            <DialogTitle>แจ้งปัญหาไอที</DialogTitle>
+            <DialogDescription>
+              ต้องเข้าสู่ระบบก่อนแจ้งปัญหาไอที
+            </DialogDescription>
+          </DialogHeader>
           <div className="text-center p-6">
             <p className="text-gray-500">กรุณาเข้าสู่ระบบเพื่อแจ้งปัญหา</p>
           </div>
-        </DialogContent>
-      </Dialog>
+        </AsyncFormDialogContent>
+      </AsyncFormDialog>
     );
   }
 
   return (
-    <>
-      <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto overscroll-contain">
+    <AsyncFormDialog
+      open={isOpen}
+      busy={isLoading}
+      dirty={isDirty}
+      onClose={onClose}
+      onDiscard={resetForm}
+    >
+      <AsyncFormDialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto overscroll-contain">
+          <AsyncFormDialogClose
+            variant="ghost"
+            size="icon-sm"
+            className="absolute right-4 top-4"
+            aria-label="ปิดแบบฟอร์มแจ้งปัญหาไอที"
+          />
           <DialogHeader>
             <DialogTitle className="text-xl font-semibold">แจ้งปัญหาไอที</DialogTitle>
             <DialogDescription>
@@ -202,13 +256,24 @@ export default function CreateTicketForm({ isOpen, onClose, onTicketCreated }: C
             </div>
 
             <div className="flex justify-end gap-3 pt-5 border-t mt-4">
-              <Button type="button" variant="ghost" onClick={onClose} disabled={isLoading} className="h-10 px-5 font-medium hover:bg-slate-100 text-slate-600">
+              <AsyncFormDialogClose
+                variant="ghost"
+                className="h-10 px-5 font-medium hover:bg-slate-100 text-slate-600"
+              >
                 ยกเลิก
-              </Button>
-              <Button type="submit" disabled={isLoading} className="h-10 px-7 font-bold bg-blue-600 hover:bg-blue-700 text-white shadow-sm transition-all">
+              </AsyncFormDialogClose>
+              <Button
+                type="submit"
+                disabled={isLoading}
+                aria-busy={isLoading}
+                className="h-10 px-7 font-bold bg-blue-600 hover:bg-blue-700 text-white shadow-sm transition-all"
+              >
                 {isLoading ? (
                   <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    <Loader2
+                      className="mr-2 h-4 w-4 animate-spin"
+                      aria-hidden="true"
+                    />
                     กำลังส่ง...
                   </>
                 ) : (
@@ -217,9 +282,7 @@ export default function CreateTicketForm({ isOpen, onClose, onTicketCreated }: C
               </Button>
             </div>
           </form>
-        </DialogContent>
-      </Dialog>
-
-    </>
+      </AsyncFormDialogContent>
+    </AsyncFormDialog>
   );
 }
