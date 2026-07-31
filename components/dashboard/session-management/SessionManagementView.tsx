@@ -140,7 +140,7 @@ export function SessionManagementView({
     const isConfirming = Boolean(revokingId) || isRevokingOthers;
 
     return (
-        <section className="min-h-[calc(100vh-6rem)] bg-slate-50 px-4 py-6 md:px-8 md:py-8">
+        <section className="min-h-[calc(100dvh-6rem)] bg-slate-50 px-4 py-6 md:px-8 md:py-8">
             <div className="mx-auto max-w-6xl space-y-5">
                 <header className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                     <div className="flex min-w-0 items-center gap-3">

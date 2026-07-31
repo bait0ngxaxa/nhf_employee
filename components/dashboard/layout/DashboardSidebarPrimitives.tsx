@@ -303,7 +303,14 @@ export function SidebarFooter({
     role,
 }: SidebarFooterProps): ReactElement {
     return (
-        <div className={cn("border-t border-sidebar-border transition-[padding] duration-200", sidebarOpen ? "p-4" : "p-3")}>
+        <div
+            className={cn(
+                "border-t border-sidebar-border transition-[padding] duration-200",
+                sidebarOpen
+                    ? "p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]"
+                    : "p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]",
+            )}
+        >
             <div
                 className={cn(
                     "flex min-w-0 items-center rounded-xl bg-sidebar-accent text-sidebar-accent-foreground",

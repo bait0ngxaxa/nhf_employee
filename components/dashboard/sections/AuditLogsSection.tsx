@@ -13,7 +13,7 @@ export function AuditLogsSection() {
     return (
         <AuditLogsProvider>
             <div
-                className="relative min-h-[calc(100vh-6rem)] overflow-hidden rounded-3xl border border-white/60 bg-slate-50/50 shadow-inner"
+                className="relative min-h-[calc(100dvh-6rem)] overflow-hidden rounded-3xl border border-white/60 bg-slate-50/50 shadow-inner"
                 style={{ backgroundImage: AUDIT_LOGS_BACKGROUND }}
             >
                 <div className="relative z-10 p-4 md:p-8 space-y-8">

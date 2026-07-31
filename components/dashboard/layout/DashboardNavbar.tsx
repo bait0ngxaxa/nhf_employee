@@ -113,8 +113,8 @@ export function DashboardNavbar(): ReactElement {
     };
 
     return (
-        <header className="sticky top-0 z-30 bg-white/95 border-b border-slate-50">
-            <div className="flex h-20 items-center justify-between px-6 lg:px-10">
+        <header className="sticky top-0 z-30 border-b border-slate-50 bg-white/95 pt-[env(safe-area-inset-top)]">
+            <div className="flex h-20 items-center justify-between pl-[calc(1.5rem+env(safe-area-inset-left))] pr-[calc(1.5rem+env(safe-area-inset-right))] lg:pl-[calc(2.5rem+env(safe-area-inset-left))] lg:pr-[calc(2.5rem+env(safe-area-inset-right))]">
                 {/* Left: Mobile menu + Page title */}
                 <div className="flex items-center gap-4">
                     <Sheet
@@ -285,7 +285,7 @@ export function DashboardNavbar(): ReactElement {
                             event.preventDefault();
                         }
                     }}
-                    className="max-h-[calc(100vh-2rem)] overflow-y-auto rounded-2xl border border-slate-200 p-0 shadow-xl sm:max-w-[26rem]"
+                    className="rounded-2xl border border-slate-200 p-0 shadow-xl sm:max-w-[26rem]"
                 >
                     <div className="space-y-5 bg-white px-6 pb-5 pt-6 sm:px-7">
                         <div className="flex items-start gap-4">

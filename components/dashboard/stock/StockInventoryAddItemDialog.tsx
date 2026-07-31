@@ -115,7 +115,7 @@ export function AddItemDialog({
                 }
             }}
         >
-            <DialogContent className="flex max-h-[90vh] flex-col overflow-hidden p-0 sm:max-w-[760px]">
+            <DialogContent className="flex flex-col overflow-hidden p-0 sm:max-w-[760px]">
                 <div className="shrink-0 border-b border-gray-100 bg-slate-50/50 px-5 py-4 sm:px-6">
                     <DialogTitle className="text-lg font-semibold text-slate-800">
                         {STOCK_ADMIN_TEXT.addNewItem}

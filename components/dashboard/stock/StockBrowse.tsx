@@ -4,6 +4,7 @@ import { useState } from "react";
 import dynamic from "next/dynamic";
 import { Package } from "lucide-react";
 import { Pagination } from "@/components/Pagination";
+import { cn } from "@/lib/ui/utils";
 import { useStockDataContext, useStockUIContext } from "../context/stock";
 import { STOCK_BROWSE_LIMIT as ITEMS_PER_PAGE } from "../context/stock/provider.shared";
 import { useDashboardDataContext } from "../context/dashboard/DashboardContext";
@@ -60,7 +61,13 @@ export function StockBrowse() {
     const totalPages = Math.max(1, Math.ceil(totalItems / ITEMS_PER_PAGE));
 
     return (
-        <div className="space-y-6">
+        <div
+            className={cn(
+                "space-y-6",
+                cartCount > 0 &&
+                    "pb-[calc(6rem+env(safe-area-inset-bottom))]",
+            )}
+        >
             <StockBrowseFilters
                 searchQuery={searchQuery}
                 onSearchChange={setSearchQuery}

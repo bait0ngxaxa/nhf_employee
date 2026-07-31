@@ -62,7 +62,7 @@ export function StockBrowseCartPanel({
     return (
         <>
             <div className="flex h-full flex-col bg-white">
-                <div className="border-b border-slate-200 bg-slate-50 px-5 py-4">
+                <div className="border-b border-slate-200 bg-slate-50 pb-4 pl-[calc(1.25rem+env(safe-area-inset-left))] pr-[calc(1.25rem+env(safe-area-inset-right))] pt-[calc(1rem+env(safe-area-inset-top))]">
                     <div className="flex items-center gap-3">
                         <div className="rounded-2xl bg-slate-100 p-2.5 text-slate-700">
                             <ShoppingCart
@@ -81,7 +81,7 @@ export function StockBrowseCartPanel({
                     </div>
                 </div>
 
-                <div className="flex-1 space-y-3 overflow-y-auto px-5 py-4">
+                <div className="flex-1 space-y-3 overflow-y-auto py-4 pl-[calc(1.25rem+env(safe-area-inset-left))] pr-[calc(1.25rem+env(safe-area-inset-right))]">
                     <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
                         <div className="space-y-1.5">
                             <Label
@@ -126,7 +126,7 @@ export function StockBrowseCartPanel({
                     ))}
                 </div>
 
-                <div className="border-t border-slate-200 bg-slate-50 px-5 py-4">
+                <div className="border-t border-slate-200 bg-slate-50 pb-[calc(1rem+env(safe-area-inset-bottom))] pl-[calc(1.25rem+env(safe-area-inset-left))] pr-[calc(1.25rem+env(safe-area-inset-right))] pt-4">
                     <div className="mb-3 rounded-2xl border border-blue-100 bg-white/95 px-4 py-3">
                         <div className="flex items-center justify-between gap-3 text-sm leading-5">
                             <span className="text-slate-500">สรุปรายการ</span>

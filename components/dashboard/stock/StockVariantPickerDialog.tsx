@@ -187,7 +187,7 @@ export function StockVariantPickerDialog({
                     onClose();
                 }}
             >
-                <DialogContent className="flex max-h-[92dvh] flex-col overflow-hidden p-0 sm:max-h-[90vh] sm:max-w-[720px]">
+                <DialogContent className="flex flex-col overflow-hidden p-0 sm:max-w-[720px]">
                 <div className="shrink-0 border-b border-slate-200 bg-white">
                     <div className="bg-slate-50 px-4 py-3 pr-12 sm:px-6 sm:py-4">
                         <DialogTitle className="text-base font-semibold text-slate-900 sm:text-lg">

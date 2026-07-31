@@ -10,7 +10,7 @@ function EmailRequestContent(): ReactElement {
     const { handleMenuClick } = useDashboardUIContext();
 
     return (
-        <div className="min-h-[calc(100vh-6rem)] overflow-hidden rounded-2xl border border-border bg-muted/40">
+        <div className="min-h-[calc(100dvh-6rem)] overflow-hidden rounded-2xl border border-border bg-muted/40">
             <div className="space-y-8 p-4 md:p-8">
                 <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end">
                     <div className="flex min-w-0 items-center gap-4">

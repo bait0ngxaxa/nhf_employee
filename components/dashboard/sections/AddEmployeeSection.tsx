@@ -13,7 +13,7 @@ export function AddEmployeeSection() {
     const { handleEmployeeAdded } = useDashboardDataContext();
 
     return (
-        <div className="min-h-[calc(100vh-6rem)] overflow-hidden rounded-2xl border border-slate-200 bg-slate-50">
+        <div className="min-h-[calc(100dvh-6rem)] overflow-hidden rounded-2xl border border-slate-200 bg-slate-50">
             <div className="space-y-8 p-4 md:p-8">
                 <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
                     <div className="flex min-w-0 items-center gap-4">

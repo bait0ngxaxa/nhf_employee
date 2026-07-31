@@ -26,7 +26,7 @@ export function SectionShell({
 
     return (
         <div
-            className={`relative min-h-[calc(100vh-6rem)] overflow-hidden rounded-2xl border border-slate-200/50 bg-white shadow-[0_20px_50px_-12px_rgba(0,0,0,0.03)] lg:rounded-[3rem] ${className}`}
+            className={`relative min-h-[calc(100dvh-6rem)] overflow-hidden rounded-2xl border border-slate-200/50 bg-white shadow-[0_20px_50px_-12px_rgba(0,0,0,0.03)] lg:rounded-[3rem] ${className}`}
         >
             <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-2xl lg:rounded-[3rem]">
                 <div

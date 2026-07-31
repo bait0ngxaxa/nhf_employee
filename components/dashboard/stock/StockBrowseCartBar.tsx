@@ -39,11 +39,11 @@ export function StockBrowseCartBar(props: StockBrowseCartBarProps) {
 
     return (
         <>
-            <div className="fixed inset-x-4 bottom-5 z-30 sm:inset-x-auto sm:right-6 sm:w-auto">
+            <div className="fixed bottom-[calc(1rem+env(safe-area-inset-bottom))] left-[calc(1rem+env(safe-area-inset-left))] right-[calc(1rem+env(safe-area-inset-right))] z-30 sm:left-auto sm:right-[calc(1.5rem+env(safe-area-inset-right))] sm:w-auto">
                 <Button
                     type="button"
                     onClick={() => setOpen(true)}
-                    className="group/cart-bar flex h-auto w-full items-center justify-between gap-4 rounded-2xl border border-blue-200 bg-blue-600 px-4 py-3 text-left text-white shadow-lg shadow-blue-900/20 transition-colors duration-200 hover:border-blue-300 hover:bg-blue-700 sm:min-w-[340px]"
+                    className="group/cart-bar flex h-auto min-h-16 w-full items-center justify-between gap-4 rounded-2xl border border-blue-200 bg-blue-600 px-4 py-3 text-left text-white shadow-lg shadow-blue-900/20 transition-colors duration-200 hover:border-blue-300 hover:bg-blue-700 sm:min-w-[340px]"
                 >
                     <div className="flex items-center gap-3">
                         <div className="rounded-xl bg-white/15 p-2.5 text-white ring-1 ring-white/20 transition-colors duration-200 group-hover/cart-bar:bg-white/20">

@@ -171,7 +171,7 @@ export function NotificationDropdown(): React.ReactElement {
                     </Button>
                 </div>
 
-                <div className="max-h-[min(26rem,calc(100vh-12rem))] overflow-y-auto">
+                <div className="max-h-[min(26rem,calc(100dvh-12rem))] overflow-y-auto">
                     {isLoading ? (
                         <NotificationLoadingState compact />
                     ) : error ? (

@@ -42,7 +42,7 @@ export function LeaveRequestForm({ open, onSuccess, onCancel, quotas }: Props) {
             onDiscard={model.resetForm}
         >
             <AsyncFormDialogContent
-                className="flex max-h-[calc(100vh-2rem)] flex-col overflow-hidden rounded-xl p-0 sm:max-w-[720px]"
+                className="flex flex-col overflow-hidden rounded-xl p-0 sm:max-w-[720px]"
             >
                 <AsyncFormDialogClose
                     variant="ghost"

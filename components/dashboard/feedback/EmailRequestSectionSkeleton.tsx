@@ -92,7 +92,7 @@ function HistorySkeleton(): ReactElement {
 export function EmailRequestSectionSkeleton(): ReactElement {
     return (
         <div
-            className="min-h-[calc(100vh-6rem)] overflow-hidden rounded-2xl border border-border bg-muted/40"
+            className="min-h-[calc(100dvh-6rem)] overflow-hidden rounded-2xl border border-border bg-muted/40"
             role="status"
             aria-label="กำลังโหลดหน้าส่งคำร้องพนักงานใหม่"
         >

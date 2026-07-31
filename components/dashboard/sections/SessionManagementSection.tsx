@@ -15,7 +15,7 @@ function SessionLoadingState() {
 
 function SessionErrorState({ onRetry }: { onRetry: () => void }) {
     return (
-        <div className="min-h-[calc(100vh-6rem)] overflow-hidden rounded-2xl border border-slate-200 bg-slate-50">
+        <div className="min-h-[calc(100dvh-6rem)] overflow-hidden rounded-2xl border border-slate-200 bg-slate-50">
             <div className="space-y-5 p-4 md:p-8">
                 <h1
                     data-page-heading

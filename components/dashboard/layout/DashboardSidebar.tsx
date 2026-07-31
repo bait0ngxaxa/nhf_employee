@@ -35,7 +35,7 @@ export function DashboardSidebar({
     return (
         <aside
             className={cn(
-                "z-20 flex h-full flex-col overflow-hidden border-r border-sidebar-border bg-sidebar text-sidebar-foreground",
+                "z-20 flex h-full flex-col overflow-hidden border-r border-sidebar-border bg-sidebar pl-[env(safe-area-inset-left)] pt-[env(safe-area-inset-top)] text-sidebar-foreground",
                 variant === "mobile"
                     ? "w-full"
                     : "transition-[width] duration-200",

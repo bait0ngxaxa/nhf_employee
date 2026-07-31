@@ -331,7 +331,7 @@ export function DashboardHomeSection() {
     const userDepartment = getDisplayText(user?.department, "ฝ่ายทั่วไป");
 
     return (
-        <div className="relative min-h-[calc(100vh-6rem)] overflow-hidden rounded-3xl border border-slate-200/70 bg-slate-50 p-4 shadow-inner shadow-white md:p-8">
+        <div className="relative min-h-[calc(100dvh-6rem)] overflow-hidden rounded-3xl border border-slate-200/70 bg-slate-50 p-4 shadow-inner shadow-white md:p-8">
             <div className="relative z-10 mx-auto max-w-7xl space-y-6">
                 <div>
                     <div className="dashboard-card-enter relative overflow-hidden rounded-3xl border border-sky-500 bg-sky-600 p-5 text-white shadow-lg shadow-sky-900/15 md:p-8">
