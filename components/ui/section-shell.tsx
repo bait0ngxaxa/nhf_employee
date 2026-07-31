@@ -1,4 +1,4 @@
-import { type ReactNode } from "react";
+import { type ReactElement, type ReactNode } from "react";
 
 /**
  * SectionShell — shared dashboard section wrapper with background gradient effects.
@@ -18,7 +18,7 @@ export function SectionShell({
     gradientFrom = "rgba(248,250,252,0.8)",
     gradientTo = "rgba(241,245,249,0.8)",
     className = "",
-}: SectionShellProps) {
+}: SectionShellProps): ReactElement {
     const backgroundMesh = [
         `radial-gradient(circle at 82% 0%, ${gradientFrom} 0%, transparent 34%)`,
         `radial-gradient(circle at 0% 100%, ${gradientTo} 0%, transparent 38%)`,
@@ -26,9 +26,9 @@ export function SectionShell({
 
     return (
         <div
-            className={`relative min-h-[calc(100vh-6rem)] bg-white rounded-[3rem] overflow-hidden border border-slate-200/50 shadow-[0_20px_50px_-12px_rgba(0,0,0,0.03)] ${className}`}
+            className={`relative min-h-[calc(100vh-6rem)] overflow-hidden rounded-2xl border border-slate-200/50 bg-white shadow-[0_20px_50px_-12px_rgba(0,0,0,0.03)] lg:rounded-[3rem] ${className}`}
         >
-            <div className="absolute inset-0 pointer-events-none overflow-hidden rounded-[3rem]">
+            <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-2xl lg:rounded-[3rem]">
                 <div
                     className="absolute inset-0 opacity-40"
                     style={{
@@ -38,7 +38,7 @@ export function SectionShell({
                 <div className="absolute inset-0 bg-white/40" />
             </div>
 
-            <div className="relative z-10 p-6 md:p-12 space-y-10">
+            <div className="relative z-10 space-y-10 p-4 sm:p-6 lg:p-10">
                 {children}
             </div>
         </div>

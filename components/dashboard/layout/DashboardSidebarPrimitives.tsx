@@ -252,7 +252,7 @@ export function SidebarHeader({
                     type="button"
                     variant="ghost"
                     size="icon-sm"
-                    className="hidden shrink-0 rounded-lg border border-sidebar-border bg-sidebar-accent text-sidebar-foreground hover:bg-accent md:inline-flex"
+                    className="hidden shrink-0 rounded-lg border border-sidebar-border bg-sidebar-accent text-sidebar-foreground hover:bg-accent lg:inline-flex"
                     aria-label="ย่อเมนู"
                     aria-expanded={true}
                     onClick={onToggle}

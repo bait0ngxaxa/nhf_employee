@@ -42,6 +42,8 @@ import { NotificationDropdown } from "@/components/dashboard/notifications/Notif
 import { DashboardSidebar } from "@/components/dashboard/layout/DashboardSidebar";
 import { getRoleLabelThai } from "@/lib/ssot/permissions";
 
+const DESKTOP_MEDIA_QUERY = "(min-width: 1024px)";
+
 export function DashboardNavbar(): ReactElement {
     const {
         mobileNavOpen,
@@ -59,7 +61,7 @@ export function DashboardNavbar(): ReactElement {
             return;
         }
 
-        const desktopMediaQuery = window.matchMedia("(min-width: 768px)");
+        const desktopMediaQuery = window.matchMedia(DESKTOP_MEDIA_QUERY);
         const closeMobileNavigation = (
             event: MediaQueryListEvent,
         ): void => {
@@ -112,7 +114,7 @@ export function DashboardNavbar(): ReactElement {
 
     return (
         <header className="sticky top-0 z-30 bg-white/95 border-b border-slate-50">
-            <div className="flex items-center justify-between h-20 px-6 md:px-10">
+            <div className="flex h-20 items-center justify-between px-6 lg:px-10">
                 {/* Left: Mobile menu + Page title */}
                 <div className="flex items-center gap-4">
                     <Sheet
@@ -123,7 +125,7 @@ export function DashboardNavbar(): ReactElement {
                             <Button
                                 variant="ghost"
                                 size="icon"
-                                className="h-10 w-10 rounded-2xl border border-slate-100 bg-white shadow-sm md:hidden"
+                                className="h-10 w-10 rounded-2xl border border-slate-100 bg-white shadow-sm lg:hidden"
                                 aria-label="เปิดเมนูหลัก"
                             >
                                 <Menu className="h-5 w-5 text-slate-600" />
@@ -132,7 +134,7 @@ export function DashboardNavbar(): ReactElement {
                         <SheetContent
                             side="left"
                             closeButtonLabel="ปิดเมนู"
-                            className="w-64 max-w-[calc(100vw-2rem)] gap-0 border-sidebar-border bg-sidebar p-0 data-[state=closed]:duration-200 data-[state=open]:duration-200 sm:max-w-72 md:hidden"
+                            className="w-64 max-w-[calc(100vw-2rem)] gap-0 border-sidebar-border bg-sidebar p-0 data-[state=closed]:duration-200 data-[state=open]:duration-200 sm:max-w-72 lg:hidden"
                         >
                             <SheetTitle className="sr-only">
                                 เมนูหลัก

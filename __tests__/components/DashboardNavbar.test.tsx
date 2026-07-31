@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DashboardNavbar } from "@/components/dashboard/layout/DashboardNavbar";
 import {
     useDashboardDataContext,
@@ -60,6 +60,10 @@ describe("DashboardNavbar mobile navigation", () => {
         vi.clearAllMocks();
     });
 
+    afterEach(() => {
+        vi.unstubAllGlobals();
+    });
+
     it("keeps the mobile navigation closed until its trigger is activated", () => {
         mockNavbarContext(false);
 
@@ -96,5 +100,28 @@ describe("DashboardNavbar mobile navigation", () => {
         );
 
         expect(setMobileNavOpen).toHaveBeenCalledWith(false);
+    });
+
+    it("keeps the mobile drawer breakpoint active through tablet widths", () => {
+        const matchMedia = vi.fn(
+            (query: string): MediaQueryList =>
+                ({
+                    matches: false,
+                    media: query,
+                    onchange: null,
+                    addListener: vi.fn(),
+                    removeListener: vi.fn(),
+                    addEventListener: vi.fn(),
+                    removeEventListener: vi.fn(),
+                    dispatchEvent: vi.fn(),
+                }) as MediaQueryList,
+        );
+        vi.stubGlobal("matchMedia", matchMedia);
+        mockNavbarContext(true);
+
+        render(<DashboardNavbar />);
+
+        expect(matchMedia).toHaveBeenCalledWith("(min-width: 1024px)");
+        expect(setMobileNavOpen).not.toHaveBeenCalledWith(false);
     });
 });

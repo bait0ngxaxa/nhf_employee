@@ -16,7 +16,7 @@ export function DashboardLayoutClient({
         return (
             <div className="flex h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
                 {/* Sidebar Skeleton */}
-                <div className="w-64 bg-white shadow-lg border-r border-gray-200/50 p-4 hidden flex-col h-full md:flex 2xl:w-72">
+                <div className="hidden h-full w-64 flex-col border-r border-gray-200/50 bg-white p-4 shadow-lg lg:flex 2xl:w-72">
                     <div className="h-8 bg-gray-200 rounded-lg animate-pulse mb-6" />
                     <div className="space-y-3 flex-1">
                         {Array.from({ length: 6 }).map((_, i) => (
@@ -44,7 +44,7 @@ export function DashboardLayoutClient({
     return (
         <div className="flex h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
             {/* Desktop Sidebar */}
-            <div className="hidden h-full flex-shrink-0 md:block">
+            <div className="hidden h-full flex-shrink-0 lg:block">
                 <DashboardSidebar variant="desktop" />
             </div>
 
@@ -69,7 +69,7 @@ export function DashboardLayoutClient({
                 <DashboardNavbar />
 
                 {/* Page Content */}
-                <main id="main" className="relative z-10 min-w-0 flex-1 overflow-y-auto p-4 md:p-6 2xl:p-8">
+                <main id="main" className="relative z-10 min-w-0 flex-1 overflow-y-auto p-4 lg:p-6 2xl:p-8">
                     {children}
                 </main>
             </div>

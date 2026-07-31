@@ -1,4 +1,4 @@
-import { type ReactNode } from "react";
+import { type ReactElement, type ReactNode } from "react";
 import { type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/ui/utils";
 
@@ -34,9 +34,9 @@ export function SectionHeader({
     roleBadge,
     badgeColor = "bg-sky-50 text-sky-600 border-sky-100/50",
     extra,
-}: SectionHeaderProps) {
+}: SectionHeaderProps): ReactElement {
     return (
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 animate-in fade-in slide-in-from-bottom-4 duration-700 ease-out">
+        <div className="animate-in flex flex-col justify-between gap-6 fade-in slide-in-from-bottom-4 duration-700 ease-out lg:flex-row lg:items-end">
             <div className="flex items-center space-x-6">
                 <div className="relative group cursor-default">
                     <div
@@ -56,7 +56,7 @@ export function SectionHeader({
                     </div>
                 </div>
                 <div className="space-y-1">
-                    <h2 className="text-4xl md:text-5xl font-black tracking-tighter text-slate-900 leading-none">
+                    <h2 className="text-3xl font-black leading-none tracking-tighter text-slate-900 sm:text-4xl lg:text-5xl">
                         {title}
                     </h2>
                     <p className="text-sm text-slate-500 font-medium tracking-tight">

@@ -1,7 +1,8 @@
+import { type ReactElement } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 
 // Generic Stats Card Skeleton
-function SkeletonStatCard() {
+function SkeletonStatCard(): ReactElement {
     return (
         <div className="bg-white/60 backdrop-blur-md border border-gray-100 shadow-lg rounded-2xl p-6">
             <div className="flex justify-between items-start">
@@ -19,7 +20,7 @@ function SkeletonStatCard() {
 }
 
 // Table Skeleton with configurable rows
-function SkeletonTable({ columns = 4, rows = 6 }: { columns?: number; rows?: number }) {
+function SkeletonTable({ columns = 4, rows = 6 }: { columns?: number; rows?: number }): ReactElement {
     return (
         <div className="w-full">
             {/* Table Header */}
@@ -46,7 +47,7 @@ function SkeletonTable({ columns = 4, rows = 6 }: { columns?: number; rows?: num
 }
 
 // Form Field Skeleton
-function SkeletonFormField({ fullWidth = false }: { fullWidth?: boolean }) {
+function SkeletonFormField({ fullWidth = false }: { fullWidth?: boolean }): ReactElement {
     return (
         <div className={`space-y-2 ${fullWidth ? 'col-span-2' : ''}`}>
             <Skeleton className="h-4 w-20" />
@@ -56,7 +57,7 @@ function SkeletonFormField({ fullWidth = false }: { fullWidth?: boolean }) {
 }
 
 // Navigation Card Skeleton
-function SkeletonNavCard() {
+function SkeletonNavCard(): ReactElement {
     return (
         <div className="bg-white/60 backdrop-blur-md border border-gray-100 shadow-lg rounded-2xl p-6">
             <div className="flex items-center space-x-4">
@@ -71,9 +72,9 @@ function SkeletonNavCard() {
 }
 
 // Sidebar Skeleton
-function SidebarSkeleton() {
+function SidebarSkeleton(): ReactElement {
     return (
-        <div className="w-64 bg-white shadow-lg border-r border-gray-200/50 p-4 hidden md:flex flex-col h-full">
+        <div className="hidden h-full w-64 flex-col border-r border-gray-200/50 bg-white p-4 shadow-lg lg:flex">
             {/* Logo */}
             <Skeleton className="h-8 rounded-lg mb-6" />
             
@@ -94,7 +95,7 @@ function SidebarSkeleton() {
 }
 
 // Header Skeleton with optional actions
-function HeaderSkeleton({ actionCount = 0 }: { actionCount?: number }) {
+function HeaderSkeleton({ actionCount = 0 }: { actionCount?: number }): ReactElement {
     return (
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <div className="space-y-2">
@@ -113,7 +114,7 @@ function HeaderSkeleton({ actionCount = 0 }: { actionCount?: number }) {
 }
 
 // Filter Bar Skeleton
-function FilterBarSkeleton({ filterCount = 2 }: { filterCount?: number }) {
+function FilterBarSkeleton({ filterCount = 2 }: { filterCount?: number }): ReactElement {
     return (
         <div className="flex flex-wrap gap-3 mb-6">
             <Skeleton className="h-10 flex-1 min-w-[200px]" />
@@ -125,7 +126,7 @@ function FilterBarSkeleton({ filterCount = 2 }: { filterCount?: number }) {
 }
 
 // Pagination Skeleton
-function PaginationSkeleton() {
+function PaginationSkeleton(): ReactElement {
     return (
         <div className="flex justify-between items-center mt-6">
             <Skeleton className="h-4 w-32" />
@@ -139,7 +140,7 @@ function PaginationSkeleton() {
 }
 
 // Main Dashboard Skeleton
-export default function DashboardLoading() {
+export default function DashboardLoading(): ReactElement {
     return (
         <div className="flex h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
             {/* Sidebar */}
@@ -160,7 +161,7 @@ export default function DashboardLoading() {
                 </div>
 
                 {/* Content */}
-                <main className="flex-1 overflow-y-auto p-4 md:p-8 relative z-10">
+                <main className="relative z-10 flex-1 overflow-y-auto p-4 lg:p-8">
                     <div className="space-y-6 max-w-7xl mx-auto">
                         {/* Header */}
                         <HeaderSkeleton actionCount={3} />
