@@ -16,7 +16,14 @@ function SessionLoadingState() {
 function SessionErrorState({ onRetry }: { onRetry: () => void }) {
     return (
         <div className="min-h-[calc(100vh-6rem)] overflow-hidden rounded-2xl border border-slate-200 bg-slate-50">
-            <div className="p-4 md:p-8">
+            <div className="space-y-5 p-4 md:p-8">
+                <h1
+                    data-page-heading
+                    tabIndex={-1}
+                    className="text-2xl font-bold tracking-tight text-slate-950"
+                >
+                    จัดการเซสชัน
+                </h1>
                 <Card className="rounded-2xl border-red-200 bg-white shadow-sm">
                     <CardContent className="flex flex-col gap-4 p-6 sm:flex-row sm:items-center sm:justify-between">
                         <div className="flex min-w-0 gap-3">

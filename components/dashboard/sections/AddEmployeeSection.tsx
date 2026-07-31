@@ -23,9 +23,13 @@ export function AddEmployeeSection() {
                             </div>
                         </div>
                         <div className="min-w-0 space-y-1">
-                            <h2 className="text-2xl font-bold tracking-tight text-slate-950 [overflow-wrap:anywhere] md:text-3xl">
+                            <h1
+                                data-page-heading
+                                tabIndex={-1}
+                                className="text-2xl font-bold tracking-tight text-slate-950 [overflow-wrap:anywhere] md:text-3xl"
+                            >
                                 เพิ่มพนักงานใหม่
-                            </h2>
+                            </h1>
                             <p className="text-sm font-medium leading-6 text-slate-600 [overflow-wrap:anywhere]">
                                 เพิ่มข้อมูลพนักงานใหม่เข้าระบบ
                             </p>

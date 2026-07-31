@@ -40,9 +40,13 @@ export function NotificationsHeader({
                     <Bell className="h-5 w-5" aria-hidden="true" />
                 </div>
                 <div className="min-w-0">
-                    <h2 className="text-2xl font-bold tracking-tight text-slate-950">
+                    <h1
+                        data-page-heading
+                        tabIndex={-1}
+                        className="text-2xl font-bold tracking-tight text-slate-950"
+                    >
                         การแจ้งเตือน
-                    </h2>
+                    </h1>
                     <p className="mt-0.5 text-sm text-slate-600">{countLabel}</p>
                 </div>
             </div>

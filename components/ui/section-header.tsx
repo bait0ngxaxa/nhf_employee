@@ -56,9 +56,13 @@ export function SectionHeader({
                     </div>
                 </div>
                 <div className="space-y-1">
-                    <h2 className="text-3xl font-black leading-none tracking-tighter text-slate-900 sm:text-4xl lg:text-5xl">
+                    <h1
+                        data-page-heading
+                        tabIndex={-1}
+                        className="text-3xl font-black leading-none tracking-tighter text-slate-900 sm:text-4xl lg:text-5xl"
+                    >
                         {title}
-                    </h2>
+                    </h1>
                     <p className="text-sm text-slate-500 font-medium tracking-tight">
                         {subtitle}
                     </p>

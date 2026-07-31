@@ -348,7 +348,11 @@ export function DashboardHomeSection() {
                                 </div>
 
                                 <div className="space-y-2">
-                                    <h1 className="text-4xl font-bold leading-tight text-white md:text-5xl">
+                                    <h1
+                                        data-page-heading
+                                        tabIndex={-1}
+                                        className="text-4xl font-bold leading-tight text-white md:text-5xl"
+                                    >
                                         {greeting},{" "}
                                         <span className="text-sky-50 [overflow-wrap:anywhere]">
                                             {userName}

@@ -19,8 +19,15 @@ function ITSupportContent() {
     if (!session) {
         return (
             <Card>
-                <CardContent className="p-6">
-                    <p className="text-center text-gray-500">
+                <CardContent className="space-y-2 p-6 text-center">
+                    <h1
+                        data-page-heading
+                        tabIndex={-1}
+                        className="text-2xl font-bold text-slate-950"
+                    >
+                        NHF IT-Support
+                    </h1>
+                    <p className="text-gray-500">
                         กรุณาเข้าสู่ระบบเพื่อใช้งานระบบ IT Support
                     </p>
                 </CardContent>

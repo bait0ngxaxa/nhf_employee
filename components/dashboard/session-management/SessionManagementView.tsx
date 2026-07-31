@@ -148,9 +148,13 @@ export function SessionManagementView({
                             <ShieldCheck className="h-5 w-5" aria-hidden="true" />
                         </div>
                         <div className="min-w-0">
-                            <h2 className="text-2xl font-bold tracking-tight text-slate-950">
+                            <h1
+                                data-page-heading
+                                tabIndex={-1}
+                                className="text-2xl font-bold tracking-tight text-slate-950"
+                            >
                                 จัดการเซสชัน
-                            </h2>
+                            </h1>
                             <p className="mt-0.5 text-sm text-slate-600">
                                 ตรวจสอบอุปกรณ์ที่กำลังเข้าถึงบัญชีของคุณ
                             </p>

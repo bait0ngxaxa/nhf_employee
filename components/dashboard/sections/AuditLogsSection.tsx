@@ -27,9 +27,13 @@ export function AuditLogsSection() {
                                 </div>
                             </div>
                             <div className="space-y-1">
-                                <h2 className="text-3xl font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-br from-gray-900 via-gray-800 to-gray-600 pb-1">
+                                <h1
+                                    data-page-heading
+                                    tabIndex={-1}
+                                    className="text-3xl font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-br from-gray-900 via-gray-800 to-gray-600 pb-1"
+                                >
                                     บันทึกการใช้งาน
-                                </h2>
+                                </h1>
                                 <p className="text-gray-500 font-medium">
                                     ประวัติการดำเนินการในระบบ
                                 </p>

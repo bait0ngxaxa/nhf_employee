@@ -71,6 +71,22 @@ export const DASHBOARD_MENU_ITEMS: MenuItem[] = [
     },
 ];
 
+const DASHBOARD_PAGE_LABELS: Readonly<Record<string, string>> = {
+    dashboard: "หน้าหลัก",
+    "manager-approval": "อนุมัติการลา",
+    "leave-history": "ประวัติการลา",
+    notifications: "การแจ้งเตือน",
+    sessions: "จัดการเซสชัน",
+};
+
+export function getDashboardPageLabel(menuId: string): string {
+    return (
+        DASHBOARD_PAGE_LABELS[menuId] ??
+        DASHBOARD_MENU_ITEMS.find((item) => item.id === menuId)?.label ??
+        "NHFapp"
+    );
+}
+
 export const DASHBOARD_MENU_GROUPS: MenuGroup[] = [
     {
         id: "employee-apps",

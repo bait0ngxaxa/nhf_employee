@@ -20,9 +20,13 @@ function EmailRequestContent(): ReactElement {
                             </div>
                         </div>
                         <div className="min-w-0 space-y-1">
-                            <h2 className="text-2xl font-bold tracking-tight text-foreground [overflow-wrap:anywhere] md:text-3xl">
+                            <h1
+                                data-page-heading
+                                tabIndex={-1}
+                                className="text-2xl font-bold tracking-tight text-foreground [overflow-wrap:anywhere] md:text-3xl"
+                            >
                                 ส่งคำร้องพนักงานใหม่
-                            </h2>
+                            </h1>
                             <p className="text-sm font-medium leading-6 text-muted-foreground [overflow-wrap:anywhere]">
                                 ส่งคำร้องอีเมล ระบบสารบรรณ และ Shared Drive ให้ทีมไอที
                             </p>
