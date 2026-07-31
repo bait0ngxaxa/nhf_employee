@@ -33,6 +33,7 @@ type MenuGroupProps = {
 type SidebarHeaderProps = {
     sidebarOpen: boolean;
     onToggle: () => void;
+    collapsible?: boolean;
 };
 
 type CollapsedSidebarToggleButtonProps = {
@@ -230,6 +231,7 @@ function CollapsedSidebarToggleButton({
 export function SidebarHeader({
     sidebarOpen,
     onToggle,
+    collapsible = true,
 }: SidebarHeaderProps): ReactElement {
     if (!sidebarOpen) {
         return (
@@ -245,17 +247,19 @@ export function SidebarHeader({
             <div className="min-w-0 flex-1">
                 <h1 className="truncate text-lg font-bold leading-6">NHFapp</h1>
             </div>
-            <Button
-                type="button"
-                variant="ghost"
-                size="icon-sm"
-                className="hidden shrink-0 rounded-lg border border-sidebar-border bg-sidebar-accent text-sidebar-foreground hover:bg-accent md:inline-flex"
-                aria-label="ย่อเมนู"
-                aria-expanded={true}
-                onClick={onToggle}
-            >
-                <PanelLeftClose aria-hidden="true" className="size-4" />
-            </Button>
+            {collapsible ? (
+                <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    className="hidden shrink-0 rounded-lg border border-sidebar-border bg-sidebar-accent text-sidebar-foreground hover:bg-accent md:inline-flex"
+                    aria-label="ย่อเมนู"
+                    aria-expanded={true}
+                    onClick={onToggle}
+                >
+                    <PanelLeftClose aria-hidden="true" className="size-4" />
+                </Button>
+            ) : null}
         </div>
     );
 }

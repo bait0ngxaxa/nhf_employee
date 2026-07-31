@@ -13,9 +13,9 @@ vi.mock("@/components/dashboard/context/dashboard/DashboardContext", () => ({
 }));
 
 const handleMenuClick = vi.fn();
-const setSidebarOpen = vi.fn();
+const setDesktopSidebarCollapsed = vi.fn();
 
-function mockSidebarContext(sidebarOpen: boolean): void {
+function mockSidebarContext(desktopSidebarCollapsed: boolean): void {
     vi.mocked(useDashboardDataContext).mockReturnValue({
         status: "authenticated",
         user: { name: "สมชาย ใจดี", role: "ADMIN", department: "IT" },
@@ -28,8 +28,10 @@ function mockSidebarContext(sidebarOpen: boolean): void {
     vi.mocked(useDashboardUIContext).mockReturnValue({
         selectedMenu: "employee-management",
         setSelectedMenu: vi.fn(),
-        sidebarOpen,
-        setSidebarOpen,
+        mobileNavOpen: false,
+        setMobileNavOpen: vi.fn(),
+        desktopSidebarCollapsed,
+        setDesktopSidebarCollapsed,
         handleMenuClick,
         handleSignOut: vi.fn(),
         router: {} as never,
@@ -42,7 +44,7 @@ describe("DashboardSidebar", () => {
     });
 
     it("marks the current menu and exposes expandable menu groups", () => {
-        mockSidebarContext(true);
+        mockSidebarContext(false);
 
         render(<DashboardSidebar />);
 
@@ -67,7 +69,7 @@ describe("DashboardSidebar", () => {
     });
 
     it("keeps icon-only menu items named when the sidebar is collapsed", () => {
-        mockSidebarContext(false);
+        mockSidebarContext(true);
 
         render(<DashboardSidebar />);
 
@@ -83,12 +85,25 @@ describe("DashboardSidebar", () => {
     });
 
     it("toggles the sidebar width state from the header control", () => {
-        mockSidebarContext(true);
+        mockSidebarContext(false);
 
         render(<DashboardSidebar />);
 
         fireEvent.click(screen.getByRole("button", { name: "ย่อเมนู" }));
 
-        expect(setSidebarOpen).toHaveBeenCalledWith(false);
+        expect(setDesktopSidebarCollapsed).toHaveBeenCalledWith(true);
+    });
+
+    it("keeps mobile navigation expanded without a desktop collapse control", () => {
+        mockSidebarContext(true);
+
+        render(<DashboardSidebar variant="mobile" />);
+
+        expect(
+            screen.getByRole("button", { name: "ข้อมูลพนักงาน" }),
+        ).not.toHaveAttribute("title");
+        expect(
+            screen.queryByRole("button", { name: "ย่อเมนู" }),
+        ).not.toBeInTheDocument();
     });
 });

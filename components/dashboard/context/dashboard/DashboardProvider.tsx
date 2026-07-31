@@ -6,6 +6,7 @@ import {
     useEffect,
     useMemo,
     startTransition,
+    type ReactElement,
     type ReactNode,
 } from "react";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
@@ -73,7 +74,7 @@ function clearStockCartStorage(userId: string): void {
 export function DashboardProvider({
     children,
     initialUser,
-}: DashboardProviderProps) {
+}: DashboardProviderProps): ReactElement {
     const { user: authUser, status, signOut } = useAuth();
     const router = useRouter();
     const searchParams = useSearchParams();
@@ -88,7 +89,9 @@ export function DashboardProvider({
     // Initialize selectedMenu from URL ?tab= param, fallback to "dashboard"
     const initialTab = normalizeDashboardTab(searchParams.get("tab"));
     const [selectedMenu, setSelectedMenu] = useState<string>(initialTab);
-    const [sidebarOpen, setSidebarOpen] = useState(true);
+    const [mobileNavOpen, setMobileNavOpen] = useState(false);
+    const [desktopSidebarCollapsed, setDesktopSidebarCollapsed] =
+        useState(false);
     const [refreshTrigger, setRefreshTrigger] = useState(0);
 
     // Sync selectedMenu when URL ?tab= changes (e.g. notification click or browser back/forward)
@@ -128,6 +131,8 @@ export function DashboardProvider({
 
     const handleMenuClick = useCallback(
         (menuId: string) => {
+            setMobileNavOpen(false);
+
             const menuItem = DASHBOARD_MENU_ITEMS.find(
                 (item) => item.id === menuId,
             );
@@ -143,10 +148,6 @@ export function DashboardProvider({
             // Sync with URL to support browser history and bookmarks
             if (pathname !== APP_ROUTES.dashboard || searchParams.get("tab") !== menuId) {
                 router.push(toDashboardTabPath(menuId), { scroll: false });
-            }
-
-            if (window.innerWidth < 768) {
-                setSidebarOpen(false);
             }
         },
         [isAdmin, router, searchParams, pathname],
@@ -189,8 +190,10 @@ export function DashboardProvider({
         () => ({
             selectedMenu,
             setSelectedMenu,
-            sidebarOpen,
-            setSidebarOpen,
+            mobileNavOpen,
+            setMobileNavOpen,
+            desktopSidebarCollapsed,
+            setDesktopSidebarCollapsed,
             handleMenuClick,
             handleSignOut,
             router,
@@ -198,8 +201,10 @@ export function DashboardProvider({
         [
             selectedMenu,
             setSelectedMenu,
-            sidebarOpen,
-            setSidebarOpen,
+            mobileNavOpen,
+            setMobileNavOpen,
+            desktopSidebarCollapsed,
+            setDesktopSidebarCollapsed,
             handleMenuClick,
             handleSignOut,
             router,

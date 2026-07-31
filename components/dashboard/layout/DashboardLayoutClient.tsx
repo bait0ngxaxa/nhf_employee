@@ -1,6 +1,6 @@
 "use client";
 
-import { useDashboardUIContext } from "@/components/dashboard/context/dashboard/DashboardContext";
+import { type ReactElement, type ReactNode } from "react";
 import { DashboardSidebar } from "@/components/dashboard/layout/DashboardSidebar";
 import { DashboardNavbar } from "@/components/dashboard/layout/DashboardNavbar";
 import { useDashboardContext } from "@/components/dashboard/context";
@@ -8,10 +8,8 @@ import { useDashboardContext } from "@/components/dashboard/context";
 export function DashboardLayoutClient({
     children,
 }: {
-    children: React.ReactNode;
-}) {
-    const { sidebarOpen, setSidebarOpen } = useDashboardUIContext();
-
+    children: ReactNode;
+}): ReactElement {
     const { status } = useDashboardContext();
 
     if (status === "loading") {
@@ -45,23 +43,9 @@ export function DashboardLayoutClient({
 
     return (
         <div className="flex h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
-            {/* Mobile Overlay */}
-            {sidebarOpen && (
-                <div
-                    className="fixed inset-0 z-30 bg-black/20 backdrop-blur-sm md:hidden"
-                    onClick={() => setSidebarOpen(false)}
-                />
-            )}
-
-            {/* Sidebar */}
-            <div
-                className={`
-                    fixed inset-y-0 left-0 z-40 h-full flex-shrink-0 md:relative md:z-20
-                    transform transition-transform duration-300 ease-in-out
-                    ${sidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}
-                `}
-            >
-                <DashboardSidebar />
+            {/* Desktop Sidebar */}
+            <div className="hidden h-full flex-shrink-0 md:block">
+                <DashboardSidebar variant="desktop" />
             </div>
 
             {/* Main Content Area */}

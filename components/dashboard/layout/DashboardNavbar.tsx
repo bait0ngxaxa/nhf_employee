@@ -26,21 +26,60 @@ import {
     DialogTitle,
     DialogDescription,
 } from "@/components/ui/dialog";
-import { useState } from "react";
+import {
+    Sheet,
+    SheetContent,
+    SheetDescription,
+    SheetTitle,
+    SheetTrigger,
+} from "@/components/ui/sheet";
+import { useEffect, useState, type ReactElement } from "react";
 import {
     useDashboardUIContext,
     useDashboardDataContext,
 } from "@/components/dashboard/context/dashboard/DashboardContext";
 import { NotificationDropdown } from "@/components/dashboard/notifications/NotificationDropdown";
+import { DashboardSidebar } from "@/components/dashboard/layout/DashboardSidebar";
 import { getRoleLabelThai } from "@/lib/ssot/permissions";
 
-export function DashboardNavbar() {
-    const { sidebarOpen, setSidebarOpen, handleSignOut, handleMenuClick } =
-        useDashboardUIContext();
+export function DashboardNavbar(): ReactElement {
+    const {
+        mobileNavOpen,
+        setMobileNavOpen,
+        handleSignOut,
+        handleMenuClick,
+    } = useDashboardUIContext();
     const { user } = useDashboardDataContext();
     const [showLogoutDialog, setShowLogoutDialog] = useState(false);
     const [isLoggingOut, setIsLoggingOut] = useState(false);
     const [logoutError, setLogoutError] = useState("");
+
+    useEffect(() => {
+        if (typeof window.matchMedia !== "function") {
+            return;
+        }
+
+        const desktopMediaQuery = window.matchMedia("(min-width: 768px)");
+        const closeMobileNavigation = (
+            event: MediaQueryListEvent,
+        ): void => {
+            if (event.matches) {
+                setMobileNavOpen(false);
+            }
+        };
+
+        if (desktopMediaQuery.matches) {
+            setMobileNavOpen(false);
+        }
+
+        desktopMediaQuery.addEventListener("change", closeMobileNavigation);
+        return () => {
+            desktopMediaQuery.removeEventListener(
+                "change",
+                closeMobileNavigation,
+            );
+        };
+    }, [setMobileNavOpen]);
 
     const openLogoutDialog = () => {
         setLogoutError("");
@@ -76,15 +115,34 @@ export function DashboardNavbar() {
             <div className="flex items-center justify-between h-20 px-6 md:px-10">
                 {/* Left: Mobile menu + Page title */}
                 <div className="flex items-center gap-4">
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        className="md:hidden h-10 w-10 rounded-2xl bg-white border border-slate-100 shadow-sm"
-                        aria-label="เปิดเมนู"
-                        onClick={() => setSidebarOpen(!sidebarOpen)}
+                    <Sheet
+                        open={mobileNavOpen}
+                        onOpenChange={setMobileNavOpen}
                     >
-                        <Menu className="h-5 w-5 text-slate-600" />
-                    </Button>
+                        <SheetTrigger asChild>
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-10 w-10 rounded-2xl border border-slate-100 bg-white shadow-sm md:hidden"
+                                aria-label="เปิดเมนูหลัก"
+                            >
+                                <Menu className="h-5 w-5 text-slate-600" />
+                            </Button>
+                        </SheetTrigger>
+                        <SheetContent
+                            side="left"
+                            closeButtonLabel="ปิดเมนู"
+                            className="w-64 max-w-[calc(100vw-2rem)] gap-0 border-sidebar-border bg-sidebar p-0 data-[state=closed]:duration-200 data-[state=open]:duration-200 sm:max-w-72 md:hidden"
+                        >
+                            <SheetTitle className="sr-only">
+                                เมนูหลัก
+                            </SheetTitle>
+                            <SheetDescription className="sr-only">
+                                เลือกหน้าที่ต้องการเปิดในแดชบอร์ด
+                            </SheetDescription>
+                            <DashboardSidebar variant="mobile" />
+                        </SheetContent>
+                    </Sheet>
                 </div>
 
                 {/* Right: User menu */}

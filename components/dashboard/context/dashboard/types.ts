@@ -37,8 +37,10 @@ export interface DashboardUIContextValue {
     // Navigation State
     selectedMenu: string;
     setSelectedMenu: (menu: string) => void;
-    sidebarOpen: boolean;
-    setSidebarOpen: (open: boolean) => void;
+    mobileNavOpen: boolean;
+    setMobileNavOpen: (open: boolean) => void;
+    desktopSidebarCollapsed: boolean;
+    setDesktopSidebarCollapsed: (collapsed: boolean) => void;
     handleMenuClick: (menuId: string) => void;
 
     // Actions
