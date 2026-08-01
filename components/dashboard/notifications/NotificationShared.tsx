@@ -17,7 +17,11 @@ import { apiGet } from "@/lib/client/api-client";
 import { isDashboardTabEnabled } from "@/lib/ssot/features";
 import { toDashboardTabPath } from "@/lib/ssot/routes";
 
-import { Button } from "@/components/ui/button";
+import {
+    EmptyState,
+    ErrorState,
+    LoadingState,
+} from "@/components/ui/state";
 
 export interface NotificationItem {
     id: string;
@@ -123,7 +127,10 @@ export function NotificationLoadingState({
     const rows = compact ? 3 : 5;
 
     return (
-        <div className={cn("space-y-2", compact ? "p-3" : "max-w-3xl")}>
+        <LoadingState
+            label="กำลังโหลดการแจ้งเตือน"
+            className={cn("space-y-2", compact ? "p-3" : "max-w-3xl")}
+        >
             {Array.from({ length: rows }).map((_, index) => (
                 <div
                     key={index}
@@ -137,7 +144,7 @@ export function NotificationLoadingState({
                     </div>
                 </div>
             ))}
-        </div>
+        </LoadingState>
     );
 }
 
@@ -156,20 +163,13 @@ export function NotificationEmptyState({
             : "เมื่อมีรายการใหม่ ระบบจะแสดงไว้ตรงนี้";
 
     return (
-        <div
-            className={cn(
-                "flex flex-col items-center justify-center text-center",
-                compact ? "px-6 py-12" : "max-w-3xl rounded-xl border border-border-subtle bg-surface-raised px-6 py-14",
-            )}
-        >
-            <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl border border-border-subtle bg-surface-subtle text-content-subtle">
-                <Bell className="h-6 w-6" aria-hidden="true" />
-            </div>
-            <p className="text-sm font-semibold text-content-heading">{title}</p>
-            <p className="mt-1 max-w-sm text-sm leading-6 text-content-secondary">
-                {description}
-            </p>
-        </div>
+        <EmptyState
+            title={title}
+            description={description}
+            icon={<Bell className="h-6 w-6" aria-hidden="true" />}
+            compact={compact}
+            className={compact ? "border-transparent bg-transparent" : undefined}
+        />
     );
 }
 
@@ -181,33 +181,17 @@ export function NotificationErrorState({
     compact?: boolean;
 }): React.ReactElement {
     return (
-        <div
-            className={cn(
-                "flex flex-col items-center justify-center text-center",
-                compact ? "px-6 py-10" : "max-w-3xl rounded-xl border border-status-danger-border bg-status-danger-surface px-6 py-10",
-            )}
-            role="alert"
-        >
-            <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-xl border border-status-danger-border bg-surface-raised text-status-danger-foreground">
-                <AlertCircle className="h-5 w-5" aria-hidden="true" />
-            </div>
-            <p className="text-sm font-semibold text-content-heading">
-                โหลดการแจ้งเตือนไม่สำเร็จ
-            </p>
-            <p className="mt-1 max-w-sm text-sm leading-6 text-content-body">
-                ตรวจสอบการเชื่อมต่อ แล้วลองโหลดข้อมูลอีกครั้ง
-            </p>
-            <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={onRetry}
-                className="mt-4 rounded-lg border-border-subtle bg-surface text-sm font-semibold text-content-body"
-            >
-                <RefreshCcw className="h-3.5 w-3.5" aria-hidden="true" />
-                โหลดใหม่
-            </Button>
-        </div>
+        <ErrorState
+            title="โหลดการแจ้งเตือนไม่สำเร็จ"
+            description="ตรวจสอบการเชื่อมต่อ แล้วลองโหลดข้อมูลอีกครั้ง"
+            action={{
+                label: "ลองใหม่",
+                onClick: onRetry,
+                icon: <RefreshCcw className="h-3.5 w-3.5" aria-hidden="true" />,
+            }}
+            compact={compact}
+            className={compact ? "border-transparent bg-transparent" : undefined}
+        />
     );
 }
 

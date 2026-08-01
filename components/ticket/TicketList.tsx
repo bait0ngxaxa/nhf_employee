@@ -10,6 +10,12 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import {
+    EmptyState,
+    ErrorState,
+    LoadingState,
+    PermissionState,
+} from "@/components/ui/state";
 import { type TicketListProps } from "@/types/tickets";
 import { useTicketList } from "@/hooks/useTicketList";
 import { TicketCard } from "./TicketCard";
@@ -25,6 +31,7 @@ export default function TicketList({
         tickets,
         loading,
         error,
+        retry,
         filters,
         setFilters,
         pagination,
@@ -34,13 +41,10 @@ export default function TicketList({
 
     if (!user) {
         return (
-            <Card>
-                <CardContent className="p-6">
-                    <p className="text-center text-content-neutral-muted">
-                        กรุณาเข้าสู่ระบบเพื่อดูรายการ tickets
-                    </p>
-                </CardContent>
-            </Card>
+            <PermissionState
+                title="กรุณาเข้าสู่ระบบเพื่อดูรายการ tickets"
+                description={undefined}
+            />
         );
     }
 
@@ -63,7 +67,10 @@ export default function TicketList({
                 </CardHeader>
                 <CardContent className="p-5 space-y-4 bg-gradient-to-b from-surface-raised/45 to-indigo-50/45">
                     {loading ? (
-                        <div className="space-y-4 py-4 animate-pulse">
+                        <LoadingState
+                            label="กำลังโหลดรายการ tickets"
+                            className="space-y-4 py-4"
+                        >
                             {/* Filter Bar Skeleton */}
                             <div className="flex flex-wrap gap-3 mb-6">
                                 <Skeleton className="h-10 flex-1 min-w-[200px]" />
@@ -88,15 +95,17 @@ export default function TicketList({
                                     </div>
                                 </div>
                             ))}
-                        </div>
+                        </LoadingState>
                     ) : error ? (
-                        <div className="text-center py-8 text-red-600">
-                            <p>{error}</p>
-                        </div>
+                        <ErrorState
+                            title="โหลดรายการ tickets ไม่สำเร็จ"
+                            action={{ label: "ลองใหม่", onClick: retry }}
+                        />
                     ) : tickets.length === 0 ? (
-                        <div className="text-center py-8 text-content-neutral-muted">
-                            <p>ไม่พบ tickets</p>
-                        </div>
+                        <EmptyState
+                            title="ไม่พบ tickets"
+                            description="ลองเปลี่ยนตัวกรองหรือคำค้นหา แล้วค้นหาอีกครั้ง"
+                        />
                     ) : (
                         <div
                             className="space-y-4 p-1"

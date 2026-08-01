@@ -25,6 +25,7 @@ interface UseTicketListReturn {
     tickets: Ticket[];
     loading: boolean;
     error: string;
+    retry: () => void;
     filters: TicketFilters;
     setFilters: React.Dispatch<React.SetStateAction<TicketFilters>>;
     pagination: Pagination;
@@ -104,6 +105,10 @@ export function useTicketList(refreshTrigger?: number): UseTicketListReturn {
         setPage(newPage);
     }, []);
 
+    const retry = useCallback((): void => {
+        void mutate();
+    }, [mutate]);
+
     const resetFilters = useCallback(() => {
         setFilters(initialFilters);
         setPage(1);
@@ -126,6 +131,7 @@ export function useTicketList(refreshTrigger?: number): UseTicketListReturn {
         tickets,
         loading: isLoading,
         error,
+        retry,
         filters,
         setFilters: setFiltersWrapper,
         pagination,
