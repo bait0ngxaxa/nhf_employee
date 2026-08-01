@@ -152,7 +152,7 @@ export default function CreateTicketForm({
             </DialogDescription>
           </DialogHeader>
           <div className="text-center p-6">
-            <p className="text-gray-500">กรุณาเข้าสู่ระบบเพื่อแจ้งปัญหา</p>
+            <p className="text-content-neutral-muted">กรุณาเข้าสู่ระบบเพื่อแจ้งปัญหา</p>
           </div>
         </AsyncFormDialogContent>
       </AsyncFormDialog>
@@ -258,7 +258,7 @@ export default function CreateTicketForm({
             <div className="flex justify-end gap-3 pt-5 border-t mt-4">
               <AsyncFormDialogClose
                 variant="ghost"
-                className="h-10 px-5 font-medium hover:bg-slate-100 text-slate-600"
+                className="h-11 px-5 font-medium hover:bg-surface-muted text-content-secondary"
               >
                 ยกเลิก
               </AsyncFormDialogClose>
@@ -266,7 +266,7 @@ export default function CreateTicketForm({
                 type="submit"
                 disabled={isLoading}
                 aria-busy={isLoading}
-                className="h-10 px-7 font-bold bg-blue-600 hover:bg-blue-700 text-white shadow-sm transition-all"
+                className="h-11 px-7 font-bold bg-blue-600 hover:bg-blue-700 text-content-on-brand shadow-sm transition-all"
               >
                 {isLoading ? (
                   <>

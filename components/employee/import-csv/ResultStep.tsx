@@ -21,13 +21,13 @@ export function ResultStep({
 
     return (
         <div className="space-y-6">
-            <Card className="rounded-2xl border-slate-200 bg-white shadow-sm">
+            <Card className="rounded-2xl border-border-subtle bg-surface-raised shadow-sm">
                 <CardHeader>
                     <CardTitle className="flex min-w-0 items-center gap-2 text-xl font-bold text-green-700">
                         <CheckCircle className="h-5 w-5 shrink-0" />
                         <span>ผลลัพธ์การนำเข้าข้อมูล</span>
                     </CardTitle>
-                    <CardDescription className="text-sm leading-6 text-slate-600 [overflow-wrap:anywhere]">
+                    <CardDescription className="text-sm leading-6 text-content-secondary [overflow-wrap:anywhere]">
                         นำเข้าสำเร็จ {importResult.success.length.toLocaleString("th-TH")} คน
                         {importResult.errors.length > 0
                             ? `, มีข้อผิดพลาด ${importResult.errors.length.toLocaleString("th-TH")} รายการ`
@@ -59,7 +59,7 @@ export function ResultStep({
             </Card>
 
             {importResult.errors.length > 0 ? (
-                <Card className="rounded-2xl border-red-200 bg-white shadow-sm">
+                <Card className="rounded-2xl border-red-200 bg-surface-raised shadow-sm">
                     <CardHeader>
                         <CardTitle className="flex min-w-0 items-center gap-2 text-xl font-bold text-red-700">
                             <AlertTriangle className="h-5 w-5 shrink-0" />

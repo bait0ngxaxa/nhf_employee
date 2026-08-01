@@ -181,7 +181,7 @@ export default function TicketDetail({
                 <CardContent className="space-y-4">
                     <div>
                         <h3 className="font-medium mb-2">รายละเอียดปัญหา</h3>
-                        <p className="text-gray-700 whitespace-pre-wrap">
+                        <p className="text-content-neutral-body whitespace-pre-wrap">
                             {ticket.description}
                         </p>
                     </div>
@@ -255,7 +255,7 @@ export default function TicketDetail({
                                         updateLoading ||
                                         statusUpdate === ticket.status
                                     }
-                                    className="flex items-center gap-2 focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white shadow-md shadow-indigo-500/25 transition-[transform,background-color,box-shadow] duration-300 hover:shadow-lg motion-safe:hover:-translate-y-0.5"
+                                    className="flex items-center gap-2 focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-content-on-brand shadow-md shadow-indigo-500/25 transition-[transform,background-color,box-shadow] duration-300 hover:shadow-lg motion-safe:hover:-translate-y-0.5"
                                 >
                                     {updateLoading && (
                                         <Loader2 className="h-4 w-4 animate-spin" />
@@ -280,7 +280,7 @@ export default function TicketDetail({
                 </CardHeader>
                 <CardContent className="space-y-4">
                     {ticket.comments.length === 0 ? (
-                        <p className="text-gray-500 text-center py-4">
+                        <p className="text-content-neutral-muted text-center py-4">
                             ยังไม่มีความคิดเห็น
                         </p>
                     ) : (
@@ -317,7 +317,7 @@ export default function TicketDetail({
                                     disabled={
                                         commentLoading || !newComment.trim()
                                     }
-                                    className="flex items-center gap-2 focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white shadow-md shadow-indigo-500/25 transition-[transform,background-color,box-shadow] duration-300 hover:shadow-lg motion-safe:hover:-translate-y-0.5"
+                                    className="flex items-center gap-2 focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-content-on-brand shadow-md shadow-indigo-500/25 transition-[transform,background-color,box-shadow] duration-300 hover:shadow-lg motion-safe:hover:-translate-y-0.5"
                                 >
                                     {commentLoading ? (
                                         <Loader2 className="h-4 w-4 animate-spin" />

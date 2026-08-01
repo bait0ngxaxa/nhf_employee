@@ -67,7 +67,7 @@ function DocumentSystemToggle({
                         onChange={onChange}
                         className="peer sr-only"
                     />
-                    <span className="ml-1 h-5 w-5 translate-x-0 rounded-full bg-white shadow-sm transition-transform duration-200 peer-checked:translate-x-5" />
+                    <span className="ml-1 h-5 w-5 translate-x-0 rounded-full bg-surface-raised shadow-sm transition-transform duration-200 peer-checked:translate-x-5" />
                 </label>
             </div>
         </div>

@@ -88,23 +88,23 @@ function LeaveHistoryItem({
     onNotTakenRequest: (leaveId: string) => void;
 }) {
     return (
-        <Card className="border-slate-200 p-5 shadow-sm">
+        <Card className="border-border-subtle p-5 shadow-sm">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                 <div className="min-w-0 space-y-3">
                     <div className="flex flex-wrap items-center gap-2">
-                        <h3 className="text-base/6 font-semibold tracking-tight text-slate-950">
+                        <h3 className="text-base/6 font-semibold tracking-tight text-content-heading">
                             {leaveTypeLabel(request.leaveType)}
                         </h3>
-                        <span className="rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs/5 font-medium text-slate-700">
+                        <span className="rounded-md border border-border-subtle bg-surface-subtle px-2 py-0.5 text-xs/5 font-medium text-content-body">
                             {periodLabel(request.period)} ({request.durationDays} วัน)
                         </span>
                     </div>
-                    <p className="flex flex-wrap items-center gap-1.5 text-sm/6 font-medium text-slate-600">
-                        <CalendarClock className="h-4 w-4 text-slate-400" aria-hidden="true" />
+                    <p className="flex flex-wrap items-center gap-1.5 text-sm/6 font-medium text-content-secondary">
+                        <CalendarClock className="h-4 w-4 text-content-subtle" aria-hidden="true" />
                         <span>{formatLeaveDateRange(request.startDate, request.endDate)}</span>
                     </p>
-                    <p className="flex flex-wrap items-center gap-1.5 text-xs/5 font-medium text-slate-500">
-                        <Clock className="h-3.5 w-3.5 text-slate-400" aria-hidden="true" />
+                    <p className="flex flex-wrap items-center gap-1.5 text-xs/5 font-medium text-content-muted">
+                        <Clock className="h-3.5 w-3.5 text-content-subtle" aria-hidden="true" />
                         <span>ยื่นคำขอเมื่อ {formatThaiDateTimeWithTimeWord(request.createdAt)}</span>
                     </p>
                     <LeaveNote label="เหตุผล" text={request.reason} />
@@ -174,7 +174,7 @@ function LeaveNote({
     tone?: "neutral" | "danger" | "info" | "warning";
 }) {
     const toneClassName = {
-        neutral: "border-slate-200 bg-slate-50 text-slate-700",
+        neutral: "border-border-subtle bg-surface-subtle text-content-body",
         danger: "border-rose-200 bg-rose-50 text-rose-800",
         info: "border-sky-200 bg-sky-50 text-sky-800",
         warning: "border-amber-200 bg-amber-50 text-amber-800",
@@ -190,9 +190,9 @@ function LeaveNote({
 
 function EmptyLeaveHistory() {
     return (
-        <Card className="border-dashed border-slate-300 p-8 text-center shadow-none">
-            <p className="text-base/6 font-semibold text-slate-900">ยังไม่มีประวัติการยื่นคำขอลา</p>
-            <p className="mt-1 text-sm/6 text-slate-500">
+        <Card className="border-dashed border-border-strong p-8 text-center shadow-none">
+            <p className="text-base/6 font-semibold text-content-primary">ยังไม่มีประวัติการยื่นคำขอลา</p>
+            <p className="mt-1 text-sm/6 text-content-muted">
                 เมื่อส่งคำขอแล้ว รายการและสถานะจะแสดงที่นี่
             </p>
         </Card>

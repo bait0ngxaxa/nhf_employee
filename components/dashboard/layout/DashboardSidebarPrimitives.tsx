@@ -83,10 +83,10 @@ function SidebarMenuItem({
                     aria-label={sidebarOpen ? undefined : itemLabel}
                     title={sidebarOpen ? undefined : itemLabel}
                     className={cn(
-                        "group/sidebar-item h-11 w-full justify-start gap-3 rounded-xl border border-transparent text-sm font-medium transition-[background-color,border-color,color,opacity] duration-200 focus-visible:ring-sidebar-ring/50 focus-visible:ring-[3px]",
+                        "group/sidebar-item h-11 min-h-11 w-full justify-start gap-3 rounded-xl border border-transparent text-sm font-medium transition-[background-color,border-color,color,opacity] duration-200 focus-visible:ring-sidebar-ring/50 focus-visible:ring-[3px]",
                         isActive ? "border-sidebar-border bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground/75 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
                         !sidebarOpen && "justify-center px-0",
-                        indented && sidebarOpen && "h-10 pl-9",
+                        indented && sidebarOpen && "h-11 pl-9",
                         disabled && "cursor-not-allowed opacity-55",
                     )}
                     onClick={disabled ? undefined : onClick}
@@ -95,7 +95,7 @@ function SidebarMenuItem({
                         className={cn(
                             "flex shrink-0 items-center justify-center rounded-lg transition-[background-color,color] duration-200",
                             indented && sidebarOpen ? "size-5" : "size-7",
-                            isActive ? "bg-gradient-to-br from-sky-400 to-indigo-500 text-white" : "text-sidebar-foreground/60 group-hover/sidebar-item:text-sidebar-accent-foreground",
+                            isActive ? "bg-gradient-to-br from-brand-start to-brand-end text-content-on-brand" : "text-sidebar-foreground/60 group-hover/sidebar-item:text-sidebar-accent-foreground",
                         )}
                     >
                         <IconComponent aria-hidden="true" className={indented && sidebarOpen ? "size-3.5" : "size-4"} />
@@ -144,7 +144,7 @@ function SidebarMenuGroup({
                 aria-controls={contentId}
                 onClick={onToggle}
                 className={cn(
-                    "flex h-9 w-full items-center gap-2 rounded-lg px-5 text-left text-xs font-semibold transition-[background-color,color] duration-200 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-sidebar-ring/50",
+                    "flex h-11 min-h-11 w-full items-center gap-2 rounded-lg px-5 text-left text-xs font-semibold transition-[background-color,color] duration-200 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-sidebar-ring/50",
                     active ? "text-sidebar-foreground" : "text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
                 )}
             >
@@ -220,7 +220,7 @@ function CollapsedSidebarToggleButton({
                     priority
                     className="transition-opacity duration-150 ease-out group-hover/sidebar-logo:opacity-0 group-focus-visible/sidebar-logo:opacity-0"
                 />
-                <span className="absolute inset-0 flex items-center justify-center rounded-[13%] bg-sidebar-accent text-sidebar-foreground opacity-0 shadow-[0_4px_8px_rgba(15,23,42,0.18),0_1px_2px_rgba(15,23,42,0.12)] transition-opacity duration-150 ease-out group-hover/sidebar-logo:opacity-100 group-focus-visible/sidebar-logo:opacity-100">
+                <span className="absolute inset-0 flex items-center justify-center rounded-[13%] bg-sidebar-accent text-sidebar-foreground opacity-0 sidebar-toggle-shadow transition-opacity duration-150 ease-out group-hover/sidebar-logo:opacity-100 group-focus-visible/sidebar-logo:opacity-100">
                     <PanelLeft aria-hidden="true" className="size-4" />
                 </span>
             </Button>

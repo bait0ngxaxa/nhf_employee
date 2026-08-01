@@ -115,7 +115,7 @@ export function EditStatusModal({
                       {status.icon === '✓' ? (
                         <CheckCircle2 className="h-4 w-4 text-green-600" />
                       ) : (
-                        <AlertCircle className="h-4 w-4 text-gray-600" />
+                        <AlertCircle className="h-4 w-4 text-content-neutral-secondary" />
                       )}
                       <span>{status.label}</span>
                     </div>

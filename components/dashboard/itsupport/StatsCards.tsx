@@ -29,8 +29,8 @@ const STAT_CONFIG: Omit<StatItem, "value">[] = [
         unit: "tickets",
         gradient: "from-gray-600 to-slate-600",
         icon: TicketIcon,
-        bgClass: "bg-gray-100",
-        iconClass: "text-gray-600",
+        bgClass: "bg-surface-neutral-muted",
+        iconClass: "text-content-neutral-secondary",
     },
     {
         label: "Tickets ใหม่",
@@ -87,7 +87,7 @@ export const StatsCards = React.memo(function StatsCards() {
                     <Card
                         key={item.label}
                         className={cn(
-                            "relative overflow-hidden bg-white border-gray-200 shadow-lg hover:shadow-xl transition-[box-shadow,transform] duration-300 rounded-2xl group",
+                            "group relative overflow-hidden rounded-2xl border-border-neutral-default bg-surface-raised shadow-lg transition-[box-shadow,transform] duration-300 hover:shadow-xl",
                             isNewCard && "ring-2 ring-blue-200",
                         )}
                     >
@@ -102,7 +102,7 @@ export const StatsCards = React.memo(function StatsCards() {
                         <CardContent className="p-5">
                             <div className="flex justify-between items-start">
                                 <div>
-                                    <p className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">
+                                    <p className="mb-1 text-xs font-medium uppercase tracking-wider text-content-neutral-muted">
                                         {item.label}
                                     </p>
                                     <div className="flex items-baseline space-x-1.5">
@@ -114,7 +114,7 @@ export const StatsCards = React.memo(function StatsCards() {
                                         >
                                             {item.value}
                                         </p>
-                                        <p className="text-xs text-gray-500">
+                                        <p className="text-xs text-content-neutral-muted">
                                             {item.unit}
                                         </p>
                                     </div>

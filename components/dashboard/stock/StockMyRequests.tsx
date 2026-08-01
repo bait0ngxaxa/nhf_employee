@@ -98,36 +98,36 @@ export function StockMyRequests() {
                         }
                     />
 
-                    <div className="hidden overflow-x-auto rounded-2xl bg-white shadow-sm ring-1 ring-slate-200 md:block">
+                    <div className="hidden overflow-x-auto rounded-2xl bg-surface-raised shadow-sm ring-1 ring-border-subtle md:block">
                         <Table className="min-w-[1080px] border-separate border-spacing-0">
                             <TableHeader>
-                                <TableRow className="border-b border-slate-200 bg-slate-50 hover:bg-slate-50">
-                                    <TableHead className="w-20 border-r border-slate-200 font-semibold text-slate-700">
+                                <TableRow className="border-b border-border-subtle bg-surface-subtle hover:bg-surface-subtle">
+                                    <TableHead className="w-20 border-r border-border-subtle font-semibold text-content-body">
                                         เลขที่
                                     </TableHead>
-                                    <TableHead className="w-40 border-r border-slate-200 font-semibold text-slate-700">
+                                    <TableHead className="w-40 border-r border-border-subtle font-semibold text-content-body">
                                         วันที่
                                     </TableHead>
-                                    <TableHead className="w-40 border-r border-slate-200 font-semibold text-slate-700">
+                                    <TableHead className="w-40 border-r border-border-subtle font-semibold text-content-body">
                                         รหัสโครงการ
                                     </TableHead>
-                                    <TableHead className="w-[24rem] border-r border-slate-200 font-semibold text-slate-700">
+                                    <TableHead className="w-[24rem] border-r border-border-subtle font-semibold text-content-body">
                                         รายการ
                                     </TableHead>
-                                    <TableHead className="w-32 border-r border-slate-200 font-semibold text-slate-700">
+                                    <TableHead className="w-32 border-r border-border-subtle font-semibold text-content-body">
                                         สถานะ
                                     </TableHead>
-                                    <TableHead className={`w-56 font-semibold text-slate-700${requests.some((r) => r.status === "PENDING_ISSUE") ? " border-r border-slate-200" : ""}`}>
+                                    <TableHead className={`w-56 font-semibold text-content-body${requests.some((r) => r.status === "PENDING_ISSUE") ? " border-r border-border-subtle" : ""}`}>
                                         หมายเหตุ
                                     </TableHead>
                                     {requests.some((r) => r.status === "PENDING_ISSUE") && (
-                                        <TableHead className="w-36 font-semibold text-slate-700">
+                                        <TableHead className="w-36 font-semibold text-content-body">
                                             ดำเนินการ
                                         </TableHead>
                                     )}
                                 </TableRow>
                             </TableHeader>
-                            <TableBody className="[&_tr:nth-child(odd)]:bg-white [&_tr:nth-child(even)]:bg-slate-50/80">
+                            <TableBody className="[&_tr:nth-child(odd)]:bg-surface-raised [&_tr:nth-child(even)]:bg-surface-subtle/80">
                                 {requests.map((request) => (
                                     <RequestRow
                                         key={request.id}
@@ -171,18 +171,18 @@ function RequestFilters(props: {
     onStatusChange: (status: StockRequestStatus | undefined) => void;
 }) {
     return (
-        <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-3 shadow-sm">
+        <div className="rounded-2xl border border-border-subtle bg-surface-subtle/70 p-3 shadow-sm">
             <div className="mb-3 px-1">
-                <div className="text-sm font-semibold text-slate-900">
+                <div className="text-sm font-semibold text-content-primary">
                     ค้นหาและกรองประวัติการเบิก
                 </div>
-                <div className="text-xs text-slate-600">
+                <div className="text-xs text-content-secondary">
                     ค้นหาจากเลขที่คำขอ รหัสโครงการ หรือชื่อรายการที่เคยเบิก
                 </div>
             </div>
             <div className="flex flex-col gap-3 sm:flex-row">
                 <div className="relative flex-1">
-                    <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" aria-hidden="true" />
+                    <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-content-subtle" aria-hidden="true" />
                     <Input
                         aria-label="ค้นหาประวัติคำขอเบิกวัสดุ"
                         name="stock-my-request-search"
@@ -190,7 +190,7 @@ function RequestFilters(props: {
                         value={props.requestSearchQuery}
                         onChange={(event) => props.onSearchChange(event.target.value)}
                         placeholder="ค้นหาเลขที่คำขอ รหัสโครงการ หรือรายการ"
-                        className="h-12 rounded-2xl border-slate-200 bg-white pl-11 pr-11 text-slate-900 placeholder:text-slate-500 focus-visible:border-blue-300 focus-visible:ring-blue-200"
+                        className="h-12 rounded-2xl border-border-subtle bg-surface-raised pl-11 pr-11 text-content-primary placeholder:text-content-muted focus-visible:border-blue-300 focus-visible:ring-blue-200"
                     />
                     {props.requestSearchQuery.trim().length > 0 && (
                         <Button
@@ -198,7 +198,7 @@ function RequestFilters(props: {
                             variant="ghost"
                             size="icon"
                             onClick={() => props.onSearchChange("")}
-                            className="absolute right-2 top-1/2 h-8 w-8 -translate-y-1/2 rounded-full text-slate-500 hover:bg-slate-100 hover:text-slate-700"
+                            className="absolute right-2 top-1/2 size-11 -translate-y-1/2 rounded-full text-content-muted hover:bg-surface-muted hover:text-content-body sm:size-8"
                             aria-label="ล้างคำค้นหาประวัติคำขอเบิกวัสดุ"
                         >
                             <X className="h-4 w-4" aria-hidden="true" />
@@ -217,7 +217,7 @@ function RequestFilters(props: {
                         }
                     >
                         <SelectTrigger
-                            className="h-12 rounded-2xl border-slate-200 bg-white text-slate-900 focus:ring-blue-200"
+                            className="h-12 rounded-2xl border-border-subtle bg-surface-raised text-content-primary focus:ring-blue-200"
                             aria-label="กรองสถานะประวัติคำขอเบิกวัสดุ"
                         >
                             <SelectValue placeholder="กรองสถานะ" />
@@ -246,24 +246,24 @@ function RequestRow(props: {
     const isPendingIssue = request.status === "PENDING_ISSUE";
 
     return (
-        <TableRow className="border-b border-slate-200 transition-colors hover:bg-blue-50/60">
-            <TableCell className="border-r border-slate-200 py-4 font-medium text-slate-800">
+        <TableRow className="border-b border-border-subtle transition-colors hover:bg-blue-50/60">
+            <TableCell className="border-r border-border-subtle py-4 font-medium text-content-strong">
                 #{request.id}
             </TableCell>
-            <TableCell className="border-r border-slate-200 py-4 text-sm text-slate-700">
+            <TableCell className="border-r border-border-subtle py-4 text-sm text-content-body">
                 {formatStockRequestDate(request.createdAt)}
             </TableCell>
-            <TableCell className="border-r border-slate-200 py-4 text-sm font-medium text-slate-700">
+            <TableCell className="border-r border-border-subtle py-4 text-sm font-medium text-content-body">
                 {request.projectCode}
             </TableCell>
-            <TableCell className="w-[24rem] min-w-[24rem] border-r border-slate-200 py-4">
+            <TableCell className="w-[24rem] min-w-[24rem] border-r border-border-subtle py-4">
                 <div className="space-y-1.5 py-1">
                     {request.items.map((requestItem) => (
                         <div key={requestItem.id} className="flex flex-wrap items-start gap-x-2 gap-y-0.5 text-sm">
-                            <span className="min-w-0 font-medium leading-6 text-slate-800">
+                            <span className="min-w-0 font-medium leading-6 text-content-strong">
                                 {getRequestItemDisplayName(requestItem)}
                             </span>
-                            <span className="shrink-0 rounded-full bg-slate-100/80 px-2 py-0.5 text-xs font-medium text-slate-600">
+                            <span className="shrink-0 rounded-full bg-surface-muted/80 px-2 py-0.5 text-xs font-medium text-content-secondary">
                                 x {requestItem.quantity}{" "}
                                 {requestItem.variant?.unit ?? requestItem.item.unit}
                             </span>
@@ -271,10 +271,10 @@ function RequestRow(props: {
                     ))}
                 </div>
             </TableCell>
-            <TableCell className="border-r border-slate-200 py-4">
+            <TableCell className="border-r border-border-subtle py-4">
                 <RequestStatusBadge status={request.status} />
             </TableCell>
-            <TableCell className={`py-4${showActionColumn ? " border-r border-slate-200" : ""}`}>
+            <TableCell className={`py-4${showActionColumn ? " border-r border-border-subtle" : ""}`}>
                 <StockRequestNote request={request} />
             </TableCell>
             {showActionColumn && (

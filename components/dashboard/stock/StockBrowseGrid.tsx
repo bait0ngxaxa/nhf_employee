@@ -140,19 +140,19 @@ function BrowseCardBase(props: BrowseCardProps) {
     const variantSummary = getVariantAttributeSummary(defaultVariant?.attributeValues);
 
     return (
-        <Card className={`group relative h-full overflow-hidden rounded-2xl border bg-white transition-colors duration-200 ${
+        <Card className={`group relative h-full overflow-hidden rounded-2xl border bg-surface-raised transition-colors duration-200 ${
             isRecentlyAdded
                 ? "border-emerald-300 ring-2 ring-emerald-300/70"
                 : availableQuantity === 0
-                    ? "border-slate-200/80"
+                    ? "border-border-subtle/80"
                     : "border-blue-100/80 hover:border-blue-300"
         }`}>
             <CardContent className="flex h-full flex-col gap-2.5 p-3">
-                <div className="overflow-hidden rounded-2xl bg-slate-50 ring-1 ring-slate-200 shadow-inner shadow-white/70">
-                    <div className="flex h-9 items-center border-b border-slate-200 bg-slate-50 px-2 py-1">
+                <div className="overflow-hidden rounded-2xl bg-surface-subtle ring-1 ring-border-subtle shadow-inner shadow-white/70">
+                    <div className="flex h-9 items-center border-b border-border-subtle bg-surface-subtle px-2 py-1">
                         <Badge
                             variant="secondary"
-                            className="max-w-full justify-start whitespace-normal border border-slate-200 bg-white px-2 text-left text-xs font-medium leading-5 text-slate-700 [display:-webkit-box] [overflow-wrap:anywhere] [-webkit-box-orient:vertical] [-webkit-line-clamp:2] hover:bg-white"
+                            className="max-w-full justify-start whitespace-normal border border-border-subtle bg-surface-raised px-2 text-left text-xs font-medium leading-5 text-content-body [display:-webkit-box] [overflow-wrap:anywhere] [-webkit-box-orient:vertical] [-webkit-line-clamp:2] hover:bg-surface-raised"
                             title={item.category.name}
                         >
                             {item.category.name}
@@ -176,13 +176,13 @@ function BrowseCardBase(props: BrowseCardProps) {
                                 unoptimized
                                 className="h-full w-full object-cover transition-transform duration-200 group-hover/preview:scale-[1.03]"
                             />
-                            <span className="absolute inset-0 bg-slate-950/0 transition-colors duration-300 group-hover/preview:bg-slate-950/20" />
-                            <span className="absolute bottom-2 right-2 flex h-8 w-8 items-center justify-center rounded-full bg-white/90 text-slate-700 opacity-0 shadow-sm transition-opacity duration-200 group-hover/preview:opacity-100 group-hover/preview:text-blue-700 group-focus-visible/preview:opacity-100 group-focus-visible/preview:text-blue-700">
+                            <span className="absolute inset-0 bg-surface-inverted/0 transition-colors duration-300 group-hover/preview:bg-surface-inverted/20" />
+                            <span className="absolute bottom-2 right-2 flex h-8 w-8 items-center justify-center rounded-full bg-surface-raised/90 text-content-body opacity-0 shadow-sm transition-opacity duration-200 group-hover/preview:opacity-100 group-hover/preview:text-blue-700 group-focus-visible/preview:opacity-100 group-focus-visible/preview:text-blue-700">
                                 <ZoomIn className="h-4 w-4" aria-hidden="true" />
                             </span>
                         </button>
                     ) : (
-                        <div className="flex h-32 items-center justify-center text-slate-300">
+                        <div className="flex h-32 items-center justify-center text-content-border">
                             <Package className="h-10 w-10" aria-hidden="true" />
                         </div>
                     )}
@@ -193,7 +193,7 @@ function BrowseCardBase(props: BrowseCardProps) {
                     <div className="flex flex-wrap items-start gap-2">
                         <p
                             title={item.sku}
-                            className="max-w-full rounded-md bg-slate-100 px-1.5 py-0.5 font-mono text-xs font-medium leading-5 text-slate-600 [overflow-wrap:anywhere]"
+                            className="max-w-full rounded-md bg-surface-muted px-1.5 py-0.5 font-mono text-xs font-medium leading-5 text-content-secondary [overflow-wrap:anywhere]"
                         >
                             {item.sku}
                         </p>
@@ -202,14 +202,14 @@ function BrowseCardBase(props: BrowseCardProps) {
 
                 <div className="min-h-8">
                     {item.description ? (
-                        <p className="line-clamp-2 text-sm leading-6 text-slate-500">
+                        <p className="line-clamp-2 text-sm leading-6 text-content-muted">
                             {item.description}
                         </p>
                     ) : null}
                 </div>
 
-                <div className="flex min-h-[5.75rem] flex-col justify-between rounded-2xl border border-slate-200 bg-slate-50/80 p-2.5 shadow-inner shadow-white">
-                    <div className="min-h-5 text-sm font-semibold leading-5 text-slate-800">
+                <div className="flex min-h-[5.75rem] flex-col justify-between rounded-2xl border border-border-subtle bg-surface-subtle/80 p-2.5 shadow-inner shadow-white">
+                    <div className="min-h-5 text-sm font-semibold leading-5 text-content-strong">
                         {hasSelectableVariants(item) ? (
                             <>มี {variantCount} ตัวเลือก</>
                         ) : variantSummary ? (
@@ -218,14 +218,14 @@ function BrowseCardBase(props: BrowseCardProps) {
                     </div>
                     <div className="space-y-1.5">
                         <div className="flex items-center justify-between">
-                            <span className="text-xs font-semibold leading-5 text-slate-500">
+                            <span className="text-xs font-semibold leading-5 text-content-muted">
                                 คงเหลือ
                             </span>
                             <span
                                 className={`rounded-lg px-2.5 py-1 text-sm font-bold tabular-nums leading-5 shadow-sm ${
                                     availableQuantity === 0
-                                        ? "bg-slate-100 text-slate-500"
-                                        : "bg-white text-slate-800"
+                                        ? "bg-surface-muted text-content-muted"
+                                        : "bg-surface-raised text-content-strong"
                                 }`}
                             >
                                 {availableQuantity} {item.unit}
@@ -256,10 +256,10 @@ function BrowseCardBase(props: BrowseCardProps) {
                         variant="default"
                         className={`group/button relative isolate w-full overflow-hidden rounded-xl shadow-sm ring-offset-2 transition-colors duration-200 focus-visible:ring-2 focus-visible:ring-blue-400 active:translate-y-0.5 active:scale-[0.98] ${
                             availableQuantity === 0
-                                ? "border-slate-200 bg-slate-50/50 text-slate-400"
+                                ? "border-border-subtle bg-surface-subtle/50 text-content-subtle"
                                 : isRecentlyAdded
-                                  ? "border border-emerald-600 bg-emerald-600 text-white hover:bg-emerald-700"
-                                : "border border-blue-600 bg-blue-600 text-white hover:border-blue-700 hover:bg-blue-700"
+                                  ? "border border-emerald-600 bg-emerald-600 text-content-on-brand hover:bg-emerald-700"
+                                : "border border-blue-600 bg-blue-600 text-content-on-brand hover:border-blue-700 hover:bg-blue-700"
                         }`}
                         onClick={() =>
                             hasSelectableVariants(item)
@@ -269,7 +269,7 @@ function BrowseCardBase(props: BrowseCardProps) {
                         disabled={availableQuantity === 0}
                     >
                         {availableQuantity > 0 && (
-                            <span className="pointer-events-none absolute inset-x-3 bottom-0 h-px bg-white/45 opacity-60 transition-opacity duration-300 group-hover/button:opacity-100" />
+                            <span className="pointer-events-none absolute inset-x-3 bottom-0 h-px bg-surface-raised/45 opacity-60 transition-opacity duration-300 group-hover/button:opacity-100" />
                         )}
                         {isRecentlyAdded ? (
                             <Check className="relative z-10 mr-1 h-4 w-4" aria-hidden="true" />
@@ -327,7 +327,7 @@ function StockItemName({ name }: { name: string }) {
                     <span className="block min-w-0">
                         <h3
                             ref={titleRef}
-                            className="line-clamp-2 min-h-11 text-base font-bold leading-[1.35] text-slate-900 [overflow-wrap:anywhere] transition-colors group-hover:text-slate-950"
+                            className="line-clamp-2 min-h-11 text-base font-bold leading-[1.35] text-content-primary [overflow-wrap:anywhere] transition-colors group-hover:text-content-heading"
                         >
                             {name}
                         </h3>
@@ -337,7 +337,7 @@ function StockItemName({ name }: { name: string }) {
                     side="top"
                     align="start"
                     hideArrow
-                    className="max-w-72 whitespace-normal border border-slate-200 bg-white text-left leading-6 text-slate-900 shadow-lg"
+                    className="max-w-72 whitespace-normal border border-border-subtle bg-surface-raised text-left leading-6 text-content-primary shadow-lg"
                 >
                     {name}
                 </TooltipContent>

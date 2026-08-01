@@ -4,7 +4,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 // Generic Stats Card Skeleton
 function SkeletonStatCard(): ReactElement {
     return (
-        <div className="bg-white/60 backdrop-blur-md border border-gray-100 shadow-lg rounded-2xl p-6">
+        <div className="rounded-2xl border border-border-neutral-muted bg-surface/60 p-6 shadow-lg backdrop-blur-md">
             <div className="flex justify-between items-start">
                 <div className="space-y-2">
                     <Skeleton className="h-4 w-24" />
@@ -24,7 +24,7 @@ function SkeletonTable({ columns = 4, rows = 6 }: { columns?: number; rows?: num
     return (
         <div className="w-full">
             {/* Table Header */}
-            <div className="flex gap-4 pb-4 border-b border-gray-100">
+            <div className="flex gap-4 border-b border-border-neutral-muted pb-4">
                 {Array.from({ length: columns }).map((_, i) => (
                     <Skeleton key={`header-${i}`} className="h-4 flex-1" />
                 ))}
@@ -59,7 +59,7 @@ function SkeletonFormField({ fullWidth = false }: { fullWidth?: boolean }): Reac
 // Navigation Card Skeleton
 function SkeletonNavCard(): ReactElement {
     return (
-        <div className="bg-white/60 backdrop-blur-md border border-gray-100 shadow-lg rounded-2xl p-6">
+        <div className="rounded-2xl border border-border-neutral-muted bg-surface/60 p-6 shadow-lg backdrop-blur-md">
             <div className="flex items-center space-x-4">
                 <Skeleton className="h-12 w-12 rounded-xl" />
                 <div className="space-y-2 flex-1">
@@ -74,7 +74,7 @@ function SkeletonNavCard(): ReactElement {
 // Sidebar Skeleton
 function SidebarSkeleton(): ReactElement {
     return (
-        <div className="hidden h-full w-64 flex-col border-r border-gray-200/50 bg-white p-4 shadow-lg lg:flex">
+                <div className="hidden h-full w-64 flex-col border-r border-border-neutral bg-surface-raised p-4 shadow-lg lg:flex">
             {/* Logo */}
             <Skeleton className="h-8 rounded-lg mb-6" />
             
@@ -142,7 +142,7 @@ function PaginationSkeleton(): ReactElement {
 // Main Dashboard Skeleton
 export default function DashboardLoading(): ReactElement {
     return (
-        <div className="flex h-dvh bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+            <div className="app-shell-background flex h-dvh">
             {/* Sidebar */}
             <SidebarSkeleton />
 
@@ -175,7 +175,7 @@ export default function DashboardLoading(): ReactElement {
                         </div>
 
                         {/* Main Content Card */}
-                        <div className="bg-white/60 backdrop-blur-md border border-gray-100 shadow-lg rounded-2xl p-6">
+            <div className="rounded-2xl border border-border-muted bg-surface/60 p-6 shadow-lg backdrop-blur-md">
                             {/* Card Header */}
                             <div className="flex justify-between items-center mb-6">
                                 <div className="space-y-2">

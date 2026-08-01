@@ -30,8 +30,8 @@ const REQUEST_STATUS_META: Record<string, RequestStatusMeta> = {
     },
     CANCELLED: {
         label: "ยกเลิก",
-        colorClass: "bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100",
-        iconClass: "text-slate-500",
+        colorClass: "bg-surface-subtle text-content-body border-border-subtle hover:bg-surface-muted",
+        iconClass: "text-content-muted",
         icon: Ban,
     },
     NOT_TAKEN: {
@@ -48,8 +48,8 @@ const REQUEST_STATUS_META: Record<string, RequestStatusMeta> = {
     },
     CANCELLED_AFTER_APPROVAL: {
         label: "ยกเลิกหลังอนุมัติ",
-        colorClass: "bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100",
-        iconClass: "text-slate-500",
+        colorClass: "bg-surface-subtle text-content-body border-border-subtle hover:bg-surface-muted",
+        iconClass: "text-content-muted",
         icon: Ban,
     },
     PENDING_ISSUE: {

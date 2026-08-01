@@ -26,12 +26,12 @@ export function AddEmployeeForm({ onSuccess }: AddEmployeeFormProps) {
     } = useAddEmployee({ onSuccess });
 
     return (
-        <Card className="mx-auto w-full max-w-3xl rounded-2xl border-slate-200 bg-white shadow-sm">
+        <Card className="mx-auto w-full max-w-3xl rounded-2xl border-border-subtle bg-surface-raised shadow-sm">
             <CardHeader>
-                <CardTitle className="text-xl font-bold text-slate-950 [overflow-wrap:anywhere]">
+                <CardTitle className="text-xl font-bold text-content-heading [overflow-wrap:anywhere]">
                     เพิ่มพนักงานใหม่
                 </CardTitle>
-                <CardDescription className="text-sm leading-6 text-slate-600 [overflow-wrap:anywhere]">
+                <CardDescription className="text-sm leading-6 text-content-secondary [overflow-wrap:anywhere]">
                     กรอกข้อมูลพนักงานใหม่เพื่อเพิ่มเข้าระบบ
                 </CardDescription>
             </CardHeader>
@@ -59,7 +59,7 @@ export function AddEmployeeForm({ onSuccess }: AddEmployeeFormProps) {
 
                         <Button
                             type="submit"
-                            className="h-11 w-full bg-blue-600 text-base font-bold text-white transition-colors hover:bg-blue-700"
+                            className="h-11 w-full bg-blue-600 text-base font-bold text-content-on-brand transition-colors hover:bg-blue-700"
                             disabled={isLoading}
                         >
                             {isLoading ? (

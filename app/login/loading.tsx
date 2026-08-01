@@ -2,7 +2,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 export default function LoginLoading() {
     return (
-        <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 flex items-center justify-center relative overflow-hidden">
+        <div className="app-shell-background relative flex min-h-screen items-center justify-center overflow-hidden">
             {/* Background Effects */}
             <div className="absolute inset-0 overflow-hidden pointer-events-none">
                 <div className="absolute -top-40 -right-40 w-80 h-80 bg-blue-200/50 rounded-full blur-3xl" />
@@ -10,7 +10,7 @@ export default function LoginLoading() {
             </div>
 
             {/* Login Form Skeleton */}
-            <div className="relative z-10 bg-white/60 backdrop-blur-md border border-gray-100 shadow-lg rounded-2xl p-8 max-w-md w-full mx-4">
+            <div className="relative z-10 mx-4 w-full max-w-md rounded-2xl border border-border-neutral-muted bg-surface/60 p-8 shadow-lg backdrop-blur-md">
                 <div className="flex flex-col items-center space-y-6">
                     {/* Logo / Icon */}
                     <Skeleton className="h-14 w-14 rounded-xl" />

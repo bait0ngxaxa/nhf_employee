@@ -159,14 +159,14 @@ function ApprovalSectionHeader({
     const toneClassName = {
         attention: "border-indigo-100 bg-indigo-50 text-indigo-700",
         info: "border-cyan-100 bg-cyan-50 text-cyan-800",
-        neutral: "border-slate-200 bg-slate-50 text-slate-700",
+        neutral: "border-border-subtle bg-surface-subtle text-content-body",
     }[tone];
 
     return (
         <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
             <div className="min-w-0">
-                <h2 className="text-xl/7 font-semibold tracking-tight text-slate-950">{title}</h2>
-                <p className="mt-1 max-w-2xl text-sm/6 text-slate-600">{description}</p>
+                <h2 className="text-xl/7 font-semibold tracking-tight text-content-heading">{title}</h2>
+                <p className="mt-1 max-w-2xl text-sm/6 text-content-secondary">{description}</p>
             </div>
             <span className={cn("w-fit rounded-full border px-3 py-1 text-sm font-medium", toneClassName)}>
                 {count} รายการ

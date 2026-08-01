@@ -60,7 +60,7 @@ function DialogContent({
             <DialogPrimitive.Content
                 data-slot="dialog-content"
                 className={cn(
-                    "bg-white fixed top-[50%] left-[50%] z-50 grid max-h-[calc(100dvh-2rem)] w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 overflow-y-auto rounded-3xl border border-gray-200/50 p-6 shadow-xl sm:max-w-lg overscroll-contain",
+                    "bg-surface-raised fixed top-[50%] left-[50%] z-50 grid max-h-[calc(100dvh-2rem)] w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 overflow-y-auto rounded-3xl border border-border-neutral p-6 shadow-xl sm:max-w-lg overscroll-contain",
                     className
                 )}
                 {...props}

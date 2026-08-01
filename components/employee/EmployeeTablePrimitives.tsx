@@ -50,7 +50,7 @@ export function EditEmployeeButton({
             size="sm"
             onClick={() => onEditEmployee(employee)}
             aria-label={`แก้ไขข้อมูล ${getEmployeeFullName(employee)}`}
-            className="h-8 rounded-lg bg-emerald-50 px-3 text-emerald-700 transition-[background-color,transform] duration-200 hover:-translate-y-0.5 hover:bg-emerald-100 hover:text-emerald-800 motion-reduce:hover:translate-y-0"
+            className="h-11 rounded-lg bg-emerald-50 px-3 text-sm text-emerald-700 transition-[background-color,transform] duration-200 hover:-translate-y-0.5 hover:bg-emerald-100 hover:text-emerald-800 motion-reduce:hover:translate-y-0"
         >
             <Edit className="h-3.5 w-3.5" aria-hidden="true" />
             <span>แก้ไข</span>

@@ -116,18 +116,18 @@ export function EditEmployeeForm({
                             variant="ghost"
                             onClick={handleClose}
                             disabled={isLoading}
-                            className="h-10 px-5 font-medium hover:bg-slate-100 text-slate-600"
+                            className="h-11 px-5 font-medium hover:bg-surface-muted text-content-secondary"
                         >
                             ยกเลิก
                         </Button>
                         <Button
                             type="submit"
                             disabled={isLoading}
-                            className="h-10 px-7 font-bold bg-blue-600 hover:bg-blue-700 text-white shadow-sm transition-all flex items-center space-x-2"
+                            className="h-11 px-7 font-bold bg-blue-600 hover:bg-blue-700 text-content-on-brand shadow-sm transition-all flex items-center space-x-2"
                         >
                             {isLoading ? (
                                 <>
-                                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
+                                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-content-on-brand" />
                                     <span>กำลังบันทึก...</span>
                                 </>
                             ) : (

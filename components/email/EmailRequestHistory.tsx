@@ -79,7 +79,7 @@ export function EmailRequestHistory(): ReactElement | null {
                         onClick={refresh}
                         disabled={isLoading}
                         aria-label="รีเฟรชประวัติคำร้องพนักงานใหม่"
-                        className="h-10 shrink-0"
+                        className="h-11 shrink-0"
                     >
                         <RefreshCw className={refreshIconClassName} />
                         รีเฟรช
@@ -122,7 +122,7 @@ export function EmailRequestHistory(): ReactElement | null {
                         <Button
                             type="button"
                             variant="outline"
-                            className="border-red-200 bg-white text-red-700 hover:bg-red-50"
+                            className="border-red-200 bg-surface-raised text-red-700 hover:bg-red-50"
                             onClick={refresh}
                         >
                             <RefreshCw className="mr-2 h-4 w-4" />

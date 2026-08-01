@@ -53,13 +53,13 @@ export function StockRequestCancelDialog({
                     </DialogTitle>
                 </div>
                 <div className="space-y-5 px-5 py-5 sm:px-6">
-                    <div className="text-sm text-slate-600">
+                    <div className="text-sm text-content-secondary">
                         รายการนี้ยังอยู่ในสถานะรอจ่าย หากยืนยันแล้วคำขอจะถูกยกเลิกทันที
                     </div>
                     <div className="space-y-1.5">
                         <Label
                             htmlFor="my-request-cancel-reason"
-                            className="text-sm font-semibold text-slate-700"
+                            className="text-sm font-semibold text-content-body"
                         >
                             เหตุผล (ถ้ามี)
                         </Label>
@@ -70,7 +70,7 @@ export function StockRequestCancelDialog({
                             value={reason}
                             onChange={(event) => setReason(event.target.value)}
                             placeholder="ระบุเหตุผลเพิ่มเติมเพื่อให้เจ้าหน้าที่ทราบ"
-                            className="h-10 focus-visible:ring-rose-500"
+                            className="h-11 focus-visible:ring-rose-500"
                         />
                     </div>
                     <div className="flex flex-col-reverse gap-2 pt-3 sm:flex-row sm:justify-end">
@@ -78,7 +78,7 @@ export function StockRequestCancelDialog({
                             variant="ghost"
                             onClick={onClose}
                             disabled={loading}
-                            className="h-11 px-5 font-medium text-slate-600 hover:bg-slate-100"
+                            className="h-11 px-5 font-medium text-content-secondary hover:bg-surface-muted"
                         >
                             ปิด
                         </Button>
@@ -86,7 +86,7 @@ export function StockRequestCancelDialog({
                             variant="destructive"
                             disabled={loading}
                             onClick={() => void onConfirm(request.id, reason.trim())}
-                            className="h-11 bg-rose-600 px-7 font-bold text-white shadow-sm transition-colors hover:bg-rose-700"
+                            className="h-11 bg-rose-600 px-7 font-bold text-content-on-brand shadow-sm transition-colors hover:bg-rose-700"
                         >
                             {loading ? (
                                 <>

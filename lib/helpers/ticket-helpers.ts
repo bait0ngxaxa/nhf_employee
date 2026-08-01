@@ -30,11 +30,11 @@ export function getTicketStatusIcon(status: string): LucideIcon {
 }
 
 export function getPriorityBadgeColor(priority: string): string {
-  return PRIORITY_BADGE_COLORS[priority as keyof typeof PRIORITY_BADGE_COLORS] || 'bg-gray-600 text-white border border-gray-700';
+    return PRIORITY_BADGE_COLORS[priority as keyof typeof PRIORITY_BADGE_COLORS] || 'bg-content-neutral-secondary text-content-on-brand border border-content-neutral-body';
 }
 
 export function getStatusBadgeColor(status: string): string {
-  return STATUS_BADGE_COLORS[status as keyof typeof STATUS_BADGE_COLORS] || 'bg-gray-500 text-white border border-gray-600';
+    return STATUS_BADGE_COLORS[status as keyof typeof STATUS_BADGE_COLORS] || 'bg-content-neutral-muted text-content-on-brand border border-content-neutral-secondary';
 }
 
 export function getPriorityHexColor(priority: string): string {

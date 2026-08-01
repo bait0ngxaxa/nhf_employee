@@ -59,23 +59,20 @@ function StockContent() {
         <SectionShell
             gradientFrom="transparent"
             gradientTo="transparent"
-            className="border-slate-200/70 bg-white shadow-sm"
+            className="border-border-subtle/70 bg-surface shadow-sm"
         >
             <SectionHeader
                 icon={Package}
                 title="NHF Stock"
                 subtitle="เบิกจ่ายวัสดุสำนักงาน"
-                iconGradient="from-orange-500 to-red-600"
-                iconGlow="from-orange-500/40 to-red-500/30"
-                iconShadow="shadow-orange-500/25"
-                badgeColor="bg-orange-50 text-orange-700 border-orange-100"
+                tone="stock"
                 roleBadge={isAdmin ? "ผู้ดูแลระบบ" : "ผู้ใช้งาน"}
             />
             <SectionTabs
                 value={activeTab}
                 onValueChange={setActiveTab}
                 tabs={tabs}
-                activeColor="#ea580c"
+                activeColor="var(--module-stock-tab)"
             />
         </SectionShell>
     );

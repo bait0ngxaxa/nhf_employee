@@ -188,15 +188,15 @@ export function StockVariantPickerDialog({
                 }}
             >
                 <DialogContent className="flex flex-col overflow-hidden p-0 sm:max-w-[720px]">
-                <div className="shrink-0 border-b border-slate-200 bg-white">
-                    <div className="bg-slate-50 px-4 py-3 pr-12 sm:px-6 sm:py-4">
-                        <DialogTitle className="text-base font-semibold text-slate-900 sm:text-lg">
+                <div className="shrink-0 border-b border-border-subtle bg-surface-raised">
+                    <div className="bg-surface-subtle px-4 py-3 pr-12 sm:px-6 sm:py-4">
+                        <DialogTitle className="text-base font-semibold text-content-primary sm:text-lg">
                             เลือกรายการย่อยสำหรับเบิก
                         </DialogTitle>
                     </div>
                     <div className="px-4 py-3 sm:px-6 sm:py-4">
-                        <div className="flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50/80 p-3 sm:gap-4 sm:rounded-2xl sm:p-4">
-                            <div className="h-16 w-16 shrink-0 overflow-hidden rounded-xl bg-white ring-1 ring-slate-200 sm:h-24 sm:w-24 sm:rounded-2xl">
+                        <div className="flex items-start gap-3 rounded-xl border border-border-subtle bg-surface-subtle/80 p-3 sm:gap-4 sm:rounded-2xl sm:p-4">
+                            <div className="h-16 w-16 shrink-0 overflow-hidden rounded-xl bg-surface-raised ring-1 ring-border-subtle sm:h-24 sm:w-24 sm:rounded-2xl">
                                 {activeImageUrl ? (
                                     <button
                                         type="button"
@@ -217,24 +217,24 @@ export function StockVariantPickerDialog({
                                             unoptimized
                                             className="h-full w-full object-contain transition-transform duration-200 group-hover/preview:scale-[1.03]"
                                         />
-                                        <span className="absolute inset-0 bg-slate-950/0 transition-colors duration-300 group-hover/preview:bg-slate-950/20" />
-                                        <span className="absolute bottom-1.5 right-1.5 flex h-7 w-7 items-center justify-center rounded-full bg-white/90 text-slate-700 opacity-0 shadow-sm transition-opacity duration-200 group-hover/preview:opacity-100 group-hover/preview:text-blue-700 group-focus-visible/preview:opacity-100 group-focus-visible/preview:text-blue-700">
+                                        <span className="absolute inset-0 bg-surface-inverted/0 transition-colors duration-300 group-hover/preview:bg-surface-inverted/20" />
+                                        <span className="absolute bottom-1.5 right-1.5 flex h-7 w-7 items-center justify-center rounded-full bg-surface-raised/90 text-content-body opacity-0 shadow-sm transition-opacity duration-200 group-hover/preview:opacity-100 group-hover/preview:text-blue-700 group-focus-visible/preview:opacity-100 group-focus-visible/preview:text-blue-700">
                                             <ZoomIn className="h-3.5 w-3.5" aria-hidden="true" />
                                         </span>
                                     </button>
                                 ) : (
-                                    <div className="flex h-full w-full items-center justify-center text-slate-300">
+                                    <div className="flex h-full w-full items-center justify-center text-content-border">
                                         <Package className="h-8 w-8" aria-hidden="true" />
                                     </div>
                                 )}
                             </div>
                             <div className="min-w-0 flex-1 space-y-1.5 sm:space-y-2">
                                 <div className="space-y-1">
-                                    <h3 className="line-clamp-2 text-base font-bold leading-snug text-slate-900 sm:text-lg">
+                                    <h3 className="line-clamp-2 text-base font-bold leading-snug text-content-primary sm:text-lg">
                                         {item.name}
                                     </h3>
                                     {item.description && (
-                                        <p className="hidden text-sm leading-6 text-slate-600 sm:line-clamp-2 sm:block">
+                                        <p className="hidden text-sm leading-6 text-content-secondary sm:line-clamp-2 sm:block">
                                             {item.description}
                                         </p>
                                     )}
@@ -242,13 +242,13 @@ export function StockVariantPickerDialog({
                                 <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
                                     <Badge
                                         variant="secondary"
-                                        className="max-w-full justify-start truncate border border-slate-200 bg-white text-xs text-slate-700 sm:text-sm"
+                                        className="max-w-full justify-start truncate border border-border-subtle bg-surface-raised text-xs text-content-body sm:text-sm"
                                     >
                                         {item.category.name}
                                     </Badge>
                                     <Badge
                                         variant="secondary"
-                                        className="border border-slate-200 bg-white text-xs text-slate-700 sm:text-sm"
+                                        className="border border-border-subtle bg-surface-raised text-xs text-content-body sm:text-sm"
                                     >
                                         เลือกแล้ว {selectedVariantCount} รายการ
                                     </Badge>
@@ -259,7 +259,7 @@ export function StockVariantPickerDialog({
                                         รวม {selectedTotalQuantity} ชิ้น
                                     </Badge>
                                 </div>
-                                <p className="hidden text-xs leading-5 text-slate-600 sm:block">
+                                <p className="hidden text-xs leading-5 text-content-secondary sm:block">
                                     เลือกจำนวนของแต่ละตัวเลือกได้หลายรายการ แล้วเพิ่มเข้าตะกร้าครั้งเดียว
                                 </p>
                             </div>
@@ -269,7 +269,7 @@ export function StockVariantPickerDialog({
                 <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4 sm:space-y-5 sm:px-6 sm:py-5">
 
                     <div className="space-y-3">
-                        <div className="text-sm font-semibold text-slate-900">
+                        <div className="text-sm font-semibold text-content-primary">
                             ตัวเลือกที่มี
                         </div>
                         <div className="grid gap-3">
@@ -291,21 +291,21 @@ export function StockVariantPickerDialog({
                                                 ? "border-emerald-300 bg-emerald-50 shadow-sm shadow-emerald-100/70"
                                                 : isActive
                                                     ? "border-blue-300 bg-blue-50/70 shadow-sm shadow-blue-100/60"
-                                                    : "border-slate-200 bg-white hover:border-blue-200 hover:bg-blue-50/35"
-                                        } ${availableQuantity === 0 ? "bg-slate-50 opacity-70" : "cursor-pointer"}`}
+                                                    : "border-border-subtle bg-surface-raised hover:border-blue-200 hover:bg-blue-50/35"
+                                        } ${availableQuantity === 0 ? "bg-surface-subtle opacity-70" : "cursor-pointer"}`}
                                     >
                                         <div className="flex flex-col gap-3">
                                             <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                                                 <button
                                                     type="button"
                                                     onClick={() => focusVariant(variant)}
-                                                    className="min-w-0 flex-1 space-y-1 rounded-xl text-left outline-none transition-colors duration-200 hover:text-slate-950 focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-2"
+                                                    className="min-w-0 flex-1 space-y-1 rounded-xl text-left outline-none transition-colors duration-200 hover:text-content-heading focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-2"
                                                     aria-label={`ดูรูปและรายละเอียด ${summary || variant.sku}`}
                                                 >
-                                                    <div className={`font-semibold ${isSelected ? "text-emerald-900" : "text-slate-800"}`}>
+                                                    <div className={`font-semibold ${isSelected ? "text-emerald-900" : "text-content-strong"}`}>
                                                         {summary || variant.sku}
                                                     </div>
-                                                    <div className={isSelected ? "text-xs text-emerald-700/80" : "text-xs text-slate-500"}>
+                                                    <div className={isSelected ? "text-xs text-emerald-700/80" : "text-xs text-content-muted"}>
                                                         SKU: {variant.sku}
                                                     </div>
                                                 </button>
@@ -313,10 +313,10 @@ export function StockVariantPickerDialog({
                                                     <div
                                                         className={`rounded-lg px-2.5 py-1 text-sm font-bold ${
                                                             availableQuantity === 0
-                                                                ? "bg-slate-100 text-slate-500"
+                                                                ? "bg-surface-muted text-content-muted"
                                                                 : isSelected
-                                                                    ? "bg-white text-emerald-800"
-                                                                    : "bg-slate-100 text-slate-800"
+                                                                    ? "bg-surface-raised text-emerald-800"
+                                                                    : "bg-surface-muted text-content-strong"
                                                         }`}
                                                     >
                                                         คงเหลือ {availableQuantity} {variant.unit}
@@ -325,7 +325,7 @@ export function StockVariantPickerDialog({
                                                         <Button
                                                             type="button"
                                                             variant="outline"
-                                                            className="h-8 rounded-lg border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-800"
+                                                            className="h-11 rounded-lg border-border-subtle bg-surface-raised px-3 text-sm font-semibold text-content-body hover:border-blue-300 hover:bg-blue-50 hover:text-blue-800"
                                                             onClick={() =>
                                                                 handleVariantCardClick(variant)
                                                             }
@@ -344,7 +344,7 @@ export function StockVariantPickerDialog({
                                                             ? "text-rose-600"
                                                             : isSelected
                                                                 ? "text-emerald-700"
-                                                                : "text-slate-500"
+                                                                : "text-content-muted"
                                                     }`}
                                                 >
                                                     {availableQuantity === 0
@@ -358,7 +358,7 @@ export function StockVariantPickerDialog({
                                                         type="button"
                                                         variant="ghost"
                                                         size="icon"
-                                                        className="h-11 w-11 rounded-lg border border-slate-200 bg-white text-slate-700 shadow-sm transition-colors duration-200 hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700"
+                                                        className="h-11 w-11 rounded-lg border border-border-subtle bg-surface-raised text-content-body shadow-sm transition-colors duration-200 hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700"
                                                         onClick={() =>
                                                             updateVariantQuantity(variant, -1)
                                                         }
@@ -367,14 +367,14 @@ export function StockVariantPickerDialog({
                                                     >
                                                         <Minus className="h-3.5 w-3.5" aria-hidden="true" />
                                                     </Button>
-                                                    <div className={`w-12 rounded-lg py-1 text-center text-sm font-bold ${quantity > 0 ? "bg-emerald-100 text-emerald-800" : "text-slate-700"}`}>
+                                                    <div className={`w-12 rounded-lg py-1 text-center text-sm font-bold ${quantity > 0 ? "bg-emerald-100 text-emerald-800" : "text-content-body"}`}>
                                                         {quantity}
                                                     </div>
                                                     <Button
                                                         type="button"
                                                         variant="ghost"
                                                         size="icon"
-                                                        className="h-11 w-11 rounded-lg border border-slate-200 bg-white text-slate-700 shadow-sm transition-colors duration-200 hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700"
+                                                        className="h-11 w-11 rounded-lg border border-border-subtle bg-surface-raised text-content-body shadow-sm transition-colors duration-200 hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700"
                                                         onClick={() =>
                                                             updateVariantQuantity(variant, 1)
                                                         }
@@ -397,16 +397,16 @@ export function StockVariantPickerDialog({
 
                 </div>
 
-                    <div className="flex shrink-0 flex-col-reverse gap-2 border-t border-slate-200 bg-slate-50 px-5 py-4 sm:flex-row sm:justify-end sm:px-6">
+                    <div className="flex shrink-0 flex-col-reverse gap-2 border-t border-border-subtle bg-surface-subtle px-5 py-4 sm:flex-row sm:justify-end sm:px-6">
                         <Button
                             variant="ghost"
                             onClick={onClose}
-                            className="h-11 border border-slate-100 transition-colors duration-200 hover:border-slate-200 hover:bg-slate-50"
+                            className="h-11 border border-border-muted transition-colors duration-200 hover:border-border-subtle hover:bg-surface-subtle"
                         >
                             ยกเลิก
                         </Button>
                         <Button
-                            className="group/confirm h-11 bg-blue-600 font-bold text-white shadow-sm transition-colors duration-200 hover:bg-blue-700"
+                            className="group/confirm h-11 bg-blue-600 font-bold text-content-on-brand shadow-sm transition-colors duration-200 hover:bg-blue-700"
                             onClick={() => onConfirm(selections)}
                             disabled={selections.length === 0}
                         >

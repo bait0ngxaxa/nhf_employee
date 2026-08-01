@@ -33,15 +33,15 @@ export function EmployeeMobileCard({
     onEditEmployee,
 }: EmployeeMobileCardProps) {
     return (
-        <article className="rounded-xl border border-slate-200 bg-white p-4">
+        <article className="rounded-xl border border-border-subtle bg-surface-raised p-4">
             <div className="flex min-w-0 items-start justify-between gap-3">
                 <div className="flex min-w-0 items-center gap-3">
                     <EmployeeAvatar employee={employee} />
                     <div className="min-w-0">
-                        <h3 className="text-sm font-semibold leading-6 text-slate-950 [overflow-wrap:anywhere]">
+                        <h3 className="text-sm font-semibold leading-6 text-content-heading [overflow-wrap:anywhere]">
                             {getEmployeeFullName(employee)}
                         </h3>
-                        <p className="mt-0.5 line-clamp-2 text-xs leading-5 text-slate-600 [overflow-wrap:anywhere]">
+                        <p className="mt-0.5 line-clamp-2 text-xs leading-5 text-content-secondary [overflow-wrap:anywhere]">
                             {employee.position}
                         </p>
                     </div>
@@ -80,7 +80,7 @@ export function EmployeeMobileCard({
             </dl>
 
             {canEdit && onEditEmployee ? (
-                <div className="mt-4 flex justify-end border-t border-slate-100 pt-3">
+                <div className="mt-4 flex justify-end border-t border-border-muted pt-3">
                     <EditEmployeeButton
                         employee={employee}
                         onEditEmployee={onEditEmployee}
@@ -102,9 +102,9 @@ function MobileDetail({
 }) {
     return (
         <div className="grid grid-cols-[1rem_minmax(5rem,7rem)_minmax(0,1fr)] items-start gap-2">
-            <Icon className="mt-0.5 h-4 w-4 text-slate-400" aria-hidden="true" />
-            <dt className="text-xs font-medium text-slate-500">{label}</dt>
-            <dd className="min-w-0 text-right text-xs font-medium leading-5 text-slate-800 [overflow-wrap:anywhere]">
+            <Icon className="mt-0.5 h-4 w-4 text-content-subtle" aria-hidden="true" />
+            <dt className="text-xs font-medium text-content-muted">{label}</dt>
+            <dd className="min-w-0 text-right text-xs font-medium leading-5 text-content-strong [overflow-wrap:anywhere]">
                 {value}
             </dd>
         </div>

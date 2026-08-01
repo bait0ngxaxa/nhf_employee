@@ -40,7 +40,7 @@ export function AppLogo({
     return (
         <span
             className={cn(
-                "relative inline-block shrink-0 overflow-hidden rounded-[13%] bg-white shadow-[0_4px_8px_rgba(15,23,42,0.18),0_1px_2px_rgba(15,23,42,0.12)]",
+                "relative inline-block shrink-0 overflow-hidden rounded-[13%] bg-surface-raised brand-logo-shadow",
                 logo.frameClassName,
                 className,
             )}

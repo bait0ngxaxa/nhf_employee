@@ -55,9 +55,9 @@ export function RefreshSessionBridge(): React.ReactElement {
     return (
         <main
             id="main"
-            className="flex min-h-svh items-center justify-center bg-slate-50 p-6"
+            className="flex min-h-svh items-center justify-center bg-surface-subtle p-6"
         >
-            <div className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-5 py-4 text-sm font-semibold text-slate-700 shadow-sm">
+            <div className="flex items-center gap-3 rounded-xl border border-border-subtle bg-surface-raised px-5 py-4 text-sm font-semibold text-content-body shadow-sm">
                 <Loader2 className="h-4 w-4 animate-spin text-blue-600" aria-hidden="true" />
                 <p>{message}</p>
             </div>

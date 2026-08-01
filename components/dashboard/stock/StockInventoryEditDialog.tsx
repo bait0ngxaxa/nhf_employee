@@ -260,18 +260,18 @@ export function EditItemDialog({
             }}
         >
             <DialogContent className="flex flex-col overflow-hidden p-0 sm:max-w-[760px]">
-                <div className="shrink-0 border-b border-gray-100 bg-slate-50/50 px-5 py-4 sm:px-6">
-                    <DialogTitle className="text-lg font-semibold text-slate-800">
+                <div className="shrink-0 border-b border-border-neutral-muted bg-surface-subtle/50 px-5 py-4 sm:px-6">
+                    <DialogTitle className="text-lg font-semibold text-content-strong">
                         แก้ไขสต็อก
                     </DialogTitle>
                 </div>
                 <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
                     <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-5 py-5 sm:px-6">
-                        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                            <div className="text-sm font-semibold text-slate-800">
+                        <div className="rounded-2xl border border-border-subtle bg-surface-subtle p-4">
+                            <div className="text-sm font-semibold text-content-strong">
                                 ข้อมูลหลักของวัสดุ
                             </div>
-                            <div className="mt-2 flex flex-wrap gap-3 text-sm text-slate-600">
+                            <div className="mt-2 flex flex-wrap gap-3 text-sm text-content-secondary">
                                 <span>คงเหลือรวม: {totalQuantity}</span>
                                 <span>จุดสั่งซื้อรวม: {totalMinStock}</span>
                             </div>
@@ -287,7 +287,7 @@ export function EditItemDialog({
                             <div className="space-y-1.5">
                                 <Label
                                     htmlFor="edit-item-name"
-                                    className="text-sm font-semibold text-slate-700"
+                                    className="text-sm font-semibold text-content-body"
                                 >
                                     {STOCK_ADMIN_TEXT.itemName}{" "}
                                     <span className="text-rose-500">*</span>
@@ -299,13 +299,13 @@ export function EditItemDialog({
                                     required
                                     maxLength={200}
                                     placeholder="เช่น กระดาษ A4"
-                                    className="h-10 focus-visible:ring-blue-500"
+                                    className="h-11 focus-visible:ring-blue-500"
                                 />
                             </div>
                             <div className="space-y-1.5">
                                 <Label
                                     htmlFor="edit-item-description"
-                                    className="text-sm font-semibold text-slate-700"
+                                    className="text-sm font-semibold text-content-body"
                                 >
                                     {STOCK_ADMIN_TEXT.itemDescription}
                                 </Label>
@@ -317,7 +317,7 @@ export function EditItemDialog({
                                     }
                                     maxLength={2000}
                                     placeholder={STOCK_ADMIN_TEXT.itemDescriptionPlaceholder}
-                                    className="min-h-10 resize-y focus-visible:ring-blue-500"
+                                    className="min-h-11 resize-y focus-visible:ring-blue-500"
                                 />
                             </div>
                         </div>
@@ -425,20 +425,20 @@ export function EditItemDialog({
                             }
                         />
                     </div>
-                    <div className="flex shrink-0 flex-col-reverse gap-2 border-t border-slate-200 bg-white px-5 py-4 sm:flex-row sm:justify-end sm:px-6">
+                    <div className="flex shrink-0 flex-col-reverse gap-2 border-t border-border-subtle bg-surface-raised px-5 py-4 sm:flex-row sm:justify-end sm:px-6">
                         <Button
                             type="button"
                             variant="ghost"
                             onClick={onClose}
                             disabled={loading}
-                            className="h-11 px-5 font-medium text-slate-600 hover:bg-slate-100"
+                            className="h-11 px-5 font-medium text-content-secondary hover:bg-surface-muted"
                         >
                             {STOCK_ADMIN_TEXT.cancel}
                         </Button>
                         <Button
                             type="submit"
                             disabled={loading || !hasChanges}
-                            className="h-11 bg-blue-600 px-7 font-bold text-white shadow-sm transition-colors hover:bg-blue-700"
+                            className="h-11 bg-blue-600 px-7 font-bold text-content-on-brand shadow-sm transition-colors hover:bg-blue-700"
                         >
                             {loading ? STOCK_ADMIN_TEXT.saving : "บันทึกการแก้ไข"}
                         </Button>

@@ -1,4 +1,5 @@
 import { type ReactElement, type ReactNode } from "react";
+import { cn } from "@/lib/ui/utils";
 
 /**
  * SectionShell — shared dashboard section wrapper with background gradient effects.
@@ -15,8 +16,8 @@ interface SectionShellProps {
 
 export function SectionShell({
     children,
-    gradientFrom = "rgba(248,250,252,0.8)",
-    gradientTo = "rgba(241,245,249,0.8)",
+    gradientFrom = "var(--section-shell-gradient-from)",
+    gradientTo = "var(--section-shell-gradient-to)",
     className = "",
 }: SectionShellProps): ReactElement {
     const backgroundMesh = [
@@ -26,7 +27,10 @@ export function SectionShell({
 
     return (
         <div
-            className={`relative min-h-[calc(100dvh-6rem)] overflow-hidden rounded-2xl border border-slate-200/50 bg-white shadow-[0_20px_50px_-12px_rgba(0,0,0,0.03)] lg:rounded-[3rem] ${className}`}
+            className={cn(
+                "relative min-h-[calc(100dvh-6rem)] overflow-hidden rounded-2xl border border-border-soft bg-surface section-shell-shadow lg:rounded-[3rem]",
+                className,
+            )}
         >
             <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-2xl lg:rounded-[3rem]">
                 <div
@@ -35,7 +39,7 @@ export function SectionShell({
                         background: backgroundMesh,
                     }}
                 />
-                <div className="absolute inset-0 bg-white/40" />
+                <div className="section-shell-overlay absolute inset-0" />
             </div>
 
             <div className="relative z-10 space-y-10 p-4 sm:p-6 lg:p-10">

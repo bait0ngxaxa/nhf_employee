@@ -23,10 +23,10 @@ export function EmployeeLeaveDashboard() {
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="min-w-0">
                     <p className="text-sm/6 font-medium text-indigo-700">วันลาของฉัน</p>
-                    <h2 className="mt-1 text-xl/7 font-semibold tracking-tight text-slate-950">
+                    <h2 className="mt-1 text-xl/7 font-semibold tracking-tight text-content-heading">
                         โควต้าวันลาของคุณ
                     </h2>
-                    <p className="mt-1 max-w-2xl text-sm/6 text-slate-600">
+                    <p className="mt-1 max-w-2xl text-sm/6 text-content-secondary">
                         ดูสิทธิ์คงเหลือก่อนยื่นคำขอใหม่
                     </p>
                 </div>
@@ -51,10 +51,10 @@ export function EmployeeLeaveDashboard() {
             <div className="mt-2 space-y-4">
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
                     <div className="min-w-0">
-                        <h2 className="text-xl/7 font-semibold tracking-tight text-slate-950">
+                        <h2 className="text-xl/7 font-semibold tracking-tight text-content-heading">
                             ประวัติการลา
                         </h2>
-                        <p className="mt-1 max-w-2xl text-sm/6 text-slate-600">
+                        <p className="mt-1 max-w-2xl text-sm/6 text-content-secondary">
                             รายการล่าสุดพร้อมสถานะและการดำเนินการที่ยังทำได้
                         </p>
                     </div>

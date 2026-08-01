@@ -27,12 +27,12 @@ export default function GlobalError({ error, reset }: ErrorProps) {
                     <div className="mx-auto mb-4 w-16 h-16 bg-red-100 rounded-full flex items-center justify-center">
                         <AlertTriangle className="w-8 h-8 text-red-600" />
                     </div>
-                    <CardTitle className="text-xl text-gray-800">
+                    <CardTitle className="text-xl text-content-neutral-strong">
                         เกิดข้อผิดพลาด
                     </CardTitle>
                 </CardHeader>
                 <CardContent className="text-center space-y-4">
-                    <p className="text-gray-600">
+                    <p className="text-content-neutral-secondary">
                         ขออภัย เกิดข้อผิดพลาดบางอย่างขึ้น กรุณาลองใหม่อีกครั้ง
                     </p>
 

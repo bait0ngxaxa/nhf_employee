@@ -26,8 +26,8 @@ const STATUS_META: Record<string, TicketBadgeMeta> = {
         icon: CheckCircle2,
     },
     CLOSED: {
-        className: "bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100",
-        iconClassName: "text-slate-500",
+        className: "bg-surface-subtle text-content-body border-border-subtle hover:bg-surface-muted",
+        iconClassName: "text-content-muted",
         icon: Ban,
     },
     CANCELLED: {
@@ -39,8 +39,8 @@ const STATUS_META: Record<string, TicketBadgeMeta> = {
 
 const PRIORITY_META: Record<string, TicketBadgeMeta> = {
     LOW: {
-        className: "bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100",
-        iconClassName: "text-slate-500",
+        className: "bg-surface-subtle text-content-body border-border-subtle hover:bg-surface-muted",
+        iconClassName: "text-content-muted",
         icon: ArrowDown,
     },
     MEDIUM: {
@@ -61,8 +61,8 @@ const PRIORITY_META: Record<string, TicketBadgeMeta> = {
 };
 
 const DEFAULT_META: TicketBadgeMeta = {
-    className: "bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100",
-    iconClassName: "text-slate-500",
+    className: "bg-surface-subtle text-content-body border-border-subtle hover:bg-surface-muted",
+    iconClassName: "text-content-muted",
     icon: Clock3,
 };
 

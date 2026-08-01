@@ -25,14 +25,14 @@ export function StockRequestMobileCards({
             {requests.map((request) => (
                 <article
                     key={request.id}
-                    className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
+                    className="rounded-2xl border border-border-subtle bg-surface-raised p-4 shadow-sm"
                 >
                     <div className="flex items-start justify-between gap-3">
                         <div>
-                            <div className="text-sm font-semibold text-slate-800">
+                            <div className="text-sm font-semibold text-content-strong">
                                 คำขอ #{request.id}
                             </div>
-                            <div className="text-xs text-slate-500">
+                            <div className="text-xs text-content-muted">
                                 {formatStockRequestDate(request.createdAt)}
                             </div>
                         </div>
@@ -50,18 +50,18 @@ export function StockRequestMobileCards({
                     </div>
 
                     <div className="mt-3 space-y-1.5">
-                        <div className="text-xs font-semibold text-slate-500">
+                        <div className="text-xs font-semibold text-content-muted">
                             รายการ
                         </div>
                         {request.items.map((item) => (
                             <div
                                 key={item.id}
-                                className="flex flex-wrap items-start gap-x-2 gap-y-1 rounded-xl bg-slate-50 px-3 py-2 text-sm"
+                                className="flex flex-wrap items-start gap-x-2 gap-y-1 rounded-xl bg-surface-subtle px-3 py-2 text-sm"
                             >
-                                <span className="font-medium text-slate-800">
+                                <span className="font-medium text-content-strong">
                                     {getRequestItemDisplayName(item)}
                                 </span>
-                                <span className="shrink-0 rounded-full bg-white px-2 py-0.5 text-xs font-medium text-slate-600 ring-1 ring-slate-200">
+                                <span className="shrink-0 rounded-full bg-surface-raised px-2 py-0.5 text-xs font-medium text-content-secondary ring-1 ring-border-subtle">
                                     x {item.quantity} {item.variant?.unit ?? item.item.unit}
                                 </span>
                             </div>
@@ -86,8 +86,8 @@ export function StockRequestMobileCards({
 function InfoRow({ label, value }: { label: string; value: string }) {
     return (
         <div className="flex gap-2">
-            <span className="shrink-0 text-slate-500">{label}:</span>
-            <span className="min-w-0 font-medium text-slate-800 [overflow-wrap:anywhere]">
+            <span className="shrink-0 text-content-muted">{label}:</span>
+            <span className="min-w-0 font-medium text-content-strong [overflow-wrap:anywhere]">
                 {value}
             </span>
         </div>

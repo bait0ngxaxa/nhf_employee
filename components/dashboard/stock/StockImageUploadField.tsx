@@ -78,8 +78,8 @@ export function StockImageUploadField({
 
     return (
         <div className="space-y-2">
-            <div className="text-sm font-semibold text-slate-700">{label}</div>
-            <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+            <div className="text-sm font-semibold text-content-body">{label}</div>
+            <div className="rounded-2xl border border-border-subtle bg-surface-subtle/70 p-4">
                 <input
                     ref={inputRef}
                     id={inputId}
@@ -92,7 +92,7 @@ export function StockImageUploadField({
 
                 {value ? (
                     <div className="space-y-3">
-                        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+                        <div className="overflow-hidden rounded-xl border border-border-subtle bg-surface-raised">
                             <Image
                                 src={value}
                                 alt={label}
@@ -136,7 +136,7 @@ export function StockImageUploadField({
                         type="button"
                         disabled={uploading}
                         onClick={() => inputRef.current?.click()}
-                        className="flex w-full flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 bg-white px-4 py-8 text-sm text-slate-500 transition hover:border-blue-300 hover:text-blue-700 disabled:cursor-not-allowed"
+                        className="flex w-full flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-border-strong bg-surface-raised px-4 py-8 text-sm text-content-muted transition hover:border-blue-300 hover:text-blue-700 disabled:cursor-not-allowed"
                     >
                         {uploading ? (
                             <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" />
@@ -146,7 +146,7 @@ export function StockImageUploadField({
                         <span>
                             {uploading ? "กำลังอัปโหลด…" : "อัปโหลดรูปภาพ"}
                         </span>
-                        <span className="text-xs text-slate-400">
+                        <span className="text-xs text-content-subtle">
                             รองรับ JPG, PNG, WEBP ไม่เกิน {IMAGE_UPLOAD_MAX_MB} MB
                         </span>
                     </button>

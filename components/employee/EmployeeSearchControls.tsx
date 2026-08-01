@@ -42,7 +42,7 @@ export function EmployeeSearchControls({
             <div className="flex min-w-0 flex-1 flex-col gap-3 sm:flex-row">
                 <div className="relative flex-1">
                     <Search
-                        className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"
+                        className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-content-subtle"
                         aria-hidden="true"
                     />
                     <Input
@@ -52,7 +52,7 @@ export function EmployeeSearchControls({
                         placeholder="ค้นหาชื่อ ชื่อเล่น อีเมล ตำแหน่ง แผนก หรือสังกัด"
                         value={searchTerm}
                         onChange={(event) => handleSearch(event.target.value)}
-                        className="h-10 rounded-lg border-slate-200 bg-white pl-10 pr-10 text-slate-900 placeholder:text-slate-500 focus:border-sky-500 focus:ring-sky-500/20"
+                        className="h-11 rounded-lg border-border-subtle bg-surface-raised pl-10 pr-10 text-content-primary placeholder:text-content-muted focus:border-sky-500 focus:ring-sky-500/20"
                     />
                     {searchTerm.trim().length > 0 && (
                         <Button
@@ -61,7 +61,7 @@ export function EmployeeSearchControls({
                             size="icon"
                             onClick={() => handleSearch("")}
                             aria-label="ล้างคำค้นหา"
-                            className="absolute right-1.5 top-1/2 h-7 w-7 -translate-y-1/2 rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-700"
+                            className="absolute right-1.5 top-1/2 size-11 -translate-y-1/2 rounded-md text-content-muted hover:bg-surface-muted hover:text-content-body sm:size-7"
                         >
                             <X className="h-4 w-4" aria-hidden="true" />
                         </Button>
@@ -75,12 +75,12 @@ export function EmployeeSearchControls({
                         onValueChange={setStatusFilter}
                     >
                         <SelectTrigger
-                            className="h-10 w-full rounded-lg border-slate-200 bg-white"
+                            className="h-11 w-full rounded-lg border-border-subtle bg-surface-raised"
                             aria-label="กรองตามสถานะพนักงาน"
                         >
                             <div className="flex min-w-0 items-center gap-2">
                                 <Filter
-                                    className="h-4 w-4 shrink-0 text-slate-400"
+                                    className="h-4 w-4 shrink-0 text-content-subtle"
                                     aria-hidden="true"
                                 />
                                 <SelectValue placeholder="กรองตามสถานะ" />
@@ -103,7 +103,7 @@ export function EmployeeSearchControls({
             {employees.length > 0 && (
                 <Button
                     variant="outline"
-                    className="h-10 justify-center rounded-lg border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900 xl:justify-start"
+                    className="h-11 justify-center rounded-lg border-border-subtle bg-surface-raised text-content-body hover:bg-surface-subtle hover:text-content-primary xl:justify-start"
                     disabled={isExporting}
                     onClick={onExportClick}
                 >

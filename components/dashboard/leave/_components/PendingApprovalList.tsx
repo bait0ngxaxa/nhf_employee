@@ -81,7 +81,7 @@ function PendingApprovalCard({
     const LeaveTypeIcon = leaveTypeIcon(leave.leaveType);
 
     return (
-        <Card className="border-slate-200 p-5 shadow-sm">
+        <Card className="border-border-subtle p-5 shadow-sm">
             <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
                 <div className="min-w-0 flex-1 space-y-4">
                     <div className="flex min-w-0 items-start gap-3">
@@ -89,15 +89,15 @@ function PendingApprovalCard({
                             <UserCircle2 className="h-5 w-5" aria-hidden="true" />
                         </div>
                         <div className="min-w-0">
-                            <h3 className="break-words text-lg/7 font-semibold tracking-tight text-slate-950">
+                            <h3 className="break-words text-lg/7 font-semibold tracking-tight text-content-heading">
                                 {leave.employee.firstName} {leave.employee.lastName}
                                 {leave.employee.nickname ? (
-                                    <span className="font-normal text-slate-600">
+                                    <span className="font-normal text-content-secondary">
                                         {" "}({leave.employee.nickname})
                                     </span>
                                 ) : null}
                             </h3>
-                            <p className="mt-1 break-words text-sm/6 font-medium text-slate-600">
+                            <p className="mt-1 break-words text-sm/6 font-medium text-content-secondary">
                                 {leave.employee.position} · {leave.employee.dept?.name ?? "ไม่ระบุแผนก"}
                             </p>
                         </div>
@@ -117,8 +117,8 @@ function PendingApprovalCard({
                     </div>
 
                     {leave.reason ? (
-                        <p className="max-w-[75ch] rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm/6 text-slate-700">
-                            <span className="font-medium text-slate-950">เหตุผล: </span>
+                        <p className="max-w-[75ch] rounded-lg border border-border-subtle bg-surface-raised px-3 py-2 text-sm/6 text-content-body">
+                            <span className="font-medium text-content-heading">เหตุผล: </span>
                             <span className="break-words">{leave.reason}</span>
                         </p>
                     ) : null}
@@ -138,7 +138,7 @@ function PendingApprovalCard({
                         </div>
                     ) : null}
 
-                    <p className="flex items-center gap-1.5 text-xs/5 font-medium text-slate-500">
+                    <p className="flex items-center gap-1.5 text-xs/5 font-medium text-content-muted">
                         <Clock className="h-3.5 w-3.5" aria-hidden="true" />
                         ยื่นคำขอเมื่อ {formatThaiDateTimeWithTimeWord(leave.createdAt)}
                     </p>
@@ -184,7 +184,7 @@ function InfoRow({
     return (
         <div className="min-w-0">
             <p className="text-xs/5 font-medium text-indigo-700">{label}</p>
-            <p className="mt-1 flex items-start gap-2 break-words text-base/6 font-semibold text-slate-950">
+            <p className="mt-1 flex items-start gap-2 break-words text-base/6 font-semibold text-content-heading">
                 <Icon className="mt-0.5 h-4 w-4 shrink-0 text-indigo-600" aria-hidden="true" />
                 <span>{value}</span>
             </p>
@@ -203,10 +203,10 @@ function SpecialFlag({ label }: { label: string }) {
 
 function EmptyPendingApproval() {
     return (
-        <Card className="border-dashed border-slate-300 p-8 text-center shadow-none">
+        <Card className="border-dashed border-border-strong p-8 text-center shadow-none">
             <CheckCircle className="mx-auto h-8 w-8 text-emerald-600" aria-hidden="true" />
-            <p className="mt-3 text-base/6 font-semibold text-slate-900">ไม่มีคำขอที่ต้องพิจารณา</p>
-            <p className="mt-1 text-sm/6 text-slate-500">คำขอใหม่จากทีมจะแสดงที่นี่</p>
+            <p className="mt-3 text-base/6 font-semibold text-content-primary">ไม่มีคำขอที่ต้องพิจารณา</p>
+            <p className="mt-1 text-sm/6 text-content-muted">คำขอใหม่จากทีมจะแสดงที่นี่</p>
         </Card>
     );
 }

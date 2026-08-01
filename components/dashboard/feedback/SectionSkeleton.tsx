@@ -22,7 +22,7 @@ export function SectionSkeleton() {
                 {Array.from({ length: 4 }).map((_, i) => (
                     <div 
                         key={i} 
-                        className="bg-white/60 backdrop-blur-md border border-gray-100 shadow-lg rounded-2xl p-6"
+                        className="rounded-2xl border border-border-neutral-muted bg-surface/60 p-6 shadow-lg backdrop-blur-md"
                     >
                         <div className="flex justify-between items-start">
                             <div className="space-y-2">
@@ -39,7 +39,7 @@ export function SectionSkeleton() {
             </div>
 
             {/* Main Content Card */}
-            <div className="bg-white/60 backdrop-blur-md border border-gray-100 shadow-lg rounded-2xl p-6">
+            <div className="rounded-2xl border border-border-neutral-muted bg-surface/60 p-6 shadow-lg backdrop-blur-md">
                 <div className="flex justify-between items-center mb-6">
                     <div className="space-y-2">
                         <Skeleton className="h-6 w-32" />
@@ -57,7 +57,7 @@ export function SectionSkeleton() {
 
                 {/* Table */}
                 <div className="w-full">
-                    <div className="flex gap-4 pb-4 border-b border-gray-100">
+                    <div className="flex gap-4 border-b border-border-neutral-muted pb-4">
                         {Array.from({ length: 5 }).map((_, i) => (
                             <Skeleton key={i} className="h-4 flex-1" />
                         ))}

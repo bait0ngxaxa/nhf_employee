@@ -6,7 +6,7 @@ export function getEmployeeStatusLabel(status: string): string {
 }
 
 export function getEmployeeStatusBadge(status: string): string {
-  return EMPLOYEE_STATUS_BADGE_CLASSES[status as EmployeeStatusValue] || 'bg-gray-100 text-gray-800';
+return EMPLOYEE_STATUS_BADGE_CLASSES[status as EmployeeStatusValue] || 'bg-surface-neutral-muted text-content-neutral-strong';
 }
 
 export function getEmployeeStatusInfo(status: string) {

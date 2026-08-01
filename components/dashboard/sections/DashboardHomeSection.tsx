@@ -98,10 +98,10 @@ const MENU_ITEM_CONFIG: Record<
 };
 
 const DEFAULT_MENU_CONFIG = {
-    text: "text-slate-900",
-    bg: "bg-slate-50/70",
-    icon: "text-slate-600",
-    border: "border-slate-200",
+    text: "text-content-primary",
+    bg: "bg-surface-subtle/70",
+    icon: "text-content-secondary",
+    border: "border-border-subtle",
 };
 
 function getGreeting(): string {
@@ -137,7 +137,7 @@ function FeaturedCard({ item, onClick, animationDelay }: FeaturedCardProps) {
             onClick={onClick}
             style={{ animationDelay }}
             className={cn(
-                "dashboard-card-enter group relative flex w-full flex-col items-start gap-5 overflow-hidden rounded-3xl text-left text-white sm:flex-row sm:items-center",
+                "dashboard-card-enter group relative flex w-full flex-col items-start gap-5 overflow-hidden rounded-3xl text-left text-content-on-brand sm:flex-row sm:items-center",
                 "min-h-[196px] border p-5 shadow-lg transition-[border-color,box-shadow,transform] duration-200 hover:-translate-y-0.5 hover:shadow-xl active:translate-y-0 md:p-7",
                 "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2",
                 config.featuredSurface,
@@ -146,8 +146,8 @@ function FeaturedCard({ item, onClick, animationDelay }: FeaturedCardProps) {
                 config.featuredFocus,
             )}
         >
-            <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(135deg,rgba(255,255,255,0.16),rgba(255,255,255,0)_45%)]" />
-            <div className="dashboard-stock-sheen pointer-events-none absolute inset-y-0 left-0 w-1/3 bg-white/20" />
+            <div className="brand-sheen-subtle pointer-events-none absolute inset-0" />
+            <div className="dashboard-stock-sheen pointer-events-none absolute inset-y-0 left-0 w-1/3 bg-content-on-brand/20" />
             <div
                 className={cn(
                     "pointer-events-none absolute bottom-0 right-0 h-28 w-28 rounded-tl-[3rem]",
@@ -157,7 +157,7 @@ function FeaturedCard({ item, onClick, animationDelay }: FeaturedCardProps) {
 
             <div
                 className={cn(
-                    "relative z-10 flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl border border-white/25 bg-white/15 text-white ring-1 ring-white/10 transition-colors duration-200 group-hover:bg-white sm:h-20 sm:w-20",
+                    "relative z-10 flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl border border-content-on-brand/25 bg-content-on-brand/15 text-content-on-brand ring-1 ring-content-on-brand/10 transition-colors duration-200 group-hover:bg-content-on-brand sm:h-20 sm:w-20",
                     config.featuredIconHover,
                 )}
             >
@@ -168,14 +168,14 @@ function FeaturedCard({ item, onClick, animationDelay }: FeaturedCardProps) {
                 <div className="mb-2 flex items-center gap-2">
                     <span
                         className={cn(
-                            "rounded-full border border-white/25 bg-white px-2.5 py-1 text-xs font-bold leading-5 shadow-sm",
+                            "rounded-full border border-content-on-brand/25 bg-content-on-brand px-2.5 py-1 text-xs font-bold leading-5 shadow-sm",
                             config.featuredBadge,
                         )}
                     >
                         Quick action
                     </span>
                 </div>
-                <h3 className="line-clamp-2 text-3xl font-bold leading-tight text-white [overflow-wrap:anywhere] md:text-4xl">
+                <h3 className="line-clamp-2 text-3xl font-bold leading-tight text-content-on-brand [overflow-wrap:anywhere] md:text-4xl">
                     {item.label}
                 </h3>
                 <p
@@ -191,7 +191,7 @@ function FeaturedCard({ item, onClick, animationDelay }: FeaturedCardProps) {
 
             <div
                 className={cn(
-                    "relative z-10 flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-white/25 bg-white shadow-sm transition-[background-color,transform] duration-200 group-hover:-translate-y-0.5 group-hover:translate-x-0.5",
+                    "relative z-10 flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-content-on-brand/25 bg-content-on-brand shadow-sm transition-[background-color,transform] duration-200 group-hover:-translate-y-0.5 group-hover:translate-x-0.5",
                     config.icon,
                     config.featuredArrowHover,
                 )}
@@ -230,23 +230,23 @@ function RegularCard({
             onClick={disabled ? undefined : onClickFn}
             style={{ animationDelay }}
             className={cn(
-                "group relative flex min-h-[180px] w-full flex-col overflow-hidden rounded-3xl bg-white text-left transition-[border-color,box-shadow,transform,opacity] duration-200",
+                "group relative flex min-h-[180px] w-full flex-col overflow-hidden rounded-3xl bg-surface-raised text-left transition-[border-color,box-shadow,transform,opacity] duration-200",
                 "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300 focus-visible:ring-offset-2",
                 disabled
-                    ? "cursor-not-allowed border border-slate-100 opacity-60"
+                    ? "cursor-not-allowed border border-border-muted opacity-60"
                     : cn(
-                          "border border-slate-100 shadow-sm hover:border-slate-200 hover:shadow-md",
+                          "border border-border-muted shadow-sm hover:border-border-subtle hover:shadow-md",
                       ),
             )}
         >
             {!disabled && (
-                <div className="absolute right-4 top-4 z-10 flex h-9 w-9 items-center justify-center rounded-xl border border-slate-100 bg-white text-slate-500 opacity-0 shadow-sm transition-opacity duration-200 group-hover:opacity-100">
+                <div className="absolute right-4 top-4 z-10 flex h-9 w-9 items-center justify-center rounded-xl border border-border-muted bg-surface-raised text-content-muted opacity-0 shadow-sm transition-opacity duration-200 group-hover:opacity-100">
                     <ArrowUpRight className={cn("h-4 w-4", config.icon)} aria-hidden="true" />
                 </div>
             )}
 
             {disabled && (
-                <span className="absolute right-4 top-4 z-10 rounded-full border border-slate-200 bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-500">
+                <span className="absolute right-4 top-4 z-10 rounded-full border border-border-subtle bg-surface-muted px-3 py-1 text-xs font-semibold text-content-muted">
                     เร็วๆ นี้
                 </span>
             )}
@@ -272,7 +272,7 @@ function RegularCard({
                     >
                         {item.label}
                     </h3>
-                    <p className="line-clamp-3 text-sm font-medium leading-6 text-slate-500 [overflow-wrap:anywhere]">
+                    <p className="line-clamp-3 text-sm font-medium leading-6 text-content-muted [overflow-wrap:anywhere]">
                         {item.description || "เปิดใช้งานเมนูนี้จากแถบด้านข้าง"}
                     </p>
                 </div>
@@ -331,17 +331,17 @@ export function DashboardHomeSection() {
     const userDepartment = getDisplayText(user?.department, "ฝ่ายทั่วไป");
 
     return (
-        <div className="relative min-h-[calc(100dvh-6rem)] overflow-hidden rounded-3xl border border-slate-200/70 bg-slate-50 p-4 shadow-inner shadow-white md:p-8">
+            <div className="relative min-h-[calc(100dvh-6rem)] overflow-hidden rounded-3xl border border-border-subtle/70 bg-surface-subtle p-4 shadow-inner shadow-content-on-brand md:p-8">
             <div className="relative z-10 mx-auto max-w-7xl space-y-6">
                 <div>
-                    <div className="dashboard-card-enter relative overflow-hidden rounded-3xl border border-sky-500 bg-sky-600 p-5 text-white shadow-lg shadow-sky-900/15 md:p-8">
-                        <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(135deg,rgba(255,255,255,0.18),rgba(255,255,255,0)_50%)]" />
-                        <div className="dashboard-card-drift pointer-events-none absolute -right-10 -top-10 h-44 w-44 rounded-full border border-white/15" />
+                    <div className="dashboard-card-enter relative overflow-hidden rounded-3xl border border-sky-500 bg-sky-600 p-5 text-content-on-brand shadow-lg shadow-sky-900/15 md:p-8">
+                        <div className="brand-sheen-strong pointer-events-none absolute inset-0" />
+                        <div className="dashboard-card-drift pointer-events-none absolute -right-10 -top-10 h-44 w-44 rounded-full border border-content-on-brand/15" />
                         <div className="dashboard-card-drift pointer-events-none absolute -bottom-14 right-20 h-36 w-36 rounded-full bg-sky-500/40 [animation-delay:900ms]" />
                         <div className="flex flex-col justify-between gap-6 md:flex-row md:items-center">
                             <div className="relative z-10 min-w-0 max-w-2xl space-y-4">
                                 <div className="flex flex-wrap items-center gap-2">
-                                    <div className="rounded-full border border-white/20 bg-white px-3 py-1 text-xs font-bold text-sky-700 shadow-sm">
+                                    <div className="rounded-full border border-content-on-brand/20 bg-content-on-brand px-3 py-1 text-xs font-bold text-sky-700 shadow-sm">
                                         NHFapp
                                     </div>
                                    
@@ -351,7 +351,7 @@ export function DashboardHomeSection() {
                                     <h1
                                         data-page-heading
                                         tabIndex={-1}
-                                        className="text-4xl font-bold leading-tight text-white md:text-5xl"
+                                        className="text-4xl font-bold leading-tight text-content-on-brand md:text-5xl"
                                     >
                                         {greeting},{" "}
                                         <span className="text-sky-50 [overflow-wrap:anywhere]">
@@ -365,11 +365,11 @@ export function DashboardHomeSection() {
                             </div>
 
                             <div className="relative z-10 flex min-w-0 flex-wrap gap-3 md:justify-end">
-                                <div className="flex min-w-0 items-center gap-2.5 rounded-xl border border-white/20 bg-white/15 px-4 py-2 text-xs font-bold text-white shadow-sm">
-                                    <div className="h-2 w-2 shrink-0 rounded-full bg-white" />
+                                <div className="flex min-w-0 items-center gap-2.5 rounded-xl border border-content-on-brand/20 bg-content-on-brand/15 px-4 py-2 text-xs font-bold text-content-on-brand shadow-sm">
+                                    <div className="h-2 w-2 shrink-0 rounded-full bg-content-on-brand" />
                                     <span className="min-w-0 truncate">{userRole}</span>
                                 </div>
-                                <div className="flex min-w-0 items-center gap-2.5 rounded-xl border border-white/20 bg-white/15 px-4 py-2 text-xs font-bold text-white shadow-sm">
+                                <div className="flex min-w-0 items-center gap-2.5 rounded-xl border border-content-on-brand/20 bg-content-on-brand/15 px-4 py-2 text-xs font-bold text-content-on-brand shadow-sm">
                                     <div className="h-2 w-2 shrink-0 rounded-full bg-sky-100" />
                                     <span className="min-w-0 truncate">{userDepartment}</span>
                                 </div>
@@ -380,14 +380,14 @@ export function DashboardHomeSection() {
 
                 <div className="pt-4">
                     {allMenuItems.length === 0 && (
-                        <div className="rounded-3xl border border-slate-200 bg-white p-8 text-center text-slate-600 shadow-sm">
+                        <div className="rounded-3xl border border-border-subtle bg-surface-raised p-8 text-center text-content-secondary shadow-sm">
                             ยังไม่มีเมนูที่พร้อมใช้งานสำหรับบัญชีนี้
                         </div>
                     )}
 
                     {featuredItems.length > 0 && (
                     <div className="mb-10">
-                        <h2 className="mb-6 flex items-center gap-2 px-2 text-xl font-bold leading-7 text-slate-800">
+                        <h2 className="mb-6 flex items-center gap-2 px-2 text-xl font-bold leading-7 text-content-strong">
                             <span className="inline-block h-6 w-1.5 rounded-full bg-orange-500" />
                             Recommended
                         </h2>
@@ -406,7 +406,7 @@ export function DashboardHomeSection() {
 
                     {regularItems.length > 0 && (
                     <div>
-                        <h2 className="mb-6 flex items-center gap-2 px-2 text-lg font-bold leading-7 text-slate-800">
+                        <h2 className="mb-6 flex items-center gap-2 px-2 text-lg font-bold leading-7 text-content-strong">
                             <span className="inline-block h-6 w-1.5 rounded-full bg-sky-500" />
                             บริการอื่นๆ
                         </h2>
@@ -431,8 +431,8 @@ export function DashboardHomeSection() {
 
                     {disabledItems.length > 0 && (
                         <div className="pt-6">
-                            <h3 className="mb-4 flex items-center gap-2 px-2 text-sm font-semibold leading-6 text-slate-500">
-                                <span className="inline-block h-4 w-1 rounded-full bg-slate-300" />
+                            <h3 className="mb-4 flex items-center gap-2 px-2 text-sm font-semibold leading-6 text-content-muted">
+                                <span className="inline-block h-4 w-1 rounded-full bg-content-border" />
                                 เร็วๆ นี้
                             </h3>
                             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 md:gap-6 xl:grid-cols-4">

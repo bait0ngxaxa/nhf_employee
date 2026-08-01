@@ -22,13 +22,13 @@ export function UploadStep({
     onDownloadSample,
 }: UploadStepProps) {
     return (
-        <Card className="rounded-2xl border-slate-200 bg-white shadow-sm">
+        <Card className="rounded-2xl border-border-subtle bg-surface-raised shadow-sm">
             <CardHeader>
-                <CardTitle className="flex min-w-0 items-center gap-2 text-xl font-bold text-slate-950">
+                <CardTitle className="flex min-w-0 items-center gap-2 text-xl font-bold text-content-heading">
                     <Upload className="h-5 w-5 shrink-0" />
                     <span>อัพโหลดไฟล์ CSV</span>
                 </CardTitle>
-                <CardDescription className="text-sm leading-6 text-slate-600 [overflow-wrap:anywhere]">
+                <CardDescription className="text-sm leading-6 text-content-secondary [overflow-wrap:anywhere]">
                     เลือกไฟล์ CSV ที่มีข้อมูลพนักงาน (ขนาดไฟล์สูงสุด 5MB)
                 </CardDescription>
             </CardHeader>
@@ -47,9 +47,9 @@ export function UploadStep({
                         aria-describedby={
                             previewError ? "csv-file-error" : "csv-file-help"
                         }
-                        className="cursor-pointer file:mr-3 file:rounded-md file:border-0 file:bg-slate-100 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-slate-700"
+                        className="cursor-pointer file:mr-3 file:rounded-md file:border-0 file:bg-surface-muted file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-content-body"
                     />
-                    <p id="csv-file-help" className="text-xs leading-5 text-slate-500">
+                    <p id="csv-file-help" className="text-xs leading-5 text-content-muted">
                         รองรับเฉพาะไฟล์ .csv แบบ UTF-8 และขนาดไม่เกิน 5MB
                     </p>
                     {previewError && (
@@ -73,10 +73,10 @@ export function UploadStep({
 
                 <div className="space-y-4">
                     <div>
-                        <h4 className="mb-2 font-medium text-gray-900">
+                        <h4 className="mb-2 font-medium text-content-neutral-primary">
                             รูปแบบไฟล์ CSV ที่ต้องการ:
                         </h4>
-                        <div className="space-y-1 text-sm leading-6 text-gray-600 [overflow-wrap:anywhere]">
+                        <div className="space-y-1 text-sm leading-6 text-content-neutral-secondary [overflow-wrap:anywhere]">
                             <p>
                                 <strong>คอลัมน์ที่จำเป็น:</strong> ชื่อ,
                                 นามสกุล, ตำแหน่ง, แผนก

@@ -31,13 +31,13 @@ export function PreviewStep({
     const hiddenRowCount = Math.max(0, parsedData.length - visibleRows.length);
 
     return (
-        <Card className="rounded-2xl border-slate-200 bg-white shadow-sm">
+        <Card className="rounded-2xl border-border-subtle bg-surface-raised shadow-sm">
             <CardHeader>
-                <CardTitle className="flex min-w-0 items-center gap-2 text-xl font-bold text-slate-950">
+                <CardTitle className="flex min-w-0 items-center gap-2 text-xl font-bold text-content-heading">
                     <FileText className="h-5 w-5 shrink-0" />
                     <span>ตรวจสอบข้อมูลก่อนนำเข้า</span>
                 </CardTitle>
-                <CardDescription className="text-sm leading-6 text-slate-600 [overflow-wrap:anywhere]">
+                <CardDescription className="text-sm leading-6 text-content-secondary [overflow-wrap:anywhere]">
                     พบข้อมูลพนักงาน {parsedData.length.toLocaleString("th-TH")} คน
                     กรุณาตรวจสอบความถูกต้องก่อนทำการนำเข้า
                 </CardDescription>
@@ -50,46 +50,46 @@ export function PreviewStep({
                         : ""}
                 </div>
 
-                <div className="max-h-96 overflow-auto rounded-lg border border-slate-200">
-                    <table className="min-w-[920px] divide-y divide-gray-200">
-                        <thead className="sticky top-0 z-10 bg-gray-50">
+                <div className="max-h-96 overflow-auto rounded-lg border border-border-subtle">
+                    <table className="min-w-[920px] divide-y divide-border-neutral-default">
+                        <thead className="sticky top-0 z-10 bg-surface-neutral-subtle">
                             <tr>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-600">
+                                <th className="px-4 py-3 text-left text-xs font-medium text-content-neutral-secondary">
                                     ลำดับ
                                 </th>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-600">
+                                <th className="px-4 py-3 text-left text-xs font-medium text-content-neutral-secondary">
                                     ชื่อ-นามสกุล
                                 </th>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-600">
+                                <th className="px-4 py-3 text-left text-xs font-medium text-content-neutral-secondary">
                                     อีเมล
                                 </th>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-600">
+                                <th className="px-4 py-3 text-left text-xs font-medium text-content-neutral-secondary">
                                     ตำแหน่ง
                                 </th>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-600">
+                                <th className="px-4 py-3 text-left text-xs font-medium text-content-neutral-secondary">
                                     แผนก
                                 </th>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-600">
+                                <th className="px-4 py-3 text-left text-xs font-medium text-content-neutral-secondary">
                                     เบอร์โทร
                                 </th>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-600">
+                                <th className="px-4 py-3 text-left text-xs font-medium text-content-neutral-secondary">
                                     ชื่อเล่น
                                 </th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-gray-200 bg-white">
+                        <tbody className="divide-y divide-border-neutral-default bg-surface-raised">
                             {visibleRows.map((employee, index) => (
-                                <tr key={index} className="hover:bg-gray-50">
-                                    <td className="px-4 py-4 text-sm text-gray-900">
+                                <tr key={index} className="hover:bg-surface-neutral-subtle">
+                                    <td className="px-4 py-4 text-sm text-content-neutral-primary">
                                         {index + 1}
                                     </td>
-                                    <td className="max-w-56 px-4 py-4 text-sm font-medium text-gray-900 [overflow-wrap:anywhere]">
+                                    <td className="max-w-56 px-4 py-4 text-sm font-medium text-content-neutral-primary [overflow-wrap:anywhere]">
                                         {employee.firstName} {employee.lastName}
                                     </td>
-                                    <td className="max-w-64 px-4 py-4 text-sm text-gray-600 [overflow-wrap:anywhere]">
+                                    <td className="max-w-64 px-4 py-4 text-sm text-content-neutral-secondary [overflow-wrap:anywhere]">
                                         {employee.email || "-"}
                                     </td>
-                                    <td className="max-w-56 px-4 py-4 text-sm text-gray-600 [overflow-wrap:anywhere]">
+                                    <td className="max-w-56 px-4 py-4 text-sm text-content-neutral-secondary [overflow-wrap:anywhere]">
                                         {employee.position}
                                     </td>
                                     <td className="max-w-52 px-4 py-4 text-sm">
@@ -100,10 +100,10 @@ export function PreviewStep({
                                             {getEmployeeDepartmentLabel(employee.department)}
                                         </Badge>
                                     </td>
-                                    <td className="max-w-40 px-4 py-4 text-sm text-gray-600 [overflow-wrap:anywhere]">
+                                    <td className="max-w-40 px-4 py-4 text-sm text-content-neutral-secondary [overflow-wrap:anywhere]">
                                         {formatEmployeePhone(employee.phone)}
                                     </td>
-                                    <td className="max-w-44 px-4 py-4 text-sm text-gray-600">
+                                    <td className="max-w-44 px-4 py-4 text-sm text-content-neutral-secondary">
                                         {employee.nickname ? (
                                             <Badge variant="secondary" className="max-w-full border border-violet-200/60 bg-violet-50 px-2.5 font-medium text-violet-700 hover:bg-violet-100 [overflow-wrap:anywhere]">
                                                 {employee.nickname}

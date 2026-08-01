@@ -120,15 +120,15 @@ export function NotificationDropdown(): React.ReactElement {
                     variant="ghost"
                     size="icon"
                     className={cn(
-                        "relative h-10 w-10 rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm transition-colors",
-                        "hover:border-slate-300 hover:bg-slate-50 hover:text-slate-950",
-                        "focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2",
+                        "relative rounded-xl border border-border-subtle bg-surface text-content-secondary shadow-sm transition-colors",
+                        "hover:border-border-subtle hover:bg-surface-subtle hover:text-content-heading",
+                        "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
                     )}
                     aria-label={getNotificationButtonLabel(unreadCount)}
                 >
                     <Bell className="h-5 w-5" aria-hidden="true" />
                     {unreadCount > 0 ? (
-                        <span className="absolute -right-1.5 -top-1.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-rose-600 px-1.5 text-[0.6875rem] font-bold leading-none text-white ring-2 ring-white">
+                        <span className="absolute -right-1.5 -top-1.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-status-danger-solid px-1.5 text-xs font-bold leading-none text-content-on-brand ring-2 ring-surface">
                             {formatNotificationBadge(unreadCount)}
                         </span>
                     ) : null}
@@ -138,14 +138,14 @@ export function NotificationDropdown(): React.ReactElement {
             <DropdownMenuContent
                 align="end"
                 sideOffset={10}
-                className="w-[min(calc(100vw-1rem),24rem)] overflow-hidden rounded-xl border-slate-200 bg-white p-0 shadow-lg"
+                className="w-[min(calc(100vw-1rem),24rem)] overflow-hidden rounded-xl border-border-subtle bg-surface-raised p-0 shadow-lg"
             >
-                <div className="flex items-start justify-between gap-3 border-b border-slate-200 bg-slate-50 px-5 py-4">
+                <div className="flex items-start justify-between gap-3 border-b border-border-subtle bg-surface-subtle px-5 py-4">
                     <div className="min-w-0">
-                        <DropdownMenuLabel className="p-0 text-base font-semibold text-slate-950">
+                        <DropdownMenuLabel className="p-0 text-base font-semibold text-content-heading">
                             การแจ้งเตือน
                         </DropdownMenuLabel>
-                        <p className="mt-1 text-sm text-slate-600">
+                        <p className="mt-1 text-sm text-content-secondary">
                             {unreadCount > 0
                                 ? `${unreadCount} รายการที่ยังไม่อ่าน`
                                 : "ไม่มีรายการค้างอ่าน"}
@@ -157,7 +157,7 @@ export function NotificationDropdown(): React.ReactElement {
                         size="sm"
                         onClick={() => void handleMarkAllAsRead()}
                         disabled={unreadCount <= 0 || isMarkingAll}
-                        className="h-9 shrink-0 rounded-lg border-slate-200 bg-white text-sm font-semibold text-slate-700"
+                        className="shrink-0 rounded-lg border-border-subtle bg-surface text-sm font-semibold text-content-body"
                         aria-busy={isMarkingAll}
                     >
                         {isMarkingAll ? (
@@ -196,11 +196,11 @@ export function NotificationDropdown(): React.ReactElement {
                     )}
                 </div>
 
-                <div className="border-t border-slate-200 bg-white p-3">
+                <div className="border-t border-border-subtle bg-surface-raised p-3">
                     <Button
                         type="button"
                         variant="ghost"
-                        className="h-10 w-full rounded-lg text-sm font-semibold text-slate-700 hover:bg-slate-50 hover:text-slate-950"
+                        className="h-11 w-full rounded-lg text-sm font-semibold text-content-body hover:bg-surface-subtle hover:text-content-heading"
                         onClick={() => {
                             setOpen(false);
                             router.push(
@@ -235,17 +235,17 @@ function NotificationDropdownItem({
             disabled={isDisabled}
             className={cn(
                 "items-start gap-3 rounded-lg p-3 outline-none transition-colors",
-                "focus:bg-slate-50 data-[disabled]:opacity-70",
+                "focus:bg-surface-subtle data-[disabled]:opacity-70",
                 notification.isRead
-                    ? "bg-white text-slate-700"
-                    : "border border-slate-200 bg-slate-50 text-slate-950",
+                    ? "bg-surface-raised text-content-body"
+                    : "border border-border-subtle bg-surface-subtle text-content-heading",
             )}
             onSelect={(event) => {
                 event.preventDefault();
                 void onOpen(notification);
             }}
         >
-            <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white">
+            <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-border-subtle bg-surface-raised">
                 {isPending ? (
                     <NotificationInlineLoading label="" />
                 ) : (
@@ -267,15 +267,15 @@ function NotificationDropdownItem({
                     </span>
                     {!notification.isRead ? (
                         <span
-                            className="mt-2 h-2 w-2 shrink-0 rounded-full bg-sky-500"
+                            className="mt-2 h-2 w-2 shrink-0 rounded-full bg-brand-solid"
                             aria-label="ยังไม่อ่าน"
                         />
                     ) : null}
                 </div>
-                <p className="mt-1 line-clamp-2 text-sm leading-6 text-slate-600 [overflow-wrap:anywhere]">
+                <p className="mt-1 line-clamp-2 text-sm leading-6 text-content-secondary [overflow-wrap:anywhere]">
                     {notification.message}
                 </p>
-                <p className="mt-2 text-xs font-medium text-slate-500">
+                <p className="mt-2 text-xs font-medium text-content-muted">
                     {getRelativeTime(notification.createdAt)}
                 </p>
             </div>

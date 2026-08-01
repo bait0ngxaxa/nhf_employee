@@ -117,12 +117,12 @@ export function SignupForm({
 
     return (
         <div className={cn("flex flex-col gap-6", className)} {...props}>
-            <Card className="rounded-2xl border-gray-200/70 bg-white/90 shadow-sm">
+            <Card className="rounded-2xl border-border-neutral-default/70 bg-surface-raised/90 shadow-sm">
                 <CardHeader className="text-center pb-2">
                     <CardTitle className="text-2xl font-bold text-blue-700">
                         สร้างบัญชีใหม่
                     </CardTitle>
-                    <CardDescription className="text-gray-600">
+                    <CardDescription className="text-content-neutral-secondary">
                         ใช้อีเมลองค์กรของคุณเพื่อลงทะเบียน ระบบจะดึงชื่อจากข้อมูลพนักงานให้อัตโนมัติ
                     </CardDescription>
                 </CardHeader>
@@ -142,7 +142,7 @@ export function SignupForm({
                             <div className="grid gap-3">
                                 <Label
                                     htmlFor="email"
-                                    className="text-gray-700"
+                                    className="text-content-neutral-body"
                                 >
                                     อีเมล
                                 </Label>
@@ -161,14 +161,14 @@ export function SignupForm({
                                     }
                                     required
                                     aria-invalid={error ? true : undefined}
-                                    className="rounded-xl border-gray-200 bg-white/70 focus:border-blue-500 focus:ring-blue-500/20"
+                                    className="rounded-xl border-border-neutral-default bg-surface-raised/70 focus:border-blue-500 focus:ring-blue-500/20"
                                 />
                             </div>
 
                             <div className="grid gap-3">
                                 <Label
                                     htmlFor="password"
-                                    className="text-gray-700"
+                                    className="text-content-neutral-body"
                                 >
                                     รหัสผ่าน
                                 </Label>
@@ -186,14 +186,14 @@ export function SignupForm({
                                     }
                                     required
                                     aria-invalid={error ? true : undefined}
-                                    className="rounded-xl border-gray-200 bg-white/70 focus:border-blue-500 focus:ring-blue-500/20"
+                                    className="rounded-xl border-border-neutral-default bg-surface-raised/70 focus:border-blue-500 focus:ring-blue-500/20"
                                 />
                             </div>
 
                             <div className="grid gap-3">
                                 <Label
                                     htmlFor="confirmPassword"
-                                    className="text-gray-700"
+                                    className="text-content-neutral-body"
                                 >
                                     ยืนยันรหัสผ่าน
                                 </Label>
@@ -211,13 +211,13 @@ export function SignupForm({
                                     }
                                     required
                                     aria-invalid={error ? true : undefined}
-                                    className="rounded-xl border-gray-200 bg-white/70 focus:border-blue-500 focus:ring-blue-500/20"
+                                    className="rounded-xl border-border-neutral-default bg-surface-raised/70 focus:border-blue-500 focus:ring-blue-500/20"
                                 />
                             </div>
 
                             <Button
                                 type="submit"
-                                className="w-full rounded-xl bg-gradient-to-r from-blue-600 to-cyan-600 text-white hover:from-blue-700 hover:to-cyan-700 disabled:opacity-70"
+                                className="w-full rounded-xl bg-gradient-to-r from-action-gradient-start to-action-gradient-end text-content-on-brand hover:from-action-gradient-hover-start hover:to-action-gradient-hover-end disabled:opacity-70"
                                 disabled={isLoading}
                             >
                                 {isLoading ? (

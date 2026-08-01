@@ -73,20 +73,20 @@ export function StockAdminRequests() {
     return (
         <div className="space-y-4">
             {/* Search & Filter bar */}
-            <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-3 shadow-sm">
+            <div className="rounded-2xl border border-border-subtle bg-surface-subtle/70 p-3 shadow-sm">
                 <div className="mb-3 flex items-center justify-between px-1">
                     <div>
-                        <div className="text-sm font-semibold text-slate-900">
+                        <div className="text-sm font-semibold text-content-primary">
                             ค้นหาและกรองคำขอเบิก
                         </div>
-                        <div className="text-xs text-slate-600">
+                        <div className="text-xs text-content-secondary">
                             ค้นหาจากเลขที่คำขอ รหัสโครงการ ชื่อผู้ขอ อีเมล หรือชื่อรายการที่ขอเบิก
                         </div>
                     </div>
                 </div>
                 <div className="flex flex-col gap-3 sm:flex-row">
                     <div className="relative flex-1">
-                        <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" aria-hidden="true" />
+                        <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-content-subtle" aria-hidden="true" />
                         <Input
                             aria-label="ค้นหาคำขอเบิกวัสดุ"
                             name="stock-admin-request-search"
@@ -94,7 +94,7 @@ export function StockAdminRequests() {
                             value={requestSearchQuery}
                             onChange={(event) => setRequestSearchQuery(event.target.value)}
                             placeholder="ค้นหาเลขที่คำขอ รหัสโครงการ ชื่อ อีเมล หรือรายการ"
-                            className="h-12 rounded-2xl border-slate-200 bg-white pl-11 pr-11 text-slate-900 placeholder:text-slate-500 focus-visible:border-blue-300 focus-visible:ring-blue-200"
+                            className="h-12 rounded-2xl border-border-subtle bg-surface-raised pl-11 pr-11 text-content-primary placeholder:text-content-muted focus-visible:border-blue-300 focus-visible:ring-blue-200"
                         />
                         {requestSearchQuery.trim().length > 0 && (
                             <Button
@@ -102,7 +102,7 @@ export function StockAdminRequests() {
                                 variant="ghost"
                                 size="icon"
                                 onClick={() => setRequestSearchQuery("")}
-                                className="absolute right-2 top-1/2 h-8 w-8 -translate-y-1/2 rounded-full text-slate-500 hover:bg-slate-100 hover:text-slate-700"
+                                className="absolute right-2 top-1/2 size-11 -translate-y-1/2 rounded-full text-content-muted hover:bg-surface-muted hover:text-content-body sm:size-8"
                                 aria-label="ล้างคำค้นหาคำขอเบิกวัสดุ"
                             >
                                 <X className="h-4 w-4" aria-hidden="true" />
@@ -121,7 +121,7 @@ export function StockAdminRequests() {
                             }
                         >
                             <SelectTrigger
-                                className="h-12 rounded-2xl border-slate-200 bg-white text-slate-900 focus:ring-blue-200"
+                                className="h-12 rounded-2xl border-border-subtle bg-surface-raised text-content-primary focus:ring-blue-200"
                                 aria-label="กรองสถานะคำขอเบิกวัสดุ"
                             >
                                 <SelectValue placeholder="กรองสถานะ" />
@@ -159,7 +159,7 @@ export function StockAdminRequests() {
                                 <>
                                     <Button
                                         size="sm"
-                                        className="h-11 bg-emerald-600 text-white shadow-sm transition-colors hover:bg-emerald-700"
+                                        className="h-11 bg-emerald-600 text-content-on-brand shadow-sm transition-colors hover:bg-emerald-700"
                                         disabled={processingRequestId === req.id}
                                         onClick={() => void handleIssue(req.id)}
                                     >
@@ -181,76 +181,76 @@ export function StockAdminRequests() {
                         }
                     />
 
-                    <div className="hidden overflow-x-auto rounded-2xl bg-white shadow-sm ring-1 ring-slate-200 md:block">
+                    <div className="hidden overflow-x-auto rounded-2xl bg-surface-raised shadow-sm ring-1 ring-border-subtle md:block">
                         <Table className="min-w-[1240px] border-separate border-spacing-0">
                             <TableHeader>
-                                <TableRow className="border-b border-slate-200 bg-slate-50 hover:bg-slate-50">
-                                    <TableHead className="w-16 border-r border-slate-200 font-semibold text-slate-700">
+                                <TableRow className="border-b border-border-subtle bg-surface-subtle hover:bg-surface-subtle">
+                                    <TableHead className="w-16 border-r border-border-subtle font-semibold text-content-body">
                                         เลขที่
                                     </TableHead>
-                                    <TableHead className="w-40 border-r border-slate-200 font-semibold text-slate-700">
+                                    <TableHead className="w-40 border-r border-border-subtle font-semibold text-content-body">
                                         วันที่
                                     </TableHead>
-                                    <TableHead className="w-40 border-r border-slate-200 font-semibold text-slate-700">
+                                    <TableHead className="w-40 border-r border-border-subtle font-semibold text-content-body">
                                         รหัสโครงการ
                                     </TableHead>
-                                    <TableHead className="w-56 border-r border-slate-200 font-semibold text-slate-700">
+                                    <TableHead className="w-56 border-r border-border-subtle font-semibold text-content-body">
                                         ผู้เบิก
                                     </TableHead>
-                                    <TableHead className="w-[24rem] border-r border-slate-200 font-semibold text-slate-700">
+                                    <TableHead className="w-[24rem] border-r border-border-subtle font-semibold text-content-body">
                                         รายการ
                                     </TableHead>
-                                    <TableHead className="w-32 border-r border-slate-200 font-semibold text-slate-700">
+                                    <TableHead className="w-32 border-r border-border-subtle font-semibold text-content-body">
                                         สถานะ
                                     </TableHead>
                                     <TableHead className="w-52" />
                                 </TableRow>
                             </TableHeader>
-                            <TableBody className="[&_tr:nth-child(odd)]:bg-white [&_tr:nth-child(even)]:bg-slate-50/80">
+                            <TableBody className="[&_tr:nth-child(odd)]:bg-surface-raised [&_tr:nth-child(even)]:bg-surface-subtle/80">
                                 {requests.map((req) => {
                                     const isPendingIssue = req.status === "PENDING_ISSUE";
                                     return (
                                         <TableRow
                                             key={req.id}
-                                            className="border-b border-slate-200 transition-colors hover:bg-blue-50/60"
+                                            className="border-b border-border-subtle transition-colors hover:bg-blue-50/60"
                                         >
-                                            <TableCell className="border-r border-slate-200 py-4 font-medium text-slate-800">
+                                            <TableCell className="border-r border-border-subtle py-4 font-medium text-content-strong">
                                                 #{req.id}
                                             </TableCell>
-                                            <TableCell className="border-r border-slate-200 py-4 text-sm text-slate-700">
+                                            <TableCell className="border-r border-border-subtle py-4 text-sm text-content-body">
                                                 {formatStockRequestDate(req.createdAt)}
                                             </TableCell>
-                                            <TableCell className="border-r border-slate-200 py-4 text-sm font-medium text-slate-700">
+                                            <TableCell className="border-r border-border-subtle py-4 text-sm font-medium text-content-body">
                                                 {req.projectCode}
                                             </TableCell>
-                                            <TableCell className="w-56 border-r border-slate-200 py-4">
+                                            <TableCell className="w-56 border-r border-border-subtle py-4">
                                                 <div className="flex flex-col">
-                                                    <span className="text-sm font-semibold text-slate-800">
+                                                    <span className="text-sm font-semibold text-content-strong">
                                                         {req.requester.name}
                                                     </span>
-                                                    <span className="text-xs font-medium text-slate-400">
+                                                    <span className="text-xs font-medium text-content-subtle">
                                                         {req.requester.email}
                                                     </span>
                                                 </div>
                                             </TableCell>
-                                            <TableCell className="w-[24rem] min-w-[24rem] border-r border-slate-200 py-4">
+                                            <TableCell className="w-[24rem] min-w-[24rem] border-r border-border-subtle py-4">
                                                 <div className="space-y-1.5 py-1">
                                                     {req.items.map((ri) => (
                                                         <div
                                                             key={ri.id}
                                                             className="flex flex-wrap items-start gap-x-2 gap-y-0.5 text-sm"
                                                         >
-                                                            <span className="min-w-0 font-medium leading-6 text-slate-800">
+                                                            <span className="min-w-0 font-medium leading-6 text-content-strong">
                                                                 {getRequestItemDisplayName(ri)}
                                                             </span>
-                                                            <span className="shrink-0 rounded-full bg-slate-100/80 px-2 py-0.5 text-xs font-medium text-slate-600">
+                                                            <span className="shrink-0 rounded-full bg-surface-muted/80 px-2 py-0.5 text-xs font-medium text-content-secondary">
                                                                 x {ri.quantity} {ri.item.unit}
                                                             </span>
                                                         </div>
                                                     ))}
                                                 </div>
                                             </TableCell>
-                                            <TableCell className="border-r border-slate-200 py-4">
+                                            <TableCell className="border-r border-border-subtle py-4">
                                                 <RequestStatusBadge status={req.status} />
                                             </TableCell>
                                             <TableCell className="py-4">
@@ -258,7 +258,7 @@ export function StockAdminRequests() {
                                                     <div className="flex justify-end gap-2">
                                                         <Button
                                                             size="sm"
-                                                            className="bg-emerald-600 text-white shadow-sm transition-colors hover:bg-emerald-700"
+                                                            className="bg-emerald-600 text-content-on-brand shadow-sm transition-colors hover:bg-emerald-700"
                                                             disabled={processingRequestId === req.id}
                                                             onClick={() => void handleIssue(req.id)}
                                                         >
@@ -348,7 +348,7 @@ function CancelDialog({
                     <div className="space-y-1.5">
                         <Label
                             htmlFor="cancel-reason"
-                            className="text-sm font-semibold text-slate-700"
+                            className="text-sm font-semibold text-content-body"
                         >
                             เหตุผล (ถ้ามี)
                         </Label>
@@ -359,7 +359,7 @@ function CancelDialog({
                             value={reason}
                             onChange={(e) => setReason(e.target.value)}
                             placeholder="ระบุเหตุผลที่ยกเลิกเพื่อแจ้งผู้เบิก"
-                            className="h-10 focus-visible:ring-rose-500"
+                            className="h-11 focus-visible:ring-rose-500"
                         />
                     </div>
                     <div className="flex flex-col-reverse gap-2 pt-3 sm:flex-row sm:justify-end">
@@ -367,7 +367,7 @@ function CancelDialog({
                             variant="ghost"
                             onClick={onClose}
                             disabled={loading}
-                            className="h-11 px-5 font-medium text-slate-600 hover:bg-slate-100"
+                            className="h-11 px-5 font-medium text-content-secondary hover:bg-surface-muted"
                         >
                             ยกเลิก
                         </Button>
@@ -375,7 +375,7 @@ function CancelDialog({
                             variant="destructive"
                             disabled={loading}
                             onClick={() => onCancel(request.id, reason.trim())}
-                            className="h-11 bg-rose-600 px-7 font-bold text-white shadow-sm transition-colors hover:bg-rose-700"
+                            className="h-11 bg-rose-600 px-7 font-bold text-content-on-brand shadow-sm transition-colors hover:bg-rose-700"
                         >
                             {loading ? (
                                 <>

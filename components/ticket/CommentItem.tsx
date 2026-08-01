@@ -48,11 +48,11 @@ export function CommentItem({
                         </Badge>
                     )}
                 </div>
-                <span className="text-sm text-gray-500">
+                <span className="text-sm text-content-neutral-muted">
                     {formatThaiDateTime(createdAt)}
                 </span>
             </div>
-            <p className="text-gray-700 whitespace-pre-wrap ml-6">{content}</p>
+            <p className="text-content-neutral-body whitespace-pre-wrap ml-6">{content}</p>
             {showSeparator && <Separator className="mt-4" />}
         </div>
     );

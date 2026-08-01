@@ -155,7 +155,7 @@ export function LeaveReportsDashboard() {
                         </div>
                         <div className="space-y-1.5">
                             <label
-                                className="text-sm font-semibold text-slate-700"
+                                className="text-sm font-semibold text-content-body"
                                 htmlFor="leave-report-scope"
                             >
                                 ประเภทรีพอร์ต
@@ -167,7 +167,7 @@ export function LeaveReportsDashboard() {
                             >
                                 <SelectTrigger
                                     id="leave-report-scope"
-                                    className="h-10 w-full max-w-sm bg-white"
+                                    className="h-11 w-full max-w-sm bg-surface-raised"
                                 >
                                     <SelectValue />
                                 </SelectTrigger>

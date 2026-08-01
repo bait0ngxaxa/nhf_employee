@@ -1,4 +1,4 @@
-export const LEAVE_THEME_COLOR = "#4f46e5";
+export const LEAVE_THEME_COLOR = "var(--module-leave-tab)";
 
 export const LEAVE_THEME_BUTTON_CLASS =
-    "border-indigo-600 bg-indigo-600 text-white hover:border-indigo-700 hover:bg-indigo-700 hover:text-white";
+    "border-module-leave-solid bg-module-leave-solid text-content-on-brand hover:border-module-leave-solid-hover hover:bg-module-leave-solid-hover hover:text-content-on-brand";

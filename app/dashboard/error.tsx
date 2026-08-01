@@ -30,12 +30,12 @@ export default function DashboardError({ error, reset }: ErrorProps) {
                     <div className="mx-auto mb-4 w-14 h-14 bg-orange-100 rounded-full flex items-center justify-center">
                         <AlertTriangle className="w-7 h-7 text-orange-600" />
                     </div>
-                    <CardTitle className="text-lg text-gray-800">
+                    <CardTitle className="text-lg text-content-neutral-strong">
                         ไม่สามารถโหลดข้อมูลได้
                     </CardTitle>
                 </CardHeader>
                 <CardContent className="text-center space-y-4">
-                    <p className="text-sm text-gray-600">
+                    <p className="text-sm text-content-neutral-secondary">
                         เกิดข้อผิดพลาดในการโหลดข้อมูล Dashboard
                     </p>
 

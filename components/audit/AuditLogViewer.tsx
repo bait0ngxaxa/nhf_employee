@@ -83,7 +83,7 @@ export function AuditLogViewer({ className }: AuditLogViewerProps) {
                     
                     {/* Table Skeleton */}
                     <div className="overflow-x-auto border rounded-lg p-4">
-                        <div className="flex gap-4 pb-4 border-b border-gray-100">
+                        <div className="flex gap-4 pb-4 border-b border-border-neutral-muted">
                             {Array.from({ length: 5 }).map((_, i) => (
                                 <Skeleton key={i} className="h-4 flex-1" />
                             ))}
@@ -141,7 +141,7 @@ export function AuditLogViewer({ className }: AuditLogViewerProps) {
                 {/* Filters */}
                 <div className="flex flex-wrap gap-3">
                     <div className="relative flex-1 min-w-[200px]">
-                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-content-neutral-subtle h-4 w-4" />
                         <Input
                             id="audit-search"
                             type="text"
@@ -192,32 +192,32 @@ export function AuditLogViewer({ className }: AuditLogViewerProps) {
 
                 {/* Table */}
                 <div className="overflow-x-auto border rounded-lg">
-                    <table className="min-w-full divide-y divide-gray-200">
-                        <thead className="bg-gray-50">
+                    <table className="min-w-full divide-y divide-border-neutral-default">
+                        <thead className="bg-surface-neutral-subtle">
                             <tr>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                                <th className="px-4 py-3 text-left text-xs font-medium text-content-neutral-muted uppercase">
                                     เวลา
                                 </th>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                                <th className="px-4 py-3 text-left text-xs font-medium text-content-neutral-muted uppercase">
                                     เหตุการณ์
                                 </th>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                                <th className="px-4 py-3 text-left text-xs font-medium text-content-neutral-muted uppercase">
                                     ผู้ดำเนินการ
                                 </th>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                                <th className="px-4 py-3 text-left text-xs font-medium text-content-neutral-muted uppercase">
                                     ข้อมูลที่เกี่ยวข้อง
                                 </th>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                                <th className="px-4 py-3 text-left text-xs font-medium text-content-neutral-muted uppercase">
                                     IP Address
                                 </th>
                             </tr>
                         </thead>
-                        <tbody className="bg-white divide-y divide-gray-200">
+                        <tbody className="bg-surface-raised divide-y divide-border-neutral-default">
                             {isLoading && filteredLogs.length === 0 ? (
                                 <tr>
                                     <td
                                         colSpan={5}
-                                        className="px-4 py-8 text-center text-gray-500"
+                                        className="px-4 py-8 text-center text-content-neutral-muted"
                                     >
                                         กำลังโหลดข้อมูล...
                                     </td>
@@ -226,7 +226,7 @@ export function AuditLogViewer({ className }: AuditLogViewerProps) {
                                 <tr>
                                     <td
                                         colSpan={5}
-                                        className="px-4 py-8 text-center text-gray-500"
+                                        className="px-4 py-8 text-center text-content-neutral-muted"
                                     >
                                         ไม่พบข้อมูล
                                     </td>
@@ -238,9 +238,9 @@ export function AuditLogViewer({ className }: AuditLogViewerProps) {
                                     return (
                                         <tr
                                             key={log.id}
-                                            className="hover:bg-gray-50"
+                                            className="hover:bg-surface-neutral-subtle"
                                         >
-                                            <td className="px-4 py-3 text-sm text-gray-600 whitespace-nowrap align-top">
+                                            <td className="px-4 py-3 text-sm text-content-neutral-secondary whitespace-nowrap align-top">
                                                 {formatThaiDateTime(log.createdAt)}
                                             </td>
                                             <td className="px-4 py-3 align-top min-w-[320px]">
@@ -249,25 +249,25 @@ export function AuditLogViewer({ className }: AuditLogViewerProps) {
                                                         action={log.action}
                                                         className="w-fit"
                                                     />
-                                                    <p className="max-w-[64ch] text-sm leading-6 text-gray-800">
+                                                    <p className="max-w-[64ch] text-sm leading-6 text-content-neutral-strong">
                                                         {display.summary}
                                                     </p>
                                                 </div>
                                             </td>
                                             <td className="px-4 py-3 text-sm align-top">
-                                                <div className="font-medium text-gray-900">
+                                                <div className="font-medium text-content-neutral-primary">
                                                     {log.user?.name || "-"}
                                                 </div>
-                                                <div className="text-gray-600 text-xs">
+                                                <div className="text-content-neutral-secondary text-xs">
                                                     {log.userEmail || "-"}
                                                 </div>
                                             </td>
                                             <td className="px-4 py-3 text-sm align-top">
-                                                <span className="text-gray-800">
+                                                <span className="text-content-neutral-strong">
                                                     {display.entityReference}
                                                 </span>
                                             </td>
-                                            <td className="px-4 py-3 text-sm text-gray-600 align-top">
+                                            <td className="px-4 py-3 text-sm text-content-neutral-secondary align-top">
                                                 {log.ipAddress || "-"}
                                             </td>
                                         </tr>

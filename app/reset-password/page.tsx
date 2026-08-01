@@ -18,14 +18,14 @@ function ResetPasswordContent() {
 
 export default function Page() {
     return (
-        <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+        <div className="app-shell-background min-h-screen">
             <Suspense
                 fallback={
                     <div className="flex min-h-svh w-full items-center justify-center p-6 md:p-10">
                         <div className="w-full max-w-sm">
                             <div className="animate-pulse">
-                                <div className="h-8 bg-gray-200 rounded mb-4" />
-                                <div className="h-32 bg-gray-200 rounded" />
+                <div className="mb-4 h-8 rounded bg-surface-neutral-border" />
+                <div className="h-32 rounded bg-surface-neutral-border" />
                             </div>
                         </div>
                     </div>

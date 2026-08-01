@@ -100,17 +100,17 @@ export function AdjustDialog({ item, onClose, onSuccess }: AdjustDialogProps) {
     return (
         <Dialog open onOpenChange={() => closeWhenIdle(loading, onClose)}>
             <DialogContent className="overflow-hidden p-0 sm:max-w-[400px]">
-                <div className="border-b border-gray-100 bg-slate-50/50 px-5 py-4 sm:px-6">
-                    <DialogTitle className="text-lg font-semibold text-slate-800">
+                <div className="border-b border-border-neutral-muted bg-surface-subtle/50 px-5 py-4 sm:px-6">
+                    <DialogTitle className="text-lg font-semibold text-content-strong">
                         {STOCK_ADMIN_TEXT.adjustStockTitle}
                     </DialogTitle>
                 </div>
                 <form onSubmit={handleSubmit} className="space-y-5 px-5 py-5 sm:px-6">
-                    <div className="flex flex-col gap-0.5 rounded-xl border border-slate-200 bg-slate-50 p-3.5 shadow-inner">
-                        <span className="text-sm font-semibold text-slate-900">
+                    <div className="flex flex-col gap-0.5 rounded-xl border border-border-subtle bg-surface-subtle p-3.5 shadow-inner">
+                        <span className="text-sm font-semibold text-content-primary">
                             {item.name}
                         </span>
-                        <span className="flex items-center gap-1.5 text-sm font-medium text-slate-600">
+                        <span className="flex items-center gap-1.5 text-sm font-medium text-content-secondary">
                             <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-blue-500" />
                             {STOCK_ADMIN_TEXT.currentStock}: {item.quantity} {item.unit}
                         </span>
@@ -154,7 +154,7 @@ function AdjustVariantField(props: {
 
     return (
         <div className="space-y-1.5">
-            <Label className="text-sm font-semibold text-slate-700">
+            <Label className="text-sm font-semibold text-content-body">
                 รายการย่อยที่จะรับเข้า <span className="text-rose-500">*</span>
             </Label>
             <Select
@@ -162,7 +162,7 @@ function AdjustVariantField(props: {
                 value={props.value}
                 onValueChange={props.onValueChange}
             >
-                <SelectTrigger className="h-10 w-full focus:ring-blue-500">
+                <SelectTrigger className="h-11 w-full focus:ring-blue-500">
                     <SelectValue placeholder="เลือกรายการย่อย" />
                 </SelectTrigger>
                 <SelectContent>
@@ -226,8 +226,8 @@ export function AddCategoryDialog({
     return (
         <Dialog open={open} onOpenChange={() => closeWhenIdle(loading, onClose)}>
             <DialogContent className="overflow-hidden p-0 sm:max-w-[400px]">
-                <div className="border-b border-gray-100 bg-slate-50/50 px-5 py-4 sm:px-6">
-                    <DialogTitle className="text-lg font-semibold text-slate-800">
+                <div className="border-b border-border-neutral-muted bg-surface-subtle/50 px-5 py-4 sm:px-6">
+                    <DialogTitle className="text-lg font-semibold text-content-strong">
                         {STOCK_ADMIN_TEXT.addCategoryTitle}
                     </DialogTitle>
                 </div>
@@ -262,7 +262,7 @@ function DialogTextField(props: {
 }) {
     return (
         <div className="space-y-1.5">
-            <Label htmlFor={props.id} className="text-sm font-semibold text-slate-700">
+            <Label htmlFor={props.id} className="text-sm font-semibold text-content-body">
                 {props.label}{" "}
                 {props.required && <span className="text-rose-500">*</span>}
             </Label>
@@ -270,7 +270,7 @@ function DialogTextField(props: {
                 id={props.id}
                 name={props.name}
                 required={props.required}
-                className="h-10 focus-visible:ring-blue-500"
+                className="h-11 focus-visible:ring-blue-500"
             />
         </div>
     );
@@ -286,7 +286,7 @@ function DialogNumberField(props: {
 }) {
     return (
         <div className="space-y-1.5">
-            <Label htmlFor={props.id} className="text-sm font-semibold text-slate-700">
+            <Label htmlFor={props.id} className="text-sm font-semibold text-content-body">
                 {props.label} <span className="text-rose-500">*</span>
             </Label>
             <Input
@@ -301,7 +301,7 @@ function DialogNumberField(props: {
                       }
                     : { defaultValue: props.defaultValue })}
                 required
-                className="h-10 focus-visible:ring-blue-500"
+                className="h-11 focus-visible:ring-blue-500"
             />
         </div>
     );
@@ -319,14 +319,14 @@ function DialogActions(props: {
                 variant="ghost"
                 onClick={props.onClose}
                 disabled={props.loading}
-                className="h-11 px-5 font-medium text-slate-600 hover:bg-slate-100"
+                className="h-11 px-5 font-medium text-content-secondary hover:bg-surface-muted"
             >
                 {STOCK_ADMIN_TEXT.cancel}
             </Button>
             <Button
                 type="submit"
                 disabled={props.loading}
-                className="h-11 bg-blue-600 px-7 font-bold text-white shadow-sm transition-colors hover:bg-blue-700"
+                className="h-11 bg-blue-600 px-7 font-bold text-content-on-brand shadow-sm transition-colors hover:bg-blue-700"
             >
                 {props.loading ? STOCK_ADMIN_TEXT.saving : props.submitLabel}
             </Button>

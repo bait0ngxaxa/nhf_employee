@@ -24,7 +24,7 @@ export function InventoryTextField(props: {
 }) {
     return (
         <div className="space-y-1.5">
-            <Label htmlFor={props.id} className="text-sm font-semibold text-slate-700">
+            <Label htmlFor={props.id} className="text-sm font-semibold text-content-body">
                 {props.label}{" "}
                 {props.required && <span className="text-rose-500">*</span>}
             </Label>
@@ -34,7 +34,7 @@ export function InventoryTextField(props: {
                 required={props.required}
                 type={props.type}
                 placeholder={props.placeholder}
-                className="h-10 focus-visible:ring-blue-500"
+                className="h-11 focus-visible:ring-blue-500"
             />
         </div>
     );
@@ -48,7 +48,7 @@ export function InventoryNumberField(props: {
 }) {
     return (
         <div className="space-y-1.5">
-            <Label htmlFor={props.id} className="text-sm font-semibold text-slate-700">
+            <Label htmlFor={props.id} className="text-sm font-semibold text-content-body">
                 {props.label} <span className="text-rose-500">*</span>
             </Label>
             <Input
@@ -58,7 +58,7 @@ export function InventoryNumberField(props: {
                 min={1}
                 defaultValue={props.defaultValue}
                 required
-                className="h-10 focus-visible:ring-blue-500"
+                className="h-11 focus-visible:ring-blue-500"
             />
         </div>
     );
@@ -72,12 +72,12 @@ export function InventoryCategoryField(props: {
 }) {
     return (
         <div className="space-y-1.5">
-            <Label htmlFor="categoryId" className="text-sm font-semibold text-slate-700">
+            <Label htmlFor="categoryId" className="text-sm font-semibold text-content-body">
                 {STOCK_ADMIN_TEXT.category}{" "}
                 {props.required && <span className="text-rose-500">*</span>}
             </Label>
             <Select name="categoryId" value={props.value} onValueChange={props.onChange}>
-                <SelectTrigger className="h-10 focus:ring-blue-500">
+                <SelectTrigger className="h-11 focus:ring-blue-500">
                     <SelectValue placeholder={STOCK_ADMIN_TEXT.categoryPlaceholder} />
                 </SelectTrigger>
                 <SelectContent>
@@ -98,20 +98,20 @@ export function InventoryDialogActions(props: {
     onClose: () => void;
 }) {
     return (
-        <div className="flex shrink-0 flex-col-reverse gap-2 border-t border-slate-200 bg-white px-5 py-4 sm:flex-row sm:justify-end sm:px-6">
+        <div className="flex shrink-0 flex-col-reverse gap-2 border-t border-border-subtle bg-surface-raised px-5 py-4 sm:flex-row sm:justify-end sm:px-6">
             <Button
                 type="button"
                 variant="ghost"
                 onClick={props.onClose}
                 disabled={props.loading}
-                className="h-11 px-5 font-medium text-slate-600 hover:bg-slate-100"
+                className="h-11 px-5 font-medium text-content-secondary hover:bg-surface-muted"
             >
                 {STOCK_ADMIN_TEXT.cancel}
             </Button>
             <Button
                 type="submit"
                 disabled={props.loading}
-                className="h-11 bg-blue-600 px-7 font-bold text-white shadow-sm transition-colors hover:bg-blue-700"
+                className="h-11 bg-blue-600 px-7 font-bold text-content-on-brand shadow-sm transition-colors hover:bg-blue-700"
             >
                 {props.loading ? STOCK_ADMIN_TEXT.saving : props.submitLabel}
             </Button>

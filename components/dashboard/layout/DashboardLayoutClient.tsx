@@ -71,27 +71,27 @@ export function DashboardLayoutClient({
 
     if (status === "loading") {
         return (
-            <div className="flex h-dvh bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+            <div className="app-shell-background flex h-dvh">
                 {/* Sidebar Skeleton */}
-                <div className="hidden h-full w-64 flex-col border-r border-gray-200/50 bg-white p-4 shadow-lg lg:flex 2xl:w-72">
-                    <div className="h-8 bg-gray-200 rounded-lg animate-pulse mb-6" />
+                <div className="hidden h-full w-64 flex-col border-r border-border-neutral bg-surface-raised p-4 shadow-lg lg:flex 2xl:w-72">
+                    <div className="mb-6 h-8 rounded-lg bg-surface-muted animate-pulse" />
                     <div className="space-y-3 flex-1">
                         {Array.from({ length: 6 }).map((_, i) => (
                             <div
                                 key={i}
-                                className="h-10 bg-gray-100 rounded-xl animate-pulse"
+                                className="h-10 rounded-xl bg-surface-neutral-muted animate-pulse"
                             />
                         ))}
                     </div>
-                    <div className="h-20 bg-gray-100 rounded-xl animate-pulse mt-4" />
+                    <div className="mt-4 h-20 rounded-xl bg-surface-neutral-muted animate-pulse" />
                 </div>
 
                 {/* Main Content Skeleton */}
                 <div className="flex-1 flex items-center justify-center">
                     <div className="animate-pulse space-y-4">
-                        <div className="h-8 bg-gray-200 rounded w-48 mx-auto" />
-                        <div className="h-4 bg-gray-200 rounded w-64 mx-auto" />
-                        <div className="h-32 bg-gray-200 rounded w-96 mx-auto mt-8" />
+                        <div className="mx-auto h-8 w-48 rounded bg-surface-muted" />
+                        <div className="mx-auto h-4 w-64 rounded bg-surface-muted" />
+                        <div className="mx-auto mt-8 h-32 w-96 rounded bg-surface-muted" />
                     </div>
                 </div>
             </div>
@@ -99,7 +99,7 @@ export function DashboardLayoutClient({
     }
 
     return (
-        <div className="flex h-dvh bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+        <div className="app-shell-background flex h-dvh">
             {/* Desktop Sidebar */}
             <div className="hidden h-full flex-shrink-0 lg:block">
                 <DashboardSidebar variant="desktop" />
@@ -113,11 +113,11 @@ export function DashboardLayoutClient({
                     style={{ willChange: 'transform' }}
                 >
                     <div 
-                        className="absolute top-0 right-0 w-[400px] h-[400px] bg-blue-200/20 rounded-full" 
+                        className="dashboard-glow-info absolute top-0 right-0 h-[400px] w-[400px] rounded-full"
                         style={{ filter: 'blur(80px)' }}
                     />
                     <div 
-                        className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-purple-200/20 rounded-full" 
+                        className="dashboard-glow-accent absolute bottom-0 left-0 h-[400px] w-[400px] rounded-full"
                         style={{ filter: 'blur(80px)' }}
                     />
                 </div>

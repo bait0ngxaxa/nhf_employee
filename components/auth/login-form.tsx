@@ -91,12 +91,12 @@ export function LoginForm({
 
     return (
         <div className={cn("flex flex-col gap-6", className)} {...props}>
-            <Card className="rounded-2xl border-gray-200/70 bg-white/90 shadow-sm">
+            <Card className="rounded-2xl border-border-neutral-default/70 bg-surface-raised/90 shadow-sm">
                 <CardHeader className="text-center pb-2">
                     <CardTitle className="text-2xl font-bold text-blue-700">
                         เข้าสู่ระบบ
                     </CardTitle>
-                    <CardDescription className="text-gray-600">
+                    <CardDescription className="text-content-neutral-secondary">
                         กรอกอีเมลเพื่อเข้าสู่ระบบ
                     </CardDescription>
                 </CardHeader>
@@ -116,7 +116,7 @@ export function LoginForm({
                             <div className="grid gap-3">
                                 <Label
                                     htmlFor="email"
-                                    className="text-gray-700"
+                                    className="text-content-neutral-body"
                                 >
                                     Email
                                 </Label>
@@ -135,14 +135,14 @@ export function LoginForm({
                                     }
                                     required
                                     aria-invalid={error ? true : undefined}
-                                    className="rounded-xl border-gray-200 bg-white/70 focus:border-blue-500 focus:ring-blue-500/20"
+                                    className="rounded-xl border-border-neutral-default bg-surface-raised/70 focus:border-blue-500 focus:ring-blue-500/20"
                                 />
                             </div>
                             <div className="grid gap-3">
                                 <div className="flex items-center justify-between">
                                     <Label
                                         htmlFor="password"
-                                        className="text-gray-700"
+                                        className="text-content-neutral-body"
                                     >
                                         Password
                                     </Label>
@@ -166,13 +166,13 @@ export function LoginForm({
                                     }
                                     required
                                     aria-invalid={error ? true : undefined}
-                                    className="rounded-xl border-gray-200 bg-white/70 focus:border-blue-500 focus:ring-blue-500/20"
+                                    className="rounded-xl border-border-neutral-default bg-surface-raised/70 focus:border-blue-500 focus:ring-blue-500/20"
                                 />
                             </div>
                             <div className="flex flex-col gap-3">
                                 <Button
                                     type="submit"
-                                    className="w-full rounded-xl bg-gradient-to-r from-blue-600 to-cyan-600 text-white hover:from-blue-700 hover:to-cyan-700 disabled:opacity-70"
+                                    className="w-full rounded-xl bg-gradient-to-r from-action-gradient-start to-action-gradient-end text-content-on-brand hover:from-action-gradient-hover-start hover:to-action-gradient-hover-end disabled:opacity-70"
                                     disabled={isLoading}
                                 >
                                     {isLoading ? (

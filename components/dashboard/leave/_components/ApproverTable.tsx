@@ -35,12 +35,12 @@ function EmployeeRow({
                     ? "border-sky-300 bg-sky-50"
                     : !managerId
                       ? "border-amber-200 bg-amber-50"
-                      : "border-slate-200 bg-white hover:bg-slate-50"
+                      : "border-border-subtle bg-surface-raised hover:bg-surface-subtle"
             }`}
         >
             <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
-                    <span className="break-words font-medium text-slate-950">{formatName(employee)}</span>
+                    <span className="break-words font-medium text-content-heading">{formatName(employee)}</span>
                     {hasChange ? (
                         <Badge variant="outline" className="border-sky-300 text-xs text-sky-700">
                             แก้ไขแล้ว
@@ -52,7 +52,7 @@ function EmployeeRow({
                         </Badge>
                     ) : null}
                 </div>
-                <p className="break-words text-sm text-slate-600">
+                <p className="break-words text-sm text-content-secondary">
                     {employee.position} • {employee.dept?.name ?? "ไม่ระบุแผนก"}
                 </p>
             </div>
@@ -60,7 +60,7 @@ function EmployeeRow({
             <select
                 value={managerId ? String(managerId) : noApproverValue}
                 onChange={(event) => onAssign(employee.id, event.target.value)}
-                className="h-9 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-700 focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 sm:w-[240px]"
+                className="h-11 w-full rounded-md border border-border-strong bg-surface-raised px-3 text-sm text-content-body focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 sm:w-[240px]"
                 aria-label={`เลือกผู้อนุมัติสำหรับ ${formatName(employee)}`}
             >
                 <option value={noApproverValue}>- ไม่ระบุ -</option>
@@ -87,11 +87,11 @@ export function ApproverTable({
 }: ApproverTableProps) {
     if (employees.length === 0) {
         return (
-            <div className="rounded-xl border border-dashed border-slate-300 p-8 text-center">
-                <p className="text-sm font-medium text-slate-800">
+            <div className="rounded-xl border border-dashed border-border-strong p-8 text-center">
+                <p className="text-sm font-medium text-content-strong">
                     ไม่พบพนักงานที่ตรงกับการค้นหา
                 </p>
-                <p className="mt-1 text-sm text-slate-500">
+                <p className="mt-1 text-sm text-content-muted">
                     ลองเปลี่ยนคำค้นหาหรือตัวกรองผู้อนุมัติ
                 </p>
             </div>

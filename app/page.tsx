@@ -34,28 +34,28 @@ const INTRO_POINTS: IntroPoint[] = [
         description: "จุดเริ่มต้นสำหรับผู้ใช้งาน NHF",
         icon: Building2,
         cardClassName: "bg-blue-50 ring-blue-100",
-        iconClassName: "bg-white text-blue-700 ring-1 ring-blue-200",
+        iconClassName: "bg-surface-raised text-blue-700 ring-1 ring-blue-200",
     },
     {
         title: "เข้าถึงตามบทบาท",
         description: "เหมาะกับผู้ใช้งานในแต่ละบทบาทขององค์กร",
         icon: ShieldCheck,
         cardClassName: "bg-indigo-50 ring-indigo-100",
-        iconClassName: "bg-white text-indigo-700 ring-1 ring-indigo-200",
+        iconClassName: "bg-surface-raised text-indigo-700 ring-1 ring-indigo-200",
     },
     {
         title: "ใช้งานง่าย",
         description: "หน้าจอเรียบง่าย อ่านสบาย และไม่ซับซ้อนเกินจำเป็น",
         icon: Sparkles,
         cardClassName: "bg-cyan-50 ring-cyan-100",
-        iconClassName: "bg-white text-cyan-700 ring-1 ring-cyan-200",
+        iconClassName: "bg-surface-raised text-cyan-700 ring-1 ring-cyan-200",
     },
     {
         title: "สำหรับพนักงาน NHF",
         description: "สร้างขึ้นเพื่อรองรับการทำงานร่วมกันของคนในองค์กร",
         icon: UsersRound,
-        cardClassName: "bg-slate-50 ring-slate-200",
-        iconClassName: "bg-white text-blue-700 ring-1 ring-blue-200",
+        cardClassName: "bg-surface-subtle ring-border-subtle",
+        iconClassName: "bg-surface-raised text-blue-700 ring-1 ring-blue-200",
     },
 ];
 
@@ -69,13 +69,13 @@ function BrandMark(): ReactElement {
     return (
         <Link
             href={APP_ROUTES.home}
-            className="flex items-center gap-3 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-sky-600 focus-visible:ring-offset-4"
+            className="flex items-center gap-3 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-brand-foreground focus-visible:ring-offset-4"
             aria-label="NHFapp หน้าแรก"
         >
             <AppLogo variant="navbar" priority />
             <div className="leading-tight">
-                <p className="text-base font-bold text-slate-950">NHFapp</p>
-                <p className="text-xs font-medium text-slate-600">
+                <p className="text-base font-bold text-content-heading">NHFapp</p>
+                <p className="text-xs font-medium text-content-secondary">
                     ระบบงาน NHF
                 </p>
             </div>
@@ -98,10 +98,10 @@ function IntroPointList() {
                         >
                             <Icon className="h-5 w-5" aria-hidden="true" />
                         </div>
-                        <h3 className="text-base font-bold leading-6 text-slate-950 [overflow-wrap:anywhere]">
+                        <h3 className="text-base font-bold leading-6 text-content-heading [overflow-wrap:anywhere]">
                             {point.title}
                         </h3>
-                        <p className="mt-1 text-sm font-medium leading-6 text-slate-700 [overflow-wrap:anywhere]">
+                        <p className="mt-1 text-sm font-medium leading-6 text-content-body [overflow-wrap:anywhere]">
                             {point.description}
                         </p>
                     </div>
@@ -113,13 +113,13 @@ function IntroPointList() {
 
 function AccessPanel() {
     return (
-        <aside className="rounded-2xl border border-gray-200/70 bg-white/90 p-6 text-slate-950 shadow-sm md:p-8">
+        <aside className="rounded-2xl border border-border-neutral-default/70 bg-surface-raised/90 p-6 text-content-heading shadow-sm md:p-8">
             <div className="flex items-start justify-between gap-4">
                 <div>
                     <p className="text-sm font-semibold text-blue-700">
                         แอปสำหรับพนักงาน
                     </p>
-                    <h2 className="mt-3 text-2xl font-bold leading-tight text-slate-950 text-balance">
+                    <h2 className="mt-3 text-2xl font-bold leading-tight text-content-heading text-balance">
                         เริ่มต้นใช้งาน NHFapp
                     </h2>
                 </div>
@@ -135,7 +135,7 @@ function AccessPanel() {
                             className="mt-0.5 h-5 w-5 shrink-0 text-blue-600"
                             aria-hidden="true"
                         />
-                        <p className="text-sm font-medium leading-6 text-slate-700 [overflow-wrap:anywhere]">
+                        <p className="text-sm font-medium leading-6 text-content-body [overflow-wrap:anywhere]">
                             {point}
                         </p>
                     </div>
@@ -146,7 +146,7 @@ function AccessPanel() {
                 <Button
                     asChild
                     size="lg"
-                    className="rounded-xl bg-gradient-to-r from-blue-600 to-cyan-600 text-white hover:from-blue-700 hover:to-cyan-700"
+                    className="rounded-xl bg-gradient-to-r from-action-gradient-start to-action-gradient-end text-content-on-brand hover:from-action-gradient-hover-start hover:to-action-gradient-hover-end"
                 >
                     <Link href={APP_ROUTES.login}>
                         เข้าสู่ระบบ
@@ -157,7 +157,7 @@ function AccessPanel() {
                     asChild
                     size="lg"
                     variant="outline"
-                    className="rounded-xl border-blue-200 bg-white/80 text-blue-700 hover:bg-blue-50 hover:text-blue-800"
+                    className="rounded-xl border-blue-200 bg-surface-raised/80 text-blue-700 hover:bg-blue-50 hover:text-blue-800"
                 >
                     <Link href={APP_ROUTES.signup}>ลงทะเบียนบัญชี</Link>
                 </Button>
@@ -174,8 +174,8 @@ export default async function Home() {
     }
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 text-slate-950">
-            <header className="border-b border-gray-200/50 bg-white/70">
+        <div className="app-shell-background min-h-screen text-content-heading">
+            <header className="border-b border-border-neutral-default/50 bg-surface-raised/70">
                 <div className="mx-auto flex max-w-7xl items-center px-4 py-4 sm:px-6 lg:px-8">
                     <BrandMark />
                 </div>
@@ -191,14 +191,14 @@ export default async function Home() {
                             <p className="inline-flex rounded-full bg-blue-100 px-3 py-1 text-sm font-bold text-blue-800">
                                 National Health Foundation
                             </p>
-                            <p className="inline-flex rounded-full bg-white/80 px-3 py-1 text-sm font-semibold text-slate-700 ring-1 ring-blue-100">
+                            <p className="inline-flex rounded-full bg-surface-raised/80 px-3 py-1 text-sm font-semibold text-content-body ring-1 ring-blue-100">
                                 สำหรับผู้ใช้งานของ NHF
                             </p>
                         </div>
-                        <h1 className="max-w-4xl text-4xl font-bold leading-tight tracking-tight text-slate-950 text-balance sm:text-5xl">
+                        <h1 className="max-w-4xl text-4xl font-bold leading-tight tracking-tight text-content-heading text-balance sm:text-5xl">
                             National Health Foundation Application
                         </h1>
-                        <p className="mt-5 max-w-3xl text-base font-medium leading-8 text-slate-700 sm:text-lg">
+                        <p className="mt-5 max-w-3xl text-base font-medium leading-8 text-content-body sm:text-lg">
                             พื้นที่ดิจิทัลของมูลนิธิสาธารณสุขแห่งชาติ
                             สำหรับเริ่มใช้งานระบบงานของ NHF
                         </p>
@@ -210,14 +210,14 @@ export default async function Home() {
                 <section className="mt-12 border-t border-blue-100 pt-8">
                     <div className="mb-5 flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
                         <div>
-                            <h2 className="text-xl font-bold leading-8 text-slate-950">
+                            <h2 className="text-xl font-bold leading-8 text-content-heading">
                                 แอปพลิเคชัน NHFapp
                             </h2>
-                            <p className="mt-1 max-w-2xl text-sm font-medium leading-6 text-slate-600">
+                            <p className="mt-1 max-w-2xl text-sm font-medium leading-6 text-content-secondary">
                                 Single source of truth
                             </p>
                         </div>
-                        <p className="text-sm font-semibold text-slate-500">
+                        <p className="text-sm font-semibold text-content-muted">
                             เวอร์ชันสำหรับพนักงานและผู้ดูแลระบบ
                         </p>
                     </div>
@@ -225,8 +225,8 @@ export default async function Home() {
                 </section>
             </main>
 
-            <footer className="border-t border-gray-200/50 bg-white/70">
-                <div className="mx-auto flex max-w-7xl flex-col gap-2 px-4 py-5 text-sm font-medium text-slate-600 sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8">
+            <footer className="border-t border-border-neutral-default/50 bg-surface-raised/70">
+                <div className="mx-auto flex max-w-7xl flex-col gap-2 px-4 py-5 text-sm font-medium text-content-secondary sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8">
                     <p>© {new Date().getFullYear()} National Health Foundation</p>
                     <p>NHFapp สำหรับผู้ใช้งาน NHF</p>
                 </div>

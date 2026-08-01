@@ -23,11 +23,11 @@ function ITSupportContent() {
                     <h1
                         data-page-heading
                         tabIndex={-1}
-                        className="text-2xl font-bold text-slate-950"
+                        className="text-2xl font-bold text-content-heading"
                     >
                         NHF IT-Support
                     </h1>
-                    <p className="text-gray-500">
+                    <p className="text-content-neutral-muted">
                         กรุณาเข้าสู่ระบบเพื่อใช้งานระบบ IT Support
                     </p>
                 </CardContent>
@@ -37,8 +37,8 @@ function ITSupportContent() {
 
     return (
         <SectionShell
-            gradientFrom="rgba(219,234,254,0.6)"
-            gradientTo="rgba(224,231,255,0.6)"
+            gradientFrom="var(--module-it-shell-from)"
+            gradientTo="var(--module-it-shell-to)"
         >
             {/* Header */}
             <Header />

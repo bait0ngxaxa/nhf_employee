@@ -23,7 +23,7 @@ export default function AccessDenied() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="text-center text-gray-600">
+          <div className="text-center text-content-neutral-secondary">
             <p>
               ส่วนนี้เป็นของผู้ดูแลระบบเท่านั้น หากคุณคิดว่านี่เป็นข้อผิดพลาด 
               กรุณาติดต่อผู้ดูแลระบบ

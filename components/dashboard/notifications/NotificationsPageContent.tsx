@@ -148,7 +148,7 @@ export function NotificationsSection(): React.ReactElement {
     };
 
     return (
-        <section className="min-h-[calc(100dvh-6rem)] bg-slate-50 px-4 py-6 md:px-8 md:py-8">
+        <section className="min-h-[calc(100dvh-6rem)] bg-surface-subtle px-4 py-6 md:px-8 md:py-8">
             <div className="mx-auto max-w-6xl space-y-5">
                 <NotificationsHeader
                     filter={filter}
@@ -184,7 +184,7 @@ export function NotificationsSection(): React.ReactElement {
                                 size="sm"
                                 onClick={() => void loadMore()}
                                 disabled={isLoadingMore}
-                                className="h-10 border-slate-300 bg-white text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                                className="border-border-subtle bg-surface text-sm font-semibold text-content-body hover:bg-surface-subtle"
                                 aria-busy={isLoadingMore}
                             >
                                 {isLoadingMore ? (

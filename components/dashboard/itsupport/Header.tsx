@@ -16,15 +16,12 @@ export const Header = memo(function Header() {
             icon={Settings}
             title="NHF IT-Support"
             subtitle="ระบบแจ้งปัญหาและติดตามการแก้ไขปัญหาไอที"
-            iconGradient="from-emerald-500 to-teal-700"
-            iconGlow="from-emerald-500/40 to-teal-500/40"
-            iconShadow="shadow-emerald-500/25"
-            badgeColor="bg-indigo-50 text-indigo-700 border-indigo-100"
+            tone="it"
             roleBadge={isAdmin ? "ผู้ดูแลระบบ" : "ผู้ใช้งาน"}
             extra={
                 <Badge
                     variant="outline"
-                    className="px-3 py-1 text-sm font-medium tracking-wide rounded-full max-w-[150px] truncate border-gray-200 text-gray-600 bg-white/50 backdrop-blur-sm"
+                    className="max-w-[150px] truncate rounded-full border-border-neutral bg-surface/50 px-3 py-1 text-sm font-medium tracking-wide text-content-neutral-secondary backdrop-blur-sm"
                 >
                     {session.user?.department}
                 </Badge>

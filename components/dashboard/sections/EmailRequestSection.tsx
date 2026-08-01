@@ -16,7 +16,7 @@ function EmailRequestContent(): ReactElement {
                     <div className="flex min-w-0 items-center gap-4">
                         <div className="shrink-0">
                             <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary">
-                                <Mail className="h-7 w-7 text-white" />
+                                <Mail className="h-7 w-7 text-content-on-brand" />
                             </div>
                         </div>
                         <div className="min-w-0 space-y-1">

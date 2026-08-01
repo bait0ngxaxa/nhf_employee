@@ -28,7 +28,7 @@ export function SectionTabs({
     value,
     onValueChange,
     tabs,
-    activeColor = "#0369a1",
+    activeColor = "var(--brand-tab)",
     ariaLabel = "แท็บของส่วนงาน",
 }: SectionTabsProps) {
     const visibleTabs = tabs.filter((t) => t.visible !== false);
@@ -61,7 +61,7 @@ export function SectionTabs({
             <div className="w-full overflow-x-auto pb-1">
                 <TabsList
                     aria-label={ariaLabel}
-                    className="flex h-auto min-w-max flex-nowrap gap-1 rounded-xl border border-slate-200 bg-slate-50 p-1 md:min-w-0 md:w-full"
+                    className="flex h-auto min-w-max flex-nowrap gap-1 rounded-xl border border-border-subtle bg-surface-subtle p-1 md:min-w-0 md:w-full"
                     data-section-tabs=""
                 >
                     {visibleTabs.map((tab) => {
@@ -71,9 +71,9 @@ export function SectionTabs({
                                 key={tab.value}
                                 value={tab.value}
                                 className={cn(
-                                    "flex min-h-10 shrink-0 items-center justify-center gap-2 rounded-lg border border-transparent px-4 py-2 text-sm font-medium",
-                                    "text-slate-600 hover:bg-white hover:text-slate-950",
-                                    "data-[state=active]:border-transparent data-[state=active]:bg-[var(--section-tab-active-color)] data-[state=active]:text-white",
+                                    "flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-lg border border-transparent px-4 py-2 text-sm font-medium",
+                                    "text-content-secondary hover:bg-surface hover:text-content-heading",
+                                    "data-[state=active]:border-transparent data-[state=active]:bg-[var(--section-tab-active-color)] data-[state=active]:text-content-on-brand",
                                     "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
                                     "motion-safe:transition-[background-color,border-color,color] motion-safe:duration-200 md:flex-1"
                                 )}

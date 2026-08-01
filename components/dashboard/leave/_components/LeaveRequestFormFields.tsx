@@ -97,7 +97,7 @@ function LeaveDateModeField({ model }: { model: LeaveRequestFormModel }) {
 
 function getDateModeButtonClassName(isSelected: boolean): string {
     return cn(
-        "h-10 rounded-md px-3 text-sm font-medium transition-[color,background-color,box-shadow] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50",
+        "h-11 rounded-md px-3 text-sm font-medium transition-[color,background-color,box-shadow] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50",
         isSelected
             ? "bg-background text-primary shadow-xs"
             : "text-muted-foreground hover:text-foreground",

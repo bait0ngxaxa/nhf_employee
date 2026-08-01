@@ -210,11 +210,11 @@ export function LeaveAttachmentViewerDialog({
                 showCloseButton={false}
                 className="flex flex-col gap-4 overflow-hidden rounded-xl p-0 sm:max-w-4xl"
             >
-                <DialogHeader className="border-b border-slate-200 px-5 py-4 pr-14 text-left">
-                    <DialogTitle className="text-lg/7 text-slate-950">
+                <DialogHeader className="border-b border-border-subtle px-5 py-4 pr-14 text-left">
+                    <DialogTitle className="text-lg/7 text-content-heading">
                         ไฟล์แนบคำขอลา
                     </DialogTitle>
-                    <DialogDescription className="text-sm/6 text-slate-600">
+                    <DialogDescription className="text-sm/6 text-content-secondary">
                         รูปที่ {safeActiveIndex + 1} จาก {attachmentCount}
                     </DialogDescription>
                 </DialogHeader>
@@ -224,7 +224,7 @@ export function LeaveAttachmentViewerDialog({
                         type="button"
                         variant="ghost"
                         size="icon"
-                        className="absolute right-3 top-3 text-slate-600"
+                        className="absolute right-3 top-3 text-content-secondary"
                         aria-label="ปิดหน้าต่างไฟล์แนบ"
                     >
                         <X className="h-5 w-5" aria-hidden="true" />
@@ -232,7 +232,7 @@ export function LeaveAttachmentViewerDialog({
                 </DialogClose>
 
                 <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4 sm:px-5 sm:pb-5">
-                    <div className="relative flex min-h-72 items-center justify-center overflow-hidden rounded-xl bg-slate-950 sm:min-h-[28rem]">
+                    <div className="relative flex min-h-72 items-center justify-center overflow-hidden rounded-xl bg-surface-inverted sm:min-h-[28rem]">
                         {activeImageUrl ? (
                             <Image
                                 key={activeAttachment.id}
@@ -248,20 +248,20 @@ export function LeaveAttachmentViewerDialog({
 
                         {activeLoadState === "loading" ? (
                             <div
-                                className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-slate-950 text-slate-200"
+          className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-surface-inverted text-content-on-inverted"
                                 role="status"
                             >
-                                <div className="h-8 w-8 animate-pulse rounded-full bg-slate-700 motion-reduce:animate-none" />
+                                <div className="h-8 w-8 animate-pulse rounded-full bg-surface-inverted-muted motion-reduce:animate-none" />
                                 <span className="text-sm">กำลังโหลดไฟล์แนบ…</span>
                             </div>
                         ) : null}
 
                         {activeLoadState === "error" ? (
                             <div
-                                className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-slate-900 px-6 text-center text-slate-100"
+          className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-surface-inverted-strong px-6 text-center text-content-on-inverted-strong"
                                 role="alert"
                             >
-                                <FileImage className="h-9 w-9 text-slate-400" aria-hidden="true" />
+                                <FileImage className="h-9 w-9 text-content-subtle" aria-hidden="true" />
                                 <p className="text-sm/6">
                                     ไม่สามารถเปิดไฟล์แนบได้ กรุณาลองใหม่ภายหลัง
                                 </p>
@@ -310,10 +310,10 @@ export function LeaveAttachmentViewerDialog({
                                             key={attachment.id}
                                             type="button"
                                             className={cn(
-                                                "relative h-16 w-16 shrink-0 overflow-hidden rounded-lg border-2 bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 focus-visible:ring-offset-2",
+                                                "relative h-16 w-16 shrink-0 overflow-hidden rounded-lg border-2 bg-surface-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 focus-visible:ring-offset-2",
                                                 index === safeActiveIndex
                                                     ? "border-indigo-600"
-                                                    : "border-transparent hover:border-slate-400",
+                                                    : "border-transparent hover:border-border-contrast",
                                             )}
                                             aria-label={`ดูไฟล์แนบรูปที่ ${index + 1}`}
                                             aria-current={index === safeActiveIndex ? "true" : undefined}
@@ -330,7 +330,7 @@ export function LeaveAttachmentViewerDialog({
                                                     className="object-cover"
                                                 />
                                             ) : (
-                                                <span className="text-sm font-medium text-slate-600">
+                                                <span className="text-sm font-medium text-content-secondary">
                                                     {index + 1}
                                                 </span>
                                             )}
@@ -339,7 +339,7 @@ export function LeaveAttachmentViewerDialog({
                                 })}
                             </div>
                         ) : (
-                            <span className="text-sm text-slate-500">มีไฟล์แนบ 1 รูป</span>
+                            <span className="text-sm text-content-muted">มีไฟล์แนบ 1 รูป</span>
                         )}
 
                         {activeImageUrl ? (

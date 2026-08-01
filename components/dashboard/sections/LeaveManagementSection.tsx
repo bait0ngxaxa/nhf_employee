@@ -47,16 +47,13 @@ export function LeaveManagementSection({ defaultTab = "my-leave" }: LeaveManagem
         <SectionShell
             gradientFrom="transparent"
             gradientTo="transparent"
-            className="border-slate-200/70 bg-white shadow-sm"
+            className="border-border-subtle/70 bg-surface shadow-sm"
         >
             <SectionHeader
                 icon={CalendarRange}
                 title="NHF Leave"
                 subtitle="จัดการวันลาพักผ่อน ลากิจ ลาป่วย และตรวจสอบโควต้าของคุณ"
-                iconGradient="from-indigo-500 to-blue-600"
-                iconGlow="from-indigo-500/40 to-blue-500/40"
-                iconShadow="shadow-indigo-500/25"
-                badgeColor="bg-indigo-50 text-indigo-700 border-indigo-100"
+                tone="leave"
             />
             {isMounted && hasTabs ? (
                 <SectionTabs

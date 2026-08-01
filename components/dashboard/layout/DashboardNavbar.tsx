@@ -113,7 +113,7 @@ export function DashboardNavbar(): ReactElement {
     };
 
     return (
-        <header className="sticky top-0 z-30 border-b border-slate-50 bg-white/95 pt-[env(safe-area-inset-top)]">
+        <header className="sticky top-0 z-30 border-b border-border-faint bg-surface/95 pt-[env(safe-area-inset-top)]">
             <div className="flex h-20 items-center justify-between pl-[calc(1.5rem+env(safe-area-inset-left))] pr-[calc(1.5rem+env(safe-area-inset-right))] lg:pl-[calc(2.5rem+env(safe-area-inset-left))] lg:pr-[calc(2.5rem+env(safe-area-inset-right))]">
                 {/* Left: Mobile menu + Page title */}
                 <div className="flex items-center gap-4">
@@ -125,10 +125,10 @@ export function DashboardNavbar(): ReactElement {
                             <Button
                                 variant="ghost"
                                 size="icon"
-                                className="h-10 w-10 rounded-2xl border border-slate-100 bg-white shadow-sm lg:hidden"
+                                className="rounded-2xl border border-border-muted bg-surface shadow-sm lg:hidden"
                                 aria-label="เปิดเมนูหลัก"
                             >
-                                <Menu className="h-5 w-5 text-slate-600" />
+                                <Menu className="h-5 w-5 text-content-secondary" />
                             </Button>
                         </SheetTrigger>
                         <SheetContent
@@ -150,11 +150,11 @@ export function DashboardNavbar(): ReactElement {
                 {/* Right: User menu */}
                 <div className="flex items-center gap-4">
                     {/* Notifications */}
-                    <div className="p-1 rounded-2xl bg-white border border-slate-100 transition-transform hover:-translate-y-0.5 shadow-sm">
+                    <div className="rounded-2xl border border-border-muted bg-surface p-1 shadow-sm transition-transform hover:-translate-y-0.5">
                         <NotificationDropdown />
                     </div>
 
-                    <div className="h-8 w-px bg-slate-100 mx-1 hidden sm:block" />
+                    <div className="mx-1 hidden h-8 w-px bg-border-muted sm:block" />
 
                     {/* User Dropdown */}
                     <DropdownMenu>
@@ -163,40 +163,40 @@ export function DashboardNavbar(): ReactElement {
                                 variant="ghost"
                                 className={cn(
                                     "h-12 gap-3 px-1 pr-4 rounded-[1.25rem] transition-colors",
-                                    "bg-white border border-slate-100 hover:border-sky-100 shadow-sm hover:shadow-md",
+                                    "border border-border-muted bg-surface shadow-sm hover:border-brand-border hover:shadow-md",
                                     "hidden sm:flex group",
                                 )}
                             >
-                                <div className="flex items-center justify-center h-10 w-10 rounded-xl bg-gradient-to-br from-sky-400 to-indigo-500 shadow-lg shadow-sky-100">
-                                    <User className="h-5 w-5 text-white" />
+                                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-brand-start to-brand-end shadow-lg shadow-brand-shadow">
+                                    <User className="h-5 w-5 text-content-on-brand" />
                                 </div>
                                 <div className="flex flex-col items-start text-left">
-                                    <span className="text-sm font-black text-slate-900 tracking-tight">
+                                    <span className="text-sm font-black tracking-tight text-content-primary">
                                         {user?.name || "User"}
                                     </span>
-                                    <span className="text-[10px] font-bold text-sky-600 uppercase tracking-widest leading-none">
+                                    <span className="text-xs font-bold uppercase leading-none tracking-widest text-brand-foreground">
                                         {getRoleLabelThai(user?.role)}
                                     </span>
                                 </div>
-                                <ChevronDown className="h-3 w-3 text-slate-400 group-hover:text-sky-600 transition-colors" />
+                                <ChevronDown className="h-3 w-3 text-content-subtle transition-colors group-hover:text-brand-foreground" />
                             </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent
                             align="end"
-                            className="w-64 p-2 rounded-2xl border-slate-100 bg-white shadow-lg"
+                            className="w-64 rounded-2xl border-border-muted bg-surface-raised p-2 shadow-lg"
                         >
-                            <div className="px-4 py-4 mb-2 rounded-xl bg-sky-50/50 border border-sky-100/50">
-                                <p className="text-sm font-black text-slate-900 leading-none mb-1">
+                            <div className="mb-2 rounded-xl border border-brand-border/50 bg-brand-surface/50 px-4 py-4">
+                                <p className="mb-1 text-sm font-black leading-none text-content-primary">
                                     {user?.name}
                                 </p>
-                                <p className="text-[10px] font-bold text-slate-400 truncate uppercase tracking-widest">
+                                <p className="truncate text-xs font-bold uppercase tracking-widest text-content-subtle">
                                     {user?.email}
                                 </p>
-                                <div className="mt-3 pt-3 border-t border-sky-100/30 flex items-center justify-between">
-                                    <span className="text-[10px] font-black uppercase tracking-widest text-sky-600">
+                                <div className="mt-3 flex items-center justify-between border-t border-brand-border/30 pt-3">
+                                    <span className="text-xs font-black uppercase tracking-widest text-brand-foreground">
                                         {user?.department}
                                     </span>
-                                    <span className="text-[8px] px-2 py-0.5 rounded-full bg-sky-500 text-white font-black uppercase tracking-widest">
+                                    <span className="rounded-full bg-brand-solid px-2 py-0.5 text-xs font-black uppercase tracking-widest text-content-on-brand">
                                         {user?.role}
                                     </span>
                                 </div>
@@ -204,17 +204,17 @@ export function DashboardNavbar(): ReactElement {
 
                             <DropdownMenuItem
                                 onClick={() => handleMenuClick("sessions")}
-                                className="h-11 rounded-xl focus:bg-sky-50 cursor-pointer group"
+                                className="h-11 cursor-pointer rounded-xl focus:bg-brand-surface group"
                             >
-                                <Smartphone className="h-4 w-4 mr-3 text-slate-400 group-hover:text-sky-600 transition-colors" />
-                                <span className="text-sm font-bold text-slate-600 group-hover:text-sky-900">
+                                <Smartphone className="mr-3 h-4 w-4 text-content-subtle transition-colors group-hover:text-brand-foreground" />
+                                <span className="text-sm font-bold text-content-secondary group-hover:text-brand-strong">
                                     จัดการเซสชัน
                                 </span>
                             </DropdownMenuItem>
-                            <DropdownMenuSeparator className="my-1 bg-slate-50" />
+                            <DropdownMenuSeparator className="my-1 bg-surface-subtle" />
                             <DropdownMenuItem
                                 onClick={openLogoutDialog}
-                                className="h-11 rounded-xl focus:bg-rose-50 cursor-pointer text-rose-600 focus:text-rose-600"
+                                className="h-11 cursor-pointer rounded-xl text-status-danger-foreground focus:bg-status-danger-surface focus:text-status-danger-foreground"
                             >
                                 <LogOut className="h-4 w-4 mr-3" />
                                 <span className="text-sm font-bold">
@@ -230,31 +230,31 @@ export function DashboardNavbar(): ReactElement {
                             <Button
                                 variant="ghost"
                                 size="icon"
-                                className="sm:hidden h-10 w-10 rounded-2xl bg-white border border-slate-100"
+                                className="rounded-2xl border border-border-muted bg-surface sm:hidden"
                                 aria-label="เมนูผู้ใช้"
                             >
-                                <div className="flex items-center justify-center h-8 w-8 rounded-xl bg-gradient-to-br from-sky-400 to-indigo-500">
-                                    <User className="h-4 w-4 text-white" />
+                                <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-brand-start to-brand-end">
+                                    <User className="h-4 w-4 text-content-on-brand" />
                                 </div>
                             </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent
                             align="end"
-                            className="w-56 p-2 rounded-2xl border-slate-100"
+                            className="w-56 rounded-2xl border-border-muted p-2"
                         >
                             <DropdownMenuItem
                                 onClick={() => handleMenuClick("sessions")}
-                                className="h-11 rounded-xl focus:bg-sky-50"
+                                className="h-11 rounded-xl focus:bg-brand-surface"
                             >
-                                <Smartphone className="h-4 w-4 mr-3 text-slate-400" />
-                                <span className="text-sm font-bold text-slate-600">
+                                <Smartphone className="mr-3 h-4 w-4 text-content-subtle" />
+                                <span className="text-sm font-bold text-content-secondary">
                                     จัดการเซสชัน
                                 </span>
                             </DropdownMenuItem>
-                            <DropdownMenuSeparator className="my-1 bg-slate-50" />
+                            <DropdownMenuSeparator className="my-1 bg-surface-subtle" />
                             <DropdownMenuItem
                                 onClick={openLogoutDialog}
-                                className="h-11 rounded-xl text-rose-600"
+                                className="h-11 rounded-xl text-status-danger-foreground"
                             >
                                 <LogOut className="h-4 w-4 mr-3" />
                                 <span className="text-sm font-bold">
@@ -285,30 +285,30 @@ export function DashboardNavbar(): ReactElement {
                             event.preventDefault();
                         }
                     }}
-                    className="rounded-2xl border border-slate-200 p-0 shadow-xl sm:max-w-[26rem]"
+                    className="rounded-2xl border border-border-subtle p-0 shadow-xl sm:max-w-[26rem]"
                 >
-                    <div className="space-y-5 bg-white px-6 pb-5 pt-6 sm:px-7">
+                    <div className="space-y-5 bg-surface-raised px-6 pb-5 pt-6 sm:px-7">
                         <div className="flex items-start gap-4">
-                            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-rose-100 bg-rose-50 text-rose-600">
+                            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-status-danger-border bg-status-danger-surface text-status-danger-foreground">
                                 <LogOut className="h-5 w-5" aria-hidden="true" />
                             </div>
                             <DialogHeader className="min-w-0 flex-1 text-left">
-                                <DialogTitle className="text-lg font-semibold leading-7 text-slate-950 [overflow-wrap:anywhere]">
+                                <DialogTitle className="text-lg font-semibold leading-7 text-content-heading [overflow-wrap:anywhere]">
                                     ออกจากระบบบัญชีนี้?
                                 </DialogTitle>
-                                <DialogDescription className="text-sm font-medium leading-6 text-slate-600 [overflow-wrap:anywhere]">
+                                <DialogDescription className="text-sm font-medium leading-6 text-content-secondary [overflow-wrap:anywhere]">
                                     ระบบจะสิ้นสุดเซสชันบนอุปกรณ์นี้ และพาคุณกลับไปหน้าเข้าสู่ระบบ
                                 </DialogDescription>
                             </DialogHeader>
                         </div>
 
-                        <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-700">
+                        <div className="rounded-xl border border-border-subtle bg-surface-subtle px-4 py-3 text-sm leading-6 text-content-body">
                             งานที่ยังไม่ได้บันทึกในหน้านี้อาจหายไป ตรวจสอบข้อมูลให้เรียบร้อยก่อนออกจากระบบ
                         </div>
 
                         {logoutError ? (
                             <div
-                                className="flex items-start gap-2 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium leading-6 text-rose-700"
+                                className="flex items-start gap-2 rounded-xl border border-status-danger-border bg-status-danger-surface px-4 py-3 text-sm font-medium leading-6 text-status-danger-strong"
                                 role="alert"
                             >
                                 <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
@@ -317,13 +317,13 @@ export function DashboardNavbar(): ReactElement {
                         ) : null}
                     </div>
 
-                    <DialogFooter className="border-t border-slate-200 bg-slate-50 px-6 py-4 sm:px-7">
+                    <DialogFooter className="border-t border-border-subtle bg-surface-subtle px-6 py-4 sm:px-7">
                         <Button
                             type="button"
                             variant="outline"
                             onClick={closeLogoutDialog}
                             disabled={isLoggingOut}
-                            className="h-11 rounded-lg border-slate-200 bg-white px-5 font-semibold text-slate-700 hover:bg-slate-100 hover:text-slate-900"
+                            className="h-11 rounded-lg border-border-subtle bg-surface px-5 font-semibold text-content-body hover:bg-surface-muted hover:text-content-primary"
                         >
                             ยกเลิก
                         </Button>
@@ -331,7 +331,7 @@ export function DashboardNavbar(): ReactElement {
                             type="button"
                             onClick={() => void confirmLogout()}
                             disabled={isLoggingOut}
-                            className="h-11 rounded-lg bg-rose-600 px-6 font-semibold text-white hover:bg-rose-700 disabled:opacity-80"
+                            className="h-11 rounded-lg bg-status-danger-solid px-6 font-semibold text-content-on-brand hover:bg-status-danger-strong disabled:opacity-80"
                             aria-busy={isLoggingOut}
                         >
                             {isLoggingOut ? (

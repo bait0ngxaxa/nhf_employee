@@ -53,17 +53,17 @@ export function YearlyReportExportPanel({
 }: YearlyReportExportPanelProps) {
     if (layout === "card") {
         return (
-            <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="rounded-xl border border-border-subtle bg-surface-raised p-5 shadow-sm">
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                     <div className="space-y-2">
                         {badge ? badge : null}
                         {(title || description) && (
                             <div>
                                 {title ? (
-                                    <h3 className="text-lg font-bold text-slate-800">{title}</h3>
+                                    <h3 className="text-lg font-bold text-content-strong">{title}</h3>
                                 ) : null}
                                 {description ? (
-                                    <p className="text-sm text-slate-500">{description}</p>
+                                    <p className="text-sm text-content-muted">{description}</p>
                                 ) : null}
                             </div>
                         )}
@@ -89,13 +89,13 @@ export function YearlyReportExportPanel({
                         {stats.map((stat) => (
                             <div
                                 key={stat.label}
-                                className="rounded-lg border border-slate-200 bg-slate-50 p-4"
+                                className="rounded-lg border border-border-subtle bg-surface-subtle p-4"
                             >
-                                <div className="flex items-center gap-2 text-xs font-semibold text-slate-500">
+                                <div className="flex items-center gap-2 text-xs font-semibold text-content-muted">
                                     {stat.icon}
                                     {stat.label}
                                 </div>
-                                <div className="mt-2 text-base font-bold text-slate-800">
+                                <div className="mt-2 text-base font-bold text-content-strong">
                                     {stat.value}
                                 </div>
                             </div>
@@ -157,8 +157,8 @@ function PanelControls({
             >
                 <SelectTrigger
                     className={cn(
-                        "w-[110px] rounded-md border-slate-300 bg-white text-sm",
-                        selectClassName ?? "h-9",
+                        "w-[110px] rounded-md border-border-subtle bg-surface text-sm",
+                        selectClassName,
                     )}
                     aria-label={selectAriaLabel}
                 >
@@ -181,7 +181,7 @@ function PanelControls({
                 variant="outline"
                 className={cn(
                     "rounded-md px-5 text-sm font-semibold",
-                    buttonClassName ?? "h-9",
+                    buttonClassName,
                 )}
             >
                 {isExporting ? (

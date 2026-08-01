@@ -43,10 +43,10 @@ export function StockBrowseCartBar(props: StockBrowseCartBarProps) {
                 <Button
                     type="button"
                     onClick={() => setOpen(true)}
-                    className="group/cart-bar flex h-auto min-h-16 w-full items-center justify-between gap-4 rounded-2xl border border-blue-200 bg-blue-600 px-4 py-3 text-left text-white shadow-lg shadow-blue-900/20 transition-colors duration-200 hover:border-blue-300 hover:bg-blue-700 sm:min-w-[340px]"
+                    className="group/cart-bar flex h-auto min-h-16 w-full items-center justify-between gap-4 rounded-2xl border border-blue-200 bg-blue-600 px-4 py-3 text-left text-content-on-brand shadow-lg shadow-blue-900/20 transition-colors duration-200 hover:border-blue-300 hover:bg-blue-700 sm:min-w-[340px]"
                 >
                     <div className="flex items-center gap-3">
-                        <div className="rounded-xl bg-white/15 p-2.5 text-white ring-1 ring-white/20 transition-colors duration-200 group-hover/cart-bar:bg-white/20">
+                        <div className="rounded-xl bg-surface-raised/15 p-2.5 text-content-on-brand ring-1 ring-content-on-brand/20 transition-colors duration-200 group-hover/cart-bar:bg-surface-raised/20">
                             <ShoppingCart className="h-5 w-5" />
                         </div>
                         <div>
@@ -59,7 +59,7 @@ export function StockBrowseCartBar(props: StockBrowseCartBarProps) {
                         </div>
                     </div>
                     <div className="flex items-center gap-2">
-                        <div className="rounded-full bg-white px-2.5 py-1 text-xs font-bold tabular-nums leading-5 text-blue-700 shadow-sm">
+                        <div className="rounded-full bg-surface-raised px-2.5 py-1 text-xs font-bold tabular-nums leading-5 text-blue-700 shadow-sm">
                             {props.cartCount}
                         </div>
                         <ChevronRight className="h-4 w-4 text-blue-100" />
@@ -70,7 +70,7 @@ export function StockBrowseCartBar(props: StockBrowseCartBarProps) {
             <Sheet open={open} onOpenChange={handleOpenChange}>
                 <SheetContent
                     side="right"
-                    className="w-full border-l-0 bg-white p-0 sm:max-w-xl"
+                    className="w-full border-l-0 bg-surface-raised p-0 sm:max-w-xl"
                 >
                     <SheetHeader className="sr-only">
                         <SheetTitle>ตะกร้ารายการเบิก</SheetTitle>

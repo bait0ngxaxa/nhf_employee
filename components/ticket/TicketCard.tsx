@@ -33,8 +33,8 @@ export function TicketCard({
                 group relative overflow-hidden rounded-xl p-5 cursor-pointer
                 transition-[box-shadow,transform,border-color] duration-200 ease-out
                 hover:shadow-xl motion-safe:hover:-translate-y-0.5
-                bg-white border-2 border-gray-200 shadow-md
-                hover:border-gray-300
+                bg-surface-raised border-2 border-border-neutral-default shadow-md
+                hover:border-border-neutral-strong
                 ${
                     isNew
                         ? "ring-2 ring-blue-200 border-blue-300 shadow-lg shadow-blue-100"
@@ -55,7 +55,7 @@ export function TicketCard({
                         <div className="flex-shrink-0 flex items-center gap-2">
                             <div className="relative">
                                 <div className="absolute inset-0 animate-ping bg-red-400 rounded-full opacity-50" />
-                                <span className="relative inline-flex items-center gap-1.5 text-xs font-bold bg-gradient-to-r from-red-500 to-rose-500 text-white px-3 py-1.5 rounded-full shadow-lg">
+                                <span className="relative inline-flex items-center gap-1.5 text-xs font-bold bg-gradient-to-r from-red-500 to-rose-500 text-content-on-brand px-3 py-1.5 rounded-full shadow-lg">
                                     <Sparkles className="h-3.5 w-3.5" />
                                     ใหม่
                                 </span>
@@ -65,7 +65,7 @@ export function TicketCard({
                     <h3
                         className={`
                         font-bold text-lg sm:text-xl leading-tight line-clamp-2
-                        ${isNew ? "text-blue-900" : "text-gray-900"}
+                        ${isNew ? "text-blue-900" : "text-content-neutral-primary"}
                         group-hover:text-indigo-700 transition-colors
                     `}
                     >
@@ -83,7 +83,7 @@ export function TicketCard({
             <p
                 className={`
                 text-sm sm:text-base mb-5 line-clamp-2 leading-relaxed
-                ${isNew ? "text-blue-800/80" : "text-gray-600"}
+                ${isNew ? "text-blue-800/80" : "text-content-neutral-secondary"}
             `}
             >
                 {ticket.description}
@@ -194,15 +194,15 @@ function MetaItem({ isNew, icon, label, children }: MetaItemProps) {
             flex flex-col gap-1 p-2.5 rounded-xl transition-colors
             ${
                 isNew
-                    ? "bg-white/60 border border-blue-200/50 hover:bg-white/80"
-                    : "bg-gray-50 border border-gray-100 hover:bg-gray-100"
+                    ? "bg-surface-raised/60 border border-blue-200/50 hover:bg-surface-raised/80"
+                    : "bg-surface-neutral-subtle border border-border-neutral-muted hover:bg-surface-neutral-muted"
             }
         `}
         >
             <div
                 className={`
                 flex items-center gap-1.5 text-xs font-medium
-                ${isNew ? "text-blue-600" : "text-gray-500"}
+                ${isNew ? "text-blue-600" : "text-content-neutral-muted"}
             `}
             >
                 {icon}
@@ -211,7 +211,7 @@ function MetaItem({ isNew, icon, label, children }: MetaItemProps) {
             <span
                 className={`
                 text-sm font-medium truncate
-                ${isNew ? "text-blue-900" : "text-gray-900"}
+                ${isNew ? "text-blue-900" : "text-content-neutral-primary"}
             `}
             >
                 {children}

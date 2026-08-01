@@ -51,14 +51,14 @@ export function ApproverManagement() {
                 unassignedCount={model.unassignedCount}
             />
 
-            <Card className="border-slate-200 shadow-sm">
+            <Card className="border-border-subtle shadow-sm">
                 <CardHeader className="pb-4">
                     <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                         <div className="min-w-0">
-                            <CardTitle className="text-lg text-slate-950">
+                            <CardTitle className="text-lg text-content-heading">
                                 กำหนดผู้อนุมัติ
                             </CardTitle>
-                            <p className="mt-1 text-sm text-slate-600">
+                            <p className="mt-1 text-sm text-content-secondary">
                                 เลือกผู้อนุมัติการลาของพนักงานแต่ละคน
                             </p>
                         </div>
@@ -127,13 +127,13 @@ export function ApproverManagement() {
                 <div className="fixed bottom-4 left-1/2 z-50 w-[calc(100vw-1.5rem)] max-w-3xl -translate-x-1/2">
                     <div
                         role="status"
-                        className="flex items-center justify-between gap-3 rounded-lg border border-indigo-200 bg-white px-4 py-3 shadow-md"
+                        className="flex items-center justify-between gap-3 rounded-lg border border-indigo-200 bg-surface-raised px-4 py-3 shadow-md"
                     >
                         <div className="min-w-0">
                             <p className="text-sm font-semibold text-indigo-700">
                                 มีรายการที่ยังไม่บันทึก {model.assignments.size} รายการ
                             </p>
-                            <p className="text-xs text-slate-600">
+                            <p className="text-xs text-content-secondary">
                                 กดบันทึกเพื่ออัปเดตผู้อนุมัติลา
                             </p>
                         </div>

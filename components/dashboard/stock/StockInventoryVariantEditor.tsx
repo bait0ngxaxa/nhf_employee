@@ -40,17 +40,17 @@ export function StockInventoryVariantEditor(
     const variantCountLabel = `มี ${variants.length} รายการ`;
 
     return (
-        <div className="space-y-4 rounded-2xl border border-slate-200 bg-slate-50/60 p-4">
+        <div className="space-y-4 rounded-2xl border border-border-subtle bg-surface-subtle/60 p-4">
             <div className="space-y-1">
-                <div className="text-sm font-semibold text-slate-800">
+                <div className="text-sm font-semibold text-content-strong">
                     {STOCK_ADMIN_TEXT.variantsTitle}
                 </div>
-                <p className="text-xs text-slate-500">
+                <p className="text-xs text-content-muted">
                     {STOCK_ADMIN_TEXT.variantsHint}
                 </p>
             </div>
             {variants.length === 0 ? (
-                <div className="rounded-xl border border-dashed border-slate-300 bg-white px-4 py-5 text-sm text-slate-500">
+                <div className="rounded-xl border border-dashed border-border-strong bg-surface-raised px-4 py-5 text-sm text-content-muted">
                     {STOCK_ADMIN_TEXT.autoVariantHint}
                 </div>
             ) : (
@@ -82,20 +82,20 @@ export function StockInventoryVariantEditor(
                         />
                     ))}
 
-                    <div className="-mx-4 rounded-b-2xl border-t border-slate-200 bg-white px-4 py-3">
+                    <div className="-mx-4 rounded-b-2xl border-t border-border-subtle bg-surface-raised px-4 py-3">
                         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                             <div className="space-y-0.5">
-                                <div className="text-sm font-semibold text-slate-800">
+                                <div className="text-sm font-semibold text-content-strong">
                                     เพิ่มรายการได้ต่อเนื่อง
                                 </div>
-                                <p className="text-xs text-slate-500">
+                                <p className="text-xs text-content-muted">
                                     {variantCountLabel}
                                 </p>
                             </div>
                             <Button
                                 type="button"
                                 onClick={props.onAddVariant}
-                                className="bg-blue-600 text-white hover:bg-blue-700"
+                                className="bg-blue-600 text-content-on-brand hover:bg-blue-700"
                             >
                                 <Plus className="mr-1 h-4 w-4" />
                                 {STOCK_ADMIN_TEXT.addVariant}
@@ -127,9 +127,9 @@ function VariantCard(props: {
     const { index, variant } = props;
 
     return (
-        <div className="space-y-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="space-y-4 rounded-2xl border border-border-subtle bg-surface-raised p-4 shadow-sm">
             <div className="flex items-center justify-between gap-3">
-                <div className="text-sm font-semibold text-slate-800">
+                <div className="text-sm font-semibold text-content-strong">
                     {`${STOCK_ADMIN_TEXT.variantLabel} ${index + 1}`}
                 </div>
                 <Button
@@ -163,7 +163,7 @@ function VariantCard(props: {
                                     sku: event.target.value,
                                 })
                             }
-                            className="h-10 focus-visible:ring-blue-500"
+                            className="h-11 focus-visible:ring-blue-500"
                         />
                     </FieldShell>
                 )}
@@ -189,7 +189,7 @@ function VariantCard(props: {
                                 unit: event.target.value,
                             })
                         }
-                        className="h-10 focus-visible:ring-blue-500"
+                        className="h-11 focus-visible:ring-blue-500"
                     />
                 </FieldShell>
                 <FieldShell label={STOCK_ADMIN_TEXT.initialQuantity}>
@@ -203,7 +203,7 @@ function VariantCard(props: {
                                 quantity: event.target.value,
                             })
                         }
-                        className="h-10 focus-visible:ring-blue-500"
+                        className="h-11 focus-visible:ring-blue-500"
                     />
                 </FieldShell>
                 <FieldShell label={STOCK_ADMIN_TEXT.minStock}>
@@ -217,7 +217,7 @@ function VariantCard(props: {
                                 minStock: event.target.value,
                             })
                         }
-                        className="h-10 focus-visible:ring-blue-500"
+                        className="h-11 focus-visible:ring-blue-500"
                     />
                 </FieldShell>
             </div>
@@ -246,7 +246,7 @@ function AttributeEditor(props: {
     return (
         <div className="space-y-3">
             <div className="flex items-center justify-between gap-3">
-                <div className="text-sm font-semibold text-slate-700">
+                <div className="text-sm font-semibold text-content-body">
                     {STOCK_ADMIN_TEXT.attributes}
                 </div>
                 <Button
@@ -254,7 +254,7 @@ function AttributeEditor(props: {
                     variant="outline"
                     size="sm"
                     onClick={props.onAddAttribute}
-                    className="border-slate-200"
+                    className="border-border-subtle"
                 >
                     <Plus className="mr-1 h-4 w-4" />
                     {STOCK_ADMIN_TEXT.addAttribute}
@@ -275,7 +275,7 @@ function AttributeEditor(props: {
                                     event.target.value,
                                 )
                             }
-                            className="h-10 focus-visible:ring-blue-500"
+                            className="h-11 focus-visible:ring-blue-500"
                         />
                         <Input
                             value={attribute.value}
@@ -289,7 +289,7 @@ function AttributeEditor(props: {
                                     event.target.value,
                                 )
                             }
-                            className="h-10 focus-visible:ring-blue-500"
+                            className="h-11 focus-visible:ring-blue-500"
                         />
                         <Button
                             type="button"
@@ -318,11 +318,11 @@ function FieldShell(props: {
 }) {
     return (
         <div className="space-y-1.5">
-            <Label className="text-sm font-semibold text-slate-700">
+            <Label className="text-sm font-semibold text-content-body">
                 {props.label}
             </Label>
             {props.hint && (
-                <p className="text-xs text-slate-500">{props.hint}</p>
+                <p className="text-xs text-content-muted">{props.hint}</p>
             )}
             {props.children}
         </div>

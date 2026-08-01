@@ -63,23 +63,23 @@ function SessionRow({
         )}>
             <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2.5">
-                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-600">
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-surface-muted text-content-secondary">
                         <DeviceIcon className="h-4 w-4" aria-hidden="true" />
                     </span>
-                    <span className="text-sm font-semibold text-slate-950">
+                    <span className="text-sm font-semibold text-content-heading">
                         {parsed.browser}
                     </span>
-                    <span className="text-sm text-slate-600">{parsed.os}</span>
+                    <span className="text-sm text-content-secondary">{parsed.os}</span>
                     {session.isCurrent ? (
                         <Badge className="bg-cyan-100 text-cyan-800 hover:bg-cyan-100">
                             อุปกรณ์นี้
                         </Badge>
                     ) : null}
                 </div>
-                <p className="mt-2 text-xs font-medium text-slate-500">
+                <p className="mt-2 text-xs font-medium text-content-muted">
                     {getDeviceTypeLabel(parsed.deviceType)}
                 </p>
-                <dl className="mt-3 grid gap-x-6 gap-y-2 text-xs leading-5 text-slate-600 lg:grid-cols-2 2xl:grid-cols-4">
+                <dl className="mt-3 grid gap-x-6 gap-y-2 text-xs leading-5 text-content-secondary lg:grid-cols-2 2xl:grid-cols-4">
                     <SessionDetail label="IP" value={session.ipAddress ?? "ไม่ทราบ"} />
                     <SessionDetail label="เริ่มใช้งาน" value={formatDateTime(session.createdAt)} />
                     <SessionDetail label="ใช้งานล่าสุด" value={formatRelativeTime(lastActive)} />
@@ -91,7 +91,7 @@ function SessionRow({
                     <Button
                         variant="outline"
                         size="sm"
-                        className="h-10 w-full border-rose-200 text-rose-700 hover:bg-rose-50 hover:text-rose-800"
+                        className="h-11 w-full border-status-danger-border text-status-danger-strong hover:bg-status-danger-surface hover:text-status-danger-strong"
                         onClick={() => onRequestRevoke(session.id)}
                         disabled={isRevoking || isValidating}
                         aria-label={`ยกเลิกเซสชัน ${parsed.browser} ${parsed.os}`}
@@ -118,8 +118,8 @@ function SessionDetail({
 }): React.ReactElement {
     return (
         <div className="min-w-0">
-            <dt className="text-slate-500">{label}</dt>
-            <dd className="font-medium text-slate-700 [overflow-wrap:anywhere]">{value}</dd>
+            <dt className="text-content-muted">{label}</dt>
+            <dd className="font-medium text-content-body [overflow-wrap:anywhere]">{value}</dd>
         </div>
     );
 }
@@ -140,7 +140,7 @@ export function SessionManagementView({
     const isConfirming = Boolean(revokingId) || isRevokingOthers;
 
     return (
-        <section className="min-h-[calc(100dvh-6rem)] bg-slate-50 px-4 py-6 md:px-8 md:py-8">
+        <section className="min-h-[calc(100dvh-6rem)] bg-surface-subtle px-4 py-6 md:px-8 md:py-8">
             <div className="mx-auto max-w-6xl space-y-5">
                 <header className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                     <div className="flex min-w-0 items-center gap-3">
@@ -151,11 +151,11 @@ export function SessionManagementView({
                             <h1
                                 data-page-heading
                                 tabIndex={-1}
-                                className="text-2xl font-bold tracking-tight text-slate-950"
+                                className="text-2xl font-bold tracking-tight text-content-heading"
                             >
                                 จัดการเซสชัน
                             </h1>
-                            <p className="mt-0.5 text-sm text-slate-600">
+                            <p className="mt-0.5 text-sm text-content-secondary">
                                 ตรวจสอบอุปกรณ์ที่กำลังเข้าถึงบัญชีของคุณ
                             </p>
                         </div>
@@ -165,7 +165,7 @@ export function SessionManagementView({
                             variant="outline"
                             onClick={() => onSetConfirmAction({ type: "signout-others" })}
                             disabled={isRevokingOthers || otherSessionCount === 0}
-                            className="h-10 border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
+                            className="h-11 border-border-subtle bg-surface text-content-body hover:bg-surface-subtle"
                         >
                             {isRevokingOthers ? (
                                 <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
@@ -176,27 +176,27 @@ export function SessionManagementView({
                         </Button>
                         <Button
                             onClick={() => onSetConfirmAction({ type: "signout-current" })}
-                            className="h-10 bg-cyan-700 text-white hover:bg-cyan-800"
+                            className="h-11 bg-cyan-700 text-content-on-brand hover:bg-cyan-800"
                         >
                             ออกจากอุปกรณ์นี้
                         </Button>
                     </div>
                 </header>
 
-                <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
-                    <div className="flex flex-col gap-3 border-b border-slate-200 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="overflow-hidden rounded-xl border border-border-subtle bg-surface-raised">
+                    <div className="flex flex-col gap-3 border-b border-border-subtle px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
                         <div>
-                            <h3 className="font-semibold text-slate-950">
+                            <h3 className="font-semibold text-content-heading">
                                 อุปกรณ์ที่กำลังใช้งาน <span className="text-cyan-700">{sessions.length}</span>
                             </h3>
-                            <p className="mt-0.5 text-sm text-slate-600">
+                            <p className="mt-0.5 text-sm text-content-secondary">
                                 เลือกยกเลิกอุปกรณ์ที่คุณไม่รู้จักได้ทันที
                             </p>
                         </div>
                         <Button
                             variant="ghost"
                             size="sm"
-                            className="h-9 self-start text-slate-700 hover:bg-slate-100 sm:self-auto"
+                            className="h-11 self-start text-content-body hover:bg-surface-muted sm:self-auto"
                             onClick={onRefresh}
                             disabled={isValidating}
                         >
@@ -209,7 +209,7 @@ export function SessionManagementView({
                         </Button>
                     </div>
                     {sessions.length > 0 ? (
-                        <ul className="divide-y divide-slate-100">
+                        <ul className="divide-y divide-border-muted">
                             {sessions.map((session) => (
                                 <SessionRow
                                     key={session.id}
@@ -222,13 +222,13 @@ export function SessionManagementView({
                         </ul>
                     ) : (
                         <div className="px-5 py-12 text-center">
-                            <Clock3 className="mx-auto h-5 w-5 text-slate-400" aria-hidden="true" />
-                            <p className="mt-3 text-sm font-semibold text-slate-900">ไม่พบเซสชันที่กำลังใช้งาน</p>
-                            <p className="mt-1 text-sm text-slate-600">ลองโหลดข้อมูลใหม่อีกครั้ง</p>
+                            <Clock3 className="mx-auto h-5 w-5 text-content-subtle" aria-hidden="true" />
+                            <p className="mt-3 text-sm font-semibold text-content-primary">ไม่พบเซสชันที่กำลังใช้งาน</p>
+                            <p className="mt-1 text-sm text-content-secondary">ลองโหลดข้อมูลใหม่อีกครั้ง</p>
                         </div>
                     )}
                     {currentSession ? (
-                        <div className="border-t border-slate-100 px-5 py-3 text-xs text-slate-500 [overflow-wrap:anywhere]">
+                        <div className="border-t border-border-muted px-5 py-3 text-xs text-content-muted [overflow-wrap:anywhere]">
                             รหัสเซสชันปัจจุบัน: {currentSession.familyId}
                         </div>
                     ) : null}

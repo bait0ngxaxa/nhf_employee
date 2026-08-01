@@ -47,57 +47,57 @@ export const EmployeeTable = memo(function EmployeeTable({
             </div>
 
             <div
-                className="hidden max-h-[70vh] overflow-auto rounded-xl border border-slate-200 bg-white lg:block"
+                className="hidden max-h-[70vh] overflow-auto rounded-xl border border-border-subtle bg-surface-raised lg:block"
                 style={{
                     contentVisibility: "auto",
                     containIntrinsicSize: "0 500px",
                 }}
             >
                 <table className="w-max min-w-[1360px] text-left text-sm">
-                    <thead className="sticky top-0 z-10 border-b border-slate-200 bg-slate-50">
+                    <thead className="sticky top-0 z-10 border-b border-border-subtle bg-surface-subtle">
                     <tr>
-                        <th className="px-5 py-4 text-left text-xs font-semibold text-slate-600">
+                        <th className="px-5 py-4 text-left text-xs font-semibold text-content-secondary">
                             ชื่อ-นามสกุล
                         </th>
-                        <th className="px-4 py-4 text-left text-xs font-semibold text-slate-600">
+                        <th className="px-4 py-4 text-left text-xs font-semibold text-content-secondary">
                             ชื่อเล่น
                         </th>
-                        <th className="px-4 py-4 text-left text-xs font-semibold text-slate-600">
+                        <th className="px-4 py-4 text-left text-xs font-semibold text-content-secondary">
                             ตำแหน่ง
                         </th>
-                        <th className="px-4 py-4 text-left text-xs font-semibold text-slate-600">
+                        <th className="px-4 py-4 text-left text-xs font-semibold text-content-secondary">
                             สังกัด
                         </th>
-                        <th className="px-4 py-4 text-left text-xs font-semibold text-slate-600">
+                        <th className="px-4 py-4 text-left text-xs font-semibold text-content-secondary">
                             แผนก
                         </th>
-                        <th className="px-4 py-4 text-left text-xs font-semibold text-slate-600">
+                        <th className="px-4 py-4 text-left text-xs font-semibold text-content-secondary">
                             อีเมล
                         </th>
-                        <th className="px-4 py-4 text-left text-xs font-semibold text-slate-600">
+                        <th className="px-4 py-4 text-left text-xs font-semibold text-content-secondary">
                             เบอร์โทร
                         </th>
-                        <th className="px-4 py-4 text-left text-xs font-semibold text-slate-600">
+                        <th className="px-4 py-4 text-left text-xs font-semibold text-content-secondary">
                             สถานะ
                         </th>
                         {canEdit ? (
-                            <th className="sticky right-0 bg-slate-50 px-4 py-4 text-left text-xs font-semibold text-slate-600 shadow-[-10px_0_18px_-18px_rgba(15,23,42,0.45)]">
+                        <th className="sticky right-0 bg-surface-subtle px-4 py-4 text-left text-xs font-semibold text-content-secondary employee-table-sticky-shadow">
                                 การจัดการ
                             </th>
                         ) : null}
                     </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
+                <tbody className="divide-y divide-border-muted">
                     {employees.map((employee) => (
                         <tr
                             key={employee.id}
-                            className="group border-b border-slate-100 transition-colors hover:bg-sky-50/40 last:border-0"
+                            className="group border-b border-border-muted transition-colors hover:bg-sky-50/40 last:border-0"
                         >
                             <td className="px-5 py-4">
                                 <div className="flex items-center gap-3">
                                     <EmployeeAvatar employee={employee} />
                                     <div>
-                                        <div className="whitespace-nowrap text-sm font-semibold text-slate-950">
+                                        <div className="whitespace-nowrap text-sm font-semibold text-content-heading">
                                             {getEmployeeFullName(employee)}
                                         </div>
                                     </div>
@@ -108,7 +108,7 @@ export const EmployeeTable = memo(function EmployeeTable({
                             </td>
                             <td className="px-4 py-4">
                                 <div
-                                    className="line-clamp-2 text-sm leading-6 text-slate-800 [overflow-wrap:anywhere]"
+                                    className="line-clamp-2 text-sm leading-6 text-content-strong [overflow-wrap:anywhere]"
                                     title={employee.position}
                                 >
                                     {employee.position}
@@ -116,7 +116,7 @@ export const EmployeeTable = memo(function EmployeeTable({
                             </td>
                             <td className="px-4 py-4">
                                 <div
-                                    className="line-clamp-2 text-sm leading-6 text-slate-700 [overflow-wrap:anywhere]"
+                                    className="line-clamp-2 text-sm leading-6 text-content-body [overflow-wrap:anywhere]"
                                     title={employee.affiliation || undefined}
                                 >
                                     {employee.affiliation || "-"}
@@ -137,7 +137,7 @@ export const EmployeeTable = memo(function EmployeeTable({
                                 <EmailValue email={employee.email} />
                             </td>
                             <td className="px-4 py-4">
-                                <div className="whitespace-nowrap text-sm text-slate-800">
+                                <div className="whitespace-nowrap text-sm text-content-strong">
                                     {formatEmployeePhone(employee.phone)}
                                 </div>
                             </td>
@@ -151,7 +151,7 @@ export const EmployeeTable = memo(function EmployeeTable({
                                 </Badge>
                             </td>
                             {canEdit && onEditEmployee ? (
-                                <td className="sticky right-0 bg-white px-4 py-4 shadow-[-10px_0_18px_-18px_rgba(15,23,42,0.45)] group-hover:bg-sky-50">
+                                <td className="sticky right-0 bg-surface-raised px-4 py-4 employee-table-sticky-shadow group-hover:bg-sky-50">
                                     <EditEmployeeButton
                                         employee={employee}
                                         onEditEmployee={onEditEmployee}
@@ -169,7 +169,7 @@ export const EmployeeTable = memo(function EmployeeTable({
 
 function NicknameBadge({ nickname }: { nickname?: string }) {
     if (!nickname) {
-        return <span className="text-sm text-slate-400">-</span>;
+        return <span className="text-sm text-content-subtle">-</span>;
     }
 
     return (
@@ -185,11 +185,11 @@ function NicknameBadge({ nickname }: { nickname?: string }) {
 
 function EmailValue({ email }: { email: string }) {
     if (isTemporaryEmail(email)) {
-        return <span className="text-sm text-slate-400">-</span>;
+        return <span className="text-sm text-content-subtle">-</span>;
     }
 
     return (
-        <div className="whitespace-nowrap text-sm text-slate-800">
+        <div className="whitespace-nowrap text-sm text-content-strong">
             {email}
         </div>
     );

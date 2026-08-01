@@ -50,16 +50,16 @@ export function ForgotPasswordForm({
     if (isSubmitted) {
         return (
             <div className={cn("flex flex-col gap-6", className)} {...props}>
-                <Card className="rounded-2xl border-gray-200/70 bg-white/90 shadow-sm">
+                <Card className="rounded-2xl border-border-neutral-default/70 bg-surface-raised/90 shadow-sm">
                     <CardContent className="pt-8 pb-8">
                         <div className="flex flex-col items-center text-center space-y-4">
                             <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center">
                                 <CheckCircle2 className="h-8 w-8 text-green-600" />
                             </div>
-                            <h3 className="text-lg font-semibold text-gray-900">
+                            <h3 className="text-lg font-semibold text-content-neutral-primary">
                                 ตรวจสอบอีเมลของคุณ
                             </h3>
-                            <p className="max-w-xs text-sm leading-6 text-gray-600">
+                            <p className="max-w-xs text-sm leading-6 text-content-neutral-secondary">
                                 หากอีเมล{" "}
                                 <strong className="break-all">{email}</strong>{" "}
                                 มีอยู่ในระบบ
@@ -82,7 +82,7 @@ export function ForgotPasswordForm({
 
     return (
         <div className={cn("flex flex-col gap-6", className)} {...props}>
-            <Card className="rounded-2xl border-gray-200/70 bg-white/90 shadow-sm">
+            <Card className="rounded-2xl border-border-neutral-default/70 bg-surface-raised/90 shadow-sm">
                 <CardHeader className="text-center pb-2">
                     <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center mx-auto mb-3">
                         <Mail className="h-6 w-6 text-blue-600" />
@@ -90,7 +90,7 @@ export function ForgotPasswordForm({
                     <CardTitle className="text-2xl font-bold text-blue-700">
                         ลืมรหัสผ่าน
                     </CardTitle>
-                    <CardDescription className="text-gray-600">
+                    <CardDescription className="text-content-neutral-secondary">
                         กรอกอีเมลเพื่อรับลิงก์รีเซ็ตรหัสผ่าน
                     </CardDescription>
                 </CardHeader>
@@ -110,7 +110,7 @@ export function ForgotPasswordForm({
                             <div className="grid gap-3">
                                 <Label
                                     htmlFor="email"
-                                    className="text-gray-700"
+                                    className="text-content-neutral-body"
                                 >
                                     อีเมล
                                 </Label>
@@ -124,13 +124,13 @@ export function ForgotPasswordForm({
                                     onChange={(e) => setEmail(e.target.value)}
                                     required
                                     aria-invalid={error ? true : undefined}
-                                    className="rounded-xl border-gray-200 bg-white/70 focus:border-blue-500 focus:ring-blue-500/20"
+                                    className="rounded-xl border-border-neutral-default bg-surface-raised/70 focus:border-blue-500 focus:ring-blue-500/20"
                                 />
                             </div>
 
                             <Button
                                 type="submit"
-                                className="w-full rounded-xl bg-gradient-to-r from-blue-600 to-cyan-600 text-white hover:from-blue-700 hover:to-cyan-700 disabled:opacity-70"
+                                className="w-full rounded-xl bg-gradient-to-r from-action-gradient-start to-action-gradient-end text-content-on-brand hover:from-action-gradient-hover-start hover:to-action-gradient-hover-end disabled:opacity-70"
                                 disabled={isLoading}
                             >
                                 {isLoading ? (
@@ -147,7 +147,7 @@ export function ForgotPasswordForm({
                         <div className="mt-4 text-center">
                             <Link
                                 href={APP_ROUTES.login}
-                                className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-blue-600 transition-colors"
+                                className="inline-flex items-center gap-1 text-sm text-content-neutral-muted hover:text-blue-600 transition-colors"
                             >
                                 <ArrowLeft className="h-3 w-3" />
                                 กลับไปหน้าเข้าสู่ระบบ

@@ -31,17 +31,17 @@ function QuotaCard({ title, remain, used, total, note, icon: Icon, theme }: Quot
     const progress = getQuotaProgress(used, total);
 
     return (
-        <Card className="border-slate-200 shadow-sm">
+        <Card className="border-border-subtle shadow-sm">
             <CardContent className="p-5">
                 <div className="flex items-start justify-between gap-4">
                     <div className="min-w-0">
-                        <p className="text-base/6 font-semibold text-slate-950">{title}</p>
-                        <p className="mt-1 text-xs/5 font-medium text-slate-500">{note}</p>
+                        <p className="text-base/6 font-semibold text-content-heading">{title}</p>
+                        <p className="mt-1 text-xs/5 font-medium text-content-muted">{note}</p>
                         <div className="mt-4 flex items-baseline gap-2">
                             <p className={cn("tabular-nums text-4xl font-bold tracking-tight", isOverQuota ? "text-rose-700" : theme.valueColor)}>
                                 {displayedRemain}
                             </p>
-                            <p className="text-sm/6 font-semibold text-slate-600">
+                            <p className="text-sm/6 font-semibold text-content-secondary">
                                 {isOverQuota ? "วันเกินสิทธิ์" : "วันคงเหลือ"}
                             </p>
                         </div>
@@ -52,12 +52,12 @@ function QuotaCard({ title, remain, used, total, note, icon: Icon, theme }: Quot
                 </div>
 
                 <div className="mt-5">
-                    <div className="flex items-center justify-between gap-3 text-xs/5 font-medium text-slate-600">
+                    <div className="flex items-center justify-between gap-3 text-xs/5 font-medium text-content-secondary">
                         <span>ใช้ไปแล้ว</span>
                         <span className="tabular-nums">{used}/{total} วัน</span>
                     </div>
                     <div
-                        className="mt-2 h-2 overflow-hidden rounded-full bg-slate-100"
+                        className="mt-2 h-2 overflow-hidden rounded-full bg-surface-muted"
                         aria-label={`ใช้วันลาไปแล้ว ${used} จาก ${total} วัน`}
                     >
                         <div

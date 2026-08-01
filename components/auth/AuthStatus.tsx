@@ -19,13 +19,13 @@ export function AuthStatus() {
     if (hasValidSession) {
         return (
             <div className="flex items-center space-x-4">
-                <div className="flex items-center space-x-2 bg-white border rounded-lg px-3 py-2">
-                    <User className="h-4 w-4 text-gray-600" />
+                <div className="flex items-center space-x-2 bg-surface-raised border rounded-lg px-3 py-2">
+                    <User className="h-4 w-4 text-content-neutral-secondary" />
                     <div className="text-sm">
-                        <p className="font-medium text-gray-900">
+                        <p className="font-medium text-content-neutral-primary">
                             {user?.name}
                         </p>
-                        <p className="text-gray-500">
+                        <p className="text-content-neutral-muted">
                             {user?.department}
                         </p>
                     </div>
@@ -46,7 +46,7 @@ export function AuthStatus() {
     return (
         <div className="flex items-center gap-2 sm:gap-3">
             <Link href={APP_ROUTES.login}>
-                <Button className="bg-gradient-to-r from-blue-600 to-cyan-600 text-white hover:from-blue-700 hover:to-cyan-700">
+                <Button className="bg-gradient-to-r from-action-gradient-start to-action-gradient-end text-content-on-brand hover:from-action-gradient-hover-start hover:to-action-gradient-hover-end">
                     <User className="h-4 w-4" />
                     <span>เข้าสู่ระบบ</span>
                 </Button>

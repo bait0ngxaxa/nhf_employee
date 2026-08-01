@@ -36,7 +36,7 @@ export default function TicketList({
         return (
             <Card>
                 <CardContent className="p-6">
-                    <p className="text-center text-gray-500">
+                    <p className="text-center text-content-neutral-muted">
                         กรุณาเข้าสู่ระบบเพื่อดูรายการ tickets
                     </p>
                 </CardContent>
@@ -53,15 +53,15 @@ export default function TicketList({
             />
 
             {/* Tickets List */}
-            <Card className="border-indigo-100/80 shadow-[0_24px_62px_-42px_rgba(30,41,59,0.46)] bg-gradient-to-b from-white/95 via-slate-50/90 to-indigo-50/50 overflow-hidden">
-                <CardHeader className="border-b border-indigo-100/80 bg-gradient-to-r from-white via-slate-50 to-indigo-50/70">
+            <Card className="ticket-list-shadow border-indigo-100/80 bg-gradient-to-b from-surface-raised/95 via-surface-subtle/90 to-indigo-50/50 overflow-hidden">
+                <CardHeader className="border-b border-indigo-100/80 bg-gradient-to-r from-surface-raised via-surface-subtle to-indigo-50/70">
                     <CardTitle>รายการ Tickets</CardTitle>
-                    <CardDescription className="text-slate-600">
+                    <CardDescription className="text-content-secondary">
                         แสดง {tickets.length} รายการจากทั้งหมด{" "}
                         {pagination.total} รายการ
                     </CardDescription>
                 </CardHeader>
-                <CardContent className="p-5 space-y-4 bg-gradient-to-b from-white/45 to-indigo-50/45">
+                <CardContent className="p-5 space-y-4 bg-gradient-to-b from-surface-raised/45 to-indigo-50/45">
                     {loading ? (
                         <div className="space-y-4 py-4 animate-pulse">
                             {/* Filter Bar Skeleton */}
@@ -94,7 +94,7 @@ export default function TicketList({
                             <p>{error}</p>
                         </div>
                     ) : tickets.length === 0 ? (
-                        <div className="text-center py-8 text-gray-500">
+                        <div className="text-center py-8 text-content-neutral-muted">
                             <p>ไม่พบ tickets</p>
                         </div>
                     ) : (
@@ -122,7 +122,7 @@ export default function TicketList({
                     {/* Pagination */}
                     {pagination.pages > 1 ? (
                         <div className="flex items-center justify-between mt-6">
-                            <div className="text-sm text-gray-500">
+                            <div className="text-sm text-content-neutral-muted">
                                 หน้า {pagination.page} จาก {pagination.pages}
                             </div>
                             <div className="flex gap-2">

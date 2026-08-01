@@ -75,7 +75,7 @@ export function EmployeeList({ userRole }: EmployeeListProps) {
 
                 {/* Table Skeleton */}
                 <div className="w-full">
-                    <div className="flex gap-4 pb-4 border-b border-gray-100">
+                    <div className="flex gap-4 pb-4 border-b border-border-neutral-muted">
                         {Array.from({ length: 6 }).map((_, i) => (
                             <Skeleton key={i} className="h-4 flex-1" />
                         ))}
@@ -128,9 +128,9 @@ export function EmployeeList({ userRole }: EmployeeListProps) {
             <EmployeeSearchControls onExportClick={onExportClick} />
 
             {/* Results Summary */}
-            <div className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-slate-50/70 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-                <div className="min-w-0 text-sm text-slate-700">
-                    <span className="font-semibold text-slate-950">
+            <div className="flex flex-col gap-3 rounded-xl border border-border-subtle bg-surface-subtle/70 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0 text-sm text-content-body">
+                    <span className="font-semibold text-content-heading">
                         แสดงผล {startIndex}-{endIndex}
                     </span>{" "}
                     จาก {totalEmployees} คน
@@ -152,7 +152,7 @@ export function EmployeeList({ userRole }: EmployeeListProps) {
                     </div>
                 </div>
                 {totalPages > 1 ? (
-                    <div className="shrink-0 text-sm font-medium text-slate-600">
+                    <div className="shrink-0 text-sm font-medium text-content-secondary">
                         หน้า {currentPage} จาก {totalPages}
                     </div>
                 ) : null}
@@ -212,7 +212,7 @@ function EmployeeEmptyState({
     const toneClass =
         type === "error"
             ? "border-red-200 bg-red-50 text-red-700"
-            : "border-slate-200 bg-white text-slate-700";
+            : "border-border-subtle bg-surface-raised text-content-body";
     const iconClass =
         type === "error"
             ? "bg-red-100 text-red-700"
@@ -228,7 +228,7 @@ function EmployeeEmptyState({
                 >
                     <Icon className="h-6 w-6" aria-hidden="true" />
                 </div>
-                <h3 className="text-base font-semibold text-slate-950">
+                <h3 className="text-base font-semibold text-content-heading">
                     {title}
                 </h3>
                 <p className="mt-2 text-sm leading-6 text-current [overflow-wrap:anywhere]">
@@ -244,7 +244,7 @@ function EmployeeEmptyState({
                     <Button
                         type="button"
                         variant="outline"
-                        className="mt-5 rounded-lg border-red-200 bg-white text-red-700 hover:bg-red-50 hover:text-red-800"
+                        className="mt-5 rounded-lg border-red-200 bg-surface-raised text-red-700 hover:bg-red-50 hover:text-red-800"
                         onClick={() => void onRetry()}
                     >
                         โหลดอีกครั้ง
