@@ -29,6 +29,19 @@ let isTransporterReady = false;
 const DEFAULT_EMAIL_FROM_NAME = "NHF IT Support";
 const LEAVE_EMAIL_FROM_NAME = "ระบบลา NHFapp";
 
+function getSafeErrorMessage(error: unknown): string {
+    if (!(error instanceof Error)) {
+        return "Unknown error";
+    }
+
+    const smtpPassword = process.env.SMTP_PASS;
+    if (!smtpPassword) {
+        return error.message;
+    }
+
+    return error.message.split(smtpPassword).join("[REDACTED]");
+}
+
 type LeaveEmailEvent =
     | "action"
     | "result"
@@ -60,7 +73,7 @@ function getTransporter(): nodemailer.Transporter {
                 pass: process.env.SMTP_PASS,
             },
             tls: {
-                rejectUnauthorized: false,
+                rejectUnauthorized: true,
             },
             pool: true,
             maxConnections: 5,
@@ -78,7 +91,10 @@ async function verifyConnection(): Promise<boolean> {
         isTransporterReady = true;
         return true;
     } catch (error) {
-        console.error("❌ SMTP connection verification failed:", error);
+        console.error(
+            "❌ SMTP connection verification failed:",
+            getSafeErrorMessage(error),
+        );
         isTransporterReady = false;
 
         // Reset and retry
@@ -88,7 +104,10 @@ async function verifyConnection(): Promise<boolean> {
             isTransporterReady = true;
             return true;
         } catch (retryError) {
-            console.error("❌ SMTP connection failed after retry:", retryError);
+            console.error(
+                "❌ SMTP connection failed after retry:",
+                getSafeErrorMessage(retryError),
+            );
             return false;
         }
     }
@@ -128,10 +147,7 @@ export async function sendEmail(emailData: EmailData): Promise<boolean> {
 
                 return true;
             } catch (sendError: unknown) {
-                const errorMessage =
-                    sendError instanceof Error
-                        ? sendError.message
-                        : "Unknown error";
+                const errorMessage = getSafeErrorMessage(sendError);
                 const errorCode =
                     sendError instanceof Error && "code" in sendError
                         ? (sendError as Error & { code: string }).code
@@ -158,7 +174,7 @@ export async function sendEmail(emailData: EmailData): Promise<boolean> {
                 } else if (attempt === maxRetries) {
                     console.error(
                         "❌ Failed to send email after all attempts:",
-                        sendError
+                        errorMessage,
                     );
                     return false;
                 }
@@ -170,7 +186,10 @@ export async function sendEmail(emailData: EmailData): Promise<boolean> {
 
         return false;
     } catch (error) {
-        console.error("❌ Unexpected error in sendEmail:", error);
+        console.error(
+            "❌ Unexpected error in sendEmail:",
+            getSafeErrorMessage(error),
+        );
         return false;
     }
 }

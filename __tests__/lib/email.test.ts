@@ -37,6 +37,21 @@ describe("Email Service", () => {
     });
 
     describe("sendEmail", () => {
+        it("requires SMTP TLS certificate verification", async () => {
+            await sendEmail({
+                to: "t",
+                subject: "s",
+                html: "h",
+                text: "t",
+            });
+
+            expect(createTransportMock).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    tls: { rejectUnauthorized: true },
+                }),
+            );
+        });
+
         it("should send email successfully", async () => {
             const result = await sendEmail({
                 to: "t",
@@ -101,6 +116,38 @@ describe("Email Service", () => {
             expect(sendMailMock).toHaveBeenCalledTimes(3);
 
             vi.useRealTimers();
+        });
+
+        it("does not expose the SMTP password in error logs", async () => {
+            vi.useFakeTimers();
+            const smtpPassword = "pass";
+            const consoleErrorSpy = vi
+                .spyOn(console, "error")
+                .mockImplementation(() => undefined);
+            sendMailMock.mockRejectedValue(
+                new Error(`SMTP authentication failed for ${smtpPassword}`),
+            );
+
+            try {
+                const promise = sendEmail({
+                    to: "t",
+                    subject: "s",
+                    html: "h",
+                    text: "t",
+                });
+
+                await vi.advanceTimersByTimeAsync(10000);
+                expect(await promise).toBe(false);
+
+                const loggedValues = consoleErrorSpy.mock.calls
+                    .flat()
+                    .map(String)
+                    .join(" ");
+                expect(loggedValues).not.toContain(smtpPassword);
+            } finally {
+                consoleErrorSpy.mockRestore();
+                vi.useRealTimers();
+            }
         });
     });
 
