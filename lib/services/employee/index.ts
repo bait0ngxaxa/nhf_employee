@@ -14,7 +14,14 @@ export type {
 
 // Import service functions
 import { getEmployees, getEmployeeById, emailExists } from "./queries";
-import { createEmployee, updateEmployee, deleteEmployee } from "./mutations";
+import {
+    createEmployee,
+    updateEmployee,
+    deleteEmployee,
+    offboardEmployee,
+    suspendEmployee,
+    reactivateEmployee,
+} from "./mutations";
 import { importEmployeesFromCSV } from "./import";
 
 /**
@@ -30,6 +37,9 @@ export const employeeService = {
     createEmployee,
     updateEmployee,
     deleteEmployee,
+    offboardEmployee,
+    suspendEmployee,
+    reactivateEmployee,
 
     // Import operations
     importEmployeesFromCSV,
@@ -45,6 +55,9 @@ export {
     createEmployee,
     updateEmployee,
     deleteEmployee,
+    offboardEmployee,
+    suspendEmployee,
+    reactivateEmployee,
     // Import
     importEmployeesFromCSV,
 };

@@ -46,7 +46,11 @@ export async function PATCH(
         const auth = await requireAdminSession();
         if (!auth.ok) return auth.response;
 
-        const result = await employeeService.updateEmployee(employeeId, validationResult.data);
+        const result = await employeeService.updateEmployee(
+            employeeId,
+            validationResult.data,
+            { userId: auth.user.id, email: auth.user.email },
+        );
 
         if (!result.success) {
             return jsonError(result.error || COMMON_API_MESSAGES.operationFailed, result.status || 500);
@@ -57,12 +61,14 @@ export async function PATCH(
                 ? ("EMPLOYEE_STATUS_CHANGE" as const)
                 : ("EMPLOYEE_UPDATE" as const);
 
-        after(async () => {
-            await logEmployeeEvent(actionType, employeeId, auth.user.id, auth.user.email, {
-                before: result.beforeData,
-                after: validationResult.data as Record<string, unknown>,
+        if (!result.auditRecorded) {
+            after(async () => {
+                await logEmployeeEvent(actionType, employeeId, auth.user.id, auth.user.email, {
+                    before: result.beforeData,
+                    after: validationResult.data as Record<string, unknown>,
+                });
             });
-        });
+        }
 
         return NextResponse.json(
             {
@@ -91,17 +97,22 @@ export async function DELETE(
             return jsonError(COMMON_API_MESSAGES.invalidEmployeeId, 400);
         }
 
-        const result = await employeeService.deleteEmployee(employeeId);
+        const result = await employeeService.deleteEmployee(
+            employeeId,
+            { userId: auth.user.id, email: auth.user.email },
+        );
 
         if (!result.success) {
             return jsonError(result.error || COMMON_API_MESSAGES.operationFailed, result.status || 500);
         }
 
-        after(async () => {
-            await logEmployeeEvent("EMPLOYEE_DELETE", employeeId, auth.user.id, auth.user.email, {
-                before: result.beforeData,
+        if (!result.auditRecorded) {
+            after(async () => {
+                await logEmployeeEvent("EMPLOYEE_DELETE", employeeId, auth.user.id, auth.user.email, {
+                    before: result.beforeData,
+                });
             });
-        });
+        }
 
         return NextResponse.json(
             { message: COMMON_API_MESSAGES.employeeDeletedSuccessfully },

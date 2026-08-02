@@ -234,7 +234,13 @@ describe("Hybrid auth routes", () => {
     });
 
     it("logout-all revokes all active refresh tokens for authenticated user", async () => {
-        prismaMock.user.findUnique.mockResolvedValue({ email: "u@test.com" });
+        prismaMock.user.findUnique.mockResolvedValue({
+            email: "u@test.com",
+            isActive: true,
+            deletedAt: null,
+            tokenVersion: 1,
+            employee: null,
+        });
         prismaMock.authRefreshToken.updateMany.mockResolvedValue({ count: 3 });
 
         const request = new NextRequest("http://localhost/api/auth/logout-all", {

@@ -22,7 +22,30 @@ export async function resolveAuthenticatedUserId(request: NextRequest): Promise<
             return null;
         }
 
-        return (await hasActiveSessionFamily(userId, claims.sessionId))
+        const hasActiveSession = await hasActiveSessionFamily(userId, claims.sessionId);
+        if (!hasActiveSession) {
+            return null;
+        }
+
+        const user = await prisma.user.findUnique({
+            where: { id: userId },
+            select: {
+                isActive: true,
+                deletedAt: true,
+                tokenVersion: true,
+                employee: {
+                    select: { status: true, deletedAt: true },
+                },
+            },
+        });
+
+        const hasActiveEmployee = !user?.employee
+            || (user.employee.status === "ACTIVE" && user.employee.deletedAt === null);
+
+        return user?.isActive === true
+            && user.deletedAt === null
+            && user.tokenVersion === claims.tokenVersion
+            && hasActiveEmployee
             ? userId
             : null;
     } catch {

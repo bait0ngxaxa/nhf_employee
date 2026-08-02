@@ -67,6 +67,35 @@ describe("server auth tokenVersion validation", () => {
         expect(session).toBeNull();
     });
 
+    it("returns null when the linked employee is inactive even if the user is active", async () => {
+        verifyAccessTokenMock.mockResolvedValue({
+            sub: "1",
+            role: "USER",
+            sessionId: "session-1",
+            tokenVersion: 1,
+        });
+
+        prismaMock.user.findUnique.mockResolvedValue({
+            id: 1,
+            role: "USER",
+            email: "employee@test.com",
+            name: "Employee",
+            isActive: true,
+            tokenVersion: 1,
+            employee: {
+                status: "INACTIVE",
+                deletedAt: null,
+                dept: null,
+                subordinates: [],
+                approvals: [],
+            },
+        });
+
+        const session = await getApiAuthSession();
+
+        expect(session).toBeNull();
+    });
+
     it("returns null when only a refresh token is present", async () => {
         cookiesMock.mockResolvedValue({
             get: vi.fn((name: string) =>

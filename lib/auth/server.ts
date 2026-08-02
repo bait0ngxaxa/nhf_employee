@@ -13,7 +13,7 @@ type SessionUser = NonNullable<Awaited<ReturnType<typeof findActiveUser>>>;
 
 async function findActiveUser(userId: number) {
     return prisma.user.findUnique({
-        where: { id: userId, isActive: true },
+        where: { id: userId, isActive: true, deletedAt: null },
         include: {
             employee: {
                 include: {
@@ -24,6 +24,11 @@ async function findActiveUser(userId: number) {
             },
         },
     });
+}
+
+function hasActiveEmployeeProfile(user: SessionUser): boolean {
+    return user.employee === null
+        || (user.employee.status === "ACTIVE" && user.employee.deletedAt === null);
 }
 
 function toApiAuthSession(user: SessionUser): ApiAuthSession {
@@ -62,7 +67,12 @@ export async function getApiAuthSession(): Promise<ApiAuthSession | null> {
             hasActiveSessionFamily(userId, claims.sessionId),
         ]);
 
-        if (!user || !hasActiveSession || claims.tokenVersion !== user.tokenVersion) {
+        if (
+            !user
+            || !hasActiveEmployeeProfile(user)
+            || !hasActiveSession
+            || claims.tokenVersion !== user.tokenVersion
+        ) {
             return null;
         }
 

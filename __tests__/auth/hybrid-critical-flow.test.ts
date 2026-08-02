@@ -43,6 +43,9 @@ describe("Hybrid critical flow", () => {
             role: "ADMIN",
             isActive: true,
             email: "admin@test.com",
+            tokenVersion: 1,
+            deletedAt: null,
+            employee: null,
         });
 
         prismaMock.authRefreshToken.create.mockResolvedValue({ id: "rt_1" });
