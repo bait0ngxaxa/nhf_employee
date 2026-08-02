@@ -15,6 +15,11 @@ import {
     isPastDate,
     type LeavePeriodValue,
 } from "@/lib/services/leave/utils";
+import {
+    compareBusinessDates,
+    isValidDateOnly,
+    toDateOnlyString,
+} from "@/lib/services/leave/business-date";
 
 type LeaveTypeValue = LeaveRequestValues["leaveType"];
 
@@ -54,10 +59,7 @@ interface UseLeaveRequestFormModelResult {
 }
 
 const getTodayString = (): string => {
-    const now = new Date();
-    const month = String(now.getMonth() + 1).padStart(2, "0");
-    const day = String(now.getDate()).padStart(2, "0");
-    return `${now.getFullYear()}-${month}-${day}`;
+    return toDateOnlyString(new Date());
 };
 
 const createDefaultLeaveRequestValues = (): LeaveRequestValues => {
@@ -146,7 +148,7 @@ export function useLeaveRequestFormModel({
         : 0;
     const needsSpecialReason = overQuotaDays > 0;
     const needsEmergencyReason = isValidDateString(startDateValue)
-        ? isPastDate(new Date(startDateValue))
+        ? isPastDate(startDateValue)
         : false;
 
     const switchToSingleDay = (): void => {
@@ -306,7 +308,7 @@ export function useLeaveRequestFormModel({
 }
 
 function isValidDateString(value: string): boolean {
-    return value.length > 0 && !Number.isNaN(new Date(value).getTime());
+    return value.length > 0 && isValidDateOnly(value);
 }
 
 function getRequestedDays(
@@ -318,11 +320,9 @@ function getRequestedDays(
         return 0;
     }
 
-    const start = new Date(startDate);
-    const end = new Date(endDate);
-    if (end < start) {
+    if (compareBusinessDates(endDate, startDate) < 0) {
         return 0;
     }
 
-    return calculateLeaveDuration(start, end, period);
+    return calculateLeaveDuration(startDate, endDate, period);
 }

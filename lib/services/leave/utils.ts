@@ -1,63 +1,83 @@
+import {
+    addCalendarDays,
+    compareBusinessDates,
+    getBusinessDayOfWeek,
+    getCalendarDaysDifference,
+    toUtcDate,
+    type BusinessDateInput,
+} from "@/lib/services/leave/business-date";
+
 export type LeavePeriodValue = "FULL_DAY" | "MORNING" | "AFTERNOON";
 
 export const EMERGENCY_BACKDATE_LIMIT_DAYS = 7;
 
-const MILLISECONDS_PER_DAY = 24 * 60 * 60 * 1000;
+export type { BusinessDateInput } from "@/lib/services/leave/business-date";
 
-export function getStartOfDay(date: Date): Date {
-    const normalized = new Date(date);
-    normalized.setHours(0, 0, 0, 0);
-    return normalized;
+export function getStartOfDay(date: BusinessDateInput): Date {
+    return toUtcDate(date);
 }
 
-export function isWorkingDay(date: Date): boolean {
-    const dayOfWeek = date.getDay();
+export function isWorkingDay(date: BusinessDateInput): boolean {
+    const dayOfWeek = getBusinessDayOfWeek(date);
     return dayOfWeek !== 0 && dayOfWeek !== 6;
 }
 
-export function isPastDate(date: Date, today: Date = new Date()): boolean {
-    return getStartOfDay(date) < getStartOfDay(today);
+export function isPastDate(
+    date: BusinessDateInput,
+    today: BusinessDateInput = new Date(),
+): boolean {
+    return compareBusinessDates(date, today) < 0;
 }
 
-export function isBeforeLeaveStart(date: Date, today: Date = new Date()): boolean {
-    return getStartOfDay(date) > getStartOfDay(today);
+export function isBeforeLeaveStart(
+    date: BusinessDateInput,
+    today: BusinessDateInput = new Date(),
+): boolean {
+    return compareBusinessDates(date, today) > 0;
 }
 
-export function isAfterLeaveEnd(endDate: Date, today: Date = new Date()): boolean {
-    return getStartOfDay(today) > getStartOfDay(endDate);
+export function isAfterLeaveEnd(
+    endDate: BusinessDateInput,
+    today: BusinessDateInput = new Date(),
+): boolean {
+    return compareBusinessDates(today, endDate) > 0;
 }
 
-export function getCalendarDaysAgo(date: Date, today: Date = new Date()): number {
-    const diff = getStartOfDay(today).getTime() - getStartOfDay(date).getTime();
-    return Math.floor(diff / MILLISECONDS_PER_DAY);
+export function getCalendarDaysAgo(
+    date: BusinessDateInput,
+    today: BusinessDateInput = new Date(),
+): number {
+    return getCalendarDaysDifference(today, date);
 }
 
 export function isWithinEmergencyBackdateWindow(
-    date: Date,
-    today: Date = new Date(),
+    date: BusinessDateInput,
+    today: BusinessDateInput = new Date(),
 ): boolean {
     const daysAgo = getCalendarDaysAgo(date, today);
     return daysAgo >= 1 && daysAgo <= EMERGENCY_BACKDATE_LIMIT_DAYS;
 }
 
-export function getWorkingDays(startDate: Date, endDate: Date): number {
+export function getWorkingDays(
+    startDate: BusinessDateInput,
+    endDate: BusinessDateInput,
+): number {
     let count = 0;
-    const current = getStartOfDay(startDate);
-    const matchEndDate = getStartOfDay(endDate);
+    let current: BusinessDateInput = startDate;
 
-    while (current <= matchEndDate) {
+    while (compareBusinessDates(current, endDate) <= 0) {
         if (isWorkingDay(current)) {
             count++;
         }
-        current.setDate(current.getDate() + 1);
+        current = addCalendarDays(current, 1);
     }
 
     return count;
 }
 
 export function calculateLeaveDuration(
-    startDate: Date,
-    endDate: Date,
+    startDate: BusinessDateInput,
+    endDate: BusinessDateInput,
     period: LeavePeriodValue,
 ): number {
     const workingDays = getWorkingDays(startDate, endDate);
@@ -68,8 +88,8 @@ export function calculateLeaveDuration(
 }
 
 export function calculateLeaveDurationHalfDays(
-    startDate: Date,
-    endDate: Date,
+    startDate: BusinessDateInput,
+    endDate: BusinessDateInput,
     period: LeavePeriodValue,
 ): number {
     const workingDays = getWorkingDays(startDate, endDate);

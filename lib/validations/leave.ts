@@ -4,6 +4,7 @@ import {
   isPastDate,
   isWithinEmergencyBackdateWindow,
 } from "@/lib/services/leave/utils";
+import { compareBusinessDates } from "@/lib/services/leave/business-date";
 import { getLeaveYearFromDateValue } from "@/lib/services/leave/quota-year";
 
 const LEAVE_VALIDATION_MESSAGES = {
@@ -40,9 +41,7 @@ export const leaveRequestSchema = z.object({
   emergencyReason: optionalLongTextSchema(LEAVE_VALIDATION_MESSAGES.emergencyReasonRequired),
   specialReason: optionalLongTextSchema("กรุณาระบุเหตุผลพิเศษอย่างน้อย 5 ตัวอักษร"),
 }).refine((data) => {
-    const start = new Date(data.startDate);
-    const end = new Date(data.endDate);
-    return end >= start;
+    return compareBusinessDates(data.endDate, data.startDate) >= 0;
 }, {
     message: "วันที่สิ้นสุดต้องไม่ก่อนวันที่เริ่มต้น",
     path: ["endDate"]
@@ -52,12 +51,11 @@ export const leaveRequestSchema = z.object({
     message: LEAVE_VALIDATION_MESSAGES.crossYearRequest,
     path: ["endDate"]
 }).superRefine((data, ctx) => {
-    const start = new Date(data.startDate);
-    if (Number.isNaN(start.getTime()) || !isPastDate(start)) {
+    if (!isPastDate(data.startDate)) {
       return;
     }
 
-    if (!isWithinEmergencyBackdateWindow(start)) {
+    if (!isWithinEmergencyBackdateWindow(data.startDate)) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         message: LEAVE_VALIDATION_MESSAGES.emergencyBackdateTooOld,

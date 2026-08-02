@@ -59,7 +59,7 @@ function CancellationPendingItem({
     onConfirm: (leaveId: string) => Promise<void>;
     onReject: (leaveId: string) => Promise<void>;
 }) {
-    const canConfirm = isBeforeLeaveStart(new Date(leave.startDate));
+    const canConfirm = isBeforeLeaveStart(leave.startDate);
 
     return (
         <Card className="border-amber-200 bg-amber-50 p-5 shadow-sm">

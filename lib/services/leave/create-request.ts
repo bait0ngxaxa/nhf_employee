@@ -32,6 +32,7 @@ import {
 import { calculateAdditionalOverQuotaHalfDays } from "@/lib/services/leave/over-quota";
 import { getLeaveYearFromDateValue } from "@/lib/services/leave/quota-year";
 import { calculateLeaveDurationHalfDays, isWorkingDay } from "@/lib/services/leave/utils";
+import { toUtcDate } from "@/lib/services/leave/business-date";
 import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
 import type { StoredLeaveAttachment } from "@/lib/uploads/leave";
 import type { LeaveRequestValues } from "@/lib/validations/leave";
@@ -72,13 +73,13 @@ function prepareLeaveRequest(payload: LeaveRequestValues): PreparedLeaveRequest 
         throw new LeaveRequestError(LEAVE_REQUEST_MESSAGES.halfDayMultiDate, 400);
     }
 
-    const start = new Date(startDate);
-    const end = new Date(endDate);
-    const durationHalfDays = calculateLeaveDurationHalfDays(start, end, period);
+    const start = toUtcDate(startDate);
+    const end = toUtcDate(endDate);
+    const durationHalfDays = calculateLeaveDurationHalfDays(startDate, endDate, period);
     if (durationHalfDays === 0) {
         throw new LeaveRequestError(LEAVE_REQUEST_MESSAGES.holidayConflict, 400);
     }
-    if (period === "FULL_DAY" && (!isWorkingDay(start) || !isWorkingDay(end))) {
+    if (period === "FULL_DAY" && (!isWorkingDay(startDate) || !isWorkingDay(endDate))) {
         throw new LeaveRequestError(LEAVE_REQUEST_MESSAGES.holidayConflict, 400);
     }
 
