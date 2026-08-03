@@ -1,6 +1,7 @@
 import type { Prisma } from "@prisma/client";
 
 import {
+    ACTIVE_LEAVE_EMPLOYEE_QUERY_WHERE,
     ACTIVE_LEAVE_APPROVER_USER_SELECT,
     isActiveLeaveApprover,
 } from "@/lib/services/leave/approver-eligibility";
@@ -29,6 +30,7 @@ export class ApproverAssignmentError extends Error {
 
 const APPROVER_MESSAGES = {
     employeeNotFound: "ไม่พบข้อมูลพนักงาน",
+    employeeUnavailable: "พนักงานต้องเป็นพนักงานที่ใช้งานอยู่และมีบัญชีผู้ใช้ที่เปิดใช้งาน",
     approverNotFound: "ไม่พบข้อมูลผู้อนุมัติ",
     approverUnavailable: "ผู้อนุมัติต้องเป็นพนักงานที่ใช้งานอยู่ มีบัญชีผู้ใช้ที่พร้อมใช้งาน และมีอีเมลที่ใช้งานได้",
     selfAssignment: "ไม่สามารถตั้งตนเองเป็นผู้อนุมัติได้",
@@ -119,7 +121,10 @@ export async function assignLeaveApprovers(
         const managerIds = assignments.flatMap(({ managerId }) => managerId === null ? [] : [managerId]);
         const [employees, approvers, pendingRequests] = await Promise.all([
             tx.employee.findMany({
-                where: { id: { in: employeeIds }, deletedAt: null },
+                where: {
+                    id: { in: employeeIds },
+                    ...ACTIVE_LEAVE_EMPLOYEE_QUERY_WHERE,
+                },
                 select: { id: true, firstName: true, lastName: true, managerId: true },
             }),
             loadApprovers(tx, managerIds),
@@ -132,6 +137,19 @@ export async function assignLeaveApprovers(
             }),
         ]);
         const employeeMap = new Map<number, EmployeeRecord>(employees.map((employee) => [employee.id, employee]));
+        const unavailableEmployeeIds = employeeIds.filter((employeeId) => !employeeMap.has(employeeId));
+        if (unavailableEmployeeIds.length > 0) {
+            const existingEmployees = await tx.employee.findMany({
+                where: { id: { in: unavailableEmployeeIds } },
+                select: { id: true },
+            });
+            const existingEmployeeIds = new Set(existingEmployees.map((employee) => employee.id));
+            if (unavailableEmployeeIds.some((employeeId) => !existingEmployeeIds.has(employeeId))) {
+                throw new ApproverAssignmentError(APPROVER_MESSAGES.employeeNotFound, 404);
+            }
+            throw new ApproverAssignmentError(APPROVER_MESSAGES.employeeUnavailable);
+        }
+
         const approverMap = new Map(approvers.map((approver) => [approver.id, approver]));
         const pendingByEmployeeId = new Map(
             pendingRequests.map((request) => [request.employeeId, request.employee]),

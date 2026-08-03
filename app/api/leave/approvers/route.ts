@@ -7,7 +7,10 @@ import {
     ApproverAssignmentError,
     assignLeaveApprovers,
 } from "@/lib/services/leave/approver-assignment";
-import { isActiveLeaveApprover } from "@/lib/services/leave/approver-eligibility";
+import {
+    ACTIVE_LEAVE_EMPLOYEE_QUERY_WHERE,
+    isActiveLeaveApprover,
+} from "@/lib/services/leave/approver-eligibility";
 import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
 import { forbidden, notFound } from "@/lib/ssot/http";
 import { FEATURE_KEYS, isFeatureEnabled } from "@/lib/ssot/features";
@@ -48,7 +51,7 @@ export async function GET(): Promise<NextResponse> {
         if (!auth.ok) return auth.response;
 
         const employees = await prisma.employee.findMany({
-            where: { status: "ACTIVE", deletedAt: null },
+            where: ACTIVE_LEAVE_EMPLOYEE_QUERY_WHERE,
             select: {
                 id: true,
                 firstName: true,

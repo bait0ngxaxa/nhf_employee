@@ -21,13 +21,22 @@ export const ACTIVE_LEAVE_APPROVER_USER_SELECT = {
     deletedAt: true,
 } as const;
 
-export const ACTIVE_LEAVE_APPROVER_QUERY_WHERE = {
+export const ACTIVE_LEAVE_EMPLOYEE_QUERY_WHERE = {
     status: "ACTIVE",
     deletedAt: null,
     user: {
         is: {
             isActive: true,
             deletedAt: null,
+        },
+    },
+} as const satisfies Prisma.EmployeeWhereInput;
+
+export const ACTIVE_LEAVE_APPROVER_QUERY_WHERE = {
+    ...ACTIVE_LEAVE_EMPLOYEE_QUERY_WHERE,
+    user: {
+        is: {
+            ...ACTIVE_LEAVE_EMPLOYEE_QUERY_WHERE.user.is,
             email: {
                 contains: "@",
                 not: { endsWith: "@temp.local" },

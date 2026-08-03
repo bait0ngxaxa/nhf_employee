@@ -3,6 +3,7 @@ import type { Prisma } from "@prisma/client";
 
 import { prisma } from "@/lib/db/prisma";
 import { assignLeaveApprovers } from "@/lib/services/leave/approver-assignment";
+import { ACTIVE_LEAVE_EMPLOYEE_QUERY_WHERE } from "@/lib/services/leave/approver-eligibility";
 
 vi.mock("@/lib/db/prisma", () => ({
     prisma: {
@@ -67,10 +68,15 @@ function mockAssignmentLookup(options: {
     employees?: unknown[];
     approvers?: unknown[];
     pending?: unknown[];
+    existingEmployees?: unknown[];
 } = {}): void {
     vi.mocked(prisma.employee.findMany)
         .mockResolvedValueOnce((options.employees ?? [buildEmployee(10)]) as never)
         .mockResolvedValueOnce((options.approvers ?? [ACTIVE_APPROVER]) as never);
+    if (options.existingEmployees !== undefined || options.employees?.length === 0) {
+        vi.mocked(prisma.employee.findMany)
+            .mockResolvedValueOnce((options.existingEmployees ?? []) as never);
+    }
     vi.mocked(prisma.leaveRequest.findMany).mockResolvedValue(
         (options.pending ?? []) as never,
     );
@@ -112,6 +118,12 @@ describe("assignLeaveApprovers", () => {
             where: { id: 10 },
             data: { managerId: 20 },
         });
+        expect(prisma.employee.findMany).toHaveBeenNthCalledWith(1, expect.objectContaining({
+            where: {
+                id: { in: [10] },
+                ...ACTIVE_LEAVE_EMPLOYEE_QUERY_WHERE,
+            },
+        }));
     });
 
     it("does not write an audit entry for a no-op assignment", async () => {
@@ -161,6 +173,30 @@ describe("assignLeaveApprovers", () => {
             ACTOR,
         )).rejects.toMatchObject({ statusCode: 404 });
         expect(prisma.employee.update).not.toHaveBeenCalled();
+    });
+
+    it.each([
+        "inactive employee",
+        "soft-deleted employee",
+        "employee without a user",
+        "inactive user",
+        "soft-deleted user",
+    ])("rejects assignment to an unavailable %s", async () => {
+        mockAssignmentLookup({
+            employees: [],
+            approvers: [],
+            existingEmployees: [{ id: 10 }],
+        });
+
+        await expect(assignLeaveApprovers(
+            [{ employeeId: 10, managerId: 20 }],
+            ACTOR,
+        )).rejects.toMatchObject({
+            statusCode: 400,
+            message: "พนักงานต้องเป็นพนักงานที่ใช้งานอยู่และมีบัญชีผู้ใช้ที่เปิดใช้งาน",
+        });
+        expect(prisma.employee.update).not.toHaveBeenCalled();
+        expect(prisma.auditLog.create).not.toHaveBeenCalled();
     });
 
     it("rejects self-assignment with status 400", async () => {
