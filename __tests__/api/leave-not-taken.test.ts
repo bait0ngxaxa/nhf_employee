@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { POST, PUT } from "@/app/api/leave/not-taken/route";
 import { getApiAuthSession } from "@/lib/auth/server";
 import { prisma } from "@/lib/db/prisma";
+import { logLeaveEvent } from "@/lib/server/audit";
 import { getEmployeeIdFromUserId } from "@/lib/services/leave/get-employee-id";
 import { processOutbox } from "@/lib/services/outbox/processor";
 import type * as NextServerModule from "next/server";
@@ -27,6 +28,10 @@ vi.mock("@/lib/services/leave/get-employee-id", () => ({
 
 vi.mock("@/lib/services/outbox/processor", () => ({
     processOutbox: vi.fn(),
+}));
+
+vi.mock("@/lib/server/audit", () => ({
+    logLeaveEvent: vi.fn(),
 }));
 
 vi.mock("@/lib/db/prisma", () => ({
@@ -96,6 +101,7 @@ describe("/api/leave/not-taken", () => {
         }] as never);
         vi.mocked(prisma.$queryRaw).mockResolvedValue([] as never);
         vi.mocked(processOutbox).mockResolvedValue({ processed: 0, failed: 0 });
+        vi.mocked(logLeaveEvent).mockResolvedValue(undefined);
         vi.mocked(prisma.$transaction).mockImplementation(async (callback) => {
             if (typeof callback === "function") {
                 return callback(prisma);
@@ -334,7 +340,7 @@ describe("/api/leave/not-taken", () => {
         expect(prisma.notification.create).not.toHaveBeenCalled();
     });
 
-    it("confirms not-taken request and returns quota", async () => {
+    it("records one non-transactional audit for a normal assigned manager", async () => {
         vi.mocked(prisma.user.findUnique).mockResolvedValue({
             isActive: true,
             deletedAt: null,
@@ -437,6 +443,8 @@ describe("/api/leave/not-taken", () => {
                 type: "LEAVE_NOT_TAKEN_CONFIRMED",
             }),
         });
+        expect(prisma.auditLog.create).not.toHaveBeenCalled();
+        expect(logLeaveEvent).toHaveBeenCalledTimes(1);
     });
 
     it("rejects confirmation when the approver becomes inactive before the transaction", async () => {
@@ -454,7 +462,7 @@ describe("/api/leave/not-taken", () => {
         expect(prisma.leaveQuota.update).not.toHaveBeenCalled();
     });
 
-    it("allows an admin to confirm a not-taken request as a recovery override", async () => {
+    it("records exactly one transactional audit for an admin recovery override", async () => {
         vi.mocked(getApiAuthSession).mockResolvedValue({
             user: {
                 id: "99",
@@ -579,9 +587,19 @@ describe("/api/leave/not-taken", () => {
         expect(prisma.auditLog.create).toHaveBeenCalledWith({
             data: expect.objectContaining({
                 action: "LEAVE_REQUEST_NOT_TAKEN_CONFIRM",
+                details: expect.stringContaining(
+                    '"overrideReason":"ตรวจสอบแทนผู้อนุมัติที่พ้นสภาพ"',
+                ),
+            }),
+        });
+        expect(prisma.auditLog.create).toHaveBeenCalledWith({
+            data: expect.objectContaining({
+                action: "LEAVE_REQUEST_NOT_TAKEN_CONFIRM",
                 details: expect.stringContaining('"adminOverride":true'),
             }),
         });
+        expect(prisma.auditLog.create).toHaveBeenCalledTimes(1);
+        expect(logLeaveEvent).not.toHaveBeenCalled();
     });
 
     it("requires a reason for an admin not-taken recovery override", async () => {
@@ -723,7 +741,7 @@ describe("/api/leave/not-taken", () => {
         expect(prisma.leaveQuota.update).not.toHaveBeenCalled();
     });
 
-    it("allows an assigned admin to confirm not-taken without an override reason", async () => {
+    it("records exactly one audit when an assigned admin confirms not-taken", async () => {
         vi.mocked(getApiAuthSession).mockResolvedValue({
             user: {
                 id: "99",
@@ -802,9 +820,12 @@ describe("/api/leave/not-taken", () => {
         });
         expect(prisma.auditLog.create).toHaveBeenCalledWith({
             data: expect.objectContaining({
+                action: "LEAVE_REQUEST_NOT_TAKEN_CONFIRM",
                 details: expect.stringContaining('"adminOverride":false'),
             }),
         });
+        expect(prisma.auditLog.create).toHaveBeenCalledTimes(1);
+        expect(logLeaveEvent).not.toHaveBeenCalled();
     });
 
     it("returns 403 to a non-approver without revealing original approver recovery", async () => {
@@ -924,5 +945,7 @@ describe("/api/leave/not-taken", () => {
         expect(data.error).toBe(
             "ไม่สามารถตรวจสอบสิทธิ์ลาของคำขอนี้ได้ กรุณาติดต่อผู้ดูแลระบบ",
         );
+        expect(prisma.auditLog.create).not.toHaveBeenCalled();
+        expect(logLeaveEvent).not.toHaveBeenCalled();
     });
 });

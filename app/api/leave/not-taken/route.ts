@@ -491,7 +491,7 @@ export async function PUT(req: NextRequest): Promise<NextResponse> {
             return { request: updatedRequest, adminOverride };
         });
 
-        if (!result.adminOverride) {
+        if (!isAdmin) {
             await logLeaveEvent(
                 "LEAVE_REQUEST_NOT_TAKEN_CONFIRM",
                 result.request.id,
