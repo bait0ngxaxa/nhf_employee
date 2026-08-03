@@ -18,6 +18,7 @@
     "test:integration:mysql": "node scripts/run-mysql-integration-tests.mjs",
     "stock:audit": "tsx scripts/stock-inventory-audit.ts",
     "stock:audit:strict": "tsx scripts/stock-inventory-audit.ts --fail-on-error",
+    "routine:import": "tsx scripts/routine-import.ts",
     "stock:default-variant:backfill": "tsx scripts/stock-default-variant-backfill.ts",
     "stock:default-variant:backfill:apply": "tsx scripts/stock-default-variant-backfill.ts --apply"
   },
@@ -48,6 +49,7 @@
     "sonner": "^2.0.7",
     "swr": "^2.3.8",
     "tailwind-merge": "^3.3.1",
+    "xlsx": "^0.18.5",
     "zod": "^4.3.6"
   },
   "devDependencies": {

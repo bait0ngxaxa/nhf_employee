@@ -40,6 +40,7 @@ model User {
   completedRoutineOccurrences RoutineOccurrence[]         @relation("RoutineOccurrenceCompletedBy")
   skippedRoutineOccurrences   RoutineOccurrence[]         @relation("RoutineOccurrenceSkippedBy")
   cancelledRoutineOccurrences RoutineOccurrence[]         @relation("RoutineOccurrenceCancelledBy")
+  routineImportLedgers        RoutineImportLedger[]       @relation("RoutineImportAppliedBy")
 
   @@map("users")
 }
@@ -803,6 +804,7 @@ model RoutineTask {
   assignees   RoutineTaskAssignee[]
   reminderRules RoutineReminderRule[]
   occurrences RoutineOccurrence[]
+  importLedger RoutineImportLedger?
   createdBy   User                  @relation("RoutineTaskCreatedBy", fields: [createdById], references: [id])
   updatedBy   User                  @relation("RoutineTaskUpdatedBy", fields: [updatedById], references: [id])
 
@@ -829,6 +831,28 @@ model RoutineReminderRule {
   @@unique([taskId, daysBefore, channel, recipientScope], map: "routine_reminder_rules_unique")
   @@index([taskId, isActive])
   @@map("routine_reminder_rules")
+}
+
+model RoutineImportLedger {
+  id              Int                 @id @default(autoincrement())
+  sourceFileName  String              @db.VarChar(255)
+  sourceSheet     String              @db.VarChar(255)
+  sourceRow       Int
+  sourceFingerprint String            @db.Char(64)
+  status          RoutineImportStatus
+  taskId          Int?                @unique
+  appliedById     Int?
+  resolutionNote  String?             @db.Text
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  task      RoutineTask? @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  appliedBy User?        @relation("RoutineImportAppliedBy", fields: [appliedById], references: [id], onDelete: SetNull)
+
+  @@unique([sourceFileName, sourceSheet, sourceRow], map: "routine_import_ledger_source_identity")
+  @@index([sourceFingerprint])
+  @@index([status])
+  @@map("routine_import_ledger")
 }
 
 model RoutineTaskAssignee {
@@ -928,4 +952,10 @@ enum RoutineReminderRecipientScope {
   ASSIGNEES
   ADMINS
   ASSIGNEES_AND_ADMINS
+}
+
+enum RoutineImportStatus {
+  APPLIED
+  SKIPPED
+  CONFLICT
 }

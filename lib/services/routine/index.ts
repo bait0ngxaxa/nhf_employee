@@ -34,6 +34,7 @@ export {
     cancelRoutineOccurrence,
     changeRoutineOccurrenceStatus,
     createRoutineTask,
+    createRoutineTaskInTransaction,
     reopenRoutineOccurrence,
     reassignRoutineOccurrence,
     skipRoutineOccurrence,

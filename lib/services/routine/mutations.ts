@@ -281,7 +281,8 @@ function occurrenceAuditDetails(
     };
 }
 
-export async function createRoutineTask(
+export async function createRoutineTaskInTransaction(
+    tx: Prisma.TransactionClient,
     input: RoutineTaskCreateInput,
     actor: RoutineCommandActor,
 ): Promise<Prisma.RoutineTaskGetPayload<{ include: typeof ROUTINE_TASK_INCLUDE }>> {
@@ -290,69 +291,76 @@ export async function createRoutineTask(
     ensureContractRange(input.contractStartDate, input.contractEndDate);
     const assignees = normalizeAssignees(input.assignees);
 
-    return runSerializableTransaction(async (tx) => {
-        await assertActiveAdminInTransaction(tx, actor);
-        await assertActiveRoutineReferences(tx, input.unitId, input.categoryId);
-        await assertActiveEmployeesInTransaction(
-            tx,
-            assignees.map((assignee) => assignee.employeeId),
-        );
+    await assertActiveAdminInTransaction(tx, actor);
+    await assertActiveRoutineReferences(tx, input.unitId, input.categoryId);
+    await assertActiveEmployeesInTransaction(
+        tx,
+        assignees.map((assignee) => assignee.employeeId),
+    );
 
-        const task = await tx.routineTask.create({
-            data: {
-                unitId: input.unitId,
-                categoryId: input.categoryId,
-                title: input.title,
-                description: input.description ?? null,
-                scheduleType: scheduleType as PrismaRoutineScheduleType,
-                scheduleConfig,
-                scheduleText: input.scheduleText ?? null,
-                contractStartDate: input.contractStartDate
-                    ? calendarDateToDate(input.contractStartDate)
-                    : null,
-                contractEndDate: input.contractEndDate
-                    ? calendarDateToDate(input.contractEndDate)
-                    : null,
-                contractText: input.contractText ?? null,
-                extraDetails: input.extraDetails ?? null,
-                businessDayPolicy: input.businessDayPolicy as PrismaRoutineBusinessDayPolicy,
-                isActive: input.isActive,
-                sourceFileName: input.sourceFileName ?? null,
-                sourceSheet: input.sourceSheet ?? null,
-                sourceRow: input.sourceRow ?? null,
-                createdById: actor.id,
-                updatedById: actor.id,
-                assignees: { create: assignees },
-                ...(input.reminderRules !== undefined
-                    ? {
-                          reminderRules: {
-                              create: normalizeReminderRules(input.reminderRules),
-                          },
-                      }
-                    : {}),
-            },
-        });
-
-        await createRoutineAuditInTransaction(
-            tx,
-            "ROUTINE_TASK_CREATE",
-            "RoutineTask",
-            task.id,
-            actor,
-            {
-                taskId: task.id,
-                affectedEmployeeIds: assignees.map((assignee) => assignee.employeeId),
-                scheduleType,
-                version: task.version,
-            },
-        );
-        await generateRoutineTaskOccurrencesInTransaction(tx, task.id);
-
-        return tx.routineTask.findUniqueOrThrow({
-            where: { id: task.id },
-            include: ROUTINE_TASK_INCLUDE,
-        });
+    const task = await tx.routineTask.create({
+        data: {
+            unitId: input.unitId,
+            categoryId: input.categoryId,
+            title: input.title,
+            description: input.description ?? null,
+            scheduleType: scheduleType as PrismaRoutineScheduleType,
+            scheduleConfig,
+            scheduleText: input.scheduleText ?? null,
+            contractStartDate: input.contractStartDate
+                ? calendarDateToDate(input.contractStartDate)
+                : null,
+            contractEndDate: input.contractEndDate
+                ? calendarDateToDate(input.contractEndDate)
+                : null,
+            contractText: input.contractText ?? null,
+            extraDetails: input.extraDetails ?? null,
+            businessDayPolicy: input.businessDayPolicy as PrismaRoutineBusinessDayPolicy,
+            isActive: input.isActive,
+            sourceFileName: input.sourceFileName ?? null,
+            sourceSheet: input.sourceSheet ?? null,
+            sourceRow: input.sourceRow ?? null,
+            createdById: actor.id,
+            updatedById: actor.id,
+            assignees: { create: assignees },
+            ...(input.reminderRules !== undefined
+                ? {
+                      reminderRules: {
+                          create: normalizeReminderRules(input.reminderRules),
+                      },
+                  }
+                : {}),
+        },
     });
+
+    await createRoutineAuditInTransaction(
+        tx,
+        "ROUTINE_TASK_CREATE",
+        "RoutineTask",
+        task.id,
+        actor,
+        {
+            taskId: task.id,
+            affectedEmployeeIds: assignees.map((assignee) => assignee.employeeId),
+            scheduleType,
+            version: task.version,
+        },
+    );
+    await generateRoutineTaskOccurrencesInTransaction(tx, task.id);
+
+    return tx.routineTask.findUniqueOrThrow({
+        where: { id: task.id },
+        include: ROUTINE_TASK_INCLUDE,
+    });
+}
+
+export async function createRoutineTask(
+    input: RoutineTaskCreateInput,
+    actor: RoutineCommandActor,
+): Promise<Prisma.RoutineTaskGetPayload<{ include: typeof ROUTINE_TASK_INCLUDE }>> {
+    return runSerializableTransaction((tx) =>
+        createRoutineTaskInTransaction(tx, input, actor),
+    );
 }
 
 export async function updateRoutineTask(
