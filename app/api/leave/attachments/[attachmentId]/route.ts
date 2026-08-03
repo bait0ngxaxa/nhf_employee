@@ -62,6 +62,7 @@ export async function GET(
                     select: {
                         employeeId: true,
                         approverId: true,
+                        exceptionApproverId: true,
                     },
                 },
             },
@@ -76,7 +77,8 @@ export async function GET(
         const canReadAttachment =
             isAdminRole(auth.user.role)
             || employeeId === attachment.leaveRequest.employeeId
-            || employeeId === attachment.leaveRequest.approverId;
+            || employeeId === attachment.leaveRequest.approverId
+            || employeeId === attachment.leaveRequest.exceptionApproverId;
         if (!canReadAttachment) {
             return notFound();
         }

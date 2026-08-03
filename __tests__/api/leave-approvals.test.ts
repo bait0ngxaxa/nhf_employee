@@ -173,7 +173,7 @@ describe("GET /api/leave/approvals", () => {
         }
     });
 
-    it("does not expose approval lists to admins", async () => {
+    it("exposes unscoped recovery lists to admins", async () => {
         vi.mocked(requireActiveWorkforceSession).mockResolvedValue({
             ok: true,
             employeeId: 999,
@@ -184,8 +184,18 @@ describe("GET /api/leave/approvals", () => {
             new Request("http://localhost/api/leave/approvals"),
         );
 
-        expect(response.status).toBe(403);
-        expect(prisma.leaveRequest.findMany).not.toHaveBeenCalled();
-        expect(prisma.leaveRequest.count).not.toHaveBeenCalled();
+        expect(response.status).toBe(200);
+        expect(prisma.leaveRequest.findMany).toHaveBeenCalledTimes(4);
+        expect(prisma.leaveRequest.count).toHaveBeenCalledTimes(4);
+        expect(vi.mocked(prisma.leaveRequest.findMany).mock.calls[1][0]).toEqual(
+            expect.objectContaining({
+                where: expect.not.objectContaining({ approverId: 999 }),
+            }),
+        );
+        expect(vi.mocked(prisma.leaveRequest.findMany).mock.calls[3][0]).toEqual(
+            expect.objectContaining({
+                where: expect.not.objectContaining({ approverId: 999 }),
+            }),
+        );
     });
 });

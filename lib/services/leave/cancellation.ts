@@ -14,9 +14,17 @@ import {
     type LeaveCancelledAfterApprovalPayload,
     type LeaveCancellationRequestedPayload,
 } from "@/lib/services/leave/notification-payloads";
+import {
+    persistLeaveExceptionApprover,
+    resolveLeaveExceptionApprover,
+    type LeaveExceptionApproverSource,
+} from "@/lib/services/leave/exception-approver";
 import { isAdminRole } from "@/lib/ssot/permissions";
 import { getLeaveYearFromDateValue } from "@/lib/services/leave/quota-year";
-import { lockLeaveRequestRow } from "@/lib/services/leave/transaction";
+import {
+    createLeaveAuditInTransaction,
+    lockLeaveRequestRow,
+} from "@/lib/services/leave/transaction";
 import { isBeforeLeaveStart } from "@/lib/services/leave/utils";
 import { halfDaysToDays } from "@/lib/services/leave/half-days";
 import {
@@ -36,6 +44,7 @@ export const LEAVE_CANCELLATION_MESSAGES = {
     confirmationTooLate: "ไม่สามารถยืนยันการยกเลิกได้ เนื่องจากวันลาเริ่มแล้ว",
     forbidden: "คุณไม่มีสิทธิ์ดำเนินการกับคำขอนี้",
     quotaNotFound: "ไม่สามารถตรวจสอบสิทธิ์ลาของคำขอนี้ได้ กรุณาติดต่อผู้ดูแลระบบ",
+    approverUnavailable: "ไม่พบผู้ดำเนินการคำขอยกเลิกที่พร้อมใช้งาน กรุณาติดต่อผู้ดูแลระบบ",
 } as const;
 
 export class LeaveCancellationError extends Error {
@@ -57,6 +66,11 @@ const CANCELLATION_REQUEST_INCLUDE = {
             user: { select: ACTIVE_LEAVE_APPROVER_USER_SELECT },
         },
     },
+    exceptionApprover: {
+        include: {
+            user: { select: ACTIVE_LEAVE_APPROVER_USER_SELECT },
+        },
+    },
 } as const satisfies Prisma.LeaveRequestInclude;
 
 type LeaveCancellationRequest = Prisma.LeaveRequestGetPayload<{
@@ -64,11 +78,12 @@ type LeaveCancellationRequest = Prisma.LeaveRequestGetPayload<{
 }>;
 type LeaveCancellationScalars = Omit<
     LeaveCancellationRequest,
-    "employee" | "approver"
+    "employee" | "approver" | "exceptionApprover"
 >;
 
 export type LeaveCancellationResult = {
     request: LeaveCancellationRequest;
+    exceptionApproverSource?: LeaveExceptionApproverSource;
     kind:
         | "PENDING_CANCELLED"
         | "CANCELLATION_REQUESTED"
@@ -144,6 +159,20 @@ export async function cancelLeaveRequest(
             throw new LeaveCancellationError(LEAVE_CANCELLATION_MESSAGES.tooLate, 400);
         }
 
+        const exceptionApprover = await resolveLeaveExceptionApprover(tx, {
+            employeeId: leaveRequest.employeeId,
+            originalApprover: leaveRequest.approver,
+            existingApprover: leaveRequest.exceptionApprover,
+            reuseExisting: false,
+        });
+        if (!exceptionApprover) {
+            throw new LeaveCancellationError(
+                LEAVE_CANCELLATION_MESSAGES.approverUnavailable,
+                409,
+            );
+        }
+        await persistLeaveExceptionApprover(tx, leaveId, exceptionApprover);
+
         const requestedAt = new Date();
         const claimedRequest = await tx.leaveRequest.updateMany({
             where: {
@@ -165,26 +194,24 @@ export async function cancelLeaveRequest(
         await markApprovedNotificationsRead(tx, actor.userId, leaveRequest);
         await createCancellationRequestedNotification(tx, actor.userId, leaveRequest);
 
-        if (isActiveLeaveApprover(leaveRequest.approver)) {
-            const payload: LeaveCancellationRequestedPayload = {
-                leaveId,
-                employee: buildLeaveRecipientSnapshot(leaveRequest.employee),
-                approver: buildConfiguredApproverSnapshot(leaveRequest.approver),
-                leaveType: leaveRequest.leaveType,
-                startDate: leaveRequest.startDate.toISOString(),
-                endDate: leaveRequest.endDate.toISOString(),
-                period: leaveRequest.period,
-                durationDays: halfDaysToDays(leaveRequest.durationHalfDays),
-                note: reason ?? "พนักงานขอยกเลิกวันลาที่อนุมัติแล้ว",
-            };
-            await tx.notificationOutbox.create({
-                data: {
-                    type: "LEAVE_CANCELLATION_REQUESTED",
-                    eventKey: `leave:${leaveId}:cancellation-requested`,
-                    payload: JSON.stringify(payload),
-                },
-            });
-        }
+        const payload: LeaveCancellationRequestedPayload = {
+            leaveId,
+            employee: buildLeaveRecipientSnapshot(leaveRequest.employee),
+            approver: buildConfiguredApproverSnapshot(exceptionApprover.approver),
+            leaveType: leaveRequest.leaveType,
+            startDate: leaveRequest.startDate.toISOString(),
+            endDate: leaveRequest.endDate.toISOString(),
+            period: leaveRequest.period,
+            durationDays: halfDaysToDays(leaveRequest.durationHalfDays),
+            note: reason ?? "พนักงานขอยกเลิกวันลาที่อนุมัติแล้ว",
+        };
+        await tx.notificationOutbox.create({
+            data: {
+                type: "LEAVE_CANCELLATION_REQUESTED",
+                eventKey: `leave:${leaveId}:cancellation-requested`,
+                payload: JSON.stringify(payload),
+            },
+        });
 
         const updatedRequest = await tx.leaveRequest.findUniqueOrThrow({ where: { id: leaveId } });
         return {
@@ -192,6 +219,7 @@ export async function cancelLeaveRequest(
                 cancellationReason: reason ?? null,
                 cancellationRequestedAt: requestedAt,
             }),
+            exceptionApproverSource: exceptionApprover.source,
             kind: "CANCELLATION_REQUESTED",
         };
     });
@@ -201,6 +229,7 @@ type CancellationDecisionActor = {
     userId: number;
     employeeId: number;
     role: string;
+    userEmail?: string;
 };
 
 export async function confirmLeaveCancellation(
@@ -221,7 +250,7 @@ export async function confirmLeaveCancellation(
             where: {
                 id: leaveId,
                 status: "CANCELLATION_REQUESTED",
-                approverId: actor.employeeId,
+                ...getCancellationApproverWhere(actor, leaveRequest),
                 cancellationRequestedAt: { not: null },
                 cancellationConfirmedAt: null,
             },
@@ -254,10 +283,11 @@ export async function confirmLeaveCancellation(
             throw new LeaveCancellationError(LEAVE_CANCELLATION_MESSAGES.quotaNotFound, 409);
         }
 
-        if (leaveRequest.approver?.user?.id) {
+        const exceptionApproverUserId = getExceptionApproverUserId(leaveRequest);
+        if (exceptionApproverUserId) {
             await tx.notification.updateMany({
                 where: {
-                    userId: leaveRequest.approver.user.id,
+                    userId: exceptionApproverUserId,
                     type: "LEAVE_CANCELLATION_REQUESTED",
                     referenceId: leaveId,
                     isRead: false,
@@ -269,9 +299,7 @@ export async function confirmLeaveCancellation(
         const payload: LeaveCancelledAfterApprovalPayload = {
             leaveId,
             employee: buildLeaveRecipientSnapshot(leaveRequest.employee),
-            approverName: leaveRequest.approver
-                ? formatEmployeeName(leaveRequest.approver)
-                : null,
+            approverName: getExceptionApproverName(leaveRequest),
             leaveType: leaveRequest.leaveType,
             startDate: leaveRequest.startDate.toISOString(),
             endDate: leaveRequest.endDate.toISOString(),
@@ -285,6 +313,26 @@ export async function confirmLeaveCancellation(
                 payload: JSON.stringify(payload),
             },
         });
+
+        if (isAdminRole(actor.role)) {
+            await createLeaveAuditInTransaction(
+                tx,
+                "LEAVE_REQUEST_CANCELLATION_CONFIRM",
+                leaveId,
+                actor.userId,
+                actor.userEmail ?? "",
+                {
+                    before: { status: "CANCELLATION_REQUESTED" },
+                    after: { status: "CANCELLED_AFTER_APPROVAL" },
+                    metadata: {
+                        adminOverride: true,
+                        decision: "CONFIRM",
+                        originalApproverId: leaveRequest.approverId,
+                        exceptionApproverId: leaveRequest.exceptionApproverId,
+                    },
+                },
+            );
+        }
 
         const updatedRequest = await tx.leaveRequest.findUniqueOrThrow({ where: { id: leaveId } });
         return {
@@ -308,7 +356,7 @@ export async function rejectLeaveCancellation(
             where: {
                 id: leaveId,
                 status: "CANCELLATION_REQUESTED",
-                approverId: actor.employeeId,
+                ...getCancellationApproverWhere(actor, leaveRequest),
                 cancellationRequestedAt: { not: null },
                 cancellationConfirmedAt: null,
             },
@@ -323,6 +371,26 @@ export async function rejectLeaveCancellation(
         await markCancellationNotificationsRead(tx, leaveRequest);
         await createCancellationRejectedNotification(tx, leaveRequest);
 
+        if (isAdminRole(actor.role)) {
+            await createLeaveAuditInTransaction(
+                tx,
+                "LEAVE_REQUEST_CANCELLATION_CONFIRM",
+                leaveId,
+                actor.userId,
+                actor.userEmail ?? "",
+                {
+                    before: { status: "CANCELLATION_REQUESTED" },
+                    after: { status: "APPROVED" },
+                    metadata: {
+                        adminOverride: true,
+                        decision: "REJECT",
+                        originalApproverId: leaveRequest.approverId,
+                        exceptionApproverId: leaveRequest.exceptionApproverId,
+                    },
+                },
+            );
+        }
+
         const updatedRequest = await tx.leaveRequest.findUniqueOrThrow({ where: { id: leaveId } });
         return {
             request: withCancellationInclude(updatedRequest, leaveRequest),
@@ -336,16 +404,12 @@ async function getCancellationDecisionRequest(
     actor: CancellationDecisionActor,
     leaveId: string,
 ): Promise<LeaveCancellationRequest> {
-    if (isAdminRole(actor.role)) {
-        throw new LeaveCancellationError(LEAVE_CANCELLATION_MESSAGES.forbidden, 403);
-    }
-
     if (!await isActiveEmployeeInTransaction(tx, actor.userId, actor.employeeId)) {
         throw new LeaveCancellationError(LEAVE_CANCELLATION_MESSAGES.forbidden, 403);
     }
 
     await lockLeaveRequestRow(tx, leaveId);
-    const leaveRequest = await tx.leaveRequest.findUnique({
+    let leaveRequest = await tx.leaveRequest.findUnique({
         where: { id: leaveId },
         include: CANCELLATION_REQUEST_INCLUDE,
     });
@@ -358,17 +422,73 @@ async function getCancellationDecisionRequest(
     ) {
         throw new LeaveCancellationError(LEAVE_CANCELLATION_MESSAGES.invalidStatus, 409);
     }
-    if (
-        leaveRequest.employeeId === actor.employeeId
-        || leaveRequest.approverId !== actor.employeeId
-    ) {
-        throw new LeaveCancellationError(LEAVE_CANCELLATION_MESSAGES.forbidden, 403);
-    }
-    if (!isActiveLeaveApprover(leaveRequest.approver)) {
-        throw new LeaveCancellationError(LEAVE_CANCELLATION_MESSAGES.forbidden, 403);
+    if (!isAdminRole(actor.role)) {
+        const exceptionApprover = await resolveLeaveExceptionApprover(tx, {
+            employeeId: leaveRequest.employeeId,
+            originalApprover: leaveRequest.approver,
+            existingApprover: leaveRequest.exceptionApprover,
+            reuseExisting: true,
+        });
+        if (!exceptionApprover) {
+            throw new LeaveCancellationError(
+                LEAVE_CANCELLATION_MESSAGES.forbidden,
+                403,
+            );
+        }
+        if (exceptionApprover.shouldPersist) {
+            await persistLeaveExceptionApprover(tx, leaveId, exceptionApprover);
+            const refreshedRequest = await tx.leaveRequest.findUnique({
+                where: { id: leaveId },
+                include: CANCELLATION_REQUEST_INCLUDE,
+            });
+            if (!refreshedRequest) {
+                throw new LeaveCancellationError(LEAVE_CANCELLATION_MESSAGES.invalidStatus, 409);
+            }
+            leaveRequest = refreshedRequest;
+        }
+
+        const currentApprover = getExceptionApprover(leaveRequest);
+        if (
+            leaveRequest.employeeId === actor.employeeId
+            || (leaveRequest.exceptionApproverId ?? leaveRequest.approverId) !== actor.employeeId
+        ) {
+            throw new LeaveCancellationError(LEAVE_CANCELLATION_MESSAGES.forbidden, 403);
+        }
+        if (!isActiveLeaveApprover(currentApprover)) {
+            throw new LeaveCancellationError(LEAVE_CANCELLATION_MESSAGES.forbidden, 403);
+        }
     }
 
     return leaveRequest;
+}
+
+function getCancellationApproverWhere(
+    actor: CancellationDecisionActor,
+    leaveRequest: LeaveCancellationRequest,
+): Prisma.LeaveRequestWhereInput {
+    if (isAdminRole(actor.role)) return {};
+    return leaveRequest.exceptionApproverId !== null
+        ? { exceptionApproverId: actor.employeeId }
+        : { approverId: actor.employeeId };
+}
+
+function getExceptionApprover(
+    leaveRequest: LeaveCancellationRequest,
+): LeaveCancellationRequest["exceptionApprover"] | LeaveCancellationRequest["approver"] {
+    return leaveRequest.exceptionApprover ?? leaveRequest.approver;
+}
+
+function getExceptionApproverUserId(
+    leaveRequest: LeaveCancellationRequest,
+): number | null {
+    return getExceptionApprover(leaveRequest)?.user?.id ?? null;
+}
+
+function getExceptionApproverName(
+    leaveRequest: LeaveCancellationRequest,
+): string | null {
+    const approver = getExceptionApprover(leaveRequest);
+    return approver ? formatEmployeeName(approver) : null;
 }
 
 async function markPendingApprovalNotificationsRead(
@@ -411,7 +531,7 @@ async function markCancellationNotificationsRead(
     tx: Prisma.TransactionClient,
     leaveRequest: LeaveCancellationRequest,
 ): Promise<void> {
-    const approverUserId = leaveRequest.approver?.user?.id;
+    const approverUserId = getExceptionApproverUserId(leaveRequest);
     if (!approverUserId) return;
 
     await tx.notification.updateMany({

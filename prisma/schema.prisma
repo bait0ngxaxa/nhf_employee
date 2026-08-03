@@ -89,6 +89,7 @@ model Employee {
   leaveQuotas   LeaveQuota[]
   leaveRequests LeaveRequest[] @relation("LeaveRequester")
   approvals     LeaveRequest[] @relation("LeaveApprover")
+  exceptionApprovals LeaveRequest[] @relation("LeaveExceptionApprover")
 
   @@index([departmentId], map: "employees_departmentId_fkey")
   @@map("employees")
@@ -448,6 +449,8 @@ model LeaveRequest {
 
   // ผู้อนุมัติ
   approverId            Int? // หัวหน้าที่ต้องอนุมัติตอนนั้น (ดึงจาก managerId ของพนักงาน)
+  exceptionApproverId   Int? // ผู้ดำเนินการปัจจุบันของ exception flow เมื่อ approver เดิมใช้การไม่ได้
+  exceptionApproverAssignedAt DateTime?
   approvedAt            DateTime? // เวลาที่กดอนุมัติ/ปฏิเสธ
   rejectReason          String?   @db.Text // เหตุผลที่ปฏิเสธ (ถ้ามี)
   notTakenReason        String?   @db.Text // โน๊ตเมื่ออนุมัติแล้วแต่ไม่ได้ใช้วันลา
@@ -467,11 +470,13 @@ model LeaveRequest {
 
   employee    Employee          @relation("LeaveRequester", fields: [employeeId], references: [id])
   approver    Employee?         @relation("LeaveApprover", fields: [approverId], references: [id])
+  exceptionApprover Employee?    @relation("LeaveExceptionApprover", fields: [exceptionApproverId], references: [id], onDelete: SetNull)
   attachments LeaveAttachment[]
   idempotency LeaveRequestIdempotency?
 
   @@index([employeeId])
   @@index([approverId])
+  @@index([exceptionApproverId])
   @@index([status])
   @@index([notTakenRequestedAt])
   @@index([cancellationRequestedAt])

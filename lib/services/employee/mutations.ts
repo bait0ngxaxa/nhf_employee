@@ -68,7 +68,7 @@ const EMPLOYEE_LIFECYCLE_MESSAGES = {
     lastAdmin: "ไม่สามารถปิดใช้งานผู้ดูแลระบบคนสุดท้ายได้",
     managerDependencies: (
         subordinates: EmployeeSummary[],
-        pendingApprovals: PendingApprovalSummary[],
+        leaveDependencies: PendingApprovalSummary[],
     ): string => {
         const details: string[] = [];
         if (subordinates.length > 0) {
@@ -78,9 +78,9 @@ const EMPLOYEE_LIFECYCLE_MESSAGES = {
                     .join(", ")}`,
             );
         }
-        if (pendingApprovals.length > 0) {
+        if (leaveDependencies.length > 0) {
             details.push(
-                `คำขอลาที่รออนุมัติ: ${pendingApprovals
+                `คำขอลาที่ต้องจัดการก่อนปิดใช้งาน: ${leaveDependencies
                     .map((request) => `${request.id} (${formatEmployeeName(request.employee)})`)
                     .join(", ")}`,
             );
@@ -194,14 +194,26 @@ async function assertCanDeactivateEmployee(
         }
     }
 
-    const [subordinates, pendingApprovals] = await Promise.all([
+    const [subordinates, leaveDependencies] = await Promise.all([
         tx.employee.findMany({
             where: { managerId: employee.id, deletedAt: null },
             select: { id: true, firstName: true, lastName: true },
             orderBy: { id: "asc" },
         }),
         tx.leaveRequest.findMany({
-            where: { approverId: employee.id, status: "PENDING" },
+            where: {
+                OR: [
+                    { approverId: employee.id },
+                    { exceptionApproverId: employee.id },
+                ],
+                AND: [{
+                    OR: [
+                        { status: "PENDING" },
+                        { status: "CANCELLATION_REQUESTED" },
+                        { status: "APPROVED", notTakenRequestedAt: { not: null } },
+                    ],
+                }],
+            },
             select: {
                 id: true,
                 employee: { select: { id: true, firstName: true, lastName: true } },
@@ -214,9 +226,9 @@ async function assertCanDeactivateEmployee(
         await lockEmployeeRows(tx, subordinates.map((subordinate) => subordinate.id));
     }
 
-    if (subordinates.length > 0 || pendingApprovals.length > 0) {
+    if (subordinates.length > 0 || leaveDependencies.length > 0) {
         throw new EmployeeLifecycleError(
-            EMPLOYEE_LIFECYCLE_MESSAGES.managerDependencies(subordinates, pendingApprovals),
+            EMPLOYEE_LIFECYCLE_MESSAGES.managerDependencies(subordinates, leaveDependencies),
             409,
         );
     }

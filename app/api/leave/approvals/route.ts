@@ -41,14 +41,9 @@ export async function GET(req: Request): Promise<NextResponse> {
 
         const auth = await requireActiveWorkforceSession();
         if (!auth.ok) return auth.response;
-        if (isAdminRole(auth.user.role)) {
-            return NextResponse.json(
-                { error: COMMON_API_MESSAGES.forbidden },
-                { status: 403 },
-            );
-        }
 
         const managerId = auth.employeeId;
+        const isAdmin = isAdminRole(auth.user.role);
 
         const requestInclude = {
             employee: {
@@ -84,30 +79,43 @@ export async function GET(req: Request): Promise<NextResponse> {
         }
 
         const pendingWhere: Prisma.LeaveRequestWhereInput = {
-            approverId: managerId,
-            status: "PENDING",
+            ...(isAdmin
+                ? { id: "__admin_recovery_pending__" }
+                : { approverId: managerId, status: "PENDING" }),
         };
+        const exceptionActionApproverWhere: Prisma.LeaveRequestWhereInput = isAdmin
+            ? {}
+            : {
+                OR: [
+                    { exceptionApproverId: managerId },
+                    { exceptionApproverId: null, approverId: managerId },
+                ],
+            };
         const notTakenWhere: Prisma.LeaveRequestWhereInput = {
-            approverId: managerId,
+            ...exceptionActionApproverWhere,
             status: "APPROVED",
             notTakenRequestedAt: { not: null },
             notTakenConfirmedAt: null,
         };
         const historyWhere: Prisma.LeaveRequestWhereInput = {
-            approverId: managerId,
-            OR: [
-                { status: { in: ["REJECTED", "NOT_TAKEN", "CANCELLED_AFTER_APPROVAL"] } },
-                {
-                    status: "APPROVED",
+            ...(isAdmin
+                ? { id: "__admin_recovery_history__" }
+                : {
+                    approverId: managerId,
                     OR: [
-                        { notTakenRequestedAt: null },
-                        { notTakenConfirmedAt: { not: null } },
+                        { status: { in: ["REJECTED", "NOT_TAKEN", "CANCELLED_AFTER_APPROVAL"] } },
+                        {
+                            status: "APPROVED",
+                            OR: [
+                                { notTakenRequestedAt: null },
+                                { notTakenConfirmedAt: { not: null } },
+                            ],
+                        },
                     ],
-                },
-            ],
+                }),
         };
         const cancellationWhere: Prisma.LeaveRequestWhereInput = {
-            approverId: managerId,
+            ...exceptionActionApproverWhere,
             status: "CANCELLATION_REQUESTED",
         };
 

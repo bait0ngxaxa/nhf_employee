@@ -47,6 +47,10 @@ vi.mock("@/lib/db/prisma", () => ({
             update: vi.fn(),
             updateMany: vi.fn(),
         },
+        employee: {
+            findUnique: vi.fn(),
+            findMany: vi.fn(),
+        },
         leaveQuota: {
             findFirst: vi.fn(),
             update: vi.fn(),
@@ -75,6 +79,21 @@ describe("/api/leave/not-taken", () => {
             employee: { id: 10, status: "ACTIVE", deletedAt: null },
         } as never);
         vi.mocked(prisma.user.findFirst).mockResolvedValue({ id: 1 } as never);
+        vi.mocked(prisma.employee.findUnique).mockResolvedValue({ manager: null } as never);
+        vi.mocked(prisma.employee.findMany).mockResolvedValue([{
+            id: 99,
+            firstName: "Recovery",
+            lastName: "Admin",
+            email: "recovery-admin@example.com",
+            status: "ACTIVE",
+            deletedAt: null,
+            user: {
+                id: 99,
+                email: "recovery-admin@example.com",
+                isActive: true,
+                deletedAt: null,
+            },
+        }] as never);
         vi.mocked(prisma.$queryRaw).mockResolvedValue([] as never);
         vi.mocked(processOutbox).mockResolvedValue({ processed: 0, failed: 0 });
         vi.mocked(prisma.$transaction).mockImplementation(async (callback) => {
@@ -100,6 +119,8 @@ describe("/api/leave/not-taken", () => {
             overQuotaHalfDays: 0,
             status: "APPROVED",
             approverId: 20,
+            exceptionApproverId: null,
+            exceptionApproverAssignedAt: null,
             approvedAt: new Date("2000-01-01T00:00:00.000Z"),
             rejectReason: null,
             notTakenReason: null,
@@ -172,6 +193,81 @@ describe("/api/leave/not-taken", () => {
         });
     });
 
+    it("records a not-taken request for admin recovery when the original approver is inactive", async () => {
+        vi.mocked(prisma.leaveRequest.findUnique).mockResolvedValue({
+            id: "leave-recovery-request",
+            employeeId: 10,
+            leaveType: "SICK",
+            startDate: new Date("2000-01-01T00:00:00.000Z"),
+            endDate: new Date("2000-01-01T00:00:00.000Z"),
+            period: "FULL_DAY",
+            durationHalfDays: 2,
+            reason: "ลาป่วย",
+            emergencyReason: null,
+            specialReason: null,
+            overQuotaHalfDays: 0,
+            status: "APPROVED",
+            approverId: 20,
+            exceptionApproverId: null,
+            exceptionApproverAssignedAt: null,
+            approvedAt: new Date("2000-01-01T00:00:00.000Z"),
+            rejectReason: null,
+            notTakenReason: null,
+            notTakenRequestedAt: null,
+            notTakenConfirmedAt: null,
+            notTakenConfirmedById: null,
+            cancellationReason: null,
+            cancellationRequestedAt: null,
+            cancellationConfirmedAt: null,
+            cancellationConfirmedById: null,
+            attachmentUrl: null,
+            createdAt: new Date("2000-01-01T00:00:00.000Z"),
+            updatedAt: new Date("2000-01-01T00:00:00.000Z"),
+            employee: {
+                id: 10,
+                firstName: "Employee",
+                lastName: "User",
+                email: "employee@example.com",
+                user: { id: 1 },
+            },
+            approver: {
+                id: 20,
+                firstName: "Former",
+                lastName: "Manager",
+                email: "former@example.com",
+                status: "INACTIVE",
+                deletedAt: null,
+                user: null,
+            },
+        } as never);
+        vi.mocked(prisma.leaveRequest.updateMany).mockResolvedValue({ count: 1 });
+
+        const response = await POST(new NextRequest("http://localhost/api/leave/not-taken", {
+            method: "POST",
+            body: JSON.stringify({
+                leaveId: "leave-recovery-request",
+                note: "ไม่ได้ลาเพราะมีงานด่วน",
+            }),
+        }));
+
+        expect(response.status).toBe(200);
+        expect(prisma.leaveRequest.updateMany).toHaveBeenCalledWith({
+            where: expect.objectContaining({
+                id: "leave-recovery-request",
+                notTakenRequestedAt: null,
+            }),
+            data: expect.objectContaining({
+                notTakenReason: "ไม่ได้ลาเพราะมีงานด่วน",
+            }),
+        });
+        expect(prisma.notificationOutbox.create).toHaveBeenCalledWith({
+            data: expect.objectContaining({
+                type: "LEAVE_NOT_TAKEN_REQUESTED",
+                payload: expect.stringContaining('"employeeId":99'),
+            }),
+        });
+    });
+
     it("does not create notifications when another request already claimed the leave", async () => {
         vi.mocked(prisma.leaveRequest.findUnique).mockResolvedValue({
             id: "leave-duplicate",
@@ -187,6 +283,8 @@ describe("/api/leave/not-taken", () => {
             overQuotaHalfDays: 0,
             status: "APPROVED",
             approverId: 20,
+            exceptionApproverId: null,
+            exceptionApproverAssignedAt: null,
             approvedAt: new Date("2000-01-01T00:00:00.000Z"),
             rejectReason: null,
             notTakenReason: null,
@@ -256,6 +354,8 @@ describe("/api/leave/not-taken", () => {
             overQuotaHalfDays: 0,
             status: "APPROVED",
             approverId: 20,
+            exceptionApproverId: null,
+            exceptionApproverAssignedAt: null,
             approvedAt: new Date("2000-02-01T00:00:00.000Z"),
             rejectReason: null,
             notTakenReason: "ไม่ได้ลาเพราะมีงานด่วน",
@@ -354,6 +454,101 @@ describe("/api/leave/not-taken", () => {
         expect(prisma.leaveQuota.update).not.toHaveBeenCalled();
     });
 
+    it("allows an admin to confirm a not-taken request as a recovery override", async () => {
+        vi.mocked(getApiAuthSession).mockResolvedValue({
+            user: {
+                id: "99",
+                email: "admin@example.com",
+                name: "Admin",
+                role: "ADMIN",
+            },
+        });
+        vi.mocked(prisma.user.findUnique).mockResolvedValue({
+            isActive: true,
+            deletedAt: null,
+            employee: { id: 99, status: "ACTIVE", deletedAt: null },
+        } as never);
+        vi.mocked(prisma.user.findFirst).mockResolvedValue({ id: 99 } as never);
+        vi.mocked(prisma.leaveRequest.findUnique).mockResolvedValue({
+            id: "leave-admin-recovery",
+            employeeId: 10,
+            leaveType: "VACATION",
+            startDate: new Date("2000-02-01T00:00:00.000Z"),
+            endDate: new Date("2000-02-01T00:00:00.000Z"),
+            period: "FULL_DAY",
+            durationHalfDays: 2,
+            status: "APPROVED",
+            approverId: 20,
+            exceptionApproverId: null,
+            exceptionApproverAssignedAt: null,
+            notTakenRequestedAt: new Date("2000-02-02T00:00:00.000Z"),
+            notTakenConfirmedAt: null,
+            employee: {
+                id: 10,
+                firstName: "Employee",
+                lastName: "User",
+                email: "employee@example.com",
+                user: { id: 1 },
+            },
+            approver: {
+                id: 20,
+                firstName: "Former",
+                lastName: "Manager",
+                email: "former@example.com",
+                status: "INACTIVE",
+                deletedAt: null,
+                user: null,
+            },
+        } as never);
+        vi.mocked(prisma.leaveRequest.updateMany).mockResolvedValue({ count: 1 });
+        vi.mocked(prisma.leaveQuota.findFirst).mockResolvedValue({
+            id: "quota-admin-recovery",
+            employeeId: 10,
+            year: 2000,
+            leaveType: "VACATION",
+            totalHalfDays: 12,
+            usedHalfDays: 4,
+        });
+        vi.mocked(prisma.leaveQuota.update).mockResolvedValue({
+            id: "quota-admin-recovery",
+            usedHalfDays: 2,
+        } as never);
+        vi.mocked(prisma.leaveRequest.findUniqueOrThrow).mockResolvedValue({
+            id: "leave-admin-recovery",
+            status: "NOT_TAKEN",
+            durationHalfDays: 2,
+            overQuotaHalfDays: 0,
+        } as never);
+
+        const response = await PUT(new NextRequest("http://localhost/api/leave/not-taken", {
+            method: "PUT",
+            body: JSON.stringify({ leaveId: "leave-admin-recovery" }),
+        }));
+
+        expect(response.status).toBe(200);
+        expect(prisma.leaveRequest.updateMany).toHaveBeenCalledWith({
+            where: expect.objectContaining({
+                id: "leave-admin-recovery",
+                status: "APPROVED",
+                notTakenRequestedAt: { not: null },
+            }),
+            data: expect.objectContaining({
+                status: "NOT_TAKEN",
+                notTakenConfirmedById: 99,
+            }),
+        });
+        expect(prisma.leaveQuota.update).toHaveBeenCalledWith({
+            where: { id: "quota-admin-recovery" },
+            data: { usedHalfDays: { decrement: 2 } },
+        });
+        expect(prisma.auditLog.create).toHaveBeenCalledWith({
+            data: expect.objectContaining({
+                action: "LEAVE_REQUEST_NOT_TAKEN_CONFIRM",
+                details: expect.stringContaining('"adminOverride":true'),
+            }),
+        });
+    });
+
     it("returns 403 to a non-approver without revealing original approver recovery", async () => {
         vi.mocked(prisma.user.findUnique).mockResolvedValue({
             isActive: true,
@@ -366,6 +561,8 @@ describe("/api/leave/not-taken", () => {
             employeeId: 10,
             status: "APPROVED",
             approverId: 20,
+            exceptionApproverId: null,
+            exceptionApproverAssignedAt: null,
             endDate: new Date("2000-02-01T00:00:00.000Z"),
             notTakenRequestedAt: new Date("2000-02-02T00:00:00.000Z"),
             notTakenConfirmedAt: null,
@@ -411,6 +608,8 @@ describe("/api/leave/not-taken", () => {
             overQuotaHalfDays: 0,
             status: "APPROVED",
             approverId: 20,
+            exceptionApproverId: null,
+            exceptionApproverAssignedAt: null,
             approvedAt: new Date("2000-02-01T00:00:00.000Z"),
             rejectReason: null,
             notTakenReason: "ไม่ได้ลาเพราะมีงานด่วน",

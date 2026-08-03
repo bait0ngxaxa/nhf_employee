@@ -330,6 +330,62 @@ describe("Employee Mutations", () => {
             expect(prismaMock.employee.update).not.toHaveBeenCalled();
         });
 
+        it.each([
+            {
+                status: "CANCELLATION_REQUESTED",
+                notTakenRequestedAt: null,
+                label: "cancellation requests",
+            },
+            {
+                status: "APPROVED",
+                notTakenRequestedAt: new Date("2026-02-01T00:00:00.000Z"),
+                label: "not-taken requests",
+            },
+        ])("blocks a manager with $label", async ({ status }) => {
+            const employee = buildEmployee({
+                user: {
+                    id: 10,
+                    email: "manager@thainhf.org",
+                    role: "USER",
+                    isActive: true,
+                    deletedAt: null,
+                },
+            });
+            prismaMock.employee.findUnique.mockResolvedValue(employee as never);
+            prismaMock.leaveRequest.findMany.mockResolvedValue([{
+                id: `leave-${status.toLowerCase()}`,
+                employee: { id: 2, firstName: "Leave", lastName: "Requester" },
+            }] as never);
+
+            const result = await offboardEmployee(1, ACTOR);
+
+            expect(result).toMatchObject({
+                success: false,
+                status: 409,
+                error: expect.stringContaining("ต้องจัดการก่อนปิดใช้งาน"),
+            });
+            expect(prismaMock.leaveRequest.findMany).toHaveBeenCalledWith({
+                where: {
+                    OR: [
+                        { approverId: 1 },
+                        { exceptionApproverId: 1 },
+                    ],
+                    AND: [{
+                        OR: [
+                            { status: "PENDING" },
+                            { status: "CANCELLATION_REQUESTED" },
+                            { status: "APPROVED", notTakenRequestedAt: { not: null } },
+                        ],
+                    }],
+                },
+                select: {
+                    id: true,
+                    employee: { select: { id: true, firstName: true, lastName: true } },
+                },
+                orderBy: { id: "asc" },
+            });
+        });
+
         it("reactivates the user only through an explicit lifecycle action", async () => {
             const employee = buildEmployee({
                 status: "INACTIVE",

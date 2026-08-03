@@ -12,7 +12,7 @@ import { ApprovalConfirmDialog } from "./_components/ApprovalConfirmDialog";
 import { NotTakenPendingList } from "./_components/NotTakenPendingList";
 import { CancellationPendingList } from "./_components/CancellationPendingList";
 
-export function ManagerApprovalDashboard() {
+export function ManagerApprovalDashboard({ isAdmin = false }: { isAdmin?: boolean }) {
     const model = useManagerApprovalModel();
 
     if (model.isLoading) {
@@ -21,30 +21,43 @@ export function ManagerApprovalDashboard() {
 
     return (
         <div className="space-y-6">
-            <ApprovalSectionHeader
-                title="รายการรอพิจารณา"
-                description="คำขอลาคงค้างของพนักงานในทีมที่รอรับการอนุมัติ"
-                count={model.metadata?.pending.totalItems ?? model.pending.length}
-                tone="attention"
-            />
+            {!isAdmin ? (
+                <>
+                    <ApprovalSectionHeader
+                        title="รายการรอพิจารณา"
+                        description="คำขอลาคงค้างของพนักงานในทีมที่รอรับการอนุมัติ"
+                        count={model.metadata?.pending.totalItems ?? model.pending.length}
+                        tone="attention"
+                    />
 
-            <div className="space-y-3">
-                <PendingApprovalList
-                    pending={model.pending}
-                    isProcessing={model.isProcessing}
-                    onApprove={model.approveLeave}
-                    onOpenReject={model.openRejectDialog}
-                />
-                <ApprovalPagination
-                    metadata={model.metadata?.pending}
-                    onPageChange={model.setPendingPage}
-                />
-            </div>
+                    <div className="space-y-3">
+                        <PendingApprovalList
+                            pending={model.pending}
+                            isProcessing={model.isProcessing}
+                            onApprove={model.approveLeave}
+                            onOpenReject={model.openRejectDialog}
+                        />
+                        <ApprovalPagination
+                            metadata={model.metadata?.pending}
+                            onPageChange={model.setPendingPage}
+                        />
+                    </div>
+                </>
+            ) : (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm/6 text-amber-950">
+                    <p className="font-semibold">โหมดกู้คืนรายการลาโดยผู้ดูแลระบบ</p>
+                    <p className="mt-1">
+                        ใช้สำหรับรายการที่ผู้อนุมัติเดิมไม่พร้อมใช้งาน การยืนยันหรือปิดคำขอจะถูกบันทึกว่าเป็นการแก้ไขโดยผู้ดูแลระบบ
+                    </p>
+                </div>
+            )}
 
             <div className="space-y-3">
                 <ApprovalSectionHeader
-                    title="รายการรอยืนยันไม่ได้ใช้วันลา"
-                    description="เมื่อยืนยันแล้วระบบจะคืนโควต้าตามวันลาสุทธิของคำขอเดิม"
+                    title={isAdmin ? "รายการกู้คืนไม่ได้ใช้วันลา" : "รายการรอยืนยันไม่ได้ใช้วันลา"}
+                    description={isAdmin
+                        ? "ผู้ดูแลระบบยืนยันได้เมื่อผู้อนุมัติเดิมพ้นสภาพ"
+                        : "เมื่อยืนยันแล้วระบบจะคืนโควต้าตามวันลาสุทธิของคำขอเดิม"}
                     count={model.metadata?.notTakenPending.totalItems ?? model.notTakenPending.length}
                     tone="info"
                 />
@@ -61,8 +74,10 @@ export function ManagerApprovalDashboard() {
 
             <div className="space-y-3 pt-2">
                 <ApprovalSectionHeader
-                    title="รายการรอยืนยันยกเลิกวันลา"
-                    description="ยืนยันเพื่อยกเลิกและคืนโควต้า หรือปิดคำขอเพื่อคงสถานะอนุมัติเดิม"
+                    title={isAdmin ? "รายการกู้คืนคำขอยกเลิกวันลา" : "รายการรอยืนยันยกเลิกวันลา"}
+                    description={isAdmin
+                        ? "ยืนยันเพื่อคืนโควต้า หรือปิดคำขอเพื่อคงสถานะอนุมัติเดิม"
+                        : "ยืนยันเพื่อยกเลิกและคืนโควต้า หรือปิดคำขอเพื่อคงสถานะอนุมัติเดิม"}
                     count={model.metadata?.cancellationPending.totalItems ?? model.cancellationPending.length}
                     tone="attention"
                 />
@@ -78,19 +93,21 @@ export function ManagerApprovalDashboard() {
                 />
             </div>
 
-            <div className="space-y-3 pt-2">
-                <ApprovalSectionHeader
-                    title="ประวัติการพิจารณา"
-                    description="รายการที่มีการตัดสินใจแล้ว"
-                    count={model.metadata?.history.totalItems ?? model.history.length}
-                    tone="neutral"
-                />
-                <ApprovalHistoryList history={model.history} />
-                <ApprovalPagination
-                    metadata={model.metadata?.history}
-                    onPageChange={model.setHistoryPage}
-                />
-            </div>
+            {!isAdmin ? (
+                <div className="space-y-3 pt-2">
+                    <ApprovalSectionHeader
+                        title="ประวัติการพิจารณา"
+                        description="รายการที่มีการตัดสินใจแล้ว"
+                        count={model.metadata?.history.totalItems ?? model.history.length}
+                        tone="neutral"
+                    />
+                    <ApprovalHistoryList history={model.history} />
+                    <ApprovalPagination
+                        metadata={model.metadata?.history}
+                        onPageChange={model.setHistoryPage}
+                    />
+                </div>
+            ) : null}
 
             <RejectLeaveDialog
                 open={model.isRejectDialogOpen}

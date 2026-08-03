@@ -63,7 +63,17 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
             : "LEAVE_REQUEST_CANCEL";
         await logLeaveEvent(auditAction, parsed.data.leaveId, auth.user.id, auth.user.email, {
             after: { status: result.request.status },
-            metadata: parsed.data.reason ? { reason: parsed.data.reason } : undefined,
+            metadata: {
+                ...(parsed.data.reason ? { reason: parsed.data.reason } : {}),
+                ...(result.kind === "CANCELLATION_REQUESTED"
+                    ? {
+                        originalApproverId: result.request.approverId,
+                        exceptionApproverId: result.request.exceptionApproverId,
+                        exceptionApproverSource: result.exceptionApproverSource
+                            ?? "ORIGINAL_APPROVER",
+                    }
+                    : {}),
+            },
         }).catch((error: unknown) => console.error("Failed to log leave cancellation:", error));
 
         after(() => {
@@ -97,10 +107,6 @@ export async function PUT(req: NextRequest): Promise<NextResponse> {
         const auth = await requireActiveWorkforceSession();
         if (!auth.ok) return auth.response;
 
-        if (isAdminRole(auth.user.role)) {
-            return jsonError(COMMON_API_MESSAGES.forbidden, 403);
-        }
-
         const principalRateLimitResponse = enforceAuthenticatedMutationRateLimit(
             "leave-cancel",
             auth.user.id,
@@ -119,25 +125,28 @@ export async function PUT(req: NextRequest): Promise<NextResponse> {
             userId: auth.user.id,
             employeeId: auth.employeeId,
             role: auth.user.role,
+            userEmail: auth.user.email,
         };
         const result = parsed.data.action === "REJECT"
             ? await rejectLeaveCancellation(actor, parsed.data.leaveId)
             : await confirmLeaveCancellation(actor, parsed.data.leaveId);
 
-        await logLeaveEvent(
-            "LEAVE_REQUEST_CANCELLATION_CONFIRM",
-            parsed.data.leaveId,
-            auth.user.id,
-            auth.user.email,
-            {
-                before: { status: "CANCELLATION_REQUESTED" },
-                after: { status: result.request.status },
-                metadata: {
-                    leaveId: parsed.data.leaveId,
-                    decision: parsed.data.action,
+        if (!isAdminRole(auth.user.role)) {
+            await logLeaveEvent(
+                "LEAVE_REQUEST_CANCELLATION_CONFIRM",
+                parsed.data.leaveId,
+                auth.user.id,
+                auth.user.email,
+                {
+                    before: { status: "CANCELLATION_REQUESTED" },
+                    after: { status: result.request.status },
+                    metadata: {
+                        leaveId: parsed.data.leaveId,
+                        decision: parsed.data.action,
+                    },
                 },
-            },
-        ).catch((error: unknown) => console.error("Failed to log leave cancellation confirmation:", error));
+            ).catch((error: unknown) => console.error("Failed to log leave cancellation confirmation:", error));
+        }
 
         after(() => {
             processOutbox().catch((error: unknown) =>

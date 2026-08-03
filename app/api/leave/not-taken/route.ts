@@ -1,4 +1,4 @@
-import { after, NextResponse } from "next/server";
+import { after, NextResponse, type NextRequest } from "next/server";
 
 import { requireActiveWorkforceSession } from "@/lib/auth/workforce";
 import { logLeaveEvent } from "@/lib/server/audit";
@@ -9,6 +9,10 @@ import {
     ACTIVE_LEAVE_APPROVER_USER_SELECT,
     isActiveLeaveApprover,
 } from "@/lib/services/leave/approver-eligibility";
+import {
+    persistLeaveExceptionApprover,
+    resolveLeaveExceptionApprover,
+} from "@/lib/services/leave/exception-approver";
 import {
     buildConfiguredApproverSnapshot,
     buildLeaveRecipientSnapshot,
@@ -34,6 +38,14 @@ import {
     leaveNotTakenRequestSchema,
 } from "@/lib/validations/leave";
 import { halfDaysToDays, toLeaveRequestDays } from "@/lib/services/leave/half-days";
+import {
+    createLeaveAuditInTransaction,
+    lockLeaveRequestRow,
+} from "@/lib/services/leave/transaction";
+import {
+    enforceAuthenticatedMutationRateLimit,
+    enforcePreAuthIpRateLimit,
+} from "@/lib/security/mutation-rate-limit";
 
 const NOT_TAKEN_MESSAGES = {
     requestNotFound: "ไม่พบคำขอลาที่แจ้งไม่ได้ใช้วันลาได้",
@@ -43,7 +55,7 @@ const NOT_TAKEN_MESSAGES = {
     alreadyRequested: "คำขอนี้ถูกแจ้งว่าไม่ได้ใช้วันลาแล้ว",
     forbidden: "คุณไม่มีสิทธิ์ดำเนินการกับคำขอนี้",
     quotaNotFound: "ไม่สามารถตรวจสอบสิทธิ์ลาของคำขอนี้ได้ กรุณาติดต่อผู้ดูแลระบบ",
-    originalApproverRecoveryRequired: "ผู้อนุมัติเดิมพ้นสภาพหรือไม่พร้อมใช้งาน กรุณาติดต่อผู้ดูแลระบบเพื่อดำเนินการกู้คืนคำขอนี้",
+    approverUnavailable: "ไม่พบผู้ดำเนินการคืนโควต้าที่พร้อมใช้งาน กรุณาติดต่อผู้ดูแลระบบ",
 } as const;
 
 class LeaveNotTakenError extends Error {
@@ -56,14 +68,23 @@ class LeaveNotTakenError extends Error {
     }
 }
 
-export async function POST(req: Request): Promise<NextResponse> {
+export async function POST(req: NextRequest): Promise<NextResponse> {
     try {
         if (!isFeatureEnabled(FEATURE_KEYS.leave)) {
             return notFound();
         }
 
+        const preAuthRateLimitResponse = enforcePreAuthIpRateLimit(req, "leave-not-taken");
+        if (preAuthRateLimitResponse) return preAuthRateLimitResponse;
+
         const auth = await requireActiveWorkforceSession();
         if (!auth.ok) return auth.response;
+
+        const principalRateLimitResponse = enforceAuthenticatedMutationRateLimit(
+            "leave-not-taken",
+            auth.user.id,
+        );
+        if (principalRateLimitResponse) return principalRateLimitResponse;
 
         const userId = auth.user.id;
         const employeeId = auth.employeeId;
@@ -81,6 +102,8 @@ export async function POST(req: Request): Promise<NextResponse> {
                 throw new LeaveNotTakenError(NOT_TAKEN_MESSAGES.forbidden, 403);
             }
 
+            await lockLeaveRequestRow(tx, parsed.data.leaveId);
+
             const leaveRequest = await tx.leaveRequest.findUnique({
                 where: { id: parsed.data.leaveId },
                 include: {
@@ -88,6 +111,13 @@ export async function POST(req: Request): Promise<NextResponse> {
                         include: { user: { select: { id: true } } },
                     },
                     approver: {
+                        include: {
+                            user: {
+                                select: ACTIVE_LEAVE_APPROVER_USER_SELECT,
+                            },
+                        },
+                    },
+                    exceptionApprover: {
                         include: {
                             user: {
                                 select: ACTIVE_LEAVE_APPROVER_USER_SELECT,
@@ -109,13 +139,19 @@ export async function POST(req: Request): Promise<NextResponse> {
             if (leaveRequest.notTakenRequestedAt) {
                 throw new LeaveNotTakenError(NOT_TAKEN_MESSAGES.alreadyRequested, 409);
             }
-            if (!isActiveLeaveApprover(leaveRequest.approver)) {
+            const exceptionApprover = await resolveLeaveExceptionApprover(tx, {
+                employeeId: leaveRequest.employeeId,
+                originalApprover: leaveRequest.approver,
+                existingApprover: leaveRequest.exceptionApprover,
+                reuseExisting: false,
+            });
+            if (!exceptionApprover) {
                 throw new LeaveNotTakenError(
-                    NOT_TAKEN_MESSAGES.originalApproverRecoveryRequired,
-                    400,
+                    NOT_TAKEN_MESSAGES.approverUnavailable,
+                    409,
                 );
             }
-
+            await persistLeaveExceptionApprover(tx, leaveRequest.id, exceptionApprover);
             const requestedAt = new Date();
             const claimedRequest = await tx.leaveRequest.updateMany({
                 where: {
@@ -137,23 +173,29 @@ export async function POST(req: Request): Promise<NextResponse> {
                 ...leaveRequest,
                 notTakenReason: parsed.data.note,
                 notTakenRequestedAt: requestedAt,
+                exceptionApproverId: exceptionApprover.exceptionApproverId,
+                exceptionApproverAssignedAt: exceptionApprover.assignedAt,
+            };
+            const leaveSummary = {
+                startDate: leaveRequest.startDate.toISOString(),
+                endDate: leaveRequest.endDate.toISOString(),
+                period: leaveRequest.period,
+                durationDays: halfDaysToDays(leaveRequest.durationHalfDays),
             };
 
             const payload: LeaveNotTakenRequestedPayload = {
                 leaveId: leaveRequest.id,
                 employee: buildLeaveRecipientSnapshot(leaveRequest.employee),
-                approver: buildConfiguredApproverSnapshot(leaveRequest.approver),
+                approver: buildConfiguredApproverSnapshot(exceptionApprover.approver),
                 leaveType: leaveRequest.leaveType,
-                startDate: leaveRequest.startDate.toISOString(),
-                endDate: leaveRequest.endDate.toISOString(),
-                period: leaveRequest.period,
-                durationDays: halfDaysToDays(leaveRequest.durationHalfDays),
+                ...leaveSummary,
                 note: parsed.data.note,
             };
 
             await tx.notificationOutbox.create({
                 data: {
                     type: "LEAVE_NOT_TAKEN_REQUESTED",
+                    eventKey: `leave:${leaveRequest.id}:not-taken-requested`,
                     payload: JSON.stringify(payload),
                 },
             });
@@ -163,21 +205,31 @@ export async function POST(req: Request): Promise<NextResponse> {
                     userId,
                     type: "LEAVE_NOT_TAKEN_REQUESTED",
                     title: "แจ้งไม่ได้ใช้วันลาแล้ว",
-                    message: `แจ้งไม่ได้ใช้วันลาแล้ว: ${getLeaveTypeLabel(leaveRequest.leaveType)} ${formatLeaveSummary(payload)}`,
+                    message: `แจ้งไม่ได้ใช้วันลาแล้ว: ${getLeaveTypeLabel(leaveRequest.leaveType)} ${formatLeaveSummary(leaveSummary)}`,
                     actionUrl: toDashboardTabPath(APP_DASHBOARD_TABS.leaveHistory),
                     referenceId: leaveRequest.id,
                 },
             });
 
-            return updatedRequest;
+            return {
+                request: updatedRequest,
+                exceptionApproverSource: exceptionApprover.source,
+            };
         });
 
         await logLeaveEvent(
             "LEAVE_REQUEST_NOT_TAKEN_REQUEST",
-            result.id,
+            result.request.id,
             userId,
             auth.user.email,
-            { metadata: { note: parsed.data.note } },
+            {
+                metadata: {
+                    note: parsed.data.note,
+                    originalApproverId: result.request.approverId,
+                    exceptionApproverId: result.request.exceptionApproverId,
+                    exceptionApproverSource: result.exceptionApproverSource,
+                },
+            },
         ).catch((err) => console.error("Failed to log leave not-taken request:", err));
 
         after(() => {
@@ -186,7 +238,10 @@ export async function POST(req: Request): Promise<NextResponse> {
             );
         });
 
-        return NextResponse.json({ success: true, data: toLeaveRequestDays(result) });
+        return NextResponse.json({
+            success: true,
+            data: toLeaveRequestDays(result.request),
+        });
     } catch (error) {
         console.error("Leave not-taken request error:", error);
         if (error instanceof LeaveNotTakenError) {
@@ -196,20 +251,26 @@ export async function POST(req: Request): Promise<NextResponse> {
     }
 }
 
-export async function PUT(req: Request): Promise<NextResponse> {
+export async function PUT(req: NextRequest): Promise<NextResponse> {
     try {
         if (!isFeatureEnabled(FEATURE_KEYS.leave)) {
             return notFound();
         }
 
+        const preAuthRateLimitResponse = enforcePreAuthIpRateLimit(req, "leave-not-taken");
+        if (preAuthRateLimitResponse) return preAuthRateLimitResponse;
+
         const auth = await requireActiveWorkforceSession();
         if (!auth.ok) return auth.response;
-        if (isAdminRole(auth.user.role)) {
-            return jsonError(COMMON_API_MESSAGES.forbidden, 403);
-        }
 
+        const principalRateLimitResponse = enforceAuthenticatedMutationRateLimit(
+            "leave-not-taken",
+            auth.user.id,
+        );
+        if (principalRateLimitResponse) return principalRateLimitResponse;
         const userId = auth.user.id;
         const managerId = auth.employeeId;
+        const adminOverride = isAdminRole(auth.user.role);
 
         const body = await req.json();
         const parsed = leaveNotTakenConfirmSchema.safeParse(body);
@@ -223,13 +284,20 @@ export async function PUT(req: Request): Promise<NextResponse> {
             if (!await isActiveEmployeeInTransaction(tx, userId, managerId)) {
                 throw new LeaveNotTakenError(NOT_TAKEN_MESSAGES.forbidden, 403);
             }
-            const leaveRequest = await tx.leaveRequest.findUnique({
+
+            await lockLeaveRequestRow(tx, parsed.data.leaveId);
+            let leaveRequest = await tx.leaveRequest.findUnique({
                 where: { id: parsed.data.leaveId },
                 include: {
                     employee: {
                         include: { user: { select: { id: true } } },
                     },
                     approver: {
+                        include: {
+                            user: { select: ACTIVE_LEAVE_APPROVER_USER_SELECT },
+                        },
+                    },
+                    exceptionApprover: {
                         include: {
                             user: { select: ACTIVE_LEAVE_APPROVER_USER_SELECT },
                         },
@@ -245,24 +313,62 @@ export async function PUT(req: Request): Promise<NextResponse> {
             ) {
                 throw new LeaveNotTakenError(NOT_TAKEN_MESSAGES.confirmNotFound, 404);
             }
-            if (leaveRequest.employeeId === managerId) {
+            if (!adminOverride && leaveRequest.employeeId === managerId) {
                 throw new LeaveNotTakenError(NOT_TAKEN_MESSAGES.forbidden, 403);
             }
-            if (leaveRequest.approverId !== managerId) {
-                throw new LeaveNotTakenError(NOT_TAKEN_MESSAGES.forbidden, 403);
-            }
-            if (!isActiveLeaveApprover(leaveRequest.approver)) {
-                throw new LeaveNotTakenError(
-                    NOT_TAKEN_MESSAGES.originalApproverRecoveryRequired,
-                    409,
-                );
+            if (!adminOverride) {
+                const exceptionApprover = await resolveLeaveExceptionApprover(tx, {
+                    employeeId: leaveRequest.employeeId,
+                    originalApprover: leaveRequest.approver,
+                    existingApprover: leaveRequest.exceptionApprover,
+                    reuseExisting: true,
+                });
+                if (!exceptionApprover) {
+                    throw new LeaveNotTakenError(NOT_TAKEN_MESSAGES.forbidden, 403);
+                }
+                if (exceptionApprover.shouldPersist) {
+                    await persistLeaveExceptionApprover(tx, leaveRequest.id, exceptionApprover);
+                    const refreshedRequest = await tx.leaveRequest.findUnique({
+                        where: { id: leaveRequest.id },
+                        include: {
+                            employee: {
+                                include: { user: { select: { id: true } } },
+                            },
+                            approver: {
+                                include: {
+                                    user: { select: ACTIVE_LEAVE_APPROVER_USER_SELECT },
+                                },
+                            },
+                            exceptionApprover: {
+                                include: {
+                                    user: { select: ACTIVE_LEAVE_APPROVER_USER_SELECT },
+                                },
+                            },
+                        },
+                    });
+                    if (!refreshedRequest) {
+                        throw new LeaveNotTakenError(NOT_TAKEN_MESSAGES.confirmNotFound, 404);
+                    }
+                    leaveRequest = refreshedRequest;
+                }
+                const currentApprover = leaveRequest.exceptionApprover ?? leaveRequest.approver;
+                if (
+                    (leaveRequest.exceptionApproverId ?? leaveRequest.approverId) !== managerId
+                    || !isActiveLeaveApprover(currentApprover)
+                ) {
+                    throw new LeaveNotTakenError(NOT_TAKEN_MESSAGES.forbidden, 403);
+                }
             }
 
             const claimedRequest = await tx.leaveRequest.updateMany({
                 where: {
                     id: leaveRequest.id,
                     status: "APPROVED",
-                    approverId: managerId,
+                    ...(adminOverride
+                        ? {}
+                        : leaveRequest.exceptionApproverId !== null
+                            ? { exceptionApproverId: managerId }
+                            : { approverId: managerId }),
                     notTakenRequestedAt: { not: null },
                     notTakenConfirmedAt: null,
                 },
@@ -311,11 +417,12 @@ export async function PUT(req: Request): Promise<NextResponse> {
                 data: { isRead: true },
             });
 
+            const currentApprover = leaveRequest.exceptionApprover ?? leaveRequest.approver;
             const payload: LeaveNotTakenConfirmedPayload = {
                 leaveId: leaveRequest.id,
                 employee: buildLeaveRecipientSnapshot(leaveRequest.employee),
-                approverName: leaveRequest.approver
-                    ? formatEmployeeName(leaveRequest.approver)
+                approverName: currentApprover
+                    ? formatEmployeeName(currentApprover)
                     : auth.user.name,
                 leaveType: leaveRequest.leaveType,
                 startDate: leaveRequest.startDate.toISOString(),
@@ -327,20 +434,42 @@ export async function PUT(req: Request): Promise<NextResponse> {
             await tx.notificationOutbox.create({
                 data: {
                     type: "LEAVE_NOT_TAKEN_CONFIRMED",
+                    eventKey: `leave:${leaveRequest.id}:not-taken-confirmed`,
                     payload: JSON.stringify(payload),
                 },
             });
 
+            if (adminOverride) {
+                await createLeaveAuditInTransaction(
+                    tx,
+                    "LEAVE_REQUEST_NOT_TAKEN_CONFIRM",
+                    leaveRequest.id,
+                    userId,
+                    auth.user.email,
+                    {
+                        after: { status: "NOT_TAKEN" },
+                        metadata: {
+                            adminOverride: true,
+                            decision: "CONFIRM_NOT_TAKEN",
+                            originalApproverId: leaveRequest.approverId,
+                            exceptionApproverId: leaveRequest.exceptionApproverId,
+                        },
+                    },
+                );
+            }
+
             return updatedRequest;
         });
 
-        await logLeaveEvent(
-            "LEAVE_REQUEST_NOT_TAKEN_CONFIRM",
-            result.id,
-            userId,
-            auth.user.email,
-            { after: { status: "NOT_TAKEN" } },
-        ).catch((err) => console.error("Failed to log leave not-taken confirm:", err));
+        if (!adminOverride) {
+            await logLeaveEvent(
+                "LEAVE_REQUEST_NOT_TAKEN_CONFIRM",
+                result.id,
+                userId,
+                auth.user.email,
+                { after: { status: "NOT_TAKEN" } },
+            ).catch((err) => console.error("Failed to log leave not-taken confirm:", err));
+        }
 
         after(() => {
             processOutbox().catch((err) =>

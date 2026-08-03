@@ -22,7 +22,7 @@ export function LeaveManagementSection({ defaultTab = "my-leave" }: LeaveManagem
     const isManager = user?.isManager === true;
     const canViewLeaveReports = user?.canViewLeaveReports === true;
     const isAdmin = isAdminRole(user?.role);
-    const showApprovalTab = isManager;
+    const showApprovalTab = isManager || isAdmin;
 
     const [activeTab, setActiveTab] = useState(defaultTab);
     const [isMounted, setIsMounted] = useState(false);
@@ -86,7 +86,7 @@ function getLeaveTabs(
             value: "approvals",
             label: "อนุมัติการลา",
             icon: CheckSquare,
-            content: <ManagerApprovalDashboard />,
+            content: <ManagerApprovalDashboard isAdmin={isAdmin} />,
             visible: showApprovalTab,
         },
         {
