@@ -425,7 +425,7 @@ describe("/api/leave/not-taken", () => {
         });
         expect(prisma.notification.updateMany).toHaveBeenCalledWith({
             where: {
-                userId: 1,
+                userId: 2,
                 type: "LEAVE_NOT_TAKEN_REQUESTED",
                 referenceId: "leave-2",
                 isRead: false,
@@ -497,7 +497,12 @@ describe("/api/leave/not-taken", () => {
                 email: "former@example.com",
                 status: "INACTIVE",
                 deletedAt: null,
-                user: null,
+                user: {
+                    id: 20,
+                    email: "former@example.com",
+                    isActive: false,
+                    deletedAt: null,
+                },
             },
         } as never);
         vi.mocked(prisma.leaveRequest.updateMany).mockResolvedValue({ count: 1 });
@@ -543,6 +548,33 @@ describe("/api/leave/not-taken", () => {
         expect(prisma.leaveQuota.update).toHaveBeenCalledWith({
             where: { id: "quota-admin-recovery" },
             data: { usedHalfDays: { decrement: 2 } },
+        });
+        expect(prisma.notification.updateMany).toHaveBeenCalledWith({
+            where: {
+                userId: 20,
+                type: "LEAVE_NOT_TAKEN_REQUESTED",
+                referenceId: "leave-admin-recovery",
+                isRead: false,
+            },
+            data: { isRead: true },
+        });
+        expect(prisma.notificationOutbox.create).toHaveBeenCalledWith({
+            data: expect.objectContaining({
+                type: "LEAVE_NOT_TAKEN_CONFIRMED",
+                payload: expect.stringContaining('"decisionActorName":"Admin"'),
+            }),
+        });
+        expect(prisma.notificationOutbox.create).toHaveBeenCalledWith({
+            data: expect.objectContaining({
+                type: "LEAVE_NOT_TAKEN_CONFIRMED",
+                payload: expect.stringContaining('"decisionActorRole":"ADMIN"'),
+            }),
+        });
+        expect(prisma.notificationOutbox.create).toHaveBeenCalledWith({
+            data: expect.objectContaining({
+                type: "LEAVE_NOT_TAKEN_CONFIRMED",
+                payload: expect.stringContaining('"recoveryOverride":true'),
+            }),
         });
         expect(prisma.auditLog.create).toHaveBeenCalledWith({
             data: expect.objectContaining({

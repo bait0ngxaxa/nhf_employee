@@ -10,6 +10,11 @@ const dateStringSchema = z
 const leaveTypeSchema = z.enum(["SICK", "PERSONAL", "VACATION"]);
 const leavePeriodSchema = z.enum(["FULL_DAY", "MORNING", "AFTERNOON"]);
 const leaveResultStatusSchema = z.enum(["APPROVED", "REJECTED"]);
+const decisionActorFields = {
+    decisionActorName: z.string().trim().min(1).nullable(),
+    decisionActorRole: z.string().trim().min(1),
+    recoveryOverride: z.boolean(),
+};
 
 const recipientSchema = z.object({
     employeeId: z.number().int().positive(),
@@ -63,7 +68,7 @@ export const leaveCancellationRequestedPayloadSchema = leaveDetailsSchema.extend
 
 export const leaveCancelledAfterApprovalPayloadSchema = leaveDetailsSchema.extend({
     employee: recipientSchema,
-    approverName: z.string().trim().min(1).nullable(),
+    ...decisionActorFields,
 });
 
 export const leaveNotTakenRequestedPayloadSchema = leaveDetailsSchema.extend({
@@ -74,7 +79,7 @@ export const leaveNotTakenRequestedPayloadSchema = leaveDetailsSchema.extend({
 
 export const leaveNotTakenConfirmedPayloadSchema = leaveDetailsSchema.extend({
     employee: recipientSchema,
-    approverName: z.string().trim().min(1).nullable(),
+    ...decisionActorFields,
 });
 
 export type LeaveNotificationRecipient = z.infer<typeof recipientSchema>;
@@ -180,6 +185,41 @@ function parseLeavePayload<T>(
     return result.data;
 }
 
+function normalizeLegacyDecisionActorPayload(payload: unknown): unknown {
+    if (!isRecord(payload)) {
+        return payload;
+    }
+
+    const hasDecisionActorField = [
+        "decisionActorName",
+        "decisionActorRole",
+        "recoveryOverride",
+    ].some((field) => Object.prototype.hasOwnProperty.call(payload, field));
+    if (hasDecisionActorField) {
+        return payload;
+    }
+
+    const legacyActorName = payload.approverName;
+    if (
+        legacyActorName !== undefined
+        && legacyActorName !== null
+        && typeof legacyActorName !== "string"
+    ) {
+        return payload;
+    }
+
+    return {
+        ...payload,
+        decisionActorName: legacyActorName ?? null,
+        decisionActorRole: "USER",
+        recoveryOverride: false,
+    };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
 export function parseLeaveActionPayload(payload: unknown): LeaveActionPayload {
     return parseLeavePayload(leaveActionPayloadSchema, payload, "LEAVE_ACTION");
 }
@@ -213,7 +253,7 @@ export function parseLeaveCancelledAfterApprovalPayload(
 ): LeaveCancelledAfterApprovalPayload {
     return parseLeavePayload(
         leaveCancelledAfterApprovalPayloadSchema,
-        payload,
+        normalizeLegacyDecisionActorPayload(payload),
         "LEAVE_CANCELLED_AFTER_APPROVAL",
     );
 }
@@ -233,7 +273,7 @@ export function parseLeaveNotTakenConfirmedPayload(
 ): LeaveNotTakenConfirmedPayload {
     return parseLeavePayload(
         leaveNotTakenConfirmedPayloadSchema,
-        payload,
+        normalizeLegacyDecisionActorPayload(payload),
         "LEAVE_NOT_TAKEN_CONFIRMED",
     );
 }

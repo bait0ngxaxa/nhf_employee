@@ -1099,7 +1099,12 @@ describe("POST /api/leave/cancel", () => {
                     email: "former@example.com",
                     status: "INACTIVE",
                     deletedAt: null,
-                    user: null,
+                    user: {
+                        id: 20,
+                        email: "former@example.com",
+                        isActive: false,
+                        deletedAt: null,
+                    },
                 },
             }),
         );
@@ -1136,6 +1141,33 @@ describe("POST /api/leave/cancel", () => {
         expect(prisma.leaveQuota.update).toHaveBeenCalledWith({
             where: { id: "quota-1" },
             data: { usedHalfDays: { decrement: 2 } },
+        });
+        expect(prisma.notification.updateMany).toHaveBeenCalledWith({
+            where: {
+                userId: 20,
+                type: "LEAVE_CANCELLATION_REQUESTED",
+                referenceId: "leave-confirm",
+                isRead: false,
+            },
+            data: { isRead: true },
+        });
+        expect(prisma.notificationOutbox.create).toHaveBeenCalledWith({
+            data: expect.objectContaining({
+                type: "LEAVE_CANCELLED_AFTER_APPROVAL",
+                payload: expect.stringContaining('"decisionActorName":"Admin"'),
+            }),
+        });
+        expect(prisma.notificationOutbox.create).toHaveBeenCalledWith({
+            data: expect.objectContaining({
+                type: "LEAVE_CANCELLED_AFTER_APPROVAL",
+                payload: expect.stringContaining('"decisionActorRole":"ADMIN"'),
+            }),
+        });
+        expect(prisma.notificationOutbox.create).toHaveBeenCalledWith({
+            data: expect.objectContaining({
+                type: "LEAVE_CANCELLED_AFTER_APPROVAL",
+                payload: expect.stringContaining('"recoveryOverride":true'),
+            }),
         });
         expect(prisma.auditLog.create).toHaveBeenCalledWith({
             data: expect.objectContaining({

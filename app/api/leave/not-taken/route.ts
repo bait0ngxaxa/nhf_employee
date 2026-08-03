@@ -427,23 +427,30 @@ export async function PUT(req: NextRequest): Promise<NextResponse> {
                 where: { id: leaveRequest.id },
             });
 
-            await tx.notification.updateMany({
-                where: {
-                    userId,
-                    type: "LEAVE_NOT_TAKEN_REQUESTED",
-                    referenceId: leaveRequest.id,
-                    isRead: false,
-                },
-                data: { isRead: true },
-            });
-
             const currentApprover = getEffectiveLeaveApprover(leaveRequest);
+            const effectiveApproverUserId = currentApprover?.user?.id;
+            if (effectiveApproverUserId) {
+                await tx.notification.updateMany({
+                    where: {
+                        userId: effectiveApproverUserId,
+                        type: "LEAVE_NOT_TAKEN_REQUESTED",
+                        referenceId: leaveRequest.id,
+                        isRead: false,
+                    },
+                    data: { isRead: true },
+                });
+            }
+
             const payload: LeaveNotTakenConfirmedPayload = {
                 leaveId: leaveRequest.id,
                 employee: buildLeaveRecipientSnapshot(leaveRequest.employee),
-                approverName: currentApprover
-                    ? formatEmployeeName(currentApprover)
-                    : auth.user.name,
+                decisionActorName: isAdmin
+                    ? auth.user.name
+                    : currentApprover
+                        ? formatEmployeeName(currentApprover)
+                        : null,
+                decisionActorRole: auth.user.role,
+                recoveryOverride: adminOverride,
                 leaveType: leaveRequest.leaveType,
                 startDate: leaveRequest.startDate.toISOString(),
                 endDate: leaveRequest.endDate.toISOString(),

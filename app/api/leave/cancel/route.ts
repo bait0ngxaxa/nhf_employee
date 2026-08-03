@@ -125,6 +125,7 @@ export async function PUT(req: NextRequest): Promise<NextResponse> {
             userId: auth.user.id,
             employeeId: auth.employeeId,
             role: auth.user.role,
+            name: auth.user.name,
             userEmail: auth.user.email,
         };
         const result = parsed.data.action === "REJECT"

@@ -22,7 +22,10 @@ import {
     APP_DASHBOARD_TABS,
     toDashboardTabPath,
 } from "@/lib/ssot/routes";
-import { getLeaveTypeLabel } from "@/lib/services/leave/notification-format";
+import {
+    formatLeaveDecisionActor,
+    getLeaveTypeLabel,
+} from "@/lib/services/leave/notification-format";
 
 let transporter: nodemailer.Transporter | null = null;
 let isTransporterReady = false;
@@ -364,21 +367,21 @@ export async function sendLeaveCancelledAfterApprovalNotification(
     data: LeaveCancelledAfterApprovalPayload,
 ): Promise<boolean> {
     const dashboardLink = `${getPublicOrigin()}${toDashboardTabPath(APP_DASHBOARD_TABS.leaveHistory)}`;
-    const approverName = data.approverName ?? "ผู้ยืนยัน";
+    const decisionActor = formatLeaveDecisionActor(data);
     const emailData: EmailData = {
         to: data.employee.email,
         subject: "[NHF Leave] ยกเลิกวันลาที่อนุมัติแล้วเรียบร้อย",
         html: generateLeaveEventEmailHTML({
             ...data,
             title: "ยกเลิกวันลาที่อนุมัติแล้วเรียบร้อย",
-            intro: "คำขอยกเลิกวันลาที่อนุมัติแล้วได้รับการยืนยัน",
+            intro: `${decisionActor} ยืนยันการยกเลิกวันลาที่อนุมัติแล้ว`,
             employeeName: data.employee.name,
             dashboardLink,
             ctaLabel: "ดูประวัติการลา",
             actorLabel: "ผู้ยืนยัน",
-            actorName: approverName,
+            actorName: decisionActor,
         }),
-        text: `ยกเลิกวันลาที่อนุมัติแล้วเรียบร้อย\nผู้ยืนยัน: ${approverName}\nดูรายละเอียด: ${dashboardLink}`,
+        text: `${decisionActor} ยืนยันการยกเลิกวันลาที่อนุมัติแล้วเรียบร้อย\nดูรายละเอียด: ${dashboardLink}`,
         messageId: buildLeaveMessageId(
             "cancelled-after-approval",
             data.leaveId,
@@ -416,21 +419,21 @@ export async function sendLeaveNotTakenConfirmedNotification(
     data: LeaveNotTakenConfirmedPayload,
 ): Promise<boolean> {
     const dashboardLink = `${getPublicOrigin()}${toDashboardTabPath(APP_DASHBOARD_TABS.leaveHistory)}`;
-    const approverName = data.approverName ?? "ผู้อนุมัติ";
+    const decisionActor = formatLeaveDecisionActor(data);
     const emailData: EmailData = {
         to: data.employee.email,
         subject: "[NHF Leave] ยืนยันไม่ได้ใช้วันลาแล้ว",
         html: generateLeaveEventEmailHTML({
             ...data,
             title: "ยืนยันไม่ได้ใช้วันลาแล้ว",
-            intro: "ผู้อนุมัติยืนยันว่าคุณไม่ได้ใช้วันลาตามคำขอนี้แล้ว",
+            intro: `${decisionActor} ยืนยันว่าคุณไม่ได้ใช้วันลาตามคำขอนี้แล้ว`,
             employeeName: data.employee.name,
             dashboardLink,
             ctaLabel: "ดูประวัติการลา",
-            actorLabel: "ผู้อนุมัติ",
-            actorName: approverName,
+            actorLabel: "ผู้ยืนยัน",
+            actorName: decisionActor,
         }),
-        text: `ยืนยันไม่ได้ใช้วันลาแล้ว\nผู้อนุมัติ: ${approverName}\nดูรายละเอียด: ${dashboardLink}`,
+        text: `${decisionActor} ยืนยันไม่ได้ใช้วันลาแล้ว\nดูรายละเอียด: ${dashboardLink}`,
         messageId: buildLeaveMessageId("not-taken-confirmed", data.leaveId),
     };
 

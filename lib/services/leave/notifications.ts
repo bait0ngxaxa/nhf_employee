@@ -7,6 +7,7 @@ import {
     toDashboardTabPath,
 } from "@/lib/ssot/routes";
 import {
+    formatLeaveDecisionActor,
     formatLeaveFlagSummary,
     formatLeaveSummary,
     getLeaveTypeLabel,
@@ -184,11 +185,12 @@ export async function sendLeaveCancellationRequestedNotifications(
 export async function sendLeaveCancelledAfterApprovalNotifications(
     payload: LeaveCancelledAfterApprovalPayload,
 ): Promise<void> {
+    const decisionActor = formatLeaveDecisionActor(payload);
     await createNotificationOnce({
         userId: payload.employee.userId,
         type: "LEAVE_CANCELLED_AFTER_APPROVAL",
         title: "ยกเลิกวันลาที่อนุมัติแล้วเรียบร้อย",
-        message: `${payload.approverName ?? "ผู้ยืนยัน"} ยืนยันการยกเลิก${buildLeaveMessage(payload)}แล้ว`,
+        message: `${decisionActor} ยืนยันการยกเลิก${buildLeaveMessage(payload)}แล้ว`,
         actionUrl: toDashboardTabPath(APP_DASHBOARD_TABS.leaveHistory),
         referenceId: payload.leaveId,
     });
@@ -220,11 +222,12 @@ export async function sendLeaveNotTakenRequestedNotifications(
 export async function sendLeaveNotTakenConfirmedNotifications(
     payload: LeaveNotTakenConfirmedPayload,
 ): Promise<void> {
+    const decisionActor = formatLeaveDecisionActor(payload);
     await createNotificationOnce({
         userId: payload.employee.userId,
         type: "LEAVE_NOT_TAKEN_CONFIRMED",
         title: "ยืนยันไม่ได้ใช้วันลาแล้ว",
-        message: `ผู้อนุมัติยืนยันไม่ได้ใช้วันลา: ${buildLeaveMessage(payload)}`,
+        message: `${decisionActor} ยืนยันไม่ได้ใช้วันลา: ${buildLeaveMessage(payload)}`,
         actionUrl: toDashboardTabPath(APP_DASHBOARD_TABS.leaveHistory),
         referenceId: payload.leaveId,
     });

@@ -1,9 +1,15 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
     sendEmail,
+    sendLeaveCancelledAfterApprovalNotification,
     sendLeaveActionNotification,
+    sendLeaveNotTakenConfirmedNotification,
     sendNewTicketNotification,
 } from "@/lib/email";
+import type {
+    LeaveCancelledAfterApprovalPayload,
+    LeaveNotTakenConfirmedPayload,
+} from "@/lib/services/leave/notification-payloads";
 import type { TicketEmailData } from "@/types/api";
 
 // Mock nodemailer with factory
@@ -13,6 +19,26 @@ const createTransportMock = vi.fn().mockReturnValue({
     sendMail: sendMailMock,
     verify: verifyMock,
 });
+
+function buildAdminLeaveDecisionPayload(): LeaveCancelledAfterApprovalPayload {
+    return {
+        leaveId: "leave-admin-recovery",
+        employee: {
+            employeeId: 10,
+            userId: 1,
+            email: "employee@thainhf.org",
+            name: "พนักงาน ทดสอบ",
+        },
+        decisionActorName: "Admin User",
+        decisionActorRole: "ADMIN",
+        recoveryOverride: true,
+        leaveType: "VACATION",
+        startDate: "2031-05-05T00:00:00.000Z",
+        endDate: "2031-05-05T00:00:00.000Z",
+        period: "FULL_DAY",
+        durationDays: 1,
+    };
+}
 
 vi.mock("nodemailer", () => ({
     default: {
@@ -250,6 +276,39 @@ describe("Email Service", () => {
             const nextMessageId = sendMailMock.mock.calls[1][0].messageId;
             expect(nextMessageId).not.toBe(previousMessageId);
             expect(nextMessageId).toContain("-300@");
+        });
+    });
+
+    describe("leave recovery decision notifications", () => {
+        it("includes the admin actor in approved-leave cancellation email", async () => {
+            await sendLeaveCancelledAfterApprovalNotification(
+                buildAdminLeaveDecisionPayload(),
+            );
+
+            expect(sendMailMock).toHaveBeenCalledWith(expect.objectContaining({
+                text: expect.stringContaining(
+                    "ผู้ดูแลระบบ Admin User ยืนยันการยกเลิกวันลาที่อนุมัติแล้ว",
+                ),
+                html: expect.stringContaining(
+                    "ผู้ดูแลระบบ Admin User ยืนยันการยกเลิกวันลาที่อนุมัติแล้ว",
+                ),
+            }));
+        });
+
+        it("includes the admin actor in not-taken confirmation email", async () => {
+            const payload: LeaveNotTakenConfirmedPayload =
+                buildAdminLeaveDecisionPayload();
+
+            await sendLeaveNotTakenConfirmedNotification(payload);
+
+            expect(sendMailMock).toHaveBeenCalledWith(expect.objectContaining({
+                text: expect.stringContaining(
+                    "ผู้ดูแลระบบ Admin User ยืนยันไม่ได้ใช้วันลาแล้ว",
+                ),
+                html: expect.stringContaining(
+                    "ผู้ดูแลระบบ Admin User ยืนยันว่าคุณไม่ได้ใช้วันลาตามคำขอนี้แล้ว",
+                ),
+            }));
         });
     });
 });

@@ -234,6 +234,7 @@ type CancellationDecisionActor = {
     userId: number;
     employeeId: number;
     role: string;
+    name?: string | null;
     userEmail?: string;
 };
 
@@ -309,7 +310,11 @@ export async function confirmLeaveCancellation(
         const payload: LeaveCancelledAfterApprovalPayload = {
             leaveId,
             employee: buildLeaveRecipientSnapshot(leaveRequest.employee),
-            approverName: getExceptionApproverName(leaveRequest),
+            decisionActorName: isAdminRole(actor.role)
+                ? actor.name ?? null
+                : getExceptionApproverName(leaveRequest),
+            decisionActorRole: actor.role,
+            recoveryOverride: authorization.adminOverride,
             leaveType: leaveRequest.leaveType,
             startDate: leaveRequest.startDate.toISOString(),
             endDate: leaveRequest.endDate.toISOString(),
