@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
     createLeaveRequestHash,
+    isLeaveRequestIdempotencyConflict,
 } from "@/lib/services/leave/idempotency";
 
 const PAYLOAD = {
@@ -63,5 +64,23 @@ describe("leave request idempotency", () => {
         expect(createLeaveRequestHash(PAYLOAD)).not.toBe(
             createLeaveRequestHash(PAYLOAD, [attachment]),
         );
+    });
+
+    it("only treats the leave idempotency unique key as an idempotency conflict", () => {
+        expect(isLeaveRequestIdempotencyConflict({
+            code: "P2002",
+            meta: {
+                modelName: "LeaveRequestIdempotency",
+                target: ["userId", "idempotencyKey"],
+            },
+        })).toBe(true);
+        expect(isLeaveRequestIdempotencyConflict({
+            code: "P2002",
+            meta: {
+                modelName: "LeaveQuota",
+                target: ["employeeId", "year", "leaveType"],
+            },
+        })).toBe(false);
+        expect(isLeaveRequestIdempotencyConflict({ code: "P2002" })).toBe(false);
     });
 });

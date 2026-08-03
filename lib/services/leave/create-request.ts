@@ -3,7 +3,6 @@ import type { Prisma } from "@prisma/client";
 import { DEFAULT_LEAVE_QUOTA_HALF_DAYS } from "@/constants/leave";
 import { prisma } from "@/lib/db/prisma";
 import {
-    hasPrismaErrorCode,
     runSerializableTransaction,
 } from "@/lib/db/transaction";
 import {
@@ -39,6 +38,7 @@ import type { LeaveRequestValues } from "@/lib/validations/leave";
 import {
     assertMatchingLeaveRequestHash,
     createLeaveRequestHash,
+    isLeaveRequestIdempotencyConflict,
 } from "@/lib/services/leave/idempotency";
 
 interface PreparedLeaveRequest {
@@ -196,18 +196,16 @@ async function getOrCreateQuota(
     prepared: PreparedLeaveRequest,
 ): Promise<{ totalHalfDays: number; usedHalfDays: number }> {
     const { leaveType } = prepared.payload;
-    const existing = await tx.leaveQuota.findFirst({
+    return tx.leaveQuota.upsert({
         where: {
-            employeeId: input.employeeId,
-            year: prepared.currentYear,
-            leaveType,
+            employeeId_year_leaveType: {
+                employeeId: input.employeeId,
+                year: prepared.currentYear,
+                leaveType,
+            },
         },
-    });
-    if (existing) {
-        return existing;
-    }
-    return tx.leaveQuota.create({
-        data: {
+        update: {},
+        create: {
             employeeId: input.employeeId,
             year: prepared.currentYear,
             leaveType,
@@ -331,7 +329,7 @@ export async function createLeaveRequest(
             createInTransaction(tx, input, prepared, requestHash),
         );
     } catch (error) {
-        if (!hasPrismaErrorCode(error, "P2002")) {
+        if (!isLeaveRequestIdempotencyConflict(error)) {
             throw error;
         }
 

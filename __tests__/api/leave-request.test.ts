@@ -60,6 +60,7 @@ vi.mock("@/lib/db/prisma", () => ({
         leaveQuota: {
             findFirst: vi.fn(),
             create: vi.fn(),
+            upsert: vi.fn(),
             update: vi.fn(),
         },
         leaveRequest: {
@@ -327,7 +328,7 @@ describe("POST /api/leave/request", () => {
 
         (prisma.employee.findUnique as unknown as { mockResolvedValue: (v: ReturnType<typeof buildEmployeeWithManager>) => void }).mockResolvedValue(buildEmployeeWithManager());
         (prisma.leaveRequest.findFirst as unknown as { mockResolvedValue: (v: null) => void }).mockResolvedValue(null);
-        (prisma.leaveQuota.findFirst as unknown as { mockResolvedValue: (v: { id: number; totalHalfDays: number; usedHalfDays: number }) => void }).mockResolvedValue({
+        (prisma.leaveQuota.upsert as unknown as { mockResolvedValue: (v: { id: number; totalHalfDays: number; usedHalfDays: number }) => void }).mockResolvedValue({
             id: 1,
             totalHalfDays: 20,
             usedHalfDays: 0,
@@ -447,7 +448,7 @@ describe("POST /api/leave/request", () => {
         it("should throw error if insufficient quota", async () => {
             (prisma.employee.findUnique as unknown as { mockResolvedValue: (v: ReturnType<typeof buildEmployeeWithManager>) => void }).mockResolvedValue(buildEmployeeWithManager());
             (prisma.leaveRequest.findFirst as unknown as { mockResolvedValue: (v: null) => void }).mockResolvedValue(null);
-            (prisma.leaveQuota.findFirst as unknown as { mockResolvedValue: (v: { id: number; totalHalfDays: number; usedHalfDays: number }) => void }).mockResolvedValue({
+            (prisma.leaveQuota.upsert as unknown as { mockResolvedValue: (v: { id: number; totalHalfDays: number; usedHalfDays: number }) => void }).mockResolvedValue({
                 id: 1,
                 totalHalfDays: 12,
                 usedHalfDays: 12,
@@ -467,7 +468,7 @@ describe("POST /api/leave/request", () => {
         it("should allow insufficient quota with special reason", async () => {
             (prisma.employee.findUnique as unknown as { mockResolvedValue: (v: ReturnType<typeof buildEmployeeWithManager>) => void }).mockResolvedValue(buildEmployeeWithManager());
             (prisma.leaveRequest.findFirst as unknown as { mockResolvedValue: (v: null) => void }).mockResolvedValue(null);
-            (prisma.leaveQuota.findFirst as unknown as { mockResolvedValue: (v: { id: number; totalHalfDays: number; usedHalfDays: number }) => void }).mockResolvedValue({
+            (prisma.leaveQuota.upsert as unknown as { mockResolvedValue: (v: { id: number; totalHalfDays: number; usedHalfDays: number }) => void }).mockResolvedValue({
                 id: 1,
                 totalHalfDays: 12,
                 usedHalfDays: 12,
@@ -504,7 +505,7 @@ describe("POST /api/leave/request", () => {
 
             (prisma.employee.findUnique as unknown as { mockResolvedValue: (v: ReturnType<typeof buildEmployeeWithManager>) => void }).mockResolvedValue(buildEmployeeWithManager());
             (prisma.leaveRequest.findFirst as unknown as { mockResolvedValue: (v: null) => void }).mockResolvedValue(null);
-            (prisma.leaveQuota.findFirst as unknown as { mockResolvedValue: (v: { id: number; totalHalfDays: number; usedHalfDays: number }) => void }).mockResolvedValue({
+            (prisma.leaveQuota.upsert as unknown as { mockResolvedValue: (v: { id: number; totalHalfDays: number; usedHalfDays: number }) => void }).mockResolvedValue({
                 id: 1,
                 totalHalfDays: 20,
                 usedHalfDays: 0,
@@ -669,8 +670,7 @@ describe("POST /api/leave/request", () => {
         it("should complete successfully, creating default quota if none exists", async () => {
             (prisma.employee.findUnique as unknown as { mockResolvedValue: (v: ReturnType<typeof buildEmployeeWithManager>) => void }).mockResolvedValue(buildEmployeeWithManager());
             (prisma.leaveRequest.findFirst as unknown as { mockResolvedValue: (v: null) => void }).mockResolvedValue(null);
-            (prisma.leaveQuota.findFirst as unknown as { mockResolvedValue: (v: null) => void }).mockResolvedValue(null);
-            (prisma.leaveQuota.create as unknown as { mockResolvedValue: (v: { id: number; totalHalfDays: number; usedHalfDays: number }) => void }).mockResolvedValue({
+            (prisma.leaveQuota.upsert as unknown as { mockResolvedValue: (v: { id: number; totalHalfDays: number; usedHalfDays: number }) => void }).mockResolvedValue({
                 id: 1,
                 totalHalfDays: 20,
                 usedHalfDays: 0,
@@ -702,8 +702,16 @@ describe("POST /api/leave/request", () => {
                 attachments: [],
             });
 
-            expect(prisma.leaveQuota.create).toHaveBeenCalledWith({
-                data: {
+            expect(prisma.leaveQuota.upsert).toHaveBeenCalledWith({
+                where: {
+                    employeeId_year_leaveType: {
+                        employeeId: mockEmployeeId,
+                        year: 2030,
+                        leaveType: "PERSONAL",
+                    },
+                },
+                update: {},
+                create: {
                     employeeId: mockEmployeeId,
                     year: 2030,
                     leaveType: "PERSONAL",
@@ -796,7 +804,7 @@ describe("POST /api/leave/request", () => {
                 buildEmployeeWithManager() as never,
             );
             vi.mocked(prisma.leaveRequest.findFirst).mockResolvedValue(null);
-            vi.mocked(prisma.leaveQuota.findFirst).mockResolvedValue({
+            vi.mocked(prisma.leaveQuota.upsert).mockResolvedValue({
                 id: "quota-1",
                 totalHalfDays: 20,
                 usedHalfDays: 0,

@@ -16,6 +16,62 @@ export class LeaveRequestIdempotencyConflictError extends Error {
     }
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === "object" && value !== null;
+}
+
+function hasIdempotencyFields(value: unknown): boolean {
+    if (!Array.isArray(value) || value.length !== 2) {
+        return false;
+    }
+
+    const fields = value.filter((field): field is string => typeof field === "string");
+    return fields.length === 2
+        && fields.includes("userId")
+        && fields.includes("idempotencyKey");
+}
+
+function hasIdempotencyIndex(value: unknown): boolean {
+    return typeof value === "string"
+        && value.includes("userId")
+        && value.includes("idempotencyKey");
+}
+
+function hasIdempotencyTarget(value: unknown): boolean {
+    return hasIdempotencyFields(value) || hasIdempotencyIndex(value);
+}
+
+export function isLeaveRequestIdempotencyConflict(error: unknown): boolean {
+    if (!isRecord(error) || error.code !== "P2002" || !isRecord(error.meta)) {
+        return false;
+    }
+
+    const modelName = error.meta.modelName;
+    if (
+        modelName !== undefined
+        && modelName !== "LeaveRequestIdempotency"
+    ) {
+        return false;
+    }
+
+    if (hasIdempotencyTarget(error.meta.target)) {
+        return true;
+    }
+
+    const driverAdapterError = error.meta.driverAdapterError;
+    if (!isRecord(driverAdapterError)) {
+        return false;
+    }
+
+    const constraint = driverAdapterError.constraint;
+    if (!isRecord(constraint)) {
+        return false;
+    }
+
+    return hasIdempotencyFields(constraint.fields)
+        || hasIdempotencyIndex(constraint.index);
+}
+
 function canonicalizeAttachments(
     attachments: readonly StoredLeaveAttachment[],
 ): Array<{
