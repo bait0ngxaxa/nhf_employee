@@ -90,6 +90,13 @@ const SessionManagementSection = dynamic(
         ),
     { loading: () => <SectionSkeleton /> },
 );
+const RoutineSection = dynamic(
+    () =>
+        import("@/components/dashboard/sections/RoutineSection").then(
+            (mod) => mod.RoutineSection,
+        ),
+    { loading: () => <SectionSkeleton /> },
+);
 
 function getPageTitle(menu: string): string {
     switch (menu) {
@@ -104,6 +111,7 @@ function getPageTitle(menu: string): string {
         case "audit-logs": return "Audit Logs | NHFapp";
         case "notifications": return "Notifications | NHFapp";
         case "sessions": return "Session Management | NHFapp";
+        case "routine": return "NHF Routine | NHFapp";
         default: return "NHFapp";
     }
 }
@@ -197,6 +205,13 @@ export function DashboardContent() {
                 return (
                     <Suspense fallback={<SectionSkeleton />}>
                         <SessionManagementSection />
+                    </Suspense>
+                );
+
+            case "routine":
+                return (
+                    <Suspense fallback={<SectionSkeleton />}>
+                        <RoutineSection />
                     </Suspense>
                 );
 

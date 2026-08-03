@@ -1,6 +1,7 @@
 export const FEATURE_KEYS = {
     leave: "leave",
     itSupport: "itSupport",
+    routine: "routine",
 } as const;
 
 export type FeatureKey = (typeof FEATURE_KEYS)[keyof typeof FEATURE_KEYS];
@@ -8,6 +9,7 @@ export type FeatureKey = (typeof FEATURE_KEYS)[keyof typeof FEATURE_KEYS];
 const FEATURE_DASHBOARD_TABS: Record<FeatureKey, readonly string[]> = {
     leave: ["leave-management", "manager-approval", "leave-history"],
     itSupport: ["it-support"],
+    routine: ["routine"],
 };
 
 function parseBooleanFlag(value: string | undefined): boolean | null {
@@ -33,6 +35,10 @@ function getFeatureOverride(feature: FeatureKey): boolean | null {
 
     if (feature === FEATURE_KEYS.itSupport) {
         return parseBooleanFlag(process.env.NEXT_PUBLIC_FEATURE_ITSUPPORT);
+    }
+
+    if (feature === FEATURE_KEYS.routine) {
+        return parseBooleanFlag(process.env.NEXT_PUBLIC_FEATURE_ROUTINE);
     }
 
     return null;

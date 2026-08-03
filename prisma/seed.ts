@@ -68,6 +68,43 @@ async function main() {
         console.log(`✅ สร้างพนักงานตั้งต้นสำเร็จ: ${adminEmployee.email} (กรุณาใช้ email นี้สมัครสมาชิก หรือเปลี่ยนในฐานข้อมูลก่อนสมัคร)`);
     }
 
+    const routineUnits = [
+        { code: "มสช.", name: "มสช." },
+        { code: "ม.สคส.", name: "ม.สคส." },
+        { code: "มสส.", name: "มสส." },
+        { code: "มส.ผส.", name: "มส.ผส." },
+    ];
+    await Promise.all(
+        routineUnits.map((unit) =>
+            prisma.routineUnit.upsert({
+                where: { code: unit.code },
+                update: { name: unit.name, isActive: true },
+                create: unit,
+            }),
+        ),
+    );
+
+    const routineCategories = [
+        "สาธารณูปโภค",
+        "อาคาร / สถานที่",
+        "ระบบคอมพิวเตอร์",
+        "บุคลากร",
+        "ยานพาหนะ",
+        "การเงิน / บัญชี",
+        "อื่น ๆ",
+    ];
+    await Promise.all(
+        routineCategories.map((name, sortOrder) =>
+            prisma.routineCategory.upsert({
+                where: { name },
+                update: { sortOrder, isActive: true },
+                create: { name, sortOrder },
+            }),
+        ),
+    );
+    // eslint-disable-next-line no-console
+    console.log("✅ สร้างหน่วยงานและหมวดหมู่ NHF Routine สำเร็จ");
+
     // eslint-disable-next-line no-console
     console.log("🎉 Seed เสร็จสิ้น!");
 }

@@ -9,6 +9,7 @@ import {
     FileText,
     AppWindow,
     ShieldCheck,
+    ClipboardCheck,
 } from "lucide-react";
 import { type MenuItem, type MenuGroup } from "@/types/dashboard";
 import { FEATURE_KEYS, isFeatureEnabled } from "@/lib/ssot/features";
@@ -27,6 +28,13 @@ export const DASHBOARD_MENU_ITEMS: MenuItem[] = [
         label: "NHF Stock",
         icon: Boxes,
         description: "เบิกวัสดุจากคลัง",
+    },
+    {
+        id: "routine",
+        label: "NHF Routine",
+        icon: ClipboardCheck,
+        description: "บันทึกและติดตามงานประจำขององค์กร",
+        feature: FEATURE_KEYS.routine,
     },
     {
         id: "it-support",
@@ -77,6 +85,7 @@ const DASHBOARD_PAGE_LABELS: Readonly<Record<string, string>> = {
     "leave-history": "ประวัติการลา",
     notifications: "การแจ้งเตือน",
     sessions: "จัดการเซสชัน",
+    routine: "NHF Routine",
 };
 
 export function getDashboardPageLabel(menuId: string): string {
@@ -95,7 +104,8 @@ export const DASHBOARD_MENU_GROUPS: MenuGroup[] = [
         items: [
             DASHBOARD_MENU_ITEMS[0], // ระบบลางาน
             DASHBOARD_MENU_ITEMS[1], // ระบบคลังวัสดุ
-            DASHBOARD_MENU_ITEMS[2], // IT Support
+            DASHBOARD_MENU_ITEMS[2], // NHF Routine
+            DASHBOARD_MENU_ITEMS[3], // IT Support
         ],
     },
     {
@@ -103,10 +113,10 @@ export const DASHBOARD_MENU_GROUPS: MenuGroup[] = [
         label: "การจัดการระบบ",
         icon: ShieldCheck,
         items: [
-            DASHBOARD_MENU_ITEMS[3], // ส่งคำร้องพนักงานใหม่ (ADMIN)
-            DASHBOARD_MENU_ITEMS[4], // ข้อมูลพนักงาน
-            DASHBOARD_MENU_ITEMS[5], // เพิ่มพนักงาน (ADMIN)
-            DASHBOARD_MENU_ITEMS[7], // บันทึกการใช้งาน (ADMIN)
+            DASHBOARD_MENU_ITEMS[4], // ส่งคำร้องพนักงานใหม่ (ADMIN)
+            DASHBOARD_MENU_ITEMS[5], // ข้อมูลพนักงาน
+            DASHBOARD_MENU_ITEMS[6], // เพิ่มพนักงาน (ADMIN)
+            DASHBOARD_MENU_ITEMS[8], // บันทึกการใช้งาน (ADMIN)
         ],
     },
 ];
@@ -178,6 +188,16 @@ export const getMenuTheme = (menuId: string) => {
                 hover: "hover:bg-orange-50",
                 activeBg: "bg-orange-50/80",
                 glow: "from-orange-400 via-red-400 to-amber-400",
+            };
+        case "routine":
+            return {
+                gradient: "from-teal-600 to-cyan-600",
+                lightBg: "bg-teal-50",
+                text: "text-teal-700",
+                border: "border-teal-700",
+                hover: "hover:bg-teal-50",
+                activeBg: "bg-teal-50/80",
+                glow: "from-teal-400 via-cyan-400 to-sky-400",
             };
         case "leave-management":
             return {

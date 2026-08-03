@@ -18,6 +18,7 @@ export const APP_DASHBOARD_TABS = {
     managerApproval: "manager-approval",
     stock: "stock",
     itSupport: "it-support",
+    routine: "routine",
 } as const;
 
 export function toDashboardTabPath(tab: string): string {
@@ -93,5 +94,26 @@ export const API_ROUTES = {
             `/api/stock/requests/${id}/cancel`,
         reviewById: (id: number | string): string =>
             `/api/stock/requests/${id}/review`,
+    },
+    routines: {
+        summary: "/api/routines/summary",
+        occurrences: "/api/routines/occurrences",
+        occurrenceById: (id: number | string): string =>
+            `/api/routines/occurrences/${id}`,
+        occurrenceStatusById: (id: number | string): string =>
+            `/api/routines/occurrences/${id}/status`,
+        occurrenceDueDateById: (id: number | string): string =>
+            `/api/routines/occurrences/${id}/due-date`,
+        occurrenceAssigneesById: (id: number | string): string =>
+            `/api/routines/occurrences/${id}/assignees`,
+        occurrenceSkipById: (id: number | string): string =>
+            `/api/routines/occurrences/${id}/skip`,
+        occurrenceCancelById: (id: number | string): string =>
+            `/api/routines/occurrences/${id}/cancel`,
+        occurrenceReopenById: (id: number | string): string =>
+            `/api/routines/occurrences/${id}/reopen`,
+        tasks: "/api/routines/tasks",
+        taskById: (id: number | string): string => `/api/routines/tasks/${id}`,
+        reference: "/api/routines/reference",
     },
 } as const;

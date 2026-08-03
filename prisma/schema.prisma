@@ -35,6 +35,11 @@ model User {
   stockCancelledRequests      StockRequest[]              @relation("StockCanceller")
   ticketMutationIdempotencies TicketMutationIdempotency[]
   leaveRequestIdempotencies    LeaveRequestIdempotency[]
+  createdRoutineTasks         RoutineTask[]               @relation("RoutineTaskCreatedBy")
+  updatedRoutineTasks         RoutineTask[]               @relation("RoutineTaskUpdatedBy")
+  completedRoutineOccurrences RoutineOccurrence[]         @relation("RoutineOccurrenceCompletedBy")
+  skippedRoutineOccurrences   RoutineOccurrence[]         @relation("RoutineOccurrenceSkippedBy")
+  cancelledRoutineOccurrences RoutineOccurrence[]         @relation("RoutineOccurrenceCancelledBy")
 
   @@map("users")
 }
@@ -90,6 +95,8 @@ model Employee {
   leaveRequests LeaveRequest[] @relation("LeaveRequester")
   approvals     LeaveRequest[] @relation("LeaveApprover")
   exceptionApprovals LeaveRequest[] @relation("LeaveExceptionApprover")
+  routineTaskAssignments       RoutineTaskAssignee[]
+  routineOccurrenceAssignments RoutineOccurrenceAssignee[]
 
   @@index([departmentId], map: "employees_departmentId_fkey")
   @@map("employees")
@@ -321,6 +328,18 @@ enum AuditAction {
   SETTINGS_UPDATE
   DATA_EXPORT
   EMAIL_REQUEST
+
+  // NHF Routine
+  ROUTINE_TASK_CREATE
+  ROUTINE_TASK_UPDATE
+  ROUTINE_TASK_DEACTIVATE
+  ROUTINE_OCCURRENCE_START
+  ROUTINE_OCCURRENCE_COMPLETE
+  ROUTINE_OCCURRENCE_SKIP
+  ROUTINE_OCCURRENCE_CANCEL
+  ROUTINE_OCCURRENCE_REOPEN
+  ROUTINE_OCCURRENCE_REASSIGN
+  ROUTINE_OCCURRENCE_DUE_DATE_CHANGE
 }
 
 // Email Request History for tracking new employee email requests
@@ -725,4 +744,156 @@ enum StockRequestStatus {
   ISSUED          @map("APPROVED") // จ่ายแล้ว
   CANCELLED       @map("CANCELLED") // ยกเลิก
   REJECTED_LEGACY @map("REJECTED") // สถานะเก่าจาก flow เดิม
+}
+
+model RoutineUnit {
+  id        Int           @id @default(autoincrement())
+  code      String        @unique @db.VarChar(100)
+  name      String        @db.VarChar(200)
+  isActive  Boolean       @default(true)
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+  tasks     RoutineTask[]
+
+  @@index([isActive])
+  @@map("routine_units")
+}
+
+model RoutineCategory {
+  id        Int           @id @default(autoincrement())
+  name      String        @unique @db.VarChar(200)
+  sortOrder Int           @default(0)
+  isActive  Boolean       @default(true)
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+  tasks     RoutineTask[]
+
+  @@index([isActive, sortOrder])
+  @@map("routine_categories")
+}
+
+model RoutineTask {
+  id                Int                      @id @default(autoincrement())
+  unitId            Int
+  categoryId        Int
+  title             String                   @db.VarChar(255)
+  description       String?                  @db.Text
+  scheduleType      RoutineScheduleType
+  scheduleConfig    Json?
+  scheduleText      String?                  @db.VarChar(500)
+  contractStartDate DateTime?                @db.Date
+  contractEndDate   DateTime?                @db.Date
+  contractText      String?                  @db.VarChar(500)
+  extraDetails      String?                  @db.Text
+  businessDayPolicy RoutineBusinessDayPolicy @default(NONE)
+  isActive          Boolean                  @default(true)
+  version           Int                      @default(1)
+  sourceFileName    String?                  @db.VarChar(255)
+  sourceSheet       String?                  @db.VarChar(255)
+  sourceRow         Int?
+  createdById       Int
+  updatedById       Int
+  createdAt         DateTime                 @default(now())
+  updatedAt         DateTime                 @updatedAt
+
+  unit        RoutineUnit           @relation(fields: [unitId], references: [id])
+  category    RoutineCategory       @relation(fields: [categoryId], references: [id])
+  assignees   RoutineTaskAssignee[]
+  occurrences RoutineOccurrence[]
+  createdBy   User                  @relation("RoutineTaskCreatedBy", fields: [createdById], references: [id])
+  updatedBy   User                  @relation("RoutineTaskUpdatedBy", fields: [updatedById], references: [id])
+
+  @@index([unitId])
+  @@index([categoryId])
+  @@index([isActive, scheduleType])
+  @@index([contractEndDate])
+  @@map("routine_tasks")
+}
+
+model RoutineTaskAssignee {
+  taskId     Int
+  employeeId Int
+  role       RoutineAssigneeRole
+  task       RoutineTask         @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  employee   Employee            @relation(fields: [employeeId], references: [id])
+
+  @@id([taskId, employeeId])
+  @@index([employeeId, role])
+  @@map("routine_task_assignees")
+}
+
+model RoutineOccurrence {
+  id                 Int                     @id @default(autoincrement())
+  taskId             Int
+  periodKey          String                  @db.VarChar(32)
+  dueDate            DateTime                @db.Date
+  originalDueDate    DateTime                @db.Date
+  status             RoutineOccurrenceStatus @default(TODO)
+  scheduleVersion    Int
+  startedAt          DateTime?
+  completedAt        DateTime?
+  completedById      Int?
+  completionNote     String?                 @db.Text
+  referenceNo        String?                 @db.VarChar(255)
+  skippedAt          DateTime?
+  skippedById        Int?
+  skipReason         String?                 @db.Text
+  cancelledAt        DateTime?
+  cancelledById      Int?
+  cancellationReason String?                 @db.Text
+  createdAt          DateTime                @default(now())
+  updatedAt          DateTime                @updatedAt
+
+  task        RoutineTask                 @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  completedBy User?                       @relation("RoutineOccurrenceCompletedBy", fields: [completedById], references: [id], onDelete: SetNull)
+  skippedBy   User?                       @relation("RoutineOccurrenceSkippedBy", fields: [skippedById], references: [id], onDelete: SetNull)
+  cancelledBy User?                       @relation("RoutineOccurrenceCancelledBy", fields: [cancelledById], references: [id], onDelete: SetNull)
+  assignees   RoutineOccurrenceAssignee[]
+
+  @@unique([taskId, periodKey])
+  @@index([status, dueDate])
+  @@index([taskId, status])
+  @@index([dueDate])
+  @@index([completedAt])
+  @@map("routine_occurrences")
+}
+
+model RoutineOccurrenceAssignee {
+  occurrenceId Int
+  employeeId   Int
+  role         RoutineAssigneeRole
+  occurrence   RoutineOccurrence   @relation(fields: [occurrenceId], references: [id], onDelete: Cascade)
+  employee     Employee            @relation(fields: [employeeId], references: [id])
+
+  @@id([occurrenceId, employeeId])
+  @@index([employeeId, role])
+  @@map("routine_occurrence_assignees")
+}
+
+enum RoutineScheduleType {
+  MONTHLY_DAY
+  MONTH_END
+  INTERVAL_MONTHS
+  YEARLY_DATE
+  ONE_TIME
+  MANUAL
+}
+
+enum RoutineBusinessDayPolicy {
+  NONE
+  PREVIOUS_BUSINESS_DAY
+  NEXT_BUSINESS_DAY
+}
+
+enum RoutineAssigneeRole {
+  OWNER
+  CO_OWNER
+}
+
+enum RoutineOccurrenceStatus {
+  TODO
+  IN_PROGRESS
+  COMPLETED
+  SKIPPED
+  CANCELLED
 }
