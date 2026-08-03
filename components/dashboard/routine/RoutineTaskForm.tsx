@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { BellPlus, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,6 +10,7 @@ import { ROUTINE_SCHEDULE_LABELS } from "./labels";
 import type {
     RoutineAssigneeRole,
     RoutineReferenceData,
+    RoutineReminderRecipientScope,
     RoutineTask,
 } from "./types";
 
@@ -33,7 +35,27 @@ interface TaskFormState {
     extraDetails: string;
     businessDayPolicy: string;
     isActive: boolean;
+    reminderRules: ReminderRuleForm[];
 }
+
+interface ReminderRuleForm {
+    daysBefore: string;
+    sendHour: string;
+    recipientScope: RoutineReminderRecipientScope;
+    isActive: boolean;
+}
+
+const REMINDER_SCOPE_LABELS: Record<RoutineReminderRecipientScope, string> = {
+    ASSIGNEES: "ผู้รับผิดชอบ",
+    ADMINS: "ผู้ดูแลระบบ",
+    ASSIGNEES_AND_ADMINS: "ผู้รับผิดชอบและผู้ดูแลระบบ",
+};
+
+const REMINDER_PRESETS: Record<string, number[]> = {
+    monthly: [3, 1],
+    yearly: [14, 7, 1],
+    contract: [30, 7, 1],
+};
 
 function defaultScheduleConfig(scheduleType: string): string {
     switch (scheduleType) {
@@ -76,6 +98,12 @@ function taskToForm(task: RoutineTask | null): TaskFormState {
         extraDetails: task?.extraDetails ?? "",
         businessDayPolicy: task?.businessDayPolicy ?? "NONE",
         isActive: task?.isActive ?? true,
+        reminderRules: task?.reminderRules?.map((rule) => ({
+            daysBefore: String(rule.daysBefore),
+            sendHour: String(rule.sendHour),
+            recipientScope: rule.recipientScope,
+            isActive: rule.isActive,
+        })) ?? [],
     };
 }
 
@@ -131,6 +159,55 @@ export function RoutineTaskForm({
         });
     }
 
+    function addReminderRule(daysBefore = 1): void {
+        setForm((current) => ({
+            ...current,
+            reminderRules: [
+                ...current.reminderRules,
+                {
+                    daysBefore: String(daysBefore),
+                    sendHour: "9",
+                    recipientScope: "ASSIGNEES",
+                    isActive: true,
+                },
+            ],
+        }));
+    }
+
+    function removeReminderRule(index: number): void {
+        setForm((current) => ({
+            ...current,
+            reminderRules: current.reminderRules.filter((_, itemIndex) => itemIndex !== index),
+        }));
+    }
+
+    function updateReminderRule<K extends keyof ReminderRuleForm>(
+        index: number,
+        key: K,
+        value: ReminderRuleForm[K],
+    ): void {
+        setForm((current) => ({
+            ...current,
+            reminderRules: current.reminderRules.map((rule, itemIndex) =>
+                itemIndex === index ? { ...rule, [key]: value } : rule,
+            ),
+        }));
+    }
+
+    function applyReminderPreset(preset: string): void {
+        const days = REMINDER_PRESETS[preset];
+        if (!days) return;
+        setForm((current) => ({
+            ...current,
+            reminderRules: days.map((daysBefore) => ({
+                daysBefore: String(daysBefore),
+                sendHour: "9",
+                recipientScope: "ASSIGNEES",
+                isActive: true,
+            })),
+        }));
+    }
+
     async function submit(): Promise<void> {
         setError(null);
         let scheduleConfig: unknown;
@@ -153,6 +230,24 @@ export function RoutineTaskForm({
             setError("กรุณากรอกหน่วยงาน หมวดหมู่ และชื่องาน");
             return;
         }
+        const reminderRules = form.reminderRules.map((rule) => ({
+            daysBefore: Number(rule.daysBefore),
+            sendHour: Number(rule.sendHour),
+            channel: "IN_APP" as const,
+            recipientScope: rule.recipientScope,
+            isActive: rule.isActive,
+        }));
+        if (reminderRules.some((rule) =>
+            !Number.isInteger(rule.daysBefore)
+            || rule.daysBefore < 0
+            || rule.daysBefore > 365
+            || !Number.isInteger(rule.sendHour)
+            || rule.sendHour < 0
+            || rule.sendHour > 23
+        )) {
+            setError("กำหนดจำนวนวันแจ้งเตือนล่วงหน้าให้อยู่ระหว่าง 0–365 และเวลาอยู่ระหว่าง 0–23 นาฬิกา");
+            return;
+        }
         setIsSubmitting(true);
         try {
             const payload = {
@@ -169,6 +264,7 @@ export function RoutineTaskForm({
                 extraDetails: form.extraDetails || null,
                 businessDayPolicy: form.businessDayPolicy,
                 isActive: form.isActive,
+                reminderRules,
                 assignees: Object.entries(assignees).map(([employeeId, role]) => ({
                     employeeId: Number(employeeId),
                     role,
@@ -246,6 +342,90 @@ export function RoutineTaskForm({
                         <Input value={form.scheduleText} onChange={(event) => updateField("scheduleText", event.target.value)} placeholder="เช่น ทุกวันที่ 10 ของเดือน" />
                     </label>
                 </div>
+            </fieldset>
+
+            <fieldset className="space-y-3 rounded-lg border border-border-subtle bg-surface-subtle p-4">
+                <legend className="px-1 text-sm font-semibold text-content-heading">การแจ้งเตือนล่วงหน้า</legend>
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                        <p className="mt-1 text-xs text-content-secondary">ตรวจตามเวลาไทย (Asia/Bangkok) และส่งผ่านการแจ้งเตือนในระบบเท่านั้น</p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                        <select
+                            className="h-9 rounded-md border border-input bg-background px-2 text-xs"
+                            defaultValue=""
+                            onChange={(event) => {
+                                applyReminderPreset(event.target.value);
+                                event.target.value = "";
+                            }}
+                            aria-label="เลือกชุดกฎการแจ้งเตือน"
+                        >
+                            <option value="">ใช้ชุดสำเร็จรูป</option>
+                            <option value="monthly">งานรายเดือน: 3 และ 1 วัน</option>
+                            <option value="yearly">งานรายปี: 14, 7 และ 1 วัน</option>
+                            <option value="contract">งานต่อสัญญา: 30, 7 และ 1 วัน</option>
+                        </select>
+                        <Button type="button" variant="outline" size="sm" onClick={() => addReminderRule()}>
+                            <BellPlus />
+                            เพิ่มกฎ
+                        </Button>
+                    </div>
+                </div>
+                {form.reminderRules.length === 0 ? (
+                    <p className="rounded-md border border-dashed border-border-subtle bg-background px-3 py-3 text-sm text-content-secondary">
+                        ยังไม่มีกฎ ระบบจะไม่ส่งการแจ้งเตือนสำหรับแม่แบบนี้
+                    </p>
+                ) : (
+                    <div className="space-y-2">
+                        {form.reminderRules.map((rule, index) => (
+                            <div key={`${index}-${rule.daysBefore}`} className="grid gap-3 rounded-md border border-border-subtle bg-background p-3 md:grid-cols-[110px_110px_1fr_auto_auto] md:items-end">
+                                <label className="grid gap-1 text-xs font-medium text-content-body">
+                                    ล่วงหน้า (วัน)
+                                    <Input
+                                        type="number"
+                                        min={0}
+                                        max={365}
+                                        value={rule.daysBefore}
+                                        onChange={(event) => updateReminderRule(index, "daysBefore", event.target.value)}
+                                    />
+                                </label>
+                                <label className="grid gap-1 text-xs font-medium text-content-body">
+                                    เวลา (น.)
+                                    <Input
+                                        type="number"
+                                        min={0}
+                                        max={23}
+                                        value={rule.sendHour}
+                                        onChange={(event) => updateReminderRule(index, "sendHour", event.target.value)}
+                                    />
+                                </label>
+                                <label className="grid gap-1 text-xs font-medium text-content-body">
+                                    ผู้รับการแจ้งเตือน
+                                    <select
+                                        className="h-11 rounded-md border border-input bg-background px-3 text-sm"
+                                        value={rule.recipientScope}
+                                        onChange={(event) => updateReminderRule(index, "recipientScope", event.target.value as RoutineReminderRecipientScope)}
+                                    >
+                                        {Object.entries(REMINDER_SCOPE_LABELS).map(([value, label]) => (
+                                            <option key={value} value={value}>{label}</option>
+                                        ))}
+                                    </select>
+                                </label>
+                                <label className="flex min-h-11 items-center gap-2 text-xs font-medium text-content-body">
+                                    <input
+                                        type="checkbox"
+                                        checked={rule.isActive}
+                                        onChange={(event) => updateReminderRule(index, "isActive", event.target.checked)}
+                                    />
+                                    เปิดใช้
+                                </label>
+                                <Button type="button" variant="ghost" size="icon-sm" onClick={() => removeReminderRule(index)} aria-label={`ลบกฎการแจ้งเตือนที่ ${index + 1}`}>
+                                    <Trash2 />
+                                </Button>
+                            </div>
+                        ))}
+                    </div>
+                )}
             </fieldset>
 
             <fieldset className="space-y-3 rounded-lg border border-border-subtle bg-surface-subtle p-4">

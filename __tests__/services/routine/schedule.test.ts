@@ -5,6 +5,7 @@ import {
     calendarDateToBangkokStart,
     calendarDayDifference,
     getCurrentBangkokDate,
+    isRoutineReminderDue,
     type RoutineDateWindow,
 } from "@/lib/routine/schedule";
 
@@ -120,5 +121,26 @@ describe("NHF Routine schedule engine", () => {
                 "NONE",
             ),
         ).toEqual([]);
+    });
+
+    it("evaluates reminder date and send hour in Bangkok time", () => {
+        const dueDate = "2026-08-05";
+
+        expect(
+            isRoutineReminderDue(
+                dueDate,
+                2,
+                9,
+                new Date("2026-08-03T01:59:59.000Z"),
+            ),
+        ).toBe(false);
+        expect(
+            isRoutineReminderDue(
+                dueDate,
+                2,
+                9,
+                new Date("2026-08-03T02:00:00.000Z"),
+            ),
+        ).toBe(true);
     });
 });

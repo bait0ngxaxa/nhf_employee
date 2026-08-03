@@ -242,6 +242,7 @@ enum NotificationOutboxType {
   LEAVE_NOT_TAKEN_CONFIRMED
   STOCK_REQUEST_LINE
   STOCK_LOW_LINE
+  ROUTINE_REMINDER_IN_APP
 }
 
 enum NotificationOutboxStatus {
@@ -431,6 +432,7 @@ enum NotificationType {
   STOCK_REQUEST_NEW
   STOCK_ISSUED              @map("STOCK_APPROVED")
   STOCK_CANCELLED           @map("STOCK_REJECTED")
+  ROUTINE_REMINDER
 }
 
 // ==========================================
@@ -799,6 +801,7 @@ model RoutineTask {
   unit        RoutineUnit           @relation(fields: [unitId], references: [id])
   category    RoutineCategory       @relation(fields: [categoryId], references: [id])
   assignees   RoutineTaskAssignee[]
+  reminderRules RoutineReminderRule[]
   occurrences RoutineOccurrence[]
   createdBy   User                  @relation("RoutineTaskCreatedBy", fields: [createdById], references: [id])
   updatedBy   User                  @relation("RoutineTaskUpdatedBy", fields: [updatedById], references: [id])
@@ -808,6 +811,24 @@ model RoutineTask {
   @@index([isActive, scheduleType])
   @@index([contractEndDate])
   @@map("routine_tasks")
+}
+
+model RoutineReminderRule {
+  id             Int                            @id @default(autoincrement())
+  taskId         Int
+  daysBefore     Int
+  sendHour       Int
+  channel        RoutineReminderChannel        @default(IN_APP)
+  recipientScope RoutineReminderRecipientScope
+  isActive       Boolean                        @default(true)
+  createdAt      DateTime                       @default(now())
+  updatedAt      DateTime                       @updatedAt
+
+  task RoutineTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@unique([taskId, daysBefore, channel, recipientScope], map: "routine_reminder_rules_unique")
+  @@index([taskId, isActive])
+  @@map("routine_reminder_rules")
 }
 
 model RoutineTaskAssignee {
@@ -830,6 +851,7 @@ model RoutineOccurrence {
   originalDueDate    DateTime                @db.Date
   status             RoutineOccurrenceStatus @default(TODO)
   scheduleVersion    Int
+  reminderVersion    Int                     @default(1)
   startedAt          DateTime?
   completedAt        DateTime?
   completedById      Int?
@@ -896,4 +918,14 @@ enum RoutineOccurrenceStatus {
   COMPLETED
   SKIPPED
   CANCELLED
+}
+
+enum RoutineReminderChannel {
+  IN_APP
+}
+
+enum RoutineReminderRecipientScope {
+  ASSIGNEES
+  ADMINS
+  ASSIGNEES_AND_ADMINS
 }

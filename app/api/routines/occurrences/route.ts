@@ -18,6 +18,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         if (!auth.ok) return auth.response;
         const params = request.nextUrl.searchParams;
         const parsed = routineOccurrenceFiltersSchema.safeParse({
+            occurrenceId: params.get("occurrenceId") ?? undefined,
             status: params.get("status") ?? undefined,
             unitId: params.get("unitId") ?? undefined,
             categoryId: params.get("categoryId") ?? undefined,

@@ -236,6 +236,37 @@ describe("NHF Routine mutations", () => {
         expect(prismaMock.routineOccurrence.updateMany).not.toHaveBeenCalled();
     });
 
+    it("increments the reminder version when an admin changes a due date", async () => {
+        const initial = occurrence();
+        const updated = occurrence({
+            dueDate: new Date("2026-02-10T00:00:00.000Z"),
+            reminderVersion: 2,
+        });
+        prismaMock.user.findUnique.mockResolvedValue(
+            asNever(activeUser("ADMIN", 99)),
+        );
+        prismaMock.routineOccurrence.findUnique
+            .mockResolvedValueOnce(asNever(initial))
+            .mockResolvedValueOnce(asNever(updated));
+
+        await updateRoutineOccurrenceDueDate(
+            91,
+            { dueDate: "2026-02-10", reason: "ปรับตามกำหนดใหม่" },
+            actor(99, "ADMIN"),
+        );
+
+        expect(prismaMock.routineOccurrence.updateMany).toHaveBeenCalledWith({
+            where: {
+                id: 91,
+                dueDate: new Date("2026-01-10T00:00:00.000Z"),
+            },
+            data: expect.objectContaining({
+                dueDate: new Date("2026-02-10T00:00:00.000Z"),
+                reminderVersion: { increment: 1 },
+            }),
+        });
+    });
+
     it("returns a conflict for a stale task version", async () => {
         prismaMock.user.findUnique.mockResolvedValue(
             asNever(activeUser("ADMIN", 99)),

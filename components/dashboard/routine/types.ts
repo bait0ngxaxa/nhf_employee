@@ -7,6 +7,20 @@ export type RoutineStatus =
 
 export type RoutineAssigneeRole = "OWNER" | "CO_OWNER";
 
+export type RoutineReminderRecipientScope =
+    | "ASSIGNEES"
+    | "ADMINS"
+    | "ASSIGNEES_AND_ADMINS";
+
+export interface RoutineReminderRule {
+    id: number;
+    daysBefore: number;
+    sendHour: number;
+    channel: "IN_APP";
+    recipientScope: RoutineReminderRecipientScope;
+    isActive: boolean;
+}
+
 export interface RoutineEmployee {
     id: number;
     firstName: string;
@@ -32,6 +46,7 @@ export interface RoutineOccurrence {
     originalDueDate: string;
     status: RoutineStatus;
     scheduleVersion: number;
+    reminderVersion: number;
     startedAt: string | null;
     completedAt: string | null;
     completedById: number | null;
@@ -85,6 +100,7 @@ export interface RoutineTask {
     unit: { id: number; code: string; name: string; isActive?: boolean };
     category: { id: number; name: string; sortOrder?: number; isActive?: boolean };
     assignees: RoutineAssignee[];
+    reminderRules: RoutineReminderRule[];
     _count: { occurrences: number };
 }
 

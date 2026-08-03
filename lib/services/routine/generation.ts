@@ -125,9 +125,58 @@ export async function generateRoutineTaskOccurrencesInTransaction(
                     periodKey: occurrence.periodKey,
                 },
             },
-            select: { id: true },
+            select: {
+                id: true,
+                dueDate: true,
+                originalDueDate: true,
+                scheduleVersion: true,
+                status: true,
+            },
         });
         if (current) {
+            const canRefreshSchedule =
+                current.scheduleVersion !== undefined
+                && current.scheduleVersion !== task.version
+                && current.dueDate instanceof Date
+                && current.originalDueDate instanceof Date
+                && (current.status === "TODO" || current.status === "IN_PROGRESS");
+
+            if (canRefreshSchedule) {
+                const currentOriginalDueDate = toBangkokCalendarDate(
+                    current.originalDueDate,
+                );
+                const currentDueDate = toBangkokCalendarDate(current.dueDate);
+                const originalDateChanged =
+                    currentOriginalDueDate !== occurrence.originalDueDate;
+                const hasManualDueDate = currentDueDate !== currentOriginalDueDate;
+                const dueDateChanged =
+                    !hasManualDueDate && currentDueDate !== occurrence.dueDate;
+
+                await tx.routineOccurrence.updateMany({
+                    where: {
+                        id: current.id,
+                        scheduleVersion: current.scheduleVersion,
+                    },
+                    data: {
+                        scheduleVersion: task.version,
+                        ...(originalDateChanged
+                            ? {
+                                  originalDueDate: calendarDateToDate(
+                                      occurrence.originalDueDate,
+                                  ),
+                              }
+                            : {}),
+                        ...(dueDateChanged
+                            ? {
+                                  dueDate: calendarDateToDate(occurrence.dueDate),
+                              }
+                            : {}),
+                        ...(originalDateChanged || dueDateChanged
+                            ? { reminderVersion: { increment: 1 } }
+                            : {}),
+                    },
+                });
+            }
             existing += 1;
             continue;
         }

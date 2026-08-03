@@ -5,6 +5,7 @@ import {
     AlertCircle,
     Bell,
     Check,
+    ClipboardCheck,
     Info,
     Loader2,
     MessageSquare,
@@ -98,6 +99,8 @@ export function NotificationIcon({
             return <AlertCircle className={cn("text-orange-500", className)} />;
         case "STOCK_REQUEST_NEW":
             return <Bell className={cn("text-amber-500", className)} />;
+        case "ROUTINE_REMINDER":
+            return <ClipboardCheck className={cn("text-violet-500", className)} />;
         case "STOCK_ISSUED":
         case "LEAVE_APPROVED":
         case "LEAVE_NOT_TAKEN_CONFIRMED":

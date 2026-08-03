@@ -68,6 +68,36 @@ export const routineAssigneeSchema = z.object({
     }),
 });
 
+export const routineReminderRuleSchema = z.object({
+    daysBefore: z.coerce.number().int().min(0).max(365),
+    sendHour: z.coerce.number().int().min(0).max(23),
+    channel: z.literal("IN_APP"),
+    recipientScope: z.enum([
+        "ASSIGNEES",
+        "ADMINS",
+        "ASSIGNEES_AND_ADMINS",
+    ]),
+    isActive: z.boolean().default(true),
+});
+
+const routineReminderRulesSchema = z
+    .array(routineReminderRuleSchema)
+    .max(20, "กฎการแจ้งเตือนมีได้ไม่เกิน 20 รายการ")
+    .superRefine((rules, ctx) => {
+        const keys = new Set<string>();
+        rules.forEach((rule, index) => {
+            const key = `${rule.daysBefore}:${rule.channel}:${rule.recipientScope}`;
+            if (keys.has(key)) {
+                ctx.addIssue({
+                    code: "custom",
+                    path: [index],
+                    message: "กฎการแจ้งเตือนซ้ำกันไม่ได้",
+                });
+            }
+            keys.add(key);
+        });
+    });
+
 function validateAssigneeList(
     assignees: Array<{ employeeId: number; role: "OWNER" | "CO_OWNER" }>,
     ctx: z.RefinementCtx,
@@ -127,6 +157,7 @@ export const routineTaskCreateSchema = z
         sourceFileName: optionalText(255),
         sourceSheet: optionalText(255),
         sourceRow: z.coerce.number().int().positive().nullable().optional(),
+        reminderRules: routineReminderRulesSchema.optional(),
     })
     .superRefine((data, ctx) => {
         validateAssigneeList(data.assignees, ctx);
@@ -167,6 +198,7 @@ export const routineTaskUpdateSchema = z
         sourceFileName: optionalText(255),
         sourceSheet: optionalText(255),
         sourceRow: z.coerce.number().int().positive().nullable().optional(),
+        reminderRules: routineReminderRulesSchema.optional(),
     })
     .superRefine((data, ctx) => {
         if (data.assignees) validateAssigneeList(data.assignees, ctx);
@@ -184,6 +216,7 @@ export const routineTaskUpdateSchema = z
     });
 
 export const routineOccurrenceFiltersSchema = z.object({
+    occurrenceId: z.coerce.number().int().positive().optional(),
     status: z
         .enum(["TODO", "IN_PROGRESS", "COMPLETED", "SKIPPED", "CANCELLED"])
         .optional(),
@@ -260,6 +293,16 @@ export const routineOccurrenceAssigneesSchema = z
     })
     .superRefine((data, ctx) => validateAssigneeList(data.assignees, ctx));
 
+export const routineReminderOutboxPayloadSchema = z.object({
+    occurrenceId: z.number().int().positive(),
+    taskId: z.number().int().positive(),
+    ruleId: z.number().int().positive(),
+    reminderVersion: z.number().int().positive(),
+    dueDate: dateSchema,
+    expectedStatus: z.enum(["TODO", "IN_PROGRESS"]),
+    createdAt: z.string().min(1),
+});
+
 export type RoutineTaskCreateInput = z.infer<typeof routineTaskCreateSchema>;
 export type RoutineTaskUpdateInput = z.infer<typeof routineTaskUpdateSchema>;
 export type RoutineOccurrenceFilters = z.infer<
@@ -273,6 +316,10 @@ export type RoutineReasonInput = z.infer<typeof routineReasonSchema>;
 export type RoutineDueDateInput = z.infer<typeof routineDueDateSchema>;
 export type RoutineOccurrenceAssigneesInput = z.infer<
     typeof routineOccurrenceAssigneesSchema
+>;
+export type RoutineReminderRuleInput = z.infer<typeof routineReminderRuleSchema>;
+export type RoutineReminderOutboxPayload = z.infer<
+    typeof routineReminderOutboxPayloadSchema
 >;
 
 export function parseRoutineScheduleConfig(

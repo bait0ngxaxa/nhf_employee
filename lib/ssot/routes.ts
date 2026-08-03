@@ -58,6 +58,9 @@ export const API_ROUTES = {
         markAllRead: "/api/notifications/mark-all-read",
         read: (id: string): string => `/api/notifications/${id}/read`,
     },
+    cron: {
+        routineScheduler: "/api/cron/routine-scheduler",
+    },
     leave: {
         me: "/api/leave/me",
         approvals: "/api/leave/approvals",

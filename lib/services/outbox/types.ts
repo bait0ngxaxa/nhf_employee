@@ -19,6 +19,7 @@ export const OUTBOX_NOTIFICATION_TYPES = [
     "LEAVE_NOT_TAKEN_CONFIRMED",
     "STOCK_REQUEST_LINE",
     "STOCK_LOW_LINE",
+    "ROUTINE_REMINDER_IN_APP",
 ] as const;
 
 export type OutboxNotificationType = (typeof OUTBOX_NOTIFICATION_TYPES)[number];

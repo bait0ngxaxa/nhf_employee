@@ -45,5 +45,6 @@ export const ROUTINE_API_MESSAGES = {
     invalidInput: "ข้อมูล NHF Routine ไม่ถูกต้อง",
     staleVersion: "ข้อมูลแม่แบบงานเปลี่ยนแปลงแล้ว กรุณาโหลดข้อมูลใหม่",
     forbidden: "คุณไม่มีสิทธิ์ดำเนินการกับงานนี้",
+    schedulerNotConfigured: "ยังไม่ได้ตั้งค่า Routine scheduler",
     internalServerError: "ไม่สามารถดำเนินการกับ NHF Routine ได้",
 } as const;

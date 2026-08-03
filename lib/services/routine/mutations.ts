@@ -2,6 +2,8 @@ import type {
     Prisma,
     RoutineAssigneeRole as PrismaRoutineAssigneeRole,
     RoutineBusinessDayPolicy as PrismaRoutineBusinessDayPolicy,
+    RoutineReminderChannel as PrismaRoutineReminderChannel,
+    RoutineReminderRecipientScope as PrismaRoutineReminderRecipientScope,
     RoutineScheduleType as PrismaRoutineScheduleType,
 } from "@prisma/client";
 import { ZodError } from "zod";
@@ -19,6 +21,7 @@ import {
     type RoutineOccurrenceAssigneesInput,
     type RoutineOccurrenceStatusInput,
     type RoutineReasonInput,
+    type RoutineReminderRuleInput,
     type RoutineTaskCreateInput,
     type RoutineTaskUpdateInput,
 } from "@/lib/validations/routine";
@@ -58,6 +61,17 @@ const ROUTINE_TASK_INCLUDE = {
             },
         },
     },
+    reminderRules: {
+        select: {
+            id: true,
+            daysBefore: true,
+            sendHour: true,
+            channel: true,
+            recipientScope: true,
+            isActive: true,
+        },
+        orderBy: [{ daysBefore: "asc" }, { sendHour: "asc" }],
+    },
 } as const satisfies Prisma.RoutineTaskInclude;
 
 const ROUTINE_OCCURRENCE_INCLUDE = {
@@ -94,6 +108,65 @@ type RoutineAssigneeInput = {
     employeeId: number;
     role: "OWNER" | "CO_OWNER";
 };
+
+type RoutineReminderRuleRecord = {
+    daysBefore: number;
+    sendHour: number;
+    channel: string;
+    recipientScope: string;
+    isActive: boolean;
+};
+
+function normalizeReminderRules(
+    rules: readonly RoutineReminderRuleInput[] | undefined,
+): Array<{
+    daysBefore: number;
+    sendHour: number;
+    channel: PrismaRoutineReminderChannel;
+    recipientScope: PrismaRoutineReminderRecipientScope;
+    isActive: boolean;
+}> {
+    return (rules ?? []).map((rule) => ({
+        daysBefore: rule.daysBefore,
+        sendHour: rule.sendHour,
+        channel: rule.channel as PrismaRoutineReminderChannel,
+        recipientScope: rule.recipientScope as PrismaRoutineReminderRecipientScope,
+        isActive: rule.isActive,
+    }));
+}
+
+function areReminderRulesEqual(
+    current: readonly RoutineReminderRuleRecord[],
+    next: readonly RoutineReminderRuleRecord[],
+): boolean {
+    if (current.length !== next.length) return false;
+
+    const toKey = (rule: RoutineReminderRuleRecord): string =>
+        [
+            rule.daysBefore,
+            rule.sendHour,
+            rule.channel,
+            rule.recipientScope,
+            rule.isActive,
+        ].join(":");
+
+    const currentKeys = current.map(toKey).sort();
+    const nextKeys = next.map(toKey).sort();
+    return currentKeys.every((key, index) => key === nextKeys[index]);
+}
+
+function areAssigneesEqual(
+    current: readonly { employeeId: number; role: string }[],
+    next: readonly { employeeId: number; role: string }[],
+): boolean {
+    if (current.length !== next.length) return false;
+
+    const toKey = (assignee: { employeeId: number; role: string }): string =>
+        `${assignee.employeeId}:${assignee.role}`;
+    const currentKeys = current.map(toKey).sort();
+    const nextKeys = next.map(toKey).sort();
+    return currentKeys.every((key, index) => key === nextKeys[index]);
+}
 
 function normalizeAssignees(
     assignees: readonly RoutineAssigneeInput[],
@@ -250,6 +323,13 @@ export async function createRoutineTask(
                 createdById: actor.id,
                 updatedById: actor.id,
                 assignees: { create: assignees },
+                ...(input.reminderRules !== undefined
+                    ? {
+                          reminderRules: {
+                              create: normalizeReminderRules(input.reminderRules),
+                          },
+                      }
+                    : {}),
             },
         });
 
@@ -308,6 +388,14 @@ export async function updateRoutineTask(
         const nextAssignees = input.assignees
             ? normalizeAssignees(input.assignees)
             : null;
+        const nextReminderRules = input.reminderRules !== undefined
+            ? normalizeReminderRules(input.reminderRules)
+            : null;
+        const assigneesChanged = nextAssignees !== null
+            && !areAssigneesEqual(current.assignees, nextAssignees);
+        const reminderRulesChanged =
+            nextReminderRules !== null
+            && !areReminderRulesEqual(current.reminderRules, nextReminderRules);
         if (nextAssignees) {
             await assertActiveEmployeesInTransaction(
                 tx,
@@ -365,6 +453,28 @@ export async function updateRoutineTask(
             });
         }
 
+        if (nextReminderRules !== null && reminderRulesChanged) {
+            await tx.routineReminderRule.deleteMany({ where: { taskId } });
+            if (nextReminderRules.length > 0) {
+                const reminderRuleTimestamp = new Date();
+                await tx.routineReminderRule.createMany({
+                    data: nextReminderRules.map((rule) => ({
+                        taskId,
+                        createdAt: reminderRuleTimestamp,
+                        updatedAt: reminderRuleTimestamp,
+                        ...rule,
+                    })),
+                });
+            }
+        }
+
+        if (assigneesChanged || reminderRulesChanged) {
+            await tx.routineOccurrence.updateMany({
+                where: { taskId },
+                data: { reminderVersion: { increment: 1 } },
+            });
+        }
+
         const updatedTask = await tx.routineTask.findUniqueOrThrow({
             where: { id: taskId },
         });
@@ -384,6 +494,8 @@ export async function updateRoutineTask(
                 affectedEmployeeIds: nextAssignees?.map(
                     (assignee) => assignee.employeeId,
                 ) ?? current.assignees.map((assignee) => assignee.employeeId),
+                assigneesChanged,
+                reminderRulesChanged,
             },
         );
         await generateRoutineTaskOccurrencesInTransaction(tx, taskId);
@@ -611,6 +723,7 @@ export async function reopenRoutineOccurrence(
             where: { id: occurrenceId, status: occurrence.status },
             data: {
                 status: "TODO",
+                reminderVersion: { increment: 1 },
                 startedAt: null,
                 completedAt: null,
                 completedById: null,
@@ -662,7 +775,10 @@ export async function updateRoutineOccurrenceDueDate(
         const oldDueDate = toBangkokCalendarDate(occurrence.dueDate);
         const claimed = await tx.routineOccurrence.updateMany({
             where: { id: occurrenceId, dueDate: occurrence.dueDate },
-            data: { dueDate: calendarDateToDate(input.dueDate) },
+            data: {
+                dueDate: calendarDateToDate(input.dueDate),
+                reminderVersion: { increment: 1 },
+            },
         });
         if (claimed.count !== 1) {
             throw new RoutineConflictError("วันกำหนดเปลี่ยนแปลงแล้ว");
@@ -714,6 +830,10 @@ export async function reassignRoutineOccurrence(
                 employeeId: assignee.employeeId,
                 role: assignee.role,
             })),
+        });
+        await tx.routineOccurrence.updateMany({
+            where: { id: occurrenceId },
+            data: { reminderVersion: { increment: 1 } },
         });
         await createRoutineAuditInTransaction(
             tx,

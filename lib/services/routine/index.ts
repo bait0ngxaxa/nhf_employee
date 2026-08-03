@@ -1,5 +1,6 @@
 export type { RoutineCommandActor, RoutineQueryActor } from "./types";
 export type { RoutineGenerationResult } from "./types";
+export type { RoutineSchedulerResult } from "./scheduler";
 export {
     RoutineConflictError,
     RoutineForbiddenError,
@@ -11,6 +12,16 @@ export {
     generateRoutineTaskOccurrences,
     generateRoutineTaskOccurrencesInTransaction,
 } from "./generation";
+export {
+    runRoutineScheduler,
+} from "./scheduler";
+export {
+    buildRoutineReminderDedupeKey,
+    buildRoutineReminderEventKey,
+    dispatchRoutineReminderOutbox,
+    getRoutineReminderActionUrl,
+    ROUTINE_REMINDER_OUTBOX_TYPE,
+} from "./reminders";
 export {
     getRoutineOccurrenceById,
     getRoutineOccurrences,

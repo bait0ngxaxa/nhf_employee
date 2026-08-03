@@ -175,6 +175,28 @@ export function getCurrentBangkokDate(now = new Date()): CalendarDate {
     return toBangkokCalendarDate(now);
 }
 
+export function getCurrentBangkokHour(now = new Date()): number {
+    const formatter = new Intl.DateTimeFormat("en-GB", {
+        timeZone: ROUTINE_TIME_ZONE,
+        hour: "2-digit",
+        hourCycle: "h23",
+    });
+    return Number(formatter.format(now));
+}
+
+export function isRoutineReminderDue(
+    dueDate: CalendarDate,
+    daysBefore: number,
+    sendHour: number,
+    now = new Date(),
+): boolean {
+    const reminderDate = addCalendarDays(dueDate, -daysBefore);
+    return (
+        compareCalendarDates(getCurrentBangkokDate(now), reminderDate) === 0
+        && getCurrentBangkokHour(now) >= sendHour
+    );
+}
+
 export function addCalendarDays(
     value: CalendarDate,
     amount: number,

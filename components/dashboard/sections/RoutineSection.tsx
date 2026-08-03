@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { ClipboardCheck, ListTodo, Settings2, Users } from "lucide-react";
+import { useSearchParams } from "next/navigation";
 import useSWR from "swr";
 
 import { useDashboardDataContext } from "@/components/dashboard/context/dashboard/DashboardContext";
@@ -41,8 +42,10 @@ async function fetchRoutine<T>(url: string): Promise<T> {
 
 function RoutineOccurrencePanel({
     isAdmin,
+    occurrenceId,
 }: {
     isAdmin: boolean;
+    occurrenceId: number | null;
 }) {
     const [search, setSearch] = useState("");
     const [status, setStatus] = useState<RoutineStatus | "">("");
@@ -54,10 +57,11 @@ function RoutineOccurrencePanel({
             page: String(page),
             limit: "12",
         });
+        if (occurrenceId !== null) params.set("occurrenceId", String(occurrenceId));
         if (search.trim()) params.set("search", search.trim());
         if (status) params.set("status", status);
         return `${API_ROUTES.routines.occurrences}?${params.toString()}`;
-    }, [page, scope, search, status]);
+    }, [occurrenceId, page, scope, search, status]);
     const { data, error, isLoading, mutate } = useSWR<PaginatedOccurrencesResponse, Error>(key, fetchRoutine);
     const { data: reference } = useSWR<RoutineReferenceData, Error>(
         isAdmin ? API_ROUTES.routines.reference : null,
@@ -66,7 +70,7 @@ function RoutineOccurrencePanel({
 
     useEffect(() => {
         setPage(1);
-    }, [search, status, isAdmin]);
+    }, [search, status, isAdmin, occurrenceId]);
 
     return (
         <div className="space-y-4">
@@ -139,23 +143,32 @@ function RoutineTaskSettings() {
 export function RoutineSection() {
     const { user } = useDashboardDataContext();
     const isAdmin = isAdminRole(user?.role);
+    const searchParams = useSearchParams();
+    const occurrenceIdValue = Number(searchParams.get("occurrenceId"));
+    const occurrenceId = Number.isInteger(occurrenceIdValue) && occurrenceIdValue > 0
+        ? occurrenceIdValue
+        : null;
     const [activeTab, setActiveTab] = useState("mine");
     const { data: summaryData, error: summaryError, isLoading: summaryLoading } = useSWR<RoutineSummaryResponse, Error>(API_ROUTES.routines.summary, fetchRoutine);
     const safeTab = isAdmin ? activeTab : "mine";
+
+    useEffect(() => {
+        if (isAdmin && occurrenceId !== null) setActiveTab("all");
+    }, [isAdmin, occurrenceId]);
 
     const tabs: SectionTabItem[] = [
         {
             value: "mine",
             label: "งานของฉัน",
             icon: ListTodo,
-            content: <RoutineOccurrencePanel isAdmin={false} />,
+            content: <RoutineOccurrencePanel isAdmin={false} occurrenceId={occurrenceId} />,
         },
         {
             value: "all",
             label: "งานทั้งหมด (Admin)",
             icon: Users,
             visible: isAdmin,
-            content: <RoutineOccurrencePanel isAdmin />,
+            content: <RoutineOccurrencePanel isAdmin occurrenceId={occurrenceId} />,
         },
         {
             value: "settings",

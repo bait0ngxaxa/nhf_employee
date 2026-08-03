@@ -19,6 +19,10 @@ vi.mock("@/components/dashboard/context/dashboard/DashboardContext", () => ({
 
 vi.mock("swr", () => ({ default: mocks.useSWR }));
 
+vi.mock("next/navigation", () => ({
+    useSearchParams: () => new URLSearchParams(),
+}));
+
 vi.mock("@/components/ui/section-tabs", async () => {
     return {
         SectionTabs: ({

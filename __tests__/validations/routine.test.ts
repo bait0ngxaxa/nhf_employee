@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
     parseRoutineScheduleConfig,
     routineTaskCreateSchema,
+    routineReminderOutboxPayloadSchema,
 } from "@/lib/validations/routine";
 
 describe("NHF Routine validation", () => {
@@ -53,5 +54,50 @@ describe("NHF Routine validation", () => {
             expect(messages).toContain("ต้องมีผู้รับผิดชอบหลัก 1 คน");
             expect(messages).toContain("วันสิ้นสุดสัญญาต้องไม่ก่อนวันเริ่มสัญญา");
         }
+    });
+
+    it("validates reminder rules and outbox identity payloads", () => {
+        const task = routineTaskCreateSchema.safeParse({
+            unitId: 1,
+            categoryId: 1,
+            title: "งานประจำ",
+            scheduleType: "MONTHLY_DAY",
+            scheduleConfig: { day: 10, monthOffset: 0 },
+            assignees: [{ employeeId: 11, role: "OWNER" }],
+            reminderRules: [
+                {
+                    daysBefore: 3,
+                    sendHour: 9,
+                    channel: "IN_APP",
+                    recipientScope: "ASSIGNEES",
+                    isActive: true,
+                },
+            ],
+        });
+        expect(task.success).toBe(true);
+
+        expect(
+            routineReminderOutboxPayloadSchema.safeParse({
+                occurrenceId: 1,
+                taskId: 2,
+                ruleId: 3,
+                reminderVersion: 1,
+                dueDate: "2026-08-05",
+                expectedStatus: "TODO",
+                createdAt: "2026-08-01T02:00:00.000Z",
+            }).success,
+        ).toBe(true);
+
+        expect(
+            routineReminderOutboxPayloadSchema.safeParse({
+                occurrenceId: 1,
+                taskId: 2,
+                ruleId: 3,
+                reminderVersion: 1,
+                dueDate: "2026-08-05",
+                expectedStatus: "TODO",
+                createdAt: "",
+            }).success,
+        ).toBe(false);
     });
 });

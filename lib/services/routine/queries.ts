@@ -27,6 +27,7 @@ const ROUTINE_OCCURRENCE_SELECT = {
     originalDueDate: true,
     status: true,
     scheduleVersion: true,
+    reminderVersion: true,
     startedAt: true,
     completedAt: true,
     completedById: true,
@@ -111,6 +112,17 @@ const ROUTINE_TASK_SELECT = {
                 },
             },
         },
+    },
+    reminderRules: {
+        select: {
+            id: true,
+            daysBefore: true,
+            sendHour: true,
+            channel: true,
+            recipientScope: true,
+            isActive: true,
+        },
+        orderBy: [{ daysBefore: "asc" }, { sendHour: "asc" }],
     },
     _count: { select: { occurrences: true } },
 } as const satisfies Prisma.RoutineTaskSelect;
@@ -210,6 +222,7 @@ function buildOccurrenceWhere(
     const search = filters.search?.trim();
 
     return {
+        ...(filters.occurrenceId ? { id: filters.occurrenceId } : {}),
         ...(filters.status ? { status: filters.status } : {}),
         ...(filters.dueFrom || filters.dueTo
             ? {

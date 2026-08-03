@@ -26,6 +26,7 @@ import {
     isSharedDriveOption,
     type SharedDriveOption,
 } from "@/constants/email-request";
+import { dispatchRoutineReminderOutbox } from "@/lib/services/routine/reminders";
 import {
     MAX_OUTBOX_ATTEMPTS,
     OUTBOX_RETRY_BASE_DELAY_MS,
@@ -308,7 +309,23 @@ async function dispatchNotification(
         throw new Error(`Unknown notification type: ${notification.type}`);
     }
 
-    const payload = parsePayload(notification.payload);
+    let payload: unknown;
+    try {
+        payload = parsePayload(notification.payload);
+    } catch (error) {
+        const routineOutcome = await dispatchRoutineReminderOutbox(
+            notification,
+            null,
+        );
+        if (routineOutcome) return routineOutcome;
+        throw error;
+    }
+    const routineOutcome = await dispatchRoutineReminderOutbox(
+        notification,
+        payload,
+    );
+    if (routineOutcome) return routineOutcome;
+
     const ticketOutcome = await dispatchTicketOutbox(notification, payload);
     if (ticketOutcome) return ticketOutcome;
 
