@@ -1,4 +1,5 @@
 import { CalendarRange, CheckCircle2, Clock3, RotateCcw } from "lucide-react";
+import type { ReactElement } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -10,8 +11,8 @@ import { isBeforeLeaveStart } from "@/lib/services/leave/utils";
 interface CancellationPendingListProps {
     items: PendingLeave[];
     isProcessing: boolean;
-    onConfirm: (leaveId: string) => Promise<void>;
-    onReject: (leaveId: string) => Promise<void>;
+    onConfirm: (leaveId: string) => Promise<boolean>;
+    onReject: (leaveId: string) => Promise<boolean>;
 }
 
 export function CancellationPendingList({
@@ -19,7 +20,7 @@ export function CancellationPendingList({
     isProcessing,
     onConfirm,
     onReject,
-}: CancellationPendingListProps) {
+}: CancellationPendingListProps): ReactElement {
     if (items.length === 0) {
         return (
             <Card className="border-dashed border-border-strong p-6 text-center shadow-none">
@@ -56,8 +57,8 @@ function CancellationPendingItem({
 }: {
     leave: PendingLeave;
     isProcessing: boolean;
-    onConfirm: (leaveId: string) => Promise<void>;
-    onReject: (leaveId: string) => Promise<void>;
+    onConfirm: (leaveId: string) => Promise<boolean>;
+    onReject: (leaveId: string) => Promise<boolean>;
 }) {
     const canConfirm = isBeforeLeaveStart(leave.startDate);
 

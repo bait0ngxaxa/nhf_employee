@@ -633,13 +633,14 @@ describe("POST /api/leave/cancel", () => {
             }),
         }));
         expect(prisma.leaveRequest.updateMany).toHaveBeenCalledWith({
-            where: {
+            where: expect.objectContaining({
                 id: "leave-cancellation",
                 status: "CANCELLATION_REQUESTED",
                 approverId: 20,
                 cancellationRequestedAt: { not: null },
                 cancellationConfirmedAt: null,
-            },
+                employeeId: { not: 20 },
+            }),
             data: { status: "APPROVED" },
         });
         expect(prisma.leaveQuota.update).not.toHaveBeenCalled();
@@ -813,6 +814,134 @@ describe("POST /api/leave/cancel", () => {
         expect(prisma.notification.create).not.toHaveBeenCalled();
     });
 
+    it("does not allow an admin to confirm their own cancellation request", async () => {
+        vi.mocked(requireApiSession).mockResolvedValue({
+            ok: true,
+            session: { user: { id: "99", email: "admin@example.com", name: "Admin", role: "ADMIN" } },
+            user: { id: 99, email: "admin@example.com", name: "Admin", role: "ADMIN" },
+        });
+        vi.mocked(prisma.user.findUnique).mockResolvedValue({
+            isActive: true,
+            deletedAt: null,
+            employee: { id: 99, status: "ACTIVE", deletedAt: null },
+        } as never);
+        vi.mocked(prisma.user.findFirst).mockResolvedValue({ id: 99 } as never);
+        vi.mocked(prisma.leaveRequest.findUnique).mockResolvedValue(
+            buildCancellationRequest({
+                employeeId: 99,
+                employee: { id: 99, firstName: "Admin", lastName: "Owner", user: { id: 99 } },
+                approver: {
+                    id: 20,
+                    firstName: "Former",
+                    lastName: "Manager",
+                    email: "former@example.com",
+                    status: "INACTIVE",
+                    deletedAt: null,
+                    user: null,
+                },
+            }),
+        );
+
+        const response = await PUT(new NextRequest("http://localhost/api/leave/cancel", {
+            method: "PUT",
+            body: JSON.stringify({
+                leaveId: "leave-cancellation",
+                action: "CONFIRM",
+                reason: "ตรวจสอบแทนผู้อนุมัติที่พ้นสภาพ",
+            }),
+        }));
+
+        expect(response.status).toBe(403);
+        expect(prisma.leaveRequest.updateMany).not.toHaveBeenCalled();
+        expect(prisma.leaveQuota.update).not.toHaveBeenCalled();
+    });
+
+    it("does not allow an admin to override an active assigned manager", async () => {
+        vi.mocked(requireApiSession).mockResolvedValue({
+            ok: true,
+            session: { user: { id: "99", email: "admin@example.com", name: "Admin", role: "ADMIN" } },
+            user: { id: 99, email: "admin@example.com", name: "Admin", role: "ADMIN" },
+        });
+        vi.mocked(prisma.user.findUnique).mockResolvedValue({
+            isActive: true,
+            deletedAt: null,
+            employee: { id: 99, status: "ACTIVE", deletedAt: null },
+        } as never);
+        vi.mocked(prisma.user.findFirst).mockResolvedValue({ id: 99 } as never);
+        vi.mocked(prisma.leaveRequest.findUnique).mockResolvedValue(buildCancellationRequest());
+
+        const response = await PUT(new NextRequest("http://localhost/api/leave/cancel", {
+            method: "PUT",
+            body: JSON.stringify({
+                leaveId: "leave-cancellation",
+                action: "CONFIRM",
+                reason: "ผู้อนุมัติเดิมยังพร้อมใช้งาน",
+            }),
+        }));
+
+        expect(response.status).toBe(403);
+        expect(prisma.leaveRequest.updateMany).not.toHaveBeenCalled();
+        expect(prisma.leaveQuota.update).not.toHaveBeenCalled();
+    });
+
+    it("allows an assigned admin to process the cancellation without an override reason", async () => {
+        vi.mocked(requireApiSession).mockResolvedValue({
+            ok: true,
+            session: { user: { id: "99", email: "admin@example.com", name: "Admin", role: "ADMIN" } },
+            user: { id: 99, email: "admin@example.com", name: "Admin", role: "ADMIN" },
+        });
+        vi.mocked(prisma.user.findUnique).mockResolvedValue({
+            isActive: true,
+            deletedAt: null,
+            employee: { id: 99, status: "ACTIVE", deletedAt: null },
+        } as never);
+        vi.mocked(prisma.user.findFirst).mockResolvedValue({ id: 99 } as never);
+        vi.mocked(prisma.leaveRequest.findUnique).mockResolvedValue(
+            buildCancellationRequest({
+                approverId: 99,
+                approver: {
+                    id: 99,
+                    firstName: "Assigned",
+                    lastName: "Admin",
+                    email: "admin@example.com",
+                    status: "ACTIVE",
+                    deletedAt: null,
+                    user: {
+                        id: 99,
+                        email: "admin@example.com",
+                        isActive: true,
+                        deletedAt: null,
+                    },
+                },
+            }),
+        );
+        vi.mocked(prisma.leaveRequest.updateMany).mockResolvedValue({ count: 1 });
+        vi.mocked(prisma.leaveRequest.findUniqueOrThrow).mockResolvedValue(
+            buildCancellationRequest({ status: "APPROVED", approverId: 99 }) as Awaited<
+                ReturnType<typeof prisma.leaveRequest.findUniqueOrThrow>
+            >,
+        );
+
+        const response = await PUT(new NextRequest("http://localhost/api/leave/cancel", {
+            method: "PUT",
+            body: JSON.stringify({ leaveId: "leave-cancellation", action: "REJECT" }),
+        }));
+
+        expect(response.status).toBe(200);
+        expect(prisma.leaveRequest.updateMany).toHaveBeenCalledWith({
+            where: expect.objectContaining({
+                approverId: 99,
+                employeeId: { not: 99 },
+            }),
+            data: { status: "APPROVED" },
+        });
+        expect(prisma.auditLog.create).toHaveBeenCalledWith({
+            data: expect.objectContaining({
+                details: expect.stringContaining('"adminOverride":false'),
+            }),
+        });
+    });
+
     it("allows an admin to reject a cancellation request as a recovery override", async () => {
         vi.mocked(requireApiSession).mockResolvedValue({
             ok: true,
@@ -847,7 +976,11 @@ describe("POST /api/leave/cancel", () => {
 
         const response = await PUT(new NextRequest("http://localhost/api/leave/cancel", {
             method: "PUT",
-            body: JSON.stringify({ leaveId: "leave-cancellation", action: "REJECT" }),
+            body: JSON.stringify({
+                leaveId: "leave-cancellation",
+                action: "REJECT",
+                reason: "ตรวจสอบแทนผู้อนุมัติที่พ้นสภาพ",
+            }),
         }));
 
         expect(response.status).toBe(200);
@@ -867,6 +1000,45 @@ describe("POST /api/leave/cancel", () => {
                 details: expect.stringContaining('"adminOverride":true'),
             }),
         });
+    });
+
+    it("requires a reason for an admin cancellation recovery override", async () => {
+        vi.mocked(requireApiSession).mockResolvedValue({
+            ok: true,
+            session: { user: { id: "99", email: "admin@example.com", name: "Admin", role: "ADMIN" } },
+            user: { id: 99, email: "admin@example.com", name: "Admin", role: "ADMIN" },
+        });
+        vi.mocked(prisma.user.findUnique).mockResolvedValue({
+            isActive: true,
+            deletedAt: null,
+            employee: { id: 99, status: "ACTIVE", deletedAt: null },
+        } as never);
+        vi.mocked(prisma.user.findFirst).mockResolvedValue({ id: 99 } as never);
+        vi.mocked(prisma.leaveRequest.findUnique).mockResolvedValue(
+            buildCancellationRequest({
+                approver: {
+                    id: 20,
+                    firstName: "Former",
+                    lastName: "Manager",
+                    email: "former@example.com",
+                    status: "INACTIVE",
+                    deletedAt: null,
+                    user: null,
+                },
+            }),
+        );
+
+        const response = await PUT(new NextRequest("http://localhost/api/leave/cancel", {
+            method: "PUT",
+            body: JSON.stringify({
+                leaveId: "leave-cancellation",
+                action: "REJECT",
+            }),
+        }));
+
+        expect(response.status).toBe(400);
+        expect(prisma.leaveRequest.updateMany).not.toHaveBeenCalled();
+        expect(prisma.leaveQuota.update).not.toHaveBeenCalled();
     });
 
     it("returns conflict and does not notify twice when rejection is duplicated", async () => {
@@ -954,7 +1126,10 @@ describe("POST /api/leave/cancel", () => {
 
         const response = await PUT(new NextRequest("http://localhost/api/leave/cancel", {
             method: "PUT",
-            body: JSON.stringify({ leaveId: "leave-confirm" }),
+            body: JSON.stringify({
+                leaveId: "leave-confirm",
+                reason: "ตรวจสอบแทนผู้อนุมัติที่พ้นสภาพ",
+            }),
         }));
 
         expect(response.status).toBe(200);

@@ -1,5 +1,7 @@
 "use client";
 
+import { useState, type ReactElement } from "react";
+
 import { Skeleton } from "@/components/ui/skeleton";
 import { Pagination } from "@/components/Pagination";
 import { cn } from "@/lib/ui/utils";
@@ -11,9 +13,60 @@ import { RejectLeaveDialog } from "./_components/RejectLeaveDialog";
 import { ApprovalConfirmDialog } from "./_components/ApprovalConfirmDialog";
 import { NotTakenPendingList } from "./_components/NotTakenPendingList";
 import { CancellationPendingList } from "./_components/CancellationPendingList";
+import {
+    AdminRecoveryReasonDialog,
+    type AdminRecoveryDecision,
+} from "./_components/AdminRecoveryReasonDialog";
 
-export function ManagerApprovalDashboard({ isAdmin = false }: { isAdmin?: boolean }) {
+export function ManagerApprovalDashboard({ isAdmin = false }: { isAdmin?: boolean }): ReactElement {
     const model = useManagerApprovalModel();
+    const [recoveryAction, setRecoveryAction] = useState<{
+        decision: AdminRecoveryDecision;
+        leaveId: string;
+    } | null>(null);
+    const [recoveryReason, setRecoveryReason] = useState("");
+
+    const openRecoveryDialog = (
+        decision: AdminRecoveryDecision,
+        leaveId: string,
+    ): Promise<boolean> => {
+        setRecoveryAction({ decision, leaveId });
+        setRecoveryReason("");
+        return Promise.resolve(true);
+    };
+
+    const closeRecoveryDialog = (): void => {
+        if (model.isProcessing) return;
+        setRecoveryAction(null);
+        setRecoveryReason("");
+    };
+
+    const submitRecoveryDecision = async (): Promise<void> => {
+        if (!recoveryAction || !recoveryReason.trim()) return;
+
+        const { decision, leaveId } = recoveryAction;
+        const succeeded = decision === "NOT_TAKEN"
+            ? await model.confirmNotTaken(leaveId, recoveryReason)
+            : decision === "CONFIRM_CANCELLATION"
+                ? await model.confirmCancellation(leaveId, recoveryReason)
+                : await model.rejectCancellation(leaveId, recoveryReason);
+        if (succeeded) {
+            closeRecoveryDialog();
+        }
+    };
+
+    const onNotTakenConfirm = (leaveId: string): Promise<boolean> =>
+        isAdmin
+            ? openRecoveryDialog("NOT_TAKEN", leaveId)
+            : model.confirmNotTaken(leaveId);
+    const onCancellationConfirm = (leaveId: string): Promise<boolean> =>
+        isAdmin
+            ? openRecoveryDialog("CONFIRM_CANCELLATION", leaveId)
+            : model.confirmCancellation(leaveId);
+    const onCancellationReject = (leaveId: string): Promise<boolean> =>
+        isAdmin
+            ? openRecoveryDialog("REJECT_CANCELLATION", leaveId)
+            : model.rejectCancellation(leaveId);
 
     if (model.isLoading) {
         return <ManagerApprovalDashboardSkeleton />;
@@ -64,7 +117,7 @@ export function ManagerApprovalDashboard({ isAdmin = false }: { isAdmin?: boolea
                 <NotTakenPendingList
                     items={model.notTakenPending}
                     isProcessing={model.isProcessing}
-                    onConfirm={model.confirmNotTaken}
+                    onConfirm={onNotTakenConfirm}
                 />
                 <ApprovalPagination
                     metadata={model.metadata?.notTakenPending}
@@ -84,8 +137,8 @@ export function ManagerApprovalDashboard({ isAdmin = false }: { isAdmin?: boolea
                 <CancellationPendingList
                     items={model.cancellationPending}
                     isProcessing={model.isProcessing}
-                    onConfirm={model.confirmCancellation}
-                    onReject={model.rejectCancellation}
+                    onConfirm={onCancellationConfirm}
+                    onReject={onCancellationReject}
                 />
                 <ApprovalPagination
                     metadata={model.metadata?.cancellationPending}
@@ -133,6 +186,20 @@ export function ManagerApprovalDashboard({ isAdmin = false }: { isAdmin?: boolea
                 }}
                 onConfirm={model.confirmApproveLeave}
             />
+
+            {isAdmin ? (
+                <AdminRecoveryReasonDialog
+                    open={recoveryAction !== null}
+                    decision={recoveryAction?.decision ?? null}
+                    reason={recoveryReason}
+                    isProcessing={model.isProcessing}
+                    onOpenChange={(open) => {
+                        if (!open) closeRecoveryDialog();
+                    }}
+                    onReasonChange={setRecoveryReason}
+                    onConfirm={submitRecoveryDecision}
+                />
+            ) : null}
         </div>
     );
 }

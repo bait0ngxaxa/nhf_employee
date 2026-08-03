@@ -62,6 +62,7 @@ interface LeaveNotTakenPayload {
 
 interface LeaveNotTakenConfirmPayload {
     leaveId: string;
+    reason?: string;
 }
 
 const DEFAULT_FETCH_ERROR = "ไม่สามารถดึงข้อมูลได้";
@@ -183,6 +184,7 @@ export type LeaveCancellationDecisionAction = LeaveCancellationDecisionValues["a
 export interface LeaveCancellationDecisionPayload {
     leaveId: string;
     action: LeaveCancellationDecisionAction;
+    reason?: string;
 }
 
 export const requestLeaveCancellation = async (
@@ -193,7 +195,7 @@ export const requestLeaveCancellation = async (
 };
 
 export const confirmLeaveCancellation = async (
-    payload: Pick<LeaveCancellationPayload, "leaveId">,
+    payload: Pick<LeaveCancellationDecisionPayload, "leaveId" | "reason">,
 ): Promise<void> => {
     const response = await apiPut(API_ROUTES.leave.cancel, {
         ...payload,
@@ -203,7 +205,7 @@ export const confirmLeaveCancellation = async (
 };
 
 export const rejectLeaveCancellation = async (
-    payload: Pick<LeaveCancellationDecisionPayload, "leaveId">,
+    payload: Pick<LeaveCancellationDecisionPayload, "leaveId" | "reason">,
 ): Promise<void> => {
     const response = await apiPut(API_ROUTES.leave.cancel, {
         ...payload,

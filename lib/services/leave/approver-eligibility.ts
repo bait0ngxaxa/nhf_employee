@@ -1,3 +1,4 @@
+import type { Prisma } from "@prisma/client";
 import { z } from "zod";
 
 type LeaveApproverUserState = {
@@ -7,7 +8,7 @@ type LeaveApproverUserState = {
     deletedAt: Date | null;
 };
 
-type LeaveApproverState = {
+export type LeaveApproverState = {
     status: string;
     deletedAt: Date | null;
     user?: LeaveApproverUserState | null;
@@ -19,6 +20,21 @@ export const ACTIVE_LEAVE_APPROVER_USER_SELECT = {
     isActive: true,
     deletedAt: true,
 } as const;
+
+export const ACTIVE_LEAVE_APPROVER_QUERY_WHERE = {
+    status: "ACTIVE",
+    deletedAt: null,
+    user: {
+        is: {
+            isActive: true,
+            deletedAt: null,
+            email: {
+                contains: "@",
+                not: { endsWith: "@temp.local" },
+            },
+        },
+    },
+} as const satisfies Prisma.EmployeeWhereInput;
 
 const usableEmailSchema = z.string().trim().email();
 

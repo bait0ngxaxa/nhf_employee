@@ -173,7 +173,7 @@ describe("GET /api/leave/approvals", () => {
         }
     });
 
-    it("exposes unscoped recovery lists to admins", async () => {
+    it("scopes admin recovery lists to assigned or unavailable approvers", async () => {
         vi.mocked(requireActiveWorkforceSession).mockResolvedValue({
             ok: true,
             employeeId: 999,
@@ -189,12 +189,24 @@ describe("GET /api/leave/approvals", () => {
         expect(prisma.leaveRequest.count).toHaveBeenCalledTimes(4);
         expect(vi.mocked(prisma.leaveRequest.findMany).mock.calls[1][0]).toEqual(
             expect.objectContaining({
-                where: expect.not.objectContaining({ approverId: 999 }),
+                where: expect.objectContaining({
+                    employeeId: { not: 999 },
+                    OR: expect.arrayContaining([
+                        { exceptionApproverId: 999 },
+                        { exceptionApproverId: null, approverId: 999 },
+                    ]),
+                }),
             }),
         );
         expect(vi.mocked(prisma.leaveRequest.findMany).mock.calls[3][0]).toEqual(
             expect.objectContaining({
-                where: expect.not.objectContaining({ approverId: 999 }),
+                where: expect.objectContaining({
+                    employeeId: { not: 999 },
+                    OR: expect.arrayContaining([
+                        { exceptionApproverId: 999 },
+                        { exceptionApproverId: null, approverId: 999 },
+                    ]),
+                }),
             }),
         );
     });

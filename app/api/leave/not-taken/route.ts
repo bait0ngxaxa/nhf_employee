@@ -10,6 +10,10 @@ import {
     isActiveLeaveApprover,
 } from "@/lib/services/leave/approver-eligibility";
 import {
+    getEffectiveLeaveApprover,
+    getEffectiveLeaveApproverId,
+    getLeaveDecisionAuthorization,
+    normalizeLeaveRecoveryReason,
     persistLeaveExceptionApprover,
     resolveLeaveExceptionApprover,
 } from "@/lib/services/leave/exception-approver";
@@ -54,6 +58,7 @@ const NOT_TAKEN_MESSAGES = {
     tooEarly: "แจ้งไม่ได้ใช้วันลาได้หลังวันสิ้นสุดการลาผ่านไปแล้ว",
     alreadyRequested: "คำขอนี้ถูกแจ้งว่าไม่ได้ใช้วันลาแล้ว",
     forbidden: "คุณไม่มีสิทธิ์ดำเนินการกับคำขอนี้",
+    adminOverrideReasonRequired: "กรุณาระบุเหตุผลสำหรับการกู้คืนรายการโดยผู้ดูแลระบบ",
     quotaNotFound: "ไม่สามารถตรวจสอบสิทธิ์ลาของคำขอนี้ได้ กรุณาติดต่อผู้ดูแลระบบ",
     approverUnavailable: "ไม่พบผู้ดำเนินการคืนโควต้าที่พร้อมใช้งาน กรุณาติดต่อผู้ดูแลระบบ",
 } as const;
@@ -270,7 +275,7 @@ export async function PUT(req: NextRequest): Promise<NextResponse> {
         if (principalRateLimitResponse) return principalRateLimitResponse;
         const userId = auth.user.id;
         const managerId = auth.employeeId;
-        const adminOverride = isAdminRole(auth.user.role);
+        const isAdmin = isAdminRole(auth.user.role);
 
         const body = await req.json();
         const parsed = leaveNotTakenConfirmSchema.safeParse(body);
@@ -313,10 +318,20 @@ export async function PUT(req: NextRequest): Promise<NextResponse> {
             ) {
                 throw new LeaveNotTakenError(NOT_TAKEN_MESSAGES.confirmNotFound, 404);
             }
-            if (!adminOverride && leaveRequest.employeeId === managerId) {
+            const decisionAuthorization = getLeaveDecisionAuthorization(
+                managerId,
+                isAdmin,
+                leaveRequest,
+            );
+            if (decisionAuthorization === "OWNER") {
                 throw new LeaveNotTakenError(NOT_TAKEN_MESSAGES.forbidden, 403);
             }
-            if (!adminOverride) {
+
+            if (isAdmin && decisionAuthorization === "FORBIDDEN") {
+                throw new LeaveNotTakenError(NOT_TAKEN_MESSAGES.forbidden, 403);
+            }
+            const adminOverride = decisionAuthorization === "ADMIN_OVERRIDE";
+            if (!isAdmin) {
                 const exceptionApprover = await resolveLeaveExceptionApprover(tx, {
                     employeeId: leaveRequest.employeeId,
                     originalApprover: leaveRequest.approver,
@@ -351,19 +366,24 @@ export async function PUT(req: NextRequest): Promise<NextResponse> {
                     }
                     leaveRequest = refreshedRequest;
                 }
-                const currentApprover = leaveRequest.exceptionApprover ?? leaveRequest.approver;
+                const currentApprover = getEffectiveLeaveApprover(leaveRequest);
                 if (
-                    (leaveRequest.exceptionApproverId ?? leaveRequest.approverId) !== managerId
+                    getEffectiveLeaveApproverId(leaveRequest) !== managerId
                     || !isActiveLeaveApprover(currentApprover)
                 ) {
                     throw new LeaveNotTakenError(NOT_TAKEN_MESSAGES.forbidden, 403);
                 }
             }
 
+            const adminOverrideReason = adminOverride
+                ? requireAdminOverrideReason(parsed.data.reason)
+                : null;
+
             const claimedRequest = await tx.leaveRequest.updateMany({
                 where: {
                     id: leaveRequest.id,
                     status: "APPROVED",
+                    employeeId: { not: managerId },
                     ...(adminOverride
                         ? {}
                         : leaveRequest.exceptionApproverId !== null
@@ -417,7 +437,7 @@ export async function PUT(req: NextRequest): Promise<NextResponse> {
                 data: { isRead: true },
             });
 
-            const currentApprover = leaveRequest.exceptionApprover ?? leaveRequest.approver;
+            const currentApprover = getEffectiveLeaveApprover(leaveRequest);
             const payload: LeaveNotTakenConfirmedPayload = {
                 leaveId: leaveRequest.id,
                 employee: buildLeaveRecipientSnapshot(leaveRequest.employee),
@@ -439,7 +459,7 @@ export async function PUT(req: NextRequest): Promise<NextResponse> {
                 },
             });
 
-            if (adminOverride) {
+            if (isAdmin) {
                 await createLeaveAuditInTransaction(
                     tx,
                     "LEAVE_REQUEST_NOT_TAKEN_CONFIRM",
@@ -449,22 +469,25 @@ export async function PUT(req: NextRequest): Promise<NextResponse> {
                     {
                         after: { status: "NOT_TAKEN" },
                         metadata: {
-                            adminOverride: true,
+                            adminOverride,
                             decision: "CONFIRM_NOT_TAKEN",
                             originalApproverId: leaveRequest.approverId,
                             exceptionApproverId: leaveRequest.exceptionApproverId,
+                            ...(adminOverrideReason
+                                ? { overrideReason: adminOverrideReason }
+                                : {}),
                         },
                     },
                 );
             }
 
-            return updatedRequest;
+            return { request: updatedRequest, adminOverride };
         });
 
-        if (!adminOverride) {
+        if (!result.adminOverride) {
             await logLeaveEvent(
                 "LEAVE_REQUEST_NOT_TAKEN_CONFIRM",
-                result.id,
+                result.request.id,
                 userId,
                 auth.user.email,
                 { after: { status: "NOT_TAKEN" } },
@@ -477,7 +500,7 @@ export async function PUT(req: NextRequest): Promise<NextResponse> {
             );
         });
 
-        return NextResponse.json({ success: true, data: toLeaveRequestDays(result) });
+        return NextResponse.json({ success: true, data: toLeaveRequestDays(result.request) });
     } catch (error) {
         console.error("Leave not-taken confirm error:", error);
         if (error instanceof LeaveNotTakenError) {
@@ -485,4 +508,15 @@ export async function PUT(req: NextRequest): Promise<NextResponse> {
         }
         return jsonError(COMMON_API_MESSAGES.operationFailed, 500);
     }
+}
+
+function requireAdminOverrideReason(reason: string | null | undefined): string {
+    const normalizedReason = normalizeLeaveRecoveryReason(reason);
+    if (!normalizedReason) {
+        throw new LeaveNotTakenError(
+            NOT_TAKEN_MESSAGES.adminOverrideReasonRequired,
+            400,
+        );
+    }
+    return normalizedReason;
 }

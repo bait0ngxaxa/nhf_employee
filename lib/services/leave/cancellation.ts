@@ -15,6 +15,10 @@ import {
     type LeaveCancellationRequestedPayload,
 } from "@/lib/services/leave/notification-payloads";
 import {
+    getEffectiveLeaveApprover,
+    getEffectiveLeaveApproverId,
+    getLeaveDecisionAuthorization,
+    normalizeLeaveRecoveryReason,
     persistLeaveExceptionApprover,
     resolveLeaveExceptionApprover,
     type LeaveExceptionApproverSource,
@@ -43,6 +47,7 @@ export const LEAVE_CANCELLATION_MESSAGES = {
     alreadyRequested: "คำขอนี้อยู่ระหว่างรอการยืนยันยกเลิก",
     confirmationTooLate: "ไม่สามารถยืนยันการยกเลิกได้ เนื่องจากวันลาเริ่มแล้ว",
     forbidden: "คุณไม่มีสิทธิ์ดำเนินการกับคำขอนี้",
+    adminOverrideReasonRequired: "กรุณาระบุเหตุผลสำหรับการกู้คืนรายการโดยผู้ดูแลระบบ",
     quotaNotFound: "ไม่สามารถตรวจสอบสิทธิ์ลาของคำขอนี้ได้ กรุณาติดต่อผู้ดูแลระบบ",
     approverUnavailable: "ไม่พบผู้ดำเนินการคำขอยกเลิกที่พร้อมใช้งาน กรุณาติดต่อผู้ดูแลระบบ",
 } as const;
@@ -235,9 +240,14 @@ type CancellationDecisionActor = {
 export async function confirmLeaveCancellation(
     actor: CancellationDecisionActor,
     leaveId: string,
+    reason?: string | null,
 ): Promise<LeaveCancellationResult> {
     return runSerializableTransaction(async (tx) => {
-        const leaveRequest = await getCancellationDecisionRequest(tx, actor, leaveId);
+        const authorization = await getCancellationDecisionRequest(tx, actor, leaveId);
+        const leaveRequest = authorization.leaveRequest;
+        const adminOverrideReason = authorization.adminOverride
+            ? requireAdminOverrideReason(reason)
+            : null;
         if (!isBeforeLeaveStart(leaveRequest.startDate)) {
             throw new LeaveCancellationError(
                 LEAVE_CANCELLATION_MESSAGES.confirmationTooLate,
@@ -250,7 +260,7 @@ export async function confirmLeaveCancellation(
             where: {
                 id: leaveId,
                 status: "CANCELLATION_REQUESTED",
-                ...getCancellationApproverWhere(actor, leaveRequest),
+                ...getCancellationApproverWhere(actor, leaveRequest, authorization.adminOverride),
                 cancellationRequestedAt: { not: null },
                 cancellationConfirmedAt: null,
             },
@@ -325,10 +335,11 @@ export async function confirmLeaveCancellation(
                     before: { status: "CANCELLATION_REQUESTED" },
                     after: { status: "CANCELLED_AFTER_APPROVAL" },
                     metadata: {
-                        adminOverride: true,
+                        adminOverride: authorization.adminOverride,
                         decision: "CONFIRM",
                         originalApproverId: leaveRequest.approverId,
                         exceptionApproverId: leaveRequest.exceptionApproverId,
+                        ...(adminOverrideReason ? { overrideReason: adminOverrideReason } : {}),
                     },
                 },
             );
@@ -348,15 +359,20 @@ export async function confirmLeaveCancellation(
 export async function rejectLeaveCancellation(
     actor: CancellationDecisionActor,
     leaveId: string,
+    reason?: string | null,
 ): Promise<LeaveCancellationResult> {
     return runSerializableTransaction(async (tx) => {
-        const leaveRequest = await getCancellationDecisionRequest(tx, actor, leaveId);
+        const authorization = await getCancellationDecisionRequest(tx, actor, leaveId);
+        const leaveRequest = authorization.leaveRequest;
+        const adminOverrideReason = authorization.adminOverride
+            ? requireAdminOverrideReason(reason)
+            : null;
 
         const claimedRequest = await tx.leaveRequest.updateMany({
             where: {
                 id: leaveId,
                 status: "CANCELLATION_REQUESTED",
-                ...getCancellationApproverWhere(actor, leaveRequest),
+                ...getCancellationApproverWhere(actor, leaveRequest, authorization.adminOverride),
                 cancellationRequestedAt: { not: null },
                 cancellationConfirmedAt: null,
             },
@@ -382,10 +398,11 @@ export async function rejectLeaveCancellation(
                     before: { status: "CANCELLATION_REQUESTED" },
                     after: { status: "APPROVED" },
                     metadata: {
-                        adminOverride: true,
+                        adminOverride: authorization.adminOverride,
                         decision: "REJECT",
                         originalApproverId: leaveRequest.approverId,
                         exceptionApproverId: leaveRequest.exceptionApproverId,
+                        ...(adminOverrideReason ? { overrideReason: adminOverrideReason } : {}),
                     },
                 },
             );
@@ -403,7 +420,10 @@ async function getCancellationDecisionRequest(
     tx: Prisma.TransactionClient,
     actor: CancellationDecisionActor,
     leaveId: string,
-): Promise<LeaveCancellationRequest> {
+): Promise<{
+    leaveRequest: LeaveCancellationRequest;
+    adminOverride: boolean;
+}> {
     if (!await isActiveEmployeeInTransaction(tx, actor.userId, actor.employeeId)) {
         throw new LeaveCancellationError(LEAVE_CANCELLATION_MESSAGES.forbidden, 403);
     }
@@ -422,72 +442,95 @@ async function getCancellationDecisionRequest(
     ) {
         throw new LeaveCancellationError(LEAVE_CANCELLATION_MESSAGES.invalidStatus, 409);
     }
-    if (!isAdminRole(actor.role)) {
-        const exceptionApprover = await resolveLeaveExceptionApprover(tx, {
-            employeeId: leaveRequest.employeeId,
-            originalApprover: leaveRequest.approver,
-            existingApprover: leaveRequest.exceptionApprover,
-            reuseExisting: true,
-        });
-        if (!exceptionApprover) {
-            throw new LeaveCancellationError(
-                LEAVE_CANCELLATION_MESSAGES.forbidden,
-                403,
-            );
+    const decisionAuthorization = getLeaveDecisionAuthorization(
+        actor.employeeId,
+        isAdminRole(actor.role),
+        leaveRequest,
+    );
+    if (decisionAuthorization === "OWNER") {
+        throw new LeaveCancellationError(LEAVE_CANCELLATION_MESSAGES.forbidden, 403);
+    }
+    if (isAdminRole(actor.role)) {
+        if (decisionAuthorization === "ASSIGNED_APPROVER") {
+            return { leaveRequest, adminOverride: false };
         }
-        if (exceptionApprover.shouldPersist) {
-            await persistLeaveExceptionApprover(tx, leaveId, exceptionApprover);
-            const refreshedRequest = await tx.leaveRequest.findUnique({
-                where: { id: leaveId },
-                include: CANCELLATION_REQUEST_INCLUDE,
-            });
-            if (!refreshedRequest) {
-                throw new LeaveCancellationError(LEAVE_CANCELLATION_MESSAGES.invalidStatus, 409);
-            }
-            leaveRequest = refreshedRequest;
+        if (decisionAuthorization === "ADMIN_OVERRIDE") {
+            return { leaveRequest, adminOverride: true };
         }
-
-        const currentApprover = getExceptionApprover(leaveRequest);
-        if (
-            leaveRequest.employeeId === actor.employeeId
-            || (leaveRequest.exceptionApproverId ?? leaveRequest.approverId) !== actor.employeeId
-        ) {
-            throw new LeaveCancellationError(LEAVE_CANCELLATION_MESSAGES.forbidden, 403);
-        }
-        if (!isActiveLeaveApprover(currentApprover)) {
-            throw new LeaveCancellationError(LEAVE_CANCELLATION_MESSAGES.forbidden, 403);
-        }
+        throw new LeaveCancellationError(LEAVE_CANCELLATION_MESSAGES.forbidden, 403);
     }
 
-    return leaveRequest;
+    const exceptionApprover = await resolveLeaveExceptionApprover(tx, {
+        employeeId: leaveRequest.employeeId,
+        originalApprover: leaveRequest.approver,
+        existingApprover: leaveRequest.exceptionApprover,
+        reuseExisting: true,
+    });
+    if (!exceptionApprover) {
+        throw new LeaveCancellationError(
+            LEAVE_CANCELLATION_MESSAGES.forbidden,
+            403,
+        );
+    }
+    if (exceptionApprover.shouldPersist) {
+        await persistLeaveExceptionApprover(tx, leaveId, exceptionApprover);
+        const refreshedRequest = await tx.leaveRequest.findUnique({
+            where: { id: leaveId },
+            include: CANCELLATION_REQUEST_INCLUDE,
+        });
+        if (!refreshedRequest) {
+            throw new LeaveCancellationError(LEAVE_CANCELLATION_MESSAGES.invalidStatus, 409);
+        }
+        leaveRequest = refreshedRequest;
+    }
+
+    const currentApprover = getEffectiveLeaveApprover(leaveRequest);
+    if (getEffectiveLeaveApproverId(leaveRequest) !== actor.employeeId) {
+        throw new LeaveCancellationError(LEAVE_CANCELLATION_MESSAGES.forbidden, 403);
+    }
+    if (!isActiveLeaveApprover(currentApprover)) {
+        throw new LeaveCancellationError(LEAVE_CANCELLATION_MESSAGES.forbidden, 403);
+    }
+
+    return { leaveRequest, adminOverride: false };
 }
 
 function getCancellationApproverWhere(
     actor: CancellationDecisionActor,
     leaveRequest: LeaveCancellationRequest,
+    adminOverride: boolean,
 ): Prisma.LeaveRequestWhereInput {
-    if (isAdminRole(actor.role)) return {};
-    return leaveRequest.exceptionApproverId !== null
-        ? { exceptionApproverId: actor.employeeId }
-        : { approverId: actor.employeeId };
+    const ownerExclusion = { employeeId: { not: actor.employeeId } };
+    if (adminOverride) return ownerExclusion;
+    return {
+        ...ownerExclusion,
+        ...(leaveRequest.exceptionApproverId !== null
+            ? { exceptionApproverId: actor.employeeId }
+            : { approverId: actor.employeeId }),
+    };
 }
 
-function getExceptionApprover(
-    leaveRequest: LeaveCancellationRequest,
-): LeaveCancellationRequest["exceptionApprover"] | LeaveCancellationRequest["approver"] {
-    return leaveRequest.exceptionApprover ?? leaveRequest.approver;
+function requireAdminOverrideReason(reason: string | null | undefined): string {
+    const normalizedReason = normalizeLeaveRecoveryReason(reason);
+    if (!normalizedReason) {
+        throw new LeaveCancellationError(
+            LEAVE_CANCELLATION_MESSAGES.adminOverrideReasonRequired,
+            400,
+        );
+    }
+    return normalizedReason;
 }
 
 function getExceptionApproverUserId(
     leaveRequest: LeaveCancellationRequest,
 ): number | null {
-    return getExceptionApprover(leaveRequest)?.user?.id ?? null;
+    return getEffectiveLeaveApprover(leaveRequest)?.user?.id ?? null;
 }
 
 function getExceptionApproverName(
     leaveRequest: LeaveCancellationRequest,
 ): string | null {
-    const approver = getExceptionApprover(leaveRequest);
+    const approver = getEffectiveLeaveApprover(leaveRequest);
     return approver ? formatEmployeeName(approver) : null;
 }
 

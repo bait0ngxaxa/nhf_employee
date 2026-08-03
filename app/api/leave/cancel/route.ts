@@ -128,8 +128,8 @@ export async function PUT(req: NextRequest): Promise<NextResponse> {
             userEmail: auth.user.email,
         };
         const result = parsed.data.action === "REJECT"
-            ? await rejectLeaveCancellation(actor, parsed.data.leaveId)
-            : await confirmLeaveCancellation(actor, parsed.data.leaveId);
+            ? await rejectLeaveCancellation(actor, parsed.data.leaveId, parsed.data.reason)
+            : await confirmLeaveCancellation(actor, parsed.data.leaveId, parsed.data.reason);
 
         if (!isAdminRole(auth.user.role)) {
             await logLeaveEvent(

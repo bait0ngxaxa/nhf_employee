@@ -522,7 +522,10 @@ describe("/api/leave/not-taken", () => {
 
         const response = await PUT(new NextRequest("http://localhost/api/leave/not-taken", {
             method: "PUT",
-            body: JSON.stringify({ leaveId: "leave-admin-recovery" }),
+            body: JSON.stringify({
+                leaveId: "leave-admin-recovery",
+                reason: "ตรวจสอบแทนผู้อนุมัติที่พ้นสภาพ",
+            }),
         }));
 
         expect(response.status).toBe(200);
@@ -545,6 +548,229 @@ describe("/api/leave/not-taken", () => {
             data: expect.objectContaining({
                 action: "LEAVE_REQUEST_NOT_TAKEN_CONFIRM",
                 details: expect.stringContaining('"adminOverride":true'),
+            }),
+        });
+    });
+
+    it("requires a reason for an admin not-taken recovery override", async () => {
+        vi.mocked(getApiAuthSession).mockResolvedValue({
+            user: {
+                id: "99",
+                email: "admin@example.com",
+                name: "Admin",
+                role: "ADMIN",
+            },
+        });
+        vi.mocked(prisma.user.findUnique).mockResolvedValue({
+            isActive: true,
+            deletedAt: null,
+            employee: { id: 99, status: "ACTIVE", deletedAt: null },
+        } as never);
+        vi.mocked(prisma.user.findFirst).mockResolvedValue({ id: 99 } as never);
+        vi.mocked(prisma.leaveRequest.findUnique).mockResolvedValue({
+            id: "leave-admin-recovery-no-reason",
+            employeeId: 10,
+            status: "APPROVED",
+            approverId: 20,
+            exceptionApproverId: null,
+            notTakenRequestedAt: new Date("2000-02-02T00:00:00.000Z"),
+            notTakenConfirmedAt: null,
+            employee: { id: 10, firstName: "Employee", lastName: "User", user: { id: 1 } },
+            approver: {
+                id: 20,
+                status: "INACTIVE",
+                deletedAt: null,
+                user: null,
+            },
+        } as never);
+
+        const response = await PUT(new NextRequest("http://localhost/api/leave/not-taken", {
+            method: "PUT",
+            body: JSON.stringify({ leaveId: "leave-admin-recovery-no-reason" }),
+        }));
+
+        expect(response.status).toBe(400);
+        expect(prisma.leaveRequest.updateMany).not.toHaveBeenCalled();
+        expect(prisma.leaveQuota.update).not.toHaveBeenCalled();
+    });
+
+    it("does not allow an admin to confirm their own not-taken request", async () => {
+        vi.mocked(getApiAuthSession).mockResolvedValue({
+            user: {
+                id: "99",
+                email: "admin@example.com",
+                name: "Admin",
+                role: "ADMIN",
+            },
+        });
+        vi.mocked(prisma.user.findUnique).mockResolvedValue({
+            isActive: true,
+            deletedAt: null,
+            employee: { id: 99, status: "ACTIVE", deletedAt: null },
+        } as never);
+        vi.mocked(prisma.user.findFirst).mockResolvedValue({ id: 99 } as never);
+        vi.mocked(prisma.leaveRequest.findUnique).mockResolvedValue({
+            id: "leave-admin-owner",
+            employeeId: 99,
+            status: "APPROVED",
+            approverId: 20,
+            exceptionApproverId: null,
+            notTakenRequestedAt: new Date("2000-02-02T00:00:00.000Z"),
+            notTakenConfirmedAt: null,
+            endDate: new Date("2000-02-01T00:00:00.000Z"),
+            employee: { id: 99, firstName: "Admin", lastName: "Owner", user: { id: 99 } },
+            approver: {
+                id: 20,
+                status: "INACTIVE",
+                deletedAt: null,
+                user: null,
+            },
+        } as never);
+
+        const response = await PUT(new NextRequest("http://localhost/api/leave/not-taken", {
+            method: "PUT",
+            body: JSON.stringify({
+                leaveId: "leave-admin-owner",
+                reason: "ตรวจสอบรายการที่ผู้อนุมัติไม่พร้อม",
+            }),
+        }));
+
+        expect(response.status).toBe(403);
+        expect(prisma.leaveRequest.updateMany).not.toHaveBeenCalled();
+        expect(prisma.leaveQuota.update).not.toHaveBeenCalled();
+    });
+
+    it("does not allow an admin to override an active assigned manager", async () => {
+        vi.mocked(getApiAuthSession).mockResolvedValue({
+            user: {
+                id: "99",
+                email: "admin@example.com",
+                name: "Admin",
+                role: "ADMIN",
+            },
+        });
+        vi.mocked(prisma.user.findUnique).mockResolvedValue({
+            isActive: true,
+            deletedAt: null,
+            employee: { id: 99, status: "ACTIVE", deletedAt: null },
+        } as never);
+        vi.mocked(prisma.user.findFirst).mockResolvedValue({ id: 99 } as never);
+        vi.mocked(prisma.leaveRequest.findUnique).mockResolvedValue({
+            id: "leave-active-manager",
+            employeeId: 10,
+            status: "APPROVED",
+            approverId: 20,
+            exceptionApproverId: null,
+            notTakenRequestedAt: new Date("2000-02-02T00:00:00.000Z"),
+            notTakenConfirmedAt: null,
+            endDate: new Date("2000-02-01T00:00:00.000Z"),
+            employee: { id: 10, firstName: "Employee", lastName: "User", user: { id: 1 } },
+            approver: {
+                id: 20,
+                status: "ACTIVE",
+                deletedAt: null,
+                user: {
+                    id: 2,
+                    email: "manager@example.com",
+                    isActive: true,
+                    deletedAt: null,
+                },
+            },
+        } as never);
+
+        const response = await PUT(new NextRequest("http://localhost/api/leave/not-taken", {
+            method: "PUT",
+            body: JSON.stringify({
+                leaveId: "leave-active-manager",
+                reason: "ผู้อนุมัติเดิมยังพร้อมใช้งาน",
+            }),
+        }));
+
+        expect(response.status).toBe(403);
+        expect(prisma.leaveRequest.updateMany).not.toHaveBeenCalled();
+        expect(prisma.leaveQuota.update).not.toHaveBeenCalled();
+    });
+
+    it("allows an assigned admin to confirm not-taken without an override reason", async () => {
+        vi.mocked(getApiAuthSession).mockResolvedValue({
+            user: {
+                id: "99",
+                email: "admin@example.com",
+                name: "Admin",
+                role: "ADMIN",
+            },
+        });
+        vi.mocked(prisma.user.findUnique).mockResolvedValue({
+            isActive: true,
+            deletedAt: null,
+            employee: { id: 99, status: "ACTIVE", deletedAt: null },
+        } as never);
+        vi.mocked(prisma.user.findFirst).mockResolvedValue({ id: 99 } as never);
+        vi.mocked(prisma.leaveRequest.findUnique).mockResolvedValue({
+            id: "leave-assigned-admin",
+            employeeId: 10,
+            leaveType: "VACATION",
+            startDate: new Date("2000-02-01T00:00:00.000Z"),
+            endDate: new Date("2000-02-01T00:00:00.000Z"),
+            period: "FULL_DAY",
+            durationHalfDays: 2,
+            status: "APPROVED",
+            approverId: 99,
+            exceptionApproverId: null,
+            notTakenRequestedAt: new Date("2000-02-02T00:00:00.000Z"),
+            notTakenConfirmedAt: null,
+            employee: { id: 10, firstName: "Employee", lastName: "User", user: { id: 1 } },
+            approver: {
+                id: 99,
+                status: "ACTIVE",
+                deletedAt: null,
+                user: {
+                    id: 99,
+                    email: "admin@example.com",
+                    isActive: true,
+                    deletedAt: null,
+                },
+            },
+        } as never);
+        vi.mocked(prisma.leaveRequest.updateMany).mockResolvedValue({ count: 1 });
+        vi.mocked(prisma.leaveQuota.findFirst).mockResolvedValue({
+            id: "quota-assigned-admin",
+            employeeId: 10,
+            year: 2000,
+            leaveType: "VACATION",
+            totalHalfDays: 12,
+            usedHalfDays: 4,
+        });
+        vi.mocked(prisma.leaveQuota.update).mockResolvedValue({
+            id: "quota-assigned-admin",
+            usedHalfDays: 2,
+        } as never);
+        vi.mocked(prisma.leaveRequest.findUniqueOrThrow).mockResolvedValue({
+            id: "leave-assigned-admin",
+            status: "NOT_TAKEN",
+            durationHalfDays: 2,
+            overQuotaHalfDays: 0,
+        } as never);
+
+        const response = await PUT(new NextRequest("http://localhost/api/leave/not-taken", {
+            method: "PUT",
+            body: JSON.stringify({ leaveId: "leave-assigned-admin" }),
+        }));
+
+        expect(response.status).toBe(200);
+        expect(prisma.leaveRequest.updateMany).toHaveBeenCalledWith({
+            where: expect.objectContaining({
+                approverId: 99,
+                employeeId: { not: 99 },
+            }),
+            data: expect.objectContaining({
+                status: "NOT_TAKEN",
+                notTakenConfirmedById: 99,
+            }),
+        });
+        expect(prisma.auditLog.create).toHaveBeenCalledWith({
+            data: expect.objectContaining({
+                details: expect.stringContaining('"adminOverride":false'),
             }),
         });
     });

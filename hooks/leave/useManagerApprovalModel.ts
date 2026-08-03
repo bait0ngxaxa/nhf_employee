@@ -40,9 +40,9 @@ interface UseManagerApprovalModelResult {
     approveLeave: (leave: PendingLeave) => Promise<void>;
     closeApprovalConfirmDialog: () => void;
     confirmApproveLeave: () => Promise<void>;
-    confirmNotTaken: (leaveId: string) => Promise<void>;
-    confirmCancellation: (leaveId: string) => Promise<void>;
-    rejectCancellation: (leaveId: string) => Promise<void>;
+    confirmNotTaken: (leaveId: string, reason?: string) => Promise<boolean>;
+    confirmCancellation: (leaveId: string, reason?: string) => Promise<boolean>;
+    rejectCancellation: (leaveId: string, reason?: string) => Promise<boolean>;
     rejectLeave: () => Promise<void>;
 }
 
@@ -117,52 +117,58 @@ export function useManagerApprovalModel(): UseManagerApprovalModelResult {
         await executeAction("APPROVE", leaveId);
     };
 
-    const confirmNotTaken = async (leaveId: string): Promise<void> => {
+    const confirmNotTaken = async (leaveId: string, reason?: string): Promise<boolean> => {
         setIsProcessing(true);
         try {
-            await confirmLeaveNotTaken({ leaveId });
+            await confirmLeaveNotTaken({ leaveId, reason });
             await refreshFirstPages();
             toast.success("ยืนยันไม่ได้ใช้วันลาและคืนโควต้าแล้ว");
+            return true;
         } catch (error: unknown) {
             toast.error(
                 error instanceof Error && error.message
                     ? error.message
                     : "เกิดข้อผิดพลาดในการยืนยันไม่ได้ใช้วันลา",
             );
+            return false;
         } finally {
             setIsProcessing(false);
         }
     };
 
-    const confirmCancellation = async (leaveId: string): Promise<void> => {
+    const confirmCancellation = async (leaveId: string, reason?: string): Promise<boolean> => {
         setIsProcessing(true);
         try {
-            await confirmLeaveCancellation({ leaveId });
+            await confirmLeaveCancellation({ leaveId, reason });
             await refreshFirstPages();
             toast.success("ยืนยันยกเลิกวันลาและคืนโควต้าแล้ว");
+            return true;
         } catch (error: unknown) {
             toast.error(
                 error instanceof Error && error.message
                     ? error.message
                     : "เกิดข้อผิดพลาดในการยืนยันยกเลิกวันลา",
             );
+            return false;
         } finally {
             setIsProcessing(false);
         }
     };
 
-    const rejectCancellation = async (leaveId: string): Promise<void> => {
+    const rejectCancellation = async (leaveId: string, reason?: string): Promise<boolean> => {
         setIsProcessing(true);
         try {
-            await rejectLeaveCancellation({ leaveId });
+            await rejectLeaveCancellation({ leaveId, reason });
             await refreshFirstPages();
             toast.success("ปิดคำขอยกเลิกแล้ว คำขอลายังคงอนุมัติ");
+            return true;
         } catch (error: unknown) {
             toast.error(
                 error instanceof Error && error.message
                     ? error.message
                     : "เกิดข้อผิดพลาดในการปิดคำขอยกเลิก",
             );
+            return false;
         } finally {
             setIsProcessing(false);
         }

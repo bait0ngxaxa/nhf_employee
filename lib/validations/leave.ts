@@ -103,6 +103,10 @@ export const leaveCancelSchema = z.object({
 export const leaveCancellationDecisionSchema = z.object({
   leaveId: leaveIdSchema,
   action: z.enum(["CONFIRM", "REJECT"]).default("CONFIRM"),
+  reason: z.preprocess(
+    emptyToNull,
+    z.string().trim().max(1000, "เหตุผลต้องไม่เกิน 1000 ตัวอักษร").nullish(),
+  ),
 });
 
 export const leaveNotTakenRequestSchema = z.object({
@@ -112,6 +116,10 @@ export const leaveNotTakenRequestSchema = z.object({
 
 export const leaveNotTakenConfirmSchema = z.object({
   leaveId: leaveIdSchema,
+  reason: z.preprocess(
+    emptyToNull,
+    z.string().trim().max(1000, "เหตุผลต้องไม่เกิน 1000 ตัวอักษร").nullish(),
+  ),
 });
 
 export const leaveActionSchema = z.object({

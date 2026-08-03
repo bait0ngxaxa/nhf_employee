@@ -3,6 +3,7 @@ import type { Prisma } from "@prisma/client";
 import {
     ACTIVE_LEAVE_APPROVER_USER_SELECT,
     isActiveLeaveApprover,
+    type LeaveApproverState,
 } from "@/lib/services/leave/approver-eligibility";
 
 const EXCEPTION_APPROVER_SELECT = {
@@ -34,6 +35,57 @@ export type LeaveExceptionApproverResolution = {
     assignedAt: Date | null;
     shouldPersist: boolean;
 };
+
+export type LeaveDecisionAuthorization =
+    | "OWNER"
+    | "ASSIGNED_APPROVER"
+    | "ADMIN_OVERRIDE"
+    | "FORBIDDEN";
+
+export function getEffectiveLeaveApprover<T>(input: {
+    approver: T | null | undefined;
+    exceptionApprover: T | null | undefined;
+}): T | null {
+    return input.exceptionApprover ?? input.approver ?? null;
+}
+
+export function getEffectiveLeaveApproverId(input: {
+    approverId: number | null;
+    exceptionApproverId: number | null;
+}): number | null {
+    return input.exceptionApproverId ?? input.approverId;
+}
+
+export function getLeaveDecisionAuthorization<T extends LeaveApproverState>(
+    actorEmployeeId: number,
+    isAdmin: boolean,
+    leaveRequest: {
+        employeeId: number;
+        approverId: number | null;
+        exceptionApproverId: number | null;
+        approver: T | null | undefined;
+        exceptionApprover: T | null | undefined;
+    },
+): LeaveDecisionAuthorization {
+    if (leaveRequest.employeeId === actorEmployeeId) {
+        return "OWNER";
+    }
+
+    if (getEffectiveLeaveApproverId(leaveRequest) === actorEmployeeId) {
+        return "ASSIGNED_APPROVER";
+    }
+
+    return isAdmin && !isActiveLeaveApprover(getEffectiveLeaveApprover(leaveRequest))
+        ? "ADMIN_OVERRIDE"
+        : "FORBIDDEN";
+}
+
+export function normalizeLeaveRecoveryReason(
+    reason: string | null | undefined,
+): string | null {
+    const normalizedReason = reason?.trim();
+    return normalizedReason || null;
+}
 
 type ResolveLeaveExceptionApproverInput = {
     employeeId: number;
@@ -91,6 +143,7 @@ export async function resolveLeaveExceptionApprover(
 
     const admins = await tx.employee.findMany({
         where: {
+            id: { not: input.employeeId },
             status: "ACTIVE",
             deletedAt: null,
             user: {

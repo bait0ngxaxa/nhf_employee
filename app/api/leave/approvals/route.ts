@@ -8,6 +8,7 @@ import { notFound } from "@/lib/ssot/http";
 import { FEATURE_KEYS, isFeatureEnabled } from "@/lib/ssot/features";
 import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
 import { toLeaveRequestDays } from "@/lib/services/leave/half-days";
+import { ACTIVE_LEAVE_APPROVER_QUERY_WHERE } from "@/lib/services/leave/approver-eligibility";
 import {
     leaveAttachmentSummaryOrderBy,
     leaveAttachmentSummarySelect,
@@ -31,6 +32,25 @@ const createMetadata = (page: number, totalItems: number) => ({
     totalPages: Math.ceil(totalItems / APPROVALS_PAGE_SIZE),
     totalItems,
     itemsPerPage: APPROVALS_PAGE_SIZE,
+});
+
+const getAdminRecoveryActionWhere = (employeeId: number): Prisma.LeaveRequestWhereInput => ({
+    employeeId: { not: employeeId },
+    OR: [
+        { exceptionApproverId: employeeId },
+        { exceptionApproverId: null, approverId: employeeId },
+        {
+            exceptionApproverId: null,
+            OR: [
+                { approverId: null },
+                { approver: { isNot: ACTIVE_LEAVE_APPROVER_QUERY_WHERE } },
+            ],
+        },
+        {
+            exceptionApproverId: { not: null },
+            exceptionApprover: { isNot: ACTIVE_LEAVE_APPROVER_QUERY_WHERE },
+        },
+    ],
 });
 
 export async function GET(req: Request): Promise<NextResponse> {
@@ -84,7 +104,7 @@ export async function GET(req: Request): Promise<NextResponse> {
                 : { approverId: managerId, status: "PENDING" }),
         };
         const exceptionActionApproverWhere: Prisma.LeaveRequestWhereInput = isAdmin
-            ? {}
+            ? getAdminRecoveryActionWhere(managerId)
             : {
                 OR: [
                     { exceptionApproverId: managerId },

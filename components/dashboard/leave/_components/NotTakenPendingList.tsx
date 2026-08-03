@@ -1,4 +1,5 @@
 import { RotateCcw } from "lucide-react";
+import type { ReactElement } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import type { PendingLeave } from "@/hooks/useLeaveApprovals";
@@ -8,14 +9,14 @@ import { LeaveAttachmentViewerButton } from "./LeaveAttachmentViewerButton";
 interface NotTakenPendingListProps {
     items: PendingLeave[];
     isProcessing: boolean;
-    onConfirm: (leaveId: string) => Promise<void>;
+    onConfirm: (leaveId: string) => Promise<boolean>;
 }
 
 export function NotTakenPendingList({
     items,
     isProcessing,
     onConfirm,
-}: NotTakenPendingListProps) {
+}: NotTakenPendingListProps): ReactElement {
     if (items.length === 0) {
         return (
             <Card className="border-dashed border-border-strong p-6 text-center shadow-none">
