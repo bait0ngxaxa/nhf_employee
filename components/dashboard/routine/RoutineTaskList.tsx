@@ -1,6 +1,17 @@
-import { Edit3, Plus } from "lucide-react";
+import { useRef, useState } from "react";
+import { Edit3, Power, Plus, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
     EmptyState,
     ErrorState,
@@ -18,6 +29,9 @@ interface RoutineTaskListProps {
     onRetry: () => void;
     onCreate: () => void;
     onEdit: (task: RoutineTask) => void;
+    onToggleActive: (task: RoutineTask) => Promise<void>;
+    onDelete: (task: RoutineTask) => Promise<void>;
+    pendingTaskId?: number | null;
     onPageChange: (page: number) => void;
 }
 
@@ -45,8 +59,14 @@ export function RoutineTaskList({
     onRetry,
     onCreate,
     onEdit,
+    onToggleActive,
+    onDelete,
+    pendingTaskId = null,
     onPageChange,
 }: RoutineTaskListProps) {
+    const [deleteTask, setDeleteTask] = useState<RoutineTask | null>(null);
+    const [isDeleting, setIsDeleting] = useState(false);
+    const deleteLockRef = useRef(false);
     const today = getCurrentBangkokDate();
     if (isLoading) return <LoadingState label="กำลังโหลดแม่แบบงานประจำ..." compact />;
     if (error) return <ErrorState compact action={{ label: "ลองใหม่", onClick: onRetry }} description={error.message} />;
@@ -77,8 +97,8 @@ export function RoutineTaskList({
                                 <td className="px-4 py-4 text-content-body">{task.unit.code}</td>
                                 <td className="px-4 py-4 text-content-body">{ROUTINE_SCHEDULE_LABELS[task.scheduleType] ?? task.scheduleType}<p className="mt-1 text-xs text-content-secondary">{task.scheduleText ?? "ไม่ได้ระบุคำอธิบาย"}</p></td>
                                 <td className="px-4 py-4 text-content-body">{task.assignees.map((assignee) => assignee.employee.displayName ?? `${assignee.employee.firstName} ${assignee.employee.lastName}`).join(", ")}</td>
-                                <td className="px-4 py-4"><span className={task.isActive ? "rounded-full bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700" : "rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600"}>{task.isActive ? "ใช้งาน" : "ปิดใช้งาน"}</span><div className="mt-2 flex flex-wrap gap-1">{taskInformationBadges(task, today).map((badge) => <span key={badge} className="rounded-full border border-status-warning-border bg-status-warning-surface px-2 py-1 text-[11px] font-medium text-status-warning-foreground">{badge}</span>)}</div><p className="mt-2 text-xs text-content-secondary">สร้างแล้ว {task._count.occurrences} รอบ</p></td>
-                                <td className="px-4 py-4 text-right"><Button type="button" variant="outline" size="sm" onClick={() => onEdit(task)}><Edit3 aria-hidden="true" /> แก้ไข</Button></td>
+                                <td className="px-4 py-4"><span className={task.isActive ? "rounded-full bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700" : "rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600"}>{task.isActive ? "ใช้งาน" : "ปิดใช้งาน"}</span><div className="mt-2 flex flex-wrap gap-1">{taskInformationBadges(task, today).map((badge) => <span key={badge} className="rounded-full border border-status-warning-border bg-status-warning-surface px-2 py-1 text-[11px] font-medium text-status-warning-foreground">{badge}</span>)}</div><p className="mt-2 text-xs text-content-secondary">รอบแจ้งเตือนภายใน {task._count.occurrences} รอบ</p></td>
+                                <td className="px-4 py-4 text-right"><div className="flex flex-wrap justify-end gap-2"><Button type="button" variant="outline" size="sm" onClick={() => onEdit(task)} disabled={pendingTaskId === task.id}><Edit3 aria-hidden="true" /> แก้ไข</Button><Button type="button" variant="outline" size="sm" disabled={pendingTaskId === task.id} onClick={() => void onToggleActive(task)}><Power aria-hidden="true" /> {pendingTaskId === task.id ? "กำลังบันทึก..." : task.isActive ? "ปิดใช้งาน" : "เปิดใช้งาน"}</Button><Button type="button" variant="ghost" size="sm" className="text-status-danger-foreground" disabled={pendingTaskId === task.id} onClick={() => setDeleteTask(task)}><Trash2 aria-hidden="true" /> ลบ</Button></div></td>
                             </tr>
                         ))}
                     </tbody>
@@ -93,6 +113,36 @@ export function RoutineTaskList({
                     </div>
                 </div>
             ) : null}
+            <AlertDialog open={deleteTask !== null} onOpenChange={(open) => { if (!open && !isDeleting && !deleteLockRef.current) setDeleteTask(null); }}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>ยืนยันการลบ Routine</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            คุณกำลังจะลบ “{deleteTask?.title}” ข้อมูลรอบแจ้งเตือนและกฎแจ้งเตือนของรายการนี้จะถูกลบ และไม่สามารถกู้คืนได้
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel disabled={isDeleting}>ยกเลิก</AlertDialogCancel>
+                        <AlertDialogAction
+                            variant="destructive"
+                            disabled={isDeleting}
+                            onClick={(event) => {
+                                event.preventDefault();
+                                if (!deleteTask || isDeleting || deleteLockRef.current) return;
+                                deleteLockRef.current = true;
+                                setIsDeleting(true);
+                                void onDelete(deleteTask)
+                                    .then(() => setDeleteTask(null))
+                                    .catch(() => undefined)
+                                    .finally(() => {
+                                        setIsDeleting(false);
+                                        deleteLockRef.current = false;
+                                    });
+                            }}
+                        >{isDeleting ? "กำลังลบ..." : "ลบรายการ"}</AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </div>
     );
 }

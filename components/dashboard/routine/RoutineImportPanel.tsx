@@ -10,6 +10,7 @@ import {
     Trash2,
     UploadCloud,
 } from "lucide-react";
+import { toast } from "sonner";
 
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
@@ -169,6 +170,10 @@ export function RoutineImportPanel() {
     const [error, setError] = useState<string | null>(null);
     const [editorRow, setEditorRow] = useState<RoutineImportRowView | null>(null);
     const [confirmOpen, setConfirmOpen] = useState(false);
+    const uploadLockRef = useRef(false);
+    const applyLockRef = useRef(false);
+    const cancelLockRef = useRef(false);
+    const selectionLocksRef = useRef<Set<number>>(new Set());
 
     const loadReference = useCallback(async (): Promise<void> => {
         try {
@@ -219,9 +224,11 @@ export function RoutineImportPanel() {
     }
 
     async function upload(): Promise<void> {
-        if (!file) return;
+        if (!file || uploadLockRef.current) return;
+        uploadLockRef.current = true;
         if (file.size > ROUTINE_IMPORT_MAX_FILE_BYTES) {
             setError("ไฟล์ต้องมีขนาดไม่เกิน 10 MB");
+            uploadLockRef.current = false;
             return;
         }
         setUploading(true);
@@ -233,15 +240,23 @@ export function RoutineImportPanel() {
             setBatchId(body.batch.id);
             setBatch(body.batch);
             setPage(1);
+            toast.success("อ่านไฟล์และสร้างตัวอย่างข้อมูลสำเร็จ");
         } catch (uploadError) {
-            setError(uploadError instanceof Error ? uploadError.message : "อัปโหลดไฟล์ไม่สำเร็จ");
+            const message = uploadError instanceof Error ? uploadError.message : "อัปโหลดไฟล์ไม่สำเร็จ";
+            setError(message);
+            toast.error(message);
         } finally {
             setUploading(false);
+            uploadLockRef.current = false;
         }
     }
 
     async function updateSelection(row: RoutineImportRowView, selected: boolean): Promise<void> {
-        if (row.status !== "VALID" && row.status !== "EXCLUDED") return;
+        if (
+            (row.status !== "VALID" && row.status !== "EXCLUDED")
+            || selectionLocksRef.current.has(row.id)
+        ) return;
+        selectionLocksRef.current.add(row.id);
         setError(null);
         try {
             await fetchJson<{ row: RoutineImportRowView }>(API_ROUTES.routines.imports.rowById(batchId ?? 0, row.id), {
@@ -250,13 +265,19 @@ export function RoutineImportPanel() {
                 body: JSON.stringify(rowToEditPayload(row, selected)),
             });
             await loadBatch();
+            toast.success("อัปเดตการเลือกแถวสำเร็จ");
         } catch (updateError) {
-            setError(updateError instanceof Error ? updateError.message : "อัปเดตการเลือกไม่สำเร็จ");
+            const message = updateError instanceof Error ? updateError.message : "อัปเดตการเลือกไม่สำเร็จ";
+            setError(message);
+            toast.error(message);
+        } finally {
+            selectionLocksRef.current.delete(row.id);
         }
     }
 
     async function apply(): Promise<void> {
-        if (!batch || batchId === null) return;
+        if (!batch || batchId === null || applyLockRef.current) return;
+        applyLockRef.current = true;
         setConfirmOpen(false);
         setApplying(true);
         setError(null);
@@ -268,22 +289,32 @@ export function RoutineImportPanel() {
             });
             setBatch(result.batch);
             await loadBatch();
+            toast.success("นำเข้าข้อมูล Routine สำเร็จ");
         } catch (applyError) {
-            setError(applyError instanceof Error ? applyError.message : "นำเข้าข้อมูลไม่สำเร็จ");
+            const message = applyError instanceof Error ? applyError.message : "นำเข้าข้อมูลไม่สำเร็จ";
+            setError(message);
+            toast.error(message);
             await loadBatch();
         } finally {
             setApplying(false);
+            applyLockRef.current = false;
         }
     }
 
     async function cancelBatch(): Promise<void> {
-        if (batchId === null || !window.confirm("ยกเลิกชุดข้อมูลนำเข้านี้หรือไม่")) return;
+        if (batchId === null || cancelLockRef.current || !window.confirm("ยกเลิกชุดข้อมูลนำเข้านี้หรือไม่")) return;
+        cancelLockRef.current = true;
         try {
             const result = await fetchJson<{ batch: RoutineImportBatchView }>(API_ROUTES.routines.imports.cancel(batchId), { method: "POST" });
             setBatch(result.batch);
             await loadBatch();
+            toast.success("ยกเลิกชุดข้อมูลนำเข้าสำเร็จ");
         } catch (cancelError) {
-            setError(cancelError instanceof Error ? cancelError.message : "ยกเลิกชุดข้อมูลไม่สำเร็จ");
+            const message = cancelError instanceof Error ? cancelError.message : "ยกเลิกชุดข้อมูลไม่สำเร็จ";
+            setError(message);
+            toast.error(message);
+        } finally {
+            cancelLockRef.current = false;
         }
     }
 

@@ -127,6 +127,15 @@ function makeDate(year: number, month: number, day: number): CalendarDate {
     return fromDateParts({ year, month, day: safeDay });
 }
 
+function makeExactDate(
+    year: number,
+    month: number,
+    day: number,
+): CalendarDate | null {
+    if (day > daysInMonth(year, month)) return null;
+    return fromDateParts({ year, month, day });
+}
+
 export function isCalendarDate(value: string): boolean {
     try {
         dateParts(value);
@@ -182,6 +191,19 @@ export function getCurrentBangkokHour(now = new Date()): number {
         hourCycle: "h23",
     });
     return Number(formatter.format(now));
+}
+
+export function formatRoutineSendTime(sendHour: number): string {
+    if (!Number.isInteger(sendHour) || sendHour < 0 || sendHour > 23) {
+        throw new RangeError("Invalid Routine send hour");
+    }
+    return `${pad(sendHour)}:00`;
+}
+
+export function parseRoutineSendTime(value: string): number | null {
+    const match = /^(?:[01]\d|2[0-3]):([0-5]\d)$/.exec(value);
+    if (!match || match[1] !== "00") return null;
+    return Number(value.slice(0, 2));
 }
 
 export function isRoutineReminderDue(
@@ -342,11 +364,12 @@ function calculateMonthlyOccurrences(
     ) {
         const shiftedMonth = addCalendarMonths(baseMonth, config.monthOffset);
         const shiftedParts = dateParts(shiftedMonth);
-        const originalDueDate = makeDate(
+        const originalDueDate = makeExactDate(
             shiftedParts.year,
             shiftedParts.month,
             config.day,
         );
+        if (!originalDueDate) continue;
         const dueDate = applyBusinessDayPolicy(originalDueDate, policy);
         if (!isWithinWindow(dueDate, window)) continue;
 
@@ -400,7 +423,8 @@ function calculateIntervalOccurrences(
         if (distance < 0 || distance % config.intervalMonths !== 0) continue;
 
         const parts = dateParts(month);
-        const originalDueDate = makeDate(parts.year, parts.month, anchor.day);
+        const originalDueDate = makeExactDate(parts.year, parts.month, anchor.day);
+        if (!originalDueDate) continue;
         if (compareCalendarDates(originalDueDate, config.anchorDate) < 0) continue;
         const dueDate = applyBusinessDayPolicy(originalDueDate, policy);
         if (!isWithinWindow(dueDate, window)) continue;
@@ -423,7 +447,8 @@ function calculateYearlyOccurrences(
     const occurrences: ScheduledRoutineOccurrence[] = [];
 
     for (let year = firstYear; year <= lastYear; year += 1) {
-        const originalDueDate = makeDate(year, config.month, config.day);
+        const originalDueDate = makeExactDate(year, config.month, config.day);
+        if (!originalDueDate) continue;
         const dueDate = applyBusinessDayPolicy(originalDueDate, policy);
         if (!isWithinWindow(dueDate, window)) continue;
         occurrences.push({

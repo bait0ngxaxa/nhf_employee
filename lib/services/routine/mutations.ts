@@ -9,6 +9,8 @@ import type {
 import { ZodError } from "zod";
 
 import { runSerializableTransaction } from "@/lib/db/transaction";
+import { hasPrismaErrorCode } from "@/lib/db/transaction";
+import { prisma } from "@/lib/db/prisma";
 import {
     calendarDateToDate,
     isCalendarDate,
@@ -29,6 +31,10 @@ import {
     assertActiveAdminInTransaction,
     assertActiveEmployeesInTransaction,
 } from "./authorization";
+import {
+    assertMatchingRoutineTaskIdempotency,
+    createRoutineTaskRequestHash,
+} from "./idempotency";
 import {
     RoutineConflictError,
     RoutineNotFoundError,
@@ -82,6 +88,7 @@ const ROUTINE_OCCURRENCE_INCLUDE = {
             description: true,
             scheduleType: true,
             scheduleText: true,
+            isActive: true,
             unit: { select: { id: true, code: true, name: true } },
             category: { select: { id: true, name: true } },
         },
@@ -347,10 +354,165 @@ export async function createRoutineTaskInTransaction(
 export async function createRoutineTask(
     input: RoutineTaskCreateInput,
     actor: RoutineCommandActor,
-): Promise<Prisma.RoutineTaskGetPayload<{ include: typeof ROUTINE_TASK_INCLUDE }>> {
-    return runSerializableTransaction((tx) =>
-        createRoutineTaskInTransaction(tx, input, actor),
-    );
+    options: { idempotencyKey: string },
+): Promise<{
+    task: Prisma.RoutineTaskGetPayload<{ include: typeof ROUTINE_TASK_INCLUDE }>;
+    replayed: boolean;
+}> {
+    const requestHash = createRoutineTaskRequestHash(input);
+
+    class RoutineIdempotencyRaceError extends Error {}
+
+    try {
+        return await runSerializableTransaction(async (tx) => {
+            await assertActiveAdminInTransaction(tx, actor);
+            const existing = await tx.routineTaskCreateIdempotency.findUnique({
+                where: {
+                    userId_idempotencyKey: {
+                        userId: actor.id,
+                        idempotencyKey: options.idempotencyKey,
+                    },
+                },
+            });
+            if (existing) {
+                assertMatchingRoutineTaskIdempotency(
+                    requestHash,
+                    existing.requestHash,
+                );
+                const task = await tx.routineTask.findUnique({
+                    where: { id: existing.taskId },
+                    include: ROUTINE_TASK_INCLUDE,
+                });
+                if (!task) {
+                    throw new RoutineConflictError(
+                        "ไม่พบผลลัพธ์ของคำขอสร้าง Routine เดิม",
+                    );
+                }
+                return { task, replayed: true };
+            }
+
+            const task = await createRoutineTaskInTransaction(tx, input, actor);
+            try {
+                await tx.routineTaskCreateIdempotency.create({
+                    data: {
+                        userId: actor.id,
+                        idempotencyKey: options.idempotencyKey,
+                        requestHash,
+                        taskId: task.id,
+                    },
+                });
+            } catch (error) {
+                if (hasPrismaErrorCode(error, "P2002")) {
+                    throw new RoutineIdempotencyRaceError();
+                }
+                throw error;
+            }
+            return { task, replayed: false };
+        });
+    } catch (error) {
+        if (!(error instanceof RoutineIdempotencyRaceError)) throw error;
+
+        const existing = await prisma.routineTaskCreateIdempotency.findUnique({
+            where: {
+                userId_idempotencyKey: {
+                    userId: actor.id,
+                    idempotencyKey: options.idempotencyKey,
+                },
+            },
+        });
+        if (!existing) throw error;
+        assertMatchingRoutineTaskIdempotency(requestHash, existing.requestHash);
+        const task = await prisma.routineTask.findUnique({
+            where: { id: existing.taskId },
+            include: ROUTINE_TASK_INCLUDE,
+        });
+        if (!task) {
+            throw new RoutineConflictError(
+                "ไม่พบผลลัพธ์ของคำขอสร้าง Routine เดิม",
+            );
+        }
+        return { task, replayed: true };
+    }
+}
+
+export async function deleteRoutineTask(
+    taskId: number,
+    actor: RoutineCommandActor,
+): Promise<void> {
+    await runSerializableTransaction(async (tx) => {
+        await assertActiveAdminInTransaction(tx, actor);
+        const task = await tx.routineTask.findUnique({
+            where: { id: taskId },
+            select: {
+                id: true,
+                title: true,
+                version: true,
+            },
+        });
+        if (!task) throw new RoutineNotFoundError();
+
+        const occurrences = await tx.routineOccurrence.findMany({
+            where: { taskId },
+            select: { id: true },
+        });
+        const occurrenceIds = occurrences.map((occurrence) => occurrence.id);
+        if (occurrenceIds.length > 0) {
+            const prefixes = occurrenceIds.map((occurrenceId) =>
+                `routine:${occurrenceId}:`,
+            );
+            const pendingOutbox = await tx.notificationOutbox.findMany({
+                where: {
+                    type: "ROUTINE_REMINDER_IN_APP",
+                    status: { in: ["PENDING", "PROCESSING", "FAILED"] },
+                    OR: prefixes.map((prefix) => ({
+                        eventKey: { startsWith: prefix },
+                    })),
+                },
+                select: { id: true, eventKey: true },
+            });
+            const outboxIds = pendingOutbox.map((row) => row.id);
+            if (outboxIds.length > 0) {
+                await tx.notificationOutbox.updateMany({
+                    where: {
+                        id: { in: outboxIds },
+                        status: { in: ["PENDING", "PROCESSING", "FAILED"] },
+                    },
+                    data: {
+                        status: "SUPERSEDED",
+                        lastError: "Routine task was deleted",
+                    },
+                });
+            }
+            await tx.routineOccurrenceAssignee.deleteMany({
+                where: { occurrenceId: { in: occurrenceIds } },
+            });
+            await tx.routineOccurrence.deleteMany({ where: { taskId } });
+        }
+
+        await tx.routineTaskAssignee.deleteMany({ where: { taskId } });
+        await tx.routineReminderRule.deleteMany({ where: { taskId } });
+        await tx.routineImportRow.updateMany({
+            where: { appliedTaskId: taskId },
+            data: { appliedTaskId: null },
+        });
+        await tx.routineImportLedger.updateMany({
+            where: { taskId },
+            data: { taskId: null },
+        });
+        await tx.routineTaskCreateIdempotency.deleteMany({
+            where: { taskId },
+        });
+
+        await createRoutineAuditInTransaction(
+            tx,
+            "ROUTINE_TASK_DELETE",
+            "RoutineTask",
+            taskId,
+            actor,
+            { taskId, title: task.title, version: task.version },
+        );
+        await tx.routineTask.delete({ where: { id: taskId } });
+    });
 }
 
 export async function updateRoutineTask(
@@ -374,10 +536,17 @@ export async function updateRoutineTask(
                 ? input.scheduleConfig
                 : current.scheduleConfig,
         );
-        ensureContractRange(
-            input.contractStartDate ?? (current.contractStartDate ? toBangkokCalendarDate(current.contractStartDate) : undefined),
-            input.contractEndDate ?? (current.contractEndDate ? toBangkokCalendarDate(current.contractEndDate) : undefined),
-        );
+        const nextContractStartDate = input.contractStartDate === undefined
+            ? (current.contractStartDate
+                ? toBangkokCalendarDate(current.contractStartDate)
+                : undefined)
+            : input.contractStartDate;
+        const nextContractEndDate = input.contractEndDate === undefined
+            ? (current.contractEndDate
+                ? toBangkokCalendarDate(current.contractEndDate)
+                : undefined)
+            : input.contractEndDate;
+        ensureContractRange(nextContractStartDate, nextContractEndDate);
 
         const nextUnitId = input.unitId ?? current.unitId;
         const nextCategoryId = input.categoryId ?? current.categoryId;
@@ -521,6 +690,7 @@ async function findOccurrenceForMutation(
         include: ROUTINE_OCCURRENCE_INCLUDE,
     });
     if (!occurrence) throw new RoutineNotFoundError();
+    if (!occurrence.task.isActive) throw new RoutineNotFoundError();
     return occurrence;
 }
 

@@ -12,6 +12,7 @@ import {
     getRoutineOccurrenceById,
     getRoutineOccurrences,
     getRoutineSummary,
+    getRoutineTaskWorkItems,
     getRoutineTasks,
 } from "@/lib/services/routine/queries";
 import { routineTaskFiltersSchema } from "@/lib/validations/routine";
@@ -258,14 +259,69 @@ describe("NHF Routine query authorization", () => {
             employeeId: null,
         });
 
-        expect(prismaMock.routineOccurrence.count).toHaveBeenCalledTimes(4);
-        for (const [call] of prismaMock.routineOccurrence.count.mock.calls) {
+        expect(prismaMock.routineTask.count).toHaveBeenCalledTimes(4);
+        for (const [call] of prismaMock.routineTask.count.mock.calls) {
             expect(call).toEqual({
                 where: expect.objectContaining({
-                    task: { isActive: true },
+                    isActive: true,
+                    occurrences: expect.objectContaining({ some: expect.any(Object) }),
                 }),
             });
         }
+    });
+
+    it("returns one operational row per active task", async () => {
+        const today = getCurrentBangkokDate();
+        prismaMock.routineTask.findMany.mockResolvedValue(asNever([
+            {
+                id: 71,
+                occurrences: [{
+                    id: 91,
+                    taskId: 71,
+                    periodKey: "2026-08",
+                    dueDate: calendarDateToDate(today),
+                    originalDueDate: calendarDateToDate(today),
+                    scheduleVersion: 1,
+                    reminderVersion: 1,
+                    createdAt: new Date("2026-08-01T00:00:00.000Z"),
+                    updatedAt: new Date("2026-08-01T00:00:00.000Z"),
+                    task: {
+                        id: 71,
+                        title: "ตรวจสอบระบบ",
+                        description: null,
+                        scheduleType: "MONTHLY_DAY",
+                        scheduleText: null,
+                        unit: { id: 1, code: "มสช.", name: "มสช." },
+                        category: { id: 1, name: "ระบบคอมพิวเตอร์" },
+                    },
+                    assignees: [],
+                }],
+            },
+        ]));
+        prismaMock.routineTask.count.mockResolvedValue(1);
+
+        const result = await getRoutineTaskWorkItems(
+            {
+                scope: "all",
+                page: 1,
+                limit: 20,
+            },
+            {
+                actor: { id: 99, email: "admin@example.com", role: "ADMIN" },
+                employeeId: null,
+            },
+        );
+
+        expect(result.occurrences).toHaveLength(1);
+        expect(result.pagination.total).toBe(1);
+        expect(prismaMock.routineTask.findMany).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: expect.objectContaining({
+                    isActive: true,
+                    occurrences: { some: expect.any(Object) },
+                }),
+            }),
+        );
     });
 
     it.each<[string, { activeOnly?: true }, { isActive?: true }]>([

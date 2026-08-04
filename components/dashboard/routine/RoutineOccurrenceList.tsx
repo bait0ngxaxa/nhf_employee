@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Pencil, Save, X } from "lucide-react";
+import { toast } from "sonner";
 import type { KeyedMutator } from "swr";
 
 import { Button } from "@/components/ui/button";
@@ -103,6 +104,7 @@ export function RoutineOccurrenceList({
     const [busyId, setBusyId] = useState<number | null>(null);
     const [editor, setEditor] = useState<RoutineOccurrenceEditorState | null>(null);
     const [actionError, setActionError] = useState<string | null>(null);
+    const saveLockRef = useRef(false);
 
     function beginEdit(occurrence: RoutineOccurrence): void {
         setActionError(null);
@@ -130,7 +132,7 @@ export function RoutineOccurrenceList({
     }
 
     async function saveEdit(occurrence: RoutineOccurrence): Promise<void> {
-        if (!editor || editor.id !== occurrence.id) return;
+        if (!editor || editor.id !== occurrence.id || saveLockRef.current) return;
         const ownerCount = Object.values(editor.assignees)
             .filter((role) => role === "OWNER")
             .length;
@@ -139,6 +141,7 @@ export function RoutineOccurrenceList({
             return;
         }
 
+        saveLockRef.current = true;
         setBusyId(occurrence.id);
         setActionError(null);
         try {
@@ -164,13 +167,19 @@ export function RoutineOccurrenceList({
             }
 
             await mutate();
+            toast.success(
+                editor.dueDate !== occurrence.dueDate
+                    ? "อัปเดตวันครบกำหนดสำเร็จ"
+                    : "อัปเดตผู้รับผิดชอบสำเร็จ",
+            );
             setEditor(null);
         } catch (saveError) {
-            setActionError(
-                saveError instanceof Error ? saveError.message : "บันทึกรายการไม่สำเร็จ",
-            );
+            const message = saveError instanceof Error ? saveError.message : "บันทึกรายการไม่สำเร็จ";
+            setActionError(message);
+            toast.error(message);
         } finally {
             setBusyId(null);
+            saveLockRef.current = false;
         }
     }
 

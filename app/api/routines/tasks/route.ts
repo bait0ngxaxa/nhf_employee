@@ -3,6 +3,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import { requireAdminSession } from "@/lib/auth/api";
 import { createRoutineCommandActor } from "@/lib/server/routine-command-actor";
 import { enforceAuthenticatedMutationRateLimit } from "@/lib/security/mutation-rate-limit";
+import { idempotencyKeySchema } from "@/lib/validations/idempotency";
 import {
     readRoutineJsonBody,
     routineErrorResponse,
@@ -55,6 +56,15 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     try {
         const auth = await requireAdminSession();
         if (!auth.ok) return auth.response;
+        const idempotencyKey = idempotencyKeySchema.safeParse(
+            request.headers.get("idempotency-key"),
+        );
+        if (!idempotencyKey.success) {
+            return NextResponse.json(
+                { error: "คำขอสร้าง Routine ต้องมี Idempotency-Key" },
+                { status: 400 },
+            );
+        }
         const rateLimitResponse = enforceAuthenticatedMutationRateLimit(
             "routine-task-create",
             auth.user.id,
@@ -77,8 +87,13 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
             },
             request.headers,
         );
-        const task = await createRoutineTask(parsed.data, actor);
-        return NextResponse.json({ task }, { status: 201 });
+        const result = await createRoutineTask(parsed.data, actor, {
+            idempotencyKey: idempotencyKey.data,
+        });
+        return NextResponse.json(
+            { task: result.task, replayed: result.replayed },
+            { status: result.replayed ? 200 : 201 },
+        );
     } catch (error) {
         return routineErrorResponse(error, "Error creating routine task");
     }

@@ -3,9 +3,15 @@ import { z } from "zod";
 import {
     ROUTINE_BUSINESS_DAY_POLICIES,
     ROUTINE_SCHEDULE_TYPES,
+    daysInMonth,
+    type YearlyDateScheduleConfig,
 } from "@/lib/routine/schedule";
 
-import { routineAssigneeSchema, routineReminderRuleSchema } from "./routine";
+import {
+    parseRoutineScheduleConfig,
+    routineAssigneeSchema,
+    routineReminderRuleSchema,
+} from "./routine";
 
 export const routineImportBatchIdSchema = z.string().regex(/^\d+$/, "รหัสไม่ถูกต้อง");
 
@@ -49,6 +55,39 @@ export const routineImportRowUpdateSchema = z.object({
     extraDetails: z.string().trim().max(5000).nullable(),
     selected: z.boolean(),
     reminderRules: z.array(routineReminderRuleSchema).max(20),
+}).superRefine((data, ctx) => {
+    if (
+        data.contractStartDate
+        && data.contractEndDate
+        && data.contractStartDate > data.contractEndDate
+    ) {
+        ctx.addIssue({
+            code: "custom",
+            path: ["contractEndDate"],
+            message: "วันสิ้นสุดสัญญาต้องไม่ก่อนวันเริ่มสัญญา",
+        });
+    }
+
+    try {
+        const config = parseRoutineScheduleConfig(data.scheduleType, data.scheduleConfig);
+        if (
+            data.scheduleType === "YEARLY_DATE"
+            && (config as YearlyDateScheduleConfig).day
+                > daysInMonth(2024, (config as YearlyDateScheduleConfig).month)
+        ) {
+            ctx.addIssue({
+                code: "custom",
+                path: ["scheduleConfig", "day"],
+                message: "เดือนและวันที่กำหนดไม่สัมพันธ์กัน",
+            });
+        }
+    } catch {
+        ctx.addIssue({
+            code: "custom",
+            path: ["scheduleConfig"],
+            message: "กำหนดค่าตารางงานประจำไม่ถูกต้อง",
+        });
+    }
 });
 
 export type RoutineImportRowUpdateInput = z.infer<typeof routineImportRowUpdateSchema>;

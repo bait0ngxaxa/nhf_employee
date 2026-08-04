@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { BellPlus, Trash2 } from "lucide-react";
+import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,7 +14,14 @@ import type {
 import {
     ROUTINE_BUSINESS_DAY_POLICIES,
     ROUTINE_SCHEDULE_TYPES,
+    formatRoutineSendTime,
+    parseRoutineSendTime,
 } from "@/lib/routine/schedule";
+import { createIdempotencyKey } from "@/lib/client/idempotency-key";
+import {
+    routineTaskCreateSchema,
+    routineTaskUpdateSchema,
+} from "@/lib/validations/routine";
 
 import { RoutineScheduleFields } from "./RoutineScheduleFields";
 import type {
@@ -95,6 +103,10 @@ function isObject(value: unknown): value is Record<string, unknown> {
     return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+function dateInputValue(value: string | null | undefined): string {
+    return value ? value.slice(0, 10) : "";
+}
+
 function taskToForm(task: RoutineTask | null): TaskFormState {
     const scheduleType = task && isRoutineScheduleType(task.scheduleType)
         ? task.scheduleType
@@ -112,15 +124,15 @@ function taskToForm(task: RoutineTask | null): TaskFormState {
             ? task.scheduleConfig
             : defaultScheduleConfig(scheduleType),
         scheduleText: task?.scheduleText ?? "",
-        contractStartDate: task?.contractStartDate ?? "",
-        contractEndDate: task?.contractEndDate ?? "",
+        contractStartDate: dateInputValue(task?.contractStartDate),
+        contractEndDate: dateInputValue(task?.contractEndDate),
         contractText: task?.contractText ?? "",
         extraDetails: task?.extraDetails ?? "",
         businessDayPolicy,
         isActive: task?.isActive ?? true,
         reminderRules: task?.reminderRules?.map((rule) => ({
             daysBefore: String(rule.daysBefore),
-            sendHour: String(rule.sendHour),
+            sendHour: formatRoutineSendTime(rule.sendHour),
             recipientScope: rule.recipientScope,
             isActive: rule.isActive,
         })) ?? [],
@@ -137,6 +149,29 @@ function readError(value: unknown): string {
     return "บันทึกข้อมูลไม่สำเร็จ";
 }
 
+function validationErrors(value: unknown): Record<string, string> {
+    if (!isObject(value) || !isObject(value.details)) return {};
+    return Object.entries(value.details).reduce<Record<string, string>>(
+        (errors, [path, messages]) => {
+            if (Array.isArray(messages) && typeof messages[0] === "string") {
+                errors[path] = messages[0];
+            }
+            return errors;
+        },
+        {},
+    );
+}
+
+function focusFirstInvalidField(errors: Record<string, string>): void {
+    const firstPath = Object.keys(errors)[0];
+    if (!firstPath || typeof document === "undefined") return;
+    window.requestAnimationFrame(() => {
+        document.querySelector<HTMLElement>(
+            `[data-routine-field="${firstPath}"]`,
+        )?.focus();
+    });
+}
+
 export function RoutineTaskForm({
     reference,
     initialTask,
@@ -149,6 +184,9 @@ export function RoutineTaskForm({
     );
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+    const submitLockRef = useRef(false);
+    const createIdempotencyKeyRef = useRef<string | null>(null);
 
     useEffect(() => {
         setForm(taskToForm(initialTask));
@@ -156,6 +194,8 @@ export function RoutineTaskForm({
             Object.fromEntries(initialTask?.assignees.map((assignee) => [assignee.employeeId, assignee.role]) ?? []) as Record<number, RoutineAssigneeRole>,
         );
         setError(null);
+        setFieldErrors({});
+        createIdempotencyKeyRef.current = initialTask ? null : createIdempotencyKey();
     }, [initialTask]);
 
     const selectedEmployeeIds = useMemo(
@@ -186,7 +226,7 @@ export function RoutineTaskForm({
                 ...current.reminderRules,
                 {
                     daysBefore: String(daysBefore),
-                    sendHour: "9",
+                    sendHour: "09:00",
                     recipientScope: "ASSIGNEES",
                     isActive: true,
                 },
@@ -221,7 +261,7 @@ export function RoutineTaskForm({
             ...current,
             reminderRules: days.map((daysBefore) => ({
                 daysBefore: String(daysBefore),
-                sendHour: "9",
+                sendHour: "09:00",
                 recipientScope: "ASSIGNEES",
                 isActive: true,
             })),
@@ -229,99 +269,163 @@ export function RoutineTaskForm({
     }
 
     async function submit(): Promise<void> {
+        if (submitLockRef.current || isSubmitting) return;
+        submitLockRef.current = true;
         setError(null);
+        setFieldErrors({});
         const ownerCount = Object.values(assignees).filter((role) => role === "OWNER").length;
         if (ownerCount !== 1) {
             setError("กรุณาเลือกผู้รับผิดชอบหลัก 1 คน");
+            setFieldErrors({ assignees: "ต้องมีผู้รับผิดชอบหลัก 1 คน" });
+            submitLockRef.current = false;
             return;
         }
-        if (!form.unitId || !form.categoryId || !form.title.trim()) {
-            setError("กรุณากรอกหน่วยงาน หมวดหมู่ และชื่องาน");
-            return;
-        }
+
         const reminderRules = form.reminderRules.map((rule) => ({
             daysBefore: Number(rule.daysBefore),
-            sendHour: Number(rule.sendHour),
+            sendHour: parseRoutineSendTime(rule.sendHour),
             channel: "IN_APP" as const,
             recipientScope: rule.recipientScope,
             isActive: rule.isActive,
         }));
-        if (reminderRules.some((rule) =>
-            !Number.isInteger(rule.daysBefore)
-            || rule.daysBefore < 0
-            || rule.daysBefore > 365
-            || !Number.isInteger(rule.sendHour)
-            || rule.sendHour < 0
-            || rule.sendHour > 23
-        )) {
-            setError("กำหนดจำนวนวันแจ้งเตือนล่วงหน้าให้อยู่ระหว่าง 0–365 และเวลาอยู่ระหว่าง 0–23 นาฬิกา");
+        const reminderTimeErrors = form.reminderRules.reduce<Record<string, string>>(
+            (errors, rule, index) => {
+                if (!/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(rule.sendHour)) {
+                    errors[`reminderRules.${index}.sendHour`] = "ระบุเวลาในรูปแบบ HH:mm";
+                } else if (parseRoutineSendTime(rule.sendHour) === null) {
+                    errors[`reminderRules.${index}.sendHour`] = "ระบบรองรับเฉพาะเวลาเต็มชั่วโมง เช่น 09:00";
+                }
+                if (!/^\d+$/.test(rule.daysBefore)) {
+                    errors[`reminderRules.${index}.daysBefore`] = "ระบุจำนวนวันเป็นจำนวนเต็ม";
+                }
+                return errors;
+            },
+            {},
+        );
+        if (Object.keys(reminderTimeErrors).length > 0) {
+            setFieldErrors(reminderTimeErrors);
+            focusFirstInvalidField(reminderTimeErrors);
+            submitLockRef.current = false;
             return;
         }
+        const payload = {
+            unitId: Number(form.unitId),
+            categoryId: Number(form.categoryId),
+            title: form.title,
+            description: form.description || null,
+            scheduleType: form.scheduleType,
+            scheduleConfig: form.scheduleConfig,
+            scheduleText: form.scheduleText || null,
+            contractStartDate: form.contractStartDate || null,
+            contractEndDate: form.contractEndDate || null,
+            contractText: form.contractText || null,
+            extraDetails: form.extraDetails || null,
+            businessDayPolicy: form.businessDayPolicy,
+            isActive: form.isActive,
+            reminderRules: reminderRules.map((rule) => ({
+                ...rule,
+                sendHour: rule.sendHour ?? -1,
+            })),
+            assignees: Object.entries(assignees).map(([employeeId, role]) => ({
+                employeeId: Number(employeeId),
+                role,
+            })),
+            ...(initialTask ? { version: initialTask.version } : {}),
+        };
+        const parsed = initialTask
+            ? routineTaskUpdateSchema.safeParse(payload)
+            : routineTaskCreateSchema.safeParse(payload);
+        if (!parsed.success) {
+            const nextErrors = parsed.error.issues.reduce<Record<string, string>>(
+                (errors, issue) => {
+                    const path = issue.path.join(".") || "form";
+                    if (!errors[path]) errors[path] = issue.message;
+                    return errors;
+                },
+                {},
+            );
+            setFieldErrors(nextErrors);
+            setError("กรุณาตรวจสอบข้อมูลในช่องที่มีเครื่องหมายเตือน");
+            focusFirstInvalidField(nextErrors);
+            submitLockRef.current = false;
+            return;
+        }
+
         setIsSubmitting(true);
         try {
-            const payload = {
-                unitId: Number(form.unitId),
-                categoryId: Number(form.categoryId),
-                title: form.title,
-                description: form.description || null,
-                scheduleType: form.scheduleType,
-                scheduleConfig: form.scheduleConfig,
-                scheduleText: form.scheduleText || null,
-                contractStartDate: form.contractStartDate || null,
-                contractEndDate: form.contractEndDate || null,
-                contractText: form.contractText || null,
-                extraDetails: form.extraDetails || null,
-                businessDayPolicy: form.businessDayPolicy,
-                isActive: form.isActive,
-                reminderRules,
-                assignees: Object.entries(assignees).map(([employeeId, role]) => ({
-                    employeeId: Number(employeeId),
-                    role,
-                })),
-                ...(initialTask ? { version: initialTask.version } : {}),
+            const headers: Record<string, string> = {
+                "content-type": "application/json",
             };
+            if (!initialTask) {
+                const idempotencyKey = createIdempotencyKeyRef.current ?? createIdempotencyKey();
+                createIdempotencyKeyRef.current = idempotencyKey;
+                headers["idempotency-key"] = idempotencyKey;
+            }
             const response = await fetch(
                 initialTask
                     ? API_ROUTES.routines.taskById(initialTask.id)
                     : API_ROUTES.routines.tasks,
                 {
                     method: initialTask ? "PATCH" : "POST",
-                    headers: { "content-type": "application/json" },
-                    body: JSON.stringify(payload),
+                    headers,
+                    body: JSON.stringify(parsed.data),
                 },
             );
             const body: unknown = await response.json().catch(() => null);
-            if (!response.ok) throw new Error(readError(body));
+            if (!response.ok) {
+                const serverErrors = validationErrors(body);
+                if (Object.keys(serverErrors).length > 0) {
+                    setFieldErrors(serverErrors);
+                    focusFirstInvalidField(serverErrors);
+                }
+                throw new Error(readError(body));
+            }
+            toast.success(initialTask ? "บันทึกการแก้ไขสำเร็จ" : "สร้างรายการ Routine สำเร็จ");
             onSaved();
         } catch (submitError) {
-            setError(submitError instanceof Error ? submitError.message : "บันทึกข้อมูลไม่สำเร็จ");
+            const message = submitError instanceof Error
+                ? submitError.message
+                : "บันทึกข้อมูลไม่สำเร็จ";
+            setError(message);
+            toast.error(message);
         } finally {
             setIsSubmitting(false);
+            submitLockRef.current = false;
         }
     }
 
     return (
-        <div className="space-y-5 rounded-xl border border-border-subtle bg-surface-raised p-4 sm:p-6">
+        <form
+            className="space-y-5 rounded-xl border border-border-subtle bg-surface-raised p-4 sm:p-6"
+            onSubmit={(event) => {
+                event.preventDefault();
+                void submit();
+            }}
+            noValidate
+        >
             <div>
                 <h3 className="text-lg font-semibold text-content-heading">{initialTask ? "แก้ไขแม่แบบงานประจำ" : "สร้างแม่แบบงานประจำ"}</h3>
-                <p className="mt-1 text-sm text-content-secondary">ระบบจะสร้างงานตามช่วงเวลาที่กำหนดในเดือนปัจจุบันและล่วงหน้า 2 เดือน</p>
+                <p className="mt-1 text-sm text-content-secondary">ผู้ใช้จะเห็น 1 รายการต่อ 1 งาน ระบบจัดเก็บรอบแจ้งเตือนภายในตามกำหนดการปัจจุบันและล่วงหน้า 2 เดือน</p>
             </div>
             {error ? <p className="rounded-lg border border-status-danger-border bg-status-danger-surface px-4 py-3 text-sm text-status-danger-foreground" role="alert">{error}</p> : null}
             <div className="grid gap-4 md:grid-cols-2">
                 <label className="grid gap-1 text-sm font-medium text-content-body">หน่วยงาน
-                    <select className="h-11 rounded-md border border-input bg-background px-3 text-sm" value={form.unitId} onChange={(event) => updateField("unitId", event.target.value)}>
+                    <select data-routine-field="unitId" aria-invalid={Boolean(fieldErrors.unitId)} className="h-11 rounded-md border border-input bg-background px-3 text-sm" value={form.unitId} onChange={(event) => updateField("unitId", event.target.value)}>
                         <option value="">เลือกหน่วยงาน</option>
                         {reference.units.map((unit) => <option key={unit.id} value={unit.id}>{unit.code} · {unit.name}</option>)}
                     </select>
+                    {fieldErrors.unitId ? <span className="text-xs text-status-danger-foreground">{fieldErrors.unitId}</span> : null}
                 </label>
                 <label className="grid gap-1 text-sm font-medium text-content-body">หมวดหมู่
-                    <select className="h-11 rounded-md border border-input bg-background px-3 text-sm" value={form.categoryId} onChange={(event) => updateField("categoryId", event.target.value)}>
+                    <select data-routine-field="categoryId" aria-invalid={Boolean(fieldErrors.categoryId)} className="h-11 rounded-md border border-input bg-background px-3 text-sm" value={form.categoryId} onChange={(event) => updateField("categoryId", event.target.value)}>
                         <option value="">เลือกหมวดหมู่</option>
                         {reference.categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
                     </select>
+                    {fieldErrors.categoryId ? <span className="text-xs text-status-danger-foreground">{fieldErrors.categoryId}</span> : null}
                 </label>
                 <label className="grid gap-1 text-sm font-medium text-content-body md:col-span-2">ชื่องาน
-                    <Input value={form.title} onChange={(event) => updateField("title", event.target.value)} placeholder="เช่น ตรวจสอบค่าใช้จ่ายประจำเดือน" />
+                    <Input data-routine-field="title" aria-invalid={Boolean(fieldErrors.title)} value={form.title} onChange={(event) => updateField("title", event.target.value)} placeholder="เช่น ตรวจสอบค่าใช้จ่ายประจำเดือน" />
+                    {fieldErrors.title ? <span className="text-xs text-status-danger-foreground">{fieldErrors.title}</span> : null}
                 </label>
                 <label className="grid gap-1 text-sm font-medium text-content-body md:col-span-2">รายละเอียด
                     <Textarea value={form.description} onChange={(event) => updateField("description", event.target.value)} placeholder="รายละเอียดหรือขั้นตอนที่จำเป็น" />
@@ -335,6 +439,7 @@ export function RoutineTaskForm({
                 onScheduleTypeChange={(value) => updateField("scheduleType", value)}
                 onScheduleConfigChange={(value) => updateField("scheduleConfig", value)}
                 onBusinessDayPolicyChange={(value) => updateField("businessDayPolicy", value)}
+                errors={fieldErrors}
             />
             <label className="grid gap-1 text-sm font-medium text-content-body">
                 คำอธิบายกำหนดการ
@@ -379,22 +484,29 @@ export function RoutineTaskForm({
                                 <label className="grid gap-1 text-xs font-medium text-content-body">
                                     ล่วงหน้า (วัน)
                                     <Input
+                                        data-routine-field={`reminderRules.${index}.daysBefore`}
+                                        aria-invalid={Boolean(fieldErrors[`reminderRules.${index}.daysBefore`])}
                                         type="number"
                                         min={0}
                                         max={365}
                                         value={rule.daysBefore}
                                         onChange={(event) => updateReminderRule(index, "daysBefore", event.target.value)}
                                     />
+                                    {fieldErrors[`reminderRules.${index}.daysBefore`] ? <span className="text-xs text-status-danger-foreground">{fieldErrors[`reminderRules.${index}.daysBefore`]}</span> : null}
                                 </label>
                                 <label className="grid gap-1 text-xs font-medium text-content-body">
-                                    เวลา (น.)
+                                    เวลาแจ้งเตือน (Asia/Bangkok)
                                     <Input
-                                        type="number"
-                                        min={0}
-                                        max={23}
+                                        data-routine-field={`reminderRules.${index}.sendHour`}
+                                        aria-invalid={Boolean(fieldErrors[`reminderRules.${index}.sendHour`])}
+                                        type="time"
+                                        step={3600}
+                                        min="00:00"
+                                        max="23:00"
                                         value={rule.sendHour}
                                         onChange={(event) => updateReminderRule(index, "sendHour", event.target.value)}
                                     />
+                                    {fieldErrors[`reminderRules.${index}.sendHour`] ? <span className="text-xs text-status-danger-foreground">{fieldErrors[`reminderRules.${index}.sendHour`]}</span> : null}
                                 </label>
                                 <label className="grid gap-1 text-xs font-medium text-content-body">
                                     ผู้รับการแจ้งเตือน
@@ -439,14 +551,17 @@ export function RoutineTaskForm({
                         );
                     })}
                 </div>
+                {fieldErrors.assignees ? <p className="text-xs text-status-danger-foreground">{fieldErrors.assignees}</p> : null}
             </fieldset>
 
             <div className="grid gap-4 md:grid-cols-3">
                 <label className="grid gap-1 text-sm font-medium text-content-body">วันเริ่มสัญญา
-                    <Input type="date" value={form.contractStartDate} onChange={(event) => updateField("contractStartDate", event.target.value)} />
+                    <Input data-routine-field="contractStartDate" aria-invalid={Boolean(fieldErrors.contractStartDate)} type="date" value={form.contractStartDate} onChange={(event) => updateField("contractStartDate", event.target.value)} />
+                    {fieldErrors.contractStartDate ? <span className="text-xs text-status-danger-foreground">{fieldErrors.contractStartDate}</span> : null}
                 </label>
                 <label className="grid gap-1 text-sm font-medium text-content-body">วันสิ้นสุดสัญญา
-                    <Input type="date" value={form.contractEndDate} onChange={(event) => updateField("contractEndDate", event.target.value)} />
+                    <Input data-routine-field="contractEndDate" aria-invalid={Boolean(fieldErrors.contractEndDate)} type="date" value={form.contractEndDate} onChange={(event) => updateField("contractEndDate", event.target.value)} />
+                    {fieldErrors.contractEndDate ? <span className="text-xs text-status-danger-foreground">{fieldErrors.contractEndDate}</span> : null}
                 </label>
                 <label className="grid gap-1 text-sm font-medium text-content-body">ข้อความช่วงสัญญา
                     <Input value={form.contractText} onChange={(event) => updateField("contractText", event.target.value)} placeholder="เช่น สัญญาปีงบประมาณ" />
@@ -458,8 +573,8 @@ export function RoutineTaskForm({
             <label className="flex items-center gap-3 text-sm font-medium text-content-body"><input type="checkbox" checked={form.isActive} onChange={(event) => updateField("isActive", event.target.checked)} /> เปิดใช้งานแม่แบบงานนี้</label>
             <div className="flex flex-wrap justify-end gap-2">
                 <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting}>ยกเลิก</Button>
-                <Button type="button" onClick={() => void submit()} disabled={isSubmitting}>{isSubmitting ? "กำลังบันทึก..." : "บันทึกแม่แบบงาน"}</Button>
+                <Button type="submit" disabled={isSubmitting}>{isSubmitting ? "กำลังบันทึก..." : "บันทึกแม่แบบงาน"}</Button>
             </div>
-        </div>
+        </form>
     );
 }

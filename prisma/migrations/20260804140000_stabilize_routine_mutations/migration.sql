@@ -1,0 +1,39 @@
+-- Keep Routine task creation idempotent across client retries and duplicate requests.
+CREATE TABLE `routine_task_create_idempotency` (
+    `id` VARCHAR(191) NOT NULL,
+    `userId` INTEGER NOT NULL,
+    `idempotencyKey` VARCHAR(255) NOT NULL,
+    `requestHash` CHAR(64) NOT NULL,
+    `taskId` INTEGER NOT NULL,
+    `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+
+    UNIQUE INDEX `routine_task_create_idempotency_taskId_key`(`taskId`),
+    UNIQUE INDEX `routine_task_create_idempotency_userId_idempotencyKey_key`(`userId`, `idempotencyKey`),
+    INDEX `routine_task_create_idempotency_createdAt_idx`(`createdAt`),
+    PRIMARY KEY (`id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+ALTER TABLE `audit_logs`
+    MODIFY `action` ENUM(
+        'LOGIN_SUCCESS', 'LOGIN_FAILED', 'LOGOUT', 'PASSWORD_CHANGE', 'PASSWORD_RESET',
+        'EMPLOYEE_CREATE', 'EMPLOYEE_UPDATE', 'EMPLOYEE_DELETE', 'EMPLOYEE_STATUS_CHANGE', 'EMPLOYEE_IMPORT',
+        'TICKET_CREATE', 'TICKET_UPDATE', 'TICKET_STATUS_CHANGE', 'TICKET_ASSIGN', 'TICKET_COMMENT', 'TICKET_DELETE',
+        'LEAVE_REQUEST_CREATE', 'LEAVE_REQUEST_APPROVE', 'LEAVE_REQUEST_REJECT', 'LEAVE_REQUEST_CANCEL',
+        'LEAVE_REQUEST_CANCELLATION_REQUEST', 'LEAVE_REQUEST_CANCELLATION_CONFIRM',
+        'LEAVE_REQUEST_NOT_TAKEN_REQUEST', 'LEAVE_REQUEST_NOT_TAKEN_CONFIRM',
+        'USER_CREATE', 'USER_UPDATE', 'USER_DELETE', 'USER_ROLE_CHANGE',
+        'STOCK_ITEM_CREATE', 'STOCK_ITEM_UPDATE', 'STOCK_ITEM_DELETE', 'STOCK_ADJUST',
+        'STOCK_REQUEST_CREATE', 'STOCK_REQUEST_APPROVE', 'STOCK_REQUEST_REJECT',
+        'STOCK_CATEGORY_CREATE', 'STOCK_CATEGORY_DELETE', 'SETTINGS_UPDATE', 'DATA_EXPORT', 'EMAIL_REQUEST',
+        'ROUTINE_TASK_CREATE', 'ROUTINE_TASK_UPDATE', 'ROUTINE_TASK_DEACTIVATE', 'ROUTINE_TASK_DELETE',
+        'ROUTINE_OCCURRENCE_REASSIGN', 'ROUTINE_OCCURRENCE_DUE_DATE_CHANGE',
+        'ROUTINE_IMPORT_UPLOAD', 'ROUTINE_IMPORT_ROW_UPDATE', 'ROUTINE_IMPORT_APPLY', 'ROUTINE_IMPORT_CANCEL'
+    ) NOT NULL;
+
+ALTER TABLE `routine_task_create_idempotency`
+    ADD CONSTRAINT `routine_task_create_idempotency_userId_fkey`
+    FOREIGN KEY (`userId`) REFERENCES `users`(`id`)
+    ON DELETE CASCADE ON UPDATE CASCADE,
+    ADD CONSTRAINT `routine_task_create_idempotency_taskId_fkey`
+    FOREIGN KEY (`taskId`) REFERENCES `routine_tasks`(`id`)
+    ON DELETE CASCADE ON UPDATE CASCADE;

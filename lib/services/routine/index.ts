@@ -8,6 +8,7 @@ export {
     RoutineServiceError,
     RoutineValidationError,
 } from "./errors";
+export { RoutineIdempotencyConflictError } from "./idempotency";
 export {
     generateRoutineTaskOccurrences,
     generateRoutineTaskOccurrencesInTransaction,
@@ -27,12 +28,14 @@ export {
     getRoutineOccurrences,
     getRoutineReferenceData,
     getRoutineSummary,
+    getRoutineTaskWorkItems,
     getRoutineTaskById,
     getRoutineTasks,
 } from "./queries";
 export {
     createRoutineTask,
     createRoutineTaskInTransaction,
+    deleteRoutineTask,
     reassignRoutineOccurrence,
     updateRoutineOccurrenceDueDate,
     updateRoutineTask,

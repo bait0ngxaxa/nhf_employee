@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { CalendarClock, FileSpreadsheet, List, Settings2, Users } from "lucide-react";
+import { toast } from "sonner";
 import { useSearchParams } from "next/navigation";
 import useSWR from "swr";
 
@@ -57,6 +58,7 @@ function RoutineOccurrencePanel({
             scope,
             page: String(page),
             limit: "12",
+            view: "tasks",
         });
         if (occurrenceId !== null) params.set("occurrenceId", String(occurrenceId));
         if (search.trim()) params.set("search", search.trim());
@@ -90,6 +92,7 @@ function RoutineOccurrencePanel({
                 </label>
                 <Button type="button" variant="outline" onClick={() => void mutate()}>รีเฟรช</Button>
             </div>
+            <p className="text-xs text-content-secondary">แต่ละรายการแสดง 1 งาน Routine รอบแจ้งเตือนของงานเดียวกันจะถูกจัดการภายในระบบ</p>
             <RoutineOccurrenceList
                 data={data}
                 error={error}
@@ -108,11 +111,60 @@ function RoutineTaskSettings() {
     const [isCreating, setIsCreating] = useState(false);
     const [editingTask, setEditingTask] = useState<RoutineTask | null>(null);
     const [taskPage, setTaskPage] = useState(1);
+    const [pendingTaskId, setPendingTaskId] = useState<number | null>(null);
+    const activeMutationLockRef = useRef<Set<number>>(new Set());
     const { data: reference, error: referenceError, isLoading: referenceLoading } = useSWR<RoutineReferenceData, Error>(API_ROUTES.routines.reference, fetchRoutine);
     const { data: tasks, error: tasksError, isLoading: tasksLoading, mutate: mutateTasks } = useSWR<PaginatedTasksResponse, Error>(
         `${API_ROUTES.routines.tasks}?activeOnly=0&page=${taskPage}&limit=20`,
         fetchRoutine,
     );
+
+    async function updateTaskActive(task: RoutineTask): Promise<void> {
+        if (activeMutationLockRef.current.has(task.id)) return;
+        activeMutationLockRef.current.add(task.id);
+        setPendingTaskId(task.id);
+        try {
+            const response = await fetch(API_ROUTES.routines.taskById(task.id), {
+                method: "PATCH",
+                headers: { "content-type": "application/json" },
+                body: JSON.stringify({ version: task.version, isActive: !task.isActive }),
+            });
+            const body: unknown = await response.json().catch(() => null);
+            if (!response.ok) throw new Error(
+                typeof body === "object" && body !== null && "error" in body && typeof body.error === "string"
+                    ? body.error
+                    : "อัปเดตสถานะ Routine ไม่สำเร็จ",
+            );
+            toast.success(task.isActive ? "ปิดใช้งาน Routine สำเร็จ" : "เปิดใช้งาน Routine สำเร็จ");
+            await mutateTasks();
+        } catch (error) {
+            const message = error instanceof Error ? error.message : "อัปเดตสถานะ Routine ไม่สำเร็จ";
+            toast.error(message);
+        } finally {
+            activeMutationLockRef.current.delete(task.id);
+            setPendingTaskId(null);
+        }
+    }
+
+    async function deleteTask(task: RoutineTask): Promise<void> {
+        try {
+            const response = await fetch(API_ROUTES.routines.taskById(task.id), {
+                method: "DELETE",
+            });
+            const body: unknown = await response.json().catch(() => null);
+            if (!response.ok) throw new Error(
+                typeof body === "object" && body !== null && "error" in body && typeof body.error === "string"
+                    ? body.error
+                    : "ลบรายการ Routine ไม่สำเร็จ",
+            );
+            toast.success("ลบรายการ Routine สำเร็จ");
+            await mutateTasks();
+        } catch (error) {
+            const message = error instanceof Error ? error.message : "ลบรายการ Routine ไม่สำเร็จ";
+            toast.error(message);
+            throw error;
+        }
+    }
 
     if (isCreating || editingTask) {
         if (referenceError) return <p className="rounded-lg border border-status-danger-border bg-status-danger-surface px-4 py-3 text-sm text-status-danger-foreground" role="alert">{referenceError.message}</p>;
@@ -135,6 +187,9 @@ function RoutineTaskSettings() {
             onRetry={() => void mutateTasks()}
             onCreate={() => setIsCreating(true)}
             onEdit={(task) => setEditingTask(task)}
+            onToggleActive={updateTaskActive}
+            onDelete={deleteTask}
+            pendingTaskId={pendingTaskId}
             onPageChange={setTaskPage}
         />
     );

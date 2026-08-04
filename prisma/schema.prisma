@@ -35,6 +35,7 @@ model User {
   stockCancelledRequests      StockRequest[]              @relation("StockCanceller")
   ticketMutationIdempotencies TicketMutationIdempotency[]
   leaveRequestIdempotencies    LeaveRequestIdempotency[]
+  routineTaskCreateIdempotencies RoutineTaskCreateIdempotency[]
   createdRoutineTasks         RoutineTask[]               @relation("RoutineTaskCreatedBy")
   updatedRoutineTasks         RoutineTask[]               @relation("RoutineTaskUpdatedBy")
   routineImportLedgers        RoutineImportLedger[]       @relation("RoutineImportAppliedBy")
@@ -333,6 +334,7 @@ enum AuditAction {
   ROUTINE_TASK_CREATE
   ROUTINE_TASK_UPDATE
   ROUTINE_TASK_DEACTIVATE
+  ROUTINE_TASK_DELETE
   ROUTINE_OCCURRENCE_REASSIGN
   ROUTINE_OCCURRENCE_DUE_DATE_CHANGE
   ROUTINE_IMPORT_UPLOAD
@@ -803,6 +805,7 @@ model RoutineTask {
   occurrences RoutineOccurrence[]
   importLedger RoutineImportLedger?
   importRows  RoutineImportRow[]
+  createIdempotency RoutineTaskCreateIdempotency?
   createdBy   User                  @relation("RoutineTaskCreatedBy", fields: [createdById], references: [id])
   updatedBy   User                  @relation("RoutineTaskUpdatedBy", fields: [updatedById], references: [id])
 
@@ -811,6 +814,22 @@ model RoutineTask {
   @@index([isActive, scheduleType])
   @@index([contractEndDate])
   @@map("routine_tasks")
+}
+
+model RoutineTaskCreateIdempotency {
+  id             String      @id @default(cuid())
+  userId         Int
+  idempotencyKey String      @db.VarChar(255)
+  requestHash    String      @db.Char(64)
+  taskId         Int         @unique
+  createdAt      DateTime    @default(now())
+
+  user User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  task RoutineTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, idempotencyKey])
+  @@index([createdAt])
+  @@map("routine_task_create_idempotency")
 }
 
 model RoutineReminderRule {

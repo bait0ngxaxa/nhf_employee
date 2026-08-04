@@ -20,6 +20,7 @@ interface RoutineScheduleFieldsProps {
     onScheduleTypeChange: (value: RoutineScheduleType) => void;
     onScheduleConfigChange: (value: Record<string, unknown>) => void;
     onBusinessDayPolicyChange: (value: RoutineBusinessDayPolicy) => void;
+    errors?: Record<string, string>;
 }
 
 function defaultScheduleConfig(type: RoutineScheduleType): Record<string, unknown> {
@@ -48,6 +49,7 @@ function configInput(
     key: string,
     fallback = 0,
 ): string {
+    if (typeof config[key] === "string") return config[key];
     return String(numberValue(config[key], fallback));
 }
 
@@ -58,17 +60,23 @@ export function RoutineScheduleFields({
     onScheduleTypeChange,
     onScheduleConfigChange,
     onBusinessDayPolicyChange,
+    errors = {},
 }: RoutineScheduleFieldsProps) {
     function updateNumber(key: string, event: ChangeEvent<HTMLInputElement>): void {
-        const value = Number(event.target.value);
+        const rawValue = event.target.value;
+        const value = rawValue === "" ? "" : Number(rawValue);
         onScheduleConfigChange({
             ...scheduleConfig,
-            [key]: Number.isFinite(value) ? value : 0,
+            [key]: typeof value === "number" && !Number.isFinite(value) ? rawValue : value,
         });
     }
 
     function updateDate(key: string, event: ChangeEvent<HTMLInputElement>): void {
         onScheduleConfigChange({ ...scheduleConfig, [key]: event.target.value });
+    }
+
+    function fieldError(key: string): string | undefined {
+        return errors[`scheduleConfig.${key}`] ?? errors.scheduleConfig;
     }
 
     return (
@@ -119,11 +127,13 @@ export function RoutineScheduleFields({
                 <div className="grid gap-3 sm:grid-cols-2">
                     <label className="grid gap-1 text-sm font-medium text-content-body">
                         วันที่ของเดือน
-                        <Input type="number" min={1} max={31} value={configInput(scheduleConfig, "day", 10)} onChange={(event) => updateNumber("day", event)} />
+                        <Input data-routine-field="scheduleConfig.day" aria-invalid={Boolean(fieldError("day"))} type="number" min={1} max={31} value={configInput(scheduleConfig, "day", 10)} onChange={(event) => updateNumber("day", event)} />
+                        {fieldError("day") ? <span className="text-xs text-status-danger-foreground">{fieldError("day")}</span> : null}
                     </label>
                     <label className="grid gap-1 text-sm font-medium text-content-body">
                         เดือนที่เลื่อนจากรอบปกติ
-                        <Input type="number" min={-120} max={120} value={configInput(scheduleConfig, "monthOffset")} onChange={(event) => updateNumber("monthOffset", event)} />
+                        <Input data-routine-field="scheduleConfig.monthOffset" aria-invalid={Boolean(fieldError("monthOffset"))} type="number" min={-120} max={120} value={configInput(scheduleConfig, "monthOffset")} onChange={(event) => updateNumber("monthOffset", event)} />
+                        {fieldError("monthOffset") ? <span className="text-xs text-status-danger-foreground">{fieldError("monthOffset")}</span> : null}
                     </label>
                 </div>
             ) : null}
@@ -132,11 +142,13 @@ export function RoutineScheduleFields({
                 <div className="grid gap-3 sm:grid-cols-2">
                     <label className="grid gap-1 text-sm font-medium text-content-body">
                         ทำซ้ำทุกกี่เดือน
-                        <Input type="number" min={1} max={120} value={configInput(scheduleConfig, "intervalMonths", 3)} onChange={(event) => updateNumber("intervalMonths", event)} />
+                        <Input data-routine-field="scheduleConfig.intervalMonths" aria-invalid={Boolean(fieldError("intervalMonths"))} type="number" min={1} max={120} value={configInput(scheduleConfig, "intervalMonths", 3)} onChange={(event) => updateNumber("intervalMonths", event)} />
+                        {fieldError("intervalMonths") ? <span className="text-xs text-status-danger-foreground">{fieldError("intervalMonths")}</span> : null}
                     </label>
                     <label className="grid gap-1 text-sm font-medium text-content-body">
                         วันที่เริ่มนับรอบ
-                        <Input type="date" value={typeof scheduleConfig.anchorDate === "string" ? scheduleConfig.anchorDate : ""} onChange={(event) => updateDate("anchorDate", event)} />
+                        <Input data-routine-field="scheduleConfig.anchorDate" aria-invalid={Boolean(fieldError("anchorDate"))} type="date" value={typeof scheduleConfig.anchorDate === "string" ? scheduleConfig.anchorDate : ""} onChange={(event) => updateDate("anchorDate", event)} />
+                        {fieldError("anchorDate") ? <span className="text-xs text-status-danger-foreground">{fieldError("anchorDate")}</span> : null}
                     </label>
                 </div>
             ) : null}
@@ -145,11 +157,13 @@ export function RoutineScheduleFields({
                 <div className="grid gap-3 sm:grid-cols-2">
                     <label className="grid gap-1 text-sm font-medium text-content-body">
                         เดือน
-                        <Input type="number" min={1} max={12} value={configInput(scheduleConfig, "month", 3)} onChange={(event) => updateNumber("month", event)} />
+                        <Input data-routine-field="scheduleConfig.month" aria-invalid={Boolean(fieldError("month"))} type="number" min={1} max={12} value={configInput(scheduleConfig, "month", 3)} onChange={(event) => updateNumber("month", event)} />
+                        {fieldError("month") ? <span className="text-xs text-status-danger-foreground">{fieldError("month")}</span> : null}
                     </label>
                     <label className="grid gap-1 text-sm font-medium text-content-body">
                         วันที่
-                        <Input type="number" min={1} max={31} value={configInput(scheduleConfig, "day", 31)} onChange={(event) => updateNumber("day", event)} />
+                        <Input data-routine-field="scheduleConfig.day" aria-invalid={Boolean(fieldError("day"))} type="number" min={1} max={31} value={configInput(scheduleConfig, "day", 31)} onChange={(event) => updateNumber("day", event)} />
+                        {fieldError("day") ? <span className="text-xs text-status-danger-foreground">{fieldError("day")}</span> : null}
                     </label>
                 </div>
             ) : null}
@@ -157,7 +171,8 @@ export function RoutineScheduleFields({
             {scheduleType === "ONE_TIME" ? (
                 <label className="grid gap-1 text-sm font-medium text-content-body">
                     วันที่ครบกำหนด
-                    <Input type="date" value={typeof scheduleConfig.date === "string" ? scheduleConfig.date : ""} onChange={(event) => updateDate("date", event)} />
+                    <Input data-routine-field="scheduleConfig.date" aria-invalid={Boolean(fieldError("date"))} type="date" value={typeof scheduleConfig.date === "string" ? scheduleConfig.date : ""} onChange={(event) => updateDate("date", event)} />
+                    {fieldError("date") ? <span className="text-xs text-status-danger-foreground">{fieldError("date")}</span> : null}
                 </label>
             ) : null}
 

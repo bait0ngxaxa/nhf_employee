@@ -9,10 +9,10 @@ interface RoutineKpiGridProps {
 }
 
 const KPI_ITEMS = [
-    { key: "today", label: "ถึงกำหนดวันนี้", icon: CalendarDays, tone: "text-sky-700" },
-    { key: "dueSoon", label: "ใกล้ถึงกำหนด 7 วัน", icon: CalendarClock, tone: "text-amber-700" },
-    { key: "overdue", label: "เกินกำหนด", icon: CircleAlert, tone: "text-rose-700" },
-    { key: "within30Days", label: "กำหนดภายใน 30 วัน", icon: CalendarRange, tone: "text-emerald-700" },
+    { key: "today", label: "งานถึงกำหนดวันนี้", icon: CalendarDays, tone: "text-sky-700" },
+    { key: "dueSoon", label: "งานใกล้ถึงกำหนด 7 วัน", icon: CalendarClock, tone: "text-amber-700" },
+    { key: "overdue", label: "งานเกินกำหนด", icon: CircleAlert, tone: "text-rose-700" },
+    { key: "within30Days", label: "งานภายใน 30 วัน", icon: CalendarRange, tone: "text-emerald-700" },
 ] as const;
 
 export function RoutineKpiGrid({

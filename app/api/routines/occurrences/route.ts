@@ -6,7 +6,10 @@ import {
     routineErrorResponse,
     routineFeatureGuard,
 } from "@/lib/server/routine-api";
-import { getRoutineOccurrences } from "@/lib/services/routine";
+import {
+    getRoutineOccurrences,
+    getRoutineTaskWorkItems,
+} from "@/lib/services/routine";
 import { routineOccurrenceFiltersSchema } from "@/lib/validations/routine";
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
@@ -46,10 +49,13 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
             request.headers,
         );
         const employeeId = "employeeId" in auth ? auth.employeeId : null;
-        const result = await getRoutineOccurrences(parsed.data, {
+        const queryActor = {
             actor,
             employeeId,
-        });
+        };
+        const result = params.get("view") === "tasks"
+            ? await getRoutineTaskWorkItems(parsed.data, queryActor)
+            : await getRoutineOccurrences(parsed.data, queryActor);
         return NextResponse.json(result);
     } catch (error) {
         return routineErrorResponse(error, "Error fetching routine occurrences");

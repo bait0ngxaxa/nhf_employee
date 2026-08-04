@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, BellPlus, Save, Trash2 } from "lucide-react";
+import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -9,7 +10,12 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { API_ROUTES } from "@/lib/ssot/routes";
 import { routineImportRowUpdateSchema } from "@/lib/validations/routine-import";
-import type { RoutineBusinessDayPolicy, RoutineScheduleType } from "@/lib/routine/schedule";
+import {
+    formatRoutineSendTime,
+    parseRoutineSendTime,
+    type RoutineBusinessDayPolicy,
+    type RoutineScheduleType,
+} from "@/lib/routine/schedule";
 import type { RoutineReminderRecipientScope } from "./types";
 
 import { RoutineScheduleFields } from "./RoutineScheduleFields";
@@ -30,7 +36,9 @@ interface RoutineImportRowEditorProps {
 }
 
 type AssigneeState = Record<number, "OWNER" | "CO_OWNER">;
-type ReminderRule = RoutineImportRowEdit["reminderRules"][number];
+type ReminderRule = Omit<RoutineImportRowEdit["reminderRules"][number], "sendHour"> & {
+    sendHour: string;
+};
 type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue };
 
 const REMINDER_SCOPE_LABELS: Record<RoutineReminderRecipientScope, string> = {
@@ -100,9 +108,11 @@ export function RoutineImportRowEditor({
     const [contractText, setContractText] = useState<string | null>(null);
     const [extraDetails, setExtraDetails] = useState<string | null>(null);
     const [selected, setSelected] = useState(false);
-    const [reminderRules, setReminderRules] = useState<RoutineImportRowEdit["reminderRules"]>([]);
+    const [reminderRules, setReminderRules] = useState<ReminderRule[]>([]);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+    const saveLockRef = useRef(false);
 
     useEffect(() => {
         if (!row) return;
@@ -125,8 +135,12 @@ export function RoutineImportRowEditor({
         setContractText(row.data.contractText);
         setExtraDetails(row.data.extraDetails);
         setSelected(row.selected);
-        setReminderRules(row.data.reminderRules ?? []);
+        setReminderRules((row.data.reminderRules ?? []).map((rule) => ({
+            ...rule,
+            sendHour: formatRoutineSendTime(rule.sendHour),
+        })));
         setError(null);
+        setFieldErrors({});
     }, [row]);
 
     const selectedEmployeeIds = useMemo(() => new Set(Object.keys(assignees).map(Number)), [assignees]);
@@ -153,7 +167,7 @@ export function RoutineImportRowEditor({
         if (!days) return;
         setReminderRules(days.map((daysBefore) => ({
             daysBefore,
-            sendHour: 9,
+            sendHour: "09:00",
             channel: "IN_APP" as const,
             recipientScope: "ASSIGNEES" as const,
             isActive: true,
@@ -165,7 +179,7 @@ export function RoutineImportRowEditor({
             ...current,
             {
                 daysBefore,
-                sendHour: 9,
+                sendHour: "09:00",
                 channel: "IN_APP" as const,
                 recipientScope: "ASSIGNEES" as const,
                 isActive: true,
@@ -184,8 +198,10 @@ export function RoutineImportRowEditor({
     }
 
     async function save(): Promise<void> {
-        if (!row) return;
+        if (!row || saveLockRef.current) return;
+        saveLockRef.current = true;
         setError(null);
+        setFieldErrors({});
         const payload: RoutineImportRowEdit = {
             version: row.version,
             categoryName,
@@ -203,11 +219,24 @@ export function RoutineImportRowEditor({
             contractText: contractText?.trim() || null,
             extraDetails: extraDetails?.trim() || null,
             selected,
-            reminderRules: reminderRules ?? [],
+            reminderRules: (reminderRules ?? []).map((rule) => ({
+                ...rule,
+                sendHour: parseRoutineSendTime(rule.sendHour) ?? -1,
+            })),
         };
         const parsed = routineImportRowUpdateSchema.safeParse(payload);
         if (!parsed.success) {
+            const nextErrors = parsed.error.issues.reduce<Record<string, string>>(
+                (errors, issue) => {
+                    const path = issue.path.join(".") || "form";
+                    if (!errors[path]) errors[path] = issue.message;
+                    return errors;
+                },
+                {},
+            );
+            setFieldErrors(nextErrors);
             setError("ข้อมูลแถวไม่ครบถ้วน กรุณาตรวจสอบช่องที่กรอก");
+            saveLockRef.current = false;
             return;
         }
         setSaving(true);
@@ -223,12 +252,16 @@ export function RoutineImportRowEditor({
             const body: unknown = await response.json().catch(() => null);
             if (!response.ok) throw new Error(responseError(body));
             if (!isRecord(body) || !isRecord(body.row)) throw new Error("ผลลัพธ์จากเซิร์ฟเวอร์ไม่ถูกต้อง");
+            toast.success("บันทึกแถวสำเร็จ");
             onSaved(body.row as unknown as RoutineImportRowView);
             onOpenChange(false);
         } catch (saveError) {
-            setError(saveError instanceof Error ? saveError.message : "บันทึกแถวไม่สำเร็จ");
+            const message = saveError instanceof Error ? saveError.message : "บันทึกแถวไม่สำเร็จ";
+            setError(message);
+            toast.error(message);
         } finally {
             setSaving(false);
+            saveLockRef.current = false;
         }
     }
 
@@ -300,11 +333,12 @@ export function RoutineImportRowEditor({
                             onScheduleTypeChange={setScheduleType}
                             onScheduleConfigChange={setScheduleConfig}
                             onBusinessDayPolicyChange={setBusinessDayPolicy}
+                            errors={fieldErrors}
                         />
                         <div className="grid gap-4 md:grid-cols-2">
                             <label className="grid gap-1 text-sm font-medium text-content-body md:col-span-2">กำหนดการจาก Excel / คำอธิบายเพิ่มเติม<Input value={scheduleText} onChange={(event) => setScheduleText(event.target.value)} /></label>
-                            <label className="grid gap-1 text-sm font-medium text-content-body">วันเริ่มสัญญา<Input type="date" value={contractStartDate ?? ""} onChange={(event) => setContractStartDate(event.target.value || null)} /></label>
-                            <label className="grid gap-1 text-sm font-medium text-content-body">วันสิ้นสุดสัญญา<Input type="date" value={contractEndDate ?? ""} onChange={(event) => setContractEndDate(event.target.value || null)} /></label>
+                            <label className="grid gap-1 text-sm font-medium text-content-body">วันเริ่มสัญญา<Input data-routine-field="contractStartDate" aria-invalid={Boolean(fieldErrors.contractStartDate)} type="date" value={contractStartDate ?? ""} onChange={(event) => setContractStartDate(event.target.value || null)} />{fieldErrors.contractStartDate ? <span className="text-xs text-status-danger-foreground">{fieldErrors.contractStartDate}</span> : null}</label>
+                            <label className="grid gap-1 text-sm font-medium text-content-body">วันสิ้นสุดสัญญา<Input data-routine-field="contractEndDate" aria-invalid={Boolean(fieldErrors.contractEndDate)} type="date" value={contractEndDate ?? ""} onChange={(event) => setContractEndDate(event.target.value || null)} />{fieldErrors.contractEndDate ? <span className="text-xs text-status-danger-foreground">{fieldErrors.contractEndDate}</span> : null}</label>
                             <label className="grid gap-1 text-sm font-medium text-content-body md:col-span-2">ข้อความสัญญา<Input value={contractText ?? ""} onChange={(event) => setContractText(event.target.value || null)} /></label>
                             <label className="grid gap-1 text-sm font-medium text-content-body md:col-span-2">รายละเอียดเพิ่มเติม<Textarea value={extraDetails ?? ""} onChange={(event) => setExtraDetails(event.target.value || null)} /></label>
                         </div>
@@ -330,7 +364,7 @@ export function RoutineImportRowEditor({
                             {reminderRules.map((rule, index) => (
                                 <div key={`${index}-${rule.daysBefore}`} className="grid gap-3 rounded-md border border-border-subtle bg-background p-3 md:grid-cols-[110px_110px_1fr_auto_auto] md:items-end">
                                     <label className="grid gap-1 text-xs font-medium text-content-body">ล่วงหน้า (วัน)<Input type="number" min={0} max={365} value={rule.daysBefore} onChange={(event) => updateReminderRule(index, { daysBefore: Number(event.target.value) })} /></label>
-                                    <label className="grid gap-1 text-xs font-medium text-content-body">เวลา (น.)<Input type="number" min={0} max={23} value={rule.sendHour} onChange={(event) => updateReminderRule(index, { sendHour: Number(event.target.value) })} /></label>
+                                    <label className="grid gap-1 text-xs font-medium text-content-body">เวลาแจ้งเตือน (Asia/Bangkok)<Input data-routine-field={`reminderRules.${index}.sendHour`} aria-invalid={Boolean(fieldErrors[`reminderRules.${index}.sendHour`])} type="time" step={3600} min="00:00" max="23:00" value={rule.sendHour} onChange={(event) => updateReminderRule(index, { sendHour: event.target.value })} />{fieldErrors[`reminderRules.${index}.sendHour`] ? <span className="text-xs text-status-danger-foreground">{fieldErrors[`reminderRules.${index}.sendHour`]}</span> : null}</label>
                                     <label className="grid gap-1 text-xs font-medium text-content-body">ผู้รับการแจ้งเตือน<select className="h-11 rounded-md border border-input bg-background px-3 text-sm" value={rule.recipientScope} onChange={(event) => updateReminderRule(index, { recipientScope: event.target.value as RoutineReminderRecipientScope })}>{Object.entries(REMINDER_SCOPE_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
                                     <label className="flex min-h-11 items-center gap-2 text-xs font-medium text-content-body"><input type="checkbox" checked={rule.isActive} onChange={(event) => updateReminderRule(index, { isActive: event.target.checked })} /> เปิดใช้</label>
                                     <Button type="button" variant="ghost" size="icon-sm" onClick={() => removeReminderRule(index)} disabled={disabled} aria-label={`ลบกฎการแจ้งเตือนที่ ${index + 1}`}><Trash2 /></Button>

@@ -101,4 +101,75 @@ describe("NHF Routine validation", () => {
             }).success,
         ).toBe(false);
     });
+
+    it.each([
+        ["2026-02-29", false],
+        ["2024-02-29", true],
+        ["2026-02-31", false],
+    ])("validates calendar date %s", (date, expected) => {
+        const result = routineTaskCreateSchema.safeParse({
+            unitId: 1,
+            categoryId: 1,
+            title: "งานประจำ",
+            scheduleType: "ONE_TIME",
+            scheduleConfig: { date },
+            assignees: [{ employeeId: 11, role: "OWNER" }],
+        });
+        expect(result.success).toBe(expected);
+    });
+
+    it("rejects an invalid yearly month/day combination and a missing one-time date", () => {
+        const yearly = routineTaskCreateSchema.safeParse({
+            unitId: 1,
+            categoryId: 1,
+            title: "งานประจำ",
+            scheduleType: "YEARLY_DATE",
+            scheduleConfig: { month: 2, day: 30 },
+            assignees: [{ employeeId: 11, role: "OWNER" }],
+        });
+        const oneTime = routineTaskCreateSchema.safeParse({
+            unitId: 1,
+            categoryId: 1,
+            title: "งานครั้งเดียว",
+            scheduleType: "ONE_TIME",
+            scheduleConfig: {},
+            assignees: [{ employeeId: 11, role: "OWNER" }],
+        });
+
+        expect(yearly.success).toBe(false);
+        expect(oneTime.success).toBe(false);
+    });
+
+    it("does not turn a cleared required schedule number into zero", () => {
+        const result = routineTaskCreateSchema.safeParse({
+            unitId: 1,
+            categoryId: 1,
+            title: "งานประจำ",
+            scheduleType: "MONTHLY_DAY",
+            scheduleConfig: { day: "", monthOffset: 0 },
+            assignees: [{ employeeId: 11, role: "OWNER" }],
+        });
+
+        expect(result.success).toBe(false);
+    });
+
+    it("rejects cleared reminder day and time values instead of coercing them to zero", () => {
+        const result = routineTaskCreateSchema.safeParse({
+            unitId: 1,
+            categoryId: 1,
+            title: "งานประจำ",
+            scheduleType: "MONTHLY_DAY",
+            scheduleConfig: { day: 10, monthOffset: 0 },
+            assignees: [{ employeeId: 11, role: "OWNER" }],
+            reminderRules: [{
+                daysBefore: "",
+                sendHour: "",
+                channel: "IN_APP",
+                recipientScope: "ASSIGNEES",
+                isActive: true,
+            }],
+        });
+
+        expect(result.success).toBe(false);
+    });
 });

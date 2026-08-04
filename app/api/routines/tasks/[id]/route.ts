@@ -10,6 +10,7 @@ import {
     routineRequestSizeGuard,
 } from "@/lib/server/routine-api";
 import {
+    deleteRoutineTask,
     getRoutineTaskById,
     updateRoutineTask,
 } from "@/lib/services/routine";
@@ -79,5 +80,40 @@ export async function PATCH(
         return NextResponse.json({ task });
     } catch (error) {
         return routineErrorResponse(error, "Error updating routine task");
+    }
+}
+
+export async function DELETE(
+    request: NextRequest,
+    { params }: { params: Promise<{ id: string }> },
+): Promise<NextResponse> {
+    const featureResponse = routineFeatureGuard();
+    if (featureResponse) return featureResponse;
+
+    try {
+        const auth = await requireAdminSession();
+        if (!auth.ok) return auth.response;
+        const rateLimitResponse = enforceAuthenticatedMutationRateLimit(
+            "routine-task-delete",
+            auth.user.id,
+        );
+        if (rateLimitResponse) return rateLimitResponse;
+        const { id: rawId } = await params;
+        const parsedId = routineIdParamSchema.safeParse(rawId);
+        if (!parsedId.success) {
+            return NextResponse.json({ error: "รหัสไม่ถูกต้อง" }, { status: 400 });
+        }
+        const actor = createRoutineCommandActor(
+            {
+                id: auth.user.id,
+                role: auth.user.role ?? "USER",
+                email: auth.user.email ?? "",
+            },
+            request.headers,
+        );
+        await deleteRoutineTask(Number(parsedId.data), actor);
+        return NextResponse.json({ success: true });
+    } catch (error) {
+        return routineErrorResponse(error, "Error deleting routine task");
     }
 }

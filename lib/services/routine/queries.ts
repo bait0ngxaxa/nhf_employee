@@ -235,19 +235,11 @@ function buildOccurrenceWhere(
     employeeId: number | null,
     isAdmin: boolean,
 ): Prisma.RoutineOccurrenceWhereInput {
-    const shouldScopeToMine = !isAdmin || filters.scope === "mine";
-    const assigneeId = shouldScopeToMine
-        ? employeeId
-        : filters.assigneeId ?? null;
+    const occurrenceWhere = buildWorkOccurrenceWhere(filters, employeeId, isAdmin);
     const search = filters.search?.trim();
-    const dueDate = buildOccurrenceDueDateFilter(
-        filters,
-        getCurrentBangkokDate(),
-    );
 
     return {
-        ...(filters.occurrenceId ? { id: filters.occurrenceId } : {}),
-        ...(dueDate ? { dueDate } : {}),
+        ...occurrenceWhere,
         task: {
             isActive: true,
             ...(filters.unitId ? { unitId: filters.unitId } : {}),
@@ -263,6 +255,26 @@ function buildOccurrenceWhere(
                   }
                 : {}),
         },
+    };
+}
+
+function buildWorkOccurrenceWhere(
+    filters: RoutineOccurrenceFilters,
+    employeeId: number | null,
+    isAdmin: boolean,
+): Prisma.RoutineOccurrenceWhereInput {
+    const shouldScopeToMine = !isAdmin || filters.scope === "mine";
+    const assigneeId = shouldScopeToMine
+        ? employeeId
+        : filters.assigneeId ?? null;
+    const dueDate = buildOccurrenceDueDateFilter(
+        filters,
+        getCurrentBangkokDate(),
+    );
+
+    return {
+        ...(filters.occurrenceId ? { id: filters.occurrenceId } : {}),
+        ...(dueDate ? { dueDate } : {}),
         ...(shouldScopeToMine || filters.assigneeId !== undefined
             ? scopedAssigneeWhere(assigneeId)
             : {}),
@@ -292,6 +304,67 @@ export async function getRoutineOccurrences(
 
     return {
         occurrences: rows.map(serializeOccurrence),
+        pagination: {
+            page: filters.page,
+            limit: filters.limit,
+            total,
+            pages: Math.ceil(total / filters.limit),
+        },
+    };
+}
+
+export async function getRoutineTaskWorkItems(
+    filters: RoutineOccurrenceFilters,
+    queryActor: RoutineQueryActor,
+): Promise<{
+    occurrences: SerializedRoutineOccurrence[];
+    pagination: RoutinePagination;
+}> {
+    const isAdmin = queryActor.actor.role === "ADMIN";
+    const employeeId = await resolveActorEmployeeId(queryActor);
+    const occurrenceWhere = buildWorkOccurrenceWhere(filters, employeeId, isAdmin);
+    const search = filters.search?.trim();
+    const taskWhere: Prisma.RoutineTaskWhereInput = {
+        isActive: true,
+        ...(filters.unitId ? { unitId: filters.unitId } : {}),
+        ...(filters.categoryId ? { categoryId: filters.categoryId } : {}),
+        ...(search
+            ? {
+                  OR: [
+                      { title: { contains: search } },
+                      { description: { contains: search } },
+                      { unit: { name: { contains: search } } },
+                      { category: { name: { contains: search } } },
+                  ],
+              }
+            : {}),
+        occurrences: { some: occurrenceWhere },
+    };
+    const [tasks, total] = await Promise.all([
+        prisma.routineTask.findMany({
+            where: taskWhere,
+            select: {
+                ...ROUTINE_TASK_SELECT,
+                occurrences: {
+                    where: occurrenceWhere,
+                    select: ROUTINE_OCCURRENCE_SELECT,
+                    orderBy: [{ dueDate: "asc" }, { id: "asc" }],
+                    take: 1,
+                },
+            },
+            orderBy: [{ title: "asc" }, { id: "asc" }],
+            skip: (filters.page - 1) * filters.limit,
+            take: filters.limit,
+        }),
+        prisma.routineTask.count({ where: taskWhere }),
+    ]);
+
+    return {
+        occurrences: tasks.flatMap((task) =>
+            task.occurrences.length > 0
+                ? [serializeOccurrence(task.occurrences[0])]
+                : [],
+        ),
         pagination: {
             page: filters.page,
             limit: filters.limit,
@@ -360,45 +433,31 @@ export async function getRoutineSummary(queryActor: RoutineQueryActor): Promise<
 }> {
     const isAdmin = queryActor.actor.role === "ADMIN";
     const employeeId = await resolveActorEmployeeId(queryActor);
-    const scope: Prisma.RoutineOccurrenceWhereInput = {
-        task: { isActive: true },
-        ...(isAdmin ? {} : scopedAssigneeWhere(employeeId)),
-    };
+    const assigneeScope = isAdmin ? {} : scopedAssigneeWhere(employeeId);
     const today = getCurrentBangkokDate();
     const nextSevenDays = addCalendarDays(today, 7);
     const nextThirtyDays = addCalendarDays(today, 30);
 
+    const countTasksByDueDate = (dueDate: Prisma.DateTimeFilter) =>
+        prisma.routineTask.count({
+            where: {
+                isActive: true,
+                occurrences: {
+                    some: { dueDate, ...assigneeScope },
+                },
+            },
+        });
     const [todayCount, dueSoonCount, overdueCount, within30Days] =
         await Promise.all([
-            prisma.routineOccurrence.count({
-                where: {
-                    ...scope,
-                    dueDate: calendarDateToDate(today),
-                },
+            countTasksByDueDate({ equals: calendarDateToDate(today) }),
+            countTasksByDueDate({
+                gt: calendarDateToDate(today),
+                lte: calendarDateToDate(nextSevenDays),
             }),
-            prisma.routineOccurrence.count({
-                where: {
-                    ...scope,
-                    dueDate: {
-                        gt: calendarDateToDate(today),
-                        lte: calendarDateToDate(nextSevenDays),
-                    },
-                },
-            }),
-            prisma.routineOccurrence.count({
-                where: {
-                    ...scope,
-                    dueDate: { lt: calendarDateToDate(today) },
-                },
-            }),
-            prisma.routineOccurrence.count({
-                where: {
-                    ...scope,
-                    dueDate: {
-                        gte: calendarDateToDate(today),
-                        lte: calendarDateToDate(nextThirtyDays),
-                    },
-                },
+            countTasksByDueDate({ lt: calendarDateToDate(today) }),
+            countTasksByDueDate({
+                gte: calendarDateToDate(today),
+                lte: calendarDateToDate(nextThirtyDays),
             }),
         ]);
 

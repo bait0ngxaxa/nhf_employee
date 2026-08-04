@@ -4,28 +4,24 @@ import {
     calculateRoutineOccurrences,
     calendarDateToBangkokStart,
     calendarDayDifference,
+    formatRoutineSendTime,
     getCurrentBangkokDate,
     isRoutineReminderDue,
+    parseRoutineSendTime,
     type RoutineDateWindow,
 } from "@/lib/routine/schedule";
 
 const window = (from: string, to: string): RoutineDateWindow => ({ from, to });
 
 describe("NHF Routine schedule engine", () => {
-    it("clamps monthly day 31 to the last day without overflowing", () => {
+    it("does not normalize monthly day 31 into a shorter month", () => {
         const result = calculateRoutineOccurrences(
             { scheduleType: "MONTHLY_DAY", config: { day: 31, monthOffset: 0 } },
             window("2026-02-01", "2026-02-28"),
             "NONE",
         );
 
-        expect(result).toEqual([
-            {
-                periodKey: "2026-02",
-                originalDueDate: "2026-02-28",
-                dueDate: "2026-02-28",
-            },
-        ]);
+        expect(result).toEqual([]);
     });
 
     it("uses the actual month end for February in leap and non-leap years", () => {
@@ -56,7 +52,6 @@ describe("NHF Routine schedule engine", () => {
 
         expect(result.map((item) => item.dueDate)).toEqual([
             "2026-01-31",
-            "2026-04-30",
             "2026-07-31",
             "2026-10-31",
         ]);
@@ -142,5 +137,17 @@ describe("NHF Routine schedule engine", () => {
                 new Date("2026-08-03T02:00:00.000Z"),
             ),
         ).toBe(true);
+    });
+
+    it("accepts only full-hour reminder input in HH:mm form", () => {
+        expect(formatRoutineSendTime(0)).toBe("00:00");
+        expect(formatRoutineSendTime(9)).toBe("09:00");
+        expect(formatRoutineSendTime(23)).toBe("23:00");
+        expect(parseRoutineSendTime("00:00")).toBe(0);
+        expect(parseRoutineSendTime("09:00")).toBe(9);
+        expect(parseRoutineSendTime("23:00")).toBe(23);
+        expect(parseRoutineSendTime("09:30")).toBeNull();
+        expect(parseRoutineSendTime("24:00")).toBeNull();
+        expect(parseRoutineSendTime("9")).toBeNull();
     });
 });

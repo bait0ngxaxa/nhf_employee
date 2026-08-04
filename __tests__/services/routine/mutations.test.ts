@@ -55,6 +55,7 @@ function occurrence(overrides: Record<string, unknown> = {}): Record<string, unk
             description: null,
             scheduleType: "MONTHLY_DAY",
             scheduleText: null,
+            isActive: true,
             unit: { id: 1, code: "มสช.", name: "มสช." },
             category: { id: 1, name: "ระบบคอมพิวเตอร์" },
         },

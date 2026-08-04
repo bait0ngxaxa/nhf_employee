@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
     requireSession: vi.fn(),
     getOccurrences: vi.fn(),
+    getTaskWorkItems: vi.fn(),
 }));
 
 vi.mock("@/lib/auth/workforce", () => ({
@@ -12,6 +13,7 @@ vi.mock("@/lib/auth/workforce", () => ({
 
 vi.mock("@/lib/services/routine", () => ({
     getRoutineOccurrences: mocks.getOccurrences,
+    getRoutineTaskWorkItems: mocks.getTaskWorkItems,
 }));
 
 import { GET } from "@/app/api/routines/occurrences/route";
@@ -30,6 +32,10 @@ describe("GET /api/routines/occurrences", () => {
             employeeId: 21,
         });
         mocks.getOccurrences.mockResolvedValue({
+            occurrences: [],
+            pagination: { page: 1, limit: 20, total: 0, pages: 0 },
+        });
+        mocks.getTaskWorkItems.mockResolvedValue({
             occurrences: [],
             pagination: { page: 1, limit: 20, total: 0, pages: 0 },
         });
@@ -71,6 +77,19 @@ describe("GET /api/routines/occurrences", () => {
         ));
 
         expect(response.status).toBe(401);
+        expect(mocks.getOccurrences).not.toHaveBeenCalled();
+    });
+
+    it("supports the task-centric operational view with one row per task", async () => {
+        const response = await GET(new NextRequest(
+            "http://localhost/api/routines/occurrences?view=tasks&scope=all",
+        ));
+
+        expect(response.status).toBe(200);
+        expect(mocks.getTaskWorkItems).toHaveBeenCalledWith(
+            expect.objectContaining({ scope: "all" }),
+            expect.objectContaining({ employeeId: 21 }),
+        );
         expect(mocks.getOccurrences).not.toHaveBeenCalled();
     });
 });
