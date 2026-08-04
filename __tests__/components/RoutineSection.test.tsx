@@ -1,5 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { ReactNode } from "react";
 
 import { RoutineSection } from "@/components/dashboard/sections/RoutineSection";
 
@@ -28,7 +29,12 @@ vi.mock("@/components/ui/section-tabs", async () => {
         SectionTabs: ({
             tabs,
         }: {
-            tabs: Array<{ value: string; label: string; visible?: boolean }>;
+            tabs: Array<{
+                value: string;
+                label: string;
+                visible?: boolean;
+                content?: ReactNode;
+            }>;
         }) => (
             <div>
                 {tabs
@@ -36,6 +42,7 @@ vi.mock("@/components/ui/section-tabs", async () => {
                     .map((tab) => (
                         <span key={tab.value}>{tab.label}</span>
                     ))}
+                {tabs.find((tab) => tab.value === "settings")?.content}
             </div>
         ),
     };
@@ -87,5 +94,18 @@ describe("RoutineSection tabs", () => {
         expect(screen.getByText("รายการทั้งหมด (Admin)")).toBeInTheDocument();
         expect(screen.getByText("ตั้งค่างานประจำ")).toBeInTheDocument();
         expect(screen.getByText("นำเข้าจาก Excel")).toBeInTheDocument();
+    });
+
+    it("requests all tasks for the admin settings list", () => {
+        mocks.useDashboardDataContext.mockReturnValue({
+            user: { role: "ADMIN" },
+        });
+
+        render(<RoutineSection />);
+
+        expect(mocks.useSWR).toHaveBeenCalledWith(
+            "/api/routines/tasks?activeOnly=0&page=1&limit=20",
+            expect.any(Function),
+        );
     });
 });

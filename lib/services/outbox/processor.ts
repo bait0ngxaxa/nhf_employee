@@ -46,7 +46,7 @@ type OutboxProcessResult = {
     failed: number;
 };
 
-type DispatchOutcome = "SENT" | "SUPERSEDED";
+type DispatchOutcome = "SENT" | "SUPERSEDED" | "DEFERRED";
 
 type StockRequestLinePayload = StockRequestLineData;
 type StockLowLinePayload = StockLowLineData;
@@ -453,6 +453,11 @@ export async function processOutbox(batchSize = 10): Promise<OutboxProcessResult
 
         try {
             const outcome = await dispatchNotification(notification);
+
+            if (outcome === "DEFERRED") {
+                processedCount++;
+                continue;
+            }
 
             await prisma.notificationOutbox.updateMany({
                 where: { id: notification.id, status: OUTBOX_STATUS_PROCESSING },

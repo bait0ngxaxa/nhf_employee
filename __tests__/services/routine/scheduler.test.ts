@@ -88,7 +88,9 @@ describe("Routine scheduler", () => {
             data: expect.objectContaining({
                 type: "ROUTINE_REMINDER_IN_APP",
                 eventKey: "routine:91:rule:31:version:2",
-                payload: expect.not.stringContaining('"expected' + "Status" + '"'),
+                payload: expect.stringContaining(
+                    '"scheduledFor":"2026-08-03T02:00:00.000Z"',
+                ),
             }),
         });
     });

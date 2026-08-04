@@ -247,7 +247,7 @@ export const routineTaskFiltersSchema = z.object({
     activeOnly: z
         .enum(["0", "1"])
         .optional()
-        .transform((value) => value === "1"),
+        .transform((value) => value === "1" ? true : undefined),
     unitId: z.coerce.number().int().positive().optional(),
     categoryId: z.coerce.number().int().positive().optional(),
     search: z.preprocess(
@@ -280,6 +280,7 @@ export const routineReminderOutboxPayloadSchema = z.object({
     ruleId: z.number().int().positive(),
     reminderVersion: z.number().int().positive(),
     dueDate: dateSchema,
+    scheduledFor: z.iso.datetime().optional(),
     createdAt: z.string().min(1),
 });
 

@@ -248,26 +248,21 @@ function buildOccurrenceWhere(
     return {
         ...(filters.occurrenceId ? { id: filters.occurrenceId } : {}),
         ...(dueDate ? { dueDate } : {}),
-        ...(filters.unitId || filters.categoryId || search
-            ? {
-                  task: {
-                      ...(filters.unitId ? { unitId: filters.unitId } : {}),
-                      ...(filters.categoryId
-                          ? { categoryId: filters.categoryId }
-                          : {}),
-                      ...(search
-                          ? {
-                                OR: [
-                                    { title: { contains: search } },
-                                    { description: { contains: search } },
-                                    { unit: { name: { contains: search } } },
-                                    { category: { name: { contains: search } } },
-                                ],
-                            }
-                          : {}),
-                  },
-              }
-            : {}),
+        task: {
+            isActive: true,
+            ...(filters.unitId ? { unitId: filters.unitId } : {}),
+            ...(filters.categoryId ? { categoryId: filters.categoryId } : {}),
+            ...(search
+                ? {
+                      OR: [
+                          { title: { contains: search } },
+                          { description: { contains: search } },
+                          { unit: { name: { contains: search } } },
+                          { category: { name: { contains: search } } },
+                      ],
+                  }
+                : {}),
+        },
         ...(shouldScopeToMine || filters.assigneeId !== undefined
             ? scopedAssigneeWhere(assigneeId)
             : {}),
@@ -324,6 +319,7 @@ export async function getRoutineOccurrenceById(
     const employeeId = await resolveActorEmployeeId(queryActor);
     const where: Prisma.RoutineOccurrenceWhereInput = {
         id: occurrenceId,
+        task: { isActive: true },
         ...(!isAdmin ? scopedAssigneeWhere(employeeId) : {}),
     };
     const row = await prisma.routineOccurrence.findFirst({
@@ -364,7 +360,10 @@ export async function getRoutineSummary(queryActor: RoutineQueryActor): Promise<
 }> {
     const isAdmin = queryActor.actor.role === "ADMIN";
     const employeeId = await resolveActorEmployeeId(queryActor);
-    const scope = isAdmin ? {} : scopedAssigneeWhere(employeeId);
+    const scope: Prisma.RoutineOccurrenceWhereInput = {
+        task: { isActive: true },
+        ...(isAdmin ? {} : scopedAssigneeWhere(employeeId)),
+    };
     const today = getCurrentBangkokDate();
     const nextSevenDays = addCalendarDays(today, 7);
     const nextThirtyDays = addCalendarDays(today, 30);

@@ -82,6 +82,7 @@ describe("NHF Routine validation", () => {
             ruleId: 3,
             reminderVersion: 1,
             dueDate: "2026-08-05",
+            scheduledFor: "2026-08-03T02:00:00.000Z",
             createdAt: "2026-08-01T02:00:00.000Z",
         });
         expect(validPayload.success).toBe(true);

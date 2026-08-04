@@ -190,10 +190,45 @@ export function isRoutineReminderDue(
     sendHour: number,
     now = new Date(),
 ): boolean {
+    return isRoutineReminderSendable(dueDate, daysBefore, sendHour, now);
+}
+
+export function getRoutineReminderScheduledFor(
+    dueDate: CalendarDate,
+    daysBefore: number,
+    sendHour: number,
+): Date {
     const reminderDate = addCalendarDays(dueDate, -daysBefore);
+    return new Date(
+        calendarDateToBangkokStart(reminderDate).getTime()
+        + sendHour * 60 * 60 * 1000,
+    );
+}
+
+export function getRoutineDueDateEnd(dueDate: CalendarDate): Date {
+    return calendarDateToBangkokStart(addCalendarDays(dueDate, 1));
+}
+
+export function isRoutineReminderExpired(
+    dueDate: CalendarDate,
+    now = new Date(),
+): boolean {
+    return now.getTime() >= getRoutineDueDateEnd(dueDate).getTime();
+}
+
+export function isRoutineReminderSendable(
+    dueDate: CalendarDate,
+    daysBefore: number,
+    sendHour: number,
+    now = new Date(),
+): boolean {
     return (
-        compareCalendarDates(getCurrentBangkokDate(now), reminderDate) === 0
-        && getCurrentBangkokHour(now) >= sendHour
+        now.getTime() >= getRoutineReminderScheduledFor(
+            dueDate,
+            daysBefore,
+            sendHour,
+        ).getTime()
+        && !isRoutineReminderExpired(dueDate, now)
     );
 }
 

@@ -3,6 +3,7 @@ import { hasPrismaErrorCode } from "@/lib/db/transaction";
 import {
     calendarDateToDate,
     getCurrentBangkokDate,
+    getRoutineReminderScheduledFor,
     isRoutineReminderDue,
     toBangkokCalendarDate,
 } from "@/lib/routine/schedule";
@@ -109,6 +110,8 @@ function resolveRecipientUserIds(
 function buildRoutineReminderPayload(
     occurrence: RoutineSchedulerOccurrence,
     ruleId: number,
+    daysBefore: number,
+    sendHour: number,
     dueDate: string,
     now: Date,
 ): string {
@@ -118,6 +121,11 @@ function buildRoutineReminderPayload(
         ruleId,
         reminderVersion: occurrence.reminderVersion,
         dueDate,
+        scheduledFor: getRoutineReminderScheduledFor(
+            dueDate,
+            daysBefore,
+            sendHour,
+        ).toISOString(),
         createdAt: now.toISOString(),
     });
 }
@@ -141,6 +149,8 @@ async function enqueueRoutineReminder(
                 payload: buildRoutineReminderPayload(
                     occurrence,
                     rule.id,
+                    rule.daysBefore,
+                    rule.sendHour,
                     dueDate,
                     now,
                 ),

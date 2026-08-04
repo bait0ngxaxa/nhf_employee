@@ -8,6 +8,8 @@ import {
 } from "@/lib/services/notifications/in-app";
 import { APP_DASHBOARD_TABS, APP_ROUTES } from "@/lib/ssot/routes";
 import {
+    getRoutineReminderScheduledFor,
+    isRoutineReminderExpired,
     isRoutineReminderDue,
     toBangkokCalendarDate,
 } from "@/lib/routine/schedule";
@@ -18,7 +20,11 @@ import {
 
 export const ROUTINE_REMINDER_OUTBOX_TYPE = "ROUTINE_REMINDER_IN_APP" as const;
 
-export type RoutineReminderDispatchResult = "SENT" | "SUPERSEDED" | null;
+export type RoutineReminderDispatchResult =
+    | "SENT"
+    | "SUPERSEDED"
+    | "DEFERRED"
+    | null;
 
 type OutboxMutationClient = Pick<Prisma.TransactionClient, "notificationOutbox">;
 
@@ -129,6 +135,21 @@ async function markRoutineReminderSuperseded(
     });
 }
 
+async function deferRoutineReminder(
+    client: OutboxMutationClient,
+    notificationId: number,
+    nextAttemptAt: Date,
+): Promise<void> {
+    await client.notificationOutbox.updateMany({
+        where: { id: notificationId, status: "PROCESSING" },
+        data: {
+            status: "PENDING",
+            nextAttemptAt,
+            lastError: null,
+        },
+    });
+}
+
 function parseRoutineReminderPayload(
     value: unknown,
 ): RoutineReminderOutboxPayload | null {
@@ -232,12 +253,6 @@ export async function dispatchRoutineReminderOutbox(
             || rule.channel !== "IN_APP"
             || occurrence.reminderVersion !== payload.reminderVersion
             || currentDueDate !== payload.dueDate
-            || !isRoutineReminderDue(
-                payload.dueDate,
-                rule.daysBefore,
-                rule.sendHour,
-                now,
-            )
         ) {
             await markRoutineReminderSuperseded(
                 tx,
@@ -245,6 +260,45 @@ export async function dispatchRoutineReminderOutbox(
                 "Superseded stale Routine reminder",
             );
             return "SUPERSEDED";
+        }
+
+        const expectedScheduledFor = getRoutineReminderScheduledFor(
+            payload.dueDate,
+            rule.daysBefore,
+            rule.sendHour,
+        );
+        const payloadScheduledFor = payload.scheduledFor
+            ? new Date(payload.scheduledFor)
+            : expectedScheduledFor;
+        const hasValidScheduledFor = !Number.isNaN(payloadScheduledFor.getTime());
+        if (
+            !hasValidScheduledFor
+            || payloadScheduledFor.getTime() !== expectedScheduledFor.getTime()
+        ) {
+            await markRoutineReminderSuperseded(
+                tx,
+                notification.id,
+                "Superseded mismatched Routine reminder schedule",
+            );
+            return "SUPERSEDED";
+        }
+
+        if (!isRoutineReminderDue(payload.dueDate, rule.daysBefore, rule.sendHour, now)) {
+            if (isRoutineReminderExpired(payload.dueDate, now)) {
+                await markRoutineReminderSuperseded(
+                    tx,
+                    notification.id,
+                    "Superseded expired Routine reminder",
+                );
+                return "SUPERSEDED";
+            }
+
+            await deferRoutineReminder(
+                tx,
+                notification.id,
+                expectedScheduledFor,
+            );
+            return "DEFERRED";
         }
 
         const recipientUserIds = await resolveRoutineRecipientUserIds(

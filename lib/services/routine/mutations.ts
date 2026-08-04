@@ -499,7 +499,9 @@ export async function updateRoutineTask(
                 isActiveChanged,
             },
         );
-        await generateRoutineTaskOccurrencesInTransaction(tx, taskId);
+        await generateRoutineTaskOccurrencesInTransaction(tx, taskId, undefined, {
+            previousAssignees: assigneesChanged ? current.assignees : undefined,
+        });
 
         return tx.routineTask.findUniqueOrThrow({
             where: { id: taskId },

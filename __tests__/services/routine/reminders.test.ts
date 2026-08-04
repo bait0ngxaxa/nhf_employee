@@ -129,8 +129,80 @@ describe("Routine reminder dispatch", () => {
         expect(prismaMock.notificationOutbox.updateMany).not.toHaveBeenCalled();
     });
 
+    it("retries a queued reminder later on the same Bangkok calendar day", async () => {
+        prismaMock.routineOccurrence.findUnique.mockResolvedValue(
+            asNever(buildOccurrence()),
+        );
+
+        const result = await dispatchRoutineReminderOutbox(
+            buildNotification(buildPayload()),
+            buildPayload(),
+            new Date("2026-08-03T10:00:00.000Z"),
+        );
+
+        expect(result).toBe("SENT");
+        expect(createInAppNotificationOnceMock).toHaveBeenCalledTimes(1);
+    });
+
+    it("retries a missed reminder on the next day while the due date is still ahead", async () => {
+        prismaMock.routineOccurrence.findUnique.mockResolvedValue(
+            asNever(buildOccurrence({
+                dueDate: new Date("2026-08-10T00:00:00.000Z"),
+                task: {
+                    ...buildOccurrence().task,
+                    reminderRules: [{
+                        ...buildOccurrence().task.reminderRules[0],
+                        daysBefore: 7,
+                    }],
+                },
+            })),
+        );
+
+        const payload = buildPayload({ dueDate: "2026-08-10" });
+        const result = await dispatchRoutineReminderOutbox(
+            buildNotification(payload),
+            payload,
+            new Date("2026-08-04T02:00:00.000Z"),
+        );
+
+        expect(result).toBe("SENT");
+        expect(createInAppNotificationOnceMock).toHaveBeenCalledTimes(1);
+    });
+
+    it("defers a reminder processed before its scheduled time", async () => {
+        prismaMock.routineOccurrence.findUnique.mockResolvedValue(
+            asNever(buildOccurrence()),
+        );
+
+        const result = await dispatchRoutineReminderOutbox(
+            buildNotification(buildPayload()),
+            buildPayload(),
+            new Date("2026-08-03T01:59:59.000Z"),
+        );
+
+        expect(result).toBe("DEFERRED");
+        expect(createInAppNotificationOnceMock).not.toHaveBeenCalled();
+        expect(prismaMock.notificationOutbox.updateMany).toHaveBeenCalledWith({
+            where: { id: 501, status: "PROCESSING" },
+            data: {
+                status: "PENDING",
+                nextAttemptAt: new Date("2026-08-03T02:00:00.000Z"),
+                lastError: null,
+            },
+        });
+    });
+
     it.each([
         ["inactive task", { task: { ...buildOccurrence().task, isActive: false } }],
+        ["inactive rule", {
+            task: {
+                ...buildOccurrence().task,
+                reminderRules: [{
+                    ...buildOccurrence().task.reminderRules[0],
+                    isActive: false,
+                }],
+            },
+        }],
         ["version changed", { reminderVersion: 3 }],
         ["due date changed", { dueDate: new Date("2026-08-06T00:00:00.000Z") }],
     ])("supersedes a stale reminder when %s", async (_label, overrides) => {
@@ -173,6 +245,84 @@ describe("Routine reminder dispatch", () => {
         expect(prismaMock.notificationOutbox.updateMany).toHaveBeenCalledWith(
             expect.objectContaining({
                 data: expect.objectContaining({ status: "SUPERSEDED" }),
+            }),
+        );
+    });
+
+    it("supersedes a reminder after the Bangkok due date ends", async () => {
+        prismaMock.routineOccurrence.findUnique.mockResolvedValue(
+            asNever(buildOccurrence()),
+        );
+
+        const result = await dispatchRoutineReminderOutbox(
+            buildNotification(buildPayload()),
+            buildPayload(),
+            new Date("2026-08-05T17:00:00.000Z"),
+        );
+
+        expect(result).toBe("SUPERSEDED");
+        expect(createInAppNotificationOnceMock).not.toHaveBeenCalled();
+        expect(prismaMock.notificationOutbox.updateMany).toHaveBeenCalledWith({
+            where: { id: 501, status: "PROCESSING" },
+            data: {
+                status: "SUPERSEDED",
+                lastError: "Superseded expired Routine reminder",
+            },
+        });
+    });
+
+    it("supersedes a same-day reminder when it is retried after the due date", async () => {
+        prismaMock.routineOccurrence.findUnique.mockResolvedValue(
+            asNever(buildOccurrence({
+                dueDate: new Date("2026-08-05T00:00:00.000Z"),
+                task: {
+                    ...buildOccurrence().task,
+                    reminderRules: [{
+                        ...buildOccurrence().task.reminderRules[0],
+                        daysBefore: 0,
+                    }],
+                },
+            })),
+        );
+
+        const payload = buildPayload({ dueDate: "2026-08-05" });
+        const result = await dispatchRoutineReminderOutbox(
+            buildNotification(payload),
+            payload,
+            new Date("2026-08-06T02:00:00.000Z"),
+        );
+
+        expect(result).toBe("SUPERSEDED");
+        expect(createInAppNotificationOnceMock).not.toHaveBeenCalled();
+    });
+
+    it("keeps the same recipient dedupe key across duplicate dispatch attempts", async () => {
+        prismaMock.routineOccurrence.findUnique.mockResolvedValue(
+            asNever(buildOccurrence()),
+        );
+
+        const notification = buildNotification(buildPayload());
+        const payload = buildPayload();
+        await dispatchRoutineReminderOutbox(
+            notification,
+            payload,
+            new Date("2026-08-03T02:00:00.000Z"),
+        );
+        await dispatchRoutineReminderOutbox(
+            notification,
+            payload,
+            new Date("2026-08-03T03:00:00.000Z"),
+        );
+
+        expect(createInAppNotificationOnceMock).toHaveBeenCalledTimes(2);
+        expect(createInAppNotificationOnceMock.mock.calls[0]?.[0]).toEqual(
+            expect.objectContaining({
+                dedupeKey: "routine:91:rule:31:user:17:version:2",
+            }),
+        );
+        expect(createInAppNotificationOnceMock.mock.calls[1]?.[0]).toEqual(
+            expect.objectContaining({
+                dedupeKey: "routine:91:rule:31:user:17:version:2",
             }),
         );
     });

@@ -39,15 +39,40 @@ function activeTask(overrides: Record<string, unknown> = {}): Record<string, unk
     };
 }
 
+function generatedOccurrence(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+    return {
+        id: 100,
+        periodKey: "2026-08",
+        dueDate: new Date("2026-08-10T00:00:00.000Z"),
+        originalDueDate: new Date("2026-08-10T00:00:00.000Z"),
+        scheduleVersion: 3,
+        assignees: [
+            { employeeId: 11, role: "OWNER" },
+            { employeeId: 12, role: "CO_OWNER" },
+        ],
+        ...overrides,
+    };
+}
+
 describe("NHF Routine occurrence generation", () => {
     beforeEach(() => {
         mockReset(prismaMock);
         prismaMock.routineTask.findUnique.mockResolvedValue(
             asNever(activeTask()),
         );
+        prismaMock.routineOccurrence.findMany.mockResolvedValue([] as never);
         prismaMock.routineOccurrence.findUnique.mockResolvedValue(null);
         prismaMock.routineOccurrence.upsert.mockResolvedValue(
             asNever({ id: 1 }),
+        );
+        prismaMock.routineOccurrence.deleteMany.mockResolvedValue(
+            asNever({ count: 0 }),
+        );
+        prismaMock.routineOccurrenceAssignee.deleteMany.mockResolvedValue(
+            asNever({ count: 0 }),
+        );
+        prismaMock.routineOccurrenceAssignee.createMany.mockResolvedValue(
+            asNever({ count: 0 }),
         );
     });
 
@@ -80,9 +105,28 @@ describe("NHF Routine occurrence generation", () => {
     });
 
     it("is idempotent when all generated periods already exist", async () => {
-        prismaMock.routineOccurrence.findUnique.mockResolvedValue(
-            asNever({ id: 100 }),
-        );
+        prismaMock.routineOccurrence.findMany.mockResolvedValue(asNever([
+            generatedOccurrence({
+                periodKey: "2026-01",
+                dueDate: new Date("2026-01-10T00:00:00.000Z"),
+                originalDueDate: new Date("2026-01-10T00:00:00.000Z"),
+                scheduleVersion: 4,
+            }),
+            generatedOccurrence({
+                id: 101,
+                periodKey: "2026-02",
+                dueDate: new Date("2026-02-10T00:00:00.000Z"),
+                originalDueDate: new Date("2026-02-10T00:00:00.000Z"),
+                scheduleVersion: 4,
+            }),
+            generatedOccurrence({
+                id: 102,
+                periodKey: "2026-03",
+                dueDate: new Date("2026-03-10T00:00:00.000Z"),
+                originalDueDate: new Date("2026-03-10T00:00:00.000Z"),
+                scheduleVersion: 4,
+            }),
+        ]));
 
         const result = await generateRoutineTaskOccurrences(
             71,
@@ -183,5 +227,289 @@ describe("NHF Routine occurrence generation", () => {
                 scheduleVersion: 4,
             },
         });
+    });
+
+    it("reconciles stale future monthly periods when changing to yearly", async () => {
+        prismaMock.routineTask.findUnique.mockResolvedValue(
+            asNever(activeTask({
+                scheduleType: "YEARLY_DATE",
+                scheduleConfig: { month: 9, day: 15 },
+                version: 5,
+            })),
+        );
+        prismaMock.routineOccurrence.findMany.mockResolvedValue(asNever([
+            generatedOccurrence({ periodKey: "2026-08" }),
+            generatedOccurrence({
+                id: 101,
+                periodKey: "2026-09",
+                dueDate: new Date("2026-09-10T00:00:00.000Z"),
+                originalDueDate: new Date("2026-09-10T00:00:00.000Z"),
+            }),
+            generatedOccurrence({
+                id: 102,
+                periodKey: "2026-10",
+                dueDate: new Date("2026-10-10T00:00:00.000Z"),
+                originalDueDate: new Date("2026-10-10T00:00:00.000Z"),
+            }),
+        ]));
+
+        const result = await generateRoutineTaskOccurrences(
+            71,
+            new Date("2026-08-04T04:00:00.000Z"),
+        );
+
+        expect(result).toEqual({ evaluated: 1, created: 0, existing: 1 });
+        expect(prismaMock.routineOccurrence.deleteMany).toHaveBeenCalledWith({
+            where: {
+                taskId: 71,
+                dueDate: {
+                    gte: new Date("2026-08-04T00:00:00.000Z"),
+                    lte: new Date("2026-10-31T00:00:00.000Z"),
+                },
+                periodKey: { notIn: ["2026-09"] },
+            },
+        });
+        expect(prismaMock.routineOccurrence.upsert).not.toHaveBeenCalled();
+    });
+
+    it("reconciles monthly periods when changing to a one-time schedule", async () => {
+        prismaMock.routineTask.findUnique.mockResolvedValue(
+            asNever(activeTask({
+                scheduleType: "ONE_TIME",
+                scheduleConfig: { date: "2026-12-15" },
+                version: 5,
+            })),
+        );
+        prismaMock.routineOccurrence.findMany.mockResolvedValue(asNever([
+            generatedOccurrence({ periodKey: "2026-10" }),
+            generatedOccurrence({
+                id: 101,
+                periodKey: "2026-11",
+                dueDate: new Date("2026-11-10T00:00:00.000Z"),
+                originalDueDate: new Date("2026-11-10T00:00:00.000Z"),
+            }),
+            generatedOccurrence({
+                id: 102,
+                periodKey: "2026-12",
+                dueDate: new Date("2026-12-10T00:00:00.000Z"),
+                originalDueDate: new Date("2026-12-10T00:00:00.000Z"),
+            }),
+        ]));
+
+        const result = await generateRoutineTaskOccurrences(
+            71,
+            new Date("2026-10-04T04:00:00.000Z"),
+        );
+
+        expect(result).toEqual({ evaluated: 1, created: 1, existing: 0 });
+        expect(prismaMock.routineOccurrence.deleteMany).toHaveBeenCalledWith({
+            where: {
+                taskId: 71,
+                dueDate: {
+                    gte: new Date("2026-10-04T00:00:00.000Z"),
+                    lte: new Date("2026-12-31T00:00:00.000Z"),
+                },
+                periodKey: { notIn: ["2026-12-15"] },
+            },
+        });
+        expect(prismaMock.routineOccurrence.upsert).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: {
+                    taskId_periodKey: { taskId: 71, periodKey: "2026-12-15" },
+                },
+            }),
+        );
+    });
+
+    it("removes only future in-window occurrences when changing to manual", async () => {
+        prismaMock.routineTask.findUnique.mockResolvedValue(
+            asNever(activeTask({
+                scheduleType: "MANUAL",
+                scheduleConfig: {},
+                version: 5,
+            })),
+        );
+
+        const result = await generateRoutineTaskOccurrences(
+            71,
+            new Date("2026-08-04T04:00:00.000Z"),
+        );
+
+        expect(result).toEqual({ evaluated: 0, created: 0, existing: 0 });
+        expect(prismaMock.routineOccurrence.deleteMany).toHaveBeenCalledWith({
+            where: {
+                taskId: 71,
+                dueDate: {
+                    gte: new Date("2026-08-04T00:00:00.000Z"),
+                    lte: new Date("2026-10-31T00:00:00.000Z"),
+                },
+            },
+        });
+        expect(prismaMock.routineOccurrence.upsert).not.toHaveBeenCalled();
+    });
+
+    it("removes future occurrences outside a reduced contract end date", async () => {
+        prismaMock.routineTask.findUnique.mockResolvedValue(
+            asNever(activeTask({
+                contractEndDate: new Date("2026-08-31T00:00:00.000Z"),
+                version: 5,
+            })),
+        );
+        prismaMock.routineOccurrence.findMany.mockResolvedValue(asNever([
+            generatedOccurrence({ periodKey: "2026-08" }),
+            generatedOccurrence({
+                id: 101,
+                periodKey: "2026-09",
+                dueDate: new Date("2026-09-10T00:00:00.000Z"),
+                originalDueDate: new Date("2026-09-10T00:00:00.000Z"),
+            }),
+            generatedOccurrence({
+                id: 102,
+                periodKey: "2026-10",
+                dueDate: new Date("2026-10-10T00:00:00.000Z"),
+                originalDueDate: new Date("2026-10-10T00:00:00.000Z"),
+            }),
+        ]));
+
+        const result = await generateRoutineTaskOccurrences(
+            71,
+            new Date("2026-08-04T04:00:00.000Z"),
+        );
+
+        expect(result).toEqual({ evaluated: 1, created: 0, existing: 1 });
+        expect(prismaMock.routineOccurrence.deleteMany).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: expect.objectContaining({
+                    periodKey: { notIn: ["2026-08"] },
+                }),
+            }),
+        );
+    });
+
+    it("updates the new original date while preserving a future admin due-date override", async () => {
+        prismaMock.routineTask.findUnique.mockResolvedValue(
+            asNever(activeTask({
+                scheduleConfig: { day: 15, monthOffset: 0 },
+                version: 5,
+            })),
+        );
+        prismaMock.routineOccurrence.findMany.mockResolvedValue(asNever([
+            generatedOccurrence({
+                dueDate: new Date("2026-08-20T00:00:00.000Z"),
+                originalDueDate: new Date("2026-08-10T00:00:00.000Z"),
+            }),
+            generatedOccurrence({
+                id: 101,
+                periodKey: "2026-09",
+                dueDate: new Date("2026-09-10T00:00:00.000Z"),
+                originalDueDate: new Date("2026-09-10T00:00:00.000Z"),
+            }),
+            generatedOccurrence({
+                id: 102,
+                periodKey: "2026-10",
+                dueDate: new Date("2026-10-10T00:00:00.000Z"),
+                originalDueDate: new Date("2026-10-10T00:00:00.000Z"),
+            }),
+        ]));
+
+        await generateRoutineTaskOccurrences(
+            71,
+            new Date("2026-08-04T04:00:00.000Z"),
+        );
+
+        expect(prismaMock.routineOccurrence.updateMany).toHaveBeenCalledWith({
+            where: { id: 100, scheduleVersion: 3 },
+            data: {
+                scheduleVersion: 5,
+                originalDueDate: new Date("2026-08-15T00:00:00.000Z"),
+                reminderVersion: { increment: 1 },
+            },
+        });
+        expect(prismaMock.routineOccurrence.updateMany).not.toHaveBeenCalledWith(
+            expect.objectContaining({
+                data: expect.objectContaining({
+                    dueDate: new Date("2026-08-15T00:00:00.000Z"),
+                }),
+            }),
+        );
+    });
+
+    it("does not include past occurrences in the stale-delete scope", async () => {
+        prismaMock.routineTask.findUnique.mockResolvedValue(
+            asNever(activeTask({ version: 5 })),
+        );
+
+        await generateRoutineTaskOccurrences(
+            71,
+            new Date("2026-08-04T04:00:00.000Z"),
+        );
+
+        expect(prismaMock.routineOccurrence.deleteMany).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: expect.objectContaining({
+                    dueDate: expect.objectContaining({
+                        gte: new Date("2026-08-04T00:00:00.000Z"),
+                    }),
+                }),
+            }),
+        );
+    });
+
+    it("syncs future template assignees only when the snapshot was not manually changed", async () => {
+        prismaMock.routineTask.findUnique.mockResolvedValue(
+            asNever(activeTask({
+                assignees: [{ employeeId: 21, role: "OWNER" }],
+                version: 5,
+            })),
+        );
+        prismaMock.routineOccurrence.findMany.mockResolvedValue(asNever([
+            generatedOccurrence(),
+        ]));
+
+        await generateRoutineTaskOccurrences(
+            71,
+            new Date("2026-08-04T04:00:00.000Z"),
+            {
+                previousAssignees: [
+                    { employeeId: 11, role: "OWNER" },
+                    { employeeId: 12, role: "CO_OWNER" },
+                ],
+            },
+        );
+
+        expect(prismaMock.routineOccurrenceAssignee.deleteMany).toHaveBeenCalledWith({
+            where: { occurrenceId: 100 },
+        });
+        expect(prismaMock.routineOccurrenceAssignee.createMany).toHaveBeenCalledWith({
+            data: [{ occurrenceId: 100, employeeId: 21, role: "OWNER" }],
+        });
+    });
+
+    it("preserves a future occurrence snapshot that differs from the old template", async () => {
+        prismaMock.routineTask.findUnique.mockResolvedValue(
+            asNever(activeTask({
+                assignees: [{ employeeId: 21, role: "OWNER" }],
+                version: 5,
+            })),
+        );
+        prismaMock.routineOccurrence.findMany.mockResolvedValue(asNever([
+            generatedOccurrence({
+                assignees: [{ employeeId: 99, role: "OWNER" }],
+            }),
+        ]));
+
+        await generateRoutineTaskOccurrences(
+            71,
+            new Date("2026-08-04T04:00:00.000Z"),
+            {
+                previousAssignees: [
+                    { employeeId: 11, role: "OWNER" },
+                    { employeeId: 12, role: "CO_OWNER" },
+                ],
+            },
+        );
+
+        expect(prismaMock.routineOccurrenceAssignee.deleteMany).not.toHaveBeenCalled();
+        expect(prismaMock.routineOccurrenceAssignee.createMany).not.toHaveBeenCalled();
     });
 });

@@ -18,3 +18,8 @@ export interface RoutineGenerationResult {
     created: number;
     existing: number;
 }
+
+export interface RoutineAssigneeSnapshot {
+    employeeId: number;
+    role: string;
+}

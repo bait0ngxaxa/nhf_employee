@@ -11,7 +11,10 @@ import {
 import {
     getRoutineOccurrenceById,
     getRoutineOccurrences,
+    getRoutineSummary,
+    getRoutineTasks,
 } from "@/lib/services/routine/queries";
+import { routineTaskFiltersSchema } from "@/lib/validations/routine";
 
 vi.mock("@/lib/db/prisma", () => ({
     prisma: mockDeep<PrismaClient>(),
@@ -29,6 +32,8 @@ describe("NHF Routine query authorization", () => {
         prismaMock.routineOccurrence.findMany.mockResolvedValue([] as never);
         prismaMock.routineOccurrence.count.mockResolvedValue(0);
         prismaMock.routineOccurrence.findFirst.mockResolvedValue(null);
+        prismaMock.routineTask.findMany.mockResolvedValue([] as never);
+        prismaMock.routineTask.count.mockResolvedValue(0);
     });
 
     it("forces a regular user query to their occurrence snapshot", async () => {
@@ -62,12 +67,14 @@ describe("NHF Routine query authorization", () => {
         expect(prismaMock.routineOccurrence.findMany).toHaveBeenCalledWith(
             expect.objectContaining({
                 where: {
+                    task: { isActive: true },
                     assignees: { some: { employeeId: 21 } },
                 },
             }),
         );
         expect(prismaMock.routineOccurrence.count).toHaveBeenCalledWith({
             where: {
+                task: { isActive: true },
                 assignees: { some: { employeeId: 21 } },
             },
         });
@@ -102,7 +109,7 @@ describe("NHF Routine query authorization", () => {
         );
 
         expect(prismaMock.routineOccurrence.findMany).toHaveBeenCalledWith(
-            expect.objectContaining({ where: {} }),
+            expect.objectContaining({ where: { task: { isActive: true } } }),
         );
     });
 
@@ -124,6 +131,7 @@ describe("NHF Routine query authorization", () => {
         expect(prismaMock.routineOccurrence.findFirst).toHaveBeenCalledWith({
             where: {
                 id: 91,
+                task: { isActive: true },
                 assignees: { some: { employeeId: 21 } },
             },
             select: expect.any(Object),
@@ -166,6 +174,7 @@ describe("NHF Routine query authorization", () => {
                         gt: calendarDateToDate(today),
                         lte: calendarDateToDate(addCalendarDays(today, 7)),
                     },
+                    task: { isActive: true },
                 },
             }),
         );
@@ -237,5 +246,55 @@ describe("NHF Routine query authorization", () => {
         });
         expect(result.occurrences[0]).not.toHaveProperty("status");
         expect(result.occurrences[0]).not.toHaveProperty("completedAt");
+    });
+
+    it("only counts active-task occurrences in the summary", async () => {
+        await getRoutineSummary({
+            actor: {
+                id: 99,
+                email: "admin@example.com",
+                role: "ADMIN",
+            },
+            employeeId: null,
+        });
+
+        expect(prismaMock.routineOccurrence.count).toHaveBeenCalledTimes(4);
+        for (const [call] of prismaMock.routineOccurrence.count.mock.calls) {
+            expect(call).toEqual({
+                where: expect.objectContaining({
+                    task: { isActive: true },
+                }),
+            });
+        }
+    });
+
+    it.each<[string, { activeOnly?: true }, { isActive?: true }]>([
+        ["no filter", {}, {}],
+        ["activeOnly=0", {}, {}],
+        ["activeOnly=1", { activeOnly: true }, { isActive: true }],
+    ])("builds the expected task filter for %s", async (_label, input, expected) => {
+        await getRoutineTasks({
+            ...input,
+            activeOnly: input.activeOnly,
+            page: 1,
+            limit: 20,
+        });
+
+        expect(prismaMock.routineTask.findMany).toHaveBeenLastCalledWith(
+            expect.objectContaining({ where: expected }),
+        );
+        expect(prismaMock.routineTask.count).toHaveBeenLastCalledWith({
+            where: expected,
+        });
+    });
+
+    it("parses task filter zero as no active predicate and one as active-only", () => {
+        expect(routineTaskFiltersSchema.parse({}).activeOnly).toBeUndefined();
+        expect(
+            routineTaskFiltersSchema.parse({ activeOnly: "0" }).activeOnly,
+        ).toBeUndefined();
+        expect(
+            routineTaskFiltersSchema.parse({ activeOnly: "1" }).activeOnly,
+        ).toBe(true);
     });
 });

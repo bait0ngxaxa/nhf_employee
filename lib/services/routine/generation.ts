@@ -13,10 +13,14 @@ import {
 import { runSerializableTransaction } from "@/lib/db/transaction";
 
 import { RoutineValidationError } from "./errors";
-import type { RoutineGenerationResult } from "./types";
+import type {
+    RoutineAssigneeSnapshot,
+    RoutineGenerationResult,
+} from "./types";
 
 export interface RoutineGenerationOptions {
     excludePastDue?: boolean;
+    previousAssignees?: readonly RoutineAssigneeSnapshot[];
 }
 
 function isOccurrenceUniqueConflict(error: unknown): boolean {
@@ -38,6 +42,70 @@ function isOccurrenceUniqueConflict(error: unknown): boolean {
         error.meta.target.includes("taskId")
         && error.meta.target.includes("periodKey")
     );
+}
+
+const ROUTINE_OCCURRENCE_RECONCILIATION_SELECT = {
+    id: true,
+    periodKey: true,
+    dueDate: true,
+    originalDueDate: true,
+    scheduleVersion: true,
+    assignees: {
+        select: { employeeId: true, role: true },
+    },
+} as const satisfies Prisma.RoutineOccurrenceSelect;
+
+type RoutineOccurrenceReconciliationRow = Prisma.RoutineOccurrenceGetPayload<{
+    select: typeof ROUTINE_OCCURRENCE_RECONCILIATION_SELECT;
+}>;
+
+function assigneeSnapshotKey(
+    assignees: readonly RoutineAssigneeSnapshot[],
+): string {
+    return assignees
+        .map((assignee) => `${assignee.employeeId}:${assignee.role}`)
+        .sort()
+        .join("|");
+}
+
+function shouldSyncFutureAssignees(
+    occurrence: RoutineOccurrenceReconciliationRow,
+    currentDate: string,
+    previousAssignees: readonly RoutineAssigneeSnapshot[] | undefined,
+): boolean {
+    if (!previousAssignees) return false;
+    if (
+        compareCalendarDates(
+            toBangkokCalendarDate(occurrence.dueDate),
+            currentDate,
+        ) < 0
+    ) {
+        return false;
+    }
+
+    return assigneeSnapshotKey(occurrence.assignees)
+        === assigneeSnapshotKey(previousAssignees);
+}
+
+async function deleteStaleFutureOccurrences(
+    tx: Prisma.TransactionClient,
+    taskId: number,
+    currentDate: string,
+    windowTo: string,
+    candidatePeriodKeys: readonly string[],
+): Promise<void> {
+    await tx.routineOccurrence.deleteMany({
+        where: {
+            taskId,
+            dueDate: {
+                gte: calendarDateToDate(currentDate),
+                lte: calendarDateToDate(windowTo),
+            },
+            ...(candidatePeriodKeys.length > 0
+                ? { periodKey: { notIn: [...candidatePeriodKeys] } }
+                : {}),
+        },
+    });
 }
 
 export async function generateRoutineTaskOccurrences(
@@ -73,7 +141,21 @@ export async function generateRoutineTaskOccurrencesInTransaction(
         },
     });
 
-    if (!task || !task.isActive || task.scheduleType === "MANUAL") {
+    if (!task || !task.isActive) {
+        return { evaluated: 0, created: 0, existing: 0 };
+    }
+
+    const window = getRoutineGenerationWindow(now);
+    const currentDate = toBangkokCalendarDate(now);
+
+    if (task.scheduleType === "MANUAL") {
+        await deleteStaleFutureOccurrences(
+            tx,
+            task.id,
+            currentDate,
+            window.to,
+            [],
+        );
         return { evaluated: 0, created: 0, existing: 0 };
     }
 
@@ -92,7 +174,6 @@ export async function generateRoutineTaskOccurrencesInTransaction(
         throw error;
     }
 
-    const window = getRoutineGenerationWindow(now);
     const scheduledOccurrences = calculateRoutineOccurrences(
         definition,
         window,
@@ -105,7 +186,6 @@ export async function generateRoutineTaskOccurrencesInTransaction(
         ? toBangkokCalendarDate(task.contractEndDate)
         : null;
 
-    const currentDate = toBangkokCalendarDate(now);
     const generationCandidates = scheduledOccurrences.filter((occurrence) => {
         if (
             contractStartDate
@@ -122,41 +202,64 @@ export async function generateRoutineTaskOccurrencesInTransaction(
         return true;
     });
 
+    const existingFutureOccurrences = await tx.routineOccurrence.findMany({
+        where: {
+            taskId: task.id,
+            dueDate: {
+                gte: calendarDateToDate(currentDate),
+                lte: calendarDateToDate(window.to),
+            },
+        },
+        select: ROUTINE_OCCURRENCE_RECONCILIATION_SELECT,
+    });
+    const existingByPeriodKey = new Map(
+        existingFutureOccurrences.map((occurrence) => [
+            occurrence.periodKey,
+            occurrence,
+        ]),
+    );
+    await deleteStaleFutureOccurrences(
+        tx,
+        task.id,
+        currentDate,
+        window.to,
+        generationCandidates.map((occurrence) => occurrence.periodKey),
+    );
+
     let created = 0;
     let existing = 0;
     for (const occurrence of generationCandidates) {
-        const current = await tx.routineOccurrence.findUnique({
-            where: {
-                taskId_periodKey: {
-                    taskId: task.id,
-                    periodKey: occurrence.periodKey,
+        const current = existingByPeriodKey.get(occurrence.periodKey)
+            ?? await tx.routineOccurrence.findUnique({
+                where: {
+                    taskId_periodKey: {
+                        taskId: task.id,
+                        periodKey: occurrence.periodKey,
+                    },
                 },
-            },
-            select: {
-                id: true,
-                dueDate: true,
-                originalDueDate: true,
-                scheduleVersion: true,
-            },
-        });
+                select: ROUTINE_OCCURRENCE_RECONCILIATION_SELECT,
+            });
         if (current) {
-            const canRefreshSchedule =
-                current.scheduleVersion !== undefined
-                && current.scheduleVersion !== task.version
-                && current.dueDate instanceof Date
-                && current.originalDueDate instanceof Date;
+            const currentOriginalDueDate = toBangkokCalendarDate(
+                current.originalDueDate,
+            );
+            const currentDueDate = toBangkokCalendarDate(current.dueDate);
+            const originalDateChanged =
+                currentOriginalDueDate !== occurrence.originalDueDate;
+            const hasManualDueDate = currentDueDate !== currentOriginalDueDate;
+            const dueDateChanged =
+                !hasManualDueDate && currentDueDate !== occurrence.dueDate;
+            const shouldSyncAssignees = shouldSyncFutureAssignees(
+                current,
+                currentDate,
+                options.previousAssignees,
+            );
+            const shouldRefreshSchedule =
+                current.scheduleVersion !== task.version
+                || originalDateChanged
+                || dueDateChanged;
 
-            if (canRefreshSchedule) {
-                const currentOriginalDueDate = toBangkokCalendarDate(
-                    current.originalDueDate,
-                );
-                const currentDueDate = toBangkokCalendarDate(current.dueDate);
-                const originalDateChanged =
-                    currentOriginalDueDate !== occurrence.originalDueDate;
-                const hasManualDueDate = currentDueDate !== currentOriginalDueDate;
-                const dueDateChanged =
-                    !hasManualDueDate && currentDueDate !== occurrence.dueDate;
-
+            if (shouldRefreshSchedule) {
                 await tx.routineOccurrence.updateMany({
                     where: {
                         id: current.id,
@@ -180,6 +283,18 @@ export async function generateRoutineTaskOccurrencesInTransaction(
                             ? { reminderVersion: { increment: 1 } }
                             : {}),
                     },
+                });
+            }
+            if (shouldSyncAssignees) {
+                await tx.routineOccurrenceAssignee.deleteMany({
+                    where: { occurrenceId: current.id },
+                });
+                await tx.routineOccurrenceAssignee.createMany({
+                    data: task.assignees.map((assignee) => ({
+                        occurrenceId: current.id,
+                        employeeId: assignee.employeeId,
+                        role: assignee.role,
+                    })),
                 });
             }
             existing += 1;
