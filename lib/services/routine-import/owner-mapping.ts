@@ -34,6 +34,42 @@ export interface RoutineOwnerResolution {
     reviewReasons: string[];
 }
 
+function addExactMapping(
+    mapping: Map<string, number | null>,
+    value: string | null,
+    employeeId: number,
+): void {
+    const key = value ? normalizeOwnerKey(value) : "";
+    if (!key) return;
+    const current = mapping.get(key);
+    if (current === undefined) {
+        mapping.set(key, employeeId);
+        return;
+    }
+    if (current !== employeeId) mapping.set(key, null);
+}
+
+export function buildExactRoutineOwnerMapping(
+    referenceData: RoutineImportReferenceData,
+): RoutineImportOwnerMapping {
+    const candidates = new Map<string, number | null>();
+    for (const employee of referenceData.employees) {
+        if (employee.status !== "ACTIVE" || employee.deletedAt !== null) continue;
+        addExactMapping(
+            candidates,
+            `${employee.firstName} ${employee.lastName}`,
+            employee.id,
+        );
+        addExactMapping(candidates, employee.nickname, employee.id);
+    }
+
+    return Object.fromEntries(
+        [...candidates.entries()]
+            .filter((entry): entry is [string, number] => entry[1] !== null)
+            .map(([key, employeeId]) => [key, employeeId]),
+    );
+}
+
 export function resolveRoutineOwners(
     ownerNames: readonly string[],
     mapping: RoutineImportOwnerMapping,

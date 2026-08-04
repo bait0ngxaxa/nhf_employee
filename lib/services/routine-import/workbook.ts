@@ -48,6 +48,10 @@ interface RoutineWorkbookExtractionResult {
     rows: RoutineImportRow[];
 }
 
+export interface RoutineWorkbookExtractionOptions {
+    includeSheets?: readonly string[];
+}
+
 function getSheetRange(sheet: WorkSheet): XLSX.Range {
     const ref = sheet["!ref"] as string | undefined;
     return ref ? XLSX.utils.decode_range(ref) : { s: { r: 0, c: 0 }, e: { r: -1, c: -1 } };
@@ -415,13 +419,15 @@ export function extractRoutineWorkbook(
     asOfDate: string,
     ownerMapping: Record<string, number>,
     referenceData: RoutineImportReferenceData,
+    options: RoutineWorkbookExtractionOptions = {},
 ): RoutineWorkbookExtractionResult {
     const sourceFileName = basename(fileName);
     const date1904 = workbook.Workbook?.WBProps?.date1904 ?? false;
     const sheets: RoutineImportSheetInspection[] = [];
     const rows: RoutineImportRow[] = [];
 
-    for (const sheetName of workbook.SheetNames) {
+    const sheetNames = options.includeSheets ?? workbook.SheetNames;
+    for (const sheetName of sheetNames) {
         const sheet = workbook.Sheets[sheetName];
         const range = getSheetRange(sheet);
         const merges = getMerges(sheet);
@@ -597,6 +603,7 @@ export function buildRoutineImportManifest(
     ownerMapping: Record<string, number>,
     referenceData: RoutineImportReferenceData,
     generatedAt = new Date().toISOString(),
+    options: RoutineWorkbookExtractionOptions = {},
 ): RoutineImportManifest {
     const extracted = extractRoutineWorkbook(
         workbook,
@@ -604,6 +611,7 @@ export function buildRoutineImportManifest(
         asOfDate,
         ownerMapping,
         referenceData,
+        options,
     );
     const identityKeys = new Set<string>();
     let duplicateSourceRows = 0;

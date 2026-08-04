@@ -4,6 +4,8 @@ import type {
     RoutineScheduleType,
 } from "@/lib/routine/schedule";
 
+import type { RoutineReminderRuleInput } from "@/lib/validations/routine";
+
 export type RoutineImportActivation = "ACTIVE" | "INACTIVE" | "HISTORY_ONLY";
 
 export type RoutineImportCellValue = string | number | boolean | null;
@@ -53,6 +55,11 @@ export interface RoutineImportRow {
     ownerNames: string[];
     mappedEmployeeIds: number[];
     mappedEmployeeNames: string[];
+    mappedAssignees?: Array<{
+        employeeId: number;
+        role: "OWNER" | "CO_OWNER";
+    }>;
+    reminderRules?: RoutineReminderRuleInput[];
     scheduleText: string | null;
     contractText: string | null;
     extraDetails: string | null;

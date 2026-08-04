@@ -15,6 +15,10 @@ import { runSerializableTransaction } from "@/lib/db/transaction";
 import { RoutineValidationError } from "./errors";
 import type { RoutineGenerationResult } from "./types";
 
+export interface RoutineGenerationOptions {
+    excludePastDue?: boolean;
+}
+
 function isOccurrenceUniqueConflict(error: unknown): boolean {
     if (
         typeof error !== "object"
@@ -39,9 +43,10 @@ function isOccurrenceUniqueConflict(error: unknown): boolean {
 export async function generateRoutineTaskOccurrences(
     taskId: number,
     now = new Date(),
+    options: RoutineGenerationOptions = {},
 ): Promise<RoutineGenerationResult> {
     return runSerializableTransaction((tx) =>
-        generateRoutineTaskOccurrencesInTransaction(tx, taskId, now),
+        generateRoutineTaskOccurrencesInTransaction(tx, taskId, now, options),
     );
 }
 
@@ -49,6 +54,7 @@ export async function generateRoutineTaskOccurrencesInTransaction(
     tx: Prisma.TransactionClient,
     taskId: number,
     now = new Date(),
+    options: RoutineGenerationOptions = {},
 ): Promise<RoutineGenerationResult> {
     const task = await tx.routineTask.findUnique({
         where: { id: taskId },
@@ -99,7 +105,14 @@ export async function generateRoutineTaskOccurrencesInTransaction(
         ? toBangkokCalendarDate(task.contractEndDate)
         : null;
 
+    const currentDate = toBangkokCalendarDate(now);
     const eligibleOccurrences = scheduledOccurrences.filter((occurrence) => {
+        if (
+            options.excludePastDue
+            && compareCalendarDates(occurrence.dueDate, currentDate) < 0
+        ) {
+            return false;
+        }
         if (
             contractStartDate
             && compareCalendarDates(occurrence.dueDate, contractStartDate) < 0

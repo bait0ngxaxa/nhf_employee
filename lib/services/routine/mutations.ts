@@ -37,7 +37,10 @@ import {
     RoutineNotFoundError,
     RoutineValidationError,
 } from "./errors";
-import { generateRoutineTaskOccurrencesInTransaction } from "./generation";
+import {
+    generateRoutineTaskOccurrencesInTransaction,
+    type RoutineGenerationOptions,
+} from "./generation";
 import type { RoutineCommandActor } from "./types";
 
 const ROUTINE_TASK_INCLUDE = {
@@ -285,6 +288,7 @@ export async function createRoutineTaskInTransaction(
     tx: Prisma.TransactionClient,
     input: RoutineTaskCreateInput,
     actor: RoutineCommandActor,
+    generationOptions: RoutineGenerationOptions = {},
 ): Promise<Prisma.RoutineTaskGetPayload<{ include: typeof ROUTINE_TASK_INCLUDE }>> {
     const scheduleType = input.scheduleType as RoutineScheduleType;
     const scheduleConfig = parseScheduleConfig(scheduleType, input.scheduleConfig);
@@ -346,7 +350,12 @@ export async function createRoutineTaskInTransaction(
             version: task.version,
         },
     );
-    await generateRoutineTaskOccurrencesInTransaction(tx, task.id);
+    await generateRoutineTaskOccurrencesInTransaction(
+        tx,
+        task.id,
+        new Date(),
+        generationOptions,
+    );
 
     return tx.routineTask.findUniqueOrThrow({
         where: { id: task.id },

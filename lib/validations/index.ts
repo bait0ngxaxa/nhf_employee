@@ -38,3 +38,12 @@ export type {
     RoutineDueDateInput,
     RoutineOccurrenceAssigneesInput,
 } from "./routine";
+
+export {
+    routineImportBatchIdSchema,
+    routineImportApplySchema,
+    routineImportPreviewOptionsSchema,
+    routineImportRowUpdateSchema,
+    routineImportRowsQuerySchema,
+} from "./routine-import";
+export type { RoutineImportRowUpdateInput } from "./routine-import";

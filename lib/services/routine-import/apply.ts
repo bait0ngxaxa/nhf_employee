@@ -37,10 +37,11 @@ function taskInputForRow(
         extraDetails: row.extraDetails,
         businessDayPolicy: row.normalizedSchedule?.businessDayPolicy ?? "NONE",
         isActive: row.proposedActivation === "ACTIVE",
-        assignees: row.mappedEmployeeIds.map((employeeId, index) => ({
+        assignees: row.mappedAssignees ?? row.mappedEmployeeIds.map((employeeId, index) => ({
             employeeId,
-            role: index === 0 ? "OWNER" : "CO_OWNER",
+            role: index === 0 ? "OWNER" as const : "CO_OWNER" as const,
         })),
+        reminderRules: row.reminderRules,
         sourceFileName: row.sourceFileName,
         sourceSheet: row.sourceSheet,
         sourceRow: row.sourceRow,

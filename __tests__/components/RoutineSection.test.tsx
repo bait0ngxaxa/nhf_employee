@@ -73,6 +73,7 @@ describe("RoutineSection tabs", () => {
         expect(screen.getByText("งานของฉัน")).toBeInTheDocument();
         expect(screen.queryByText("งานทั้งหมด (Admin)")).not.toBeInTheDocument();
         expect(screen.queryByText("ตั้งค่างานประจำ")).not.toBeInTheDocument();
+        expect(screen.queryByText("นำเข้าจาก Excel")).not.toBeInTheDocument();
     });
 
     it("exposes task settings and all-occurrence tabs to an admin", () => {
@@ -85,5 +86,6 @@ describe("RoutineSection tabs", () => {
         expect(screen.getByText("งานของฉัน")).toBeInTheDocument();
         expect(screen.getByText("งานทั้งหมด (Admin)")).toBeInTheDocument();
         expect(screen.getByText("ตั้งค่างานประจำ")).toBeInTheDocument();
+        expect(screen.getByText("นำเข้าจาก Excel")).toBeInTheDocument();
     });
 });

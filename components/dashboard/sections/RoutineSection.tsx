@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { ClipboardCheck, ListTodo, Settings2, Users } from "lucide-react";
+import { ClipboardCheck, FileSpreadsheet, ListTodo, Settings2, Users } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import useSWR from "swr";
 
@@ -19,6 +19,7 @@ import { RoutineKpiGrid } from "../routine/RoutineKpiGrid";
 import { RoutineOccurrenceList } from "../routine/RoutineOccurrenceList";
 import { RoutineTaskForm } from "../routine/RoutineTaskForm";
 import { RoutineTaskList } from "../routine/RoutineTaskList";
+import { RoutineImportPanel } from "../routine/RoutineImportPanel";
 import type {
     PaginatedOccurrencesResponse,
     PaginatedTasksResponse,
@@ -156,6 +157,13 @@ export function RoutineSection() {
         if (isAdmin && occurrenceId !== null) setActiveTab("all");
     }, [isAdmin, occurrenceId]);
 
+    useEffect(() => {
+        const requestedTab = searchParams.get("routineTab");
+        if (isAdmin && (requestedTab === "mine" || requestedTab === "all" || requestedTab === "settings" || requestedTab === "import")) {
+            setActiveTab(requestedTab);
+        }
+    }, [isAdmin, searchParams]);
+
     const tabs: SectionTabItem[] = [
         {
             value: "mine",
@@ -176,6 +184,13 @@ export function RoutineSection() {
             icon: Settings2,
             visible: isAdmin,
             content: <RoutineTaskSettings />,
+        },
+        {
+            value: "import",
+            label: "นำเข้าจาก Excel",
+            icon: FileSpreadsheet,
+            visible: isAdmin,
+            content: <RoutineImportPanel />,
         },
     ];
 

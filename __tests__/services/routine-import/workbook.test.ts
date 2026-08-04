@@ -7,6 +7,7 @@ import {
     computeRoutineImportRowFingerprint,
     readRoutineWorkbook,
 } from "@/lib/services/routine-import";
+import { ROUTINE_IMPORT_TARGET_SHEET } from "@/lib/services/routine-import/sheet-config";
 import type { RoutineImportReferenceData } from "@/lib/services/routine-import";
 
 const referenceData: RoutineImportReferenceData = {
@@ -132,5 +133,30 @@ describe("routine workbook extraction", () => {
             workbook,
             "fixture.xls",
         )).toThrow("source row ไม่ตรง");
+    });
+
+    it("extracts only the explicitly allowlisted sheet", () => {
+        const workbook = readRoutineWorkbook(buildFixtureWorkbook());
+        const sourceSheet = workbook.Sheets.U1;
+        if (!sourceSheet) throw new Error("fixture sheet missing");
+        workbook.Sheets[ROUTINE_IMPORT_TARGET_SHEET] = sourceSheet;
+        workbook.Sheets["ม.สคส."] = sourceSheet;
+        workbook.SheetNames = ["ม.สคส.", ROUTINE_IMPORT_TARGET_SHEET];
+
+        const manifest = buildRoutineImportManifest(
+            workbook,
+            "fixture.xls",
+            "e".repeat(64),
+            "2026-08-03",
+            { กัลยาณี: 10 },
+            referenceData,
+            "2026-08-03T00:00:00.000Z",
+            { includeSheets: [ROUTINE_IMPORT_TARGET_SHEET] },
+        );
+
+        expect(manifest.inspection.sheets.map((sheet) => sheet.sheetName)).toEqual([
+            ROUTINE_IMPORT_TARGET_SHEET,
+        ]);
+        expect(manifest.rows.every((row) => row.sourceSheet === ROUTINE_IMPORT_TARGET_SHEET)).toBe(true);
     });
 });

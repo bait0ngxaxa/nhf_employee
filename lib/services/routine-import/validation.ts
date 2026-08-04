@@ -35,6 +35,17 @@ const importRowSchema = z.object({
     ownerNames: z.array(z.string()),
     mappedEmployeeIds: z.array(z.number().int().positive()),
     mappedEmployeeNames: z.array(z.string()),
+    mappedAssignees: z.array(z.object({
+        employeeId: z.number().int().positive(),
+        role: z.enum(["OWNER", "CO_OWNER"]),
+    })).optional(),
+    reminderRules: z.array(z.object({
+        daysBefore: z.number().int().min(0).max(365),
+        sendHour: z.number().int().min(0).max(23),
+        channel: z.literal("IN_APP"),
+        recipientScope: z.enum(["ASSIGNEES", "ADMINS", "ASSIGNEES_AND_ADMINS"]),
+        isActive: z.boolean(),
+    })).max(20).optional(),
     scheduleText: z.string().nullable(),
     contractText: z.string().nullable(),
     extraDetails: z.string().nullable(),
@@ -102,6 +113,14 @@ export function parseRoutineImportManifest(
     const result = manifestSchema.safeParse(value);
     if (!result.success) {
         throw new Error("ไฟล์ manifest ไม่ผ่านการตรวจสอบรูปแบบ");
+    }
+    return result.data;
+}
+
+export function parseRoutineImportRow(value: unknown): RoutineImportManifest["rows"][number] {
+    const result = importRowSchema.safeParse(value);
+    if (!result.success) {
+        throw new Error("ข้อมูล staging row ไม่ผ่านการตรวจสอบรูปแบบ");
     }
     return result.data;
 }

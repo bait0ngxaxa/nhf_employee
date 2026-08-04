@@ -41,6 +41,7 @@ model User {
   skippedRoutineOccurrences   RoutineOccurrence[]         @relation("RoutineOccurrenceSkippedBy")
   cancelledRoutineOccurrences RoutineOccurrence[]         @relation("RoutineOccurrenceCancelledBy")
   routineImportLedgers        RoutineImportLedger[]       @relation("RoutineImportAppliedBy")
+  routineImportBatches         RoutineImportBatch[]        @relation("RoutineImportUploadedBy")
 
   @@map("users")
 }
@@ -342,6 +343,10 @@ enum AuditAction {
   ROUTINE_OCCURRENCE_REOPEN
   ROUTINE_OCCURRENCE_REASSIGN
   ROUTINE_OCCURRENCE_DUE_DATE_CHANGE
+  ROUTINE_IMPORT_UPLOAD
+  ROUTINE_IMPORT_ROW_UPDATE
+  ROUTINE_IMPORT_APPLY
+  ROUTINE_IMPORT_CANCEL
 }
 
 // Email Request History for tracking new employee email requests
@@ -805,6 +810,7 @@ model RoutineTask {
   reminderRules RoutineReminderRule[]
   occurrences RoutineOccurrence[]
   importLedger RoutineImportLedger?
+  importRows  RoutineImportRow[]
   createdBy   User                  @relation("RoutineTaskCreatedBy", fields: [createdById], references: [id])
   updatedBy   User                  @relation("RoutineTaskUpdatedBy", fields: [updatedById], references: [id])
 
@@ -853,6 +859,75 @@ model RoutineImportLedger {
   @@index([sourceFingerprint])
   @@index([status])
   @@map("routine_import_ledger")
+}
+
+model RoutineImportBatch {
+  id               Int                      @id @default(autoincrement())
+  originalFileName String                   @db.VarChar(255)
+  fileHash         String                   @db.Char(64)
+  targetSheet      String                   @db.VarChar(255)
+  asOfDate         DateTime                 @db.Date
+  ignoredSheets    Json?
+  status           RoutineImportBatchStatus @default(PREVIEW)
+  uploadedById     Int
+  totalRows        Int                      @default(0)
+  validRows        Int                      @default(0)
+  reviewRows       Int                      @default(0)
+  excludedRows     Int                      @default(0)
+  alreadyImportedRows Int                    @default(0)
+  appliedRows      Int                      @default(0)
+  conflictRows     Int                      @default(0)
+  failedRows       Int                      @default(0)
+  selectedRows     Int                      @default(0)
+  activeRows       Int                      @default(0)
+  inactiveRows     Int                      @default(0)
+  expiredRows      Int                      @default(0)
+  unresolvedOwnerRows Int                   @default(0)
+  expiresAt        DateTime?
+  appliedAt        DateTime?
+  errorMessage     String?                  @db.Text
+  version          Int                      @default(1)
+  createdAt        DateTime                 @default(now())
+  updatedAt        DateTime                 @updatedAt
+
+  uploadedBy User               @relation("RoutineImportUploadedBy", fields: [uploadedById], references: [id], onDelete: Restrict)
+  rows       RoutineImportRow[]
+
+  @@index([fileHash, targetSheet, status])
+  @@index([uploadedById, createdAt])
+  @@index([status, expiresAt])
+  @@map("routine_import_batches")
+}
+
+model RoutineImportRow {
+  id                 Int                     @id @default(autoincrement())
+  batchId            Int
+  sourceSheet        String                  @db.VarChar(255)
+  sourceRow          Int
+  sourceKey          String                  @db.VarChar(255)
+  sourceFingerprint  String                  @db.Char(64)
+  categoryName       String                  @db.VarChar(200)
+  title              String                  @db.VarChar(255)
+  ownerNamesText     String                  @db.Text
+  rawData            Json
+  normalizedData     Json
+  status             RoutineImportRowStatus  @default(REQUIRES_REVIEW)
+  selected           Boolean                 @default(false)
+  proposedActivation RoutineImportActivation @default(INACTIVE)
+  reviewReasons      Json
+  appliedTaskId      Int?
+  version            Int                     @default(1)
+  createdAt          DateTime                @default(now())
+  updatedAt          DateTime                @updatedAt
+
+  batch       RoutineImportBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  appliedTask RoutineTask?        @relation(fields: [appliedTaskId], references: [id], onDelete: SetNull)
+
+  @@unique([batchId, sourceSheet, sourceRow], map: "routine_import_rows_source_identity")
+  @@index([batchId, status, selected])
+  @@index([batchId, title])
+  @@index([sourceKey, sourceFingerprint])
+  @@map("routine_import_rows")
 }
 
 model RoutineTaskAssignee {
@@ -958,4 +1033,30 @@ enum RoutineImportStatus {
   APPLIED
   SKIPPED
   CONFLICT
+}
+
+enum RoutineImportBatchStatus {
+  PREVIEW
+  READY
+  APPLYING
+  COMPLETED
+  FAILED
+  CANCELLED
+  EXPIRED
+}
+
+enum RoutineImportRowStatus {
+  VALID
+  REQUIRES_REVIEW
+  EXCLUDED
+  ALREADY_IMPORTED
+  CONFLICT
+  APPLIED
+  FAILED
+}
+
+enum RoutineImportActivation {
+  ACTIVE
+  INACTIVE
+  HISTORY_ONLY
 }
