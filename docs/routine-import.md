@@ -1,78 +1,45 @@
-# NHF Routine Phase 3: Excel migration
+# NHF Routine Import
 
-เอกสารนี้อธิบาย one-time migration pipeline สำหรับไฟล์ `NHF Routine list_cost_update270625.xls` โดย default เป็น preview และไม่เขียนฐานข้อมูล การเขียนข้อมูลต้องใช้ `--apply` พร้อม manifest ที่ผ่านการตรวจแล้วเท่านั้น
+การนำเข้าข้อมูล Routine ใช้หน้าเว็บสำหรับ Admin เป็นช่องทางเดียว:
 
-## ช่องทางหลักใน Phase 3
+`NHF Routine` → `นำเข้าจาก Excel`
 
-การนำเข้าผ่านหน้าเว็บเป็นช่องทางหลัก: Admin เปิด `NHF Routine` → `นำเข้าจาก Excel` ระบบจะรับไฟล์, สร้าง staging batch, แสดง preview และต้องยืนยันก่อน apply เฉพาะชีต `มสช.` เท่านั้น ชุด API อยู่ที่ `/api/routines/imports/*` และตรวจสิทธิ์ Admin ฝั่ง server ทุก endpoint
+ระบบอ่านเฉพาะชีต `มสช.` ชีตอื่นจะแสดงเป็นรายการที่ถูกละเว้นและไม่ถูกนำเข้า
 
-สคริปต์ด้านล่างเป็น legacy pipeline สำหรับงานตรวจสอบ/กู้คืนแบบ one-time เท่านั้น ไม่ใช่ช่องทางหลักของ UI และไม่ถูกใช้โดยปุ่มอัปโหลด
+## ลำดับการทำงาน
 
-## โครงสร้าง workbook ที่ตรวจพบ
+1. อัปโหลดไฟล์ `.xls` หรือ `.xlsx`
+2. ระบบสร้าง staging preview และเก็บข้อมูลต้นฉบับของแต่ละแถว
+3. Admin ตรวจชื่อรายการและเลือก Employee แบบตรงตัว พร้อมกำหนด `OWNER`/`CO_OWNER`
+4. เลือกแถวที่ต้องการนำเข้า
+5. ยืนยัน Apply เพื่อสร้าง RoutineTask ที่ active
 
-ตรวจไฟล์จริงเมื่อวันที่ 3 สิงหาคม 2569:
+ระบบไม่ใช้ fuzzy matching และไม่สร้าง RoutineTask หาก owner ยัง map ไม่ได้, Employee inactive/soft deleted, มี owner ซ้ำ หรือบทบาท owner ไม่ถูกต้อง
 
-| Sheet | Range | Candidate rows | Merged regions | Formula/date-serial ในข้อมูล |
-| --- | --- | ---: | ---: | --- |
-| มสช. | A1:AF86 | 67 | 25 | ไม่พบ |
-| ม.สคส. | A1:Q28 | 16 | 6 | ไม่พบ |
-| มสส. | A1:Q32 | 20 | 6 | ไม่พบ |
-| มส.ผส. | A1:Q26 | 15 | 5 | ไม่พบ |
+## เงื่อนไขที่ block
 
-ทุก sheet มีหัวตารางผู้รับผิดชอบ/รายการ/กำหนดชำระ/กำหนดสัญญา โดยบาง sheet มีแถว `รอบวางบิล` ต่อเนื่อง มี category rows, blank rows, footer rows และ blank owner ที่ต้องสืบทอดภายใน category เดียวกัน ตัว parser เก็บ merged regions, header rows, blank rows, repeated headers, formula cells และ date-like cells ไว้ใน manifest inspection
+- ไม่มีชื่อรายการ
+- ไม่มีหมวดหรือหน่วยงานที่ใช้ได้
+- ไม่มีผู้รับผิดชอบหรือ map Employee ไม่ได้
+- Employee inactive หรือ soft deleted
+- ผู้รับผิดชอบซ้ำ หรือไม่มี/มี `OWNER` มากกว่าหนึ่งคน
+- source identity ซ้ำหรือ source fingerprint conflict
+- ข้อมูลที่ normalize แล้วไม่สามารถผ่าน validation ของ RoutineTask
 
-ข้อมูลจริงมี 118 candidate rows รวมทั้งหมด การ preview ที่ไม่มี owner mapping จะกัน row ที่มีผู้รับผิดชอบไว้ ไม่สร้าง task โดยอัตโนมัติ
+## เงื่อนไขที่ไม่ block
 
-## Owner mapping
+สัญญาที่หมดอายุ, due date ที่ผ่านมาแล้ว, วันที่เก่า, schedule text เก่า, schedule ที่คลุมเครือหรือขึ้นกับ event และ holiday wording ไม่ทำให้แถวเป็น review blocker ระบบเก็บข้อความต้นฉบับไว้ และใช้ `MANUAL` เมื่อไม่สามารถตีความ schedule ได้อย่างปลอดภัย
 
-ต้องส่ง mapping ที่ Admin ตรวจเองเป็น JSON โดย key ต้องตรงกับข้อความ owner หลังแบ่งหลายคนด้วย `/`, `,` หรือ `และ` และ value ต้องเป็น Employee ID:
+วันที่จาก Excel ที่ parse ได้จะถูกเก็บตามจริง ไม่ถูกแทนด้วยวันที่ปัจจุบัน และไม่ทำให้ task inactive อัตโนมัติ Admin แก้ schedule, contract date, reminder และ active state ได้ภายหลังจากหน้า RoutineTask settings
 
-```json
-{
-  "ชื่อใน Excel แบบตรงตัว": 123
-}
-```
+## Occurrence และ idempotency
 
-ระบบไม่ fuzzy match และไม่เลือก candidate ให้อัตโนมัติ หาก mapping ไม่พบ, Employee ไม่มีอยู่จริง, inactive หรือ soft-deleted row จะไม่ถูกเสนอเป็น active task
+Apply เรียก generation ด้วย `{ excludePastDue: true }` ดังนั้นข้อมูลเก่าจะไม่สร้าง occurrence ย้อนหลัง ข้อมูลวันเดิมยังอยู่ใน RoutineTask และจะสร้างรอบใหม่เมื่อ Admin แก้ schedule หรือวันที่
 
-## คำสั่ง
+source identity และ fingerprint ใน ledger ป้องกันการ Apply ซ้ำและตรวจ source conflict โดยไม่ overwrite RoutineTask เดิม
 
-สร้าง manifest และ preview:
+## Reminder defaults
 
-```text
-npm run routine:import -- --preview --file="C:\path\NHF Routine list_cost_update270625.xls" --owner-mapping="C:\path\routine-owner-mapping.json" --manifest="C:\path\routine-import-manifest.json" --report="C:\path\routine-import-report.json"
-```
+Import ไม่บังคับให้ Admin ตั้ง reminder ทีละแถว และไม่สร้าง preset จากการเดา หากต้องการแจ้งเตือนให้ตั้ง rule ภายหลังใน RoutineTask settings
 
-`--preview` เป็น optional เพราะไม่มี `--apply` ก็จะเป็น preview อยู่แล้ว `--manifest` และ `--report` เป็นไฟล์ output แบบ UTF-8; workbook ต้นฉบับไม่ถูกแก้ไข
-
-หลัง Admin ตรวจ manifest แล้วจึง apply:
-
-```text
-npm run routine:import -- --apply --manifest="C:\path\routine-import-manifest.json" --file="C:\path\NHF Routine list_cost_update270625.xls" --admin-user-id=123 --report="C:\path\routine-import-apply.json"
-```
-
-`--file` ตอน apply เป็น optional แต่ถ้าระบุจะตรวจ SHA-256 กับ manifest ก่อนเริ่มเขียนข้อมูล `--admin-user-id` ต้องเป็น User ที่มีสิทธิ์ Admin และ active; script ไม่รับ role จาก client
-
-## Apply safety
-
-- `RoutineImportLedger` unique ต่อ `sourceFileName + sourceSheet + sourceRow` และเก็บ SHA-256 ของ source row
-- apply ซ้ำด้วย fingerprint เดิมจะ skip; fingerprint เปลี่ยนหรือพบ task เดิมโดยไม่มี ledger จะเป็น conflict และไม่ overwrite
-- แต่ละ row ใช้ transaction เดียวกับ unit/category upsert, task, assignee snapshot, occurrence generation, audit log และ ledger
-- `ACTIVE` อนุญาตเฉพาะ row ที่ schedule/owner/reference ผ่านทั้งหมดและไม่มี review reason
-- `INACTIVE` สร้างเป็นข้อมูลอ้างอิงโดยไม่ generate occurrence
-- `HISTORY_ONLY` เขียน ledger เป็น skipped เท่านั้น ไม่สร้าง task
-- ไม่สร้าง reminder rules จาก Excel อัตโนมัติ เพราะ workbook ไม่มี policy ที่ชัดเจน
-- occurrence ใช้ generation horizon ของ Phase 1 (เดือนปัจจุบันและล่วงหน้า 2 เดือน) จึงไม่สร้าง overdue ย้อนหลังจำนวนมาก
-
-## Schedule และวันที่
-
-รองรับเฉพาะข้อความที่ normalize ได้อย่างชัดเจน เช่น วันที่ N ของเดือน, เดือนถัดไป, สิ้นเดือน, วันที่ของทุกปี และ interval ที่มี anchor date ชัดเจน ข้อความเช่น `วันที่ 16 หรือ 23`, `เมื่อแจ้งหนี้ครบ`, `ตามความเหมาะสม` หรือ event-driven จะเป็น manual/review
-
-ปี พ.ศ. ถูกแปลงเป็น ค.ศ. แบบ explicit เช่น 2568 → 2025 และ 2569 → 2026 ส่วน contract text ที่เป็นช่วงวันที่จะเก็บข้อความเดิมและแยกวันที่ที่ parse ได้ไว้ด้วย ถ้าไม่ครบหรือขัดแย้งจะไม่เดา
-
-ก่อนใช้งาน production ต้อง deploy migration และ generate Prisma Client:
-
-```text
-npx prisma migrate deploy
-npx prisma generate
-```
+ไม่มี CLI import flow หรือ npm script แยกจาก UI

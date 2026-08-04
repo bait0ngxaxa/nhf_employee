@@ -82,7 +82,7 @@ export interface RoutineImportRowsFilter {
     limit: number;
     status?: RoutineImportRowStatus;
     selected?: boolean;
-    issue?: "UNRESOLVED_OWNER" | "AMBIGUOUS_SCHEDULE" | "EXPIRED_CONTRACT";
+    issue?: "UNRESOLVED_OWNER";
     search?: string;
 }
 
@@ -104,9 +104,6 @@ export interface RoutineImportBatchView {
     conflictRows: number;
     failedRows: number;
     selectedRows: number;
-    activeRows: number;
-    inactiveRows: number;
-    expiredRows: number;
     unresolvedOwnerRows: number;
     expiresAt: string | null;
     appliedAt: string | null;
@@ -123,7 +120,7 @@ export interface RoutineImportRowView {
     sourceFingerprint: string;
     status: RoutineImportRowStatus;
     selected: boolean;
-    proposedActivation: "ACTIVE" | "INACTIVE" | "HISTORY_ONLY";
+    proposedActivation: "ACTIVE";
     reviewReasons: string[];
     appliedTaskId: number | null;
     version: number;
@@ -270,9 +267,6 @@ function getBatchView(batch: StoredBatch): RoutineImportBatchView {
         conflictRows: batch.conflictRows,
         failedRows: batch.failedRows,
         selectedRows: batch.selectedRows,
-        activeRows: batch.activeRows,
-        inactiveRows: batch.inactiveRows,
-        expiredRows: batch.expiredRows,
         unresolvedOwnerRows: batch.unresolvedOwnerRows,
         expiresAt: batch.expiresAt?.toISOString() ?? null,
         appliedAt: batch.appliedAt?.toISOString() ?? null,
@@ -309,9 +303,6 @@ function initialRowStatus(
     if (row.requiresReview) {
         return { status: "REQUIRES_REVIEW", selected: false };
     }
-    if (row.proposedActivation !== "ACTIVE") {
-        return { status: "EXCLUDED", selected: false };
-    }
     return { status: "VALID", selected: true };
 }
 
@@ -330,10 +321,9 @@ function mapEmployeeNames(
 }
 
 function withStagingDefaults(row: RoutineImportRow): RoutineImportRow {
-    const activation = row.proposedActivation === "ACTIVE" ? "ACTIVE" : "INACTIVE";
     return {
         ...row,
-        proposedActivation: activation,
+        proposedActivation: "ACTIVE",
         mappedAssignees: row.mappedEmployeeIds.map((employeeId, index) => ({
             employeeId,
             role: index === 0 ? "OWNER" : "CO_OWNER",
@@ -360,7 +350,7 @@ function addExactOwnerResolution(
         mappedEmployeeNames: resolution.mappedEmployeeNames,
         reviewReasons: reasons,
         requiresReview: reasons.length > 0,
-        proposedActivation: reasons.length === 0 ? "ACTIVE" : "INACTIVE",
+        proposedActivation: "ACTIVE",
     });
     return next;
 }
@@ -418,9 +408,6 @@ interface RoutineImportBatchCounts {
     conflictRows: number;
     failedRows: number;
     selectedRows: number;
-    activeRows: number;
-    inactiveRows: number;
-    expiredRows: number;
     unresolvedOwnerRows: number;
 }
 
@@ -434,7 +421,6 @@ function recalculateBatchCounts(
     rows: Array<{
         status: RoutineImportRowStatus;
         selected: boolean;
-        proposedActivation: "ACTIVE" | "INACTIVE" | "HISTORY_ONLY";
         reviewReasons: Prisma.JsonValue | null;
     }>,
 ): RoutineImportBatchCounts {
@@ -448,9 +434,6 @@ function recalculateBatchCounts(
         conflictRows: rows.filter((row) => row.status === "CONFLICT").length,
         failedRows: rows.filter((row) => row.status === "FAILED").length,
         selectedRows: rows.filter((row) => row.selected).length,
-        activeRows: rows.filter((row) => row.selected && row.proposedActivation === "ACTIVE").length,
-        inactiveRows: rows.filter((row) => row.selected && row.proposedActivation === "INACTIVE").length,
-        expiredRows: rows.filter((row) => hasReasonCode(row.reviewReasons, ROUTINE_IMPORT_REVIEW_REASONS.EXPIRED_CONTRACT)).length,
         unresolvedOwnerRows: rows.filter((row) => (
             hasReasonCode(row.reviewReasons, ROUTINE_IMPORT_REVIEW_REASONS.MISSING_OWNER)
             || hasReasonCode(row.reviewReasons, ROUTINE_IMPORT_REVIEW_REASONS.OWNER_MAPPING_EMPLOYEE_NOT_FOUND)
@@ -720,13 +703,6 @@ export async function getRoutineImportRows(
             orderBy: { sourceRow: "asc" },
         });
         const filteredRows = allRows.filter((row) => {
-            if (filters.issue === "EXPIRED_CONTRACT") {
-                return hasReasonCode(row.reviewReasons, ROUTINE_IMPORT_REVIEW_REASONS.EXPIRED_CONTRACT);
-            }
-            if (filters.issue === "AMBIGUOUS_SCHEDULE") {
-                return hasReasonCode(row.reviewReasons, ROUTINE_IMPORT_REVIEW_REASONS.AMBIGUOUS_SCHEDULE)
-                    || hasReasonCode(row.reviewReasons, ROUTINE_IMPORT_REVIEW_REASONS.UNSUPPORTED_EVENT_SCHEDULE);
-            }
             return hasReasonCode(row.reviewReasons, ROUTINE_IMPORT_REVIEW_REASONS.MISSING_OWNER)
                 || hasReasonCode(row.reviewReasons, ROUTINE_IMPORT_REVIEW_REASONS.OWNER_MAPPING_EMPLOYEE_NOT_FOUND)
                 || hasReasonCode(row.reviewReasons, ROUTINE_IMPORT_REVIEW_REASONS.OWNER_MAPPING_EMPLOYEE_INACTIVE);
@@ -765,15 +741,11 @@ function validateDate(value: string | null, label: string): void {
 }
 
 function buildReviewReasons(
-    current: RoutineImportRow,
     input: RoutineImportRowUpdateInput,
     referenceData: RoutineImportReferenceData,
     employees: RoutineImportReferenceData["employees"],
-    asOfDate: string,
 ): string[] {
-    const reasons = current.reviewReasons.filter(
-        (reason) => reason === ROUTINE_IMPORT_REVIEW_REASONS.FORMULA_CELL,
-    );
+    const reasons: string[] = [];
     const unit = referenceData.units.find(
         (candidate) => candidate.code === ROUTINE_IMPORT_TARGET_UNIT_CODE,
     );
@@ -801,19 +773,12 @@ function buildReviewReasons(
         }
     }
     if (input.mappedAssignees.length > 0 && ownerCount !== 1) {
-        addReason(reasons, "ต้องมีผู้รับผิดชอบหลัก 1 คน");
+        addReason(reasons, ROUTINE_IMPORT_REVIEW_REASONS.INVALID_OWNER_ROLE);
     }
     validateDate(input.contractStartDate, "วันเริ่มสัญญา");
     validateDate(input.contractEndDate, "วันสิ้นสุดสัญญา");
     if (input.contractStartDate && input.contractEndDate && input.contractStartDate > input.contractEndDate) {
         addReason(reasons, ROUTINE_IMPORT_REVIEW_REASONS.INVALID_CONTRACT_DATE_RANGE);
-    }
-    if (
-        input.proposedActivation === "ACTIVE"
-        && input.contractEndDate
-        && input.contractEndDate < asOfDate
-    ) {
-        addReason(reasons, ROUTINE_IMPORT_REVIEW_REASONS.EXPIRED_CONTRACT);
     }
     if (ROUTINE_IMPORT_PLACEHOLDER_TITLES.has(input.title.trim())) {
         addReason(reasons, ROUTINE_IMPORT_REVIEW_REASONS.PLACEHOLDER_ROW);
@@ -825,7 +790,6 @@ function buildUpdatedRow(
     current: RoutineImportRow,
     input: RoutineImportRowUpdateInput,
     referenceData: RoutineImportReferenceData,
-    asOfDate: string,
 ): RoutineImportRow {
     const employees = referenceData.employees;
     let normalizedConfig: RoutineImportJsonObject;
@@ -837,7 +801,7 @@ function buildUpdatedRow(
     } catch {
         throw new RoutineValidationError("กำหนดค่าตารางงานประจำไม่ถูกต้อง");
     }
-    const reasons = buildReviewReasons(current, input, referenceData, employees, asOfDate);
+    const reasons = buildReviewReasons(input, referenceData, employees);
     const mappedEmployeeIds = input.mappedAssignees.map((assignee) => assignee.employeeId);
     const mappedEmployeeNames = mapEmployeeNames(mappedEmployeeIds, referenceData);
     return {
@@ -860,7 +824,7 @@ function buildUpdatedRow(
         extraDetails: input.extraDetails?.trim() || null,
         requiresReview: reasons.length > 0,
         reviewReasons: reasons,
-        proposedActivation: input.proposedActivation,
+        proposedActivation: "ACTIVE",
     };
 }
 
@@ -893,7 +857,7 @@ export async function updateRoutineImportRow(
         }
         const current = parseRoutineImportRow(row.normalizedData);
         const referenceData = await loadRoutineReferenceDataInTransaction(tx);
-        const updatedData = buildUpdatedRow(current, input, referenceData, toBangkokCalendarDate(row.batch.asOfDate));
+        const updatedData = buildUpdatedRow(current, input, referenceData);
         const selectedStatus: RoutineImportRowStatus = updatedData.requiresReview
             ? "REQUIRES_REVIEW"
             : input.selected ? "VALID" : "EXCLUDED";
@@ -907,7 +871,7 @@ export async function updateRoutineImportRow(
                 normalizedData: toPrismaJson(updatedData),
                 status: selectedStatus,
                 selected: selectedForStorage,
-                proposedActivation: input.proposedActivation,
+                proposedActivation: "ACTIVE",
                 reviewReasons: toPrismaJson(updatedData.reviewReasons),
                 version: { increment: 1 },
             },
@@ -934,7 +898,6 @@ export async function updateRoutineImportRow(
                     batchId,
                     sourceKey: row.sourceKey,
                     selected: selectedForStorage,
-                    proposedActivation: input.proposedActivation,
                     affectedEmployeeIds: updatedData.mappedEmployeeIds,
                 }),
             },
@@ -1124,8 +1087,6 @@ export async function applyRoutineImportBatch(
                         targetSheet: batch.targetSheet,
                         totalSelected: rows.length,
                         appliedRows: completed.appliedRows,
-                        activeRows: rows.filter((row) => row.proposedActivation === "ACTIVE").length,
-                        inactiveRows: rows.filter((row) => row.proposedActivation === "INACTIVE").length,
                         conflictRows: completed.conflictRows,
                     }),
                 },

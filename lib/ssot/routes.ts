@@ -103,18 +103,10 @@ export const API_ROUTES = {
         occurrences: "/api/routines/occurrences",
         occurrenceById: (id: number | string): string =>
             `/api/routines/occurrences/${id}`,
-        occurrenceStatusById: (id: number | string): string =>
-            `/api/routines/occurrences/${id}/status`,
         occurrenceDueDateById: (id: number | string): string =>
             `/api/routines/occurrences/${id}/due-date`,
         occurrenceAssigneesById: (id: number | string): string =>
             `/api/routines/occurrences/${id}/assignees`,
-        occurrenceSkipById: (id: number | string): string =>
-            `/api/routines/occurrences/${id}/skip`,
-        occurrenceCancelById: (id: number | string): string =>
-            `/api/routines/occurrences/${id}/cancel`,
-        occurrenceReopenById: (id: number | string): string =>
-            `/api/routines/occurrences/${id}/reopen`,
         tasks: "/api/routines/tasks",
         taskById: (id: number | string): string => `/api/routines/tasks/${id}`,
         reference: "/api/routines/reference",

@@ -226,11 +226,3 @@ export function normalizeCellDate(
     const dates = parseSourceDates(value);
     return dates.length === 1 ? dates[0].date : null;
 }
-
-export function isDateExpired(
-    endDate: CalendarDate | null,
-    asOfDate: CalendarDate,
-): boolean {
-    if (!endDate) return false;
-    return endDate < asOfDate;
-}

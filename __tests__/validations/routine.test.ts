@@ -76,17 +76,18 @@ describe("NHF Routine validation", () => {
         });
         expect(task.success).toBe(true);
 
-        expect(
-            routineReminderOutboxPayloadSchema.safeParse({
-                occurrenceId: 1,
-                taskId: 2,
-                ruleId: 3,
-                reminderVersion: 1,
-                dueDate: "2026-08-05",
-                expectedStatus: "TODO",
-                createdAt: "2026-08-01T02:00:00.000Z",
-            }).success,
-        ).toBe(true);
+        const validPayload = routineReminderOutboxPayloadSchema.safeParse({
+            occurrenceId: 1,
+            taskId: 2,
+            ruleId: 3,
+            reminderVersion: 1,
+            dueDate: "2026-08-05",
+            createdAt: "2026-08-01T02:00:00.000Z",
+        });
+        expect(validPayload.success).toBe(true);
+        if (validPayload.success) {
+            expect(Object.keys(validPayload.data)).not.toContain("expected" + "Status");
+        }
 
         expect(
             routineReminderOutboxPayloadSchema.safeParse({
@@ -95,7 +96,6 @@ describe("NHF Routine validation", () => {
                 ruleId: 3,
                 reminderVersion: 1,
                 dueDate: "2026-08-05",
-                expectedStatus: "TODO",
                 createdAt: "",
             }).success,
         ).toBe(false);

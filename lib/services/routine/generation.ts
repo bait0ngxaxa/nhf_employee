@@ -106,13 +106,7 @@ export async function generateRoutineTaskOccurrencesInTransaction(
         : null;
 
     const currentDate = toBangkokCalendarDate(now);
-    const eligibleOccurrences = scheduledOccurrences.filter((occurrence) => {
-        if (
-            options.excludePastDue
-            && compareCalendarDates(occurrence.dueDate, currentDate) < 0
-        ) {
-            return false;
-        }
+    const generationCandidates = scheduledOccurrences.filter((occurrence) => {
         if (
             contractStartDate
             && compareCalendarDates(occurrence.dueDate, contractStartDate) < 0
@@ -130,7 +124,7 @@ export async function generateRoutineTaskOccurrencesInTransaction(
 
     let created = 0;
     let existing = 0;
-    for (const occurrence of eligibleOccurrences) {
+    for (const occurrence of generationCandidates) {
         const current = await tx.routineOccurrence.findUnique({
             where: {
                 taskId_periodKey: {
@@ -143,7 +137,6 @@ export async function generateRoutineTaskOccurrencesInTransaction(
                 dueDate: true,
                 originalDueDate: true,
                 scheduleVersion: true,
-                status: true,
             },
         });
         if (current) {
@@ -151,8 +144,7 @@ export async function generateRoutineTaskOccurrencesInTransaction(
                 current.scheduleVersion !== undefined
                 && current.scheduleVersion !== task.version
                 && current.dueDate instanceof Date
-                && current.originalDueDate instanceof Date
-                && (current.status === "TODO" || current.status === "IN_PROGRESS");
+                && current.originalDueDate instanceof Date;
 
             if (canRefreshSchedule) {
                 const currentOriginalDueDate = toBangkokCalendarDate(
@@ -194,6 +186,13 @@ export async function generateRoutineTaskOccurrencesInTransaction(
             continue;
         }
 
+        if (
+            options.excludePastDue
+            && compareCalendarDates(occurrence.dueDate, currentDate) < 0
+        ) {
+            continue;
+        }
+
         try {
             await tx.routineOccurrence.upsert({
                 where: {
@@ -208,7 +207,6 @@ export async function generateRoutineTaskOccurrencesInTransaction(
                     periodKey: occurrence.periodKey,
                     dueDate: calendarDateToDate(occurrence.dueDate),
                     originalDueDate: calendarDateToDate(occurrence.originalDueDate),
-                    status: "TODO",
                     scheduleVersion: task.version,
                     assignees: {
                         create: task.assignees.map((assignee) => ({
@@ -228,7 +226,7 @@ export async function generateRoutineTaskOccurrencesInTransaction(
     }
 
     return {
-        evaluated: eligibleOccurrences.length,
+        evaluated: generationCandidates.length,
         created,
         existing,
     };

@@ -9,7 +9,10 @@ import {
     routineFeatureGuard,
     routineRequestSizeGuard,
 } from "@/lib/server/routine-api";
-import { updateRoutineOccurrenceDueDate } from "@/lib/services/routine";
+import {
+    getRoutineOccurrenceById,
+    updateRoutineOccurrenceDueDate,
+} from "@/lib/services/routine";
 import { routineDueDateSchema, routineIdParamSchema } from "@/lib/validations/routine";
 
 export async function PATCH(
@@ -33,8 +36,13 @@ export async function PATCH(
         const parsed = routineDueDateSchema.safeParse(body.body);
         if (!parsed.success) return NextResponse.json({ error: "ข้อมูลไม่ถูกต้อง", details: parsed.error.flatten().fieldErrors }, { status: 400 });
         const actor = createRoutineCommandActor({ id: auth.user.id, role: auth.user.role ?? "ADMIN", email: auth.user.email ?? "" }, request.headers);
-        const occurrence = await updateRoutineOccurrenceDueDate(Number(parsedId.data), parsed.data, actor);
-        return NextResponse.json({ occurrence });
+        await updateRoutineOccurrenceDueDate(Number(parsedId.data), parsed.data, actor);
+        const result = await getRoutineOccurrenceById(Number(parsedId.data), {
+            actor,
+            employeeId: null,
+        });
+        if (!result) return NextResponse.json({ error: "ไม่พบรายการ Routine" }, { status: 404 });
+        return NextResponse.json({ occurrence: result.occurrence });
     } catch (error) {
         return routineErrorResponse(error, "Error updating routine occurrence due date");
     }

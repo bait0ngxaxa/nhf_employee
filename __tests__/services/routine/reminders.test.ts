@@ -52,7 +52,6 @@ function buildPayload(overrides: Record<string, unknown> = {}) {
         ruleId: 31,
         reminderVersion: 2,
         dueDate: "2026-08-05",
-        expectedStatus: "TODO",
         createdAt: "2026-08-03T02:00:00.000Z",
         ...overrides,
     };
@@ -63,7 +62,6 @@ function buildOccurrence(overrides: Record<string, unknown> = {}) {
         id: 91,
         taskId: 71,
         dueDate: new Date("2026-08-05T00:00:00.000Z"),
-        status: "TODO",
         reminderVersion: 2,
         task: {
             id: 71,
@@ -132,7 +130,7 @@ describe("Routine reminder dispatch", () => {
     });
 
     it.each([
-        ["completed", { status: "COMPLETED" }],
+        ["inactive task", { task: { ...buildOccurrence().task, isActive: false } }],
         ["version changed", { reminderVersion: 3 }],
         ["due date changed", { dueDate: new Date("2026-08-06T00:00:00.000Z") }],
     ])("supersedes a stale reminder when %s", async (_label, overrides) => {

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { ClipboardCheck, FileSpreadsheet, ListTodo, Settings2, Users } from "lucide-react";
+import { CalendarClock, FileSpreadsheet, List, Settings2, Users } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import useSWR from "swr";
 
@@ -24,7 +24,7 @@ import type {
     PaginatedOccurrencesResponse,
     PaginatedTasksResponse,
     RoutineReferenceData,
-    RoutineStatus,
+    RoutineTimingStatus,
     RoutineSummaryResponse,
     RoutineTask,
 } from "../routine/types";
@@ -49,7 +49,7 @@ function RoutineOccurrencePanel({
     occurrenceId: number | null;
 }) {
     const [search, setSearch] = useState("");
-    const [status, setStatus] = useState<RoutineStatus | "">("");
+    const [timingStatus, setTimingStatus] = useState<RoutineTimingStatus | "">("");
     const [page, setPage] = useState(1);
     const scope = isAdmin ? "all" : "mine";
     const key = useMemo(() => {
@@ -60,9 +60,9 @@ function RoutineOccurrencePanel({
         });
         if (occurrenceId !== null) params.set("occurrenceId", String(occurrenceId));
         if (search.trim()) params.set("search", search.trim());
-        if (status) params.set("status", status);
+        if (timingStatus) params.set("timingStatus", timingStatus);
         return `${API_ROUTES.routines.occurrences}?${params.toString()}`;
-    }, [occurrenceId, page, scope, search, status]);
+    }, [occurrenceId, page, scope, search, timingStatus]);
     const { data, error, isLoading, mutate } = useSWR<PaginatedOccurrencesResponse, Error>(key, fetchRoutine);
     const { data: reference } = useSWR<RoutineReferenceData, Error>(
         isAdmin ? API_ROUTES.routines.reference : null,
@@ -71,22 +71,21 @@ function RoutineOccurrencePanel({
 
     useEffect(() => {
         setPage(1);
-    }, [search, status, isAdmin, occurrenceId]);
+    }, [search, timingStatus, isAdmin, occurrenceId]);
 
     return (
         <div className="space-y-4">
             <div className="grid gap-3 rounded-xl border border-border-subtle bg-surface-raised p-4 md:grid-cols-[1fr_220px_auto] md:items-end">
-                <label className="grid gap-1 text-sm font-medium text-content-body">ค้นหางาน
-                    <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="ค้นหาชื่องาน หน่วยงาน หรือหมวดหมู่" />
+                <label className="grid gap-1 text-sm font-medium text-content-body">ค้นหารายการ
+                    <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="ค้นหาชื่อรายการ หน่วยงาน หรือหมวดหมู่" />
                 </label>
-                <label className="grid gap-1 text-sm font-medium text-content-body">สถานะ
-                    <select className="h-11 rounded-md border border-input bg-background px-3 text-sm" value={status} onChange={(event) => setStatus(event.target.value as RoutineStatus | "")}>
-                        <option value="">ทุกสถานะ</option>
-                        <option value="TODO">รอดำเนินการ</option>
-                        <option value="IN_PROGRESS">กำลังดำเนินการ</option>
-                        <option value="COMPLETED">เสร็จแล้ว</option>
-                        <option value="SKIPPED">ข้ามงาน</option>
-                        <option value="CANCELLED">ยกเลิก</option>
+                <label className="grid gap-1 text-sm font-medium text-content-body">ช่วงเวลา
+                    <select className="h-11 rounded-md border border-input bg-background px-3 text-sm" value={timingStatus} onChange={(event) => setTimingStatus(event.target.value as RoutineTimingStatus | "")}>
+                        <option value="">ทุกช่วงเวลา</option>
+                        <option value="OVERDUE">เกินกำหนด</option>
+                        <option value="DUE_TODAY">ถึงกำหนดวันนี้</option>
+                        <option value="DUE_SOON">ใกล้ถึงกำหนด</option>
+                        <option value="UPCOMING">ยังไม่ถึงกำหนด</option>
                     </select>
                 </label>
                 <Button type="button" variant="outline" onClick={() => void mutate()}>รีเฟรช</Button>
@@ -167,13 +166,13 @@ export function RoutineSection() {
     const tabs: SectionTabItem[] = [
         {
             value: "mine",
-            label: "งานของฉัน",
-            icon: ListTodo,
+            label: "รายการของฉัน",
+            icon: List,
             content: <RoutineOccurrencePanel isAdmin={false} occurrenceId={occurrenceId} />,
         },
         {
             value: "all",
-            label: "งานทั้งหมด (Admin)",
+            label: "รายการทั้งหมด (Admin)",
             icon: Users,
             visible: isAdmin,
             content: <RoutineOccurrencePanel isAdmin occurrenceId={occurrenceId} />,
@@ -197,13 +196,13 @@ export function RoutineSection() {
     return (
         <SectionShell gradientFrom="transparent" gradientTo="transparent" className="border-border-subtle/70 bg-surface shadow-sm">
             <SectionHeader
-                icon={ClipboardCheck}
+                icon={CalendarClock}
                 title="NHF Routine"
-                subtitle="บันทึกและติดตามงานประจำขององค์กรให้เห็นงานถัดไปและประวัติการดำเนินงานในที่เดียว"
+                subtitle="รวมรายการ Routine ตามกำหนดเวลา ผู้รับผิดชอบ และการแจ้งเตือนที่เกี่ยวข้อง"
                 tone="brand"
             />
             <RoutineKpiGrid summary={summaryData?.summary} isLoading={summaryLoading} />
-            {summaryError ? <p className="text-sm text-status-danger-foreground" role="alert">โหลดสรุปงานไม่สำเร็จ: {summaryError.message}</p> : null}
+            {summaryError ? <p className="text-sm text-status-danger-foreground" role="alert">โหลดสรุปรายการไม่สำเร็จ: {summaryError.message}</p> : null}
             <SectionTabs value={safeTab} onValueChange={setActiveTab} tabs={tabs} activeColor="var(--primary)" ariaLabel="แท็บ NHF Routine" />
         </SectionShell>
     );

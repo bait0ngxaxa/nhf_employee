@@ -37,9 +37,6 @@ model User {
   leaveRequestIdempotencies    LeaveRequestIdempotency[]
   createdRoutineTasks         RoutineTask[]               @relation("RoutineTaskCreatedBy")
   updatedRoutineTasks         RoutineTask[]               @relation("RoutineTaskUpdatedBy")
-  completedRoutineOccurrences RoutineOccurrence[]         @relation("RoutineOccurrenceCompletedBy")
-  skippedRoutineOccurrences   RoutineOccurrence[]         @relation("RoutineOccurrenceSkippedBy")
-  cancelledRoutineOccurrences RoutineOccurrence[]         @relation("RoutineOccurrenceCancelledBy")
   routineImportLedgers        RoutineImportLedger[]       @relation("RoutineImportAppliedBy")
   routineImportBatches         RoutineImportBatch[]        @relation("RoutineImportUploadedBy")
 
@@ -336,11 +333,6 @@ enum AuditAction {
   ROUTINE_TASK_CREATE
   ROUTINE_TASK_UPDATE
   ROUTINE_TASK_DEACTIVATE
-  ROUTINE_OCCURRENCE_START
-  ROUTINE_OCCURRENCE_COMPLETE
-  ROUTINE_OCCURRENCE_SKIP
-  ROUTINE_OCCURRENCE_CANCEL
-  ROUTINE_OCCURRENCE_REOPEN
   ROUTINE_OCCURRENCE_REASSIGN
   ROUTINE_OCCURRENCE_DUE_DATE_CHANGE
   ROUTINE_IMPORT_UPLOAD
@@ -879,9 +871,6 @@ model RoutineImportBatch {
   conflictRows     Int                      @default(0)
   failedRows       Int                      @default(0)
   selectedRows     Int                      @default(0)
-  activeRows       Int                      @default(0)
-  inactiveRows     Int                      @default(0)
-  expiredRows      Int                      @default(0)
   unresolvedOwnerRows Int                   @default(0)
   expiresAt        DateTime?
   appliedAt        DateTime?
@@ -913,7 +902,7 @@ model RoutineImportRow {
   normalizedData     Json
   status             RoutineImportRowStatus  @default(REQUIRES_REVIEW)
   selected           Boolean                 @default(false)
-  proposedActivation RoutineImportActivation @default(INACTIVE)
+  proposedActivation RoutineImportActivation @default(ACTIVE)
   reviewReasons      Json
   appliedTaskId      Int?
   version            Int                     @default(1)
@@ -943,39 +932,21 @@ model RoutineTaskAssignee {
 }
 
 model RoutineOccurrence {
-  id                 Int                     @id @default(autoincrement())
-  taskId             Int
-  periodKey          String                  @db.VarChar(32)
-  dueDate            DateTime                @db.Date
-  originalDueDate    DateTime                @db.Date
-  status             RoutineOccurrenceStatus @default(TODO)
-  scheduleVersion    Int
-  reminderVersion    Int                     @default(1)
-  startedAt          DateTime?
-  completedAt        DateTime?
-  completedById      Int?
-  completionNote     String?                 @db.Text
-  referenceNo        String?                 @db.VarChar(255)
-  skippedAt          DateTime?
-  skippedById        Int?
-  skipReason         String?                 @db.Text
-  cancelledAt        DateTime?
-  cancelledById      Int?
-  cancellationReason String?                 @db.Text
-  createdAt          DateTime                @default(now())
-  updatedAt          DateTime                @updatedAt
+  id              Int      @id @default(autoincrement())
+  taskId          Int
+  periodKey       String   @db.VarChar(32)
+  dueDate         DateTime @db.Date
+  originalDueDate DateTime @db.Date
+  scheduleVersion Int
+  reminderVersion Int      @default(1)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
-  task        RoutineTask                 @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  completedBy User?                       @relation("RoutineOccurrenceCompletedBy", fields: [completedById], references: [id], onDelete: SetNull)
-  skippedBy   User?                       @relation("RoutineOccurrenceSkippedBy", fields: [skippedById], references: [id], onDelete: SetNull)
-  cancelledBy User?                       @relation("RoutineOccurrenceCancelledBy", fields: [cancelledById], references: [id], onDelete: SetNull)
-  assignees   RoutineOccurrenceAssignee[]
+  task      RoutineTask                 @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  assignees RoutineOccurrenceAssignee[]
 
   @@unique([taskId, periodKey])
-  @@index([status, dueDate])
-  @@index([taskId, status])
   @@index([dueDate])
-  @@index([completedAt])
   @@map("routine_occurrences")
 }
 
@@ -1009,14 +980,6 @@ enum RoutineBusinessDayPolicy {
 enum RoutineAssigneeRole {
   OWNER
   CO_OWNER
-}
-
-enum RoutineOccurrenceStatus {
-  TODO
-  IN_PROGRESS
-  COMPLETED
-  SKIPPED
-  CANCELLED
 }
 
 enum RoutineReminderChannel {
@@ -1057,6 +1020,4 @@ enum RoutineImportRowStatus {
 
 enum RoutineImportActivation {
   ACTIVE
-  INACTIVE
-  HISTORY_ONLY
 }

@@ -40,14 +40,18 @@ describe("routine import schedule normalization", () => {
             });
     });
 
-    it("keeps ambiguous and event-driven schedules manual", () => {
+    it("keeps ambiguous and event-driven schedules manual without blocking import", () => {
         const ambiguous = normalizeRoutineSchedule("วันที่ 16 หรือ 23 ของเดือนถัดไป");
-        expect(ambiguous.normalizedSchedule).toBeNull();
-        expect(ambiguous.reviewReasons).toContain("AMBIGUOUS_SCHEDULE");
+        expect(ambiguous.normalizedSchedule).toEqual({
+            scheduleType: "MANUAL",
+            scheduleConfig: {},
+            businessDayPolicy: "NONE",
+        });
+        expect(ambiguous.reviewReasons).toEqual([]);
 
         const eventDriven = normalizeRoutineSchedule("เมื่อแจ้งหนี้ครบทุกเบอร์");
-        expect(eventDriven.normalizedSchedule).toBeNull();
-        expect(eventDriven.reviewReasons).toContain("UNSUPPORTED_EVENT_SCHEDULE");
+        expect(eventDriven.normalizedSchedule?.scheduleType).toBe("MANUAL");
+        expect(eventDriven.reviewReasons).toEqual([]);
     });
 
     it("normalizes explicit Thai and ISO one-time dates", () => {
@@ -71,13 +75,12 @@ describe("routine import schedule normalization", () => {
         });
     });
 
-    it("flags holiday semantics because only weekend shifting exists in Phase 1", () => {
+    it("keeps holiday wording as a manual schedule without blocking import", () => {
         const result = normalizeRoutineSchedule(
             "วันที่ 25 ของเดือน (หรือก่อน ถ้า 25 ตรงวันหยุด)",
         );
-        expect(result.normalizedSchedule?.businessDayPolicy).toBe(
-            "PREVIOUS_BUSINESS_DAY",
-        );
-        expect(result.reviewReasons).toContain("HOLIDAY_CALENDAR_NOT_SUPPORTED");
+        expect(result.normalizedSchedule?.scheduleType).toBe("MANUAL");
+        expect(result.normalizedSchedule?.businessDayPolicy).toBe("NONE");
+        expect(result.reviewReasons).toEqual([]);
     });
 });

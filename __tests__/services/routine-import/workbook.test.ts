@@ -2,7 +2,6 @@ import * as XLSX from "xlsx";
 import { describe, expect, it } from "vitest";
 
 import {
-    assertRoutineImportManifestMatchesWorkbook,
     buildRoutineImportManifest,
     computeRoutineImportRowFingerprint,
     readRoutineWorkbook,
@@ -56,7 +55,7 @@ describe("routine workbook extraction", () => {
         expect(manifest.rows[1]?.title).toBe("ค่าโทรศัพท์");
         expect(manifest.rows[1]?.ownerNames).toEqual(["กัลยาณี"]);
         expect(manifest.rows[0]?.proposedActivation).toBe("ACTIVE");
-        expect(manifest.rows[1]?.proposedActivation).toBe("INACTIVE");
+        expect(manifest.rows[1]?.proposedActivation).toBe("ACTIVE");
         expect(manifest.inspection.sheets[0]?.mergedRegions).toHaveLength(1);
         expect(manifest.inspection.sheets[0]?.repeatedHeaderRows).toEqual([7]);
         expect(manifest.inspection.sheets[0]?.blankRows).toContain(6);
@@ -79,7 +78,29 @@ describe("routine workbook extraction", () => {
         );
         expect(manifest.inspection.sheets[0]?.formulaCells).toContain("D4");
         expect(manifest.inspection.sheets[0]?.numericDateCells).toContain("E4");
-        expect(manifest.rows[0]?.reviewReasons).toContain("FORMULA_CELL");
+        expect(manifest.rows[0]?.reviewReasons).toEqual([]);
+        expect(manifest.rows[0]?.normalizedSchedule?.scheduleType).toBe("MONTHLY_DAY");
+    });
+
+    it("does not block an expired contract or an ambiguous old schedule", () => {
+        const workbook = readRoutineWorkbook(buildFixtureWorkbook());
+        const sheet = workbook.Sheets.U1;
+        if (!sheet) throw new Error("fixture sheet missing");
+        sheet.E4 = { t: "s", v: "1 ม.ค. 60 - 31 ธ.ค. 65" };
+
+        const manifest = buildRoutineImportManifest(
+            workbook,
+            "fixture.xls",
+            "f".repeat(64),
+            "2026-08-03",
+            { กัลยาณี: 10 },
+            referenceData,
+        );
+
+        expect(manifest.rows[0]?.requiresReview).toBe(false);
+        expect(manifest.rows[0]?.contractEndDate).toBe("2022-12-31");
+        expect(manifest.rows[1]?.requiresReview).toBe(false);
+        expect(manifest.rows[1]?.normalizedSchedule?.scheduleType).toBe("MANUAL");
     });
 
     it("changes the source fingerprint when inherited owner context changes", () => {
@@ -107,32 +128,6 @@ describe("routine workbook extraction", () => {
                 ownerNames: ["พี่นวล"],
             }),
         );
-    });
-
-    it("detects a changed source row before apply", () => {
-        const workbook = readRoutineWorkbook(buildFixtureWorkbook());
-        const manifest = buildRoutineImportManifest(
-            workbook,
-            "fixture.xls",
-            "d".repeat(64),
-            "2026-08-03",
-            { กัลยาณี: 10 },
-            referenceData,
-        );
-        expect(() => assertRoutineImportManifestMatchesWorkbook(
-            manifest,
-            workbook,
-            "fixture.xls",
-        )).not.toThrow();
-
-        const sheet = workbook.Sheets.U1;
-        if (!sheet) throw new Error("fixture sheet missing");
-        sheet.C4 = { t: "s", v: "ค่าไฟฟ้าที่แก้ไข" };
-        expect(() => assertRoutineImportManifestMatchesWorkbook(
-            manifest,
-            workbook,
-            "fixture.xls",
-        )).toThrow("source row ไม่ตรง");
     });
 
     it("extracts only the explicitly allowlisted sheet", () => {

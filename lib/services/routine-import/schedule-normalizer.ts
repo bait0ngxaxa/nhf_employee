@@ -4,7 +4,6 @@ import type {
 
 import {
     ROUTINE_IMPORT_DEFAULT_BUSINESS_DAY_POLICY,
-    ROUTINE_IMPORT_REVIEW_REASONS,
 } from "./constants";
 import {
     normalizeSourceText,
@@ -72,21 +71,20 @@ export function normalizeRoutineSchedule(
 ): RoutineScheduleNormalizationResult {
     if (!scheduleText || normalizeSourceText(scheduleText).length === 0) {
         return {
-            normalizedSchedule: null,
-            reviewReasons: [ROUTINE_IMPORT_REVIEW_REASONS.MISSING_SCHEDULE],
+            normalizedSchedule: makeSchedule("MANUAL", {}),
+            reviewReasons: [],
         };
     }
 
     const normalized = normalizeSourceText(scheduleText);
     const reviewReasons: string[] = [];
-    const holidayPolicy = normalized.includes("วันหยุด")
-        ? "PREVIOUS_BUSINESS_DAY"
-        : ROUTINE_IMPORT_DEFAULT_BUSINESS_DAY_POLICY;
     if (normalized.includes("วันหยุด")) {
-        reviewReasons.push(
-            ROUTINE_IMPORT_REVIEW_REASONS.HOLIDAY_CALENDAR_NOT_SUPPORTED,
-        );
+        return {
+            normalizedSchedule: makeSchedule("MANUAL", {}),
+            reviewReasons,
+        };
     }
+    const holidayPolicy = ROUTINE_IMPORT_DEFAULT_BUSINESS_DAY_POLICY;
 
     const monthlyMatch = /^(?:ภายใน\s*)?(?:ส่งบุคคล\s*)?วันที่\s*(\d{1,2})\s*ของเดือน(ถัดไป)?(?:\s*\(.*\))?$/u.exec(
         normalized,
@@ -168,10 +166,9 @@ export function normalizeRoutineSchedule(
                 reviewReasons: uniqueReasons(reviewReasons),
             };
         }
-        reviewReasons.push(ROUTINE_IMPORT_REVIEW_REASONS.AMBIGUOUS_SCHEDULE);
         return {
-            normalizedSchedule: null,
-            reviewReasons: uniqueReasons(reviewReasons),
+            normalizedSchedule: makeSchedule("MANUAL", {}),
+            reviewReasons: [],
         };
     }
 
@@ -194,16 +191,8 @@ export function normalizeRoutineSchedule(
         }
     }
 
-    const unsupportedEvent = /เมื่อ|ตามความเหมาะสม|โดยประมาณ|ก่อนวัน|ได้รับเอกสาร|ตามวาระ|เข้าและออก|ลาออก|ปีละ|รอบวางบิล|ต่ออัตโนมัติ/u.test(
-        normalized,
-    );
-    reviewReasons.push(
-        unsupportedEvent
-            ? ROUTINE_IMPORT_REVIEW_REASONS.UNSUPPORTED_EVENT_SCHEDULE
-            : ROUTINE_IMPORT_REVIEW_REASONS.AMBIGUOUS_SCHEDULE,
-    );
     return {
-        normalizedSchedule: null,
-        reviewReasons: uniqueReasons(reviewReasons),
+        normalizedSchedule: makeSchedule("MANUAL", {}),
+        reviewReasons: [],
     };
 }

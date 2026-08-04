@@ -70,8 +70,8 @@ describe("RoutineSection tabs", () => {
 
         render(<RoutineSection />);
 
-        expect(screen.getByText("งานของฉัน")).toBeInTheDocument();
-        expect(screen.queryByText("งานทั้งหมด (Admin)")).not.toBeInTheDocument();
+        expect(screen.getByText("รายการของฉัน")).toBeInTheDocument();
+        expect(screen.queryByText("รายการทั้งหมด (Admin)")).not.toBeInTheDocument();
         expect(screen.queryByText("ตั้งค่างานประจำ")).not.toBeInTheDocument();
         expect(screen.queryByText("นำเข้าจาก Excel")).not.toBeInTheDocument();
     });
@@ -83,8 +83,8 @@ describe("RoutineSection tabs", () => {
 
         render(<RoutineSection />);
 
-        expect(screen.getByText("งานของฉัน")).toBeInTheDocument();
-        expect(screen.getByText("งานทั้งหมด (Admin)")).toBeInTheDocument();
+        expect(screen.getByText("รายการของฉัน")).toBeInTheDocument();
+        expect(screen.getByText("รายการทั้งหมด (Admin)")).toBeInTheDocument();
         expect(screen.getByText("ตั้งค่างานประจำ")).toBeInTheDocument();
         expect(screen.getByText("นำเข้าจาก Excel")).toBeInTheDocument();
     });

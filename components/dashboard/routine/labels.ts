@@ -1,11 +1,10 @@
-import type { RoutineStatus } from "./types";
+import type { RoutineTimingStatus } from "./types";
 
-export const ROUTINE_STATUS_LABELS: Record<RoutineStatus, string> = {
-    TODO: "รอดำเนินการ",
-    IN_PROGRESS: "กำลังดำเนินการ",
-    COMPLETED: "เสร็จแล้ว",
-    SKIPPED: "ข้ามงาน",
-    CANCELLED: "ยกเลิก",
+export const ROUTINE_TIMING_STATUS_LABELS: Record<RoutineTimingStatus, string> = {
+    OVERDUE: "เกินกำหนด",
+    DUE_TODAY: "ถึงกำหนดวันนี้",
+    DUE_SOON: "ใกล้ถึงกำหนด",
+    UPCOMING: "ยังไม่ถึงกำหนด",
 };
 
 export const ROUTINE_SCHEDULE_LABELS: Record<string, string> = {
@@ -97,18 +96,16 @@ export function formatRoutineScheduleSummary(schedule: {
     return `${summary}${businessDayLabel(schedule.businessDayPolicy)}`;
 }
 
-export function getRoutineStatusClass(status: RoutineStatus): string {
+export function getRoutineTimingStatusClass(status: RoutineTimingStatus): string {
     switch (status) {
-        case "COMPLETED":
-            return "border-emerald-200 bg-emerald-50 text-emerald-700";
-        case "IN_PROGRESS":
+        case "OVERDUE":
+            return "border-rose-200 bg-rose-50 text-rose-700";
+        case "DUE_TODAY":
             return "border-sky-200 bg-sky-50 text-sky-700";
-        case "SKIPPED":
+        case "DUE_SOON":
             return "border-amber-200 bg-amber-50 text-amber-700";
-        case "CANCELLED":
-            return "border-slate-200 bg-slate-100 text-slate-600";
-        case "TODO":
-            return "border-orange-200 bg-orange-50 text-orange-700";
+        case "UPCOMING":
+            return "border-slate-200 bg-slate-100 text-slate-700";
     }
 }
 
@@ -117,7 +114,7 @@ export function formatRoutineDueLabel(occurrence: {
     isOverdue?: boolean;
     daysUntilDue?: number;
 }): string {
-    if (occurrence.isOverdue) return "เกินกำหนด";
+    if (occurrence.isOverdue) return `เกินกำหนด ${Math.abs(occurrence.daysUntilDue ?? 0)} วัน`;
     if (occurrence.daysUntilDue === 0) return "วันนี้";
     if (occurrence.daysUntilDue === 1) return "พรุ่งนี้";
     if (occurrence.daysUntilDue !== undefined && occurrence.daysUntilDue > 1) {

@@ -12,11 +12,11 @@ import type {
 import {
     ROUTINE_IMPORT_CATEGORY_ALIASES,
     ROUTINE_IMPORT_FOOTER_PREFIXES,
+    ROUTINE_IMPORT_MANIFEST_VERSION,
     ROUTINE_IMPORT_PLACEHOLDER_TITLES,
     ROUTINE_IMPORT_REVIEW_REASONS,
 } from "./constants";
 import {
-    isDateExpired,
     isDateNumberFormat,
     normalizeCellDate,
     normalizeSourceText,
@@ -272,17 +272,6 @@ function addReason(reasons: string[], reason: string): void {
     if (!reasons.includes(reason)) reasons.push(reason);
 }
 
-function hasFormulaInRow(
-    sheet: WorkSheet,
-    row: number,
-    range: XLSX.Range,
-): boolean {
-    for (let column = range.s.c; column <= range.e.c; column += 1) {
-        if (getCell(sheet, row, column)?.f) return true;
-    }
-    return false;
-}
-
 export function computeRoutineImportRowFingerprint(
     sourceFileName: string,
     sourceSheet: string,
@@ -380,28 +369,6 @@ function inspectSheet(
     };
 }
 
-function classifyActivation(
-    reasons: readonly string[],
-    ownerNames: readonly string[],
-    mappedEmployeeIds: readonly number[],
-    title: string,
-    asOfDate: string,
-    contractEndDate: string | null,
-): RoutineImportRow["proposedActivation"] {
-    const hasHistoryOnlyReason =
-        ROUTINE_IMPORT_PLACEHOLDER_TITLES.has(normalizeSourceText(title))
-        || ownerNames.length === 0
-        || mappedEmployeeIds.length !== ownerNames.length
-        || reasons.includes(ROUTINE_IMPORT_REVIEW_REASONS.MISSING_CATEGORY)
-        || reasons.includes(ROUTINE_IMPORT_REVIEW_REASONS.MISSING_UNIT)
-        || reasons.includes(ROUTINE_IMPORT_REVIEW_REASONS.INACTIVE_CATEGORY)
-        || reasons.includes(ROUTINE_IMPORT_REVIEW_REASONS.INACTIVE_UNIT)
-        || reasons.includes(ROUTINE_IMPORT_REVIEW_REASONS.INVALID_CONTRACT_DATE_RANGE);
-    if (hasHistoryOnlyReason) return "HISTORY_ONLY";
-    if (isDateExpired(contractEndDate, asOfDate)) return "INACTIVE";
-    return reasons.length > 0 ? "INACTIVE" : "ACTIVE";
-}
-
 export function readRoutineWorkbook(input: Uint8Array): WorkBook {
     return XLSX.read(input, {
         type: "buffer",
@@ -416,7 +383,7 @@ export function readRoutineWorkbook(input: Uint8Array): WorkBook {
 export function extractRoutineWorkbook(
     workbook: WorkBook,
     fileName: string,
-    asOfDate: string,
+    _asOfDate: string,
     ownerMapping: Record<string, number>,
     referenceData: RoutineImportReferenceData,
     options: RoutineWorkbookExtractionOptions = {},
@@ -456,13 +423,7 @@ export function extractRoutineWorkbook(
                     header.columns.title,
                     merges,
                     date1904,
-                );
-                if (!title) continue;
-                if (ROUTINE_IMPORT_FOOTER_PREFIXES.some((prefix) => title.startsWith(prefix))) {
-                    continue;
-                }
-
-                dataRows.push(row + 1);
+                ) ?? "";
                 const ownerCell = getEffectiveCell(
                     sheet,
                     row,
@@ -488,10 +449,24 @@ export function extractRoutineWorkbook(
                 const extraDetails = header.columns.details === null
                     ? null
                     : rawRowText(sheet, row, header.columns.details, merges, date1904);
+                const hasSourceData = [title, ownerSourceText, scheduleText, contractText, extraDetails]
+                    .some((value) => value !== null && value.trim().length > 0);
+                if (!hasSourceData) continue;
+                if (ROUTINE_IMPORT_FOOTER_PREFIXES.some((prefix) => title.startsWith(prefix))) {
+                    continue;
+                }
+
+                dataRows.push(row + 1);
                 const contract = parseContractDates(contractText);
+                const contractStartDate = contract.reviewReasons.length === 0
+                    ? contract.startDate
+                    : null;
+                const contractEndDate = contract.reviewReasons.length === 0
+                    ? contract.endDate
+                    : null;
                 const schedule = normalizeRoutineSchedule(
                     scheduleText,
-                    contract.startDate,
+                    contractStartDate,
                 );
                 const ownerResolution = resolveRoutineOwners(
                     ownerNames,
@@ -499,13 +474,9 @@ export function extractRoutineWorkbook(
                     referenceData,
                 );
                 const reasons = [
-                    ...schedule.reviewReasons,
-                    ...contract.reviewReasons,
                     ...ownerResolution.reviewReasons,
                 ];
-                if (isDateExpired(contract.endDate, asOfDate)) {
-                    addReason(reasons, ROUTINE_IMPORT_REVIEW_REASONS.EXPIRED_CONTRACT);
-                }
+                if (!title.trim()) addReason(reasons, ROUTINE_IMPORT_REVIEW_REASONS.MISSING_TITLE);
                 if (!currentCategory) addReason(reasons, ROUTINE_IMPORT_REVIEW_REASONS.MISSING_CATEGORY);
                 const unitReference = referenceData.units.find((unit) => unit.code === sheetName);
                 if (!unitReference) {
@@ -523,22 +494,11 @@ export function extractRoutineWorkbook(
                         addReason(reasons, ROUTINE_IMPORT_REVIEW_REASONS.INACTIVE_CATEGORY);
                     }
                 }
-                if (hasFormulaInRow(sheet, row, range)) {
-                    addReason(reasons, ROUTINE_IMPORT_REVIEW_REASONS.FORMULA_CELL);
-                }
                 if (ROUTINE_IMPORT_PLACEHOLDER_TITLES.has(normalizeSourceText(title))) {
                     addReason(reasons, ROUTINE_IMPORT_REVIEW_REASONS.PLACEHOLDER_ROW);
                 }
 
                 const sourceCells = sourceCellsForRow(sheet, row, range);
-                const proposedActivation = classifyActivation(
-                    reasons,
-                    ownerNames,
-                    ownerResolution.mappedEmployeeIds,
-                    title,
-                    asOfDate,
-                    contract.endDate,
-                );
                 const importRow: RoutineImportRow = {
                     sourceFileName,
                     sourceSheet: sheetName,
@@ -571,11 +531,11 @@ export function extractRoutineWorkbook(
                     contractText,
                     extraDetails,
                     normalizedSchedule: schedule.normalizedSchedule,
-                    contractStartDate: contract.startDate,
-                    contractEndDate: contract.endDate,
+                    contractStartDate,
+                    contractEndDate,
                     requiresReview: reasons.length > 0,
                     reviewReasons: [...new Set(reasons)],
-                    proposedActivation,
+                    proposedActivation: "ACTIVE",
                 };
                 rows.push(importRow);
             }
@@ -625,13 +585,6 @@ export function buildRoutineImportManifest(
         validRows: extracted.rows.filter((row) => !row.requiresReview).length,
         requiresReview: extracted.rows.filter((row) => row.requiresReview).length,
         unresolvedOwners: extracted.rows.filter((row) => hasUnresolvedOwnerReview(row.reviewReasons)).length,
-        ambiguousSchedules: extracted.rows.filter((row) =>
-            row.reviewReasons.includes(ROUTINE_IMPORT_REVIEW_REASONS.AMBIGUOUS_SCHEDULE)
-            || row.reviewReasons.includes(ROUTINE_IMPORT_REVIEW_REASONS.UNSUPPORTED_EVENT_SCHEDULE),
-        ).length,
-        expiredContracts: extracted.rows.filter((row) =>
-            isDateExpired(row.contractEndDate, asOfDate),
-        ).length,
         missingCategory: extracted.rows.filter((row) =>
             row.reviewReasons.includes(ROUTINE_IMPORT_REVIEW_REASONS.MISSING_CATEGORY),
         ).length,
@@ -639,12 +592,9 @@ export function buildRoutineImportManifest(
             row.reviewReasons.includes(ROUTINE_IMPORT_REVIEW_REASONS.MISSING_UNIT),
         ).length,
         duplicateSourceRows,
-        proposedActive: extracted.rows.filter((row) => row.proposedActivation === "ACTIVE").length,
-        proposedInactive: extracted.rows.filter((row) => row.proposedActivation === "INACTIVE").length,
-        proposedHistoryOnly: extracted.rows.filter((row) => row.proposedActivation === "HISTORY_ONLY").length,
     };
     return {
-        manifestVersion: 1,
+        manifestVersion: ROUTINE_IMPORT_MANIFEST_VERSION,
         sourceFileName: basename(fileName),
         sourceSha256,
         generatedAt,
@@ -653,38 +603,4 @@ export function buildRoutineImportManifest(
         rows: extracted.rows,
         summary,
     };
-}
-
-export function assertRoutineImportManifestMatchesWorkbook(
-    manifest: RoutineImportManifest,
-    workbook: WorkBook,
-    fileName: string,
-): void {
-    const extracted = extractRoutineWorkbook(
-        workbook,
-        fileName,
-        manifest.asOfDate,
-        {},
-        { units: [], categories: [], employees: [] },
-    );
-    const expected = new Map(
-        manifest.rows.map((row) => [
-            `${row.sourceSheet}:${row.sourceRow}`,
-            row.sourceFingerprint,
-        ]),
-    );
-    const actual = new Map(
-        extracted.rows.map((row) => [
-            `${row.sourceSheet}:${row.sourceRow}`,
-            row.sourceFingerprint,
-        ]),
-    );
-    if (expected.size !== actual.size) {
-        throw new Error("workbook มีจำนวน source row ไม่ตรงกับ manifest");
-    }
-    for (const [identity, fingerprint] of expected) {
-        if (actual.get(identity) !== fingerprint) {
-            throw new Error(`workbook source row ไม่ตรงกับ manifest: ${identity}`);
-        }
-    }
 }

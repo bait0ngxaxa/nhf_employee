@@ -4,7 +4,7 @@ import { mockDeep, mockReset } from "vitest-mock-extended";
 
 import { prisma } from "@/lib/db/prisma";
 import {
-    changeRoutineOccurrenceStatus,
+    reassignRoutineOccurrence,
     updateRoutineOccurrenceDueDate,
     updateRoutineTask,
 } from "@/lib/services/routine/mutations";
@@ -39,50 +39,37 @@ function actor(id: number, role: "USER" | "ADMIN" = "USER") {
 }
 
 function occurrence(overrides: Record<string, unknown> = {}): Record<string, unknown> {
-    const task = {
-        id: 71,
-        title: "ตรวจสอบระบบประจำเดือน",
-        description: null,
-        scheduleType: "MONTHLY_DAY",
-        scheduleText: null,
-        unit: { id: 1, code: "มสช.", name: "มสช." },
-        category: { id: 1, name: "ระบบคอมพิวเตอร์" },
-    };
-    const assignee = {
-        employeeId: 20,
-        role: "OWNER",
-        employee: {
-            id: 20,
-            firstName: "สมชาย",
-            lastName: "ใจดี",
-            nickname: null,
-            status: "ACTIVE",
-            deletedAt: null,
-        },
-    };
     return {
         id: 91,
         taskId: 71,
         periodKey: "2026-01",
         dueDate: new Date("2026-01-10T00:00:00.000Z"),
         originalDueDate: new Date("2026-01-10T00:00:00.000Z"),
-        status: "TODO",
         scheduleVersion: 1,
-        startedAt: null,
-        completedAt: null,
-        completedById: null,
-        completionNote: null,
-        referenceNo: null,
-        skippedAt: null,
-        skippedById: null,
-        skipReason: null,
-        cancelledAt: null,
-        cancelledById: null,
-        cancellationReason: null,
+        reminderVersion: 1,
         createdAt: new Date("2026-01-01T00:00:00.000Z"),
         updatedAt: new Date("2026-01-01T00:00:00.000Z"),
-        task,
-        assignees: [assignee],
+        task: {
+            id: 71,
+            title: "ตรวจสอบระบบประจำเดือน",
+            description: null,
+            scheduleType: "MONTHLY_DAY",
+            scheduleText: null,
+            unit: { id: 1, code: "มสช.", name: "มสช." },
+            category: { id: 1, name: "ระบบคอมพิวเตอร์" },
+        },
+        assignees: [{
+            employeeId: 20,
+            role: "OWNER",
+            employee: {
+                id: 20,
+                firstName: "สมชาย",
+                lastName: "ใจดี",
+                nickname: null,
+                status: "ACTIVE",
+                deletedAt: null,
+            },
+        }],
         ...overrides,
     };
 }
@@ -107,136 +94,7 @@ describe("NHF Routine mutations", () => {
         );
     });
 
-    it("lets only the snapshot assignee complete an occurrence and audits it", async () => {
-        const initial = occurrence();
-        const completed = occurrence({
-            status: "COMPLETED",
-            completedById: 3,
-            completionNote: "ดำเนินการเรียบร้อย",
-            referenceNo: "REF-1",
-        });
-        prismaMock.user.findUnique.mockResolvedValue(
-            asNever(activeUser("USER", 20)),
-        );
-        prismaMock.routineOccurrence.findUnique
-            .mockResolvedValueOnce(asNever(initial))
-            .mockResolvedValueOnce(asNever(completed));
-
-        const result = await changeRoutineOccurrenceStatus(
-            91,
-            {
-                status: "COMPLETED",
-                completionNote: "ดำเนินการเรียบร้อย",
-                referenceNo: "REF-1",
-            },
-            actor(3),
-        );
-
-        expect(result.status).toBe("COMPLETED");
-        expect(prismaMock.routineOccurrence.updateMany).toHaveBeenCalledWith({
-            where: { id: 91, status: "TODO" },
-            data: expect.objectContaining({
-                status: "COMPLETED",
-                completedById: 3,
-                completedAt: expect.any(Date),
-            }),
-        });
-        expect(prismaMock.auditLog.create).toHaveBeenCalledWith({
-            data: expect.objectContaining({
-                action: "ROUTINE_OCCURRENCE_COMPLETE",
-                entityType: "RoutineOccurrence",
-                entityId: 91,
-            }),
-        });
-    });
-
-    it("does not allow a user to update another employee's occurrence", async () => {
-        prismaMock.user.findUnique.mockResolvedValue(
-            asNever(activeUser("USER", 20)),
-        );
-        prismaMock.routineOccurrence.findUnique.mockResolvedValue(
-            asNever(occurrence({
-                assignees: [{
-                    employeeId: 21,
-                    role: "OWNER",
-                    employee: {
-                        id: 21,
-                        firstName: "คนอื่น",
-                        lastName: "ในทีม",
-                        nickname: null,
-                        status: "ACTIVE",
-                        deletedAt: null,
-                    },
-                }],
-            })),
-        );
-
-        await expect(
-            changeRoutineOccurrenceStatus(
-                91,
-                { status: "IN_PROGRESS" },
-                actor(3),
-            ),
-        ).rejects.toThrow("ไม่พบงานประจำ");
-        expect(prismaMock.routineOccurrence.updateMany).not.toHaveBeenCalled();
-        expect(prismaMock.auditLog.create).not.toHaveBeenCalled();
-    });
-
-    it("rejects an inactive employee even when the employee was an assignee", async () => {
-        prismaMock.user.findUnique.mockResolvedValue(
-            asNever(activeUser("USER", 20, "INACTIVE")),
-        );
-        prismaMock.routineOccurrence.findUnique.mockResolvedValue(
-            asNever(occurrence()),
-        );
-
-        await expect(
-            changeRoutineOccurrenceStatus(
-                91,
-                { status: "IN_PROGRESS" },
-                actor(3),
-            ),
-        ).rejects.toThrow("บัญชีพนักงานไม่พร้อมดำเนินการ");
-        expect(prismaMock.routineOccurrence.updateMany).not.toHaveBeenCalled();
-    });
-
-    it("rejects a duplicate completion after a terminal status", async () => {
-        prismaMock.user.findUnique.mockResolvedValue(
-            asNever(activeUser("USER", 20)),
-        );
-        prismaMock.routineOccurrence.findUnique.mockResolvedValue(
-            asNever(occurrence({ status: "COMPLETED" })),
-        );
-
-        await expect(
-            changeRoutineOccurrenceStatus(
-                91,
-                { status: "COMPLETED" },
-                actor(3),
-            ),
-        ).rejects.toThrow("งานนี้ปิดงานไปแล้ว");
-        expect(prismaMock.routineOccurrence.updateMany).not.toHaveBeenCalled();
-    });
-
-    it("requires a reason when an admin changes a due date", async () => {
-        prismaMock.user.findUnique.mockResolvedValue(
-            asNever(activeUser("ADMIN", 99)),
-        );
-        prismaMock.routineOccurrence.findUnique.mockResolvedValue(
-            asNever(occurrence()),
-        );
-
-        await expect(
-            updateRoutineOccurrenceDueDate(
-                91,
-                { dueDate: "2026-02-10", reason: "สั้น" },
-                actor(99, "ADMIN"),
-            ),
-        ).rejects.toThrow("อย่างน้อย 5 ตัวอักษร");
-        expect(prismaMock.routineOccurrence.updateMany).not.toHaveBeenCalled();
-    });
-
-    it("increments the reminder version when an admin changes a due date", async () => {
+    it("lets an admin change a due date without a required reason", async () => {
         const initial = occurrence();
         const updated = occurrence({
             dueDate: new Date("2026-02-10T00:00:00.000Z"),
@@ -251,7 +109,7 @@ describe("NHF Routine mutations", () => {
 
         await updateRoutineOccurrenceDueDate(
             91,
-            { dueDate: "2026-02-10", reason: "ปรับตามกำหนดใหม่" },
+            { dueDate: "2026-02-10" },
             actor(99, "ADMIN"),
         );
 
@@ -265,6 +123,74 @@ describe("NHF Routine mutations", () => {
                 reminderVersion: { increment: 1 },
             }),
         });
+        expect(prismaMock.auditLog.create).toHaveBeenCalledWith({
+            data: expect.objectContaining({
+                action: "ROUTINE_OCCURRENCE_DUE_DATE_CHANGE",
+                details: expect.stringContaining('"oldDueDate":"2026-01-10"'),
+            }),
+        });
+    });
+
+    it("snapshots new active assignees and increments the reminder version", async () => {
+        const initial = occurrence();
+        const updated = occurrence({
+            reminderVersion: 2,
+            assignees: [{
+                employeeId: 21,
+                role: "OWNER",
+                employee: {
+                    id: 21,
+                    firstName: "มานะ",
+                    lastName: "ดีใจ",
+                    nickname: null,
+                    status: "ACTIVE",
+                    deletedAt: null,
+                },
+            }],
+        });
+        prismaMock.user.findUnique.mockResolvedValue(
+            asNever(activeUser("ADMIN", 99)),
+        );
+        prismaMock.routineOccurrence.findUnique
+            .mockResolvedValueOnce(asNever(initial))
+            .mockResolvedValueOnce(asNever(updated));
+        prismaMock.employee.findMany.mockResolvedValue(asNever([{ id: 21 }]));
+
+        await reassignRoutineOccurrence(
+            91,
+            { assignees: [{ employeeId: 21, role: "OWNER" }] },
+            actor(99, "ADMIN"),
+        );
+
+        expect(prismaMock.routineOccurrenceAssignee.deleteMany).toHaveBeenCalledWith({
+            where: { occurrenceId: 91 },
+        });
+        expect(prismaMock.routineOccurrenceAssignee.createMany).toHaveBeenCalledWith({
+            data: [{ occurrenceId: 91, employeeId: 21, role: "OWNER" }],
+        });
+        expect(prismaMock.routineOccurrence.updateMany).toHaveBeenCalledWith({
+            where: { id: 91 },
+            data: { reminderVersion: { increment: 1 } },
+        });
+    });
+
+    it("rejects reassignment to an inactive employee", async () => {
+        prismaMock.user.findUnique.mockResolvedValue(
+            asNever(activeUser("ADMIN", 99)),
+        );
+        prismaMock.routineOccurrence.findUnique.mockResolvedValue(
+            asNever(occurrence()),
+        );
+        prismaMock.employee.findMany.mockResolvedValue(asNever([]));
+
+        await expect(
+            reassignRoutineOccurrence(
+                91,
+                { assignees: [{ employeeId: 21, role: "OWNER" }] },
+                actor(99, "ADMIN"),
+            ),
+        ).rejects.toThrow("ผู้รับผิดชอบต้องเป็นพนักงานที่ยังปฏิบัติงาน");
+        expect(prismaMock.routineOccurrenceAssignee.deleteMany).not.toHaveBeenCalled();
     });
 
     it("returns a conflict for a stale task version", async () => {

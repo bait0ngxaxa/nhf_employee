@@ -31,13 +31,9 @@ export {
     getRoutineTasks,
 } from "./queries";
 export {
-    cancelRoutineOccurrence,
-    changeRoutineOccurrenceStatus,
     createRoutineTask,
     createRoutineTaskInTransaction,
-    reopenRoutineOccurrence,
     reassignRoutineOccurrence,
-    skipRoutineOccurrence,
     updateRoutineOccurrenceDueDate,
     updateRoutineTask,
 } from "./mutations";

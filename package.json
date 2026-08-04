@@ -18,7 +18,6 @@
     "test:integration:mysql": "node scripts/run-mysql-integration-tests.mjs",
     "stock:audit": "tsx scripts/stock-inventory-audit.ts",
     "stock:audit:strict": "tsx scripts/stock-inventory-audit.ts --fail-on-error",
-    "routine:import": "tsx scripts/routine-import.ts",
     "stock:default-variant:backfill": "tsx scripts/stock-default-variant-backfill.ts",
     "stock:default-variant:backfill:apply": "tsx scripts/stock-default-variant-backfill.ts --apply"
   },

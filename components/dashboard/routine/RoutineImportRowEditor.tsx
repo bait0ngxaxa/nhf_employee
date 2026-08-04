@@ -99,7 +99,6 @@ export function RoutineImportRowEditor({
     const [contractEndDate, setContractEndDate] = useState<string | null>(null);
     const [contractText, setContractText] = useState<string | null>(null);
     const [extraDetails, setExtraDetails] = useState<string | null>(null);
-    const [proposedActivation, setProposedActivation] = useState<"ACTIVE" | "INACTIVE">("INACTIVE");
     const [selected, setSelected] = useState(false);
     const [reminderRules, setReminderRules] = useState<RoutineImportRowEdit["reminderRules"]>([]);
     const [saving, setSaving] = useState(false);
@@ -125,7 +124,6 @@ export function RoutineImportRowEditor({
         setContractEndDate(row.data.contractEndDate);
         setContractText(row.data.contractText);
         setExtraDetails(row.data.extraDetails);
-        setProposedActivation(row.data.proposedActivation === "ACTIVE" ? "ACTIVE" : "INACTIVE");
         setSelected(row.selected);
         setReminderRules(row.data.reminderRules ?? []);
         setError(null);
@@ -204,7 +202,6 @@ export function RoutineImportRowEditor({
             contractEndDate,
             contractText: contractText?.trim() || null,
             extraDetails: extraDetails?.trim() || null,
-            proposedActivation,
             selected,
             reminderRules: reminderRules ?? [],
         };
@@ -263,13 +260,6 @@ export function RoutineImportRowEditor({
                             {reference.categories.map((category) => <option key={category.id} value={category.name}>{category.name}</option>)}
                         </select>
                     </label>
-                    <label className="grid gap-1 text-sm font-medium text-content-body">
-                        สถานะนำเข้า
-                        <select className="h-11 rounded-md border border-input bg-background px-3 text-sm" value={proposedActivation} onChange={(event) => setProposedActivation(event.target.value as "ACTIVE" | "INACTIVE")}>
-                            <option value="ACTIVE">เปิดใช้งานทันที</option>
-                            <option value="INACTIVE">นำเข้าแบบไม่เปิดใช้งาน</option>
-                        </select>
-                    </label>
                     <label className="grid gap-1 text-sm font-medium text-content-body md:col-span-2">
                         รายการ
                         <Input value={title} onChange={(event) => setTitle(event.target.value)} />
@@ -300,23 +290,26 @@ export function RoutineImportRowEditor({
                     {reference.employees.length === 0 ? <p className="mt-3 text-sm text-content-secondary">ยังไม่มีข้อมูลพนักงานให้เลือก</p> : null}
                 </div>
 
-                <RoutineScheduleFields
-                    scheduleType={scheduleType}
-                    scheduleConfig={scheduleConfig}
-                    businessDayPolicy={businessDayPolicy}
-                    onScheduleTypeChange={setScheduleType}
-                    onScheduleConfigChange={setScheduleConfig}
-                    onBusinessDayPolicyChange={setBusinessDayPolicy}
-                />
-                <div className="grid gap-4 md:grid-cols-2">
-                    <label className="grid gap-1 text-sm font-medium text-content-body md:col-span-2">กำหนดการจาก Excel / คำอธิบายเพิ่มเติม<Input value={scheduleText} onChange={(event) => setScheduleText(event.target.value)} /></label>
-                    <label className="grid gap-1 text-sm font-medium text-content-body">วันเริ่มสัญญา<Input type="date" value={contractStartDate ?? ""} onChange={(event) => setContractStartDate(event.target.value || null)} /></label>
-                    <label className="grid gap-1 text-sm font-medium text-content-body">วันสิ้นสุดสัญญา<Input type="date" value={contractEndDate ?? ""} onChange={(event) => setContractEndDate(event.target.value || null)} /></label>
-                    <label className="grid gap-1 text-sm font-medium text-content-body md:col-span-2">ข้อความสัญญา<Input value={contractText ?? ""} onChange={(event) => setContractText(event.target.value || null)} /></label>
-                    <label className="grid gap-1 text-sm font-medium text-content-body md:col-span-2">รายละเอียดเพิ่มเติม<Textarea value={extraDetails ?? ""} onChange={(event) => setExtraDetails(event.target.value || null)} /></label>
-                </div>
+                <details className="rounded-lg border border-border-subtle bg-surface-subtle p-4">
+                    <summary className="cursor-pointer text-sm font-semibold text-content-heading">แก้ไขข้อมูลเพิ่มเติม</summary>
+                    <div className="mt-4 space-y-4">
+                        <RoutineScheduleFields
+                            scheduleType={scheduleType}
+                            scheduleConfig={scheduleConfig}
+                            businessDayPolicy={businessDayPolicy}
+                            onScheduleTypeChange={setScheduleType}
+                            onScheduleConfigChange={setScheduleConfig}
+                            onBusinessDayPolicyChange={setBusinessDayPolicy}
+                        />
+                        <div className="grid gap-4 md:grid-cols-2">
+                            <label className="grid gap-1 text-sm font-medium text-content-body md:col-span-2">กำหนดการจาก Excel / คำอธิบายเพิ่มเติม<Input value={scheduleText} onChange={(event) => setScheduleText(event.target.value)} /></label>
+                            <label className="grid gap-1 text-sm font-medium text-content-body">วันเริ่มสัญญา<Input type="date" value={contractStartDate ?? ""} onChange={(event) => setContractStartDate(event.target.value || null)} /></label>
+                            <label className="grid gap-1 text-sm font-medium text-content-body">วันสิ้นสุดสัญญา<Input type="date" value={contractEndDate ?? ""} onChange={(event) => setContractEndDate(event.target.value || null)} /></label>
+                            <label className="grid gap-1 text-sm font-medium text-content-body md:col-span-2">ข้อความสัญญา<Input value={contractText ?? ""} onChange={(event) => setContractText(event.target.value || null)} /></label>
+                            <label className="grid gap-1 text-sm font-medium text-content-body md:col-span-2">รายละเอียดเพิ่มเติม<Textarea value={extraDetails ?? ""} onChange={(event) => setExtraDetails(event.target.value || null)} /></label>
+                        </div>
 
-                <div className="rounded-lg border border-border-subtle bg-surface-subtle p-4">
+                        <div className="rounded-lg border border-border-subtle bg-background p-4">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                         <div>
                             <h3 className="text-sm font-semibold text-content-heading">การแจ้งเตือนล่วงหน้า</h3>
@@ -345,7 +338,9 @@ export function RoutineImportRowEditor({
                             ))}
                         </div>
                     )}
-                </div>
+                        </div>
+                    </div>
+                </details>
 
                 <label className="flex items-center gap-3 text-sm font-medium text-content-body">
                     <input type="checkbox" checked={selected} onChange={(event) => setSelected(event.target.checked)} />

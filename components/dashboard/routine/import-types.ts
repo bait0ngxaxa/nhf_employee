@@ -37,9 +37,6 @@ export interface RoutineImportBatchView {
     conflictRows: number;
     failedRows: number;
     selectedRows: number;
-    activeRows: number;
-    inactiveRows: number;
-    expiredRows: number;
     unresolvedOwnerRows: number;
     expiresAt: string | null;
     appliedAt: string | null;
@@ -56,7 +53,7 @@ export interface RoutineImportRowView {
     sourceFingerprint: string;
     status: RoutineImportRowStatus;
     selected: boolean;
-    proposedActivation: "ACTIVE" | "INACTIVE" | "HISTORY_ONLY";
+    proposedActivation: "ACTIVE";
     reviewReasons: string[];
     appliedTaskId: number | null;
     version: number;

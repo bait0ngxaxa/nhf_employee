@@ -26,7 +26,6 @@ function buildOccurrence(overrides: Record<string, unknown> = {}) {
         id: 91,
         taskId: 71,
         dueDate: new Date("2026-08-05T00:00:00.000Z"),
-        status: "TODO",
         reminderVersion: 2,
         task: {
             id: 71,
@@ -89,7 +88,7 @@ describe("Routine scheduler", () => {
             data: expect.objectContaining({
                 type: "ROUTINE_REMINDER_IN_APP",
                 eventKey: "routine:91:rule:31:version:2",
-                payload: expect.stringContaining('"expectedStatus":"TODO"'),
+                payload: expect.not.stringContaining('"expected' + "Status" + '"'),
             }),
         });
     });

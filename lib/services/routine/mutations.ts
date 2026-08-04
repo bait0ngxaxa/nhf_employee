@@ -19,8 +19,6 @@ import {
     parseRoutineScheduleConfig,
     type RoutineDueDateInput,
     type RoutineOccurrenceAssigneesInput,
-    type RoutineOccurrenceStatusInput,
-    type RoutineReasonInput,
     type RoutineReminderRuleInput,
     type RoutineTaskCreateInput,
     type RoutineTaskUpdateInput,
@@ -30,7 +28,6 @@ import { createRoutineAuditInTransaction } from "./audit";
 import {
     assertActiveAdminInTransaction,
     assertActiveEmployeesInTransaction,
-    assertActiveWorkforceInTransaction,
 } from "./authorization";
 import {
     RoutineConflictError,
@@ -268,22 +265,6 @@ function taskAuditSnapshot(task: {
     };
 }
 
-function occurrenceAuditDetails(
-    taskId: number,
-    occurrenceId: number,
-    oldStatus: string,
-    newStatus: string,
-    extra: Record<string, unknown> = {},
-): Record<string, unknown> {
-    return {
-        taskId,
-        occurrenceId,
-        oldStatus,
-        newStatus,
-        ...extra,
-    };
-}
-
 export async function createRoutineTaskInTransaction(
     tx: Prisma.TransactionClient,
     input: RoutineTaskCreateInput,
@@ -413,6 +394,8 @@ export async function updateRoutineTask(
         const reminderRulesChanged =
             nextReminderRules !== null
             && !areReminderRulesEqual(current.reminderRules, nextReminderRules);
+        const isActiveChanged =
+            input.isActive !== undefined && input.isActive !== current.isActive;
         if (nextAssignees) {
             await assertActiveEmployeesInTransaction(
                 tx,
@@ -485,7 +468,7 @@ export async function updateRoutineTask(
             }
         }
 
-        if (assigneesChanged || reminderRulesChanged) {
+        if (assigneesChanged || reminderRulesChanged || isActiveChanged) {
             await tx.routineOccurrence.updateMany({
                 where: { taskId },
                 data: { reminderVersion: { increment: 1 } },
@@ -513,6 +496,7 @@ export async function updateRoutineTask(
                 ) ?? current.assignees.map((assignee) => assignee.employeeId),
                 assigneesChanged,
                 reminderRulesChanged,
+                isActiveChanged,
             },
         );
         await generateRoutineTaskOccurrencesInTransaction(tx, taskId);
@@ -538,243 +522,6 @@ async function findOccurrenceForMutation(
     return occurrence;
 }
 
-async function assertOccurrenceAccess(
-    tx: Prisma.TransactionClient,
-    actor: RoutineCommandActor,
-    occurrence: Prisma.RoutineOccurrenceGetPayload<{
-        include: typeof ROUTINE_OCCURRENCE_INCLUDE;
-    }>,
-): Promise<void> {
-    if (actor.role === "ADMIN") {
-        await assertActiveAdminInTransaction(tx, actor);
-        return;
-    }
-
-    const employeeId = await assertActiveWorkforceInTransaction(tx, actor);
-    if (!occurrence.assignees.some((assignee) => assignee.employeeId === employeeId)) {
-        throw new RoutineNotFoundError();
-    }
-}
-
-export async function changeRoutineOccurrenceStatus(
-    occurrenceId: number,
-    input: RoutineOccurrenceStatusInput,
-    actor: RoutineCommandActor,
-): Promise<Prisma.RoutineOccurrenceGetPayload<{
-    include: typeof ROUTINE_OCCURRENCE_INCLUDE;
-}>> {
-    return runSerializableTransaction(async (tx) => {
-        const occurrence = await findOccurrenceForMutation(tx, occurrenceId);
-        await assertOccurrenceAccess(tx, actor, occurrence);
-        const now = new Date();
-
-        if (input.status === "IN_PROGRESS") {
-            if (occurrence.status !== "TODO") {
-                throw new RoutineConflictError("งานนี้เริ่มดำเนินการแล้ว");
-            }
-            const claimed = await tx.routineOccurrence.updateMany({
-                where: { id: occurrenceId, status: "TODO" },
-                data: {
-                    status: "IN_PROGRESS",
-                    startedAt: occurrence.startedAt ?? now,
-                },
-            });
-            if (claimed.count !== 1) {
-                throw new RoutineConflictError("สถานะงานเปลี่ยนแปลงแล้ว");
-            }
-            await createRoutineAuditInTransaction(
-                tx,
-                "ROUTINE_OCCURRENCE_START",
-                "RoutineOccurrence",
-                occurrenceId,
-                actor,
-                occurrenceAuditDetails(
-                    occurrence.taskId,
-                    occurrenceId,
-                    occurrence.status,
-                    "IN_PROGRESS",
-                ),
-            );
-        } else {
-            if (occurrence.status !== "TODO" && occurrence.status !== "IN_PROGRESS") {
-                throw new RoutineConflictError("งานนี้ปิดงานไปแล้วหรือไม่สามารถปิดได้");
-            }
-            const claimed = await tx.routineOccurrence.updateMany({
-                where: {
-                    id: occurrenceId,
-                    status: occurrence.status,
-                },
-                data: {
-                    status: "COMPLETED",
-                    startedAt: occurrence.startedAt ?? now,
-                    completedAt: now,
-                    completedById: actor.id,
-                    completionNote: input.completionNote ?? null,
-                    referenceNo: input.referenceNo ?? null,
-                },
-            });
-            if (claimed.count !== 1) {
-                throw new RoutineConflictError("สถานะงานเปลี่ยนแปลงแล้ว");
-            }
-            await createRoutineAuditInTransaction(
-                tx,
-                "ROUTINE_OCCURRENCE_COMPLETE",
-                "RoutineOccurrence",
-                occurrenceId,
-                actor,
-                occurrenceAuditDetails(
-                    occurrence.taskId,
-                    occurrenceId,
-                    occurrence.status,
-                    "COMPLETED",
-                    {
-                        referenceNo: input.referenceNo ?? null,
-                    },
-                ),
-            );
-        }
-
-        return findOccurrenceForMutation(tx, occurrenceId);
-    });
-}
-
-function ensureReason(input: RoutineReasonInput): string {
-    const reason = input.reason.trim();
-    if (reason.length < 5) {
-        throw new RoutineValidationError("กรุณาระบุเหตุผลอย่างน้อย 5 ตัวอักษร");
-    }
-    return reason;
-}
-
-async function changeAdminOccurrenceTerminalStatus(
-    occurrenceId: number,
-    nextStatus: "SKIPPED" | "CANCELLED",
-    input: RoutineReasonInput,
-    actor: RoutineCommandActor,
-): Promise<Prisma.RoutineOccurrenceGetPayload<{
-    include: typeof ROUTINE_OCCURRENCE_INCLUDE;
-}>> {
-    return runSerializableTransaction(async (tx) => {
-        await assertActiveAdminInTransaction(tx, actor);
-        const occurrence = await findOccurrenceForMutation(tx, occurrenceId);
-        if (occurrence.status === "COMPLETED" || occurrence.status === "SKIPPED" || occurrence.status === "CANCELLED") {
-            throw new RoutineConflictError("งานนี้อยู่ในสถานะสิ้นสุดแล้ว");
-        }
-        const reason = ensureReason(input);
-        const now = new Date();
-        const data: Prisma.RoutineOccurrenceUncheckedUpdateInput = nextStatus === "SKIPPED"
-            ? { status: "SKIPPED", skippedAt: now, skippedById: actor.id, skipReason: reason }
-            : { status: "CANCELLED", cancelledAt: now, cancelledById: actor.id, cancellationReason: reason };
-        const claimed = await tx.routineOccurrence.updateMany({
-            where: { id: occurrenceId, status: occurrence.status },
-            data,
-        });
-        if (claimed.count !== 1) {
-            throw new RoutineConflictError("สถานะงานเปลี่ยนแปลงแล้ว");
-        }
-        await createRoutineAuditInTransaction(
-            tx,
-            nextStatus === "SKIPPED"
-                ? "ROUTINE_OCCURRENCE_SKIP"
-                : "ROUTINE_OCCURRENCE_CANCEL",
-            "RoutineOccurrence",
-            occurrenceId,
-            actor,
-            occurrenceAuditDetails(
-                occurrence.taskId,
-                occurrenceId,
-                occurrence.status,
-                nextStatus,
-                { reason },
-            ),
-        );
-        return findOccurrenceForMutation(tx, occurrenceId);
-    });
-}
-
-export function skipRoutineOccurrence(
-    occurrenceId: number,
-    input: RoutineReasonInput,
-    actor: RoutineCommandActor,
-): Promise<Prisma.RoutineOccurrenceGetPayload<{
-    include: typeof ROUTINE_OCCURRENCE_INCLUDE;
-}>> {
-    return changeAdminOccurrenceTerminalStatus(
-        occurrenceId,
-        "SKIPPED",
-        input,
-        actor,
-    );
-}
-
-export function cancelRoutineOccurrence(
-    occurrenceId: number,
-    input: RoutineReasonInput,
-    actor: RoutineCommandActor,
-): Promise<Prisma.RoutineOccurrenceGetPayload<{
-    include: typeof ROUTINE_OCCURRENCE_INCLUDE;
-}>> {
-    return changeAdminOccurrenceTerminalStatus(
-        occurrenceId,
-        "CANCELLED",
-        input,
-        actor,
-    );
-}
-
-export async function reopenRoutineOccurrence(
-    occurrenceId: number,
-    input: RoutineReasonInput,
-    actor: RoutineCommandActor,
-): Promise<Prisma.RoutineOccurrenceGetPayload<{
-    include: typeof ROUTINE_OCCURRENCE_INCLUDE;
-}>> {
-    return runSerializableTransaction(async (tx) => {
-        await assertActiveAdminInTransaction(tx, actor);
-        const occurrence = await findOccurrenceForMutation(tx, occurrenceId);
-        if (occurrence.status === "TODO" || occurrence.status === "IN_PROGRESS") {
-            throw new RoutineConflictError("งานนี้ยังไม่อยู่ในสถานะที่กู้คืนได้");
-        }
-        const reason = ensureReason(input);
-        const claimed = await tx.routineOccurrence.updateMany({
-            where: { id: occurrenceId, status: occurrence.status },
-            data: {
-                status: "TODO",
-                reminderVersion: { increment: 1 },
-                startedAt: null,
-                completedAt: null,
-                completedById: null,
-                completionNote: null,
-                referenceNo: null,
-                skippedAt: null,
-                skippedById: null,
-                skipReason: null,
-                cancelledAt: null,
-                cancelledById: null,
-                cancellationReason: null,
-            },
-        });
-        if (claimed.count !== 1) {
-            throw new RoutineConflictError("สถานะงานเปลี่ยนแปลงแล้ว");
-        }
-        await createRoutineAuditInTransaction(
-            tx,
-            "ROUTINE_OCCURRENCE_REOPEN",
-            "RoutineOccurrence",
-            occurrenceId,
-            actor,
-            occurrenceAuditDetails(
-                occurrence.taskId,
-                occurrenceId,
-                occurrence.status,
-                "TODO",
-                { reason },
-            ),
-        );
-        return findOccurrenceForMutation(tx, occurrenceId);
-    });
-}
-
 export async function updateRoutineOccurrenceDueDate(
     occurrenceId: number,
     input: RoutineDueDateInput,
@@ -788,8 +535,8 @@ export async function updateRoutineOccurrenceDueDate(
     return runSerializableTransaction(async (tx) => {
         await assertActiveAdminInTransaction(tx, actor);
         const occurrence = await findOccurrenceForMutation(tx, occurrenceId);
-        const reason = ensureReason(input);
         const oldDueDate = toBangkokCalendarDate(occurrence.dueDate);
+        if (oldDueDate === input.dueDate) return occurrence;
         const claimed = await tx.routineOccurrence.updateMany({
             where: { id: occurrenceId, dueDate: occurrence.dueDate },
             data: {
@@ -806,18 +553,14 @@ export async function updateRoutineOccurrenceDueDate(
             "RoutineOccurrence",
             occurrenceId,
             actor,
-            occurrenceAuditDetails(
-                occurrence.taskId,
+            {
+                taskId: occurrence.taskId,
                 occurrenceId,
-                occurrence.status,
-                occurrence.status,
-                {
-                    oldDueDate,
-                    newDueDate: input.dueDate,
-                    originalDueDate: toBangkokCalendarDate(occurrence.originalDueDate),
-                    reason,
-                },
-            ),
+                oldDueDate,
+                newDueDate: input.dueDate,
+                originalDueDate: toBangkokCalendarDate(occurrence.originalDueDate),
+                note: input.note ?? null,
+            },
         );
         return findOccurrenceForMutation(tx, occurrenceId);
     });

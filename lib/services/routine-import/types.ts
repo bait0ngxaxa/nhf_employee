@@ -6,7 +6,8 @@ import type {
 
 import type { RoutineReminderRuleInput } from "@/lib/validations/routine";
 
-export type RoutineImportActivation = "ACTIVE" | "INACTIVE" | "HISTORY_ONLY";
+/** Kept for staging compatibility. Imported RoutineTasks are always active. */
+export type RoutineImportActivation = "ACTIVE";
 
 export type RoutineImportCellValue = string | number | boolean | null;
 export type RoutineImportJsonValue =
@@ -108,14 +109,9 @@ export interface RoutineImportSummary {
     validRows: number;
     requiresReview: number;
     unresolvedOwners: number;
-    ambiguousSchedules: number;
-    expiredContracts: number;
     missingCategory: number;
     missingUnit: number;
     duplicateSourceRows: number;
-    proposedActive: number;
-    proposedInactive: number;
-    proposedHistoryOnly: number;
 }
 
 export interface RoutineImportManifest {
@@ -153,20 +149,5 @@ export interface RoutineImportReferenceData {
         nickname: string | null;
         status: string;
         deletedAt: string | null;
-    }>;
-}
-
-export interface RoutineImportApplyResult {
-    inserted: number;
-    skipped: number;
-    conflicts: number;
-    failed: number;
-    historyOnly: number;
-    inactive: number;
-    errors: Array<{
-        sourceSheet: string;
-        sourceRow: number;
-        title: string;
-        reason: string;
     }>;
 }

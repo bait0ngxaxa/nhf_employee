@@ -6,6 +6,7 @@ import {
     ErrorState,
     LoadingState,
 } from "@/components/ui/state";
+import { getCurrentBangkokDate } from "@/lib/routine/schedule";
 
 import { ROUTINE_SCHEDULE_LABELS } from "./labels";
 import type { PaginatedTasksResponse, RoutineTask } from "./types";
@@ -20,6 +21,23 @@ interface RoutineTaskListProps {
     onPageChange: (page: number) => void;
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function taskInformationBadges(task: RoutineTask, today: string): string[] {
+    const badges: string[] = [];
+    if (task.contractEndDate && task.contractEndDate < today) {
+        badges.push("สัญญาสิ้นสุดแล้ว");
+    }
+    if (task.scheduleType === "ONE_TIME" && isRecord(task.scheduleConfig)) {
+        const date = task.scheduleConfig.date;
+        if (typeof date === "string" && date < today) badges.push("กำหนดครั้งเดียวผ่านแล้ว");
+    }
+    if (task.scheduleType === "MANUAL") badges.push("กำหนดการแบบ Manual");
+    return badges;
+}
+
 export function RoutineTaskList({
     data,
     error,
@@ -29,6 +47,7 @@ export function RoutineTaskList({
     onEdit,
     onPageChange,
 }: RoutineTaskListProps) {
+    const today = getCurrentBangkokDate();
     if (isLoading) return <LoadingState label="กำลังโหลดแม่แบบงานประจำ..." compact />;
     if (error) return <ErrorState compact action={{ label: "ลองใหม่", onClick: onRetry }} description={error.message} />;
     if (!data || data.tasks.length === 0) {
@@ -58,7 +77,7 @@ export function RoutineTaskList({
                                 <td className="px-4 py-4 text-content-body">{task.unit.code}</td>
                                 <td className="px-4 py-4 text-content-body">{ROUTINE_SCHEDULE_LABELS[task.scheduleType] ?? task.scheduleType}<p className="mt-1 text-xs text-content-secondary">{task.scheduleText ?? "ไม่ได้ระบุคำอธิบาย"}</p></td>
                                 <td className="px-4 py-4 text-content-body">{task.assignees.map((assignee) => assignee.employee.displayName ?? `${assignee.employee.firstName} ${assignee.employee.lastName}`).join(", ")}</td>
-                                <td className="px-4 py-4"><span className={task.isActive ? "rounded-full bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700" : "rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600"}>{task.isActive ? "ใช้งาน" : "ปิดใช้งาน"}</span><p className="mt-2 text-xs text-content-secondary">สร้างแล้ว {task._count.occurrences} รอบ</p></td>
+                                <td className="px-4 py-4"><span className={task.isActive ? "rounded-full bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700" : "rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600"}>{task.isActive ? "ใช้งาน" : "ปิดใช้งาน"}</span><div className="mt-2 flex flex-wrap gap-1">{taskInformationBadges(task, today).map((badge) => <span key={badge} className="rounded-full border border-status-warning-border bg-status-warning-surface px-2 py-1 text-[11px] font-medium text-status-warning-foreground">{badge}</span>)}</div><p className="mt-2 text-xs text-content-secondary">สร้างแล้ว {task._count.occurrences} รอบ</p></td>
                                 <td className="px-4 py-4 text-right"><Button type="button" variant="outline" size="sm" onClick={() => onEdit(task)}><Edit3 aria-hidden="true" /> แก้ไข</Button></td>
                             </tr>
                         ))}

@@ -22,11 +22,7 @@ export const routineImportRowsQuerySchema = z.object({
         "FAILED",
     ]).optional(),
     selected: z.enum(["0", "1"]).transform((value) => value === "1").optional(),
-    issue: z.enum([
-        "UNRESOLVED_OWNER",
-        "AMBIGUOUS_SCHEDULE",
-        "EXPIRED_CONTRACT",
-    ]).optional(),
+    issue: z.enum(["UNRESOLVED_OWNER"]).optional(),
     search: z.string().trim().max(100).optional(),
 });
 
@@ -51,7 +47,6 @@ export const routineImportRowUpdateSchema = z.object({
     contractEndDate: z.iso.date().nullable(),
     contractText: z.string().trim().max(500).nullable(),
     extraDetails: z.string().trim().max(5000).nullable(),
-    proposedActivation: z.enum(["ACTIVE", "INACTIVE"]),
     selected: z.boolean(),
     reminderRules: z.array(routineReminderRuleSchema).max(20),
 });

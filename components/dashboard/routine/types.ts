@@ -1,9 +1,6 @@
-export type RoutineStatus =
-    | "TODO"
-    | "IN_PROGRESS"
-    | "COMPLETED"
-    | "SKIPPED"
-    | "CANCELLED";
+import type { RoutineTimingStatus } from "@/lib/routine/timing";
+
+export type { RoutineTimingStatus } from "@/lib/routine/timing";
 
 export type RoutineAssigneeRole = "OWNER" | "CO_OWNER";
 
@@ -44,24 +41,13 @@ export interface RoutineOccurrence {
     periodKey: string;
     dueDate: string;
     originalDueDate: string;
-    status: RoutineStatus;
     scheduleVersion: number;
     reminderVersion: number;
-    startedAt: string | null;
-    completedAt: string | null;
-    completedById: number | null;
-    completionNote: string | null;
-    referenceNo: string | null;
-    skippedAt: string | null;
-    skippedById: number | null;
-    skipReason: string | null;
-    cancelledAt: string | null;
-    cancelledById: number | null;
-    cancellationReason: string | null;
     createdAt: string;
     updatedAt: string;
-    isOverdue?: boolean;
-    daysUntilDue?: number;
+    timingStatus: RoutineTimingStatus;
+    isOverdue: boolean;
+    daysUntilDue: number;
     task: {
         id: number;
         title: string;
@@ -108,7 +94,7 @@ export interface RoutineSummary {
     today: number;
     dueSoon: number;
     overdue: number;
-    completedThisMonth: number;
+    within30Days: number;
     asOfDate: string;
 }
 

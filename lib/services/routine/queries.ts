@@ -3,14 +3,15 @@ import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
 import {
     addCalendarDays,
-    addCalendarMonths,
-    calendarDateToBangkokStart,
     calendarDayDifference,
     calendarDateToDate,
     getCurrentBangkokDate,
-    startOfMonth,
     toBangkokCalendarDate,
 } from "@/lib/routine/schedule";
+import {
+    getRoutineTimingStatus,
+    type RoutineTimingStatus,
+} from "@/lib/routine/timing";
 import type {
     RoutineOccurrenceFilters,
     RoutineTaskFilters,
@@ -25,20 +26,8 @@ const ROUTINE_OCCURRENCE_SELECT = {
     periodKey: true,
     dueDate: true,
     originalDueDate: true,
-    status: true,
     scheduleVersion: true,
     reminderVersion: true,
-    startedAt: true,
-    completedAt: true,
-    completedById: true,
-    completionNote: true,
-    referenceNo: true,
-    skippedAt: true,
-    skippedById: true,
-    skipReason: true,
-    cancelledAt: true,
-    cancelledById: true,
-    cancellationReason: true,
     createdAt: true,
     updatedAt: true,
     task: {
@@ -139,10 +128,6 @@ type RoutineTaskDetailRow = RoutineTaskRow & {
     occurrences: RoutineOccurrenceRow[];
 };
 
-function serializeDate(value: Date | null): string | null {
-    return value?.toISOString() ?? null;
-}
-
 function serializeEmployeeName(employee: {
     firstName: string;
     lastName: string;
@@ -156,17 +141,14 @@ function serializeOccurrence(row: RoutineOccurrenceRow) {
     const dueDate = toBangkokCalendarDate(row.dueDate);
     const today = getCurrentBangkokDate();
     const daysUntilDue = calendarDayDifference(today, dueDate);
-    const isTerminal = ["COMPLETED", "SKIPPED", "CANCELLED"].includes(row.status);
+    const timingStatus = getRoutineTimingStatus(today, dueDate);
     return {
         ...row,
         dueDate,
         originalDueDate: toBangkokCalendarDate(row.originalDueDate),
-        isOverdue: !isTerminal && daysUntilDue < 0,
+        timingStatus,
+        isOverdue: timingStatus === "OVERDUE",
         daysUntilDue,
-        startedAt: serializeDate(row.startedAt),
-        completedAt: serializeDate(row.completedAt),
-        skippedAt: serializeDate(row.skippedAt),
-        cancelledAt: serializeDate(row.cancelledAt),
         assignees: row.assignees.map((assignee) => ({
             employeeId: assignee.employeeId,
             role: assignee.role,
@@ -176,6 +158,44 @@ function serializeOccurrence(row: RoutineOccurrenceRow) {
             },
         })),
     };
+}
+
+function buildOccurrenceDueDateFilter(
+    filters: RoutineOccurrenceFilters,
+    today: string,
+): Prisma.DateTimeFilter | undefined {
+    const dueDate: Prisma.DateTimeFilter = {};
+    if (filters.dueFrom) dueDate.gte = calendarDateToDate(filters.dueFrom);
+    if (filters.dueTo) dueDate.lte = calendarDateToDate(filters.dueTo);
+
+    function setGte(value: Date): void {
+        if (!dueDate.gte || value > dueDate.gte) dueDate.gte = value;
+    }
+
+    function setLte(value: Date): void {
+        if (!dueDate.lte || value < dueDate.lte) dueDate.lte = value;
+    }
+
+    switch (filters.timingStatus as RoutineTimingStatus | undefined) {
+        case "OVERDUE":
+            dueDate.lt = calendarDateToDate(today);
+            break;
+        case "DUE_TODAY": {
+            const date = calendarDateToDate(today);
+            setGte(date);
+            setLte(date);
+            break;
+        }
+        case "DUE_SOON":
+            dueDate.gt = calendarDateToDate(today);
+            dueDate.lte = calendarDateToDate(addCalendarDays(today, 7));
+            break;
+        case "UPCOMING":
+            dueDate.gt = calendarDateToDate(addCalendarDays(today, 7));
+            break;
+    }
+
+    return Object.keys(dueDate).length > 0 ? dueDate : undefined;
 }
 
 type SerializedRoutineOccurrence = ReturnType<typeof serializeOccurrence>;
@@ -220,22 +240,14 @@ function buildOccurrenceWhere(
         ? employeeId
         : filters.assigneeId ?? null;
     const search = filters.search?.trim();
+    const dueDate = buildOccurrenceDueDateFilter(
+        filters,
+        getCurrentBangkokDate(),
+    );
 
     return {
         ...(filters.occurrenceId ? { id: filters.occurrenceId } : {}),
-        ...(filters.status ? { status: filters.status } : {}),
-        ...(filters.dueFrom || filters.dueTo
-            ? {
-                  dueDate: {
-                      ...(filters.dueFrom
-                          ? { gte: calendarDateToDate(filters.dueFrom) }
-                          : {}),
-                      ...(filters.dueTo
-                          ? { lte: calendarDateToDate(filters.dueTo) }
-                          : {}),
-                  },
-              }
-            : {}),
+        ...(dueDate ? { dueDate } : {}),
         ...(filters.unitId || filters.categoryId || search
             ? {
                   task: {
@@ -347,7 +359,7 @@ export async function getRoutineSummary(queryActor: RoutineQueryActor): Promise<
     today: number;
     dueSoon: number;
     overdue: number;
-    completedThisMonth: number;
+    within30Days: number;
     asOfDate: string;
 }> {
     const isAdmin = queryActor.actor.role === "ADMIN";
@@ -355,27 +367,21 @@ export async function getRoutineSummary(queryActor: RoutineQueryActor): Promise<
     const scope = isAdmin ? {} : scopedAssigneeWhere(employeeId);
     const today = getCurrentBangkokDate();
     const nextSevenDays = addCalendarDays(today, 7);
-    const monthStart = startOfMonth(today);
-    const nextMonthStart = addCalendarMonths(monthStart, 1);
-    const nonTerminal: Prisma.RoutineOccurrenceWhereInput = {
-        status: { notIn: ["COMPLETED", "SKIPPED", "CANCELLED"] },
-    };
+    const nextThirtyDays = addCalendarDays(today, 30);
 
-    const [todayCount, dueSoonCount, overdueCount, completedThisMonth] =
+    const [todayCount, dueSoonCount, overdueCount, within30Days] =
         await Promise.all([
             prisma.routineOccurrence.count({
                 where: {
                     ...scope,
                     dueDate: calendarDateToDate(today),
-                    status: { not: "CANCELLED" },
                 },
             }),
             prisma.routineOccurrence.count({
                 where: {
                     ...scope,
-                    ...nonTerminal,
                     dueDate: {
-                        gte: calendarDateToDate(today),
+                        gt: calendarDateToDate(today),
                         lte: calendarDateToDate(nextSevenDays),
                     },
                 },
@@ -383,17 +389,15 @@ export async function getRoutineSummary(queryActor: RoutineQueryActor): Promise<
             prisma.routineOccurrence.count({
                 where: {
                     ...scope,
-                    ...nonTerminal,
                     dueDate: { lt: calendarDateToDate(today) },
                 },
             }),
             prisma.routineOccurrence.count({
                 where: {
                     ...scope,
-                    status: "COMPLETED",
-                    completedAt: {
-                        gte: calendarDateToBangkokStart(monthStart),
-                        lt: calendarDateToBangkokStart(nextMonthStart),
+                    dueDate: {
+                        gte: calendarDateToDate(today),
+                        lte: calendarDateToDate(nextThirtyDays),
                     },
                 },
             }),
@@ -403,7 +407,7 @@ export async function getRoutineSummary(queryActor: RoutineQueryActor): Promise<
         today: todayCount,
         dueSoon: dueSoonCount,
         overdue: overdueCount,
-        completedThisMonth,
+        within30Days,
         asOfDate: today,
     };
 }

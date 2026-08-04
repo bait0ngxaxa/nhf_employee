@@ -8,6 +8,9 @@ import {
     type RoutineScheduleDefinition,
     type RoutineScheduleType,
 } from "@/lib/routine/schedule";
+import {
+    ROUTINE_TIMING_STATUSES,
+} from "@/lib/routine/timing";
 
 const emptyToUndefined = (value: unknown): unknown => {
     if (typeof value !== "string") return value;
@@ -217,9 +220,7 @@ export const routineTaskUpdateSchema = z
 
 export const routineOccurrenceFiltersSchema = z.object({
     occurrenceId: z.coerce.number().int().positive().optional(),
-    status: z
-        .enum(["TODO", "IN_PROGRESS", "COMPLETED", "SKIPPED", "CANCELLED"])
-        .optional(),
+    timingStatus: z.enum(ROUTINE_TIMING_STATUSES).optional(),
     unitId: z.coerce.number().int().positive().optional(),
     categoryId: z.coerce.number().int().positive().optional(),
     assigneeId: z.coerce.number().int().positive().optional(),
@@ -259,29 +260,9 @@ export const routineTaskFiltersSchema = z.object({
 
 export const routineIdParamSchema = z.string().regex(/^\d+$/, "รหัสไม่ถูกต้อง");
 
-export const routineOccurrenceStatusSchema = z.object({
-    status: z.enum(["IN_PROGRESS", "COMPLETED"], {
-        message: "การเปลี่ยนสถานะไม่ถูกต้อง",
-    }),
-    completionNote: optionalText(2000),
-    referenceNo: optionalText(255),
-});
-
-export const routineReasonSchema = z.object({
-    reason: z
-        .string({ message: "กรุณาระบุเหตุผล" })
-        .trim()
-        .min(5, "กรุณาระบุเหตุผลอย่างน้อย 5 ตัวอักษร")
-        .max(1000, "เหตุผลต้องไม่เกิน 1000 ตัวอักษร"),
-});
-
 export const routineDueDateSchema = z.object({
     dueDate: dateSchema,
-    reason: z
-        .string({ message: "กรุณาระบุเหตุผล" })
-        .trim()
-        .min(5, "กรุณาระบุเหตุผลอย่างน้อย 5 ตัวอักษร")
-        .max(1000, "เหตุผลต้องไม่เกิน 1000 ตัวอักษร"),
+    note: optionalText(1000),
 });
 
 export const routineOccurrenceAssigneesSchema = z
@@ -299,7 +280,6 @@ export const routineReminderOutboxPayloadSchema = z.object({
     ruleId: z.number().int().positive(),
     reminderVersion: z.number().int().positive(),
     dueDate: dateSchema,
-    expectedStatus: z.enum(["TODO", "IN_PROGRESS"]),
     createdAt: z.string().min(1),
 });
 
@@ -309,10 +289,6 @@ export type RoutineOccurrenceFilters = z.infer<
     typeof routineOccurrenceFiltersSchema
 >;
 export type RoutineTaskFilters = z.infer<typeof routineTaskFiltersSchema>;
-export type RoutineOccurrenceStatusInput = z.infer<
-    typeof routineOccurrenceStatusSchema
->;
-export type RoutineReasonInput = z.infer<typeof routineReasonSchema>;
 export type RoutineDueDateInput = z.infer<typeof routineDueDateSchema>;
 export type RoutineOccurrenceAssigneesInput = z.infer<
     typeof routineOccurrenceAssigneesSchema

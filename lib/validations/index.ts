@@ -23,8 +23,6 @@ export {
     routineTaskUpdateSchema,
     routineOccurrenceFiltersSchema,
     routineTaskFiltersSchema,
-    routineOccurrenceStatusSchema,
-    routineReasonSchema,
     routineDueDateSchema,
     routineOccurrenceAssigneesSchema,
 } from "./routine";
@@ -33,8 +31,6 @@ export type {
     RoutineTaskUpdateInput,
     RoutineOccurrenceFilters,
     RoutineTaskFilters,
-    RoutineOccurrenceStatusInput,
-    RoutineReasonInput,
     RoutineDueDateInput,
     RoutineOccurrenceAssigneesInput,
 } from "./routine";

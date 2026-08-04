@@ -13,8 +13,6 @@ import {
     ROUTINE_REMINDER_OUTBOX_TYPE,
 } from "./reminders";
 
-const ROUTINE_ACTIONABLE_STATUSES = ["TODO", "IN_PROGRESS"] as const;
-
 export interface RoutineSchedulerResult {
     occurrencesCreated: number;
     remindersConsidered: number;
@@ -34,7 +32,6 @@ type RoutineSchedulerOccurrence = {
     id: number;
     taskId: number;
     dueDate: Date;
-    status: (typeof ROUTINE_ACTIONABLE_STATUSES)[number];
     reminderVersion: number;
     task: {
         id: number;
@@ -121,7 +118,6 @@ function buildRoutineReminderPayload(
         ruleId,
         reminderVersion: occurrence.reminderVersion,
         dueDate,
-        expectedStatus: occurrence.status,
         createdAt: now.toISOString(),
     });
 }
@@ -187,13 +183,11 @@ async function findSchedulerOccurrences(
     const rows = await prisma.routineOccurrence.findMany({
         where: {
             dueDate: { gte: calendarDateToDate(currentDate) },
-            status: { in: [...ROUTINE_ACTIONABLE_STATUSES] },
         },
         select: {
             id: true,
             taskId: true,
             dueDate: true,
-            status: true,
             reminderVersion: true,
             task: {
                 select: {

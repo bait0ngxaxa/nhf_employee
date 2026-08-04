@@ -180,7 +180,6 @@ export async function dispatchRoutineReminderOutbox(
                 id: true,
                 taskId: true,
                 dueDate: true,
-                status: true,
                 reminderVersion: true,
                 task: {
                     select: {
@@ -233,7 +232,6 @@ export async function dispatchRoutineReminderOutbox(
             || rule.channel !== "IN_APP"
             || occurrence.reminderVersion !== payload.reminderVersion
             || currentDueDate !== payload.dueDate
-            || (occurrence.status !== "TODO" && occurrence.status !== "IN_PROGRESS")
             || !isRoutineReminderDue(
                 payload.dueDate,
                 rule.daysBefore,

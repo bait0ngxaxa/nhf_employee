@@ -75,6 +75,8 @@ describe("NHF Routine occurrence generation", () => {
                 }),
             }),
         );
+        expect(prismaMock.routineOccurrence.upsert.mock.calls[0]?.[0]?.create)
+            .not.toHaveProperty("status");
     });
 
     it("is idempotent when all generated periods already exist", async () => {
@@ -139,5 +141,47 @@ describe("NHF Routine occurrence generation", () => {
 
         expect(result).toEqual({ evaluated: 2, created: 2, existing: 0 });
         expect(prismaMock.routineOccurrence.upsert).toHaveBeenCalledTimes(2);
+    });
+
+    it("excludes past occurrences when importing a task", async () => {
+        const result = await generateRoutineTaskOccurrences(
+            71,
+            new Date("2026-01-15T04:00:00.000Z"),
+            { excludePastDue: true },
+        );
+
+        expect(result).toEqual({ evaluated: 3, created: 2, existing: 0 });
+        expect(prismaMock.routineOccurrence.upsert).toHaveBeenCalledTimes(2);
+        expect(prismaMock.routineOccurrence.upsert).not.toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: { taskId_periodKey: { taskId: 71, periodKey: "2026-01" } },
+            }),
+        );
+    });
+
+    it("refreshes schedule metadata without overwriting an admin due-date override", async () => {
+        prismaMock.routineOccurrence.findUnique
+            .mockResolvedValueOnce(asNever({
+                id: 100,
+                dueDate: new Date("2026-01-20T00:00:00.000Z"),
+                originalDueDate: new Date("2026-01-10T00:00:00.000Z"),
+                scheduleVersion: 3,
+            }))
+            .mockResolvedValue(null);
+        prismaMock.routineOccurrence.updateMany.mockResolvedValue(
+            asNever({ count: 1 }),
+        );
+
+        await generateRoutineTaskOccurrences(
+            71,
+            new Date("2026-01-15T04:00:00.000Z"),
+        );
+
+        expect(prismaMock.routineOccurrence.updateMany).toHaveBeenCalledWith({
+            where: { id: 100, scheduleVersion: 3 },
+            data: {
+                scheduleVersion: 4,
+            },
+        });
     });
 });

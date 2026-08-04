@@ -1,12 +1,5 @@
 import { useState } from "react";
-import {
-    CalendarDays,
-    Check,
-    Play,
-    RotateCcw,
-    SkipForward,
-    X,
-} from "lucide-react";
+import { Pencil, Save, X } from "lucide-react";
 import type { KeyedMutator } from "swr";
 
 import { Button } from "@/components/ui/button";
@@ -21,8 +14,8 @@ import { API_ROUTES } from "@/lib/ssot/routes";
 
 import {
     formatRoutineDueLabel,
-    getRoutineStatusClass,
-    ROUTINE_STATUS_LABELS,
+    getRoutineTimingStatusClass,
+    ROUTINE_TIMING_STATUS_LABELS,
 } from "./labels";
 import type {
     PaginatedOccurrencesResponse,
@@ -42,7 +35,12 @@ interface RoutineOccurrenceListProps {
     employees: RoutineEmployee[];
 }
 
-type AdminAction = "SKIPPED" | "CANCELLED" | "REOPEN" | "DUE_DATE" | "REASSIGN";
+interface RoutineOccurrenceEditorState {
+    id: number;
+    dueDate: string;
+    note: string;
+    assignees: Record<number, RoutineAssigneeRole>;
+}
 
 function employeeNames(occurrence: RoutineOccurrence): string {
     return occurrence.assignees
@@ -51,26 +49,25 @@ function employeeNames(occurrence: RoutineOccurrence): string {
         .join(", ");
 }
 
-function errorMessage(body: unknown): string {
-    if (typeof body === "object" && body !== null && "error" in body) {
-        const value = body.error;
-        return typeof value === "string" ? value : "ดำเนินการไม่สำเร็จ";
-    }
-    return "ดำเนินการไม่สำเร็จ";
-}
-
 function displayEmployeeName(employee: RoutineEmployee): string {
     const name = `${employee.firstName} ${employee.lastName}`.trim();
     return employee.nickname ? `${name} (${employee.nickname})` : name;
 }
 
+function errorMessage(body: unknown): string {
+    if (typeof body === "object" && body !== null && "error" in body) {
+        const value = body.error;
+        return typeof value === "string" ? value : "บันทึกรายการไม่สำเร็จ";
+    }
+    return "บันทึกรายการไม่สำเร็จ";
+}
+
 async function sendRoutineMutation(
     url: string,
-    method: "PATCH" | "POST",
     payload: unknown,
 ): Promise<void> {
     const response = await fetch(url, {
-        method,
+        method: "PATCH",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(payload),
     });
@@ -83,7 +80,14 @@ function formatDate(date: string): string {
         day: "numeric",
         month: "short",
         year: "numeric",
+        timeZone: "Asia/Bangkok",
     }).format(new Date(`${date}T00:00:00+07:00`));
+}
+
+function editorAssignees(occurrence: RoutineOccurrence): Record<number, RoutineAssigneeRole> {
+    return Object.fromEntries(
+        occurrence.assignees.map((assignee) => [assignee.employeeId, assignee.role]),
+    );
 }
 
 export function RoutineOccurrenceList({
@@ -97,68 +101,80 @@ export function RoutineOccurrenceList({
     employees,
 }: RoutineOccurrenceListProps) {
     const [busyId, setBusyId] = useState<number | null>(null);
-    const [completionId, setCompletionId] = useState<number | null>(null);
-    const [completionNote, setCompletionNote] = useState("");
-    const [referenceNo, setReferenceNo] = useState("");
-    const [adminAction, setAdminAction] = useState<{
-        id: number;
-        action: AdminAction;
-    } | null>(null);
-    const [reason, setReason] = useState("");
-    const [newDueDate, setNewDueDate] = useState("");
-    const [reassignment, setReassignment] = useState<Record<number, RoutineAssigneeRole>>({});
+    const [editor, setEditor] = useState<RoutineOccurrenceEditorState | null>(null);
     const [actionError, setActionError] = useState<string | null>(null);
 
-    async function runAction(
-        occurrence: RoutineOccurrence,
-        action: () => Promise<void>,
-    ): Promise<void> {
+    function beginEdit(occurrence: RoutineOccurrence): void {
+        setActionError(null);
+        setEditor({
+            id: occurrence.id,
+            dueDate: occurrence.dueDate,
+            note: "",
+            assignees: editorAssignees(occurrence),
+        });
+    }
+
+    function toggleAssignee(employeeId: number): void {
+        setEditor((current) => {
+            if (!current) return current;
+            const assignees = { ...current.assignees };
+            if (assignees[employeeId]) {
+                delete assignees[employeeId];
+            } else {
+                assignees[employeeId] = Object.keys(assignees).length === 0
+                    ? "OWNER"
+                    : "CO_OWNER";
+            }
+            return { ...current, assignees };
+        });
+    }
+
+    async function saveEdit(occurrence: RoutineOccurrence): Promise<void> {
+        if (!editor || editor.id !== occurrence.id) return;
+        const ownerCount = Object.values(editor.assignees)
+            .filter((role) => role === "OWNER")
+            .length;
+        if (!editor.dueDate || ownerCount !== 1 || Object.keys(editor.assignees).length === 0) {
+            setActionError("กรุณาระบุวันกำหนดและผู้รับผิดชอบหลัก 1 คน");
+            return;
+        }
+
         setBusyId(occurrence.id);
         setActionError(null);
         try {
-            await action();
+            if (editor.dueDate !== occurrence.dueDate) {
+                await sendRoutineMutation(
+                    API_ROUTES.routines.occurrenceDueDateById(occurrence.id),
+                    { dueDate: editor.dueDate, note: editor.note.trim() || null },
+                );
+            }
+
+            const currentAssignees = editorAssignees(occurrence);
+            const nextAssignees = Object.entries(editor.assignees).map(
+                ([employeeId, role]) => ({ employeeId: Number(employeeId), role }),
+            );
+            const assigneesChanged =
+                Object.keys(currentAssignees).length !== nextAssignees.length
+                || nextAssignees.some(({ employeeId, role }) => currentAssignees[employeeId] !== role);
+            if (assigneesChanged) {
+                await sendRoutineMutation(
+                    API_ROUTES.routines.occurrenceAssigneesById(occurrence.id),
+                    { assignees: nextAssignees },
+                );
+            }
+
             await mutate();
-            setCompletionId(null);
-            setAdminAction(null);
-            setReason("");
-            setNewDueDate("");
-            setReassignment({});
-        } catch (actionFailure) {
+            setEditor(null);
+        } catch (saveError) {
             setActionError(
-                actionFailure instanceof Error
-                    ? actionFailure.message
-                    : "ดำเนินการไม่สำเร็จ",
+                saveError instanceof Error ? saveError.message : "บันทึกรายการไม่สำเร็จ",
             );
         } finally {
             setBusyId(null);
         }
     }
 
-    function beginReassignment(occurrence: RoutineOccurrence): void {
-        const selected: Record<number, RoutineAssigneeRole> = {};
-        occurrence.assignees.forEach((assignee) => {
-            selected[assignee.employeeId] = assignee.role;
-        });
-        setAdminAction({ id: occurrence.id, action: "REASSIGN" });
-        setReassignment(selected);
-        setReason("");
-    }
-
-    function toggleReassignmentEmployee(employeeId: number): void {
-        setReassignment((current) => {
-            const next = { ...current };
-            if (next[employeeId]) {
-                delete next[employeeId];
-            } else {
-                next[employeeId] = Object.keys(next).length === 0
-                    ? "OWNER"
-                    : "CO_OWNER";
-            }
-            return next;
-        });
-    }
-
-    if (isLoading) return <LoadingState label="กำลังโหลดรายการงานประจำ..." compact />;
+    if (isLoading) return <LoadingState label="กำลังโหลดรายการ Routine..." compact />;
     if (error) {
         return (
             <ErrorState
@@ -172,23 +188,22 @@ export function RoutineOccurrenceList({
         return (
             <EmptyState
                 compact
-                title="ยังไม่มีงานในรายการ"
-                description="เมื่อมีงานตามช่วงเวลาที่เลือก งานจะแสดงที่นี่"
+                title="ยังไม่มีรายการ Routine"
+                description="รายการตามกำหนดการจะแสดงที่นี่เมื่อมีรอบที่สร้างไว้"
             />
         );
     }
 
     return (
-        <div className="space-y-3" aria-label="รายการงานประจำ">
+        <div className="space-y-3" aria-label="รายการ Routine">
             {actionError ? (
                 <p className="rounded-lg border border-status-danger-border bg-status-danger-surface px-4 py-3 text-sm text-status-danger-foreground" role="alert">
                     {actionError}
                 </p>
             ) : null}
             {data.occurrences.map((occurrence) => {
+                const isEditing = editor?.id === occurrence.id;
                 const isBusy = busyId === occurrence.id;
-                const showCompletion = completionId === occurrence.id;
-                const showAdminAction = adminAction?.id === occurrence.id;
                 return (
                     <article
                         key={occurrence.id}
@@ -205,134 +220,99 @@ export function RoutineOccurrenceList({
                                     {occurrence.task.title}
                                 </h3>
                                 <div className="grid gap-2 text-sm text-content-secondary sm:grid-cols-2">
-                                    <p>ผู้รับผิดชอบ: <span className="text-content-body">{employeeNames(occurrence)}</span></p>
-                                    <p>กำหนด: <span className={occurrence.isOverdue ? "font-semibold text-status-danger-foreground" : "text-content-body"}>{formatDate(occurrence.dueDate)} ({formatRoutineDueLabel(occurrence)})</span></p>
+                                    <p>
+                                        ผู้รับผิดชอบ: <span className="text-content-body">{employeeNames(occurrence)}</span>
+                                    </p>
+                                    <p>
+                                        กำหนด: <span className={occurrence.isOverdue ? "font-semibold text-status-danger-foreground" : "text-content-body"}>
+                                            {formatDate(occurrence.dueDate)} ({formatRoutineDueLabel(occurrence)})
+                                        </span>
+                                    </p>
                                 </div>
                             </div>
                             <div className="flex shrink-0 flex-col items-start gap-3 lg:items-end">
-                                <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${getRoutineStatusClass(occurrence.status)}`}>
-                                    {ROUTINE_STATUS_LABELS[occurrence.status]}
+                                <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${getRoutineTimingStatusClass(occurrence.timingStatus)}`}>
+                                    {ROUTINE_TIMING_STATUS_LABELS[occurrence.timingStatus]}
                                 </span>
-                                <div className="flex flex-wrap gap-2 lg:justify-end">
-                                    {occurrence.status === "TODO" ? (
-                                        <Button type="button" size="sm" variant="outline" disabled={isBusy} onClick={() => void runAction(occurrence, () => sendRoutineMutation(API_ROUTES.routines.occurrenceStatusById(occurrence.id), "PATCH", { status: "IN_PROGRESS" }))}>
-                                            <Play aria-hidden="true" /> เริ่มงาน
-                                        </Button>
-                                    ) : null}
-                                    {occurrence.status === "TODO" || occurrence.status === "IN_PROGRESS" ? (
-                                        <Button type="button" size="sm" disabled={isBusy} onClick={() => { setCompletionId(occurrence.id); setCompletionNote(occurrence.completionNote ?? ""); setReferenceNo(occurrence.referenceNo ?? ""); }}>
-                                            <Check aria-hidden="true" /> ปิดงาน
-                                        </Button>
-                                    ) : null}
-                                    {isAdmin && occurrence.status !== "COMPLETED" && occurrence.status !== "SKIPPED" && occurrence.status !== "CANCELLED" ? (
-                                        <>
-                                            <Button type="button" size="sm" variant="outline" disabled={isBusy} onClick={() => { setAdminAction({ id: occurrence.id, action: "SKIPPED" }); setReason(""); }}>
-                                                <SkipForward aria-hidden="true" /> ข้ามงาน
-                                            </Button>
-                                            <Button type="button" size="sm" variant="outline" disabled={isBusy} onClick={() => { setAdminAction({ id: occurrence.id, action: "CANCELLED" }); setReason(""); }}>
-                                                <X aria-hidden="true" /> ยกเลิก
-                                            </Button>
-                                        </>
-                                    ) : null}
-                                    {isAdmin ? (
-                                        <Button type="button" size="sm" variant="outline" disabled={isBusy} onClick={() => { setAdminAction({ id: occurrence.id, action: "DUE_DATE" }); setNewDueDate(occurrence.dueDate); setReason(""); }}>
-                                            <CalendarDays aria-hidden="true" /> เปลี่ยนวันกำหนด
-                                        </Button>
-                                    ) : null}
-                                    {isAdmin ? (
-                                        <Button type="button" size="sm" variant="outline" disabled={isBusy || employees.length === 0} onClick={() => beginReassignment(occurrence)}>
-                                            เปลี่ยนผู้รับผิดชอบ
-                                        </Button>
-                                    ) : null}
-                                    {isAdmin && (occurrence.status === "COMPLETED" || occurrence.status === "SKIPPED" || occurrence.status === "CANCELLED") ? (
-                                        <Button type="button" size="sm" variant="outline" disabled={isBusy} onClick={() => { setAdminAction({ id: occurrence.id, action: "REOPEN" }); setReason(""); }}>
-                                            <RotateCcw aria-hidden="true" /> เปิดงานอีกครั้ง
-                                        </Button>
-                                    ) : null}
-                                </div>
+                                {isAdmin ? (
+                                    <Button
+                                        type="button"
+                                        size="sm"
+                                        variant="outline"
+                                        disabled={isBusy}
+                                        onClick={() => (isEditing ? setEditor(null) : beginEdit(occurrence))}
+                                    >
+                                        {isEditing ? <X aria-hidden="true" /> : <Pencil aria-hidden="true" />}
+                                        {isEditing ? "ปิดการแก้ไข" : "แก้ไขรายการ"}
+                                    </Button>
+                                ) : null}
                             </div>
                         </div>
 
-                        {showCompletion ? (
-                            <div className="mt-4 grid gap-3 rounded-lg border border-border-subtle bg-surface-subtle p-4 md:grid-cols-[1fr_1fr_auto] md:items-end">
-                                <label className="grid gap-1 text-sm font-medium text-content-body">
-                                    โน้ตปิดงาน
-                                    <Textarea value={completionNote} onChange={(event) => setCompletionNote(event.target.value)} placeholder="สรุปผลการดำเนินงาน (ถ้ามี)" />
-                                </label>
-                                <label className="grid gap-1 text-sm font-medium text-content-body">
-                                    เลขเอกสารอ้างอิง
-                                    <Input value={referenceNo} onChange={(event) => setReferenceNo(event.target.value)} placeholder="เช่น NHF-2026-001" />
-                                </label>
-                                <Button type="button" disabled={isBusy} onClick={() => void runAction(occurrence, () => sendRoutineMutation(API_ROUTES.routines.occurrenceStatusById(occurrence.id), "PATCH", { status: "COMPLETED", completionNote, referenceNo }))}>
-                                    ยืนยันปิดงาน
-                                </Button>
-                            </div>
-                        ) : null}
-
-                        {showAdminAction ? (
-                            <div className="mt-4 grid gap-3 rounded-lg border border-border-subtle bg-surface-subtle p-4 md:grid-cols-[1fr_1fr_auto] md:items-end">
-                                {adminAction.action === "REASSIGN" ? (
-                                    <fieldset className="grid gap-2 md:col-span-3">
-                                        <legend className="text-sm font-medium text-content-body">ผู้รับผิดชอบใหม่</legend>
-                                        {employees.length === 0 ? (
-                                            <p className="text-sm text-content-secondary">ไม่พบพนักงานที่พร้อมรับผิดชอบ</p>
-                                        ) : (
-                                            <div className="grid gap-2 sm:grid-cols-2">
-                                                {employees.map((employee) => {
-                                                    const selectedRole = reassignment[employee.id];
-                                                    return (
-                                                        <div key={employee.id} className="flex items-center gap-3 rounded-lg border border-border-subtle bg-background px-3 py-2">
-                                                            <input type="checkbox" checked={selectedRole !== undefined} onChange={() => toggleReassignmentEmployee(employee.id)} aria-label={`เลือก ${displayEmployeeName(employee)}`} />
-                                                            <span className="min-w-0 flex-1 text-sm text-content-body">{displayEmployeeName(employee)}</span>
-                                                            {selectedRole ? (
-                                                                <select className="h-9 rounded-md border border-input bg-background px-2 text-xs" value={selectedRole} onChange={(event) => setReassignment((current) => ({ ...current, [employee.id]: event.target.value as RoutineAssigneeRole }))} aria-label={`บทบาท ${displayEmployeeName(employee)}`}>
-                                                                    <option value="OWNER">ผู้รับผิดชอบหลัก</option>
-                                                                    <option value="CO_OWNER">ผู้ร่วมรับผิดชอบ</option>
-                                                                </select>
-                                                            ) : null}
-                                                        </div>
-                                                    );
-                                                })}
-                                            </div>
-                                        )}
-                                    </fieldset>
-                                ) : null}
-                                {adminAction.action === "DUE_DATE" ? (
+                        {isEditing && editor ? (
+                            <div className="mt-4 space-y-4 rounded-lg border border-border-subtle bg-surface-subtle p-4">
+                                <div className="grid gap-4 md:grid-cols-[220px_1fr]">
                                     <label className="grid gap-1 text-sm font-medium text-content-body">
-                                        วันกำหนดใหม่
-                                        <Input type="date" value={newDueDate} onChange={(event) => setNewDueDate(event.target.value)} />
+                                        วันกำหนด
+                                        <Input
+                                            type="date"
+                                            value={editor.dueDate}
+                                            onChange={(event) => setEditor((current) => current ? { ...current, dueDate: event.target.value } : current)}
+                                        />
                                     </label>
-                                ) : adminAction.action !== "REASSIGN" ? <label className="grid gap-1 text-sm font-medium text-content-body">
-                                    เหตุผล
-                                    <Textarea value={reason} onChange={(event) => setReason(event.target.value)} placeholder="กรุณาระบุเหตุผลอย่างน้อย 5 ตัวอักษร" />
-                                </label> : null}
-                                {adminAction.action === "DUE_DATE" ? <label className="grid gap-1 text-sm font-medium text-content-body">
-                                    เหตุผล
-                                    <Textarea value={reason} onChange={(event) => setReason(event.target.value)} placeholder="กรุณาระบุเหตุผลอย่างน้อย 5 ตัวอักษร" />
-                                </label> : null}
-                                <Button type="button" disabled={isBusy || (adminAction.action !== "REASSIGN" && reason.trim().length < 5) || (adminAction.action === "DUE_DATE" && !newDueDate) || (adminAction.action === "REASSIGN" && Object.values(reassignment).filter((role) => role === "OWNER").length !== 1)} onClick={() => void runAction(occurrence, () => {
-                                    if (adminAction.action === "REASSIGN") {
-                                        return sendRoutineMutation(
-                                            API_ROUTES.routines.occurrenceAssigneesById(occurrence.id),
-                                            "PATCH",
-                                            { assignees: Object.entries(reassignment).map(([employeeId, role]) => ({ employeeId: Number(employeeId), role })) },
-                                        );
-                                    }
-                                    if (adminAction.action === "DUE_DATE") {
-                                        return sendRoutineMutation(
-                                            API_ROUTES.routines.occurrenceDueDateById(occurrence.id),
-                                            "PATCH",
-                                            { dueDate: newDueDate, reason },
-                                        );
-                                    }
-                                    return sendRoutineMutation(
-                                        adminAction.action === "SKIPPED" ? API_ROUTES.routines.occurrenceSkipById(occurrence.id) : adminAction.action === "CANCELLED" ? API_ROUTES.routines.occurrenceCancelById(occurrence.id) : API_ROUTES.routines.occurrenceReopenById(occurrence.id),
-                                        "POST",
-                                        { reason },
-                                    );
-                                })}>
-                                    ยืนยันการดำเนินการ
-                                </Button>
+                                    <label className="grid gap-1 text-sm font-medium text-content-body">
+                                        หมายเหตุ (ถ้ามี)
+                                        <Textarea
+                                            value={editor.note}
+                                            onChange={(event) => setEditor((current) => current ? { ...current, note: event.target.value } : current)}
+                                            placeholder="บันทึกเหตุผลหรือรายละเอียดเพิ่มเติมได้ตามต้องการ"
+                                        />
+                                    </label>
+                                </div>
+                                <fieldset className="grid gap-2">
+                                    <legend className="text-sm font-medium text-content-body">ผู้รับผิดชอบ</legend>
+                                    <div className="grid gap-2 sm:grid-cols-2">
+                                        {employees.map((employee) => {
+                                            const selectedRole = editor.assignees[employee.id];
+                                            return (
+                                                <div key={employee.id} className="flex items-center gap-3 rounded-lg border border-border-subtle bg-background px-3 py-2">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={selectedRole !== undefined}
+                                                        onChange={() => toggleAssignee(employee.id)}
+                                                        aria-label={`เลือก ${displayEmployeeName(employee)}`}
+                                                    />
+                                                    <span className="min-w-0 flex-1 text-sm text-content-body">{displayEmployeeName(employee)}</span>
+                                                    {selectedRole ? (
+                                                        <select
+                                                            className="h-9 rounded-md border border-input bg-background px-2 text-xs"
+                                                            value={selectedRole}
+                                                            onChange={(event) => setEditor((current) => current ? {
+                                                                ...current,
+                                                                assignees: {
+                                                                    ...current.assignees,
+                                                                    [employee.id]: event.target.value as RoutineAssigneeRole,
+                                                                },
+                                                            } : current)}
+                                                            aria-label={`บทบาท ${displayEmployeeName(employee)}`}
+                                                        >
+                                                            <option value="OWNER">ผู้รับผิดชอบหลัก</option>
+                                                            <option value="CO_OWNER">ผู้ร่วมรับผิดชอบ</option>
+                                                        </select>
+                                                    ) : null}
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                    {employees.length === 0 ? <p className="text-sm text-content-secondary">ไม่พบพนักงานที่พร้อมรับผิดชอบ</p> : null}
+                                </fieldset>
+                                <div className="flex flex-wrap justify-end gap-2">
+                                    <Button type="button" variant="outline" disabled={isBusy} onClick={() => setEditor(null)}>ปิด</Button>
+                                    <Button type="button" disabled={isBusy} onClick={() => void saveEdit(occurrence)}>
+                                        <Save aria-hidden="true" />
+                                        {isBusy ? "กำลังบันทึก..." : "บันทึกการแก้ไข"}
+                                    </Button>
+                                </div>
                             </div>
                         ) : null}
                     </article>
