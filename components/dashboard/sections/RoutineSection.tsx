@@ -92,7 +92,6 @@ function RoutineOccurrencePanel({
                 </label>
                 <Button type="button" variant="outline" onClick={() => void mutate()}>รีเฟรช</Button>
             </div>
-            <p className="text-xs text-content-secondary">แต่ละรายการแสดง 1 งาน Routine รอบแจ้งเตือนของงานเดียวกันจะถูกจัดการภายในระบบ</p>
             <RoutineOccurrenceList
                 data={data}
                 error={error}

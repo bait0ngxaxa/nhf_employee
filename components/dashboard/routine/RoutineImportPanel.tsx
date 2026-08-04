@@ -171,6 +171,7 @@ export function RoutineImportPanel() {
     const [editorRow, setEditorRow] = useState<RoutineImportRowView | null>(null);
     const [confirmOpen, setConfirmOpen] = useState(false);
     const uploadLockRef = useRef(false);
+    const uploadToastBatchIdRef = useRef<number | null>(null);
     const applyLockRef = useRef(false);
     const cancelLockRef = useRef(false);
     const selectionLocksRef = useRef<Set<number>>(new Set());
@@ -187,6 +188,7 @@ export function RoutineImportPanel() {
     const loadBatch = useCallback(async (): Promise<void> => {
         if (batchId === null) return;
         setLoading(true);
+        setError(null);
         try {
             const params = new URLSearchParams({ page: String(page), limit: "25" });
             if (filter) params.set("status", filter);
@@ -199,6 +201,10 @@ export function RoutineImportPanel() {
             ]);
             setBatch(batchBody.batch);
             setRowsPage(rowsBody);
+            if (uploadToastBatchIdRef.current === batchId) {
+                uploadToastBatchIdRef.current = null;
+                toast.success("อ่านไฟล์และสร้างตัวอย่างข้อมูลสำเร็จ");
+            }
         } catch (loadError) {
             setError(loadError instanceof Error ? loadError.message : "โหลดข้อมูลนำเข้าไม่สำเร็จ");
         } finally {
@@ -215,6 +221,7 @@ export function RoutineImportPanel() {
         setBatch(null);
         setRowsPage(null);
         setError(null);
+        uploadToastBatchIdRef.current = null;
         setFilter("");
         setIssue("");
         setSelectedOnly(false);
@@ -237,10 +244,9 @@ export function RoutineImportPanel() {
             const formData = new FormData();
             formData.append("file", file);
             const body = await fetchJson<{ batch: RoutineImportBatchView; reusedExisting: boolean }>(API_ROUTES.routines.imports.preview, { method: "POST", body: formData });
+            uploadToastBatchIdRef.current = body.batch.id;
             setBatchId(body.batch.id);
-            setBatch(body.batch);
             setPage(1);
-            toast.success("อ่านไฟล์และสร้างตัวอย่างข้อมูลสำเร็จ");
         } catch (uploadError) {
             const message = uploadError instanceof Error ? uploadError.message : "อัปโหลดไฟล์ไม่สำเร็จ";
             setError(message);

@@ -405,7 +405,6 @@ export function RoutineTaskForm({
         >
             <div>
                 <h3 className="text-lg font-semibold text-content-heading">{initialTask ? "แก้ไขแม่แบบงานประจำ" : "สร้างแม่แบบงานประจำ"}</h3>
-                <p className="mt-1 text-sm text-content-secondary">ผู้ใช้จะเห็น 1 รายการต่อ 1 งาน ระบบจัดเก็บรอบแจ้งเตือนภายในตามกำหนดการปัจจุบันและล่วงหน้า 2 เดือน</p>
             </div>
             {error ? <p className="rounded-lg border border-status-danger-border bg-status-danger-surface px-4 py-3 text-sm text-status-danger-foreground" role="alert">{error}</p> : null}
             <div className="grid gap-4 md:grid-cols-2">

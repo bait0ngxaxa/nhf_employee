@@ -16,6 +16,10 @@ const normalizedScheduleSchema = z.object({
     scheduleConfig: jsonObjectSchema,
     businessDayPolicy: z.enum(ROUTINE_BUSINESS_DAY_POLICIES),
 });
+const proposedActivationSchema = z.preprocess(
+    (value: unknown) => value === "INACTIVE" || value === "HISTORY_ONLY" ? "ACTIVE" : value,
+    z.literal("ACTIVE"),
+);
 const importRowSchema = z.object({
     sourceFileName: z.string().min(1).max(255),
     sourceSheet: z.string().min(1).max(255),
@@ -50,7 +54,7 @@ const importRowSchema = z.object({
     contractEndDate: z.iso.date().nullable(),
     requiresReview: z.boolean(),
     reviewReasons: z.array(z.string()),
-    proposedActivation: z.literal("ACTIVE"),
+    proposedActivation: proposedActivationSchema,
 });
 export function parseRoutineImportRow(value: unknown): RoutineImportRow {
     const result = importRowSchema.safeParse(value);
