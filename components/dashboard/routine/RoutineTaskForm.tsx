@@ -6,7 +6,16 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { API_ROUTES } from "@/lib/ssot/routes";
 
-import { ROUTINE_SCHEDULE_LABELS } from "./labels";
+import type {
+    RoutineBusinessDayPolicy,
+    RoutineScheduleType,
+} from "@/lib/routine/schedule";
+import {
+    ROUTINE_BUSINESS_DAY_POLICIES,
+    ROUTINE_SCHEDULE_TYPES,
+} from "@/lib/routine/schedule";
+
+import { RoutineScheduleFields } from "./RoutineScheduleFields";
 import type {
     RoutineAssigneeRole,
     RoutineReferenceData,
@@ -26,14 +35,14 @@ interface TaskFormState {
     categoryId: string;
     title: string;
     description: string;
-    scheduleType: string;
-    scheduleConfig: string;
+    scheduleType: RoutineScheduleType;
+    scheduleConfig: Record<string, unknown>;
     scheduleText: string;
     contractStartDate: string;
     contractEndDate: string;
     contractText: string;
     extraDetails: string;
-    businessDayPolicy: string;
+    businessDayPolicy: RoutineBusinessDayPolicy;
     isActive: boolean;
     reminderRules: ReminderRuleForm[];
 }
@@ -57,23 +66,29 @@ const REMINDER_PRESETS: Record<string, number[]> = {
     contract: [30, 7, 1],
 };
 
-function defaultScheduleConfig(scheduleType: string): string {
+function defaultScheduleConfig(scheduleType: RoutineScheduleType): Record<string, unknown> {
     switch (scheduleType) {
         case "MONTHLY_DAY":
-            return '{\n  "day": 10,\n  "monthOffset": 0\n}';
+            return { day: 10, monthOffset: 0 };
         case "MONTH_END":
-            return "{}";
+            return {};
         case "INTERVAL_MONTHS":
-            return '{\n  "intervalMonths": 3,\n  "anchorDate": "2026-01-01"\n}';
+            return { intervalMonths: 3, anchorDate: "2026-01-01" };
         case "YEARLY_DATE":
-            return '{\n  "month": 3,\n  "day": 31\n}';
+            return { month: 3, day: 31 };
         case "ONE_TIME":
-            return '{\n  "date": "2026-07-21"\n}';
+            return { date: "2026-07-21" };
         case "MANUAL":
-            return "{}";
-        default:
-            return "{}";
+            return {};
     }
+}
+
+function isRoutineScheduleType(value: string): value is RoutineScheduleType {
+    return ROUTINE_SCHEDULE_TYPES.includes(value as RoutineScheduleType);
+}
+
+function isRoutineBusinessDayPolicy(value: string): value is RoutineBusinessDayPolicy {
+    return ROUTINE_BUSINESS_DAY_POLICIES.includes(value as RoutineBusinessDayPolicy);
 }
 
 function isObject(value: unknown): value is Record<string, unknown> {
@@ -81,7 +96,12 @@ function isObject(value: unknown): value is Record<string, unknown> {
 }
 
 function taskToForm(task: RoutineTask | null): TaskFormState {
-    const scheduleType = task?.scheduleType ?? "MONTHLY_DAY";
+    const scheduleType = task && isRoutineScheduleType(task.scheduleType)
+        ? task.scheduleType
+        : "MONTHLY_DAY";
+    const businessDayPolicy = task && isRoutineBusinessDayPolicy(task.businessDayPolicy)
+        ? task.businessDayPolicy
+        : "NONE";
     return {
         unitId: task ? String(task.unitId) : "",
         categoryId: task ? String(task.categoryId) : "",
@@ -89,14 +109,14 @@ function taskToForm(task: RoutineTask | null): TaskFormState {
         description: task?.description ?? "",
         scheduleType,
         scheduleConfig: task && isObject(task.scheduleConfig)
-            ? JSON.stringify(task.scheduleConfig, null, 2)
+            ? task.scheduleConfig
             : defaultScheduleConfig(scheduleType),
         scheduleText: task?.scheduleText ?? "",
         contractStartDate: task?.contractStartDate ?? "",
         contractEndDate: task?.contractEndDate ?? "",
         contractText: task?.contractText ?? "",
         extraDetails: task?.extraDetails ?? "",
-        businessDayPolicy: task?.businessDayPolicy ?? "NONE",
+        businessDayPolicy,
         isActive: task?.isActive ?? true,
         reminderRules: task?.reminderRules?.map((rule) => ({
             daysBefore: String(rule.daysBefore),
@@ -210,17 +230,6 @@ export function RoutineTaskForm({
 
     async function submit(): Promise<void> {
         setError(null);
-        let scheduleConfig: unknown;
-        try {
-            scheduleConfig = JSON.parse(form.scheduleConfig) as unknown;
-        } catch {
-            setError("กำหนดค่า schedule config ต้องเป็น JSON ที่ถูกต้อง");
-            return;
-        }
-        if (!isObject(scheduleConfig)) {
-            setError("กำหนดค่า schedule config ต้องเป็น object");
-            return;
-        }
         const ownerCount = Object.values(assignees).filter((role) => role === "OWNER").length;
         if (ownerCount !== 1) {
             setError("กรุณาเลือกผู้รับผิดชอบหลัก 1 คน");
@@ -256,7 +265,7 @@ export function RoutineTaskForm({
                 title: form.title,
                 description: form.description || null,
                 scheduleType: form.scheduleType,
-                scheduleConfig,
+                scheduleConfig: form.scheduleConfig,
                 scheduleText: form.scheduleText || null,
                 contractStartDate: form.contractStartDate || null,
                 contractEndDate: form.contractEndDate || null,
@@ -319,30 +328,18 @@ export function RoutineTaskForm({
                 </label>
             </div>
 
-            <fieldset className="space-y-3 rounded-lg border border-border-subtle bg-surface-subtle p-4">
-                <legend className="px-1 text-sm font-semibold text-content-heading">ตารางงาน</legend>
-                <div className="grid gap-4 md:grid-cols-2">
-                    <label className="grid gap-1 text-sm font-medium text-content-body">รูปแบบการเกิดงาน
-                        <select className="h-11 rounded-md border border-input bg-background px-3 text-sm" value={form.scheduleType} onChange={(event) => { updateField("scheduleType", event.target.value); updateField("scheduleConfig", defaultScheduleConfig(event.target.value)); }}>
-                            {Object.entries(ROUTINE_SCHEDULE_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-                        </select>
-                    </label>
-                    <label className="grid gap-1 text-sm font-medium text-content-body">การเลื่อนวันทำการ
-                        <select className="h-11 rounded-md border border-input bg-background px-3 text-sm" value={form.businessDayPolicy} onChange={(event) => updateField("businessDayPolicy", event.target.value)}>
-                            <option value="NONE">ไม่เลื่อนวัน</option>
-                            <option value="PREVIOUS_BUSINESS_DAY">เลื่อนเป็นวันทำการก่อนหน้า</option>
-                            <option value="NEXT_BUSINESS_DAY">เลื่อนเป็นวันทำการถัดไป</option>
-                        </select>
-                    </label>
-                    <p className="text-xs text-content-secondary md:col-span-2">ระยะนี้เลื่อนเฉพาะเสาร์–อาทิตย์ ยังไม่รวมวันหยุดนักขัตฤกษ์</p>
-                    <label className="grid gap-1 text-sm font-medium text-content-body md:col-span-2">Schedule config (JSON)
-                        <Textarea className="min-h-32 font-mono text-xs" value={form.scheduleConfig} onChange={(event) => updateField("scheduleConfig", event.target.value)} />
-                    </label>
-                    <label className="grid gap-1 text-sm font-medium text-content-body md:col-span-2">คำอธิบายกำหนดการ
-                        <Input value={form.scheduleText} onChange={(event) => updateField("scheduleText", event.target.value)} placeholder="เช่น ทุกวันที่ 10 ของเดือน" />
-                    </label>
-                </div>
-            </fieldset>
+            <RoutineScheduleFields
+                scheduleType={form.scheduleType}
+                scheduleConfig={form.scheduleConfig}
+                businessDayPolicy={form.businessDayPolicy}
+                onScheduleTypeChange={(value) => updateField("scheduleType", value)}
+                onScheduleConfigChange={(value) => updateField("scheduleConfig", value)}
+                onBusinessDayPolicyChange={(value) => updateField("businessDayPolicy", value)}
+            />
+            <label className="grid gap-1 text-sm font-medium text-content-body">
+                คำอธิบายกำหนดการ
+                <Input value={form.scheduleText} onChange={(event) => updateField("scheduleText", event.target.value)} placeholder="เช่น ทุกวันที่ 10 ของเดือน" />
+            </label>
 
             <fieldset className="space-y-3 rounded-lg border border-border-subtle bg-surface-subtle p-4">
                 <legend className="px-1 text-sm font-semibold text-content-heading">การแจ้งเตือนล่วงหน้า</legend>

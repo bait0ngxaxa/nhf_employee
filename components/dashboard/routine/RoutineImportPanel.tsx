@@ -23,6 +23,7 @@ import {
 } from "@/lib/services/routine-import/sheet-config";
 
 import { RoutineImportRowEditor } from "./RoutineImportRowEditor";
+import { formatRoutineScheduleSummary } from "./labels";
 import type {
     RoutineImportBatchView,
     RoutineImportReference,
@@ -79,7 +80,7 @@ function formatDate(value: string | null): string {
 function scheduleLabel(row: RoutineImportRowView): string {
     const schedule = row.data.normalizedSchedule;
     if (!schedule) return "ยังไม่กำหนด";
-    return `${schedule.scheduleType} ${JSON.stringify(schedule.scheduleConfig)}`;
+    return formatRoutineScheduleSummary(schedule);
 }
 
 function reviewLabel(reason: string): string {

@@ -35,6 +35,9 @@ describe("RoutineTaskForm reminder rules", () => {
             />,
         );
 
+        expect(screen.queryByText("Schedule config (JSON)")).not.toBeInTheDocument();
+        expect(screen.getByText("วันที่ของเดือน")).toBeInTheDocument();
+
         fireEvent.change(screen.getByDisplayValue("เลือกหน่วยงาน"), {
             target: { value: "1" },
         });

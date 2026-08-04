@@ -12,7 +12,7 @@ import { routineImportRowUpdateSchema } from "@/lib/validations/routine-import";
 import type { RoutineBusinessDayPolicy, RoutineScheduleType } from "@/lib/routine/schedule";
 import type { RoutineReminderRecipientScope } from "./types";
 
-import { RoutineImportScheduleFields } from "./RoutineImportScheduleFields";
+import { RoutineScheduleFields } from "./RoutineScheduleFields";
 import type {
     RoutineImportReference,
     RoutineImportRowEdit,
@@ -300,7 +300,7 @@ export function RoutineImportRowEditor({
                     {reference.employees.length === 0 ? <p className="mt-3 text-sm text-content-secondary">ยังไม่มีข้อมูลพนักงานให้เลือก</p> : null}
                 </div>
 
-                <RoutineImportScheduleFields
+                <RoutineScheduleFields
                     scheduleType={scheduleType}
                     scheduleConfig={scheduleConfig}
                     businessDayPolicy={businessDayPolicy}

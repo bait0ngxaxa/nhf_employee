@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input";
 
 import { ROUTINE_SCHEDULE_LABELS } from "./labels";
 
-interface RoutineImportScheduleFieldsProps {
+interface RoutineScheduleFieldsProps {
     scheduleType: RoutineScheduleType;
     scheduleConfig: Record<string, unknown>;
     businessDayPolicy: RoutineBusinessDayPolicy;
@@ -51,14 +51,14 @@ function configInput(
     return String(numberValue(config[key], fallback));
 }
 
-export function RoutineImportScheduleFields({
+export function RoutineScheduleFields({
     scheduleType,
     scheduleConfig,
     businessDayPolicy,
     onScheduleTypeChange,
     onScheduleConfigChange,
     onBusinessDayPolicyChange,
-}: RoutineImportScheduleFieldsProps) {
+}: RoutineScheduleFieldsProps) {
     function updateNumber(key: string, event: ChangeEvent<HTMLInputElement>): void {
         const value = Number(event.target.value);
         onScheduleConfigChange({
@@ -122,7 +122,7 @@ export function RoutineImportScheduleFields({
                         <Input type="number" min={1} max={31} value={configInput(scheduleConfig, "day", 10)} onChange={(event) => updateNumber("day", event)} />
                     </label>
                     <label className="grid gap-1 text-sm font-medium text-content-body">
-                        เลื่อนเดือน
+                        เดือนที่เลื่อนจากรอบปกติ
                         <Input type="number" min={-120} max={120} value={configInput(scheduleConfig, "monthOffset")} onChange={(event) => updateNumber("monthOffset", event)} />
                     </label>
                 </div>
@@ -131,11 +131,11 @@ export function RoutineImportScheduleFields({
             {scheduleType === "INTERVAL_MONTHS" ? (
                 <div className="grid gap-3 sm:grid-cols-2">
                     <label className="grid gap-1 text-sm font-medium text-content-body">
-                        ทุกกี่เดือน
+                        ทำซ้ำทุกกี่เดือน
                         <Input type="number" min={1} max={120} value={configInput(scheduleConfig, "intervalMonths", 3)} onChange={(event) => updateNumber("intervalMonths", event)} />
                     </label>
                     <label className="grid gap-1 text-sm font-medium text-content-body">
-                        วันตั้งต้น
+                        วันที่เริ่มนับรอบ
                         <Input type="date" value={typeof scheduleConfig.anchorDate === "string" ? scheduleConfig.anchorDate : ""} onChange={(event) => updateDate("anchorDate", event)} />
                     </label>
                 </div>
@@ -156,19 +156,19 @@ export function RoutineImportScheduleFields({
 
             {scheduleType === "ONE_TIME" ? (
                 <label className="grid gap-1 text-sm font-medium text-content-body">
-                    วันที่สร้างงาน
+                    วันที่ครบกำหนด
                     <Input type="date" value={typeof scheduleConfig.date === "string" ? scheduleConfig.date : ""} onChange={(event) => updateDate("date", event)} />
                 </label>
             ) : null}
 
             {scheduleType === "MONTH_END" ? (
                 <p className="text-xs leading-5 text-content-secondary">
-                    ระบบใช้วันสุดท้ายจริงของเดือน รวมกรณีเดือนกุมภาพันธ์และปีอธิกสุรทิน
+                    ระบบใช้วันสุดท้ายจริงของเดือน รวมเดือนกุมภาพันธ์และปีอธิกสุรทิน
                 </p>
             ) : null}
             {scheduleType === "MANUAL" ? (
                 <p className="text-xs leading-5 text-content-secondary">
-                    งานแบบสร้างเองจะไม่สร้าง occurrence อัตโนมัติ
+                    งานแบบสร้างเองจะไม่สร้างงานแต่ละรอบโดยอัตโนมัติ
                 </p>
             ) : null}
             {businessDayPolicy !== "NONE" ? (
