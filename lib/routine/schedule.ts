@@ -1,5 +1,6 @@
 export const ROUTINE_TIME_ZONE = "Asia/Bangkok" as const;
 export const ROUTINE_GENERATION_HORIZON_MONTHS = 2 as const;
+export const ROUTINE_GENERATION_SAFETY_DAYS = 7 as const;
 
 // Phase 1 treats Saturday and Sunday as non-business days; public holidays are deferred.
 
@@ -492,12 +493,30 @@ export function calculateRoutineOccurrences(
 
 export function getRoutineGenerationWindow(
     now = new Date(),
+    maxActiveDaysBefore = 0,
 ): RoutineDateWindow {
-    const currentMonth = startOfMonth(getCurrentBangkokDate(now));
+    if (
+        !Number.isInteger(maxActiveDaysBefore)
+        || maxActiveDaysBefore < 0
+    ) {
+        throw new RangeError("Invalid Routine reminder horizon");
+    }
+
+    const today = getCurrentBangkokDate(now);
+    const currentMonth = startOfMonth(today);
+    const baselineTo = endOfMonth(
+        addCalendarMonths(currentMonth, ROUTINE_GENERATION_HORIZON_MONTHS),
+    );
+    const reminderTo = endOfMonth(
+        addCalendarDays(
+            today,
+            maxActiveDaysBefore + ROUTINE_GENERATION_SAFETY_DAYS,
+        ),
+    );
     return {
         from: currentMonth,
-        to: endOfMonth(
-            addCalendarMonths(currentMonth, ROUTINE_GENERATION_HORIZON_MONTHS),
-        ),
+        to: compareCalendarDates(baselineTo, reminderTo) >= 0
+            ? baselineTo
+            : reminderTo,
     };
 }

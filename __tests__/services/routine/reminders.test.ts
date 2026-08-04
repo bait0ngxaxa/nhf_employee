@@ -121,7 +121,7 @@ describe("Routine reminder dispatch", () => {
                 type: "ROUTINE_REMINDER",
                 title: "งานใกล้ถึงกำหนด",
                 referenceId: "91",
-                actionUrl: "/dashboard?tab=routine&occurrenceId=91",
+                actionUrl: "/dashboard?tab=routine&taskId=71&occurrenceId=91",
                 dedupeKey: "routine:91:rule:31:user:17:version:2",
             }),
             prismaMock,

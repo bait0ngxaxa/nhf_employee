@@ -6,6 +6,7 @@ import {
     calendarDayDifference,
     formatRoutineSendTime,
     getCurrentBangkokDate,
+    getRoutineGenerationWindow,
     isRoutineReminderDue,
     parseRoutineSendTime,
     type RoutineDateWindow,
@@ -116,6 +117,18 @@ describe("NHF Routine schedule engine", () => {
                 "NONE",
             ),
         ).toEqual([]);
+    });
+
+    it("keeps the baseline generation horizon when no reminder is active", () => {
+        expect(
+            getRoutineGenerationWindow(new Date("2026-08-04T04:00:00.000Z")),
+        ).toEqual({ from: "2026-08-01", to: "2026-10-31" });
+    });
+
+    it("extends the generation horizon for a long active reminder", () => {
+        expect(
+            getRoutineGenerationWindow(new Date("2026-08-04T04:00:00.000Z"), 365),
+        ).toEqual({ from: "2026-08-01", to: "2027-08-31" });
     });
 
     it("evaluates reminder date and send hour in Bangkok time", () => {

@@ -22,6 +22,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         const params = request.nextUrl.searchParams;
         const parsed = routineOccurrenceFiltersSchema.safeParse({
             occurrenceId: params.get("occurrenceId") ?? undefined,
+            taskId: params.get("taskId") ?? undefined,
             timingStatus: params.get("timingStatus") ?? undefined,
             unitId: params.get("unitId") ?? undefined,
             categoryId: params.get("categoryId") ?? undefined,

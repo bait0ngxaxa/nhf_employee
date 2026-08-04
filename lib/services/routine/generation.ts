@@ -138,6 +138,10 @@ export async function generateRoutineTaskOccurrencesInTransaction(
             assignees: {
                 select: { employeeId: true, role: true },
             },
+            reminderRules: {
+                where: { isActive: true },
+                select: { daysBefore: true },
+            },
         },
     });
 
@@ -145,7 +149,11 @@ export async function generateRoutineTaskOccurrencesInTransaction(
         return { evaluated: 0, created: 0, existing: 0 };
     }
 
-    const window = getRoutineGenerationWindow(now);
+    const maxActiveDaysBefore = (task.reminderRules ?? []).reduce(
+        (maximum, rule) => Math.max(maximum, rule.daysBefore),
+        0,
+    );
+    const window = getRoutineGenerationWindow(now, maxActiveDaysBefore);
     const currentDate = toBangkokCalendarDate(now);
 
     if (task.scheduleType === "MANUAL") {

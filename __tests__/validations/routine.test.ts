@@ -66,7 +66,7 @@ describe("NHF Routine validation", () => {
             assignees: [{ employeeId: 11, role: "OWNER" }],
             reminderRules: [
                 {
-                    daysBefore: 3,
+                    daysBefore: 365,
                     sendHour: 9,
                     channel: "IN_APP",
                     recipientScope: "ASSIGNEES",

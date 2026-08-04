@@ -1,4 +1,5 @@
 import type { RoutineTimingStatus } from "@/lib/routine/timing";
+import type { RoutineScheduleType } from "@/lib/routine/schedule";
 
 export type { RoutineTimingStatus } from "@/lib/routine/timing";
 
@@ -60,6 +61,33 @@ export interface RoutineOccurrence {
     assignees: RoutineAssignee[];
 }
 
+export interface RoutineTaskWorkItemOccurrence {
+    id: number;
+    taskId: number;
+    periodKey: string;
+    dueDate: string;
+    originalDueDate: string;
+    scheduleVersion: number;
+    reminderVersion: number;
+    timingStatus: RoutineTimingStatus;
+    isOverdue: boolean;
+    daysUntilDue: number;
+    assignees: RoutineAssignee[];
+}
+
+export interface RoutineTaskWorkItem {
+    id: number;
+    title: string;
+    description: string | null;
+    scheduleType: RoutineScheduleType;
+    scheduleText: string | null;
+    isActive: boolean;
+    unit: { id: number; code: string; name: string };
+    category: { id: number; name: string };
+    assignees: RoutineAssignee[];
+    relevantOccurrence: RoutineTaskWorkItemOccurrence | null;
+}
+
 export interface RoutineTask {
     id: number;
     unitId: number;
@@ -109,6 +137,11 @@ export interface PaginatedOccurrencesResponse {
     pagination: { page: number; limit: number; total: number; pages: number };
 }
 
+export interface PaginatedRoutineTaskWorkItemsResponse {
+    tasks: RoutineTaskWorkItem[];
+    pagination: { page: number; limit: number; total: number; pages: number };
+}
+
 export interface PaginatedTasksResponse {
     tasks: RoutineTask[];
     pagination: { page: number; limit: number; total: number; pages: number };
@@ -116,6 +149,10 @@ export interface PaginatedTasksResponse {
 
 export interface RoutineSummaryResponse {
     summary: RoutineSummary;
+}
+
+export interface RoutineTaskByIdResponse {
+    task: RoutineTask;
 }
 
 export interface RoutineApiError {

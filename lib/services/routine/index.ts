@@ -37,6 +37,7 @@ export {
     createRoutineTaskInTransaction,
     deleteRoutineTask,
     reassignRoutineOccurrence,
+    updateRoutineOccurrenceOverride,
     updateRoutineOccurrenceDueDate,
     updateRoutineTask,
 } from "./mutations";

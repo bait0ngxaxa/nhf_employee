@@ -31,6 +31,7 @@ function activeTask(overrides: Record<string, unknown> = {}): Record<string, unk
         version: 4,
         contractStartDate: null,
         contractEndDate: null,
+        reminderRules: [],
         assignees: [
             { employeeId: 11, role: "OWNER" },
             { employeeId: 12, role: "CO_OWNER" },
@@ -102,6 +103,75 @@ describe("NHF Routine occurrence generation", () => {
         );
         expect(prismaMock.routineOccurrence.upsert.mock.calls[0]?.[0]?.create)
             .not.toHaveProperty("status");
+    });
+
+    it("extends generation for the largest active reminder rule", async () => {
+        prismaMock.routineTask.findUnique.mockResolvedValue(
+            asNever(activeTask({
+                scheduleType: "ONE_TIME",
+                scheduleConfig: { date: "2027-08-04" },
+                reminderRules: [
+                    { daysBefore: 30 },
+                    { daysBefore: 365 },
+                ],
+            })),
+        );
+
+        const result = await generateRoutineTaskOccurrences(
+            71,
+            new Date("2026-08-04T04:00:00.000Z"),
+        );
+
+        expect(result).toEqual({ evaluated: 1, created: 1, existing: 0 });
+        expect(prismaMock.routineOccurrence.upsert).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: {
+                    taskId_periodKey: { taskId: 71, periodKey: "2027-08-04" },
+                },
+            }),
+        );
+    });
+
+    it("does not extend the window for an inactive reminder rule", async () => {
+        prismaMock.routineTask.findUnique.mockResolvedValue(
+            asNever(activeTask({
+                scheduleType: "ONE_TIME",
+                scheduleConfig: { date: "2027-08-04" },
+                reminderRules: [],
+            })),
+        );
+
+        const result = await generateRoutineTaskOccurrences(
+            71,
+            new Date("2026-08-04T04:00:00.000Z"),
+        );
+
+        expect(result).toEqual({ evaluated: 0, created: 0, existing: 0 });
+        expect(prismaMock.routineOccurrence.upsert).not.toHaveBeenCalled();
+    });
+
+    it("generates the next yearly occurrence before a 365-day reminder", async () => {
+        prismaMock.routineTask.findUnique.mockResolvedValue(
+            asNever(activeTask({
+                scheduleType: "YEARLY_DATE",
+                scheduleConfig: { month: 8, day: 4 },
+                reminderRules: [{ daysBefore: 365 }],
+            })),
+        );
+
+        const result = await generateRoutineTaskOccurrences(
+            71,
+            new Date("2026-08-04T04:00:00.000Z"),
+        );
+
+        expect(result).toEqual({ evaluated: 2, created: 2, existing: 0 });
+        expect(prismaMock.routineOccurrence.upsert).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: {
+                    taskId_periodKey: { taskId: 71, periodKey: "2027-08" },
+                },
+            }),
+        );
     });
 
     it("is idempotent when all generated periods already exist", async () => {

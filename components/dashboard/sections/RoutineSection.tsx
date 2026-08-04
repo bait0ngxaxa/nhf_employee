@@ -22,11 +22,12 @@ import { RoutineTaskForm } from "../routine/RoutineTaskForm";
 import { RoutineTaskList } from "../routine/RoutineTaskList";
 import { RoutineImportPanel } from "../routine/RoutineImportPanel";
 import type {
-    PaginatedOccurrencesResponse,
+    PaginatedRoutineTaskWorkItemsResponse,
     PaginatedTasksResponse,
     RoutineReferenceData,
     RoutineTimingStatus,
     RoutineSummaryResponse,
+    RoutineTaskByIdResponse,
     RoutineTask,
 } from "../routine/types";
 
@@ -44,14 +45,19 @@ async function fetchRoutine<T>(url: string): Promise<T> {
 
 function RoutineOccurrencePanel({
     isAdmin,
+    taskId,
     occurrenceId,
+    onTaskSaved,
 }: {
     isAdmin: boolean;
+    taskId: number | null;
     occurrenceId: number | null;
+    onTaskSaved: () => void;
 }) {
     const [search, setSearch] = useState("");
     const [timingStatus, setTimingStatus] = useState<RoutineTimingStatus | "">("");
     const [page, setPage] = useState(1);
+    const [editingTaskId, setEditingTaskId] = useState<number | null>(null);
     const scope = isAdmin ? "all" : "mine";
     const key = useMemo(() => {
         const params = new URLSearchParams({
@@ -60,20 +66,71 @@ function RoutineOccurrencePanel({
             limit: "12",
             view: "tasks",
         });
+        if (taskId !== null) params.set("taskId", String(taskId));
         if (occurrenceId !== null) params.set("occurrenceId", String(occurrenceId));
         if (search.trim()) params.set("search", search.trim());
         if (timingStatus) params.set("timingStatus", timingStatus);
         return `${API_ROUTES.routines.occurrences}?${params.toString()}`;
-    }, [occurrenceId, page, scope, search, timingStatus]);
-    const { data, error, isLoading, mutate } = useSWR<PaginatedOccurrencesResponse, Error>(key, fetchRoutine);
-    const { data: reference } = useSWR<RoutineReferenceData, Error>(
+    }, [occurrenceId, page, scope, search, taskId, timingStatus]);
+    const { data, error, isLoading, mutate } = useSWR<PaginatedRoutineTaskWorkItemsResponse, Error>(key, fetchRoutine);
+    const { data: reference, error: referenceError } = useSWR<RoutineReferenceData, Error>(
         isAdmin ? API_ROUTES.routines.reference : null,
+        fetchRoutine,
+    );
+    const {
+        data: editingTaskData,
+        error: editingTaskError,
+        isLoading: editingTaskLoading,
+        mutate: mutateEditingTask,
+    } = useSWR<RoutineTaskByIdResponse, Error>(
+        isAdmin && editingTaskId !== null
+            ? API_ROUTES.routines.taskById(editingTaskId)
+            : null,
         fetchRoutine,
     );
 
     useEffect(() => {
         setPage(1);
-    }, [search, timingStatus, isAdmin, occurrenceId]);
+    }, [search, timingStatus, isAdmin, occurrenceId, taskId]);
+
+    if (editingTaskId !== null) {
+        if (referenceError) {
+            return (
+                <div className="space-y-3">
+                    <p className="rounded-lg border border-status-danger-border bg-status-danger-surface px-4 py-3 text-sm text-status-danger-foreground" role="alert">
+                        โหลดข้อมูลอ้างอิงสำหรับแก้ไขไม่สำเร็จ: {referenceError.message}
+                    </p>
+                    <Button type="button" variant="outline" onClick={() => setEditingTaskId(null)}>กลับไปยังรายการ</Button>
+                </div>
+            );
+        }
+        if (editingTaskError) {
+            return (
+                <div className="space-y-3">
+                    <p className="rounded-lg border border-status-danger-border bg-status-danger-surface px-4 py-3 text-sm text-status-danger-foreground" role="alert">
+                        โหลดข้อมูล Routine สำหรับแก้ไขไม่สำเร็จ: {editingTaskError.message}
+                    </p>
+                    <Button type="button" variant="outline" onClick={() => setEditingTaskId(null)}>กลับไปยังรายการ</Button>
+                </div>
+            );
+        }
+        if (editingTaskLoading || !reference || !editingTaskData) {
+            return <LoadingState label="กำลังโหลดข้อมูล Routine สำหรับแก้ไข..." compact />;
+        }
+        return (
+            <RoutineTaskForm
+                reference={reference}
+                initialTask={editingTaskData.task}
+                onSaved={() => {
+                    setEditingTaskId(null);
+                    void mutateEditingTask();
+                    void mutate();
+                    onTaskSaved();
+                }}
+                onCancel={() => setEditingTaskId(null)}
+            />
+        );
+    }
 
     return (
         <div className="space-y-4">
@@ -97,8 +154,10 @@ function RoutineOccurrencePanel({
                 error={error}
                 isLoading={isLoading}
                 isAdmin={isAdmin}
+                focusTaskId={taskId}
                 onRetry={() => void mutate()}
                 onPageChange={setPage}
+                onEditTask={setEditingTaskId}
                 mutate={mutate}
                 employees={reference?.employees ?? []}
             />
@@ -198,17 +257,26 @@ export function RoutineSection() {
     const { user } = useDashboardDataContext();
     const isAdmin = isAdminRole(user?.role);
     const searchParams = useSearchParams();
+    const taskIdValue = Number(searchParams.get("taskId"));
+    const taskId = Number.isInteger(taskIdValue) && taskIdValue > 0
+        ? taskIdValue
+        : null;
     const occurrenceIdValue = Number(searchParams.get("occurrenceId"));
     const occurrenceId = Number.isInteger(occurrenceIdValue) && occurrenceIdValue > 0
         ? occurrenceIdValue
         : null;
     const [activeTab, setActiveTab] = useState("mine");
-    const { data: summaryData, error: summaryError, isLoading: summaryLoading } = useSWR<RoutineSummaryResponse, Error>(API_ROUTES.routines.summary, fetchRoutine);
+    const {
+        data: summaryData,
+        error: summaryError,
+        isLoading: summaryLoading,
+        mutate: mutateSummary,
+    } = useSWR<RoutineSummaryResponse, Error>(API_ROUTES.routines.summary, fetchRoutine);
     const safeTab = isAdmin ? activeTab : "mine";
 
     useEffect(() => {
-        if (isAdmin && occurrenceId !== null) setActiveTab("all");
-    }, [isAdmin, occurrenceId]);
+        if (isAdmin && (taskId !== null || occurrenceId !== null)) setActiveTab("all");
+    }, [isAdmin, occurrenceId, taskId]);
 
     useEffect(() => {
         const requestedTab = searchParams.get("routineTab");
@@ -222,14 +290,14 @@ export function RoutineSection() {
             value: "mine",
             label: "รายการของฉัน",
             icon: List,
-            content: <RoutineOccurrencePanel isAdmin={false} occurrenceId={occurrenceId} />,
+            content: <RoutineOccurrencePanel isAdmin={false} taskId={taskId} occurrenceId={occurrenceId} onTaskSaved={() => undefined} />,
         },
         {
             value: "all",
             label: "รายการทั้งหมด (Admin)",
             icon: Users,
             visible: isAdmin,
-            content: <RoutineOccurrencePanel isAdmin occurrenceId={occurrenceId} />,
+            content: <RoutineOccurrencePanel isAdmin taskId={taskId} occurrenceId={occurrenceId} onTaskSaved={() => void mutateSummary()} />,
         },
         {
             value: "settings",

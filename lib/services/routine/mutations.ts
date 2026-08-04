@@ -21,6 +21,7 @@ import {
     parseRoutineScheduleConfig,
     type RoutineDueDateInput,
     type RoutineOccurrenceAssigneesInput,
+    type RoutineOccurrenceOverrideInput,
     type RoutineReminderRuleInput,
     type RoutineTaskCreateInput,
     type RoutineTaskUpdateInput,
@@ -692,6 +693,104 @@ async function findOccurrenceForMutation(
     if (!occurrence) throw new RoutineNotFoundError();
     if (!occurrence.task.isActive) throw new RoutineNotFoundError();
     return occurrence;
+}
+
+export async function updateRoutineOccurrenceOverride(
+    occurrenceId: number,
+    input: RoutineOccurrenceOverrideInput,
+    actor: RoutineCommandActor,
+): Promise<Prisma.RoutineOccurrenceGetPayload<{
+    include: typeof ROUTINE_OCCURRENCE_INCLUDE;
+}>> {
+    if (!isCalendarDate(input.dueDate)) {
+        throw new RoutineValidationError("รูปแบบวันกำหนดไม่ถูกต้อง");
+    }
+    const assignees = normalizeAssignees(input.assignees);
+
+    return runSerializableTransaction(async (tx) => {
+        await assertActiveAdminInTransaction(tx, actor);
+        const occurrence = await findOccurrenceForMutation(tx, occurrenceId);
+        if (
+            input.expectedReminderVersion !== undefined
+            && input.expectedReminderVersion !== occurrence.reminderVersion
+        ) {
+            throw new RoutineConflictError(
+                "ข้อมูลรอบนี้เปลี่ยนแปลงแล้ว กรุณาโหลดข้อมูลใหม่",
+            );
+        }
+        await assertActiveEmployeesInTransaction(
+            tx,
+            assignees.map((assignee) => assignee.employeeId),
+        );
+
+        const oldDueDate = toBangkokCalendarDate(occurrence.dueDate);
+        const dueDateChanged = oldDueDate !== input.dueDate;
+        const assigneesChanged = !areAssigneesEqual(occurrence.assignees, assignees);
+        if (!dueDateChanged && !assigneesChanged) return occurrence;
+
+        const claimed = await tx.routineOccurrence.updateMany({
+            where: {
+                id: occurrenceId,
+                ...(input.expectedReminderVersion !== undefined
+                    ? { reminderVersion: input.expectedReminderVersion }
+                    : {}),
+            },
+            data: {
+                ...(dueDateChanged
+                    ? { dueDate: calendarDateToDate(input.dueDate) }
+                    : {}),
+                reminderVersion: { increment: 1 },
+            },
+        });
+        if (claimed.count !== 1) {
+            throw new RoutineConflictError(
+                "ข้อมูลรอบนี้เปลี่ยนแปลงแล้ว กรุณาโหลดข้อมูลใหม่",
+            );
+        }
+
+        if (assigneesChanged) {
+            await tx.routineOccurrenceAssignee.deleteMany({
+                where: { occurrenceId },
+            });
+            await tx.routineOccurrenceAssignee.createMany({
+                data: assignees.map((assignee) => ({
+                    occurrenceId,
+                    employeeId: assignee.employeeId,
+                    role: assignee.role,
+                })),
+            });
+        }
+
+        await createRoutineAuditInTransaction(
+            tx,
+            "ROUTINE_OCCURRENCE_DUE_DATE_CHANGE",
+            "RoutineOccurrence",
+            occurrenceId,
+            actor,
+            {
+                taskId: occurrence.taskId,
+                occurrenceId,
+                operation: "ATOMIC_OCCURRENCE_OVERRIDE",
+                note: input.note ?? null,
+                before: {
+                    dueDate: oldDueDate,
+                    originalDueDate: toBangkokCalendarDate(occurrence.originalDueDate),
+                    reminderVersion: occurrence.reminderVersion,
+                    assignees: occurrence.assignees.map((assignee) => ({
+                        employeeId: assignee.employeeId,
+                        role: assignee.role,
+                    })),
+                },
+                after: {
+                    dueDate: input.dueDate,
+                    originalDueDate: toBangkokCalendarDate(occurrence.originalDueDate),
+                    reminderVersion: occurrence.reminderVersion + 1,
+                    assignees,
+                },
+            },
+        );
+        return findOccurrenceForMutation(tx, occurrenceId);
+    });
 }
 
 export async function updateRoutineOccurrenceDueDate(

@@ -36,19 +36,19 @@ describe("GET /api/routines/occurrences", () => {
             pagination: { page: 1, limit: 20, total: 0, pages: 0 },
         });
         mocks.getTaskWorkItems.mockResolvedValue({
-            occurrences: [],
+            tasks: [],
             pagination: { page: 1, limit: 20, total: 0, pages: 0 },
         });
     });
 
     it("passes the authenticated employee context to the query service", async () => {
         const response = await GET(new NextRequest(
-            "http://localhost/api/routines/occurrences?scope=all&assigneeId=999&occurrenceId=91&timingStatus=DUE_SOON&limit=20",
+            "http://localhost/api/routines/occurrences?scope=all&assigneeId=999&taskId=71&occurrenceId=91&timingStatus=DUE_SOON&limit=20",
         ));
 
         expect(response.status).toBe(200);
         expect(mocks.getOccurrences).toHaveBeenCalledWith(
-            expect.objectContaining({ scope: "all", assigneeId: 999, occurrenceId: 91, timingStatus: "DUE_SOON" }),
+            expect.objectContaining({ scope: "all", assigneeId: 999, taskId: 71, occurrenceId: 91, timingStatus: "DUE_SOON" }),
             expect.objectContaining({
                 employeeId: 21,
                 actor: expect.objectContaining({ id: 5, role: "USER" }),

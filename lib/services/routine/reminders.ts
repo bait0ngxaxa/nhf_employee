@@ -73,8 +73,11 @@ export function buildRoutineReminderDedupeKey(
     return `routine:${occurrenceId}:rule:${ruleId}:user:${userId}:version:${reminderVersion}`;
 }
 
-export function getRoutineReminderActionUrl(occurrenceId: number): string {
-    return `${APP_ROUTES.dashboard}?tab=${APP_DASHBOARD_TABS.routine}&occurrenceId=${occurrenceId}`;
+export function getRoutineReminderActionUrl(
+    occurrenceId: number,
+    taskId: number,
+): string {
+    return `${APP_ROUTES.dashboard}?tab=${APP_DASHBOARD_TABS.routine}&taskId=${taskId}&occurrenceId=${occurrenceId}`;
 }
 
 export function formatRoutineReminderMessage(
@@ -331,7 +334,10 @@ export async function dispatchRoutineReminderOutbox(
                     type: "ROUTINE_REMINDER",
                     title: "งานใกล้ถึงกำหนด",
                     message,
-                    actionUrl: getRoutineReminderActionUrl(payload.occurrenceId),
+                    actionUrl: getRoutineReminderActionUrl(
+                        payload.occurrenceId,
+                        payload.taskId,
+                    ),
                     referenceId: String(payload.occurrenceId),
                     dedupeKey: buildRoutineReminderDedupeKey(
                         payload.occurrenceId,

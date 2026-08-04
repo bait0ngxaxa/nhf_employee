@@ -11,6 +11,7 @@ import {
     ErrorState,
     LoadingState,
 } from "@/components/ui/state";
+import { calendarDateToDate } from "@/lib/routine/schedule";
 import { API_ROUTES } from "@/lib/ssot/routes";
 
 import {
@@ -19,20 +20,24 @@ import {
     ROUTINE_TIMING_STATUS_LABELS,
 } from "./labels";
 import type {
-    PaginatedOccurrencesResponse,
+    PaginatedRoutineTaskWorkItemsResponse,
+    RoutineAssignee,
     RoutineAssigneeRole,
     RoutineEmployee,
-    RoutineOccurrence,
+    RoutineTaskWorkItem,
+    RoutineTaskWorkItemOccurrence,
 } from "./types";
 
 interface RoutineOccurrenceListProps {
-    data: PaginatedOccurrencesResponse | undefined;
+    data: PaginatedRoutineTaskWorkItemsResponse | undefined;
     error: Error | undefined;
     isLoading: boolean;
     isAdmin: boolean;
+    focusTaskId: number | null;
     onRetry: () => void;
     onPageChange: (page: number) => void;
-    mutate: KeyedMutator<PaginatedOccurrencesResponse>;
+    onEditTask: (taskId: number) => void;
+    mutate: KeyedMutator<PaginatedRoutineTaskWorkItemsResponse>;
     employees: RoutineEmployee[];
 }
 
@@ -43,8 +48,8 @@ interface RoutineOccurrenceEditorState {
     assignees: Record<number, RoutineAssigneeRole>;
 }
 
-function employeeNames(occurrence: RoutineOccurrence): string {
-    return occurrence.assignees
+function employeeNames(assignees: RoutineAssignee[]): string {
+    return assignees
         .map((assignee) => assignee.employee.displayName
             ?? `${assignee.employee.firstName} ${assignee.employee.lastName}`)
         .join(", ");
@@ -82,10 +87,12 @@ function formatDate(date: string): string {
         month: "short",
         year: "numeric",
         timeZone: "Asia/Bangkok",
-    }).format(new Date(`${date}T00:00:00+07:00`));
+    }).format(calendarDateToDate(date));
 }
 
-function editorAssignees(occurrence: RoutineOccurrence): Record<number, RoutineAssigneeRole> {
+function editorAssignees(
+    occurrence: RoutineTaskWorkItemOccurrence,
+): Record<number, RoutineAssigneeRole> {
     return Object.fromEntries(
         occurrence.assignees.map((assignee) => [assignee.employeeId, assignee.role]),
     );
@@ -96,8 +103,10 @@ export function RoutineOccurrenceList({
     error,
     isLoading,
     isAdmin,
+    focusTaskId,
     onRetry,
     onPageChange,
+    onEditTask,
     mutate,
     employees,
 }: RoutineOccurrenceListProps) {
@@ -106,7 +115,7 @@ export function RoutineOccurrenceList({
     const [actionError, setActionError] = useState<string | null>(null);
     const saveLockRef = useRef(false);
 
-    function beginEdit(occurrence: RoutineOccurrence): void {
+    function beginEdit(occurrence: RoutineTaskWorkItemOccurrence): void {
         setActionError(null);
         setEditor({
             id: occurrence.id,
@@ -131,7 +140,10 @@ export function RoutineOccurrenceList({
         });
     }
 
-    async function saveEdit(occurrence: RoutineOccurrence): Promise<void> {
+    async function saveEdit(
+        task: RoutineTaskWorkItem,
+        occurrence: RoutineTaskWorkItemOccurrence,
+    ): Promise<void> {
         if (!editor || editor.id !== occurrence.id || saveLockRef.current) return;
         const ownerCount = Object.values(editor.assignees)
             .filter((role) => role === "OWNER")
@@ -145,33 +157,20 @@ export function RoutineOccurrenceList({
         setBusyId(occurrence.id);
         setActionError(null);
         try {
-            if (editor.dueDate !== occurrence.dueDate) {
-                await sendRoutineMutation(
-                    API_ROUTES.routines.occurrenceDueDateById(occurrence.id),
-                    { dueDate: editor.dueDate, note: editor.note.trim() || null },
-                );
-            }
-
-            const currentAssignees = editorAssignees(occurrence);
-            const nextAssignees = Object.entries(editor.assignees).map(
+            const assignees = Object.entries(editor.assignees).map(
                 ([employeeId, role]) => ({ employeeId: Number(employeeId), role }),
             );
-            const assigneesChanged =
-                Object.keys(currentAssignees).length !== nextAssignees.length
-                || nextAssignees.some(({ employeeId, role }) => currentAssignees[employeeId] !== role);
-            if (assigneesChanged) {
-                await sendRoutineMutation(
-                    API_ROUTES.routines.occurrenceAssigneesById(occurrence.id),
-                    { assignees: nextAssignees },
-                );
-            }
-
-            await mutate();
-            toast.success(
-                editor.dueDate !== occurrence.dueDate
-                    ? "อัปเดตวันครบกำหนดสำเร็จ"
-                    : "อัปเดตผู้รับผิดชอบสำเร็จ",
+            await sendRoutineMutation(
+                API_ROUTES.routines.occurrenceById(occurrence.id),
+                {
+                    expectedReminderVersion: occurrence.reminderVersion,
+                    dueDate: editor.dueDate,
+                    note: editor.note.trim() || null,
+                    assignees,
+                },
             );
+            await mutate();
+            toast.success(`ปรับเฉพาะรอบของ “${task.title}” สำเร็จ`);
             setEditor(null);
         } catch (saveError) {
             const message = saveError instanceof Error ? saveError.message : "บันทึกรายการไม่สำเร็จ";
@@ -193,12 +192,14 @@ export function RoutineOccurrenceList({
             />
         );
     }
-    if (!data || data.occurrences.length === 0) {
+    if (!data || data.tasks.length === 0) {
         return (
             <EmptyState
                 compact
-                title="ยังไม่มีรายการ Routine"
-                description="รายการตามกำหนดการจะแสดงที่นี่เมื่อมีรอบที่สร้างไว้"
+                title={focusTaskId === null ? "ยังไม่มีรายการ Routine" : "ไม่พบรายการ Routine นี้"}
+                description={focusTaskId === null
+                    ? "รายการตามกำหนดการจะแสดงที่นี่เมื่อมีแม่แบบงานที่รับผิดชอบ"
+                    : "รายการอาจถูกลบ ปิดใช้งาน หรือคุณไม่มีสิทธิ์เข้าถึงรายการนี้"}
             />
         );
     }
@@ -210,56 +211,87 @@ export function RoutineOccurrenceList({
                     {actionError}
                 </p>
             ) : null}
-            {data.occurrences.map((occurrence) => {
-                const isEditing = editor?.id === occurrence.id;
-                const isBusy = busyId === occurrence.id;
+            {data.tasks.map((task) => {
+                const occurrence = task.relevantOccurrence;
+                const isEditing = occurrence !== null && editor?.id === occurrence.id;
+                const isBusy = occurrence !== null && busyId === occurrence.id;
                 return (
                     <article
-                        key={occurrence.id}
+                        key={task.id}
                         className="rounded-xl border border-border-subtle bg-surface-raised p-4 shadow-sm sm:p-5"
                     >
                         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                             <div className="min-w-0 space-y-2">
                                 <div className="flex flex-wrap items-center gap-2 text-xs text-content-secondary">
-                                    <span>{occurrence.task.unit.name}</span>
+                                    <span>{task.unit.name}</span>
                                     <span aria-hidden="true">•</span>
-                                    <span>{occurrence.task.category.name}</span>
+                                    <span>{task.category.name}</span>
                                 </div>
                                 <h3 className="text-base font-semibold text-content-heading">
-                                    {occurrence.task.title}
+                                    {task.title}
                                 </h3>
                                 <div className="grid gap-2 text-sm text-content-secondary sm:grid-cols-2">
                                     <p>
-                                        ผู้รับผิดชอบ: <span className="text-content-body">{employeeNames(occurrence)}</span>
+                                        ผู้รับผิดชอบ: <span className="text-content-body">{employeeNames(task.assignees) || "ยังไม่ได้ระบุ"}</span>
                                     </p>
                                     <p>
-                                        กำหนด: <span className={occurrence.isOverdue ? "font-semibold text-status-danger-foreground" : "text-content-body"}>
-                                            {formatDate(occurrence.dueDate)} ({formatRoutineDueLabel(occurrence)})
-                                        </span>
+                                        กำหนด: {occurrence ? (
+                                            <span className={occurrence.isOverdue ? "font-semibold text-status-danger-foreground" : "text-content-body"}>
+                                                {formatDate(occurrence.dueDate)} ({formatRoutineDueLabel(occurrence)})
+                                            </span>
+                                        ) : (
+                                            <span className="text-content-body">ยังไม่มีรอบกำหนด</span>
+                                        )}
                                     </p>
                                 </div>
                             </div>
                             <div className="flex shrink-0 flex-col items-start gap-3 lg:items-end">
-                                <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${getRoutineTimingStatusClass(occurrence.timingStatus)}`}>
-                                    {ROUTINE_TIMING_STATUS_LABELS[occurrence.timingStatus]}
-                                </span>
+                                {occurrence ? (
+                                    <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${getRoutineTimingStatusClass(occurrence.timingStatus)}`}>
+                                        {ROUTINE_TIMING_STATUS_LABELS[occurrence.timingStatus]}
+                                    </span>
+                                ) : (
+                                    <span className="rounded-full border border-border-subtle bg-surface-subtle px-3 py-1 text-xs font-semibold text-content-secondary">
+                                        ยังไม่มีรอบกำหนด
+                                    </span>
+                                )}
                                 {isAdmin ? (
-                                    <Button
-                                        type="button"
-                                        size="sm"
-                                        variant="outline"
-                                        disabled={isBusy}
-                                        onClick={() => (isEditing ? setEditor(null) : beginEdit(occurrence))}
-                                    >
-                                        {isEditing ? <X aria-hidden="true" /> : <Pencil aria-hidden="true" />}
-                                        {isEditing ? "ปิดการแก้ไข" : "แก้ไขรายการ"}
-                                    </Button>
+                                    <div className="flex flex-wrap gap-2 lg:justify-end">
+                                        <Button
+                                            type="button"
+                                            size="sm"
+                                            variant="outline"
+                                            onClick={() => onEditTask(task.id)}
+                                            disabled={isBusy}
+                                        >
+                                            <Pencil aria-hidden="true" />
+                                            แก้ไข Routine
+                                        </Button>
+                                        {occurrence ? (
+                                            <Button
+                                                type="button"
+                                                size="sm"
+                                                variant="outline"
+                                                disabled={isBusy}
+                                                onClick={() => (isEditing ? setEditor(null) : beginEdit(occurrence))}
+                                            >
+                                                {isEditing ? <X aria-hidden="true" /> : <Pencil aria-hidden="true" />}
+                                                {isEditing ? "ปิดการแก้ไข" : "ปรับเฉพาะรอบนี้"}
+                                            </Button>
+                                        ) : null}
+                                    </div>
                                 ) : null}
                             </div>
                         </div>
 
-                        {isEditing && editor ? (
+                        {isEditing && editor && occurrence ? (
                             <div className="mt-4 space-y-4 rounded-lg border border-border-subtle bg-surface-subtle p-4">
+                                <div>
+                                    <p className="text-sm font-semibold text-content-heading">ปรับเฉพาะรอบนี้</p>
+                                    <p className="mt-1 text-xs text-content-secondary">
+                                        มีผลกับรอบ {occurrence.periodKey} ของรายการนี้เท่านั้น ไม่เปลี่ยนแม่แบบงานหรือรอบอื่น
+                                    </p>
+                                </div>
                                 <div className="grid gap-4 md:grid-cols-[220px_1fr]">
                                     <label className="grid gap-1 text-sm font-medium text-content-body">
                                         วันกำหนด
@@ -279,7 +311,7 @@ export function RoutineOccurrenceList({
                                     </label>
                                 </div>
                                 <fieldset className="grid gap-2">
-                                    <legend className="text-sm font-medium text-content-body">ผู้รับผิดชอบ</legend>
+                                    <legend className="text-sm font-medium text-content-body">ผู้รับผิดชอบของรอบนี้</legend>
                                     <div className="grid gap-2 sm:grid-cols-2">
                                         {employees.map((employee) => {
                                             const selectedRole = editor.assignees[employee.id];
@@ -317,9 +349,9 @@ export function RoutineOccurrenceList({
                                 </fieldset>
                                 <div className="flex flex-wrap justify-end gap-2">
                                     <Button type="button" variant="outline" disabled={isBusy} onClick={() => setEditor(null)}>ปิด</Button>
-                                    <Button type="button" disabled={isBusy} onClick={() => void saveEdit(occurrence)}>
+                                    <Button type="button" disabled={isBusy} onClick={() => void saveEdit(task, occurrence)}>
                                         <Save aria-hidden="true" />
-                                        {isBusy ? "กำลังบันทึก..." : "บันทึกการแก้ไข"}
+                                        {isBusy ? "กำลังบันทึก..." : "บันทึกการปรับรอบนี้"}
                                     </Button>
                                 </div>
                             </div>

@@ -262,6 +262,7 @@ export const routineTaskUpdateSchema = z
 
 export const routineOccurrenceFiltersSchema = z.object({
     occurrenceId: z.coerce.number().int().positive().optional(),
+    taskId: z.coerce.number().int().positive().optional(),
     timingStatus: z.enum(ROUTINE_TIMING_STATUSES).optional(),
     unitId: z.coerce.number().int().positive().optional(),
     categoryId: z.coerce.number().int().positive().optional(),
@@ -316,6 +317,18 @@ export const routineOccurrenceAssigneesSchema = z
     })
     .superRefine((data, ctx) => validateAssigneeList(data.assignees, ctx));
 
+export const routineOccurrenceOverrideSchema = z
+    .object({
+        expectedReminderVersion: z.coerce.number().int().positive().optional(),
+        dueDate: dateSchema,
+        note: optionalText(1000),
+        assignees: z
+            .array(routineAssigneeSchema)
+            .min(1, "กรุณาระบุผู้รับผิดชอบ")
+            .max(100, "ผู้รับผิดชอบมีได้ไม่เกิน 100 คน"),
+    })
+    .superRefine((data, ctx) => validateAssigneeList(data.assignees, ctx));
+
 export const routineReminderOutboxPayloadSchema = z.object({
     occurrenceId: z.number().int().positive(),
     taskId: z.number().int().positive(),
@@ -335,6 +348,9 @@ export type RoutineTaskFilters = z.infer<typeof routineTaskFiltersSchema>;
 export type RoutineDueDateInput = z.infer<typeof routineDueDateSchema>;
 export type RoutineOccurrenceAssigneesInput = z.infer<
     typeof routineOccurrenceAssigneesSchema
+>;
+export type RoutineOccurrenceOverrideInput = z.infer<
+    typeof routineOccurrenceOverrideSchema
 >;
 export type RoutineReminderRuleInput = z.infer<typeof routineReminderRuleSchema>;
 export type RoutineReminderOutboxPayload = z.infer<
