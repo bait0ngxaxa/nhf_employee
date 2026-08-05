@@ -20,10 +20,15 @@ import {
 } from "./request-idempotency";
 import {
     buildVariantLabel,
+    enqueueStockRequestResultEmail,
     notifyAdminsStockRequestCancelledByRequester,
     notifyStockRequestResult,
     persistLowStockNotifications,
 } from "./notifications";
+import {
+    buildStockRequestResultEmailPayload,
+    stockRequestResultEmailSelect,
+} from "./notification-payloads";
 import type {
     CreateRequestInput,
 } from "@/lib/validations/stock";
@@ -179,18 +184,7 @@ export async function issueRequest(
 
         const request = await tx.stockRequest.findUnique({
             where: { id: requestId },
-            select: {
-                requestedBy: true,
-                projectCode: true,
-                items: {
-                    select: {
-                        id: true,
-                        itemId: true,
-                        variantId: true,
-                        quantity: true,
-                    },
-                },
-            },
+            select: stockRequestResultEmailSelect,
         });
 
         if (!request) {
@@ -379,10 +373,19 @@ export async function issueRequest(
             requestId,
             request.requestedBy,
             true,
-            undefined,
+            null,
             tx,
         );
         await persistLowStockNotifications(lowStockAlerts, tx);
+        await enqueueStockRequestResultEmail(
+            buildStockRequestResultEmailPayload(
+                request,
+                "ISSUED",
+                null,
+                issuedAt,
+            ),
+            tx,
+        );
 
         return {
             request: {
@@ -407,7 +410,7 @@ export async function cancelRequest(
 
         const request = await tx.stockRequest.findUnique({
             where: { id: requestId },
-            select: { status: true, requestedBy: true, projectCode: true },
+            select: stockRequestResultEmailSelect,
         });
 
         if (!request) {
@@ -420,6 +423,7 @@ export async function cancelRequest(
             throw new Error("ไม่มีสิทธิ์ยกเลิกคำขอนี้");
         }
 
+        const cancelledAt = new Date();
         const cancelledRequest = await tx.stockRequest.updateMany({
             where: {
                 id: requestId,
@@ -429,7 +433,7 @@ export async function cancelRequest(
                 status: StockRequestStatus.CANCELLED,
                 cancelReason: reason ?? null,
                 cancelledById: actor.id,
-                cancelledAt: new Date(),
+                cancelledAt,
             },
         });
 
@@ -473,6 +477,16 @@ export async function cancelRequest(
             await notifyAdminsStockRequestCancelledByRequester(
                 requestId,
                 actor.name,
+                tx,
+            );
+        } else {
+            await enqueueStockRequestResultEmail(
+                buildStockRequestResultEmailPayload(
+                    request,
+                    "CANCELLED",
+                    reason ?? null,
+                    cancelledAt,
+                ),
                 tx,
             );
         }

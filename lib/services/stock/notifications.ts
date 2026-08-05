@@ -10,6 +10,11 @@ import type {
     StockLowLineData,
     StockRequestLineData,
 } from "@/types/api";
+import { toDashboardStockTabPath, STOCK_DASHBOARD_TABS } from "@/lib/ssot/routes";
+import {
+    buildVariantLabel,
+    type StockRequestResultEmailPayload,
+} from "./notification-payloads";
 import type { LowStockAlertCandidate } from "./types";
 
 type StockNotificationClient = Pick<
@@ -66,9 +71,23 @@ export async function notifyStockRequestResult(
             message: isIssued
                 ? `คำขอเบิก #${requestId} ถูกจ่ายเรียบร้อยแล้ว`
                 : `คำขอเบิก #${requestId} ถูกยกเลิก${cancelReason ? `: ${cancelReason}` : ""}`,
-            actionUrl: "/dashboard?tab=stock&stockTab=my-requests",
+            actionUrl: toDashboardStockTabPath(STOCK_DASHBOARD_TABS.myRequests),
             referenceId: String(requestId),
         },
+    });
+}
+
+export async function enqueueStockRequestResultEmail(
+    payload: StockRequestResultEmailPayload,
+    client: StockNotificationClient = prisma,
+): Promise<void> {
+    await client.notificationOutbox.createMany({
+        data: [{
+            type: "STOCK_REQUEST_RESULT_EMAIL",
+            eventKey: `stock-request:${payload.requestId}:${payload.status}:email`,
+            payload: JSON.stringify(payload),
+        }],
+        skipDuplicates: true,
     });
 }
 
@@ -91,26 +110,7 @@ export async function notifyAdminsNewStockRequest(
     }, client);
 }
 
-export function buildVariantLabel(
-    attributeValues: Array<{
-        attributeValue: {
-            value: string;
-            attribute: {
-                name: string;
-            };
-        };
-    }>,
-): string | undefined {
-    if (attributeValues.length === 0) {
-        return undefined;
-    }
-
-    return attributeValues
-        .map(({ attributeValue }) => {
-            return `${attributeValue.attribute.name}: ${attributeValue.value}`;
-        })
-        .join(", ");
-}
+export { buildVariantLabel } from "./notification-payloads";
 
 function buildStockRequestLinePayload(
     stockRequest: StockRequestLineSource,

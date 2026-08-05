@@ -38,6 +38,57 @@ function requestOptions(): { idempotencyKey: string } {
     return { idempotencyKey: "stock-request-test-key" };
 }
 
+function requestResultSnapshotFields(
+    projectCode = "PRJ-TEST",
+    id = 99,
+): {
+    id: number;
+    projectCode: string;
+    requestedBy: number;
+    requester: { id: number; name: string; email: string };
+} {
+    return {
+        id,
+        requestedBy: 3,
+        projectCode,
+        requester: {
+            id: 3,
+            name: "ผู้ใช้ 3",
+            email: "user-3@example.com",
+        },
+    };
+}
+
+function requestItemSnapshot(
+    name: string,
+    unit: string,
+    attributes: Array<{ name: string; value: string }> = [],
+): {
+    item: { name: string; unit: string };
+    variant: {
+        unit: string;
+        attributeValues: Array<{
+            attributeValue: {
+                value: string;
+                attribute: { name: string };
+            };
+        }>;
+    };
+} {
+    return {
+        item: { name, unit },
+        variant: {
+            unit,
+            attributeValues: attributes.map((attribute) => ({
+                attributeValue: {
+                    value: attribute.value,
+                    attribute: { name: attribute.name },
+                },
+            })),
+        },
+    };
+}
+
 function expectNoParentInventoryUpdate(): void {
     for (const [args] of prismaMock.stockItem.update.mock.calls) {
         expect(args.data).not.toHaveProperty("quantity");
@@ -196,6 +247,7 @@ describe("Stock Service Mutations", () => {
             expect(prismaMock.stockItemVariant.updateMany).not.toHaveBeenCalled();
             expect(prismaMock.stockItem.update).not.toHaveBeenCalled();
             expect(prismaMock.stockTransaction.create).not.toHaveBeenCalled();
+            expect(prismaMock.notificationOutbox.createMany).not.toHaveBeenCalled();
         });
 
         it("should not issue stock when another transaction has already claimed the request", async () => {
@@ -222,6 +274,7 @@ describe("Stock Service Mutations", () => {
             );
             expect(prismaMock.stockItemVariant.updateMany).not.toHaveBeenCalled();
             expect(prismaMock.stockTransaction.create).not.toHaveBeenCalled();
+            expect(prismaMock.notificationOutbox.createMany).not.toHaveBeenCalled();
         });
 
         it("should reject issuing a request when its variant is inactive", async () => {
@@ -466,12 +519,29 @@ describe("Stock Service Mutations", () => {
             prismaMock.stockRequest.findUnique.mockResolvedValue(
                 asNever({
                     status: "PENDING_ISSUE",
-                    requestedBy: 3,
-                    projectCode: "PRJ-ISSUE",
+                    ...requestResultSnapshotFields("PRJ-ISSUE"),
                     items: [
-                        { id: 1001, itemId: 10, variantId: 101, quantity: 2 },
-                        { id: 1002, itemId: 10, variantId: 101, quantity: 3 },
-                        { id: 1003, itemId: 12, variantId: 121, quantity: 1 },
+                        {
+                            id: 1001,
+                            itemId: 10,
+                            variantId: 101,
+                            quantity: 2,
+                            ...requestItemSnapshot("ปากกา", "ด้าม"),
+                        },
+                        {
+                            id: 1002,
+                            itemId: 10,
+                            variantId: 101,
+                            quantity: 3,
+                            ...requestItemSnapshot("ปากกา", "ด้าม"),
+                        },
+                        {
+                            id: 1003,
+                            itemId: 12,
+                            variantId: 121,
+                            quantity: 1,
+                            ...requestItemSnapshot("สมุด", "เล่ม"),
+                        },
                     ],
                 }),
             );
@@ -666,13 +736,67 @@ describe("Stock Service Mutations", () => {
                     }),
                 }),
             );
+            expect(prismaMock.notificationOutbox.createMany).toHaveBeenCalledWith({
+                data: [{
+                    type: "STOCK_REQUEST_RESULT_EMAIL",
+                    eventKey: "stock-request:99:ISSUED:email",
+                    payload: expect.stringContaining('"status":"ISSUED"'),
+                }],
+                skipDuplicates: true,
+            });
+
+            const emailOutboxCall = prismaMock.notificationOutbox.createMany.mock
+                .calls[0]?.[0] as unknown as {
+                data: Array<{ payload: string }>;
+            };
+            const issuedPayload = JSON.parse(emailOutboxCall.data[0].payload) as {
+                schemaVersion: number;
+                requestId: number;
+                status: string;
+                projectCode: string;
+                recipient: { userId: number; name: string; email: string };
+                items: Array<{
+                    name: string;
+                    quantity: number;
+                    unit: string;
+                    variantLabel?: string;
+                }>;
+                cancelReason: string | null;
+                actedAt: string;
+            };
+            expect(issuedPayload).toEqual({
+                schemaVersion: 1,
+                requestId: 99,
+                status: "ISSUED",
+                projectCode: "PRJ-ISSUE",
+                recipient: {
+                    userId: 3,
+                    name: "ผู้ใช้ 3",
+                    email: "user-3@example.com",
+                },
+                items: [
+                    { name: "ปากกา", quantity: 2, unit: "ด้าม" },
+                    { name: "ปากกา", quantity: 3, unit: "ด้าม" },
+                    { name: "สมุด", quantity: 1, unit: "เล่ม" },
+                ],
+                cancelReason: null,
+                actedAt: (prismaMock.stockRequest.updateMany.mock.calls[0]?.[0]
+                    .data as { issuedAt: Date }).issuedAt.toISOString(),
+            });
         });
 
         it("should alert for a variant crossing its threshold while aggregate stock stays high", async () => {
             prismaMock.stockRequest.findUnique.mockResolvedValue(
                 asNever({
-                    requestedBy: 3,
-                    items: [{ itemId: 10, variantId: 101, quantity: 5 }],
+                    ...requestResultSnapshotFields("PRJ-LOW-VARIANT"),
+                    items: [{
+                        itemId: 10,
+                        variantId: 101,
+                        quantity: 5,
+                        ...requestItemSnapshot("หมึกพิมพ์", "ตลับ", [
+                            { name: "สี", value: "ดำ" },
+                        ]),
+                    }],
                 }),
             );
             prismaMock.stockItem.findMany.mockResolvedValue(
@@ -733,8 +857,13 @@ describe("Stock Service Mutations", () => {
         it("should not duplicate a low-stock alert for a single-variant item", async () => {
             prismaMock.stockRequest.findUnique.mockResolvedValue(
                 asNever({
-                    requestedBy: 3,
-                    items: [{ itemId: 10, variantId: 101, quantity: 1 }],
+                    ...requestResultSnapshotFields("PRJ-SINGLE-VARIANT"),
+                    items: [{
+                        itemId: 10,
+                        variantId: 101,
+                        quantity: 1,
+                        ...requestItemSnapshot("ปากกา", "ด้าม"),
+                    }],
                 }),
             );
             prismaMock.stockItem.findMany.mockResolvedValue(
@@ -790,10 +919,22 @@ describe("Stock Service Mutations", () => {
         it("should retry P2034 and lock parent items before variants", async () => {
             prismaMock.stockRequest.findUnique.mockResolvedValue(
                 asNever({
-                    requestedBy: 3,
+                    ...requestResultSnapshotFields("PRJ-RETRY"),
                     items: [
-                        { itemId: 10, variantId: 200, quantity: 2 },
-                        { itemId: 20, variantId: 100, quantity: 3 },
+                        {
+                            id: 1001,
+                            itemId: 10,
+                            variantId: 200,
+                            quantity: 2,
+                            ...requestItemSnapshot("ปากกา", "ด้าม"),
+                        },
+                        {
+                            id: 1002,
+                            itemId: 20,
+                            variantId: 100,
+                            quantity: 3,
+                            ...requestItemSnapshot("กระดาษ", "รีม"),
+                        },
                     ],
                 }),
             );
@@ -1598,6 +1739,128 @@ describe("Stock Service Mutations", () => {
                     }),
                 }),
             );
+            expect(prismaMock.notificationOutbox.createMany).not.toHaveBeenCalled();
+        });
+
+        it("should enqueue a result email when an admin cancels a request", async () => {
+            prismaMock.stockRequest.findUnique.mockResolvedValue(
+                asNever({
+                    ...requestResultSnapshotFields("PRJ-ADMIN-CANCEL", 55),
+                    status: "PENDING_ISSUE",
+                    items: [{
+                        id: 1001,
+                        itemId: 10,
+                        variantId: 101,
+                        quantity: 2,
+                        ...requestItemSnapshot("ปากกา", "ด้าม", [
+                            { name: "สี", value: "น้ำเงิน" },
+                        ]),
+                    }],
+                }),
+            );
+            prismaMock.stockRequest.findUniqueOrThrow.mockResolvedValue(
+                asNever({
+                    id: 55,
+                    requestedBy: 3,
+                    status: "CANCELLED",
+                    projectCode: "PRJ-ADMIN-CANCEL",
+                }),
+            );
+
+            await stockService.cancelRequest(
+                55,
+                commandActor(9),
+                "มีวัสดุทดแทนแล้ว",
+                { isAdmin: true },
+            );
+
+            expect(prismaMock.notificationOutbox.createMany).toHaveBeenCalledWith({
+                data: [{
+                    type: "STOCK_REQUEST_RESULT_EMAIL",
+                    eventKey: "stock-request:55:CANCELLED:email",
+                    payload: expect.stringContaining('"status":"CANCELLED"'),
+                }],
+                skipDuplicates: true,
+            });
+            const emailOutboxCall = prismaMock.notificationOutbox.createMany.mock
+                .calls[0]?.[0] as unknown as {
+                data: Array<{ payload: string }>;
+            };
+            const cancelledPayload = JSON.parse(emailOutboxCall.data[0].payload) as {
+                schemaVersion: number;
+                requestId: number;
+                status: string;
+                projectCode: string;
+                recipient: { userId: number; name: string; email: string };
+                items: Array<{
+                    name: string;
+                    quantity: number;
+                    unit: string;
+                    variantLabel?: string;
+                }>;
+                cancelReason: string | null;
+                actedAt: string;
+            };
+            expect(cancelledPayload).toEqual({
+                schemaVersion: 1,
+                requestId: 55,
+                status: "CANCELLED",
+                projectCode: "PRJ-ADMIN-CANCEL",
+                recipient: {
+                    userId: 3,
+                    name: "ผู้ใช้ 3",
+                    email: "user-3@example.com",
+                },
+                items: [{
+                    name: "ปากกา",
+                    quantity: 2,
+                    unit: "ด้าม",
+                    variantLabel: "สี: น้ำเงิน",
+                }],
+                cancelReason: "มีวัสดุทดแทนแล้ว",
+                actedAt: (prismaMock.stockRequest.updateMany.mock.calls[0]?.[0]
+                    .data as { cancelledAt: Date }).cancelledAt.toISOString(),
+            });
+        });
+
+        it("should enqueue a cancelled result email with a null reason", async () => {
+            prismaMock.stockRequest.findUnique.mockResolvedValue(
+                asNever({
+                    ...requestResultSnapshotFields("PRJ-ADMIN-CANCEL-NO-REASON", 55),
+                    status: "PENDING_ISSUE",
+                    items: [{
+                        id: 1001,
+                        itemId: 10,
+                        variantId: 101,
+                        quantity: 1,
+                        ...requestItemSnapshot("ปากกา", "ด้าม"),
+                    }],
+                }),
+            );
+            prismaMock.stockRequest.findUniqueOrThrow.mockResolvedValue(
+                asNever({
+                    id: 55,
+                    requestedBy: 3,
+                    status: "CANCELLED",
+                    projectCode: "PRJ-ADMIN-CANCEL-NO-REASON",
+                }),
+            );
+
+            await stockService.cancelRequest(
+                55,
+                commandActor(9),
+                undefined,
+                { isAdmin: true },
+            );
+
+            const emailOutboxCall = prismaMock.notificationOutbox.createMany.mock
+                .calls[0]?.[0] as unknown as {
+                data: Array<{ payload: string }>;
+            };
+            const cancelledPayload = JSON.parse(emailOutboxCall.data[0].payload) as {
+                cancelReason: string | null;
+            };
+            expect(cancelledPayload.cancelReason).toBeNull();
         });
 
         it("should reject when non-admin tries to cancel another user's request", async () => {

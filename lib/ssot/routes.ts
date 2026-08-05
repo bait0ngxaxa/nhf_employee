@@ -25,6 +25,23 @@ export function toDashboardTabPath(tab: string): string {
     return `${APP_ROUTES.dashboard}?tab=${tab}`;
 }
 
+export const STOCK_DASHBOARD_TABS = {
+    browse: "browse",
+    myRequests: "my-requests",
+    adminRequests: "admin-requests",
+    inventory: "inventory",
+    reports: "reports",
+} as const;
+
+export type StockDashboardTab =
+    (typeof STOCK_DASHBOARD_TABS)[keyof typeof STOCK_DASHBOARD_TABS];
+
+export function toDashboardStockTabPath(
+    stockTab: StockDashboardTab,
+): string {
+    return `${toDashboardTabPath(APP_DASHBOARD_TABS.stock)}&stockTab=${stockTab}`;
+}
+
 export const API_ROUTES = {
     auth: {
         forgotPassword: "/api/auth/forgot-password",

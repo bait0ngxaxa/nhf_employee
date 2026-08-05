@@ -4,6 +4,7 @@ import {
     getTicketStatusLabel,
     getTicketPriorityLabel,
 } from "@/lib/helpers/ticket-helpers";
+import type { StockRequestResultEmailPayload } from "@/lib/services/stock/notification-payloads";
 import { type EmailData, type LeaveActionPayload, type LeaveResultPayload } from "./types";
 import type {
     LeaveCancelledAfterApprovalPayload,
@@ -17,10 +18,16 @@ import { generateStatusUpdateEmailHTML } from "./templates/status-update";
 import { generateLeaveActionEmailHTML } from "./templates/leave-action";
 import { generateLeaveResultEmailHTML } from "./templates/leave-result";
 import { generateLeaveEventEmailHTML } from "./templates/leave-event";
+import {
+    generateStockRequestResultEmailHTML,
+    generateStockRequestResultEmailText,
+} from "./templates/stock-request-result";
 import { getPublicOrigin } from "@/lib/network/public-url";
 import {
     APP_DASHBOARD_TABS,
+    STOCK_DASHBOARD_TABS,
     toDashboardTabPath,
+    toDashboardStockTabPath,
 } from "@/lib/ssot/routes";
 import {
     formatLeaveDecisionActor,
@@ -31,6 +38,7 @@ let transporter: nodemailer.Transporter | null = null;
 let isTransporterReady = false;
 const DEFAULT_EMAIL_FROM_NAME = "NHF IT Support";
 const LEAVE_EMAIL_FROM_NAME = "ระบบลา NHFapp";
+const STOCK_EMAIL_FROM_NAME = "ระบบเบิกวัสดุ NHFapp";
 
 function getSafeErrorMessage(error: unknown): string {
     if (!(error instanceof Error)) {
@@ -63,6 +71,14 @@ function buildLeaveMessageId(
     const safeRecipient = recipientIdentity?.replace(/[^a-zA-Z0-9._-]/g, "-");
     const recipientPart = safeRecipient ? `-${safeRecipient}` : "";
     return `<nhf-leave-${event}-${safeLeaveId}${recipientPart}@notifications.thainhf.org>`;
+}
+
+function buildStockRequestResultMessageId(
+    data: StockRequestResultEmailPayload,
+): string {
+    const safeRequestId = String(data.requestId).replace(/[^a-zA-Z0-9._-]/g, "-");
+    const safeStatus = data.status.toLowerCase().replace(/[^a-zA-Z0-9._-]/g, "-");
+    return `<nhf-stock-request-${safeRequestId}-${safeStatus}@notifications.thainhf.org>`;
 }
 
 function getTransporter(): nodemailer.Transporter {
@@ -199,6 +215,24 @@ export async function sendEmail(emailData: EmailData): Promise<boolean> {
 
 function sendLeaveEmail(emailData: EmailData): Promise<boolean> {
     return sendEmail({ ...emailData, fromName: LEAVE_EMAIL_FROM_NAME });
+}
+
+export async function sendStockRequestResultNotification(
+    data: StockRequestResultEmailPayload,
+): Promise<boolean> {
+    const dashboardUrl = `${getPublicOrigin()}${toDashboardStockTabPath(STOCK_DASHBOARD_TABS.myRequests)}`;
+    const emailData: EmailData = {
+        to: data.recipient.email,
+        subject: data.status === "ISSUED"
+            ? `[NHF Stock] คำขอเบิก #${data.requestId} ถูกจ่ายเรียบร้อยแล้ว`
+            : `[NHF Stock] คำขอเบิก #${data.requestId} ถูกยกเลิก`,
+        html: generateStockRequestResultEmailHTML(data, dashboardUrl),
+        text: generateStockRequestResultEmailText(data, dashboardUrl),
+        messageId: buildStockRequestResultMessageId(data),
+        fromName: STOCK_EMAIL_FROM_NAME,
+    };
+
+    return sendEmail(emailData);
 }
 
 export async function sendNewTicketNotification(
@@ -442,6 +476,7 @@ export async function sendLeaveNotTakenConfirmedNotification(
 
 export const emailService = {
     sendEmail,
+    sendStockRequestResultNotification,
     sendNewTicketNotification,
     sendStatusUpdateNotification,
     sendITTeamNotification,

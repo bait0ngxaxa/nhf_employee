@@ -1,4 +1,5 @@
 import type { NotificationOutbox } from "@prisma/client";
+import { sendStockRequestResultNotification } from "@/lib/email";
 import { lineNotificationService } from "@/lib/line";
 import { prisma } from "@/lib/db/prisma";
 import { dispatchTicketOutbox } from "@/lib/services/ticket/outbox-dispatch";
@@ -8,6 +9,9 @@ import type {
     StockRequestLineData,
 } from "@/types/api";
 import { createEmailRequestInAppNotification } from "@/lib/services/email-request/notifications";
+import {
+    parseStockRequestResultEmailPayload,
+} from "@/lib/services/stock/notification-payloads";
 import {
     notifyAdminsLowStockInApp,
     notifyAdminsStockRequestLineInApp,
@@ -242,6 +246,12 @@ async function assertLineSent(
     }
 }
 
+async function assertEmailSent(isSent: boolean): Promise<void> {
+    if (!isSent) {
+        throw new Error("STOCK_REQUEST_RESULT_EMAIL failed");
+    }
+}
+
 async function markStaleProcessingRows(): Promise<void> {
     const now = new Date();
     const staleBefore = new Date(
@@ -412,6 +422,13 @@ async function dispatchNotification(
                     parsedPayload,
                 ),
                 "LINE low stock notification",
+            );
+            return "SENT";
+        }
+        case "STOCK_REQUEST_RESULT_EMAIL": {
+            const parsedPayload = parseStockRequestResultEmailPayload(payload);
+            await assertEmailSent(
+                await sendStockRequestResultNotification(parsedPayload),
             );
             return "SENT";
         }

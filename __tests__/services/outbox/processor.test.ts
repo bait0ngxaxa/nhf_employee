@@ -6,6 +6,7 @@ import type {
     PrismaClient,
 } from "@prisma/client";
 import { mockDeep, mockReset } from "vitest-mock-extended";
+import { sendStockRequestResultNotification } from "@/lib/email";
 import { lineNotificationService } from "@/lib/line";
 import { prisma } from "@/lib/db/prisma";
 import { processOutbox } from "@/lib/services/outbox/processor";
@@ -31,9 +32,14 @@ import {
     sendLeaveNotTakenConfirmedNotifications,
     sendLeaveNotTakenRequestedNotifications,
 } from "@/lib/services/leave/notifications";
+import type { StockRequestResultEmailPayload } from "@/lib/services/stock/notification-payloads";
 
 vi.mock("@/lib/db/prisma", () => ({
     prisma: mockDeep<PrismaClient>(),
+}));
+
+vi.mock("@/lib/email", () => ({
+    sendStockRequestResultNotification: vi.fn(),
 }));
 
 vi.mock("@/lib/services/ticket/notifications", () => ({
@@ -173,6 +179,30 @@ function buildLeavePayload() {
         specialReason: null,
         overQuotaDays: 0,
         note: "ไม่ได้ลาเพราะมีงานด่วน",
+    };
+}
+
+function buildStockRequestResultPayload(
+    status: StockRequestResultEmailPayload["status"],
+): StockRequestResultEmailPayload {
+    return {
+        schemaVersion: 1,
+        requestId: 77,
+        status,
+        projectCode: "PRJ-2569/01",
+        recipient: {
+            userId: 3,
+            name: "สมชาย",
+            email: "somchai@example.com",
+        },
+        items: [{
+            name: "กระดาษ",
+            quantity: 2,
+            unit: "รีม",
+            variantLabel: "ขนาด: A4",
+        }],
+        cancelReason: status === "CANCELLED" ? "มีวัสดุทดแทนแล้ว" : null,
+        actedAt: "2026-07-01T03:00:00.000Z",
     };
 }
 
@@ -1001,6 +1031,166 @@ describe("processOutbox", () => {
             vi.mocked(lineNotificationService.sendStockLowNotification).mock
                 .invocationCallOrder[0];
         expect(inAppOrder).toBeLessThan(lineOrder);
+    });
+
+    it("processes a valid issued stock request result email", async () => {
+        vi.mocked(sendStockRequestResultNotification).mockResolvedValue(true);
+        const payload = buildStockRequestResultPayload("ISSUED");
+        prismaMock.notificationOutbox.findMany.mockResolvedValue(
+            asNever([
+                buildNotification(
+                    120,
+                    "STOCK_REQUEST_RESULT_EMAIL",
+                    JSON.stringify(payload),
+                    "stock-request:77:ISSUED:email",
+                ),
+            ]),
+        );
+
+        const result = await processOutbox();
+
+        expect(result).toEqual({ processed: 1, failed: 0 });
+        expect(sendStockRequestResultNotification).toHaveBeenCalledWith(payload);
+        expect(prismaMock.notification.create).not.toHaveBeenCalled();
+        expect(prismaMock.notificationOutbox.updateMany).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: { id: 120, status: "PROCESSING" },
+                data: { status: "SENT", lastError: null },
+            }),
+        );
+    });
+
+    it("processes a valid cancelled stock request result email", async () => {
+        vi.mocked(sendStockRequestResultNotification).mockResolvedValue(true);
+        const payload = buildStockRequestResultPayload("CANCELLED");
+        prismaMock.notificationOutbox.findMany.mockResolvedValue(
+            asNever([
+                buildNotification(
+                    121,
+                    "STOCK_REQUEST_RESULT_EMAIL",
+                    JSON.stringify(payload),
+                    "stock-request:77:CANCELLED:email",
+                ),
+            ]),
+        );
+
+        const result = await processOutbox();
+
+        expect(result).toEqual({ processed: 1, failed: 0 });
+        expect(sendStockRequestResultNotification).toHaveBeenCalledWith(payload);
+        expect(prismaMock.notification.create).not.toHaveBeenCalled();
+    });
+
+    it("retries a stock request result email when the email service returns false", async () => {
+        vi.mocked(sendStockRequestResultNotification).mockResolvedValue(false);
+        const payload = buildStockRequestResultPayload("ISSUED");
+        prismaMock.notificationOutbox.findMany.mockResolvedValue(
+            asNever([
+                buildNotification(
+                    122,
+                    "STOCK_REQUEST_RESULT_EMAIL",
+                    JSON.stringify(payload),
+                ),
+            ]),
+        );
+
+        const result = await processOutbox();
+
+        expect(result).toEqual({ processed: 0, failed: 1 });
+        expect(prismaMock.notificationOutbox.updateMany).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: { id: 122, status: "PROCESSING" },
+                data: expect.objectContaining({
+                    status: "FAILED",
+                    lastError: "STOCK_REQUEST_RESULT_EMAIL failed",
+                }),
+            }),
+        );
+        expect(prismaMock.notification.create).not.toHaveBeenCalled();
+    });
+
+    it("rejects malformed stock request result email payloads", async () => {
+        prismaMock.notificationOutbox.findMany.mockResolvedValue(
+            asNever([
+                buildNotification(
+                    123,
+                    "STOCK_REQUEST_RESULT_EMAIL",
+                    JSON.stringify({
+                        ...buildStockRequestResultPayload("ISSUED"),
+                        status: "UNKNOWN",
+                    }),
+                ),
+            ]),
+        );
+
+        const result = await processOutbox();
+
+        expect(result).toEqual({ processed: 0, failed: 1 });
+        expect(sendStockRequestResultNotification).not.toHaveBeenCalled();
+        expect(prismaMock.notificationOutbox.updateMany).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: { id: 123, status: "PROCESSING" },
+                data: expect.objectContaining({
+                    status: "FAILED",
+                    lastError: "Invalid STOCK_REQUEST_RESULT_EMAIL payload",
+                }),
+            }),
+        );
+    });
+
+    it("uses the existing retry flow for invalid stock request result JSON", async () => {
+        prismaMock.notificationOutbox.findMany.mockResolvedValue(
+            asNever([
+                buildNotification(
+                    124,
+                    "STOCK_REQUEST_RESULT_EMAIL",
+                    "{invalid-json",
+                ),
+            ]),
+        );
+
+        const result = await processOutbox();
+
+        expect(result).toEqual({ processed: 0, failed: 1 });
+        expect(sendStockRequestResultNotification).not.toHaveBeenCalled();
+        expect(prismaMock.notificationOutbox.updateMany).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: { id: 124, status: "PROCESSING" },
+                data: expect.objectContaining({
+                    status: "FAILED",
+                    lastError: "Invalid payload JSON",
+                }),
+            }),
+        );
+    });
+
+    it("moves a failed stock request result email to dead letter after retries", async () => {
+        vi.mocked(sendStockRequestResultNotification).mockResolvedValue(false);
+        const payload = buildStockRequestResultPayload("CANCELLED");
+        prismaMock.notificationOutbox.findMany.mockResolvedValue(
+            asNever([{
+                ...buildNotification(
+                    125,
+                    "STOCK_REQUEST_RESULT_EMAIL",
+                    JSON.stringify(payload),
+                ),
+                attempts: 2,
+            }]),
+        );
+
+        const result = await processOutbox();
+
+        expect(result).toEqual({ processed: 0, failed: 1 });
+        expect(prismaMock.notificationOutbox.updateMany).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: { id: 125, status: "PROCESSING" },
+                data: expect.objectContaining({
+                    status: "DEAD",
+                    attempts: { increment: 1 },
+                    lastError: "STOCK_REQUEST_RESULT_EMAIL failed",
+                }),
+            }),
+        );
     });
 
     it("skips notification when claim fails", async () => {
