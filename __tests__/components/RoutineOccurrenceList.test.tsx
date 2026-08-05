@@ -63,14 +63,20 @@ const employees: RoutineEmployee[] = [{
     nickname: null,
 }];
 
-function renderList(isAdmin: boolean, onEditTask = vi.fn()): void {
+function renderList(
+    isAdmin: boolean,
+    onEditTask = vi.fn(),
+    data = taskData,
+    focusOccurrenceId: number | null = null,
+): void {
     render(
         <RoutineOccurrenceList
-            data={taskData}
+            data={data}
             error={undefined}
             isLoading={false}
             isAdmin={isAdmin}
             focusTaskId={null}
+            focusOccurrenceId={focusOccurrenceId}
             onRetry={vi.fn()}
             onPageChange={vi.fn()}
             onEditTask={onEditTask}
@@ -134,5 +140,69 @@ describe("RoutineOccurrenceList", () => {
             expect.objectContaining({ method: "PATCH" }),
         );
         expect(fetchMock.mock.calls[0]?.[1]?.body).toContain("expectedReminderVersion");
+    });
+
+    it("shows occurrence assignees separately in a focused notification view", () => {
+        const baseTask = taskData.tasks[0];
+        if (!baseTask || !baseTask.relevantOccurrence) {
+            throw new Error("Routine test fixture is incomplete");
+        }
+        const focusedData: PaginatedRoutineTaskWorkItemsResponse = {
+            ...taskData,
+            tasks: [{
+                ...baseTask,
+                relevantOccurrence: {
+                    ...baseTask.relevantOccurrence,
+                    assignees: [{
+                        employeeId: 42,
+                        role: "OWNER",
+                        employee: {
+                            id: 42,
+                            firstName: "มานะ",
+                            lastName: "ดีใจ",
+                            nickname: null,
+                            displayName: "มานะ ดีใจ",
+                        },
+                    }],
+                },
+            }],
+        };
+
+        renderList(false, vi.fn(), focusedData, 91);
+
+        expect(screen.getByText(/ผู้รับผิดชอบรอบนี้:/)).toHaveTextContent("มานะ ดีใจ");
+        expect(screen.getByText(/ผู้รับผิดชอบ Routine:/)).toHaveTextContent("สมชาย ใจดี");
+    });
+
+    it("indicates an occurrence-only assignee override in the regular list", () => {
+        const baseTask = taskData.tasks[0];
+        if (!baseTask || !baseTask.relevantOccurrence) {
+            throw new Error("Routine test fixture is incomplete");
+        }
+        const overriddenData: PaginatedRoutineTaskWorkItemsResponse = {
+            ...taskData,
+            tasks: [{
+                ...baseTask,
+                relevantOccurrence: {
+                    ...baseTask.relevantOccurrence,
+                    assignees: [{
+                        employeeId: 42,
+                        role: "OWNER",
+                        employee: {
+                            id: 42,
+                            firstName: "มานะ",
+                            lastName: "ดีใจ",
+                            nickname: null,
+                            displayName: "มานะ ดีใจ",
+                        },
+                    }],
+                },
+            }],
+        };
+
+        renderList(false, vi.fn(), overriddenData);
+
+        expect(screen.getByText("รอบนี้มีการปรับผู้รับผิดชอบเฉพาะกิจ")).toBeInTheDocument();
+        expect(screen.getByText(/ผู้รับผิดชอบ Routine:/)).toHaveTextContent("สมชาย ใจดี");
     });
 });

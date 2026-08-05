@@ -361,6 +361,15 @@ function buildTaskWhere(
     employeeId: number | null,
     isAdmin: boolean,
 ): Prisma.RoutineTaskWhereInput {
+    return {
+        ...buildTaskMetadataWhere(filters),
+        ...buildTaskAssigneeWhere(filters, employeeId, isAdmin),
+    };
+}
+
+function buildTaskMetadataWhere(
+    filters: RoutineOccurrenceFilters,
+): Prisma.RoutineTaskWhereInput {
     const search = filters.search?.trim();
     return {
         isActive: true,
@@ -377,25 +386,79 @@ function buildTaskWhere(
                   ],
               }
             : {}),
-        ...buildTaskAssigneeWhere(filters, employeeId, isAdmin),
     };
 }
 
-async function findAuthorizedFocusTaskId(
+function activeEmployeeWhere(): Prisma.EmployeeWhereInput {
+    return {
+        status: "ACTIVE",
+        deletedAt: null,
+        user: {
+            is: {
+                isActive: true,
+                deletedAt: null,
+            },
+        },
+    };
+}
+
+type RoutineFocusResolution =
+    | { kind: "NONE" }
+    | { kind: "AUTHORIZED_OCCURRENCE"; taskId: number }
+    | { kind: "CURRENT_TASK_FALLBACK"; taskId: number }
+    | { kind: "DENIED" };
+
+async function resolveRoutineFocus(
     filters: RoutineOccurrenceFilters,
     employeeId: number | null,
     isAdmin: boolean,
-): Promise<number | null> {
-    if (filters.occurrenceId === undefined) return null;
+): Promise<RoutineFocusResolution> {
+    if (filters.occurrenceId === undefined) return { kind: "NONE" };
+    if (filters.taskId === undefined) return { kind: "DENIED" };
 
-    const occurrence = await prisma.routineOccurrence.findFirst({
+    const occurrence = await prisma.routineOccurrence.findUnique({
+        where: { id: filters.occurrenceId },
+        select: {
+            taskId: true,
+            task: { select: { isActive: true } },
+        },
+    });
+    if (!occurrence) {
+        const fallbackTask = await prisma.routineTask.findFirst({
+            where: buildTaskWhere(filters, employeeId, isAdmin),
+            select: { id: true },
+        });
+        return fallbackTask
+            ? { kind: "CURRENT_TASK_FALLBACK", taskId: fallbackTask.id }
+            : { kind: "DENIED" };
+    }
+    if (!occurrence.task.isActive || occurrence.taskId !== filters.taskId) {
+        return { kind: "DENIED" };
+    }
+    if (isAdmin) {
+        return { kind: "AUTHORIZED_OCCURRENCE", taskId: occurrence.taskId };
+    }
+    if (employeeId === null) return { kind: "DENIED" };
+
+    const activeAssignee = {
+        employeeId,
+        employee: activeEmployeeWhere(),
+    };
+    const authorizedOccurrence = await prisma.routineOccurrence.findFirst({
         where: {
             id: filters.occurrenceId,
-            task: buildTaskWhere(filters, employeeId, isAdmin),
+            taskId: occurrence.taskId,
+            task: { isActive: true },
+            OR: [
+                { task: { assignees: { some: activeAssignee } } },
+                { assignees: { some: activeAssignee } },
+            ],
         },
-        select: { id: true, taskId: true },
+        select: { taskId: true },
     });
-    return occurrence?.taskId ?? null;
+    return authorizedOccurrence
+        ? { kind: "AUTHORIZED_OCCURRENCE", taskId: authorizedOccurrence.taskId }
+        : { kind: "DENIED" };
 }
 
 type RoutineOccurrenceCandidateWithRow = {
@@ -541,19 +604,31 @@ export async function getRoutineTaskWorkItems(
     const isAdmin = queryActor.actor.role === "ADMIN";
     const employeeId = await resolveActorEmployeeId(queryActor);
     const today = getCurrentBangkokDate();
-    const authorizedFocusTaskId = await findAuthorizedFocusTaskId(
+    const focus = await resolveRoutineFocus(
         filters,
         employeeId,
         isAdmin,
     );
+    if (focus.kind === "DENIED") {
+        return {
+            tasks: [],
+            pagination: {
+                page: filters.page,
+                limit: filters.limit,
+                total: 0,
+                pages: 0,
+            },
+        };
+    }
+    const hasAuthorizedFocus = focus.kind === "AUTHORIZED_OCCURRENCE";
     const taskWhere: Prisma.RoutineTaskWhereInput = {
-        ...buildTaskWhere(filters, employeeId, isAdmin),
-        ...(authorizedFocusTaskId !== null
-            ? { id: authorizedFocusTaskId }
-            : {}),
+        ...(hasAuthorizedFocus
+            ? buildTaskMetadataWhere(filters)
+            : buildTaskWhere(filters, employeeId, isAdmin)),
+        ...(focus.kind !== "NONE" ? { id: focus.taskId } : {}),
     };
     const hasValidFocus =
-        filters.occurrenceId !== undefined && authorizedFocusTaskId !== null;
+        hasAuthorizedFocus;
     const mustResolveBeforePagination =
         !hasValidFocus
         && (
@@ -634,10 +709,36 @@ export async function getRoutineTaskWorkItems(
     const occurrenceRows = await findRoutineOccurrenceRowsForTasks(
         tasks.map((task) => task.id),
     );
+    let focusOccurrenceId = hasValidFocus
+        ? filters.occurrenceId ?? null
+        : null;
+    if (
+        hasValidFocus
+        && !occurrenceRows.some(
+            (occurrence) => occurrence.id === focusOccurrenceId,
+        )
+    ) {
+        const fallbackTask = await prisma.routineTask.findFirst({
+            where: buildTaskWhere(filters, employeeId, isAdmin),
+            select: { id: true },
+        });
+        if (!fallbackTask) {
+            return {
+                tasks: [],
+                pagination: {
+                    page: filters.page,
+                    limit: filters.limit,
+                    total: 0,
+                    pages: 0,
+                },
+            };
+        }
+        focusOccurrenceId = null;
+    }
     const relevantByTask = resolveOccurrenceRows(
         occurrenceRows,
         today,
-        hasValidFocus ? filters.occurrenceId ?? null : null,
+        focusOccurrenceId,
     );
 
     return {

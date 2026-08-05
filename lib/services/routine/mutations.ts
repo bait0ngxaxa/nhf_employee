@@ -710,10 +710,7 @@ export async function updateRoutineOccurrenceOverride(
     return runSerializableTransaction(async (tx) => {
         await assertActiveAdminInTransaction(tx, actor);
         const occurrence = await findOccurrenceForMutation(tx, occurrenceId);
-        if (
-            input.expectedReminderVersion !== undefined
-            && input.expectedReminderVersion !== occurrence.reminderVersion
-        ) {
+        if (input.expectedReminderVersion !== occurrence.reminderVersion) {
             throw new RoutineConflictError(
                 "ข้อมูลรอบนี้เปลี่ยนแปลงแล้ว กรุณาโหลดข้อมูลใหม่",
             );
@@ -726,20 +723,19 @@ export async function updateRoutineOccurrenceOverride(
         const oldDueDate = toBangkokCalendarDate(occurrence.dueDate);
         const dueDateChanged = oldDueDate !== input.dueDate;
         const assigneesChanged = !areAssigneesEqual(occurrence.assignees, assignees);
-        if (!dueDateChanged && !assigneesChanged) return occurrence;
 
         const claimed = await tx.routineOccurrence.updateMany({
             where: {
                 id: occurrenceId,
-                ...(input.expectedReminderVersion !== undefined
-                    ? { reminderVersion: input.expectedReminderVersion }
-                    : {}),
+                reminderVersion: input.expectedReminderVersion,
             },
             data: {
                 ...(dueDateChanged
                     ? { dueDate: calendarDateToDate(input.dueDate) }
                     : {}),
-                reminderVersion: { increment: 1 },
+                reminderVersion: {
+                    increment: dueDateChanged || assigneesChanged ? 1 : 0,
+                },
             },
         });
         if (claimed.count !== 1) {
@@ -747,6 +743,7 @@ export async function updateRoutineOccurrenceOverride(
                 "ข้อมูลรอบนี้เปลี่ยนแปลงแล้ว กรุณาโหลดข้อมูลใหม่",
             );
         }
+        if (!dueDateChanged && !assigneesChanged) return occurrence;
 
         if (assigneesChanged) {
             await tx.routineOccurrenceAssignee.deleteMany({
@@ -807,17 +804,29 @@ export async function updateRoutineOccurrenceDueDate(
         await assertActiveAdminInTransaction(tx, actor);
         const occurrence = await findOccurrenceForMutation(tx, occurrenceId);
         const oldDueDate = toBangkokCalendarDate(occurrence.dueDate);
-        if (oldDueDate === input.dueDate) return occurrence;
+        if (input.expectedReminderVersion !== occurrence.reminderVersion) {
+            throw new RoutineConflictError(
+                "ข้อมูลรอบนี้เปลี่ยนแปลงแล้ว กรุณาโหลดข้อมูลใหม่",
+            );
+        }
+        const dueDateChanged = oldDueDate !== input.dueDate;
         const claimed = await tx.routineOccurrence.updateMany({
-            where: { id: occurrenceId, dueDate: occurrence.dueDate },
+            where: {
+                id: occurrenceId,
+                dueDate: occurrence.dueDate,
+                reminderVersion: input.expectedReminderVersion,
+            },
             data: {
-                dueDate: calendarDateToDate(input.dueDate),
-                reminderVersion: { increment: 1 },
+                ...(dueDateChanged
+                    ? { dueDate: calendarDateToDate(input.dueDate) }
+                    : {}),
+                reminderVersion: { increment: dueDateChanged ? 1 : 0 },
             },
         });
         if (claimed.count !== 1) {
             throw new RoutineConflictError("วันกำหนดเปลี่ยนแปลงแล้ว");
         }
+        if (!dueDateChanged) return occurrence;
         await createRoutineAuditInTransaction(
             tx,
             "ROUTINE_OCCURRENCE_DUE_DATE_CHANGE",
@@ -852,6 +861,27 @@ export async function reassignRoutineOccurrence(
             tx,
             assignees.map((assignee) => assignee.employeeId),
         );
+        if (input.expectedReminderVersion !== occurrence.reminderVersion) {
+            throw new RoutineConflictError(
+                "ข้อมูลรอบนี้เปลี่ยนแปลงแล้ว กรุณาโหลดข้อมูลใหม่",
+            );
+        }
+        const assigneesChanged = !areAssigneesEqual(occurrence.assignees, assignees);
+        const claimed = await tx.routineOccurrence.updateMany({
+            where: {
+                id: occurrenceId,
+                reminderVersion: input.expectedReminderVersion,
+            },
+            data: {
+                reminderVersion: { increment: assigneesChanged ? 1 : 0 },
+            },
+        });
+        if (claimed.count !== 1) {
+            throw new RoutineConflictError(
+                "ข้อมูลรอบนี้เปลี่ยนแปลงแล้ว กรุณาโหลดข้อมูลใหม่",
+            );
+        }
+        if (!assigneesChanged) return occurrence;
         await tx.routineOccurrenceAssignee.deleteMany({
             where: { occurrenceId },
         });
@@ -861,10 +891,6 @@ export async function reassignRoutineOccurrence(
                 employeeId: assignee.employeeId,
                 role: assignee.role,
             })),
-        });
-        await tx.routineOccurrence.updateMany({
-            where: { id: occurrenceId },
-            data: { reminderVersion: { increment: 1 } },
         });
         await createRoutineAuditInTransaction(
             tx,

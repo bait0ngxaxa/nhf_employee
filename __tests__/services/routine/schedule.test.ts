@@ -99,6 +99,81 @@ describe("NHF Routine schedule engine", () => {
         expect(next[0]?.dueDate).toBe("2026-08-10");
     });
 
+    it("keeps a month-end occurrence when the next business day crosses the target month", () => {
+        const result = calculateRoutineOccurrences(
+            { scheduleType: "MONTH_END", config: {} },
+            window("2026-08-01", "2026-10-31"),
+            "NEXT_BUSINESS_DAY",
+        );
+
+        expect(result.at(-1)).toEqual({
+            periodKey: "2026-10",
+            originalDueDate: "2026-10-31",
+            dueDate: "2026-11-02",
+        });
+    });
+
+    it("keeps a day-one occurrence when the previous business day crosses the target month", () => {
+        const result = calculateRoutineOccurrences(
+            { scheduleType: "MONTHLY_DAY", config: { day: 1, monthOffset: 0 } },
+            window("2026-08-01", "2026-08-31"),
+            "PREVIOUS_BUSINESS_DAY",
+        );
+
+        expect(result).toContainEqual({
+            periodKey: "2026-08",
+            originalDueDate: "2026-08-01",
+            dueDate: "2026-07-31",
+        });
+    });
+
+    it("keeps yearly, interval, and one-time periods when weekend adjustment crosses a calendar boundary", () => {
+        const yearly = calculateRoutineOccurrences(
+            { scheduleType: "YEARLY_DATE", config: { month: 12, day: 31 } },
+            window("2028-12-01", "2028-12-31"),
+            "NEXT_BUSINESS_DAY",
+        );
+        const interval = calculateRoutineOccurrences(
+            {
+                scheduleType: "INTERVAL_MONTHS",
+                config: { intervalMonths: 1, anchorDate: "2026-10-31" },
+            },
+            window("2026-10-01", "2026-10-31"),
+            "NEXT_BUSINESS_DAY",
+        );
+        const oneTime = calculateRoutineOccurrences(
+            { scheduleType: "ONE_TIME", config: { date: "2026-10-31" } },
+            window("2026-10-01", "2026-10-31"),
+            "NEXT_BUSINESS_DAY",
+        );
+
+        expect(yearly).toContainEqual({
+            periodKey: "2028-12",
+            originalDueDate: "2028-12-31",
+            dueDate: "2029-01-01",
+        });
+        expect(interval).toContainEqual({
+            periodKey: "2026-10",
+            originalDueDate: "2026-10-31",
+            dueDate: "2026-11-02",
+        });
+        expect(oneTime).toEqual([{
+            periodKey: "2026-10-31",
+            originalDueDate: "2026-10-31",
+            dueDate: "2026-11-02",
+        }]);
+    });
+
+    it("does not materialize a period outside the target and business-day margin", () => {
+        const result = calculateRoutineOccurrences(
+            { scheduleType: "ONE_TIME", config: { date: "2026-11-01" } },
+            window("2026-10-01", "2026-10-31"),
+            "NEXT_BUSINESS_DAY",
+        );
+
+        expect(result).toEqual([]);
+    });
+
     it("keeps calendar calculations in Bangkok time", () => {
         expect(getCurrentBangkokDate(new Date("2026-01-31T17:00:00.000Z"))).toBe(
             "2026-02-01",

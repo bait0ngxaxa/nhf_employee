@@ -1,6 +1,12 @@
 export const ROUTINE_TIME_ZONE = "Asia/Bangkok" as const;
 export const ROUTINE_GENERATION_HORIZON_MONTHS = 2 as const;
 export const ROUTINE_GENERATION_SAFETY_DAYS = 7 as const;
+export const ROUTINE_BUSINESS_DAY_CANDIDATE_MARGIN_DAYS = 7 as const;
+export const ROUTINE_MAX_REMINDER_DAYS_BEFORE = 365 as const;
+export const ROUTINE_RECONCILIATION_MAX_FUTURE_DAYS =
+    ROUTINE_MAX_REMINDER_DAYS_BEFORE
+    + ROUTINE_GENERATION_SAFETY_DAYS
+    + 31;
 
 // Phase 1 treats Saturday and Sunday as non-business days; public holidays are deferred.
 
@@ -343,17 +349,44 @@ function isWithinWindow(value: CalendarDate, window: RoutineDateWindow): boolean
     );
 }
 
+function isWithinRoutineTargetWindow(
+    occurrence: Pick<ScheduledRoutineOccurrence, "originalDueDate" | "dueDate">,
+    window: RoutineDateWindow,
+): boolean {
+    // Keep a period anchored at a target boundary when its weekend adjustment crosses it.
+    return (
+        isWithinWindow(occurrence.originalDueDate, window)
+        || isWithinWindow(occurrence.dueDate, window)
+    );
+}
+
+export function getRoutineCandidateCalculationWindow(
+    targetWindow: RoutineDateWindow,
+): RoutineDateWindow {
+    return {
+        from: addCalendarDays(
+            targetWindow.from,
+            -ROUTINE_BUSINESS_DAY_CANDIDATE_MARGIN_DAYS,
+        ),
+        to: addCalendarDays(
+            targetWindow.to,
+            ROUTINE_BUSINESS_DAY_CANDIDATE_MARGIN_DAYS,
+        ),
+    };
+}
+
 function calculateMonthlyOccurrences(
     config: MonthlyDayScheduleConfig,
-    window: RoutineDateWindow,
+    candidateWindow: RoutineDateWindow,
+    targetWindow: RoutineDateWindow,
     policy: RoutineBusinessDayPolicy,
 ): ScheduledRoutineOccurrence[] {
     const firstBaseMonth = addCalendarMonths(
-        startOfMonth(window.from),
+        startOfMonth(candidateWindow.from),
         -config.monthOffset,
     );
     const lastBaseMonth = addCalendarMonths(
-        startOfMonth(window.to),
+        startOfMonth(candidateWindow.to),
         -config.monthOffset,
     );
     const occurrences: ScheduledRoutineOccurrence[] = [];
@@ -372,43 +405,47 @@ function calculateMonthlyOccurrences(
         );
         if (!originalDueDate) continue;
         const dueDate = applyBusinessDayPolicy(originalDueDate, policy);
-        if (!isWithinWindow(dueDate, window)) continue;
-
-        occurrences.push({
+        const occurrence = {
             periodKey: monthKey(baseMonth),
             originalDueDate,
             dueDate,
-        });
+        };
+        if (!isWithinRoutineTargetWindow(occurrence, targetWindow)) continue;
+
+        occurrences.push(occurrence);
     }
 
     return occurrences;
 }
 
 function calculateMonthEndOccurrences(
-    window: RoutineDateWindow,
+    candidateWindow: RoutineDateWindow,
+    targetWindow: RoutineDateWindow,
     policy: RoutineBusinessDayPolicy,
 ): ScheduledRoutineOccurrence[] {
     const occurrences: ScheduledRoutineOccurrence[] = [];
     for (
-        let month = startOfMonth(window.from);
-        compareCalendarDates(month, startOfMonth(window.to)) <= 0;
+        let month = startOfMonth(candidateWindow.from);
+        compareCalendarDates(month, startOfMonth(candidateWindow.to)) <= 0;
         month = addCalendarMonths(month, 1)
     ) {
         const originalDueDate = endOfMonth(month);
         const dueDate = applyBusinessDayPolicy(originalDueDate, policy);
-        if (!isWithinWindow(dueDate, window)) continue;
-        occurrences.push({
+        const occurrence = {
             periodKey: monthKey(month),
             originalDueDate,
             dueDate,
-        });
+        };
+        if (!isWithinRoutineTargetWindow(occurrence, targetWindow)) continue;
+        occurrences.push(occurrence);
     }
     return occurrences;
 }
 
 function calculateIntervalOccurrences(
     config: IntervalMonthsScheduleConfig,
-    window: RoutineDateWindow,
+    candidateWindow: RoutineDateWindow,
+    targetWindow: RoutineDateWindow,
     policy: RoutineBusinessDayPolicy,
 ): ScheduledRoutineOccurrence[] {
     const anchor = dateParts(config.anchorDate);
@@ -416,8 +453,8 @@ function calculateIntervalOccurrences(
     const occurrences: ScheduledRoutineOccurrence[] = [];
 
     for (
-        let month = startOfMonth(window.from);
-        compareCalendarDates(month, startOfMonth(window.to)) <= 0;
+        let month = startOfMonth(candidateWindow.from);
+        compareCalendarDates(month, startOfMonth(candidateWindow.to)) <= 0;
         month = addCalendarMonths(month, 1)
     ) {
         const distance = monthDifference(anchorMonth, month);
@@ -428,35 +465,38 @@ function calculateIntervalOccurrences(
         if (!originalDueDate) continue;
         if (compareCalendarDates(originalDueDate, config.anchorDate) < 0) continue;
         const dueDate = applyBusinessDayPolicy(originalDueDate, policy);
-        if (!isWithinWindow(dueDate, window)) continue;
-        occurrences.push({
+        const occurrence = {
             periodKey: monthKey(month),
             originalDueDate,
             dueDate,
-        });
+        };
+        if (!isWithinRoutineTargetWindow(occurrence, targetWindow)) continue;
+        occurrences.push(occurrence);
     }
     return occurrences;
 }
 
 function calculateYearlyOccurrences(
     config: YearlyDateScheduleConfig,
-    window: RoutineDateWindow,
+    candidateWindow: RoutineDateWindow,
+    targetWindow: RoutineDateWindow,
     policy: RoutineBusinessDayPolicy,
 ): ScheduledRoutineOccurrence[] {
-    const firstYear = dateParts(window.from).year;
-    const lastYear = dateParts(window.to).year;
+    const firstYear = dateParts(candidateWindow.from).year;
+    const lastYear = dateParts(candidateWindow.to).year;
     const occurrences: ScheduledRoutineOccurrence[] = [];
 
     for (let year = firstYear; year <= lastYear; year += 1) {
         const originalDueDate = makeExactDate(year, config.month, config.day);
         if (!originalDueDate) continue;
         const dueDate = applyBusinessDayPolicy(originalDueDate, policy);
-        if (!isWithinWindow(dueDate, window)) continue;
-        occurrences.push({
+        const occurrence = {
             periodKey: `${year}-${pad(config.month)}`,
             originalDueDate,
             dueDate,
-        });
+        };
+        if (!isWithinRoutineTargetWindow(occurrence, targetWindow)) continue;
+        occurrences.push(occurrence);
     }
     return occurrences;
 }
@@ -470,25 +510,58 @@ export function calculateRoutineOccurrences(
         return [];
     }
 
+    const candidateWindow = getRoutineCandidateCalculationWindow(window);
+    let occurrences: ScheduledRoutineOccurrence[];
+
     switch (definition.scheduleType) {
         case "MONTHLY_DAY":
-            return calculateMonthlyOccurrences(definition.config, window, policy);
+            occurrences = calculateMonthlyOccurrences(
+                definition.config,
+                candidateWindow,
+                window,
+                policy,
+            );
+            break;
         case "MONTH_END":
-            return calculateMonthEndOccurrences(window, policy);
+            occurrences = calculateMonthEndOccurrences(
+                candidateWindow,
+                window,
+                policy,
+            );
+            break;
         case "INTERVAL_MONTHS":
-            return calculateIntervalOccurrences(definition.config, window, policy);
+            occurrences = calculateIntervalOccurrences(
+                definition.config,
+                candidateWindow,
+                window,
+                policy,
+            );
+            break;
         case "YEARLY_DATE":
-            return calculateYearlyOccurrences(definition.config, window, policy);
+            occurrences = calculateYearlyOccurrences(
+                definition.config,
+                candidateWindow,
+                window,
+                policy,
+            );
+            break;
         case "ONE_TIME": {
             const originalDueDate = definition.config.date;
             const dueDate = applyBusinessDayPolicy(originalDueDate, policy);
-            return isWithinWindow(dueDate, window)
-                ? [{ periodKey: originalDueDate, originalDueDate, dueDate }]
+            const occurrence = { periodKey: originalDueDate, originalDueDate, dueDate };
+            occurrences = isWithinRoutineTargetWindow(occurrence, window)
+                ? [occurrence]
                 : [];
+            break;
         }
         case "MANUAL":
-            return [];
+            occurrences = [];
+            break;
     }
+
+    return [...new Map(
+        occurrences.map((occurrence) => [occurrence.periodKey, occurrence]),
+    ).values()];
 }
 
 export function getRoutineGenerationWindow(

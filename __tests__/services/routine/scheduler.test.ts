@@ -95,6 +95,33 @@ describe("Routine scheduler", () => {
         });
     });
 
+    it("finds a 70-day reminder for a month-end date shifted into November", async () => {
+        const now = new Date("2026-08-24T02:00:00.000Z");
+        prismaMock.routineOccurrence.findMany.mockResolvedValue(asNever([
+            buildOccurrence({
+                dueDate: new Date("2026-11-02T00:00:00.000Z"),
+                task: {
+                    ...buildOccurrence().task,
+                    reminderRules: [{
+                        ...buildOccurrence().task.reminderRules[0],
+                        daysBefore: 70,
+                    }],
+                },
+            }),
+        ]));
+
+        const result = await runRoutineScheduler(now);
+
+        expect(result.outboxEnqueued).toBe(1);
+        expect(prismaMock.notificationOutbox.create).toHaveBeenCalledWith({
+            data: expect.objectContaining({
+                payload: expect.stringContaining(
+                    '"scheduledFor":"2026-08-24T02:00:00.000Z"',
+                ),
+            }),
+        });
+    });
+
     it("counts a duplicate event key instead of creating another outbox row", async () => {
         prismaMock.notificationOutbox.create.mockRejectedValue({
             code: "P2002",

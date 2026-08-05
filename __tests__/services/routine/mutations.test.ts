@@ -122,7 +122,7 @@ describe("NHF Routine mutations", () => {
 
         await updateRoutineOccurrenceDueDate(
             91,
-            { dueDate: "2026-02-10" },
+            { expectedReminderVersion: 1, dueDate: "2026-02-10" },
             actor(99, "ADMIN"),
         );
 
@@ -130,6 +130,7 @@ describe("NHF Routine mutations", () => {
             where: {
                 id: 91,
                 dueDate: new Date("2026-01-10T00:00:00.000Z"),
+                reminderVersion: 1,
             },
             data: expect.objectContaining({
                 dueDate: new Date("2026-02-10T00:00:00.000Z"),
@@ -215,7 +216,7 @@ describe("NHF Routine mutations", () => {
                 91,
                 {
                     expectedReminderVersion: 1,
-                    dueDate: "2026-02-10",
+                    dueDate: "2026-01-10",
                     assignees: [{ employeeId: 20, role: "OWNER" }],
                 },
                 actor(99, "ADMIN"),
@@ -223,6 +224,86 @@ describe("NHF Routine mutations", () => {
         ).rejects.toThrow("ข้อมูลรอบนี้เปลี่ยนแปลงแล้ว");
         expect(prismaMock.routineOccurrence.updateMany).not.toHaveBeenCalled();
         expect(prismaMock.routineOccurrenceAssignee.deleteMany).not.toHaveBeenCalled();
+        expect(prismaMock.auditLog.create).not.toHaveBeenCalled();
+    });
+
+    it("checks the expected version for an atomic no-op without incrementing it", async () => {
+        const initial = occurrence();
+        prismaMock.user.findUnique.mockResolvedValue(
+            asNever(activeUser("ADMIN", 99)),
+        );
+        prismaMock.employee.findMany.mockResolvedValue(asNever([{ id: 20 }]));
+        prismaMock.routineOccurrence.findUnique.mockResolvedValue(
+            asNever(initial),
+        );
+
+        await updateRoutineOccurrenceOverride(
+            91,
+            {
+                expectedReminderVersion: 1,
+                dueDate: "2026-01-10",
+                assignees: [{ employeeId: 20, role: "OWNER" }],
+            },
+            actor(99, "ADMIN"),
+        );
+
+        expect(prismaMock.routineOccurrence.updateMany).toHaveBeenCalledWith({
+            where: { id: 91, reminderVersion: 1 },
+            data: { reminderVersion: { increment: 0 } },
+        });
+        expect(prismaMock.auditLog.create).not.toHaveBeenCalled();
+    });
+
+    it("returns a conflict when the atomic version claim loses a race", async () => {
+        prismaMock.user.findUnique.mockResolvedValue(
+            asNever(activeUser("ADMIN", 99)),
+        );
+        prismaMock.employee.findMany.mockResolvedValue(asNever([{ id: 21 }]));
+        prismaMock.routineOccurrence.findUnique.mockResolvedValue(
+            asNever(occurrence()),
+        );
+        prismaMock.routineOccurrence.updateMany.mockResolvedValueOnce(
+            asNever({ count: 0 }),
+        );
+
+        await expect(
+            updateRoutineOccurrenceOverride(
+                91,
+                {
+                    expectedReminderVersion: 1,
+                    dueDate: "2026-02-10",
+                    assignees: [{ employeeId: 21, role: "OWNER" }],
+                },
+                actor(99, "ADMIN"),
+            ),
+        ).rejects.toThrow("ข้อมูลรอบนี้เปลี่ยนแปลงแล้ว");
+        expect(prismaMock.routineOccurrenceAssignee.deleteMany).not.toHaveBeenCalled();
+        expect(prismaMock.auditLog.create).not.toHaveBeenCalled();
+    });
+
+    it("rolls back an atomic override when an assignee is inactive", async () => {
+        prismaMock.user.findUnique.mockResolvedValue(
+            asNever(activeUser("ADMIN", 99)),
+        );
+        prismaMock.routineOccurrence.findUnique.mockResolvedValue(
+            asNever(occurrence()),
+        );
+        prismaMock.employee.findMany.mockResolvedValue(asNever([]));
+
+        await expect(
+            updateRoutineOccurrenceOverride(
+                91,
+                {
+                    expectedReminderVersion: 1,
+                    dueDate: "2026-02-10",
+                    assignees: [{ employeeId: 21, role: "OWNER" }],
+                },
+                actor(99, "ADMIN"),
+            ),
+        ).rejects.toThrow("ผู้รับผิดชอบต้องเป็นพนักงานที่ยังปฏิบัติงาน");
+        expect(prismaMock.routineOccurrence.updateMany).not.toHaveBeenCalled();
+        expect(prismaMock.routineOccurrenceAssignee.deleteMany).not.toHaveBeenCalled();
+        expect(prismaMock.auditLog.create).not.toHaveBeenCalled();
     });
 
     it("snapshots new active assignees and increments the reminder version", async () => {
@@ -252,7 +333,10 @@ describe("NHF Routine mutations", () => {
 
         await reassignRoutineOccurrence(
             91,
-            { assignees: [{ employeeId: 21, role: "OWNER" }] },
+            {
+                expectedReminderVersion: 1,
+                assignees: [{ employeeId: 21, role: "OWNER" }],
+            },
             actor(99, "ADMIN"),
         );
 
@@ -263,9 +347,51 @@ describe("NHF Routine mutations", () => {
             data: [{ occurrenceId: 91, employeeId: 21, role: "OWNER" }],
         });
         expect(prismaMock.routineOccurrence.updateMany).toHaveBeenCalledWith({
-            where: { id: 91 },
+            where: { id: 91, reminderVersion: 1 },
             data: { reminderVersion: { increment: 1 } },
         });
+    });
+
+    it("rejects a stale legacy due-date request before changing any data", async () => {
+        prismaMock.user.findUnique.mockResolvedValue(
+            asNever(activeUser("ADMIN", 99)),
+        );
+        prismaMock.routineOccurrence.findUnique.mockResolvedValue(
+            asNever(occurrence({ reminderVersion: 2 })),
+        );
+
+        await expect(
+            updateRoutineOccurrenceDueDate(
+                91,
+                { expectedReminderVersion: 1, dueDate: "2026-02-10" },
+                actor(99, "ADMIN"),
+            ),
+        ).rejects.toThrow("ข้อมูลรอบนี้เปลี่ยนแปลงแล้ว");
+        expect(prismaMock.routineOccurrence.updateMany).not.toHaveBeenCalled();
+        expect(prismaMock.auditLog.create).not.toHaveBeenCalled();
+    });
+
+    it("rejects a stale legacy assignee request before changing any data", async () => {
+        prismaMock.user.findUnique.mockResolvedValue(
+            asNever(activeUser("ADMIN", 99)),
+        );
+        prismaMock.routineOccurrence.findUnique.mockResolvedValue(
+            asNever(occurrence({ reminderVersion: 2 })),
+        );
+        prismaMock.employee.findMany.mockResolvedValue(asNever([{ id: 21 }]));
+
+        await expect(
+            reassignRoutineOccurrence(
+                91,
+                {
+                    expectedReminderVersion: 1,
+                    assignees: [{ employeeId: 21, role: "OWNER" }],
+                },
+                actor(99, "ADMIN"),
+            ),
+        ).rejects.toThrow("ข้อมูลรอบนี้เปลี่ยนแปลงแล้ว");
+        expect(prismaMock.routineOccurrenceAssignee.deleteMany).not.toHaveBeenCalled();
+        expect(prismaMock.auditLog.create).not.toHaveBeenCalled();
     });
 
     it("rejects reassignment to an inactive employee", async () => {
@@ -280,7 +406,10 @@ describe("NHF Routine mutations", () => {
         await expect(
             reassignRoutineOccurrence(
                 91,
-                { assignees: [{ employeeId: 21, role: "OWNER" }] },
+                {
+                    expectedReminderVersion: 1,
+                    assignees: [{ employeeId: 21, role: "OWNER" }],
+                },
                 actor(99, "ADMIN"),
             ),
         ).rejects.toThrow("ผู้รับผิดชอบต้องเป็นพนักงานที่ยังปฏิบัติงาน");

@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import {
+    RoutineConflictError,
+    RoutineServiceError,
+} from "@/lib/services/routine/errors";
+
 const mocks = vi.hoisted(() => ({
     requireAdminSession: vi.fn(),
     getOccurrence: vi.fn(),
@@ -12,6 +17,7 @@ vi.mock("@/lib/auth/api", () => ({
 }));
 
 vi.mock("@/lib/services/routine", () => ({
+    RoutineServiceError,
     getRoutineOccurrenceById: mocks.getOccurrence,
     updateRoutineOccurrenceOverride: mocks.updateOverride,
 }));
@@ -77,5 +83,43 @@ describe("PATCH /api/routines/occurrences/:id", () => {
 
         expect(response.status).toBe(403);
         expect(mocks.updateOverride).not.toHaveBeenCalled();
+    });
+
+    it("rejects an atomic override without an expected reminder version", async () => {
+        const response = await PATCH(
+            new NextRequest("http://localhost/api/routines/occurrences/91", {
+                method: "PATCH",
+                headers: { "content-type": "application/json" },
+                body: JSON.stringify({
+                    dueDate: "2026-08-10",
+                    assignees: [{ employeeId: 21, role: "OWNER" }],
+                }),
+            }),
+            { params: Promise.resolve({ id: "91" }) },
+        );
+
+        expect(response.status).toBe(400);
+        expect(mocks.updateOverride).not.toHaveBeenCalled();
+    });
+
+    it("returns 409 when the atomic override version is stale", async () => {
+        mocks.updateOverride.mockRejectedValue(
+            new RoutineConflictError("ข้อมูลรอบนี้เปลี่ยนแปลงแล้ว กรุณาโหลดข้อมูลใหม่"),
+        );
+
+        const response = await PATCH(
+            new NextRequest("http://localhost/api/routines/occurrences/91", {
+                method: "PATCH",
+                headers: { "content-type": "application/json" },
+                body: JSON.stringify({
+                    expectedReminderVersion: 3,
+                    dueDate: "2026-08-10",
+                    assignees: [{ employeeId: 21, role: "OWNER" }],
+                }),
+            }),
+            { params: Promise.resolve({ id: "91" }) },
+        );
+
+        expect(response.status).toBe(409);
     });
 });

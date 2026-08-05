@@ -3,10 +3,13 @@ import { ZodError } from "zod";
 
 import { buildRoutineScheduleDefinition } from "@/lib/validations/routine";
 import {
+    addCalendarDays,
     calculateRoutineOccurrences,
     calendarDateToDate,
     compareCalendarDates,
     getRoutineGenerationWindow,
+    ROUTINE_MAX_REMINDER_DAYS_BEFORE,
+    ROUTINE_RECONCILIATION_MAX_FUTURE_DAYS,
     toBangkokCalendarDate,
     type RoutineScheduleType,
 } from "@/lib/routine/schedule";
@@ -91,7 +94,7 @@ async function deleteStaleFutureOccurrences(
     tx: Prisma.TransactionClient,
     taskId: number,
     currentDate: string,
-    windowTo: string,
+    reconciliationWindowTo: string | null,
     candidatePeriodKeys: readonly string[],
 ): Promise<void> {
     await tx.routineOccurrence.deleteMany({
@@ -99,13 +102,69 @@ async function deleteStaleFutureOccurrences(
             taskId,
             dueDate: {
                 gte: calendarDateToDate(currentDate),
-                lte: calendarDateToDate(windowTo),
+                ...(reconciliationWindowTo
+                    ? { lte: calendarDateToDate(reconciliationWindowTo) }
+                    : {}),
             },
             ...(candidatePeriodKeys.length > 0
                 ? { periodKey: { notIn: [...candidatePeriodKeys] } }
                 : {}),
         },
     });
+}
+
+function assertSupportedReminderHorizon(
+    taskId: number,
+    maxActiveDaysBefore: number,
+): void {
+    if (
+        Number.isInteger(maxActiveDaysBefore)
+        && maxActiveDaysBefore >= 0
+        && maxActiveDaysBefore <= ROUTINE_MAX_REMINDER_DAYS_BEFORE
+    ) {
+        return;
+    }
+
+    console.error("Routine generation found an invalid reminder horizon", {
+        taskId,
+        maxActiveDaysBefore,
+        maximumSupportedDaysBefore: ROUTINE_MAX_REMINDER_DAYS_BEFORE,
+    });
+    throw new RoutineValidationError(
+        "พบระยะเวลาแจ้งเตือนล่วงหน้าที่อยู่นอกช่วงที่ระบบรองรับ กรุณาตรวจสอบข้อมูล",
+    );
+}
+
+async function assertFutureOccurrencesWithinSafetyBound(
+    tx: Prisma.TransactionClient,
+    taskId: number,
+    currentDate: string,
+): Promise<void> {
+    const safetyBound = addCalendarDays(
+        currentDate,
+        ROUTINE_RECONCILIATION_MAX_FUTURE_DAYS,
+    );
+    const unsafeOccurrence = await tx.routineOccurrence.findFirst({
+        where: {
+            taskId,
+            dueDate: { gte: calendarDateToDate(currentDate) },
+            OR: [
+                { dueDate: { gt: calendarDateToDate(safetyBound) } },
+                { originalDueDate: { gt: calendarDateToDate(safetyBound) } },
+            ],
+        },
+        select: { id: true, dueDate: true, originalDueDate: true },
+    });
+    if (!unsafeOccurrence) return;
+
+    console.error("Routine reconciliation found an occurrence beyond its safety bound", {
+        taskId,
+        occurrenceId: unsafeOccurrence.id,
+        safetyBound,
+    });
+    throw new RoutineValidationError(
+        "พบข้อมูลรอบงานประจำอยู่นอกช่วงที่ระบบรองรับ กรุณาตรวจสอบข้อมูล",
+    );
 }
 
 export async function generateRoutineTaskOccurrences(
@@ -153,6 +212,7 @@ export async function generateRoutineTaskOccurrencesInTransaction(
         (maximum, rule) => Math.max(maximum, rule.daysBefore),
         0,
     );
+    assertSupportedReminderHorizon(task.id, maxActiveDaysBefore);
     const window = getRoutineGenerationWindow(now, maxActiveDaysBefore);
     const currentDate = toBangkokCalendarDate(now);
 
@@ -161,7 +221,7 @@ export async function generateRoutineTaskOccurrencesInTransaction(
             tx,
             task.id,
             currentDate,
-            window.to,
+            null,
             [],
         );
         return { evaluated: 0, created: 0, existing: 0 };
@@ -210,12 +270,23 @@ export async function generateRoutineTaskOccurrencesInTransaction(
         return true;
     });
 
+    await assertFutureOccurrencesWithinSafetyBound(
+        tx,
+        task.id,
+        currentDate,
+    );
+
+    const reconciliationSafetyBound = addCalendarDays(
+        currentDate,
+        ROUTINE_RECONCILIATION_MAX_FUTURE_DAYS,
+    );
+
     const existingFutureOccurrences = await tx.routineOccurrence.findMany({
         where: {
             taskId: task.id,
             dueDate: {
                 gte: calendarDateToDate(currentDate),
-                lte: calendarDateToDate(window.to),
+                lte: calendarDateToDate(reconciliationSafetyBound),
             },
         },
         select: ROUTINE_OCCURRENCE_RECONCILIATION_SELECT,
@@ -226,11 +297,29 @@ export async function generateRoutineTaskOccurrencesInTransaction(
             occurrence,
         ]),
     );
+    const existingFutureMaxDate = existingFutureOccurrences.reduce(
+        (maximum, occurrence) => {
+            const occurrenceDueDate = toBangkokCalendarDate(occurrence.dueDate);
+            const occurrenceOriginalDueDate = toBangkokCalendarDate(
+                occurrence.originalDueDate,
+            );
+            const latestDate = compareCalendarDates(
+                occurrenceDueDate,
+                occurrenceOriginalDueDate,
+            ) >= 0
+                ? occurrenceDueDate
+                : occurrenceOriginalDueDate;
+            return compareCalendarDates(latestDate, maximum) > 0
+                ? latestDate
+                : maximum;
+        },
+        window.to,
+    );
     await deleteStaleFutureOccurrences(
         tx,
         task.id,
         currentDate,
-        window.to,
+        existingFutureMaxDate,
         generationCandidates.map((occurrence) => occurrence.periodKey),
     );
 

@@ -34,6 +34,7 @@ interface RoutineOccurrenceListProps {
     isLoading: boolean;
     isAdmin: boolean;
     focusTaskId: number | null;
+    focusOccurrenceId: number | null;
     onRetry: () => void;
     onPageChange: (page: number) => void;
     onEditTask: (taskId: number) => void;
@@ -53,6 +54,18 @@ function employeeNames(assignees: RoutineAssignee[]): string {
         .map((assignee) => assignee.employee.displayName
             ?? `${assignee.employee.firstName} ${assignee.employee.lastName}`)
         .join(", ");
+}
+
+function areAssigneeSnapshotsEqual(
+    left: RoutineAssignee[],
+    right: RoutineAssignee[],
+): boolean {
+    if (left.length !== right.length) return false;
+    const toKey = (assignee: RoutineAssignee): string =>
+        `${assignee.employeeId}:${assignee.role}`;
+    const leftKeys = left.map(toKey).sort();
+    const rightKeys = right.map(toKey).sort();
+    return leftKeys.every((key, index) => key === rightKeys[index]);
 }
 
 function displayEmployeeName(employee: RoutineEmployee): string {
@@ -104,6 +117,7 @@ export function RoutineOccurrenceList({
     isLoading,
     isAdmin,
     focusTaskId,
+    focusOccurrenceId,
     onRetry,
     onPageChange,
     onEditTask,
@@ -213,6 +227,10 @@ export function RoutineOccurrenceList({
             ) : null}
             {data.tasks.map((task) => {
                 const occurrence = task.relevantOccurrence;
+                const isFocusedOccurrence = occurrence !== null
+                    && occurrence.id === focusOccurrenceId;
+                const hasOccurrenceAssigneeOverride = occurrence !== null
+                    && !areAssigneeSnapshotsEqual(task.assignees, occurrence.assignees);
                 const isEditing = occurrence !== null && editor?.id === occurrence.id;
                 const isBusy = occurrence !== null && busyId === occurrence.id;
                 return (
@@ -231,9 +249,25 @@ export function RoutineOccurrenceList({
                                     {task.title}
                                 </h3>
                                 <div className="grid gap-2 text-sm text-content-secondary sm:grid-cols-2">
-                                    <p>
-                                        ผู้รับผิดชอบ: <span className="text-content-body">{employeeNames(task.assignees) || "ยังไม่ได้ระบุ"}</span>
-                                    </p>
+                                    {isFocusedOccurrence ? (
+                                        <>
+                                            <p>
+                                                ผู้รับผิดชอบรอบนี้: <span className="text-content-body">{employeeNames(occurrence.assignees) || "ยังไม่ได้ระบุ"}</span>
+                                            </p>
+                                            <p>
+                                                ผู้รับผิดชอบ Routine: <span className="text-content-body">{employeeNames(task.assignees) || "ยังไม่ได้ระบุ"}</span>
+                                            </p>
+                                        </>
+                                    ) : (
+                                        <p>
+                                            ผู้รับผิดชอบ Routine: <span className="text-content-body">{employeeNames(task.assignees) || "ยังไม่ได้ระบุ"}</span>
+                                        </p>
+                                    )}
+                                    {!isFocusedOccurrence && hasOccurrenceAssigneeOverride ? (
+                                        <p className="text-xs text-content-secondary">
+                                            รอบนี้มีการปรับผู้รับผิดชอบเฉพาะกิจ
+                                        </p>
+                                    ) : null}
                                     <p>
                                         กำหนด: {occurrence ? (
                                             <span className={occurrence.isOverdue ? "font-semibold text-status-danger-foreground" : "text-content-body"}>

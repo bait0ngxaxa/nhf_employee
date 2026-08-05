@@ -155,6 +155,7 @@ function RoutineOccurrencePanel({
                 isLoading={isLoading}
                 isAdmin={isAdmin}
                 focusTaskId={taskId}
+                focusOccurrenceId={occurrenceId}
                 onRetry={() => void mutate()}
                 onPageChange={setPage}
                 onEditTask={setEditingTaskId}

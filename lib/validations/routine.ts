@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import {
     ROUTINE_BUSINESS_DAY_POLICIES,
+    ROUTINE_MAX_REMINDER_DAYS_BEFORE,
     ROUTINE_SCHEDULE_TYPES,
     daysInMonth,
     type YearlyDateScheduleConfig,
@@ -76,7 +77,7 @@ export const routineAssigneeSchema = z.object({
 export const routineReminderRuleSchema = z.object({
     daysBefore: z.preprocess(
         emptyToUndefined,
-        z.coerce.number().int().min(0).max(365),
+        z.coerce.number().int().min(0).max(ROUTINE_MAX_REMINDER_DAYS_BEFORE),
     ),
     sendHour: z.preprocess(
         emptyToUndefined,
@@ -304,12 +305,14 @@ export const routineTaskFiltersSchema = z.object({
 export const routineIdParamSchema = z.string().regex(/^\d+$/, "รหัสไม่ถูกต้อง");
 
 export const routineDueDateSchema = z.object({
+    expectedReminderVersion: z.coerce.number().int().positive(),
     dueDate: dateSchema,
     note: optionalText(1000),
 });
 
 export const routineOccurrenceAssigneesSchema = z
     .object({
+        expectedReminderVersion: z.coerce.number().int().positive(),
         assignees: z
             .array(routineAssigneeSchema)
             .min(1, "กรุณาระบุผู้รับผิดชอบ")
@@ -319,7 +322,7 @@ export const routineOccurrenceAssigneesSchema = z
 
 export const routineOccurrenceOverrideSchema = z
     .object({
-        expectedReminderVersion: z.coerce.number().int().positive().optional(),
+        expectedReminderVersion: z.coerce.number().int().positive(),
         dueDate: dateSchema,
         note: optionalText(1000),
         assignees: z

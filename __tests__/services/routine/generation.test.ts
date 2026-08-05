@@ -132,6 +132,61 @@ describe("NHF Routine occurrence generation", () => {
         );
     });
 
+    it("materializes a weekend-shifted month-end before a 70-day reminder boundary", async () => {
+        prismaMock.routineTask.findUnique.mockResolvedValue(
+            asNever(activeTask({
+                scheduleType: "MONTH_END",
+                scheduleConfig: {},
+                businessDayPolicy: "NEXT_BUSINESS_DAY",
+                reminderRules: [{ daysBefore: 70 }],
+            })),
+        );
+
+        const result = await generateRoutineTaskOccurrences(
+            71,
+            new Date("2026-08-04T04:00:00.000Z"),
+        );
+
+        expect(result).toEqual({ evaluated: 3, created: 3, existing: 0 });
+        expect(prismaMock.routineOccurrence.upsert).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: {
+                    taskId_periodKey: { taskId: 71, periodKey: "2026-10" },
+                },
+                create: expect.objectContaining({
+                    originalDueDate: new Date("2026-10-31T00:00:00.000Z"),
+                    dueDate: new Date("2026-11-02T00:00:00.000Z"),
+                }),
+            }),
+        );
+    });
+
+    it("does not materialize a shifted occurrence beyond the contract end", async () => {
+        prismaMock.routineTask.findUnique.mockResolvedValue(
+            asNever(activeTask({
+                scheduleType: "MONTH_END",
+                scheduleConfig: {},
+                businessDayPolicy: "NEXT_BUSINESS_DAY",
+                contractEndDate: new Date("2026-10-31T00:00:00.000Z"),
+                reminderRules: [{ daysBefore: 70 }],
+            })),
+        );
+
+        const result = await generateRoutineTaskOccurrences(
+            71,
+            new Date("2026-08-04T04:00:00.000Z"),
+        );
+
+        expect(result).toEqual({ evaluated: 2, created: 2, existing: 0 });
+        expect(prismaMock.routineOccurrence.upsert).not.toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: {
+                    taskId_periodKey: { taskId: 71, periodKey: "2026-10" },
+                },
+            }),
+        );
+    });
+
     it("does not extend the window for an inactive reminder rule", async () => {
         prismaMock.routineTask.findUnique.mockResolvedValue(
             asNever(activeTask({
@@ -391,7 +446,7 @@ describe("NHF Routine occurrence generation", () => {
         );
     });
 
-    it("removes only future in-window occurrences when changing to manual", async () => {
+    it("removes every future occurrence when changing to manual", async () => {
         prismaMock.routineTask.findUnique.mockResolvedValue(
             asNever(activeTask({
                 scheduleType: "MANUAL",
@@ -411,10 +466,105 @@ describe("NHF Routine occurrence generation", () => {
                 taskId: 71,
                 dueDate: {
                     gte: new Date("2026-08-04T00:00:00.000Z"),
-                    lte: new Date("2026-10-31T00:00:00.000Z"),
                 },
             },
         });
+        expect(prismaMock.routineOccurrence.upsert).not.toHaveBeenCalled();
+    });
+
+    it("reconciles stale occurrences beyond a reduced generation horizon", async () => {
+        prismaMock.routineTask.findUnique.mockResolvedValue(
+            asNever(activeTask({ reminderRules: [], version: 5 })),
+        );
+        prismaMock.routineOccurrence.findMany.mockResolvedValue(asNever([
+            generatedOccurrence({ periodKey: "2026-08" }),
+            generatedOccurrence({
+                id: 101,
+                periodKey: "2027-08",
+                dueDate: new Date("2027-01-10T00:00:00.000Z"),
+                originalDueDate: new Date("2027-08-10T00:00:00.000Z"),
+            }),
+        ]));
+
+        const result = await generateRoutineTaskOccurrences(
+            71,
+            new Date("2026-08-04T04:00:00.000Z"),
+        );
+
+        expect(result).toEqual({ evaluated: 3, created: 2, existing: 1 });
+        expect(prismaMock.routineOccurrence.deleteMany).toHaveBeenCalledWith({
+            where: {
+                taskId: 71,
+                dueDate: {
+                    gte: new Date("2026-08-04T00:00:00.000Z"),
+                    lte: new Date("2027-08-10T00:00:00.000Z"),
+                },
+                periodKey: { notIn: ["2026-08", "2026-09", "2026-10"] },
+            },
+        });
+    });
+
+    it("preserves a manually moved occurrence when its period remains valid", async () => {
+        prismaMock.routineTask.findUnique.mockResolvedValue(
+            asNever(activeTask({
+                scheduleConfig: { day: 10, monthOffset: 0 },
+                reminderRules: [{ daysBefore: 365 }],
+                version: 5,
+            })),
+        );
+        prismaMock.routineOccurrence.findMany.mockResolvedValue(asNever([
+            generatedOccurrence({
+                periodKey: "2027-08",
+                dueDate: new Date("2027-01-10T00:00:00.000Z"),
+                originalDueDate: new Date("2027-08-10T00:00:00.000Z"),
+            }),
+        ]));
+
+        const result = await generateRoutineTaskOccurrences(
+            71,
+            new Date("2026-08-04T04:00:00.000Z"),
+        );
+
+        expect(result).toEqual({ evaluated: 13, created: 12, existing: 1 });
+        expect(prismaMock.routineOccurrence.deleteMany).toHaveBeenCalledWith({
+            where: expect.objectContaining({
+                periodKey: {
+                    notIn: expect.arrayContaining(["2027-08"]),
+                },
+            }),
+        });
+        expect(prismaMock.routineOccurrence.upsert).toHaveBeenCalledTimes(12);
+    });
+
+    it("fails closed when a future occurrence is outside the reconciliation safety bound", async () => {
+        prismaMock.routineOccurrence.findFirst.mockResolvedValue(asNever({
+            id: 999,
+            dueDate: new Date("2030-01-10T00:00:00.000Z"),
+            originalDueDate: new Date("2030-01-10T00:00:00.000Z"),
+        }));
+
+        await expect(
+            generateRoutineTaskOccurrences(
+                71,
+                new Date("2026-08-04T04:00:00.000Z"),
+            ),
+        ).rejects.toThrow("อยู่นอกช่วงที่ระบบรองรับ");
+        expect(prismaMock.routineOccurrence.deleteMany).not.toHaveBeenCalled();
+        expect(prismaMock.routineOccurrence.upsert).not.toHaveBeenCalled();
+    });
+
+    it("fails closed when stored reminder data exceeds the supported horizon", async () => {
+        prismaMock.routineTask.findUnique.mockResolvedValue(
+            asNever(activeTask({ reminderRules: [{ daysBefore: 366 }] })),
+        );
+
+        await expect(
+            generateRoutineTaskOccurrences(
+                71,
+                new Date("2026-08-04T04:00:00.000Z"),
+            ),
+        ).rejects.toThrow("อยู่นอกช่วงที่ระบบรองรับ");
+        expect(prismaMock.routineOccurrence.deleteMany).not.toHaveBeenCalled();
         expect(prismaMock.routineOccurrence.upsert).not.toHaveBeenCalled();
     });
 
@@ -439,6 +589,12 @@ describe("NHF Routine occurrence generation", () => {
                 dueDate: new Date("2026-10-10T00:00:00.000Z"),
                 originalDueDate: new Date("2026-10-10T00:00:00.000Z"),
             }),
+            generatedOccurrence({
+                id: 103,
+                periodKey: "2027-08",
+                dueDate: new Date("2027-08-10T00:00:00.000Z"),
+                originalDueDate: new Date("2027-08-10T00:00:00.000Z"),
+            }),
         ]));
 
         const result = await generateRoutineTaskOccurrences(
@@ -448,11 +604,15 @@ describe("NHF Routine occurrence generation", () => {
 
         expect(result).toEqual({ evaluated: 1, created: 0, existing: 1 });
         expect(prismaMock.routineOccurrence.deleteMany).toHaveBeenCalledWith(
-            expect.objectContaining({
+            {
                 where: expect.objectContaining({
+                    dueDate: {
+                        gte: new Date("2026-08-04T00:00:00.000Z"),
+                        lte: new Date("2027-08-10T00:00:00.000Z"),
+                    },
                     periodKey: { notIn: ["2026-08"] },
                 }),
-            }),
+            },
         );
     });
 
