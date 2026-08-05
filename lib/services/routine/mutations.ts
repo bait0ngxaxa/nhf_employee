@@ -731,7 +731,10 @@ export async function updateRoutineOccurrenceOverride(
             },
             data: {
                 ...(dueDateChanged
-                    ? { dueDate: calendarDateToDate(input.dueDate) }
+                    ? {
+                          dueDate: calendarDateToDate(input.dueDate),
+                          isDueDateOverridden: true,
+                      }
                     : {}),
                 reminderVersion: {
                     increment: dueDateChanged || assigneesChanged ? 1 : 0,
@@ -818,7 +821,10 @@ export async function updateRoutineOccurrenceDueDate(
             },
             data: {
                 ...(dueDateChanged
-                    ? { dueDate: calendarDateToDate(input.dueDate) }
+                    ? {
+                          dueDate: calendarDateToDate(input.dueDate),
+                          isDueDateOverridden: true,
+                      }
                     : {}),
                 reminderVersion: { increment: dueDateChanged ? 1 : 0 },
             },

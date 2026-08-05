@@ -21,7 +21,7 @@ Phase 4 และความสามารถ operational hardening อื่�
 เป็น snapshot ของรอบวันที่คำนวณจาก RoutineTask ประกอบด้วย:
 
 - `id`, `taskId`, `periodKey`
-- `dueDate`, `originalDueDate`
+- `dueDate`, `originalDueDate`, `isDueDateOverridden`
 - `scheduleVersion`, `reminderVersion`
 - `createdAt`, `updatedAt`
 - relation ไปยัง `task` และ snapshot `assignees`

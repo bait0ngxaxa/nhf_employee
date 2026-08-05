@@ -52,6 +52,7 @@ function occurrence(overrides: Record<string, unknown> = {}): Record<string, unk
         periodKey: "2026-01",
         dueDate: new Date("2026-01-10T00:00:00.000Z"),
         originalDueDate: new Date("2026-01-10T00:00:00.000Z"),
+        isDueDateOverridden: false,
         scheduleVersion: 1,
         reminderVersion: 1,
         createdAt: new Date("2026-01-01T00:00:00.000Z"),
@@ -111,6 +112,7 @@ describe("NHF Routine mutations", () => {
         const initial = occurrence();
         const updated = occurrence({
             dueDate: new Date("2026-02-10T00:00:00.000Z"),
+            isDueDateOverridden: true,
             reminderVersion: 2,
         });
         prismaMock.user.findUnique.mockResolvedValue(
@@ -134,6 +136,7 @@ describe("NHF Routine mutations", () => {
             },
             data: expect.objectContaining({
                 dueDate: new Date("2026-02-10T00:00:00.000Z"),
+                isDueDateOverridden: true,
                 reminderVersion: { increment: 1 },
             }),
         });
@@ -149,6 +152,7 @@ describe("NHF Routine mutations", () => {
         const initial = occurrence();
         const updated = occurrence({
             dueDate: new Date("2026-02-10T00:00:00.000Z"),
+            isDueDateOverridden: true,
             reminderVersion: 2,
             assignees: [{
                 employeeId: 21,
@@ -186,6 +190,7 @@ describe("NHF Routine mutations", () => {
             where: { id: 91, reminderVersion: 1 },
             data: {
                 dueDate: new Date("2026-02-10T00:00:00.000Z"),
+                isDueDateOverridden: true,
                 reminderVersion: { increment: 1 },
             },
         });

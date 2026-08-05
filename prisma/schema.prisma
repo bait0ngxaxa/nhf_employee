@@ -956,6 +956,7 @@ model RoutineOccurrence {
   periodKey       String   @db.VarChar(32)
   dueDate         DateTime @db.Date
   originalDueDate DateTime @db.Date
+  isDueDateOverridden Boolean @default(false)
   scheduleVersion Int
   reminderVersion Int      @default(1)
   createdAt       DateTime @default(now())

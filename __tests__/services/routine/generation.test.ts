@@ -46,6 +46,7 @@ function generatedOccurrence(overrides: Record<string, unknown> = {}): Record<st
         periodKey: "2026-08",
         dueDate: new Date("2026-08-10T00:00:00.000Z"),
         originalDueDate: new Date("2026-08-10T00:00:00.000Z"),
+        isDueDateOverridden: false,
         scheduleVersion: 3,
         assignees: [
             { employeeId: 11, role: "OWNER" },
@@ -91,6 +92,7 @@ describe("NHF Routine occurrence generation", () => {
                 where: { taskId_periodKey: { taskId: 71, periodKey: "2026-01" } },
                 create: expect.objectContaining({
                     dueDate: new Date("2026-01-10T00:00:00.000Z"),
+                    isDueDateOverridden: false,
                     scheduleVersion: 4,
                     assignees: {
                         create: [
@@ -417,6 +419,7 @@ describe("NHF Routine occurrence generation", () => {
                 id: 100,
                 dueDate: new Date("2026-01-20T00:00:00.000Z"),
                 originalDueDate: new Date("2026-01-10T00:00:00.000Z"),
+                isDueDateOverridden: true,
                 scheduleVersion: 3,
             }))
             .mockResolvedValue(null);
@@ -575,6 +578,7 @@ describe("NHF Routine occurrence generation", () => {
                     periodKey: "2027-08",
                     dueDate: new Date("2027-01-10T00:00:00.000Z"),
                     originalDueDate: new Date("2027-08-10T00:00:00.000Z"),
+                    isDueDateOverridden: true,
                     assignees: [{ employeeId: 99, role: "OWNER" }],
                 }),
             ]));
@@ -688,6 +692,7 @@ describe("NHF Routine occurrence generation", () => {
                 periodKey: "2027-08",
                 dueDate: new Date("2027-09-01T00:00:00.000Z"),
                 originalDueDate: new Date("2027-08-10T00:00:00.000Z"),
+                isDueDateOverridden: true,
                 scheduleVersion: 4,
                 assignees: [{ employeeId: 99, role: "OWNER" }],
             }),
@@ -730,6 +735,7 @@ describe("NHF Routine occurrence generation", () => {
                 periodKey: "2026-07",
                 dueDate: new Date("2026-08-10T00:00:00.000Z"),
                 originalDueDate: new Date("2026-07-31T00:00:00.000Z"),
+                isDueDateOverridden: true,
                 assignees: [{ employeeId: 99, role: "OWNER" }],
             }),
         ]));
@@ -775,6 +781,7 @@ describe("NHF Routine occurrence generation", () => {
                 periodKey: "2027-08",
                 dueDate: new Date("2027-01-10T00:00:00.000Z"),
                 originalDueDate: new Date("2027-08-10T00:00:00.000Z"),
+                isDueDateOverridden: true,
             }),
         ]));
 
@@ -904,6 +911,75 @@ describe("NHF Routine occurrence generation", () => {
         );
     });
 
+    it("refreshes a weekend-adjusted due date when the business-day policy changes", async () => {
+        prismaMock.routineTask.findUnique.mockResolvedValue(
+            asNever(activeTask({
+                scheduleType: "MONTH_END",
+                scheduleConfig: {},
+                businessDayPolicy: "NONE",
+                version: 5,
+            })),
+        );
+        prismaMock.routineOccurrence.findMany.mockResolvedValue(asNever([
+            generatedOccurrence({
+                periodKey: "2026-10",
+                originalDueDate: new Date("2026-10-31T00:00:00.000Z"),
+                dueDate: new Date("2026-11-02T00:00:00.000Z"),
+                isDueDateOverridden: false,
+                scheduleVersion: 4,
+            }),
+        ]));
+
+        await generateRoutineTaskOccurrences(
+            71,
+            new Date("2026-10-01T04:00:00.000Z"),
+        );
+
+        expect(prismaMock.routineOccurrence.updateMany).toHaveBeenCalledWith({
+            where: { id: 100, scheduleVersion: 4 },
+            data: {
+                scheduleVersion: 5,
+                dueDate: new Date("2026-10-31T00:00:00.000Z"),
+                reminderVersion: { increment: 1 },
+            },
+        });
+    });
+
+    it("refreshes a weekend-adjusted due date when the schedule date changes", async () => {
+        prismaMock.routineTask.findUnique.mockResolvedValue(
+            asNever(activeTask({
+                scheduleType: "MONTHLY_DAY",
+                scheduleConfig: { day: 30, monthOffset: 0 },
+                businessDayPolicy: "NONE",
+                version: 5,
+            })),
+        );
+        prismaMock.routineOccurrence.findMany.mockResolvedValue(asNever([
+            generatedOccurrence({
+                periodKey: "2026-10",
+                originalDueDate: new Date("2026-10-31T00:00:00.000Z"),
+                dueDate: new Date("2026-11-02T00:00:00.000Z"),
+                isDueDateOverridden: false,
+                scheduleVersion: 4,
+            }),
+        ]));
+
+        await generateRoutineTaskOccurrences(
+            71,
+            new Date("2026-10-01T04:00:00.000Z"),
+        );
+
+        expect(prismaMock.routineOccurrence.updateMany).toHaveBeenCalledWith({
+            where: { id: 100, scheduleVersion: 4 },
+            data: {
+                scheduleVersion: 5,
+                originalDueDate: new Date("2026-10-30T00:00:00.000Z"),
+                dueDate: new Date("2026-10-30T00:00:00.000Z"),
+                reminderVersion: { increment: 1 },
+            },
+        });
+    });
+
     it("updates the new original date while preserving a future admin due-date override", async () => {
         prismaMock.routineTask.findUnique.mockResolvedValue(
             asNever(activeTask({
@@ -915,6 +991,7 @@ describe("NHF Routine occurrence generation", () => {
             generatedOccurrence({
                 dueDate: new Date("2026-08-20T00:00:00.000Z"),
                 originalDueDate: new Date("2026-08-10T00:00:00.000Z"),
+                isDueDateOverridden: true,
             }),
             generatedOccurrence({
                 id: 101,

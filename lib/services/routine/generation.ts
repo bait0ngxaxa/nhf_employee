@@ -57,6 +57,7 @@ const ROUTINE_OCCURRENCE_RECONCILIATION_SELECT = {
     periodKey: true,
     dueDate: true,
     originalDueDate: true,
+    isDueDateOverridden: true,
     scheduleVersion: true,
     assignees: {
         select: { employeeId: true, role: true },
@@ -112,9 +113,8 @@ async function refreshExistingRoutineOccurrence(
     const currentDueDate = toBangkokCalendarDate(current.dueDate);
     const originalDateChanged =
         currentOriginalDueDate !== candidate.originalDueDate;
-    const hasManualDueDate = currentDueDate !== currentOriginalDueDate;
     const dueDateChanged =
-        !hasManualDueDate && currentDueDate !== candidate.dueDate;
+        !current.isDueDateOverridden && currentDueDate !== candidate.dueDate;
     const shouldSyncAssignees = shouldSyncFutureAssignees(
         current,
         currentDate,
@@ -514,6 +514,7 @@ export async function generateRoutineTaskOccurrencesInTransaction(
                     periodKey: occurrence.periodKey,
                     dueDate: calendarDateToDate(occurrence.dueDate),
                     originalDueDate: calendarDateToDate(occurrence.originalDueDate),
+                    isDueDateOverridden: false,
                     scheduleVersion: task.version,
                     assignees: {
                         create: task.assignees.map((assignee) => ({
