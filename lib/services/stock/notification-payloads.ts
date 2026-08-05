@@ -39,7 +39,7 @@ const stockRequestResultEmailPayloadSchema = z.object({
     recipient: z.object({
         userId: z.number().int().positive(),
         name: z.string().trim().min(1),
-        email: z.string().trim().min(1),
+        email: z.string().trim().email(),
     }),
     items: z.array(z.object({
         name: z.string().trim().min(1),
@@ -113,6 +113,9 @@ export function buildStockRequestResultEmailPayload(
     cancelReason: string | null,
     actedAt: Date,
 ): StockRequestResultEmailPayload {
+    const requesterName = request.requester.name.trim()
+        || request.requester.email;
+
     return {
         schemaVersion: 1,
         requestId: request.id,
@@ -120,7 +123,7 @@ export function buildStockRequestResultEmailPayload(
         projectCode: request.projectCode,
         recipient: {
             userId: request.requestedBy,
-            name: request.requester.name,
+            name: requesterName,
             email: request.requester.email,
         },
         items: request.items.map((item) => {
