@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { type PrismaClient } from "@prisma/client";
+import { type Prisma, type PrismaClient } from "@prisma/client";
 import { mockDeep, mockReset } from "vitest-mock-extended";
 
 import { prisma } from "@/lib/db/prisma";
@@ -159,6 +159,89 @@ describe("NHF Routine occurrence generation", () => {
                 }),
             }),
         );
+    });
+
+    it("is idempotent when a 365-day month-end horizon shifts into the next month", async () => {
+        const now = new Date("2026-06-24T04:00:00.000Z");
+        const existingOccurrences = [
+            ["2026-05", "2026-05-31", "2026-06-01"],
+            ["2026-06", "2026-06-30", "2026-06-30"],
+            ["2026-07", "2026-07-31", "2026-07-31"],
+            ["2026-08", "2026-08-31", "2026-08-31"],
+            ["2026-09", "2026-09-30", "2026-09-30"],
+            ["2026-10", "2026-10-31", "2026-11-02"],
+            ["2026-11", "2026-11-30", "2026-11-30"],
+            ["2026-12", "2026-12-31", "2026-12-31"],
+            ["2027-01", "2027-01-31", "2027-02-01"],
+            ["2027-02", "2027-02-28", "2027-03-01"],
+            ["2027-03", "2027-03-31", "2027-03-31"],
+            ["2027-04", "2027-04-30", "2027-04-30"],
+            ["2027-05", "2027-05-31", "2027-05-31"],
+            ["2027-06", "2027-06-30", "2027-06-30"],
+            ["2027-07", "2027-07-31", "2027-08-02"],
+        ].map(([periodKey, originalDueDate, dueDate], index) =>
+            generatedOccurrence({
+                id: 100 + index,
+                periodKey,
+                originalDueDate: new Date(`${originalDueDate}T00:00:00.000Z`),
+                dueDate: new Date(`${dueDate}T00:00:00.000Z`),
+            }),
+        );
+
+        prismaMock.routineTask.findUnique.mockResolvedValue(
+            asNever(activeTask({
+                scheduleType: "MONTH_END",
+                scheduleConfig: {},
+                businessDayPolicy: "NEXT_BUSINESS_DAY",
+                reminderRules: [{ daysBefore: 365 }],
+            })),
+        );
+        prismaMock.routineOccurrence.findFirst
+            .mockResolvedValueOnce(asNever(null))
+            .mockImplementationOnce((async (args?: Prisma.RoutineOccurrenceFindFirstArgs) => {
+                const dueDateFilter = args?.where?.OR?.[0]?.dueDate;
+                const safetyBound = dueDateFilter
+                    && typeof dueDateFilter === "object"
+                    && "gt" in dueDateFilter
+                    && dueDateFilter.gt instanceof Date
+                    ? dueDateFilter.gt
+                    : null;
+                if (
+                    !safetyBound
+                    || new Date("2027-08-02T00:00:00.000Z") <= safetyBound
+                ) {
+                    return null;
+                }
+                return asNever({
+                    id: 113,
+                    originalDueDate: new Date("2027-07-31T00:00:00.000Z"),
+                    dueDate: new Date("2027-08-02T00:00:00.000Z"),
+                });
+            }) as never);
+        prismaMock.routineOccurrence.findMany
+            .mockResolvedValueOnce([] as never)
+            .mockResolvedValueOnce(asNever(existingOccurrences));
+
+        const initialResult = await generateRoutineTaskOccurrences(71, now);
+
+        expect(initialResult).toEqual({ evaluated: 15, created: 15, existing: 0 });
+        expect(prismaMock.routineOccurrence.upsert).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: {
+                    taskId_periodKey: { taskId: 71, periodKey: "2027-07" },
+                },
+                create: expect.objectContaining({
+                    originalDueDate: new Date("2027-07-31T00:00:00.000Z"),
+                    dueDate: new Date("2027-08-02T00:00:00.000Z"),
+                }),
+            }),
+        );
+        prismaMock.routineOccurrence.upsert.mockClear();
+
+        const repeatedResult = await generateRoutineTaskOccurrences(71, now);
+
+        expect(repeatedResult).toEqual({ evaluated: 15, created: 0, existing: 15 });
+        expect(prismaMock.routineOccurrence.upsert).not.toHaveBeenCalled();
     });
 
     it("does not materialize a shifted occurrence beyond the contract end", async () => {

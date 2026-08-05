@@ -6,7 +6,8 @@ export const ROUTINE_MAX_REMINDER_DAYS_BEFORE = 365 as const;
 export const ROUTINE_RECONCILIATION_MAX_FUTURE_DAYS =
     ROUTINE_MAX_REMINDER_DAYS_BEFORE
     + ROUTINE_GENERATION_SAFETY_DAYS
-    + 31;
+    + 31
+    + ROUTINE_BUSINESS_DAY_CANDIDATE_MARGIN_DAYS;
 
 // Phase 1 treats Saturday and Sunday as non-business days; public holidays are deferred.
 
