@@ -45,7 +45,7 @@ Server serialize `timingStatus`, `daysUntilDue` และ `isOverdue` จาก 
 
 การสร้าง occurrence ใช้ unique key `[taskId, periodKey]` และ snapshot assignees ตอนสร้าง
 
-เมื่อ task version เปลี่ยน ระบบ refresh occurrence ทุกอันใน generation window:
+เมื่อ task version เปลี่ยน ระบบ refresh occurrence ที่ยัง valid ทุกอันใน reconciliation window แต่สร้าง occurrence ใหม่เฉพาะ generation window:
 
 - ถ้า occurrence ยังไม่ถูก override วันกำหนด จะปรับตาม schedule ใหม่
 - ถ้า Admin override วันกำหนดแล้ว จะรักษา `dueDate` override และปรับ `originalDueDate` ตาม schedule ใหม่

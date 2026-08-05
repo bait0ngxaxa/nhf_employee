@@ -7,12 +7,16 @@ import {
     calculateRoutineOccurrences,
     calendarDateToDate,
     compareCalendarDates,
+    endOfMonth,
     getRoutineGenerationWindow,
     ROUTINE_MAX_REMINDER_DAYS_BEFORE,
     ROUTINE_RECONCILIATION_MAX_FUTURE_DAYS,
+    ROUTINE_RECONCILIATION_MAX_PAST_DAYS,
+    startOfMonth,
     toBangkokCalendarDate,
     type CalendarDate,
     type RoutineScheduleType,
+    type ScheduledRoutineOccurrence,
 } from "@/lib/routine/schedule";
 import { runSerializableTransaction } from "@/lib/db/transaction";
 
@@ -91,6 +95,74 @@ function shouldSyncFutureAssignees(
         === assigneeSnapshotKey(previousAssignees);
 }
 
+async function refreshExistingRoutineOccurrence(
+    tx: Prisma.TransactionClient,
+    current: RoutineOccurrenceReconciliationRow,
+    candidate: ScheduledRoutineOccurrence,
+    taskVersion: number,
+    currentDate: CalendarDate,
+    taskAssignees: ReadonlyArray<
+        RoutineOccurrenceReconciliationRow["assignees"][number]
+    >,
+    previousAssignees: readonly RoutineAssigneeSnapshot[] | undefined,
+): Promise<void> {
+    const currentOriginalDueDate = toBangkokCalendarDate(
+        current.originalDueDate,
+    );
+    const currentDueDate = toBangkokCalendarDate(current.dueDate);
+    const originalDateChanged =
+        currentOriginalDueDate !== candidate.originalDueDate;
+    const hasManualDueDate = currentDueDate !== currentOriginalDueDate;
+    const dueDateChanged =
+        !hasManualDueDate && currentDueDate !== candidate.dueDate;
+    const shouldSyncAssignees = shouldSyncFutureAssignees(
+        current,
+        currentDate,
+        previousAssignees,
+    );
+    const shouldRefreshSchedule =
+        current.scheduleVersion !== taskVersion
+        || originalDateChanged
+        || dueDateChanged;
+
+    if (shouldRefreshSchedule) {
+        await tx.routineOccurrence.updateMany({
+            where: {
+                id: current.id,
+                scheduleVersion: current.scheduleVersion,
+            },
+            data: {
+                scheduleVersion: taskVersion,
+                ...(originalDateChanged
+                    ? {
+                          originalDueDate: calendarDateToDate(
+                              candidate.originalDueDate,
+                          ),
+                      }
+                    : {}),
+                ...(dueDateChanged
+                    ? { dueDate: calendarDateToDate(candidate.dueDate) }
+                    : {}),
+                ...(originalDateChanged || dueDateChanged
+                    ? { reminderVersion: { increment: 1 } }
+                    : {}),
+            },
+        });
+    }
+    if (!shouldSyncAssignees) return;
+
+    await tx.routineOccurrenceAssignee.deleteMany({
+        where: { occurrenceId: current.id },
+    });
+    await tx.routineOccurrenceAssignee.createMany({
+        data: taskAssignees.map((assignee) => ({
+            occurrenceId: current.id,
+            employeeId: assignee.employeeId,
+            role: assignee.role,
+        })),
+    });
+}
+
 function isWithinRoutineContract(
     occurrence: { dueDate: CalendarDate },
     contractStartDate: CalendarDate | null,
@@ -156,22 +228,35 @@ function assertSupportedReminderHorizon(
     );
 }
 
-async function assertFutureOccurrencesWithinSafetyBound(
+async function assertFutureOccurrencesWithinSafetyBounds(
     tx: Prisma.TransactionClient,
     taskId: number,
     currentDate: string,
 ): Promise<void> {
-    const safetyBound = addCalendarDays(
+    const futureSafetyBound = addCalendarDays(
         currentDate,
         ROUTINE_RECONCILIATION_MAX_FUTURE_DAYS,
+    );
+    const pastSafetyBound = addCalendarDays(
+        currentDate,
+        -ROUTINE_RECONCILIATION_MAX_PAST_DAYS,
     );
     const unsafeOccurrence = await tx.routineOccurrence.findFirst({
         where: {
             taskId,
             dueDate: { gte: calendarDateToDate(currentDate) },
             OR: [
-                { dueDate: { gt: calendarDateToDate(safetyBound) } },
-                { originalDueDate: { gt: calendarDateToDate(safetyBound) } },
+                { dueDate: { gt: calendarDateToDate(futureSafetyBound) } },
+                {
+                    originalDueDate: {
+                        gt: calendarDateToDate(futureSafetyBound),
+                    },
+                },
+                {
+                    originalDueDate: {
+                        lt: calendarDateToDate(pastSafetyBound),
+                    },
+                },
             ],
         },
         select: { id: true, dueDate: true, originalDueDate: true },
@@ -181,7 +266,8 @@ async function assertFutureOccurrencesWithinSafetyBound(
     console.error("Routine reconciliation found an occurrence beyond its safety bound", {
         taskId,
         occurrenceId: unsafeOccurrence.id,
-        safetyBound,
+        pastSafetyBound,
+        futureSafetyBound,
     });
     throw new RoutineValidationError(
         "พบข้อมูลรอบงานประจำอยู่นอกช่วงที่ระบบรองรับ กรุณาตรวจสอบข้อมูล",
@@ -279,7 +365,7 @@ export async function generateRoutineTaskOccurrencesInTransaction(
         isWithinRoutineContract(occurrence, contractStartDate, contractEndDate),
     );
 
-    await assertFutureOccurrencesWithinSafetyBound(
+    await assertFutureOccurrencesWithinSafetyBounds(
         tx,
         task.id,
         currentDate,
@@ -324,20 +410,61 @@ export async function generateRoutineTaskOccurrencesInTransaction(
         },
         window.to,
     );
+    const reconciliationWindowFrom = existingFutureOccurrences.reduce(
+        (minimum, occurrence) => {
+            const occurrenceOriginalDueDate = toBangkokCalendarDate(
+                occurrence.originalDueDate,
+            );
+            return compareCalendarDates(occurrenceOriginalDueDate, minimum) < 0
+                ? occurrenceOriginalDueDate
+                : minimum;
+        },
+        window.from,
+    );
     const reconciliationValidityCandidates = calculateRoutineOccurrences(
         definition,
-        { ...window, to: existingFutureMaxDate },
+        {
+            from: startOfMonth(reconciliationWindowFrom),
+            to: endOfMonth(existingFutureMaxDate),
+        },
         task.businessDayPolicy,
     ).filter((occurrence) =>
         isWithinRoutineContract(occurrence, contractStartDate, contractEndDate),
+    );
+    const reconciliationCandidatesByPeriodKey = new Map(
+        reconciliationValidityCandidates.map((occurrence) => [
+            occurrence.periodKey,
+            occurrence,
+        ]),
     );
     await deleteStaleFutureOccurrences(
         tx,
         task.id,
         currentDate,
         existingFutureMaxDate,
-        reconciliationValidityCandidates.map((occurrence) => occurrence.periodKey),
+        [...reconciliationCandidatesByPeriodKey.keys()],
     );
+
+    const generationPeriodKeys = new Set(
+        generationCandidates.map((occurrence) => occurrence.periodKey),
+    );
+    for (const current of existingFutureOccurrences) {
+        if (generationPeriodKeys.has(current.periodKey)) continue;
+        const candidate = reconciliationCandidatesByPeriodKey.get(
+            current.periodKey,
+        );
+        if (!candidate) continue;
+
+        await refreshExistingRoutineOccurrence(
+            tx,
+            current,
+            candidate,
+            task.version,
+            currentDate,
+            task.assignees,
+            options.previousAssignees,
+        );
+    }
 
     let created = 0;
     let existing = 0;
@@ -353,63 +480,15 @@ export async function generateRoutineTaskOccurrencesInTransaction(
                 select: ROUTINE_OCCURRENCE_RECONCILIATION_SELECT,
             });
         if (current) {
-            const currentOriginalDueDate = toBangkokCalendarDate(
-                current.originalDueDate,
-            );
-            const currentDueDate = toBangkokCalendarDate(current.dueDate);
-            const originalDateChanged =
-                currentOriginalDueDate !== occurrence.originalDueDate;
-            const hasManualDueDate = currentDueDate !== currentOriginalDueDate;
-            const dueDateChanged =
-                !hasManualDueDate && currentDueDate !== occurrence.dueDate;
-            const shouldSyncAssignees = shouldSyncFutureAssignees(
+            await refreshExistingRoutineOccurrence(
+                tx,
                 current,
+                occurrence,
+                task.version,
                 currentDate,
+                task.assignees,
                 options.previousAssignees,
             );
-            const shouldRefreshSchedule =
-                current.scheduleVersion !== task.version
-                || originalDateChanged
-                || dueDateChanged;
-
-            if (shouldRefreshSchedule) {
-                await tx.routineOccurrence.updateMany({
-                    where: {
-                        id: current.id,
-                        scheduleVersion: current.scheduleVersion,
-                    },
-                    data: {
-                        scheduleVersion: task.version,
-                        ...(originalDateChanged
-                            ? {
-                                  originalDueDate: calendarDateToDate(
-                                      occurrence.originalDueDate,
-                                  ),
-                              }
-                            : {}),
-                        ...(dueDateChanged
-                            ? {
-                                  dueDate: calendarDateToDate(occurrence.dueDate),
-                              }
-                            : {}),
-                        ...(originalDateChanged || dueDateChanged
-                            ? { reminderVersion: { increment: 1 } }
-                            : {}),
-                    },
-                });
-            }
-            if (shouldSyncAssignees) {
-                await tx.routineOccurrenceAssignee.deleteMany({
-                    where: { occurrenceId: current.id },
-                });
-                await tx.routineOccurrenceAssignee.createMany({
-                    data: task.assignees.map((assignee) => ({
-                        occurrenceId: current.id,
-                        employeeId: assignee.employeeId,
-                        role: assignee.role,
-                    })),
-                });
-            }
             existing += 1;
             continue;
         }
