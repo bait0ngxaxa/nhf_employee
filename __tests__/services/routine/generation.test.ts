@@ -472,35 +472,53 @@ describe("NHF Routine occurrence generation", () => {
         expect(prismaMock.routineOccurrence.upsert).not.toHaveBeenCalled();
     });
 
-    it("reconciles stale occurrences beyond a reduced generation horizon", async () => {
-        prismaMock.routineTask.findUnique.mockResolvedValue(
-            asNever(activeTask({ reminderRules: [], version: 5 })),
-        );
-        prismaMock.routineOccurrence.findMany.mockResolvedValue(asNever([
-            generatedOccurrence({ periodKey: "2026-08" }),
-            generatedOccurrence({
-                id: 101,
-                periodKey: "2027-08",
-                dueDate: new Date("2027-01-10T00:00:00.000Z"),
-                originalDueDate: new Date("2027-08-10T00:00:00.000Z"),
-            }),
-        ]));
+    it("preserves a future occurrence and its overrides when the reminder horizon is reduced", async () => {
+        const now = new Date("2026-08-04T04:00:00.000Z");
+        prismaMock.routineTask.findUnique
+            .mockResolvedValueOnce(asNever(activeTask({
+                reminderRules: [{ daysBefore: 365 }],
+                version: 4,
+            })))
+            .mockResolvedValueOnce(asNever(activeTask({
+                reminderRules: [{ daysBefore: 7 }],
+                version: 5,
+            })));
+        prismaMock.routineOccurrence.findMany
+            .mockResolvedValueOnce([] as never)
+            .mockResolvedValueOnce(asNever([
+                generatedOccurrence({ periodKey: "2026-08" }),
+                generatedOccurrence({
+                    id: 101,
+                    periodKey: "2027-08",
+                    dueDate: new Date("2027-01-10T00:00:00.000Z"),
+                    originalDueDate: new Date("2027-08-10T00:00:00.000Z"),
+                    assignees: [{ employeeId: 99, role: "OWNER" }],
+                }),
+            ]));
 
-        const result = await generateRoutineTaskOccurrences(
-            71,
-            new Date("2026-08-04T04:00:00.000Z"),
-        );
+        const initialResult = await generateRoutineTaskOccurrences(71, now);
 
-        expect(result).toEqual({ evaluated: 3, created: 2, existing: 1 });
-        expect(prismaMock.routineOccurrence.deleteMany).toHaveBeenCalledWith({
-            where: {
-                taskId: 71,
-                dueDate: {
-                    gte: new Date("2026-08-04T00:00:00.000Z"),
-                    lte: new Date("2027-08-10T00:00:00.000Z"),
+        expect(initialResult).toEqual({ evaluated: 13, created: 13, existing: 0 });
+        expect(prismaMock.routineOccurrence.upsert).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: {
+                    taskId_periodKey: { taskId: 71, periodKey: "2027-08" },
                 },
-                periodKey: { notIn: ["2026-08", "2026-09", "2026-10"] },
-            },
+            }),
+        );
+
+        prismaMock.routineOccurrence.deleteMany.mockClear();
+        prismaMock.routineOccurrence.upsert.mockClear();
+
+        const reducedHorizonResult = await generateRoutineTaskOccurrences(71, now);
+
+        expect(reducedHorizonResult).toEqual({ evaluated: 3, created: 2, existing: 1 });
+        expect(prismaMock.routineOccurrence.deleteMany).toHaveBeenCalledWith({
+            where: expect.objectContaining({
+                periodKey: expect.objectContaining({
+                    notIn: expect.arrayContaining(["2027-08"]),
+                }),
+            }),
         });
     });
 

@@ -11,6 +11,7 @@ import {
     ROUTINE_MAX_REMINDER_DAYS_BEFORE,
     ROUTINE_RECONCILIATION_MAX_FUTURE_DAYS,
     toBangkokCalendarDate,
+    type CalendarDate,
     type RoutineScheduleType,
 } from "@/lib/routine/schedule";
 import { runSerializableTransaction } from "@/lib/db/transaction";
@@ -90,12 +91,32 @@ function shouldSyncFutureAssignees(
         === assigneeSnapshotKey(previousAssignees);
 }
 
+function isWithinRoutineContract(
+    occurrence: { dueDate: CalendarDate },
+    contractStartDate: CalendarDate | null,
+    contractEndDate: CalendarDate | null,
+): boolean {
+    if (
+        contractStartDate
+        && compareCalendarDates(occurrence.dueDate, contractStartDate) < 0
+    ) {
+        return false;
+    }
+    if (
+        contractEndDate
+        && compareCalendarDates(occurrence.dueDate, contractEndDate) > 0
+    ) {
+        return false;
+    }
+    return true;
+}
+
 async function deleteStaleFutureOccurrences(
     tx: Prisma.TransactionClient,
     taskId: number,
     currentDate: string,
     reconciliationWindowTo: string | null,
-    candidatePeriodKeys: readonly string[],
+    validPeriodKeys: readonly string[],
 ): Promise<void> {
     await tx.routineOccurrence.deleteMany({
         where: {
@@ -106,8 +127,8 @@ async function deleteStaleFutureOccurrences(
                     ? { lte: calendarDateToDate(reconciliationWindowTo) }
                     : {}),
             },
-            ...(candidatePeriodKeys.length > 0
-                ? { periodKey: { notIn: [...candidatePeriodKeys] } }
+            ...(validPeriodKeys.length > 0
+                ? { periodKey: { notIn: [...validPeriodKeys] } }
                 : {}),
         },
     });
@@ -254,21 +275,9 @@ export async function generateRoutineTaskOccurrencesInTransaction(
         ? toBangkokCalendarDate(task.contractEndDate)
         : null;
 
-    const generationCandidates = scheduledOccurrences.filter((occurrence) => {
-        if (
-            contractStartDate
-            && compareCalendarDates(occurrence.dueDate, contractStartDate) < 0
-        ) {
-            return false;
-        }
-        if (
-            contractEndDate
-            && compareCalendarDates(occurrence.dueDate, contractEndDate) > 0
-        ) {
-            return false;
-        }
-        return true;
-    });
+    const generationCandidates = scheduledOccurrences.filter((occurrence) =>
+        isWithinRoutineContract(occurrence, contractStartDate, contractEndDate),
+    );
 
     await assertFutureOccurrencesWithinSafetyBound(
         tx,
@@ -315,12 +324,19 @@ export async function generateRoutineTaskOccurrencesInTransaction(
         },
         window.to,
     );
+    const reconciliationValidityCandidates = calculateRoutineOccurrences(
+        definition,
+        { ...window, to: existingFutureMaxDate },
+        task.businessDayPolicy,
+    ).filter((occurrence) =>
+        isWithinRoutineContract(occurrence, contractStartDate, contractEndDate),
+    );
     await deleteStaleFutureOccurrences(
         tx,
         task.id,
         currentDate,
         existingFutureMaxDate,
-        generationCandidates.map((occurrence) => occurrence.periodKey),
+        reconciliationValidityCandidates.map((occurrence) => occurrence.periodKey),
     );
 
     let created = 0;
