@@ -29,9 +29,11 @@ const batch = {
     conflictRows: 0,
     failedRows: 0,
     selectedRows: 0,
+    selectedValidRows: 0,
     unresolvedOwnerRows: 0,
     expiresAt: null,
     appliedAt: null,
+    errorMessage: null,
     version: 1,
     createdAt: "2026-08-04T00:00:00.000Z",
     updatedAt: "2026-08-04T00:00:00.000Z",
@@ -92,13 +94,14 @@ const editableRow = {
 } satisfies RoutineImportRowView;
 
 const reference = {
-    units: [{ id: 1, code: "มสช.", name: "มสช." }],
-    categories: [{ id: 1, name: "บุคลากร", sortOrder: 1 }],
+    units: [{ id: 1, code: "มสช.", name: "มสช.", isActive: true }],
+    categories: [{ id: 1, name: "บุคลากร", sortOrder: 1, isActive: true }],
     employees: [{
         id: 42,
         firstName: "สมชาย",
         lastName: "ใจดี",
         nickname: "ชาย",
+        departmentId: 1,
         status: "ACTIVE",
         deletedAt: null,
     }, {
@@ -106,6 +109,7 @@ const reference = {
         firstName: "สุดา",
         lastName: "ใจดี",
         nickname: "ดา",
+        departmentId: 1,
         status: "ACTIVE",
         deletedAt: null,
     }, {
@@ -113,6 +117,7 @@ const reference = {
         firstName: "อดีต",
         lastName: "พนักงาน",
         nickname: "เก่า",
+        departmentId: 1,
         status: "INACTIVE",
         deletedAt: null,
     }, {
@@ -120,6 +125,7 @@ const reference = {
         firstName: "ปิด",
         lastName: "การใช้งาน",
         nickname: "ปิด",
+        departmentId: 1,
         status: "INACTIVE",
         deletedAt: null,
     }],
@@ -455,8 +461,147 @@ describe("RoutineImportPanel", () => {
         expect(editButton).toBeEnabled();
         fireEvent.click(editButton);
 
+        expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+
         resolveReference?.(response(reference));
         expect(await screen.findByRole("dialog")).toBeInTheDocument();
+    });
+
+    it("reloads import reference when starting a new batch", async () => {
+        let previewAttempt = 0;
+        let referenceAttempts = 0;
+        const fetchMock = vi.fn().mockImplementation(async (input: RequestInfo | URL) => {
+            const url = String(input);
+            if (url.endsWith("/imports/reference")) {
+                referenceAttempts += 1;
+                return response(reference);
+            }
+            if (url.includes("/preview")) {
+                previewAttempt += 1;
+                return response({ batch: { id: previewAttempt }, reusedExisting: false });
+            }
+            if (url.includes("/rows")) return response({
+                rows: [],
+                pagination: { page: 1, limit: 25, total: 0, pages: 1 },
+            });
+            if (url.endsWith("/imports/1")) return response({ batch: { ...batch, id: 1 } });
+            if (url.endsWith("/imports/2")) return response({ batch: { ...batch, id: 2 } });
+            return response({ error: "unexpected request" }, false);
+        });
+        vi.stubGlobal("fetch", fetchMock);
+
+        render(<RoutineImportPanel />);
+        selectUploadFile();
+        fireEvent.click(screen.getByRole("button", { name: /อัปโหลดและดูตัวอย่าง/ }));
+        await waitFor(() => expect(referenceAttempts).toBe(1));
+
+        fireEvent.click(screen.getByRole("button", { name: "อัปโหลดไฟล์ใหม่" }));
+        selectUploadFile();
+        fireEvent.click(screen.getByRole("button", { name: /อัปโหลดและดูตัวอย่าง/ }));
+
+        await waitFor(() => expect(referenceAttempts).toBe(2));
+    });
+
+    it("rejects an incomplete employee reference response and keeps the editor closed", async () => {
+        const fetchMock = vi.fn().mockImplementation(async (input: RequestInfo | URL) => {
+            const url = String(input);
+            if (url.endsWith("/imports/reference")) return response({
+                ...reference,
+                employees: [{
+                    id: 42,
+                    firstName: "สมชาย",
+                    lastName: "ใจดี",
+                    nickname: "ชาย",
+                    departmentId: 1,
+                    deletedAt: null,
+                }],
+            });
+            if (url.includes("/preview")) return response({ batch: { id: 1 }, reusedExisting: false });
+            if (url.includes("/rows")) return response({
+                rows: [editableRow],
+                pagination: { page: 1, limit: 25, total: 1, pages: 1 },
+            });
+            if (url.endsWith("/imports/1")) return response({ batch: { ...batch, totalRows: 1, reviewRows: 1 } });
+            return response({ error: "unexpected request" }, false);
+        });
+        vi.stubGlobal("fetch", fetchMock);
+
+        render(<RoutineImportPanel />);
+        selectUploadFile();
+        fireEvent.click(screen.getByRole("button", { name: /อัปโหลดและดูตัวอย่าง/ }));
+        const editButton = await screen.findByRole("button", { name: /แก้ไขและ map ผู้รับผิดชอบ/ });
+        fireEvent.click(editButton);
+
+        expect(await screen.findByText(/ข้อมูลอ้างอิงสำหรับนำเข้าไม่ถูกต้อง/)).toBeInTheDocument();
+        expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+        expect(screen.getByRole("button", { name: /ลองโหลดข้อมูลอ้างอิงใหม่/ })).toBeEnabled();
+    });
+
+    it("enables Apply when at least one valid row is selected without requiring every valid row", async () => {
+        vi.stubGlobal("fetch", importFetchMock(validRow, undefined, {
+            totalRows: 2,
+            validRows: 2,
+            selectedRows: 1,
+            selectedValidRows: 1,
+        }));
+
+        render(<RoutineImportPanel />);
+        selectUploadFile();
+        fireEvent.click(screen.getByRole("button", { name: /อัปโหลดและดูตัวอย่าง/ }));
+
+        expect(await screen.findByRole("button", { name: /ยืนยันและนำเข้า/ })).toBeEnabled();
+    });
+
+    it("closes a stale editor and reloads the latest row after an optimistic conflict", async () => {
+        const latestRow = {
+            ...editableRow,
+            version: 2,
+            data: {
+                ...editableRow.data,
+                title: "ข้อมูลล่าสุดจากผู้ดูแลอีกคน",
+            },
+        } satisfies RoutineImportRowView;
+        let rowsRequestCount = 0;
+        const fetchMock = vi.fn().mockImplementation(async (
+            input: RequestInfo | URL,
+            init?: RequestInit,
+        ) => {
+            const url = String(input);
+            if (init?.method === "PATCH") {
+                return {
+                    ok: false,
+                    status: 409,
+                    json: async () => ({ error: "รายการถูกเปลี่ยนแปลงแล้ว" }),
+                } as Response;
+            }
+            if (url.endsWith("/imports/reference")) return response(reference);
+            if (url.includes("/preview")) return response({ batch: { id: 1 }, reusedExisting: false });
+            if (url.includes("/rows")) {
+                rowsRequestCount += 1;
+                return response({
+                    rows: [rowsRequestCount === 1 ? editableRow : latestRow],
+                    pagination: { page: 1, limit: 25, total: 1, pages: 1 },
+                });
+            }
+            if (url.endsWith("/imports/1")) return response({
+                batch: { ...batch, totalRows: 1, reviewRows: 1, selectedRows: 1 },
+            });
+            return response({ error: "unexpected request" }, false);
+        });
+        vi.stubGlobal("fetch", fetchMock);
+
+        render(<RoutineImportPanel />);
+        selectUploadFile();
+        fireEvent.click(screen.getByRole("button", { name: /อัปโหลดและดูตัวอย่าง/ }));
+        fireEvent.click(await screen.findByRole("button", { name: /แก้ไข/ }));
+        fireEvent.change(screen.getByDisplayValue("ตรวจสอบรายการนำเข้า"), {
+            target: { value: "ค่าที่ stale" },
+        });
+        fireEvent.click(screen.getByRole("button", { name: /บันทึกแถว/ }));
+
+        await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+        expect(await screen.findByText("ข้อมูลล่าสุดจากผู้ดูแลอีกคน")).toBeInTheDocument();
+        expect(screen.queryByDisplayValue("ค่าที่ stale")).not.toBeInTheDocument();
     });
 
     it("can retry the employee reference request when the first load fails", async () => {

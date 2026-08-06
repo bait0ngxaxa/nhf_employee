@@ -23,10 +23,13 @@ import type { RoutineCommandActor } from "@/lib/services/routine/types";
 import {
     RoutineConflictError,
     RoutineNotFoundError,
-    RoutineServiceError,
     RoutineValidationError,
 } from "@/lib/services/routine/errors";
-import { parseRoutineScheduleConfig, routineTaskCreateSchema } from "@/lib/validations/routine";
+import {
+    parseRoutineScheduleConfig,
+    routineTaskCreateSchema,
+    type RoutineTaskCreateInput,
+} from "@/lib/validations/routine";
 import type { RoutineImportRowUpdateInput } from "@/lib/validations/routine-import";
 
 import {
@@ -74,6 +77,8 @@ const ALLOWED_MIME_TYPES = new Set([
 const OLE_SIGNATURE = [0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1];
 const ZIP_SIGNATURE = [0x50, 0x4b, 0x03, 0x04];
 const ROUTINE_IMPORT_PAGE_LIMIT = 50;
+const ROUTINE_IMPORT_APPLY_MAX_WAIT_MS = 5_000;
+const ROUTINE_IMPORT_APPLY_TIMEOUT_MS = 30_000;
 const REUSABLE_BATCH_STATUSES: RoutineImportBatchStatus[] = [
     "READY",
     "PREVIEW",
@@ -109,9 +114,11 @@ export interface RoutineImportBatchView {
     conflictRows: number;
     failedRows: number;
     selectedRows: number;
+    selectedValidRows: number;
     unresolvedOwnerRows: number;
     expiresAt: string | null;
     appliedAt: string | null;
+    errorMessage: string | null;
     version: number;
     createdAt: string;
     updatedAt: string;
@@ -140,6 +147,14 @@ export interface RoutineImportRowsPage {
 export interface RoutineImportApplyView {
     batch: RoutineImportBatchView;
     idempotent: boolean;
+    importedTaskIds: number[];
+    importedRowIds: number[];
+    importedCount: number;
+    skippedCount: number;
+    appliedBy: {
+        userId: number;
+        email: string;
+    };
 }
 
 type StoredBatch = Prisma.RoutineImportBatchGetPayload<{
@@ -253,7 +268,10 @@ function stringArray(value: Prisma.JsonValue | null): string[] {
     return value.filter((item): item is string => typeof item === "string");
 }
 
-function getBatchView(batch: StoredBatch): RoutineImportBatchView {
+function getBatchView(
+    batch: StoredBatch,
+    selectedValidRows: number,
+): RoutineImportBatchView {
     return {
         id: batch.id,
         originalFileName: batch.originalFileName,
@@ -272,9 +290,11 @@ function getBatchView(batch: StoredBatch): RoutineImportBatchView {
         conflictRows: batch.conflictRows,
         failedRows: batch.failedRows,
         selectedRows: batch.selectedRows,
+        selectedValidRows,
         unresolvedOwnerRows: batch.unresolvedOwnerRows,
         expiresAt: batch.expiresAt?.toISOString() ?? null,
         appliedAt: batch.appliedAt?.toISOString() ?? null,
+        errorMessage: batch.errorMessage,
         version: batch.version,
         createdAt: batch.createdAt.toISOString(),
         updatedAt: batch.updatedAt.toISOString(),
@@ -458,6 +478,15 @@ async function loadBatchOrThrow(
     return batch;
 }
 
+async function countSelectedValidRows(
+    client: Pick<Prisma.TransactionClient, "routineImportRow">,
+    batchId: number,
+): Promise<number> {
+    return client.routineImportRow.count({
+        where: { batchId, selected: true, status: "VALID" },
+    });
+}
+
 async function expireBatchIfNeeded(batch: StoredBatch): Promise<StoredBatch> {
     if (
         (batch.status !== "READY" && batch.status !== "PREVIEW")
@@ -515,7 +544,11 @@ export async function createRoutineImportPreview(
         include: { uploadedBy: { select: { id: true, name: true } } },
     });
     if (existingBatch) {
-        return { batch: getBatchView(existingBatch), reusedExisting: true };
+        const selectedValidRows = await countSelectedValidRows(prisma, existingBatch.id);
+        return {
+            batch: getBatchView(existingBatch, selectedValidRows),
+            reusedExisting: true,
+        };
     }
 
     const created = await runSerializableTransaction(async (tx) => {
@@ -634,7 +667,11 @@ export async function createRoutineImportPreview(
     });
 
     const savedBatch = await loadBatchOrThrow(created.id);
-    return { batch: getBatchView(savedBatch), reusedExisting: created.reusedExisting };
+    const selectedValidRows = await countSelectedValidRows(prisma, created.id);
+    return {
+        batch: getBatchView(savedBatch, selectedValidRows),
+        reusedExisting: created.reusedExisting,
+    };
 }
 
 async function loadRoutineReferenceDataForImport(): Promise<RoutineImportReferenceData> {
@@ -678,7 +715,9 @@ export async function getRoutineImportReferenceData(): Promise<RoutineImportRefe
 export async function getRoutineImportBatch(
     batchId: number,
 ): Promise<RoutineImportBatchView> {
-    return getBatchView(await expireBatchIfNeeded(await loadBatchOrThrow(batchId)));
+    const batch = await expireBatchIfNeeded(await loadBatchOrThrow(batchId));
+    const selectedValidRows = await countSelectedValidRows(prisma, batchId);
+    return getBatchView(batch, selectedValidRows);
 }
 
 export async function getRoutineImportRows(
@@ -839,6 +878,152 @@ function assertRowCanApply(row: RoutineImportRow): void {
     throw new RoutineValidationError("มีรายการที่เลือกซึ่งยังต้องตรวจสอบให้เรียบร้อยก่อนนำเข้า");
 }
 
+interface PreparedRoutineImportRow {
+    storedRow: StoredRow;
+    taskInput: RoutineTaskCreateInput;
+}
+
+function rowAssignees(row: RoutineImportRow): Array<{
+    employeeId: number;
+    role: "OWNER" | "CO_OWNER";
+}> {
+    return row.mappedAssignees ?? row.mappedEmployeeIds.map((employeeId, index) => ({
+        employeeId,
+        role: index === 0 ? "OWNER" : "CO_OWNER",
+    }));
+}
+
+async function prepareRowsForApplyInTransaction(
+    tx: Prisma.TransactionClient,
+    storedRows: StoredRow[],
+): Promise<PreparedRoutineImportRow[]> {
+    const parsedRows = storedRows.map((storedRow) => {
+        if (storedRow.status !== "VALID") {
+            throw new RoutineValidationError(
+                "มีรายการที่เลือกซึ่งยังต้องตรวจสอบให้เรียบร้อยก่อนนำเข้า",
+            );
+        }
+        if (stringArray(storedRow.reviewReasons).length > 0) {
+            throw new RoutineValidationError(
+                "มีรายการที่เลือกซึ่งยังมีเหตุผลที่ต้องตรวจสอบก่อนนำเข้า",
+            );
+        }
+        const row = parseRoutineImportRow(storedRow.normalizedData);
+        assertRowCanApply(row);
+        if (row.sourceSheet !== ROUTINE_IMPORT_TARGET_SHEET) {
+            throw new RoutineValidationError("อนุญาตให้นำเข้าเฉพาะชีต มสช. เท่านั้น");
+        }
+        if (row.sourceFingerprint !== storedRow.sourceFingerprint) {
+            throw new RoutineConflictError(
+                `ข้อมูลต้นทางของแถว ${storedRow.sourceRow} ไม่ตรงกับ staging`,
+            );
+        }
+        return { storedRow, row, assignees: rowAssignees(row) };
+    });
+    const categoryNames = [...new Set(parsedRows.map(({ row }) => row.categoryName))];
+    const employeeIds = [
+        ...new Set(parsedRows.flatMap(({ assignees }) => (
+            assignees.map((assignee) => assignee.employeeId)
+        ))),
+    ];
+    const sourceRows = parsedRows.map(({ storedRow }) => storedRow.sourceRow);
+    const [targetUnit, categories, employees, ledgers, tasks] = await Promise.all([
+        tx.routineUnit.findUnique({
+            where: { code: ROUTINE_IMPORT_TARGET_UNIT_CODE },
+            select: { id: true, isActive: true },
+        }),
+        tx.routineCategory.findMany({
+            where: { name: { in: categoryNames } },
+            select: { id: true, name: true, isActive: true },
+        }),
+        tx.employee.findMany({
+            where: { id: { in: employeeIds } },
+            select: { id: true, status: true, deletedAt: true },
+        }),
+        tx.routineImportLedger.findMany({
+            where: {
+                sourceSheet: ROUTINE_IMPORT_TARGET_SHEET,
+                sourceRow: { in: sourceRows },
+            },
+            select: {
+                sourceRow: true,
+                sourceFingerprint: true,
+                status: true,
+            },
+        }),
+        tx.routineTask.findMany({
+            where: {
+                sourceSheet: ROUTINE_IMPORT_TARGET_SHEET,
+                sourceRow: { in: sourceRows },
+            },
+            select: { sourceRow: true },
+        }),
+    ]);
+    if (!targetUnit || !targetUnit.isActive) {
+        throw new RoutineValidationError("หน่วยงาน มสช. ไม่พร้อมใช้งาน");
+    }
+    const categoriesByName = new Map(categories.map((category) => [category.name, category]));
+    const employeesById = new Map(employees.map((employee) => [employee.id, employee]));
+    const ledgersBySourceRow = new Map<number, typeof ledgers>();
+    for (const ledger of ledgers) {
+        const matching = ledgersBySourceRow.get(ledger.sourceRow) ?? [];
+        matching.push(ledger);
+        ledgersBySourceRow.set(ledger.sourceRow, matching);
+    }
+    const taskSourceRows = new Set(tasks.map((task) => task.sourceRow));
+
+    return parsedRows.map(({ storedRow, row, assignees }) => {
+        const category = categoriesByName.get(row.categoryName);
+        if (!category?.isActive) {
+            throw new RoutineValidationError(
+                `หมวดหมู่ของแถว ${storedRow.sourceRow} ไม่พร้อมใช้งาน`,
+            );
+        }
+        const uniqueEmployeeIds = new Set<number>();
+        let ownerCount = 0;
+        for (const assignee of assignees) {
+            if (uniqueEmployeeIds.has(assignee.employeeId)) {
+                throw new RoutineValidationError(
+                    `ผู้รับผิดชอบของแถว ${storedRow.sourceRow} ซ้ำกัน`,
+                );
+            }
+            uniqueEmployeeIds.add(assignee.employeeId);
+            if (assignee.role === "OWNER") ownerCount += 1;
+            const employee = employeesById.get(assignee.employeeId);
+            if (!employee || employee.status !== "ACTIVE" || employee.deletedAt !== null) {
+                throw new RoutineValidationError(
+                    `ผู้รับผิดชอบของแถว ${storedRow.sourceRow} ไม่พร้อมใช้งาน`,
+                );
+            }
+        }
+        if (ownerCount !== 1) {
+            throw new RoutineValidationError(
+                `แถว ${storedRow.sourceRow} ต้องมีผู้รับผิดชอบหลัก 1 คน`,
+            );
+        }
+        const matchingLedgers = ledgersBySourceRow.get(storedRow.sourceRow) ?? [];
+        const sameFingerprint = matchingLedgers.some(
+            (ledger) => ledger.sourceFingerprint === storedRow.sourceFingerprint
+                && ledger.status !== "CONFLICT",
+        );
+        if (sameFingerprint) {
+            throw new RoutineConflictError(`แถว ${storedRow.sourceRow} ถูกนำเข้าแล้ว`);
+        }
+        if (matchingLedgers.length > 0 || taskSourceRows.has(storedRow.sourceRow)) {
+            throw new RoutineConflictError(`แถว ${storedRow.sourceRow} มี source conflict`);
+        }
+        const parsedTask = routineTaskCreateSchema.safeParse(
+            buildRoutineImportTaskInput(row, targetUnit.id, category.id),
+        );
+        if (!parsedTask.success) {
+            throw new RoutineValidationError(
+                `ข้อมูลแถว ${storedRow.sourceRow} ไม่ผ่านการตรวจสอบ`,
+            );
+        }
+        return { storedRow, taskInput: parsedTask.data };
+    });
+}
+
 export async function updateRoutineImportRow(
     batchId: number,
     rowId: number,
@@ -960,169 +1145,149 @@ async function refreshBatchCountsInTransaction(
     return recalculateBatchCounts(rows);
 }
 
-function safeImportFailureMessage(error: unknown): string {
-    if (error instanceof RoutineServiceError) return error.message;
-    return "เกิดข้อผิดพลาดระหว่างนำเข้า กรุณาตรวจสอบสถานะชุดข้อมูลอีกครั้ง";
-}
-
-function isRoutineServiceError(error: unknown): error is RoutineServiceError {
-    return error instanceof RoutineValidationError
-        || error instanceof RoutineConflictError
-        || error instanceof RoutineNotFoundError;
-}
-
 export async function applyRoutineImportBatch(
     batchId: number,
     actor: RoutineCommandActor,
 ): Promise<RoutineImportApplyView> {
-    try {
-        const result = await runSerializableTransaction(async (tx) => {
-            await assertActiveAdminInTransaction(tx, actor);
-            const batch = await tx.routineImportBatch.findUnique({ where: { id: batchId } });
-            if (!batch) throw new RoutineNotFoundError("ไม่พบรายการนำเข้า");
-            if (batch.status === "COMPLETED") {
-                const completed = await tx.routineImportBatch.findUniqueOrThrow({
-                    where: { id: batchId },
-                    include: { uploadedBy: { select: { id: true, name: true } } },
-                });
-                return { batch: completed, idempotent: true };
-            }
-            if (batch.status !== "READY" && batch.status !== "PREVIEW") {
-                throw new RoutineConflictError("ชุดข้อมูลนี้ไม่อยู่ในสถานะที่นำเข้าได้");
-            }
-            if (batch.expiresAt && batch.expiresAt.getTime() <= Date.now()) {
-                await tx.routineImportBatch.update({ where: { id: batchId }, data: { status: "EXPIRED" } });
-                throw new RoutineConflictError("ชุดข้อมูลนำเข้าหมดอายุแล้ว กรุณาอัปโหลดใหม่");
-            }
-            const rows = await tx.routineImportRow.findMany({
-                where: { batchId, selected: true },
-                orderBy: { sourceRow: "asc" },
-            });
-            if (rows.length === 0) throw new RoutineValidationError("กรุณาเลือกรายการที่จะนำเข้าอย่างน้อย 1 รายการ");
-
-            for (const storedRow of rows) {
-                if (storedRow.status !== "VALID") {
-                    throw new RoutineValidationError("มีรายการที่เลือกซึ่งยังต้องตรวจสอบให้เรียบร้อยก่อนนำเข้า");
-                }
-                assertRowCanApply(parseRoutineImportRow(storedRow.normalizedData));
-            }
-
-            const claimed = await tx.routineImportBatch.updateMany({
-                where: { id: batchId, status: { in: ["READY", "PREVIEW"] } },
-                data: { status: "APPLYING", version: { increment: 1 } },
-            });
-            if (claimed.count !== 1) throw new RoutineConflictError("ชุดข้อมูลกำลังถูกนำเข้าโดยผู้ดูแลระบบคนอื่น");
-
-            const referenceData = await loadRoutineReferenceDataInTransaction(tx);
-            const targetUnit = await tx.routineUnit.upsert({
-                where: { code: ROUTINE_IMPORT_TARGET_UNIT_CODE },
-                update: { name: ROUTINE_IMPORT_TARGET_SHEET },
-                create: { code: ROUTINE_IMPORT_TARGET_UNIT_CODE, name: ROUTINE_IMPORT_TARGET_SHEET, isActive: true },
-                select: { id: true, isActive: true },
-            });
-            if (!targetUnit.isActive) throw new RoutineValidationError("หน่วยงาน มสช. ไม่พร้อมใช้งาน");
-
-            for (const storedRow of rows) {
-                const row = parseRoutineImportRow(storedRow.normalizedData);
-                assertRowCanApply(row);
-                if (row.sourceSheet !== ROUTINE_IMPORT_TARGET_SHEET) {
-                    throw new RoutineValidationError("อนุญาตให้นำเข้าเฉพาะชีต มสช. เท่านั้น");
-                }
-                const category = referenceData.categories.find(
-                    (candidate) => candidate.name === row.categoryName && candidate.isActive,
-                );
-                if (!category) throw new RoutineValidationError(`หมวดหมู่ของแถว ${storedRow.sourceRow} ไม่พร้อมใช้งาน`);
-                const existingLedgers = await tx.routineImportLedger.findMany({
-                    where: { sourceSheet: row.sourceSheet, sourceRow: row.sourceRow },
-                    select: { sourceFingerprint: true, status: true, taskId: true },
-                });
-                const same = existingLedgers.find(
-                    (ledger) => ledger.sourceFingerprint === storedRow.sourceFingerprint,
-                );
-                if (same && same.status !== "CONFLICT") {
-                    throw new RoutineConflictError(`แถว ${storedRow.sourceRow} ถูกนำเข้าแล้ว`);
-                }
-                if (existingLedgers.length > 0) {
-                    throw new RoutineConflictError(`แถว ${storedRow.sourceRow} มี source conflict`);
-                }
-                const existingTask = await tx.routineTask.findFirst({
-                    where: { sourceSheet: row.sourceSheet, sourceRow: row.sourceRow },
-                    select: { id: true },
-                });
-                if (existingTask) throw new RoutineConflictError(`แถว ${storedRow.sourceRow} มีงานเดิมอยู่แล้ว`);
-
-                const taskInput = buildRoutineImportTaskInput(row, targetUnit.id, category.id);
-                const parsedTask = routineTaskCreateSchema.safeParse(taskInput);
-                if (!parsedTask.success) throw new RoutineValidationError(`ข้อมูลแถว ${storedRow.sourceRow} ไม่ผ่านการตรวจสอบ`);
-                const task = await createRoutineTaskInTransaction(
-                    tx,
-                    parsedTask.data,
-                    actor,
-                    { excludePastDue: true },
-                );
-                await tx.routineImportLedger.create({
-                    data: {
-                        sourceFileName: row.sourceFileName,
-                        sourceSheet: row.sourceSheet,
-                        sourceRow: row.sourceRow,
-                        sourceFingerprint: storedRow.sourceFingerprint,
-                        status: "APPLIED",
-                        taskId: task.id,
-                        appliedById: actor.id,
-                    },
-                });
-                await tx.routineImportRow.update({
-                    where: { id: storedRow.id },
-                    data: { status: "APPLIED", appliedTaskId: task.id, version: { increment: 1 } },
-                });
-            }
-
-            const counts = await refreshBatchCountsInTransaction(tx, batchId);
-            const completed = await tx.routineImportBatch.update({
+    const result = await runSerializableTransaction(async (tx) => {
+        await assertActiveAdminInTransaction(tx, actor);
+        const batch = await tx.routineImportBatch.findUnique({ where: { id: batchId } });
+        if (!batch) throw new RoutineNotFoundError("ไม่พบรายการนำเข้า");
+        if (batch.status === "COMPLETED") {
+            throw new RoutineConflictError("นำเข้าชุดข้อมูลนี้เสร็จแล้ว");
+        }
+        if (batch.status === "APPLYING") {
+            throw new RoutineConflictError(
+                "ชุดข้อมูลกำลังถูกนำเข้าโดยผู้ดูแลระบบคนอื่น",
+            );
+        }
+        if (batch.status !== "READY" && batch.status !== "PREVIEW") {
+            throw new RoutineConflictError("ชุดข้อมูลนี้ไม่อยู่ในสถานะที่นำเข้าได้");
+        }
+        if (batch.expiresAt && batch.expiresAt.getTime() <= Date.now()) {
+            await tx.routineImportBatch.update({
                 where: { id: batchId },
-                data: {
-                    status: "COMPLETED",
-                    appliedAt: new Date(),
-                    errorMessage: null,
-                    ...counts,
-                },
-                include: { uploadedBy: { select: { id: true, name: true } } },
+                data: { status: "EXPIRED" },
             });
-            await tx.auditLog.create({
-                data: {
-                    action: "ROUTINE_IMPORT_APPLY",
-                    entityType: "RoutineImportBatch",
-                    entityId: batchId,
-                    userId: actor.id,
-                    userEmail: actor.email,
-                    ipAddress: actor.ipAddress,
-                    userAgent: actor.userAgent,
-                    details: JSON.stringify({
-                        batchId,
-                        targetSheet: batch.targetSheet,
-                        totalSelected: rows.length,
-                        appliedRows: completed.appliedRows,
-                        conflictRows: completed.conflictRows,
-                    }),
-                },
-            });
-            return { batch: completed, idempotent: false };
+            return { kind: "EXPIRED" as const };
+        }
+        const rows = await tx.routineImportRow.findMany({
+            where: { batchId, selected: true },
+            orderBy: { sourceRow: "asc" },
         });
-        return {
-            batch: getBatchView(result.batch),
-            idempotent: result.idempotent,
-        };
-    } catch (error) {
-        if (isRoutineServiceError(error)) throw error;
-        await prisma.routineImportBatch.updateMany({
-            where: { id: batchId, status: "APPLYING" },
+        if (rows.length === 0) {
+            throw new RoutineValidationError(
+                "กรุณาเลือกรายการที่จะนำเข้าอย่างน้อย 1 รายการ",
+            );
+        }
+
+        const preparedRows = await prepareRowsForApplyInTransaction(tx, rows);
+
+        const claimed = await tx.routineImportBatch.updateMany({
+            where: {
+                id: batchId,
+                status: { in: ["READY", "PREVIEW"] },
+                version: batch.version,
+            },
+            data: { status: "APPLYING", version: { increment: 1 } },
+        });
+        if (claimed.count !== 1) {
+            throw new RoutineConflictError(
+                "ชุดข้อมูลกำลังถูกนำเข้าโดยผู้ดูแลระบบคนอื่น",
+            );
+        }
+
+        const importedTaskIds: number[] = [];
+        const importedRowIds: number[] = [];
+        for (const { storedRow, taskInput } of preparedRows) {
+            const task = await createRoutineTaskInTransaction(
+                tx,
+                taskInput,
+                actor,
+                { excludePastDue: true },
+            );
+            await tx.routineImportLedger.create({
+                data: {
+                    sourceFileName: taskInput.sourceFileName ?? batch.originalFileName,
+                    sourceSheet: taskInput.sourceSheet ?? batch.targetSheet,
+                    sourceRow: taskInput.sourceRow ?? storedRow.sourceRow,
+                    sourceFingerprint: storedRow.sourceFingerprint,
+                    status: "APPLIED",
+                    taskId: task.id,
+                    appliedById: actor.id,
+                },
+            });
+            await tx.routineImportRow.update({
+                where: { id: storedRow.id },
+                data: {
+                    status: "APPLIED",
+                    appliedTaskId: task.id,
+                    version: { increment: 1 },
+                },
+            });
+            importedTaskIds.push(task.id);
+            importedRowIds.push(storedRow.id);
+        }
+
+        const counts = await refreshBatchCountsInTransaction(tx, batchId);
+        const completed = await tx.routineImportBatch.update({
+            where: { id: batchId },
             data: {
-                status: "FAILED",
-                errorMessage: safeImportFailureMessage(error),
+                status: "COMPLETED",
+                appliedAt: new Date(),
+                errorMessage: null,
+                ...counts,
+            },
+            include: { uploadedBy: { select: { id: true, name: true } } },
+        });
+        await tx.auditLog.create({
+            data: {
+                action: "ROUTINE_IMPORT_APPLY",
+                entityType: "RoutineImportBatch",
+                entityId: batchId,
+                userId: actor.id,
+                userEmail: actor.email,
+                ipAddress: actor.ipAddress,
+                userAgent: actor.userAgent,
+                details: JSON.stringify({
+                    batchId,
+                    targetSheet: batch.targetSheet,
+                    totalSelected: rows.length,
+                    appliedRows: completed.appliedRows,
+                    conflictRows: completed.conflictRows,
+                    taskIds: importedTaskIds,
+                    importedRowIds,
+                }),
             },
         });
-        throw error;
+        const selectedValidRows = await countSelectedValidRows(tx, batchId);
+        return {
+            kind: "APPLIED" as const,
+            batch: completed,
+            selectedValidRows,
+            importedTaskIds,
+            importedRowIds,
+            skippedCount: Math.max(0, completed.totalRows - importedRowIds.length),
+        };
+    }, {
+        maxWaitMs: ROUTINE_IMPORT_APPLY_MAX_WAIT_MS,
+        timeoutMs: ROUTINE_IMPORT_APPLY_TIMEOUT_MS,
+    });
+    if (result.kind === "EXPIRED") {
+        throw new RoutineConflictError("ชุดข้อมูลนำเข้าหมดอายุแล้ว กรุณาอัปโหลดใหม่");
     }
+    return {
+        batch: getBatchView(result.batch, result.selectedValidRows),
+        idempotent: false,
+        importedTaskIds: result.importedTaskIds,
+        importedRowIds: result.importedRowIds,
+        importedCount: result.importedTaskIds.length,
+        skippedCount: result.skippedCount,
+        appliedBy: {
+            userId: actor.id,
+            email: actor.email,
+        },
+    };
 }
 
 export async function cancelRoutineImportBatch(
@@ -1154,7 +1319,8 @@ export async function cancelRoutineImportBatch(
         });
         return updated;
     });
-    return getBatchView(batch);
+    const selectedValidRows = await countSelectedValidRows(prisma, batchId);
+    return getBatchView(batch, selectedValidRows);
 }
 
 export function routineImportRowsQueryLimit(value: number): number {

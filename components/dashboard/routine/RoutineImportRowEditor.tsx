@@ -419,7 +419,15 @@ export function RoutineImportRowEditor({
                         หมวดงาน
                         <select data-routine-field="categoryName" aria-invalid={Boolean(fieldErrors.categoryName)} className="h-11 rounded-md border border-input bg-background px-3 text-sm" value={categoryName} onChange={(event) => setCategoryName(event.target.value)} disabled={disabled || saving}>
                             <option value="">เลือกหมวดงาน</option>
-                            {reference.categories.map((category) => <option key={category.id} value={category.name}>{category.name}</option>)}
+                            {reference.categories.map((category) => (
+                                <option
+                                    key={category.id}
+                                    value={category.name}
+                                    disabled={!category.isActive}
+                                >
+                                    {category.name}{category.isActive ? "" : " (ไม่พร้อมใช้งาน)"}
+                                </option>
+                            ))}
                         </select>
                         {fieldErrors.categoryName ? <span className="text-sm font-normal text-status-danger-foreground" role="alert">{fieldErrors.categoryName}</span> : null}
                     </label>

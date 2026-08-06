@@ -202,7 +202,7 @@ describe("routine import preview reuse", () => {
         });
     });
 
-    it("does not reuse a completed batch when the same workbook is uploaded again", async () => {
+    it("reuses READY/PREVIEW/APPLYING but not terminal batches for the same workbook", async () => {
         const editableBatch = storedBatch(2, "READY");
         prismaMock.routineImportBatch.findFirst
             .mockResolvedValueOnce(null)

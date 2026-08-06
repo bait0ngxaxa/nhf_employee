@@ -33,3 +33,33 @@ export async function createRollbackTrigger(): Promise<void> {
         await connection.end();
     }
 }
+
+export async function dropRoutineImportRollbackTrigger(): Promise<void> {
+    const connection = await mysql.createConnection(getTestDatabaseUrl());
+    try {
+        await connection.query(
+            "DROP TRIGGER IF EXISTS integration_fail_routine_import_ledger",
+        );
+    } finally {
+        await connection.end();
+    }
+}
+
+export async function createRoutineImportRollbackTrigger(): Promise<void> {
+    const connection = await mysql.createConnection(getTestDatabaseUrl());
+    try {
+        await connection.query(`
+            CREATE TRIGGER integration_fail_routine_import_ledger
+            BEFORE INSERT ON routine_import_ledger
+            FOR EACH ROW
+            BEGIN
+                IF NEW.sourceRow = 12 THEN
+                    SIGNAL SQLSTATE '45000'
+                    SET MESSAGE_TEXT = 'forced routine import rollback';
+                END IF;
+            END
+        `);
+    } finally {
+        await connection.end();
+    }
+}

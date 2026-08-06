@@ -17,6 +17,7 @@ const referenceData: RoutineImportReferenceData = {
         firstName: "กัลยาณี",
         lastName: "ศรีตะพันธ์",
         nickname: null,
+        departmentId: 1,
         status: "ACTIVE",
         deletedAt: null,
     }],

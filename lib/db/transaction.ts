@@ -33,13 +33,25 @@ function waitForRetry(delayMs: number): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, delayMs));
 }
 
+export interface SerializableTransactionOptions {
+    maxWaitMs?: number;
+    timeoutMs?: number;
+}
+
 export async function runSerializableTransaction<T>(
     callback: (tx: Prisma.TransactionClient) => Promise<T>,
+    options: SerializableTransactionOptions = {},
 ): Promise<T> {
     for (let attempt = 0; attempt < MAX_TRANSACTION_RETRIES; attempt += 1) {
         try {
             return await prisma.$transaction(callback, {
                 isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+                ...(options.maxWaitMs === undefined
+                    ? {}
+                    : { maxWait: options.maxWaitMs }),
+                ...(options.timeoutMs === undefined
+                    ? {}
+                    : { timeout: options.timeoutMs }),
             });
         } catch (error) {
             const isFinalAttempt = attempt === MAX_TRANSACTION_RETRIES - 1;

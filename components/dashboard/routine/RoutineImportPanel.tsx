@@ -27,6 +27,7 @@ import { Button } from "@/components/ui/button";
 import { EmptyState, ErrorState, LoadingState } from "@/components/ui/state";
 import { Input } from "@/components/ui/input";
 import { API_ROUTES } from "@/lib/ssot/routes";
+import { routineImportReferenceDataSchema } from "@/lib/validations/routine-import-reference";
 import {
     ROUTINE_IMPORT_MAX_FILE_BYTES,
     ROUTINE_IMPORT_TARGET_SHEET,
@@ -75,6 +76,15 @@ const BATCH_STATUS_LABELS: Record<RoutineImportBatchView["status"], string> = {
     CANCELLED: "ยกเลิกแล้ว",
     EXPIRED: "หมดอายุแล้ว",
 };
+
+const REFERENCE_REVIEW_REASON_CODES = new Set([
+    "OWNER_MAPPING_EMPLOYEE_NOT_FOUND",
+    "OWNER_MAPPING_EMPLOYEE_INACTIVE",
+    "MISSING_CATEGORY",
+    "INACTIVE_CATEGORY",
+    "MISSING_UNIT",
+    "INACTIVE_UNIT",
+]);
 
 function isEditableBatchStatus(
     status: RoutineImportBatchView["status"],
@@ -156,6 +166,12 @@ function rowStatusLabel(row: RoutineImportRowView): string {
     return STATUS_LABELS[row.status];
 }
 
+function hasReferenceReviewReason(row: RoutineImportRowView): boolean {
+    return row.reviewReasons.some((reason) => (
+        REFERENCE_REVIEW_REASON_CODES.has(reason.split(":", 1)[0] ?? "")
+    ));
+}
+
 function rowToEditPayload(
     row: RoutineImportRowView,
     selected: boolean,
@@ -226,6 +242,7 @@ export function RoutineImportPanel() {
     const [reference, setReference] = useState<RoutineImportReference | null>(
         null,
     );
+    const [referenceBatchKey, setReferenceBatchKey] = useState<string | null>(null);
     const [filter, setFilter] = useState<ImportFilter>("");
     const [issue, setIssue] = useState<ImportIssue>("");
     const [selectedOnly, setSelectedOnly] = useState(false);
@@ -246,27 +263,41 @@ export function RoutineImportPanel() {
     const applyLockRef = useRef(false);
     const cancelLockRef = useRef(false);
     const selectionLocksRef = useRef<Set<number>>(new Set());
-    const referenceLockRef = useRef(false);
+    const referenceRequestIdRef = useRef(0);
+    const referenceLoadingKeyRef = useRef<string | null>(null);
 
-    const loadReference = useCallback(async (): Promise<void> => {
-        if (referenceLockRef.current) return;
-        referenceLockRef.current = true;
+    const loadReference = useCallback(async (batchKey: string): Promise<void> => {
+        if (referenceLoadingKeyRef.current === batchKey) return;
+        const requestId = referenceRequestIdRef.current + 1;
+        referenceRequestIdRef.current = requestId;
+        referenceLoadingKeyRef.current = batchKey;
         setReferenceLoading(true);
         setReferenceError(null);
+        setReference(null);
+        setReferenceBatchKey(null);
         try {
-            const body = await fetchJson<RoutineImportReference>(
+            const body = await fetchJson<unknown>(
                 API_ROUTES.routines.imports.reference,
             );
-            setReference(body);
+            const parsed = routineImportReferenceDataSchema.safeParse(body);
+            if (!parsed.success) {
+                throw new Error("ข้อมูลอ้างอิงสำหรับนำเข้าไม่ถูกต้อง กรุณาลองใหม่");
+            }
+            if (referenceRequestIdRef.current !== requestId) return;
+            setReference(parsed.data);
+            setReferenceBatchKey(batchKey);
         } catch (loadError) {
+            if (referenceRequestIdRef.current !== requestId) return;
             setReferenceError(
                 loadError instanceof Error
                     ? loadError.message
-                    : "โหลดข้อมูลพนักงานไม่สำเร็จ",
+                    : "โหลดข้อมูลอ้างอิงสำหรับนำเข้าไม่สำเร็จ",
             );
         } finally {
-            setReferenceLoading(false);
-            referenceLockRef.current = false;
+            if (referenceRequestIdRef.current === requestId) {
+                setReferenceLoading(false);
+                referenceLoadingKeyRef.current = null;
+            }
         }
     }, []);
 
@@ -308,9 +339,18 @@ export function RoutineImportPanel() {
         }
     }, [batchId, filter, issue, page, search, selectedOnly]);
 
+    const currentReferenceBatchKey = batchId !== null && batch
+        ? `${batchId}:${batch.version}`
+        : null;
+    const referenceReady = currentReferenceBatchKey !== null
+        && referenceBatchKey === currentReferenceBatchKey
+        && reference !== null;
+
     useEffect(() => {
-        if (batchId !== null && !reference) void loadReference();
-    }, [batchId, loadReference, reference]);
+        if (currentReferenceBatchKey && !referenceReady) {
+            void loadReference(currentReferenceBatchKey);
+        }
+    }, [currentReferenceBatchKey, loadReference, referenceReady]);
     useEffect(() => {
         void loadBatch();
     }, [loadBatch]);
@@ -320,6 +360,13 @@ export function RoutineImportPanel() {
         setBatchId(null);
         setBatch(null);
         setRowsPage(null);
+        referenceRequestIdRef.current += 1;
+        referenceLoadingKeyRef.current = null;
+        setReference(null);
+        setReferenceBatchKey(null);
+        setReferenceLoading(false);
+        setReferenceError(null);
+        setEditorRow(null);
         setError(null);
         uploadToastBatchIdRef.current = null;
         setFilter("");
@@ -351,6 +398,11 @@ export function RoutineImportPanel() {
                 body: formData,
             });
             uploadToastBatchIdRef.current = body.batch.id;
+            referenceRequestIdRef.current += 1;
+            referenceLoadingKeyRef.current = null;
+            setReference(null);
+            setReferenceBatchKey(null);
+            setReferenceError(null);
             setBatchId(body.batch.id);
             setPage(1);
         } catch (uploadError) {
@@ -427,7 +479,12 @@ export function RoutineImportPanel() {
                     : "นำเข้าข้อมูลไม่สำเร็จ";
             setError(message);
             toast.error(message);
-            await loadBatch();
+            await Promise.all([
+                loadBatch(),
+                currentReferenceBatchKey
+                    ? loadReference(currentReferenceBatchKey)
+                    : Promise.resolve(),
+            ]);
         } finally {
             setApplying(false);
             applyLockRef.current = false;
@@ -465,8 +522,8 @@ export function RoutineImportPanel() {
     const canApply = Boolean(
         batch &&
         isEditableBatchStatus(batch.status) &&
-        batch.validRows > 0 &&
-        batch.selectedRows === batch.validRows &&
+        batch.selectedValidRows > 0 &&
+        batch.selectedRows === batch.selectedValidRows &&
         !applying,
     );
     const currentPage = rowsPage?.pagination;
@@ -556,15 +613,17 @@ export function RoutineImportPanel() {
         ? applying
             ? "กำลังนำเข้าข้อมูล จึงยังแก้ไขแถวไม่ได้"
             : undefined
-        : batchReadOnlyReason(batch.status);
+        : batch.errorMessage
+            ? `${batchReadOnlyReason(batch.status)} เหตุผล: ${batch.errorMessage}`
+            : batchReadOnlyReason(batch.status);
     const applyDisabledReason = !batchEditable
         ? readOnlyReason
         : applying
             ? "กำลังนำเข้าข้อมูล..."
-            : batch.selectedRows !== batch.validRows
+            : batch.selectedRows !== batch.selectedValidRows
                 ? "กรุณาแก้ไขรายการที่ต้องตรวจสอบ หรือยกเลิกการเลือกแถวนั้นก่อนนำเข้า"
-                : batch.validRows === 0
-                    ? "ยังไม่มีแถวที่ผ่านการตรวจสอบ"
+                : batch.selectedValidRows === 0
+                    ? "กรุณาเลือกแถวที่พร้อมนำเข้าอย่างน้อย 1 รายการ"
                     : undefined;
 
     return (
@@ -707,16 +766,20 @@ export function RoutineImportPanel() {
                     role="alert"
                 >
                     <span>
-                        โหลดข้อมูลพนักงานสำหรับ map ไม่สำเร็จ: {referenceError}
+                        โหลดข้อมูลอ้างอิงสำหรับนำเข้าไม่สำเร็จ: {referenceError}
                     </span>
                     <Button
                         type="button"
                         variant="outline"
                         size="sm"
-                        onClick={() => void loadReference()}
-                        disabled={referenceLoading}
+                        onClick={() => {
+                            if (currentReferenceBatchKey) {
+                                void loadReference(currentReferenceBatchKey);
+                            }
+                        }}
+                        disabled={referenceLoading || !currentReferenceBatchKey}
                     >
-                        <RefreshCw /> ลองโหลดข้อมูลพนักงานใหม่
+                        <RefreshCw /> ลองโหลดข้อมูลอ้างอิงใหม่
                     </Button>
                 </div>
             ) : null}
@@ -833,7 +896,7 @@ export function RoutineImportPanel() {
                                         terminal || !batchEditable || applying;
                                     const openingEditor =
                                         editorRow?.id === row.id &&
-                                        !reference &&
+                                        !referenceReady &&
                                         referenceLoading;
                                     return (
                                         <tr
@@ -960,7 +1023,9 @@ export function RoutineImportPanel() {
                                                     }
                                                     onClick={() => {
                                                         setEditorRow(row);
-                                                        if (!reference) void loadReference();
+                                                        if (!referenceReady && currentReferenceBatchKey) {
+                                                            void loadReference(currentReferenceBatchKey);
+                                                        }
                                                     }}
                                                 >
                                                     {openingEditor ? (
@@ -1047,7 +1112,7 @@ export function RoutineImportPanel() {
                 </Button>
             </div>
 
-            {reference ? (
+            {referenceReady && reference ? (
                 <RoutineImportRowEditor
                     batchId={batch.id}
                     row={editorRow}
@@ -1061,10 +1126,21 @@ export function RoutineImportPanel() {
                     onSaved={(savedRow) => {
                         setEditorRow(savedRow);
                         void loadBatch();
+                        if (
+                            hasReferenceReviewReason(savedRow)
+                            && currentReferenceBatchKey
+                        ) {
+                            void loadReference(currentReferenceBatchKey);
+                        }
                     }}
                     onConflict={async () => {
                         setEditorRow(null);
-                        await loadBatch();
+                        await Promise.all([
+                            loadBatch(),
+                            currentReferenceBatchKey
+                                ? loadReference(currentReferenceBatchKey)
+                                : Promise.resolve(),
+                        ]);
                     }}
                 />
             ) : null}

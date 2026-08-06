@@ -1,5 +1,6 @@
 import type { RoutineImportRow } from "@/lib/services/routine-import/types";
 import type { RoutineImportRowUpdateInput } from "@/lib/validations/routine-import";
+import type { RoutineImportReferenceData } from "@/lib/validations/routine-import-reference";
 
 export type RoutineImportBatchStatus =
     | "PREVIEW"
@@ -37,9 +38,11 @@ export interface RoutineImportBatchView {
     conflictRows: number;
     failedRows: number;
     selectedRows: number;
+    selectedValidRows: number;
     unresolvedOwnerRows: number;
     expiresAt: string | null;
     appliedAt: string | null;
+    errorMessage: string | null;
     version: number;
     createdAt: string;
     updatedAt: string;
@@ -65,18 +68,6 @@ export interface RoutineImportRowsPage {
     pagination: { page: number; limit: number; total: number; pages: number };
 }
 
-export interface RoutineImportReference {
-    units: Array<{ id: number; code: string; name: string }>;
-    categories: Array<{ id: number; name: string; sortOrder: number }>;
-    employees: Array<{
-        id: number;
-        firstName: string;
-        lastName: string;
-        nickname: string | null;
-        departmentId?: number;
-        status?: string;
-        deletedAt?: string | null;
-    }>;
-}
+export type RoutineImportReference = RoutineImportReferenceData;
 
 export type RoutineImportRowEdit = RoutineImportRowUpdateInput;

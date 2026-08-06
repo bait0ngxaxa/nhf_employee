@@ -5,6 +5,7 @@ import type {
 } from "@/lib/routine/schedule";
 
 import type { RoutineReminderRuleInput } from "@/lib/validations/routine";
+export type { RoutineImportReferenceData } from "@/lib/validations/routine-import-reference";
 
 /** Kept for staging compatibility. Imported RoutineTasks are always active. */
 export type RoutineImportActivation = "ACTIVE";
@@ -127,28 +128,4 @@ export interface RoutineImportManifest {
 
 export interface RoutineImportOwnerMapping {
     [sourceOwnerName: string]: number;
-}
-
-export interface RoutineImportReferenceData {
-    units: Array<{
-        id: number;
-        code: string;
-        name: string;
-        isActive: boolean;
-    }>;
-    categories: Array<{
-        id: number;
-        name: string;
-        sortOrder: number;
-        isActive: boolean;
-    }>;
-    employees: Array<{
-        id: number;
-        firstName: string;
-        lastName: string;
-        nickname: string | null;
-        departmentId?: number;
-        status: string;
-        deletedAt: string | null;
-    }>;
 }
