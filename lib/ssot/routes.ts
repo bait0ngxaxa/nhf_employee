@@ -128,6 +128,7 @@ export const API_ROUTES = {
         taskById: (id: number | string): string => `/api/routines/tasks/${id}`,
         reference: "/api/routines/reference",
         imports: {
+            reference: "/api/routines/imports/reference",
             preview: "/api/routines/imports/preview",
             batchById: (id: number | string): string => `/api/routines/imports/${id}`,
             rows: (id: number | string): string => `/api/routines/imports/${id}/rows`,

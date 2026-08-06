@@ -101,8 +101,77 @@ const reference = {
         nickname: "ชาย",
         status: "ACTIVE",
         deletedAt: null,
+    }, {
+        id: 43,
+        firstName: "สุดา",
+        lastName: "ใจดี",
+        nickname: "ดา",
+        status: "ACTIVE",
+        deletedAt: null,
+    }, {
+        id: 44,
+        firstName: "อดีต",
+        lastName: "พนักงาน",
+        nickname: "เก่า",
+        status: "INACTIVE",
+        deletedAt: null,
+    }, {
+        id: 45,
+        firstName: "ปิด",
+        lastName: "การใช้งาน",
+        nickname: "ปิด",
+        status: "INACTIVE",
+        deletedAt: null,
     }],
 };
+
+const validRow = {
+    ...editableRow,
+    status: "VALID",
+    selected: true,
+    reviewReasons: [],
+    data: {
+        ...editableRow.data,
+        mappedEmployeeIds: [42],
+        mappedEmployeeNames: ["สมชาย ใจดี"],
+        mappedAssignees: [{ employeeId: 42, role: "OWNER" as const }],
+        requiresReview: false,
+        reviewReasons: [],
+    },
+} satisfies RoutineImportRowView;
+
+const staleRow = {
+    ...editableRow,
+    data: {
+        ...editableRow.data,
+        mappedEmployeeIds: [44, 999],
+        mappedEmployeeNames: ["อดีต พนักงาน", "ไม่พบข้อมูลพนักงาน (ID: 999)"],
+        mappedAssignees: [
+            { employeeId: 44, role: "OWNER" as const },
+            { employeeId: 999, role: "CO_OWNER" as const },
+        ],
+        reviewReasons: ["OWNER_MAPPING_EMPLOYEE_INACTIVE:44", "OWNER_MAPPING_EMPLOYEE_NOT_FOUND:999"],
+    },
+} satisfies RoutineImportRowView;
+
+function importFetchMock(
+    row: RoutineImportRowView,
+    patchRow?: RoutineImportRowView,
+    batchOverrides: Record<string, unknown> = {},
+): ReturnType<typeof vi.fn> {
+    return vi.fn().mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+        if (init?.method === "PATCH") return response({ row: patchRow ?? row });
+        if (url.includes("/preview")) return response({ batch: { id: 1 }, reusedExisting: false });
+        if (url.includes("/rows")) return response({
+            rows: [row],
+            pagination: { page: 1, limit: 25, total: 1, pages: 1 },
+        });
+        if (url.endsWith("/imports/1")) return response({ batch: { ...batch, ...batchOverrides, totalRows: 1 } });
+        if (url.endsWith("/reference")) return response(reference);
+        return response({ units: [], categories: [], employees: [] });
+    });
+}
 
 describe("RoutineImportPanel", () => {
     beforeEach(() => {
@@ -204,5 +273,220 @@ describe("RoutineImportPanel", () => {
 
         expect(dialog).toHaveTextContent("สมชาย ใจดี (ชาย)");
         expect(dialog).toHaveTextContent("เลือกแล้ว 1 คน");
+        expect(screen.getByRole("checkbox", { name: "เลือกรายการนี้เพื่อนำเข้า" })).toBeChecked();
+        expect(dialog).toHaveTextContent("จาก Excel: สมชาย");
+    });
+
+    it("assigns one owner, demotes the previous owner, and promotes a replacement on removal", async () => {
+        vi.stubGlobal("fetch", importFetchMock(editableRow));
+
+        render(<RoutineImportPanel />);
+        selectUploadFile();
+        fireEvent.click(screen.getByRole("button", { name: /อัปโหลดและดูตัวอย่าง/ }));
+        fireEvent.click(await screen.findByRole("button", { name: /แก้ไข/ }));
+
+        const searchInput = await screen.findByRole("searchbox", { name: "ค้นหาพนักงาน" });
+        fireEvent.change(searchInput, { target: { value: "ชาย" } });
+        fireEvent.click(await screen.findByRole("option", { name: /เพิ่ม สมชาย ใจดี \(ชาย\)/ }));
+        fireEvent.change(searchInput, { target: { value: "ดา" } });
+        fireEvent.click(await screen.findByRole("option", { name: /เพิ่ม สุดา ใจดี \(ดา\)/ }));
+
+        const firstRole = screen.getByRole("combobox", { name: "บทบาทของ สมชาย ใจดี (ชาย)" });
+        const secondRole = screen.getByRole("combobox", { name: "บทบาทของ สุดา ใจดี (ดา)" });
+        expect(firstRole).toHaveValue("OWNER");
+        expect(secondRole).toHaveValue("CO_OWNER");
+
+        fireEvent.change(secondRole, { target: { value: "OWNER" } });
+        expect(firstRole).toHaveValue("CO_OWNER");
+        expect(secondRole).toHaveValue("OWNER");
+
+        fireEvent.click(screen.getByRole("button", { name: "นำ สุดา ใจดี (ดา) ออกจากผู้รับผิดชอบ" }));
+        expect(firstRole).toHaveValue("OWNER");
+    });
+
+    it("shows unavailable and unknown mapped employees and prevents adding unavailable employees", async () => {
+        vi.stubGlobal("fetch", importFetchMock(staleRow));
+
+        render(<RoutineImportPanel />);
+        selectUploadFile();
+        fireEvent.click(screen.getByRole("button", { name: /อัปโหลดและดูตัวอย่าง/ }));
+        fireEvent.click(await screen.findByRole("button", { name: /แก้ไข/ }));
+        const dialog = await screen.findByRole("dialog");
+
+        expect(dialog).toHaveTextContent("อดีต พนักงาน (เก่า)");
+        expect(dialog).toHaveTextContent("ไม่พร้อมใช้งาน");
+        expect(dialog).toHaveTextContent("ไม่พบข้อมูลพนักงาน (ID: 999)");
+
+        const searchInput = screen.getByRole("searchbox", { name: "ค้นหาพนักงาน" });
+        fireEvent.change(searchInput, { target: { value: "ปิด" } });
+        expect(screen.getByRole("checkbox", { name: "เลือก ปิด การใช้งาน (ปิด)" })).toBeDisabled();
+
+        fireEvent.click(screen.getByRole("button", { name: "นำ ไม่พบข้อมูลพนักงาน (ID: 999) ออกจากผู้รับผิดชอบ" }));
+        expect(dialog).not.toHaveTextContent("ไม่พบข้อมูลพนักงาน (ID: 999)");
+    });
+
+    it("keeps the editor open and shows remaining review reasons when the server still requires review", async () => {
+        const reviewResponse = {
+            ...staleRow,
+            reviewReasons: ["OWNER_MAPPING_EMPLOYEE_INACTIVE:44"],
+            selected: true,
+            data: {
+                ...staleRow.data,
+                reviewReasons: ["OWNER_MAPPING_EMPLOYEE_INACTIVE:44"],
+                requiresReview: true,
+            },
+        } satisfies RoutineImportRowView;
+        vi.stubGlobal("fetch", importFetchMock(editableRow, reviewResponse));
+
+        render(<RoutineImportPanel />);
+        selectUploadFile();
+        fireEvent.click(screen.getByRole("button", { name: /อัปโหลดและดูตัวอย่าง/ }));
+        fireEvent.click(await screen.findByRole("button", { name: /แก้ไข/ }));
+        fireEvent.click(await screen.findByRole("button", { name: /บันทึกแถว/ }));
+
+        expect(await screen.findByText("บันทึกข้อมูลแล้ว แต่ยังมีรายการที่ต้องแก้ไข")).toBeInTheDocument();
+        expect(screen.getByRole("dialog")).toHaveTextContent("พนักงานไม่พร้อมใช้งาน (44)");
+        expect(screen.getByRole("button", { name: /บันทึกแถว/ })).toBeInTheDocument();
+    });
+
+    it("closes the editor only when the server returns VALID", async () => {
+        vi.stubGlobal("fetch", importFetchMock(editableRow, validRow, { validRows: 1, selectedRows: 1 }));
+
+        render(<RoutineImportPanel />);
+        selectUploadFile();
+        fireEvent.click(screen.getByRole("button", { name: /อัปโหลดและดูตัวอย่าง/ }));
+        fireEvent.click(await screen.findByRole("button", { name: /แก้ไข/ }));
+
+        const searchInput = screen.getByRole("searchbox", { name: "ค้นหาพนักงาน" });
+        fireEvent.change(searchInput, { target: { value: "สมชาย" } });
+        fireEvent.click(await screen.findByRole("option", { name: /เพิ่ม สมชาย ใจดี \(ชาย\)/ }));
+        fireEvent.click(screen.getByRole("button", { name: /บันทึกแถว/ }));
+
+        await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+        expect(toastMocks.success).toHaveBeenCalledWith("บันทึกแถวพร้อมนำเข้าแล้ว");
+    });
+
+    it.each(["COMPLETED", "FAILED", "CANCELLED", "EXPIRED"] as const)("disables editing for terminal batch status %s", async (status) => {
+        vi.stubGlobal("fetch", importFetchMock(validRow, undefined, { status }));
+
+        render(<RoutineImportPanel />);
+        selectUploadFile();
+        fireEvent.click(screen.getByRole("button", { name: /อัปโหลดและดูตัวอย่าง/ }));
+
+        const editButton = await screen.findByRole("button", { name: /แก้ไข/ });
+        expect(editButton).toBeDisabled();
+        expect(screen.getByRole("status")).toHaveTextContent("จึงแก้ไข");
+    });
+
+    it("offers a new editable preview when a completed batch still has review rows", async () => {
+        vi.stubGlobal("fetch", importFetchMock(editableRow, undefined, {
+            status: "COMPLETED",
+            appliedRows: 1,
+            reviewRows: 66,
+            selectedRows: 1,
+            unresolvedOwnerRows: 66,
+        }));
+
+        render(<RoutineImportPanel />);
+        selectUploadFile();
+        fireEvent.click(screen.getByRole("button", { name: /อัปโหลดและดูตัวอย่าง/ }));
+
+        const continueButton = await screen.findByRole("button", {
+            name: "อัปโหลดไฟล์เดิมเพื่อ map ต่อ",
+        });
+        expect(continueButton).toBeEnabled();
+        expect(screen.getByRole("status")).toHaveTextContent(
+            "ยังเหลือ 66 รายการที่ต้องตรวจสอบ",
+        );
+
+        fireEvent.click(continueButton);
+        expect(screen.getByText("นำเข้าข้อมูลจาก Excel")).toBeInTheDocument();
+    });
+
+    it("explains why confirmation remains disabled while review rows are selected", async () => {
+        vi.stubGlobal("fetch", importFetchMock(editableRow, undefined, {
+            totalRows: 1,
+            reviewRows: 1,
+            selectedRows: 1,
+            unresolvedOwnerRows: 1,
+        }));
+
+        render(<RoutineImportPanel />);
+        selectUploadFile();
+        fireEvent.click(screen.getByRole("button", { name: /อัปโหลดและดูตัวอย่าง/ }));
+
+        const applyButton = await screen.findByRole("button", { name: /ยืนยันและนำเข้า/ });
+        expect(applyButton).toBeDisabled();
+        expect(screen.getByRole("status")).toHaveTextContent(
+            "กรุณาแก้ไขรายการที่ต้องตรวจสอบ หรือยกเลิกการเลือกแถวนั้นก่อนนำเข้า",
+        );
+    });
+
+    it("keeps the mapping action enabled for a PREVIEW row while employee data is loading", async () => {
+        let resolveReference: ((value: Response) => void) | undefined;
+        const pendingReference = new Promise<Response>((resolve) => {
+            resolveReference = resolve;
+        });
+        const fetchMock = vi.fn().mockImplementation(async (input: RequestInfo | URL) => {
+            const url = String(input);
+            if (url.endsWith("/imports/reference")) return pendingReference;
+            if (url.includes("/preview")) return response({ batch: { id: 1 }, reusedExisting: false });
+            if (url.includes("/rows")) return response({
+                rows: [editableRow],
+                pagination: { page: 1, limit: 25, total: 1, pages: 1 },
+            });
+            if (url.endsWith("/imports/1")) return response({ batch: {
+                ...batch,
+                status: "PREVIEW",
+                totalRows: 1,
+                reviewRows: 1,
+                selectedRows: 1,
+                unresolvedOwnerRows: 1,
+            } });
+            return response({ units: [], categories: [], employees: [] });
+        });
+        vi.stubGlobal("fetch", fetchMock);
+
+        render(<RoutineImportPanel />);
+        selectUploadFile();
+        fireEvent.click(screen.getByRole("button", { name: /อัปโหลดและดูตัวอย่าง/ }));
+
+        const editButton = await screen.findByRole("button", { name: "แก้ไขและ map ผู้รับผิดชอบ" });
+        expect(editButton).toBeEnabled();
+        fireEvent.click(editButton);
+
+        resolveReference?.(response(reference));
+        expect(await screen.findByRole("dialog")).toBeInTheDocument();
+    });
+
+    it("can retry the employee reference request when the first load fails", async () => {
+        let referenceAttempts = 0;
+        const fetchMock = vi.fn().mockImplementation(async (input: RequestInfo | URL) => {
+            const url = String(input);
+            if (url.endsWith("/imports/reference")) {
+                referenceAttempts += 1;
+                return referenceAttempts === 1
+                    ? response({ error: "โหลดข้อมูลพนักงานไม่สำเร็จ" }, false)
+                    : response(reference);
+            }
+            if (url.includes("/preview")) return response({ batch: { id: 1 }, reusedExisting: false });
+            if (url.includes("/rows")) return response({
+                rows: [editableRow],
+                pagination: { page: 1, limit: 25, total: 1, pages: 1 },
+            });
+            if (url.endsWith("/imports/1")) return response({ batch: { ...batch, totalRows: 1, reviewRows: 1 } });
+            return response({ units: [], categories: [], employees: [] });
+        });
+        vi.stubGlobal("fetch", fetchMock);
+
+        render(<RoutineImportPanel />);
+        selectUploadFile();
+        fireEvent.click(screen.getByRole("button", { name: /อัปโหลดและดูตัวอย่าง/ }));
+
+        const editButton = await screen.findByRole("button", { name: "แก้ไขและ map ผู้รับผิดชอบ" });
+        expect(editButton).toBeEnabled();
+        fireEvent.click(editButton);
+
+        expect(await screen.findByRole("dialog")).toBeInTheDocument();
     });
 });

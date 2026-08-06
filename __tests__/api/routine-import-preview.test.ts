@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
     requireAdminSession: vi.fn(),
     createRoutineImportPreview: vi.fn(),
+    getRoutineImportReferenceData: vi.fn(),
     createRoutineCommandActor: vi.fn(),
     enforceAuthenticatedMutationRateLimit: vi.fn(),
 }));
@@ -14,6 +15,7 @@ vi.mock("@/lib/auth/api", () => ({
 
 vi.mock("@/lib/services/routine-import", () => ({
     createRoutineImportPreview: mocks.createRoutineImportPreview,
+    getRoutineImportReferenceData: mocks.getRoutineImportReferenceData,
     ROUTINE_IMPORT_MAX_FILE_BYTES: 10 * 1024 * 1024,
 }));
 
@@ -34,6 +36,7 @@ vi.mock("@/lib/server/routine-api", () => ({
 }));
 
 import { POST } from "@/app/api/routines/imports/preview/route";
+import { GET as GETImportReference } from "@/app/api/routines/imports/reference/route";
 
 const admin = {
     ok: true,
@@ -56,6 +59,19 @@ describe("POST /api/routines/imports/preview", () => {
         mocks.requireAdminSession.mockResolvedValue(admin);
         mocks.enforceAuthenticatedMutationRateLimit.mockReturnValue(null);
         mocks.createRoutineCommandActor.mockReturnValue({ id: 7, role: "ADMIN", email: "admin@example.com" });
+        mocks.getRoutineImportReferenceData.mockResolvedValue({
+            units: [],
+            categories: [],
+            employees: [{
+                id: 22,
+                firstName: "อดีต",
+                lastName: "พนักงาน",
+                nickname: "เก่า",
+                departmentId: 3,
+                status: "INACTIVE",
+                deletedAt: "2026-01-01T00:00:00.000Z",
+            }],
+        });
         mocks.createRoutineImportPreview.mockResolvedValue({
             batch: { id: 12 },
             reusedExisting: false,
@@ -100,5 +116,40 @@ describe("POST /api/routines/imports/preview", () => {
             expect.objectContaining({ id: 7, role: "ADMIN" }),
             undefined,
         );
+    });
+});
+
+describe("GET /api/routines/imports/reference", () => {
+    beforeEach(() => {
+        mocks.requireAdminSession.mockResolvedValue(admin);
+        mocks.getRoutineImportReferenceData.mockResolvedValue({
+            units: [],
+            categories: [],
+            employees: [{
+                id: 22,
+                firstName: "อดีต",
+                lastName: "พนักงาน",
+                nickname: "เก่า",
+                departmentId: 3,
+                status: "INACTIVE",
+                deletedAt: "2026-01-01T00:00:00.000Z",
+            }],
+        });
+    });
+
+    it("returns import reference employees including unavailable records", async () => {
+        const response = await GETImportReference(
+            new NextRequest("http://localhost/api/routines/imports/reference"),
+        );
+
+        expect(response.status).toBe(200);
+        expect(await response.json()).toEqual(expect.objectContaining({
+            employees: [expect.objectContaining({
+                id: 22,
+                status: "INACTIVE",
+                deletedAt: "2026-01-01T00:00:00.000Z",
+            })],
+        }));
+        expect(mocks.getRoutineImportReferenceData).toHaveBeenCalledOnce();
     });
 });

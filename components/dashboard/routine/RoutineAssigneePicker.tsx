@@ -25,13 +25,14 @@ const MAX_VISIBLE_SEARCH_RESULTS = 8;
 
 function employeeName(employee: RoutineEmployee): string {
     const fullName = `${employee.firstName} ${employee.lastName}`.trim();
-    if (!fullName) return `พนักงาน #${employee.id}`;
+    if (!fullName) return `ไม่พบข้อมูลพนักงาน (ID: ${employee.id})`;
     if (!employee.nickname || employee.nickname === "-") return fullName;
     return `${fullName} (${employee.nickname})`;
 }
 
 function employeeSearchText(employee: RoutineEmployee): string {
     return [
+        String(employee.id),
         employeeName(employee),
         employee.firstName,
         employee.lastName,
@@ -47,6 +48,19 @@ function isUnavailable(employee: RoutineEmployee): boolean {
         employee.status !== undefined
         && employee.status !== "ACTIVE"
     ) || Boolean(employee.deletedAt);
+}
+
+function unavailableLabel(employee: RoutineEmployee): string | null {
+    if (!employee.firstName && !employee.lastName) return "ไม่พบข้อมูลพนักงาน";
+    if (employee.deletedAt) return "ถูกลบแล้ว";
+    if (employee.status && employee.status !== "ACTIVE") return "ไม่พร้อมใช้งาน";
+    return null;
+}
+
+function employeeDetails(employee: RoutineEmployee): string {
+    const details = [`รหัส ${employee.id}`];
+    if (employee.departmentId !== undefined) details.push(`แผนก #${employee.departmentId}`);
+    return details.join(" · ");
 }
 
 function isAssigneeRole(value: string): value is RoutineAssigneeRole {
@@ -125,27 +139,31 @@ export function RoutineAssigneePicker({
                     {visibleEmployees.length > 0 ? visibleEmployees.map((employee) => {
                         const unavailable = isUnavailable(employee);
                         const name = employeeName(employee);
+                        const unavailableText = unavailableLabel(employee);
                         return (
-                            <Button
+                            <label
                                 key={employee.id}
-                                type="button"
-                                variant="ghost"
-                                className="h-auto min-h-11 w-full justify-start px-3 py-2 text-left"
+                                className="flex min-h-11 items-center gap-3 rounded-md px-3 py-2 text-left hover:bg-accent has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring"
                                 role="option"
                                 aria-selected={false}
                                 aria-label={`เพิ่ม ${name} เป็นผู้รับผิดชอบ`}
-                                disabled={disabled || unavailable}
-                                onClick={() => {
-                                    onToggle(employee.id);
-                                    setSearchQuery("");
-                                }}
                             >
+                                <input
+                                    type="checkbox"
+                                    checked={false}
+                                    disabled={disabled || unavailable}
+                                    aria-label={`เลือก ${name}`}
+                                    onChange={() => {
+                                        onToggle(employee.id);
+                                        setSearchQuery("");
+                                    }}
+                                />
                                 <span className="min-w-0 flex-1">
                                     <span className="block truncate text-sm text-content-body">{name}</span>
-                                    {unavailable ? <span className="block text-xs text-status-danger-foreground">ไม่พร้อมใช้งาน</span> : null}
+                                    <span className="block text-xs text-content-secondary">{employeeDetails(employee)}</span>
+                                    {unavailableText ? <span className="block text-xs text-status-danger-foreground">{unavailableText} · เลือกเพิ่มไม่ได้</span> : null}
                                 </span>
-                                <span className="text-xs text-content-secondary">{unavailable ? "เลือกไม่ได้" : "เพิ่ม"}</span>
-                            </Button>
+                            </label>
                         );
                     }) : (
                         <p className="px-3 py-2 text-sm text-content-secondary">ไม่พบพนักงานที่ตรงกับคำค้น</p>
@@ -175,9 +193,14 @@ export function RoutineAssigneePicker({
                     <div className="max-h-52 space-y-2 overflow-y-auto">
                         {selectedEmployees.map((employee) => {
                             const name = employeeName(employee);
+                            const unavailableText = unavailableLabel(employee);
                             return (
                                 <div key={employee.id} className="flex min-w-0 items-center gap-2 rounded-lg border border-border-subtle bg-background px-3 py-2">
-                                    <span className="min-w-0 flex-1 break-words text-sm text-content-body">{name}{isUnavailable(employee) ? <span className="ml-1 text-xs text-status-danger-foreground">(ไม่พร้อมใช้งาน)</span> : null}</span>
+                                    <span className="min-w-0 flex-1 break-words text-sm text-content-body">
+                                        {name}
+                                        {unavailableText ? <span className="ml-1 text-xs text-status-danger-foreground">({unavailableText})</span> : null}
+                                        <span className="block text-xs text-content-secondary">{employeeDetails(employee)}</span>
+                                    </span>
                                     <select
                                         className="h-11 max-w-40 rounded-md border border-input bg-background px-2 text-sm sm:h-9 sm:text-xs"
                                         value={assignees[employee.id]}

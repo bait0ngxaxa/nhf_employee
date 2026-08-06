@@ -30,6 +30,7 @@ import { RoutineScheduleFields } from "./RoutineScheduleFields";
 import type {
     RoutineImportReference,
     RoutineImportRowEdit,
+    RoutineImportRowStatus,
     RoutineImportRowView,
 } from "./import-types";
 
@@ -39,8 +40,10 @@ interface RoutineImportRowEditorProps {
     reference: RoutineImportReference;
     open: boolean;
     disabled?: boolean;
+    readOnlyReason?: string;
     onOpenChange: (open: boolean) => void;
     onSaved: (row: RoutineImportRowView) => void;
+    onConflict?: () => Promise<void> | void;
 }
 
 type AssigneeState = Record<number, "OWNER" | "CO_OWNER">;
@@ -80,14 +83,88 @@ function defaultBusinessDayPolicy(row: RoutineImportRowView): RoutineBusinessDay
     return row.data.normalizedSchedule?.businessDayPolicy ?? "NONE";
 }
 
+function normalizeAssignees(row: RoutineImportRowView): AssigneeState {
+    const source = row.data.mappedAssignees ?? row.data.mappedEmployeeIds.map((employeeId, index) => ({
+        employeeId,
+        role: index === 0 ? "OWNER" as const : "CO_OWNER" as const,
+    }));
+    const next: AssigneeState = {};
+    let ownerAssigned = false;
+    for (const assignee of source) {
+        if (next[assignee.employeeId] !== undefined) continue;
+        const role: "OWNER" | "CO_OWNER" = assignee.role === "OWNER" && !ownerAssigned ? "OWNER" : "CO_OWNER";
+        next[assignee.employeeId] = role;
+        ownerAssigned = ownerAssigned || role === "OWNER";
+    }
+    if (!ownerAssigned) {
+        const firstEmployeeId = Object.keys(next)[0];
+        if (firstEmployeeId) next[Number(firstEmployeeId)] = "OWNER";
+    }
+    return next;
+}
+
+const ROUTINE_IMPORT_ROW_STATUSES: readonly RoutineImportRowStatus[] = [
+    "VALID",
+    "REQUIRES_REVIEW",
+    "EXCLUDED",
+    "ALREADY_IMPORTED",
+    "CONFLICT",
+    "APPLIED",
+    "FAILED",
+];
+
+function isRoutineImportRowStatus(value: unknown): value is RoutineImportRowStatus {
+    return typeof value === "string"
+        && ROUTINE_IMPORT_ROW_STATUSES.includes(value as RoutineImportRowStatus);
+}
+
+function isRoutineImportRowView(value: unknown): value is RoutineImportRowView {
+    if (!isRecord(value) || !isRoutineImportRowStatus(value.status)) return false;
+    return typeof value.id === "number"
+        && typeof value.sourceRow === "number"
+        && typeof value.version === "number"
+        && typeof value.selected === "boolean"
+        && Array.isArray(value.reviewReasons)
+        && value.reviewReasons.every((reason) => typeof reason === "string")
+        && isRecord(value.data)
+        && typeof value.data.title === "string"
+        && Array.isArray(value.data.mappedEmployeeIds);
+}
+
+function parseRoutineImportRowView(value: unknown): RoutineImportRowView {
+    if (!isRoutineImportRowView(value)) throw new Error("ผลลัพธ์แถวจากเซิร์ฟเวอร์ไม่ถูกต้อง");
+    return value;
+}
+
+function reviewReasonLabel(reason: string): string {
+    const [code, detail] = reason.split(":", 2);
+    const labels: Record<string, string> = {
+        MISSING_OWNER: "ไม่มีผู้รับผิดชอบ",
+        OWNER_MAPPING_EMPLOYEE_NOT_FOUND: "ยังจับคู่พนักงานไม่ได้",
+        OWNER_MAPPING_EMPLOYEE_INACTIVE: "พนักงานไม่พร้อมใช้งาน",
+        DUPLICATE_OWNER: "ผู้รับผิดชอบซ้ำกันไม่ได้",
+        INVALID_OWNER_ROLE: "ต้องมีผู้รับผิดชอบหลัก 1 คน",
+        INVALID_CONTRACT_DATE_RANGE: "ช่วงสัญญาไม่ถูกต้อง",
+        MISSING_CATEGORY: "ไม่มีหมวดงาน",
+        MISSING_TITLE: "ไม่มีชื่อรายการ",
+        MISSING_UNIT: "ไม่มีหน่วยงาน",
+        INACTIVE_UNIT: "หน่วยงานไม่พร้อมใช้งาน",
+        INACTIVE_CATEGORY: "หมวดงานไม่พร้อมใช้งาน",
+        PLACEHOLDER_ROW: "รายการอ้างอิงหรือ placeholder",
+    };
+    return `${labels[code] ?? code}${detail ? ` (${detail})` : ""}`;
+}
+
 export function RoutineImportRowEditor({
     batchId,
     row,
     reference,
     open,
     disabled = false,
+    readOnlyReason,
     onOpenChange,
     onSaved,
+    onConflict,
 }: RoutineImportRowEditorProps) {
     const [categoryName, setCategoryName] = useState("");
     const [title, setTitle] = useState("");
@@ -105,21 +182,21 @@ export function RoutineImportRowEditor({
     const [reminderPreset, setReminderPreset] = useState<RoutineReminderPreset | "">("");
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [notice, setNotice] = useState<string | null>(null);
     const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
     const saveLockRef = useRef(false);
+    const initializedRowIdRef = useRef<number | null>(null);
 
     useEffect(() => {
-        if (!row) return;
+        if (!row) {
+            initializedRowIdRef.current = null;
+            return;
+        }
+        if (initializedRowIdRef.current === row.id) return;
+        initializedRowIdRef.current = row.id;
         setCategoryName(row.data.categoryName);
         setTitle(row.data.title);
-        setAssignees(
-            Object.fromEntries(
-                (row.data.mappedAssignees ?? row.data.mappedEmployeeIds.map((employeeId, index) => ({
-                    employeeId,
-                    role: index === 0 ? "OWNER" : "CO_OWNER",
-                }))).map((assignee) => [assignee.employeeId, assignee.role]),
-            ) as AssigneeState,
-        );
+        setAssignees(normalizeAssignees(row));
         setScheduleText(row.data.scheduleText ?? "");
         setScheduleType(defaultScheduleType(row));
         setScheduleConfig(defaultScheduleConfig(row));
@@ -128,7 +205,7 @@ export function RoutineImportRowEditor({
         setContractEndDate(row.data.contractEndDate);
         setContractText(row.data.contractText);
         setExtraDetails(row.data.extraDetails);
-        setSelected(row.selected);
+        setSelected(row.status === "REQUIRES_REVIEW" ? true : row.selected);
         setReminderRules((row.data.reminderRules ?? []).map((rule) => ({
             daysBefore: String(rule.daysBefore),
             sendHour: formatRoutineSendTime(rule.sendHour),
@@ -136,6 +213,7 @@ export function RoutineImportRowEditor({
             isActive: rule.isActive,
         })));
         setError(null);
+        setNotice(null);
         setFieldErrors({});
         setReminderPreset("");
     }, [row]);
@@ -144,7 +222,12 @@ export function RoutineImportRowEditor({
         setAssignees((current) => {
             const next = { ...current };
             if (next[employeeId]) {
+                const wasOwner = next[employeeId] === "OWNER";
                 delete next[employeeId];
+                if (wasOwner) {
+                    const replacementId = Object.keys(next)[0];
+                    if (replacementId) next[Number(replacementId)] = "OWNER";
+                }
             } else {
                 next[employeeId] = Object.keys(next).length === 0 ? "OWNER" : "CO_OWNER";
             }
@@ -153,7 +236,28 @@ export function RoutineImportRowEditor({
     }
 
     function updateAssigneeRole(employeeId: number, role: RoutineAssigneeRole): void {
-        setAssignees((current) => ({ ...current, [employeeId]: role }));
+        setAssignees((current) => {
+            if (current[employeeId] === undefined) return current;
+            if (role === "OWNER") {
+                return Object.fromEntries(
+                    Object.keys(current).map((id) => [
+                        Number(id),
+                        Number(id) === employeeId ? "OWNER" : "CO_OWNER",
+                    ]),
+                ) as AssigneeState;
+            }
+            if (current[employeeId] !== "OWNER") return { ...current, [employeeId]: "CO_OWNER" };
+            const replacementId = Object.keys(current).find((id) => Number(id) !== employeeId);
+            if (!replacementId) return current;
+            return Object.fromEntries(
+                Object.keys(current).map((id) => [
+                    Number(id),
+                    Number(id) === employeeId
+                        ? "CO_OWNER"
+                        : Number(id) === Number(replacementId) ? "OWNER" : "CO_OWNER",
+                ]),
+            ) as AssigneeState;
+        });
     }
 
     function applyReminderPreset(value: RoutineReminderPreset): void {
@@ -194,9 +298,10 @@ export function RoutineImportRowEditor({
     }
 
     async function save(): Promise<void> {
-        if (!row || saveLockRef.current) return;
+        if (!row || disabled || saveLockRef.current) return;
         saveLockRef.current = true;
         setError(null);
+        setNotice(null);
         setFieldErrors({});
         const reminderFieldErrors = getRoutineReminderFieldErrors(reminderRules);
         if (Object.keys(reminderFieldErrors).length > 0) {
@@ -256,11 +361,27 @@ export function RoutineImportRowEditor({
                 },
             );
             const body: unknown = await response.json().catch(() => null);
+            if (response.status === 409) {
+                const message = "ข้อมูลแถวถูกแก้ไขจาก session อื่น กำลังโหลดข้อมูลล่าสุด";
+                setError(message);
+                toast.error(message);
+                await onConflict?.();
+                return;
+            }
             if (!response.ok) throw new Error(responseError(body));
             if (!isRecord(body) || !isRecord(body.row)) throw new Error("ผลลัพธ์จากเซิร์ฟเวอร์ไม่ถูกต้อง");
-            toast.success("บันทึกแถวสำเร็จ");
-            onSaved(body.row as unknown as RoutineImportRowView);
-            onOpenChange(false);
+            const savedRow = parseRoutineImportRowView(body.row);
+            onSaved(savedRow);
+            if (savedRow.status === "REQUIRES_REVIEW") {
+                setAssignees(normalizeAssignees(savedRow));
+                setSelected(savedRow.selected);
+                setNotice("บันทึกข้อมูลแล้ว แต่ยังมีรายการที่ต้องแก้ไข");
+            } else if (savedRow.status === "VALID" || savedRow.status === "EXCLUDED") {
+                toast.success(savedRow.status === "EXCLUDED" ? "บันทึกแถวและข้ามรายการแล้ว" : "บันทึกแถวพร้อมนำเข้าแล้ว");
+                onOpenChange(false);
+            } else {
+                throw new Error("สถานะแถวจากเซิร์ฟเวอร์ไม่ถูกต้อง");
+            }
         } catch (saveError) {
             const message = saveError instanceof Error ? saveError.message : "บันทึกแถวไม่สำเร็จ";
             setError(message);
@@ -283,11 +404,13 @@ export function RoutineImportRowEditor({
                     </DialogDescription>
                 </DialogHeader>
 
+                {disabled && readOnlyReason ? <div className="rounded-lg border border-status-warning-border bg-status-warning-surface px-4 py-3 text-sm leading-6 text-status-warning-foreground" role="status">{readOnlyReason}</div> : null}
                 {error ? <p className="rounded-lg border border-status-danger-border bg-status-danger-surface px-4 py-3 text-sm leading-6 text-status-danger-foreground" role="alert">{error}</p> : null}
+                {notice ? <p className="rounded-lg border border-status-warning-border bg-status-warning-surface px-4 py-3 text-sm leading-6 text-status-warning-foreground" role="status">{notice}</p> : null}
                 {row.reviewReasons.length > 0 ? (
                     <div className="rounded-lg border border-status-warning-border bg-status-warning-surface px-4 py-3 text-sm text-status-warning-foreground">
                         <div className="flex items-start gap-2 font-semibold"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />ประเด็นที่ระบบพบ</div>
-                        <p className="mt-1 break-words text-sm leading-6">{row.reviewReasons.join(" · ")}</p>
+                        <ul className="mt-1 space-y-1 text-sm leading-6">{row.reviewReasons.map((reason) => <li key={reason}>{reviewReasonLabel(reason)}</li>)}</ul>
                     </div>
                 ) : null}
 
@@ -354,10 +477,13 @@ export function RoutineImportRowEditor({
                     </div>
                 </details>
 
-                <label className="flex items-center gap-3 text-sm font-medium text-content-body">
-                    <input type="checkbox" checked={selected} onChange={(event) => setSelected(event.target.checked)} disabled={disabled || saving} />
-                    เลือกรายการนี้เพื่อนำเข้า
-                </label>
+                <div className="flex flex-col gap-2 rounded-lg border border-border-subtle bg-surface-subtle px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                    <label className="flex items-center gap-3 text-sm font-semibold text-content-body">
+                        <input type="checkbox" checked={selected} onChange={(event) => setSelected(event.target.checked)} disabled={disabled || saving} />
+                        เลือกรายการนี้เพื่อนำเข้า
+                    </label>
+                    <p className="text-sm leading-6 text-content-secondary">หากยังมีประเด็นที่ต้องแก้ ระบบจะยังไม่นำเข้าแถวนี้</p>
+                </div>
 
                 <DialogFooter>
                     <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>ปิด</Button>

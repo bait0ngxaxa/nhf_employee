@@ -74,6 +74,11 @@ const ALLOWED_MIME_TYPES = new Set([
 const OLE_SIGNATURE = [0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1];
 const ZIP_SIGNATURE = [0x50, 0x4b, 0x03, 0x04];
 const ROUTINE_IMPORT_PAGE_LIMIT = 50;
+const REUSABLE_BATCH_STATUSES: RoutineImportBatchStatus[] = [
+    "READY",
+    "PREVIEW",
+    "APPLYING",
+];
 
 export type { RoutineImportRowUpdateInput } from "@/lib/validations/routine-import";
 
@@ -301,7 +306,7 @@ function initialRowStatus(
     row: RoutineImportRow,
 ): { status: RoutineImportRowStatus; selected: boolean } {
     if (row.requiresReview) {
-        return { status: "REQUIRES_REVIEW", selected: false };
+        return { status: "REQUIRES_REVIEW", selected: true };
     }
     return { status: "VALID", selected: true };
 }
@@ -315,7 +320,7 @@ function mapEmployeeNames(
     );
     return ids.flatMap((id) => {
         const employee = employeesById.get(id);
-        if (!employee) return [];
+        if (!employee) return [`ไม่พบข้อมูลพนักงาน (ID: ${id})`];
         return [`${employee.firstName} ${employee.lastName}`.trim()];
     });
 }
@@ -504,7 +509,7 @@ export async function createRoutineImportPreview(
         where: {
             fileHash: upload.hash,
             targetSheet: scope.targetSheet,
-            status: { in: ["READY", "PREVIEW", "APPLYING", "COMPLETED"] },
+            status: { in: REUSABLE_BATCH_STATUSES },
         },
         orderBy: { createdAt: "desc" },
         include: { uploadedBy: { select: { id: true, name: true } } },
@@ -518,7 +523,7 @@ export async function createRoutineImportPreview(
             where: {
                 fileHash: upload.hash,
                 targetSheet: scope.targetSheet,
-                status: { in: ["READY", "PREVIEW", "APPLYING", "COMPLETED"] },
+                status: { in: REUSABLE_BATCH_STATUSES },
             },
             orderBy: { createdAt: "desc" },
             include: { uploadedBy: { select: { id: true, name: true } } },
@@ -648,6 +653,7 @@ async function loadRoutineReferenceDataForImport(): Promise<RoutineImportReferen
                 firstName: true,
                 lastName: true,
                 nickname: true,
+                departmentId: true,
                 status: true,
                 deletedAt: true,
             },
@@ -861,7 +867,7 @@ export async function updateRoutineImportRow(
         const selectedStatus: RoutineImportRowStatus = updatedData.requiresReview
             ? "REQUIRES_REVIEW"
             : input.selected ? "VALID" : "EXCLUDED";
-        const selectedForStorage = !updatedData.requiresReview && input.selected;
+        const selectedForStorage = input.selected;
         const updated = await tx.routineImportRow.updateMany({
             where: { id: rowId, batchId, version: input.version },
             data: {
@@ -925,6 +931,7 @@ async function loadRoutineReferenceDataInTransaction(
                 firstName: true,
                 lastName: true,
                 nickname: true,
+                departmentId: true,
                 status: true,
                 deletedAt: true,
             },
@@ -987,17 +994,25 @@ export async function applyRoutineImportBatch(
                 await tx.routineImportBatch.update({ where: { id: batchId }, data: { status: "EXPIRED" } });
                 throw new RoutineConflictError("ชุดข้อมูลนำเข้าหมดอายุแล้ว กรุณาอัปโหลดใหม่");
             }
+            const rows = await tx.routineImportRow.findMany({
+                where: { batchId, selected: true },
+                orderBy: { sourceRow: "asc" },
+            });
+            if (rows.length === 0) throw new RoutineValidationError("กรุณาเลือกรายการที่จะนำเข้าอย่างน้อย 1 รายการ");
+
+            for (const storedRow of rows) {
+                if (storedRow.status !== "VALID") {
+                    throw new RoutineValidationError("มีรายการที่เลือกซึ่งยังต้องตรวจสอบให้เรียบร้อยก่อนนำเข้า");
+                }
+                assertRowCanApply(parseRoutineImportRow(storedRow.normalizedData));
+            }
+
             const claimed = await tx.routineImportBatch.updateMany({
                 where: { id: batchId, status: { in: ["READY", "PREVIEW"] } },
                 data: { status: "APPLYING", version: { increment: 1 } },
             });
             if (claimed.count !== 1) throw new RoutineConflictError("ชุดข้อมูลกำลังถูกนำเข้าโดยผู้ดูแลระบบคนอื่น");
 
-            const rows = await tx.routineImportRow.findMany({
-                where: { batchId, selected: true },
-                orderBy: { sourceRow: "asc" },
-            });
-            if (rows.length === 0) throw new RoutineValidationError("กรุณาเลือกรายการที่จะนำเข้าอย่างน้อย 1 รายการ");
             const referenceData = await loadRoutineReferenceDataInTransaction(tx);
             const targetUnit = await tx.routineUnit.upsert({
                 where: { code: ROUTINE_IMPORT_TARGET_UNIT_CODE },

@@ -147,6 +147,7 @@ export interface RoutineImportReferenceData {
         firstName: string;
         lastName: string;
         nickname: string | null;
+        departmentId?: number;
         status: string;
         deletedAt: string | null;
     }>;
