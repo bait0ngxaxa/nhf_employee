@@ -16,9 +16,11 @@ import { API_ROUTES } from "@/lib/ssot/routes";
 
 import {
     formatRoutineDueLabel,
+    formatRoutineUnitLabel,
     getRoutineTimingStatusClass,
     ROUTINE_TIMING_STATUS_LABELS,
 } from "./labels";
+import { RoutineAssigneePicker } from "./RoutineAssigneePicker";
 import type {
     PaginatedRoutineTaskWorkItemsResponse,
     RoutineAssignee,
@@ -66,11 +68,6 @@ function areAssigneeSnapshotsEqual(
     const leftKeys = left.map(toKey).sort();
     const rightKeys = right.map(toKey).sort();
     return leftKeys.every((key, index) => key === rightKeys[index]);
-}
-
-function displayEmployeeName(employee: RoutineEmployee): string {
-    const name = `${employee.firstName} ${employee.lastName}`.trim();
-    return employee.nickname ? `${name} (${employee.nickname})` : name;
 }
 
 function errorMessage(body: unknown): string {
@@ -152,6 +149,13 @@ export function RoutineOccurrenceList({
             }
             return { ...current, assignees };
         });
+    }
+
+    function updateEditorAssigneeRole(employeeId: number, role: RoutineAssigneeRole): void {
+        setEditor((current) => current ? {
+            ...current,
+            assignees: { ...current.assignees, [employeeId]: role },
+        } : current);
     }
 
     async function saveEdit(
@@ -236,19 +240,19 @@ export function RoutineOccurrenceList({
                 return (
                     <article
                         key={task.id}
-                        className="rounded-xl border border-border-subtle bg-surface-raised p-4 shadow-sm sm:p-5"
+                        className="rounded-xl border border-border-subtle bg-surface-raised p-5 shadow-sm sm:p-6"
                     >
                         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                             <div className="min-w-0 space-y-2">
-                                <div className="flex flex-wrap items-center gap-2 text-xs text-content-secondary">
-                                    <span>{task.unit.name}</span>
+                                <div className="flex flex-wrap items-center gap-2 text-sm font-medium text-content-secondary">
+                                    <span>{formatRoutineUnitLabel(task.unit)}</span>
                                     <span aria-hidden="true">•</span>
                                     <span>{task.category.name}</span>
                                 </div>
-                                <h3 className="text-base font-semibold text-content-heading">
+                                <h3 className="text-lg font-semibold tracking-tight text-content-heading">
                                     {task.title}
                                 </h3>
-                                <div className="grid gap-2 text-sm text-content-secondary sm:grid-cols-2">
+                                <div className="grid gap-2 text-base leading-6 text-content-secondary sm:grid-cols-2">
                                     {isFocusedOccurrence ? (
                                         <>
                                             <p>
@@ -264,7 +268,7 @@ export function RoutineOccurrenceList({
                                         </p>
                                     )}
                                     {!isFocusedOccurrence && hasOccurrenceAssigneeOverride ? (
-                                        <p className="text-xs text-content-secondary">
+                                        <p className="text-sm text-content-secondary">
                                             รอบนี้มีการปรับผู้รับผิดชอบเฉพาะกิจ
                                         </p>
                                     ) : null}
@@ -281,11 +285,11 @@ export function RoutineOccurrenceList({
                             </div>
                             <div className="flex shrink-0 flex-col items-start gap-3 lg:items-end">
                                 {occurrence ? (
-                                    <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${getRoutineTimingStatusClass(occurrence.timingStatus)}`}>
+                                    <span className={`rounded-full border px-3 py-1 text-sm font-semibold ${getRoutineTimingStatusClass(occurrence.timingStatus)}`}>
                                         {ROUTINE_TIMING_STATUS_LABELS[occurrence.timingStatus]}
                                     </span>
                                 ) : (
-                                    <span className="rounded-full border border-border-subtle bg-surface-subtle px-3 py-1 text-xs font-semibold text-content-secondary">
+                                    <span className="rounded-full border border-border-subtle bg-surface-subtle px-3 py-1 text-sm font-semibold text-content-secondary">
                                         ยังไม่มีรอบกำหนด
                                     </span>
                                 )}
@@ -319,10 +323,10 @@ export function RoutineOccurrenceList({
                         </div>
 
                         {isEditing && editor && occurrence ? (
-                            <div className="mt-4 space-y-4 rounded-lg border border-border-subtle bg-surface-subtle p-4">
+                            <div className="mt-5 space-y-5 rounded-xl border border-border-subtle bg-surface-subtle p-4 sm:p-5">
                                 <div>
-                                    <p className="text-sm font-semibold text-content-heading">ปรับเฉพาะรอบนี้</p>
-                                    <p className="mt-1 text-xs text-content-secondary">
+                                    <p className="text-base font-semibold text-content-heading">ปรับเฉพาะรอบนี้</p>
+                                    <p className="mt-1 max-w-prose text-sm leading-6 text-content-secondary">
                                         มีผลกับรอบ {occurrence.periodKey} ของรายการนี้เท่านั้น ไม่เปลี่ยนแม่แบบงานหรือรอบอื่น
                                     </p>
                                 </div>
@@ -332,6 +336,7 @@ export function RoutineOccurrenceList({
                                         <Input
                                             type="date"
                                             value={editor.dueDate}
+                                            disabled={isBusy}
                                             onChange={(event) => setEditor((current) => current ? { ...current, dueDate: event.target.value } : current)}
                                         />
                                     </label>
@@ -339,48 +344,20 @@ export function RoutineOccurrenceList({
                                         หมายเหตุ (ถ้ามี)
                                         <Textarea
                                             value={editor.note}
+                                            maxLength={1000}
+                                            disabled={isBusy}
                                             onChange={(event) => setEditor((current) => current ? { ...current, note: event.target.value } : current)}
                                             placeholder="บันทึกเหตุผลหรือรายละเอียดเพิ่มเติมได้ตามต้องการ"
                                         />
                                     </label>
                                 </div>
-                                <fieldset className="grid gap-2">
-                                    <legend className="text-sm font-medium text-content-body">ผู้รับผิดชอบของรอบนี้</legend>
-                                    <div className="grid gap-2 sm:grid-cols-2">
-                                        {employees.map((employee) => {
-                                            const selectedRole = editor.assignees[employee.id];
-                                            return (
-                                                <div key={employee.id} className="flex items-center gap-3 rounded-lg border border-border-subtle bg-background px-3 py-2">
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={selectedRole !== undefined}
-                                                        onChange={() => toggleAssignee(employee.id)}
-                                                        aria-label={`เลือก ${displayEmployeeName(employee)}`}
-                                                    />
-                                                    <span className="min-w-0 flex-1 text-sm text-content-body">{displayEmployeeName(employee)}</span>
-                                                    {selectedRole ? (
-                                                        <select
-                                                            className="h-9 rounded-md border border-input bg-background px-2 text-xs"
-                                                            value={selectedRole}
-                                                            onChange={(event) => setEditor((current) => current ? {
-                                                                ...current,
-                                                                assignees: {
-                                                                    ...current.assignees,
-                                                                    [employee.id]: event.target.value as RoutineAssigneeRole,
-                                                                },
-                                                            } : current)}
-                                                            aria-label={`บทบาท ${displayEmployeeName(employee)}`}
-                                                        >
-                                                            <option value="OWNER">ผู้รับผิดชอบหลัก</option>
-                                                            <option value="CO_OWNER">ผู้ร่วมรับผิดชอบ</option>
-                                                        </select>
-                                                    ) : null}
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
-                                    {employees.length === 0 ? <p className="text-sm text-content-secondary">ไม่พบพนักงานที่พร้อมรับผิดชอบ</p> : null}
-                                </fieldset>
+                                <RoutineAssigneePicker
+                                    employees={employees}
+                                    assignees={editor.assignees}
+                                    onToggle={toggleAssignee}
+                                    onRoleChange={updateEditorAssigneeRole}
+                                    disabled={isBusy}
+                                />
                                 <div className="flex flex-wrap justify-end gap-2">
                                     <Button type="button" variant="outline" disabled={isBusy} onClick={() => setEditor(null)}>ปิด</Button>
                                     <Button type="button" disabled={isBusy} onClick={() => void saveEdit(task, occurrence)}>

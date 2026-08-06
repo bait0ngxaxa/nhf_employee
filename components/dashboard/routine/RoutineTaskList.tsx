@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/state";
 import { getCurrentBangkokDate } from "@/lib/routine/schedule";
 
-import { ROUTINE_SCHEDULE_LABELS } from "./labels";
+import { formatRoutineUnitLabel, ROUTINE_SCHEDULE_LABELS } from "./labels";
 import type { PaginatedTasksResponse, RoutineTask } from "./types";
 
 interface RoutineTaskListProps {
@@ -81,23 +81,23 @@ export function RoutineTaskList({
         );
     }
     return (
-        <div className="space-y-3">
+        <div className="space-y-4">
             <div className="flex justify-end">
                 <Button type="button" size="sm" onClick={onCreate}><Plus aria-hidden="true" /> สร้างแม่แบบงาน</Button>
             </div>
             <div className="overflow-x-auto rounded-xl border border-border-subtle bg-surface-raised">
-                <table className="w-full min-w-[720px] text-left text-sm">
-                    <thead className="border-b border-border-subtle bg-surface-subtle text-xs text-content-secondary">
+                <table className="w-full min-w-[780px] text-left text-sm">
+                    <thead className="border-b border-border-subtle bg-surface-subtle text-sm text-content-secondary">
                         <tr><th className="px-4 py-3 font-semibold">งาน</th><th className="px-4 py-3 font-semibold">หน่วยงาน</th><th className="px-4 py-3 font-semibold">กำหนดการ</th><th className="px-4 py-3 font-semibold">ผู้รับผิดชอบ</th><th className="px-4 py-3 font-semibold">สถานะ</th><th className="px-4 py-3" /></tr>
                     </thead>
                     <tbody className="divide-y divide-border-subtle">
                         {data.tasks.map((task) => (
                             <tr key={task.id} className="align-top">
-                                <td className="px-4 py-4"><p className="font-semibold text-content-heading">{task.title}</p><p className="mt-1 text-xs text-content-secondary">{task.category.name}</p></td>
-                                <td className="px-4 py-4 text-content-body">{task.unit.code}</td>
-                                <td className="px-4 py-4 text-content-body">{ROUTINE_SCHEDULE_LABELS[task.scheduleType] ?? task.scheduleType}<p className="mt-1 text-xs text-content-secondary">{task.scheduleText ?? "ไม่ได้ระบุคำอธิบาย"}</p></td>
-                                <td className="px-4 py-4 text-content-body">{task.assignees.map((assignee) => assignee.employee.displayName ?? `${assignee.employee.firstName} ${assignee.employee.lastName}`).join(", ")}</td>
-                                <td className="px-4 py-4"><span className={task.isActive ? "rounded-full bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700" : "rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600"}>{task.isActive ? "ใช้งาน" : "ปิดใช้งาน"}</span><div className="mt-2 flex flex-wrap gap-1">{taskInformationBadges(task, today).map((badge) => <span key={badge} className="rounded-full border border-status-warning-border bg-status-warning-surface px-2 py-1 text-[11px] font-medium text-status-warning-foreground">{badge}</span>)}</div></td>
+                                <td className="px-4 py-4"><p className="text-base font-semibold leading-6 text-content-heading">{task.title}</p><p className="mt-1 text-sm text-content-secondary">{task.category.name}</p></td>
+                                <td className="px-4 py-4 text-content-body">{formatRoutineUnitLabel(task.unit)}</td>
+                                <td className="px-4 py-4 text-content-body">{ROUTINE_SCHEDULE_LABELS[task.scheduleType] ?? task.scheduleType}<p className="mt-1 text-sm leading-5 text-content-secondary">{task.scheduleText ?? "ไม่ได้ระบุคำอธิบาย"}</p></td>
+                                <td className="max-w-56 px-4 py-4 text-content-body">{task.assignees.map((assignee) => assignee.employee.displayName ?? `${assignee.employee.firstName} ${assignee.employee.lastName}`).join(", ")}</td>
+                                <td className="px-4 py-4"><span className={task.isActive ? "rounded-full bg-emerald-50 px-2.5 py-1 text-sm font-semibold text-emerald-700" : "rounded-full bg-slate-100 px-2.5 py-1 text-sm font-semibold text-slate-600"}>{task.isActive ? "ใช้งาน" : "ปิดใช้งาน"}</span><div className="mt-2 flex flex-wrap gap-1">{taskInformationBadges(task, today).map((badge) => <span key={badge} className="rounded-full border border-status-warning-border bg-status-warning-surface px-2 py-1 text-xs font-medium text-status-warning-foreground">{badge}</span>)}</div></td>
                                 <td className="px-4 py-4 text-right"><div className="flex flex-wrap justify-end gap-2"><Button type="button" variant="outline" size="sm" onClick={() => onEdit(task)} disabled={pendingTaskId === task.id}><Edit3 aria-hidden="true" /> แก้ไข</Button><Button type="button" variant="outline" size="sm" disabled={pendingTaskId === task.id} onClick={() => void onToggleActive(task)}><Power aria-hidden="true" /> {pendingTaskId === task.id ? "กำลังบันทึก..." : task.isActive ? "ปิดใช้งาน" : "เปิดใช้งาน"}</Button><Button type="button" variant="ghost" size="sm" className="text-status-danger-foreground" disabled={pendingTaskId === task.id} onClick={() => setDeleteTask(task)}><Trash2 aria-hidden="true" /> ลบ</Button></div></td>
                             </tr>
                         ))}

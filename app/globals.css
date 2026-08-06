@@ -451,6 +451,22 @@
             sans-serif;
     }
 
+    .routine-section {
+        font-kerning: normal;
+        font-optical-sizing: auto;
+    }
+
+    .routine-section h1,
+    .routine-section h2,
+    .routine-section h3,
+    .routine-section h4 {
+        text-wrap: balance;
+    }
+
+    .routine-section p {
+        text-wrap: pretty;
+    }
+
     .app-shell-background {
         background: var(--app-shell-background);
     }

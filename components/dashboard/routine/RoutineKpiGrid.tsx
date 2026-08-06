@@ -20,21 +20,21 @@ export function RoutineKpiGrid({
     isLoading,
 }: RoutineKpiGridProps) {
     return (
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             {KPI_ITEMS.map((item) => {
                 const Icon = item.icon;
                 return (
                     <Card
                         key={item.key}
-                        className="gap-3 rounded-xl border-border-subtle bg-surface-raised px-5 py-4 shadow-sm"
+                        className="gap-4 rounded-xl border-border-subtle bg-surface-raised px-5 py-5 shadow-sm"
                     >
                         <div className="flex items-center justify-between gap-3">
-                            <p className="text-sm font-medium text-content-secondary">
+                            <p className="max-w-[18ch] text-sm font-semibold leading-5 text-content-secondary">
                                 {item.label}
                             </p>
                             <Icon className={`size-5 ${item.tone}`} aria-hidden="true" />
                         </div>
-                        <p className="text-2xl font-semibold text-content-heading" aria-live="polite">
+                        <p className="text-3xl font-bold tracking-tight text-content-heading tabular-nums" aria-live="polite">
                             {isLoading ? "–" : summary?.[item.key] ?? 0}
                         </p>
                     </Card>

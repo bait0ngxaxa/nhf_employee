@@ -16,6 +16,26 @@ export const ROUTINE_SCHEDULE_LABELS: Record<string, string> = {
     MANUAL: "สร้างเอง",
 };
 
+export function formatRoutineUnitLabel(unit: { code: string; name: string }): string {
+    const code = unit.code.trim();
+    const name = unit.name.trim();
+    if (!code) return name;
+    if (!name || code === name) return code;
+    return `${code} · ${name}`;
+}
+
+export function uniqueRoutineUnits(
+    units: readonly { id: number; code: string; name: string }[],
+): Array<{ id: number; code: string; name: string }> {
+    const seenCodes = new Set<string>();
+    return units.filter((unit) => {
+        const key = unit.code.trim().toLocaleLowerCase() || unit.name.trim().toLocaleLowerCase();
+        if (seenCodes.has(key)) return false;
+        seenCodes.add(key);
+        return true;
+    });
+}
+
 const THAI_MONTH_LABELS = [
     "มกราคม",
     "กุมภาพันธ์",

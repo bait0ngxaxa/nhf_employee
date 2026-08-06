@@ -20,7 +20,10 @@ describe("RoutineTaskForm reminder rules", () => {
         render(
             <RoutineTaskForm
                 reference={{
-                    units: [{ id: 1, code: "มสช.", name: "มสช." }],
+                    units: [
+                        { id: 1, code: "มสช.", name: "มสช." },
+                        { id: 2, code: "มสช.", name: "มสช." },
+                    ],
                     categories: [{ id: 1, name: "ระบบคอมพิวเตอร์", sortOrder: 1 }],
                     employees: [{
                         id: 11,
@@ -37,6 +40,11 @@ describe("RoutineTaskForm reminder rules", () => {
 
         expect(screen.queryByText("Schedule config (JSON)")).not.toBeInTheDocument();
         expect(screen.getByText("วันที่ของเดือน")).toBeInTheDocument();
+        expect(screen.queryByText("เดือนที่เลื่อนจากรอบปกติ")).not.toBeInTheDocument();
+        expect(screen.getByText("ช่วงสัญญา")).toBeInTheDocument();
+        expect(screen.getAllByRole("option", { name: "มสช." })).toHaveLength(1);
+        expect(screen.getByRole("option", { name: "เลือกรูปแบบการแจ้งเตือน" })).toBeInTheDocument();
+        expect(screen.getByLabelText("เลือกชุดกฎการแจ้งเตือน")).toHaveValue("");
 
         fireEvent.change(screen.getByDisplayValue("เลือกหน่วยงาน"), {
             target: { value: "1" },
@@ -47,11 +55,15 @@ describe("RoutineTaskForm reminder rules", () => {
         fireEvent.change(screen.getByPlaceholderText("เช่น ตรวจสอบค่าใช้จ่ายประจำเดือน"), {
             target: { value: "ตรวจสอบระบบ" },
         });
-        fireEvent.click(screen.getByRole("checkbox", { name: "เลือก สมชาย ใจดี" }));
+        fireEvent.change(screen.getByLabelText("ค้นหาพนักงาน"), {
+            target: { value: "สมชาย" },
+        });
+        fireEvent.click(screen.getByRole("option", { name: "เพิ่ม สมชาย ใจดี เป็นผู้รับผิดชอบ" }));
         fireEvent.change(screen.getByLabelText("เลือกชุดกฎการแจ้งเตือน"), {
             target: { value: "monthly" },
         });
 
+        expect(screen.getByLabelText("เลือกชุดกฎการแจ้งเตือน")).toHaveValue("monthly");
         expect(screen.getAllByDisplayValue("09:00")).toHaveLength(2);
 
         fireEvent.click(screen.getByRole("button", { name: "บันทึกแม่แบบงาน" }));
@@ -91,7 +103,10 @@ describe("RoutineTaskForm reminder rules", () => {
         fireEvent.change(screen.getByDisplayValue("เลือกหน่วยงาน"), { target: { value: "1" } });
         fireEvent.change(screen.getByDisplayValue("เลือกหมวดหมู่"), { target: { value: "1" } });
         fireEvent.change(screen.getByPlaceholderText("เช่น ตรวจสอบค่าใช้จ่ายประจำเดือน"), { target: { value: "ตรวจสอบระบบ" } });
-        fireEvent.click(screen.getByRole("checkbox", { name: "เลือก สมชาย ใจดี" }));
+        fireEvent.change(screen.getByLabelText("ค้นหาพนักงาน"), {
+            target: { value: "สมชาย" },
+        });
+        fireEvent.click(screen.getByRole("option", { name: "เพิ่ม สมชาย ใจดี เป็นผู้รับผิดชอบ" }));
         const submit = screen.getByRole("button", { name: "บันทึกแม่แบบงาน" });
         fireEvent.click(submit);
         fireEvent.click(submit);

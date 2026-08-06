@@ -133,8 +133,12 @@ function RoutineOccurrencePanel({
     }
 
     return (
-        <div className="space-y-4">
-            <div className="grid gap-3 rounded-xl border border-border-subtle bg-surface-raised p-4 md:grid-cols-[1fr_220px_auto] md:items-end">
+        <div className="space-y-5">
+            <div className="space-y-1">
+                <h2 className="text-xl font-semibold tracking-tight text-content-heading">ติดตามรายการตามกำหนด</h2>
+                <p className="max-w-prose text-sm leading-6 text-content-secondary">ค้นหารายการ ตรวจสถานะ และปรับเฉพาะรอบที่ต้องการได้จากหน้านี้</p>
+            </div>
+            <div className="grid gap-4 rounded-xl border border-border-subtle bg-surface-raised p-4 sm:p-5 md:grid-cols-[minmax(0,1fr)_220px_auto] md:items-end">
                 <label className="grid gap-1 text-sm font-medium text-content-body">ค้นหารายการ
                     <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="ค้นหาชื่อรายการ หน่วยงาน หรือหมวดหมู่" />
                 </label>
@@ -239,18 +243,24 @@ function RoutineTaskSettings() {
     }
 
     return (
-        <RoutineTaskList
-            data={tasks}
-            error={tasksError}
-            isLoading={tasksLoading}
-            onRetry={() => void mutateTasks()}
-            onCreate={() => setIsCreating(true)}
-            onEdit={(task) => setEditingTask(task)}
-            onToggleActive={updateTaskActive}
-            onDelete={deleteTask}
-            pendingTaskId={pendingTaskId}
-            onPageChange={setTaskPage}
-        />
+        <div className="space-y-5">
+            <div className="space-y-1">
+                <h2 className="text-xl font-semibold tracking-tight text-content-heading">ตั้งค่าแม่แบบงานประจำ</h2>
+                <p className="max-w-prose text-sm leading-6 text-content-secondary">กำหนดตารางงาน ผู้รับผิดชอบ และการแจ้งเตือนของแต่ละแม่แบบ</p>
+            </div>
+            <RoutineTaskList
+                data={tasks}
+                error={tasksError}
+                isLoading={tasksLoading}
+                onRetry={() => void mutateTasks()}
+                onCreate={() => setIsCreating(true)}
+                onEdit={(task) => setEditingTask(task)}
+                onToggleActive={updateTaskActive}
+                onDelete={deleteTask}
+                pendingTaskId={pendingTaskId}
+                onPageChange={setTaskPage}
+            />
+        </div>
     );
 }
 
@@ -317,7 +327,7 @@ export function RoutineSection() {
     ];
 
     return (
-        <SectionShell gradientFrom="transparent" gradientTo="transparent" className="border-border-subtle/70 bg-surface shadow-sm">
+        <SectionShell gradientFrom="transparent" gradientTo="transparent" className="routine-section border-border-subtle/70 bg-surface shadow-sm lg:rounded-2xl">
             <SectionHeader
                 icon={CalendarClock}
                 title="NHF Routine"

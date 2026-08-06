@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle, BellPlus, Save, Trash2 } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { AlertTriangle, Save } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -16,8 +16,16 @@ import {
     type RoutineBusinessDayPolicy,
     type RoutineScheduleType,
 } from "@/lib/routine/schedule";
-import type { RoutineReminderRecipientScope } from "./types";
+import type { RoutineAssigneeRole } from "./types";
 
+import { RoutineAssigneePicker } from "./RoutineAssigneePicker";
+import {
+    RoutineReminderFields,
+    getRoutineReminderFieldErrors,
+    getRoutineReminderPresetDays,
+    type RoutineReminderPreset,
+    type RoutineReminderRuleForm,
+} from "./RoutineReminderFields";
 import { RoutineScheduleFields } from "./RoutineScheduleFields";
 import type {
     RoutineImportReference,
@@ -36,26 +44,11 @@ interface RoutineImportRowEditorProps {
 }
 
 type AssigneeState = Record<number, "OWNER" | "CO_OWNER">;
-type ReminderRule = Omit<RoutineImportRowEdit["reminderRules"][number], "sendHour"> & {
-    sendHour: string;
-};
+type ReminderRule = RoutineReminderRuleForm;
 type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue };
-
-const REMINDER_SCOPE_LABELS: Record<RoutineReminderRecipientScope, string> = {
-    ASSIGNEES: "ผู้รับผิดชอบ",
-    ADMINS: "ผู้ดูแลระบบ",
-    ASSIGNEES_AND_ADMINS: "ผู้รับผิดชอบและผู้ดูแลระบบ",
-};
 
 function isRecord(value: unknown): value is Record<string, unknown> {
     return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function employeeName(employee: RoutineImportReference["employees"][number]): string {
-    const fullName = `${employee.firstName} ${employee.lastName}`.trim();
-    return employee.nickname && employee.nickname !== "-"
-        ? `${fullName} (${employee.nickname})`
-        : fullName;
 }
 
 function responseError(value: unknown): string {
@@ -109,6 +102,7 @@ export function RoutineImportRowEditor({
     const [extraDetails, setExtraDetails] = useState<string | null>(null);
     const [selected, setSelected] = useState(false);
     const [reminderRules, setReminderRules] = useState<ReminderRule[]>([]);
+    const [reminderPreset, setReminderPreset] = useState<RoutineReminderPreset | "">("");
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
@@ -136,14 +130,15 @@ export function RoutineImportRowEditor({
         setExtraDetails(row.data.extraDetails);
         setSelected(row.selected);
         setReminderRules((row.data.reminderRules ?? []).map((rule) => ({
-            ...rule,
+            daysBefore: String(rule.daysBefore),
             sendHour: formatRoutineSendTime(rule.sendHour),
+            recipientScope: rule.recipientScope,
+            isActive: rule.isActive,
         })));
         setError(null);
         setFieldErrors({});
+        setReminderPreset("");
     }, [row]);
-
-    const selectedEmployeeIds = useMemo(() => new Set(Object.keys(assignees).map(Number)), [assignees]);
 
     function toggleEmployee(employeeId: number): void {
         setAssignees((current) => {
@@ -157,43 +152,44 @@ export function RoutineImportRowEditor({
         });
     }
 
-    function applyReminderPreset(value: string): void {
-        const presets: Record<string, number[]> = {
-            monthly: [3, 1],
-            yearly: [14, 7, 1],
-            contract: [30, 7, 1],
-        };
-        const days = presets[value];
-        if (!days) return;
+    function updateAssigneeRole(employeeId: number, role: RoutineAssigneeRole): void {
+        setAssignees((current) => ({ ...current, [employeeId]: role }));
+    }
+
+    function applyReminderPreset(value: RoutineReminderPreset): void {
+        const days = getRoutineReminderPresetDays(value);
+        if (days.length === 0) return;
+        setReminderPreset(value);
         setReminderRules(days.map((daysBefore) => ({
-            daysBefore,
+            daysBefore: String(daysBefore),
             sendHour: "09:00",
-            channel: "IN_APP" as const,
-            recipientScope: "ASSIGNEES" as const,
+            recipientScope: "ASSIGNEES",
             isActive: true,
         })));
     }
 
     function addReminderRule(daysBefore = 1): void {
+        setReminderPreset("");
         setReminderRules((current) => [
             ...current,
             {
-                daysBefore,
+                daysBefore: String(daysBefore),
                 sendHour: "09:00",
-                channel: "IN_APP" as const,
-                recipientScope: "ASSIGNEES" as const,
+                recipientScope: "ASSIGNEES",
                 isActive: true,
             },
         ]);
     }
 
-    function updateReminderRule(index: number, patch: Partial<ReminderRule>): void {
+    function updateReminderRule(index: number, patch: Partial<RoutineReminderRuleForm>): void {
+        setReminderPreset("");
         setReminderRules((current) => current.map((rule, itemIndex) => (
             itemIndex === index ? { ...rule, ...patch } : rule
         )));
     }
 
     function removeReminderRule(index: number): void {
+        setReminderPreset("");
         setReminderRules((current) => current.filter((_, itemIndex) => itemIndex !== index));
     }
 
@@ -202,6 +198,13 @@ export function RoutineImportRowEditor({
         saveLockRef.current = true;
         setError(null);
         setFieldErrors({});
+        const reminderFieldErrors = getRoutineReminderFieldErrors(reminderRules);
+        if (Object.keys(reminderFieldErrors).length > 0) {
+            setFieldErrors(reminderFieldErrors);
+            setError("กรุณาตรวจสอบรูปแบบการแจ้งเตือนในช่องที่มีเครื่องหมายเตือน");
+            saveLockRef.current = false;
+            return;
+        }
         const payload: RoutineImportRowEdit = {
             version: row.version,
             categoryName,
@@ -220,8 +223,11 @@ export function RoutineImportRowEditor({
             extraDetails: extraDetails?.trim() || null,
             selected,
             reminderRules: (reminderRules ?? []).map((rule) => ({
-                ...rule,
+                daysBefore: Number(rule.daysBefore),
                 sendHour: parseRoutineSendTime(rule.sendHour) ?? -1,
+                channel: "IN_APP" as const,
+                recipientScope: rule.recipientScope,
+                isActive: rule.isActive,
             })),
         };
         const parsed = routineImportRowUpdateSchema.safeParse(payload);
@@ -268,8 +274,8 @@ export function RoutineImportRowEditor({
     if (!row) return null;
 
     return (
-        <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-4xl">
+        <Dialog open={open} onOpenChange={(nextOpen) => { if (!nextOpen && saving) return; onOpenChange(nextOpen); }}>
+            <DialogContent className="max-h-[90dvh] max-w-4xl overflow-y-auto">
                 <DialogHeader>
                     <DialogTitle>แก้ไขแถวที่ {row.sourceRow}</DialogTitle>
                     <DialogDescription>
@@ -277,107 +283,79 @@ export function RoutineImportRowEditor({
                     </DialogDescription>
                 </DialogHeader>
 
-                {error ? <p className="rounded-lg border border-status-danger-border bg-status-danger-surface px-4 py-3 text-sm text-status-danger-foreground" role="alert">{error}</p> : null}
+                {error ? <p className="rounded-lg border border-status-danger-border bg-status-danger-surface px-4 py-3 text-sm leading-6 text-status-danger-foreground" role="alert">{error}</p> : null}
                 {row.reviewReasons.length > 0 ? (
                     <div className="rounded-lg border border-status-warning-border bg-status-warning-surface px-4 py-3 text-sm text-status-warning-foreground">
                         <div className="flex items-start gap-2 font-semibold"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />ประเด็นที่ระบบพบ</div>
-                        <p className="mt-1 break-words text-xs">{row.reviewReasons.join(" · ")}</p>
+                        <p className="mt-1 break-words text-sm leading-6">{row.reviewReasons.join(" · ")}</p>
                     </div>
                 ) : null}
 
                 <div className="grid gap-4 md:grid-cols-2">
                     <label className="grid gap-1 text-sm font-medium text-content-body">
                         หมวดงาน
-                        <select className="h-11 rounded-md border border-input bg-background px-3 text-sm" value={categoryName} onChange={(event) => setCategoryName(event.target.value)}>
+                        <select data-routine-field="categoryName" aria-invalid={Boolean(fieldErrors.categoryName)} className="h-11 rounded-md border border-input bg-background px-3 text-sm" value={categoryName} onChange={(event) => setCategoryName(event.target.value)} disabled={disabled || saving}>
                             <option value="">เลือกหมวดงาน</option>
                             {reference.categories.map((category) => <option key={category.id} value={category.name}>{category.name}</option>)}
                         </select>
+                        {fieldErrors.categoryName ? <span className="text-sm font-normal text-status-danger-foreground" role="alert">{fieldErrors.categoryName}</span> : null}
                     </label>
                     <label className="grid gap-1 text-sm font-medium text-content-body md:col-span-2">
                         รายการ
-                        <Input value={title} onChange={(event) => setTitle(event.target.value)} />
+                        <Input data-routine-field="title" aria-invalid={Boolean(fieldErrors.title)} value={title} onChange={(event) => setTitle(event.target.value)} maxLength={255} disabled={disabled || saving} />
+                        {fieldErrors.title ? <span className="text-sm font-normal text-status-danger-foreground" role="alert">{fieldErrors.title}</span> : null}
                     </label>
                 </div>
 
-                <div className="rounded-lg border border-border-subtle bg-surface-subtle p-4">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                        <div>
-                            <h3 className="text-sm font-semibold text-content-heading">ผู้รับผิดชอบ</h3>
-                            <p className="mt-1 text-xs text-content-secondary">จาก Excel: {row.data.ownerNames.join(", ") || "ไม่พบชื่อ"}</p>
-                        </div>
-                        <span className="text-xs text-content-secondary">เลือกแล้ว {selectedEmployeeIds.size} คน</span>
-                    </div>
-                    <div className="mt-3 grid max-h-56 gap-2 overflow-y-auto sm:grid-cols-2">
-                        {reference.employees.map((employee) => {
-                            const chosen = assignees[employee.id];
-                            const inactive = employee.status !== undefined && employee.status !== "ACTIVE" || Boolean(employee.deletedAt);
-                            return (
-                                <div key={employee.id} className="flex items-center gap-2 rounded-md border border-border-subtle bg-background px-3 py-2">
-                                    <input type="checkbox" checked={Boolean(chosen)} disabled={disabled || (inactive && !chosen)} onChange={() => toggleEmployee(employee.id)} aria-label={`เลือก ${employeeName(employee)}`} />
-                                    <span className="min-w-0 flex-1 text-sm text-content-body">{employeeName(employee)}{inactive ? <span className="ml-1 text-xs text-status-danger-foreground">(ไม่พร้อมใช้งาน)</span> : null}</span>
-                                    {chosen ? <select className="h-9 max-w-36 rounded-md border border-input bg-background px-2 text-xs" value={chosen} onChange={(event) => setAssignees((current) => ({ ...current, [employee.id]: event.target.value as "OWNER" | "CO_OWNER" }))} aria-label={`บทบาท ${employeeName(employee)}`}><option value="OWNER">หลัก</option><option value="CO_OWNER">ร่วม</option></select> : null}
-                                </div>
-                            );
-                        })}
-                    </div>
-                    {reference.employees.length === 0 ? <p className="mt-3 text-sm text-content-secondary">ยังไม่มีข้อมูลพนักงานให้เลือก</p> : null}
-                </div>
+                <RoutineAssigneePicker
+                    employees={reference.employees}
+                    assignees={assignees}
+                    onToggle={toggleEmployee}
+                    onRoleChange={updateAssigneeRole}
+                    note={`จาก Excel: ${row.data.ownerNames.join(", ") || "ไม่พบชื่อ"}`}
+                    error={fieldErrors.assignees}
+                    disabled={disabled || saving}
+                />
 
                 <details className="rounded-lg border border-border-subtle bg-surface-subtle p-4">
-                    <summary className="cursor-pointer text-sm font-semibold text-content-heading">แก้ไขข้อมูลเพิ่มเติม</summary>
+                    <summary className="cursor-pointer text-base font-semibold text-content-heading">แก้ไขข้อมูลเพิ่มเติม</summary>
                     <div className="mt-4 space-y-4">
                         <RoutineScheduleFields
                             scheduleType={scheduleType}
                             scheduleConfig={scheduleConfig}
                             businessDayPolicy={businessDayPolicy}
+                            contractStartDate={contractStartDate ?? ""}
+                            contractEndDate={contractEndDate ?? ""}
+                            contractText={contractText ?? ""}
                             onScheduleTypeChange={setScheduleType}
                             onScheduleConfigChange={setScheduleConfig}
                             onBusinessDayPolicyChange={setBusinessDayPolicy}
+                            onContractStartDateChange={(value) => setContractStartDate(value || null)}
+                            onContractEndDateChange={(value) => setContractEndDate(value || null)}
+                            onContractTextChange={(value) => setContractText(value || null)}
                             errors={fieldErrors}
+                            disabled={disabled || saving}
                         />
                         <div className="grid gap-4 md:grid-cols-2">
-                            <label className="grid gap-1 text-sm font-medium text-content-body md:col-span-2">กำหนดการจาก Excel / คำอธิบายเพิ่มเติม<Input value={scheduleText} onChange={(event) => setScheduleText(event.target.value)} /></label>
-                            <label className="grid gap-1 text-sm font-medium text-content-body">วันเริ่มสัญญา<Input data-routine-field="contractStartDate" aria-invalid={Boolean(fieldErrors.contractStartDate)} type="date" value={contractStartDate ?? ""} onChange={(event) => setContractStartDate(event.target.value || null)} />{fieldErrors.contractStartDate ? <span className="text-xs text-status-danger-foreground">{fieldErrors.contractStartDate}</span> : null}</label>
-                            <label className="grid gap-1 text-sm font-medium text-content-body">วันสิ้นสุดสัญญา<Input data-routine-field="contractEndDate" aria-invalid={Boolean(fieldErrors.contractEndDate)} type="date" value={contractEndDate ?? ""} onChange={(event) => setContractEndDate(event.target.value || null)} />{fieldErrors.contractEndDate ? <span className="text-xs text-status-danger-foreground">{fieldErrors.contractEndDate}</span> : null}</label>
-                            <label className="grid gap-1 text-sm font-medium text-content-body md:col-span-2">ข้อความสัญญา<Input value={contractText ?? ""} onChange={(event) => setContractText(event.target.value || null)} /></label>
-                            <label className="grid gap-1 text-sm font-medium text-content-body md:col-span-2">รายละเอียดเพิ่มเติม<Textarea value={extraDetails ?? ""} onChange={(event) => setExtraDetails(event.target.value || null)} /></label>
+                            <label className="grid gap-1 text-sm font-medium text-content-body md:col-span-2">กำหนดการจาก Excel / คำอธิบายเพิ่มเติม<Input data-routine-field="scheduleText" aria-invalid={Boolean(fieldErrors.scheduleText)} value={scheduleText} onChange={(event) => setScheduleText(event.target.value)} maxLength={500} disabled={disabled || saving} />{fieldErrors.scheduleText ? <span className="text-sm font-normal text-status-danger-foreground" role="alert">{fieldErrors.scheduleText}</span> : null}</label>
+                            <label className="grid gap-1 text-sm font-medium text-content-body md:col-span-2">รายละเอียดเพิ่มเติม<Textarea value={extraDetails ?? ""} onChange={(event) => setExtraDetails(event.target.value || null)} maxLength={5000} disabled={disabled || saving} /></label>
                         </div>
 
-                        <div className="rounded-lg border border-border-subtle bg-background p-4">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                        <div>
-                            <h3 className="text-sm font-semibold text-content-heading">การแจ้งเตือนล่วงหน้า</h3>
-                            <p className="mt-1 text-xs text-content-secondary">ส่งในระบบตามเวลาไทย (Asia/Bangkok) เท่านั้น</p>
-                        </div>
-                        <div className="flex flex-wrap gap-2">
-                            <select className="h-9 rounded-md border border-input bg-background px-2 text-xs" defaultValue="" onChange={(event) => { applyReminderPreset(event.target.value); event.target.value = ""; }} aria-label="เลือกชุดแจ้งเตือน">
-                                <option value="">ใช้ชุดสำเร็จรูป</option>
-                                <option value="monthly">รายเดือน: 3 และ 1 วัน</option>
-                                <option value="yearly">รายปี: 14, 7 และ 1 วัน</option>
-                                <option value="contract">ต่อสัญญา: 30, 7 และ 1 วัน</option>
-                            </select>
-                            <Button type="button" variant="outline" size="sm" onClick={() => addReminderRule()} disabled={disabled}><BellPlus /> เพิ่มกฎ</Button>
-                        </div>
-                    </div>
-                    {reminderRules.length === 0 ? <p className="mt-3 rounded-md border border-dashed border-border-subtle bg-background px-3 py-3 text-sm text-content-secondary">ยังไม่มีกฎ ระบบจะไม่ส่งการแจ้งเตือนสำหรับแม่แบบนี้</p> : (
-                        <div className="mt-3 space-y-2">
-                            {reminderRules.map((rule, index) => (
-                                <div key={`${index}-${rule.daysBefore}`} className="grid gap-3 rounded-md border border-border-subtle bg-background p-3 md:grid-cols-[110px_110px_1fr_auto_auto] md:items-end">
-                                    <label className="grid gap-1 text-xs font-medium text-content-body">ล่วงหน้า (วัน)<Input type="number" min={0} max={365} value={rule.daysBefore} onChange={(event) => updateReminderRule(index, { daysBefore: Number(event.target.value) })} /></label>
-                                    <label className="grid gap-1 text-xs font-medium text-content-body">เวลาแจ้งเตือน (Asia/Bangkok)<Input data-routine-field={`reminderRules.${index}.sendHour`} aria-invalid={Boolean(fieldErrors[`reminderRules.${index}.sendHour`])} type="time" step={3600} min="00:00" max="23:00" value={rule.sendHour} onChange={(event) => updateReminderRule(index, { sendHour: event.target.value })} />{fieldErrors[`reminderRules.${index}.sendHour`] ? <span className="text-xs text-status-danger-foreground">{fieldErrors[`reminderRules.${index}.sendHour`]}</span> : null}</label>
-                                    <label className="grid gap-1 text-xs font-medium text-content-body">ผู้รับการแจ้งเตือน<select className="h-11 rounded-md border border-input bg-background px-3 text-sm" value={rule.recipientScope} onChange={(event) => updateReminderRule(index, { recipientScope: event.target.value as RoutineReminderRecipientScope })}>{Object.entries(REMINDER_SCOPE_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
-                                    <label className="flex min-h-11 items-center gap-2 text-xs font-medium text-content-body"><input type="checkbox" checked={rule.isActive} onChange={(event) => updateReminderRule(index, { isActive: event.target.checked })} /> เปิดใช้</label>
-                                    <Button type="button" variant="ghost" size="icon-sm" onClick={() => removeReminderRule(index)} disabled={disabled} aria-label={`ลบกฎการแจ้งเตือนที่ ${index + 1}`}><Trash2 /></Button>
-                                </div>
-                            ))}
-                        </div>
-                    )}
-                        </div>
+                        <RoutineReminderFields
+                            rules={reminderRules}
+                            selectedPreset={reminderPreset}
+                            errors={fieldErrors}
+                            disabled={disabled || saving}
+                            onPresetChange={applyReminderPreset}
+                            onAddRule={() => addReminderRule()}
+                            onUpdateRule={updateReminderRule}
+                            onRemoveRule={removeReminderRule}
+                        />
                     </div>
                 </details>
 
                 <label className="flex items-center gap-3 text-sm font-medium text-content-body">
-                    <input type="checkbox" checked={selected} onChange={(event) => setSelected(event.target.checked)} />
+                    <input type="checkbox" checked={selected} onChange={(event) => setSelected(event.target.checked)} disabled={disabled || saving} />
                     เลือกรายการนี้เพื่อนำเข้า
                 </label>
 

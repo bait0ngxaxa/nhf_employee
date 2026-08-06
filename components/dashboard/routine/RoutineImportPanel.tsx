@@ -149,7 +149,7 @@ function SummaryItem({ label, value, tone = "default" }: { label: string; value:
             : tone === "danger"
                 ? "text-status-danger-foreground"
                 : "text-content-heading";
-    return <div className="rounded-lg border border-border-subtle bg-surface-raised px-3 py-3"><p className="text-xs text-content-secondary">{label}</p><p className={`mt-1 text-2xl font-bold ${toneClass}`}>{value}</p></div>;
+    return <div className="rounded-lg border border-border-subtle bg-surface-raised px-4 py-4"><p className="text-sm font-medium leading-5 text-content-secondary">{label}</p><p className={`mt-2 text-3xl font-bold tracking-tight tabular-nums ${toneClass}`}>{value}</p></div>;
 }
 
 export function RoutineImportPanel() {
@@ -335,16 +335,16 @@ export function RoutineImportPanel() {
     if (!batchId) {
         return (
             <div className="space-y-5">
-                <div className="rounded-xl border border-border-subtle bg-surface-raised p-5">
+                <div className="rounded-xl border border-border-subtle bg-surface-raised p-5 sm:p-6">
                     <div className="flex items-start gap-3">
                         <div className="rounded-lg bg-brand-surface p-2 text-brand-foreground"><FileSpreadsheet className="h-5 w-5" /></div>
-                        <div><h3 className="font-semibold text-content-heading">นำเข้าข้อมูลจาก Excel</h3><p className="mt-1 max-w-2xl text-sm leading-6 text-content-secondary">ระบบจะอ่านเฉพาะชีต มสช. แสดงตัวอย่างให้ตรวจสอบก่อนสร้างแม่แบบงาน ชีตอื่นในไฟล์จะไม่ถูกนำเข้า</p></div>
+                        <div><h3 className="text-lg font-semibold tracking-tight text-content-heading">นำเข้าข้อมูลจาก Excel</h3><p className="mt-1 max-w-2xl text-sm leading-6 text-content-secondary">ระบบจะอ่านเฉพาะชีต มสช. แสดงตัวอย่างให้ตรวจสอบก่อนสร้างแม่แบบงาน ชีตอื่นในไฟล์จะไม่ถูกนำเข้า</p></div>
                     </div>
                     <div className="mt-5 grid gap-3 md:grid-cols-[1fr_auto] md:items-end">
                         <label className="grid gap-1 text-sm font-medium text-content-body">ไฟล์ Excel (.xls หรือ .xlsx)<Input ref={inputRef} type="file" accept=".xls,.xlsx,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" onChange={(event) => { setFile(event.target.files?.[0] ?? null); setError(null); }} /></label>
                         <Button type="button" onClick={() => void upload()} disabled={!file || uploading}>{uploading ? "กำลังอ่านไฟล์..." : <><UploadCloud /> อัปโหลดและดูตัวอย่าง</>}</Button>
                     </div>
-                    <p className="mt-3 text-xs text-content-secondary">ขนาดไฟล์ไม่เกิน 10 MB · ไม่ประเมินสูตรหรือ macro · ข้อมูลจริงจะยังไม่ถูกสร้างจนกว่าจะกดยืนยัน</p>
+                    <p className="mt-3 text-sm leading-6 text-content-secondary">ขนาดไฟล์ไม่เกิน 10 MB · ไม่ประเมินสูตรหรือ macro · ข้อมูลจริงจะยังไม่ถูกสร้างจนกว่าจะกดยืนยัน</p>
                 </div>
                 {error ? <p className="rounded-lg border border-status-danger-border bg-status-danger-surface px-4 py-3 text-sm text-status-danger-foreground" role="alert">{error}</p> : null}
             </div>
@@ -358,11 +358,11 @@ export function RoutineImportPanel() {
     return (
         <div className="space-y-5">
             <div className="flex flex-wrap items-start justify-between gap-3">
-                <div><h3 className="text-lg font-semibold text-content-heading">ตัวอย่างการนำเข้า · ชีต {ROUTINE_IMPORT_TARGET_SHEET}</h3><p className="mt-1 text-sm text-content-secondary">{batch.originalFileName} · hash {batch.fileHashPrefix} · อ้างอิงวันที่ {formatDate(batch.asOfDate)}</p></div>
+                <div><h3 className="text-xl font-semibold tracking-tight text-content-heading">ตัวอย่างการนำเข้า · ชีต {ROUTINE_IMPORT_TARGET_SHEET}</h3><p className="mt-1 text-sm leading-6 text-content-secondary">{batch.originalFileName} · hash {batch.fileHashPrefix} · อ้างอิงวันที่ {formatDate(batch.asOfDate)}</p></div>
                 <div className="flex flex-wrap gap-2"><Button type="button" variant="outline" onClick={() => void loadBatch()} disabled={loading || applying}><RefreshCw /> รีเฟรช</Button>{batch.status === "READY" || batch.status === "PREVIEW" ? <Button type="button" variant="outline" onClick={() => void cancelBatch()} disabled={applying}><Trash2 /> ยกเลิกชุดนี้</Button> : null}<Button type="button" variant="outline" onClick={reset} disabled={applying}>อัปโหลดไฟล์ใหม่</Button></div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-7">
+            <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-7">
                 <SummaryItem label="อ่านได้ทั้งหมด" value={batch.totalRows} />
                 <SummaryItem label="พร้อมนำเข้า" value={batch.validRows} tone="success" />
                 <SummaryItem label="ต้อง map ผู้รับผิดชอบ" value={batch.unresolvedOwnerRows} tone="warning" />
@@ -372,26 +372,26 @@ export function RoutineImportPanel() {
                 <SummaryItem label="ข้าม" value={batch.excludedRows} />
             </div>
 
-            {batch.ignoredSheetNames.length > 0 ? <div className="rounded-lg border border-status-warning-border bg-status-warning-surface px-4 py-3 text-sm text-status-warning-foreground"><p className="font-semibold">ชีตที่พบแต่ยังไม่เปิดใช้งาน</p><p className="mt-1">{batch.ignoredSheetNames.join(" · ")}</p></div> : null}
-            {error ? <p className="rounded-lg border border-status-danger-border bg-status-danger-surface px-4 py-3 text-sm text-status-danger-foreground" role="alert">{error}</p> : null}
-            {batch.status === "COMPLETED" ? <div className="flex items-start gap-3 rounded-lg border border-status-success-border bg-status-success-surface px-4 py-3 text-sm text-status-success-foreground"><CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0" /><div><p className="font-semibold">นำเข้าชุดข้อมูลนี้เสร็จแล้ว</p><p className="mt-1">สร้างรายการ Routine แล้ว {batch.appliedRows} รายการ</p></div></div> : null}
+            {batch.ignoredSheetNames.length > 0 ? <div className="rounded-lg border border-status-warning-border bg-status-warning-surface px-4 py-3 text-sm leading-6 text-status-warning-foreground"><p className="font-semibold">ชีตที่พบแต่ยังไม่เปิดใช้งาน</p><p className="mt-1">{batch.ignoredSheetNames.join(" · ")}</p></div> : null}
+            {error ? <p className="rounded-lg border border-status-danger-border bg-status-danger-surface px-4 py-3 text-sm leading-6 text-status-danger-foreground" role="alert">{error}</p> : null}
+            {batch.status === "COMPLETED" ? <div className="flex items-start gap-3 rounded-lg border border-status-success-border bg-status-success-surface px-4 py-3 text-sm leading-6 text-status-success-foreground"><CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0" /><div><p className="font-semibold">นำเข้าชุดข้อมูลนี้เสร็จแล้ว</p><p className="mt-1">สร้างรายการ Routine แล้ว {batch.appliedRows} รายการ</p></div></div> : null}
 
-            <div className="grid gap-3 rounded-xl border border-border-subtle bg-surface-raised p-4 lg:grid-cols-[1fr_180px_220px_auto_auto] lg:items-end">
+            <div className="grid gap-4 rounded-xl border border-border-subtle bg-surface-raised p-4 sm:p-5 lg:grid-cols-[minmax(0,1fr)_180px_220px_auto_auto] lg:items-end">
                 <label className="grid gap-1 text-sm font-medium text-content-body">ค้นหา<Input value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} placeholder="รายการ หมวดงาน หรือผู้รับผิดชอบ" /></label>
                 <label className="grid gap-1 text-sm font-medium text-content-body">สถานะ<select className="h-11 rounded-md border border-input bg-background px-3 text-sm" value={filter} onChange={(event) => { setFilter(event.target.value as ImportFilter); setPage(1); }}><option value="">ทุกสถานะ</option>{Object.entries(STATUS_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
                 <label className="grid gap-1 text-sm font-medium text-content-body">ประเด็น<select className="h-11 rounded-md border border-input bg-background px-3 text-sm" value={issue} onChange={(event) => { setIssue(event.target.value as ImportIssue); setPage(1); }}><option value="">ทุกประเด็น</option><option value="UNRESOLVED_OWNER">ไม่มีผู้รับผิดชอบ / ยัง map ไม่ได้</option></select></label>
                 <label className="flex h-11 items-center gap-2 text-sm font-medium text-content-body"><input type="checkbox" checked={selectedOnly} onChange={(event) => { setSelectedOnly(event.target.checked); setPage(1); }} /> เฉพาะที่เลือก</label>
-                <p className="text-xs text-content-secondary">ผู้รับผิดชอบระบบ: {batch.uploadedBy.name}</p>
+                <p className="text-sm leading-6 text-content-secondary">ผู้รับผิดชอบระบบ: {batch.uploadedBy.name}</p>
             </div>
 
             {loading ? <LoadingState label="กำลังโหลดแถวข้อมูล..." compact /> : rowsPage && rowsPage.rows.length === 0 ? <EmptyState compact title="ไม่พบแถวตามตัวกรอง" description="ลองเปลี่ยนตัวกรองหรือค้นหาคำอื่น" /> : rowsPage ? (
                 <div className="overflow-hidden rounded-xl border border-border-subtle bg-surface-raised">
                     <div className="overflow-x-auto">
                         <table className="w-full min-w-[1100px] text-sm">
-                            <thead className="bg-surface-subtle text-left text-xs text-content-secondary"><tr><th className="w-12 px-3 py-3">เลือก</th><th className="px-3 py-3">แถว</th><th className="px-3 py-3">หมวด / รายการ</th><th className="px-3 py-3">ผู้รับผิดชอบ</th><th className="px-3 py-3">กำหนดการ</th><th className="px-3 py-3">สัญญา</th><th className="px-3 py-3">สถานะ</th><th className="px-3 py-3">จัดการ</th></tr></thead>
+                            <thead className="bg-surface-subtle text-left text-sm text-content-secondary"><tr><th className="w-12 px-4 py-3 font-semibold">เลือก</th><th className="px-4 py-3 font-semibold">แถว</th><th className="px-4 py-3 font-semibold">หมวด / รายการ</th><th className="px-4 py-3 font-semibold">ผู้รับผิดชอบ</th><th className="px-4 py-3 font-semibold">กำหนดการ</th><th className="px-4 py-3 font-semibold">สัญญา</th><th className="px-4 py-3 font-semibold">สถานะ</th><th className="px-4 py-3 font-semibold">จัดการ</th></tr></thead>
                             <tbody>{rowsPage.rows.map((row) => {
                                 const terminal = row.status === "ALREADY_IMPORTED" || row.status === "CONFLICT" || row.status === "APPLIED";
-                                return <tr key={row.id} className="border-t border-border-subtle align-top"><td className="px-3 py-3"><input type="checkbox" checked={row.selected} disabled={terminal || row.status === "REQUIRES_REVIEW" || applying} onChange={(event) => void updateSelection(row, event.target.checked)} aria-label={`เลือกแถว ${row.sourceRow}`} /></td><td className="px-3 py-3 text-content-secondary">{row.sourceRow}</td><td className="max-w-xs px-3 py-3"><p className="font-medium text-content-heading">{row.data.title}</p><p className="mt-1 text-xs text-content-secondary">{row.data.categoryName || "ไม่มีหมวด"}</p></td><td className="max-w-xs px-3 py-3"><p className="text-content-body">{row.data.ownerNames.join(", ") || "ไม่พบชื่อ"}</p><p className="mt-1 text-xs text-content-secondary">{row.data.mappedEmployeeNames.join(", ") || "ยังไม่ map"}</p></td><td className="max-w-xs px-3 py-3"><p className="text-xs text-content-secondary">{row.data.scheduleText || "-"}</p><p className="mt-1 break-all text-xs text-content-body">{scheduleLabel(row)}</p></td><td className="max-w-xs px-3 py-3"><p className="text-xs text-content-body">{row.data.contractText || "-"}</p><p className="mt-1 text-xs text-content-secondary">{formatDate(row.data.contractStartDate)} – {formatDate(row.data.contractEndDate)}</p></td><td className="px-3 py-3"><Badge variant="outline" className={STATUS_CLASSES[row.status]}>{rowStatusLabel(row)}</Badge>{row.reviewReasons.length > 0 ? <ul className="mt-2 max-w-52 space-y-1 text-xs text-status-warning-foreground">{row.reviewReasons.slice(0, 2).map((reason) => <li key={reason}>• {reviewLabel(reason)}</li>)}</ul> : null}</td><td className="px-3 py-3"><Button type="button" variant="outline" size="sm" disabled={terminal || applying || !reference} onClick={() => setEditorRow(row)}><Pencil /> แก้ไข</Button></td></tr>;
+                                return <tr key={row.id} className="border-t border-border-subtle align-top"><td className="px-4 py-4"><input type="checkbox" checked={row.selected} disabled={terminal || row.status === "REQUIRES_REVIEW" || applying} onChange={(event) => void updateSelection(row, event.target.checked)} aria-label={`เลือกแถว ${row.sourceRow}`} /></td><td className="px-4 py-4 text-content-secondary">{row.sourceRow}</td><td className="max-w-xs px-4 py-4"><p className="text-base font-semibold leading-6 text-content-heading">{row.data.title}</p><p className="mt-1 text-sm text-content-secondary">{row.data.categoryName || "ไม่มีหมวด"}</p></td><td className="max-w-xs px-4 py-4"><p className="text-sm leading-6 text-content-body">{row.data.ownerNames.join(", ") || "ไม่พบชื่อ"}</p><p className="mt-1 text-sm text-content-secondary">{row.data.mappedEmployeeNames.join(", ") || "ยังไม่ map"}</p></td><td className="max-w-xs px-4 py-4"><p className="text-sm text-content-secondary">{row.data.scheduleText || "-"}</p><p className="mt-1 break-all text-sm text-content-body">{scheduleLabel(row)}</p></td><td className="max-w-xs px-4 py-4"><p className="text-sm text-content-body">{row.data.contractText || "-"}</p><p className="mt-1 text-sm text-content-secondary">{formatDate(row.data.contractStartDate)} – {formatDate(row.data.contractEndDate)}</p></td><td className="px-4 py-4"><Badge variant="outline" className={STATUS_CLASSES[row.status]}>{rowStatusLabel(row)}</Badge>{row.reviewReasons.length > 0 ? <ul className="mt-2 max-w-52 space-y-1 text-sm text-status-warning-foreground">{row.reviewReasons.slice(0, 2).map((reason) => <li key={reason}>• {reviewLabel(reason)}</li>)}</ul> : null}</td><td className="px-4 py-4"><Button type="button" variant="outline" size="sm" disabled={terminal || applying || !reference} onClick={() => setEditorRow(row)}><Pencil /> แก้ไข</Button></td></tr>;
                             })}</tbody>
                         </table>
                     </div>
@@ -400,7 +400,7 @@ export function RoutineImportPanel() {
             ) : null}
 
             <div className="sticky bottom-3 z-10 flex flex-col gap-3 rounded-xl border border-border-subtle bg-surface-raised/95 p-4 shadow-md backdrop-blur-sm sm:flex-row sm:items-center sm:justify-between">
-                <div className="text-sm"><p className="font-semibold text-content-heading">รายการที่เลือก {batch.selectedRows} รายการ</p><p className="mt-1 text-xs text-content-secondary">พร้อมนำเข้า {batch.validRows} · ยัง map ไม่ครบ {batch.unresolvedOwnerRows} · ข้าม {batch.excludedRows}</p></div>
+                <div className="text-sm"><p className="text-base font-semibold text-content-heading">รายการที่เลือก {batch.selectedRows} รายการ</p><p className="mt-1 text-sm leading-6 text-content-secondary">พร้อมนำเข้า {batch.validRows} · ยัง map ไม่ครบ {batch.unresolvedOwnerRows} · ข้าม {batch.excludedRows}</p></div>
                 <Button type="button" onClick={() => setConfirmOpen(true)} disabled={!canApply}><Check /> ยืนยันและนำเข้า</Button>
             </div>
 
