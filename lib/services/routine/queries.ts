@@ -389,6 +389,14 @@ function buildTaskMetadataWhere(
     };
 }
 
+function buildRoutineTaskOwnershipWhere(
+    queryActor: RoutineQueryActor,
+): Prisma.RoutineTaskWhereInput {
+    return queryActor.actor.role === "ADMIN"
+        ? {}
+        : { createdById: queryActor.actor.id };
+}
+
 function activeEmployeeWhere(): Prisma.EmployeeWhereInput {
     return {
         status: "ACTIVE",
@@ -874,12 +882,14 @@ export async function getRoutineSummary(queryActor: RoutineQueryActor): Promise<
 
 export async function getRoutineTasks(
     filters: RoutineTaskFilters,
+    queryActor: RoutineQueryActor,
 ): Promise<{
     tasks: RoutineTaskRow[];
     pagination: RoutinePagination;
 }> {
     const search = filters.search?.trim();
     const where: Prisma.RoutineTaskWhereInput = {
+        ...buildRoutineTaskOwnershipWhere(queryActor),
         ...(filters.activeOnly !== undefined
             ? { isActive: filters.activeOnly }
             : {}),
@@ -920,6 +930,7 @@ export async function getRoutineTasks(
 
 export async function getRoutineTaskById(
     taskId: number,
+    queryActor: RoutineQueryActor,
 ): Promise<Omit<
     RoutineTaskDetailRow,
     "contractStartDate" | "contractEndDate" | "createdAt" | "updatedAt" | "occurrences"
@@ -930,8 +941,11 @@ export async function getRoutineTaskById(
     updatedAt: string;
     occurrences: SerializedRoutineOccurrence[];
 }> {
-    const task = await prisma.routineTask.findUnique({
-        where: { id: taskId },
+    const task = await prisma.routineTask.findFirst({
+        where: {
+            id: taskId,
+            ...buildRoutineTaskOwnershipWhere(queryActor),
+        },
         select: {
             ...ROUTINE_TASK_SELECT,
             occurrences: {
@@ -958,7 +972,9 @@ export async function getRoutineTaskById(
     };
 }
 
-export async function getRoutineReferenceData(): Promise<{
+export async function getRoutineReferenceData(
+    queryActor: RoutineQueryActor,
+): Promise<{
     units: Array<{ id: number; code: string; name: string }>;
     categories: Array<{ id: number; name: string; sortOrder: number }>;
     employees: Array<{
@@ -981,7 +997,19 @@ export async function getRoutineReferenceData(): Promise<{
             orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
         }),
         prisma.employee.findMany({
-            where: { status: "ACTIVE", deletedAt: null },
+            where: queryActor.actor.role === "ADMIN"
+                ? { status: "ACTIVE", deletedAt: null }
+                : {
+                      status: "ACTIVE",
+                      deletedAt: null,
+                      user: {
+                          is: {
+                              id: queryActor.actor.id,
+                              isActive: true,
+                              deletedAt: null,
+                          },
+                      },
+                  },
             select: {
                 id: true,
                 firstName: true,

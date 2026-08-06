@@ -78,6 +78,7 @@ describe("RoutineSection tabs", () => {
         render(<RoutineSection />);
 
         expect(screen.getByText("รายการของฉัน")).toBeInTheDocument();
+        expect(screen.getByText("จัดการงานของฉัน")).toBeInTheDocument();
         expect(screen.queryByText("รายการทั้งหมด (Admin)")).not.toBeInTheDocument();
         expect(screen.queryByText("ตั้งค่างานประจำ")).not.toBeInTheDocument();
         expect(screen.queryByText("นำเข้าจาก Excel")).not.toBeInTheDocument();

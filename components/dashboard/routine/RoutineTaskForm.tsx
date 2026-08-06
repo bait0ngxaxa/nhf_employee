@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -43,6 +43,7 @@ interface RoutineTaskFormProps {
     initialTask: RoutineTask | null;
     onSaved: () => void;
     onCancel: () => void;
+    mode?: "SELF_SERVICE" | "ADMIN";
 }
 
 interface TaskFormState {
@@ -160,11 +161,22 @@ export function RoutineTaskForm({
     initialTask,
     onSaved,
     onCancel,
+    mode = "ADMIN",
 }: RoutineTaskFormProps) {
     const units = uniqueRoutineUnits(reference.units);
+    const isSelfService = mode === "SELF_SERVICE";
+    const selfEmployee = isSelfService ? reference.employees[0] : undefined;
+    const initialAssignees = useMemo(
+        () => initialTask?.assignees.length
+            ? Object.fromEntries(initialTask.assignees.map((assignee) => [assignee.employeeId, assignee.role])) as Record<number, RoutineAssigneeRole>
+            : selfEmployee
+                ? { [selfEmployee.id]: "OWNER" as const }
+                : {},
+        [initialTask, selfEmployee],
+    );
     const [form, setForm] = useState<TaskFormState>(() => taskToForm(initialTask));
     const [assignees, setAssignees] = useState<Record<number, RoutineAssigneeRole>>(
-        () => Object.fromEntries(initialTask?.assignees.map((assignee) => [assignee.employeeId, assignee.role]) ?? []) as Record<number, RoutineAssigneeRole>,
+        () => initialAssignees,
     );
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [reminderPreset, setReminderPreset] = useState<RoutineReminderPreset | "">("");
@@ -175,14 +187,12 @@ export function RoutineTaskForm({
 
     useEffect(() => {
         setForm(taskToForm(initialTask));
-        setAssignees(
-            Object.fromEntries(initialTask?.assignees.map((assignee) => [assignee.employeeId, assignee.role]) ?? []) as Record<number, RoutineAssigneeRole>,
-        );
+        setAssignees(initialAssignees);
         setError(null);
         setFieldErrors({});
         setReminderPreset("");
         createIdempotencyKeyRef.current = initialTask ? null : createIdempotencyKey();
-    }, [initialTask]);
+    }, [initialAssignees, initialTask]);
 
     function updateField<K extends keyof TaskFormState>(key: K, value: TaskFormState[K]): void {
         setForm((current) => ({ ...current, [key]: value }));
@@ -259,9 +269,14 @@ export function RoutineTaskForm({
         setError(null);
         setFieldErrors({});
         const ownerCount = Object.values(assignees).filter((role) => role === "OWNER").length;
-        if (ownerCount !== 1) {
+        if (!isSelfService && ownerCount !== 1) {
             setError("กรุณาเลือกผู้รับผิดชอบหลัก 1 คน");
             setFieldErrors({ assignees: "ต้องมีผู้รับผิดชอบหลัก 1 คน" });
+            submitLockRef.current = false;
+            return;
+        }
+        if (isSelfService && !selfEmployee) {
+            setError("ไม่พบข้อมูลพนักงานของบัญชีผู้ใช้");
             submitLockRef.current = false;
             return;
         }
@@ -270,7 +285,7 @@ export function RoutineTaskForm({
             daysBefore: Number(rule.daysBefore),
             sendHour: parseRoutineSendTime(rule.sendHour),
             channel: "IN_APP" as const,
-            recipientScope: rule.recipientScope,
+            recipientScope: isSelfService ? "ASSIGNEES" : rule.recipientScope,
             isActive: rule.isActive,
         }));
         const reminderTimeErrors = getRoutineReminderFieldErrors(form.reminderRules);
@@ -299,10 +314,12 @@ export function RoutineTaskForm({
                 ...rule,
                 sendHour: rule.sendHour ?? -1,
             })),
-            assignees: Object.entries(assignees).map(([employeeId, role]) => ({
-                employeeId: Number(employeeId),
-                role,
-            })),
+            assignees: isSelfService && selfEmployee
+                ? [{ employeeId: selfEmployee.id, role: "OWNER" as const }]
+                : Object.entries(assignees).map(([employeeId, role]) => ({
+                      employeeId: Number(employeeId),
+                      role,
+                  })),
             ...(initialTask ? { version: initialTask.version } : {}),
         };
         const parsed = initialTask
@@ -377,9 +394,14 @@ export function RoutineTaskForm({
             noValidate
         >
             <div className="space-y-1">
-                <h3 className="text-xl font-semibold tracking-tight text-content-heading">{initialTask ? "แก้ไขแม่แบบงานประจำ" : "สร้างแม่แบบงานประจำ"}</h3>
+                <h3 className="text-xl font-semibold tracking-tight text-content-heading">{initialTask ? (isSelfService ? "แก้ไขแม่แบบงานของฉัน" : "แก้ไขแม่แบบงานประจำ") : (isSelfService ? "สร้างแม่แบบงานของฉัน" : "สร้างแม่แบบงานประจำ")}</h3>
                 <p className="max-w-prose text-sm leading-6 text-content-secondary">กำหนดข้อมูลหลัก ตารางงาน ผู้รับผิดชอบ และการแจ้งเตือนในแบบฟอร์มเดียว</p>
             </div>
+            {isSelfService ? (
+                <div className="rounded-lg border border-brand-border bg-brand-surface px-4 py-3 text-sm leading-6 text-brand-strong">
+                    ผู้รับผิดชอบคือคุณ และการแจ้งเตือนจะส่งทั้งในระบบและอีเมล
+                </div>
+            ) : null}
             {error ? <p className="rounded-lg border border-status-danger-border bg-status-danger-surface px-4 py-3 text-sm leading-6 text-status-danger-foreground" role="alert">{error}</p> : null}
             <div className="grid gap-5 md:grid-cols-2">
                 <label className="grid gap-1 text-sm font-medium text-content-body">หน่วยงาน
@@ -432,20 +454,32 @@ export function RoutineTaskForm({
                 selectedPreset={reminderPreset}
                 errors={fieldErrors}
                 disabled={isSubmitting}
+                selfService={isSelfService}
                 onPresetChange={applyReminderPreset}
                 onAddRule={() => addReminderRule()}
                 onUpdateRule={updateReminderRule}
                 onRemoveRule={removeReminderRule}
             />
 
-            <RoutineAssigneePicker
-                employees={reference.employees}
-                assignees={assignees}
-                onToggle={toggleEmployee}
-                onRoleChange={updateAssigneeRole}
-                error={fieldErrors.assignees}
-                disabled={isSubmitting}
-            />
+            {isSelfService ? (
+                <fieldset className="space-y-2 rounded-xl border border-border-subtle bg-surface-subtle p-4 sm:p-5">
+                    <legend className="px-1 text-base font-semibold text-content-heading">ผู้รับผิดชอบ</legend>
+                    <p className="text-sm leading-6 text-content-secondary">
+                        {selfEmployee
+                            ? `${selfEmployee.firstName} ${selfEmployee.lastName}`.trim()
+                            : "ไม่พบข้อมูลพนักงานของบัญชีผู้ใช้"}
+                    </p>
+                </fieldset>
+            ) : (
+                <RoutineAssigneePicker
+                    employees={reference.employees}
+                    assignees={assignees}
+                    onToggle={toggleEmployee}
+                    onRoleChange={updateAssigneeRole}
+                    error={fieldErrors.assignees}
+                    disabled={isSubmitting}
+                />
+            )}
 
             <div>
                 <label className="grid gap-1 text-sm font-medium text-content-body">รายละเอียดเพิ่มเติม
@@ -455,7 +489,7 @@ export function RoutineTaskForm({
             <label className="flex min-h-11 items-center gap-3 text-sm font-medium text-content-body"><input type="checkbox" checked={form.isActive} onChange={(event) => updateField("isActive", event.target.checked)} disabled={isSubmitting} /> เปิดใช้งานแม่แบบงานนี้</label>
             <div className="flex flex-wrap justify-end gap-2">
                 <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting}>ยกเลิก</Button>
-                <Button type="submit" disabled={isSubmitting}>{isSubmitting ? "กำลังบันทึก..." : "บันทึกแม่แบบงาน"}</Button>
+                <Button type="submit" disabled={isSubmitting}>{isSubmitting ? "กำลังบันทึก..." : isSelfService ? "บันทึกงานของฉัน" : "บันทึกแม่แบบงาน"}</Button>
             </div>
         </form>
     );

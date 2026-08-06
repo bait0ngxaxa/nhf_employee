@@ -4,6 +4,7 @@ import { mockDeep, mockReset } from "vitest-mock-extended";
 
 import { prisma } from "@/lib/db/prisma";
 import {
+    createRoutineTaskInTransaction,
     reassignRoutineOccurrence,
     updateRoutineOccurrenceOverride,
     updateRoutineOccurrenceDueDate,
@@ -544,5 +545,197 @@ describe("NHF Routine mutations", () => {
             undefined,
             { previousAssignees: undefined },
         );
+    });
+
+    it("canonicalizes a self-service task to the authenticated employee", async () => {
+        const createdTask = {
+            id: 72,
+            version: 1,
+            unitId: 1,
+            categoryId: 1,
+            title: "งานของฉัน",
+        };
+        prismaMock.user.findUnique.mockResolvedValue(
+            asNever(activeUser("USER", 11)),
+        );
+        prismaMock.routineUnit.findFirst.mockResolvedValue(asNever({ id: 1 }));
+        prismaMock.routineCategory.findFirst.mockResolvedValue(asNever({ id: 1 }));
+        prismaMock.employee.findMany.mockResolvedValue(asNever([{ id: 11 }]));
+        prismaMock.routineTask.create.mockResolvedValue(asNever(createdTask));
+        prismaMock.routineTask.findUniqueOrThrow.mockResolvedValue(asNever(createdTask));
+
+        await createRoutineTaskInTransaction(
+            prismaMock as unknown as Prisma.TransactionClient,
+            {
+                unitId: 1,
+                categoryId: 1,
+                title: "งานของฉัน",
+                scheduleType: "MONTHLY_DAY",
+                scheduleConfig: { day: 10, monthOffset: 0 },
+                businessDayPolicy: "NONE",
+                isActive: true,
+                assignees: [{ employeeId: 999, role: "OWNER" }],
+                sourceFileName: "spoof.xlsx",
+                sourceSheet: "Sheet1",
+                sourceRow: 12,
+                reminderRules: [{
+                    daysBefore: 1,
+                    sendHour: 9,
+                    channel: "IN_APP",
+                    recipientScope: "ADMINS",
+                    isActive: true,
+                }],
+            },
+            actor(3, "USER"),
+        );
+
+        expect(prismaMock.routineTask.create).toHaveBeenCalledWith({
+            data: expect.objectContaining({
+                createdById: 3,
+                updatedById: 3,
+                sourceFileName: null,
+                sourceSheet: null,
+                sourceRow: null,
+                assignees: { create: [{ employeeId: 11, role: "OWNER" }] },
+                reminderRules: {
+                    create: [{
+                        daysBefore: 1,
+                        sendHour: 9,
+                        channel: "IN_APP",
+                        recipientScope: "ASSIGNEES",
+                        isActive: true,
+                    }],
+                },
+            }),
+        });
+    });
+
+    it("rejects self-service creation when the employee is inactive", async () => {
+        prismaMock.user.findUnique.mockResolvedValue(
+            asNever(activeUser("USER", 11, "INACTIVE")),
+        );
+
+        await expect(
+            createRoutineTaskInTransaction(
+                prismaMock as unknown as Prisma.TransactionClient,
+                {
+                    unitId: 1,
+                    categoryId: 1,
+                    title: "งานของฉัน",
+                    scheduleType: "MONTHLY_DAY",
+                    scheduleConfig: { day: 10, monthOffset: 0 },
+                    businessDayPolicy: "NONE",
+                    isActive: true,
+                    assignees: [{ employeeId: 999, role: "OWNER" }],
+                },
+                actor(3, "USER"),
+            ),
+        ).rejects.toMatchObject({ code: "FORBIDDEN", statusCode: 403 });
+        expect(prismaMock.routineTask.create).not.toHaveBeenCalled();
+    });
+
+    it("does not let self-service updates change assignees or import metadata", async () => {
+        const current = {
+            id: 71,
+            unitId: 1,
+            categoryId: 1,
+            title: "งานเดิม",
+            description: null,
+            scheduleType: "ONE_TIME",
+            scheduleConfig: { date: "2027-08-04" },
+            scheduleText: null,
+            contractStartDate: null,
+            contractEndDate: null,
+            contractText: null,
+            extraDetails: null,
+            businessDayPolicy: "NONE",
+            isActive: true,
+            version: 1,
+            sourceFileName: null,
+            sourceSheet: null,
+            sourceRow: null,
+            createdById: 3,
+            updatedById: 3,
+            createdAt: new Date("2026-01-01T00:00:00.000Z"),
+            updatedAt: new Date("2026-01-01T00:00:00.000Z"),
+            unit: { id: 1, code: "มสช.", name: "มสช.", isActive: true },
+            category: { id: 1, name: "อื่น ๆ", sortOrder: 1, isActive: true },
+            assignees: [{ employeeId: 11, role: "OWNER" }],
+            reminderRules: [{
+                id: 31,
+                daysBefore: 7,
+                sendHour: 9,
+                channel: "IN_APP",
+                recipientScope: "ASSIGNEES",
+                isActive: true,
+            }],
+        };
+        prismaMock.user.findUnique.mockResolvedValue(
+            asNever(activeUser("USER", 11)),
+        );
+        prismaMock.routineUnit.findFirst.mockResolvedValue(asNever({ id: 1 }));
+        prismaMock.routineCategory.findFirst.mockResolvedValue(asNever({ id: 1 }));
+        prismaMock.routineTask.findFirst.mockResolvedValue(asNever(current));
+        prismaMock.routineTask.updateMany.mockResolvedValue(asNever({ count: 1 }));
+        prismaMock.routineTask.findUniqueOrThrow.mockResolvedValue(
+            asNever({ ...current, version: 2, title: "แก้ไขแล้ว" }),
+        );
+
+        await updateRoutineTask(
+            71,
+            {
+                version: 1,
+                title: "แก้ไขแล้ว",
+                assignees: [{ employeeId: 999, role: "OWNER" }],
+                sourceFileName: "spoof.xlsx",
+                sourceSheet: "Sheet1",
+                sourceRow: 1,
+                reminderRules: [{
+                    daysBefore: 3,
+                    sendHour: 10,
+                    channel: "IN_APP",
+                    recipientScope: "ADMINS",
+                    isActive: true,
+                }],
+            },
+            actor(3, "USER"),
+        );
+
+        expect(prismaMock.routineTask.updateMany).toHaveBeenCalledWith({
+            where: { id: 71, version: 1, createdById: 3 },
+            data: expect.objectContaining({
+                title: "แก้ไขแล้ว",
+                updatedById: 3,
+            }),
+        });
+        expect(prismaMock.routineTaskAssignee.deleteMany).not.toHaveBeenCalled();
+        expect(prismaMock.routineReminderRule.createMany).toHaveBeenCalledWith({
+            data: [{
+                taskId: 71,
+                createdAt: expect.any(Date),
+                updatedAt: expect.any(Date),
+                daysBefore: 3,
+                sendHour: 10,
+                channel: "IN_APP",
+                recipientScope: "ASSIGNEES",
+                isActive: true,
+            }],
+        });
+    });
+
+    it("returns not found when a self-service user updates another user's task", async () => {
+        prismaMock.user.findUnique.mockResolvedValue(
+            asNever(activeUser("USER", 11)),
+        );
+        prismaMock.routineTask.findFirst.mockResolvedValue(null);
+
+        await expect(
+            updateRoutineTask(
+                71,
+                { version: 1, title: "ไม่ควรแก้ได้" },
+                actor(3, "USER"),
+            ),
+        ).rejects.toMatchObject({ code: "NOT_FOUND", statusCode: 404 });
+        expect(prismaMock.routineTask.updateMany).not.toHaveBeenCalled();
     });
 });

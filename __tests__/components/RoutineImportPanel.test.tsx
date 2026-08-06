@@ -269,7 +269,7 @@ describe("RoutineImportPanel", () => {
         fireEvent.change(titleInput, { target: { value: "รายการที่แก้ไขแล้ว" } });
         expect(titleInput).toHaveValue("รายการที่แก้ไขแล้ว");
 
-        const searchInput = screen.getByRole("searchbox", { name: "ค้นหาพนักงาน" });
+        const searchInput = await screen.findByRole("searchbox", { name: "ค้นหาพนักงาน" });
         expect(searchInput).toBeEnabled();
         fireEvent.change(searchInput, { target: { value: "สมชาย" } });
 
@@ -363,7 +363,7 @@ describe("RoutineImportPanel", () => {
         fireEvent.click(screen.getByRole("button", { name: /อัปโหลดและดูตัวอย่าง/ }));
         fireEvent.click(await screen.findByRole("button", { name: /แก้ไข/ }));
 
-        const searchInput = screen.getByRole("searchbox", { name: "ค้นหาพนักงาน" });
+        const searchInput = await screen.findByRole("searchbox", { name: "ค้นหาพนักงาน" });
         fireEvent.change(searchInput, { target: { value: "สมชาย" } });
         fireEvent.click(await screen.findByRole("option", { name: /เพิ่ม สมชาย ใจดี \(ชาย\)/ }));
         fireEvent.click(screen.getByRole("button", { name: /บันทึกแถว/ }));
@@ -594,7 +594,7 @@ describe("RoutineImportPanel", () => {
         selectUploadFile();
         fireEvent.click(screen.getByRole("button", { name: /อัปโหลดและดูตัวอย่าง/ }));
         fireEvent.click(await screen.findByRole("button", { name: /แก้ไข/ }));
-        fireEvent.change(screen.getByDisplayValue("ตรวจสอบรายการนำเข้า"), {
+        fireEvent.change(await screen.findByDisplayValue("ตรวจสอบรายการนำเข้า"), {
             target: { value: "ค่าที่ stale" },
         });
         fireEvent.click(screen.getByRole("button", { name: /บันทึกแถว/ }));

@@ -6,6 +6,8 @@ import { prisma } from "@/lib/db/prisma";
 import { createRoutineTask } from "@/lib/services/routine/mutations";
 import { createRoutineTaskRequestHash } from "@/lib/services/routine/idempotency";
 
+const assertActiveRoutineActorMock = vi.hoisted(() => vi.fn());
+
 vi.mock("@/lib/db/prisma", () => ({
     prisma: mockDeep<PrismaClient>(),
 }));
@@ -20,6 +22,7 @@ vi.mock("@/lib/db/transaction", () => ({
 
 vi.mock("@/lib/services/routine/authorization", () => ({
     assertActiveAdminInTransaction: vi.fn(),
+    assertActiveRoutineActorInTransaction: assertActiveRoutineActorMock,
     assertActiveEmployeesInTransaction: vi.fn(),
 }));
 
@@ -67,6 +70,10 @@ const task = {
 describe("Routine task create idempotency", () => {
     beforeEach(() => {
         mockReset(prismaMock);
+        assertActiveRoutineActorMock.mockResolvedValue({
+            isAdmin: true,
+            employeeId: null,
+        });
         prismaMock.routineTask.findUnique.mockResolvedValue(asNever(null));
         prismaMock.routineTask.findUniqueOrThrow.mockResolvedValue(asNever(task));
         prismaMock.routineTask.create.mockResolvedValue(asNever(task));
@@ -134,5 +141,71 @@ describe("Routine task create idempotency", () => {
 
         expect(result.replayed).toBe(true);
         expect(result.task).toMatchObject({ id: 71 });
+    });
+
+    it("hashes the canonical self-service payload instead of spoofed fields", async () => {
+        const userActor = { id: 3, role: "USER", email: "user@example.com" };
+        const spoofedInput = {
+            ...input,
+            assignees: [{ employeeId: 999, role: "OWNER" as const }],
+            sourceFileName: "spoof.xlsx",
+            sourceSheet: "Sheet1",
+            sourceRow: 12,
+            reminderRules: [{
+                daysBefore: 1,
+                sendHour: 9,
+                channel: "IN_APP" as const,
+                recipientScope: "ADMINS" as const,
+                isActive: true,
+            }],
+        };
+        assertActiveRoutineActorMock.mockResolvedValue({
+            isAdmin: false,
+            employeeId: 11,
+        });
+
+        await createRoutineTask(spoofedInput, userActor, {
+            idempotencyKey: "self-service-key",
+        });
+
+        const expectedCanonicalInput = {
+            ...spoofedInput,
+            assignees: [{ employeeId: 11, role: "OWNER" as const }],
+            sourceFileName: undefined,
+            sourceSheet: undefined,
+            sourceRow: undefined,
+            reminderRules: [{
+                daysBefore: 1,
+                sendHour: 9,
+                channel: "IN_APP" as const,
+                recipientScope: "ASSIGNEES" as const,
+                isActive: true,
+            }],
+        };
+        expect(prismaMock.routineTaskCreateIdempotency.create).toHaveBeenCalledWith({
+            data: expect.objectContaining({
+                userId: 3,
+                requestHash: createRoutineTaskRequestHash(expectedCanonicalInput),
+            }),
+        });
+        expect(prismaMock.routineTask.create).toHaveBeenCalledWith({
+            data: expect.objectContaining({
+                createdById: 3,
+                updatedById: 3,
+                sourceFileName: null,
+                sourceSheet: null,
+                sourceRow: null,
+                assignees: { create: [{ employeeId: 11, role: "OWNER" }] },
+                reminderRules: {
+                    create: [{
+                        daysBefore: 1,
+                        sendHour: 9,
+                        channel: "IN_APP",
+                        recipientScope: "ASSIGNEES",
+                        isActive: true,
+                    }],
+                },
+            }),
+        });
     });
 });

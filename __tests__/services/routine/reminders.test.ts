@@ -9,6 +9,7 @@ import {
 } from "@/lib/services/routine/reminders";
 
 const createInAppNotificationOnceMock = vi.hoisted(() => vi.fn());
+const sendRoutineReminderNotificationMock = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/db/prisma", () => ({
     prisma: mockDeep<PrismaClient>(),
@@ -22,6 +23,10 @@ vi.mock("@/lib/db/transaction", () => ({
 
 vi.mock("@/lib/services/notifications/in-app", () => ({
     createInAppNotificationOnce: createInAppNotificationOnceMock,
+}));
+
+vi.mock("@/lib/email", () => ({
+    sendRoutineReminderNotification: sendRoutineReminderNotificationMock,
 }));
 
 const prismaMock = prisma as unknown as ReturnType<typeof mockDeep<PrismaClient>>;
@@ -67,6 +72,8 @@ function buildOccurrence(overrides: Record<string, unknown> = {}) {
             id: 71,
             title: "ตรวจสอบระบบประจำเดือน",
             isActive: true,
+            unit: { name: "หน่วยงานทดสอบ" },
+            category: { name: "หมวดหมู่ทดสอบ" },
             reminderRules: [
                 {
                     id: 31,
@@ -83,7 +90,13 @@ function buildOccurrence(overrides: Record<string, unknown> = {}) {
                 employee: {
                     status: "ACTIVE",
                     deletedAt: null,
-                    user: { id: 17, isActive: true, deletedAt: null },
+                user: {
+                    id: 17,
+                    name: "สมชาย ใจดี",
+                    email: "somchai@example.com",
+                    isActive: true,
+                    deletedAt: null,
+                },
                 },
             },
         ],
@@ -101,6 +114,7 @@ describe("Routine reminder dispatch", () => {
         prismaMock.notificationOutbox.updateMany.mockResolvedValue(
             asNever({ count: 1 }),
         );
+        sendRoutineReminderNotificationMock.mockResolvedValue(true);
     });
 
     it("revalidates current state and creates a deduplicated in-app notification", async () => {
@@ -125,6 +139,15 @@ describe("Routine reminder dispatch", () => {
                 dedupeKey: "routine:91:rule:31:user:17:version:2",
             }),
             prismaMock,
+        );
+        expect(sendRoutineReminderNotificationMock).toHaveBeenCalledWith(
+            expect.objectContaining({
+                to: "somchai@example.com",
+                occurrenceId: 91,
+                ruleId: 31,
+                userId: 17,
+                reminderVersion: 2,
+            }),
         );
         expect(prismaMock.notificationOutbox.updateMany).not.toHaveBeenCalled();
     });
@@ -339,7 +362,11 @@ describe("Routine reminder dispatch", () => {
                 },
             })),
         );
-        prismaMock.user.findMany.mockResolvedValue(asNever([{ id: 99 }]));
+        prismaMock.user.findMany.mockResolvedValue(asNever([{
+            id: 99,
+            name: "ผู้ดูแลระบบ",
+            email: "admin@example.com",
+        }]));
 
         const result = await dispatchRoutineReminderOutbox(
             buildNotification(buildPayload()),
@@ -352,6 +379,129 @@ describe("Routine reminder dispatch", () => {
             expect.objectContaining({ userId: 99 }),
             prismaMock,
         );
+    });
+
+    it("deduplicates assignee and administrator recipients for both channels", async () => {
+        prismaMock.routineOccurrence.findUnique.mockResolvedValue(
+            asNever(buildOccurrence({
+                assignees: [
+                    buildOccurrence().assignees[0],
+                    {
+                        employee: {
+                            status: "ACTIVE",
+                            deletedAt: null,
+                            user: {
+                                id: 99,
+                                name: "ผู้ดูแลร่วม",
+                                email: "admin@example.com",
+                                isActive: true,
+                                deletedAt: null,
+                            },
+                        },
+                    },
+                ],
+                task: {
+                    ...buildOccurrence().task,
+                    reminderRules: [{
+                        ...buildOccurrence().task.reminderRules[0],
+                        recipientScope: "ASSIGNEES_AND_ADMINS",
+                    }],
+                },
+            })),
+        );
+        prismaMock.user.findMany.mockResolvedValue(asNever([
+            { id: 99, name: "ผู้ดูแลร่วม", email: "admin@example.com" },
+            { id: 100, name: "ผู้ดูแลระบบ", email: "admin2@example.com" },
+        ]));
+
+        const result = await dispatchRoutineReminderOutbox(
+            buildNotification(buildPayload()),
+            buildPayload(),
+            new Date("2026-08-03T02:00:00.000Z"),
+        );
+
+        expect(result).toBe("SENT");
+        expect(createInAppNotificationOnceMock.mock.calls.map(([value]) => value.userId))
+            .toEqual([17, 99, 100]);
+        expect(sendRoutineReminderNotificationMock.mock.calls.map(([value]) => value.to))
+            .toEqual(["somchai@example.com", "admin@example.com", "admin2@example.com"]);
+    });
+
+    it("does not send either channel to inactive or deleted recipients", async () => {
+        prismaMock.routineOccurrence.findUnique.mockResolvedValue(
+            asNever(buildOccurrence({
+                assignees: [
+                    {
+                        employee: {
+                            status: "INACTIVE",
+                            deletedAt: null,
+                            user: {
+                                id: 18,
+                                name: "พนักงานไม่พร้อมใช้งาน",
+                                email: "inactive@example.com",
+                                isActive: true,
+                                deletedAt: null,
+                            },
+                        },
+                    },
+                    {
+                        employee: {
+                            status: "ACTIVE",
+                            deletedAt: null,
+                            user: {
+                                id: 19,
+                                name: "บัญชีปิดใช้งาน",
+                                email: "disabled@example.com",
+                                isActive: false,
+                                deletedAt: null,
+                            },
+                        },
+                    },
+                    {
+                        employee: {
+                            status: "ACTIVE",
+                            deletedAt: new Date("2026-01-01T00:00:00.000Z"),
+                            user: {
+                                id: 20,
+                                name: "พนักงานถูกลบ",
+                                email: "deleted@example.com",
+                                isActive: true,
+                                deletedAt: null,
+                            },
+                        },
+                    },
+                ],
+            })),
+        );
+
+        const result = await dispatchRoutineReminderOutbox(
+            buildNotification(buildPayload()),
+            buildPayload(),
+            new Date("2026-08-03T02:00:00.000Z"),
+        );
+
+        expect(result).toBe("SUPERSEDED");
+        expect(createInAppNotificationOnceMock).not.toHaveBeenCalled();
+        expect(sendRoutineReminderNotificationMock).not.toHaveBeenCalled();
+    });
+
+    it("throws after committing in-app notifications when an email delivery fails", async () => {
+        prismaMock.routineOccurrence.findUnique.mockResolvedValue(
+            asNever(buildOccurrence()),
+        );
+        sendRoutineReminderNotificationMock.mockResolvedValue(false);
+
+        await expect(
+            dispatchRoutineReminderOutbox(
+                buildNotification(buildPayload()),
+                buildPayload(),
+                new Date("2026-08-03T02:00:00.000Z"),
+            ),
+        ).rejects.toThrow("Routine reminder email delivery failed");
+
+        expect(createInAppNotificationOnceMock).toHaveBeenCalledTimes(1);
+        expect(sendRoutineReminderNotificationMock).toHaveBeenCalledTimes(1);
+        expect(prismaMock.notificationOutbox.updateMany).not.toHaveBeenCalled();
     });
 
     it("does not retry an invalid payload", async () => {

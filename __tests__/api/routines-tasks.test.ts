@@ -2,16 +2,21 @@ import { NextRequest } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-    requireAdminSession: vi.fn(),
+    requireActiveWorkforceOrAdminSession: vi.fn(),
     getTasks: vi.fn(),
     createTask: vi.fn(),
 }));
 
 vi.mock("@/lib/auth/api", () => ({
-    requireAdminSession: mocks.requireAdminSession,
+    requireAdminSession: vi.fn(),
+}));
+
+vi.mock("@/lib/auth/workforce", () => ({
+    requireActiveWorkforceOrAdminSession: mocks.requireActiveWorkforceOrAdminSession,
 }));
 
 vi.mock("@/lib/services/routine", () => ({
+    RoutineServiceError: class RoutineServiceError extends Error {},
     getRoutineTasks: mocks.getTasks,
     createRoutineTask: mocks.createTask,
 }));
@@ -21,7 +26,7 @@ import { GET, POST } from "@/app/api/routines/tasks/route";
 describe("GET /api/routines/tasks active filter semantics", () => {
     beforeEach(() => {
         vi.clearAllMocks();
-        mocks.requireAdminSession.mockResolvedValue({
+        mocks.requireActiveWorkforceOrAdminSession.mockResolvedValue({
             ok: true,
             user: { id: 99, email: "admin@example.com", role: "ADMIN" },
         });
@@ -45,12 +50,33 @@ describe("GET /api/routines/tasks active filter semantics", () => {
         expect(mocks.getTasks).toHaveBeenCalledTimes(1);
         expect(mocks.getTasks.mock.calls[0]?.[0]?.activeOnly).toBe(expected);
     });
+
+    it("passes a regular user's actor scope to the management query", async () => {
+        mocks.requireActiveWorkforceOrAdminSession.mockResolvedValue({
+            ok: true,
+            user: { id: 5, email: "user@example.com", role: "USER" },
+            employeeId: 21,
+        });
+
+        const response = await GET(
+            new NextRequest("http://localhost/api/routines/tasks"),
+        );
+
+        expect(response.status).toBe(200);
+        expect(mocks.getTasks).toHaveBeenCalledWith(
+            expect.any(Object),
+            expect.objectContaining({
+                actor: expect.objectContaining({ id: 5, role: "USER" }),
+                employeeId: 21,
+            }),
+        );
+    });
 });
 
 describe("POST /api/routines/tasks idempotency", () => {
     beforeEach(() => {
         vi.clearAllMocks();
-        mocks.requireAdminSession.mockResolvedValue({
+        mocks.requireActiveWorkforceOrAdminSession.mockResolvedValue({
             ok: true,
             user: { id: 99, email: "admin@example.com", role: "ADMIN" },
         });

@@ -5,7 +5,12 @@ import {
     getTicketPriorityLabel,
 } from "@/lib/helpers/ticket-helpers";
 import type { StockRequestResultEmailPayload } from "@/lib/services/stock/notification-payloads";
-import { type EmailData, type LeaveActionPayload, type LeaveResultPayload } from "./types";
+import {
+    type EmailData,
+    type LeaveActionPayload,
+    type LeaveResultPayload,
+    type RoutineReminderEmailData,
+} from "./types";
 import type {
     LeaveCancelledAfterApprovalPayload,
     LeaveCancelledPayload,
@@ -24,6 +29,10 @@ import {
 } from "./templates/stock-request-result";
 import { getPublicOrigin } from "@/lib/network/public-url";
 import {
+    generateRoutineReminderEmailHTML,
+    generateRoutineReminderEmailText,
+} from "./templates/routine-reminder";
+import {
     APP_DASHBOARD_TABS,
     STOCK_DASHBOARD_TABS,
     toDashboardTabPath,
@@ -39,6 +48,7 @@ let isTransporterReady = false;
 const DEFAULT_EMAIL_FROM_NAME = "NHF IT Support";
 const LEAVE_EMAIL_FROM_NAME = "ระบบลา NHFapp";
 const STOCK_EMAIL_FROM_NAME = "ระบบเบิกวัสดุ NHFapp";
+const ROUTINE_EMAIL_FROM_NAME = "ระบบ NHF Routine";
 
 function getSafeErrorMessage(error: unknown): string {
     if (!(error instanceof Error)) {
@@ -233,6 +243,33 @@ export async function sendStockRequestResultNotification(
     };
 
     return sendEmail(emailData);
+}
+
+function buildRoutineReminderMessageId(data: RoutineReminderEmailData): string {
+    const safePart = (value: number | string): string =>
+        String(value).replace(/[^a-zA-Z0-9._-]/g, "-");
+    return `<nhf-routine-${safePart(data.occurrenceId)}-rule-${safePart(data.ruleId)}-user-${safePart(data.userId)}-v${safePart(data.reminderVersion)}@notifications.thainhf.org>`;
+}
+
+function buildRoutineReminderActionUrl(actionUrl: string): string {
+    const origin = getPublicOrigin();
+    const candidate = new URL(actionUrl, origin);
+    return candidate.origin === origin ? candidate.toString() : origin;
+}
+
+export async function sendRoutineReminderNotification(
+    data: RoutineReminderEmailData,
+): Promise<boolean> {
+    const actionUrl = buildRoutineReminderActionUrl(data.actionUrl);
+    const subjectTitle = data.taskTitle.replace(/[\r\n]+/g, " ").trim();
+    return sendEmail({
+        to: data.to,
+        subject: `[NHF Routine] งานใกล้ถึงกำหนด: ${subjectTitle}`,
+        html: generateRoutineReminderEmailHTML({ ...data, actionUrl }),
+        text: generateRoutineReminderEmailText({ ...data, actionUrl }),
+        messageId: buildRoutineReminderMessageId(data),
+        fromName: ROUTINE_EMAIL_FROM_NAME,
+    });
 }
 
 export async function sendNewTicketNotification(
@@ -477,6 +514,7 @@ export async function sendLeaveNotTakenConfirmedNotification(
 export const emailService = {
     sendEmail,
     sendStockRequestResultNotification,
+    sendRoutineReminderNotification,
     sendNewTicketNotification,
     sendStatusUpdateNotification,
     sendITTeamNotification,
@@ -489,4 +527,4 @@ export const emailService = {
     sendLeaveNotTakenConfirmedNotification,
 };
 
-export type { EmailData };
+export type { EmailData, RoutineReminderEmailData };

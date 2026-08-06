@@ -11,7 +11,9 @@ import {
 import {
     getRoutineOccurrenceById,
     getRoutineOccurrences,
+    getRoutineReferenceData,
     getRoutineSummary,
+    getRoutineTaskById,
     getRoutineTaskWorkItems,
     getRoutineTasks,
 } from "@/lib/services/routine/queries";
@@ -697,6 +699,9 @@ describe("NHF Routine query authorization", () => {
             activeOnly: input.activeOnly,
             page: 1,
             limit: 20,
+        }, {
+            actor: { id: 99, email: "admin@example.com", role: "ADMIN" },
+            employeeId: null,
         });
 
         expect(prismaMock.routineTask.findMany).toHaveBeenLastCalledWith(
@@ -705,6 +710,67 @@ describe("NHF Routine query authorization", () => {
         expect(prismaMock.routineTask.count).toHaveBeenLastCalledWith({
             where: expected,
         });
+    });
+
+    it("scopes routine management queries to the creator for regular users", async () => {
+        await getRoutineTasks(
+            { activeOnly: undefined, page: 1, limit: 20 },
+            {
+                actor: { id: 5, email: "user@example.com", role: "USER" },
+                employeeId: 21,
+            },
+        );
+
+        expect(prismaMock.routineTask.findMany).toHaveBeenCalledWith(
+            expect.objectContaining({ where: { createdById: 5 } }),
+        );
+        expect(prismaMock.routineTask.count).toHaveBeenCalledWith({
+            where: { createdById: 5 },
+        });
+    });
+
+    it("returns 404-compatible detail queries for another user's task", async () => {
+        prismaMock.routineTask.findFirst.mockResolvedValue(null);
+
+        await expect(
+            getRoutineTaskById(71, {
+                actor: { id: 5, email: "user@example.com", role: "USER" },
+                employeeId: 21,
+            }),
+        ).rejects.toMatchObject({ statusCode: 404, code: "NOT_FOUND" });
+
+        expect(prismaMock.routineTask.findFirst).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: { id: 71, createdById: 5 },
+            }),
+        );
+    });
+
+    it("returns only the current employee in regular-user reference data", async () => {
+        prismaMock.routineUnit.findMany.mockResolvedValue(asNever([]));
+        prismaMock.routineCategory.findMany.mockResolvedValue(asNever([]));
+        prismaMock.employee.findMany.mockResolvedValue(asNever([{ id: 21 }]));
+
+        await getRoutineReferenceData({
+            actor: { id: 5, email: "user@example.com", role: "USER" },
+            employeeId: 21,
+        });
+
+        expect(prismaMock.employee.findMany).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: {
+                    status: "ACTIVE",
+                    deletedAt: null,
+                    user: {
+                        is: {
+                            id: 5,
+                            isActive: true,
+                            deletedAt: null,
+                        },
+                    },
+                },
+            }),
+        );
     });
 
     it("parses task filter zero as no active predicate and one as active-only", () => {

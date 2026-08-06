@@ -10,6 +10,11 @@ import type { RoutineCommandActor } from "./types";
 
 type RoutineTransaction = Prisma.TransactionClient;
 
+export interface RoutineActorAuthorization {
+    isAdmin: boolean;
+    employeeId: number | null;
+}
+
 interface ActiveUserRecord {
     id: number;
     role: string;
@@ -45,6 +50,33 @@ function isActiveEmployee(
     employee: ActiveUserRecord["employee"],
 ): employee is NonNullable<ActiveUserRecord["employee"]> {
     return employee?.status === "ACTIVE" && employee.deletedAt === null;
+}
+
+export async function assertActiveRoutineActorInTransaction(
+    tx: RoutineTransaction,
+    actor: RoutineCommandActor,
+): Promise<RoutineActorAuthorization> {
+    const user = await findActiveUser(tx, actor.id);
+    if (!user || !user.isActive || user.deletedAt !== null) {
+        throw new RoutineForbiddenError("บัญชีผู้ใช้ไม่พร้อมดำเนินการ");
+    }
+
+    if (user.role === "ADMIN") {
+        if (user.employee && !isActiveEmployee(user.employee)) {
+            throw new RoutineForbiddenError("บัญชีผู้ดูแลระบบไม่พร้อมดำเนินการ");
+        }
+        return {
+            isAdmin: true,
+            employeeId: user.employee?.id ?? null,
+        };
+    }
+
+    if (!isActiveEmployee(user.employee)) {
+        throw new RoutineForbiddenError("บัญชีพนักงานไม่พร้อมดำเนินการ");
+    }
+
+    await lockEmployeeRows(tx, [user.employee.id]);
+    return { isAdmin: false, employeeId: user.employee.id };
 }
 
 export async function assertActiveAdminInTransaction(

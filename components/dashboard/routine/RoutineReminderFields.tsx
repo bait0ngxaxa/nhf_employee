@@ -72,6 +72,7 @@ interface RoutineReminderFieldsProps {
     selectedPreset: RoutineReminderPreset | "";
     errors?: Readonly<Record<string, string>>;
     disabled?: boolean;
+    selfService?: boolean;
     onPresetChange: (preset: RoutineReminderPreset) => void;
     onAddRule: () => void;
     onUpdateRule: (index: number, patch: Partial<RoutineReminderRuleForm>) => void;
@@ -83,6 +84,7 @@ export function RoutineReminderFields({
     selectedPreset,
     errors = {},
     disabled = false,
+    selfService = false,
     onPresetChange,
     onAddRule,
     onUpdateRule,
@@ -103,7 +105,7 @@ export function RoutineReminderFields({
                 <div className="min-w-0">
                     <p className="text-base font-semibold text-content-heading">ตั้งค่ารอบการแจ้งเตือน</p>
                     <p className="mt-1 max-w-prose text-sm leading-6 text-content-secondary">
-                        ตรวจตามเวลาไทย (Asia/Bangkok) และส่งผ่านการแจ้งเตือนในระบบเท่านั้น
+                        ตรวจตามเวลาไทย (Asia/Bangkok) และแจ้งเตือนทั้งในระบบและอีเมล
                     </p>
                 </div>
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
@@ -177,22 +179,31 @@ export function RoutineReminderFields({
                                     />
                                     {sendHourError ? <span className="text-sm font-normal text-status-danger-foreground" role="alert">{sendHourError}</span> : null}
                                 </label>
-                                <label className="grid min-w-0 gap-1 text-sm font-medium text-content-body">
-                                    ผู้รับการแจ้งเตือน
-                                    <select
-                                        className="h-11 min-w-0 rounded-md border border-input bg-background px-3 text-sm"
-                                        value={rule.recipientScope}
-                                        disabled={disabled}
-                                        onChange={(event) => {
-                                            const value = event.target.value;
-                                            if (isReminderRecipientScope(value)) onUpdateRule(index, { recipientScope: value });
-                                        }}
-                                    >
-                                        {REMINDER_SCOPE_OPTIONS.map((option) => (
-                                            <option key={option.value} value={option.value}>{option.label}</option>
-                                        ))}
-                                    </select>
-                                </label>
+                                {selfService ? (
+                                    <div className="grid min-w-0 gap-1 text-sm font-medium text-content-body">
+                                        ผู้รับการแจ้งเตือน
+                                        <p className="flex h-11 items-center rounded-md border border-input bg-background px-3 font-normal text-content-secondary">
+                                            ผู้รับผิดชอบของฉัน
+                                        </p>
+                                    </div>
+                                ) : (
+                                    <label className="grid min-w-0 gap-1 text-sm font-medium text-content-body">
+                                        ผู้รับการแจ้งเตือน
+                                        <select
+                                            className="h-11 min-w-0 rounded-md border border-input bg-background px-3 text-sm"
+                                            value={rule.recipientScope}
+                                            disabled={disabled}
+                                            onChange={(event) => {
+                                                const value = event.target.value;
+                                                if (isReminderRecipientScope(value)) onUpdateRule(index, { recipientScope: value });
+                                            }}
+                                        >
+                                            {REMINDER_SCOPE_OPTIONS.map((option) => (
+                                                <option key={option.value} value={option.value}>{option.label}</option>
+                                            ))}
+                                        </select>
+                                    </label>
+                                )}
                                 <label className="flex min-h-11 items-center gap-2 text-sm font-medium text-content-body xl:justify-center">
                                     <input
                                         type="checkbox"

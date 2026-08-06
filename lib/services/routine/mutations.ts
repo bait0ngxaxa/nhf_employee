@@ -31,6 +31,8 @@ import { createRoutineAuditInTransaction } from "./audit";
 import {
     assertActiveAdminInTransaction,
     assertActiveEmployeesInTransaction,
+    assertActiveRoutineActorInTransaction,
+    type RoutineActorAuthorization,
 } from "./authorization";
 import {
     assertMatchingRoutineTaskIdempotency,
@@ -124,6 +126,61 @@ type RoutineReminderRuleRecord = {
     recipientScope: string;
     isActive: boolean;
 };
+
+function canonicalizeReminderRules(
+    rules: RoutineTaskCreateInput["reminderRules"] | RoutineTaskUpdateInput["reminderRules"],
+    authorization: RoutineActorAuthorization,
+): typeof rules {
+    if (authorization.isAdmin || rules === undefined) return rules;
+    const canonicalRules = rules.map((rule) => ({
+        ...rule,
+        recipientScope: "ASSIGNEES" as const,
+    }));
+    const keys = new Set<string>();
+    for (const rule of canonicalRules) {
+        const key = `${rule.daysBefore}:${rule.channel}:${rule.recipientScope}`;
+        if (keys.has(key)) {
+            throw new RoutineValidationError("กฎการแจ้งเตือนซ้ำกันไม่ได้");
+        }
+        keys.add(key);
+    }
+    return canonicalRules;
+}
+
+function normalizeRoutineTaskCreateInput(
+    input: RoutineTaskCreateInput,
+    authorization: RoutineActorAuthorization,
+): RoutineTaskCreateInput {
+    if (authorization.isAdmin) return input;
+    if (authorization.employeeId === null) {
+        throw new RoutineValidationError("ไม่พบข้อมูลพนักงานของบัญชีผู้ใช้");
+    }
+
+    return {
+        ...input,
+        assignees: [{ employeeId: authorization.employeeId, role: "OWNER" }],
+        sourceFileName: undefined,
+        sourceSheet: undefined,
+        sourceRow: undefined,
+        reminderRules: canonicalizeReminderRules(input.reminderRules, authorization),
+    };
+}
+
+function normalizeRoutineTaskUpdateInput(
+    input: RoutineTaskUpdateInput,
+    authorization: RoutineActorAuthorization,
+): RoutineTaskUpdateInput {
+    if (authorization.isAdmin) return input;
+
+    return {
+        ...input,
+        assignees: undefined,
+        sourceFileName: undefined,
+        sourceSheet: undefined,
+        sourceRow: undefined,
+        reminderRules: canonicalizeReminderRules(input.reminderRules, authorization),
+    };
+}
 
 function normalizeReminderRules(
     rules: readonly RoutineReminderRuleInput[] | undefined,
@@ -279,13 +336,14 @@ export async function createRoutineTaskInTransaction(
     actor: RoutineCommandActor,
     generationOptions: RoutineGenerationOptions = {},
 ): Promise<Prisma.RoutineTaskGetPayload<{ include: typeof ROUTINE_TASK_INCLUDE }>> {
-    const scheduleType = input.scheduleType as RoutineScheduleType;
-    const scheduleConfig = parseScheduleConfig(scheduleType, input.scheduleConfig);
-    ensureContractRange(input.contractStartDate, input.contractEndDate);
-    const assignees = normalizeAssignees(input.assignees);
+    const authorization = await assertActiveRoutineActorInTransaction(tx, actor);
+    const normalizedInput = normalizeRoutineTaskCreateInput(input, authorization);
+    const scheduleType = normalizedInput.scheduleType as RoutineScheduleType;
+    const scheduleConfig = parseScheduleConfig(scheduleType, normalizedInput.scheduleConfig);
+    ensureContractRange(normalizedInput.contractStartDate, normalizedInput.contractEndDate);
+    const assignees = normalizeAssignees(normalizedInput.assignees);
 
-    await assertActiveAdminInTransaction(tx, actor);
-    await assertActiveRoutineReferences(tx, input.unitId, input.categoryId);
+    await assertActiveRoutineReferences(tx, normalizedInput.unitId, normalizedInput.categoryId);
     await assertActiveEmployeesInTransaction(
         tx,
         assignees.map((assignee) => assignee.employeeId),
@@ -293,33 +351,33 @@ export async function createRoutineTaskInTransaction(
 
     const task = await tx.routineTask.create({
         data: {
-            unitId: input.unitId,
-            categoryId: input.categoryId,
-            title: input.title,
-            description: input.description ?? null,
+            unitId: normalizedInput.unitId,
+            categoryId: normalizedInput.categoryId,
+            title: normalizedInput.title,
+            description: normalizedInput.description ?? null,
             scheduleType: scheduleType as PrismaRoutineScheduleType,
             scheduleConfig,
-            scheduleText: input.scheduleText ?? null,
-            contractStartDate: input.contractStartDate
-                ? calendarDateToDate(input.contractStartDate)
+            scheduleText: normalizedInput.scheduleText ?? null,
+            contractStartDate: normalizedInput.contractStartDate
+                ? calendarDateToDate(normalizedInput.contractStartDate)
                 : null,
-            contractEndDate: input.contractEndDate
-                ? calendarDateToDate(input.contractEndDate)
+            contractEndDate: normalizedInput.contractEndDate
+                ? calendarDateToDate(normalizedInput.contractEndDate)
                 : null,
-            contractText: input.contractText ?? null,
-            extraDetails: input.extraDetails ?? null,
-            businessDayPolicy: input.businessDayPolicy as PrismaRoutineBusinessDayPolicy,
-            isActive: input.isActive,
-            sourceFileName: input.sourceFileName ?? null,
-            sourceSheet: input.sourceSheet ?? null,
-            sourceRow: input.sourceRow ?? null,
+            contractText: normalizedInput.contractText ?? null,
+            extraDetails: normalizedInput.extraDetails ?? null,
+            businessDayPolicy: normalizedInput.businessDayPolicy as PrismaRoutineBusinessDayPolicy,
+            isActive: normalizedInput.isActive,
+            sourceFileName: normalizedInput.sourceFileName ?? null,
+            sourceSheet: normalizedInput.sourceSheet ?? null,
+            sourceRow: normalizedInput.sourceRow ?? null,
             createdById: actor.id,
             updatedById: actor.id,
             assignees: { create: assignees },
-            ...(input.reminderRules !== undefined
+            ...(normalizedInput.reminderRules !== undefined
                 ? {
                       reminderRules: {
-                          create: normalizeReminderRules(input.reminderRules),
+                          create: normalizeReminderRules(normalizedInput.reminderRules),
                       },
                   }
                 : {}),
@@ -337,6 +395,8 @@ export async function createRoutineTaskInTransaction(
             affectedEmployeeIds: assignees.map((assignee) => assignee.employeeId),
             scheduleType,
             version: task.version,
+            ownershipMode: authorization.isAdmin ? "ADMIN" : "SELF_SERVICE",
+            createdById: actor.id,
         },
     );
     await generateRoutineTaskOccurrencesInTransaction(
@@ -360,13 +420,16 @@ export async function createRoutineTask(
     task: Prisma.RoutineTaskGetPayload<{ include: typeof ROUTINE_TASK_INCLUDE }>;
     replayed: boolean;
 }> {
-    const requestHash = createRoutineTaskRequestHash(input);
+    let requestHash: string | null = null;
 
     class RoutineIdempotencyRaceError extends Error {}
 
     try {
         return await runSerializableTransaction(async (tx) => {
-            await assertActiveAdminInTransaction(tx, actor);
+            const authorization = await assertActiveRoutineActorInTransaction(tx, actor);
+            const normalizedInput = normalizeRoutineTaskCreateInput(input, authorization);
+            const normalizedRequestHash = createRoutineTaskRequestHash(normalizedInput);
+            requestHash = normalizedRequestHash;
             const existing = await tx.routineTaskCreateIdempotency.findUnique({
                 where: {
                     userId_idempotencyKey: {
@@ -377,7 +440,7 @@ export async function createRoutineTask(
             });
             if (existing) {
                 assertMatchingRoutineTaskIdempotency(
-                    requestHash,
+                    normalizedRequestHash,
                     existing.requestHash,
                 );
                 const task = await tx.routineTask.findUnique({
@@ -392,13 +455,13 @@ export async function createRoutineTask(
                 return { task, replayed: true };
             }
 
-            const task = await createRoutineTaskInTransaction(tx, input, actor);
+            const task = await createRoutineTaskInTransaction(tx, normalizedInput, actor);
             try {
                 await tx.routineTaskCreateIdempotency.create({
                     data: {
                         userId: actor.id,
                         idempotencyKey: options.idempotencyKey,
-                        requestHash,
+                        requestHash: normalizedRequestHash,
                         taskId: task.id,
                     },
                 });
@@ -421,7 +484,7 @@ export async function createRoutineTask(
                 },
             },
         });
-        if (!existing) throw error;
+        if (!existing || requestHash === null) throw error;
         assertMatchingRoutineTaskIdempotency(requestHash, existing.requestHash);
         const task = await prisma.routineTask.findUnique({
             where: { id: existing.taskId },
@@ -441,15 +504,26 @@ export async function deleteRoutineTask(
     actor: RoutineCommandActor,
 ): Promise<void> {
     await runSerializableTransaction(async (tx) => {
-        await assertActiveAdminInTransaction(tx, actor);
-        const task = await tx.routineTask.findUnique({
-            where: { id: taskId },
-            select: {
-                id: true,
-                title: true,
-                version: true,
-            },
-        });
+        const authorization = await assertActiveRoutineActorInTransaction(tx, actor);
+        const task = authorization.isAdmin
+            ? await tx.routineTask.findUnique({
+                  where: { id: taskId },
+                  select: {
+                      id: true,
+                      title: true,
+                      version: true,
+                      createdById: true,
+                  },
+              })
+            : await tx.routineTask.findFirst({
+                  where: { id: taskId, createdById: actor.id },
+                  select: {
+                      id: true,
+                      title: true,
+                      version: true,
+                      createdById: true,
+                  },
+              });
         if (!task) throw new RoutineNotFoundError();
 
         const occurrences = await tx.routineOccurrence.findMany({
@@ -510,7 +584,13 @@ export async function deleteRoutineTask(
             "RoutineTask",
             taskId,
             actor,
-            { taskId, title: task.title, version: task.version },
+            {
+                taskId,
+                title: task.title,
+                version: task.version,
+                ownershipMode: authorization.isAdmin ? "ADMIN" : "SELF_SERVICE",
+                createdById: task.createdById,
+            },
         );
         await tx.routineTask.delete({ where: { id: taskId } });
     });
@@ -522,42 +602,48 @@ export async function updateRoutineTask(
     actor: RoutineCommandActor,
 ): Promise<Prisma.RoutineTaskGetPayload<{ include: typeof ROUTINE_TASK_INCLUDE }>> {
     return runSerializableTransaction(async (tx) => {
-        await assertActiveAdminInTransaction(tx, actor);
-        const current = await tx.routineTask.findUnique({
-            where: { id: taskId },
-            include: ROUTINE_TASK_INCLUDE,
-        });
+        const authorization = await assertActiveRoutineActorInTransaction(tx, actor);
+        const normalizedInput = normalizeRoutineTaskUpdateInput(input, authorization);
+        const current = authorization.isAdmin
+            ? await tx.routineTask.findUnique({
+                  where: { id: taskId },
+                  include: ROUTINE_TASK_INCLUDE,
+              })
+            : await tx.routineTask.findFirst({
+                  where: { id: taskId, createdById: actor.id },
+                  include: ROUTINE_TASK_INCLUDE,
+              });
         if (!current) throw new RoutineNotFoundError();
 
-        const nextScheduleType = (input.scheduleType
+        const nextScheduleType = (normalizedInput.scheduleType
             ?? current.scheduleType) as RoutineScheduleType;
         const nextScheduleConfig = parseScheduleConfig(
             nextScheduleType,
-            input.scheduleConfig !== undefined
-                ? input.scheduleConfig
+            normalizedInput.scheduleConfig !== undefined
+                ? normalizedInput.scheduleConfig
                 : current.scheduleConfig,
         );
-        const nextContractStartDate = input.contractStartDate === undefined
+        const nextContractStartDate = normalizedInput.contractStartDate === undefined
             ? (current.contractStartDate
                 ? toBangkokCalendarDate(current.contractStartDate)
                 : undefined)
-            : input.contractStartDate;
-        const nextContractEndDate = input.contractEndDate === undefined
+            : normalizedInput.contractStartDate;
+        const nextContractEndDate = normalizedInput.contractEndDate === undefined
             ? (current.contractEndDate
                 ? toBangkokCalendarDate(current.contractEndDate)
                 : undefined)
-            : input.contractEndDate;
+            : normalizedInput.contractEndDate;
         ensureContractRange(nextContractStartDate, nextContractEndDate);
 
-        const nextUnitId = input.unitId ?? current.unitId;
-        const nextCategoryId = input.categoryId ?? current.categoryId;
+        const nextUnitId = normalizedInput.unitId ?? current.unitId;
+        const nextCategoryId = normalizedInput.categoryId ?? current.categoryId;
         await assertActiveRoutineReferences(tx, nextUnitId, nextCategoryId);
 
-        const nextAssignees = input.assignees
-            ? normalizeAssignees(input.assignees)
+        const nextAssignees = normalizedInput.assignees
+            ? normalizeAssignees(normalizedInput.assignees)
             : null;
-        const nextReminderRules = input.reminderRules !== undefined
-            ? normalizeReminderRules(input.reminderRules)
+        const nextReminderRules = normalizedInput.reminderRules !== undefined
+            ? normalizeReminderRules(normalizedInput.reminderRules)
             : null;
         const assigneesChanged = nextAssignees !== null
             && !areAssigneesEqual(current.assignees, nextAssignees);
@@ -565,7 +651,8 @@ export async function updateRoutineTask(
             nextReminderRules !== null
             && !areReminderRulesEqual(current.reminderRules, nextReminderRules);
         const isActiveChanged =
-            input.isActive !== undefined && input.isActive !== current.isActive;
+            normalizedInput.isActive !== undefined
+            && normalizedInput.isActive !== current.isActive;
         if (nextAssignees) {
             await assertActiveEmployeesInTransaction(
                 tx,
@@ -574,36 +661,40 @@ export async function updateRoutineTask(
         }
 
         const data: Prisma.RoutineTaskUncheckedUpdateInput = {
-            unitId: input.unitId,
-            categoryId: input.categoryId,
-            title: input.title,
-            description: input.description,
+            unitId: normalizedInput.unitId,
+            categoryId: normalizedInput.categoryId,
+            title: normalizedInput.title,
+            description: normalizedInput.description,
             scheduleType: nextScheduleType as PrismaRoutineScheduleType,
             scheduleConfig: nextScheduleConfig,
-            scheduleText: input.scheduleText,
-            contractStartDate: input.contractStartDate === undefined
+            scheduleText: normalizedInput.scheduleText,
+            contractStartDate: normalizedInput.contractStartDate === undefined
                 ? undefined
-                : input.contractStartDate
-                    ? calendarDateToDate(input.contractStartDate)
+                : normalizedInput.contractStartDate
+                    ? calendarDateToDate(normalizedInput.contractStartDate)
                     : null,
-            contractEndDate: input.contractEndDate === undefined
+            contractEndDate: normalizedInput.contractEndDate === undefined
                 ? undefined
-                : input.contractEndDate
-                    ? calendarDateToDate(input.contractEndDate)
+                : normalizedInput.contractEndDate
+                    ? calendarDateToDate(normalizedInput.contractEndDate)
                     : null,
-            contractText: input.contractText,
-            extraDetails: input.extraDetails,
-            businessDayPolicy: input.businessDayPolicy as PrismaRoutineBusinessDayPolicy | undefined,
-            isActive: input.isActive,
-            sourceFileName: input.sourceFileName,
-            sourceSheet: input.sourceSheet,
-            sourceRow: input.sourceRow,
+            contractText: normalizedInput.contractText,
+            extraDetails: normalizedInput.extraDetails,
+            businessDayPolicy: normalizedInput.businessDayPolicy as PrismaRoutineBusinessDayPolicy | undefined,
+            isActive: normalizedInput.isActive,
+            sourceFileName: normalizedInput.sourceFileName,
+            sourceSheet: normalizedInput.sourceSheet,
+            sourceRow: normalizedInput.sourceRow,
             updatedById: actor.id,
             version: { increment: 1 },
         };
 
         const updated = await tx.routineTask.updateMany({
-            where: { id: taskId, version: input.version },
+            where: {
+                id: taskId,
+                version: normalizedInput.version,
+                ...(authorization.isAdmin ? {} : { createdById: actor.id }),
+            },
             data,
         });
         if (updated.count !== 1) {
@@ -664,6 +755,8 @@ export async function updateRoutineTask(
                 affectedEmployeeIds: nextAssignees?.map(
                     (assignee) => assignee.employeeId,
                 ) ?? current.assignees.map((assignee) => assignee.employeeId),
+                ownershipMode: authorization.isAdmin ? "ADMIN" : "SELF_SERVICE",
+                createdById: current.createdById,
                 assigneesChanged,
                 reminderRulesChanged,
                 isActiveChanged,

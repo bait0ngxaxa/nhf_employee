@@ -170,7 +170,12 @@ function RoutineOccurrencePanel({
     );
 }
 
-function RoutineTaskSettings() {
+function RoutineTaskSettings({
+    mode,
+}: {
+    mode: "SELF_SERVICE" | "ADMIN";
+}) {
+    const isSelfService = mode === "SELF_SERVICE";
     const [isCreating, setIsCreating] = useState(false);
     const [editingTask, setEditingTask] = useState<RoutineTask | null>(null);
     const [taskPage, setTaskPage] = useState(1);
@@ -236,6 +241,7 @@ function RoutineTaskSettings() {
             <RoutineTaskForm
                 reference={reference}
                 initialTask={editingTask}
+                mode={mode}
                 onSaved={() => { setIsCreating(false); setEditingTask(null); void mutateTasks(); }}
                 onCancel={() => { setIsCreating(false); setEditingTask(null); }}
             />
@@ -245,8 +251,8 @@ function RoutineTaskSettings() {
     return (
         <div className="space-y-5">
             <div className="space-y-1">
-                <h2 className="text-xl font-semibold tracking-tight text-content-heading">ตั้งค่าแม่แบบงานประจำ</h2>
-                <p className="max-w-prose text-sm leading-6 text-content-secondary">กำหนดตารางงาน ผู้รับผิดชอบ และการแจ้งเตือนของแต่ละแม่แบบ</p>
+                <h2 className="text-xl font-semibold tracking-tight text-content-heading">{isSelfService ? "จัดการงานของฉัน" : "ตั้งค่าแม่แบบงานประจำ"}</h2>
+                <p className="max-w-prose text-sm leading-6 text-content-secondary">{isSelfService ? "สร้างและจัดการเฉพาะแม่แบบงาน Routine ที่คุณสร้างไว้" : "กำหนดตารางงาน ผู้รับผิดชอบ และการแจ้งเตือนของแต่ละแม่แบบ"}</p>
             </div>
             <RoutineTaskList
                 data={tasks}
@@ -283,7 +289,11 @@ export function RoutineSection() {
         isLoading: summaryLoading,
         mutate: mutateSummary,
     } = useSWR<RoutineSummaryResponse, Error>(API_ROUTES.routines.summary, fetchRoutine);
-    const safeTab = isAdmin ? activeTab : "mine";
+    const safeTab = isAdmin
+        ? activeTab
+        : activeTab === "manage"
+            ? "manage"
+            : "mine";
 
     useEffect(() => {
         if (isAdmin && (taskId !== null || occurrenceId !== null)) setActiveTab("all");
@@ -291,7 +301,11 @@ export function RoutineSection() {
 
     useEffect(() => {
         const requestedTab = searchParams.get("routineTab");
-        if (isAdmin && (requestedTab === "mine" || requestedTab === "all" || requestedTab === "settings" || requestedTab === "import")) {
+        if (
+            requestedTab === "mine"
+            || (!isAdmin && requestedTab === "manage")
+            || (isAdmin && (requestedTab === "all" || requestedTab === "settings" || requestedTab === "import"))
+        ) {
             setActiveTab(requestedTab);
         }
     }, [isAdmin, searchParams]);
@@ -311,11 +325,18 @@ export function RoutineSection() {
             content: <RoutineOccurrencePanel isAdmin taskId={taskId} occurrenceId={occurrenceId} onTaskSaved={() => void mutateSummary()} />,
         },
         {
+            value: "manage",
+            label: "จัดการงานของฉัน",
+            icon: Settings2,
+            visible: !isAdmin,
+            content: <RoutineTaskSettings mode="SELF_SERVICE" />,
+        },
+        {
             value: "settings",
             label: "ตั้งค่างานประจำ",
             icon: Settings2,
             visible: isAdmin,
-            content: <RoutineTaskSettings />,
+            content: <RoutineTaskSettings mode="ADMIN" />,
         },
         {
             value: "import",

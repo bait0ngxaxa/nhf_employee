@@ -110,7 +110,7 @@ describe("NHF Routine task deletion", () => {
         expect(prismaMock.routineTask.delete).not.toHaveBeenCalled();
     });
 
-    it("rejects a non-admin before touching the task", async () => {
+    it("returns not found for a regular user accessing another user's task", async () => {
         prismaMock.user.findUnique.mockResolvedValue(asNever({
             id: 5,
             role: "USER",
@@ -120,7 +120,7 @@ describe("NHF Routine task deletion", () => {
         }));
 
         await expect(deleteRoutineTask(71, { ...adminActor, id: 5, role: "USER" }))
-            .rejects.toMatchObject({ statusCode: 403, code: "FORBIDDEN" });
+            .rejects.toMatchObject({ statusCode: 404, code: "NOT_FOUND" });
         expect(prismaMock.routineTask.findUnique).not.toHaveBeenCalled();
     });
 });

@@ -68,4 +68,23 @@ describe("notification outbox Routine dispatch", () => {
             }),
         );
     });
+
+    it("marks a failed email side effect for the existing outbox retry policy", async () => {
+        dispatchRoutineReminderOutboxMock.mockRejectedValueOnce(
+            new Error("Routine reminder email delivery failed"),
+        );
+
+        const result = await processOutbox();
+
+        expect(result).toEqual({ processed: 0, failed: 1 });
+        expect(prismaMock.notificationOutbox.updateMany).toHaveBeenCalledWith({
+            where: { id: 701, status: "PROCESSING" },
+            data: expect.objectContaining({
+                status: "FAILED",
+                attempts: { increment: 1 },
+                lastError: "Routine reminder email delivery failed",
+                nextAttemptAt: expect.any(Date),
+            }),
+        });
+    });
 });

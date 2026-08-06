@@ -5,6 +5,7 @@ import { generateLeaveEventEmailHTML } from "@/lib/email/templates/leave-event";
 import { generateLeaveResultEmailHTML } from "@/lib/email/templates/leave-result";
 import { generateNewTicketEmailHTML } from "@/lib/email/templates/new-ticket";
 import { generatePasswordResetEmailHTML } from "@/lib/email/templates/password-reset";
+import { generateRoutineReminderEmailHTML } from "@/lib/email/templates/routine-reminder";
 import { generateStatusUpdateEmailHTML } from "@/lib/email/templates/status-update";
 import { generateStockRequestResultEmailHTML } from "@/lib/email/templates/stock-request-result";
 
@@ -168,5 +169,25 @@ describe("email template XSS escaping", () => {
 
         expectEscapedHtml(html);
         expect(html).toContain("เหตุผลยกเลิก:");
+    });
+
+    it("escapes Routine reminder fields and action links", () => {
+        const html = generateRoutineReminderEmailHTML({
+            to: "user@example.com",
+            recipientName: XSS_PAYLOAD,
+            taskTitle: XSS_PAYLOAD,
+            unitName: XSS_PAYLOAD,
+            categoryName: XSS_PAYLOAD,
+            dueDate: "2026-05-28",
+            daysBefore: 1,
+            actionUrl: `https://example.com/dashboard?next=${XSS_PAYLOAD}`,
+            occurrenceId: 1,
+            ruleId: 2,
+            userId: 3,
+            reminderVersion: 4,
+        });
+
+        expectEscapedHtml(html);
+        expect(html).toContain("ดูรายการ Routine");
     });
 });

@@ -114,4 +114,49 @@ describe("RoutineTaskForm reminder rules", () => {
         await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
         resolveFetch?.(new Response(JSON.stringify({ task: { id: 1 } }), { status: 201 }));
     });
+
+    it("uses the current employee and describes both reminder channels in self-service mode", async () => {
+        const onSaved = vi.fn();
+
+        render(
+            <RoutineTaskForm
+                reference={{
+                    units: [{ id: 1, code: "มสช.", name: "มสช." }],
+                    categories: [{ id: 1, name: "ระบบคอมพิวเตอร์", sortOrder: 1 }],
+                    employees: [{
+                        id: 11,
+                        firstName: "สมชาย",
+                        lastName: "ใจดี",
+                        nickname: null,
+                    }],
+                }}
+                initialTask={null}
+                mode="SELF_SERVICE"
+                onSaved={onSaved}
+                onCancel={vi.fn()}
+            />,
+        );
+
+        expect(screen.getByText("ผู้รับผิดชอบคือคุณ และการแจ้งเตือนจะส่งทั้งในระบบและอีเมล")).toBeInTheDocument();
+        expect(screen.getByText("สมชาย ใจดี")).toBeInTheDocument();
+        expect(screen.queryByLabelText("ค้นหาพนักงาน")).not.toBeInTheDocument();
+        expect(screen.getByText(/แจ้งเตือนทั้งในระบบและอีเมล/)).toBeInTheDocument();
+
+        fireEvent.change(screen.getByDisplayValue("เลือกหน่วยงาน"), { target: { value: "1" } });
+        fireEvent.change(screen.getByDisplayValue("เลือกหมวดหมู่"), { target: { value: "1" } });
+        fireEvent.change(screen.getByPlaceholderText("เช่น ตรวจสอบค่าใช้จ่ายประจำเดือน"), {
+            target: { value: "งานของฉัน" },
+        });
+        fireEvent.click(screen.getByRole("button", { name: "บันทึกงานของฉัน" }));
+
+        await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+        const request = fetchMock.mock.calls[0]?.[1] as RequestInit;
+        const body = JSON.parse(String(request.body)) as {
+            assignees: Array<{ employeeId: number; role: string }>;
+            reminderRules: Array<{ recipientScope: string }>;
+        };
+        expect(body.assignees).toEqual([{ employeeId: 11, role: "OWNER" }]);
+        expect(body.reminderRules).toEqual([]);
+        expect(onSaved).toHaveBeenCalledTimes(1);
+    });
 });

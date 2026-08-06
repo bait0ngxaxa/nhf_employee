@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 
-import { requireAdminSession } from "@/lib/auth/api";
+import { requireActiveWorkforceOrAdminSession } from "@/lib/auth/workforce";
+import { createRoutineCommandActor } from "@/lib/server/routine-command-actor";
 import {
     routineErrorResponse,
     routineFeatureGuard,
@@ -11,9 +12,20 @@ export async function GET(_request: NextRequest): Promise<NextResponse> {
     const featureResponse = routineFeatureGuard();
     if (featureResponse) return featureResponse;
     try {
-        const auth = await requireAdminSession();
+        const auth = await requireActiveWorkforceOrAdminSession();
         if (!auth.ok) return auth.response;
-        return NextResponse.json(await getRoutineReferenceData());
+        const actor = createRoutineCommandActor(
+            {
+                id: auth.user.id,
+                role: auth.user.role ?? "USER",
+                email: auth.user.email ?? "",
+            },
+            _request.headers,
+        );
+        return NextResponse.json(await getRoutineReferenceData({
+            actor,
+            employeeId: "employeeId" in auth ? auth.employeeId : null,
+        }));
     } catch (error) {
         return routineErrorResponse(error, "Error fetching routine reference data");
     }

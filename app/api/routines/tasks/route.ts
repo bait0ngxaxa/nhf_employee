@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 
-import { requireAdminSession } from "@/lib/auth/api";
+import { requireActiveWorkforceOrAdminSession } from "@/lib/auth/workforce";
 import { createRoutineCommandActor } from "@/lib/server/routine-command-actor";
 import { enforceAuthenticatedMutationRateLimit } from "@/lib/security/mutation-rate-limit";
 import { idempotencyKeySchema } from "@/lib/validations/idempotency";
@@ -24,8 +24,20 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     if (featureResponse) return featureResponse;
 
     try {
-        const auth = await requireAdminSession();
+        const auth = await requireActiveWorkforceOrAdminSession();
         if (!auth.ok) return auth.response;
+        const actor = createRoutineCommandActor(
+            {
+                id: auth.user.id,
+                role: auth.user.role ?? "USER",
+                email: auth.user.email ?? "",
+            },
+            request.headers,
+        );
+        const queryActor = {
+            actor,
+            employeeId: "employeeId" in auth ? auth.employeeId : null,
+        };
         const params = request.nextUrl.searchParams;
         const parsed = routineTaskFiltersSchema.safeParse({
             activeOnly: params.get("activeOnly") ?? undefined,
@@ -41,7 +53,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
                 { status: 400 },
             );
         }
-        return NextResponse.json(await getRoutineTasks(parsed.data));
+        return NextResponse.json(await getRoutineTasks(parsed.data, queryActor));
     } catch (error) {
         return routineErrorResponse(error, "Error fetching routine tasks");
     }
@@ -54,7 +66,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     if (sizeResponse) return sizeResponse;
 
     try {
-        const auth = await requireAdminSession();
+        const auth = await requireActiveWorkforceOrAdminSession();
         if (!auth.ok) return auth.response;
         const idempotencyKey = idempotencyKeySchema.safeParse(
             request.headers.get("idempotency-key"),

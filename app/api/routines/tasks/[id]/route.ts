@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 
-import { requireAdminSession } from "@/lib/auth/api";
+import { requireActiveWorkforceOrAdminSession } from "@/lib/auth/workforce";
 import { createRoutineCommandActor } from "@/lib/server/routine-command-actor";
 import { enforceAuthenticatedMutationRateLimit } from "@/lib/security/mutation-rate-limit";
 import {
@@ -27,12 +27,23 @@ export async function GET(
     if (featureResponse) return featureResponse;
 
     try {
-        const auth = await requireAdminSession();
+        const auth = await requireActiveWorkforceOrAdminSession();
         if (!auth.ok) return auth.response;
         const { id: rawId } = await params;
         const parsedId = routineIdParamSchema.safeParse(rawId);
         if (!parsedId.success) return NextResponse.json({ error: "รหัสไม่ถูกต้อง" }, { status: 400 });
-        const task = await getRoutineTaskById(Number(parsedId.data));
+        const actor = createRoutineCommandActor(
+            {
+                id: auth.user.id,
+                role: auth.user.role ?? "USER",
+                email: auth.user.email ?? "",
+            },
+            request.headers,
+        );
+        const task = await getRoutineTaskById(Number(parsedId.data), {
+            actor,
+            employeeId: "employeeId" in auth ? auth.employeeId : null,
+        });
         return NextResponse.json({ task });
     } catch (error) {
         return routineErrorResponse(error, "Error fetching routine task");
@@ -49,7 +60,7 @@ export async function PATCH(
     if (sizeResponse) return sizeResponse;
 
     try {
-        const auth = await requireAdminSession();
+        const auth = await requireActiveWorkforceOrAdminSession();
         if (!auth.ok) return auth.response;
         const rateLimitResponse = enforceAuthenticatedMutationRateLimit(
             "routine-task-update",
@@ -91,7 +102,7 @@ export async function DELETE(
     if (featureResponse) return featureResponse;
 
     try {
-        const auth = await requireAdminSession();
+        const auth = await requireActiveWorkforceOrAdminSession();
         if (!auth.ok) return auth.response;
         const rateLimitResponse = enforceAuthenticatedMutationRateLimit(
             "routine-task-delete",
