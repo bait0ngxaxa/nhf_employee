@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { RoutineTaskForm } from "@/components/dashboard/routine/RoutineTaskForm";
+import type { RoutineTask } from "@/components/dashboard/routine/types";
 
 describe("RoutineTaskForm reminder rules", () => {
     const fetchMock = vi.fn();
@@ -158,5 +159,80 @@ describe("RoutineTaskForm reminder rules", () => {
         expect(body.assignees).toEqual([{ employeeId: 11, role: "OWNER" }]);
         expect(body.reminderRules).toEqual([]);
         expect(onSaved).toHaveBeenCalledTimes(1);
+    });
+
+    it("shows an admin-reassigned employee and preserves that assignee on self-service edit", async () => {
+        const initialTask = {
+            id: 71,
+            unitId: 1,
+            categoryId: 1,
+            title: "งานที่ถูกมอบหมายใหม่",
+            description: null,
+            scheduleType: "MONTHLY_DAY",
+            scheduleConfig: { day: 10, monthOffset: 0 },
+            scheduleText: null,
+            contractStartDate: null,
+            contractEndDate: null,
+            contractText: null,
+            extraDetails: null,
+            businessDayPolicy: "NONE",
+            isActive: true,
+            version: 3,
+            sourceFileName: null,
+            sourceSheet: null,
+            sourceRow: null,
+            createdById: 3,
+            updatedById: 99,
+            createdAt: "2026-01-01T00:00:00.000Z",
+            updatedAt: "2026-08-06T00:00:00.000Z",
+            unit: { id: 1, code: "มสช.", name: "มสช.", isActive: true },
+            category: { id: 1, name: "ระบบคอมพิวเตอร์", sortOrder: 1, isActive: true },
+            assignees: [{
+                employeeId: 22,
+                role: "OWNER",
+                employee: {
+                    id: 22,
+                    firstName: "มานะ",
+                    lastName: "ดีใจ",
+                    nickname: null,
+                    status: "ACTIVE",
+                    deletedAt: null,
+                },
+            }],
+            reminderRules: [],
+            _count: { occurrences: 1 },
+        } satisfies RoutineTask;
+
+        render(
+            <RoutineTaskForm
+                reference={{
+                    units: [{ id: 1, code: "มสช.", name: "มสช." }],
+                    categories: [{ id: 1, name: "ระบบคอมพิวเตอร์", sortOrder: 1 }],
+                    employees: [{
+                        id: 11,
+                        firstName: "สมชาย",
+                        lastName: "ใจดี",
+                        nickname: null,
+                    }],
+                }}
+                initialTask={initialTask}
+                mode="SELF_SERVICE"
+                onSaved={vi.fn()}
+                onCancel={vi.fn()}
+            />,
+        );
+
+        expect(screen.getByText("มานะ ดีใจ")).toBeInTheDocument();
+        expect(screen.queryByText("สมชาย ใจดี")).not.toBeInTheDocument();
+        expect(screen.queryByText("ผู้รับผิดชอบคือคุณ และการแจ้งเตือนจะส่งทั้งในระบบและอีเมล")).not.toBeInTheDocument();
+        expect(screen.getByText("ผู้รับผิดชอบของงานนี้ถูกปรับโดยผู้ดูแลระบบ")).toBeInTheDocument();
+
+        fireEvent.click(screen.getByRole("button", { name: "บันทึกงานของฉัน" }));
+
+        await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+        const request = fetchMock.mock.calls[0]?.[1] as RequestInit;
+        const body = JSON.parse(String(request.body)) as { assignees?: unknown };
+        expect(request.method).toBe("PATCH");
+        expect(body).not.toHaveProperty("assignees");
     });
 });

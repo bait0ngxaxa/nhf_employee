@@ -34,6 +34,7 @@ import { RoutineScheduleFields } from "./RoutineScheduleFields";
 import { formatRoutineUnitLabel, uniqueRoutineUnits } from "./labels";
 import type {
     RoutineAssigneeRole,
+    RoutineEmployee,
     RoutineReferenceData,
     RoutineTask,
 } from "./types";
@@ -94,6 +95,13 @@ function isObject(value: unknown): value is Record<string, unknown> {
 
 function dateInputValue(value: string | null | undefined): string {
     return value ? value.slice(0, 10) : "";
+}
+
+function routineEmployeeName(employee: RoutineEmployee): string {
+    return employee.displayName?.trim()
+        || `${employee.firstName} ${employee.lastName}`.trim()
+        || employee.nickname?.trim()
+        || `รหัสพนักงาน ${employee.id}`;
 }
 
 function taskToForm(task: RoutineTask | null): TaskFormState {
@@ -166,6 +174,16 @@ export function RoutineTaskForm({
     const units = uniqueRoutineUnits(reference.units);
     const isSelfService = mode === "SELF_SERVICE";
     const selfEmployee = isSelfService ? reference.employees[0] : undefined;
+    const selfServiceAssignees = initialTask
+        ? initialTask.assignees
+        : selfEmployee
+            ? [{ employeeId: selfEmployee.id, role: "OWNER" as const, employee: selfEmployee }]
+            : [];
+    const hasReassignedSelfServiceTask = Boolean(
+        initialTask
+        && selfEmployee
+        && initialTask.assignees.some((assignee) => assignee.employeeId !== selfEmployee.id),
+    );
     const initialAssignees = useMemo(
         () => initialTask?.assignees.length
             ? Object.fromEntries(initialTask.assignees.map((assignee) => [assignee.employeeId, assignee.role])) as Record<number, RoutineAssigneeRole>
@@ -296,6 +314,16 @@ export function RoutineTaskForm({
             submitLockRef.current = false;
             return;
         }
+        const assigneesPayload = isSelfService
+            ? initialTask
+                ? undefined
+                : selfEmployee
+                    ? [{ employeeId: selfEmployee.id, role: "OWNER" as const }]
+                    : undefined
+            : Object.entries(assignees).map(([employeeId, role]) => ({
+                  employeeId: Number(employeeId),
+                  role,
+              }));
         const payload = {
             unitId: Number(form.unitId),
             categoryId: Number(form.categoryId),
@@ -314,12 +342,7 @@ export function RoutineTaskForm({
                 ...rule,
                 sendHour: rule.sendHour ?? -1,
             })),
-            assignees: isSelfService && selfEmployee
-                ? [{ employeeId: selfEmployee.id, role: "OWNER" as const }]
-                : Object.entries(assignees).map(([employeeId, role]) => ({
-                      employeeId: Number(employeeId),
-                      role,
-                  })),
+            ...(assigneesPayload ? { assignees: assigneesPayload } : {}),
             ...(initialTask ? { version: initialTask.version } : {}),
         };
         const parsed = initialTask
@@ -399,7 +422,16 @@ export function RoutineTaskForm({
             </div>
             {isSelfService ? (
                 <div className="rounded-lg border border-brand-border bg-brand-surface px-4 py-3 text-sm leading-6 text-brand-strong">
-                    ผู้รับผิดชอบคือคุณ และการแจ้งเตือนจะส่งทั้งในระบบและอีเมล
+                    {initialTask ? (
+                        <>
+                            <p>
+                                {hasReassignedSelfServiceTask
+                                    ? "ผู้รับผิดชอบของงานนี้ถูกปรับโดยผู้ดูแลระบบ"
+                                    : "ผู้รับผิดชอบปัจจุบันของงานนี้เป็นไปตามข้อมูลในระบบ"}
+                            </p>
+                            <p>การแจ้งเตือนจะส่งทั้งในระบบและอีเมล</p>
+                        </>
+                    ) : "ผู้รับผิดชอบคือคุณ และการแจ้งเตือนจะส่งทั้งในระบบและอีเมล"}
                 </div>
             ) : null}
             {error ? <p className="rounded-lg border border-status-danger-border bg-status-danger-surface px-4 py-3 text-sm leading-6 text-status-danger-foreground" role="alert">{error}</p> : null}
@@ -465,8 +497,10 @@ export function RoutineTaskForm({
                 <fieldset className="space-y-2 rounded-xl border border-border-subtle bg-surface-subtle p-4 sm:p-5">
                     <legend className="px-1 text-base font-semibold text-content-heading">ผู้รับผิดชอบ</legend>
                     <p className="text-sm leading-6 text-content-secondary">
-                        {selfEmployee
-                            ? `${selfEmployee.firstName} ${selfEmployee.lastName}`.trim()
+                        {selfServiceAssignees.length > 0
+                            ? selfServiceAssignees
+                                .map((assignee) => routineEmployeeName(assignee.employee))
+                                .join(", ")
                             : "ไม่พบข้อมูลพนักงานของบัญชีผู้ใช้"}
                     </p>
                 </fieldset>
