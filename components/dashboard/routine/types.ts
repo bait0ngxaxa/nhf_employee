@@ -121,7 +121,6 @@ export interface RoutineTask {
 export interface RoutineSummary {
     today: number;
     dueSoon: number;
-    overdue: number;
     within30Days: number;
     asOfDate: string;
 }

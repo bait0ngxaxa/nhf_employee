@@ -815,7 +815,6 @@ export async function getRoutineOccurrenceById(
 export async function getRoutineSummary(queryActor: RoutineQueryActor): Promise<{
     today: number;
     dueSoon: number;
-    overdue: number;
     within30Days: number;
     asOfDate: string;
 }> {
@@ -856,13 +855,11 @@ export async function getRoutineSummary(queryActor: RoutineQueryActor): Promise<
 
     let todayCount = 0;
     let dueSoonCount = 0;
-    let overdueCount = 0;
     let within30Days = 0;
     for (const occurrence of relevantByTask.values()) {
         const timingStatus = getRoutineTimingStatus(today, occurrence.dueDate);
         if (timingStatus === "DUE_TODAY") todayCount += 1;
         if (timingStatus === "DUE_SOON") dueSoonCount += 1;
-        if (timingStatus === "OVERDUE") overdueCount += 1;
         if (
             occurrence.dueDate >= today
             && occurrence.dueDate <= nextThirtyDays
@@ -874,7 +871,6 @@ export async function getRoutineSummary(queryActor: RoutineQueryActor): Promise<
     return {
         today: todayCount,
         dueSoon: dueSoonCount,
-        overdue: overdueCount,
         within30Days,
         asOfDate: today,
     };

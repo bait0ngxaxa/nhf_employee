@@ -333,9 +333,9 @@ describe("NHF Routine query authorization", () => {
         expect(result).toMatchObject({
             today: 1,
             dueSoon: 2,
-            overdue: 0,
             within30Days: 3,
         });
+        expect(result).not.toHaveProperty("overdue");
         expect(prismaMock.routineTask.findMany).toHaveBeenCalledWith(
             expect.objectContaining({
                 where: { isActive: true },

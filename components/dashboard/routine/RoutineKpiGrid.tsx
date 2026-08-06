@@ -1,4 +1,4 @@
-import { CalendarClock, CalendarDays, CalendarRange, CircleAlert } from "lucide-react";
+import { CalendarClock, CalendarDays, CalendarRange } from "lucide-react";
 
 import { Card } from "@/components/ui/card";
 import type { RoutineSummary } from "./types";
@@ -11,7 +11,6 @@ interface RoutineKpiGridProps {
 const KPI_ITEMS = [
     { key: "today", label: "งานถึงกำหนดวันนี้", icon: CalendarDays, tone: "text-sky-700" },
     { key: "dueSoon", label: "งานใกล้ถึงกำหนด 7 วัน", icon: CalendarClock, tone: "text-amber-700" },
-    { key: "overdue", label: "งานเกินกำหนด", icon: CircleAlert, tone: "text-rose-700" },
     { key: "within30Days", label: "งานภายใน 30 วัน", icon: CalendarRange, tone: "text-emerald-700" },
 ] as const;
 
@@ -20,7 +19,7 @@ export function RoutineKpiGrid({
     isLoading,
 }: RoutineKpiGridProps) {
     return (
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {KPI_ITEMS.map((item) => {
                 const Icon = item.icon;
                 return (
