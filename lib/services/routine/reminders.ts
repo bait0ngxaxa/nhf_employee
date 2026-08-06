@@ -1,5 +1,6 @@
 import type { NotificationOutbox, Prisma } from "@prisma/client";
 import { Role } from "@prisma/client";
+import { z } from "zod";
 
 import {
     sendRoutineReminderNotification,
@@ -86,6 +87,13 @@ type RoutineReminderRecipient = {
     name: string;
 };
 
+type RoutineReminderRecipients = {
+    activeRecipients: RoutineReminderRecipient[];
+    emailRecipients: RoutineReminderRecipient[];
+};
+
+const routineReminderEmailSchema = z.string().trim().email();
+
 function isActiveUser(user: {
     isActive: boolean;
     deletedAt: Date | null;
@@ -145,18 +153,16 @@ async function resolveRoutineRecipients(
     tx: Pick<Prisma.TransactionClient, "user">,
     scope: "ASSIGNEES" | "ADMINS" | "ASSIGNEES_AND_ADMINS",
     snapshot: RoutineReminderOccurrence,
-): Promise<RoutineReminderRecipient[]> {
+): Promise<RoutineReminderRecipients> {
     const recipients = new Map<number, RoutineReminderRecipient>();
     const addRecipient = (user: {
         id: number;
         email: string;
         name: string;
     }): void => {
-        const email = user.email.trim();
-        if (!email || /[\r\n]/.test(email)) return;
         recipients.set(user.id, {
             userId: user.id,
-            email,
+            email: user.email,
             name: user.name.trim() || "ผู้รับการแจ้งเตือน",
         });
     };
@@ -176,7 +182,28 @@ async function resolveRoutineRecipients(
         });
         admins.forEach(addRecipient);
     }
-    return [...recipients.values()];
+
+    const activeRecipients = [...recipients.values()];
+    const emailRecipients = activeRecipients.flatMap((recipient) => {
+        if (/[\r\n]/.test(recipient.email)) {
+            console.warn("Routine reminder recipient email is unavailable", {
+                userId: recipient.userId,
+            });
+            return [];
+        }
+
+        const parsedEmail = routineReminderEmailSchema.safeParse(recipient.email);
+        if (!parsedEmail.success) {
+            console.warn("Routine reminder recipient email is unavailable", {
+                userId: recipient.userId,
+            });
+            return [];
+        }
+
+        return [{ ...recipient, email: parsedEmail.data }];
+    });
+
+    return { activeRecipients, emailRecipients };
 }
 
 async function markRoutineReminderSuperseded(
@@ -318,12 +345,12 @@ export async function dispatchRoutineReminderOutbox(
             return "DEFERRED";
         }
 
-        const recipients = await resolveRoutineRecipients(
+        const { activeRecipients, emailRecipients } = await resolveRoutineRecipients(
             tx,
             rule.recipientScope,
             occurrence,
         );
-        if (recipients.length === 0) {
+        if (activeRecipients.length === 0) {
             console.warn("Routine reminder has no active recipients", {
                 occurrenceId: payload.occurrenceId,
                 ruleId: payload.ruleId,
@@ -341,7 +368,7 @@ export async function dispatchRoutineReminderOutbox(
             payload.dueDate,
             rule.daysBefore,
         );
-        for (const recipient of recipients) {
+        for (const recipient of activeRecipients) {
             await createInAppNotificationOnce(
                 {
                     userId: recipient.userId,
@@ -364,7 +391,7 @@ export async function dispatchRoutineReminderOutbox(
             );
         }
 
-        const emailDeliveries: RoutineReminderEmailData[] = recipients.map(
+        const emailDeliveries: RoutineReminderEmailData[] = emailRecipients.map(
             (recipient) => ({
                 to: recipient.email,
                 recipientName: recipient.name,

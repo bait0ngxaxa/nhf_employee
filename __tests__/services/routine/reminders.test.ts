@@ -152,6 +152,98 @@ describe("Routine reminder dispatch", () => {
         expect(prismaMock.notificationOutbox.updateMany).not.toHaveBeenCalled();
     });
 
+    it("keeps active recipients in-app when email is missing or invalid", async () => {
+        prismaMock.routineOccurrence.findUnique.mockResolvedValue(
+            asNever(buildOccurrence({
+                assignees: [
+                    buildOccurrence().assignees[0],
+                    {
+                        employee: {
+                            status: "ACTIVE",
+                            deletedAt: null,
+                            user: {
+                                id: 18,
+                                name: "ไม่มีอีเมล",
+                                email: "",
+                                isActive: true,
+                                deletedAt: null,
+                            },
+                        },
+                    },
+                    {
+                        employee: {
+                            status: "ACTIVE",
+                            deletedAt: null,
+                            user: {
+                                id: 19,
+                                name: "อีเมลไม่ถูกต้อง",
+                                email: "bad@example.com\n",
+                                isActive: true,
+                                deletedAt: null,
+                            },
+                        },
+                    },
+                ],
+            })),
+        );
+        const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+
+        try {
+            const result = await dispatchRoutineReminderOutbox(
+                buildNotification(buildPayload()),
+                buildPayload(),
+                new Date("2026-08-03T02:00:00.000Z"),
+            );
+
+            expect(result).toBe("SENT");
+            expect(createInAppNotificationOnceMock.mock.calls.map(([value]) => value.userId))
+                .toEqual([17, 18, 19]);
+            expect(sendRoutineReminderNotificationMock.mock.calls.map(([value]) => value.to))
+                .toEqual(["somchai@example.com"]);
+        } finally {
+            warnSpy.mockRestore();
+        }
+    });
+
+    it("does not retry an outbox event for an invalid email address", async () => {
+        prismaMock.routineOccurrence.findUnique.mockResolvedValue(
+            asNever(buildOccurrence({
+                assignees: [{
+                    employee: {
+                        status: "ACTIVE",
+                        deletedAt: null,
+                        user: {
+                            id: 18,
+                            name: "อีเมลไม่ถูกต้อง",
+                            email: "not-an-email",
+                            isActive: true,
+                            deletedAt: null,
+                        },
+                    },
+                }],
+            })),
+        );
+        sendRoutineReminderNotificationMock.mockResolvedValue(false);
+        const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+
+        try {
+            const result = await dispatchRoutineReminderOutbox(
+                buildNotification(buildPayload()),
+                buildPayload(),
+                new Date("2026-08-03T02:00:00.000Z"),
+            );
+
+            expect(result).toBe("SENT");
+            expect(createInAppNotificationOnceMock).toHaveBeenCalledWith(
+                expect.objectContaining({ userId: 18 }),
+                prismaMock,
+            );
+            expect(sendRoutineReminderNotificationMock).not.toHaveBeenCalled();
+        } finally {
+            warnSpy.mockRestore();
+        }
+    });
+
     it("retries a queued reminder later on the same Bangkok calendar day", async () => {
         prismaMock.routineOccurrence.findUnique.mockResolvedValue(
             asNever(buildOccurrence()),
