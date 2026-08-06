@@ -100,6 +100,7 @@ npm run dev
 | `AUDIT_LOG_CLEANUP_SECRET` | secret ของ `POST /api/audit-logs/cleanup` |
 | `LEAVE_ATTACHMENT_CLEANUP_SECRET` | secret ของ `POST /api/leave/attachments/cleanup` |
 | `NOTIFICATION_OUTBOX_CRON_SECRET` | secret ของ `POST /api/cron/notification-outbox` |
+| `ROUTINE_SCHEDULER_CRON_SECRET` | secret ของ `POST /api/cron/routine-scheduler` |
 | `PUBLIC_APPROVE_URL` | origin แบบ HTTPS ของระบบ เช่น `https://approve.example.com` ห้ามเป็น localhost ใน production |
 | `MYSQL_ROOT_PASSWORD` | รหัสผ่าน root ที่ใช้ตอนสร้าง MySQL container |
 | `MYSQL_DATABASE` | ชื่อฐานข้อมูลที่ Compose สร้าง |
@@ -135,7 +136,7 @@ openssl rand -base64 48
 | `IT_TEAM_EMAIL` | email ปลายทางของทีมไอที |
 | `EMAIL_REQUEST_INAPP_RECIPIENT_EMAILS` | email ผู้รับ in-app notification คั่นด้วย comma |
 
-ถ้าไม่ตั้ง `SMTP_USER` หรือ `SMTP_PASS` ระบบจะข้ามการส่ง email แต่ notification outbox ยังคงทำงานตาม flow ของระบบ
+ถ้าไม่ตั้ง `SMTP_USER` หรือ `SMTP_PASS` ระบบจะส่ง email ไม่ได้ และ event ที่ต้องส่ง email จะเข้า retry/dead ตาม policy ของ notification outbox; สำหรับ Routine production ต้องตั้งค่า SMTP ให้ครบ
 
 ### LINE
 
@@ -156,6 +157,7 @@ Webhook route ของแอปคือ `/api/line/webhook`
 | --- | --- | --- |
 | `NEXT_PUBLIC_FEATURE_LEAVE` | ปิด | เปิดโมดูล Leave เมื่อเป็น `true` |
 | `NEXT_PUBLIC_FEATURE_ITSUPPORT` | ปิด | เปิดโมดูล IT Support เมื่อเป็น `true` |
+| `NEXT_PUBLIC_FEATURE_ROUTINE` | ปิด | เปิดโมดูล Routine เมื่อเป็น `true` |
 
 ค่า `NEXT_PUBLIC_*` ถูกฝังใน client bundle ตอน build ดังนั้นต้องตั้งค่าก่อน `npm run build` และ build ใหม่ทุกครั้งที่เปลี่ยนค่า
 
@@ -302,6 +304,14 @@ sudo systemctl reload nginx
 ## Scheduled Maintenance
 
 ตั้ง external scheduler ให้เรียก endpoints ต่อไปนี้ด้วย `POST`
+
+### Routine scheduler — ทุก 1 นาที
+
+สร้าง occurrence ตาม schedule และ enqueue reminder เข้า notification outbox:
+
+```cron
+* * * * * curl --fail --silent --show-error --max-time 50 --request POST --header "x-routine-secret: $ROUTINE_SCHEDULER_CRON_SECRET" "$APP_BASE_URL/api/cron/routine-scheduler"
+```
 
 ### Notification outbox — ทุก 1 นาที
 
