@@ -2,6 +2,10 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { RoutineTaskForm } from "@/components/dashboard/routine/RoutineTaskForm";
+import {
+    getCurrentBangkokDate,
+    getDefaultRoutineScheduleConfig,
+} from "@/lib/routine/schedule";
 import type { RoutineTask } from "@/components/dashboard/routine/types";
 
 describe("RoutineTaskForm reminder rules", () => {
@@ -13,6 +17,86 @@ describe("RoutineTaskForm reminder rules", () => {
         fetchMock.mockResolvedValue(
             new Response(JSON.stringify({ task: { id: 1 } }), { status: 201 }),
         );
+    });
+
+    it("uses the shared Bangkok-date defaults when switching schedule types", () => {
+        render(
+            <RoutineTaskForm
+                reference={{
+                    units: [{ id: 1, code: "มสช.", name: "มสช." }],
+                    categories: [{ id: 1, name: "ระบบคอมพิวเตอร์", sortOrder: 1 }],
+                    employees: [],
+                }}
+                initialTask={null}
+                onSaved={vi.fn()}
+                onCancel={vi.fn()}
+            />,
+        );
+
+        const today = getCurrentBangkokDate();
+        fireEvent.change(screen.getByLabelText("รูปแบบการเกิดงาน"), {
+            target: { value: "INTERVAL_MONTHS" },
+        });
+        expect(screen.getByLabelText("วันที่เริ่มนับรอบ")).toHaveValue(
+            String(getDefaultRoutineScheduleConfig("INTERVAL_MONTHS", today).anchorDate),
+        );
+
+        fireEvent.change(screen.getByLabelText("รูปแบบการเกิดงาน"), {
+            target: { value: "ONE_TIME" },
+        });
+        expect(screen.getByLabelText("วันที่ครบกำหนด")).toHaveValue(
+            String(getDefaultRoutineScheduleConfig("ONE_TIME", today).date),
+        );
+    });
+
+    it("cancels a pristine form without opening a confirmation", () => {
+        const onCancel = vi.fn();
+        render(
+            <RoutineTaskForm
+                reference={{
+                    units: [],
+                    categories: [],
+                    employees: [],
+                }}
+                initialTask={null}
+                onSaved={vi.fn()}
+                onCancel={onCancel}
+            />,
+        );
+
+        fireEvent.click(screen.getByRole("button", { name: "ยกเลิก" }));
+
+        expect(onCancel).toHaveBeenCalledTimes(1);
+        expect(screen.queryByText("มีข้อมูลที่ยังไม่ได้บันทึก")).not.toBeInTheDocument();
+    });
+
+    it("protects dirty form data and keeps it when returning to edit", () => {
+        const onCancel = vi.fn();
+        render(
+            <RoutineTaskForm
+                reference={{
+                    units: [],
+                    categories: [],
+                    employees: [],
+                }}
+                initialTask={null}
+                onSaved={vi.fn()}
+                onCancel={onCancel}
+            />,
+        );
+
+        const title = screen.getByPlaceholderText("เช่น ตรวจสอบค่าใช้จ่ายประจำเดือน");
+        fireEvent.change(title, { target: { value: "งานที่กำลังแก้" } });
+        fireEvent.click(screen.getByRole("button", { name: "ยกเลิก" }));
+
+        expect(screen.getByText("มีข้อมูลที่ยังไม่ได้บันทึก")).toBeInTheDocument();
+        fireEvent.click(screen.getByRole("button", { name: "กลับไปแก้ไข" }));
+        expect(onCancel).not.toHaveBeenCalled();
+        expect(title).toHaveValue("งานที่กำลังแก้");
+
+        fireEvent.click(screen.getByRole("button", { name: "ยกเลิก" }));
+        fireEvent.click(screen.getByRole("button", { name: "ออกโดยไม่บันทึก" }));
+        expect(onCancel).toHaveBeenCalledTimes(1);
     });
 
     it("keeps day and month inputs within their valid calendar bounds", () => {
@@ -41,7 +125,9 @@ describe("RoutineTaskForm reminder rules", () => {
         expect(month).toHaveValue(12);
 
         fireEvent.change(month, { target: { value: "2" } });
-        expect(screen.getByLabelText("วันที่")).toHaveValue(29);
+        expect(screen.getByLabelText("วันที่")).toHaveValue(
+            Number(getCurrentBangkokDate().slice(-2)),
+        );
     });
 
     it("brings the first inline error into view after submit", async () => {

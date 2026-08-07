@@ -3,6 +3,16 @@ import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { API_ROUTES } from "@/lib/ssot/routes";
@@ -15,8 +25,15 @@ import {
     ROUTINE_BUSINESS_DAY_POLICIES,
     ROUTINE_SCHEDULE_TYPES,
     formatRoutineSendTime,
+    getDefaultRoutineScheduleConfig,
     parseRoutineSendTime,
 } from "@/lib/routine/schedule";
+import {
+    addRoutineAssignee,
+    normalizeRoutineAssignees,
+    removeRoutineAssignee,
+    setRoutineAssigneeRole,
+} from "@/lib/routine/assignees";
 import { createIdempotencyKey } from "@/lib/client/idempotency-key";
 import {
     routineTaskCreateSchema,
@@ -33,6 +50,7 @@ import {
 } from "./RoutineReminderFields";
 import { RoutineScheduleFields } from "./RoutineScheduleFields";
 import { focusFirstRoutineInvalidField } from "./focus-invalid-field";
+import { routineFormSnapshot } from "./form-dirty-state";
 import { formatRoutineUnitLabel, uniqueRoutineUnits } from "./labels";
 import type {
     RoutineAssigneeRole,
@@ -64,23 +82,6 @@ interface TaskFormState {
     businessDayPolicy: RoutineBusinessDayPolicy;
     isActive: boolean;
     reminderRules: RoutineReminderRuleForm[];
-}
-
-function defaultScheduleConfig(scheduleType: RoutineScheduleType): Record<string, unknown> {
-    switch (scheduleType) {
-        case "MONTHLY_DAY":
-            return { day: 10 };
-        case "MONTH_END":
-            return {};
-        case "INTERVAL_MONTHS":
-            return { intervalMonths: 3, anchorDate: "2026-01-01" };
-        case "YEARLY_DATE":
-            return { month: 3, day: 31 };
-        case "ONE_TIME":
-            return { date: "2026-07-21" };
-        case "MANUAL":
-            return {};
-    }
 }
 
 function isRoutineScheduleType(value: string): value is RoutineScheduleType {
@@ -121,7 +122,7 @@ function taskToForm(task: RoutineTask | null): TaskFormState {
         scheduleType,
         scheduleConfig: task && isObject(task.scheduleConfig)
             ? task.scheduleConfig
-            : defaultScheduleConfig(scheduleType),
+            : getDefaultRoutineScheduleConfig(scheduleType),
         scheduleText: task?.scheduleText ?? "",
         contractStartDate: dateInputValue(task?.contractStartDate),
         contractEndDate: dateInputValue(task?.contractEndDate),
@@ -178,7 +179,7 @@ export function RoutineTaskForm({
     );
     const initialAssignees = useMemo(
         () => initialTask?.assignees.length
-            ? Object.fromEntries(initialTask.assignees.map((assignee) => [assignee.employeeId, assignee.role])) as Record<number, RoutineAssigneeRole>
+            ? normalizeRoutineAssignees(Object.fromEntries(initialTask.assignees.map((assignee) => [assignee.employeeId, assignee.role])))
             : selfEmployee
                 ? { [selfEmployee.id]: "OWNER" as const }
                 : {},
@@ -192,6 +193,16 @@ export function RoutineTaskForm({
     const [reminderPreset, setReminderPreset] = useState<RoutineReminderPreset | "">("");
     const [error, setError] = useState<string | null>(null);
     const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+    const initialSnapshot = useMemo(
+        () => routineFormSnapshot({ form: taskToForm(initialTask), assignees: initialAssignees }),
+        [initialAssignees, initialTask],
+    );
+    const currentSnapshot = useMemo(
+        () => routineFormSnapshot({ form, assignees }),
+        [assignees, form],
+    );
+    const initialSnapshotRef = useRef(initialSnapshot);
+    const [discardConfirmOpen, setDiscardConfirmOpen] = useState(false);
     const submitLockRef = useRef(false);
     const createIdempotencyKeyRef = useRef<string | null>(null);
 
@@ -201,27 +212,39 @@ export function RoutineTaskForm({
         setError(null);
         setFieldErrors({});
         setReminderPreset("");
+        initialSnapshotRef.current = initialSnapshot;
+        setDiscardConfirmOpen(false);
         createIdempotencyKeyRef.current = initialTask ? null : createIdempotencyKey();
-    }, [initialAssignees, initialTask]);
+    }, [initialAssignees, initialSnapshot, initialTask]);
+
+    const isDirty = currentSnapshot !== initialSnapshotRef.current;
+
+    function requestCancel(): void {
+        if (isSubmitting) return;
+        if (isDirty) {
+            setDiscardConfirmOpen(true);
+            return;
+        }
+        onCancel();
+    }
+
+    function discardChanges(): void {
+        setDiscardConfirmOpen(false);
+        onCancel();
+    }
 
     function updateField<K extends keyof TaskFormState>(key: K, value: TaskFormState[K]): void {
         setForm((current) => ({ ...current, [key]: value }));
     }
 
     function toggleEmployee(employeeId: number): void {
-        setAssignees((current) => {
-            const next = { ...current };
-            if (next[employeeId]) {
-                delete next[employeeId];
-            } else {
-                next[employeeId] = Object.keys(next).length === 0 ? "OWNER" : "CO_OWNER";
-            }
-            return next;
-        });
+        setAssignees((current) => current[employeeId]
+            ? removeRoutineAssignee(current, employeeId)
+            : addRoutineAssignee(current, employeeId));
     }
 
     function updateAssigneeRole(employeeId: number, role: RoutineAssigneeRole): void {
-        setAssignees((current) => ({ ...current, [employeeId]: role }));
+        setAssignees((current) => setRoutineAssigneeRole(current, employeeId, role));
     }
 
     function addReminderRule(daysBefore = 1): void {
@@ -387,6 +410,7 @@ export function RoutineTaskForm({
                 throw new Error(readError(body));
             }
             toast.success(initialTask ? "บันทึกการแก้ไขสำเร็จ" : "สร้างรายการ Routine สำเร็จ");
+            initialSnapshotRef.current = routineFormSnapshot({ form, assignees });
             onSaved();
         } catch (submitError) {
             const message = submitError instanceof Error
@@ -515,7 +539,7 @@ export function RoutineTaskForm({
             </div>
             <label className="flex min-h-11 items-center gap-3 text-sm font-medium text-content-body"><input type="checkbox" checked={form.isActive} onChange={(event) => updateField("isActive", event.target.checked)} disabled={isSubmitting} /> เปิดใช้งานแม่แบบงานนี้</label>
             <div className="flex flex-wrap justify-end gap-2">
-                <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting}>ยกเลิก</Button>
+                <Button type="button" variant="outline" onClick={requestCancel} disabled={isSubmitting}>ยกเลิก</Button>
                 <Button type="submit" disabled={isSubmitting} aria-busy={isSubmitting} aria-live="polite">
                     {isSubmitting ? (
                         <>
@@ -525,6 +549,22 @@ export function RoutineTaskForm({
                     ) : isSelfService ? "บันทึกงานของฉัน" : "บันทึกแม่แบบงาน"}
                 </Button>
             </div>
+            <AlertDialog open={discardConfirmOpen} onOpenChange={setDiscardConfirmOpen}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>มีข้อมูลที่ยังไม่ได้บันทึก</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            หากออกตอนนี้ การแก้ไขล่าสุดจะหายไป
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>กลับไปแก้ไข</AlertDialogCancel>
+                        <AlertDialogAction variant="destructive" onClick={discardChanges}>
+                            ออกโดยไม่บันทึก
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </form>
     );
 }

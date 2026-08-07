@@ -7,6 +7,7 @@ import {
     ROUTINE_SCHEDULE_LIMITS,
     ROUTINE_SCHEDULE_TYPES,
     daysInMonth,
+    getDefaultRoutineScheduleConfig,
     type RoutineBusinessDayPolicy,
     type RoutineScheduleType,
 } from "@/lib/routine/schedule";
@@ -30,23 +31,6 @@ interface RoutineScheduleFieldsProps {
     onContractTextChange: (value: string) => void;
     errors?: Record<string, string>;
     disabled?: boolean;
-}
-
-function defaultScheduleConfig(type: RoutineScheduleType): Record<string, unknown> {
-    switch (type) {
-        case "MONTHLY_DAY":
-            return { day: 10 };
-        case "MONTH_END":
-            return {};
-        case "INTERVAL_MONTHS":
-            return { intervalMonths: 3, anchorDate: "2026-01-01" };
-        case "YEARLY_DATE":
-            return { month: 3, day: 31 };
-        case "ONE_TIME":
-            return { date: "2026-07-21" };
-        case "MANUAL":
-            return {};
-    }
 }
 
 function numberValue(value: unknown, fallback = 0): number {
@@ -153,7 +137,7 @@ export function RoutineScheduleFields({
                         onChange={(event) => {
                             const nextType = event.target.value as RoutineScheduleType;
                             onScheduleTypeChange(nextType);
-                            onScheduleConfigChange(defaultScheduleConfig(nextType));
+                            onScheduleConfigChange(getDefaultRoutineScheduleConfig(nextType));
                         }}
                     >
                         {ROUTINE_SCHEDULE_TYPES.map((type) => (

@@ -15,10 +15,11 @@ import {
 } from "@/lib/routine/timing";
 import type {
     RoutineOccurrenceFilters,
+    RoutineSummaryScope,
     RoutineTaskFilters,
 } from "@/lib/validations/routine";
 
-import { RoutineNotFoundError } from "./errors";
+import { RoutineForbiddenError, RoutineNotFoundError } from "./errors";
 import { resolveRelevantRoutineOccurrences } from "./relevant-occurrence";
 import type { RoutineQueryActor } from "./types";
 
@@ -812,7 +813,9 @@ export async function getRoutineOccurrenceById(
     };
 }
 
-export async function getRoutineSummary(queryActor: RoutineQueryActor): Promise<{
+export async function getRoutineSummary(
+    queryActor: RoutineQueryActor & { scope?: RoutineSummaryScope },
+): Promise<{
     today: number;
     dueSoon: number;
     within30Days: number;
@@ -820,12 +823,16 @@ export async function getRoutineSummary(queryActor: RoutineQueryActor): Promise<
 }> {
     const isAdmin = queryActor.actor.role === "ADMIN";
     const employeeId = await resolveActorEmployeeId(queryActor);
+    const scope = queryActor.scope ?? (isAdmin ? "all" : "mine");
+    if (!isAdmin && scope === "all") {
+        throw new RoutineForbiddenError("คุณไม่มีสิทธิ์ดูสรุป Routine ทั้งหมด");
+    }
     const today = getCurrentBangkokDate();
     const nextThirtyDays = addCalendarDays(today, 30);
 
     const taskWhere = buildTaskWhere(
         {
-            scope: isAdmin ? "all" : "mine",
+            scope,
             page: 1,
             limit: 1,
         },

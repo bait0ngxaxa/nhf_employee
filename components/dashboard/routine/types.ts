@@ -1,9 +1,9 @@
 import type { RoutineTimingStatus } from "@/lib/routine/timing";
 import type { RoutineScheduleType } from "@/lib/routine/schedule";
+import type { RoutineAssigneeRole } from "@/lib/routine/assignees";
 
 export type { RoutineTimingStatus } from "@/lib/routine/timing";
-
-export type RoutineAssigneeRole = "OWNER" | "CO_OWNER";
+export type { RoutineAssigneeRole } from "@/lib/routine/assignees";
 
 export type RoutineReminderRecipientScope =
     | "ASSIGNEES"

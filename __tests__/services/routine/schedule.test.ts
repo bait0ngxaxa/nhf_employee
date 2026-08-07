@@ -5,6 +5,7 @@ import {
     calendarDateToBangkokStart,
     calendarDayDifference,
     formatRoutineSendTime,
+    getDefaultRoutineScheduleConfig,
     getCurrentBangkokDate,
     getRoutineGenerationWindow,
     isRoutineReminderDue,
@@ -15,6 +16,24 @@ import {
 const window = (from: string, to: string): RoutineDateWindow => ({ from, to });
 
 describe("NHF Routine schedule engine", () => {
+    it("builds fresh defaults from the Bangkok calendar date", () => {
+        const today = "2026-08-07";
+
+        expect(getDefaultRoutineScheduleConfig("INTERVAL_MONTHS", today)).toEqual({
+            intervalMonths: 3,
+            anchorDate: today,
+        });
+        expect(getDefaultRoutineScheduleConfig("ONE_TIME", today)).toEqual({
+            date: today,
+        });
+        expect(getDefaultRoutineScheduleConfig("YEARLY_DATE", today)).toEqual({
+            month: 8,
+            day: 7,
+        });
+        expect(JSON.stringify(getDefaultRoutineScheduleConfig("ONE_TIME", today)))
+            .not.toContain("2026-07-21");
+    });
+
     it("does not normalize monthly day 31 into a shorter month", () => {
         const result = calculateRoutineOccurrences(
             { scheduleType: "MONTHLY_DAY", config: { day: 31, monthOffset: 0 } },

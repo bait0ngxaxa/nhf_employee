@@ -39,6 +39,27 @@ export const ROUTINE_SCHEDULE_LIMITS = {
     intervalMonths: { min: 1, max: 120 },
 } as const;
 
+export function getDefaultRoutineScheduleConfig(
+    scheduleType: RoutineScheduleType,
+    today: CalendarDate = getCurrentBangkokDate(),
+): Record<string, unknown> {
+    const parts = dateParts(today);
+    switch (scheduleType) {
+        case "MONTHLY_DAY":
+            return { day: 10 };
+        case "MONTH_END":
+            return {};
+        case "INTERVAL_MONTHS":
+            return { intervalMonths: 3, anchorDate: today };
+        case "YEARLY_DATE":
+            return { month: parts.month, day: parts.day };
+        case "ONE_TIME":
+            return { date: today };
+        case "MANUAL":
+            return {};
+    }
+}
+
 export interface MonthlyDayScheduleConfig {
     day: number;
     monthOffset: number;

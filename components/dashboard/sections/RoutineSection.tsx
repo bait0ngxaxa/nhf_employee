@@ -283,17 +283,23 @@ export function RoutineSection() {
         ? occurrenceIdValue
         : null;
     const [activeTab, setActiveTab] = useState("mine");
-    const {
-        data: summaryData,
-        error: summaryError,
-        isLoading: summaryLoading,
-        mutate: mutateSummary,
-    } = useSWR<RoutineSummaryResponse, Error>(API_ROUTES.routines.summary, fetchRoutine);
+    const [summaryScope, setSummaryScope] = useState<"mine" | "all">("mine");
     const safeTab = isAdmin
         ? activeTab
         : activeTab === "manage"
             ? "manage"
             : "mine";
+    useEffect(() => {
+        if (safeTab === "mine") setSummaryScope("mine");
+        if (safeTab === "all" && isAdmin) setSummaryScope("all");
+    }, [isAdmin, safeTab]);
+    const summaryKey = `${API_ROUTES.routines.summary}?scope=${summaryScope}`;
+    const {
+        data: summaryData,
+        error: summaryError,
+        isLoading: summaryLoading,
+        mutate: mutateSummary,
+    } = useSWR<RoutineSummaryResponse, Error>(summaryKey, fetchRoutine);
 
     useEffect(() => {
         if (isAdmin && (taskId !== null || occurrenceId !== null)) setActiveTab("all");

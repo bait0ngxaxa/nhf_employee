@@ -12,6 +12,12 @@ import {
     LoadingState,
 } from "@/components/ui/state";
 import { calendarDateToDate } from "@/lib/routine/schedule";
+import {
+    addRoutineAssignee,
+    normalizeRoutineAssignees,
+    removeRoutineAssignee,
+    setRoutineAssigneeRole,
+} from "@/lib/routine/assignees";
 import { API_ROUTES } from "@/lib/ssot/routes";
 
 import {
@@ -103,9 +109,9 @@ function formatDate(date: string): string {
 function editorAssignees(
     occurrence: RoutineTaskWorkItemOccurrence,
 ): Record<number, RoutineAssigneeRole> {
-    return Object.fromEntries(
+    return normalizeRoutineAssignees(Object.fromEntries(
         occurrence.assignees.map((assignee) => [assignee.employeeId, assignee.role]),
-    );
+    ));
 }
 
 export function RoutineOccurrenceList({
@@ -137,25 +143,20 @@ export function RoutineOccurrenceList({
     }
 
     function toggleAssignee(employeeId: number): void {
-        setEditor((current) => {
-            if (!current) return current;
-            const assignees = { ...current.assignees };
-            if (assignees[employeeId]) {
-                delete assignees[employeeId];
-            } else {
-                assignees[employeeId] = Object.keys(assignees).length === 0
-                    ? "OWNER"
-                    : "CO_OWNER";
-            }
-            return { ...current, assignees };
-        });
+        setEditor((current) => current
+            ? {
+                  ...current,
+                  assignees: current.assignees[employeeId]
+                      ? removeRoutineAssignee(current.assignees, employeeId)
+                      : addRoutineAssignee(current.assignees, employeeId),
+              }
+            : current);
     }
 
     function updateEditorAssigneeRole(employeeId: number, role: RoutineAssigneeRole): void {
-        setEditor((current) => current ? {
-            ...current,
-            assignees: { ...current.assignees, [employeeId]: role },
-        } : current);
+        setEditor((current) => current
+            ? { ...current, assignees: setRoutineAssigneeRole(current.assignees, employeeId, role) }
+            : current);
     }
 
     async function saveEdit(

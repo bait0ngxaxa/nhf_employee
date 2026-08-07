@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ReactNode } from "react";
 
@@ -6,6 +6,7 @@ import { RoutineSection } from "@/components/dashboard/sections/RoutineSection";
 
 const mocks = vi.hoisted(() => ({
     useDashboardDataContext: vi.fn(),
+    useSearchParams: vi.fn(() => new URLSearchParams()),
     useSWR: vi.fn(() => ({
         data: undefined,
         error: undefined,
@@ -21,26 +22,28 @@ vi.mock("@/components/dashboard/context/dashboard/DashboardContext", () => ({
 vi.mock("swr", () => ({ default: mocks.useSWR }));
 
 vi.mock("next/navigation", () => ({
-    useSearchParams: () => new URLSearchParams(),
+    useSearchParams: mocks.useSearchParams,
 }));
 
 vi.mock("@/components/ui/section-tabs", async () => {
     return {
-        SectionTabs: ({
-            tabs,
-        }: {
-            tabs: Array<{
+    SectionTabs: ({
+        tabs,
+        onValueChange,
+    }: {
+        tabs: Array<{
                 value: string;
                 label: string;
                 visible?: boolean;
                 content?: ReactNode;
             }>;
+            onValueChange: (value: string) => void;
         }) => (
             <div>
                 {tabs
                     .filter((tab) => tab.visible !== false)
                     .map((tab) => (
-                        <span key={tab.value}>{tab.label}</span>
+                        <button key={tab.value} type="button" onClick={() => onValueChange(tab.value)}>{tab.label}</button>
                     ))}
                 {tabs.find((tab) => tab.value === "settings")?.content}
             </div>
@@ -62,6 +65,7 @@ vi.mock("@/components/dashboard/routine/RoutineTaskList", () => ({
 
 describe("RoutineSection tabs", () => {
     beforeEach(() => {
+        mocks.useSearchParams.mockReturnValue(new URLSearchParams());
         mocks.useSWR.mockReturnValue({
             data: undefined,
             error: undefined,
@@ -82,6 +86,10 @@ describe("RoutineSection tabs", () => {
         expect(screen.queryByText("รายการทั้งหมด (Admin)")).not.toBeInTheDocument();
         expect(screen.queryByText("ตั้งค่างานประจำ")).not.toBeInTheDocument();
         expect(screen.queryByText("นำเข้าจาก Excel")).not.toBeInTheDocument();
+        expect(mocks.useSWR).toHaveBeenCalledWith(
+            "/api/routines/summary?scope=mine",
+            expect.any(Function),
+        );
     });
 
     it("exposes task settings and all-occurrence tabs to an admin", () => {
@@ -108,5 +116,38 @@ describe("RoutineSection tabs", () => {
             "/api/routines/tasks?activeOnly=0&page=1&limit=20",
             expect.any(Function),
         );
+    });
+
+    it("requests the KPI summary for the active admin operational scope", async () => {
+        mocks.useDashboardDataContext.mockReturnValue({
+            user: { role: "ADMIN" },
+        });
+
+        render(<RoutineSection />);
+
+        expect(mocks.useSWR).toHaveBeenCalledWith(
+            "/api/routines/summary?scope=mine",
+            expect.any(Function),
+        );
+        fireEvent.click(screen.getByRole("button", { name: "รายการทั้งหมด (Admin)" }));
+
+        await waitFor(() => expect(mocks.useSWR).toHaveBeenCalledWith(
+            "/api/routines/summary?scope=all",
+            expect.any(Function),
+        ));
+    });
+
+    it("opens an admin deep link with the all-scope KPI", async () => {
+        mocks.useDashboardDataContext.mockReturnValue({
+            user: { role: "ADMIN" },
+        });
+        mocks.useSearchParams.mockReturnValue(new URLSearchParams("taskId=71&occurrenceId=91"));
+
+        render(<RoutineSection />);
+
+        await waitFor(() => expect(mocks.useSWR).toHaveBeenCalledWith(
+            "/api/routines/summary?scope=all",
+            expect.any(Function),
+        ));
     });
 });

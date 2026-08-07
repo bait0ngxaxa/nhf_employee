@@ -283,6 +283,28 @@ describe("RoutineImportPanel", () => {
         expect(dialog).toHaveTextContent("จาก Excel: สมชาย");
     });
 
+    it("protects unsaved row edits when the editor is closed", async () => {
+        vi.stubGlobal("fetch", importFetchMock(editableRow));
+
+        render(<RoutineImportPanel />);
+        selectUploadFile();
+        fireEvent.click(screen.getByRole("button", { name: /อัปโหลดและดูตัวอย่าง/ }));
+        fireEvent.click(await screen.findByRole("button", { name: /แก้ไข/ }));
+
+        const titleInput = await screen.findByDisplayValue("ตรวจสอบรายการนำเข้า");
+        fireEvent.change(titleInput, { target: { value: "งานที่ยังไม่บันทึก" } });
+        fireEvent.click(screen.getByRole("button", { name: "ปิด" }));
+
+        expect(screen.getByRole("alertdialog")).toHaveTextContent("มีข้อมูลที่ยังไม่ได้บันทึก");
+        fireEvent.click(screen.getByRole("button", { name: "กลับไปแก้ไข" }));
+        expect(screen.getByDisplayValue("งานที่ยังไม่บันทึก")).toBeInTheDocument();
+        expect(screen.getByRole("dialog")).toBeInTheDocument();
+
+        fireEvent.click(screen.getByRole("button", { name: "ปิด" }));
+        fireEvent.click(screen.getByRole("button", { name: "ออกโดยไม่บันทึก" }));
+        await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    });
+
     it("assigns one owner, demotes the previous owner, and promotes a replacement on removal", async () => {
         vi.stubGlobal("fetch", importFetchMock(editableRow));
 

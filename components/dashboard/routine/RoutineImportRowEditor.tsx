@@ -5,6 +5,16 @@ import { AlertTriangle, Loader2, Save } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -16,6 +26,12 @@ import {
     type RoutineBusinessDayPolicy,
     type RoutineScheduleType,
 } from "@/lib/routine/schedule";
+import {
+    addRoutineAssignee,
+    normalizeRoutineAssignees,
+    removeRoutineAssignee,
+    setRoutineAssigneeRole,
+} from "@/lib/routine/assignees";
 import type { RoutineAssigneeRole } from "./types";
 
 import { RoutineAssigneePicker } from "./RoutineAssigneePicker";
@@ -28,6 +44,7 @@ import {
 } from "./RoutineReminderFields";
 import { RoutineScheduleFields } from "./RoutineScheduleFields";
 import { focusFirstRoutineInvalidField } from "./focus-invalid-field";
+import { routineFormSnapshot } from "./form-dirty-state";
 import type {
     RoutineImportReference,
     RoutineImportRowEdit,
@@ -90,18 +107,11 @@ function normalizeAssignees(row: RoutineImportRowView): AssigneeState {
         role: index === 0 ? "OWNER" as const : "CO_OWNER" as const,
     }));
     const next: AssigneeState = {};
-    let ownerAssigned = false;
     for (const assignee of source) {
         if (next[assignee.employeeId] !== undefined) continue;
-        const role: "OWNER" | "CO_OWNER" = assignee.role === "OWNER" && !ownerAssigned ? "OWNER" : "CO_OWNER";
-        next[assignee.employeeId] = role;
-        ownerAssigned = ownerAssigned || role === "OWNER";
+        next[assignee.employeeId] = assignee.role;
     }
-    if (!ownerAssigned) {
-        const firstEmployeeId = Object.keys(next)[0];
-        if (firstEmployeeId) next[Number(firstEmployeeId)] = "OWNER";
-    }
-    return next;
+    return normalizeRoutineAssignees(next);
 }
 
 const ROUTINE_IMPORT_ROW_STATUSES: readonly RoutineImportRowStatus[] = [
@@ -185,8 +195,26 @@ export function RoutineImportRowEditor({
     const [error, setError] = useState<string | null>(null);
     const [notice, setNotice] = useState<string | null>(null);
     const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+    const [discardConfirmOpen, setDiscardConfirmOpen] = useState(false);
     const saveLockRef = useRef(false);
     const initializedRowIdRef = useRef<number | null>(null);
+    const initialSnapshotRef = useRef<string | null>(null);
+
+    const currentSnapshot = routineFormSnapshot({
+        categoryName,
+        title,
+        assignees,
+        scheduleText,
+        scheduleType,
+        scheduleConfig,
+        businessDayPolicy,
+        contractStartDate,
+        contractEndDate,
+        contractText,
+        extraDetails,
+        selected,
+        reminderRules,
+    });
 
     useEffect(() => {
         if (!row) {
@@ -195,70 +223,81 @@ export function RoutineImportRowEditor({
         }
         if (initializedRowIdRef.current === row.id) return;
         initializedRowIdRef.current = row.id;
-        setCategoryName(row.data.categoryName);
-        setTitle(row.data.title);
-        setAssignees(normalizeAssignees(row));
-        setScheduleText(row.data.scheduleText ?? "");
-        setScheduleType(defaultScheduleType(row));
-        setScheduleConfig(defaultScheduleConfig(row));
-        setBusinessDayPolicy(defaultBusinessDayPolicy(row));
-        setContractStartDate(row.data.contractStartDate);
-        setContractEndDate(row.data.contractEndDate);
-        setContractText(row.data.contractText);
-        setExtraDetails(row.data.extraDetails);
-        setSelected(row.status === "REQUIRES_REVIEW" ? true : row.selected);
-        setReminderRules((row.data.reminderRules ?? []).map((rule) => ({
+        const normalizedAssignees = normalizeAssignees(row);
+        const nextReminderRules = (row.data.reminderRules ?? []).map((rule) => ({
             daysBefore: String(rule.daysBefore),
             sendHour: formatRoutineSendTime(rule.sendHour),
             recipientScope: rule.recipientScope,
             isActive: rule.isActive,
-        })));
+        }));
+        const nextScheduleType = defaultScheduleType(row);
+        const nextScheduleConfig = defaultScheduleConfig(row);
+        const nextBusinessDayPolicy = defaultBusinessDayPolicy(row);
+        const nextContractStartDate = row.data.contractStartDate;
+        const nextContractEndDate = row.data.contractEndDate;
+        const nextContractText = row.data.contractText;
+        const nextExtraDetails = row.data.extraDetails;
+        const nextSelected = row.status === "REQUIRES_REVIEW" ? true : row.selected;
+        initialSnapshotRef.current = routineFormSnapshot({
+            categoryName: row.data.categoryName,
+            title: row.data.title,
+            assignees: normalizedAssignees,
+            scheduleText: row.data.scheduleText ?? "",
+            scheduleType: nextScheduleType,
+            scheduleConfig: nextScheduleConfig,
+            businessDayPolicy: nextBusinessDayPolicy,
+            contractStartDate: nextContractStartDate,
+            contractEndDate: nextContractEndDate,
+            contractText: nextContractText,
+            extraDetails: nextExtraDetails,
+            selected: nextSelected,
+            reminderRules: nextReminderRules,
+        });
+        setCategoryName(row.data.categoryName);
+        setTitle(row.data.title);
+        setAssignees(normalizedAssignees);
+        setScheduleText(row.data.scheduleText ?? "");
+        setScheduleType(nextScheduleType);
+        setScheduleConfig(nextScheduleConfig);
+        setBusinessDayPolicy(nextBusinessDayPolicy);
+        setContractStartDate(nextContractStartDate);
+        setContractEndDate(nextContractEndDate);
+        setContractText(nextContractText);
+        setExtraDetails(nextExtraDetails);
+        setSelected(nextSelected);
+        setReminderRules(nextReminderRules);
         setError(null);
         setNotice(null);
         setFieldErrors({});
         setReminderPreset("");
+        setDiscardConfirmOpen(false);
     }, [row]);
 
+    const isDirty = initialSnapshotRef.current !== null
+        && currentSnapshot !== initialSnapshotRef.current;
+
+    function requestClose(): void {
+        if (saving) return;
+        if (isDirty) {
+            setDiscardConfirmOpen(true);
+            return;
+        }
+        onOpenChange(false);
+    }
+
+    function discardChanges(): void {
+        setDiscardConfirmOpen(false);
+        onOpenChange(false);
+    }
+
     function toggleEmployee(employeeId: number): void {
-        setAssignees((current) => {
-            const next = { ...current };
-            if (next[employeeId]) {
-                const wasOwner = next[employeeId] === "OWNER";
-                delete next[employeeId];
-                if (wasOwner) {
-                    const replacementId = Object.keys(next)[0];
-                    if (replacementId) next[Number(replacementId)] = "OWNER";
-                }
-            } else {
-                next[employeeId] = Object.keys(next).length === 0 ? "OWNER" : "CO_OWNER";
-            }
-            return next;
-        });
+        setAssignees((current) => current[employeeId]
+            ? removeRoutineAssignee(current, employeeId)
+            : addRoutineAssignee(current, employeeId));
     }
 
     function updateAssigneeRole(employeeId: number, role: RoutineAssigneeRole): void {
-        setAssignees((current) => {
-            if (current[employeeId] === undefined) return current;
-            if (role === "OWNER") {
-                return Object.fromEntries(
-                    Object.keys(current).map((id) => [
-                        Number(id),
-                        Number(id) === employeeId ? "OWNER" : "CO_OWNER",
-                    ]),
-                ) as AssigneeState;
-            }
-            if (current[employeeId] !== "OWNER") return { ...current, [employeeId]: "CO_OWNER" };
-            const replacementId = Object.keys(current).find((id) => Number(id) !== employeeId);
-            if (!replacementId) return current;
-            return Object.fromEntries(
-                Object.keys(current).map((id) => [
-                    Number(id),
-                    Number(id) === employeeId
-                        ? "CO_OWNER"
-                        : Number(id) === Number(replacementId) ? "OWNER" : "CO_OWNER",
-                ]),
-            ) as AssigneeState;
-        });
+        setAssignees((current) => setRoutineAssigneeRole(current, employeeId, role));
     }
 
     function applyReminderPreset(value: RoutineReminderPreset): void {
@@ -376,10 +415,27 @@ export function RoutineImportRowEditor({
             const savedRow = parseRoutineImportRowView(body.row);
             onSaved(savedRow);
             if (savedRow.status === "REQUIRES_REVIEW") {
-                setAssignees(normalizeAssignees(savedRow));
+                const savedAssignees = normalizeAssignees(savedRow);
+                setAssignees(savedAssignees);
                 setSelected(savedRow.selected);
+                initialSnapshotRef.current = routineFormSnapshot({
+                    categoryName,
+                    title,
+                    assignees: savedAssignees,
+                    scheduleText,
+                    scheduleType,
+                    scheduleConfig,
+                    businessDayPolicy,
+                    contractStartDate,
+                    contractEndDate,
+                    contractText,
+                    extraDetails,
+                    selected: savedRow.selected,
+                    reminderRules,
+                });
                 setNotice("บันทึกข้อมูลแล้ว แต่ยังมีรายการที่ต้องแก้ไข");
             } else if (savedRow.status === "VALID" || savedRow.status === "EXCLUDED") {
+                initialSnapshotRef.current = currentSnapshot;
                 toast.success(savedRow.status === "EXCLUDED" ? "บันทึกแถวและข้ามรายการแล้ว" : "บันทึกแถวพร้อมนำเข้าแล้ว");
                 onOpenChange(false);
             } else {
@@ -398,7 +454,7 @@ export function RoutineImportRowEditor({
     if (!row) return null;
 
     return (
-        <Dialog open={open} onOpenChange={(nextOpen) => { if (!nextOpen && saving) return; onOpenChange(nextOpen); }}>
+        <Dialog open={open} onOpenChange={(nextOpen) => { if (nextOpen) onOpenChange(true); else requestClose(); }}>
             <DialogContent className="max-h-[90dvh] max-w-4xl overflow-y-auto">
                 <DialogHeader>
                     <DialogTitle>แก้ไขแถวที่ {row.sourceRow}</DialogTitle>
@@ -497,7 +553,7 @@ export function RoutineImportRowEditor({
                 </div>
 
                 <DialogFooter>
-                    <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>ปิด</Button>
+                    <Button type="button" variant="outline" onClick={requestClose} disabled={saving}>ปิด</Button>
                     <Button type="button" onClick={() => void save()} disabled={disabled || saving} aria-busy={saving} aria-live="polite">
                         {saving ? (
                             <>
@@ -508,6 +564,22 @@ export function RoutineImportRowEditor({
                     </Button>
                 </DialogFooter>
             </DialogContent>
+            <AlertDialog open={discardConfirmOpen} onOpenChange={setDiscardConfirmOpen}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>มีข้อมูลที่ยังไม่ได้บันทึก</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            หากออกตอนนี้ การแก้ไขล่าสุดจะหายไป
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>กลับไปแก้ไข</AlertDialogCancel>
+                        <AlertDialogAction variant="destructive" onClick={discardChanges}>
+                            ออกโดยไม่บันทึก
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </Dialog>
     );
 }

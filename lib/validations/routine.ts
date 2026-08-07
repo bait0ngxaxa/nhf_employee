@@ -328,6 +328,10 @@ export const routineOccurrenceFiltersSchema = z.object({
     }
 });
 
+export const routineSummaryQuerySchema = z.object({
+    scope: z.enum(["mine", "all"]).default("mine"),
+});
+
 export const routineTaskFiltersSchema = z.object({
     activeOnly: z
         .enum(["0", "1"])
@@ -403,6 +407,7 @@ export type RoutineTaskUpdateInput = z.infer<typeof routineTaskUpdateSchema>;
 export type RoutineOccurrenceFilters = z.infer<
     typeof routineOccurrenceFiltersSchema
 >;
+export type RoutineSummaryScope = z.infer<typeof routineSummaryQuerySchema>["scope"];
 export type RoutineTaskFilters = z.infer<typeof routineTaskFiltersSchema>;
 export type RoutineDueDateInput = z.infer<typeof routineDueDateSchema>;
 export type RoutineOccurrenceAssigneesInput = z.infer<
