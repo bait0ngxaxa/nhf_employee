@@ -33,6 +33,12 @@ export type RoutineBusinessDayPolicy =
 
 export type CalendarDate = string;
 
+export const ROUTINE_SCHEDULE_LIMITS = {
+    day: { min: 1, max: 31 },
+    month: { min: 1, max: 12 },
+    intervalMonths: { min: 1, max: 120 },
+} as const;
+
 export interface MonthlyDayScheduleConfig {
     day: number;
     monthOffset: number;

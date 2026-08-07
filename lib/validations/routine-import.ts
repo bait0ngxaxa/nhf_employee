@@ -3,14 +3,12 @@ import { z } from "zod";
 import {
     ROUTINE_BUSINESS_DAY_POLICIES,
     ROUTINE_SCHEDULE_TYPES,
-    daysInMonth,
-    type YearlyDateScheduleConfig,
 } from "@/lib/routine/schedule";
 
 import {
-    parseRoutineScheduleConfig,
     routineAssigneeSchema,
     routineReminderRuleSchema,
+    validateRoutineScheduleConfig,
 } from "./routine";
 
 export const routineImportBatchIdSchema = z.string().regex(/^\d+$/, "รหัสไม่ถูกต้อง");
@@ -68,26 +66,7 @@ export const routineImportRowUpdateSchema = z.object({
         });
     }
 
-    try {
-        const config = parseRoutineScheduleConfig(data.scheduleType, data.scheduleConfig);
-        if (
-            data.scheduleType === "YEARLY_DATE"
-            && (config as YearlyDateScheduleConfig).day
-                > daysInMonth(2024, (config as YearlyDateScheduleConfig).month)
-        ) {
-            ctx.addIssue({
-                code: "custom",
-                path: ["scheduleConfig", "day"],
-                message: "เดือนและวันที่กำหนดไม่สัมพันธ์กัน",
-            });
-        }
-    } catch {
-        ctx.addIssue({
-            code: "custom",
-            path: ["scheduleConfig"],
-            message: "กำหนดค่าตารางงานประจำไม่ถูกต้อง",
-        });
-    }
+    validateRoutineScheduleConfig(data.scheduleType, data.scheduleConfig, ctx);
 });
 
 export type RoutineImportRowUpdateInput = z.infer<typeof routineImportRowUpdateSchema>;

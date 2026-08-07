@@ -4,6 +4,7 @@ import {
     ROUTINE_BUSINESS_DAY_POLICIES,
     ROUTINE_MAX_REMINDER_DAYS_BEFORE,
     ROUTINE_SCHEDULE_TYPES,
+    ROUTINE_SCHEDULE_LIMITS,
     daysInMonth,
     type YearlyDateScheduleConfig,
     type RoutineBusinessDayPolicy,
@@ -35,21 +36,51 @@ const optionalText = (max: number) =>
 
 const dateSchema = z.iso.date({ error: "รูปแบบวันที่ไม่ถูกต้อง" });
 
+function boundedIntegerSchema(
+    min: number,
+    max: number,
+    message: string,
+) {
+    return z.preprocess(
+        emptyToUndefined,
+        z.coerce.number({ error: message })
+            .int(message)
+            .min(min, message)
+            .max(max, message),
+    );
+}
+
 const monthlyDayScheduleConfigSchema = z.strictObject({
-    day: z.preprocess(emptyToUndefined, z.coerce.number().int().min(1).max(31)),
+    day: boundedIntegerSchema(
+        ROUTINE_SCHEDULE_LIMITS.day.min,
+        ROUTINE_SCHEDULE_LIMITS.day.max,
+        "กรุณาระบุวันที่ตั้งแต่ 1 ถึง 31",
+    ),
     monthOffset: z.preprocess(emptyToUndefined, z.coerce.number().int().min(-120).max(120)).default(0),
 });
 
 const monthEndScheduleConfigSchema = z.strictObject({});
 
 const intervalMonthsScheduleConfigSchema = z.strictObject({
-    intervalMonths: z.preprocess(emptyToUndefined, z.coerce.number().int().min(1).max(120)),
+    intervalMonths: boundedIntegerSchema(
+        ROUTINE_SCHEDULE_LIMITS.intervalMonths.min,
+        ROUTINE_SCHEDULE_LIMITS.intervalMonths.max,
+        "กรุณาระบุรอบเดือนตั้งแต่ 1 ถึง 120",
+    ),
     anchorDate: dateSchema,
 });
 
 const yearlyDateScheduleConfigSchema = z.strictObject({
-    month: z.preprocess(emptyToUndefined, z.coerce.number().int().min(1).max(12)),
-    day: z.preprocess(emptyToUndefined, z.coerce.number().int().min(1).max(31)),
+    month: boundedIntegerSchema(
+        ROUTINE_SCHEDULE_LIMITS.month.min,
+        ROUTINE_SCHEDULE_LIMITS.month.max,
+        "กรุณาระบุเดือนตั้งแต่ 1 ถึง 12",
+    ),
+    day: boundedIntegerSchema(
+        ROUTINE_SCHEDULE_LIMITS.day.min,
+        ROUTINE_SCHEDULE_LIMITS.day.max,
+        "กรุณาระบุวันที่ตั้งแต่ 1 ถึง 31",
+    ),
 });
 
 const oneTimeScheduleConfigSchema = z.strictObject({
@@ -143,7 +174,7 @@ export const routineBusinessDayPolicySchema = z.enum(
     ROUTINE_BUSINESS_DAY_POLICIES,
 );
 
-function validateScheduleConfig(
+export function validateRoutineScheduleConfig(
     scheduleType: RoutineScheduleType,
     value: unknown,
     ctx: z.RefinementCtx,
@@ -161,7 +192,17 @@ function validateScheduleConfig(
                 message: "เดือนและวันที่กำหนดไม่สัมพันธ์กัน",
             });
         }
-    } catch {
+    } catch (error) {
+        if (error instanceof z.ZodError) {
+            error.issues.forEach((issue) => {
+                ctx.addIssue({
+                    code: "custom",
+                    path: ["scheduleConfig", ...issue.path],
+                    message: issue.message,
+                });
+            });
+            return;
+        }
         const path = scheduleType === "ONE_TIME"
             ? ["scheduleConfig", "date"]
             : ["scheduleConfig"];
@@ -203,7 +244,7 @@ export const routineTaskCreateSchema = z
     })
     .superRefine((data, ctx) => {
         validateAssigneeList(data.assignees, ctx);
-        validateScheduleConfig(data.scheduleType, data.scheduleConfig, ctx);
+        validateRoutineScheduleConfig(data.scheduleType, data.scheduleConfig, ctx);
         if (
             data.contractStartDate
             && data.contractEndDate
@@ -246,7 +287,7 @@ export const routineTaskUpdateSchema = z
     .superRefine((data, ctx) => {
         if (data.assignees) validateAssigneeList(data.assignees, ctx);
         if (data.scheduleType !== undefined) {
-            validateScheduleConfig(data.scheduleType, data.scheduleConfig, ctx);
+            validateRoutineScheduleConfig(data.scheduleType, data.scheduleConfig, ctx);
         }
         if (
             data.contractStartDate

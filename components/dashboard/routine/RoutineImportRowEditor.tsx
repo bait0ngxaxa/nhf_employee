@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { AlertTriangle, Save } from "lucide-react";
+import { AlertTriangle, Loader2, Save } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -27,6 +27,7 @@ import {
     type RoutineReminderRuleForm,
 } from "./RoutineReminderFields";
 import { RoutineScheduleFields } from "./RoutineScheduleFields";
+import { focusFirstRoutineInvalidField } from "./focus-invalid-field";
 import type {
     RoutineImportReference,
     RoutineImportRowEdit,
@@ -307,6 +308,7 @@ export function RoutineImportRowEditor({
         if (Object.keys(reminderFieldErrors).length > 0) {
             setFieldErrors(reminderFieldErrors);
             setError("กรุณาตรวจสอบรูปแบบการแจ้งเตือนในช่องที่มีเครื่องหมายเตือน");
+            focusFirstRoutineInvalidField(reminderFieldErrors);
             saveLockRef.current = false;
             return;
         }
@@ -347,6 +349,7 @@ export function RoutineImportRowEditor({
             );
             setFieldErrors(nextErrors);
             setError("ข้อมูลแถวไม่ครบถ้วน กรุณาตรวจสอบช่องที่กรอก");
+            focusFirstRoutineInvalidField(nextErrors);
             saveLockRef.current = false;
             return;
         }
@@ -495,8 +498,13 @@ export function RoutineImportRowEditor({
 
                 <DialogFooter>
                     <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>ปิด</Button>
-                    <Button type="button" onClick={() => void save()} disabled={disabled || saving}>
-                        {saving ? "กำลังบันทึก..." : <><Save /> บันทึกแถว</>}
+                    <Button type="button" onClick={() => void save()} disabled={disabled || saving} aria-busy={saving} aria-live="polite">
+                        {saving ? (
+                            <>
+                                <Loader2 className="animate-spin motion-reduce:animate-none" aria-hidden="true" />
+                                กำลังบันทึก…
+                            </>
+                        ) : <><Save /> บันทึกแถว</>}
                     </Button>
                 </DialogFooter>
             </DialogContent>

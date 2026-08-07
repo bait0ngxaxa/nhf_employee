@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -31,6 +32,7 @@ import {
     type RoutineReminderRuleForm,
 } from "./RoutineReminderFields";
 import { RoutineScheduleFields } from "./RoutineScheduleFields";
+import { focusFirstRoutineInvalidField } from "./focus-invalid-field";
 import { formatRoutineUnitLabel, uniqueRoutineUnits } from "./labels";
 import type {
     RoutineAssigneeRole,
@@ -152,16 +154,6 @@ function validationErrors(value: unknown): Record<string, string> {
         },
         {},
     );
-}
-
-function focusFirstInvalidField(errors: Record<string, string>): void {
-    const firstPath = Object.keys(errors)[0];
-    if (!firstPath || typeof document === "undefined") return;
-    window.requestAnimationFrame(() => {
-        document.querySelector<HTMLElement>(
-            `[data-routine-field="${firstPath}"]`,
-        )?.focus();
-    });
 }
 
 export function RoutineTaskForm({
@@ -290,6 +282,7 @@ export function RoutineTaskForm({
         if (!isSelfService && ownerCount !== 1) {
             setError("กรุณาเลือกผู้รับผิดชอบหลัก 1 คน");
             setFieldErrors({ assignees: "ต้องมีผู้รับผิดชอบหลัก 1 คน" });
+            focusFirstRoutineInvalidField({ assignees: "ต้องมีผู้รับผิดชอบหลัก 1 คน" });
             submitLockRef.current = false;
             return;
         }
@@ -310,7 +303,7 @@ export function RoutineTaskForm({
         if (Object.keys(reminderTimeErrors).length > 0) {
             setFieldErrors(reminderTimeErrors);
             setError("กรุณาตรวจสอบรูปแบบการแจ้งเตือนในช่องที่มีเครื่องหมายเตือน");
-            focusFirstInvalidField(reminderTimeErrors);
+            focusFirstRoutineInvalidField(reminderTimeErrors);
             submitLockRef.current = false;
             return;
         }
@@ -359,7 +352,7 @@ export function RoutineTaskForm({
             );
             setFieldErrors(nextErrors);
             setError("กรุณาตรวจสอบข้อมูลในช่องที่มีเครื่องหมายเตือน");
-            focusFirstInvalidField(nextErrors);
+            focusFirstRoutineInvalidField(nextErrors);
             submitLockRef.current = false;
             return;
         }
@@ -389,7 +382,7 @@ export function RoutineTaskForm({
                 const serverErrors = validationErrors(body);
                 if (Object.keys(serverErrors).length > 0) {
                     setFieldErrors(serverErrors);
-                    focusFirstInvalidField(serverErrors);
+                    focusFirstRoutineInvalidField(serverErrors);
                 }
                 throw new Error(readError(body));
             }
@@ -523,7 +516,14 @@ export function RoutineTaskForm({
             <label className="flex min-h-11 items-center gap-3 text-sm font-medium text-content-body"><input type="checkbox" checked={form.isActive} onChange={(event) => updateField("isActive", event.target.checked)} disabled={isSubmitting} /> เปิดใช้งานแม่แบบงานนี้</label>
             <div className="flex flex-wrap justify-end gap-2">
                 <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting}>ยกเลิก</Button>
-                <Button type="submit" disabled={isSubmitting}>{isSubmitting ? "กำลังบันทึก..." : isSelfService ? "บันทึกงานของฉัน" : "บันทึกแม่แบบงาน"}</Button>
+                <Button type="submit" disabled={isSubmitting} aria-busy={isSubmitting} aria-live="polite">
+                    {isSubmitting ? (
+                        <>
+                            <Loader2 className="animate-spin motion-reduce:animate-none" aria-hidden="true" />
+                            กำลังบันทึก…
+                        </>
+                    ) : isSelfService ? "บันทึกงานของฉัน" : "บันทึกแม่แบบงาน"}
+                </Button>
             </div>
         </form>
     );

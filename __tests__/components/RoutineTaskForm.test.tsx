@@ -15,6 +15,71 @@ describe("RoutineTaskForm reminder rules", () => {
         );
     });
 
+    it("keeps day and month inputs within their valid calendar bounds", () => {
+        render(
+            <RoutineTaskForm
+                reference={{
+                    units: [{ id: 1, code: "มสช.", name: "มสช." }],
+                    categories: [{ id: 1, name: "ระบบคอมพิวเตอร์", sortOrder: 1 }],
+                    employees: [],
+                }}
+                initialTask={null}
+                onSaved={vi.fn()}
+                onCancel={vi.fn()}
+            />,
+        );
+
+        const monthlyDay = screen.getByLabelText("วันที่ของเดือน");
+        fireEvent.change(monthlyDay, { target: { value: "45" } });
+        expect(monthlyDay).toHaveValue(31);
+
+        fireEvent.change(screen.getByLabelText("รูปแบบการเกิดงาน"), {
+            target: { value: "YEARLY_DATE" },
+        });
+        const month = screen.getByLabelText("เดือน");
+        fireEvent.change(month, { target: { value: "15" } });
+        expect(month).toHaveValue(12);
+
+        fireEvent.change(month, { target: { value: "2" } });
+        expect(screen.getByLabelText("วันที่")).toHaveValue(29);
+    });
+
+    it("brings the first inline error into view after submit", async () => {
+        const scrollIntoView = vi.fn();
+        Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
+            configurable: true,
+            value: scrollIntoView,
+        });
+
+        render(
+            <RoutineTaskForm
+                reference={{
+                    units: [{ id: 1, code: "มสช.", name: "มสช." }],
+                    categories: [{ id: 1, name: "ระบบคอมพิวเตอร์", sortOrder: 1 }],
+                    employees: [{
+                        id: 11,
+                        firstName: "สมชาย",
+                        lastName: "ใจดี",
+                        nickname: null,
+                    }],
+                }}
+                initialTask={null}
+                mode="SELF_SERVICE"
+                onSaved={vi.fn()}
+                onCancel={vi.fn()}
+            />,
+        );
+
+        fireEvent.click(screen.getByRole("button", { name: "บันทึกงานของฉัน" }));
+
+        const unitField = screen.getByDisplayValue("เลือกหน่วยงาน");
+        await waitFor(() => expect(unitField).toHaveFocus());
+        expect(scrollIntoView).toHaveBeenCalledWith({
+            behavior: "smooth",
+            block: "center",
+        });
+    });
+
     it("adds a preset and submits the reminder rules with the task", async () => {
         const onSaved = vi.fn();
 
@@ -113,6 +178,9 @@ describe("RoutineTaskForm reminder rules", () => {
         fireEvent.click(submit);
 
         await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+        const savingButton = screen.getByRole("button", { name: "กำลังบันทึก…" });
+        expect(savingButton).toBeDisabled();
+        expect(savingButton.querySelector("svg.animate-spin")).toBeInTheDocument();
         resolveFetch?.(new Response(JSON.stringify({ task: { id: 1 } }), { status: 201 }));
     });
 
