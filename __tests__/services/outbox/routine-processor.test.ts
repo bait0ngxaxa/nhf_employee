@@ -36,6 +36,16 @@ function buildNotification(): NotificationOutbox {
     };
 }
 
+function buildEmailNotification(): NotificationOutbox {
+    return {
+        ...buildNotification(),
+        id: 702,
+        type: "ROUTINE_REMINDER_EMAIL",
+        eventKey: "routine:91:rule:31:user:17:version:2:email",
+        payload: JSON.stringify({ userId: 17 }),
+    };
+}
+
 describe("notification outbox Routine dispatch", () => {
     beforeEach(() => {
         mockReset(prismaMock);
@@ -69,7 +79,10 @@ describe("notification outbox Routine dispatch", () => {
         );
     });
 
-    it("marks a failed email side effect for the existing outbox retry policy", async () => {
+    it("retries only the failed recipient email event", async () => {
+        prismaMock.notificationOutbox.findMany.mockResolvedValue(
+            asNever([buildEmailNotification()]),
+        );
         dispatchRoutineReminderOutboxMock.mockRejectedValueOnce(
             new Error("Routine reminder email delivery failed"),
         );
@@ -77,8 +90,16 @@ describe("notification outbox Routine dispatch", () => {
         const result = await processOutbox();
 
         expect(result).toEqual({ processed: 0, failed: 1 });
+        expect(dispatchRoutineReminderOutboxMock).toHaveBeenCalledWith(
+            expect.objectContaining({
+                id: 702,
+                type: "ROUTINE_REMINDER_EMAIL",
+                eventKey: "routine:91:rule:31:user:17:version:2:email",
+            }),
+            { userId: 17 },
+        );
         expect(prismaMock.notificationOutbox.updateMany).toHaveBeenCalledWith({
-            where: { id: 701, status: "PROCESSING" },
+            where: { id: 702, status: "PROCESSING" },
             data: expect.objectContaining({
                 status: "FAILED",
                 attempts: { increment: 1 },

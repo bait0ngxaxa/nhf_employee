@@ -342,6 +342,21 @@ export const routineReminderOutboxPayloadSchema = z.object({
     createdAt: z.string().min(1),
 });
 
+export const routineReminderEmailOutboxPayloadSchema = z.object({
+    to: z.string().email().max(320).refine((value) => !/[\r\n]/.test(value)),
+    recipientName: z.string().trim().min(1).max(255),
+    taskTitle: z.string().min(1).max(255),
+    unitName: z.string().min(1).max(255),
+    categoryName: z.string().min(1).max(255),
+    dueDate: dateSchema,
+    daysBefore: z.number().int().nonnegative(),
+    actionUrl: z.string().min(1).max(2048),
+    occurrenceId: z.number().int().positive(),
+    ruleId: z.number().int().positive(),
+    userId: z.number().int().positive(),
+    reminderVersion: z.number().int().positive(),
+});
+
 export type RoutineTaskCreateInput = z.infer<typeof routineTaskCreateSchema>;
 export type RoutineTaskUpdateInput = z.infer<typeof routineTaskUpdateSchema>;
 export type RoutineOccurrenceFilters = z.infer<
@@ -358,6 +373,9 @@ export type RoutineOccurrenceOverrideInput = z.infer<
 export type RoutineReminderRuleInput = z.infer<typeof routineReminderRuleSchema>;
 export type RoutineReminderOutboxPayload = z.infer<
     typeof routineReminderOutboxPayloadSchema
+>;
+export type RoutineReminderEmailOutboxPayload = z.infer<
+    typeof routineReminderEmailOutboxPayloadSchema
 >;
 
 export function parseRoutineScheduleConfig(

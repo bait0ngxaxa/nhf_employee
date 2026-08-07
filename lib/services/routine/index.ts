@@ -18,10 +18,12 @@ export {
 } from "./scheduler";
 export {
     buildRoutineReminderDedupeKey,
+    buildRoutineReminderEmailEventKey,
     buildRoutineReminderEventKey,
     dispatchRoutineReminderOutbox,
     getRoutineReminderActionUrl,
     ROUTINE_REMINDER_OUTBOX_TYPE,
+    ROUTINE_REMINDER_EMAIL_OUTBOX_TYPE,
 } from "./reminders";
 export {
     getRoutineOccurrenceById,

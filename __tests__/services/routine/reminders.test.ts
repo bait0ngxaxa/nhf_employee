@@ -4,6 +4,7 @@ import { mockDeep, mockReset } from "vitest-mock-extended";
 
 import { prisma } from "@/lib/db/prisma";
 import {
+    buildRoutineReminderEmailEventKey,
     buildRoutineReminderEventKey,
     dispatchRoutineReminderOutbox,
 } from "@/lib/services/routine/reminders";
@@ -59,6 +60,44 @@ function buildPayload(overrides: Record<string, unknown> = {}) {
         dueDate: "2026-08-05",
         createdAt: "2026-08-03T02:00:00.000Z",
         ...overrides,
+    };
+}
+
+function buildEmailPayload(overrides: Record<string, unknown> = {}) {
+    return {
+        to: "somchai@example.com",
+        recipientName: "สมชาย ใจดี",
+        taskTitle: "ตรวจสอบระบบประจำเดือน",
+        unitName: "หน่วยงานทดสอบ",
+        categoryName: "หมวดหมู่ทดสอบ",
+        dueDate: "2026-08-05",
+        daysBefore: 2,
+        actionUrl: "/dashboard?tab=routine&taskId=71&occurrenceId=91",
+        occurrenceId: 91,
+        ruleId: 31,
+        userId: 17,
+        reminderVersion: 2,
+        ...overrides,
+    };
+}
+
+function buildEmailNotification(payload: ReturnType<typeof buildEmailPayload>): NotificationOutbox {
+    return {
+        id: 502,
+        type: "ROUTINE_REMINDER_EMAIL",
+        eventKey: buildRoutineReminderEmailEventKey(
+            payload.occurrenceId as number,
+            payload.ruleId as number,
+            payload.userId as number,
+            payload.reminderVersion as number,
+        ),
+        payload: JSON.stringify(payload),
+        status: "PROCESSING",
+        attempts: 0,
+        nextAttemptAt: new Date("2026-08-03T02:00:00.000Z"),
+        lastError: null,
+        createdAt: new Date("2026-08-03T02:00:00.000Z"),
+        updatedAt: new Date("2026-08-03T02:00:00.000Z"),
     };
 }
 
@@ -140,15 +179,15 @@ describe("Routine reminder dispatch", () => {
             }),
             prismaMock,
         );
-        expect(sendRoutineReminderNotificationMock).toHaveBeenCalledWith(
-            expect.objectContaining({
-                to: "somchai@example.com",
-                occurrenceId: 91,
-                ruleId: 31,
-                userId: 17,
-                reminderVersion: 2,
-            }),
-        );
+        expect(prismaMock.notificationOutbox.createMany).toHaveBeenCalledWith({
+            data: [{
+                type: "ROUTINE_REMINDER_EMAIL",
+                eventKey: "routine:91:rule:31:user:17:version:2:email",
+                payload: JSON.stringify(buildEmailPayload()),
+            }],
+            skipDuplicates: true,
+        });
+        expect(sendRoutineReminderNotificationMock).not.toHaveBeenCalled();
         expect(prismaMock.notificationOutbox.updateMany).not.toHaveBeenCalled();
     });
 
@@ -198,8 +237,14 @@ describe("Routine reminder dispatch", () => {
             expect(result).toBe("SENT");
             expect(createInAppNotificationOnceMock.mock.calls.map(([value]) => value.userId))
                 .toEqual([17, 18, 19]);
-            expect(sendRoutineReminderNotificationMock.mock.calls.map(([value]) => value.to))
-                .toEqual(["somchai@example.com"]);
+            expect(prismaMock.notificationOutbox.createMany).toHaveBeenCalledWith({
+                data: [expect.objectContaining({
+                    type: "ROUTINE_REMINDER_EMAIL",
+                    eventKey: "routine:91:rule:31:user:17:version:2:email",
+                })],
+                skipDuplicates: true,
+            });
+            expect(sendRoutineReminderNotificationMock).not.toHaveBeenCalled();
         } finally {
             warnSpy.mockRestore();
         }
@@ -515,8 +560,20 @@ describe("Routine reminder dispatch", () => {
         expect(result).toBe("SENT");
         expect(createInAppNotificationOnceMock.mock.calls.map(([value]) => value.userId))
             .toEqual([17, 99, 100]);
-        expect(sendRoutineReminderNotificationMock.mock.calls.map(([value]) => value.to))
-            .toEqual(["somchai@example.com", "admin@example.com", "admin2@example.com"]);
+        const createManyInput = prismaMock.notificationOutbox.createMany.mock
+            .calls[0]?.[0];
+        expect(createManyInput?.data).toEqual([
+            expect.objectContaining({
+                eventKey: "routine:91:rule:31:user:17:version:2:email",
+            }),
+            expect.objectContaining({
+                eventKey: "routine:91:rule:31:user:99:version:2:email",
+            }),
+            expect.objectContaining({
+                eventKey: "routine:91:rule:31:user:100:version:2:email",
+            }),
+        ]);
+        expect(sendRoutineReminderNotificationMock).not.toHaveBeenCalled();
     });
 
     it("does not send either channel to inactive or deleted recipients", async () => {
@@ -577,23 +634,39 @@ describe("Routine reminder dispatch", () => {
         expect(sendRoutineReminderNotificationMock).not.toHaveBeenCalled();
     });
 
-    it("throws after committing in-app notifications when an email delivery fails", async () => {
+    it("does not couple the in-app event outcome to email delivery", async () => {
         prismaMock.routineOccurrence.findUnique.mockResolvedValue(
             asNever(buildOccurrence()),
         );
         sendRoutineReminderNotificationMock.mockResolvedValue(false);
 
+        const result = await dispatchRoutineReminderOutbox(
+            buildNotification(buildPayload()),
+            buildPayload(),
+            new Date("2026-08-03T02:00:00.000Z"),
+        );
+
+        expect(result).toBe("SENT");
+        expect(createInAppNotificationOnceMock).toHaveBeenCalledTimes(1);
+        expect(sendRoutineReminderNotificationMock).not.toHaveBeenCalled();
+        expect(prismaMock.notificationOutbox.createMany).toHaveBeenCalledTimes(1);
+        expect(prismaMock.notificationOutbox.updateMany).not.toHaveBeenCalled();
+    });
+
+    it("retries a failed Routine email independently for its recipient", async () => {
+        const payload = buildEmailPayload();
+        sendRoutineReminderNotificationMock.mockResolvedValue(false);
+
         await expect(
             dispatchRoutineReminderOutbox(
-                buildNotification(buildPayload()),
-                buildPayload(),
-                new Date("2026-08-03T02:00:00.000Z"),
+                buildEmailNotification(payload),
+                payload,
             ),
         ).rejects.toThrow("Routine reminder email delivery failed");
 
-        expect(createInAppNotificationOnceMock).toHaveBeenCalledTimes(1);
         expect(sendRoutineReminderNotificationMock).toHaveBeenCalledTimes(1);
-        expect(prismaMock.notificationOutbox.updateMany).not.toHaveBeenCalled();
+        expect(sendRoutineReminderNotificationMock).toHaveBeenCalledWith(payload);
+        expect(createInAppNotificationOnceMock).not.toHaveBeenCalled();
     });
 
     it("does not retry an invalid payload", async () => {

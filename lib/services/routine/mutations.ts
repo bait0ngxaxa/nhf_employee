@@ -537,7 +537,12 @@ export async function deleteRoutineTask(
             );
             const pendingOutbox = await tx.notificationOutbox.findMany({
                 where: {
-                    type: "ROUTINE_REMINDER_IN_APP",
+                    type: {
+                        in: [
+                            "ROUTINE_REMINDER_IN_APP",
+                            "ROUTINE_REMINDER_EMAIL",
+                        ],
+                    },
                     status: { in: ["PENDING", "PROCESSING", "FAILED"] },
                     OR: prefixes.map((prefix) => ({
                         eventKey: { startsWith: prefix },

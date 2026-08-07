@@ -18,11 +18,14 @@ import {
     toBangkokCalendarDate,
 } from "@/lib/routine/schedule";
 import {
+    routineReminderEmailOutboxPayloadSchema,
     routineReminderOutboxPayloadSchema,
+    type RoutineReminderEmailOutboxPayload,
     type RoutineReminderOutboxPayload,
 } from "@/lib/validations/routine";
 
 export const ROUTINE_REMINDER_OUTBOX_TYPE = "ROUTINE_REMINDER_IN_APP" as const;
+export const ROUTINE_REMINDER_EMAIL_OUTBOX_TYPE = "ROUTINE_REMINDER_EMAIL" as const;
 
 export type RoutineReminderDispatchResult =
     | "SENT"
@@ -123,6 +126,20 @@ export function buildRoutineReminderDedupeKey(
     reminderVersion: number,
 ): string {
     return `routine:${occurrenceId}:rule:${ruleId}:user:${userId}:version:${reminderVersion}`;
+}
+
+export function buildRoutineReminderEmailEventKey(
+    occurrenceId: number,
+    ruleId: number,
+    userId: number,
+    reminderVersion: number,
+): string {
+    return `${buildRoutineReminderDedupeKey(
+        occurrenceId,
+        ruleId,
+        userId,
+        reminderVersion,
+    )}:email`;
 }
 
 export function getRoutineReminderActionUrl(
@@ -239,11 +256,64 @@ function parseRoutineReminderPayload(
     return parsed.success ? parsed.data : null;
 }
 
+function parseRoutineReminderEmailPayload(
+    value: unknown,
+): RoutineReminderEmailOutboxPayload | null {
+    const parsed = routineReminderEmailOutboxPayloadSchema.safeParse(value);
+    return parsed.success ? parsed.data : null;
+}
+
+async function supersedeInvalidRoutineEmail(
+    notificationId: number,
+    reason: string,
+): Promise<void> {
+    await runSerializableTransaction(async (tx) => {
+        await markRoutineReminderSuperseded(tx, notificationId, reason);
+    });
+}
+
+async function dispatchRoutineReminderEmailOutbox(
+    notification: NotificationOutbox,
+    value: unknown,
+): Promise<RoutineReminderDispatchResult> {
+    const payload = parseRoutineReminderEmailPayload(value);
+    if (!payload) {
+        await supersedeInvalidRoutineEmail(
+            notification.id,
+            "Superseded invalid Routine reminder email payload",
+        );
+        return "SUPERSEDED";
+    }
+
+    const expectedEventKey = buildRoutineReminderEmailEventKey(
+        payload.occurrenceId,
+        payload.ruleId,
+        payload.userId,
+        payload.reminderVersion,
+    );
+    if (notification.eventKey !== expectedEventKey) {
+        await supersedeInvalidRoutineEmail(
+            notification.id,
+            "Superseded mismatched Routine reminder email event key",
+        );
+        return "SUPERSEDED";
+    }
+
+    const sent = await sendRoutineReminderNotification(payload);
+    if (!sent) {
+        throw new Error("Routine reminder email delivery failed");
+    }
+    return "SENT";
+}
+
 export async function dispatchRoutineReminderOutbox(
     notification: NotificationOutbox,
     value: unknown,
     now = new Date(),
 ): Promise<RoutineReminderDispatchResult> {
+    if (notification.type === ROUTINE_REMINDER_EMAIL_OUTBOX_TYPE) {
+        return dispatchRoutineReminderEmailOutbox(notification, value);
+    }
     if (notification.type !== ROUTINE_REMINDER_OUTBOX_TYPE) return null;
 
     const result = await runSerializableTransaction(async (tx) => {
@@ -411,15 +481,24 @@ export async function dispatchRoutineReminderOutbox(
             }),
         );
 
-        return { outcome: "SENT" as const, emailDeliveries };
+        if (emailDeliveries.length > 0) {
+            await tx.notificationOutbox.createMany({
+                data: emailDeliveries.map((emailDelivery) => ({
+                    type: ROUTINE_REMINDER_EMAIL_OUTBOX_TYPE,
+                    eventKey: buildRoutineReminderEmailEventKey(
+                        emailDelivery.occurrenceId,
+                        emailDelivery.ruleId,
+                        emailDelivery.userId,
+                        emailDelivery.reminderVersion,
+                    ),
+                    payload: JSON.stringify(emailDelivery),
+                })),
+                skipDuplicates: true,
+            });
+        }
+
+        return "SENT" as const;
     });
 
-    if (result === "SUPERSEDED" || result === "DEFERRED") return result;
-    for (const emailDelivery of result.emailDeliveries) {
-        const sent = await sendRoutineReminderNotification(emailDelivery);
-        if (!sent) {
-            throw new Error("Routine reminder email delivery failed");
-        }
-    }
-    return "SENT";
+    return result;
 }
