@@ -689,10 +689,12 @@ describe("NHF Routine query authorization", () => {
         expect(prismaMock.routineTask.count).not.toHaveBeenCalled();
     });
 
-    it.each<[string, { activeOnly?: true }, { isActive?: true }]>([
+    it.each<[string, { activeOnly?: true; status?: "active" | "inactive" }, { isActive?: boolean }]>([
         ["no filter", {}, {}],
         ["activeOnly=0", {}, {}],
         ["activeOnly=1", { activeOnly: true }, { isActive: true }],
+        ["status=active", { status: "active" }, { isActive: true }],
+        ["status=inactive", { status: "inactive" }, { isActive: false }],
     ])("builds the expected task filter for %s", async (_label, input, expected) => {
         await getRoutineTasks({
             ...input,
@@ -781,5 +783,8 @@ describe("NHF Routine query authorization", () => {
         expect(
             routineTaskFiltersSchema.parse({ activeOnly: "1" }).activeOnly,
         ).toBe(true);
+        expect(
+            routineTaskFiltersSchema.parse({ status: "inactive" }).status,
+        ).toBe("inactive");
     });
 });

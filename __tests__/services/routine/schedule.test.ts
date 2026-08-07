@@ -10,6 +10,8 @@ import {
     getRoutineGenerationWindow,
     isRoutineReminderDue,
     parseRoutineSendTime,
+    ROUTINE_DEFAULT_REMINDER_TIME,
+    ROUTINE_REMINDER_TIME_OPTIONS,
     type RoutineDateWindow,
 } from "@/lib/routine/schedule";
 
@@ -247,6 +249,9 @@ describe("NHF Routine schedule engine", () => {
     });
 
     it("accepts only full-hour reminder input in HH:mm form", () => {
+        expect(ROUTINE_DEFAULT_REMINDER_TIME).toBe("09:00");
+        expect(ROUTINE_REMINDER_TIME_OPTIONS).toHaveLength(24);
+        expect(ROUTINE_REMINDER_TIME_OPTIONS.map((option) => option.value)).not.toContain("09:30");
         expect(formatRoutineSendTime(0)).toBe("00:00");
         expect(formatRoutineSendTime(9)).toBe("09:00");
         expect(formatRoutineSendTime(23)).toBe("23:00");

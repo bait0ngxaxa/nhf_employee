@@ -656,4 +656,37 @@ describe("RoutineImportPanel", () => {
 
         expect(await screen.findByRole("dialog")).toBeInTheDocument();
     });
+
+    it("debounces import row search and clears back to the unfiltered request", async () => {
+        const fetchMock = importFetchMock(editableRow);
+        vi.stubGlobal("fetch", fetchMock);
+
+        render(<RoutineImportPanel />);
+        selectUploadFile();
+        fireEvent.click(screen.getByRole("button", { name: /อัปโหลดและดูตัวอย่าง/ }));
+
+        const searchInput = await screen.findByRole("searchbox", { name: "ค้นหา" });
+        const rowRequests = (): string[] => fetchMock.mock.calls
+            .map(([input]) => String(input))
+            .filter((url) => url.includes("/imports/1/rows?"));
+        const initialRequestCount = rowRequests().length;
+
+        fireEvent.change(searchInput, { target: { value: "ต" } });
+        fireEvent.change(searchInput, { target: { value: "ตร" } });
+        fireEvent.change(searchInput, { target: { value: "ตรวจสอบ" } });
+        expect(rowRequests()).toHaveLength(initialRequestCount);
+
+        await waitFor(() => {
+            const latestUrl = rowRequests().at(-1);
+            expect(latestUrl ? new URL(latestUrl, "http://localhost").searchParams.get("search") : null).toBe("ตรวจสอบ");
+        });
+
+        const searchedRequestCount = rowRequests().length;
+        fireEvent.change(searchInput, { target: { value: "" } });
+        await waitFor(() => {
+            const latestUrl = rowRequests().at(-1);
+            expect(latestUrl ? new URL(latestUrl, "http://localhost").searchParams.get("search") : null).toBeNull();
+        });
+        expect(rowRequests()).toHaveLength(searchedRequestCount + 1);
+    });
 });

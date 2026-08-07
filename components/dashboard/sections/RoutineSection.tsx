@@ -13,8 +13,10 @@ import { SectionTabs, type SectionTabItem } from "@/components/ui/section-tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { LoadingState } from "@/components/ui/state";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { API_ROUTES } from "@/lib/ssot/routes";
 import { isAdminRole } from "@/lib/ssot/permissions";
+import type { RoutineTaskStatusFilter } from "@/lib/validations/routine";
 
 import { RoutineKpiGrid } from "../routine/RoutineKpiGrid";
 import { RoutineOccurrenceList } from "../routine/RoutineOccurrenceList";
@@ -54,7 +56,8 @@ function RoutineOccurrencePanel({
     occurrenceId: number | null;
     onTaskSaved: () => void;
 }) {
-    const [search, setSearch] = useState("");
+    const [searchInput, setSearchInput] = useState("");
+    const debouncedSearch = useDebouncedValue(searchInput, 300);
     const [timingStatus, setTimingStatus] = useState<RoutineTimingStatus | "">("");
     const [page, setPage] = useState(1);
     const [editingTaskId, setEditingTaskId] = useState<number | null>(null);
@@ -68,10 +71,10 @@ function RoutineOccurrencePanel({
         });
         if (taskId !== null) params.set("taskId", String(taskId));
         if (occurrenceId !== null) params.set("occurrenceId", String(occurrenceId));
-        if (search.trim()) params.set("search", search.trim());
+        if (debouncedSearch.trim()) params.set("search", debouncedSearch.trim());
         if (timingStatus) params.set("timingStatus", timingStatus);
         return `${API_ROUTES.routines.occurrences}?${params.toString()}`;
-    }, [occurrenceId, page, scope, search, taskId, timingStatus]);
+    }, [debouncedSearch, occurrenceId, page, scope, taskId, timingStatus]);
     const { data, error, isLoading, mutate } = useSWR<PaginatedRoutineTaskWorkItemsResponse, Error>(key, fetchRoutine);
     const { data: reference, error: referenceError } = useSWR<RoutineReferenceData, Error>(
         isAdmin ? API_ROUTES.routines.reference : null,
@@ -91,7 +94,7 @@ function RoutineOccurrencePanel({
 
     useEffect(() => {
         setPage(1);
-    }, [search, timingStatus, isAdmin, occurrenceId, taskId]);
+    }, [debouncedSearch, timingStatus, isAdmin, occurrenceId, taskId]);
 
     if (editingTaskId !== null) {
         if (referenceError) {
@@ -140,7 +143,7 @@ function RoutineOccurrencePanel({
             </div>
             <div className="grid gap-4 rounded-xl border border-border-subtle bg-surface-raised p-4 sm:p-5 md:grid-cols-[minmax(0,1fr)_220px_auto] md:items-end">
                 <label className="grid gap-1 text-sm font-medium text-content-body">ค้นหารายการ
-                    <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="ค้นหาชื่อรายการ หน่วยงาน หรือหมวดหมู่" />
+                    <Input type="search" value={searchInput} onChange={(event) => { setSearchInput(event.target.value); setPage(1); }} placeholder="ค้นหาชื่อรายการ หน่วยงาน หรือหมวดหมู่" />
                 </label>
                 <label className="grid gap-1 text-sm font-medium text-content-body">ช่วงเวลา
                     <select className="h-11 rounded-md border border-input bg-background px-3 text-sm" value={timingStatus} onChange={(event) => setTimingStatus(event.target.value as RoutineTimingStatus | "")}>
@@ -179,11 +182,26 @@ function RoutineTaskSettings({
     const [isCreating, setIsCreating] = useState(false);
     const [editingTask, setEditingTask] = useState<RoutineTask | null>(null);
     const [taskPage, setTaskPage] = useState(1);
+    const [taskSearch, setTaskSearch] = useState("");
+    const [taskUnitId, setTaskUnitId] = useState("");
+    const [taskStatus, setTaskStatus] = useState<RoutineTaskStatusFilter | "">("");
+    const debouncedTaskSearch = useDebouncedValue(taskSearch, 300);
     const [pendingTaskId, setPendingTaskId] = useState<number | null>(null);
     const activeMutationLockRef = useRef<Set<number>>(new Set());
     const { data: reference, error: referenceError, isLoading: referenceLoading } = useSWR<RoutineReferenceData, Error>(API_ROUTES.routines.reference, fetchRoutine);
+    const tasksKey = useMemo(() => {
+        const params = new URLSearchParams({
+            activeOnly: "0",
+            page: String(taskPage),
+            limit: "20",
+        });
+        if (debouncedTaskSearch.trim()) params.set("search", debouncedTaskSearch.trim());
+        if (taskUnitId) params.set("unitId", taskUnitId);
+        if (taskStatus) params.set("status", taskStatus);
+        return `${API_ROUTES.routines.tasks}?${params.toString()}`;
+    }, [debouncedTaskSearch, taskPage, taskStatus, taskUnitId]);
     const { data: tasks, error: tasksError, isLoading: tasksLoading, mutate: mutateTasks } = useSWR<PaginatedTasksResponse, Error>(
-        `${API_ROUTES.routines.tasks}?activeOnly=0&page=${taskPage}&limit=20`,
+        tasksKey,
         fetchRoutine,
     );
 
@@ -265,6 +283,22 @@ function RoutineTaskSettings({
                 onDelete={deleteTask}
                 pendingTaskId={pendingTaskId}
                 onPageChange={setTaskPage}
+                units={reference?.units ?? []}
+                search={taskSearch}
+                unitId={taskUnitId}
+                status={taskStatus}
+                onSearchChange={(value) => {
+                    setTaskSearch(value);
+                    setTaskPage(1);
+                }}
+                onUnitChange={(value) => {
+                    setTaskUnitId(value);
+                    setTaskPage(1);
+                }}
+                onStatusChange={(value) => {
+                    setTaskStatus(value);
+                    setTaskPage(1);
+                }}
             />
         </div>
     );

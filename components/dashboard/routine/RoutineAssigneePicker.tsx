@@ -57,12 +57,6 @@ function unavailableLabel(employee: RoutineEmployee): string | null {
     return null;
 }
 
-function employeeDetails(employee: RoutineEmployee): string {
-    const details = [`รหัส ${employee.id}`];
-    if (employee.departmentId !== undefined) details.push(`แผนก #${employee.departmentId}`);
-    return details.join(" · ");
-}
-
 function isAssigneeRole(value: string): value is RoutineAssigneeRole {
     return value === "OWNER" || value === "CO_OWNER";
 }
@@ -160,7 +154,6 @@ export function RoutineAssigneePicker({
                                 />
                                 <span className="min-w-0 flex-1">
                                     <span className="block truncate text-sm text-content-body">{name}</span>
-                                    <span className="block text-xs text-content-secondary">{employeeDetails(employee)}</span>
                                     {unavailableText ? <span className="block text-xs text-status-danger-foreground">{unavailableText} · เลือกเพิ่มไม่ได้</span> : null}
                                 </span>
                             </label>
@@ -178,11 +171,7 @@ export function RoutineAssigneePicker({
                 <p className="rounded-md border border-dashed border-border-subtle bg-background px-3 py-2 text-sm text-content-secondary">
                     ยังไม่มีข้อมูลพนักงานให้เลือก
                 </p>
-            ) : (
-                <p className="rounded-md border border-dashed border-border-subtle bg-background px-3 py-2 text-sm text-content-secondary">
-                    พิมพ์ชื่อเพื่อค้นหาและเพิ่มผู้รับผิดชอบ
-                </p>
-            )}
+            ) : null}
 
             <div className="space-y-2">
                 <div className="flex items-center justify-between gap-2">
@@ -199,7 +188,6 @@ export function RoutineAssigneePicker({
                                     <span className="min-w-0 flex-1 break-words text-sm text-content-body">
                                         {name}
                                         {unavailableText ? <span className="ml-1 text-xs text-status-danger-foreground">({unavailableText})</span> : null}
-                                        <span className="block text-xs text-content-secondary">{employeeDetails(employee)}</span>
                                     </span>
                                     <select
                                         className="h-11 max-w-40 rounded-md border border-input bg-background px-2 text-sm sm:h-9 sm:text-xs"

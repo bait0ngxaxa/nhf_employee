@@ -23,6 +23,7 @@ import { routineImportRowUpdateSchema } from "@/lib/validations/routine-import";
 import {
     formatRoutineSendTime,
     parseRoutineSendTime,
+    ROUTINE_DEFAULT_REMINDER_TIME,
     type RoutineBusinessDayPolicy,
     type RoutineScheduleType,
 } from "@/lib/routine/schedule";
@@ -306,7 +307,7 @@ export function RoutineImportRowEditor({
         setReminderPreset(value);
         setReminderRules(days.map((daysBefore) => ({
             daysBefore: String(daysBefore),
-            sendHour: "09:00",
+            sendHour: ROUTINE_DEFAULT_REMINDER_TIME,
             recipientScope: "ASSIGNEES",
             isActive: true,
         })));
@@ -318,7 +319,7 @@ export function RoutineImportRowEditor({
             ...current,
             {
                 daysBefore: String(daysBefore),
-                sendHour: "09:00",
+                sendHour: ROUTINE_DEFAULT_REMINDER_TIME,
                 recipientScope: "ASSIGNEES",
                 isActive: true,
             },

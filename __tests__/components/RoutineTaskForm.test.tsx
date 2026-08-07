@@ -217,6 +217,14 @@ describe("RoutineTaskForm reminder rules", () => {
 
         expect(screen.getByLabelText("เลือกชุดกฎการแจ้งเตือน")).toHaveValue("monthly");
         expect(screen.getAllByDisplayValue("09:00")).toHaveLength(2);
+        const reminderTimeFields = screen.getAllByLabelText("เวลาแจ้งเตือน (เวลาไทย)");
+        expect(reminderTimeFields).toHaveLength(2);
+        expect(reminderTimeFields[0]).toHaveValue("09:00");
+        expect(reminderTimeFields[0]?.querySelectorAll("option")).toHaveLength(24);
+        expect(screen.queryByRole("option", { name: "09:30" })).not.toBeInTheDocument();
+        const firstReminderTime = reminderTimeFields[0];
+        if (!firstReminderTime) throw new Error("Expected a reminder time field");
+        fireEvent.change(firstReminderTime, { target: { value: "14:00" } });
 
         fireEvent.click(screen.getByRole("button", { name: "บันทึกแม่แบบงาน" }));
 
@@ -227,7 +235,7 @@ describe("RoutineTaskForm reminder rules", () => {
         };
 
         expect(body.reminderRules).toEqual([
-            { daysBefore: 3, sendHour: 9, channel: "IN_APP", recipientScope: "ASSIGNEES", isActive: true },
+            { daysBefore: 3, sendHour: 14, channel: "IN_APP", recipientScope: "ASSIGNEES", isActive: true },
             { daysBefore: 1, sendHour: 9, channel: "IN_APP", recipientScope: "ASSIGNEES", isActive: true },
         ]);
         expect(onSaved).toHaveBeenCalledTimes(1);

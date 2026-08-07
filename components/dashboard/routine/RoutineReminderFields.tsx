@@ -5,7 +5,10 @@ import { BellPlus, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { parseRoutineSendTime } from "@/lib/routine/schedule";
+import {
+    parseRoutineSendTime,
+    ROUTINE_REMINDER_TIME_OPTIONS,
+} from "@/lib/routine/schedule";
 
 import type { RoutineReminderRecipientScope } from "./types";
 
@@ -165,18 +168,21 @@ export function RoutineReminderFields({
                                     {daysBeforeError ? <span className="text-sm font-normal text-status-danger-foreground" role="alert">{daysBeforeError}</span> : null}
                                 </label>
                                 <label className="grid min-w-0 gap-1 text-sm font-medium text-content-body">
-                                    เวลาแจ้งเตือน (Asia/Bangkok)
-                                    <Input
+                                    เวลาแจ้งเตือน (เวลาไทย)
+                                    <select
                                         data-routine-field={`reminderRules.${index}.sendHour`}
                                         aria-invalid={Boolean(sendHourError)}
-                                        type="time"
-                                        step={3600}
-                                        min="00:00"
-                                        max="23:00"
+                                        className="h-11 min-w-0 rounded-md border border-input bg-background px-3 text-sm focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
                                         value={rule.sendHour}
                                         disabled={disabled}
                                         onChange={(event) => onUpdateRule(index, { sendHour: event.target.value })}
-                                    />
+                                    >
+                                        {ROUTINE_REMINDER_TIME_OPTIONS.map((option) => (
+                                            <option key={option.value} value={option.value}>
+                                                {option.label}
+                                            </option>
+                                        ))}
+                                    </select>
                                     {sendHourError ? <span className="text-sm font-normal text-status-danger-foreground" role="alert">{sendHourError}</span> : null}
                                 </label>
                                 {selfService ? (

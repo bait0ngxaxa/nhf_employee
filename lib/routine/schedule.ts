@@ -3,6 +3,7 @@ export const ROUTINE_GENERATION_HORIZON_MONTHS = 2 as const;
 export const ROUTINE_GENERATION_SAFETY_DAYS = 7 as const;
 export const ROUTINE_BUSINESS_DAY_CANDIDATE_MARGIN_DAYS = 7 as const;
 export const ROUTINE_MAX_REMINDER_DAYS_BEFORE = 365 as const;
+export const ROUTINE_DEFAULT_REMINDER_TIME = "09:00" as const;
 export const ROUTINE_RECONCILIATION_MAX_FUTURE_DAYS =
     ROUTINE_MAX_REMINDER_DAYS_BEFORE
     + ROUTINE_GENERATION_SAFETY_DAYS
@@ -236,6 +237,14 @@ export function formatRoutineSendTime(sendHour: number): string {
     }
     return `${pad(sendHour)}:00`;
 }
+
+export const ROUTINE_REMINDER_TIME_OPTIONS: ReadonlyArray<{
+    value: string;
+    label: string;
+}> = Array.from({ length: 24 }, (_, sendHour) => {
+    const value = formatRoutineSendTime(sendHour);
+    return { value, label: value };
+});
 
 export function parseRoutineSendTime(value: string): number | null {
     const match = /^(?:[01]\d|2[0-3]):([0-5]\d)$/.exec(value);

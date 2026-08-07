@@ -23,6 +23,7 @@ import type {
 } from "@/lib/routine/schedule";
 import {
     ROUTINE_BUSINESS_DAY_POLICIES,
+    ROUTINE_DEFAULT_REMINDER_TIME,
     ROUTINE_SCHEDULE_TYPES,
     formatRoutineSendTime,
     getDefaultRoutineScheduleConfig,
@@ -255,7 +256,7 @@ export function RoutineTaskForm({
                 ...current.reminderRules,
                 {
                     daysBefore: String(daysBefore),
-                    sendHour: "09:00",
+                    sendHour: ROUTINE_DEFAULT_REMINDER_TIME,
                     recipientScope: "ASSIGNEES",
                     isActive: true,
                 },
@@ -289,7 +290,7 @@ export function RoutineTaskForm({
             ...current,
             reminderRules: days.map((daysBefore) => ({
                 daysBefore: String(daysBefore),
-                sendHour: "09:00",
+                sendHour: ROUTINE_DEFAULT_REMINDER_TIME,
                 recipientScope: "ASSIGNEES",
                 isActive: true,
             })),

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ReactNode } from "react";
 
@@ -28,9 +28,11 @@ vi.mock("next/navigation", () => ({
 vi.mock("@/components/ui/section-tabs", async () => {
     return {
     SectionTabs: ({
+        value,
         tabs,
         onValueChange,
     }: {
+        value: string;
         tabs: Array<{
                 value: string;
                 label: string;
@@ -38,16 +40,25 @@ vi.mock("@/components/ui/section-tabs", async () => {
                 content?: ReactNode;
             }>;
             onValueChange: (value: string) => void;
-        }) => (
+        }) => {
+            const activeTab = tabs.find((tab) => tab.value === value && tab.visible !== false);
+            const managementTab = tabs.find((tab) => tab.value === "settings" && tab.visible !== false);
+            const contentTabs = activeTab === undefined
+                ? managementTab ? [managementTab] : []
+                : activeTab.value === managementTab?.value
+                    ? [activeTab]
+                    : managementTab ? [activeTab, managementTab] : [activeTab];
+            return (
             <div>
                 {tabs
                     .filter((tab) => tab.visible !== false)
                     .map((tab) => (
                         <button key={tab.value} type="button" onClick={() => onValueChange(tab.value)}>{tab.label}</button>
                     ))}
-                {tabs.find((tab) => tab.value === "settings")?.content}
+                {contentTabs.map((tab) => <div key={tab.value}>{tab.content}</div>)}
             </div>
-        ),
+            );
+        },
     };
 });
 
@@ -60,7 +71,26 @@ vi.mock("@/components/dashboard/routine/RoutineOccurrenceList", () => ({
 }));
 
 vi.mock("@/components/dashboard/routine/RoutineTaskList", () => ({
-    RoutineTaskList: () => <div data-testid="routine-task-list" />,
+    RoutineTaskList: ({
+        search,
+        onSearchChange,
+        onPageChange,
+    }: {
+        search: string;
+        onSearchChange: (value: string) => void;
+        onPageChange: (page: number) => void;
+    }) => (
+        <div data-testid="routine-task-list">
+            <input
+                aria-label="ค้นหาแม่แบบงาน"
+                value={search}
+                onChange={(event) => onSearchChange(event.target.value)}
+            />
+            <button type="button" onClick={() => onPageChange(2)}>
+                ไปหน้าถัดไป
+            </button>
+        </div>
+    ),
 }));
 
 describe("RoutineSection tabs", () => {
@@ -149,5 +179,69 @@ describe("RoutineSection tabs", () => {
             "/api/routines/summary?scope=all",
             expect.any(Function),
         ));
+    });
+
+    it("debounces task settings search, resets pagination, and clears the query", () => {
+        vi.useFakeTimers();
+        mocks.useDashboardDataContext.mockReturnValue({
+            user: { role: "ADMIN" },
+        });
+
+        const taskKeys = (): string[] => (mocks.useSWR.mock.calls as unknown as Array<[unknown]>)
+            .map(([key]) => typeof key === "string" ? key : "")
+            .filter((key) => key.includes("/api/routines/tasks"));
+
+        render(<RoutineSection />);
+
+        const searchInput = screen.getByRole("textbox", { name: "ค้นหาแม่แบบงาน" });
+        fireEvent.click(screen.getByRole("button", { name: "ไปหน้าถัดไป" }));
+        expect(taskKeys()).toContain("/api/routines/tasks?activeOnly=0&page=2&limit=20");
+
+        fireEvent.change(searchInput, { target: { value: "ต" } });
+        fireEvent.change(searchInput, { target: { value: "ตร" } });
+        fireEvent.change(searchInput, { target: { value: "ตรวจสอบ" } });
+        expect(taskKeys().some((key) => key.includes("search="))).toBe(false);
+        expect(taskKeys()).toContain("/api/routines/tasks?activeOnly=0&page=1&limit=20");
+
+        act(() => {
+            vi.advanceTimersByTime(299);
+        });
+        expect(taskKeys().some((key) => key.includes("search="))).toBe(false);
+
+        act(() => {
+            vi.advanceTimersByTime(1);
+        });
+        expect(taskKeys()).toContain("/api/routines/tasks?activeOnly=0&page=1&limit=20&search=%E0%B8%95%E0%B8%A3%E0%B8%A7%E0%B8%88%E0%B8%AA%E0%B8%AD%E0%B8%9A");
+
+        fireEvent.change(searchInput, { target: { value: "" } });
+        act(() => {
+            vi.advanceTimersByTime(300);
+        });
+        expect(taskKeys().at(-1)).toBe("/api/routines/tasks?activeOnly=0&page=1&limit=20");
+        vi.useRealTimers();
+    });
+
+    it("debounces the operational routine search before changing the request key", () => {
+        vi.useFakeTimers();
+        mocks.useDashboardDataContext.mockReturnValue({
+            user: { role: "USER" },
+        });
+
+        const occurrenceKeys = (): string[] => (mocks.useSWR.mock.calls as unknown as Array<[unknown]>)
+            .map(([key]) => typeof key === "string" ? key : "")
+            .filter((key) => key.includes("/api/routines/occurrences"));
+
+        render(<RoutineSection />);
+
+        const searchInput = screen.getByPlaceholderText("ค้นหาชื่อรายการ หน่วยงาน หรือหมวดหมู่");
+        fireEvent.change(searchInput, { target: { value: "ตรวจ" } });
+        fireEvent.change(searchInput, { target: { value: "ตรวจสอบ" } });
+        expect(occurrenceKeys().some((key) => key.includes("search="))).toBe(false);
+
+        act(() => {
+            vi.advanceTimersByTime(300);
+        });
+        expect(occurrenceKeys()).toContain("/api/routines/occurrences?scope=mine&page=1&limit=12&view=tasks&search=%E0%B8%95%E0%B8%A3%E0%B8%A7%E0%B8%88%E0%B8%AA%E0%B8%AD%E0%B8%9A");
+        vi.useRealTimers();
     });
 });

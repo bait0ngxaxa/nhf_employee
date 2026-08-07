@@ -41,6 +41,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         const params = request.nextUrl.searchParams;
         const parsed = routineTaskFiltersSchema.safeParse({
             activeOnly: params.get("activeOnly") ?? undefined,
+            status: params.get("status") ?? undefined,
             unitId: params.get("unitId") ?? undefined,
             categoryId: params.get("categoryId") ?? undefined,
             search: params.get("search") ?? undefined,

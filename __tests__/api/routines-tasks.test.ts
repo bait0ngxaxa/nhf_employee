@@ -51,6 +51,18 @@ describe("GET /api/routines/tasks active filter semantics", () => {
         expect(mocks.getTasks.mock.calls[0]?.[0]?.activeOnly).toBe(expected);
     });
 
+    it.each([
+        ["active", "active"],
+        ["inactive", "inactive"],
+    ])("passes the %s status filter to the service", async (_label, status) => {
+        const response = await GET(
+            new NextRequest(`http://localhost/api/routines/tasks?status=${status}`),
+        );
+
+        expect(response.status).toBe(200);
+        expect(mocks.getTasks.mock.calls[0]?.[0]?.status).toBe(status);
+    });
+
     it("passes a regular user's actor scope to the management query", async () => {
         mocks.requireActiveWorkforceOrAdminSession.mockResolvedValue({
             ok: true,

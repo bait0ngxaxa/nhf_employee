@@ -26,6 +26,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { EmptyState, ErrorState, LoadingState } from "@/components/ui/state";
 import { Input } from "@/components/ui/input";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { API_ROUTES } from "@/lib/ssot/routes";
 import { routineImportReferenceDataSchema } from "@/lib/validations/routine-import-reference";
 import {
@@ -204,10 +205,12 @@ function SummaryItem({
     label,
     value,
     tone = "default",
+    priority = "primary",
 }: {
     label: string;
     value: number;
     tone?: "default" | "warning" | "success" | "danger";
+    priority?: "primary" | "secondary";
 }) {
     const toneClass =
         tone === "warning"
@@ -218,12 +221,12 @@ function SummaryItem({
                 ? "text-status-danger-foreground"
                 : "text-content-heading";
     return (
-        <div className="rounded-lg border border-border-subtle bg-surface-raised px-4 py-4">
-            <p className="text-sm font-medium leading-5 text-content-secondary">
+        <div className={`rounded-lg border border-border-subtle ${priority === "primary" ? "bg-surface-raised px-4 py-4" : "bg-surface-subtle px-4 py-3"}`}>
+            <p className={`font-medium leading-5 text-content-secondary ${priority === "primary" ? "text-sm" : "text-xs sm:text-sm"}`}>
                 {label}
             </p>
             <p
-                className={`mt-2 text-3xl font-bold tracking-tight tabular-nums ${toneClass}`}
+                className={`mt-2 font-bold tracking-tight tabular-nums ${priority === "primary" ? "text-3xl" : "text-2xl"} ${toneClass}`}
             >
                 {value}
             </p>
@@ -246,7 +249,8 @@ export function RoutineImportPanel() {
     const [filter, setFilter] = useState<ImportFilter>("");
     const [issue, setIssue] = useState<ImportIssue>("");
     const [selectedOnly, setSelectedOnly] = useState(false);
-    const [search, setSearch] = useState("");
+    const [searchInput, setSearchInput] = useState("");
+    const debouncedSearch = useDebouncedValue(searchInput, 300);
     const [page, setPage] = useState(1);
     const [loading, setLoading] = useState(false);
     const [uploading, setUploading] = useState(false);
@@ -313,7 +317,7 @@ export function RoutineImportPanel() {
             if (filter) params.set("status", filter);
             if (issue) params.set("issue", issue);
             if (selectedOnly) params.set("selected", "1");
-            if (search.trim()) params.set("search", search.trim());
+            if (debouncedSearch.trim()) params.set("search", debouncedSearch.trim());
             const [batchBody, rowsBody] = await Promise.all([
                 fetchJson<{ batch: RoutineImportBatchView }>(
                     API_ROUTES.routines.imports.batchById(batchId),
@@ -337,7 +341,7 @@ export function RoutineImportPanel() {
         } finally {
             setLoading(false);
         }
-    }, [batchId, filter, issue, page, search, selectedOnly]);
+    }, [batchId, debouncedSearch, filter, issue, page, selectedOnly]);
 
     const currentReferenceBatchKey = batchId !== null && batch
         ? `${batchId}:${batch.version}`
@@ -372,7 +376,7 @@ export function RoutineImportPanel() {
         setFilter("");
         setIssue("");
         setSelectedOnly(false);
-        setSearch("");
+        setSearchInput("");
         setPage(1);
         if (inputRef.current) inputRef.current.value = "";
     }
@@ -668,33 +672,39 @@ export function RoutineImportPanel() {
                 </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-7">
-                <SummaryItem label="อ่านได้ทั้งหมด" value={batch.totalRows} />
-                <SummaryItem
-                    label="พร้อมนำเข้า"
-                    value={batch.validRows}
-                    tone="success"
-                />
-                <SummaryItem
-                    label="ต้อง map ผู้รับผิดชอบ"
-                    value={batch.unresolvedOwnerRows}
-                    tone="warning"
-                />
-                <SummaryItem
-                    label="เคยนำเข้าแล้ว"
-                    value={batch.alreadyImportedRows}
-                />
-                <SummaryItem
-                    label="conflict"
-                    value={batch.conflictRows}
-                    tone="danger"
-                />
-                <SummaryItem
-                    label="เลือกไว้สำหรับนำเข้า"
-                    value={batch.selectedRows}
-                    tone="success"
-                />
-                <SummaryItem label="ข้าม" value={batch.excludedRows} />
+            <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
+                    <SummaryItem label="อ่านได้ทั้งหมด" value={batch.totalRows} />
+                    <SummaryItem
+                        label="พร้อมนำเข้า"
+                        value={batch.validRows}
+                        tone="success"
+                    />
+                    <SummaryItem
+                        label="ต้อง map ผู้รับผิดชอบ"
+                        value={batch.unresolvedOwnerRows}
+                        tone="warning"
+                    />
+                    <SummaryItem
+                        label="เลือกไว้สำหรับนำเข้า"
+                        value={batch.selectedRows}
+                        tone="success"
+                    />
+                </div>
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
+                    <SummaryItem
+                        label="เคยนำเข้าแล้ว"
+                        value={batch.alreadyImportedRows}
+                        priority="secondary"
+                    />
+                    <SummaryItem
+                        label="ข้อมูลขัดแย้ง"
+                        value={batch.conflictRows}
+                        tone="danger"
+                        priority="secondary"
+                    />
+                    <SummaryItem label="ข้าม" value={batch.excludedRows} priority="secondary" />
+                </div>
             </div>
 
             {batch.ignoredSheetNames.length > 0 ? (
@@ -788,9 +798,10 @@ export function RoutineImportPanel() {
                 <label className="grid gap-1 text-sm font-medium text-content-body">
                     ค้นหา
                     <Input
-                        value={search}
+                        type="search"
+                        value={searchInput}
                         onChange={(event) => {
-                            setSearch(event.target.value);
+                            setSearchInput(event.target.value);
                             setPage(1);
                         }}
                         placeholder="รายการ หมวดงาน หรือผู้รับผิดชอบ"
@@ -857,7 +868,7 @@ export function RoutineImportPanel() {
             ) : rowsPage ? (
                 <div className="overflow-hidden rounded-xl border border-border-subtle bg-surface-raised">
                     <div className="overflow-x-auto">
-                        <table className="w-full min-w-[1100px] text-sm">
+                        <table className="w-full min-w-[1100px] text-sm" aria-label="รายการตัวอย่างนำเข้า">
                             <thead className="bg-surface-subtle text-left text-sm text-content-secondary">
                                 <tr>
                                     <th className="w-12 px-4 py-3 font-semibold">
@@ -881,7 +892,7 @@ export function RoutineImportPanel() {
                                     <th className="px-4 py-3 font-semibold">
                                         สถานะ
                                     </th>
-                                    <th className="px-4 py-3 font-semibold">
+                                    <th className="sticky right-0 z-20 whitespace-nowrap border-l border-border-subtle bg-surface-subtle px-4 py-3 font-semibold employee-table-sticky-shadow">
                                         จัดการ
                                     </th>
                                 </tr>
@@ -1003,7 +1014,7 @@ export function RoutineImportPanel() {
                                                     </ul>
                                                 ) : null}
                                             </td>
-                                            <td className="px-4 py-4">
+                                            <td className="sticky right-0 z-10 whitespace-nowrap border-l border-border-subtle bg-surface-raised px-4 py-4 employee-table-sticky-shadow">
                                                 <Button
                                                     type="button"
                                                     variant={
@@ -1014,12 +1025,13 @@ export function RoutineImportPanel() {
                                                     size="sm"
                                                     disabled={editDisabled}
                                                     aria-busy={openingEditor}
+                                                    aria-label={openingEditor ? "กำลังเปิดตัวแก้ไข..." : "แก้ไขและ map ผู้รับผิดชอบ"}
                                                     title={
                                                         terminal
                                                             ? `แถวนี้อยู่ในสถานะ “${rowStatusLabel(row)}” จึงแก้ไขไม่ได้`
                                                             : !batchEditable || applying
                                                             ? readOnlyReason
-                                                            : "แก้ไขข้อมูลและ map ผู้รับผิดชอบ"
+                                                            : "ตรวจสอบและแก้ไขข้อมูลและ map ผู้รับผิดชอบ"
                                                     }
                                                     onClick={() => {
                                                         setEditorRow(row);
@@ -1035,7 +1047,7 @@ export function RoutineImportPanel() {
                                                         </>
                                                     ) : (
                                                         <>
-                                                            <Pencil /> แก้ไขและ map ผู้รับผิดชอบ
+                                                            <Pencil /> ตรวจสอบและแก้ไข
                                                         </>
                                                     )}
                                                 </Button>

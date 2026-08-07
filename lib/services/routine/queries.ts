@@ -891,10 +891,15 @@ export async function getRoutineTasks(
     pagination: RoutinePagination;
 }> {
     const search = filters.search?.trim();
+    const isActive = filters.status === "active"
+        ? true
+        : filters.status === "inactive"
+            ? false
+            : filters.activeOnly;
     const where: Prisma.RoutineTaskWhereInput = {
         ...buildRoutineTaskOwnershipWhere(queryActor),
-        ...(filters.activeOnly !== undefined
-            ? { isActive: filters.activeOnly }
+        ...(isActive !== undefined
+            ? { isActive }
             : {}),
         ...(filters.unitId ? { unitId: filters.unitId } : {}),
         ...(filters.categoryId ? { categoryId: filters.categoryId } : {}),

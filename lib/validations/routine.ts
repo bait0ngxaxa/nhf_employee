@@ -332,11 +332,15 @@ export const routineSummaryQuerySchema = z.object({
     scope: z.enum(["mine", "all"]).default("mine"),
 });
 
+export const ROUTINE_TASK_STATUS_FILTERS = ["active", "inactive"] as const;
+export type RoutineTaskStatusFilter = (typeof ROUTINE_TASK_STATUS_FILTERS)[number];
+
 export const routineTaskFiltersSchema = z.object({
     activeOnly: z
         .enum(["0", "1"])
         .optional()
         .transform((value) => value === "1" ? true : undefined),
+    status: z.enum(ROUTINE_TASK_STATUS_FILTERS).optional(),
     unitId: z.coerce.number().int().positive().optional(),
     categoryId: z.coerce.number().int().positive().optional(),
     search: z.preprocess(
