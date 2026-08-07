@@ -76,6 +76,21 @@ describe("Routine scheduler cron route", () => {
         expect(runRoutineSchedulerMock).toHaveBeenCalledTimes(1);
     });
 
+    it("returns a non-success status with counters when the scheduler partially fails", async () => {
+        process.env.ROUTINE_SCHEDULER_CRON_SECRET = "expected-secret";
+        const partialResult = { ...result, outboxEnqueued: 15, errors: 4 };
+        runRoutineSchedulerMock.mockResolvedValue(partialResult);
+
+        const response = await POST(buildRequest("expected-secret"));
+
+        expect(response.status).toBe(500);
+        await expect(response.json()).resolves.toEqual({
+            success: false,
+            ...partialResult,
+        });
+        expect(runRoutineSchedulerMock).toHaveBeenCalledTimes(1);
+    });
+
     it("does not generate reminders when the feature is explicitly disabled", async () => {
         process.env.ROUTINE_SCHEDULER_CRON_SECRET = "expected-secret";
         process.env.NEXT_PUBLIC_FEATURE_ROUTINE = "false";

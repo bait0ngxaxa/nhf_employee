@@ -47,6 +47,12 @@ export async function POST(request: Request): Promise<NextResponse> {
 
     try {
         const result = await runRoutineScheduler();
+        if (result.errors > 0) {
+            return NextResponse.json(
+                { success: false, ...result },
+                { status: 500 },
+            );
+        }
         return NextResponse.json({ success: true, ...result });
     } catch {
         return serverError();
