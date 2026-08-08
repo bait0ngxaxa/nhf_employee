@@ -63,21 +63,18 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 // NOTE: normalized to remove mojibake
 export async function POST(request: NextRequest): Promise<NextResponse> {
     try {
-        const body = await request.json();
-
-        // 1. Input Validation
-        const result = createEmployeeSchema.safeParse(body);
-        if (!result.success) {
-            const errors = result.error.flatten();
-            return operationFailed(400, { details: errors.fieldErrors });
-        }
-
-        // 2. Auth Check & Access Control
         const auth = await requireAdminSession({
             unauthorizedResponse: () => operationFailed(403),
             forbiddenResponse: () => operationFailed(403),
         });
         if (!auth.ok) return auth.response;
+
+        const body = await request.json();
+        const result = createEmployeeSchema.safeParse(body);
+        if (!result.success) {
+            const errors = result.error.flatten();
+            return operationFailed(400, { details: errors.fieldErrors });
+        }
 
         const createResult = await employeeService.createEmployee(result.data);
 

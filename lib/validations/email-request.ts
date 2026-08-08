@@ -42,6 +42,11 @@ export const emailRequestSchema = z.object({
         .default([]),
 });
 
+export const emailRequestFiltersSchema = z.object({
+    page: z.coerce.number().int().min(1).default(1),
+    limit: z.coerce.number().int().min(1).max(100).default(10),
+});
+
 /**
  * Type inference from schema
  */

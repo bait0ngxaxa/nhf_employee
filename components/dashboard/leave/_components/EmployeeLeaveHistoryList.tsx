@@ -120,6 +120,12 @@ function LeaveHistoryItem({
                     {request.notTakenRequestedAt && request.status === "APPROVED" ? (
                         <LeaveNote tone="info" label="รอหัวหน้ายืนยันไม่ได้ใช้วันลา" text={request.notTakenReason ?? "-"} />
                     ) : null}
+                    {request.cancellationRequestedAt && request.status === "APPROVED" ? (
+                        <LeaveNote
+                            label="คำขอยกเลิกได้รับการพิจารณาแล้ว"
+                            text="คำขอยกเลิกครั้งก่อนไม่ได้รับการอนุมัติ และไม่สามารถส่งคำขอยกเลิกซ้ำได้"
+                        />
+                    ) : null}
                     {request.cancellationRequestedAt && request.status === "CANCELLATION_REQUESTED" ? (
                         <LeaveNote
                             tone="warning"

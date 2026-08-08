@@ -16,6 +16,10 @@ export interface CreateEmailRequestData {
     sharedDriveAccess: SharedDriveOption[];
 }
 
+export interface CreateEmailRequestOptions {
+    idempotencyKey: string;
+}
+
 /** Filters for querying email requests */
 export interface EmailRequestFilters {
     page: number;
@@ -60,6 +64,7 @@ export interface PaginatedEmailRequestsResult {
 export interface CreateEmailRequestResult {
     success: boolean;
     emailRequest?: EmailRequest;
+    replayed: boolean;
     error?: string;
     status?: number;
 }

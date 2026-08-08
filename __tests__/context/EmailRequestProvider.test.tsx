@@ -223,6 +223,11 @@ describe("EmailRequestProvider", () => {
                     needsDocumentSystem: true,
                     sharedDriveAccess: ["it"],
                 }),
+                {
+                    headers: {
+                        "Idempotency-Key": expect.any(String),
+                    },
+                },
             );
         });
 
@@ -257,6 +262,55 @@ describe("EmailRequestProvider", () => {
                 "API Error",
             );
         });
+    });
+
+    it("reuses the idempotency key after an uncertain failure", async () => {
+        vi.mocked(apiPost)
+            .mockResolvedValueOnce(createErrorResponse("Network Error", 503))
+            .mockResolvedValueOnce(createSuccessResponse({ success: true }));
+
+        render(
+            <EmailRequestProvider>
+                <TestComponent />
+            </EmailRequestProvider>,
+        );
+
+        fillValidForm();
+        fireEvent.click(screen.getByTestId("submit-btn"));
+        await waitFor(() => expect(apiPost).toHaveBeenCalledTimes(1));
+        fireEvent.click(screen.getByTestId("submit-btn"));
+        await waitFor(() => expect(apiPost).toHaveBeenCalledTimes(2));
+
+        const firstConfig = vi.mocked(apiPost).mock.calls[0]?.[2];
+        const secondConfig = vi.mocked(apiPost).mock.calls[1]?.[2];
+        expect(new Headers(firstConfig?.headers).get("Idempotency-Key")).toBe(
+            new Headers(secondConfig?.headers).get("Idempotency-Key"),
+        );
+    });
+
+    it("uses a new idempotency key after form data changes following a failure", async () => {
+        vi.mocked(apiPost).mockResolvedValue(createErrorResponse("Network Error", 503));
+
+        render(
+            <EmailRequestProvider>
+                <TestComponent />
+            </EmailRequestProvider>,
+        );
+
+        fillValidForm();
+        fireEvent.click(screen.getByTestId("submit-btn"));
+        await waitFor(() => expect(apiPost).toHaveBeenCalledTimes(1));
+        fireEvent.change(screen.getByTestId("input-position"), {
+            target: { value: "ผู้จัดการ" },
+        });
+        fireEvent.click(screen.getByTestId("submit-btn"));
+        await waitFor(() => expect(apiPost).toHaveBeenCalledTimes(2));
+
+        const firstConfig = vi.mocked(apiPost).mock.calls[0]?.[2];
+        const secondConfig = vi.mocked(apiPost).mock.calls[1]?.[2];
+        expect(new Headers(firstConfig?.headers).get("Idempotency-Key")).not.toBe(
+            new Headers(secondConfig?.headers).get("Idempotency-Key"),
+        );
     });
 
     it("should display data from SWR", () => {

@@ -286,6 +286,49 @@ describe("POST /api/leave/cancel", () => {
         });
     });
 
+    it("rejects a duplicate cancellation request that is still pending", async () => {
+        vi.mocked(prisma.leaveRequest.findUnique).mockResolvedValue(
+            buildCancellationRequest(),
+        );
+
+        const response = await POST(new NextRequest("http://localhost/api/leave/cancel", {
+            method: "POST",
+            body: JSON.stringify({ leaveId: "leave-cancellation" }),
+        }));
+
+        expect(response.status).toBe(409);
+        await expect(response.json()).resolves.toEqual({
+            error: "คำขอนี้อยู่ระหว่างรอการยืนยันยกเลิก",
+        });
+        expect(prisma.leaveRequest.updateMany).not.toHaveBeenCalled();
+        expect(prisma.notification.create).not.toHaveBeenCalled();
+        expect(prisma.notificationOutbox.create).not.toHaveBeenCalled();
+    });
+
+    it("rejects a second cancellation attempt after the first was considered", async () => {
+        vi.mocked(prisma.leaveRequest.findUnique).mockResolvedValue(
+            buildCancellationRequest({ status: "APPROVED" }),
+        );
+
+        const response = await POST(new NextRequest("http://localhost/api/leave/cancel", {
+            method: "POST",
+            body: JSON.stringify({
+                leaveId: "leave-cancellation",
+                reason: "ลองส่งอีกครั้ง",
+            }),
+        }));
+
+        expect(response.status).toBe(409);
+        await expect(response.json()).resolves.toEqual({
+            error: "คำขอยกเลิกวันลานี้ได้รับการพิจารณาแล้ว ไม่สามารถส่งคำขอยกเลิกซ้ำได้",
+        });
+        expect(prisma.employee.findUnique).not.toHaveBeenCalled();
+        expect(prisma.leaveRequest.update).not.toHaveBeenCalled();
+        expect(prisma.leaveRequest.updateMany).not.toHaveBeenCalled();
+        expect(prisma.notification.create).not.toHaveBeenCalled();
+        expect(prisma.notificationOutbox.create).not.toHaveBeenCalled();
+    });
+
     it("routes cancellation to the current manager when the original approver is inactive", async () => {
         vi.mocked(prisma.leaveRequest.findUnique).mockResolvedValue(buildCancellationRequest({
             status: "APPROVED",

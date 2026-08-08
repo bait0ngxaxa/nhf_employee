@@ -27,6 +27,7 @@ model User {
   employee                    Employee?                   @relation(fields: [employeeId], references: [id])
   auditLogs                   AuditLog[]
   emailRequests               EmailRequest[]
+  emailRequestIdempotencies   EmailRequestIdempotency[]
   notifications               Notification[]
   refreshTokens               AuthRefreshToken[]
   stockTransactions           StockTransaction[]
@@ -361,10 +362,27 @@ model EmailRequest {
   updatedAt           DateTime @updatedAt
   requestedBy         Int
   user                User     @relation(fields: [requestedBy], references: [id])
+  idempotency         EmailRequestIdempotency?
 
   @@index([requestedBy])
   @@index([createdAt])
   @@map("email_requests")
+}
+
+model EmailRequestIdempotency {
+  id             String       @id @default(cuid())
+  userId         Int
+  idempotencyKey String       @db.VarChar(255)
+  requestHash    String       @db.Char(64)
+  emailRequestId Int          @unique
+  createdAt      DateTime     @default(now())
+
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  emailRequest EmailRequest @relation(fields: [emailRequestId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, idempotencyKey])
+  @@index([createdAt])
+  @@map("email_request_idempotency")
 }
 
 // Password Reset Token for forgot password flow

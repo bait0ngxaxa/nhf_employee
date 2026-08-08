@@ -20,6 +20,8 @@ export const PAGINATION_DEFAULTS = {
     maxLimit: 100,
 } as const;
 
+export const EMPLOYEE_IMPORT_MAX_ROWS = 1000;
+
 /** Department code mappings for CSV import */
 export const DEPARTMENT_CODE_MAP: Record<string, string> = {
     ADMIN: "ADMIN",

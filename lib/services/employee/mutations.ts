@@ -182,6 +182,24 @@ async function findLifecycleEmployee(
     });
 }
 
+async function findCommittedEmployee(
+    tx: Prisma.TransactionClient,
+    employeeId: number,
+): Promise<EmployeeWithRelations> {
+    const employee = await tx.employee.findUnique({
+        where: { id: employeeId },
+        include: EMPLOYEE_WITH_RELATIONS_INCLUDE,
+    });
+    if (!employee) {
+        throw new EmployeeMutationError(
+            EMPLOYEE_LIFECYCLE_MESSAGES.employeeNotFound,
+            404,
+        );
+    }
+
+    return employee as EmployeeWithRelations;
+}
+
 async function lockEmployeeForMutation(
     tx: Prisma.TransactionClient,
     employeeId: number,
@@ -326,22 +344,12 @@ async function runEmployeeLifecycle(
             const shouldWriteLifecycle = lifecycleNeedsWrite(operation, lockedEmployee);
 
             if (!shouldWriteLifecycle) {
-                const employeeResult = Object.keys(employeeData).length > 0
-                    ? await tx.employee.update({
+                if (Object.keys(employeeData).length > 0) {
+                    await tx.employee.update({
                         where: { id: employeeId },
                         data: employeeData,
                         include: EMPLOYEE_WITH_RELATIONS_INCLUDE,
-                    })
-                    : await tx.employee.findUnique({
-                        where: { id: employeeId },
-                        include: EMPLOYEE_WITH_RELATIONS_INCLUDE,
                     });
-
-                if (!employeeResult) {
-                    throw new EmployeeMutationError(
-                        EMPLOYEE_LIFECYCLE_MESSAGES.employeeNotFound,
-                        404,
-                    );
                 }
 
                 if (
@@ -353,10 +361,14 @@ async function runEmployeeLifecycle(
                         data: userIdentityData,
                     });
                 }
+                const committedEmployee = await findCommittedEmployee(
+                    tx,
+                    employeeId,
+                );
 
                 return {
                     success: true,
-                    employee: employeeResult as EmployeeWithRelations,
+                    employee: committedEmployee,
                     beforeData,
                 };
             }
@@ -418,10 +430,14 @@ async function runEmployeeLifecycle(
                     userIsActive: isDeactivation(operation) ? false : true,
                 },
             );
+            const committedEmployee = await findCommittedEmployee(
+                tx,
+                employeeId,
+            );
 
             return {
                 success: true,
-                employee: employeeResult as EmployeeWithRelations,
+                employee: committedEmployee,
                 beforeData,
                 lifecycle: operation,
                 auditRecorded: true,
@@ -609,7 +625,7 @@ async function runEmployeeProfileUpdate(
                 lockedEmployee,
                 data,
             );
-            const updatedEmployee = await tx.employee.update({
+            await tx.employee.update({
                 where: { id: employeeId },
                 data: employeeData,
                 include: EMPLOYEE_WITH_RELATIONS_INCLUDE,
@@ -624,10 +640,14 @@ async function runEmployeeProfileUpdate(
                     data: userIdentityData,
                 });
             }
+            const committedEmployee = await findCommittedEmployee(
+                tx,
+                employeeId,
+            );
 
             return {
                 success: true,
-                employee: updatedEmployee as EmployeeWithRelations,
+                employee: committedEmployee,
                 beforeData: buildLifecycleBeforeData(lockedEmployee),
             };
         });

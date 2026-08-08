@@ -97,6 +97,31 @@ async function createTwoVariantStockItem(
     }, fixture.issuerActor);
 }
 
+function createPendingReservation(
+    fixture: StockFixture,
+    quantity: number,
+    idempotencyKey: string,
+): ReturnType<typeof createNewStockRequest> {
+    return runSerializableTransaction((tx) =>
+        createNewStockRequest(
+            tx,
+            {
+                projectCode: `RESERVATION-${idempotencyKey}`,
+                items: [{
+                    itemId: fixture.item.id,
+                    variantId: fixture.variant.id,
+                    quantity,
+                }],
+            },
+            fixture.requesterActor,
+            {
+                idempotencyKey,
+                requestHash: idempotencyKey.padEnd(64, "0").slice(0, 64),
+            },
+        ),
+    );
+}
+
 describe.sequential("stock mutations with real MySQL", () => {
     beforeAll(async () => {
         assertDedicatedDatabase();
@@ -1581,6 +1606,59 @@ describe.sequential("stock mutations with real MySQL", () => {
             await holdingTransaction.catch(() => undefined);
             await holder.$disconnect();
         }
+    });
+
+    it("คำขอรอจ่าย 7 + 7 พร้อมกันไม่จองเกินสต็อก 10", async () => {
+        const fixture = await createStockFixture(prisma, {
+            suffix: "RESERVATION-OVER",
+            quantity: 10,
+        });
+        await prisma.stockRequest.delete({ where: { id: fixture.request.id } });
+
+        const results = await Promise.allSettled([
+            createPendingReservation(fixture, 7, "reservation-over-a"),
+            createPendingReservation(fixture, 7, "reservation-over-b"),
+        ]);
+        const reserved = await prisma.stockRequestItem.aggregate({
+            where: {
+                variantId: fixture.variant.id,
+                request: { status: StockRequestStatus.PENDING_ISSUE },
+            },
+            _sum: { quantity: true },
+        });
+
+        expect(results.filter((result) => result.status === "fulfilled")).toHaveLength(1);
+        expect(results.filter((result) => result.status === "rejected")).toHaveLength(1);
+        expect(reserved._sum.quantity ?? 0).toBeLessThanOrEqual(10);
+        expect(await prisma.stockRequest.count({
+            where: {
+                requestedBy: fixture.requester.id,
+                status: StockRequestStatus.PENDING_ISSUE,
+            },
+        })).toBe(1);
+    });
+
+    it("คำขอรอจ่าย 5 + 5 พร้อมกันจองได้พอดีสต็อก 10", async () => {
+        const fixture = await createStockFixture(prisma, {
+            suffix: "RESERVATION-BOUNDARY",
+            quantity: 10,
+        });
+        await prisma.stockRequest.delete({ where: { id: fixture.request.id } });
+
+        const results = await Promise.allSettled([
+            createPendingReservation(fixture, 5, "reservation-boundary-a"),
+            createPendingReservation(fixture, 5, "reservation-boundary-b"),
+        ]);
+        const reserved = await prisma.stockRequestItem.aggregate({
+            where: {
+                variantId: fixture.variant.id,
+                request: { status: StockRequestStatus.PENDING_ISSUE },
+            },
+            _sum: { quantity: true },
+        });
+
+        expect(results.filter((result) => result.status === "fulfilled")).toHaveLength(2);
+        expect(reserved._sum.quantity).toBe(10);
     });
 
     it("Issue พร้อมกันสองคำขอจ่ายสต็อกเพียงครั้งเดียว", async () => {

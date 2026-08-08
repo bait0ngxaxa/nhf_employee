@@ -51,5 +51,9 @@ describe("EmployeeLeaveHistoryList", () => {
         expect(
             screen.queryByRole("button", { name: "ขอยกเลิก" }),
         ).not.toBeInTheDocument();
+        expect(screen.getByText("คำขอยกเลิกได้รับการพิจารณาแล้ว:")).toBeInTheDocument();
+        expect(screen.getByText(
+            "คำขอยกเลิกครั้งก่อนไม่ได้รับการอนุมัติ และไม่สามารถส่งคำขอยกเลิกซ้ำได้",
+        )).toBeInTheDocument();
     });
 });

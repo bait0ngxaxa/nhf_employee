@@ -240,10 +240,27 @@ describe("Employee Mutations", () => {
             });
         });
 
-        it("updates employee and linked user email in the same transaction", async () => {
+        it("returns the committed employee and linked user email", async () => {
             const employee = buildLinkedEmployee();
-            prismaMock.employee.findFirst.mockResolvedValue(employee as never);
-            prismaMock.employee.findUnique.mockResolvedValue(employee as never);
+            const committedEmployee = buildLinkedEmployee({
+                email: "new@thainhf.org",
+                user: {
+                    id: 10,
+                    name: "Test Employee",
+                    email: "new@thainhf.org",
+                    role: "USER",
+                    isActive: true,
+                    deletedAt: null,
+                },
+            });
+            prismaMock.employee.findUnique.mockImplementation((async (
+                args: Prisma.EmployeeFindUniqueArgs,
+            ) => {
+                if ("email" in args.where) return null;
+                if ("include" in args) return committedEmployee;
+                return employee;
+            }) as never);
+            prismaMock.user.findUnique.mockResolvedValue(null);
             prismaMock.employee.update.mockResolvedValue({
                 ...employee,
                 email: "new@thainhf.org",
@@ -268,7 +285,89 @@ describe("Employee Mutations", () => {
                 where: { id: 10 },
                 data: { email: "new@thainhf.org" },
             });
+            expect(result.employee).toMatchObject({
+                email: "new@thainhf.org",
+                user: { email: "new@thainhf.org" },
+            });
             expect(prismaMock.$transaction).toHaveBeenCalledTimes(1);
+        });
+
+        it("returns committed identity state for a lifecycle and email update", async () => {
+            const employee = buildLinkedEmployee();
+            const committedEmployee = buildLinkedEmployee({
+                email: "suspended@thainhf.org",
+                status: "SUSPENDED",
+                user: {
+                    id: 10,
+                    name: "Test Employee",
+                    email: "suspended@thainhf.org",
+                    role: "USER",
+                    isActive: false,
+                    deletedAt: null,
+                },
+            });
+            prismaMock.employee.findUnique.mockImplementation((async (
+                args: Prisma.EmployeeFindUniqueArgs,
+            ) => {
+                if ("email" in args.where) return null;
+                if ("include" in args) return committedEmployee;
+                return employee;
+            }) as never);
+            prismaMock.user.findUnique.mockResolvedValue(null);
+            prismaMock.employee.update.mockResolvedValue({
+                ...employee,
+                email: "suspended@thainhf.org",
+                status: "SUSPENDED",
+            } as never);
+
+            const result = await updateEmployee(1, {
+                email: "SUSPENDED@THAINHF.ORG",
+                status: "SUSPENDED",
+            }, ACTOR);
+
+            expect(result.employee).toMatchObject({
+                email: "suspended@thainhf.org",
+                status: "SUSPENDED",
+                user: { email: "suspended@thainhf.org" },
+            });
+        });
+
+        it("returns committed identity state from a lifecycle no-op branch", async () => {
+            const employee = buildLinkedEmployee();
+            const committedEmployee = buildLinkedEmployee({
+                email: "active@thainhf.org",
+                user: {
+                    id: 10,
+                    name: "Test Employee",
+                    email: "active@thainhf.org",
+                    role: "USER",
+                    isActive: true,
+                    deletedAt: null,
+                },
+            });
+            prismaMock.employee.findUnique.mockImplementation((async (
+                args: Prisma.EmployeeFindUniqueArgs,
+            ) => {
+                if ("email" in args.where) return null;
+                if ("include" in args) return committedEmployee;
+                return employee;
+            }) as never);
+            prismaMock.user.findUnique.mockResolvedValue(null);
+            prismaMock.employee.update.mockResolvedValue({
+                ...employee,
+                email: "active@thainhf.org",
+            } as never);
+
+            const result = await updateEmployee(1, {
+                email: "ACTIVE@THAINHF.ORG",
+                status: "ACTIVE",
+            }, ACTOR);
+
+            expect(result.employee).toMatchObject({
+                email: "active@thainhf.org",
+                status: "ACTIVE",
+                user: { email: "active@thainhf.org" },
+            });
         });
 
         it("rejects an email owned by another employee without partial writes", async () => {

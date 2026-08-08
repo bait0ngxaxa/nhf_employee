@@ -4,6 +4,7 @@ import {
     useState,
     useCallback,
     useMemo,
+    useRef,
     type ChangeEvent,
     type FormEvent,
     type ReactNode,
@@ -51,6 +52,14 @@ function getSubmitErrorMessage(error: unknown): string {
     }
 
     return "เกิดข้อผิดพลาดในการเชื่อมต่อ กรุณาลองใหม่อีกครั้ง";
+}
+
+function createIdempotencyKey(): string {
+    if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+        return crypto.randomUUID();
+    }
+
+    return `email_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
 }
 
 function getValidationErrors(
@@ -110,6 +119,7 @@ export function EmailRequestProvider({ children }: EmailRequestProviderProps) {
     const [fieldErrors, setFieldErrors] = useState<
         Partial<Record<keyof EmailRequestFormData, string>>
     >({});
+    const pendingIdempotencyKeyRef = useRef<string | null>(null);
 
     // SWR for List
     const {
@@ -171,6 +181,7 @@ export function EmailRequestProvider({ children }: EmailRequestProviderProps) {
                     [field]: value,
                 };
             });
+            pendingIdempotencyKeyRef.current = null;
             setFormError(null);
             setFieldErrors((current) => {
                 if (!current[field]) {
@@ -207,14 +218,21 @@ export function EmailRequestProvider({ children }: EmailRequestProviderProps) {
             setIsFormLoading(true);
             setFormError(null);
             setFieldErrors({});
+            const idempotencyKey =
+                pendingIdempotencyKeyRef.current ?? createIdempotencyKey();
+            pendingIdempotencyKeyRef.current = idempotencyKey;
 
             try {
                 const response = await apiPost<{ success: boolean; error?: string }>(
                     API_ROUTES.emailRequest.list,
                     validation.data,
+                    {
+                        headers: { "Idempotency-Key": idempotencyKey },
+                    },
                 );
 
                 if (response.success) {
+                    pendingIdempotencyKeyRef.current = null;
                     setFormData(initialFormData);
                     toast.success("ส่งคำร้องพนักงานใหม่สำเร็จ", {
                         description: "คำร้องถูกส่งไปยังทีมไอทีแล้ว",

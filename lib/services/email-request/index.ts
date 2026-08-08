@@ -1,6 +1,7 @@
 // Re-export types
 export type {
     CreateEmailRequestData,
+    CreateEmailRequestOptions,
     EmailRequestFilters,
     UserContext,
     EmailRequestWithUser,
@@ -22,3 +23,4 @@ export const emailRequestService = {
 
 // Also export individual functions
 export { getEmailRequests, createEmailRequest };
+export { EmailRequestIdempotencyConflictError } from "./idempotency";

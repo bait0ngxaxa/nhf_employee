@@ -11,9 +11,16 @@ async function parseEmployeeId(
     params: Promise<{ id: string }>,
 ): Promise<{ employeeId: number | null; error?: NextResponse }> {
     const { id } = await params;
-    const employeeId = parseInt(id, 10);
+    if (!/^\d+$/.test(id)) {
+        return {
+            employeeId: null,
+            error: jsonError(COMMON_API_MESSAGES.invalidEmployeeId, 400),
+        };
+    }
 
-    if (Number.isNaN(employeeId)) {
+    const employeeId = Number(id);
+
+    if (!Number.isSafeInteger(employeeId) || employeeId <= 0) {
         return {
             employeeId: null,
             error: jsonError(COMMON_API_MESSAGES.invalidEmployeeId, 400),

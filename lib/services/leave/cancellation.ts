@@ -45,6 +45,7 @@ export const LEAVE_CANCELLATION_MESSAGES = {
     invalidStatus: "คำขอนี้ไม่สามารถขอยกเลิกได้แล้ว",
     tooLate: "ขอยกเลิกวันลาได้ก่อนวันลาเริ่มเท่านั้น",
     alreadyRequested: "คำขอนี้อยู่ระหว่างรอการยืนยันยกเลิก",
+    alreadyConsidered: "คำขอยกเลิกวันลานี้ได้รับการพิจารณาแล้ว ไม่สามารถส่งคำขอยกเลิกซ้ำได้",
     confirmationTooLate: "ไม่สามารถยืนยันการยกเลิกได้ เนื่องจากวันลาเริ่มแล้ว",
     forbidden: "คุณไม่มีสิทธิ์ดำเนินการกับคำขอนี้",
     adminOverrideReasonRequired: "กรุณาระบุเหตุผลสำหรับการกู้คืนรายการโดยผู้ดูแลระบบ",
@@ -157,8 +158,20 @@ export async function cancelLeaveRequest(
             };
         }
 
+        if (leaveRequest.status === "CANCELLATION_REQUESTED") {
+            throw new LeaveCancellationError(
+                LEAVE_CANCELLATION_MESSAGES.alreadyRequested,
+                409,
+            );
+        }
         if (leaveRequest.status !== "APPROVED") {
             throw new LeaveCancellationError(LEAVE_CANCELLATION_MESSAGES.invalidStatus, 409);
+        }
+        if (leaveRequest.cancellationRequestedAt !== null) {
+            throw new LeaveCancellationError(
+                LEAVE_CANCELLATION_MESSAGES.alreadyConsidered,
+                409,
+            );
         }
         if (!isBeforeLeaveStart(leaveRequest.startDate)) {
             throw new LeaveCancellationError(LEAVE_CANCELLATION_MESSAGES.tooLate, 400);
