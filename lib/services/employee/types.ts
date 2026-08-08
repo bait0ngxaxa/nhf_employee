@@ -46,6 +46,7 @@ export interface UpdateEmployeeData {
 
 /** Employee data from CSV import */
 export interface CSVImportEmployee {
+    sourceRow?: number;
     firstName: string;
     lastName: string;
     email?: string;

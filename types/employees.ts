@@ -46,6 +46,7 @@ export interface EmployeeFormData {
 }
 
 export interface CSVEmployee {
+    sourceRow?: number;
     firstName: string;
     lastName: string;
     email?: string;

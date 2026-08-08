@@ -32,17 +32,21 @@ function assertRequiredFields(
 }
 
 /**
- * Validate email format (only if provided and not empty/dash)
+ * Normalize and validate a provided organizational email.
  */
-function validateEmail(email: string | undefined): string | null {
+function normalizeImportEmail(email: string | undefined): string | null {
     if (!email || email.trim() === "" || email.trim() === "-") {
         return null;
     }
+    const normalizedEmail = email.trim().toLowerCase();
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-        return "รูปแบบอีเมลไม่ถูกต้อง";
+    if (!emailRegex.test(normalizedEmail)) {
+        throw new Error("รูปแบบอีเมลไม่ถูกต้อง");
     }
-    return null;
+    if (!normalizedEmail.endsWith("@thainhf.org")) {
+        throw new Error("กรุณาใช้อีเมลองค์กร (@thainhf.org) เท่านั้น");
+    }
+    return normalizedEmail;
 }
 
 /**
@@ -109,25 +113,19 @@ export async function importEmployeesFromCSV(
 
     // Process each employee
     for (let i = 0; i < employees.length; i++) {
-        const rowNumber = i + 1;
+        const rowNumber = employees[i].sourceRow ?? i + 1;
         const employeeData = employees[i];
 
         try {
             // Validate required fields
             assertRequiredFields(employeeData);
 
-            // Validate email format
-            const emailError = validateEmail(employeeData.email);
-            if (emailError) {
-                throw new Error(emailError);
-            }
+            const normalizedEmail = normalizeImportEmail(employeeData.email);
 
             // Check for duplicate email
             if (
-                employeeData.email &&
-                employeeData.email.trim() !== "" &&
-                employeeData.email.trim() !== "-" &&
-                existingEmails.has(employeeData.email.toLowerCase())
+                normalizedEmail
+                && existingEmails.has(normalizedEmail)
             ) {
                 throw new Error("อีเมลนี้ถูกใช้งานแล้ว");
             }
@@ -152,12 +150,8 @@ export async function importEmployeesFromCSV(
             }
 
             // Determine email to use
-            const email =
-                employeeData.email &&
-                employeeData.email.trim() !== "" &&
-                employeeData.email.trim() !== "-"
-                    ? employeeData.email.trim()
-                    : generateTempEmail();
+            const email = normalizedEmail ?? generateTempEmail();
+            const status = parseEmployeeStatus(employeeData.status);
 
             // Create employee
             const newEmployee = await prisma.employee.create({
@@ -170,7 +164,7 @@ export async function importEmployeesFromCSV(
                     position: employeeData.position.trim(),
                     affiliation: employeeData.affiliation?.trim() || null,
                     departmentId,
-                    status: parseEmployeeStatus(employeeData.status),
+                    status,
                 },
                 include: {
                     dept: true,

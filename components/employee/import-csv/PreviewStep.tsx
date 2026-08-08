@@ -38,7 +38,7 @@ export function PreviewStep({
                     <span>ตรวจสอบข้อมูลก่อนนำเข้า</span>
                 </CardTitle>
                 <CardDescription className="text-sm leading-6 text-content-secondary [overflow-wrap:anywhere]">
-                    พบข้อมูลพนักงาน {parsedData.length.toLocaleString("th-TH")} คน
+                    พบข้อมูล {parsedData.length.toLocaleString("th-TH")} รายการ
                     กรุณาตรวจสอบความถูกต้องก่อนทำการนำเข้า
                 </CardDescription>
             </CardHeader>
@@ -79,18 +79,21 @@ export function PreviewStep({
                         </thead>
                         <tbody className="divide-y divide-border-neutral-default bg-surface-raised">
                             {visibleRows.map((employee, index) => (
-                                <tr key={index} className="hover:bg-surface-neutral-subtle">
+                                <tr
+                                    key={employee.sourceRow ?? index}
+                                    className="hover:bg-surface-neutral-subtle"
+                                >
                                     <td className="px-4 py-4 text-sm text-content-neutral-primary">
-                                        {index + 1}
+                                        {employee.sourceRow ?? index + 1}
                                     </td>
                                     <td className="max-w-56 px-4 py-4 text-sm font-medium text-content-neutral-primary [overflow-wrap:anywhere]">
-                                        {employee.firstName} {employee.lastName}
+                                        {`${employee.firstName} ${employee.lastName}`.trim() || "-"}
                                     </td>
                                     <td className="max-w-64 px-4 py-4 text-sm text-content-neutral-secondary [overflow-wrap:anywhere]">
                                         {employee.email || "-"}
                                     </td>
                                     <td className="max-w-56 px-4 py-4 text-sm text-content-neutral-secondary [overflow-wrap:anywhere]">
-                                        {employee.position}
+                                        {employee.position || "-"}
                                     </td>
                                     <td className="max-w-52 px-4 py-4 text-sm">
                                         <Badge
@@ -154,7 +157,7 @@ export function PreviewStep({
                             <>
                                 <CheckCircle className="h-4 w-4" />
                                 <span>
-                                    นำเข้าข้อมูล ({parsedData.length} คน)
+                                    นำเข้าข้อมูล ({parsedData.length} รายการ)
                                 </span>
                             </>
                         )}

@@ -2,7 +2,11 @@ import bcrypt from "bcryptjs";
 import { type NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
-import { AUTH_ERROR_MESSAGES, authLoginUserSelect } from "@/lib/auth/ssot";
+import {
+    AUTH_ERROR_MESSAGES,
+    authLoginUserSelect,
+    hasEligibleEmployeeLifecycle,
+} from "@/lib/auth/ssot";
 import { withTrustedMutation } from "@/lib/auth/csrf";
 import { isAuthRateLimited, recordAuthAttempt } from "@/lib/auth/rate-limit";
 import { logAuthEvent } from "@/lib/server/audit";
@@ -58,7 +62,13 @@ export const POST = withTrustedMutation(async (request: NextRequest): Promise<Ne
             ? await bcrypt.compare(parsed.data.password, user.password)
             : false;
 
-        if (!user || !isPasswordValid || !user.isActive || user.deletedAt) {
+        if (
+            !user
+            || !isPasswordValid
+            || !user.isActive
+            || user.deletedAt
+            || !hasEligibleEmployeeLifecycle(user.employee)
+        ) {
             recordAuthAttempt(rateLimitInput, LOGIN_RATE_LIMIT_POLICY);
             await logAuthEvent("LOGIN_FAILED", user?.id, normalizedEmail, {
                 metadata: { method: "hybrid_login", reason: "invalid_credentials_or_inactive" },

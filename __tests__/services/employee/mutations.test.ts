@@ -39,6 +39,22 @@ function buildEmployee(overrides: Record<string, unknown> = {}): Record<string, 
     };
 }
 
+function buildLinkedEmployee(
+    overrides: Record<string, unknown> = {},
+): Record<string, unknown> {
+    return buildEmployee({
+        user: {
+            id: 10,
+            name: "Test Employee",
+            email: "employee@thainhf.org",
+            role: "USER",
+            isActive: true,
+            deletedAt: null,
+        },
+        ...overrides,
+    });
+}
+
 describe("Employee Mutations", () => {
     beforeEach(() => {
         mockReset(prismaMock);
@@ -56,6 +72,9 @@ describe("Employee Mutations", () => {
         prismaMock.user.update.mockResolvedValue({ id: 10 } as never);
         prismaMock.authRefreshToken.updateMany.mockResolvedValue({ count: 1 });
         prismaMock.auditLog.create.mockResolvedValue({ id: 1 } as never);
+        prismaMock.employee.findUnique.mockResolvedValue(
+            buildEmployee() as never,
+        );
     });
 
     describe("createEmployee", () => {
@@ -105,7 +124,7 @@ describe("Employee Mutations", () => {
 
     describe("updateEmployee", () => {
         it("should fail if employee not found", async () => {
-            prismaMock.employee.findFirst.mockResolvedValue(null);
+            prismaMock.employee.findUnique.mockResolvedValue(null);
 
             const result = await updateEmployee(999, { firstName: "New" });
 
@@ -132,6 +151,219 @@ describe("Employee Mutations", () => {
                     data: expect.objectContaining({ firstName: "New" }),
                 }),
             );
+        });
+        it("keeps the existing behavior for an employee without a linked user", async () => {
+            const employee = buildEmployee();
+            prismaMock.employee.findFirst.mockResolvedValue(employee as never);
+            prismaMock.employee.findUnique.mockResolvedValue(employee as never);
+            prismaMock.employee.update.mockResolvedValue({
+                ...employee,
+                firstName: "New",
+                email: "new@thainhf.org",
+            } as never);
+            vi.mocked(emailExists).mockResolvedValue(false);
+
+            const result = await updateEmployee(1, {
+                firstName: "New",
+                email: "NEW@THAINHF.ORG",
+            });
+
+            expect(result.success).toBe(true);
+            expect(prismaMock.employee.update).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    data: expect.objectContaining({
+                        firstName: "New",
+                        email: "new@thainhf.org",
+                    }),
+                }),
+            );
+            expect(prismaMock.user.update).not.toHaveBeenCalled();
+        });
+
+        it("keeps temporary-email behavior for an employee without a linked user", async () => {
+            const employee = buildEmployee();
+            prismaMock.employee.findUnique.mockResolvedValue(employee as never);
+            prismaMock.employee.update.mockResolvedValue(employee as never);
+
+            const result = await updateEmployee(1, { email: "-" });
+
+            expect(result.success).toBe(true);
+            expect(prismaMock.employee.update).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    data: expect.objectContaining({
+                        email: expect.stringMatching(/@temp\.local$/),
+                    }),
+                }),
+            );
+            expect(prismaMock.user.update).not.toHaveBeenCalled();
+        });
+
+        it.each([
+            {
+                label: "first name",
+                update: { firstName: "New" },
+                expectedName: "New Employee",
+            },
+            {
+                label: "last name",
+                update: { lastName: "Name" },
+                expectedName: "Test Name",
+            },
+        ])("syncs the linked user name after changing the employee $label", async ({
+            update,
+            expectedName,
+        }) => {
+            const employee = buildLinkedEmployee();
+            prismaMock.employee.findFirst.mockResolvedValue(employee as never);
+            prismaMock.employee.findUnique.mockResolvedValue(employee as never);
+            prismaMock.employee.update.mockResolvedValue(employee as never);
+
+            const result = await updateEmployee(1, update);
+
+            expect(result.success).toBe(true);
+            expect(prismaMock.user.update).toHaveBeenCalledWith({
+                where: { id: 10 },
+                data: { name: expectedName },
+            });
+        });
+
+        it("updates employee and linked user email in the same transaction", async () => {
+            const employee = buildLinkedEmployee();
+            prismaMock.employee.findFirst.mockResolvedValue(employee as never);
+            prismaMock.employee.findUnique.mockResolvedValue(employee as never);
+            prismaMock.employee.update.mockResolvedValue({
+                ...employee,
+                email: "new@thainhf.org",
+            } as never);
+            prismaMock.employee.findFirst
+                .mockResolvedValueOnce(employee as never)
+                .mockResolvedValueOnce(null);
+            prismaMock.user.findFirst.mockResolvedValue(null);
+            vi.mocked(emailExists).mockResolvedValue(false);
+
+            const result = await updateEmployee(1, {
+                email: "NEW@THAINHF.ORG",
+            });
+
+            expect(result.success).toBe(true);
+            expect(prismaMock.employee.update).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    data: expect.objectContaining({ email: "new@thainhf.org" }),
+                }),
+            );
+            expect(prismaMock.user.update).toHaveBeenCalledWith({
+                where: { id: 10 },
+                data: { email: "new@thainhf.org" },
+            });
+            expect(prismaMock.$transaction).toHaveBeenCalledTimes(1);
+        });
+
+        it("rejects an email owned by another employee without partial writes", async () => {
+            const employee = buildLinkedEmployee();
+            prismaMock.employee.findFirst.mockResolvedValue(employee as never);
+            prismaMock.employee.findUnique.mockImplementation((async (
+                args: Prisma.EmployeeFindUniqueArgs,
+            ) =>
+                "email" in args.where
+                    ? { id: 2 }
+                    : employee
+            ) as never);
+            vi.mocked(emailExists).mockResolvedValue(true);
+
+            const result = await updateEmployee(1, {
+                email: "taken@thainhf.org",
+            });
+
+            expect(result).toMatchObject({ success: false, status: 400 });
+            expect(prismaMock.employee.update).not.toHaveBeenCalled();
+            expect(prismaMock.user.update).not.toHaveBeenCalled();
+        });
+
+        it("rejects an email owned by another user without partial writes", async () => {
+            const employee = buildLinkedEmployee();
+            prismaMock.employee.findFirst.mockResolvedValue(employee as never);
+            prismaMock.employee.findUnique.mockResolvedValue(employee as never);
+            prismaMock.user.findUnique.mockResolvedValue({ id: 99 } as never);
+            vi.mocked(emailExists).mockResolvedValue(false);
+
+            const result = await updateEmployee(1, {
+                email: "taken@thainhf.org",
+            });
+
+            expect(result).toMatchObject({ success: false, status: 400 });
+            expect(prismaMock.employee.update).not.toHaveBeenCalled();
+            expect(prismaMock.user.update).not.toHaveBeenCalled();
+        });
+
+        it("maps a concurrent unique collision to a business error", async () => {
+            const employee = buildLinkedEmployee();
+            prismaMock.employee.findUnique.mockResolvedValue(employee as never);
+            prismaMock.user.findUnique.mockResolvedValue(null);
+            prismaMock.employee.update.mockRejectedValue({ code: "P2002" });
+
+            const result = await updateEmployee(1, {
+                email: "race@thainhf.org",
+            });
+
+            expect(result).toMatchObject({
+                success: false,
+                status: 400,
+                error: expect.stringContaining("อีเมลนี้ถูกใช้งานแล้ว"),
+            });
+            expect(prismaMock.user.update).not.toHaveBeenCalled();
+        });
+
+        it.each(["", "-"])(
+            "rejects %j as the email of an employee with a linked user",
+            async (email) => {
+                const employee = buildLinkedEmployee();
+                prismaMock.employee.findFirst.mockResolvedValue(employee as never);
+                prismaMock.employee.findUnique.mockResolvedValue(employee as never);
+
+                const result = await updateEmployee(1, { email });
+
+                expect(result).toMatchObject({ success: false, status: 400 });
+                expect(prismaMock.employee.update).not.toHaveBeenCalled();
+                expect(prismaMock.user.update).not.toHaveBeenCalled();
+            },
+        );
+
+        it("rolls back both identity records when the linked user update fails", async () => {
+            const employee = buildLinkedEmployee();
+            const state = {
+                employeeFirstName: "Test",
+                userName: "Test Employee",
+            };
+            prismaMock.employee.findFirst.mockResolvedValue(employee as never);
+            prismaMock.employee.findUnique.mockResolvedValue(employee as never);
+            prismaMock.employee.update.mockImplementation((async () => {
+                state.employeeFirstName = "New";
+                return { ...employee, firstName: "New" };
+            }) as never);
+            prismaMock.user.update.mockImplementation((async () => {
+                state.userName = "New Employee";
+                throw new Error("user update failed");
+            }) as never);
+            prismaMock.$transaction.mockImplementation(async (callback) => {
+                const before = { ...state };
+                try {
+                    if (typeof callback === "function") {
+                        return await callback(prismaMock as never);
+                    }
+                    return callback as never;
+                } catch (error) {
+                    Object.assign(state, before);
+                    throw error;
+                }
+            });
+
+            await expect(updateEmployee(1, { firstName: "New" })).rejects.toThrow(
+                "user update failed",
+            );
+            expect(state).toEqual({
+                employeeFirstName: "Test",
+                userName: "Test Employee",
+            });
         });
 
         it("should fail if email domain is not @thainhf.org", async () => {

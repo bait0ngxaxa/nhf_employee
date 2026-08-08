@@ -1,7 +1,10 @@
 import type { EmployeeStatus, Prisma } from "@prisma/client";
 
 import { prisma } from "@/lib/db/prisma";
-import { runSerializableTransaction } from "@/lib/db/transaction";
+import {
+    hasPrismaErrorCode,
+    runSerializableTransaction,
+} from "@/lib/db/transaction";
 import { lockEmployeeRows, lockUserRows } from "@/lib/db/row-locks";
 import { EMPLOYEE_WITH_RELATIONS_INCLUDE } from "./constants";
 import type {
@@ -34,6 +37,7 @@ type LifecycleEmployee = {
     deletedAt: Date | null;
     user: {
         id: number;
+        name: string;
         email: string;
         role: string;
         isActive: boolean;
@@ -52,12 +56,22 @@ type PendingApprovalSummary = {
     employee: EmployeeSummary;
 };
 
-class EmployeeLifecycleError extends Error {
+type UserIdentityUpdateData = {
+    name?: string;
+    email?: string;
+};
+
+type PreparedEmployeeUpdate = {
+    employeeData: Prisma.EmployeeUncheckedUpdateInput;
+    userIdentityData: UserIdentityUpdateData;
+};
+
+class EmployeeMutationError extends Error {
     readonly statusCode: number;
 
     constructor(message: string, statusCode: number) {
         super(message);
-        this.name = "EmployeeLifecycleError";
+        this.name = "EmployeeMutationError";
         this.statusCode = statusCode;
     }
 }
@@ -88,6 +102,10 @@ const EMPLOYEE_LIFECYCLE_MESSAGES = {
         return `ไม่สามารถปิดใช้งานพนักงานได้ กรุณากำหนดผู้จัดการหรือผู้อนุมัติใหม่ก่อนดำเนินการ: ${details.join("; ")}`;
     },
     lifecycleActorRequired: "ไม่พบผู้ดำเนินการสำหรับการเปลี่ยนสถานะพนักงาน",
+    linkedUserEmailRequired: "พนักงานที่มีบัญชีผู้ใช้ต้องมีอีเมลองค์กรที่ใช้งานได้",
+    invalidEmail: "รูปแบบอีเมลไม่ถูกต้อง",
+    organizationEmailOnly: "กรุณาใช้อีเมลองค์กร (@thainhf.org) เท่านั้น",
+    emailAlreadyUsed: "อีเมลนี้ถูกใช้งานแล้ว",
 } as const;
 
 const LIFECYCLE_EMPLOYEE_SELECT = {
@@ -100,6 +118,7 @@ const LIFECYCLE_EMPLOYEE_SELECT = {
     user: {
         select: {
             id: true,
+            name: true,
             email: true,
             role: true,
             isActive: true,
@@ -163,13 +182,43 @@ async function findLifecycleEmployee(
     });
 }
 
+async function lockEmployeeForMutation(
+    tx: Prisma.TransactionClient,
+    employeeId: number,
+    allowDeleted: boolean,
+): Promise<LifecycleEmployee> {
+    await lockEmployeeRows(tx, [employeeId]);
+
+    const employee = await findLifecycleEmployee(tx, employeeId);
+    if (!employee || (!allowDeleted && employee.deletedAt !== null)) {
+        throw new EmployeeMutationError(
+            EMPLOYEE_LIFECYCLE_MESSAGES.employeeNotFound,
+            404,
+        );
+    }
+
+    if (employee.user) {
+        await lockUserRows(tx, [employee.user.id]);
+    }
+
+    const lockedEmployee = await findLifecycleEmployee(tx, employeeId);
+    if (!lockedEmployee || (!allowDeleted && lockedEmployee.deletedAt !== null)) {
+        throw new EmployeeMutationError(
+            EMPLOYEE_LIFECYCLE_MESSAGES.employeeNotFound,
+            404,
+        );
+    }
+
+    return lockedEmployee;
+}
+
 async function assertCanDeactivateEmployee(
     tx: Prisma.TransactionClient,
     employee: LifecycleEmployee,
     actor: EmployeeLifecycleActor,
 ): Promise<void> {
     if (employee.user?.id === actor.userId) {
-        throw new EmployeeLifecycleError(
+        throw new EmployeeMutationError(
             EMPLOYEE_LIFECYCLE_MESSAGES.selfOffboarding,
             403,
         );
@@ -187,7 +236,7 @@ async function assertCanDeactivateEmployee(
         await lockUserRows(tx, activeAdmins.map((admin) => admin.id));
 
         if (activeAdmins.length <= 1) {
-            throw new EmployeeLifecycleError(
+            throw new EmployeeMutationError(
                 EMPLOYEE_LIFECYCLE_MESSAGES.lastAdmin,
                 409,
             );
@@ -227,7 +276,7 @@ async function assertCanDeactivateEmployee(
     }
 
     if (subordinates.length > 0 || leaveDependencies.length > 0) {
-        throw new EmployeeLifecycleError(
+        throw new EmployeeMutationError(
             EMPLOYEE_LIFECYCLE_MESSAGES.managerDependencies(subordinates, leaveDependencies),
             409,
         );
@@ -258,31 +307,20 @@ async function runEmployeeLifecycle(
     employeeId: number,
     operation: EmployeeLifecycleOperation,
     actor: EmployeeLifecycleActor,
-    employeeData: Prisma.EmployeeUncheckedUpdateInput = {},
+    data: UpdateEmployeeData = {},
 ): Promise<EmployeeMutationWithAudit> {
     try {
         return await runSerializableTransaction(async (tx) => {
-            await lockEmployeeRows(tx, [employeeId]);
-
-            const employee = await findLifecycleEmployee(tx, employeeId);
-            if (!employee || (isDeactivation(operation) && employee.deletedAt !== null)) {
-                throw new EmployeeLifecycleError(
-                    EMPLOYEE_LIFECYCLE_MESSAGES.employeeNotFound,
-                    404,
-                );
-            }
-
-            if (employee.user) {
-                await lockUserRows(tx, [employee.user.id]);
-            }
-
-            const lockedEmployee = await findLifecycleEmployee(tx, employeeId);
-            if (!lockedEmployee || (isDeactivation(operation) && lockedEmployee.deletedAt !== null)) {
-                throw new EmployeeLifecycleError(
-                    EMPLOYEE_LIFECYCLE_MESSAGES.employeeNotFound,
-                    404,
-                );
-            }
+            const lockedEmployee = await lockEmployeeForMutation(
+                tx,
+                employeeId,
+                !isDeactivation(operation),
+            );
+            const { employeeData, userIdentityData } = await prepareEmployeeUpdate(
+                tx,
+                lockedEmployee,
+                data,
+            );
 
             const beforeData = buildLifecycleBeforeData(lockedEmployee);
             const shouldWriteLifecycle = lifecycleNeedsWrite(operation, lockedEmployee);
@@ -300,10 +338,20 @@ async function runEmployeeLifecycle(
                     });
 
                 if (!employeeResult) {
-                    throw new EmployeeLifecycleError(
+                    throw new EmployeeMutationError(
                         EMPLOYEE_LIFECYCLE_MESSAGES.employeeNotFound,
                         404,
                     );
+                }
+
+                if (
+                    lockedEmployee.user
+                    && Object.keys(userIdentityData).length > 0
+                ) {
+                    await tx.user.update({
+                        where: { id: lockedEmployee.user.id },
+                        data: userIdentityData,
+                    });
                 }
 
                 return {
@@ -339,10 +387,12 @@ async function runEmployeeLifecycle(
                     where: { id: lockedEmployee.user.id },
                     data: isDeactivation(operation)
                         ? {
+                            ...userIdentityData,
                             isActive: false,
                             tokenVersion: { increment: 1 },
                         }
                         : {
+                            ...userIdentityData,
                             isActive: true,
                             deletedAt: null,
                             tokenVersion: { increment: 1 },
@@ -378,11 +428,18 @@ async function runEmployeeLifecycle(
             };
         });
     } catch (error) {
-        if (error instanceof EmployeeLifecycleError) {
+        if (error instanceof EmployeeMutationError) {
             return {
                 success: false,
                 error: error.message,
                 status: error.statusCode,
+            };
+        }
+        if (hasPrismaErrorCode(error, "P2002")) {
+            return {
+                success: false,
+                error: EMPLOYEE_LIFECYCLE_MESSAGES.emailAlreadyUsed,
+                status: 400,
             };
         }
         throw error;
@@ -409,19 +466,180 @@ function isValidEmail(email: string): boolean {
  */
 function processEmailForUpdate(
     email: string | undefined,
+    hasLinkedUser: boolean,
 ): { email: string; error?: string } | null {
     if (email === undefined) return null;
 
     const trimmed = email.trim();
     if (trimmed === "" || trimmed === "-") {
+        if (hasLinkedUser) {
+            return {
+                email: "",
+                error: EMPLOYEE_LIFECYCLE_MESSAGES.linkedUserEmailRequired,
+            };
+        }
         return { email: generateTempEmail() };
     }
 
     if (!isValidEmail(trimmed)) {
-        return { email: "", error: "รูปแบบอีเมลไม่ถูกต้อง" };
+        return {
+            email: "",
+            error: EMPLOYEE_LIFECYCLE_MESSAGES.invalidEmail,
+        };
     }
 
     return { email: trimmed.toLowerCase() };
+}
+
+function buildEmployeeUpdateData(
+    data: UpdateEmployeeData,
+): Prisma.EmployeeUncheckedUpdateInput {
+    const dataToUpdate: Prisma.EmployeeUncheckedUpdateInput = {};
+
+    if (data.firstName) dataToUpdate.firstName = data.firstName.trim();
+    if (data.lastName) dataToUpdate.lastName = data.lastName.trim();
+    if (data.nickname !== undefined) {
+        dataToUpdate.nickname = data.nickname?.trim() || null;
+    }
+    if (data.phone !== undefined) {
+        dataToUpdate.phone = data.phone?.trim() || null;
+    }
+    if (data.position) dataToUpdate.position = data.position.trim();
+    if (data.affiliation !== undefined) {
+        dataToUpdate.affiliation = data.affiliation?.trim() || null;
+    }
+    if (data.departmentId) dataToUpdate.departmentId = data.departmentId;
+
+    return dataToUpdate;
+}
+
+async function prepareEmployeeUpdate(
+    tx: Prisma.TransactionClient,
+    employee: LifecycleEmployee,
+    data: UpdateEmployeeData,
+): Promise<PreparedEmployeeUpdate> {
+    const employeeData = buildEmployeeUpdateData(data);
+    const userIdentityData: UserIdentityUpdateData = {};
+
+    if (data.firstName !== undefined || data.lastName !== undefined) {
+        const nextFirstName = data.firstName?.trim() || employee.firstName;
+        const nextLastName = data.lastName?.trim() || employee.lastName;
+        const nextName = `${nextFirstName} ${nextLastName}`.trim();
+
+        if (employee.user && employee.user.name !== nextName) {
+            userIdentityData.name = nextName;
+        }
+    }
+
+    if (data.email === undefined) {
+        return { employeeData, userIdentityData };
+    }
+
+    const emailResult = processEmailForUpdate(data.email, Boolean(employee.user));
+    if (!emailResult || emailResult.error) {
+        throw new EmployeeMutationError(
+            emailResult?.error ?? EMPLOYEE_LIFECYCLE_MESSAGES.invalidEmail,
+            400,
+        );
+    }
+
+    const normalizedEmail = emailResult.email;
+    if (!normalizedEmail.includes("@temp.local")) {
+        if (!normalizedEmail.endsWith("@thainhf.org")) {
+            throw new EmployeeMutationError(
+                EMPLOYEE_LIFECYCLE_MESSAGES.organizationEmailOnly,
+                400,
+            );
+        }
+
+        const [employeeWithEmail, userWithEmail] = await Promise.all([
+            tx.employee.findUnique({
+                where: { email: normalizedEmail },
+                select: { id: true },
+            }),
+            tx.user.findUnique({
+                where: { email: normalizedEmail },
+                select: { id: true },
+            }),
+        ]);
+
+        const employeeEmailConflict = Boolean(
+            employeeWithEmail && employeeWithEmail.id !== employee.id,
+        );
+        const userEmailConflict = Boolean(
+            userWithEmail && userWithEmail.id !== employee.user?.id,
+        );
+        if (employeeEmailConflict || userEmailConflict) {
+            throw new EmployeeMutationError(
+                EMPLOYEE_LIFECYCLE_MESSAGES.emailAlreadyUsed,
+                400,
+            );
+        }
+    }
+
+    employeeData.email = normalizedEmail;
+    if (employee.user && employee.user.email !== normalizedEmail) {
+        userIdentityData.email = normalizedEmail;
+    }
+
+    return { employeeData, userIdentityData };
+}
+
+async function runEmployeeProfileUpdate(
+    employeeId: number,
+    data: UpdateEmployeeData,
+): Promise<EmployeeMutationWithAudit> {
+    try {
+        return await runSerializableTransaction(async (tx) => {
+            const lockedEmployee = await lockEmployeeForMutation(
+                tx,
+                employeeId,
+                false,
+            );
+            const { employeeData, userIdentityData } = await prepareEmployeeUpdate(
+                tx,
+                lockedEmployee,
+                data,
+            );
+            const updatedEmployee = await tx.employee.update({
+                where: { id: employeeId },
+                data: employeeData,
+                include: EMPLOYEE_WITH_RELATIONS_INCLUDE,
+            });
+
+            if (
+                lockedEmployee.user
+                && Object.keys(userIdentityData).length > 0
+            ) {
+                await tx.user.update({
+                    where: { id: lockedEmployee.user.id },
+                    data: userIdentityData,
+                });
+            }
+
+            return {
+                success: true,
+                employee: updatedEmployee as EmployeeWithRelations,
+                beforeData: buildLifecycleBeforeData(lockedEmployee),
+            };
+        });
+    } catch (error) {
+        if (error instanceof EmployeeMutationError) {
+            return {
+                success: false,
+                error: error.message,
+                status: error.statusCode,
+            };
+        }
+        if (hasPrismaErrorCode(error, "P2002")) {
+            return {
+                success: false,
+                error: EMPLOYEE_LIFECYCLE_MESSAGES.emailAlreadyUsed,
+                status: 400,
+            };
+        }
+        throw error;
+    }
 }
 
 /**
@@ -476,79 +694,6 @@ export async function updateEmployee(
     data: UpdateEmployeeData,
     actor?: EmployeeLifecycleActor,
 ): Promise<EmployeeMutationWithAudit> {
-    // Check if employee exists
-    const existingEmployee = await prisma.employee.findFirst({
-        where: { id: employeeId },
-    });
-
-    if (!existingEmployee || (Boolean(existingEmployee.deletedAt) && data.status !== "ACTIVE")) {
-        return {
-            success: false,
-            error: EMPLOYEE_LIFECYCLE_MESSAGES.employeeNotFound,
-            status: 404,
-        };
-    }
-
-    // Store before values for audit
-    const beforeData = {
-        firstName: existingEmployee.firstName,
-        lastName: existingEmployee.lastName,
-        email: existingEmployee.email,
-        status: existingEmployee.status,
-    };
-
-    // Prepare update data
-    const dataToUpdate: Prisma.EmployeeUncheckedUpdateInput = {};
-
-    if (data.firstName) dataToUpdate.firstName = data.firstName.trim();
-    if (data.lastName) dataToUpdate.lastName = data.lastName.trim();
-    if (data.nickname !== undefined) {
-        dataToUpdate.nickname = data.nickname?.trim() || null;
-    }
-    if (data.phone !== undefined) {
-        dataToUpdate.phone = data.phone?.trim() || null;
-    }
-    if (data.position) dataToUpdate.position = data.position.trim();
-    if (data.affiliation !== undefined) {
-        dataToUpdate.affiliation = data.affiliation?.trim() || null;
-    }
-    if (data.departmentId) dataToUpdate.departmentId = data.departmentId;
-    // Handle email update
-    if (data.email !== undefined) {
-        const emailResult = processEmailForUpdate(data.email);
-        if (emailResult) {
-            if (emailResult.error) {
-                return {
-                    success: false,
-                    error: emailResult.error,
-                    status: 400,
-                };
-            }
-
-            // Check for duplicate email if real email provided
-            if (!emailResult.email.includes("@temp.local")) {
-                // Validate email domain
-                if (!emailResult.email.endsWith("@thainhf.org")) {
-                    return {
-                        success: false,
-                        error: "กรุณาใช้อีเมลองค์กร (@thainhf.org) เท่านั้น",
-                        status: 400,
-                    };
-                }
-
-                if (await emailExists(emailResult.email, employeeId)) {
-                    return {
-                        success: false,
-                        error: "อีเมลนี้ถูกใช้งานแล้ว",
-                        status: 400,
-                    };
-                }
-            }
-
-            dataToUpdate.email = emailResult.email;
-        }
-    }
-
     if (data.status) {
         if (!actor) {
             return {
@@ -564,21 +709,10 @@ export async function updateEmployee(
                 ? "SUSPEND"
                 : "REACTIVATE";
 
-        return runEmployeeLifecycle(employeeId, operation, actor, dataToUpdate);
+        return runEmployeeLifecycle(employeeId, operation, actor, data);
     }
 
-    // Update employee
-    const updatedEmployee = await prisma.employee.update({
-        where: { id: employeeId },
-        data: dataToUpdate,
-        include: EMPLOYEE_WITH_RELATIONS_INCLUDE,
-    });
-
-    return {
-        success: true,
-        employee: updatedEmployee as EmployeeWithRelations,
-        beforeData,
-    };
+    return runEmployeeProfileUpdate(employeeId, data);
 }
 
 /**

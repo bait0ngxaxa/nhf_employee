@@ -51,13 +51,18 @@ const STATUS_INPUT_MAP: Record<string, EmployeeStatus> = {
 
 /**
  * Parse a status string from CSV into the EmployeeStatus enum.
- * Falls back to ACTIVE when the value is absent or unrecognised.
+ * Defaults only blank values to ACTIVE and rejects unknown non-empty values.
  */
 export function parseEmployeeStatus(raw: string | undefined): EmployeeStatus {
     if (!raw || raw.trim() === "-" || raw.trim() === "") {
         return EmployeeStatus.ACTIVE;
     }
-    return STATUS_INPUT_MAP[raw.trim().toLowerCase()] ?? EmployeeStatus.ACTIVE;
+    const normalized = raw.trim().toLowerCase();
+    const status = STATUS_INPUT_MAP[normalized];
+    if (!status) {
+        throw new Error(`สถานะพนักงาน "${raw.trim()}" ไม่ถูกต้อง`);
+    }
+    return status;
 }
 
 /**
@@ -92,16 +97,19 @@ export function parseCSV(csvText: string): CSVEmployee[] {
     // Remove BOM if present
     const cleanText = csvText.replace(/^\uFEFF/, "");
     const lines = cleanText
-        .split("\n")
-        .map((line) => line.trim())
-        .filter((line) => line);
+        .split(/\r?\n/)
+        .map((line, index) => ({
+            text: line.trim(),
+            sourceRow: index + 1,
+        }))
+        .filter((line) => line.text.length > 0);
 
     if (lines.length < 2) {
         throw new Error("ไฟล์ CSV ต้องมีหัวตารางและข้อมูลอย่างน้อย 1 แถว");
     }
 
     // Parse headers
-    const headers = parseCSVLine(lines[0]).map((header) =>
+    const headers = parseCSVLine(lines[0].text).map((header) =>
         header.toLowerCase().trim(),
     );
 
@@ -135,27 +143,24 @@ export function parseCSV(csvText: string): CSVEmployee[] {
     // Parse data rows
     const employees: CSVEmployee[] = [];
     for (let i = 1; i < lines.length; i++) {
-        const values = parseCSVLine(lines[i]);
+        const values = parseCSVLine(lines[i].text);
 
-        const employee: Partial<CSVEmployee> = {};
+        const employee: CSVEmployee = {
+            sourceRow: lines[i].sourceRow,
+            firstName: "",
+            lastName: "",
+            position: "",
+            department: "",
+        };
         values.forEach((value, index) => {
             const field = fieldMapping[index];
             if (field && value && value.trim() !== "") {
-                (employee as Record<string, string | undefined>)[field] =
+                (employee as unknown as Record<string, string | number | undefined>)[field] =
                     value.trim();
             }
         });
 
-        // Validate required fields
-        const missing: string[] = [];
-        if (!employee.firstName) missing.push("firstName");
-        if (!employee.lastName) missing.push("lastName");
-        if (!employee.position) missing.push("position");
-        if (!employee.department) missing.push("department");
-
-        if (missing.length === 0) {
-            employees.push(employee as CSVEmployee);
-        }
+        employees.push(employee);
     }
 
     return employees;
@@ -166,7 +171,7 @@ export function parseCSV(csvText: string): CSVEmployee[] {
  */
 export function generateSampleCSV(): string {
     const sampleData = `ลำดับ,ชื่อ,นามสกุล,ชื่อเล่น,ตำแหน่ง,สังกัด,แผนก,อีเมล,เบอร์โทร,สถานะ
-1,สมชาย,ใจดี,ชาย,ผู้จัดการ,สำนักงานใหญ่,บริหาร,somchai@company.com,081-234-5678,ปกติ
+1,สมชาย,ใจดี,ชาย,ผู้จัดการ,สำนักงานใหญ่,บริหาร,somchai@thainhf.org,081-234-5678,ปกติ
 2,สมหญิง,รักงาน,หญิง,อาจารย์,คณะวิทยาศาสตร์,วิชาการ,,082-345-6789,ปกติ
 3,เจษฎา,รักเรียน,เจ,ครู,โรงเรียนประถม,ADMIN,,081-111-2222,ปกติ`;
 

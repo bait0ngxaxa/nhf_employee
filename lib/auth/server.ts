@@ -5,6 +5,7 @@ import { HYBRID_ACCESS_COOKIE_NAME } from "@/lib/auth/hybrid/constants";
 import { parseUserId } from "@/lib/auth/hybrid/session";
 import { hasActiveSessionFamily } from "@/lib/auth/hybrid/session-store";
 import { verifyAccessToken } from "@/lib/auth/hybrid/tokens";
+import { hasEligibleEmployeeLifecycle } from "@/lib/auth/ssot";
 import { prisma } from "@/lib/db/prisma";
 
 export type ApiAuthSession = HybridAuthSession;
@@ -24,11 +25,6 @@ async function findActiveUser(userId: number) {
             },
         },
     });
-}
-
-function hasActiveEmployeeProfile(user: SessionUser): boolean {
-    return user.employee === null
-        || (user.employee.status === "ACTIVE" && user.employee.deletedAt === null);
 }
 
 function toApiAuthSession(user: SessionUser): ApiAuthSession {
@@ -69,7 +65,7 @@ export async function getApiAuthSession(): Promise<ApiAuthSession | null> {
 
         if (
             !user
-            || !hasActiveEmployeeProfile(user)
+            || !hasEligibleEmployeeLifecycle(user.employee)
             || !hasActiveSession
             || claims.tokenVersion !== user.tokenVersion
         ) {

@@ -94,7 +94,7 @@ export function useImportCSV({
                 setImportResult(result);
                 setStep("result");
                 toast.success("นำเข้าข้อมูลเสร็จสิ้น", {
-                    description: `พบข้อมูลทั้งหมด ${((result.imported || 0) + (result.failed || 0)).toLocaleString("th-TH")} รายการ`,
+                    description: `พบข้อมูลทั้งหมด ${(result.success.length + result.errors.length).toLocaleString("th-TH")} รายการ`,
                 });
                 onSuccess?.();
             } else {

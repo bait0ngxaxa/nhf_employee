@@ -8,7 +8,10 @@ import {
     isAuthRateLimited,
     recordAuthAttempt,
 } from "@/lib/auth/rate-limit";
-import { AUTH_SIGNUP_MESSAGES } from "@/lib/auth/ssot";
+import {
+    AUTH_SIGNUP_MESSAGES,
+    hasEligibleEmployeeLifecycle,
+} from "@/lib/auth/ssot";
 import { withTrustedMutation } from "@/lib/auth/csrf";
 import { getClientMetadata } from "@/lib/auth/hybrid/session";
 import { prisma } from "@/lib/db/prisma";
@@ -79,11 +82,16 @@ export const POST = withTrustedMutation(
                     id: true,
                     firstName: true,
                     lastName: true,
+                    status: true,
+                    deletedAt: true,
                     user: { select: { id: true } },
                 },
             });
 
-            if (!matchedEmployee) {
+            if (
+                !matchedEmployee
+                || !hasEligibleEmployeeLifecycle(matchedEmployee)
+            ) {
                 return NextResponse.json(
                     { error: AUTH_SIGNUP_MESSAGES.employeeNotFoundThai },
                     { status: 400 },

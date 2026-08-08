@@ -115,6 +115,8 @@ describe("Auth signup route", () => {
             id: 10,
             firstName: "สมชาย",
             lastName: "ใจดี",
+            status: "ACTIVE",
+            deletedAt: null,
             user: null,
         });
         prismaMock.user.create.mockResolvedValue({
@@ -153,6 +155,8 @@ describe("Auth signup route", () => {
             id: 11,
             firstName: "System",
             lastName: "Administrator",
+            status: "ACTIVE",
+            deletedAt: null,
             user: null,
         });
         prismaMock.user.create.mockResolvedValue({
@@ -189,6 +193,8 @@ describe("Auth signup route", () => {
             id: 10,
             firstName: "สมชาย",
             lastName: "ใจดี",
+            status: "ACTIVE",
+            deletedAt: null,
             user: null,
         });
         prismaMock.user.create.mockRejectedValue(
@@ -211,6 +217,60 @@ describe("Auth signup route", () => {
         await expect(response.json()).resolves.toEqual({
             error: "บัญชีนี้ถูกลงทะเบียนแล้ว",
         });
+    });
+
+    it.each([
+        { status: "INACTIVE", deletedAt: null, label: "inactive" },
+        { status: "SUSPENDED", deletedAt: null, label: "suspended" },
+        {
+            status: "ACTIVE",
+            deletedAt: new Date("2026-01-01T00:00:00.000Z"),
+            label: "soft-deleted",
+        },
+    ])("rejects signup for a $label employee", async ({ status, deletedAt }) => {
+        prismaMock.user.findUnique.mockResolvedValue(null);
+        prismaMock.employee.findUnique.mockResolvedValue({
+            id: 10,
+            firstName: "Lifecycle",
+            lastName: "Blocked",
+            status,
+            deletedAt,
+            user: null,
+        });
+
+        const response = await signupRoute(
+            buildRequest({
+                email: "user@thainhf.org",
+                password: "secret1",
+                confirmPassword: "secret1",
+            }),
+        );
+
+        expect(response.status).toBe(400);
+        expect(prismaMock.user.create).not.toHaveBeenCalled();
+    });
+
+    it("does not let the bootstrap admin email bypass employee lifecycle", async () => {
+        prismaMock.user.findUnique.mockResolvedValue(null);
+        prismaMock.employee.findUnique.mockResolvedValue({
+            id: 11,
+            firstName: "System",
+            lastName: "Administrator",
+            status: "INACTIVE",
+            deletedAt: null,
+            user: null,
+        });
+
+        const response = await signupRoute(
+            buildRequest({
+                email: "admin@thainhf.org",
+                password: "secret1",
+                confirmPassword: "secret1",
+            }),
+        );
+
+        expect(response.status).toBe(400);
+        expect(prismaMock.user.create).not.toHaveBeenCalled();
     });
 
     it("returns 429 when signup attempts exceed limit", async () => {

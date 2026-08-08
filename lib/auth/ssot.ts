@@ -13,6 +13,11 @@ export interface RequiredAccessClaims extends JWTPayload {
     ver: number;
 }
 
+interface EmployeeLifecycleIdentity {
+    status: "ACTIVE" | "INACTIVE" | "SUSPENDED";
+    deletedAt: Date | null;
+}
+
 function isNonEmptyString(value: unknown): value is string {
     return typeof value === "string" && value.length > 0;
 }
@@ -43,6 +48,13 @@ export function hasRequiredAccessClaims(payload: JWTPayload): payload is Require
     return true;
 }
 
+export function hasEligibleEmployeeLifecycle(
+    employee: EmployeeLifecycleIdentity | null,
+): boolean {
+    return employee === null
+        || (employee.status === "ACTIVE" && employee.deletedAt === null);
+}
+
 export const authSessionUserSelect = Prisma.validator<Prisma.UserSelect>()({
     id: true,
     role: true,
@@ -63,6 +75,12 @@ export const authLoginUserSelect = Prisma.validator<Prisma.UserSelect>()({
     name: true,
     password: true,
     deletedAt: true,
+    employee: {
+        select: {
+            status: true,
+            deletedAt: true,
+        },
+    },
 });
 
 export const AUTH_ERROR_MESSAGES = {
