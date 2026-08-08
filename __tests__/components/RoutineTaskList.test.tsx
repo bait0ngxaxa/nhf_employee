@@ -106,10 +106,22 @@ describe("RoutineTaskList", () => {
         const props = makeProps();
         const { container } = render(<RoutineTaskList {...props} />);
 
-        const actionCell = container.querySelector("tbody td.sticky");
-        expect(actionCell).toHaveClass("right-0", "bg-surface-raised", "employee-table-sticky-shadow");
+        const actionCell = container.querySelector("tbody td:last-child");
+        expect(actionCell).toHaveClass("lg:sticky", "lg:right-0", "bg-surface-raised");
 
         fireEvent.click(screen.getByRole("button", { name: "แก้ไข" }));
         expect(props.onEdit).toHaveBeenCalledWith(task);
+    });
+
+    it("reflows task details without a forced-width table on mobile", () => {
+        const props = makeProps();
+        const { container } = render(<RoutineTaskList {...props} />);
+
+        const table = screen.getByRole("table");
+        expect(table).toHaveClass("block", "lg:table", "lg:min-w-[780px]");
+        expect(table).not.toHaveClass("min-w-[780px]");
+        expect(container.querySelector("thead")).toHaveClass("hidden", "lg:table-header-group");
+        expect(screen.getByText("หน่วยงาน", { selector: "td span" })).toHaveClass("lg:hidden");
+        expect(screen.getByText("ยังไม่ระบุ")).toBeInTheDocument();
     });
 });
