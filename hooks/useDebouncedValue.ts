@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { LIVE_SEARCH_DEBOUNCE_MS } from "@/constants/ui";
 
 /**
  * Custom hook that returns a debounced value
@@ -8,7 +9,10 @@ import { useState, useEffect } from "react";
  * @param delay - Delay in milliseconds (default: 300ms)
  * @returns The debounced value
  */
-export function useDebouncedValue<T>(value: T, delay: number = 1000): T {
+export function useDebouncedValue<T>(
+    value: T,
+    delay: number = LIVE_SEARCH_DEBOUNCE_MS,
+): T {
     const [debouncedValue, setDebouncedValue] = useState<T>(value);
 
     useEffect(() => {

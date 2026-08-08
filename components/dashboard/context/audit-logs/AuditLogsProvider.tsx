@@ -22,7 +22,7 @@ export function AuditLogsProvider({ children }: AuditLogsProviderProps) {
     const [entityTypeFilter, setEntityTypeFilter] = useState<string>("all");
     const [searchTerm, setSearchTerm] = useState("");
 
-    const debouncedSearchTerm = useDebouncedValue(searchTerm, 300);
+    const debouncedSearchTerm = useDebouncedValue(searchTerm);
 
     const params = new URLSearchParams();
     params.set("page", currentPage.toString());

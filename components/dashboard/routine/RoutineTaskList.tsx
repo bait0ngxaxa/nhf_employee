@@ -1,5 +1,5 @@
 import { useId, useRef, useState } from "react";
-import { Edit3, Power, Plus, Trash2 } from "lucide-react";
+import { Edit3, Power, Plus, Trash2, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -98,16 +98,31 @@ export function RoutineTaskList({
     return (
         <div className="space-y-4">
             <div className="grid gap-3 rounded-xl border border-border-subtle bg-surface-raised p-4 sm:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_minmax(11rem,0.4fr)_minmax(9rem,0.3fr)_auto] xl:items-end">
-                <label className="grid min-w-0 gap-1 text-sm font-medium text-content-body" htmlFor={searchId}>
-                    ค้นหาแม่แบบงาน
-                    <Input
-                        id={searchId}
-                        type="search"
-                        value={search}
-                        onChange={(event) => onSearchChange(event.target.value)}
-                        placeholder="ชื่องาน หมวดหมู่ หรือหน่วยงาน"
-                    />
-                </label>
+                <div className="grid min-w-0 gap-1 text-sm font-medium text-content-body">
+                    <label htmlFor={searchId}>ค้นหาแม่แบบงาน</label>
+                    <div className="relative">
+                        <Input
+                            id={searchId}
+                            type="search"
+                            value={search}
+                            onChange={(event) => onSearchChange(event.target.value)}
+                            className="pr-12 sm:pr-10 [&::-webkit-search-cancel-button]:appearance-none"
+                            placeholder="ชื่องาน หมวดหมู่ หรือหน่วยงาน"
+                        />
+                        {search.trim().length > 0 ? (
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => onSearchChange("")}
+                                className="absolute right-1.5 top-1/2 size-11 -translate-y-1/2 rounded-md text-content-muted hover:bg-surface-muted hover:text-content-body sm:size-7"
+                                aria-label="ล้างคำค้นหาแม่แบบงาน"
+                            >
+                                <X className="size-4" aria-hidden="true" />
+                            </Button>
+                        ) : null}
+                    </div>
+                </div>
                 <label className="grid min-w-0 gap-1 text-sm font-medium text-content-body" htmlFor={unitIdField}>
                     หน่วยงาน
                     <select

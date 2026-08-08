@@ -303,28 +303,57 @@ sudo systemctl reload nginx
 
 ## Scheduled Maintenance
 
-ตั้ง external scheduler ให้เรียก endpoints ต่อไปนี้ด้วย `POST`
+แอปไม่มี in-process cron และไม่ควรพึ่ง request จากผู้ใช้เพื่อปลุก worker ใน production ให้ตั้ง external
+scheduler เรียก endpoints ต่อไปนี้ด้วย `POST`
+
+cron process ไม่ได้โหลด `.env` ของ Next.js อัตโนมัติ ต้องส่ง environment variables ให้ cron โดยตรง หรือสร้างไฟล์
+เฉพาะสำหรับ cron ที่อ่านได้เฉพาะผู้ดูแลระบบ เช่น `/etc/employee_nhf/cron.env`:
+
+```dotenv
+APP_BASE_URL="https://approve.example.com"
+ROUTINE_SCHEDULER_CRON_SECRET="replace-with-production-secret"
+NOTIFICATION_OUTBOX_CRON_SECRET="replace-with-production-secret"
+AUDIT_LOG_CLEANUP_SECRET="replace-with-production-secret"
+AUTH_CLEANUP_SECRET="replace-with-production-secret"
+LEAVE_ATTACHMENT_CLEANUP_SECRET="replace-with-production-secret"
+```
+
+ตั้ง permission เป็น `600` และใช้ secret คนละค่ากันทุกตัว `APP_BASE_URL` ต้องเป็น HTTPS origin เดียวกับ
+`PUBLIC_APPROVE_URL` โดยไม่มี `/` ท้าย URL หาก scheduler platform รองรับ environment variables อยู่แล้ว ไม่ต้องสร้างไฟล์นี้
+
+ตัวอย่าง crontab ด้านล่างใช้ `/bin/bash` และโหลดไฟล์ดังกล่าวก่อนเรียก endpoint:
+
+```cron
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+```
 
 ### Routine scheduler — ทุก 1 นาที
 
-สร้าง occurrence ตาม schedule และ enqueue reminder เข้า notification outbox:
+สร้าง occurrence ตาม schedule และ enqueue reminder เข้า notification outbox แต่ไม่ได้ส่ง notification เอง ต้องตั้ง
+Notification outbox worker ด้านล่างด้วย สำหรับ production ต้องตั้ง `NEXT_PUBLIC_FEATURE_ROUTINE=true` ก่อน build มิฉะนั้น
+endpoint จะตอบสำเร็จแบบ no-op โดยไม่สร้าง occurrence หรือ reminder:
 
 ```cron
-* * * * * curl --fail --silent --show-error --max-time 50 --request POST --header "x-routine-secret: $ROUTINE_SCHEDULER_CRON_SECRET" "$APP_BASE_URL/api/cron/routine-scheduler"
+* * * * * . /etc/employee_nhf/cron.env && curl --fail --silent --show-error --max-time 50 --request POST --header "x-routine-secret: $ROUTINE_SCHEDULER_CRON_SECRET" "$APP_BASE_URL/api/cron/routine-scheduler"
 ```
 
 ### Notification outbox — ทุก 1 นาที
 
 ```cron
-* * * * * curl --fail --silent --show-error --request POST --header "x-outbox-secret: $NOTIFICATION_OUTBOX_CRON_SECRET" "$APP_BASE_URL/api/cron/notification-outbox"
+* * * * * . /etc/employee_nhf/cron.env && curl --fail --silent --show-error --request POST --header "x-outbox-secret: $NOTIFICATION_OUTBOX_CRON_SECRET" "$APP_BASE_URL/api/cron/notification-outbox"
 ```
 
+Worker claim สูงสุด 10 รายการต่อ invocation และ process ตามลำดับเวลาสร้าง การเรียกทุก 1 นาทีช่วยระบาย backlog ต่อเนื่อง
 Worker ส่งซ้ำสูงสุด 3 ครั้ง โดย backoff 1 และ 2 นาที รายการที่ล้มเหลวหลังครั้งที่ 3 เปลี่ยนเป็น `DEAD`
+
+Routine scheduler กับ outbox worker เริ่มในนาทีเดียวกันได้ หาก worker ทำงานก่อน scheduler enqueue รายการใหม่ รายการนั้นจะถูก
+process ในรอบถัดไป โดยอาจช้าสูงสุดประมาณ 1 นาที
 
 ### Audit log cleanup — วันละครั้ง
 
 ```cron
-15 2 * * * curl --fail --silent --show-error --request POST --header "x-cleanup-secret: $AUDIT_LOG_CLEANUP_SECRET" "$APP_BASE_URL/api/audit-logs/cleanup"
+15 2 * * * . /etc/employee_nhf/cron.env && curl --fail --silent --show-error --request POST --header "x-cleanup-secret: $AUDIT_LOG_CLEANUP_SECRET" "$APP_BASE_URL/api/audit-logs/cleanup"
 ```
 
 ระบบลบ audit log ที่เก่ากว่า 90 วัน
@@ -332,22 +361,33 @@ Worker ส่งซ้ำสูงสุด 3 ครั้ง โดย backoff 
 ### Auth token cleanup — วันละครั้ง
 
 ```cron
-30 2 * * * curl --fail --silent --show-error --request POST --header "x-cleanup-secret: $AUTH_CLEANUP_SECRET" "$APP_BASE_URL/api/auth/cleanup"
+30 2 * * * . /etc/employee_nhf/cron.env && curl --fail --silent --show-error --request POST --header "x-cleanup-secret: $AUTH_CLEANUP_SECRET" "$APP_BASE_URL/api/auth/cleanup"
 ```
 
-ตั้ง `APP_BASE_URL` เป็นค่าเดียวกับ `PUBLIC_APPROVE_URL`
+ระบบลบ refresh token ที่หมดอายุหรือถูก revoke และเก่ากว่า retention window 7 วัน
 
 ### Leave attachment orphan cleanup — วันละครั้ง
 
-รัน dry-run ก่อนในช่วง rollout แล้วจึงรันจริงด้วย secret ที่แยกจาก secret อื่น:
+ก่อนเปิด cron ให้รัน dry-run ด้วยตนเองหนึ่งครั้งและตรวจ counters ที่ตอบกลับ:
+
+```bash
+set -a
+. /etc/employee_nhf/cron.env
+set +a
+curl --fail --silent --show-error --request POST --header "x-cleanup-secret: $LEAVE_ATTACHMENT_CLEANUP_SECRET" "$APP_BASE_URL/api/leave/attachments/cleanup?dryRun=true"
+```
+
+เมื่อผล dry-run ถูกต้องจึงเปิด cron ที่ลบจริง:
 
 ```cron
-45 2 * * * curl --fail --silent --show-error --request POST --header "x-cleanup-secret: $LEAVE_ATTACHMENT_CLEANUP_SECRET" "$APP_BASE_URL/api/leave/attachments/cleanup?dryRun=true"
-0 3 * * * curl --fail --silent --show-error --request POST --header "x-cleanup-secret: $LEAVE_ATTACHMENT_CLEANUP_SECRET" "$APP_BASE_URL/api/leave/attachments/cleanup"
+0 3 * * * . /etc/employee_nhf/cron.env && curl --fail --silent --show-error --request POST --header "x-cleanup-secret: $LEAVE_ATTACHMENT_CLEANUP_SECRET" "$APP_BASE_URL/api/leave/attachments/cleanup"
 ```
 
 งานนี้ scan เฉพาะ private leave directory, เทียบ `storageKey` กับฐานข้อมูล และลบเฉพาะไฟล์ที่เก่ากว่า safety
 window 24 ชั่วโมง จึงไม่ควรลบไฟล์ที่อยู่ระหว่าง request; endpoint ต้องมี header secret เสมอและไม่คืนชื่อไฟล์หรือ path
+
+ทุก endpoint ตอบ `503` เมื่อไม่ได้ตั้ง secret และ `403` เมื่อ header secret ไม่ตรง Routine scheduler ตอบ `500` พร้อม
+counters เมื่อบางรายการทำงานไม่สำเร็จ `curl --fail` จึงทำให้ cron run นั้นล้มและสามารถแจ้งเตือนผ่านระบบ monitoring ภายนอกได้
 
 ## Deployment Checklist
 
@@ -361,7 +401,7 @@ window 24 ชั่วโมง จึงไม่ควรลบไฟล์ท
 - [ ] process supervisor รัน Next.js ด้วย non-root user
 - [ ] `.uploads/` เป็น persistent storage และมี backup
 - [ ] Nginx `nginx -t` ผ่านและส่ง forwarded headers ครบ
-- [ ] scheduler ทั้ง 4 endpoints ทำงานและเก็บ secrets อย่างปลอดภัย
+- [ ] scheduled maintenance ทั้ง 5 endpoints ทำงาน, cron โหลด environment ได้ และเก็บ secrets อย่างปลอดภัย
 - [ ] ทดสอบ dry-run ของ leave attachment cleanup และตรวจ disk usage/permission
 - [ ] backup ฐานข้อมูลและ `.uploads/private/leave/` สำเร็จก่อน migration และเก็บไว้นอกเครื่องเดียวกับ app
 - [ ] ทดสอบ login, refresh session, upload รูป, Email/LINE และหน้า feature ที่เปิด

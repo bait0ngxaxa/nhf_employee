@@ -60,6 +60,22 @@ function makeProps() {
 }
 
 describe("RoutineTaskList", () => {
+    it("shows the standard clear-search action only when search has a value", () => {
+        const props = makeProps();
+        const { rerender } = render(<RoutineTaskList {...props} />);
+
+        expect(
+            screen.queryByRole("button", { name: "ล้างคำค้นหาแม่แบบงาน" }),
+        ).not.toBeInTheDocument();
+
+        rerender(<RoutineTaskList {...props} search="ตรวจสอบ" />);
+        fireEvent.click(
+            screen.getByRole("button", { name: "ล้างคำค้นหาแม่แบบงาน" }),
+        );
+
+        expect(props.onSearchChange).toHaveBeenCalledWith("");
+    });
+
     it("exposes labelled search and status filters and separates filtered empty state", () => {
         const props = makeProps();
         const { rerender } = render(

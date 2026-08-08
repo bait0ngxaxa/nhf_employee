@@ -9,6 +9,7 @@ import {
     RefreshCw,
     Trash2,
     UploadCloud,
+    X,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -250,7 +251,7 @@ export function RoutineImportPanel() {
     const [issue, setIssue] = useState<ImportIssue>("");
     const [selectedOnly, setSelectedOnly] = useState(false);
     const [searchInput, setSearchInput] = useState("");
-    const debouncedSearch = useDebouncedValue(searchInput, 300);
+    const debouncedSearch = useDebouncedValue(searchInput);
     const [page, setPage] = useState(1);
     const [loading, setLoading] = useState(false);
     const [uploading, setUploading] = useState(false);
@@ -795,18 +796,37 @@ export function RoutineImportPanel() {
             ) : null}
 
             <div className="grid gap-4 rounded-xl border border-border-subtle bg-surface-raised p-4 sm:p-5 lg:grid-cols-[minmax(0,1fr)_180px_220px_auto_auto] lg:items-end">
-                <label className="grid gap-1 text-sm font-medium text-content-body">
-                    ค้นหา
-                    <Input
-                        type="search"
-                        value={searchInput}
-                        onChange={(event) => {
-                            setSearchInput(event.target.value);
-                            setPage(1);
-                        }}
-                        placeholder="รายการ หมวดงาน หรือผู้รับผิดชอบ"
-                    />
-                </label>
+                <div className="grid gap-1 text-sm font-medium text-content-body">
+                    <label htmlFor="routine-import-search">ค้นหา</label>
+                    <div className="relative">
+                        <Input
+                            id="routine-import-search"
+                            type="search"
+                            value={searchInput}
+                            onChange={(event) => {
+                                setSearchInput(event.target.value);
+                                setPage(1);
+                            }}
+                            className="pr-12 sm:pr-10 [&::-webkit-search-cancel-button]:appearance-none"
+                            placeholder="รายการ หมวดงาน หรือผู้รับผิดชอบ"
+                        />
+                        {searchInput.trim().length > 0 ? (
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => {
+                                    setSearchInput("");
+                                    setPage(1);
+                                }}
+                                className="absolute right-1.5 top-1/2 size-11 -translate-y-1/2 rounded-md text-content-muted hover:bg-surface-muted hover:text-content-body sm:size-7"
+                                aria-label="ล้างคำค้นหารายการนำเข้า"
+                            >
+                                <X className="size-4" aria-hidden="true" />
+                            </Button>
+                        ) : null}
+                    </div>
+                </div>
                 <label className="grid gap-1 text-sm font-medium text-content-body">
                     สถานะ
                     <select

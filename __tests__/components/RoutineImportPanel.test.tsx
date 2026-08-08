@@ -682,7 +682,12 @@ describe("RoutineImportPanel", () => {
         });
 
         const searchedRequestCount = rowRequests().length;
-        fireEvent.change(searchInput, { target: { value: "" } });
+        fireEvent.click(
+            screen.getByRole("button", {
+                name: "ล้างคำค้นหารายการนำเข้า",
+            }),
+        );
+        expect(searchInput).toHaveValue("");
         await waitFor(() => {
             const latestUrl = rowRequests().at(-1);
             expect(latestUrl ? new URL(latestUrl, "http://localhost").searchParams.get("search") : null).toBeNull();

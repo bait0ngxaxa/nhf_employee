@@ -11,6 +11,7 @@ import {
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { type StockRequestStatus } from "@prisma/client";
 import { isAdminRole } from "@/lib/ssot/permissions";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { StockDataContext, StockUIContext } from "./StockContext";
 import {
     useStockCategoriesQuery,
@@ -74,8 +75,14 @@ export function StockProvider({ children }: StockProviderProps) {
         parsePositivePage(searchParams.get(STOCK_REQUESTS_PAGE_QUERY_KEY)),
     );
     const [requestSearchQuery, setRequestSearchQuery] = useState("");
+    const debouncedRequestSearchQuery = useDebouncedValue(requestSearchQuery);
     const [searchQuery, setSearchQueryState] = useState(
         searchParams.get(STOCK_ITEMS_SEARCH_QUERY_KEY) ?? "",
+    );
+    const debouncedSearchQuery = useDebouncedValue(searchQuery);
+    const [searchUrlSyncRevision, setSearchUrlSyncRevision] = useState(0);
+    const debouncedSearchUrlSyncRevision = useDebouncedValue(
+        searchUrlSyncRevision,
     );
     const [selectedCategoryId, setSelectedCategoryIdState] = useState<
         number | undefined
@@ -84,6 +91,7 @@ export function StockProvider({ children }: StockProviderProps) {
         StockRequestStatus | undefined
     >();
     const hasInitializedStatusFilterRef = useRef(false);
+    const hasInitializedSearchUrlSyncRef = useRef(false);
     const itemsPage =
         activeTab === "inventory" ? inventoryItemsPage : browseItemsPage;
 
@@ -214,21 +222,55 @@ export function StockProvider({ children }: StockProviderProps) {
             setSearchQueryState(value);
             setBrowseItemsPageState(1);
             setInventoryItemsPageState(1);
-
-            if (!isStockDashboardRoute(pathname, searchParams)) {
-                return;
-            }
-
-            router.replace(createStockDashboardUrl(searchParams, {
-                [STOCK_ITEMS_PAGE_QUERY_KEY]: "1",
-                [STOCK_INVENTORY_ITEMS_PAGE_QUERY_KEY]: null,
-                [STOCK_ITEMS_SEARCH_QUERY_KEY]: value.trim() || null,
-            }), {
-                scroll: false,
-            });
+            setSearchUrlSyncRevision((revision) => revision + 1);
         },
-        [pathname, router, searchParams],
+        [],
     );
+
+    useEffect(() => {
+        if (!hasInitializedSearchUrlSyncRef.current) {
+            hasInitializedSearchUrlSyncRef.current = true;
+            return;
+        }
+
+        const latestSearchParams = latestSearchParamsRef.current;
+
+        if (!isStockDashboardRoute(pathname, latestSearchParams)) {
+            return;
+        }
+
+        const nextSearch = debouncedSearchQuery.trim();
+        const currentSearch = latestSearchParams.get(
+            STOCK_ITEMS_SEARCH_QUERY_KEY,
+        ) ?? "";
+        const currentPage = parsePositivePage(
+            latestSearchParams.get(STOCK_ITEMS_PAGE_QUERY_KEY),
+        );
+        const hasInventoryPage = latestSearchParams.has(
+            STOCK_INVENTORY_ITEMS_PAGE_QUERY_KEY,
+        );
+
+        if (
+            currentSearch === nextSearch
+            && currentPage === 1
+            && !hasInventoryPage
+        ) {
+            return;
+        }
+
+        router.replace(createStockDashboardUrl(latestSearchParams, {
+            [STOCK_ITEMS_PAGE_QUERY_KEY]: "1",
+            [STOCK_INVENTORY_ITEMS_PAGE_QUERY_KEY]: null,
+            [STOCK_ITEMS_SEARCH_QUERY_KEY]: nextSearch || null,
+        }), {
+            scroll: false,
+        });
+    }, [
+        debouncedSearchQuery,
+        debouncedSearchUrlSyncRevision,
+        pathname,
+        router,
+    ]);
 
     const setSelectedCategoryId = useCallback(
         (categoryId: number | undefined) => {
@@ -257,10 +299,10 @@ export function StockProvider({ children }: StockProviderProps) {
             buildStockItemsQuery({
                 activeTab,
                 itemsPage,
-                searchQuery,
+                searchQuery: debouncedSearchQuery,
                 selectedCategoryId,
             }),
-        [activeTab, itemsPage, searchQuery, selectedCategoryId],
+        [activeTab, debouncedSearchQuery, itemsPage, selectedCategoryId],
     );
 
     const shouldFetchItems = activeTab === "browse" || activeTab === "inventory";
@@ -272,11 +314,17 @@ export function StockProvider({ children }: StockProviderProps) {
             buildStockRequestsQuery({
                 activeTab,
                 isAdmin,
-                requestSearchQuery,
+                requestSearchQuery: debouncedRequestSearchQuery,
                 requestsPage,
                 statusFilter,
             }),
-        [activeTab, isAdmin, requestSearchQuery, requestsPage, statusFilter],
+        [
+            activeTab,
+            debouncedRequestSearchQuery,
+            isAdmin,
+            requestsPage,
+            statusFilter,
+        ],
     );
 
     const {
@@ -306,11 +354,6 @@ export function StockProvider({ children }: StockProviderProps) {
     const refreshRequests = useCallback((): void => {
         void mutateRequests();
     }, [mutateRequests]);
-
-    useEffect(() => {
-        setBrowseItemsPageState((prev) => (prev === 1 ? prev : 1));
-        setInventoryItemsPageState((prev) => (prev === 1 ? prev : 1));
-    }, [searchQuery, selectedCategoryId]);
 
     useEffect(() => {
         if (!hasInitializedStatusFilterRef.current) {

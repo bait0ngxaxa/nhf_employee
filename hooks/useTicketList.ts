@@ -52,7 +52,7 @@ export function useTicketList(refreshTrigger?: number): UseTicketListReturn {
     const { user } = useAuth();
     const [filters, setFilters] = useState<TicketFilters>(initialFilters);
     const [page, setPage] = useState(1);
-    const debouncedSearch = useDebouncedValue(filters.search, 300);
+    const debouncedSearch = useDebouncedValue(filters.search);
 
     const searchParams = new URLSearchParams({
         page: page.toString(),

@@ -1,40 +1,37 @@
 import { renderHook, act } from "@testing-library/react";
-import { describe, it, expect, vi } from "vitest";
+import { afterEach, describe, it, expect, vi } from "vitest";
+import { LIVE_SEARCH_DEBOUNCE_MS } from "@/constants/ui";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 
 describe("useDebouncedValue", () => {
+    afterEach(() => {
+        vi.useRealTimers();
+    });
+
     it("should return initial value immediately", () => {
         const { result } = renderHook(() => useDebouncedValue("test", 500));
         expect(result.current).toBe("test");
     });
 
-    it("should debounce value updates", () => {
+    it("should debounce value updates using the live search default", () => {
         vi.useFakeTimers();
         const { result, rerender } = renderHook(
-            ({ value, delay }) => useDebouncedValue(value, delay),
-            {
-                initialProps: { value: "initial", delay: 500 },
-            },
+            ({ value }) => useDebouncedValue(value),
+            { initialProps: { value: "initial" } },
         );
 
-        // Update value
-        rerender({ value: "updated", delay: 500 });
+        rerender({ value: "updated" });
 
-        // Should still be initial
         expect(result.current).toBe("initial");
 
-        // Fast forward 200ms
         act(() => {
-            vi.advanceTimersByTime(200);
+            vi.advanceTimersByTime(LIVE_SEARCH_DEBOUNCE_MS - 1);
         });
         expect(result.current).toBe("initial");
 
-        // Fast forward rest
         act(() => {
-            vi.advanceTimersByTime(300);
+            vi.advanceTimersByTime(1);
         });
         expect(result.current).toBe("updated");
-
-        vi.useRealTimers();
     });
 });

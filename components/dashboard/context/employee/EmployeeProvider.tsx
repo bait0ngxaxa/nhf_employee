@@ -68,7 +68,7 @@ export function EmployeeProvider({ children }: EmployeeProviderProps) {
     const [employeeToEdit, setEmployeeToEdit] = useState<Employee | null>(null);
     const [refreshTrigger, setRefreshTrigger] = useState(0);
 
-    const debouncedSearchTerm = useDebouncedValue(searchTerm, 300);
+    const debouncedSearchTerm = useDebouncedValue(searchTerm);
 
     // Prepare SWR key
     const params = new URLSearchParams({

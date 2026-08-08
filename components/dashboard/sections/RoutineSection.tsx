@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import { CalendarClock, FileSpreadsheet, List, Settings2, Users } from "lucide-react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { CalendarClock, FileSpreadsheet, List, Settings2, Users, X } from "lucide-react";
 import { toast } from "sonner";
 import { useSearchParams } from "next/navigation";
 import useSWR from "swr";
@@ -57,10 +57,11 @@ function RoutineOccurrencePanel({
     onTaskSaved: () => void;
 }) {
     const [searchInput, setSearchInput] = useState("");
-    const debouncedSearch = useDebouncedValue(searchInput, 300);
+    const debouncedSearch = useDebouncedValue(searchInput);
     const [timingStatus, setTimingStatus] = useState<RoutineTimingStatus | "">("");
     const [page, setPage] = useState(1);
     const [editingTaskId, setEditingTaskId] = useState<number | null>(null);
+    const searchInputId = useId();
     const scope = isAdmin ? "all" : "mine";
     const key = useMemo(() => {
         const params = new URLSearchParams({
@@ -142,9 +143,37 @@ function RoutineOccurrencePanel({
                 <p className="max-w-prose text-sm leading-6 text-content-secondary">ค้นหารายการ ตรวจสถานะ และปรับเฉพาะรอบที่ต้องการได้จากหน้านี้</p>
             </div>
             <div className="grid gap-4 rounded-xl border border-border-subtle bg-surface-raised p-4 sm:p-5 md:grid-cols-[minmax(0,1fr)_220px_auto] md:items-end">
-                <label className="grid gap-1 text-sm font-medium text-content-body">ค้นหารายการ
-                    <Input type="search" value={searchInput} onChange={(event) => { setSearchInput(event.target.value); setPage(1); }} placeholder="ค้นหาชื่อรายการ หน่วยงาน หรือหมวดหมู่" />
-                </label>
+                <div className="grid gap-1 text-sm font-medium text-content-body">
+                    <label htmlFor={searchInputId}>ค้นหารายการ</label>
+                    <div className="relative">
+                        <Input
+                            id={searchInputId}
+                            type="search"
+                            value={searchInput}
+                            onChange={(event) => {
+                                setSearchInput(event.target.value);
+                                setPage(1);
+                            }}
+                            className="pr-12 sm:pr-10 [&::-webkit-search-cancel-button]:appearance-none"
+                            placeholder="ค้นหาชื่อรายการ หน่วยงาน หรือหมวดหมู่"
+                        />
+                        {searchInput.trim().length > 0 ? (
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => {
+                                    setSearchInput("");
+                                    setPage(1);
+                                }}
+                                className="absolute right-1.5 top-1/2 size-11 -translate-y-1/2 rounded-md text-content-muted hover:bg-surface-muted hover:text-content-body sm:size-7"
+                                aria-label="ล้างคำค้นหารายการ Routine"
+                            >
+                                <X className="size-4" aria-hidden="true" />
+                            </Button>
+                        ) : null}
+                    </div>
+                </div>
                 <label className="grid gap-1 text-sm font-medium text-content-body">ช่วงเวลา
                     <select className="h-11 rounded-md border border-input bg-background px-3 text-sm" value={timingStatus} onChange={(event) => setTimingStatus(event.target.value as RoutineTimingStatus | "")}>
                         <option value="">ทุกช่วงเวลา</option>
@@ -185,7 +214,7 @@ function RoutineTaskSettings({
     const [taskSearch, setTaskSearch] = useState("");
     const [taskUnitId, setTaskUnitId] = useState("");
     const [taskStatus, setTaskStatus] = useState<RoutineTaskStatusFilter | "">("");
-    const debouncedTaskSearch = useDebouncedValue(taskSearch, 300);
+    const debouncedTaskSearch = useDebouncedValue(taskSearch);
     const [pendingTaskId, setPendingTaskId] = useState<number | null>(null);
     const activeMutationLockRef = useRef<Set<number>>(new Set());
     const { data: reference, error: referenceError, isLoading: referenceLoading } = useSWR<RoutineReferenceData, Error>(API_ROUTES.routines.reference, fetchRoutine);

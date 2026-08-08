@@ -242,6 +242,19 @@ describe("RoutineSection tabs", () => {
             vi.advanceTimersByTime(300);
         });
         expect(occurrenceKeys()).toContain("/api/routines/occurrences?scope=mine&page=1&limit=12&view=tasks&search=%E0%B8%95%E0%B8%A3%E0%B8%A7%E0%B8%88%E0%B8%AA%E0%B8%AD%E0%B8%9A");
+
+        fireEvent.click(
+            screen.getByRole("button", {
+                name: "ล้างคำค้นหารายการ Routine",
+            }),
+        );
+        expect(searchInput).toHaveValue("");
+        act(() => {
+            vi.advanceTimersByTime(300);
+        });
+        expect(occurrenceKeys().at(-1)).toBe(
+            "/api/routines/occurrences?scope=mine&page=1&limit=12&view=tasks",
+        );
         vi.useRealTimers();
     });
 });
