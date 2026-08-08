@@ -78,7 +78,7 @@ export const StatsCards = React.memo(function StatsCards() {
     ];
 
     return (
-        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4 lg:gap-5">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-3 xl:grid-cols-5 xl:gap-5">
             {statItems.map((item, index) => {
                 const Icon = item.icon;
                 const isNewCard = index === 1 && item.value > 0;
@@ -108,8 +108,7 @@ export const StatsCards = React.memo(function StatsCards() {
                                     <div className="flex items-baseline space-x-1.5">
                                         <p
                                             className={cn(
-                                                "text-2xl font-bold bg-gradient-to-r bg-clip-text text-transparent",
-                                                item.gradient,
+                                                "text-2xl font-bold text-content-heading",
                                             )}
                                         >
                                             {item.value}

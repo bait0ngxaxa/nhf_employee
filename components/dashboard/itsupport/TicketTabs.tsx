@@ -37,11 +37,11 @@ export const TicketTabs = memo(function TicketTabs() {
             onValueChange={setActiveTab}
             className="space-y-8 animate-in fade-in slide-in-from-bottom-6 duration-700 ease-out"
         >
-            <div className="flex justify-center md:justify-start w-full md:pb-0 mb-2">
-                <TabsList className="flex h-auto max-w-full flex-nowrap gap-1 overflow-x-auto rounded-[2rem] bg-gradient-to-r from-module-it-tabs-start via-module-it-tabs-mid to-module-it-tabs-end p-1.5 shadow-inner ring-1 ring-module-it-tab-border/80 hide-scrollbar md:grid md:w-full md:max-w-md md:grid-cols-2">
+            <div className="mb-2 flex min-w-0 max-w-full justify-center md:justify-start md:pb-0">
+                <TabsList className="flex h-auto max-w-full flex-nowrap gap-1 overflow-x-auto rounded-2xl bg-gradient-to-r from-module-it-tabs-start via-module-it-tabs-mid to-module-it-tabs-end p-1.5 shadow-inner ring-1 ring-module-it-tab-border/80 hide-scrollbar md:grid md:w-full md:max-w-md md:grid-cols-2">
                     <TabsTrigger
                         value="tickets"
-                        className="flex min-h-11 flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-full px-6 py-2.5 font-medium text-content-neutral-secondary transition-[color,background-color,box-shadow] hover:text-content-neutral-primary data-[state=active]:bg-surface data-[state=active]:text-module-it-tab-active data-[state=active]:shadow-sm data-[state=active]:ring-1 data-[state=active]:ring-module-it-tab-border"
+                        className="flex min-h-11 min-w-0 shrink-0 flex-1 items-center justify-center gap-2 rounded-full px-4 py-2.5 text-center font-medium leading-5 text-content-neutral-secondary transition-[color,background-color,box-shadow] hover:text-content-neutral-primary data-[state=active]:bg-surface data-[state=active]:text-module-it-tab-active data-[state=active]:shadow-sm data-[state=active]:ring-1 data-[state=active]:ring-module-it-tab-border md:shrink md:px-6"
                     >
                         <List className="h-4 w-4 shrink-0" />
                         <span>รายการ Tickets</span>
@@ -49,7 +49,7 @@ export const TicketTabs = memo(function TicketTabs() {
                     {selectedTicketId !== null && (
                         <TabsTrigger
                             value="detail"
-                            className="flex min-h-11 flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-full px-6 py-2.5 font-medium text-content-neutral-secondary transition-[color,background-color,box-shadow] hover:text-content-neutral-primary data-[state=active]:bg-surface data-[state=active]:text-module-it-tab-active data-[state=active]:shadow-sm data-[state=active]:ring-1 data-[state=active]:ring-module-it-tab-border"
+                            className="flex min-h-11 min-w-0 shrink-0 flex-1 items-center justify-center gap-2 rounded-full px-4 py-2.5 text-center font-medium leading-5 text-content-neutral-secondary transition-[color,background-color,box-shadow] hover:text-content-neutral-primary data-[state=active]:bg-surface data-[state=active]:text-module-it-tab-active data-[state=active]:shadow-sm data-[state=active]:ring-1 data-[state=active]:ring-module-it-tab-border md:shrink md:px-6"
                         >
                             <TicketIcon className="h-4 w-4 shrink-0" />
                             <span>รายละเอียด</span>
@@ -65,9 +65,9 @@ export const TicketTabs = memo(function TicketTabs() {
                         <div className="absolute -bottom-14 left-8 h-44 w-44 rounded-full bg-module-it-sky-glow/30 blur-3xl" />
                     </div>
                     <CardHeader className="relative border-b border-module-it-tab-border/70 bg-gradient-to-r from-surface-subtle via-module-it-tabs-mid/70 to-brand-surface/70 px-6 py-5">
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                            <div>
-                                <CardTitle className="text-xl font-bold tracking-tight text-content-primary">รายการ IT Support Tickets</CardTitle>
+                        <div className="flex min-w-0 flex-col justify-between gap-4 sm:flex-row sm:items-center">
+                            <div className="min-w-0">
+                                <CardTitle className="text-lg font-bold leading-6 tracking-tight text-content-primary [overflow-wrap:anywhere] sm:text-xl">รายการ IT Support Tickets</CardTitle>
                                 <CardDescription className="mt-1 text-content-secondary">
                                     {isAdmin
                                         ? "จัดการและติดตาม tickets ทั้งหมดในระบบ"
@@ -76,7 +76,7 @@ export const TicketTabs = memo(function TicketTabs() {
                             </div>
                             <Button
                                 onClick={() => setShowCreateModal(true)}
-                                className="flex items-center gap-2 bg-gradient-to-r from-module-it-action-start to-module-it-action-end text-content-on-brand shadow-md shadow-module-it-action-shadow/25 transition-[transform,background-color,box-shadow] duration-300 hover:from-module-it-action-hover-start hover:to-module-it-action-hover-end focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 motion-safe:hover:-translate-y-0.5"
+                                className="flex w-full items-center justify-center gap-2 bg-gradient-to-r from-module-it-action-start to-module-it-action-end text-content-on-brand shadow-md shadow-module-it-action-shadow/25 transition-[transform,background-color,box-shadow] duration-300 hover:from-module-it-action-hover-start hover:to-module-it-action-hover-end focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 motion-safe:hover:-translate-y-0.5 sm:w-auto"
                             >
                                 <PlusIcon className="h-4 w-4" />
                                 แจ้งปัญหาใหม่

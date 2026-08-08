@@ -139,11 +139,11 @@ function RoutineOccurrencePanel({
     return (
         <div className="space-y-5">
             <div className="space-y-1">
-                <h2 className="text-xl font-semibold tracking-tight text-content-heading">ติดตามรายการตามกำหนด</h2>
+                <h2 className="text-xl font-semibold tracking-tight text-brand-strong">ติดตามรายการตามกำหนด</h2>
                 <p className="max-w-prose text-sm leading-6 text-content-secondary">ค้นหารายการ ตรวจสถานะ และปรับเฉพาะรอบที่ต้องการได้จากหน้านี้</p>
             </div>
-            <div className="grid gap-4 rounded-xl border border-border-subtle bg-surface-raised p-4 sm:p-5 md:grid-cols-[minmax(0,1fr)_220px_auto] md:items-end">
-                <div className="grid gap-1 text-sm font-medium text-content-body">
+            <div className="grid gap-4 rounded-xl border border-brand-border/70 bg-transparent p-4 sm:p-5 md:grid-cols-[minmax(0,1fr)_220px_auto] md:items-end">
+                <div className="grid gap-1 text-sm font-medium text-brand-strong">
                     <label htmlFor={searchInputId}>ค้นหารายการ</label>
                     <div className="relative">
                         <Input
@@ -174,8 +174,8 @@ function RoutineOccurrencePanel({
                         ) : null}
                     </div>
                 </div>
-                <label className="grid gap-1 text-sm font-medium text-content-body">ช่วงเวลา
-                    <select className="h-11 rounded-md border border-input bg-background px-3 text-sm" value={timingStatus} onChange={(event) => setTimingStatus(event.target.value as RoutineTimingStatus | "")}>
+                <label className="grid gap-1 text-sm font-medium text-brand-strong">ช่วงเวลา
+                    <select className="h-11 rounded-md border border-brand-border bg-surface-raised px-3 text-sm focus-visible:border-brand-solid focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-solid/40" value={timingStatus} onChange={(event) => setTimingStatus(event.target.value as RoutineTimingStatus | "")}>
                         <option value="">ทุกช่วงเวลา</option>
                         <option value="OVERDUE">เกินกำหนด</option>
                         <option value="DUE_TODAY">ถึงกำหนดวันนี้</option>
@@ -183,7 +183,7 @@ function RoutineOccurrencePanel({
                         <option value="UPCOMING">ยังไม่ถึงกำหนด</option>
                     </select>
                 </label>
-                <Button type="button" variant="outline" onClick={() => void mutate()}>รีเฟรช</Button>
+                <Button type="button" variant="outline" className="border-brand-border text-brand-strong hover:bg-brand-surface-strong hover:text-brand-strong" onClick={() => void mutate()}>รีเฟรช</Button>
             </div>
             <RoutineOccurrenceList
                 data={data}
@@ -298,7 +298,7 @@ function RoutineTaskSettings({
     return (
         <div className="space-y-5">
             <div className="space-y-1">
-                <h2 className="text-xl font-semibold tracking-tight text-content-heading">{isSelfService ? "จัดการงานของฉัน" : "ตั้งค่าแม่แบบงานประจำ"}</h2>
+                <h2 className="text-xl font-semibold tracking-tight text-brand-strong">{isSelfService ? "จัดการงานของฉัน" : "ตั้งค่าแม่แบบงานประจำ"}</h2>
                 <p className="max-w-prose text-sm leading-6 text-content-secondary">{isSelfService ? "สร้างและจัดการเฉพาะแม่แบบงาน Routine ที่คุณสร้างไว้" : "กำหนดตารางงาน ผู้รับผิดชอบ และการแจ้งเตือนของแต่ละแม่แบบ"}</p>
             </div>
             <RoutineTaskList
@@ -417,7 +417,11 @@ export function RoutineSection() {
     ];
 
     return (
-        <SectionShell gradientFrom="transparent" gradientTo="transparent" className="routine-section border-border-subtle/70 bg-surface shadow-sm lg:rounded-2xl">
+        <SectionShell
+            gradientFrom="var(--brand-surface-strong)"
+            gradientTo="var(--brand-surface)"
+            className="routine-section border-brand-border/70 bg-surface shadow-sm lg:rounded-2xl"
+        >
             <SectionHeader
                 icon={CalendarClock}
                 title="NHF Routine"
@@ -426,7 +430,14 @@ export function RoutineSection() {
             />
             <RoutineKpiGrid summary={summaryData?.summary} isLoading={summaryLoading} />
             {summaryError ? <p className="text-sm text-status-danger-foreground" role="alert">โหลดสรุปรายการไม่สำเร็จ: {summaryError.message}</p> : null}
-            <SectionTabs value={safeTab} onValueChange={setActiveTab} tabs={tabs} activeColor="var(--primary)" ariaLabel="แท็บ NHF Routine" />
+            <SectionTabs
+                value={safeTab}
+                onValueChange={setActiveTab}
+                tabs={tabs}
+                activeColor="var(--brand-tab)"
+                listClassName="border-brand-border/70 bg-transparent"
+                ariaLabel="แท็บ NHF Routine"
+            />
         </SectionShell>
     );
 }

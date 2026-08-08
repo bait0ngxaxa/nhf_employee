@@ -40,7 +40,7 @@ export function EmployeeSearchControls({
     return (
         <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
             <div className="flex min-w-0 flex-1 flex-col gap-3 sm:flex-row">
-                <div className="relative flex-1">
+                <div className="relative min-w-0 flex-1">
                     <Search
                         className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-content-subtle"
                         aria-hidden="true"
@@ -69,7 +69,7 @@ export function EmployeeSearchControls({
                 </div>
 
                 {/* Status Filter */}
-                <div className="w-full sm:w-52">
+                <div className="w-full max-w-full sm:w-52">
                     <Select
                         value={statusFilter}
                         onValueChange={setStatusFilter}
@@ -103,7 +103,7 @@ export function EmployeeSearchControls({
             {employees.length > 0 && (
                 <Button
                     variant="outline"
-                    className="h-11 justify-center rounded-lg border-border-subtle bg-surface-raised text-content-body hover:bg-surface-subtle hover:text-content-primary xl:justify-start"
+                    className="h-11 w-full justify-center rounded-lg border-border-subtle bg-surface-raised text-content-body hover:bg-surface-subtle hover:text-content-primary xl:w-auto xl:justify-start"
                     disabled={isExporting}
                     onClick={onExportClick}
                 >

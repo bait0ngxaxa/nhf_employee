@@ -21,7 +21,7 @@ export function StockRequestMobileCards({
     renderActions,
 }: StockRequestMobileCardsProps) {
     return (
-        <div className="space-y-3 md:hidden">
+        <div className="space-y-3 xl:hidden">
             {requests.map((request) => (
                 <article
                     key={request.id}

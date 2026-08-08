@@ -81,43 +81,43 @@ export function SectionHeader({
     const toneClasses = SECTION_HEADER_TONES[tone];
 
     return (
-        <div className="animate-in flex flex-col justify-between gap-6 fade-in slide-in-from-bottom-4 duration-700 ease-out lg:flex-row lg:items-end">
-            <div className="flex items-center space-x-6">
+        <div className="animate-in flex min-w-0 flex-col justify-between gap-4 fade-in slide-in-from-bottom-4 duration-700 ease-out sm:gap-6 lg:flex-row lg:items-end">
+            <div className="flex min-w-0 items-center gap-4 sm:gap-5 lg:gap-6">
                 <div className="relative group cursor-default">
                     <div
                         className={cn(
-                            "absolute -inset-3 rounded-[2rem] bg-gradient-to-r blur-2xl opacity-0 group-hover:opacity-40 transition-opacity duration-700",
+                            "absolute -inset-2 rounded-2xl bg-gradient-to-r blur-2xl opacity-0 transition-opacity duration-700 group-hover:opacity-40 sm:-inset-3",
                             iconGlow ?? toneClasses.iconGlow,
                         )}
                     />
                     <div
                         className={cn(
-                            "relative flex items-center justify-center w-16 h-16 rounded-[1.5rem] bg-gradient-to-br shadow-xl ring-1 ring-content-on-brand/20 transition-transform duration-500 group-hover:scale-105 group-hover:rotate-3",
+                            "relative flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br shadow-xl ring-1 ring-content-on-brand/20 transition-transform duration-500 group-hover:scale-105 group-hover:rotate-3 sm:h-14 sm:w-14 sm:rounded-2xl lg:h-16 lg:w-16",
                             iconGradient ?? toneClasses.iconGradient,
                             iconShadow ?? toneClasses.iconShadow,
                         )}
                     >
-                        <Icon className="h-8 w-8 text-content-on-brand" />
+                        <Icon className="h-6 w-6 text-content-on-brand sm:h-7 sm:w-7 lg:h-8 lg:w-8" />
                     </div>
                 </div>
-                <div className="space-y-1">
+                <div className="min-w-0 space-y-1">
                     <h1
                         data-page-heading
                         tabIndex={-1}
-                        className="text-3xl font-black leading-none tracking-tighter text-content-primary sm:text-4xl lg:text-5xl"
+                        className="text-2xl font-bold leading-tight tracking-tight text-content-primary [overflow-wrap:anywhere] sm:text-3xl lg:text-4xl"
                     >
                         {title}
                     </h1>
-                    <p className="text-sm font-medium tracking-tight text-content-muted">
+                    <p className="text-sm font-medium leading-5 tracking-tight text-content-muted [overflow-wrap:anywhere]">
                         {subtitle}
                     </p>
                 </div>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex w-full min-w-0 flex-wrap items-center gap-2 sm:gap-3 lg:w-auto lg:justify-end">
                 {roleBadge && (
                     <div
                         className={cn(
-                            "px-4 py-1.5 text-xs font-black uppercase tracking-[0.2em] rounded-full border shadow-sm transition-all duration-300 hover:-translate-y-0.5",
+                            "max-w-full rounded-full border px-3 py-1.5 text-center text-xs font-bold leading-5 tracking-wide shadow-sm transition-all duration-300 hover:-translate-y-0.5 sm:px-4",
                             badgeColor ?? toneClasses.badgeColor,
                         )}
                     >

@@ -28,11 +28,11 @@ export function SectionShell({
     return (
         <div
             className={cn(
-                "relative min-h-[calc(100dvh-6rem)] overflow-hidden rounded-2xl border border-border-soft bg-surface section-shell-shadow lg:rounded-[3rem]",
+                "relative isolate min-h-[calc(100dvh-6rem)] min-w-0 rounded-xl border border-border-soft bg-surface section-shell-shadow sm:rounded-2xl",
                 className,
             )}
         >
-            <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-2xl lg:rounded-[3rem]">
+            <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-xl sm:rounded-2xl">
                 <div
                     className="absolute inset-0 opacity-40"
                     style={{
@@ -42,7 +42,7 @@ export function SectionShell({
                 <div className="section-shell-overlay absolute inset-0" />
             </div>
 
-            <div className="relative z-10 space-y-10 p-4 sm:p-6 lg:p-10">
+            <div className="relative z-10 min-w-0 space-y-8 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:space-y-10 sm:p-6 sm:pb-[calc(1.5rem+env(safe-area-inset-bottom))] lg:p-10 lg:pb-[calc(2.5rem+env(safe-area-inset-bottom))]">
                 {children}
             </div>
         </div>

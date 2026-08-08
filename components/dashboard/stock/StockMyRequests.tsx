@@ -98,7 +98,7 @@ export function StockMyRequests() {
                         }
                     />
 
-                    <div className="hidden overflow-x-auto rounded-2xl bg-surface-raised shadow-sm ring-1 ring-border-subtle md:block">
+                    <div className="hidden overflow-x-auto rounded-2xl bg-surface-raised shadow-sm ring-1 ring-border-subtle xl:block">
                         <Table className="min-w-[1080px] border-separate border-spacing-0">
                             <TableHeader>
                                 <TableRow className="border-b border-border-subtle bg-surface-subtle hover:bg-surface-subtle">

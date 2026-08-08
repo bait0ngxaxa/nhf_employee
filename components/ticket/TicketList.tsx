@@ -59,7 +59,7 @@ export default function TicketList({
             {/* Tickets List */}
             <Card className="ticket-list-shadow border-indigo-100/80 bg-gradient-to-b from-surface-raised/95 via-surface-subtle/90 to-indigo-50/50 overflow-hidden">
                 <CardHeader className="border-b border-indigo-100/80 bg-gradient-to-r from-surface-raised via-surface-subtle to-indigo-50/70">
-                    <CardTitle>รายการ Tickets</CardTitle>
+                    <CardTitle className="min-w-0 [overflow-wrap:anywhere]">รายการ Tickets</CardTitle>
                     <CardDescription className="text-content-secondary">
                         แสดง {tickets.length} รายการจากทั้งหมด{" "}
                         {pagination.total} รายการ
@@ -130,14 +130,15 @@ export default function TicketList({
 
                     {/* Pagination */}
                     {pagination.pages > 1 ? (
-                        <div className="flex items-center justify-between mt-6">
+                        <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                             <div className="text-sm text-content-neutral-muted">
                                 หน้า {pagination.page} จาก {pagination.pages}
                             </div>
-                            <div className="flex gap-2">
+                            <div className="flex w-full gap-2 sm:w-auto">
                                 <Button
                                     variant="outline"
                                     size="sm"
+                                    className="min-w-0 flex-1 sm:flex-none"
                                     onClick={() =>
                                         handlePageChange(pagination.page - 1)
                                     }
@@ -149,6 +150,7 @@ export default function TicketList({
                                 <Button
                                     variant="outline"
                                     size="sm"
+                                    className="min-w-0 flex-1 sm:flex-none"
                                     onClick={() =>
                                         handlePageChange(pagination.page + 1)
                                     }

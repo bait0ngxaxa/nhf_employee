@@ -99,14 +99,14 @@ export function DashboardLayoutClient({
     }
 
     return (
-        <div className="app-shell-background flex h-dvh">
+        <div className="app-shell-background flex h-dvh min-h-0">
             {/* Desktop Sidebar */}
             <div className="hidden h-full flex-shrink-0 lg:block">
                 <DashboardSidebar variant="desktop" />
             </div>
 
             {/* Main Content Area */}
-            <div className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
+            <div className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
             {/* Background Effects - Optimized with contain */}
                 <div 
                     className="absolute inset-0 overflow-hidden pointer-events-none contain-paint"
@@ -138,7 +138,7 @@ export function DashboardLayoutClient({
                 <main
                     ref={mainRef}
                     id="main"
-                    className="relative z-10 min-w-0 flex-1 overflow-y-auto py-4 pl-[calc(1rem+env(safe-area-inset-left))] pr-[calc(1rem+env(safe-area-inset-right))] lg:p-6 2xl:p-8"
+                    className="relative z-10 min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto py-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pl-[calc(1rem+env(safe-area-inset-left))] pr-[calc(1rem+env(safe-area-inset-right))] lg:p-6 lg:pb-[calc(1.5rem+env(safe-area-inset-bottom))] 2xl:p-8 2xl:pb-[calc(2rem+env(safe-area-inset-bottom))]"
                 >
                     {children}
                 </main>

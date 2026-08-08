@@ -97,8 +97,8 @@ export function RoutineTaskList({
 
     return (
         <div className="space-y-4">
-            <div className="grid gap-3 rounded-xl border border-border-subtle bg-surface-raised p-4 sm:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_minmax(11rem,0.4fr)_minmax(9rem,0.3fr)_auto] xl:items-end">
-                <div className="grid min-w-0 gap-1 text-sm font-medium text-content-body">
+            <div className="grid gap-3 rounded-xl border border-brand-border/70 bg-transparent p-4 sm:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_minmax(11rem,0.4fr)_minmax(9rem,0.3fr)_auto] xl:items-end">
+                <div className="grid min-w-0 gap-1 text-sm font-medium text-brand-strong">
                     <label htmlFor={searchId}>ค้นหาแม่แบบงาน</label>
                     <div className="relative">
                         <Input
@@ -123,11 +123,11 @@ export function RoutineTaskList({
                         ) : null}
                     </div>
                 </div>
-                <label className="grid min-w-0 gap-1 text-sm font-medium text-content-body" htmlFor={unitIdField}>
+                <label className="grid min-w-0 gap-1 text-sm font-medium text-brand-strong" htmlFor={unitIdField}>
                     หน่วยงาน
                     <select
                         id={unitIdField}
-                        className="h-11 min-w-0 rounded-md border border-input bg-background px-3 text-sm focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+                        className="h-11 min-w-0 rounded-md border border-brand-border bg-surface-raised px-3 text-sm focus-visible:border-brand-solid focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-solid/40"
                         value={unitId}
                         onChange={(event) => onUnitChange(event.target.value)}
                     >
@@ -139,11 +139,11 @@ export function RoutineTaskList({
                         ))}
                     </select>
                 </label>
-                <label className="grid min-w-0 gap-1 text-sm font-medium text-content-body" htmlFor={statusId}>
+                <label className="grid min-w-0 gap-1 text-sm font-medium text-brand-strong" htmlFor={statusId}>
                     สถานะ
                     <select
                         id={statusId}
-                        className="h-11 min-w-0 rounded-md border border-input bg-background px-3 text-sm focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+                        className="h-11 min-w-0 rounded-md border border-brand-border bg-surface-raised px-3 text-sm focus-visible:border-brand-solid focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-solid/40"
                         value={status}
                         onChange={(event) => {
                             const value = event.target.value;
@@ -172,10 +172,10 @@ export function RoutineTaskList({
                 />
             ) : null}
             {!isLoading && !error && data && data.tasks.length > 0 ? <>
-            <div className="overflow-x-auto rounded-xl border border-border-subtle bg-surface-raised">
+            <div className="overflow-x-auto rounded-xl border border-brand-border/70 bg-surface-raised">
                 <table className="w-full min-w-[780px] text-left text-sm">
-                    <thead className="border-b border-border-subtle bg-surface-subtle text-sm text-content-secondary">
-                        <tr><th className="px-4 py-3 font-semibold">งาน</th><th className="px-4 py-3 font-semibold">หน่วยงาน</th><th className="px-4 py-3 font-semibold">กำหนดการ</th><th className="px-4 py-3 font-semibold">ผู้รับผิดชอบ</th><th className="px-4 py-3 font-semibold">สถานะ</th><th className="sticky right-0 z-20 border-l border-border-subtle bg-surface-subtle px-4 py-3" /></tr>
+                    <thead className="border-b border-brand-border/70 bg-brand-surface text-sm text-brand-strong">
+                        <tr><th className="px-4 py-3 font-semibold">งาน</th><th className="px-4 py-3 font-semibold">หน่วยงาน</th><th className="px-4 py-3 font-semibold">กำหนดการ</th><th className="px-4 py-3 font-semibold">ผู้รับผิดชอบ</th><th className="px-4 py-3 font-semibold">สถานะ</th><th className="sticky right-0 z-20 border-l border-brand-border/70 bg-brand-surface px-4 py-3" /></tr>
                     </thead>
                     <tbody className="divide-y divide-border-subtle">
                         {data.tasks.map((task) => (
@@ -184,7 +184,7 @@ export function RoutineTaskList({
                                 <td className="px-4 py-4 text-content-body">{formatRoutineUnitLabel(task.unit)}</td>
                                 <td className="px-4 py-4 text-content-body">{ROUTINE_SCHEDULE_LABELS[task.scheduleType] ?? task.scheduleType}<p className="mt-1 text-sm leading-5 text-content-secondary">{task.scheduleText ?? "ไม่ได้ระบุคำอธิบาย"}</p></td>
                                 <td className="max-w-56 px-4 py-4 text-content-body">{task.assignees.map((assignee) => assignee.employee.displayName ?? `${assignee.employee.firstName} ${assignee.employee.lastName}`).join(", ")}</td>
-                                <td className="px-4 py-4"><span className={task.isActive ? "rounded-full bg-emerald-50 px-2.5 py-1 text-sm font-semibold text-emerald-700" : "rounded-full bg-slate-100 px-2.5 py-1 text-sm font-semibold text-slate-600"}>{task.isActive ? "ใช้งาน" : "ปิดใช้งาน"}</span><div className="mt-2 flex flex-wrap gap-1">{taskInformationBadges(task, today).map((badge) => <span key={badge} className="rounded-full border border-status-warning-border bg-status-warning-surface px-2 py-1 text-xs font-medium text-status-warning-foreground">{badge}</span>)}</div></td>
+                                <td className="px-4 py-4"><span className={task.isActive ? "inline-flex items-center whitespace-nowrap [overflow-wrap:normal] rounded-full bg-emerald-50 px-2.5 py-1 text-sm font-semibold text-emerald-700" : "inline-flex items-center whitespace-nowrap [overflow-wrap:normal] rounded-full bg-slate-100 px-2.5 py-1 text-sm font-semibold text-slate-600"}>{task.isActive ? "ใช้งาน" : "ปิดใช้งาน"}</span><div className="mt-2 flex flex-wrap gap-1">{taskInformationBadges(task, today).map((badge) => <span key={badge} className="inline-flex items-center whitespace-nowrap [overflow-wrap:normal] rounded-full border border-status-warning-border bg-status-warning-surface px-2 py-1 text-xs font-medium text-status-warning-foreground">{badge}</span>)}</div></td>
                                 <td className="sticky right-0 z-10 whitespace-nowrap border-l border-border-subtle bg-surface-raised px-4 py-4 text-right employee-table-sticky-shadow"><div className="flex flex-wrap justify-end gap-2"><Button type="button" variant="outline" size="sm" onClick={() => onEdit(task)} disabled={pendingTaskId === task.id}><Edit3 aria-hidden="true" /> แก้ไข</Button><Button type="button" variant="outline" size="sm" disabled={pendingTaskId === task.id} onClick={() => void onToggleActive(task)}><Power aria-hidden="true" /> {pendingTaskId === task.id ? "กำลังบันทึก..." : task.isActive ? "ปิดใช้งาน" : "เปิดใช้งาน"}</Button><Button type="button" variant="ghost" size="sm" className="text-status-danger-foreground" disabled={pendingTaskId === task.id} onClick={() => setDeleteTask(task)}><Trash2 aria-hidden="true" /> ลบ</Button></div></td>
                             </tr>
                         ))}

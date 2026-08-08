@@ -21,7 +21,7 @@ export function StockInventoryMobileCards({
     deleteDisabled,
 }: StockInventoryMobileCardsProps) {
     return (
-        <div className="space-y-3 md:hidden">
+        <div className="space-y-3 xl:hidden">
             {items.map((item) => (
                 <InventoryMobileCard
                     key={item.id}

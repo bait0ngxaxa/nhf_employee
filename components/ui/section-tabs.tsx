@@ -21,6 +21,8 @@ interface SectionTabsProps {
     tabs: SectionTabItem[];
     /** CSS color for the active tab background (any valid CSS value, e.g. "#ea580c") */
     activeColor?: string;
+    /** Optional class override for the tab rail surface and border. */
+    listClassName?: string;
     ariaLabel?: string;
 }
 
@@ -29,6 +31,7 @@ export function SectionTabs({
     onValueChange,
     tabs,
     activeColor = "var(--brand-tab)",
+    listClassName,
     ariaLabel = "แท็บของส่วนงาน",
 }: SectionTabsProps) {
     const visibleTabs = tabs.filter((t) => t.visible !== false);
@@ -55,13 +58,16 @@ export function SectionTabs({
         <Tabs
             value={value}
             onValueChange={onValueChange}
-            className="space-y-6"
+            className="min-w-0 space-y-6"
             style={tabStyle}
         >
-            <div className="w-full overflow-x-auto pb-1">
+            <div className="min-w-0 max-w-full overflow-x-auto pb-1 [touch-action:pan-x]">
                 <TabsList
                     aria-label={ariaLabel}
-                    className="flex h-auto min-w-max flex-nowrap gap-1 rounded-xl border border-border-subtle bg-surface-subtle p-1 md:min-w-0 md:w-full"
+                    className={cn(
+                        "flex h-auto min-w-max flex-nowrap gap-1 rounded-xl border border-border-subtle bg-surface-subtle p-1 md:min-w-0 md:w-full",
+                        listClassName,
+                    )}
                     data-section-tabs=""
                 >
                     {visibleTabs.map((tab) => {
@@ -71,11 +77,11 @@ export function SectionTabs({
                                 key={tab.value}
                                 value={tab.value}
                                 className={cn(
-                                    "flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-lg border border-transparent px-4 py-2 text-sm font-medium",
+                                    "flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-lg border border-transparent px-3 py-2 text-center text-sm font-medium leading-5 sm:px-4",
                                     "text-content-secondary hover:bg-surface hover:text-content-heading",
                                     "data-[state=active]:border-transparent data-[state=active]:bg-[var(--section-tab-active-color)] data-[state=active]:text-content-on-brand",
                                     "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-                                    "motion-safe:transition-[background-color,border-color,color] motion-safe:duration-200 md:flex-1"
+                                    "motion-safe:transition-[background-color,border-color,color] motion-safe:duration-200 md:min-w-0 md:shrink md:flex-1 md:basis-0"
                                 )}
                                 ref={(node) => {
                                     triggerRefs.current[tab.value] = node;
@@ -84,7 +90,9 @@ export function SectionTabs({
                                 {TabIcon && (
                                     <TabIcon className="h-4 w-4 shrink-0" aria-hidden="true" />
                                 )}
-                                <span className="truncate">{tab.label}</span>
+                                <span className="min-w-0 max-w-full md:line-clamp-2 md:whitespace-normal">
+                                    {tab.label}
+                                </span>
                             </TabsTrigger>
                         );
                     })}

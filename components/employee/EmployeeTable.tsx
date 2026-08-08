@@ -35,7 +35,7 @@ export const EmployeeTable = memo(function EmployeeTable({
 
     return (
         <div className="space-y-3">
-            <div className="grid gap-3 lg:hidden">
+            <div className="grid gap-3 xl:hidden">
                 {employees.map((employee) => (
                     <EmployeeMobileCard
                         key={employee.id}
@@ -47,7 +47,7 @@ export const EmployeeTable = memo(function EmployeeTable({
             </div>
 
             <div
-                className="hidden max-h-[70vh] overflow-auto rounded-xl border border-border-subtle bg-surface-raised lg:block"
+                className="hidden max-h-[70vh] overflow-auto rounded-xl border border-border-subtle bg-surface-raised xl:block"
                 style={{
                     contentVisibility: "auto",
                     containIntrinsicSize: "0 500px",

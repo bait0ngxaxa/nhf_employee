@@ -59,6 +59,22 @@ const MENU_ITEM_CONFIG: Record<
         featuredCorner: "bg-orange-500/40",
         featuredFocus: "focus-visible:ring-orange-300",
     },
+    routine: {
+        text: "text-teal-900",
+        bg: "bg-teal-50/70",
+        icon: "text-teal-600",
+        border: "border-teal-100",
+        featured: true,
+        featuredSurface: "bg-teal-600",
+        featuredBorder: "border-teal-500 hover:border-teal-400",
+        featuredShadow: "shadow-teal-900/15 hover:shadow-teal-900/20",
+        featuredIconHover: "group-hover:text-teal-700",
+        featuredArrowHover: "group-hover:bg-teal-50",
+        featuredBadge: "text-teal-700",
+        featuredDescription: "text-teal-50",
+        featuredCorner: "bg-cyan-500/40",
+        featuredFocus: "focus-visible:ring-teal-300",
+    },
     "it-support": {
         text: "text-emerald-950",
         bg: "bg-emerald-50/70",
@@ -137,7 +153,7 @@ function FeaturedCard({ item, onClick, animationDelay }: FeaturedCardProps) {
             onClick={onClick}
             style={{ animationDelay }}
             className={cn(
-                "dashboard-card-enter group relative flex w-full flex-col items-start gap-5 overflow-hidden rounded-3xl text-left text-content-on-brand sm:flex-row sm:items-center",
+                "dashboard-card-enter group relative flex w-full min-w-0 flex-col items-start gap-5 overflow-hidden rounded-2xl text-left text-content-on-brand sm:flex-row sm:items-center sm:rounded-3xl",
                 "min-h-[196px] border p-5 shadow-lg transition-[border-color,box-shadow,transform] duration-200 hover:-translate-y-0.5 hover:shadow-xl active:translate-y-0 md:p-7",
                 "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2",
                 config.featuredSurface,
@@ -175,7 +191,7 @@ function FeaturedCard({ item, onClick, animationDelay }: FeaturedCardProps) {
                         Quick action
                     </span>
                 </div>
-                <h3 className="line-clamp-2 text-3xl font-bold leading-tight text-content-on-brand [overflow-wrap:anywhere] md:text-4xl">
+                <h3 className="line-clamp-2 text-2xl font-bold leading-tight text-content-on-brand [overflow-wrap:anywhere] sm:text-3xl md:text-4xl">
                     {item.label}
                 </h3>
                 <p
@@ -191,7 +207,7 @@ function FeaturedCard({ item, onClick, animationDelay }: FeaturedCardProps) {
 
             <div
                 className={cn(
-                    "relative z-10 flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-content-on-brand/25 bg-content-on-brand shadow-sm transition-[background-color,transform] duration-200 group-hover:-translate-y-0.5 group-hover:translate-x-0.5",
+                    "relative z-10 flex h-12 w-12 shrink-0 items-center justify-center self-end rounded-2xl border border-content-on-brand/25 bg-content-on-brand shadow-sm transition-[background-color,transform] duration-200 group-hover:-translate-y-0.5 group-hover:translate-x-0.5 sm:self-auto",
                     config.icon,
                     config.featuredArrowHover,
                 )}
@@ -293,6 +309,7 @@ function RegularCard({
 const FEATURED_ORDER = new Map([
     ["stock", 0],
     ["leave-management", 1],
+    ["routine", 2],
 ]);
 
 function getFeaturedRank(id: string): number {
@@ -331,10 +348,10 @@ export function DashboardHomeSection() {
     const userDepartment = getDisplayText(user?.department, "ฝ่ายทั่วไป");
 
     return (
-            <div className="relative min-h-[calc(100dvh-6rem)] overflow-hidden rounded-3xl border border-border-subtle/70 bg-surface-subtle p-4 shadow-inner shadow-content-on-brand md:p-8">
+            <div className="relative min-h-[calc(100dvh-6rem)] overflow-hidden rounded-2xl border border-border-subtle/70 bg-surface-subtle p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] shadow-inner shadow-content-on-brand sm:rounded-3xl md:p-8 md:pb-[calc(2rem+env(safe-area-inset-bottom))]">
             <div className="relative z-10 mx-auto max-w-7xl space-y-6">
                 <div>
-                    <div className="dashboard-card-enter relative overflow-hidden rounded-3xl border border-sky-500 bg-sky-600 p-5 text-content-on-brand shadow-lg shadow-sky-900/15 md:p-8">
+                    <div className="dashboard-card-enter relative min-w-0 overflow-hidden rounded-2xl border border-sky-500 bg-sky-600 p-5 text-content-on-brand shadow-lg shadow-sky-900/15 sm:rounded-3xl md:p-8">
                         <div className="brand-sheen-strong pointer-events-none absolute inset-0" />
                         <div className="dashboard-card-drift pointer-events-none absolute -right-10 -top-10 h-44 w-44 rounded-full border border-content-on-brand/15" />
                         <div className="dashboard-card-drift pointer-events-none absolute -bottom-14 right-20 h-36 w-36 rounded-full bg-sky-500/40 [animation-delay:900ms]" />
@@ -351,7 +368,7 @@ export function DashboardHomeSection() {
                                     <h1
                                         data-page-heading
                                         tabIndex={-1}
-                                        className="text-4xl font-bold leading-tight text-content-on-brand md:text-5xl"
+                                        className="text-3xl font-bold leading-tight text-content-on-brand sm:text-4xl md:text-5xl [overflow-wrap:anywhere]"
                                     >
                                         {greeting},{" "}
                                         <span className="text-sky-50 [overflow-wrap:anywhere]">
@@ -365,11 +382,11 @@ export function DashboardHomeSection() {
                             </div>
 
                             <div className="relative z-10 flex min-w-0 flex-wrap gap-3 md:justify-end">
-                                <div className="flex min-w-0 items-center gap-2.5 rounded-xl border border-content-on-brand/20 bg-content-on-brand/15 px-4 py-2 text-xs font-bold text-content-on-brand shadow-sm">
+                                <div className="flex min-w-0 max-w-full items-center gap-2.5 rounded-xl border border-content-on-brand/20 bg-content-on-brand/15 px-3 py-2 text-xs font-bold text-content-on-brand shadow-sm sm:px-4">
                                     <div className="h-2 w-2 shrink-0 rounded-full bg-content-on-brand" />
                                     <span className="min-w-0 truncate">{userRole}</span>
                                 </div>
-                                <div className="flex min-w-0 items-center gap-2.5 rounded-xl border border-content-on-brand/20 bg-content-on-brand/15 px-4 py-2 text-xs font-bold text-content-on-brand shadow-sm">
+                                <div className="flex min-w-0 max-w-full items-center gap-2.5 rounded-xl border border-content-on-brand/20 bg-content-on-brand/15 px-3 py-2 text-xs font-bold text-content-on-brand shadow-sm sm:px-4">
                                     <div className="h-2 w-2 shrink-0 rounded-full bg-sky-100" />
                                     <span className="min-w-0 truncate">{userDepartment}</span>
                                 </div>

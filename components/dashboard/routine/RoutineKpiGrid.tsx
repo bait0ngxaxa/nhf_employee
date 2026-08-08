@@ -9,9 +9,30 @@ interface RoutineKpiGridProps {
 }
 
 const KPI_ITEMS = [
-    { key: "today", label: "งานถึงกำหนดวันนี้", icon: CalendarDays, tone: "text-sky-700" },
-    { key: "dueSoon", label: "งานใกล้ถึงกำหนด 7 วัน", icon: CalendarClock, tone: "text-amber-700" },
-    { key: "within30Days", label: "งานภายใน 30 วัน", icon: CalendarRange, tone: "text-emerald-700" },
+    {
+        key: "today",
+        label: "งานถึงกำหนดวันนี้",
+        icon: CalendarDays,
+        cardClass: "border-brand-border bg-brand-surface",
+        iconClass: "bg-brand-surface-strong text-brand-strong",
+        valueClass: "text-brand-strong",
+    },
+    {
+        key: "dueSoon",
+        label: "งานใกล้ถึงกำหนด 7 วัน",
+        icon: CalendarClock,
+        cardClass: "border-status-warning-border bg-status-warning-surface",
+        iconClass: "bg-status-warning-border text-status-warning-strong",
+        valueClass: "text-status-warning-strong",
+    },
+    {
+        key: "within30Days",
+        label: "งานภายใน 30 วัน",
+        icon: CalendarRange,
+        cardClass: "border-status-success-border bg-status-success-surface",
+        iconClass: "bg-status-success-border text-status-success-strong",
+        valueClass: "text-status-success-strong",
+    },
 ] as const;
 
 export function RoutineKpiGrid({
@@ -25,15 +46,17 @@ export function RoutineKpiGrid({
                 return (
                     <Card
                         key={item.key}
-                        className="gap-4 rounded-xl border-border-subtle bg-surface-raised px-5 py-5 shadow-sm"
+                        className={`gap-4 rounded-xl border px-5 py-5 shadow-sm ${item.cardClass}`}
                     >
                         <div className="flex items-center justify-between gap-3">
                             <p className="max-w-[18ch] text-sm font-semibold leading-5 text-content-secondary">
                                 {item.label}
                             </p>
-                            <Icon className={`size-5 ${item.tone}`} aria-hidden="true" />
+                            <span className={`flex size-10 shrink-0 items-center justify-center rounded-xl ${item.iconClass}`}>
+                                <Icon className="size-5" aria-hidden="true" />
+                            </span>
                         </div>
-                        <p className="text-3xl font-bold tracking-tight text-content-heading tabular-nums" aria-live="polite">
+                        <p className={`text-3xl font-bold tracking-tight tabular-nums ${item.valueClass}`} aria-live="polite">
                             {isLoading ? "–" : summary?.[item.key] ?? 0}
                         </p>
                     </Card>

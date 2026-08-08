@@ -241,11 +241,11 @@ export function RoutineOccurrenceList({
                 return (
                     <article
                         key={task.id}
-                        className="rounded-xl border border-border-subtle bg-surface-raised p-5 shadow-sm sm:p-6"
+                        className="rounded-xl border border-brand-border/70 bg-surface-raised p-5 shadow-sm transition-colors hover:border-brand-foreground/45 sm:p-6"
                     >
                         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                             <div className="min-w-0 space-y-2">
-                                <div className="flex flex-wrap items-center gap-2 text-sm font-medium text-content-secondary">
+                                <div className="flex flex-wrap items-center gap-2 text-sm font-medium text-brand-strong">
                                     <span>{formatRoutineUnitLabel(task.unit)}</span>
                                     <span aria-hidden="true">•</span>
                                     <span>{task.category.name}</span>
@@ -286,11 +286,11 @@ export function RoutineOccurrenceList({
                             </div>
                             <div className="flex shrink-0 flex-col items-start gap-3 lg:items-end">
                                 {occurrence ? (
-                                    <span className={`rounded-full border px-3 py-1 text-sm font-semibold ${getRoutineTimingStatusClass(occurrence.timingStatus)}`}>
+                                    <span className={`inline-flex items-center whitespace-nowrap [overflow-wrap:normal] rounded-full border px-3 py-1 text-sm font-semibold ${getRoutineTimingStatusClass(occurrence.timingStatus)}`}>
                                         {ROUTINE_TIMING_STATUS_LABELS[occurrence.timingStatus]}
                                     </span>
                                 ) : (
-                                    <span className="rounded-full border border-border-subtle bg-surface-subtle px-3 py-1 text-sm font-semibold text-content-secondary">
+                                    <span className="inline-flex items-center whitespace-nowrap [overflow-wrap:normal] rounded-full border border-brand-border bg-brand-surface px-3 py-1 text-sm font-semibold text-brand-strong">
                                         ยังไม่มีรอบกำหนด
                                     </span>
                                 )}

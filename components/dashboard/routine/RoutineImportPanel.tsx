@@ -213,21 +213,31 @@ function SummaryItem({
     tone?: "default" | "warning" | "success" | "danger";
     priority?: "primary" | "secondary";
 }) {
-    const toneClass =
-        tone === "warning"
-            ? "text-status-warning-foreground"
-            : tone === "success"
-              ? "text-status-success-foreground"
-              : tone === "danger"
-                ? "text-status-danger-foreground"
-                : "text-content-heading";
+    const toneClasses = {
+        default: {
+            surface: "border-brand-border bg-brand-surface",
+            value: "text-brand-strong",
+        },
+        warning: {
+            surface: "border-status-warning-border bg-status-warning-surface",
+            value: "text-status-warning-foreground",
+        },
+        success: {
+            surface: "border-status-success-border bg-status-success-surface",
+            value: "text-status-success-foreground",
+        },
+        danger: {
+            surface: "border-status-danger-border bg-status-danger-surface",
+            value: "text-status-danger-foreground",
+        },
+    }[tone];
     return (
-        <div className={`rounded-lg border border-border-subtle ${priority === "primary" ? "bg-surface-raised px-4 py-4" : "bg-surface-subtle px-4 py-3"}`}>
+        <div className={`rounded-lg border ${toneClasses.surface} ${priority === "primary" ? "px-4 py-4" : "px-4 py-3"}`}>
             <p className={`font-medium leading-5 text-content-secondary ${priority === "primary" ? "text-sm" : "text-xs sm:text-sm"}`}>
                 {label}
             </p>
             <p
-                className={`mt-2 font-bold tracking-tight tabular-nums ${priority === "primary" ? "text-3xl" : "text-2xl"} ${toneClass}`}
+                className={`mt-2 font-bold tracking-tight tabular-nums ${priority === "primary" ? "text-3xl" : "text-2xl"} ${toneClasses.value}`}
             >
                 {value}
             </p>
@@ -536,13 +546,13 @@ export function RoutineImportPanel() {
     if (!batchId) {
         return (
             <div className="space-y-5">
-                <div className="rounded-xl border border-border-subtle bg-surface-raised p-5 sm:p-6">
+                <div className="rounded-xl border border-brand-border/70 bg-brand-surface p-5 sm:p-6">
                     <div className="flex items-start gap-3">
                         <div className="rounded-lg bg-brand-surface p-2 text-brand-foreground">
                             <FileSpreadsheet className="h-5 w-5" />
                         </div>
                         <div>
-                            <h3 className="text-lg font-semibold tracking-tight text-content-heading">
+                            <h3 className="text-lg font-semibold tracking-tight text-brand-strong">
                                 นำเข้าข้อมูลจาก Excel
                             </h3>
                             <p className="mt-1 max-w-2xl text-sm leading-6 text-content-secondary">
@@ -635,7 +645,7 @@ export function RoutineImportPanel() {
         <div className="space-y-5">
             <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                    <h3 className="text-xl font-semibold tracking-tight text-content-heading">
+                    <h3 className="text-xl font-semibold tracking-tight text-brand-strong">
                         ตัวอย่างการนำเข้า · ชีต {ROUTINE_IMPORT_TARGET_SHEET}
                     </h3>
                     <p className="mt-1 text-sm leading-6 text-content-secondary">
@@ -795,8 +805,8 @@ export function RoutineImportPanel() {
                 </div>
             ) : null}
 
-            <div className="grid gap-4 rounded-xl border border-border-subtle bg-surface-raised p-4 sm:p-5 lg:grid-cols-[minmax(0,1fr)_180px_220px_auto_auto] lg:items-end">
-                <div className="grid gap-1 text-sm font-medium text-content-body">
+            <div className="grid gap-4 rounded-xl border border-brand-border/70 bg-transparent p-4 sm:p-5 lg:grid-cols-[minmax(0,1fr)_180px_220px_auto_auto] lg:items-end">
+                <div className="grid gap-1 text-sm font-medium text-brand-strong">
                     <label htmlFor="routine-import-search">ค้นหา</label>
                     <div className="relative">
                         <Input
@@ -827,10 +837,10 @@ export function RoutineImportPanel() {
                         ) : null}
                     </div>
                 </div>
-                <label className="grid gap-1 text-sm font-medium text-content-body">
+                <label className="grid gap-1 text-sm font-medium text-brand-strong">
                     สถานะ
                     <select
-                        className="h-11 rounded-md border border-input bg-background px-3 text-sm"
+                        className="h-11 rounded-md border border-brand-border bg-surface-raised px-3 text-sm focus-visible:border-brand-solid focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-solid/40"
                         value={filter}
                         onChange={(event) => {
                             setFilter(event.target.value as ImportFilter);
@@ -845,10 +855,10 @@ export function RoutineImportPanel() {
                         ))}
                     </select>
                 </label>
-                <label className="grid gap-1 text-sm font-medium text-content-body">
+                <label className="grid gap-1 text-sm font-medium text-brand-strong">
                     ประเด็น
                     <select
-                        className="h-11 rounded-md border border-input bg-background px-3 text-sm"
+                        className="h-11 rounded-md border border-brand-border bg-surface-raised px-3 text-sm focus-visible:border-brand-solid focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-solid/40"
                         value={issue}
                         onChange={(event) => {
                             setIssue(event.target.value as ImportIssue);
@@ -861,7 +871,7 @@ export function RoutineImportPanel() {
                         </option>
                     </select>
                 </label>
-                <label className="flex h-11 items-center gap-2 text-sm font-medium text-content-body">
+                <label className="flex h-11 items-center gap-2 text-sm font-medium text-brand-strong">
                     <input
                         type="checkbox"
                         checked={selectedOnly}
@@ -886,10 +896,10 @@ export function RoutineImportPanel() {
                     description="ลองเปลี่ยนตัวกรองหรือค้นหาคำอื่น"
                 />
             ) : rowsPage ? (
-                <div className="overflow-hidden rounded-xl border border-border-subtle bg-surface-raised">
+                <div className="overflow-hidden rounded-xl border border-brand-border/70 bg-surface-raised">
                     <div className="overflow-x-auto">
                         <table className="w-full min-w-[1100px] text-sm" aria-label="รายการตัวอย่างนำเข้า">
-                            <thead className="bg-surface-subtle text-left text-sm text-content-secondary">
+                            <thead className="bg-brand-surface text-left text-sm text-brand-strong">
                                 <tr>
                                     <th className="w-12 px-4 py-3 font-semibold">
                                         เลือก
@@ -912,7 +922,7 @@ export function RoutineImportPanel() {
                                     <th className="px-4 py-3 font-semibold">
                                         สถานะ
                                     </th>
-                                    <th className="sticky right-0 z-20 whitespace-nowrap border-l border-border-subtle bg-surface-subtle px-4 py-3 font-semibold employee-table-sticky-shadow">
+                                    <th className="sticky right-0 z-20 whitespace-nowrap border-l border-brand-border/70 bg-brand-surface px-4 py-3 font-semibold employee-table-sticky-shadow">
                                         จัดการ
                                     </th>
                                 </tr>
@@ -1009,9 +1019,9 @@ export function RoutineImportPanel() {
                                                 <Badge
                                                     variant="outline"
                                                     className={
-                                                        STATUS_CLASSES[
+                                                        `whitespace-nowrap [overflow-wrap:normal] ${STATUS_CLASSES[
                                                             row.status
-                                                        ]
+                                                        ]}`
                                                     }
                                                 >
                                                     {rowStatusLabel(row)}
@@ -1079,7 +1089,7 @@ export function RoutineImportPanel() {
                         </table>
                     </div>
                     {currentPage ? (
-                        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border-subtle px-4 py-3 text-sm">
+                        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-brand-border/70 px-4 py-3 text-sm">
                             <span className="text-content-secondary">
                                 หน้า {currentPage.page} / {currentPage.pages} ·
                                 ทั้งหมด {currentPage.total} แถว
@@ -1116,9 +1126,9 @@ export function RoutineImportPanel() {
                 </div>
             ) : null}
 
-            <div className="sticky bottom-3 z-10 flex flex-col gap-3 rounded-xl border border-border-subtle bg-surface-raised/95 p-4 shadow-md backdrop-blur-sm sm:flex-row sm:items-center sm:justify-between">
+            <div className="sticky bottom-3 z-10 flex flex-col gap-3 rounded-xl border border-brand-border/70 bg-brand-surface/95 p-4 shadow-md backdrop-blur-sm sm:flex-row sm:items-center sm:justify-between">
                 <div className="text-sm">
-                    <p className="text-base font-semibold text-content-heading">
+                    <p className="text-base font-semibold text-brand-strong">
                         เลือกไว้สำหรับนำเข้า {batch.selectedRows} รายการ
                     </p>
                     <p className="mt-1 text-sm leading-6 text-content-secondary">
@@ -1188,7 +1198,7 @@ export function RoutineImportPanel() {
                             {ROUTINE_IMPORT_TARGET_SHEET}
                         </AlertDialogDescription>
                     </AlertDialogHeader>
-                    <div className="rounded-lg bg-surface-subtle p-4 text-sm text-content-body">
+                    <div className="rounded-lg border border-brand-border/70 bg-brand-surface p-4 text-sm text-content-body">
                         <p>
                             รายการที่เลือก:{" "}
                             <strong>{batch.selectedRows}</strong>

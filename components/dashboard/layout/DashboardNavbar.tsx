@@ -113,10 +113,10 @@ export function DashboardNavbar(): ReactElement {
     };
 
     return (
-        <header className="sticky top-0 z-30 border-b border-border-faint bg-surface/95 pt-[env(safe-area-inset-top)]">
-            <div className="flex h-20 items-center justify-between pl-[calc(1.5rem+env(safe-area-inset-left))] pr-[calc(1.5rem+env(safe-area-inset-right))] lg:pl-[calc(2.5rem+env(safe-area-inset-left))] lg:pr-[calc(2.5rem+env(safe-area-inset-right))]">
+        <header className="sticky top-0 z-30 shrink-0 border-b border-border-faint bg-surface/95 pt-[env(safe-area-inset-top)]">
+            <div className="flex min-w-0 items-center justify-between px-[calc(1rem+env(safe-area-inset-left))] pr-[calc(1rem+env(safe-area-inset-right))] sm:px-[calc(1.5rem+env(safe-area-inset-left))] sm:pr-[calc(1.5rem+env(safe-area-inset-right))] lg:pl-[calc(2.5rem+env(safe-area-inset-left))] lg:pr-[calc(2.5rem+env(safe-area-inset-right))]">
                 {/* Left: Mobile menu + Page title */}
-                <div className="flex items-center gap-4">
+                <div className="flex min-w-0 items-center gap-3 sm:gap-4">
                     <Sheet
                         open={mobileNavOpen}
                         onOpenChange={setMobileNavOpen}
@@ -148,7 +148,7 @@ export function DashboardNavbar(): ReactElement {
                 </div>
 
                 {/* Right: User menu */}
-                <div className="flex items-center gap-4">
+                <div className="flex shrink-0 items-center gap-2 sm:gap-4">
                     {/* Notifications */}
                     <div className="rounded-2xl border border-border-muted bg-surface p-1 shadow-sm transition-transform hover:-translate-y-0.5">
                         <NotificationDropdown />

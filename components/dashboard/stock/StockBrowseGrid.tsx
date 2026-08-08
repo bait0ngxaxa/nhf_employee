@@ -149,7 +149,7 @@ function BrowseCardBase(props: BrowseCardProps) {
         }`}>
             <CardContent className="flex h-full flex-col gap-2.5 p-3">
                 <div className="overflow-hidden rounded-2xl bg-surface-subtle ring-1 ring-border-subtle shadow-inner shadow-white/70">
-                    <div className="flex h-9 items-center border-b border-border-subtle bg-surface-subtle px-2 py-1">
+                    <div className="flex min-h-10 items-start border-b border-border-subtle bg-surface-subtle px-2 py-1">
                         <Badge
                             variant="secondary"
                             className="max-w-full justify-start whitespace-normal border border-border-subtle bg-surface-raised px-2 text-left text-xs font-medium leading-5 text-content-body [display:-webkit-box] [overflow-wrap:anywhere] [-webkit-box-orient:vertical] [-webkit-line-clamp:2] hover:bg-surface-raised"

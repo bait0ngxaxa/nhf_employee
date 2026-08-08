@@ -8,21 +8,21 @@ export function AuditLogsSection() {
     return (
         <AuditLogsProvider>
             <div className="audit-logs-background relative min-h-[calc(100dvh-6rem)] overflow-hidden rounded-3xl border border-content-on-brand/60 bg-surface-subtle/50 shadow-inner">
-                <div className="relative z-10 p-4 md:p-8 space-y-8">
+                <div className="relative z-10 min-w-0 space-y-8 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] md:p-8 md:pb-[calc(2rem+env(safe-area-inset-bottom))]">
                     {/* Header */}
-                    <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 animate-in fade-in slide-in-from-bottom-2 duration-700 ease-out">
-                        <div className="flex items-center space-x-5">
+                    <div className="flex min-w-0 flex-col justify-between gap-4 animate-in fade-in slide-in-from-bottom-2 duration-700 ease-out md:flex-row md:items-end">
+                        <div className="flex min-w-0 items-center gap-4 sm:gap-5">
                             <div className="relative group cursor-default">
                                 <div className="absolute -inset-2 rounded-2xl bg-gradient-to-r from-yellow-500/40 to-amber-500/40 blur-xl opacity-70 group-hover:opacity-100 group-hover:scale-110 transition-[opacity,transform] duration-500 will-change-transform" />
                                 <div className="relative flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-yellow-500 to-amber-600 shadow-lg shadow-yellow-500/25 ring-1 ring-content-on-brand/20">
                                     <History className="h-7 w-7 text-content-on-brand" />
                                 </div>
                             </div>
-                            <div className="space-y-1">
+                            <div className="min-w-0 space-y-1">
                                 <h1
                                     data-page-heading
                                     tabIndex={-1}
-                                    className="text-3xl font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-br from-gray-900 via-gray-800 to-gray-600 pb-1"
+                                    className="text-2xl font-bold leading-tight tracking-tight text-content-heading [overflow-wrap:anywhere] sm:text-3xl"
                                 >
                                     บันทึกการใช้งาน
                                 </h1>

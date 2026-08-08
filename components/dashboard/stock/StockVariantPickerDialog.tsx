@@ -242,7 +242,7 @@ export function StockVariantPickerDialog({
                                 <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
                                     <Badge
                                         variant="secondary"
-                                        className="max-w-full justify-start truncate border border-border-subtle bg-surface-raised text-xs text-content-body sm:text-sm"
+                                        className="max-w-full justify-start whitespace-normal border border-border-subtle bg-surface-raised text-left text-xs leading-5 text-content-body sm:text-sm"
                                     >
                                         {item.category.name}
                                     </Badge>
@@ -309,9 +309,9 @@ export function StockVariantPickerDialog({
                                                         SKU: {variant.sku}
                                                     </div>
                                                 </button>
-                                                <div className="flex items-center gap-2 self-start">
+                                                <div className="flex flex-wrap items-center justify-end gap-2 self-start">
                                                     <div
-                                                        className={`rounded-lg px-2.5 py-1 text-sm font-bold ${
+                                                        className={`max-w-full rounded-lg px-2.5 py-1 text-right text-sm font-bold [overflow-wrap:anywhere] ${
                                                             availableQuantity === 0
                                                                 ? "bg-surface-muted text-content-muted"
                                                                 : isSelected
