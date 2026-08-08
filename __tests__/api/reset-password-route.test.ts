@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 
 import { POST as resetPasswordRoute } from "@/app/api/auth/reset-password/route";
@@ -78,6 +78,10 @@ describe("Reset password route", () => {
         });
     });
 
+    afterEach(() => {
+        vi.useRealTimers();
+    });
+
     it("resets the password after atomically claiming an unused token", async () => {
         const response = await resetPasswordRoute(buildRequest());
 
@@ -133,5 +137,69 @@ describe("Reset password route", () => {
         expect(prismaMock.user.update).not.toHaveBeenCalled();
         expect(prismaMock.authRefreshToken.updateMany).not.toHaveBeenCalled();
         expect(response.headers.get("set-cookie")).toBeNull();
+    });
+
+    it("rejects a token that expires after precheck but before the atomic claim", async () => {
+        const requestStartedAt = new Date("2029-12-31T23:59:59.000Z");
+        const expiresAt = new Date("2030-01-01T00:00:00.000Z");
+        vi.useFakeTimers();
+        vi.setSystemTime(requestStartedAt);
+        prismaMock.passwordResetToken.findUnique.mockResolvedValue(
+            buildToken({ expiresAt }),
+        );
+        hashPasswordMock.mockImplementation(async () => {
+            vi.setSystemTime(new Date("2030-01-01T00:00:00.001Z"));
+            return "hashed-password";
+        });
+        prismaMock.passwordResetToken.updateMany.mockImplementation(
+            async (args: { where: { expiresAt: { gt: Date } } }) => ({
+                count: expiresAt > args.where.expiresAt.gt ? 1 : 0,
+            }),
+        );
+
+        const response = await resetPasswordRoute(buildRequest());
+
+        expect(response.status).toBe(400);
+        expect(prismaMock.passwordResetToken.updateMany).toHaveBeenCalledTimes(1);
+        expect(prismaMock.user.update).not.toHaveBeenCalled();
+        expect(prismaMock.authRefreshToken.updateMany).not.toHaveBeenCalled();
+        expect(response.headers.get("set-cookie")).toBeNull();
+    });
+
+    it("reevaluates expiration time for each serializable transaction attempt", async () => {
+        const firstAttemptAt = new Date("2029-12-31T23:59:59.000Z");
+        const retryAttemptAt = new Date("2030-01-01T00:00:00.001Z");
+        const expiresAt = new Date("2030-01-01T00:00:00.000Z");
+        const claimedAtValues: Date[] = [];
+        vi.useFakeTimers();
+        vi.setSystemTime(firstAttemptAt);
+        prismaMock.passwordResetToken.findUnique.mockResolvedValue(
+            buildToken({ expiresAt }),
+        );
+        prismaMock.passwordResetToken.updateMany.mockImplementation(
+            async (args: { where: { expiresAt: { gt: Date } } }) => {
+                claimedAtValues.push(args.where.expiresAt.gt);
+                if (claimedAtValues.length === 1) {
+                    vi.setSystemTime(retryAttemptAt);
+                    throw { code: "P2034" };
+                }
+                return {
+                    count: expiresAt > args.where.expiresAt.gt ? 1 : 0,
+                };
+            },
+        );
+
+        const responsePromise = resetPasswordRoute(buildRequest());
+        await vi.runAllTimersAsync();
+        const response = await responsePromise;
+
+        expect(response.status).toBe(400);
+        expect(claimedAtValues).toHaveLength(2);
+        expect(claimedAtValues[0]).toEqual(firstAttemptAt);
+        expect(claimedAtValues[1]?.getTime()).toBeGreaterThan(
+            expiresAt.getTime(),
+        );
+        expect(prismaMock.user.update).not.toHaveBeenCalled();
+        expect(prismaMock.authRefreshToken.updateMany).not.toHaveBeenCalled();
     });
 });

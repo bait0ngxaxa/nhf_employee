@@ -15,6 +15,8 @@ import {
 import { withTrustedMutation } from "@/lib/auth/csrf";
 import { getClientMetadata } from "@/lib/auth/hybrid/session";
 import { prisma } from "@/lib/db/prisma";
+import { lockEmployeeRows } from "@/lib/db/row-locks";
+import { runSerializableTransaction } from "@/lib/db/transaction";
 import { isBootstrapAdminEmail } from "@/lib/ssot/admin-bootstrap";
 import { signupSchema } from "@/lib/validations/auth";
 
@@ -23,6 +25,23 @@ const SIGNUP_RATE_LIMIT_POLICY = {
     maxAttemptsPerIdentity: 5,
     maxAttemptsPerIp: 25,
 } as const;
+
+const SIGNUP_EMPLOYEE_SELECT = {
+    id: true,
+    firstName: true,
+    lastName: true,
+    email: true,
+    status: true,
+    deletedAt: true,
+    user: { select: { id: true } },
+} as const satisfies Prisma.EmployeeSelect;
+
+class SignupEligibilityError extends Error {
+    constructor(message: string) {
+        super(message);
+        this.name = "SignupEligibilityError";
+    }
+}
 
 function isUniqueConstraintError(error: unknown): boolean {
     return (
@@ -78,14 +97,7 @@ export const POST = withTrustedMutation(
 
             const matchedEmployee = await prisma.employee.findUnique({
                 where: { email },
-                select: {
-                    id: true,
-                    firstName: true,
-                    lastName: true,
-                    status: true,
-                    deletedAt: true,
-                    user: { select: { id: true } },
-                },
+                select: SIGNUP_EMPLOYEE_SELECT,
             });
 
             if (
@@ -106,20 +118,50 @@ export const POST = withTrustedMutation(
             }
 
             const hashedPassword = await bcrypt.hash(password, 12);
-            const employeeName = `${matchedEmployee.firstName} ${matchedEmployee.lastName}`;
-            const assignedRole = isBootstrapAdminEmail(email)
-                ? Role.ADMIN
-                : Role.USER;
+            const { user, assignedRole } = await runSerializableTransaction(async (tx) => {
+                await lockEmployeeRows(tx, [matchedEmployee.id]);
 
-            const user = await prisma.user.create({
-                data: {
-                    name: employeeName,
-                    email,
-                    password: hashedPassword,
-                    role: assignedRole,
-                    isActive: true,
-                    employeeId: matchedEmployee.id,
-                },
+                const lockedEmployee = await tx.employee.findUnique({
+                    where: { id: matchedEmployee.id },
+                    select: SIGNUP_EMPLOYEE_SELECT,
+                });
+
+                if (
+                    !lockedEmployee
+                    || lockedEmployee.email !== email
+                    || !hasEligibleEmployeeLifecycle(lockedEmployee)
+                ) {
+                    throw new SignupEligibilityError(
+                        AUTH_SIGNUP_MESSAGES.employeeNotFoundThai,
+                    );
+                }
+
+                if (lockedEmployee.user) {
+                    throw new SignupEligibilityError(
+                        AUTH_SIGNUP_MESSAGES.emailAlreadyUsedThai,
+                    );
+                }
+
+                const lockedEmployeeName =
+                    `${lockedEmployee.firstName} ${lockedEmployee.lastName}`.trim();
+                const lockedEmployeeRole = isBootstrapAdminEmail(lockedEmployee.email)
+                    ? Role.ADMIN
+                    : Role.USER;
+                const createdUser = await tx.user.create({
+                    data: {
+                        name: lockedEmployeeName,
+                        email: lockedEmployee.email,
+                        password: hashedPassword,
+                        role: lockedEmployeeRole,
+                        isActive: true,
+                        employeeId: lockedEmployee.id,
+                    },
+                });
+
+                return {
+                    user: createdUser,
+                    assignedRole: lockedEmployeeRole,
+                };
             });
 
             clearAuthIdentityRateLimit(rateLimitInput);
@@ -158,6 +200,13 @@ export const POST = withTrustedMutation(
                 { status: 201 },
             );
         } catch (error) {
+            if (error instanceof SignupEligibilityError) {
+                return NextResponse.json(
+                    { error: error.message },
+                    { status: 400 },
+                );
+            }
+
             if (isUniqueConstraintError(error)) {
                 return NextResponse.json(
                     { error: AUTH_SIGNUP_MESSAGES.accountAlreadyRegisteredThai },

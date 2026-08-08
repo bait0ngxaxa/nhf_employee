@@ -59,8 +59,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
             );
         }
 
-        const now = new Date();
-        if (resetToken.expiresAt <= now) {
+        const precheckedAt = new Date();
+        if (resetToken.expiresAt <= precheckedAt) {
             return NextResponse.json(
                 { error: AUTH_ERROR_MESSAGES.expiredResetLinkThai },
                 { status: 400 },
@@ -83,11 +83,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
         try {
             await runSerializableTransaction(async (tx) => {
+                const claimedAt = new Date();
                 const claim = await tx.passwordResetToken.updateMany({
                     where: {
                         id: resetToken.id,
                         used: false,
-                        expiresAt: { gt: now },
+                        expiresAt: { gt: claimedAt },
                     },
                     data: { used: true },
                 });
@@ -105,7 +106,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
                 });
                 await tx.authRefreshToken.updateMany({
                     where: { userId: user.id, revokedAt: null },
-                    data: { revokedAt: now },
+                    data: { revokedAt: claimedAt },
                 });
             });
         } catch (error) {

@@ -22,6 +22,8 @@ const { prismaMock } = vi.hoisted(() => ({
         auditLog: {
             create: vi.fn(),
         },
+        $queryRaw: vi.fn(),
+        $transaction: vi.fn(),
     },
 }));
 
@@ -78,6 +80,19 @@ describe("Auth signup route", () => {
     beforeEach(() => {
         vi.clearAllMocks();
         resetAuthRateLimit();
+        prismaMock.user.findUnique.mockReset();
+        prismaMock.user.create.mockReset();
+        prismaMock.employee.findUnique.mockReset();
+        prismaMock.auditLog.create.mockReset();
+        prismaMock.$queryRaw.mockReset();
+        prismaMock.$transaction.mockReset();
+        prismaMock.$queryRaw.mockResolvedValue([]);
+        prismaMock.$transaction.mockImplementation(async (operation) => {
+            if (typeof operation === "function") {
+                return operation(prismaMock);
+            }
+            return Promise.all(operation);
+        });
     });
 
     it("rejects signup without trusted mutation headers", async () => {
@@ -115,6 +130,7 @@ describe("Auth signup route", () => {
             id: 10,
             firstName: "สมชาย",
             lastName: "ใจดี",
+            email: "user@thainhf.org",
             status: "ACTIVE",
             deletedAt: null,
             user: null,
@@ -145,6 +161,11 @@ describe("Auth signup route", () => {
                 }),
             }),
         );
+        expect(prismaMock.$queryRaw).toHaveBeenCalledTimes(1);
+        expect(prismaMock.employee.findUnique).toHaveBeenNthCalledWith(2, {
+            where: { id: 10 },
+            select: expect.objectContaining({ email: true }),
+        });
         expect(prismaMock.authRefreshToken.create).not.toHaveBeenCalled();
         expect(response.headers.get("set-cookie")).toBeNull();
     });
@@ -155,6 +176,7 @@ describe("Auth signup route", () => {
             id: 11,
             firstName: "System",
             lastName: "Administrator",
+            email: "admin@thainhf.org",
             status: "ACTIVE",
             deletedAt: null,
             user: null,
@@ -193,6 +215,7 @@ describe("Auth signup route", () => {
             id: 10,
             firstName: "สมชาย",
             lastName: "ใจดี",
+            email: "user@thainhf.org",
             status: "ACTIVE",
             deletedAt: null,
             user: null,
@@ -233,6 +256,7 @@ describe("Auth signup route", () => {
             id: 10,
             firstName: "Lifecycle",
             lastName: "Blocked",
+            email: "user@thainhf.org",
             status,
             deletedAt,
             user: null,
@@ -256,10 +280,144 @@ describe("Auth signup route", () => {
             id: 11,
             firstName: "System",
             lastName: "Administrator",
+            email: "admin@thainhf.org",
             status: "INACTIVE",
             deletedAt: null,
             user: null,
         });
+
+        const response = await signupRoute(
+            buildRequest({
+                email: "admin@thainhf.org",
+                password: "secret1",
+                confirmPassword: "secret1",
+            }),
+        );
+
+        expect(response.status).toBe(400);
+        expect(prismaMock.user.create).not.toHaveBeenCalled();
+    });
+
+    it.each([
+        { status: "INACTIVE", deletedAt: null, label: "inactive" },
+        { status: "SUSPENDED", deletedAt: null, label: "suspended" },
+        {
+            status: "ACTIVE",
+            deletedAt: new Date("2026-01-01T00:00:00.000Z"),
+            label: "soft-deleted",
+        },
+    ])(
+        "rejects when an initially active employee becomes $label before the locked reload",
+        async ({ status, deletedAt }) => {
+            const initialEmployee = {
+                id: 10,
+                firstName: "Lifecycle",
+                lastName: "Changed",
+                email: "user@thainhf.org",
+                status: "ACTIVE",
+                deletedAt: null,
+                user: null,
+            };
+            prismaMock.user.findUnique.mockResolvedValue(null);
+            prismaMock.employee.findUnique
+                .mockResolvedValueOnce(initialEmployee)
+                .mockResolvedValueOnce({
+                    ...initialEmployee,
+                    status,
+                    deletedAt,
+                });
+
+            const response = await signupRoute(
+                buildRequest({
+                    email: "user@thainhf.org",
+                    password: "secret1",
+                    confirmPassword: "secret1",
+                }),
+            );
+
+            expect(response.status).toBe(400);
+            expect(prismaMock.$queryRaw).toHaveBeenCalledTimes(1);
+            expect(prismaMock.user.create).not.toHaveBeenCalled();
+        },
+    );
+
+    it("rejects when the employee email changes before the locked reload", async () => {
+        const initialEmployee = {
+            id: 10,
+            firstName: "Identity",
+            lastName: "Changed",
+            email: "user@thainhf.org",
+            status: "ACTIVE",
+            deletedAt: null,
+            user: null,
+        };
+        prismaMock.user.findUnique.mockResolvedValue(null);
+        prismaMock.employee.findUnique
+            .mockResolvedValueOnce(initialEmployee)
+            .mockResolvedValueOnce({
+                ...initialEmployee,
+                email: "changed@thainhf.org",
+            });
+
+        const response = await signupRoute(
+            buildRequest({
+                email: "user@thainhf.org",
+                password: "secret1",
+                confirmPassword: "secret1",
+            }),
+        );
+
+        expect(response.status).toBe(400);
+        expect(prismaMock.user.create).not.toHaveBeenCalled();
+    });
+
+    it("rejects when the employee is linked by the time of the locked reload", async () => {
+        const initialEmployee = {
+            id: 10,
+            firstName: "Already",
+            lastName: "Linked",
+            email: "user@thainhf.org",
+            status: "ACTIVE",
+            deletedAt: null,
+            user: null,
+        };
+        prismaMock.user.findUnique.mockResolvedValue(null);
+        prismaMock.employee.findUnique
+            .mockResolvedValueOnce(initialEmployee)
+            .mockResolvedValueOnce({
+                ...initialEmployee,
+                user: { id: 99 },
+            });
+
+        const response = await signupRoute(
+            buildRequest({
+                email: "user@thainhf.org",
+                password: "secret1",
+                confirmPassword: "secret1",
+            }),
+        );
+
+        expect(response.status).toBe(400);
+        expect(prismaMock.user.create).not.toHaveBeenCalled();
+    });
+
+    it("does not let bootstrap admin eligibility become stale before creation", async () => {
+        const initialEmployee = {
+            id: 11,
+            firstName: "System",
+            lastName: "Administrator",
+            email: "admin@thainhf.org",
+            status: "ACTIVE",
+            deletedAt: null,
+            user: null,
+        };
+        prismaMock.user.findUnique.mockResolvedValue(null);
+        prismaMock.employee.findUnique
+            .mockResolvedValueOnce(initialEmployee)
+            .mockResolvedValueOnce({
+                ...initialEmployee,
+                status: "INACTIVE",
+            });
 
         const response = await signupRoute(
             buildRequest({

@@ -467,7 +467,7 @@ function isValidEmail(email: string): boolean {
 function processEmailForUpdate(
     email: string | undefined,
     hasLinkedUser: boolean,
-): { email: string; error?: string } | null {
+): { email: string; isSystemGeneratedTemporary: boolean; error?: string } | null {
     if (email === undefined) return null;
 
     const trimmed = email.trim();
@@ -475,20 +475,28 @@ function processEmailForUpdate(
         if (hasLinkedUser) {
             return {
                 email: "",
+                isSystemGeneratedTemporary: false,
                 error: EMPLOYEE_LIFECYCLE_MESSAGES.linkedUserEmailRequired,
             };
         }
-        return { email: generateTempEmail() };
+        return {
+            email: generateTempEmail(),
+            isSystemGeneratedTemporary: true,
+        };
     }
 
     if (!isValidEmail(trimmed)) {
         return {
             email: "",
+            isSystemGeneratedTemporary: false,
             error: EMPLOYEE_LIFECYCLE_MESSAGES.invalidEmail,
         };
     }
 
-    return { email: trimmed.toLowerCase() };
+    return {
+        email: trimmed.toLowerCase(),
+        isSystemGeneratedTemporary: false,
+    };
 }
 
 function buildEmployeeUpdateData(
@@ -544,7 +552,7 @@ async function prepareEmployeeUpdate(
     }
 
     const normalizedEmail = emailResult.email;
-    if (!normalizedEmail.includes("@temp.local")) {
+    if (!emailResult.isSystemGeneratedTemporary) {
         if (!normalizedEmail.endsWith("@thainhf.org")) {
             throw new EmployeeMutationError(
                 EMPLOYEE_LIFECYCLE_MESSAGES.organizationEmailOnly,

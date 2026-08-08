@@ -180,22 +180,35 @@ describe("Employee Mutations", () => {
             expect(prismaMock.user.update).not.toHaveBeenCalled();
         });
 
-        it("keeps temporary-email behavior for an employee without a linked user", async () => {
+        it.each(["", "-"])(
+            "generates a temporary email for unlinked employee input %j",
+            async (email) => {
+                const employee = buildEmployee();
+                prismaMock.employee.findUnique.mockResolvedValue(employee as never);
+                prismaMock.employee.update.mockResolvedValue(employee as never);
+
+                const result = await updateEmployee(1, { email });
+
+                expect(result.success).toBe(true);
+                expect(prismaMock.employee.update).toHaveBeenCalledWith(
+                    expect.objectContaining({
+                        data: expect.objectContaining({
+                            email: expect.stringMatching(/@temp\.local$/),
+                        }),
+                    }),
+                );
+                expect(prismaMock.user.update).not.toHaveBeenCalled();
+            },
+        );
+
+        it("rejects a client-supplied temporary email for an unlinked employee", async () => {
             const employee = buildEmployee();
             prismaMock.employee.findUnique.mockResolvedValue(employee as never);
-            prismaMock.employee.update.mockResolvedValue(employee as never);
 
-            const result = await updateEmployee(1, { email: "-" });
+            const result = await updateEmployee(1, { email: "foo@temp.local" });
 
-            expect(result.success).toBe(true);
-            expect(prismaMock.employee.update).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    data: expect.objectContaining({
-                        email: expect.stringMatching(/@temp\.local$/),
-                    }),
-                }),
-            );
-            expect(prismaMock.user.update).not.toHaveBeenCalled();
+            expect(result).toMatchObject({ success: false, status: 400 });
+            expect(prismaMock.employee.update).not.toHaveBeenCalled();
         });
 
         it.each([
@@ -318,6 +331,20 @@ describe("Employee Mutations", () => {
             async (email) => {
                 const employee = buildLinkedEmployee();
                 prismaMock.employee.findFirst.mockResolvedValue(employee as never);
+                prismaMock.employee.findUnique.mockResolvedValue(employee as never);
+
+                const result = await updateEmployee(1, { email });
+
+                expect(result).toMatchObject({ success: false, status: 400 });
+                expect(prismaMock.employee.update).not.toHaveBeenCalled();
+                expect(prismaMock.user.update).not.toHaveBeenCalled();
+            },
+        );
+
+        it.each(["foo@temp.local", "foo@temp.local.evil"])(
+            "rejects client-supplied temporary namespace email %j for a linked user",
+            async (email) => {
+                const employee = buildLinkedEmployee();
                 prismaMock.employee.findUnique.mockResolvedValue(employee as never);
 
                 const result = await updateEmployee(1, { email });
