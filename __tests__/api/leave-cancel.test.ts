@@ -5,7 +5,6 @@ import { POST as requestNotTaken } from "@/app/api/leave/not-taken/route";
 import { requireApiSession } from "@/lib/auth/api";
 import { prisma } from "@/lib/db/prisma";
 import { getEmployeeIdFromUserId } from "@/lib/services/leave/get-employee-id";
-import { logLeaveEvent } from "@/lib/server/audit";
 import { processOutbox } from "@/lib/services/outbox/processor";
 import type * as NextServerModule from "next/server";
 
@@ -17,7 +16,6 @@ vi.mock("next/server", async (importOriginal) => {
 vi.mock("@/lib/auth/api", () => ({ requireApiSession: vi.fn() }));
 vi.mock("@/lib/services/leave/get-employee-id", () => ({ getEmployeeIdFromUserId: vi.fn() }));
 vi.mock("@/lib/services/outbox/processor", () => ({ processOutbox: vi.fn() }));
-vi.mock("@/lib/server/audit", () => ({ logLeaveEvent: vi.fn() }));
 vi.mock("@/lib/db/prisma", () => ({
     prisma: {
         $transaction: vi.fn(),
@@ -112,7 +110,6 @@ describe("POST /api/leave/cancel", () => {
         vi.mocked(prisma.employee.findMany).mockResolvedValue([] as never);
         vi.mocked(prisma.$queryRaw).mockResolvedValue([] as never);
         vi.mocked(prisma.auditLog.create).mockResolvedValue({ id: 1 } as never);
-        vi.mocked(logLeaveEvent).mockResolvedValue(undefined);
         vi.mocked(processOutbox).mockResolvedValue({ processed: 0, failed: 0 });
         vi.mocked(prisma.$transaction).mockImplementation(async (callback) => {
             if (typeof callback === "function") return callback(prisma);
@@ -696,20 +693,14 @@ describe("POST /api/leave/cancel", () => {
             }),
         });
         expect(prisma.notificationOutbox.create).not.toHaveBeenCalled();
-        expect(logLeaveEvent).toHaveBeenCalledWith(
-            "LEAVE_REQUEST_CANCELLATION_CONFIRM",
-            "leave-cancellation",
-            20,
-            "manager@example.com",
-            expect.objectContaining({
-                before: { status: "CANCELLATION_REQUESTED" },
-                after: { status: "APPROVED" },
-                metadata: {
-                    leaveId: "leave-cancellation",
-                    decision: "REJECT",
-                },
+        expect(prisma.auditLog.create).toHaveBeenCalledWith({
+            data: expect.objectContaining({
+                action: "LEAVE_REQUEST_CANCELLATION_CONFIRM",
+                userId: 20,
+                userEmail: "manager@example.com",
+                details: expect.stringContaining('"decision":"REJECT"'),
             }),
-        );
+        });
     });
 
     it("rejects a cancellation request after the leave has started", async () => {
@@ -1116,7 +1107,7 @@ describe("POST /api/leave/cancel", () => {
         expect(firstResponse.status).toBe(200);
         expect(secondResponse.status).toBe(409);
         expect(prisma.notification.create).toHaveBeenCalledTimes(1);
-        expect(logLeaveEvent).toHaveBeenCalledTimes(1);
+        expect(prisma.auditLog.create).toHaveBeenCalledTimes(1);
         expect(prisma.leaveQuota.update).not.toHaveBeenCalled();
     });
 

@@ -1,4 +1,9 @@
 import { type StockTxType } from "@prisma/client";
+import {
+    defineAuditDetails,
+    type StockItemAuditSnapshot,
+    type StockVariantAuditSnapshot,
+} from "@/lib/audit-log/contracts";
 import { prisma } from "@/lib/db/prisma";
 import { runSerializableTransaction } from "@/lib/db/transaction";
 import {
@@ -127,10 +132,11 @@ type AuditableStockItem = {
     imageUrl: string | null;
     categoryId: number;
     isActive: boolean;
+    category?: { name: string };
     variants: AuditableStockVariant[];
 };
 
-function createItemAuditSnapshot(item: AuditableStockItem): Record<string, unknown> {
+function createItemAuditSnapshot(item: AuditableStockItem): StockItemAuditSnapshot {
     const inventory = summarizeVariantInventory(item.variants ?? []);
 
     return {
@@ -141,13 +147,14 @@ function createItemAuditSnapshot(item: AuditableStockItem): Record<string, unkno
         ...inventory,
         imageUrl: item.imageUrl,
         categoryId: item.categoryId,
+        ...(item.category?.name ? { categoryName: item.category.name } : {}),
         isActive: item.isActive,
     };
 }
 
 function createVariantAuditSnapshot(
     variant: AuditableStockVariant,
-): Record<string, unknown> {
+): StockVariantAuditSnapshot {
     const attributes = (variant.attributeValues ?? [])
         .map(({ attributeValue }) => ({
             name: attributeValue.attribute.name,
@@ -176,7 +183,7 @@ async function auditChangedVariants(
     beforeVariants: AuditableStockVariant[],
     afterVariants: AuditableStockVariant[],
     actor: StockCommandActor,
-    itemId: number,
+    item: Pick<AuditableStockItem, "id" | "name" | "sku">,
     transactionIdsByVariantId: Map<number, number[]>,
 ): Promise<void> {
     const beforeById = new Map(beforeVariants.map((variant) => [variant.id, variant]));
@@ -197,17 +204,29 @@ async function auditChangedVariants(
             "STOCK_ITEM_UPDATE",
             variantId,
             actor,
-            {
+            defineAuditDetails("STOCK_ITEM_UPDATE", {
                 ...(beforeSnapshot && { before: beforeSnapshot }),
                 ...(afterSnapshot && { after: afterSnapshot }),
                 metadata: {
-                    itemId,
+                    itemId: item.id,
+                    itemName: item.name,
+                    itemSku: item.sku,
+                    variantLabel: formatAttributeAuditLabel(
+                        afterSnapshot?.attributes ?? beforeSnapshot?.attributes ?? [],
+                    ),
                     variantId,
                     transactionIds: transactionIdsByVariantId.get(variantId) ?? [],
                 },
-            },
+            }),
         );
     }
+}
+
+function formatAttributeAuditLabel(
+    attributes: StockVariantAuditSnapshot["attributes"],
+): string | undefined {
+    const label = attributes.map(({ value }) => value).join(" / ");
+    return label || undefined;
 }
 
 async function findAdjustmentVariant(
@@ -477,13 +496,13 @@ export async function createItem(
             "STOCK_ITEM_CREATE",
             item.id,
             actor,
-            {
+            defineAuditDetails("STOCK_ITEM_CREATE", {
                 after: createItemAuditSnapshot(createdItem),
                 metadata: {
                     itemId: item.id,
                     variantIds: createdItem.variants.map((variant) => variant.id),
                 },
-            },
+            }),
         );
         for (const variant of createdItem.variants) {
             await createStockVariantAudit(
@@ -491,10 +510,18 @@ export async function createItem(
                 "STOCK_ITEM_CREATE",
                 variant.id,
                 actor,
-                {
+                defineAuditDetails("STOCK_ITEM_CREATE", {
                     after: createVariantAuditSnapshot(variant),
-                    metadata: { itemId: item.id, variantId: variant.id },
-                },
+                    metadata: {
+                        itemId: item.id,
+                        itemName: createdItem.name,
+                        itemSku: createdItem.sku,
+                        variantId: variant.id,
+                        variantLabel: formatAttributeAuditLabel(
+                            createVariantAuditSnapshot(variant).attributes,
+                        ),
+                    },
+                }),
             );
         }
         return createdItem;
@@ -523,21 +550,29 @@ export async function updateItem(
         });
         const beforeVariants = beforeItem.variants ?? [];
         const afterVariants = item.variants ?? [];
-        await createStockCommandAudit(tx, auditAction, id, actor, {
-            before: createItemAuditSnapshot(beforeItem),
-            after: createItemAuditSnapshot(item),
-            metadata: {
-                itemId: id,
-                variantIds: afterVariants.map((variant) => variant.id),
-                transactionIds: Array.from(transactionIdsByVariantId.values()).flat(),
-            },
-        });
+        await createStockCommandAudit(
+            tx,
+            auditAction,
+            id,
+            actor,
+            defineAuditDetails(auditAction, {
+                before: createItemAuditSnapshot(beforeItem),
+                after: createItemAuditSnapshot(item),
+                metadata: {
+                    itemId: id,
+                    variantIds: afterVariants.map((variant) => variant.id),
+                    transactionIds: Array.from(
+                        transactionIdsByVariantId.values(),
+                    ).flat(),
+                },
+            }),
+        );
         await auditChangedVariants(
             tx,
             beforeVariants,
             afterVariants,
             actor,
-            id,
+            item,
             transactionIdsByVariantId,
         );
         return { item, cleanupCandidates, retainedUploadUrls };
@@ -593,7 +628,7 @@ export async function adjustStock(
             "STOCK_ADJUST",
             adjustment.transactionId,
             actor,
-            {
+            defineAuditDetails("STOCK_ADJUST", {
                 before: {
                     quantity: adjustment.previousQty,
                     minStock: adjustment.previousMinStock,
@@ -610,12 +645,17 @@ export async function adjustStock(
                 },
                 metadata: {
                     itemId,
+                    itemName: item.name,
+                    itemSku: item.sku,
                     variantId: adjustment.variantId,
+                    variantLabel: buildVariantLabel(variant.attributeValues ?? [])
+                        ?? variant.sku,
+                    unit: variant.unit,
                     adjustmentType: input.type,
                     adjustmentQuantity: input.quantity,
                     transactionIds: [adjustment.transactionId],
                 },
-            },
+            }),
         );
         await persistLowStockNotifications(adjustment.notificationAlerts, tx);
 

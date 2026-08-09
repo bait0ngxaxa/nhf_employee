@@ -10,7 +10,7 @@ import {
     isEmployeeInTransaction,
 } from "@/lib/services/leave/active-employee-session";
 import { isActiveLeaveApprover } from "@/lib/services/leave/approver-eligibility";
-import { auditCreatedLeaveRequest } from "@/lib/services/leave/create-request-audit";
+import { buildCreatedLeaveRequestAuditDetails } from "@/lib/services/leave/create-request-audit";
 import {
     LEAVE_REQUEST_MESSAGES,
     LeaveRequestError,
@@ -40,6 +40,7 @@ import {
     createLeaveRequestHash,
     isLeaveRequestIdempotencyConflict,
 } from "@/lib/services/leave/idempotency";
+import { createLeaveAuditInTransaction } from "@/lib/services/leave/transaction";
 
 interface PreparedLeaveRequest {
     payload: LeaveRequestValues;
@@ -315,6 +316,18 @@ async function createInTransaction(
             leaveRequestId: leaveRequest.id,
         },
     });
+    await createLeaveAuditInTransaction(
+        tx,
+        "LEAVE_REQUEST_CREATE",
+        leaveRequest.id,
+        input.userId,
+        input.userEmail,
+        buildCreatedLeaveRequestAuditDetails({
+            request: leaveRequest,
+            employeeName: `${employee.firstName} ${employee.lastName}`.trim(),
+            attachmentCount: input.attachments.length,
+        }),
+    );
     return { request: leaveRequest, replayed: false };
 }
 
@@ -344,14 +357,6 @@ export async function createLeaveRequest(
         result = { request: replayedRequest, replayed: true };
     }
 
-    if (!result.replayed) {
-        await auditCreatedLeaveRequest({
-            id: input.id,
-            userId: input.userId,
-            userEmail: input.userEmail,
-            attachmentCount: input.attachments.length,
-        });
-    }
     return result;
 }
 

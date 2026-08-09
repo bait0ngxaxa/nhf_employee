@@ -7,6 +7,7 @@ import {
 import { describe, expect, it, vi } from "vitest";
 
 import { auditTicketUpdate } from "@/lib/services/ticket/audit";
+import { formatAuditLogDisplay } from "@/lib/audit-log/display";
 
 function createTicket(overrides: Partial<Ticket> = {}): Ticket {
     return {
@@ -33,12 +34,26 @@ function createTicket(overrides: Partial<Ticket> = {}): Ticket {
 describe("ticket audit", () => {
     it("records assignment and field updates without a false status event", async () => {
         const create = vi.fn().mockResolvedValue({});
-        const before = createTicket();
-        const after = createTicket({
+        const before = {
+            ...createTicket({ assignedToId: 10 }),
+            assignedTo: {
+                name: "Somchai",
+                email: "somchai@example.com",
+                employee: { firstName: "สมชาย", lastName: "ใจดี" },
+            },
+        };
+        const after = {
+            ...createTicket({
             priority: TicketPriority.HIGH,
             assignedToId: 99,
             resolvedAt: new Date("2026-07-24T01:30:00.000Z"),
-        });
+            }),
+            assignedTo: {
+                name: "Wichai",
+                email: "wichai@example.com",
+                employee: { firstName: "วิชัย", lastName: "ใจดี" },
+            },
+        };
 
         await auditTicketUpdate(
             { auditLog: { create } } as never,
@@ -68,6 +83,20 @@ describe("ticket audit", () => {
                     details: expect.stringContaining('"requestId":"req-1"'),
                 }),
             }),
+        );
+        const assignmentCall = create.mock.calls.find(
+            ([call]) => call.data.action === "TICKET_ASSIGN",
+        )?.[0];
+        const assignmentDetails = JSON.parse(
+            String(assignmentCall?.data.details),
+        ) as Record<string, unknown>;
+        expect(formatAuditLogDisplay({
+            action: "TICKET_ASSIGN",
+            entityType: "Ticket",
+            entityId: 1,
+            details: assignmentDetails,
+        }).summary).toBe(
+            "มอบหมาย Ticket #1 “Printer” จาก สมชาย ใจดี → วิชัย ใจดี",
         );
     });
 });

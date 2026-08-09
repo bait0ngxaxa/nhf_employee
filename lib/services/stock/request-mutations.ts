@@ -3,6 +3,7 @@ import {
     StockRequestStatus,
     type Prisma,
 } from "@prisma/client";
+import { defineAuditDetails } from "@/lib/audit-log/contracts";
 import { prisma } from "@/lib/db/prisma";
 import { assertActiveWorkforceInTransaction } from "@/lib/auth/workforce-transaction";
 import {
@@ -240,7 +241,7 @@ export async function issueRequest(
                 quantity: true,
                 minStock: true,
                 isActive: true,
-                stockItem: { select: { name: true, isActive: true } },
+                stockItem: { select: { name: true, sku: true, isActive: true } },
                 attributeValues: {
                     select: {
                         attributeValue: {
@@ -342,7 +343,7 @@ export async function issueRequest(
             "STOCK_REQUEST_ISSUE",
             requestId,
             actor,
-            {
+            defineAuditDetails("STOCK_REQUEST_ISSUE", {
                 before: { status: StockRequestStatus.PENDING_ISSUE },
                 after: { status: StockRequestStatus.ISSUED },
                 metadata: {
@@ -356,7 +357,19 @@ export async function issueRequest(
 
                             return {
                                 itemId: requestItem.itemId,
+                                itemName: variant?.stockItem.name
+                                    ?? "ไม่ทราบชื่อวัสดุ",
+                                sku: variant?.stockItem.sku ?? variant?.sku
+                                    ?? "ไม่ทราบรหัส",
                                 variantId,
+                                ...(variant
+                                    ? {
+                                          variantLabel:
+                                              buildVariantLabel(variant.attributeValues)
+                                              ?? variant.sku,
+                                          unit: variant.unit,
+                                      }
+                                    : { unit: "" }),
                                 quantity: requestItem.quantity,
                                 variantQuantityBefore: variant?.quantity,
                                 variantQuantityAfter:
@@ -367,7 +380,7 @@ export async function issueRequest(
                         },
                     ),
                 },
-            },
+            }),
         );
         await notifyStockRequestResult(
             requestId,
@@ -456,7 +469,7 @@ export async function cancelRequest(
             "STOCK_REQUEST_CANCEL",
             requestId,
             actor,
-            {
+            defineAuditDetails("STOCK_REQUEST_CANCEL", {
                 before: { status: request.status },
                 after: { status: StockRequestStatus.CANCELLED },
                 metadata: {
@@ -464,7 +477,7 @@ export async function cancelRequest(
                     projectCode: request.projectCode,
                     reason: reason ?? null,
                 },
-            },
+            }),
         );
         await notifyStockRequestResult(
             requestId,

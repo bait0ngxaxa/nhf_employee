@@ -3,6 +3,7 @@ import { Prisma, type PrismaClient } from "@prisma/client";
 import { mockDeep, mockReset } from "vitest-mock-extended";
 import { prisma } from "@/lib/db/prisma";
 import { stockService } from "@/lib/services/stock";
+import { formatAuditLogDisplay } from "@/lib/audit-log/display";
 
 vi.mock("@/lib/db/prisma", () => ({
     prisma: mockDeep<PrismaClient>(),
@@ -704,15 +705,23 @@ describe("Stock Service Mutations", () => {
                     lines: [
                         {
                             itemId: 10,
+                            itemName: "ปากกา",
+                            sku: "SKU-101",
                             variantId: 101,
+                            variantLabel: "SKU-101",
                             quantity: 5,
+                            unit: "ด้าม",
                             variantQuantityBefore: 6,
                             variantQuantityAfter: 1,
                         },
                         {
                             itemId: 12,
+                            itemName: "สมุด",
+                            sku: "SKU-121",
                             variantId: 121,
+                            variantLabel: "SKU-121",
                             quantity: 1,
+                            unit: "เล่ม",
                             variantQuantityBefore: 7,
                             variantQuantityAfter: 6,
                         },
@@ -721,6 +730,12 @@ describe("Stock Service Mutations", () => {
                     correlationId: "corr-9",
                 }),
             });
+            expect(formatAuditLogDisplay({
+                action: "STOCK_REQUEST_ISSUE",
+                entityType: "StockRequest",
+                entityId: 99,
+                details: auditDetails,
+            }).summary).toBe("จ่ายคำขอเบิก #99 โครงการ PRJ-ISSUE จำนวน 2 รายการ");
             expect(prismaMock.notification.create).toHaveBeenCalledWith(
                 expect.objectContaining({
                     data: expect.objectContaining({
@@ -1092,7 +1107,14 @@ describe("Stock Service Mutations", () => {
                 }),
             );
             prismaMock.stockItemVariant.findFirst.mockResolvedValue(
-                asNever({ id: 102, quantity: 4, minStock: 2 }),
+                asNever({
+                    id: 102,
+                    sku: "INK-10-BLACK",
+                    unit: "ตลับ",
+                    quantity: 4,
+                    minStock: 2,
+                    attributeValues: [],
+                }),
             );
             prismaMock.stockItemVariant.updateMany.mockResolvedValue(
                 asNever({ count: 1 }),
@@ -1167,6 +1189,14 @@ describe("Stock Service Mutations", () => {
                     correlationId: "corr-9",
                 }),
             });
+            const adjustmentDisplay = formatAuditLogDisplay({
+                action: "STOCK_ADJUST",
+                entityType: "StockAdjustment",
+                entityId: 701,
+                details: auditDetails,
+            });
+            expect(adjustmentDisplay.summary).toContain("ปรับยอดวัสดุ");
+            expect(adjustmentDisplay.summary).toContain("เพิ่ม 3 ตลับ จาก 4 เป็น 7");
         });
 
         it("should require a selected variant when multiple active variants exist", async () => {
@@ -1379,7 +1409,30 @@ describe("Stock Service Mutations", () => {
                 note: null,
                 createdAt: new Date("2026-01-01T00:00:00.000Z"),
                 requester: { name: "ผู้ใช้ 7", email: "user-7@example.com" },
-                items: [],
+                items: [{
+                    id: 101,
+                    itemId: 50,
+                    variantId: 501,
+                    quantity: 1,
+                    item: {
+                        id: 50,
+                        name: "จอภาพ",
+                        sku: "MONITOR-50",
+                        unit: "เครื่อง",
+                    },
+                    variant: {
+                        id: 501,
+                        sku: "MONITOR-50-24",
+                        unit: "เครื่อง",
+                        imageUrl: null,
+                        attributeValues: [{
+                            attributeValue: {
+                                value: "24 นิ้ว",
+                                attribute: { id: 1, name: "ขนาด" },
+                            },
+                        }],
+                    },
+                }],
             }));
 
             await stockService.createRequest({
@@ -1411,6 +1464,15 @@ describe("Stock Service Mutations", () => {
                 stockRequestId: 1,
                 projectCode: "PRJ-MATCH",
                 variantIds: [501],
+                lines: [{
+                    itemId: 50,
+                    itemName: "จอภาพ",
+                    sku: "MONITOR-50",
+                    variantId: 501,
+                    variantLabel: "ขนาด: 24 นิ้ว",
+                    quantity: 1,
+                    unit: "เครื่อง",
+                }],
                 requestId: "req-7",
                 correlationId: "corr-7",
                 idempotencyKeyHash: expect.stringMatching(/^[a-f0-9]{12}$/),
@@ -1418,6 +1480,12 @@ describe("Stock Service Mutations", () => {
             expect(auditDetails.metadata.idempotencyKeyHash).not.toBe(
                 requestOptions().idempotencyKey,
             );
+            expect(formatAuditLogDisplay({
+                action: "STOCK_REQUEST_CREATE",
+                entityType: "StockRequest",
+                entityId: 1,
+                details: auditDetails,
+            }).summary).toBe("สร้างคำขอเบิก #1 โครงการ PRJ-MATCH จำนวน 1 รายการ");
             expect(prismaMock.notification.create).toHaveBeenCalledWith(
                 expect.objectContaining({
                     data: expect.objectContaining({
@@ -1731,6 +1799,12 @@ describe("Stock Service Mutations", () => {
                     correlationId: "corr-3",
                 }),
             });
+            expect(formatAuditLogDisplay({
+                action: "STOCK_REQUEST_CANCEL",
+                entityType: "StockRequest",
+                entityId: 55,
+                details: auditDetails,
+            }).summary).toBe("ยกเลิกคำขอเบิก #55: ผู้เบิกไม่มารับ");
             expect(prismaMock.notification.create).toHaveBeenCalledWith(
                 expect.objectContaining({
                     data: expect.objectContaining({
@@ -2109,6 +2183,17 @@ describe("Stock Service Mutations", () => {
                     details: expect.stringContaining('"transactionIds":[901]'),
                 }),
             });
+            const variantAuditDetails = JSON.parse(
+                prismaMock.auditLog.create.mock.calls[1][0].data.details as string,
+            ) as Record<string, unknown>;
+            const variantDisplay = formatAuditLogDisplay({
+                action: "STOCK_ITEM_UPDATE",
+                entityType: "StockVariant",
+                entityId: 241,
+                details: variantAuditDetails,
+            });
+            expect(variantDisplay.summary).toContain("แก้ไขรายการย่อย “ปากกา / SKU-24-A”");
+            expect(variantDisplay.summary).toContain("จำนวนคงเหลือ: 5 → 0");
         });
 
         it("should reject a stale variant update when updateMany changes no rows", async () => {

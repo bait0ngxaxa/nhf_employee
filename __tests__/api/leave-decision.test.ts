@@ -3,10 +3,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { POST } from "@/app/api/leave/decision/route";
 import { requireApiSession } from "@/lib/auth/api";
 import { prisma } from "@/lib/db/prisma";
-import { logLeaveEvent } from "@/lib/server/audit";
 import { getEmployeeIdFromUserId } from "@/lib/services/leave/get-employee-id";
 import { processOutbox } from "@/lib/services/outbox/processor";
 import type * as NextServerModule from "next/server";
+import { formatAuditLogDisplay } from "@/lib/audit-log/display";
 
 vi.mock("next/server", async (importOriginal) => {
     const actual = await importOriginal<typeof NextServerModule>();
@@ -20,10 +20,6 @@ vi.mock("next/server", async (importOriginal) => {
 
 vi.mock("@/lib/auth/api", () => ({
     requireApiSession: vi.fn(),
-}));
-
-vi.mock("@/lib/server/audit", () => ({
-    logLeaveEvent: vi.fn(),
 }));
 
 vi.mock("@/lib/services/leave/get-employee-id", () => ({
@@ -58,6 +54,9 @@ vi.mock("@/lib/db/prisma", () => ({
         notificationOutbox: {
             create: vi.fn(),
         },
+        auditLog: {
+            create: vi.fn(),
+        },
     },
 }));
 
@@ -90,7 +89,6 @@ describe("POST /api/leave/decision", () => {
         vi.mocked(prisma.user.findFirst).mockResolvedValue({ id: 20 } as never);
         vi.mocked(prisma.$queryRaw).mockResolvedValue([] as never);
         vi.mocked(processOutbox).mockResolvedValue({ processed: 0, failed: 0 });
-        vi.mocked(logLeaveEvent).mockResolvedValue(undefined);
         vi.mocked(prisma.$transaction).mockImplementation(async (callback) => {
             if (typeof callback === "function") {
                 return callback(prisma);
@@ -127,7 +125,7 @@ describe("POST /api/leave/decision", () => {
         expect(prisma.leaveRequest.updateMany).not.toHaveBeenCalled();
         expect(prisma.leaveQuota.update).not.toHaveBeenCalled();
         expect(prisma.notificationOutbox.create).not.toHaveBeenCalled();
-        expect(logLeaveEvent).not.toHaveBeenCalled();
+        expect(prisma.auditLog.create).not.toHaveBeenCalled();
     });
 
     it("rejects an approver who is not recorded on the pending request", async () => {
@@ -176,7 +174,7 @@ describe("POST /api/leave/decision", () => {
         expect(res.status).toBe(403);
         expect(prisma.leaveRequest.updateMany).not.toHaveBeenCalled();
         expect(prisma.notificationOutbox.create).not.toHaveBeenCalled();
-        expect(logLeaveEvent).not.toHaveBeenCalled();
+        expect(prisma.auditLog.create).not.toHaveBeenCalled();
     });
 
     it("returns 403 instead of disclosing a processed request to a non-approver", async () => {
@@ -310,6 +308,74 @@ describe("POST /api/leave/decision", () => {
                 status: "APPROVED",
             }),
         });
+        const auditCall = vi.mocked(prisma.auditLog.create).mock.calls[0]?.[0];
+        const auditDetails = JSON.parse(String(auditCall?.data.details)) as Record<string, unknown>;
+        expect(auditCall?.data.action).toBe("LEAVE_REQUEST_APPROVE");
+        expect(formatAuditLogDisplay({
+            action: "LEAVE_REQUEST_APPROVE",
+            entityType: "LeaveRequest",
+            entityId: null,
+            details: auditDetails,
+        }).summary).toContain("อนุมัติคำขอลาพักร้อนของ Employee User");
+    });
+
+    it("records a rejection reason in the real writer-to-formatter contract", async () => {
+        vi.mocked(prisma.leaveRequest.findUnique).mockResolvedValue({
+            id: "leave-rejected",
+            employeeId: 10,
+            leaveType: "SICK",
+            startDate: new Date("2031-07-10T00:00:00.000Z"),
+            endDate: new Date("2031-07-11T00:00:00.000Z"),
+            period: "FULL_DAY",
+            durationHalfDays: 4,
+            status: "PENDING",
+            approverId: 20,
+            specialReason: null,
+            overQuotaHalfDays: 0,
+            employee: {
+                id: 10,
+                firstName: "สมชาย",
+                lastName: "ใจดี",
+                email: "somchai@example.com",
+                user: { id: 10 },
+            },
+            approver: {
+                id: 20,
+                firstName: "วิชัย",
+                lastName: "ใจดี",
+                email: "manager@example.com",
+            },
+        } as never);
+        vi.mocked(prisma.leaveRequest.updateMany).mockResolvedValue({ count: 1 });
+        vi.mocked(prisma.leaveRequest.findUniqueOrThrow).mockResolvedValue({
+            id: "leave-rejected",
+            durationHalfDays: 4,
+            overQuotaHalfDays: 0,
+            status: "REJECTED",
+        } as never);
+
+        const response = await POST(new NextRequest("http://localhost/api/leave/decision", {
+            method: "POST",
+            body: JSON.stringify({
+                leaveId: "leave-rejected",
+                action: "REJECT",
+                reason: "เอกสารไม่ครบ",
+            }),
+        }));
+
+        expect(response.status).toBe(200);
+        const auditCall = vi.mocked(prisma.auditLog.create).mock.calls[0]?.[0];
+        const auditDetails = JSON.parse(String(auditCall?.data.details)) as Record<string, unknown>;
+        const display = formatAuditLogDisplay({
+            action: "LEAVE_REQUEST_REJECT",
+            entityType: "LeaveRequest",
+            entityId: null,
+            details: auditDetails,
+        });
+
+        expect(auditCall?.data.action).toBe("LEAVE_REQUEST_REJECT");
+        expect(display.summary).toContain("ไม่อนุมัติคำขอลาป่วยของ สมชาย ใจดี");
+        expect(display.summary).toContain("เอกสารไม่ครบ");
     });
 
     it("records only the additional over-quota days when quota is already exceeded", async () => {

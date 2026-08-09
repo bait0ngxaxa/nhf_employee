@@ -1,5 +1,9 @@
 import type { AuditAction, Prisma, Ticket } from "@prisma/client";
 
+import {
+    defineAuditDetails,
+    type AuditDetails,
+} from "@/lib/audit-log/contracts";
 import type { UserContext } from "./types";
 
 type AuditClient = Pick<Prisma.TransactionClient, "auditLog">;
@@ -11,11 +15,18 @@ type TicketAuditAction =
     | "TICKET_COMMENT"
     | "TICKET_DELETE";
 
-interface TicketAuditDetails {
-    before?: Record<string, unknown>;
-    after?: Record<string, unknown>;
-    metadata?: Record<string, unknown>;
-}
+type TicketAuditDetails = AuditDetails;
+
+type TicketWithOptionalAssignee = Ticket & {
+    assignedTo?: {
+        name: string;
+        email: string;
+        employee: {
+            firstName: string;
+            lastName: string;
+        } | null;
+    } | null;
+};
 
 const UPDATE_FIELDS = [
     "title",
@@ -85,10 +96,11 @@ function changedValues(
 
 export async function auditTicketUpdate(
     client: AuditClient,
-    before: Ticket,
-    after: Ticket,
+    before: TicketWithOptionalAssignee,
+    after: TicketWithOptionalAssignee,
     actor: UserContext,
 ): Promise<void> {
+    const assignmentChange = changedValues(before, after, ["assignedToId"]);
     const events: Array<{
         action: TicketAuditAction;
         details: TicketAuditDetails | null;
@@ -104,7 +116,25 @@ export async function auditTicketUpdate(
         },
         {
             action: "TICKET_ASSIGN",
-            details: changedValues(before, after, ["assignedToId"]),
+            details: assignmentChange
+                ? defineAuditDetails("TICKET_ASSIGN", {
+                      before: {
+                          assignedToId: before.assignedToId,
+                      },
+                      after: {
+                          assignedToId: after.assignedToId,
+                      },
+                      metadata: {
+                          ticketTitle: after.title,
+                          previousAssigneeName: getAssigneeDisplayName(
+                              before.assignedTo,
+                          ),
+                          newAssigneeName: getAssigneeDisplayName(
+                              after.assignedTo,
+                          ),
+                      },
+                  })
+                : null,
         },
         {
             action: "TICKET_UPDATE",
@@ -122,4 +152,14 @@ export async function auditTicketUpdate(
             event.details,
         );
     }
+}
+
+function getAssigneeDisplayName(
+    assignee: TicketWithOptionalAssignee["assignedTo"],
+): string | null {
+    if (!assignee) return null;
+    const employeeName = assignee.employee
+        ? `${assignee.employee.firstName} ${assignee.employee.lastName}`.trim()
+        : "";
+    return employeeName || assignee.name.trim() || assignee.email;
 }

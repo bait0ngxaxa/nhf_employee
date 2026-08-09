@@ -4,6 +4,7 @@ import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
 import { assignLeaveApprovers } from "@/lib/services/leave/approver-assignment";
 import { ACTIVE_LEAVE_EMPLOYEE_QUERY_WHERE } from "@/lib/services/leave/approver-eligibility";
+import { formatAuditLogDisplay } from "@/lib/audit-log/display";
 
 vi.mock("@/lib/db/prisma", () => ({
     prisma: {
@@ -243,6 +244,47 @@ describe("assignLeaveApprovers", () => {
             data: { managerId: 20 },
         });
         expect(prisma.auditLog.create).toHaveBeenCalledTimes(1);
+    });
+
+    it("stores immutable employee and approver names for display", async () => {
+        const employee = {
+            id: 10,
+            firstName: "สมชาย",
+            lastName: "ใจดี",
+            managerId: 15,
+        };
+        const previousApprover = {
+            ...buildApprover(),
+            id: 15,
+            firstName: "วิชัย",
+            lastName: "ใจดี",
+        };
+        const newApprover = {
+            ...buildApprover(),
+            id: 20,
+            firstName: "สุชาติ",
+            lastName: "ใจดี",
+        };
+        mockAssignmentLookup({
+            employees: [employee],
+            approvers: [previousApprover, newApprover],
+        });
+
+        await assignLeaveApprovers(
+            [{ employeeId: 10, managerId: 20 }],
+            ACTOR,
+        );
+
+        const auditCall = vi.mocked(prisma.auditLog.create).mock.calls[0]?.[0];
+        const details = JSON.parse(String(auditCall?.data.details)) as Record<string, unknown>;
+        expect(formatAuditLogDisplay({
+            action: "EMPLOYEE_UPDATE",
+            entityType: "EmployeeApprover",
+            entityId: 10,
+            details,
+        }).summary).toBe(
+            "เปลี่ยนผู้อนุมัติการลาของ สมชาย ใจดี: วิชัย ใจดี → สุชาติ ใจดี",
+        );
     });
 
     it("does not block a no-op assignment when a pending request exists", async () => {

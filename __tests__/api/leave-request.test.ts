@@ -12,6 +12,7 @@ import { resetMutationRateLimit } from "@/lib/security/mutation-rate-limit";
 import { createLeaveRequestHash } from "@/lib/services/leave/idempotency";
 import { NextRequest } from "next/server";
 import type * as NextServerModule from "next/server";
+import { formatAuditLogDisplay } from "@/lib/audit-log/display";
 
 const uploadMocks = vi.hoisted(() => ({
     save: vi.fn(),
@@ -811,6 +812,11 @@ describe("POST /api/leave/request", () => {
             } as never);
             vi.mocked(prisma.leaveRequest.create).mockResolvedValue({
                 id: "leave-request-1",
+                employeeId: mockEmployeeId,
+                leaveType: validPayload.leaveType,
+                startDate: new Date("2030-05-10T00:00:00.000Z"),
+                endDate: new Date("2030-05-10T00:00:00.000Z"),
+                period: validPayload.period,
                 durationHalfDays: 2,
                 overQuotaHalfDays: 0,
                 attachments,
@@ -903,10 +909,20 @@ describe("POST /api/leave/request", () => {
                 String(auditCall?.data.details),
             ) as { metadata?: Record<string, unknown> };
             expect(auditDetails.metadata?.attachmentCount).toBe(1);
-            expect(Object.keys(auditDetails.metadata ?? {}).sort()).toEqual([
-                "attachmentCount",
-                "leaveRequestId",
-            ]);
+            expect(auditDetails.metadata).toMatchObject({
+                attachmentCount: 1,
+                employeeId: mockEmployeeId,
+                employeeName: "A B",
+                leaveType: "PERSONAL",
+                period: "FULL_DAY",
+                durationDays: 1,
+            });
+            expect(formatAuditLogDisplay({
+                action: "LEAVE_REQUEST_CREATE",
+                entityType: "LeaveRequest",
+                entityId: null,
+                details: auditDetails as Record<string, unknown>,
+            }).summary).toContain("ยื่นคำขอลากิจของ A B");
             expect(String(auditCall?.data.details)).not.toContain("storageKey");
             expect(String(auditCall?.data.details)).not.toContain("proof.jpg");
         });

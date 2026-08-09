@@ -1,4 +1,8 @@
-import type { AuditAction, Prisma } from "@prisma/client";
+import type { Prisma } from "@prisma/client";
+import type {
+    AuditDetailsFor,
+    ContractedAuditAction,
+} from "@/lib/audit-log/contracts";
 
 export { lockEmployeeRows } from "@/lib/db/row-locks";
 
@@ -14,19 +18,20 @@ export async function lockLeaveRequestRow(
     `;
 }
 
-export type LeaveTransactionAuditDetails = {
-    before?: Record<string, unknown>;
-    after?: Record<string, unknown>;
-    metadata?: Record<string, unknown>;
-};
+type LeaveTransactionAuditAction = Extract<
+    ContractedAuditAction,
+    `LEAVE_REQUEST_${string}`
+>;
 
-export async function createLeaveAuditInTransaction(
+export async function createLeaveAuditInTransaction<
+    Action extends LeaveTransactionAuditAction,
+>(
     tx: Prisma.TransactionClient,
-    action: AuditAction,
+    action: Action,
     leaveId: string,
     userId: number | null,
     userEmail: string,
-    details: LeaveTransactionAuditDetails = {},
+    details: AuditDetailsFor<Action>,
 ): Promise<void> {
     await tx.auditLog.create({
         data: {

@@ -1,3 +1,5 @@
+import type { AuditAction } from "@prisma/client";
+
 interface AuditActionMeta {
     label: string;
     badgeClassName: string;
@@ -8,7 +10,7 @@ const DEFAULT_AUDIT_ACTION_META: AuditActionMeta = {
     badgeClassName: "bg-slate-100 text-slate-700 border border-slate-200",
 };
 
-export const AUDIT_ACTION_META: Record<string, AuditActionMeta> = {
+export const AUDIT_ACTION_META = {
     LOGIN_SUCCESS: {
         label: "เข้าสู่ระบบสำเร็จ",
         badgeClassName: "bg-emerald-100 text-emerald-700 border border-emerald-200",
@@ -66,8 +68,12 @@ export const AUDIT_ACTION_META: Record<string, AuditActionMeta> = {
         badgeClassName: "bg-purple-100 text-purple-700 border border-purple-200",
     },
     TICKET_COMMENT: {
-        label: "คอมเมนต์ Ticket",
+        label: "เพิ่มความคิดเห็นใน Ticket",
         badgeClassName: "bg-orange-100 text-orange-700 border border-orange-200",
+    },
+    TICKET_DELETE: {
+        label: "ลบ Ticket",
+        badgeClassName: "bg-rose-100 text-rose-700 border border-rose-200",
     },
     USER_CREATE: {
         label: "สร้างผู้ใช้",
@@ -165,70 +171,98 @@ export const AUDIT_ACTION_META: Record<string, AuditActionMeta> = {
         label: "ยกเลิกคำขอเบิกวัสดุ",
         badgeClassName: "bg-red-100 text-red-700 border border-red-200",
     },
-};
+    ROUTINE_TASK_CREATE: {
+        label: "สร้างแม่แบบงานประจำ",
+        badgeClassName: "bg-emerald-100 text-emerald-700 border border-emerald-200",
+    },
+    ROUTINE_TASK_UPDATE: {
+        label: "แก้ไขแม่แบบงานประจำ",
+        badgeClassName: "bg-blue-100 text-blue-700 border border-blue-200",
+    },
+    ROUTINE_TASK_DEACTIVATE: {
+        label: "ปิดใช้งานแม่แบบงานประจำ",
+        badgeClassName: "bg-amber-100 text-amber-700 border border-amber-200",
+    },
+    ROUTINE_TASK_DELETE: {
+        label: "ลบแม่แบบงานประจำ",
+        badgeClassName: "bg-rose-100 text-rose-700 border border-rose-200",
+    },
+    ROUTINE_OCCURRENCE_REASSIGN: {
+        label: "เปลี่ยนผู้รับผิดชอบรอบงาน",
+        badgeClassName: "bg-purple-100 text-purple-700 border border-purple-200",
+    },
+    ROUTINE_OCCURRENCE_DUE_DATE_CHANGE: {
+        label: "เปลี่ยนวันกำหนดรอบงาน",
+        badgeClassName: "bg-cyan-100 text-cyan-700 border border-cyan-200",
+    },
+    ROUTINE_IMPORT_UPLOAD: {
+        label: "อัปโหลดไฟล์งานประจำ",
+        badgeClassName: "bg-sky-100 text-sky-700 border border-sky-200",
+    },
+    ROUTINE_IMPORT_ROW_UPDATE: {
+        label: "แก้ไขแถวนำเข้างานประจำ",
+        badgeClassName: "bg-blue-100 text-blue-700 border border-blue-200",
+    },
+    ROUTINE_IMPORT_APPLY: {
+        label: "นำเข้างานประจำ",
+        badgeClassName: "bg-green-100 text-green-700 border border-green-200",
+    },
+    ROUTINE_IMPORT_CANCEL: {
+        label: "ยกเลิกการนำเข้างานประจำ",
+        badgeClassName: "bg-orange-100 text-orange-700 border border-orange-200",
+    },
+} as const satisfies Record<AuditAction, AuditActionMeta>;
 
-export const AUDIT_ACTION_LABELS: Record<string, string> = Object.entries(
-    AUDIT_ACTION_META,
-).reduce<Record<string, string>>((acc, [key, value]) => {
-    acc[key] = value.label;
-    return acc;
-}, {});
-
-const AUDIT_FILTER_ACTIONS = [
-    "LOGIN_SUCCESS",
-    "LOGIN_FAILED",
-    "EMPLOYEE_CREATE",
-    "EMPLOYEE_UPDATE",
-    "EMPLOYEE_DELETE",
-    "TICKET_CREATE",
-    "USER_CREATE",
-    "DATA_EXPORT",
-    "EMAIL_REQUEST",
-    "LEAVE_REQUEST_CREATE",
-    "LEAVE_REQUEST_APPROVE",
-    "LEAVE_REQUEST_REJECT",
-    "LEAVE_REQUEST_CANCEL",
-    "LEAVE_REQUEST_CANCELLATION_REQUEST",
-    "LEAVE_REQUEST_CANCELLATION_CONFIRM",
-    "LEAVE_REQUEST_NOT_TAKEN_REQUEST",
-    "LEAVE_REQUEST_NOT_TAKEN_CONFIRM",
-    "STOCK_ITEM_CREATE",
-    "STOCK_ITEM_UPDATE",
-    "STOCK_ITEM_DELETE",
-    "STOCK_ADJUST",
-    "STOCK_CATEGORY_CREATE",
-    "STOCK_CATEGORY_DELETE",
-    "STOCK_REQUEST_CREATE",
-    "STOCK_REQUEST_ISSUE",
-    "STOCK_REQUEST_CANCEL",
-] as const;
+export const AUDIT_ACTION_LABELS = Object.fromEntries(
+    Object.entries(AUDIT_ACTION_META).map(([action, metadata]) => [
+        action,
+        metadata.label,
+    ]),
+) as Record<AuditAction, string>;
 
 export const AUDIT_ACTION_FILTER_OPTIONS = [
     { value: "all", label: "ทั้งหมด" },
-    ...AUDIT_FILTER_ACTIONS.map((action) => ({
+    ...Object.entries(AUDIT_ACTION_META).map(([action, metadata]) => ({
         value: action,
-        label: AUDIT_ACTION_LABELS[action],
+        label: metadata.label,
     })),
 ];
 
+export const AUDIT_ENTITY_LABELS = {
+    User: "ผู้ใช้ระบบ",
+    Employee: "พนักงาน",
+    EmployeeApprover: "ผู้อนุมัติการลา",
+    Ticket: "งานบริการ IT",
+    EmailRequest: "คำร้องพนักงานใหม่",
+    Stock: "สต็อก",
+    StockItem: "วัสดุ",
+    StockVariant: "รายการย่อยวัสดุ",
+    StockAdjustment: "รายการปรับยอดสต็อก",
+    StockRequest: "คำขอเบิกวัสดุ",
+    StockCategory: "หมวดหมู่วัสดุ",
+    LeaveRequest: "คำขอลา",
+    Leave: "คำขอลา",
+    RoutineTask: "แม่แบบงานประจำ",
+    RoutineOccurrence: "รอบงานประจำ",
+    RoutineImportBatch: "ชุดนำเข้างานประจำ",
+    RoutineImportRow: "แถวนำเข้างานประจำ",
+} as const satisfies Record<string, string>;
+
 export const AUDIT_ENTITY_TYPE_OPTIONS = [
     { value: "all", label: "ทั้งหมด" },
-    { value: "User", label: "ผู้ใช้ระบบ" },
-    { value: "Employee", label: "พนักงาน" },
-    { value: "Ticket", label: "งานบริการ IT" },
-    { value: "Stock", label: "สต็อก" },
-    { value: "StockItem", label: "วัสดุ" },
-    { value: "StockRequest", label: "คำขอเบิกวัสดุ" },
-    { value: "StockCategory", label: "หมวดหมู่วัสดุ" },
-    { value: "LeaveRequest", label: "คำขอลา" },
+    ...Object.entries(AUDIT_ENTITY_LABELS).map(([value, label]) => ({
+        value,
+        label,
+    })),
 ];
 
 export function getAuditActionLabel(action: string): string {
-    return AUDIT_ACTION_META[action]?.label ?? DEFAULT_AUDIT_ACTION_META.label;
+    return (AUDIT_ACTION_META as Partial<Record<string, AuditActionMeta>>)[action]?.label
+        ?? DEFAULT_AUDIT_ACTION_META.label;
 }
 
 export function getAuditActionBadgeClassName(action: string): string {
-    return AUDIT_ACTION_META[action]?.badgeClassName
+    return (AUDIT_ACTION_META as Partial<Record<string, AuditActionMeta>>)[action]?.badgeClassName
         ?? DEFAULT_AUDIT_ACTION_META.badgeClassName;
 }
 

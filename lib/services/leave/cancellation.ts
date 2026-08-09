@@ -31,6 +31,7 @@ import {
 } from "@/lib/services/leave/transaction";
 import { isBeforeLeaveStart } from "@/lib/services/leave/utils";
 import { halfDaysToDays } from "@/lib/services/leave/half-days";
+import { buildLeaveAuditContext } from "@/lib/services/leave/audit-details";
 import {
     formatLeaveSummary,
     getLeaveTypeLabel,
@@ -100,6 +101,7 @@ export type LeaveCancellationResult = {
 type EmployeeActor = {
     userId: number;
     employeeId: number;
+    userEmail?: string;
 };
 
 export async function cancelLeaveRequest(
@@ -151,6 +153,20 @@ export async function cancelLeaveRequest(
                     },
                 });
             }
+            await createLeaveAuditInTransaction(
+                tx,
+                "LEAVE_REQUEST_CANCEL",
+                leaveId,
+                actor.userId,
+                actor.userEmail ?? "",
+                {
+                    before: { status: "PENDING" },
+                    after: { status: "CANCELLED" },
+                    metadata: buildLeaveAuditContext(leaveRequest, {
+                        reason: reason ?? null,
+                    }),
+                },
+            );
             const updatedRequest = await tx.leaveRequest.findUniqueOrThrow({ where: { id: leaveId } });
             return {
                 request: withCancellationInclude(updatedRequest, leaveRequest),
@@ -230,6 +246,26 @@ export async function cancelLeaveRequest(
                 payload: JSON.stringify(payload),
             },
         });
+
+        await createLeaveAuditInTransaction(
+            tx,
+            "LEAVE_REQUEST_CANCELLATION_REQUEST",
+            leaveId,
+            actor.userId,
+            actor.userEmail ?? "",
+            {
+                before: { status: "APPROVED" },
+                after: { status: "CANCELLATION_REQUESTED" },
+                metadata: {
+                    ...buildLeaveAuditContext(leaveRequest, {
+                        reason: reason ?? null,
+                    }),
+                    originalApproverId: leaveRequest.approverId,
+                    exceptionApproverId: exceptionApprover.exceptionApproverId,
+                    exceptionApproverSource: exceptionApprover.source,
+                },
+            },
+        );
 
         const updatedRequest = await tx.leaveRequest.findUniqueOrThrow({ where: { id: leaveId } });
         return {
@@ -342,26 +378,27 @@ export async function confirmLeaveCancellation(
             },
         });
 
-        if (isAdminRole(actor.role)) {
-            await createLeaveAuditInTransaction(
-                tx,
-                "LEAVE_REQUEST_CANCELLATION_CONFIRM",
-                leaveId,
-                actor.userId,
-                actor.userEmail ?? "",
-                {
-                    before: { status: "CANCELLATION_REQUESTED" },
-                    after: { status: "CANCELLED_AFTER_APPROVAL" },
-                    metadata: {
-                        adminOverride: authorization.adminOverride,
-                        decision: "CONFIRM",
-                        originalApproverId: leaveRequest.approverId,
-                        exceptionApproverId: leaveRequest.exceptionApproverId,
-                        ...(adminOverrideReason ? { overrideReason: adminOverrideReason } : {}),
-                    },
+        await createLeaveAuditInTransaction(
+            tx,
+            "LEAVE_REQUEST_CANCELLATION_CONFIRM",
+            leaveId,
+            actor.userId,
+            actor.userEmail ?? "",
+            {
+                before: { status: "CANCELLATION_REQUESTED" },
+                after: { status: "CANCELLED_AFTER_APPROVAL" },
+                metadata: {
+                    ...buildLeaveAuditContext(leaveRequest, {
+                        reason: adminOverrideReason,
+                    }),
+                    adminOverride: authorization.adminOverride,
+                    decision: "CONFIRM",
+                    originalApproverId: leaveRequest.approverId,
+                    exceptionApproverId: leaveRequest.exceptionApproverId,
+                    ...(adminOverrideReason ? { overrideReason: adminOverrideReason } : {}),
                 },
-            );
-        }
+            },
+        );
 
         const updatedRequest = await tx.leaveRequest.findUniqueOrThrow({ where: { id: leaveId } });
         return {
@@ -405,26 +442,27 @@ export async function rejectLeaveCancellation(
         await markCancellationNotificationsRead(tx, leaveRequest);
         await createCancellationRejectedNotification(tx, leaveRequest);
 
-        if (isAdminRole(actor.role)) {
-            await createLeaveAuditInTransaction(
-                tx,
-                "LEAVE_REQUEST_CANCELLATION_CONFIRM",
-                leaveId,
-                actor.userId,
-                actor.userEmail ?? "",
-                {
-                    before: { status: "CANCELLATION_REQUESTED" },
-                    after: { status: "APPROVED" },
-                    metadata: {
-                        adminOverride: authorization.adminOverride,
-                        decision: "REJECT",
-                        originalApproverId: leaveRequest.approverId,
-                        exceptionApproverId: leaveRequest.exceptionApproverId,
-                        ...(adminOverrideReason ? { overrideReason: adminOverrideReason } : {}),
-                    },
+        await createLeaveAuditInTransaction(
+            tx,
+            "LEAVE_REQUEST_CANCELLATION_CONFIRM",
+            leaveId,
+            actor.userId,
+            actor.userEmail ?? "",
+            {
+                before: { status: "CANCELLATION_REQUESTED" },
+                after: { status: "APPROVED" },
+                metadata: {
+                    ...buildLeaveAuditContext(leaveRequest, {
+                        reason: reason ?? null,
+                    }),
+                    adminOverride: authorization.adminOverride,
+                    decision: "REJECT",
+                    originalApproverId: leaveRequest.approverId,
+                    exceptionApproverId: leaveRequest.exceptionApproverId,
+                    ...(adminOverrideReason ? { overrideReason: adminOverrideReason } : {}),
                 },
-            );
-        }
+            },
+        );
 
         const updatedRequest = await tx.leaveRequest.findUniqueOrThrow({ where: { id: leaveId } });
         return {

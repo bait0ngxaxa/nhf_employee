@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db/prisma";
+import type { AuditDetails } from "@/lib/audit-log/contracts";
 import { getTrustedClientIp } from "@/lib/network/trusted-client-ip";
 import { type AuditAction } from "@prisma/client";
 import { headers } from "next/headers";
@@ -10,14 +11,7 @@ import {
 /**
  * Audit log details interface
  */
-export interface AuditLogDetails {
-    /** Previous values before update */
-    before?: Record<string, unknown>;
-    /** New values after update */
-    after?: Record<string, unknown>;
-    /** Additional metadata */
-    metadata?: Record<string, unknown>;
-}
+export type AuditLogDetails = AuditDetails;
 
 /**
  * Audit log parameters interface

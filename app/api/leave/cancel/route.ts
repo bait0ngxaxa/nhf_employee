@@ -1,8 +1,6 @@
 import { after, NextResponse, type NextRequest } from "next/server";
 
 import { requireActiveWorkforceSession } from "@/lib/auth/workforce";
-import { isAdminRole } from "@/lib/ssot/permissions";
-import { logLeaveEvent } from "@/lib/server/audit";
 import {
     cancelLeaveRequest,
     confirmLeaveCancellation,
@@ -53,28 +51,14 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         }
 
         const result = await cancelLeaveRequest(
-            { userId: auth.user.id, employeeId: auth.employeeId },
+            {
+                userId: auth.user.id,
+                employeeId: auth.employeeId,
+                userEmail: auth.user.email,
+            },
             parsed.data.leaveId,
             parsed.data.reason,
         );
-
-        const auditAction = result.kind === "CANCELLATION_REQUESTED"
-            ? "LEAVE_REQUEST_CANCELLATION_REQUEST"
-            : "LEAVE_REQUEST_CANCEL";
-        await logLeaveEvent(auditAction, parsed.data.leaveId, auth.user.id, auth.user.email, {
-            after: { status: result.request.status },
-            metadata: {
-                ...(parsed.data.reason ? { reason: parsed.data.reason } : {}),
-                ...(result.kind === "CANCELLATION_REQUESTED"
-                    ? {
-                        originalApproverId: result.request.approverId,
-                        exceptionApproverId: result.request.exceptionApproverId,
-                        exceptionApproverSource: result.exceptionApproverSource
-                            ?? "ORIGINAL_APPROVER",
-                    }
-                    : {}),
-            },
-        }).catch((error: unknown) => console.error("Failed to log leave cancellation:", error));
 
         after(() => {
             processOutbox().catch((error: unknown) =>
@@ -131,23 +115,6 @@ export async function PUT(req: NextRequest): Promise<NextResponse> {
         const result = parsed.data.action === "REJECT"
             ? await rejectLeaveCancellation(actor, parsed.data.leaveId, parsed.data.reason)
             : await confirmLeaveCancellation(actor, parsed.data.leaveId, parsed.data.reason);
-
-        if (!isAdminRole(auth.user.role)) {
-            await logLeaveEvent(
-                "LEAVE_REQUEST_CANCELLATION_CONFIRM",
-                parsed.data.leaveId,
-                auth.user.id,
-                auth.user.email,
-                {
-                    before: { status: "CANCELLATION_REQUESTED" },
-                    after: { status: result.request.status },
-                    metadata: {
-                        leaveId: parsed.data.leaveId,
-                        decision: parsed.data.action,
-                    },
-                },
-            ).catch((error: unknown) => console.error("Failed to log leave cancellation confirmation:", error));
-        }
 
         after(() => {
             processOutbox().catch((error: unknown) =>

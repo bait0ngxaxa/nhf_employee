@@ -1,7 +1,6 @@
 import { after, NextResponse, type NextRequest } from "next/server";
 
 import { requireActiveWorkforceSession } from "@/lib/auth/workforce";
-import { logLeaveEvent } from "@/lib/server/audit";
 import {
     isActiveEmployeeInTransaction,
 } from "@/lib/services/leave/active-employee-session";
@@ -46,6 +45,7 @@ import {
     createLeaveAuditInTransaction,
     lockLeaveRequestRow,
 } from "@/lib/services/leave/transaction";
+import { buildLeaveAuditContext } from "@/lib/services/leave/audit-details";
 import {
     enforceAuthenticatedMutationRateLimit,
     enforcePreAuthIpRateLimit,
@@ -216,26 +216,31 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
                 },
             });
 
+            await createLeaveAuditInTransaction(
+                tx,
+                "LEAVE_REQUEST_NOT_TAKEN_REQUEST",
+                leaveRequest.id,
+                userId,
+                auth.user.email,
+                {
+                    before: { status: "APPROVED" },
+                    after: { status: "APPROVED" },
+                    metadata: {
+                        ...buildLeaveAuditContext(leaveRequest, {
+                            reason: parsed.data.note,
+                        }),
+                        originalApproverId: leaveRequest.approverId,
+                        exceptionApproverId: exceptionApprover.exceptionApproverId,
+                        exceptionApproverSource: exceptionApprover.source,
+                    },
+                },
+            );
+
             return {
                 request: updatedRequest,
                 exceptionApproverSource: exceptionApprover.source,
             };
         });
-
-        await logLeaveEvent(
-            "LEAVE_REQUEST_NOT_TAKEN_REQUEST",
-            result.request.id,
-            userId,
-            auth.user.email,
-            {
-                metadata: {
-                    note: parsed.data.note,
-                    originalApproverId: result.request.approverId,
-                    exceptionApproverId: result.request.exceptionApproverId,
-                    exceptionApproverSource: result.exceptionApproverSource,
-                },
-            },
-        ).catch((err) => console.error("Failed to log leave not-taken request:", err));
 
         after(() => {
             processOutbox().catch((err) =>
@@ -466,40 +471,30 @@ export async function PUT(req: NextRequest): Promise<NextResponse> {
                 },
             });
 
-            if (isAdmin) {
-                await createLeaveAuditInTransaction(
-                    tx,
-                    "LEAVE_REQUEST_NOT_TAKEN_CONFIRM",
-                    leaveRequest.id,
-                    userId,
-                    auth.user.email,
-                    {
-                        after: { status: "NOT_TAKEN" },
-                        metadata: {
-                            adminOverride,
-                            decision: "CONFIRM_NOT_TAKEN",
-                            originalApproverId: leaveRequest.approverId,
-                            exceptionApproverId: leaveRequest.exceptionApproverId,
-                            ...(adminOverrideReason
-                                ? { overrideReason: adminOverrideReason }
-                                : {}),
-                        },
+            await createLeaveAuditInTransaction(
+                tx,
+                "LEAVE_REQUEST_NOT_TAKEN_CONFIRM",
+                leaveRequest.id,
+                userId,
+                auth.user.email,
+                {
+                    before: { status: "APPROVED" },
+                    after: { status: "NOT_TAKEN" },
+                    metadata: {
+                        ...buildLeaveAuditContext(leaveRequest),
+                        adminOverride,
+                        decision: "CONFIRM_NOT_TAKEN",
+                        originalApproverId: leaveRequest.approverId,
+                        exceptionApproverId: leaveRequest.exceptionApproverId,
+                        ...(adminOverrideReason
+                            ? { overrideReason: adminOverrideReason }
+                            : {}),
                     },
-                );
-            }
+                },
+            );
 
             return { request: updatedRequest, adminOverride };
         });
-
-        if (!isAdmin) {
-            await logLeaveEvent(
-                "LEAVE_REQUEST_NOT_TAKEN_CONFIRM",
-                result.request.id,
-                userId,
-                auth.user.email,
-                { after: { status: "NOT_TAKEN" } },
-            ).catch((err) => console.error("Failed to log leave not-taken confirm:", err));
-        }
 
         after(() => {
             processOutbox().catch((err) =>

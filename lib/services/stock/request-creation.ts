@@ -1,8 +1,10 @@
 import { StockRequestStatus, type Prisma } from "@prisma/client";
 
+import { defineAuditDetails } from "@/lib/audit-log/contracts";
 import type { CreateRequestInput } from "@/lib/validations/stock";
 import { createStockCommandAudit } from "./command-audit";
 import {
+    buildVariantLabel,
     enqueueLineNewStockRequest,
     notifyAdminsNewStockRequest,
 } from "./notifications";
@@ -227,23 +229,46 @@ async function persistRequest(
         include: buildRequestInclude(),
     });
 
-    await createStockCommandAudit(tx, "STOCK_REQUEST_CREATE", request.id, actor, {
-        after: {
-            status: request.status,
-            itemCount: data.items.length,
-            projectCode: data.projectCode,
-        },
-        metadata: {
-            stockRequestId: request.id,
-            projectCode: data.projectCode,
-            variantIds: Array.from(new Set(items.map((item) => item.variantId))).sort(
-                (left, right) => left - right,
-            ),
-            idempotencyKeyHash: createIdempotencyKeyAuditHash(
-                identity.idempotencyKey,
-            ),
-        },
+    const auditLines = request.items.flatMap((requestItem) => {
+        if (requestItem.variantId === null) return [];
+        const variantLabel = requestItem.variant
+            ? buildVariantLabel(requestItem.variant.attributeValues)
+            : undefined;
+        return [{
+            itemId: requestItem.itemId,
+            itemName: requestItem.item.name,
+            sku: requestItem.item.sku,
+            variantId: requestItem.variantId,
+            ...(variantLabel ? { variantLabel } : {}),
+            quantity: requestItem.quantity,
+            unit: requestItem.variant?.unit ?? requestItem.item.unit,
+        }];
     });
+
+    await createStockCommandAudit(
+        tx,
+        "STOCK_REQUEST_CREATE",
+        request.id,
+        actor,
+        defineAuditDetails("STOCK_REQUEST_CREATE", {
+            after: {
+                status: request.status,
+                itemCount: data.items.length,
+                projectCode: data.projectCode,
+            },
+            metadata: {
+                stockRequestId: request.id,
+                projectCode: data.projectCode,
+                variantIds: Array.from(
+                    new Set(items.map((item) => item.variantId)),
+                ).sort((left, right) => left - right),
+                lines: auditLines,
+                idempotencyKeyHash: createIdempotencyKeyAuditHash(
+                    identity.idempotencyKey,
+                ),
+            },
+        }),
+    );
     await notifyAdminsNewStockRequest(
         request.id,
         actor.name,

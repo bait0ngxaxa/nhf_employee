@@ -3,6 +3,7 @@ import { type Prisma, type PrismaClient } from "@prisma/client";
 import { mockDeep, mockReset } from "vitest-mock-extended";
 
 import { prisma } from "@/lib/db/prisma";
+import { formatAuditLogDisplay } from "@/lib/audit-log/display";
 import {
     createRoutineTaskInTransaction,
     reassignRoutineOccurrence,
@@ -545,6 +546,23 @@ describe("NHF Routine mutations", () => {
             undefined,
             { previousAssignees: undefined },
         );
+        const auditCall = prismaMock.auditLog.create.mock.calls[0]?.[0];
+        const auditDetails = JSON.parse(
+            String(auditCall?.data.details),
+        ) as Record<string, unknown>;
+        const display = formatAuditLogDisplay({
+            action: "ROUTINE_TASK_UPDATE",
+            entityType: "RoutineTask",
+            entityId: 71,
+            details: auditDetails,
+        });
+
+        expect(auditDetails).toMatchObject({
+            before: { unitName: "มสช.", categoryName: "อื่น ๆ" },
+            after: { unitName: "มสช.", categoryName: "อื่น ๆ" },
+            reminderRulesChanged: true,
+        });
+        expect(display.summary).toContain("เปลี่ยนการแจ้งเตือน");
     });
 
     it("canonicalizes a self-service task to the authenticated employee", async () => {

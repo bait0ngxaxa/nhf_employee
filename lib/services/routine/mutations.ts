@@ -305,19 +305,29 @@ function taskAuditSnapshot(task: {
     unitId: number;
     categoryId: number;
     title: string;
+    description: string | null;
     scheduleType: string;
+    scheduleText: string | null;
+    contractText: string | null;
+    extraDetails: string | null;
     businessDayPolicy: string;
     isActive: boolean;
     version: number;
     contractStartDate: Date | null;
     contractEndDate: Date | null;
+    unit: { name: string };
+    category: { name: string };
 }): Record<string, unknown> {
     return {
         taskId: task.id,
         unitId: task.unitId,
         categoryId: task.categoryId,
         title: task.title,
+        description: task.description,
+        unitName: task.unit.name,
+        categoryName: task.category.name,
         scheduleType: task.scheduleType,
+        scheduleText: task.scheduleText,
         businessDayPolicy: task.businessDayPolicy,
         isActive: task.isActive,
         version: task.version,
@@ -327,6 +337,8 @@ function taskAuditSnapshot(task: {
         contractEndDate: task.contractEndDate
             ? toBangkokCalendarDate(task.contractEndDate)
             : null,
+        contractText: task.contractText,
+        extraDetails: task.extraDetails,
     };
 }
 
@@ -392,6 +404,7 @@ export async function createRoutineTaskInTransaction(
         actor,
         {
             taskId: task.id,
+            title: task.title,
             affectedEmployeeIds: assignees.map((assignee) => assignee.employeeId),
             scheduleType,
             version: task.version,
@@ -743,6 +756,7 @@ export async function updateRoutineTask(
 
         const updatedTask = await tx.routineTask.findUniqueOrThrow({
             where: { id: taskId },
+            include: ROUTINE_TASK_INCLUDE,
         });
         const auditAction = current.isActive && !updatedTask.isActive
             ? "ROUTINE_TASK_DEACTIVATE"
@@ -771,10 +785,7 @@ export async function updateRoutineTask(
             previousAssignees: assigneesChanged ? current.assignees : undefined,
         });
 
-        return tx.routineTask.findUniqueOrThrow({
-            where: { id: taskId },
-            include: ROUTINE_TASK_INCLUDE,
-        });
+        return updatedTask;
     });
 }
 
@@ -867,6 +878,7 @@ export async function updateRoutineOccurrenceOverride(
             actor,
             {
                 taskId: occurrence.taskId,
+                taskTitle: occurrence.task.title,
                 occurrenceId,
                 operation: "ATOMIC_OCCURRENCE_OVERRIDE",
                 note: input.note ?? null,
@@ -939,6 +951,7 @@ export async function updateRoutineOccurrenceDueDate(
             actor,
             {
                 taskId: occurrence.taskId,
+                taskTitle: occurrence.task.title,
                 occurrenceId,
                 oldDueDate,
                 newDueDate: input.dueDate,
@@ -1004,6 +1017,7 @@ export async function reassignRoutineOccurrence(
             actor,
             {
                 taskId: occurrence.taskId,
+                taskTitle: occurrence.task.title,
                 occurrenceId,
                 affectedEmployeeIds: assignees.map((assignee) => assignee.employeeId),
                 previousEmployeeIds: occurrence.assignees.map(

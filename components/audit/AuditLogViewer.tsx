@@ -43,6 +43,30 @@ interface AuditLogMobileCardProps {
     display: AuditLogDisplay;
 }
 
+function AuditChangedDetails({
+    changedFields,
+}: Pick<AuditLogDisplay, "changedFields">): ReactElement | null {
+    if (changedFields.length === 0) return null;
+
+    return (
+        <details className="group text-sm text-content-neutral-secondary">
+            <summary className="w-fit cursor-pointer rounded-sm font-medium text-content-neutral-primary outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
+                ดูรายละเอียด ({changedFields.length.toLocaleString("th-TH")})
+            </summary>
+            <ul className="mt-2 space-y-1 border-l border-border-neutral-default pl-3">
+                {changedFields.map((field) => (
+                    <li
+                        key={field}
+                        className="leading-6 [overflow-wrap:anywhere]"
+                    >
+                        {field}
+                    </li>
+                ))}
+            </ul>
+        </details>
+    );
+}
+
 function AuditLogMobileCard({
     log,
     display,
@@ -64,6 +88,7 @@ function AuditLogMobileCard({
             <p className="text-sm leading-6 text-content-neutral-strong [overflow-wrap:anywhere]">
                 {display.summary}
             </p>
+            <AuditChangedDetails changedFields={display.changedFields} />
             <dl className="grid gap-3 border-t border-border-neutral-muted pt-3 sm:grid-cols-2">
                 <div className="min-w-0">
                     <dt className="text-xs font-semibold text-content-neutral-muted">
@@ -298,6 +323,9 @@ export function AuditLogViewer({ className }: AuditLogViewerProps) {
                                                     <p className="max-w-[64ch] text-sm leading-6 text-content-neutral-strong">
                                                         {display.summary}
                                                     </p>
+                                                    <AuditChangedDetails
+                                                        changedFields={display.changedFields}
+                                                    />
                                                 </div>
                                             </td>
                                             <td className="px-4 py-3 text-sm align-top">

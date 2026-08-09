@@ -237,6 +237,7 @@ export async function updateTicket(
     // Fetch existing ticket
     const existingTicket = await prisma.ticket.findFirst({
         where: { id: ticketId, deletedAt: null },
+        include: TICKET_WITH_USERS_INCLUDE,
     });
 
     if (!existingTicket) {
@@ -398,6 +399,7 @@ export async function deleteTicket(
                 deletedById: user.id,
                 deleteReason,
             },
+            metadata: { ticketTitle: existingTicket.title, deleteReason },
         });
 
         return true;

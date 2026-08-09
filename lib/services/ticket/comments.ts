@@ -120,6 +120,7 @@ async function persistCommentSideEffects(
             content: comment.content,
             authorId: actor.id,
         },
+        metadata: { ticketTitle: ticket.title },
     });
     const recipientIds = await getTicketCommentRecipientIds(tx, {
         reportedById: ticket.reportedById,

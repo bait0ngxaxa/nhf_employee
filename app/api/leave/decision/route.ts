@@ -3,7 +3,6 @@ import type { Prisma } from "@prisma/client";
 import { after, NextResponse } from "next/server";
 
 import { requireActiveWorkforceSession } from "@/lib/auth/workforce";
-import { logLeaveEvent } from "@/lib/server/audit";
 import { processOutbox } from "@/lib/services/outbox/processor";
 import { runSerializableTransaction } from "@/lib/db/transaction";
 import { isActiveEmployeeInTransaction } from "@/lib/services/leave/active-employee-session";
@@ -20,6 +19,8 @@ import { FEATURE_KEYS, isFeatureEnabled } from "@/lib/ssot/features";
 import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
 import { isAdminRole } from "@/lib/ssot/permissions";
 import { leaveActionSchema } from "@/lib/validations/leave";
+import { buildLeaveAuditContext } from "@/lib/services/leave/audit-details";
+import { createLeaveAuditInTransaction } from "@/lib/services/leave/transaction";
 
 const LEAVE_APPROVAL_MESSAGES = {
     requestNotFound: "ไม่พบคำขอลา",
@@ -186,18 +187,29 @@ export async function POST(req: Request): Promise<NextResponse> {
                 },
             });
 
+            const auditAction = action === "APPROVE"
+                ? "LEAVE_REQUEST_APPROVE"
+                : "LEAVE_REQUEST_REJECT";
+            await createLeaveAuditInTransaction(
+                tx,
+                auditAction,
+                leaveId,
+                userId,
+                auth.user.email || `User ${userId}`,
+                {
+                    before: { status: "PENDING" },
+                    after: {
+                        status: newStatus,
+                        ...(action === "REJECT" ? { reason: reason ?? null } : {}),
+                    },
+                    metadata: buildLeaveAuditContext(leaveRequest, {
+                        reason: action === "REJECT" ? reason ?? null : undefined,
+                    }),
+                },
+            );
+
             return updatedRequest;
         });
-
-        const auditAction = action === "APPROVE" ? "LEAVE_REQUEST_APPROVE" : "LEAVE_REQUEST_REJECT";
-        const userEmail = auth.user.email || `User ${userId}`;
-
-        await logLeaveEvent(auditAction, leaveId, userId, userEmail, {
-            after: {
-                status: action === "APPROVE" ? "APPROVED" : "REJECTED",
-                reason: action === "REJECT" ? reason : null,
-            },
-        }).catch((err) => console.error("Failed to log audit event:", err));
 
         after(() => {
             processOutbox().catch((err) =>

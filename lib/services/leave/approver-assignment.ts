@@ -1,5 +1,6 @@
 import type { Prisma } from "@prisma/client";
 
+import { defineAuditDetails } from "@/lib/audit-log/contracts";
 import {
     ACTIVE_LEAVE_EMPLOYEE_QUERY_WHERE,
     ACTIVE_LEAVE_APPROVER_USER_SELECT,
@@ -50,10 +51,7 @@ type EmployeeRecord = {
     managerId: number | null;
 };
 
-async function loadApprovers(
-    tx: TransactionClient,
-    managerIds: number[],
-): Promise<Array<{
+type ApproverRecord = {
     id: number;
     firstName: string;
     lastName: string;
@@ -66,7 +64,12 @@ async function loadApprovers(
         isActive: boolean;
         deletedAt: Date | null;
     } | null;
-}>> {
+};
+
+async function loadApprovers(
+    tx: TransactionClient,
+    managerIds: number[],
+): Promise<ApproverRecord[]> {
     return tx.employee.findMany({
         where: { id: { in: managerIds } },
         select: {
@@ -84,9 +87,18 @@ async function loadApprovers(
 async function writeAudit(
     tx: TransactionClient,
     assignment: ApproverAssignment,
-    previousManagerId: number | null,
+    employee: EmployeeRecord,
+    previousApprover: ApproverRecord | undefined,
+    newApprover: ApproverRecord | undefined,
     actor: ApproverAssignmentActor,
 ): Promise<void> {
+    const employeeName = formatEmployeeName(employee);
+    const previousApproverName = previousApprover
+        ? formatEmployeeName(previousApprover)
+        : null;
+    const newApproverName = newApprover
+        ? formatEmployeeName(newApprover)
+        : null;
     await tx.auditLog.create({
         data: {
             action: "EMPLOYEE_UPDATE",
@@ -94,10 +106,24 @@ async function writeAudit(
             entityId: assignment.employeeId,
             userId: actor.userId,
             userEmail: actor.email,
-            details: JSON.stringify({
-                before: { managerId: previousManagerId },
-                after: { managerId: assignment.managerId },
-            }),
+            details: JSON.stringify(defineAuditDetails("EMPLOYEE_UPDATE", {
+                before: {
+                    managerId: employee.managerId,
+                    managerName: previousApproverName,
+                },
+                after: {
+                    managerId: assignment.managerId,
+                    managerName: newApproverName,
+                },
+                metadata: {
+                    employeeId: employee.id,
+                    employeeName,
+                    previousApproverId: employee.managerId,
+                    previousApproverName,
+                    newApproverId: assignment.managerId,
+                    newApproverName,
+                },
+            })),
         },
     });
 }
@@ -118,7 +144,9 @@ export async function assignLeaveApprovers(
     await runSerializableTransaction(async (tx) => {
         await lockEmployeeRows(tx, [...employeeIds].sort((left, right) => left - right));
 
-        const managerIds = assignments.flatMap(({ managerId }) => managerId === null ? [] : [managerId]);
+        const managerIds = assignments.flatMap(({ managerId }) =>
+            managerId === null ? [] : [managerId]
+        );
         const [employees, approvers, pendingRequests] = await Promise.all([
             tx.employee.findMany({
                 where: {
@@ -188,12 +216,39 @@ export async function assignLeaveApprovers(
             changes.push({ assignment, employee });
         }
 
+        const missingPreviousManagerIds = Array.from(new Set(changes.flatMap(
+            ({ employee }) => employee.managerId !== null
+                && !approverMap.has(employee.managerId)
+                ? [employee.managerId]
+                : [],
+        )));
+        if (missingPreviousManagerIds.length > 0) {
+            const previousApprovers = await loadApprovers(
+                tx,
+                missingPreviousManagerIds,
+            );
+            for (const approver of previousApprovers ?? []) {
+                approverMap.set(approver.id, approver);
+            }
+        }
+
         for (const { assignment, employee } of changes) {
             await tx.employee.update({
                 where: { id: assignment.employeeId },
                 data: { managerId: assignment.managerId },
             });
-            await writeAudit(tx, assignment, employee.managerId, actor);
+            await writeAudit(
+                tx,
+                assignment,
+                employee,
+                employee.managerId === null
+                    ? undefined
+                    : approverMap.get(employee.managerId),
+                assignment.managerId === null
+                    ? undefined
+                    : approverMap.get(assignment.managerId),
+                actor,
+            );
         }
     });
 }

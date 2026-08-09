@@ -1,27 +1,31 @@
-import { logLeaveEvent } from "@/lib/server/audit";
-interface AuditCreatedLeaveRequestInput {
-    id: string;
-    userId: number;
-    userEmail: string;
+import {
+    defineAuditDetails,
+    type AuditDetailsFor,
+} from "@/lib/audit-log/contracts";
+import { buildLeaveAuditContext } from "./audit-details";
+
+interface CreatedLeaveRequestAuditInput {
+    request: {
+        id: string;
+        employeeId: number;
+        leaveType: "SICK" | "PERSONAL" | "VACATION";
+        startDate: Date;
+        endDate: Date;
+        period: "FULL_DAY" | "MORNING" | "AFTERNOON";
+        durationHalfDays: number;
+    };
+    employeeName: string;
     attachmentCount: number;
 }
 
-export async function auditCreatedLeaveRequest(
-    input: AuditCreatedLeaveRequestInput,
-): Promise<void> {
-    await logLeaveEvent(
-        "LEAVE_REQUEST_CREATE",
-        input.id,
-        input.userId,
-        input.userEmail,
-        {
-            metadata: {
-                attachmentCount: input.attachmentCount,
-            },
-        },
-    ).catch((error: unknown) => {
-        console.error("บันทึกเหตุการณ์สร้างคำขอลาไม่สำเร็จ", {
-            errorType: error instanceof Error ? error.name : "UnknownError",
-        });
+export function buildCreatedLeaveRequestAuditDetails(
+    input: CreatedLeaveRequestAuditInput,
+): AuditDetailsFor<"LEAVE_REQUEST_CREATE"> {
+    return defineAuditDetails("LEAVE_REQUEST_CREATE", {
+        after: { status: "PENDING" },
+        metadata: buildLeaveAuditContext(input.request, {
+            employeeName: input.employeeName,
+            attachmentCount: input.attachmentCount,
+        }),
     });
 }
