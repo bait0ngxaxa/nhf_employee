@@ -2,7 +2,6 @@
 
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
 import { LeaveRequestForm } from "./LeaveRequestForm";
 import { LEAVE_THEME_BUTTON_CLASS } from "./leaveTheme";
 import { useEmployeeLeaveDashboardModel } from "@/hooks/leave/useEmployeeLeaveDashboardModel";
@@ -10,6 +9,7 @@ import { LeaveQuotaCards } from "./_components/LeaveQuotaCards";
 import { EmployeeLeaveHistoryList } from "./_components/EmployeeLeaveHistoryList";
 import { CancelLeaveDialog } from "./_components/CancelLeaveDialog";
 import { NotTakenRequestDialog } from "./_components/NotTakenRequestDialog";
+import { EmployeeLeaveDashboardSkeleton } from "./LeaveSkeletons";
 
 export function EmployeeLeaveDashboard() {
     const model = useEmployeeLeaveDashboardModel();
@@ -98,31 +98,6 @@ export function EmployeeLeaveDashboard() {
                 }}
                 onConfirm={model.confirmNotTakenRequest}
             />
-        </div>
-    );
-}
-
-function EmployeeLeaveDashboardSkeleton() {
-    return (
-        <div className="space-y-6" aria-label="กำลังโหลดข้อมูลวันลา">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div className="space-y-2">
-                    <Skeleton className="h-6 w-48" />
-                    <Skeleton className="h-4 w-64 max-w-full" />
-                </div>
-                <Skeleton className="h-9 w-28" />
-            </div>
-            <div className="grid gap-4 md:grid-cols-3">
-                {[1, 2, 3].map((item) => (
-                    <Skeleton key={item} className="h-36 rounded-xl" />
-                ))}
-            </div>
-            <div className="space-y-3">
-                <Skeleton className="h-6 w-40" />
-                {[1, 2, 3].map((item) => (
-                    <Skeleton key={item} className="h-24 rounded-xl" />
-                ))}
-            </div>
         </div>
     );
 }

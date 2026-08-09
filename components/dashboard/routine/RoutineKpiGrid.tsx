@@ -1,6 +1,7 @@
 import { CalendarClock, CalendarDays, CalendarRange } from "lucide-react";
 
 import { Card } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import type { RoutineSummary } from "./types";
 
 interface RoutineKpiGridProps {
@@ -40,7 +41,10 @@ export function RoutineKpiGrid({
     isLoading,
 }: RoutineKpiGridProps) {
     return (
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        <div
+            className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3"
+            aria-busy={isLoading}
+        >
             {KPI_ITEMS.map((item) => {
                 const Icon = item.icon;
                 return (
@@ -56,9 +60,16 @@ export function RoutineKpiGrid({
                                 <Icon className="size-5" aria-hidden="true" />
                             </span>
                         </div>
-                        <p className={`text-3xl font-bold tracking-tight tabular-nums ${item.valueClass}`} aria-live="polite">
-                            {isLoading ? "–" : summary?.[item.key] ?? 0}
-                        </p>
+                        <div
+                            className={`min-h-9 text-3xl font-bold tracking-tight tabular-nums ${item.valueClass}`}
+                            aria-live="polite"
+                        >
+                            {isLoading ? (
+                                <Skeleton className="h-9 w-16" />
+                            ) : (
+                                summary?.[item.key] ?? 0
+                            )}
+                        </div>
                     </Card>
                 );
             })}

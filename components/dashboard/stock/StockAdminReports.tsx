@@ -10,14 +10,14 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { YearlyReportExportPanel } from "@/components/dashboard/shared/YearlyReportExportPanel";
-import { StockLoadingState } from "./StockLoadingState";
+import { StockReportsSkeleton } from "./StockSkeletons";
 import { useStockAdminReports } from "./useStockAdminReports";
 
 export function StockAdminReports() {
     const reports = useStockAdminReports();
 
     if (reports.isPageLoading) {
-        return <StockLoadingState message="กำลังโหลดข้อมูลรีพอร์ต..." />;
+        return <StockReportsSkeleton />;
     }
 
     return (

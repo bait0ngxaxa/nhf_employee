@@ -13,7 +13,8 @@ import { AddCategoryDialog } from "./StockInventoryDialogs";
 import { EditItemDialog } from "./StockInventoryEditDialog";
 import { StockBrowseFilters } from "./StockBrowseFilters";
 import { StockInventoryTable } from "./StockInventoryTable";
-import { StockEmptyState, StockLoadingState } from "./StockLoadingState";
+import { StockEmptyState } from "./StockLoadingState";
+import { StockInventorySkeleton } from "./StockSkeletons";
 import { STOCK_ADMIN_TEXT } from "./stockAdminInventory.shared";
 
 export function StockAdminInventory() {
@@ -37,6 +38,7 @@ export function StockAdminInventory() {
     const [editingItem, setEditingItem] = useState<StockItem | null>(null);
     const [showAddCategory, setShowAddCategory] = useState(false);
     const totalPages = Math.max(1, Math.ceil(totalItems / ITEMS_PER_PAGE));
+    const isInitialLoading = isLoading && items.length === 0;
 
     return (
         <div className="space-y-4">
@@ -65,8 +67,8 @@ export function StockAdminInventory() {
                 categories={categories}
             />
 
-            {isLoading ? (
-                <StockLoadingState message={STOCK_ADMIN_TEXT.loading} />
+            {isInitialLoading ? (
+                <StockInventorySkeleton />
             ) : items.length === 0 ? (
                 <StockEmptyState
                     icon={<PackageSearch className="h-6 w-6" aria-hidden="true" />}

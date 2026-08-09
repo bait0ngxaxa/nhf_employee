@@ -71,13 +71,6 @@ export default function TicketList({
                             label="กำลังโหลดรายการ tickets"
                             className="space-y-4 py-4"
                         >
-                            {/* Filter Bar Skeleton */}
-                            <div className="flex flex-wrap gap-3 mb-6">
-                                <Skeleton className="h-10 flex-1 min-w-[200px]" />
-                                <Skeleton className="h-10 w-40" />
-                                <Skeleton className="h-10 w-40" />
-                            </div>
-
                             {/* Ticket Cards Skeleton */}
                             {Array.from({ length: 4 }).map((_, i) => (
                                 <div

@@ -68,7 +68,9 @@ export function useTicketList(refreshTrigger?: number): UseTicketListReturn {
 
     const swrKey = user ? `/api/tickets?${searchParams.toString()}` : null;
 
-    const { data, isLoading, error: swrError, mutate } = useSWR(swrKey);
+    const { data, isLoading, error: swrError, mutate } = useSWR(swrKey, {
+        keepPreviousData: true,
+    });
 
     useEffect(() => {
         if (refreshTrigger) {
@@ -129,7 +131,7 @@ export function useTicketList(refreshTrigger?: number): UseTicketListReturn {
 
     return {
         tickets,
-        loading: isLoading,
+        loading: isLoading && !data,
         error,
         retry,
         filters,

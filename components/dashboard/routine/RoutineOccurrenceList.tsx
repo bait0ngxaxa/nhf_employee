@@ -9,7 +9,6 @@ import { Textarea } from "@/components/ui/textarea";
 import {
     EmptyState,
     ErrorState,
-    LoadingState,
 } from "@/components/ui/state";
 import { calendarDateToDate } from "@/lib/routine/schedule";
 import {
@@ -35,6 +34,7 @@ import type {
     RoutineTaskWorkItem,
     RoutineTaskWorkItemOccurrence,
 } from "./types";
+import { RoutineOccurrenceListSkeleton } from "./RoutineSkeletons";
 
 interface RoutineOccurrenceListProps {
     data: PaginatedRoutineTaskWorkItemsResponse | undefined;
@@ -201,7 +201,7 @@ export function RoutineOccurrenceList({
         }
     }
 
-    if (isLoading) return <LoadingState label="กำลังโหลดรายการ Routine..." compact />;
+    if (isLoading && !data) return <RoutineOccurrenceListSkeleton />;
     if (error) {
         return (
             <ErrorState

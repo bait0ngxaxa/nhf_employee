@@ -76,7 +76,11 @@ function RoutineOccurrencePanel({
         if (timingStatus) params.set("timingStatus", timingStatus);
         return `${API_ROUTES.routines.occurrences}?${params.toString()}`;
     }, [debouncedSearch, occurrenceId, page, scope, taskId, timingStatus]);
-    const { data, error, isLoading, mutate } = useSWR<PaginatedRoutineTaskWorkItemsResponse, Error>(key, fetchRoutine);
+    const { data, error, isLoading, mutate } = useSWR<PaginatedRoutineTaskWorkItemsResponse, Error>(
+        key,
+        fetchRoutine,
+        { keepPreviousData: true },
+    );
     const { data: reference, error: referenceError } = useSWR<RoutineReferenceData, Error>(
         isAdmin ? API_ROUTES.routines.reference : null,
         fetchRoutine,
@@ -232,6 +236,7 @@ function RoutineTaskSettings({
     const { data: tasks, error: tasksError, isLoading: tasksLoading, mutate: mutateTasks } = useSWR<PaginatedTasksResponse, Error>(
         tasksKey,
         fetchRoutine,
+        { keepPreviousData: true },
     );
 
     async function updateTaskActive(task: RoutineTask): Promise<void> {
@@ -362,7 +367,9 @@ export function RoutineSection() {
         error: summaryError,
         isLoading: summaryLoading,
         mutate: mutateSummary,
-    } = useSWR<RoutineSummaryResponse, Error>(summaryKey, fetchRoutine);
+    } = useSWR<RoutineSummaryResponse, Error>(summaryKey, fetchRoutine, {
+        keepPreviousData: true,
+    });
 
     useEffect(() => {
         if (isAdmin && (taskId !== null || occurrenceId !== null)) setActiveTab("all");
@@ -428,7 +435,10 @@ export function RoutineSection() {
                 subtitle="รวมรายการ Routine ตามกำหนดเวลา ผู้รับผิดชอบ และการแจ้งเตือนที่เกี่ยวข้อง"
                 tone="brand"
             />
-            <RoutineKpiGrid summary={summaryData?.summary} isLoading={summaryLoading} />
+            <RoutineKpiGrid
+                summary={summaryData?.summary}
+                isLoading={summaryLoading && !summaryData}
+            />
             {summaryError ? <p className="text-sm text-status-danger-foreground" role="alert">โหลดสรุปรายการไม่สำเร็จ: {summaryError.message}</p> : null}
             <SectionTabs
                 value={safeTab}

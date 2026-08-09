@@ -2,7 +2,6 @@
 
 import { useState, type ReactElement } from "react";
 
-import { Skeleton } from "@/components/ui/skeleton";
 import { Pagination } from "@/components/Pagination";
 import { cn } from "@/lib/ui/utils";
 import { useManagerApprovalModel } from "@/hooks/leave/useManagerApprovalModel";
@@ -17,6 +16,7 @@ import {
     AdminRecoveryReasonDialog,
     type AdminRecoveryDecision,
 } from "./_components/AdminRecoveryReasonDialog";
+import { ManagerApprovalDashboardSkeleton } from "./LeaveSkeletons";
 
 export function ManagerApprovalDashboard({ isAdmin = false }: { isAdmin?: boolean }): ReactElement {
     const model = useManagerApprovalModel();
@@ -69,7 +69,7 @@ export function ManagerApprovalDashboard({ isAdmin = false }: { isAdmin?: boolea
             : model.rejectCancellation(leaveId);
 
     if (model.isLoading) {
-        return <ManagerApprovalDashboardSkeleton />;
+        return <ManagerApprovalDashboardSkeleton isAdmin={isAdmin} />;
     }
 
     return (
@@ -203,7 +203,6 @@ export function ManagerApprovalDashboard({ isAdmin = false }: { isAdmin?: boolea
         </div>
     );
 }
-
 function ApprovalPagination({
     metadata,
     onPageChange,
@@ -228,7 +227,6 @@ function ApprovalPagination({
         </div>
     );
 }
-
 function ApprovalSectionHeader({
     title,
     description,
@@ -255,24 +253,6 @@ function ApprovalSectionHeader({
             <span className={cn("w-fit rounded-full border px-3 py-1 text-sm font-medium", toneClassName)}>
                 {count} รายการ
             </span>
-        </div>
-    );
-}
-
-function ManagerApprovalDashboardSkeleton() {
-    return (
-        <div className="space-y-6" aria-label="กำลังโหลดรายการอนุมัติการลา">
-            <div className="space-y-2">
-                <Skeleton className="h-6 w-48" />
-                <Skeleton className="h-4 w-72 max-w-full" />
-            </div>
-            {[1, 2].map((item) => (
-                <Skeleton key={item} className="h-44 rounded-xl" />
-            ))}
-            <div className="space-y-3">
-                <Skeleton className="h-6 w-56" />
-                <Skeleton className="h-24 rounded-xl" />
-            </div>
         </div>
     );
 }

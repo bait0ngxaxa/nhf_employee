@@ -1,6 +1,5 @@
 "use client";
 
-import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import {
     EmployeeTable,
@@ -16,6 +15,7 @@ import {
     useEmployeeDataContext,
     useEmployeeUIContext,
 } from "@/components/dashboard/context/employee/EmployeeContext";
+import { EmployeeListSkeleton } from "./EmployeeSkeletons";
 
 export function EmployeeList({ userRole }: EmployeeListProps) {
     const {
@@ -57,49 +57,7 @@ export function EmployeeList({ userRole }: EmployeeListProps) {
     };
 
     if (isInitialLoading) {
-        return (
-            <div className="space-y-6 animate-pulse">
-                {/* Search Controls Skeleton */}
-                <div className="flex flex-wrap gap-3">
-                    <Skeleton className="h-10 flex-1 min-w-[200px]" />
-                    <Skeleton className="h-10 w-40" />
-                    <Skeleton className="h-10 w-32" />
-                    <Skeleton className="h-10 w-32" />
-                </div>
-
-                {/* Results Summary Skeleton */}
-                <div className="flex justify-between">
-                    <Skeleton className="h-4 w-48" />
-                    <Skeleton className="h-4 w-24" />
-                </div>
-
-                {/* Table Skeleton */}
-                <div className="w-full">
-                    <div className="flex gap-4 pb-4 border-b border-border-neutral-muted">
-                        {Array.from({ length: 6 }).map((_, i) => (
-                            <Skeleton key={i} className="h-4 flex-1" />
-                        ))}
-                    </div>
-                    <div className="space-y-4 pt-4">
-                        {Array.from({ length: 5 }).map((_, rowIndex) => (
-                            <div
-                                key={rowIndex}
-                                className="flex gap-4 items-center"
-                            >
-                                {Array.from({ length: 6 }).map(
-                                    (_, colIndex) => (
-                                        <Skeleton
-                                            key={colIndex}
-                                            className="h-12 flex-1"
-                                        />
-                                    ),
-                                )}
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            </div>
-        );
+        return <EmployeeListSkeleton />;
     }
 
     // Calculate display range

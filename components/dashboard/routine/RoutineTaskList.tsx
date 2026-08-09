@@ -17,7 +17,6 @@ import {
 import {
     EmptyState,
     ErrorState,
-    LoadingState,
 } from "@/components/ui/state";
 import { getCurrentBangkokDate } from "@/lib/routine/schedule";
 
@@ -27,6 +26,7 @@ import {
     uniqueRoutineUnits,
 } from "./labels";
 import type { PaginatedTasksResponse, RoutineTask } from "./types";
+import { RoutineTaskListSkeleton } from "./RoutineSkeletons";
 
 interface RoutineTaskListProps {
     data: PaginatedTasksResponse | undefined;
@@ -94,6 +94,7 @@ export function RoutineTaskList({
     const searchId = `${filterId}-search`;
     const unitIdField = `${filterId}-unit`;
     const statusId = `${filterId}-status`;
+    const isInitialLoading = isLoading && !data;
 
     return (
         <div className="space-y-4">
@@ -162,16 +163,16 @@ export function RoutineTaskList({
                 </Button>
             </div>
 
-            {isLoading ? <LoadingState label="กำลังโหลดแม่แบบงานประจำ..." compact /> : null}
+            {isInitialLoading ? <RoutineTaskListSkeleton /> : null}
             {error ? <ErrorState compact action={{ label: "ลองใหม่", onClick: onRetry }} description={error.message} /> : null}
-            {!isLoading && !error && (!data || data.tasks.length === 0) ? (
+            {!isInitialLoading && !error && (!data || data.tasks.length === 0) ? (
                 <EmptyState
                     compact
                     title={hasFilters ? "ไม่พบแม่แบบงานที่ตรงกับตัวกรอง" : "ยังไม่มีแม่แบบงานประจำ"}
                     description={hasFilters ? "ลองเปลี่ยนคำค้นหาหรือตัวกรอง" : "สร้างแม่แบบงานเพื่อให้ระบบสร้างงานแต่ละรอบอัตโนมัติ"}
                 />
             ) : null}
-            {!isLoading && !error && data && data.tasks.length > 0 ? <>
+            {!error && data && data.tasks.length > 0 ? <>
             <div className="overflow-hidden rounded-xl border border-brand-border/70 bg-surface-raised lg:overflow-x-auto">
                 <table className="block w-full text-left text-sm lg:table lg:min-w-[780px]">
                     <thead className="hidden border-b border-brand-border/70 bg-brand-surface text-sm text-brand-strong lg:table-header-group">

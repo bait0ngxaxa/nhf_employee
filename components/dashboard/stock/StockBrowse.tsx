@@ -11,7 +11,8 @@ import { useDashboardDataContext } from "../context/dashboard/DashboardContext";
 import type { StockItem } from "../context/stock/types";
 import { StockBrowseFilters } from "./StockBrowseFilters";
 import { StockBrowseGrid } from "./StockBrowseGrid";
-import { StockEmptyState, StockLoadingState } from "./StockLoadingState";
+import { StockEmptyState } from "./StockLoadingState";
+import { StockBrowseSkeleton } from "./StockSkeletons";
 import { useStockBrowseCart } from "./useStockBrowseCart";
 
 const StockBrowseCartBar = dynamic(
@@ -59,6 +60,7 @@ export function StockBrowse() {
         onSubmitted: refreshRequests,
     });
     const totalPages = Math.max(1, Math.ceil(totalItems / ITEMS_PER_PAGE));
+    const isInitialLoading = isLoading && items.length === 0;
 
     return (
         <div
@@ -76,8 +78,8 @@ export function StockBrowse() {
                 categories={categories}
             />
 
-            {isLoading ? (
-                <StockLoadingState message="กำลังโหลดข้อมูลวัสดุ..." />
+            {isInitialLoading ? (
+                <StockBrowseSkeleton />
             ) : items.length === 0 ? (
                 <EmptyState />
             ) : (
@@ -90,14 +92,16 @@ export function StockBrowse() {
                 />
             )}
 
-            <Pagination
-                currentPage={itemsPage}
-                totalPages={totalPages}
-                itemsPerPage={ITEMS_PER_PAGE}
-                onPageChange={setItemsPage}
-                onPreviousPage={() => setItemsPage(Math.max(1, itemsPage - 1))}
-                onNextPage={() => setItemsPage(Math.min(totalPages, itemsPage + 1))}
-            />
+            {!isInitialLoading ? (
+                <Pagination
+                    currentPage={itemsPage}
+                    totalPages={totalPages}
+                    itemsPerPage={ITEMS_PER_PAGE}
+                    onPageChange={setItemsPage}
+                    onPreviousPage={() => setItemsPage(Math.max(1, itemsPage - 1))}
+                    onNextPage={() => setItemsPage(Math.min(totalPages, itemsPage + 1))}
+                />
+            ) : null}
 
             {cartCount > 0 && (
                 <StockBrowseCartBar

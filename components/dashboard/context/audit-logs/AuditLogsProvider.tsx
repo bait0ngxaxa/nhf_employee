@@ -40,7 +40,9 @@ export function AuditLogsProvider({ children }: AuditLogsProviderProps) {
 
     const swrKey = `/api/audit-logs?${params.toString()}`;
 
-    const { data, mutate, isLoading, error: swrError } = useSWR(swrKey);
+    const { data, mutate, isLoading, error: swrError } = useSWR(swrKey, {
+        keepPreviousData: true,
+    });
 
     const auditLogs: AuditLog[] = useMemo(
         () => data?.auditLogs || [],

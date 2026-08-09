@@ -88,7 +88,10 @@ export function useStockAdminReports() {
         availableYears,
         selectedYear,
         setSelectedYear,
-        isPageLoading: isLoadingYears || isLoadingMeta || isLoadingBalanceMeta,
+        isPageLoading:
+            isLoadingYears
+            || (isLoadingMeta && meta === null)
+            || (isLoadingBalanceMeta && balanceMeta === null),
         isExportingReport,
         isExportingBalance,
         isReportDisabled: isExportingReport || isExportUnavailable(meta),

@@ -4,7 +4,6 @@ import { type ReactElement } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Skeleton } from "@/components/ui/skeleton";
 import {
     Select,
     SelectContent,
@@ -33,6 +32,7 @@ import {
 } from "@/lib/audit-log/display";
 import { formatThaiDateTime } from "@/lib/helpers/date-helpers";
 import { AuditActionBadge } from "./AuditActionBadge";
+import { AuditLogViewerSkeleton } from "./AuditLogSkeletons";
 
 interface AuditLogViewerProps {
     className?: string;
@@ -128,64 +128,7 @@ export function AuditLogViewer({ className }: AuditLogViewerProps) {
         && searchTerm.trim().length === 0;
 
     if (isInitialLoading) {
-        return (
-            <Card>
-                <CardHeader>
-                    <div className="flex items-center justify-between">
-                        <div className="space-y-2">
-                            <Skeleton className="h-6 w-48" />
-                            <Skeleton className="h-4 w-32" />
-                        </div>
-                        <Skeleton className="h-10 w-24" />
-                    </div>
-                </CardHeader>
-                <CardContent className="space-y-4 animate-pulse">
-                    {/* Filters Skeleton */}
-                    <div className="flex flex-wrap gap-3">
-                        <Skeleton className="h-10 flex-1 min-w-[200px]" />
-                        <Skeleton className="h-10 w-44" />
-                        <Skeleton className="h-10 w-36" />
-                    </div>
-                    
-                    {/* Table Skeleton */}
-                    <div className="space-y-3 xl:hidden">
-                        {Array.from({ length: 4 }).map((_, index) => (
-                            <div
-                                key={index}
-                                className="space-y-3 rounded-xl border border-border-neutral-muted p-4"
-                            >
-                                <div className="flex items-center justify-between gap-3">
-                                    <Skeleton className="h-6 w-32" />
-                                    <Skeleton className="h-4 w-24" />
-                                </div>
-                                <Skeleton className="h-5 w-full" />
-                                <Skeleton className="h-4 w-3/4" />
-                                <Skeleton className="h-4 w-1/2" />
-                            </div>
-                        ))}
-                    </div>
-                    <div className="hidden overflow-x-auto rounded-lg border p-4 xl:block">
-                        <div className="flex gap-4 border-b border-border-neutral-muted pb-4">
-                            {Array.from({ length: 5 }).map((_, i) => (
-                                <Skeleton key={i} className="h-4 flex-1" />
-                            ))}
-                        </div>
-                        <div className="space-y-4 pt-4">
-                            {Array.from({ length: 6 }).map((_, rowIndex) => (
-                                <div key={rowIndex} className="flex items-center gap-4">
-                                    {Array.from({ length: 5 }).map((_, colIndex) => (
-                                        <Skeleton
-                                            key={colIndex}
-                                            className="h-8 flex-1"
-                                        />
-                                    ))}
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                </CardContent>
-            </Card>
-        );
+        return <AuditLogViewerSkeleton />;
     }
 
     if (error) {

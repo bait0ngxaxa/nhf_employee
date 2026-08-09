@@ -36,6 +36,7 @@ import {
 } from "@/lib/services/routine-import/sheet-config";
 
 import { RoutineImportRowEditor } from "./RoutineImportRowEditor";
+import { RoutineImportRowsSkeleton } from "./RoutineSkeletons";
 import { formatRoutineScheduleSummary } from "./labels";
 import type {
     RoutineImportBatchView,
@@ -888,7 +889,7 @@ export function RoutineImportPanel() {
             </div>
 
             {loading ? (
-                <LoadingState label="กำลังโหลดแถวข้อมูล..." compact />
+                <RoutineImportRowsSkeleton />
             ) : rowsPage && rowsPage.rows.length === 0 ? (
                 <EmptyState
                     compact

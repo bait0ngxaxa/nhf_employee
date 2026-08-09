@@ -9,6 +9,7 @@ import {
 } from "react";
 import { DashboardSidebar } from "@/components/dashboard/layout/DashboardSidebar";
 import { DashboardNavbar } from "@/components/dashboard/layout/DashboardNavbar";
+import { DashboardShellSkeleton } from "@/components/dashboard/feedback/DashboardShellSkeleton";
 import { useDashboardContext } from "@/components/dashboard/context";
 import { getDashboardPageLabel } from "@/constants/dashboard";
 
@@ -70,32 +71,7 @@ export function DashboardLayoutClient({
     }, [selectedMenu, status]);
 
     if (status === "loading") {
-        return (
-            <div className="app-shell-background flex h-dvh">
-                {/* Sidebar Skeleton */}
-                <div className="hidden h-full w-64 flex-col border-r border-border-neutral bg-surface-raised p-4 shadow-lg lg:flex 2xl:w-72">
-                    <div className="mb-6 h-8 rounded-lg bg-surface-muted animate-pulse" />
-                    <div className="space-y-3 flex-1">
-                        {Array.from({ length: 6 }).map((_, i) => (
-                            <div
-                                key={i}
-                                className="h-10 rounded-xl bg-surface-neutral-muted animate-pulse"
-                            />
-                        ))}
-                    </div>
-                    <div className="mt-4 h-20 rounded-xl bg-surface-neutral-muted animate-pulse" />
-                </div>
-
-                {/* Main Content Skeleton */}
-                <div className="flex-1 flex items-center justify-center">
-                    <div className="animate-pulse space-y-4">
-                        <div className="mx-auto h-8 w-48 rounded bg-surface-muted" />
-                        <div className="mx-auto h-4 w-64 rounded bg-surface-muted" />
-                        <div className="mx-auto mt-8 h-32 w-96 rounded bg-surface-muted" />
-                    </div>
-                </div>
-            </div>
-        );
+        return <DashboardShellSkeleton />;
     }
 
     return (

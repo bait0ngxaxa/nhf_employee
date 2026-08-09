@@ -33,7 +33,8 @@ import {
 import { getRequestItemDisplayName } from "./stockVariant.shared";
 import { useStockRequestActions } from "./useStockRequestActions";
 import { StockRequestNote } from "./StockRequestNote";
-import { StockEmptyState, StockLoadingState } from "./StockLoadingState";
+import { StockEmptyState } from "./StockLoadingState";
+import { StockRequestListSkeleton } from "./StockSkeletons";
 import { StockRequestMobileCards } from "./StockRequestMobileCards";
 
 export function StockMyRequests() {
@@ -54,6 +55,7 @@ export function StockMyRequests() {
     const totalPages = Math.max(1, Math.ceil(totalRequests / REQUESTS_PER_PAGE));
     const hasActiveFilters =
         statusFilter !== undefined || requestSearchQuery.trim().length > 0;
+    const isInitialLoading = isLoading && requests.length === 0;
 
     async function handleCancel(requestId: number, cancelReason?: string): Promise<void> {
         await runCancelRequest(requestId, cancelReason);
@@ -68,8 +70,8 @@ export function StockMyRequests() {
                 onStatusChange={setStatusFilter}
             />
 
-            {isLoading ? (
-                <StockLoadingState message="กำลังโหลดประวัติการเบิก..." />
+            {isInitialLoading ? (
+                <StockRequestListSkeleton />
             ) : requests.length === 0 ? (
                 <StockEmptyState
                     icon={<ClipboardList className="h-6 w-6" aria-hidden="true" />}

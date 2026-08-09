@@ -94,6 +94,8 @@ export function EmailRequestSectionSkeleton(): ReactElement {
         <div
             className="min-h-[calc(100dvh-6rem)] overflow-hidden rounded-2xl border border-border bg-muted/40"
             role="status"
+            aria-live="polite"
+            aria-busy="true"
             aria-label="กำลังโหลดหน้าส่งคำร้องพนักงานใหม่"
         >
             <div className="space-y-8 p-4 md:p-8">

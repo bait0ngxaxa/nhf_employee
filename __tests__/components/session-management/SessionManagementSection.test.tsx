@@ -12,12 +12,8 @@ vi.mock("@/components/dashboard/session-management/useSessionManagement", () => 
     useSessionManagement: vi.fn(),
 }));
 
-vi.mock("@/components/dashboard/feedback/SectionSkeleton", () => ({
-    SectionSkeleton: () => <div data-testid="section-skeleton" />,
-}));
-
 describe("SessionManagementSection", () => {
-    it("renders the shared skeleton instead of a loading spinner", () => {
+    it("renders a layout-aware skeleton instead of a loading spinner", () => {
         vi.mocked(useDashboardUIContext).mockReturnValue({
             handleSignOut: vi.fn(),
         } as never);
@@ -38,7 +34,9 @@ describe("SessionManagementSection", () => {
 
         render(<SessionManagementSection />);
 
-        expect(screen.getByTestId("section-skeleton")).toBeInTheDocument();
+        expect(
+            screen.getByRole("status", { name: "กำลังโหลดข้อมูลเซสชัน" }),
+        ).toBeInTheDocument();
         expect(screen.queryByText("กำลังโหลดข้อมูลเซสชัน...")).not.toBeInTheDocument();
     });
 });

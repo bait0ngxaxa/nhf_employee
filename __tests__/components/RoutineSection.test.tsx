@@ -119,6 +119,7 @@ describe("RoutineSection tabs", () => {
         expect(mocks.useSWR).toHaveBeenCalledWith(
             "/api/routines/summary?scope=mine",
             expect.any(Function),
+            expect.objectContaining({ keepPreviousData: true }),
         );
     });
 
@@ -145,6 +146,7 @@ describe("RoutineSection tabs", () => {
         expect(mocks.useSWR).toHaveBeenCalledWith(
             "/api/routines/tasks?activeOnly=0&page=1&limit=20",
             expect.any(Function),
+            expect.objectContaining({ keepPreviousData: true }),
         );
     });
 
@@ -158,12 +160,14 @@ describe("RoutineSection tabs", () => {
         expect(mocks.useSWR).toHaveBeenCalledWith(
             "/api/routines/summary?scope=mine",
             expect.any(Function),
+            expect.objectContaining({ keepPreviousData: true }),
         );
         fireEvent.click(screen.getByRole("button", { name: "รายการทั้งหมด (Admin)" }));
 
         await waitFor(() => expect(mocks.useSWR).toHaveBeenCalledWith(
             "/api/routines/summary?scope=all",
             expect.any(Function),
+            expect.objectContaining({ keepPreviousData: true }),
         ));
     });
 
@@ -178,6 +182,7 @@ describe("RoutineSection tabs", () => {
         await waitFor(() => expect(mocks.useSWR).toHaveBeenCalledWith(
             "/api/routines/summary?scope=all",
             expect.any(Function),
+            expect.objectContaining({ keepPreviousData: true }),
         ));
     });
 

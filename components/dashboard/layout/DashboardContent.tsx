@@ -4,8 +4,20 @@ import { Suspense } from "react";
 import dynamic from "next/dynamic";
 
 import { useTitle } from "@/hooks/useTitle";
-import { SectionSkeleton } from "@/components/dashboard/feedback/SectionSkeleton";
+import {
+    DashboardHomeSkeleton,
+    FormSectionSkeleton,
+    ImportSectionSkeleton,
+    ITSupportSectionSkeleton,
+    NotificationSectionSkeleton,
+} from "@/components/dashboard/feedback/SectionSkeleton";
 import { EmailRequestSectionSkeleton } from "@/components/dashboard/feedback/EmailRequestSectionSkeleton";
+import { StockSectionSkeleton } from "@/components/dashboard/stock/StockSkeletons";
+import { EmployeeManagementSectionSkeleton } from "@/components/employee/EmployeeSkeletons";
+import { AuditLogsSectionSkeleton } from "@/components/audit/AuditLogSkeletons";
+import { LeaveManagementSectionSkeleton } from "@/components/dashboard/leave/LeaveSkeletons";
+import { SessionManagementSkeleton } from "@/components/dashboard/session-management/SessionManagementSkeleton";
+import { RoutineSectionSkeleton } from "@/components/dashboard/routine/RoutineSkeletons";
 import {
     useDashboardUIContext,
     useDashboardDataContext,
@@ -18,14 +30,14 @@ const StockSection = dynamic(
         import("@/components/dashboard/sections/StockSection").then(
             (mod) => mod.StockSection,
         ),
-    { loading: () => <SectionSkeleton />, ssr: false },
+    { loading: () => <StockSectionSkeleton />, ssr: false },
 );
 const ITSupportSection = dynamic(
     () =>
         import("@/components/dashboard/sections/ITSupportSection").then(
             (mod) => mod.ITSupportSection,
         ),
-    { loading: () => <SectionSkeleton /> },
+    { loading: () => <ITSupportSectionSkeleton /> },
 );
 const EmailRequestSection = dynamic(
     () =>
@@ -39,63 +51,63 @@ const EmployeeManagementSection = dynamic(
         import("@/components/dashboard/sections/EmployeeManagementSection").then(
             (mod) => mod.EmployeeManagementSection,
         ),
-    { loading: () => <SectionSkeleton /> },
+    { loading: () => <EmployeeManagementSectionSkeleton /> },
 );
 const AddEmployeeSection = dynamic(
     () =>
         import("@/components/dashboard/sections/AddEmployeeSection").then(
             (mod) => mod.AddEmployeeSection,
         ),
-    { loading: () => <SectionSkeleton /> },
+    { loading: () => <FormSectionSkeleton /> },
 );
 const AuditLogsSection = dynamic(
     () =>
         import("@/components/dashboard/sections/AuditLogsSection").then(
             (mod) => mod.AuditLogsSection,
         ),
-    { loading: () => <SectionSkeleton /> },
+    { loading: () => <AuditLogsSectionSkeleton /> },
 );
 const DashboardHomeSection = dynamic(
     () =>
         import("@/components/dashboard/sections/DashboardHomeSection").then(
             (mod) => mod.DashboardHomeSection,
         ),
-    { loading: () => <SectionSkeleton /> },
+    { loading: () => <DashboardHomeSkeleton /> },
 );
 const LeaveManagementSection = dynamic(
     () =>
         import("@/components/dashboard/sections/LeaveManagementSection").then(
             (mod) => mod.LeaveManagementSection,
         ),
-    { loading: () => <SectionSkeleton /> },
+    { loading: () => <LeaveManagementSectionSkeleton /> },
 );
 const ImportEmployeeCSV = dynamic(
     () =>
         import("@/components/employee/import-csv/ImportEmployeeCSV").then(
             (mod) => mod.ImportEmployeeCSV,
         ),
-    { loading: () => <SectionSkeleton /> },
+    { loading: () => <ImportSectionSkeleton /> },
 );
 const NotificationsSection = dynamic(
     () =>
         import("@/components/dashboard/notifications/NotificationsPageContent").then(
             (mod) => mod.NotificationsSection,
         ),
-    { loading: () => <SectionSkeleton /> },
+    { loading: () => <NotificationSectionSkeleton /> },
 );
 const SessionManagementSection = dynamic(
     () =>
         import("@/components/dashboard/sections/SessionManagementSection").then(
             (mod) => mod.SessionManagementSection,
         ),
-    { loading: () => <SectionSkeleton /> },
+    { loading: () => <SessionManagementSkeleton /> },
 );
 const RoutineSection = dynamic(
     () =>
         import("@/components/dashboard/sections/RoutineSection").then(
             (mod) => mod.RoutineSection,
         ),
-    { loading: () => <SectionSkeleton /> },
+    { loading: () => <RoutineSectionSkeleton /> },
 );
 
 function getPageTitle(menu: string): string {
@@ -135,7 +147,13 @@ export function DashboardContent() {
                     activeMenu === "leave-history" ? "my-leave" : undefined;
 
                 return (
-                    <Suspense fallback={<SectionSkeleton />}>
+                    <Suspense
+                        fallback={
+                            <LeaveManagementSectionSkeleton
+                                showApprovals={defaultLeaveTab === "approvals"}
+                            />
+                        }
+                    >
                         <LeaveManagementSection defaultTab={defaultLeaveTab} />
                     </Suspense>
                 );
@@ -143,14 +161,14 @@ export function DashboardContent() {
 
             case "stock":
                 return (
-                    <Suspense fallback={<SectionSkeleton />}>
+                    <Suspense fallback={<StockSectionSkeleton />}>
                         <StockSection />
                     </Suspense>
                 );
 
             case "it-support":
                 return (
-                    <Suspense fallback={<SectionSkeleton />}>
+                    <Suspense fallback={<ITSupportSectionSkeleton />}>
                         <ITSupportSection />
                     </Suspense>
                 );
@@ -164,21 +182,21 @@ export function DashboardContent() {
 
             case "employee-management":
                 return (
-                    <Suspense fallback={<SectionSkeleton />}>
+                    <Suspense fallback={<EmployeeManagementSectionSkeleton />}>
                         <EmployeeManagementSection />
                     </Suspense>
                 );
 
             case "add-employee":
                 return (
-                    <Suspense fallback={<SectionSkeleton />}>
+                    <Suspense fallback={<FormSectionSkeleton />}>
                         <AddEmployeeSection />
                     </Suspense>
                 );
 
             case "import-employee":
                 return (
-                    <Suspense fallback={<SectionSkeleton />}>
+                    <Suspense fallback={<ImportSectionSkeleton />}>
                         <ImportEmployeeCSV
                             onSuccess={handleEmployeeAdded}
                             onBack={() =>
@@ -190,34 +208,34 @@ export function DashboardContent() {
 
             case "audit-logs":
                 return (
-                    <Suspense fallback={<SectionSkeleton />}>
+                    <Suspense fallback={<AuditLogsSectionSkeleton />}>
                         <AuditLogsSection />
                     </Suspense>
                 );
 
             case "notifications":
                 return (
-                    <Suspense fallback={<SectionSkeleton />}>
+                    <Suspense fallback={<NotificationSectionSkeleton />}>
                         <NotificationsSection />
                     </Suspense>
                 );
             case "sessions":
                 return (
-                    <Suspense fallback={<SectionSkeleton />}>
+                    <Suspense fallback={<SessionManagementSkeleton />}>
                         <SessionManagementSection />
                     </Suspense>
                 );
 
             case "routine":
                 return (
-                    <Suspense fallback={<SectionSkeleton />}>
+                    <Suspense fallback={<RoutineSectionSkeleton />}>
                         <RoutineSection />
                     </Suspense>
                 );
 
             default:
                 return (
-                    <Suspense fallback={<SectionSkeleton />}>
+                    <Suspense fallback={<DashboardHomeSkeleton />}>
                         <DashboardHomeSection />
                     </Suspense>
                 );

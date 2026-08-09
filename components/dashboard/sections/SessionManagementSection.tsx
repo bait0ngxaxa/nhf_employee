@@ -3,15 +3,11 @@
 import { AlertTriangle, RefreshCw } from "lucide-react";
 
 import { useDashboardUIContext } from "@/components/dashboard/context/dashboard/DashboardContext";
-import { SectionSkeleton } from "@/components/dashboard/feedback/SectionSkeleton";
+import { SessionManagementSkeleton } from "@/components/dashboard/session-management/SessionManagementSkeleton";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { SessionManagementView } from "@/components/dashboard/session-management/SessionManagementView";
 import { useSessionManagement } from "@/components/dashboard/session-management/useSessionManagement";
-
-function SessionLoadingState() {
-    return <SectionSkeleton />;
-}
 
 function SessionErrorState({ onRetry }: { onRetry: () => void }) {
     return (
@@ -70,7 +66,7 @@ export function SessionManagementSection() {
     } = useSessionManagement({ onSignOutCurrent: handleSignOut });
 
     if (isLoading) {
-        return <SessionLoadingState />;
+        return <SessionManagementSkeleton />;
     }
 
     if (error) {
