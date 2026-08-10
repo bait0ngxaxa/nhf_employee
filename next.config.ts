@@ -10,13 +10,19 @@ const scriptSrc = [
     "https://static.cloudflareinsights.com",
 ].join(" ");
 
+const lineLiffConnectSrc = [
+    "https://api.line.me",
+    "https://access.line.me",
+    "https://liff.line.me",
+].join(" ");
+
 const contentSecurityPolicy = [
     "default-src 'self'",
     `script-src ${scriptSrc}`,
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' blob: data:",
     "font-src 'self'",
-    "connect-src 'self' https://cloudflareinsights.com",
+    `connect-src 'self' https://cloudflareinsights.com ${lineLiffConnectSrc}`,
     "object-src 'none'",
     "base-uri 'self'",
     "form-action 'self'",

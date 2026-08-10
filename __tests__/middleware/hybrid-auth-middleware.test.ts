@@ -8,6 +8,7 @@ import {
     HYBRID_ACCESS_COOKIE_NAME,
     HYBRID_REFRESH_COOKIE_NAME,
 } from "@/lib/auth/hybrid/constants";
+import { APP_ROUTES } from "@/lib/ssot/routes";
 
 function buildRequest(url: string, cookie?: string): NextRequest {
     return new NextRequest(url, {
@@ -65,6 +66,26 @@ describe("hybrid auth middleware", () => {
         const response = await middleware(request);
 
         expect(response.status).toBe(200);
+    });
+
+    it("allows the unauthenticated LIFF Routine route", async () => {
+        const request = buildRequest(
+            `http://localhost${APP_ROUTES.line.routine}`,
+        );
+        const response = await middleware(request);
+
+        expect(response.status).toBe(200);
+        expect(response.headers.get("location")).toBeNull();
+    });
+
+    it("allows LIFF Routine query parameters without redirecting", async () => {
+        const request = buildRequest(
+            `http://localhost${APP_ROUTES.line.routine}?taskId=71&occurrenceId=91`,
+        );
+        const response = await middleware(request);
+
+        expect(response.status).toBe(200);
+        expect(response.headers.get("location")).toBeNull();
     });
 
     it("redirects root route with only refresh cookie to refresh bridge for dashboard", async () => {

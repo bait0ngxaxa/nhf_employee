@@ -19,6 +19,7 @@ const PUBLIC_ROUTES = new Set([
     "/forgot-password",
     "/reset-password",
     "/leave/action",
+    APP_ROUTES.line.routine,
 ]);
 
 async function hasValidHybridAccessToken(request: NextRequest): Promise<boolean> {
