@@ -1,5 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+const loadEnvConfigMock = vi.hoisted(() => vi.fn());
+
+vi.mock("@next/env", () => ({
+    loadEnvConfig: loadEnvConfigMock,
+}));
+
 import {
     buildRoutineRichMenuDefinition,
     getRoutineRichMenuImagePath,
@@ -12,7 +18,10 @@ import {
     buildRoutineLiffTaskUrl,
     buildRoutineLiffUrl,
 } from "@/lib/line/routine-links";
-import { runRoutineRichMenuCli } from "../../scripts/line-routine-rich-menu";
+import {
+    loadRoutineRichMenuEnvironment,
+    runRoutineRichMenuCli,
+} from "../../scripts/line-routine-rich-menu";
 
 function jsonResponse(body: unknown, status = 200): Response {
     return new Response(JSON.stringify(body), {
@@ -115,6 +124,7 @@ describe("Routine Rich Menu provisioning", () => {
         vi.stubEnv("LINE_ROUTINE_CHANNEL_ACCESS_TOKEN", "routine-token");
         vi.stubEnv("NEXT_PUBLIC_FEATURE_ROUTINE", "true");
         fetchMock.mockReset();
+        loadEnvConfigMock.mockReset();
     });
 
     afterEach(() => {
@@ -129,6 +139,14 @@ describe("Routine Rich Menu provisioning", () => {
 
         expect(result.mode).toBe("dry-run");
         expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it("loads the project environment with Next.js env semantics", () => {
+        vi.stubEnv("NODE_ENV", "development");
+
+        loadRoutineRichMenuEnvironment();
+
+        expect(loadEnvConfigMock).toHaveBeenCalledWith(process.cwd(), true);
     });
 
     it("validates before create and runs the complete apply sequence", async () => {

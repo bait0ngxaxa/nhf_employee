@@ -2,6 +2,8 @@
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
+import { loadEnvConfig } from "@next/env";
+
 import {
     getRoutineRichMenuStatus,
     provisionRoutineRichMenu,
@@ -103,6 +105,10 @@ function printUsage(): void {
     console.log("  npm run line:richmenu:provision -- --apply");
 }
 
+export function loadRoutineRichMenuEnvironment(): void {
+    loadEnvConfig(process.cwd(), process.env.NODE_ENV === "development");
+}
+
 export async function runRoutineRichMenuCli(args: string[]): Promise<number> {
     const command = args[0] ?? "help";
     try {
@@ -125,6 +131,7 @@ export async function runRoutineRichMenuCli(args: string[]): Promise<number> {
 
 const scriptPath = process.argv[1];
 if (scriptPath && import.meta.url === pathToFileURL(path.resolve(scriptPath)).href) {
+    loadRoutineRichMenuEnvironment();
     void runRoutineRichMenuCli(process.argv.slice(2)).then((exitCode) => {
         process.exitCode = exitCode;
     });
