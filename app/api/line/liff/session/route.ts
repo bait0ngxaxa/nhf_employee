@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 
 import { findActiveLiffWorkforceIdentity } from "@/lib/auth/liff";
+import { withTrustedMutation } from "@/lib/auth/csrf";
 import {
     findLineAccountLinkByLineUserId,
 } from "@/lib/line/account-link";
@@ -32,7 +33,7 @@ function lineVerificationErrorResponse(
     return serverError();
 }
 
-export async function POST(request: NextRequest): Promise<NextResponse> {
+async function handleLiffSession(request: NextRequest): Promise<NextResponse> {
     const requestSizeResponse = lineRequestSizeGuard(request);
     if (requestSizeResponse) {
         return requestSizeResponse;
@@ -81,3 +82,5 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         return serverError();
     }
 }
+
+export const POST = withTrustedMutation(handleLiffSession);

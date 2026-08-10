@@ -469,6 +469,75 @@ describe("NHF Routine query authorization", () => {
         });
     });
 
+    it("denies an admin mine focus when the occurrence belongs to another employee", async () => {
+        prismaMock.routineOccurrence.findUnique.mockResolvedValue(asNever({
+            taskId: 71,
+            task: { isActive: true },
+        }));
+        prismaMock.routineOccurrence.findFirst.mockResolvedValue(null);
+
+        const result = await getRoutineTaskWorkItems(
+            { scope: "mine", taskId: 71, occurrenceId: 99, page: 1, limit: 20 },
+            { actor: { id: 99, email: "admin@example.com", role: "ADMIN" }, employeeId: 42 },
+        );
+
+        expect(result.tasks).toEqual([]);
+        expect(prismaMock.routineTask.findMany).not.toHaveBeenCalled();
+    });
+
+    it("allows an admin mine focus for their own employee assignment", async () => {
+        const today = getCurrentBangkokDate();
+        prismaMock.routineOccurrence.findUnique.mockResolvedValue(asNever({
+            taskId: 71,
+            task: { isActive: true },
+        }));
+        prismaMock.routineOccurrence.findFirst.mockResolvedValue(
+            asNever({ taskId: 71 }),
+        );
+        prismaMock.routineTask.findMany.mockResolvedValue(asNever([
+            taskRow(71, 42),
+        ]));
+        prismaMock.routineTask.count.mockResolvedValue(1);
+        prismaMock.routineOccurrence.findMany.mockResolvedValue(asNever([
+            occurrenceRow(99, 71, addCalendarDays(today, 4)),
+        ]));
+
+        const result = await getRoutineTaskWorkItems(
+            { scope: "mine", taskId: 71, occurrenceId: 99, page: 1, limit: 20 },
+            { actor: { id: 99, email: "admin@example.com", role: "ADMIN" }, employeeId: 42 },
+        );
+
+        expect(result.tasks).toHaveLength(1);
+        expect(result.tasks[0]?.id).toBe(71);
+        expect(result.tasks[0]?.relevantOccurrence?.id).toBe(99);
+    });
+
+    it("keeps a regular user's mine focus employee-scoped", async () => {
+        const today = getCurrentBangkokDate();
+        prismaMock.routineOccurrence.findUnique.mockResolvedValue(asNever({
+            taskId: 71,
+            task: { isActive: true },
+        }));
+        prismaMock.routineOccurrence.findFirst.mockResolvedValue(
+            asNever({ taskId: 71 }),
+        );
+        prismaMock.routineTask.findMany.mockResolvedValue(asNever([
+            taskRow(71, 42),
+        ]));
+        prismaMock.routineTask.count.mockResolvedValue(1);
+        prismaMock.routineOccurrence.findMany.mockResolvedValue(asNever([
+            occurrenceRow(99, 71, addCalendarDays(today, 4)),
+        ]));
+
+        const result = await getRoutineTaskWorkItems(
+            { scope: "mine", taskId: 71, occurrenceId: 99, page: 1, limit: 20 },
+            { actor: { id: 5, email: "user@example.com", role: "USER" }, employeeId: 42 },
+        );
+
+        expect(result.tasks).toHaveLength(1);
+        expect(result.tasks[0]?.id).toBe(71);
+    });
+
     it("allows an active occurrence-only assignee to open the focused Task", async () => {
         const today = getCurrentBangkokDate();
         prismaMock.routineOccurrence.findUnique.mockResolvedValue(asNever({

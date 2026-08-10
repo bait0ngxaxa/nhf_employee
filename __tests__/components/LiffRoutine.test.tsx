@@ -322,4 +322,29 @@ describe("LiffRoutineApp", () => {
             limit: 12,
         });
     });
+
+    it("deduplicates a focused task when a later page contains it again", async () => {
+        const firstPageTask = { ...TASK, id: 72, title: "งานหน้าแรก" };
+        const laterPageTask = { ...TASK, id: 73, title: "งานใหม่จากหน้าถัดไป" };
+        mocks.useSearchParams.mockReturnValue(
+            new URLSearchParams("taskId=71&occurrenceId=91"),
+        );
+        mocks.fetchLiffRoutineTasks
+            .mockResolvedValueOnce(tasksResponse([TASK]))
+            .mockResolvedValueOnce(tasksResponse([firstPageTask], 2, 1))
+            .mockResolvedValueOnce(tasksResponse([TASK, laterPageTask], 2, 2));
+
+        render(<LiffRoutineApp />);
+
+        await waitFor(() => {
+            expect(screen.getByText("งานจากการแจ้งเตือน")).toBeInTheDocument();
+        });
+        fireEvent.click(screen.getByRole("button", { name: "โหลดเพิ่มเติม" }));
+
+        await waitFor(() => {
+            expect(screen.getByText("งานใหม่จากหน้าถัดไป")).toBeInTheDocument();
+        });
+        expect(screen.getAllByText("ตรวจสอบระบบ")).toHaveLength(1);
+        expect(screen.getByText("งานหน้าแรก")).toBeInTheDocument();
+    });
 });

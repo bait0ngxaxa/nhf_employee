@@ -444,7 +444,7 @@ async function resolveRoutineFocus(
     if (!occurrence.task.isActive || occurrence.taskId !== filters.taskId) {
         return { kind: "DENIED" };
     }
-    if (isAdmin) {
+    if (isAdmin && filters.scope !== "mine") {
         return { kind: "AUTHORIZED_OCCURRENCE", taskId: occurrence.taskId };
     }
     if (employeeId === null) return { kind: "DENIED" };

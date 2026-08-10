@@ -510,6 +510,12 @@ export async function provisionRoutineRichMenu(
     if (!options.apply) {
         return toProvisionResult(prepared, "dry-run");
     }
+    if (!prepared.routineFeatureEnabled) {
+        throw new RichMenuProvisioningError(
+            "configuration",
+            "Routine feature is disabled; Rich Menu provisioning cannot be applied",
+        );
+    }
 
     const fetchImpl = options.fetchImpl ?? fetch;
     await requestLineApi({

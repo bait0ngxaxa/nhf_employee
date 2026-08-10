@@ -49,6 +49,7 @@ vi.mock("@/lib/line/liff-session", () => ({
 import { POST as accountLinkRoute } from "@/app/api/line/account-link/route";
 import { POST as liffSessionRoute } from "@/app/api/line/liff/session/route";
 import { LineAccountLinkConflictError } from "@/lib/line/account-link";
+import { LINE_AUTH_MAX_REQUEST_BYTES } from "@/lib/line/api";
 import { LineIdentityVerificationError } from "@/lib/line/errors";
 
 const ACTIVE_AUTH = {
@@ -95,6 +96,18 @@ function requestWithBody(
         method: "POST",
         headers: { ...TRUSTED_HEADERS, ...headers },
         body: JSON.stringify(body),
+    });
+}
+
+function requestWithRawBody(
+    url: string,
+    body: string,
+    headers: Record<string, string> = {},
+): NextRequest {
+    return new NextRequest(url, {
+        method: "POST",
+        headers: { ...TRUSTED_HEADERS, ...headers },
+        body,
     });
 }
 
@@ -234,7 +247,7 @@ describe("LINE authentication routes", () => {
         expect(issueLiffSessionMock).not.toHaveBeenCalled();
     });
 
-    it("creates a LIFF session from a linked, active workforce identity", async () => {
+    it("accepts a valid bounded body and creates a LIFF session", async () => {
         const response = await liffSessionRoute(
             requestWithBody(
                 "http://localhost/api/line/liff/session",
@@ -254,6 +267,61 @@ describe("LINE authentication routes", () => {
             expect.any(NextResponse),
             "signed-liff-session",
         );
+    });
+
+    it.each([
+        ["missing Origin", { origin: "" }],
+        ["untrusted Origin", { origin: "https://attacker.example" }],
+        ["missing AJAX header", { "x-requested-with": "" }],
+    ])("rejects a LIFF session mutation with %s", async (_label, headers) => {
+        const response = await liffSessionRoute(
+            requestWithBody(
+                "http://localhost/api/line/liff/session",
+                { idToken: "line-id-token" },
+                headers,
+            ),
+        );
+
+        expect(response.status).toBe(403);
+        expect(verifyLineIdTokenMock).not.toHaveBeenCalled();
+    });
+
+    it("rejects a LIFF session request whose declared size exceeds the limit", async () => {
+        const response = await liffSessionRoute(
+            requestWithBody(
+                "http://localhost/api/line/liff/session",
+                { idToken: "line-id-token" },
+                { "content-length": String(LINE_AUTH_MAX_REQUEST_BYTES + 1) },
+            ),
+        );
+
+        expect(response.status).toBe(413);
+        expect(verifyLineIdTokenMock).not.toHaveBeenCalled();
+    });
+
+    it("rejects an oversized body even when Content-Length is missing", async () => {
+        const request = requestWithRawBody(
+            "http://localhost/api/line/liff/session",
+            JSON.stringify({ idToken: "x".repeat(LINE_AUTH_MAX_REQUEST_BYTES) }),
+        );
+
+        expect(request.headers.get("content-length")).toBeNull();
+        const response = await liffSessionRoute(request);
+
+        expect(response.status).toBe(413);
+        expect(verifyLineIdTokenMock).not.toHaveBeenCalled();
+    });
+
+    it("maps malformed JSON to 400 without verifying a token", async () => {
+        const response = await liffSessionRoute(
+            requestWithRawBody(
+                "http://localhost/api/line/liff/session",
+                "{not-json",
+            ),
+        );
+
+        expect(response.status).toBe(400);
+        expect(verifyLineIdTokenMock).not.toHaveBeenCalled();
     });
 
     it.each([
@@ -283,7 +351,13 @@ describe("LINE authentication routes", () => {
         const response = await liffSessionRoute(
             requestWithBody(
                 "http://localhost/api/line/liff/session",
-                { lineUserId: "client-supplied" },
+                {
+                    idToken: "line-id-token",
+                    lineUserId: "client-supplied",
+                    userId: 999,
+                    employeeId: 999,
+                    role: "ADMIN",
+                },
                 {},
             ),
         );

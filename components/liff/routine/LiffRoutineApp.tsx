@@ -396,7 +396,13 @@ export function LiffRoutineApp(): ReactElement {
                 timingStatus: selectedFilter || undefined,
             });
             if (requestId !== taskRequestIdRef.current) return;
-            setTasks((current) => [...current, ...response.tasks]);
+            setTasks((current) => {
+                const existingIds = new Set(current.map((task) => task.id));
+                return [
+                    ...current,
+                    ...response.tasks.filter((task) => !existingIds.has(task.id)),
+                ];
+            });
             setPagination(response.pagination);
         } catch (error) {
             if (requestId !== taskRequestIdRef.current) return;

@@ -141,6 +141,33 @@ describe("Routine Rich Menu provisioning", () => {
         expect(fetchMock).not.toHaveBeenCalled();
     });
 
+    it("allows a disabled Routine feature during dry-run without API calls", async () => {
+        vi.stubEnv("NEXT_PUBLIC_FEATURE_ROUTINE", "false");
+
+        const result = await provisionRoutineRichMenu({
+            apply: false,
+            fetchImpl: fetchMock,
+        });
+
+        expect(result).toMatchObject({
+            mode: "dry-run",
+            routineFeatureEnabled: false,
+        });
+        expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it("fails before any API call when applying while Routine is disabled", async () => {
+        vi.stubEnv("NEXT_PUBLIC_FEATURE_ROUTINE", "false");
+
+        await expect(
+            provisionRoutineRichMenu({ apply: true, fetchImpl: fetchMock }),
+        ).rejects.toMatchObject({
+            phase: "configuration",
+            message: expect.stringContaining("Routine feature is disabled"),
+        });
+        expect(fetchMock).not.toHaveBeenCalled();
+    });
+
     it("loads the project environment with Next.js env semantics", () => {
         vi.stubEnv("NODE_ENV", "development");
 
