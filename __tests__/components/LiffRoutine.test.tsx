@@ -191,7 +191,7 @@ describe("LiffRoutineApp", () => {
             expect(screen.getByRole("heading", { name: "เชื่อมบัญชี NHF" })).toBeInTheDocument();
         });
 
-        expect(screen.getByRole("button", { name: "เชื่อมต่อบัญชี NHF" })).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "เชื่อมบัญชี NHF" })).toBeInTheDocument();
         expect(mocks.fetchLiffRoutineSummary).not.toHaveBeenCalled();
     });
 

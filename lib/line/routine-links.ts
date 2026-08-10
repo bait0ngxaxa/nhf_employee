@@ -3,13 +3,15 @@ import { getPublicOrigin } from "@/lib/network/public-url";
 
 import { getLineRoutineLiffId } from "./config";
 
+export function buildRoutineLiffUrl(): string {
+    return `https://liff.line.me/${encodeURIComponent(getLineRoutineLiffId())}`;
+}
+
 export function buildRoutineLiffTaskUrl(
     taskId: number,
     occurrenceId: number,
 ): string {
-    const url = new URL(
-        `https://liff.line.me/${encodeURIComponent(getLineRoutineLiffId())}`,
-    );
+    const url = new URL(buildRoutineLiffUrl());
     url.searchParams.set("taskId", String(taskId));
     url.searchParams.set("occurrenceId", String(occurrenceId));
     return url.toString();

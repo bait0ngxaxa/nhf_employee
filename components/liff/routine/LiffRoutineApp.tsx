@@ -168,8 +168,8 @@ function LinkRequiredView({ onConnect }: { onConnect: () => void }): ReactElemen
                             เชื่อมบัญชี NHF
                         </h1>
                         <p className="text-sm leading-6 text-content-secondary">
-                            บัญชี LINE นี้ยังไม่ได้เชื่อมกับบัญชี NHF
-                            กรุณาเชื่อมบัญชี NHF เพื่อดูงาน Routine ที่ได้รับมอบหมาย
+                            เชื่อมบัญชี LINE กับบัญชีพนักงาน NHF เพียงครั้งแรก
+                            เพื่อดูงาน Routine ของคุณผ่าน LINE
                         </p>
                     </div>
                     <Button
@@ -177,7 +177,7 @@ function LinkRequiredView({ onConnect }: { onConnect: () => void }): ReactElemen
                         onClick={onConnect}
                         className="min-h-12 w-full rounded-xl bg-gradient-to-r from-action-gradient-start to-action-gradient-end text-base font-semibold text-content-on-brand hover:from-action-gradient-hover-start hover:to-action-gradient-hover-end"
                     >
-                        เชื่อมต่อบัญชี NHF
+                        เชื่อมบัญชี NHF
                     </Button>
                 </Card>
             </div>

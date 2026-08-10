@@ -8,6 +8,10 @@ export interface LineRoutineConfig {
     loginChannelId: string;
 }
 
+export interface LineRoutineMessagingConfig {
+    channelAccessToken: string;
+}
+
 export function getLineRoutineLiffId(): string {
     const liffId = process.env.NEXT_PUBLIC_LINE_ROUTINE_LIFF_ID?.trim();
 
@@ -37,6 +41,19 @@ export function getLineRoutineConfig(): LineRoutineConfig {
     }
 
     return { loginChannelId };
+}
+
+export function getLineRoutineMessagingConfig(): LineRoutineMessagingConfig {
+    const channelAccessToken = process.env.LINE_ROUTINE_CHANNEL_ACCESS_TOKEN?.trim();
+
+    if (!channelAccessToken) {
+        throw new LineIdentityVerificationError(
+            "MISCONFIGURED",
+            "LINE Routine Messaging API channel is not configured",
+        );
+    }
+
+    return { channelAccessToken };
 }
 
 function getLineLiffSessionTtlSeconds(): number {
