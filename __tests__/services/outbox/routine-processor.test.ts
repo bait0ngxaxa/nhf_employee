@@ -46,6 +46,16 @@ function buildEmailNotification(): NotificationOutbox {
     };
 }
 
+function buildLineNotification(): NotificationOutbox {
+    return {
+        ...buildNotification(),
+        id: 703,
+        type: "ROUTINE_REMINDER_LINE",
+        eventKey: "routine:91:rule:31:user:17:version:2:line",
+        payload: JSON.stringify({ userId: 17, retryKey: "retry-key" }),
+    };
+}
+
 describe("notification outbox Routine dispatch", () => {
     beforeEach(() => {
         mockReset(prismaMock);
@@ -107,5 +117,22 @@ describe("notification outbox Routine dispatch", () => {
                 nextAttemptAt: expect.any(Date),
             }),
         });
+    });
+
+    it("routes the LINE child through the same outbox processor", async () => {
+        prismaMock.notificationOutbox.findMany.mockResolvedValue(
+            asNever([buildLineNotification()]),
+        );
+
+        const result = await processOutbox();
+
+        expect(result).toEqual({ processed: 1, failed: 0 });
+        expect(dispatchRoutineReminderOutboxMock).toHaveBeenCalledWith(
+            expect.objectContaining({
+                id: 703,
+                type: "ROUTINE_REMINDER_LINE",
+            }),
+            { userId: 17, retryKey: "retry-key" },
+        );
     });
 });

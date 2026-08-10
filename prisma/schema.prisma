@@ -41,8 +41,21 @@ model User {
   updatedRoutineTasks         RoutineTask[]               @relation("RoutineTaskUpdatedBy")
   routineImportLedgers        RoutineImportLedger[]       @relation("RoutineImportAppliedBy")
   routineImportBatches         RoutineImportBatch[]        @relation("RoutineImportUploadedBy")
+  lineAccountLink              LineAccountLink?
 
   @@map("users")
+}
+
+model LineAccountLink {
+  id         String   @id @default(cuid())
+  userId     Int      @unique
+  lineUserId String   @unique @db.VarChar(64)
+  linkedAt   DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("line_account_links")
 }
 
 enum Role {
@@ -246,6 +259,7 @@ enum NotificationOutboxType {
   STOCK_REQUEST_RESULT_EMAIL
   ROUTINE_REMINDER_IN_APP
   ROUTINE_REMINDER_EMAIL
+  ROUTINE_REMINDER_LINE
 }
 
 enum NotificationOutboxStatus {

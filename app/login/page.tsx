@@ -3,6 +3,7 @@ import { Suspense } from "react";
 import { type Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getApiAuthSession } from "@/lib/auth/server";
+import { resolveSafeInternalPath } from "@/lib/auth/return-path";
 import { APP_ROUTES } from "@/lib/ssot/routes";
 
 export const metadata: Metadata = {
@@ -19,10 +20,18 @@ function LoginPageContent() {
     );
 }
 
-export default async function Page() {
+export default async function Page({
+    searchParams,
+}: {
+    searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
     const session = await getApiAuthSession();
     if (session) {
-        redirect(APP_ROUTES.dashboard);
+        const params = await searchParams;
+        const returnTo = typeof params.returnTo === "string"
+            ? params.returnTo
+            : undefined;
+        redirect(resolveSafeInternalPath(returnTo, APP_ROUTES.dashboard));
     }
 
     return (

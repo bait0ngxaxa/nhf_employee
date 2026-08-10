@@ -6,11 +6,13 @@ import { prisma } from "@/lib/db/prisma";
 import {
     buildRoutineReminderEmailEventKey,
     buildRoutineReminderEventKey,
+    buildRoutineReminderLineEventKey,
     dispatchRoutineReminderOutbox,
 } from "@/lib/services/routine/reminders";
 
 const createInAppNotificationOnceMock = vi.hoisted(() => vi.fn());
 const sendRoutineReminderNotificationMock = vi.hoisted(() => vi.fn());
+const sendRoutineLineMessageMock = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/db/prisma", () => ({
     prisma: mockDeep<PrismaClient>(),
@@ -30,10 +32,42 @@ vi.mock("@/lib/email", () => ({
     sendRoutineReminderNotification: sendRoutineReminderNotificationMock,
 }));
 
+vi.mock("@/lib/line", () => ({
+    sendRoutineLineMessage: sendRoutineLineMessageMock,
+}));
+
 const prismaMock = prisma as unknown as ReturnType<typeof mockDeep<PrismaClient>>;
 
 function asNever<T>(value: T): never {
     return value as unknown as never;
+}
+
+type OutboxCreateManyRow = {
+    type?: string;
+    eventKey?: string;
+    payload?: string;
+};
+
+function getOutboxCreateManyRows(value: unknown): OutboxCreateManyRow[] {
+    if (typeof value !== "object" || value === null || !("data" in value)) {
+        return [];
+    }
+    const data: unknown = value.data;
+    if (!Array.isArray(data)) return [];
+
+    return data.flatMap((row): OutboxCreateManyRow[] => {
+        if (typeof row !== "object" || row === null) return [];
+        const record = row as Record<string, unknown>;
+        return [{
+            type: typeof record.type === "string" ? record.type : undefined,
+            eventKey: typeof record.eventKey === "string"
+                ? record.eventKey
+                : undefined,
+            payload: typeof record.payload === "string"
+                ? record.payload
+                : undefined,
+        }];
+    });
 }
 
 function buildNotification(payload: unknown): NotificationOutbox {
@@ -101,6 +135,39 @@ function buildEmailNotification(payload: ReturnType<typeof buildEmailPayload>): 
     };
 }
 
+function buildLinePayload(overrides: Record<string, unknown> = {}) {
+    return {
+        occurrenceId: 91,
+        taskId: 71,
+        ruleId: 31,
+        userId: 17,
+        reminderVersion: 2,
+        taskTitle: "ตรวจสอบระบบประจำเดือน",
+        unitName: "หน่วยงานทดสอบ",
+        categoryName: "หมวดหมู่ทดสอบ",
+        dueDate: "2026-08-05",
+        daysBefore: 2,
+        scheduledFor: "2026-08-03T02:00:00.000Z",
+        isAssignee: true,
+        retryKey: "123e4567-e89b-42d3-a456-426614174000",
+        ...overrides,
+    };
+}
+
+function buildLineNotification(payload: ReturnType<typeof buildLinePayload>): NotificationOutbox {
+    return {
+        ...buildNotification(payload),
+        id: 503,
+        type: "ROUTINE_REMINDER_LINE",
+        eventKey: buildRoutineReminderLineEventKey(
+            payload.occurrenceId as number,
+            payload.ruleId as number,
+            payload.userId as number,
+            payload.reminderVersion as number,
+        ),
+    };
+}
+
 function buildOccurrence(overrides: Record<string, unknown> = {}) {
     return {
         id: 91,
@@ -154,6 +221,7 @@ describe("Routine reminder dispatch", () => {
             asNever({ count: 1 }),
         );
         sendRoutineReminderNotificationMock.mockResolvedValue(true);
+        sendRoutineLineMessageMock.mockResolvedValue(true);
     });
 
     it("revalidates current state and creates a deduplicated in-app notification", async () => {
@@ -684,5 +752,235 @@ describe("Routine reminder dispatch", () => {
                 lastError: "Superseded invalid Routine reminder payload",
             },
         });
+    });
+
+    it("creates one LINE child outbox for a linked assignee with a persisted retry key", async () => {
+        prismaMock.routineOccurrence.findUnique.mockResolvedValue(
+            asNever(buildOccurrence()),
+        );
+        prismaMock.lineAccountLink.findMany.mockResolvedValue(
+            asNever([{ userId: 17 }]),
+        );
+
+        const result = await dispatchRoutineReminderOutbox(
+            buildNotification(buildPayload()),
+            buildPayload(),
+            new Date("2026-08-03T02:00:00.000Z"),
+        );
+
+        expect(result).toBe("SENT");
+        const lineRows = prismaMock.notificationOutbox.createMany.mock.calls
+            .map(([value]) => getOutboxCreateManyRows(value))
+            .find((rows) =>
+                rows.some((row) => row.type === "ROUTINE_REMINDER_LINE"),
+            );
+        expect(lineRows).toHaveLength(1);
+        expect(lineRows?.[0]).toEqual(expect.objectContaining({
+            type: "ROUTINE_REMINDER_LINE",
+            eventKey: "routine:91:rule:31:user:17:version:2:line",
+        }));
+        const linePayload = JSON.parse(lineRows?.[0]?.payload ?? "{}") as Record<
+            string,
+            unknown
+        >;
+        expect(linePayload).toMatchObject({
+            isAssignee: true,
+            userId: 17,
+            reminderVersion: 2,
+        });
+        expect(linePayload.retryKey).toEqual(
+            expect.stringMatching(
+                /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
+            ),
+        );
+    });
+
+    it("does not create a LINE child outbox for an unlinked recipient", async () => {
+        prismaMock.routineOccurrence.findUnique.mockResolvedValue(
+            asNever(buildOccurrence()),
+        );
+        prismaMock.lineAccountLink.findMany.mockResolvedValue(asNever([]));
+
+        await dispatchRoutineReminderOutbox(
+            buildNotification(buildPayload()),
+            buildPayload(),
+            new Date("2026-08-03T02:00:00.000Z"),
+        );
+
+        expect(
+            prismaMock.notificationOutbox.createMany.mock.calls.some(([value]) =>
+                getOutboxCreateManyRows(value).some(
+                    (row) => row.type === "ROUTINE_REMINDER_LINE",
+                ),
+            ),
+        ).toBe(false);
+    });
+
+    it("dispatches an assignee LINE child through LIFF with the original retry key", async () => {
+        vi.stubEnv("NEXT_PUBLIC_LINE_ROUTINE_LIFF_ID", "routine-liff-id");
+        vi.stubEnv("LINE_ROUTINE_CHANNEL_ACCESS_TOKEN", "routine-token");
+        vi.stubEnv("PUBLIC_APPROVE_URL", "https://employee.example.com");
+        prismaMock.routineOccurrence.findUnique.mockResolvedValue(
+            asNever(buildOccurrence()),
+        );
+        prismaMock.user.findUnique.mockResolvedValue(
+            asNever({
+                id: 17,
+                role: "USER",
+                employeeId: 5,
+                isActive: true,
+                deletedAt: null,
+                employee: { status: "ACTIVE", deletedAt: null },
+                lineAccountLink: { lineUserId: "U-assignee" },
+            }),
+        );
+
+        const payload = buildLinePayload();
+        const notification = buildLineNotification(payload);
+        const result = await dispatchRoutineReminderOutbox(
+            notification,
+            payload,
+            new Date("2026-08-03T02:00:00.000Z"),
+        );
+
+        expect(result).toBe("SENT");
+        expect(sendRoutineLineMessageMock).toHaveBeenCalledWith(
+            "U-assignee",
+            expect.objectContaining({ type: "flex" }),
+            payload.retryKey,
+        );
+        const message = sendRoutineLineMessageMock.mock.calls[0]?.[1];
+        expect(JSON.stringify(message)).toContain(
+            "https://liff.line.me/routine-liff-id?taskId=71&occurrenceId=91",
+        );
+
+        await dispatchRoutineReminderOutbox(
+            notification,
+            payload,
+            new Date("2026-08-03T02:01:00.000Z"),
+        );
+        expect(sendRoutineLineMessageMock.mock.calls[1]?.[2]).toBe(
+            payload.retryKey,
+        );
+    });
+
+    it("uses the Dashboard action for an admin-only LINE recipient", async () => {
+        vi.stubEnv("LINE_ROUTINE_CHANNEL_ACCESS_TOKEN", "routine-token");
+        vi.stubEnv("PUBLIC_APPROVE_URL", "https://employee.example.com");
+        prismaMock.routineOccurrence.findUnique.mockResolvedValue(
+            asNever(buildOccurrence()),
+        );
+        prismaMock.user.findUnique.mockResolvedValue(
+            asNever({
+                id: 99,
+                role: "ADMIN",
+                employeeId: null,
+                isActive: true,
+                deletedAt: null,
+                employee: null,
+                lineAccountLink: { lineUserId: "U-admin" },
+            }),
+        );
+
+        const payload = buildLinePayload({ userId: 99, isAssignee: false });
+        const result = await dispatchRoutineReminderOutbox(
+            buildLineNotification(payload),
+            payload,
+            new Date("2026-08-03T02:00:00.000Z"),
+        );
+
+        expect(result).toBe("SENT");
+        const message = sendRoutineLineMessageMock.mock.calls[0]?.[1];
+        expect(JSON.stringify(message)).toContain(
+            "https://employee.example.com/dashboard?tab=routine&taskId=71&occurrenceId=91",
+        );
+        expect(JSON.stringify(message)).not.toContain("liff.line.me");
+    });
+
+    it("supersedes a LINE child when its mapping disappears before dispatch", async () => {
+        prismaMock.routineOccurrence.findUnique.mockResolvedValue(
+            asNever(buildOccurrence()),
+        );
+        prismaMock.user.findUnique.mockResolvedValue(
+            asNever({
+                id: 17,
+                role: "USER",
+                employeeId: 5,
+                isActive: true,
+                deletedAt: null,
+                employee: { status: "ACTIVE", deletedAt: null },
+                lineAccountLink: null,
+            }),
+        );
+
+        const payload = buildLinePayload();
+        const result = await dispatchRoutineReminderOutbox(
+            buildLineNotification(payload),
+            payload,
+            new Date("2026-08-03T02:00:00.000Z"),
+        );
+
+        expect(result).toBe("SUPERSEDED");
+        expect(sendRoutineLineMessageMock).not.toHaveBeenCalled();
+        expect(prismaMock.notificationOutbox.updateMany).toHaveBeenCalledWith({
+            where: { id: 503, status: "PROCESSING" },
+            data: {
+                status: "SUPERSEDED",
+                lastError: "Superseded Routine reminder LINE delivery for unavailable recipient",
+            },
+        });
+    });
+
+    it("supersedes malformed and mismatched LINE child payloads", async () => {
+        const payload = buildLinePayload();
+        const notification = buildLineNotification(payload);
+
+        const malformedResult = await dispatchRoutineReminderOutbox(
+            notification,
+            { userId: payload.userId },
+        );
+        expect(malformedResult).toBe("SUPERSEDED");
+
+        const mismatchedNotification = {
+            ...notification,
+            id: 504,
+            eventKey: "routine:91:rule:31:user:17:version:999:line",
+        };
+        const mismatchedResult = await dispatchRoutineReminderOutbox(
+            mismatchedNotification,
+            payload,
+        );
+        expect(mismatchedResult).toBe("SUPERSEDED");
+        expect(sendRoutineLineMessageMock).not.toHaveBeenCalled();
+    });
+
+    it("throws on a LINE provider failure so the generic outbox can retry", async () => {
+        vi.stubEnv("NEXT_PUBLIC_LINE_ROUTINE_LIFF_ID", "routine-liff-id");
+        vi.stubEnv("LINE_ROUTINE_CHANNEL_ACCESS_TOKEN", "routine-token");
+        vi.stubEnv("PUBLIC_APPROVE_URL", "https://employee.example.com");
+        prismaMock.routineOccurrence.findUnique.mockResolvedValue(
+            asNever(buildOccurrence()),
+        );
+        prismaMock.user.findUnique.mockResolvedValue(
+            asNever({
+                id: 17,
+                role: "USER",
+                employeeId: 5,
+                isActive: true,
+                deletedAt: null,
+                employee: { status: "ACTIVE", deletedAt: null },
+                lineAccountLink: { lineUserId: "U-assignee" },
+            }),
+        );
+        sendRoutineLineMessageMock.mockResolvedValueOnce(false);
+
+        const payload = buildLinePayload();
+        await expect(
+            dispatchRoutineReminderOutbox(
+                buildLineNotification(payload),
+                payload,
+                new Date("2026-08-03T02:00:00.000Z"),
+            ),
+        ).rejects.toThrow("Routine LINE reminder delivery failed");
     });
 });

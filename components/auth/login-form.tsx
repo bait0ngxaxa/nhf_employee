@@ -17,6 +17,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Loader2 } from "lucide-react";
 import { apiPost } from "@/lib/client/api-client";
+import { resolveSafeInternalPath } from "@/lib/auth/return-path";
 import { API_ROUTES, APP_ROUTES } from "@/lib/ssot/routes";
 import { useAuth } from "@/components/auth/HybridAuthProvider";
 
@@ -80,7 +81,11 @@ export function LoginForm({
                 description: "ยินดีต้อนรับ! กำลังนำคุณไปยังหน้าแดชบอร์ด",
             });
             setFormData({ email: "", password: "" });
-            router.push(APP_ROUTES.dashboard);
+            const returnTo = resolveSafeInternalPath(
+                searchParams.get("returnTo"),
+                APP_ROUTES.dashboard,
+            );
+            router.push(returnTo);
             router.refresh();
         } catch {
             setError("เกิดข้อผิดพลาดในการเข้าสู่ระบบ");

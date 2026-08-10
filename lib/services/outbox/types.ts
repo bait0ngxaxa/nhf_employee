@@ -22,6 +22,7 @@ export const OUTBOX_NOTIFICATION_TYPES = [
     "STOCK_REQUEST_RESULT_EMAIL",
     "ROUTINE_REMINDER_IN_APP",
     "ROUTINE_REMINDER_EMAIL",
+    "ROUTINE_REMINDER_LINE",
 ] as const;
 
 export type OutboxNotificationType = (typeof OUTBOX_NOTIFICATION_TYPES)[number];

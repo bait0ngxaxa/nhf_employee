@@ -11,3 +11,7 @@ export interface LineWebhookData {
     oldStatus?: string;
     flexMessage: LineFlexMessage;
 }
+
+export interface VerifiedLineIdentity {
+    lineUserId: string;
+}

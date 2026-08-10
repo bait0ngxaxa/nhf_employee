@@ -7,6 +7,9 @@ export const APP_ROUTES = {
     accessDenied: "/access-denied",
     forgotPassword: "/forgot-password",
     resetPassword: "/reset-password",
+    line: {
+        routine: "/liff/routine",
+    },
 } as const;
 
 export const APP_DASHBOARD_TABS = {
@@ -99,6 +102,12 @@ export const API_ROUTES = {
     },
     emailRequest: {
         list: "/api/email-request",
+    },
+    line: {
+        accountLink: "/api/line/account-link",
+        liffSession: "/api/line/liff/session",
+        routineTasks: "/api/line/routine/tasks",
+        routineSummary: "/api/line/routine/summary",
     },
     stock: {
         categories: "/api/stock/categories",

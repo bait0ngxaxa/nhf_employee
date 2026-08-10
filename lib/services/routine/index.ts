@@ -20,10 +20,14 @@ export {
     buildRoutineReminderDedupeKey,
     buildRoutineReminderEmailEventKey,
     buildRoutineReminderEventKey,
+    buildRoutineReminderLineEventKey,
     dispatchRoutineReminderOutbox,
     getRoutineReminderActionUrl,
+    formatRoutineReminderDueDate,
+    formatRoutineReminderTiming,
     ROUTINE_REMINDER_OUTBOX_TYPE,
     ROUTINE_REMINDER_EMAIL_OUTBOX_TYPE,
+    ROUTINE_REMINDER_LINE_OUTBOX_TYPE,
 } from "./reminders";
 export {
     getRoutineOccurrenceById,

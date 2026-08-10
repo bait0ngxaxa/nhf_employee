@@ -406,6 +406,27 @@ export const routineReminderEmailOutboxPayloadSchema = z.object({
     reminderVersion: z.number().int().positive(),
 });
 
+const lineRetryKeySchema = z.string().regex(
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
+    "LINE retry key must be a UUID",
+);
+
+export const routineReminderLineOutboxPayloadSchema = z.object({
+    occurrenceId: z.number().int().positive(),
+    taskId: z.number().int().positive(),
+    ruleId: z.number().int().positive(),
+    userId: z.number().int().positive(),
+    reminderVersion: z.number().int().positive(),
+    taskTitle: z.string().min(1).max(255),
+    unitName: z.string().min(1).max(255),
+    categoryName: z.string().min(1).max(255),
+    dueDate: dateSchema,
+    daysBefore: z.number().int().nonnegative(),
+    scheduledFor: z.iso.datetime(),
+    isAssignee: z.boolean(),
+    retryKey: lineRetryKeySchema,
+});
+
 export type RoutineTaskCreateInput = z.infer<typeof routineTaskCreateSchema>;
 export type RoutineTaskUpdateInput = z.infer<typeof routineTaskUpdateSchema>;
 export type RoutineOccurrenceFilters = z.infer<
@@ -426,6 +447,9 @@ export type RoutineReminderOutboxPayload = z.infer<
 >;
 export type RoutineReminderEmailOutboxPayload = z.infer<
     typeof routineReminderEmailOutboxPayloadSchema
+>;
+export type RoutineReminderLineOutboxPayload = z.infer<
+    typeof routineReminderLineOutboxPayloadSchema
 >;
 
 export function parseRoutineScheduleConfig(

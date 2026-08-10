@@ -45,6 +45,7 @@ const PUBLIC_AUTH_PATHS: ReadonlySet<string> = new Set<string>([
     APP_ROUTES.accessDenied,
     APP_ROUTES.forgotPassword,
     APP_ROUTES.resetPassword,
+    APP_ROUTES.line.routine,
 ]);
 
 function shouldBootstrapAuth(pathname: string | null): boolean {

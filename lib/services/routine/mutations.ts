@@ -554,6 +554,7 @@ export async function deleteRoutineTask(
                         in: [
                             "ROUTINE_REMINDER_IN_APP",
                             "ROUTINE_REMINDER_EMAIL",
+                            "ROUTINE_REMINDER_LINE",
                         ],
                     },
                     status: { in: ["PENDING", "PROCESSING", "FAILED"] },

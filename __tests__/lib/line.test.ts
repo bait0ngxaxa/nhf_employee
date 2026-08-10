@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
     sendLineMessage,
     sendLineBroadcast,
+    sendRoutineLineMessage,
     sendNewTicketNotification,
 } from "@/lib/line";
 import type { LineFlexMessage, TicketEmailData } from "@/types/api";
@@ -27,6 +28,7 @@ describe("LINE Notification Service", () => {
     beforeEach(() => {
         vi.clearAllMocks();
         process.env.LINE_IT_CHANNEL_ACCESS_TOKEN = "test_token";
+        process.env.LINE_ROUTINE_CHANNEL_ACCESS_TOKEN = "routine_test_token";
         process.env.LINE_IT_TEAM_USER_ID = "user_123";
         process.env.PUBLIC_APPROVE_URL = "http://localhost:3000";
 
@@ -109,6 +111,58 @@ describe("LINE Notification Service", () => {
                 "https://api.line.me/v2/bot/message/broadcast",
                 expect.anything(),
             );
+        });
+    });
+
+    describe("sendRoutineLineMessage", () => {
+        it("uses the Routine token and preserves the retry key", async () => {
+            const retryKey = "123e4567-e89b-42d3-a456-426614174000";
+
+            const result = await sendRoutineLineMessage(
+                "routine-user",
+                flexMessage,
+                retryKey,
+            );
+
+            expect(result).toBe(true);
+            expect(fetchMock).toHaveBeenCalledWith(
+                "https://api.line.me/v2/bot/message/push",
+                expect.objectContaining({
+                    headers: expect.objectContaining({
+                        Authorization: "Bearer routine_test_token",
+                        "X-Line-Retry-Key": retryKey,
+                    }),
+                    body: expect.stringContaining("routine-user"),
+                }),
+            );
+        });
+
+        it("does not fall back to the IT token when Routine configuration is missing", async () => {
+            delete process.env.LINE_ROUTINE_CHANNEL_ACCESS_TOKEN;
+
+            const result = await sendRoutineLineMessage(
+                "routine-user",
+                flexMessage,
+                "123e4567-e89b-42d3-a456-426614174000",
+            );
+
+            expect(result).toBe(false);
+            expect(fetchMock).not.toHaveBeenCalled();
+        });
+
+        it("treats a retry-key duplicate acknowledgement as accepted", async () => {
+            fetchMock.mockResolvedValue({
+                ok: false,
+                status: 409,
+            });
+
+            const result = await sendRoutineLineMessage(
+                "routine-user",
+                flexMessage,
+                "123e4567-e89b-42d3-a456-426614174000",
+            );
+
+            expect(result).toBe(true);
         });
     });
 

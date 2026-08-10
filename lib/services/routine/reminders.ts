@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+
 import type { NotificationOutbox, Prisma } from "@prisma/client";
 import { Role } from "@prisma/client";
 import { z } from "zod";
@@ -6,6 +8,12 @@ import {
     sendRoutineReminderNotification,
     type RoutineReminderEmailData,
 } from "@/lib/email";
+import { sendRoutineLineMessage } from "@/lib/line";
+import { generateRoutineReminderFlexMessage } from "@/lib/line/flex-messages/routine-reminder";
+import {
+    buildRoutineDashboardTaskUrl,
+    buildRoutineLiffTaskUrl,
+} from "@/lib/line/routine-links";
 import { runSerializableTransaction } from "@/lib/db/transaction";
 import {
     createInAppNotificationOnce,
@@ -19,13 +27,16 @@ import {
 } from "@/lib/routine/schedule";
 import {
     routineReminderEmailOutboxPayloadSchema,
+    routineReminderLineOutboxPayloadSchema,
     routineReminderOutboxPayloadSchema,
     type RoutineReminderEmailOutboxPayload,
+    type RoutineReminderLineOutboxPayload,
     type RoutineReminderOutboxPayload,
 } from "@/lib/validations/routine";
 
 export const ROUTINE_REMINDER_OUTBOX_TYPE = "ROUTINE_REMINDER_IN_APP" as const;
 export const ROUTINE_REMINDER_EMAIL_OUTBOX_TYPE = "ROUTINE_REMINDER_EMAIL" as const;
+export const ROUTINE_REMINDER_LINE_OUTBOX_TYPE = "ROUTINE_REMINDER_LINE" as const;
 
 export type RoutineReminderDispatchResult =
     | "SENT"
@@ -88,6 +99,7 @@ type RoutineReminderRecipient = {
     userId: number;
     email: string;
     name: string;
+    isAssignee: boolean;
 };
 
 type RoutineReminderRecipients = {
@@ -142,6 +154,20 @@ export function buildRoutineReminderEmailEventKey(
     )}:email`;
 }
 
+export function buildRoutineReminderLineEventKey(
+    occurrenceId: number,
+    ruleId: number,
+    userId: number,
+    reminderVersion: number,
+): string {
+    return `${buildRoutineReminderDedupeKey(
+        occurrenceId,
+        ruleId,
+        userId,
+        reminderVersion,
+    )}:line`;
+}
+
 export function getRoutineReminderActionUrl(
     occurrenceId: number,
     taskId: number,
@@ -154,16 +180,22 @@ export function formatRoutineReminderMessage(
     dueDate: string,
     daysBefore: number,
 ): string {
-    const formattedDate = new Intl.DateTimeFormat("th-TH", {
+    return `“${title}” จะครบกำหนดวันที่ ${formatRoutineReminderDueDate(dueDate)}\n${formatRoutineReminderTiming(daysBefore)}`;
+}
+
+export function formatRoutineReminderDueDate(dueDate: string): string {
+    return new Intl.DateTimeFormat("th-TH", {
         timeZone: "Asia/Bangkok",
         day: "numeric",
         month: "long",
         year: "numeric",
     }).format(new Date(`${dueDate}T00:00:00.000+07:00`));
-    const timing = daysBefore === 0
+}
+
+export function formatRoutineReminderTiming(daysBefore: number): string {
+    return daysBefore === 0
         ? "ครบกำหนดวันนี้"
         : `เหลือเวลา ${daysBefore} วัน`;
-    return `“${title}” จะครบกำหนดวันที่ ${formattedDate}\n${timing}`;
 }
 
 async function resolveRoutineRecipients(
@@ -176,11 +208,13 @@ async function resolveRoutineRecipients(
         id: number;
         email: string;
         name: string;
-    }): void => {
+    }, isAssignee: boolean): void => {
+        const existing = recipients.get(user.id);
         recipients.set(user.id, {
             userId: user.id,
             email: user.email,
             name: user.name.trim() || "ผู้รับการแจ้งเตือน",
+            isAssignee: existing?.isAssignee ?? isAssignee,
         });
     };
 
@@ -189,7 +223,7 @@ async function resolveRoutineRecipients(
             if (!isActiveEmployee(employee) || !employee.user || !isActiveUser(employee.user)) {
                 return;
             }
-            addRecipient(employee.user);
+            addRecipient(employee.user, true);
         });
     }
     if (scope === "ADMINS" || scope === "ASSIGNEES_AND_ADMINS") {
@@ -197,7 +231,7 @@ async function resolveRoutineRecipients(
             where: { role: Role.ADMIN, isActive: true, deletedAt: null },
             select: { id: true, email: true, name: true },
         });
-        admins.forEach(addRecipient);
+        admins.forEach((admin) => addRecipient(admin, false));
     }
 
     const activeRecipients = [...recipients.values()];
@@ -221,6 +255,20 @@ async function resolveRoutineRecipients(
     });
 
     return { activeRecipients, emailRecipients };
+}
+
+async function resolveLinkedRoutineLineRecipients(
+    tx: Pick<Prisma.TransactionClient, "lineAccountLink">,
+    recipients: readonly RoutineReminderRecipient[],
+): Promise<RoutineReminderRecipient[]> {
+    if (recipients.length === 0) return [];
+
+    const links = (await tx.lineAccountLink.findMany({
+        where: { userId: { in: recipients.map((recipient) => recipient.userId) } },
+        select: { userId: true },
+    })) ?? [];
+    const linkedUserIds = new Set(links.map((link) => link.userId));
+    return recipients.filter((recipient) => linkedUserIds.has(recipient.userId));
 }
 
 async function markRoutineReminderSuperseded(
@@ -263,6 +311,13 @@ function parseRoutineReminderEmailPayload(
     return parsed.success ? parsed.data : null;
 }
 
+function parseRoutineReminderLinePayload(
+    value: unknown,
+): RoutineReminderLineOutboxPayload | null {
+    const parsed = routineReminderLineOutboxPayloadSchema.safeParse(value);
+    return parsed.success ? parsed.data : null;
+}
+
 async function supersedeInvalidRoutineEmail(
     notificationId: number,
     reason: string,
@@ -270,6 +325,87 @@ async function supersedeInvalidRoutineEmail(
     await runSerializableTransaction(async (tx) => {
         await markRoutineReminderSuperseded(tx, notificationId, reason);
     });
+}
+
+async function supersedeInvalidRoutineLine(
+    notificationId: number,
+    reason: string,
+): Promise<void> {
+    await runSerializableTransaction(async (tx) => {
+        await markRoutineReminderSuperseded(tx, notificationId, reason);
+    });
+}
+
+type RoutineReminderValidationPayload = {
+    occurrenceId: number;
+    taskId: number;
+    ruleId: number;
+    reminderVersion: number;
+    dueDate: string;
+    daysBefore?: number;
+    scheduledFor?: string;
+};
+
+type CurrentRoutineReminderState = {
+    occurrence: RoutineReminderOccurrence;
+    rule: RoutineReminderOccurrence["task"]["reminderRules"][number];
+    currentDueDate: string;
+    expectedScheduledFor: Date;
+};
+
+async function getCurrentRoutineReminderState(
+    tx: Pick<Prisma.TransactionClient, "routineOccurrence">,
+    payload: RoutineReminderValidationPayload,
+): Promise<CurrentRoutineReminderState | null> {
+    const occurrence = await tx.routineOccurrence.findUnique({
+        where: { id: payload.occurrenceId },
+        select: ROUTINE_REMINDER_OCCURRENCE_SELECT,
+    });
+    const rule = occurrence?.task.reminderRules.find(
+        (candidate) => candidate.id === payload.ruleId,
+    );
+    const currentDueDate = occurrence
+        ? toBangkokCalendarDate(occurrence.dueDate)
+        : null;
+
+    if (
+        !occurrence
+        || occurrence.taskId !== payload.taskId
+        || !occurrence.task.isActive
+        || !rule
+        || !rule.isActive
+        || rule.channel !== "IN_APP"
+        || occurrence.reminderVersion !== payload.reminderVersion
+        || currentDueDate !== payload.dueDate
+        || (
+            payload.daysBefore !== undefined
+            && rule.daysBefore !== payload.daysBefore
+        )
+    ) {
+        return null;
+    }
+
+    const expectedScheduledFor = getRoutineReminderScheduledFor(
+        payload.dueDate,
+        rule.daysBefore,
+        rule.sendHour,
+    );
+    const payloadScheduledFor = payload.scheduledFor
+        ? new Date(payload.scheduledFor)
+        : expectedScheduledFor;
+    if (
+        Number.isNaN(payloadScheduledFor.getTime())
+        || payloadScheduledFor.getTime() !== expectedScheduledFor.getTime()
+    ) {
+        return null;
+    }
+
+    return {
+        occurrence,
+        rule,
+        currentDueDate,
+        expectedScheduledFor,
+    };
 }
 
 async function dispatchRoutineReminderEmailOutbox(
@@ -306,6 +442,176 @@ async function dispatchRoutineReminderEmailOutbox(
     return "SENT";
 }
 
+type RoutineLineDeliveryContext = {
+    lineUserId: string;
+    taskTitle: string;
+    unitName: string;
+    categoryName: string;
+    dueDate: string;
+    daysBefore: number;
+    isAssignee: boolean;
+};
+
+async function dispatchRoutineReminderLineOutbox(
+    notification: NotificationOutbox,
+    value: unknown,
+    now: Date,
+): Promise<RoutineReminderDispatchResult> {
+    const payload = parseRoutineReminderLinePayload(value);
+    if (!payload) {
+        await supersedeInvalidRoutineLine(
+            notification.id,
+            "Superseded invalid Routine reminder LINE payload",
+        );
+        return "SUPERSEDED";
+    }
+
+    const expectedEventKey = buildRoutineReminderLineEventKey(
+        payload.occurrenceId,
+        payload.ruleId,
+        payload.userId,
+        payload.reminderVersion,
+    );
+    if (notification.eventKey !== expectedEventKey) {
+        await supersedeInvalidRoutineLine(
+            notification.id,
+            "Superseded mismatched Routine reminder LINE event key",
+        );
+        return "SUPERSEDED";
+    }
+
+    const prepared = await runSerializableTransaction(async (tx) => {
+        const claimed = await tx.notificationOutbox.findFirst({
+            where: { id: notification.id, status: "PROCESSING" },
+            select: { id: true },
+        });
+        if (!claimed) return { kind: "SUPERSEDED" as const };
+
+        const state = await getCurrentRoutineReminderState(tx, payload);
+        if (!state) {
+            await markRoutineReminderSuperseded(
+                tx,
+                notification.id,
+                "Superseded stale Routine reminder LINE delivery",
+            );
+            return { kind: "SUPERSEDED" as const };
+        }
+
+        if (!isRoutineReminderDue(
+            payload.dueDate,
+            state.rule.daysBefore,
+            state.rule.sendHour,
+            now,
+        )) {
+            if (isRoutineReminderExpired(payload.dueDate, now)) {
+                await markRoutineReminderSuperseded(
+                    tx,
+                    notification.id,
+                    "Superseded expired Routine reminder LINE delivery",
+                );
+                return { kind: "SUPERSEDED" as const };
+            }
+
+            await deferRoutineReminder(
+                tx,
+                notification.id,
+                state.expectedScheduledFor,
+            );
+            return { kind: "DEFERRED" as const };
+        }
+
+        const recipient = await tx.user.findUnique({
+            where: { id: payload.userId },
+            select: {
+                id: true,
+                role: true,
+                employeeId: true,
+                isActive: true,
+                deletedAt: true,
+                employee: {
+                    select: {
+                        status: true,
+                        deletedAt: true,
+                    },
+                },
+                lineAccountLink: {
+                    select: { lineUserId: true },
+                },
+            },
+        });
+        const lineUserId = recipient?.lineAccountLink?.lineUserId.trim();
+        if (
+            !recipient
+            || !isActiveUser(recipient)
+            || (recipient.employee !== null && !isActiveEmployee(recipient.employee))
+            || (recipient.employeeId !== null && recipient.employee === null)
+            || !lineUserId
+        ) {
+            await markRoutineReminderSuperseded(
+                tx,
+                notification.id,
+                "Superseded Routine reminder LINE delivery for unavailable recipient",
+            );
+            return { kind: "SUPERSEDED" as const };
+        }
+
+        const isCurrentAssignee = state.occurrence.assignees.some(
+            ({ employee }) => employee.user?.id === recipient.id,
+        );
+        if (
+            (payload.isAssignee && !isCurrentAssignee)
+            || (!payload.isAssignee && recipient.role !== Role.ADMIN)
+            || (payload.taskTitle !== state.occurrence.task.title)
+            || (payload.unitName !== state.occurrence.task.unit.name)
+            || (payload.categoryName !== state.occurrence.task.category.name)
+        ) {
+            await markRoutineReminderSuperseded(
+                tx,
+                notification.id,
+                "Superseded stale Routine reminder LINE recipient state",
+            );
+            return { kind: "SUPERSEDED" as const };
+        }
+
+        return {
+            kind: "READY" as const,
+            context: {
+                lineUserId,
+                taskTitle: state.occurrence.task.title,
+                unitName: state.occurrence.task.unit.name,
+                categoryName: state.occurrence.task.category.name,
+                dueDate: payload.dueDate,
+                daysBefore: state.rule.daysBefore,
+                isAssignee: isCurrentAssignee,
+            } satisfies RoutineLineDeliveryContext,
+        };
+    });
+
+    if (prepared.kind !== "READY") return prepared.kind;
+
+    const actionUrl = prepared.context.isAssignee
+        ? buildRoutineLiffTaskUrl(payload.taskId, payload.occurrenceId)
+        : buildRoutineDashboardTaskUrl(payload.taskId, payload.occurrenceId);
+    const message = generateRoutineReminderFlexMessage({
+        taskTitle: prepared.context.taskTitle,
+        unitName: prepared.context.unitName,
+        categoryName: prepared.context.categoryName,
+        dueDateLabel: formatRoutineReminderDueDate(prepared.context.dueDate),
+        timingLabel: formatRoutineReminderTiming(prepared.context.daysBefore),
+        actionUrl,
+    });
+    const sent = await sendRoutineLineMessage(
+        prepared.context.lineUserId,
+        message,
+        payload.retryKey,
+    );
+    if (!sent) {
+        throw new Error("Routine LINE reminder delivery failed");
+    }
+
+    return "SENT";
+}
+
 export async function dispatchRoutineReminderOutbox(
     notification: NotificationOutbox,
     value: unknown,
@@ -313,6 +619,9 @@ export async function dispatchRoutineReminderOutbox(
 ): Promise<RoutineReminderDispatchResult> {
     if (notification.type === ROUTINE_REMINDER_EMAIL_OUTBOX_TYPE) {
         return dispatchRoutineReminderEmailOutbox(notification, value);
+    }
+    if (notification.type === ROUTINE_REMINDER_LINE_OUTBOX_TYPE) {
+        return dispatchRoutineReminderLineOutbox(notification, value, now);
     }
     if (notification.type !== ROUTINE_REMINDER_OUTBOX_TYPE) return null;
 
@@ -493,6 +802,43 @@ export async function dispatchRoutineReminderOutbox(
                     ),
                     payload: JSON.stringify(emailDelivery),
                 })),
+                skipDuplicates: true,
+            });
+        }
+
+        const lineRecipients = await resolveLinkedRoutineLineRecipients(
+            tx,
+            activeRecipients,
+        );
+        if (lineRecipients.length > 0) {
+            await tx.notificationOutbox.createMany({
+                data: lineRecipients.map((recipient) => {
+                    const linePayload: RoutineReminderLineOutboxPayload = {
+                        occurrenceId: payload.occurrenceId,
+                        taskId: payload.taskId,
+                        ruleId: payload.ruleId,
+                        userId: recipient.userId,
+                        reminderVersion: payload.reminderVersion,
+                        taskTitle: occurrence.task.title,
+                        unitName: occurrence.task.unit.name,
+                        categoryName: occurrence.task.category.name,
+                        dueDate: payload.dueDate,
+                        daysBefore: rule.daysBefore,
+                        scheduledFor: expectedScheduledFor.toISOString(),
+                        isAssignee: recipient.isAssignee,
+                        retryKey: randomUUID(),
+                    };
+                    return {
+                        type: ROUTINE_REMINDER_LINE_OUTBOX_TYPE,
+                        eventKey: buildRoutineReminderLineEventKey(
+                            linePayload.occurrenceId,
+                            linePayload.ruleId,
+                            linePayload.userId,
+                            linePayload.reminderVersion,
+                        ),
+                        payload: JSON.stringify(linePayload),
+                    };
+                }),
                 skipDuplicates: true,
             });
         }

@@ -17,142 +17,112 @@ import { getPublicOrigin } from "@/lib/network/public-url";
 const getConfig = () => ({
     channelAccessToken: process.env.LINE_IT_CHANNEL_ACCESS_TOKEN || "",
     stockChannelAccessToken: process.env.LINE_STOCK_CHANNEL_ACCESS_TOKEN || "",
+    routineChannelAccessToken: process.env.LINE_ROUTINE_CHANNEL_ACCESS_TOKEN || "",
     lineWebhookUrl: process.env.LINE_WEBHOOK_URL || "",
     baseUrl: getPublicOrigin(),
     itTeamUserId: process.env.LINE_IT_TEAM_USER_ID || "",
 });
+
+async function sendLineApiRequest(
+    endpoint: string,
+    channelAccessToken: string,
+    body: unknown,
+    retryKey?: string,
+): Promise<boolean> {
+    if (!channelAccessToken) return false;
+
+    const headers: Record<string, string> = {
+        Authorization: `Bearer ${channelAccessToken}`,
+        "Content-Type": "application/json",
+    };
+    if (retryKey) headers["X-Line-Retry-Key"] = retryKey;
+
+    try {
+        const response = await fetch(endpoint, {
+            method: "POST",
+            headers,
+            body: JSON.stringify(body),
+        });
+
+        if (response.ok || (retryKey !== undefined && response.status === 409)) {
+            return true;
+        }
+
+        console.error("LINE API request failed", {
+            endpoint,
+            status: response.status,
+            hasRetryKey: retryKey !== undefined,
+        });
+        return false;
+    } catch (error) {
+        console.error("LINE API request error", {
+            endpoint,
+            errorType: error instanceof Error ? error.name : "UnknownError",
+        });
+        return false;
+    }
+}
+
+export async function sendLinePushMessage(input: {
+    channelAccessToken: string;
+    userId: string;
+    message: LineFlexMessage;
+    retryKey?: string;
+}): Promise<boolean> {
+    return sendLineApiRequest(
+        "https://api.line.me/v2/bot/message/push",
+        input.channelAccessToken,
+        { to: input.userId, messages: [input.message] },
+        input.retryKey,
+    );
+}
 
 export async function sendLineMessage(
     userId: string,
     message: LineFlexMessage,
     retryKey?: string,
 ): Promise<boolean> {
-    const { channelAccessToken } = getConfig();
+    return sendLinePushMessage({
+        channelAccessToken: getConfig().channelAccessToken,
+        userId,
+        message,
+        retryKey,
+    });
+}
 
-    if (!channelAccessToken) {
-        return false;
-    }
-
-    try {
-        const headers: Record<string, string> = {
-            Authorization: `Bearer ${channelAccessToken}`,
-            "Content-Type": "application/json",
-        };
-        if (retryKey) headers["X-Line-Retry-Key"] = retryKey;
-
-        const response = await fetch(
-            "https://api.line.me/v2/bot/message/push",
-            {
-                method: "POST",
-                headers,
-                body: JSON.stringify({
-                    to: userId,
-                    messages: [message],
-                }),
-            }
-        );
-
-        if (response.ok || (retryKey !== undefined && response.status === 409)) {
-            return true;
-        } else {
-            const errorText = await response.text();
-            console.error(
-                "❌ LINE Message ส่งไม่สำเร็จ:",
-                response.status,
-                errorText
-            );
-            return false;
-        }
-    } catch (error) {
-        console.error("❌ เกิดข้อผิดพลาดใน LINE Message:", error);
-        return false;
-    }
+export async function sendRoutineLineMessage(
+    userId: string,
+    message: LineFlexMessage,
+    retryKey: string,
+): Promise<boolean> {
+    return sendLinePushMessage({
+        channelAccessToken: getConfig().routineChannelAccessToken,
+        userId,
+        message,
+        retryKey,
+    });
 }
 
 export async function sendLineBroadcast(
     message: LineFlexMessage,
     retryKey?: string,
 ): Promise<boolean> {
-    const { channelAccessToken } = getConfig();
-
-    if (!channelAccessToken) {
-        return false;
-    }
-
-    try {
-        const headers: Record<string, string> = {
-            Authorization: `Bearer ${channelAccessToken}`,
-            "Content-Type": "application/json",
-        };
-        if (retryKey) headers["X-Line-Retry-Key"] = retryKey;
-
-        const response = await fetch(
-            "https://api.line.me/v2/bot/message/broadcast",
-            {
-                method: "POST",
-                headers,
-                body: JSON.stringify({
-                    messages: [message],
-                }),
-            }
-        );
-
-        if (response.ok || (retryKey !== undefined && response.status === 409)) {
-            return true;
-        } else {
-            const errorText = await response.text();
-            console.error(
-                "❌ LINE Broadcast ส่งไม่สำเร็จ:",
-                response.status,
-                errorText
-            );
-            return false;
-        }
-    } catch (error) {
-        console.error("❌ เกิดข้อผิดพลาดใน LINE Broadcast:", error);
-        return false;
-    }
+    return sendLineApiRequest(
+        "https://api.line.me/v2/bot/message/broadcast",
+        getConfig().channelAccessToken,
+        { messages: [message] },
+        retryKey,
+    );
 }
 
 export async function sendStockLineBroadcast(
     message: LineFlexMessage
 ): Promise<boolean> {
-    const { stockChannelAccessToken } = getConfig();
-
-    if (!stockChannelAccessToken) {
-        return false;
-    }
-
-    try {
-        const response = await fetch(
-            "https://api.line.me/v2/bot/message/broadcast",
-            {
-                method: "POST",
-                headers: {
-                    Authorization: `Bearer ${stockChannelAccessToken}`,
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                    messages: [message],
-                }),
-            }
-        );
-
-        if (response.ok) {
-            return true;
-        } else {
-            const errorText = await response.text();
-            console.error(
-                "LINE Stock Broadcast ส่งไม่สำเร็จ:",
-                response.status,
-                errorText
-            );
-            return false;
-        }
-    } catch (error) {
-        console.error("เกิดข้อผิดพลาดใน LINE Stock Broadcast:", error);
-        return false;
-    }
+    return sendLineApiRequest(
+        "https://api.line.me/v2/bot/message/broadcast",
+        getConfig().stockChannelAccessToken,
+        { messages: [message] },
+    );
 }
 
 export async function sendLineWebhook(data: LineWebhookData): Promise<boolean> {
@@ -278,6 +248,7 @@ export async function sendStockLowNotification(
 // Export as object for backward compatibility
 export const lineNotificationService = {
     sendLineMessage,
+    sendRoutineLineMessage,
     sendLineBroadcast,
     sendStockLineBroadcast,
     sendLineWebhook,
