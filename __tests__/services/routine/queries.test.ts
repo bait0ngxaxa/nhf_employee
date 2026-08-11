@@ -35,7 +35,13 @@ function taskRow(id: number, employeeId = 21): Record<string, unknown> {
         title: `งาน ${id}`,
         description: null,
         scheduleType: "MONTHLY_DAY",
+        scheduleConfig: { day: 10, monthOffset: 0 },
         scheduleText: "ทุกเดือน",
+        contractStartDate: new Date("2026-01-01T00:00:00.000Z"),
+        contractEndDate: new Date("2026-12-31T00:00:00.000Z"),
+        contractText: "สัญญารายปี",
+        extraDetails: "รายละเอียดสำหรับผู้ปฏิบัติงาน",
+        businessDayPolicy: "NONE",
         isActive: true,
         unit: { id: 1, code: "มสช.", name: "มสช." },
         category: { id: 1, name: "ระบบคอมพิวเตอร์" },
@@ -50,6 +56,14 @@ function taskRow(id: number, employeeId = 21): Record<string, unknown> {
                 status: "ACTIVE",
                 deletedAt: null,
             },
+        }],
+        reminderRules: [{
+            id: 301,
+            daysBefore: 3,
+            sendHour: 9,
+            channel: "IN_APP",
+            recipientScope: "ASSIGNEES",
+            isActive: true,
         }],
     };
 }
@@ -393,6 +407,21 @@ describe("NHF Routine query authorization", () => {
         expect(result.tasks).toHaveLength(1);
         expect(result.tasks[0]?.id).toBe(71);
         expect(result.tasks[0]?.relevantOccurrence?.id).toBe(3);
+        expect(result.tasks[0]).toMatchObject({
+            scheduleConfig: { day: 10, monthOffset: 0 },
+            contractStartDate: "2026-01-01",
+            contractEndDate: "2026-12-31",
+            contractText: "สัญญารายปี",
+            extraDetails: "รายละเอียดสำหรับผู้ปฏิบัติงาน",
+            businessDayPolicy: "NONE",
+            reminderRules: [{
+                id: 301,
+                daysBefore: 3,
+                sendHour: 9,
+                recipientScope: "ASSIGNEES",
+                isActive: true,
+            }],
+        });
         expect(result.pagination.total).toBe(1);
         expect(prismaMock.routineTask.findMany).toHaveBeenCalledWith(
             expect.objectContaining({

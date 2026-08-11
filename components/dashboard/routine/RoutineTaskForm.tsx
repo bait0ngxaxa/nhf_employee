@@ -1,4 +1,13 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import {
+    forwardRef,
+    useCallback,
+    useEffect,
+    useImperativeHandle,
+    useMemo,
+    useRef,
+    useState,
+    type ReactElement,
+} from "react";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -15,6 +24,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { DialogFooter } from "@/components/ui/dialog";
 import { API_ROUTES } from "@/lib/ssot/routes";
 
 import type {
@@ -66,6 +76,11 @@ interface RoutineTaskFormProps {
     onSaved: () => void;
     onCancel: () => void;
     mode?: "SELF_SERVICE" | "ADMIN";
+    presentation?: "dialog" | "standalone";
+}
+
+export interface RoutineTaskFormHandle {
+    requestClose: () => void;
 }
 
 interface TaskFormState {
@@ -158,13 +173,15 @@ function validationErrors(value: unknown): Record<string, string> {
     );
 }
 
-export function RoutineTaskForm({
+export const RoutineTaskForm = forwardRef<RoutineTaskFormHandle, RoutineTaskFormProps>(
+function RoutineTaskForm({
     reference,
     initialTask,
     onSaved,
     onCancel,
     mode = "ADMIN",
-}: RoutineTaskFormProps) {
+    presentation = "standalone",
+}: RoutineTaskFormProps, ref): ReactElement {
     const units = uniqueRoutineUnits(reference.units);
     const isSelfService = mode === "SELF_SERVICE";
     const selfEmployee = isSelfService ? reference.employees[0] : undefined;
@@ -220,14 +237,16 @@ export function RoutineTaskForm({
 
     const isDirty = currentSnapshot !== initialSnapshotRef.current;
 
-    function requestCancel(): void {
+    const requestCancel = useCallback((): void => {
         if (isSubmitting) return;
         if (isDirty) {
             setDiscardConfirmOpen(true);
             return;
         }
         onCancel();
-    }
+    }, [isDirty, isSubmitting, onCancel]);
+
+    useImperativeHandle(ref, () => ({ requestClose: requestCancel }), [requestCancel]);
 
     function discardChanges(): void {
         setDiscardConfirmOpen(false);
@@ -427,17 +446,25 @@ export function RoutineTaskForm({
 
     return (
         <form
-            className="space-y-6 rounded-2xl border border-border-subtle bg-surface-raised p-4 sm:p-6"
+            className={presentation === "dialog"
+                ? "flex min-h-0 flex-1 flex-col overflow-hidden"
+                : "rounded-2xl border border-border-subtle bg-surface-raised p-4 sm:p-6"}
             onSubmit={(event) => {
                 event.preventDefault();
                 void submit();
             }}
             noValidate
         >
-            <div className="space-y-1">
-                <h3 className="text-xl font-semibold tracking-tight text-content-heading">{initialTask ? (isSelfService ? "แก้ไขแม่แบบงานของฉัน" : "แก้ไขแม่แบบงานประจำ") : (isSelfService ? "สร้างแม่แบบงานของฉัน" : "สร้างแม่แบบงานประจำ")}</h3>
-                <p className="max-w-prose text-sm leading-6 text-content-secondary">กำหนดข้อมูลหลัก ตารางงาน ผู้รับผิดชอบ และการแจ้งเตือนในแบบฟอร์มเดียว</p>
-            </div>
+            <div className={presentation === "dialog"
+                ? "min-h-0 flex-1 space-y-6 overflow-y-auto overscroll-contain px-4 py-5 sm:px-6"
+                : "space-y-6"}
+            >
+                {presentation === "standalone" ? (
+                    <div className="space-y-1">
+                        <h3 className="text-xl font-semibold tracking-tight text-content-heading">{initialTask ? (isSelfService ? "แก้ไขแม่แบบงานของฉัน" : "แก้ไขแม่แบบงานประจำ") : (isSelfService ? "สร้างแม่แบบงานของฉัน" : "สร้างแม่แบบงานประจำ")}</h3>
+                        <p className="max-w-prose text-sm leading-6 text-content-secondary">กำหนดข้อมูลหลัก ตารางงาน ผู้รับผิดชอบ และการแจ้งเตือนในแบบฟอร์มเดียว</p>
+                    </div>
+                ) : null}
             {isSelfService ? (
                 <div className="rounded-lg border border-brand-border bg-brand-surface px-4 py-3 text-sm leading-6 text-brand-strong">
                     {initialTask ? (
@@ -540,7 +567,11 @@ export function RoutineTaskForm({
                 </label>
             </div>
             <label className="flex min-h-11 items-center gap-3 text-sm font-medium text-content-body"><input type="checkbox" checked={form.isActive} onChange={(event) => updateField("isActive", event.target.checked)} disabled={isSubmitting} /> เปิดใช้งานแม่แบบงานนี้</label>
-            <div className="flex flex-wrap justify-end gap-2">
+            </div>
+            <DialogFooter className={presentation === "dialog"
+                ? "shrink-0 border-t border-border-subtle bg-surface-subtle px-4 py-4 sm:px-6"
+                : "mt-6"}
+            >
                 <Button type="button" variant="outline" onClick={requestCancel} disabled={isSubmitting}>ยกเลิก</Button>
                 <Button type="submit" disabled={isSubmitting} aria-busy={isSubmitting} aria-live="polite">
                     {isSubmitting ? (
@@ -550,7 +581,7 @@ export function RoutineTaskForm({
                         </>
                     ) : isSelfService ? "บันทึกงานของฉัน" : "บันทึกแม่แบบงาน"}
                 </Button>
-            </div>
+            </DialogFooter>
             <AlertDialog open={discardConfirmOpen} onOpenChange={setDiscardConfirmOpen}>
                 <AlertDialogContent>
                     <AlertDialogHeader>
@@ -569,4 +600,4 @@ export function RoutineTaskForm({
             </AlertDialog>
         </form>
     );
-}
+});

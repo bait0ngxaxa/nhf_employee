@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ReactNode } from "react";
 
 import { RoutineSection } from "@/components/dashboard/sections/RoutineSection";
@@ -7,6 +7,8 @@ import { RoutineSection } from "@/components/dashboard/sections/RoutineSection";
 const mocks = vi.hoisted(() => ({
     useDashboardDataContext: vi.fn(),
     useSearchParams: vi.fn(() => new URLSearchParams()),
+    mutateSummary: vi.fn(),
+    mutateTasks: vi.fn(),
     useSWR: vi.fn((_key: unknown) => ({
         data: undefined as unknown,
         error: undefined as Error | undefined,
@@ -24,7 +26,12 @@ const routineReference = {
         { id: 5, name: "รายงานประจำเดือน", sortOrder: 1 },
         { id: 6, name: "ตรวจสอบระบบ", sortOrder: 2 },
     ],
-    employees: [],
+    employees: [{
+        id: 11,
+        firstName: "สมชาย",
+        lastName: "ใจดี",
+        nickname: null,
+    }],
 };
 
 vi.mock("@/components/dashboard/context/dashboard/DashboardContext", () => ({
@@ -80,14 +87,23 @@ vi.mock("@/components/dashboard/routine/RoutineKpiGrid", () => ({
 
 vi.mock("@/components/dashboard/routine/RoutineOccurrenceList", () => ({
     RoutineOccurrenceList: ({
+        isAdmin,
+        onEditTask,
         onPageChange,
     }: {
+        isAdmin: boolean;
+        onEditTask: (taskId: number) => void;
         onPageChange: (page: number) => void;
     }) => (
         <div data-testid="routine-occurrence-list">
             <button type="button" onClick={() => onPageChange(2)}>
                 ไปหน้ารายการ Routine ถัดไป
             </button>
+            {isAdmin ? (
+                <button type="button" onClick={() => onEditTask(71)}>
+                    แก้ไข Routine ทดสอบ
+                </button>
+            ) : null}
         </div>
     ),
 }));
@@ -97,6 +113,7 @@ vi.mock("@/components/dashboard/routine/RoutineTaskList", () => ({
         search,
         categories,
         categoryId,
+        onCreate,
         onSearchChange,
         onCategoryChange,
         onPageChange,
@@ -104,6 +121,7 @@ vi.mock("@/components/dashboard/routine/RoutineTaskList", () => ({
         search: string;
         categories: Array<{ id: number; name: string }>;
         categoryId: string;
+        onCreate: () => void;
         onSearchChange: (value: string) => void;
         onCategoryChange: (value: string) => void;
         onPageChange: (page: number) => void;
@@ -129,6 +147,9 @@ vi.mock("@/components/dashboard/routine/RoutineTaskList", () => ({
             <button type="button" onClick={() => onPageChange(2)}>
                 ไปหน้าถัดไป
             </button>
+            <button type="button" onClick={onCreate}>
+                สร้างแม่แบบงานทดสอบ
+            </button>
         </div>
     ),
 }));
@@ -141,8 +162,16 @@ describe("RoutineSection tabs", () => {
             data: key === "/api/routines/reference" ? routineReference : undefined,
             error: undefined,
             isLoading: false,
-            mutate: vi.fn(),
+            mutate: typeof key === "string" && key.startsWith("/api/routines/tasks?")
+                ? mocks.mutateTasks
+                : typeof key === "string" && key.startsWith("/api/routines/summary?")
+                    ? mocks.mutateSummary
+                    : vi.fn(),
         }));
+    });
+
+    afterEach(() => {
+        vi.unstubAllGlobals();
     });
 
     it("does not expose admin tabs to a regular user", () => {
@@ -202,6 +231,64 @@ describe("RoutineSection tabs", () => {
         expect(screen.getByText("รายการทั้งหมด (Admin)")).toBeInTheDocument();
         expect(screen.getByText("ตั้งค่างานประจำ")).toBeInTheDocument();
         expect(screen.getByText("นำเข้าจาก Excel")).toBeInTheDocument();
+    });
+
+    it("opens create in a dialog while keeping the management list mounted", async () => {
+        mocks.useDashboardDataContext.mockReturnValue({
+            user: { role: "ADMIN" },
+        });
+
+        render(<RoutineSection />);
+        fireEvent.click(screen.getByRole("button", { name: "สร้างแม่แบบงานทดสอบ" }));
+
+        expect(screen.getByTestId("routine-task-list")).toBeInTheDocument();
+        expect(screen.getByRole("dialog", { name: "สร้างแม่แบบงานประจำ" })).toBeInTheDocument();
+        fireEvent.click(screen.getByRole("button", { name: "ยกเลิก" }));
+        await waitFor(() => expect(screen.queryByRole("dialog", { name: "สร้างแม่แบบงานประจำ" })).not.toBeInTheDocument());
+        expect(screen.getByTestId("routine-task-list")).toBeInTheDocument();
+    });
+
+    it("closes after create success and refreshes the current list and summary", async () => {
+        mocks.useDashboardDataContext.mockReturnValue({
+            user: { role: "USER" },
+        });
+        const fetchMock = vi.fn().mockResolvedValue(
+            new Response(JSON.stringify({ task: { id: 81 } }), { status: 201 }),
+        );
+        vi.stubGlobal("fetch", fetchMock);
+
+        render(<RoutineSection />);
+        fireEvent.click(screen.getByRole("button", { name: "จัดการงานของฉัน" }));
+        fireEvent.click(screen.getByRole("button", { name: "สร้างแม่แบบงานทดสอบ" }));
+        fireEvent.change(screen.getByDisplayValue("เลือกหน่วยงาน"), {
+            target: { value: "3" },
+        });
+        fireEvent.change(screen.getByDisplayValue("เลือกหมวดหมู่"), {
+            target: { value: "5" },
+        });
+        fireEvent.change(screen.getByPlaceholderText("เช่น ตรวจสอบค่าใช้จ่ายประจำเดือน"), {
+            target: { value: "ตรวจสอบระบบรายเดือน" },
+        });
+        fireEvent.click(screen.getByRole("button", { name: "บันทึกงานของฉัน" }));
+
+        await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+        await waitFor(() => expect(screen.queryByRole("dialog", { name: "สร้างแม่แบบงานของฉัน" })).not.toBeInTheDocument());
+        expect(screen.getByTestId("routine-task-list")).toBeInTheDocument();
+        expect(mocks.mutateTasks).toHaveBeenCalledTimes(1);
+        expect(mocks.mutateSummary).toHaveBeenCalledTimes(1);
+    });
+
+    it("opens operational edit in a dialog while keeping the operational list mounted", () => {
+        mocks.useDashboardDataContext.mockReturnValue({
+            user: { role: "ADMIN" },
+        });
+
+        render(<RoutineSection />);
+        fireEvent.click(screen.getByRole("button", { name: "รายการทั้งหมด (Admin)" }));
+        fireEvent.click(screen.getByRole("button", { name: "แก้ไข Routine ทดสอบ" }));
+
+        expect(screen.getByTestId("routine-occurrence-list")).toBeInTheDocument();
+        expect(screen.getByRole("dialog", { name: "แก้ไข Routine" })).toBeInTheDocument();
     });
 
     it("exposes only current and future timing options in the operational filter", () => {

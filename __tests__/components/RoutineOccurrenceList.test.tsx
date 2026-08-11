@@ -1,5 +1,5 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { KeyedMutator } from "swr";
 
 import { RoutineOccurrenceList } from "@/components/dashboard/routine/RoutineOccurrenceList";
@@ -12,9 +12,15 @@ const taskData: PaginatedRoutineTaskWorkItemsResponse = {
     tasks: [{
         id: 71,
         title: "ตรวจสอบระบบประจำเดือน",
-        description: null,
+        description: "ตรวจรายการระบบทั้งหมดและสรุปผลให้ทีมบริหาร",
         scheduleType: "MONTHLY_DAY",
-        scheduleText: null,
+        scheduleConfig: { day: 10, monthOffset: 0 },
+        scheduleText: "ตรวจทุกวันที่ 10 ของเดือน",
+        contractStartDate: "2026-01-01",
+        contractEndDate: "2026-12-31",
+        contractText: "สัญญาบำรุงรักษาระบบประจำปี 2569",
+        extraDetails: "ประสานผู้ให้บริการก่อนเข้าตรวจอย่างน้อย 2 วัน",
+        businessDayPolicy: "NONE",
         isActive: true,
         unit: { id: 1, code: "มสช.", name: "มสช." },
         category: { id: 1, name: "ระบบคอมพิวเตอร์" },
@@ -28,6 +34,24 @@ const taskData: PaginatedRoutineTaskWorkItemsResponse = {
                 nickname: null,
                 displayName: "สมชาย ใจดี",
             },
+        }, {
+            employeeId: 22,
+            role: "CO_OWNER",
+            employee: {
+                id: 22,
+                firstName: "สมหญิง",
+                lastName: "ใจงาม",
+                nickname: null,
+                displayName: "สมหญิง ใจงาม",
+            },
+        }],
+        reminderRules: [{
+            id: 301,
+            daysBefore: 3,
+            sendHour: 9,
+            channel: "IN_APP",
+            recipientScope: "ASSIGNEES",
+            isActive: true,
         }],
         relevantOccurrence: {
             id: 91,
@@ -50,6 +74,16 @@ const taskData: PaginatedRoutineTaskWorkItemsResponse = {
                     nickname: null,
                     displayName: "สมชาย ใจดี",
                 },
+            }, {
+                employeeId: 22,
+                role: "CO_OWNER",
+                employee: {
+                    id: 22,
+                    firstName: "สมหญิง",
+                    lastName: "ใจงาม",
+                    nickname: null,
+                    displayName: "สมหญิง ใจงาม",
+                },
             }],
         },
     }],
@@ -61,14 +95,28 @@ const employees: RoutineEmployee[] = [{
     firstName: "สมชาย",
     lastName: "ใจดี",
     nickname: null,
+}, {
+    id: 22,
+    firstName: "สมหญิง",
+    lastName: "ใจงาม",
+    nickname: null,
 }];
 
-function renderList(
-    isAdmin: boolean,
-    onEditTask = vi.fn(),
+interface RenderListOptions {
+    data?: PaginatedRoutineTaskWorkItemsResponse;
+    focusOccurrenceId?: number | null;
+    isAdmin?: boolean;
+    mutate?: KeyedMutator<PaginatedRoutineTaskWorkItemsResponse>;
+    onEditTask?: (taskId: number) => void;
+}
+
+function renderList({
     data = taskData,
-    focusOccurrenceId: number | null = null,
-): void {
+    focusOccurrenceId = null,
+    isAdmin = false,
+    mutate = vi.fn(async () => undefined),
+    onEditTask = vi.fn<(taskId: number) => void>(),
+}: RenderListOptions = {}): void {
     render(
         <RoutineOccurrenceList
             data={data}
@@ -80,23 +128,52 @@ function renderList(
             onRetry={vi.fn()}
             onPageChange={vi.fn()}
             onEditTask={onEditTask}
-            mutate={vi.fn() as unknown as KeyedMutator<PaginatedRoutineTaskWorkItemsResponse>}
+            mutate={mutate}
             employees={employees}
         />,
     );
 }
 
-describe("RoutineOccurrenceList", () => {
-    it("renders a read-only task-centric timing list for regular users", () => {
-        renderList(false);
+afterEach(() => {
+    vi.unstubAllGlobals();
+});
 
-        expect(screen.getByText("ถึงกำหนดวันนี้")).toBeInTheDocument();
-        expect(screen.getByRole("article")).toHaveTextContent("วันนี้");
-        expect(screen.queryByText("แก้ไข Routine")).not.toBeInTheDocument();
-        expect(screen.queryByText("ปรับเฉพาะรอบนี้")).not.toBeInTheDocument();
+describe("RoutineOccurrenceList", () => {
+    it("keeps operational cards compact while showing scan-critical metadata", () => {
+        renderList();
+
+        const card = screen.getByRole("article");
+        expect(card).toHaveTextContent("ตรวจสอบระบบประจำเดือน");
+        expect(card).toHaveTextContent("มสช.");
+        expect(card).toHaveTextContent("ระบบคอมพิวเตอร์");
+        expect(card).toHaveTextContent("ถึงกำหนดวันนี้");
+        expect(card).toHaveTextContent("วันนี้");
+        expect(card).toHaveTextContent("วันที่ 10 ของเดือน");
+        expect(card).toHaveTextContent("สมชาย ใจดี +1 คน");
+        expect(card).not.toHaveTextContent("ตรวจรายการระบบทั้งหมดและสรุปผลให้ทีมบริหาร");
+        expect(card).not.toHaveTextContent("สัญญาบำรุงรักษาระบบประจำปี 2569");
+        expect(card).not.toHaveTextContent("ประสานผู้ให้บริการก่อนเข้าตรวจอย่างน้อย 2 วัน");
+        expect(screen.getByRole("button", { name: "ดูรายละเอียด" })).toBeInTheDocument();
+        expect(screen.queryByRole("button", { name: "แก้ไข Routine" })).not.toBeInTheDocument();
+        expect(screen.queryByRole("button", { name: "ปรับเฉพาะรอบนี้" })).not.toBeInTheDocument();
     });
 
-    it("renders the neutral no-current-round state when no relevant occurrence exists", () => {
+    it("opens a read-only detail dialog with complete business information", () => {
+        renderList();
+
+        fireEvent.click(screen.getByRole("button", { name: "ดูรายละเอียด" }));
+
+        const dialog = screen.getByRole("dialog", { name: "ตรวจสอบระบบประจำเดือน" });
+        expect(dialog).toHaveTextContent("ตรวจรายการระบบทั้งหมดและสรุปผลให้ทีมบริหาร");
+        expect(dialog).toHaveTextContent("สัญญาบำรุงรักษาระบบประจำปี 2569");
+        expect(dialog).toHaveTextContent("ประสานผู้ให้บริการก่อนเข้าตรวจอย่างน้อย 2 วัน");
+        expect(dialog).toHaveTextContent("3 วันก่อนครบกำหนด · 09:00 น.");
+        expect(dialog).toHaveTextContent("รอบ 2026-08");
+        expect(dialog).toHaveTextContent("สมหญิง ใจงาม");
+        expect(dialog).not.toHaveTextContent("ข้อมูลนำเข้า (ผู้ดูแลระบบ)");
+    });
+
+    it("renders the neutral no-current-round state without inventing completion", () => {
         const baseTask = taskData.tasks[0];
         if (!baseTask) throw new Error("Routine test fixture is incomplete");
         const data: PaginatedRoutineTaskWorkItemsResponse = {
@@ -104,92 +181,78 @@ describe("RoutineOccurrenceList", () => {
             tasks: [{ ...baseTask, relevantOccurrence: null }],
         };
 
-        renderList(false, vi.fn(), data);
+        renderList({ data });
 
-        expect(screen.getByRole("article")).toHaveTextContent("กำหนด: ยังไม่มีรอบกำหนด");
-        expect(screen.getAllByText("ยังไม่มีรอบกำหนด")).toHaveLength(2);
-        expect(screen.queryByText("เกินกำหนด")).not.toBeInTheDocument();
+        expect(screen.getByRole("article")).toHaveTextContent("ยังไม่มีรอบกำหนด");
+        expect(screen.queryByText("เสร็จสิ้น")).not.toBeInTheDocument();
+        fireEvent.click(screen.getByRole("button", { name: "ดูรายละเอียด" }));
+        expect(screen.getByRole("dialog")).toHaveTextContent(
+            "ยังไม่มีรอบกำหนดที่เกี่ยวข้องในขณะนี้",
+        );
     });
 
-    it("separates primary Task edit from the occurrence-only override", () => {
-        renderList(true);
+    it("separates admin task edit from the occurrence-only override", () => {
+        const onEditTask = vi.fn();
+        renderList({ isAdmin: true, onEditTask });
 
+        expect(screen.getByRole("button", { name: "ดูรายละเอียด" })).toBeInTheDocument();
         expect(screen.getByRole("button", { name: "แก้ไข Routine" })).toBeInTheDocument();
         expect(screen.getByRole("button", { name: "ปรับเฉพาะรอบนี้" })).toBeInTheDocument();
-    });
-
-    it("passes the Task id to the primary edit action", () => {
-        const onEditTask = vi.fn();
-        renderList(true, onEditTask);
 
         fireEvent.click(screen.getByRole("button", { name: "แก้ไข Routine" }));
-
         expect(onEditTask).toHaveBeenCalledWith(71);
     });
 
-    it("does not call an occurrence endpoint for primary Task edit", () => {
+    it("opens occurrence editing in a prefilled dialog and cancel does not mutate", async () => {
         const fetchMock = vi.fn();
         vi.stubGlobal("fetch", fetchMock);
-        const onEditTask = vi.fn();
-        renderList(true, onEditTask);
+        renderList({ isAdmin: true });
 
-        fireEvent.click(screen.getByRole("button", { name: "แก้ไข Routine" }));
+        fireEvent.click(screen.getByRole("button", { name: "ปรับเฉพาะรอบนี้" }));
 
-        expect(onEditTask).toHaveBeenCalledWith(71);
+        const dialog = screen.getByRole("dialog", { name: "ปรับเฉพาะรอบนี้" });
+        expect(within(dialog).getByLabelText("วันกำหนด")).toHaveValue("2026-08-04");
+        expect(within(dialog).getByLabelText("บทบาทของ สมชาย ใจดี")).toHaveValue("OWNER");
+        fireEvent.click(within(dialog).getByRole("button", { name: "ยกเลิก" }));
+
+        await waitFor(() => expect(screen.queryByRole("dialog", { name: "ปรับเฉพาะรอบนี้" })).not.toBeInTheDocument());
         expect(fetchMock).not.toHaveBeenCalled();
     });
 
-    it("saves an occurrence override with one atomic endpoint", async () => {
+    it("saves an occurrence override with the existing atomic mutation and refreshes", async () => {
         const fetchMock = vi.fn().mockResolvedValue(
             new Response(JSON.stringify({ occurrence: { id: 91 } }), { status: 200 }),
         );
+        const mutate = vi.fn().mockResolvedValue(undefined);
         vi.stubGlobal("fetch", fetchMock);
-        renderList(true);
+        renderList({ isAdmin: true, mutate });
 
         fireEvent.click(screen.getByRole("button", { name: "ปรับเฉพาะรอบนี้" }));
-        fireEvent.click(screen.getByRole("button", { name: "บันทึกการปรับรอบนี้" }));
+        const dialog = screen.getByRole("dialog", { name: "ปรับเฉพาะรอบนี้" });
+        fireEvent.change(within(dialog).getByLabelText("วันกำหนด"), {
+            target: { value: "2026-08-10" },
+        });
+        fireEvent.change(within(dialog).getByLabelText("หมายเหตุ (ถ้ามี)"), {
+            target: { value: "เลื่อนตามการประชุม" },
+        });
+        fireEvent.click(within(dialog).getByRole("button", { name: "บันทึกการปรับรอบนี้" }));
 
         await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
         expect(fetchMock).toHaveBeenCalledWith(
             "/api/routines/occurrences/91",
             expect.objectContaining({ method: "PATCH" }),
         );
-        expect(fetchMock.mock.calls[0]?.[1]?.body).toContain("expectedReminderVersion");
+        const request = fetchMock.mock.calls[0]?.[1] as RequestInit;
+        expect(JSON.parse(String(request.body))).toMatchObject({
+            expectedReminderVersion: 1,
+            dueDate: "2026-08-10",
+            note: "เลื่อนตามการประชุม",
+        });
+        await waitFor(() => expect(mutate).toHaveBeenCalledTimes(1));
+        await waitFor(() => expect(screen.queryByRole("dialog", { name: "ปรับเฉพาะรอบนี้" })).not.toBeInTheDocument());
     });
 
-    it("shows occurrence assignees separately in a focused notification view", () => {
-        const baseTask = taskData.tasks[0];
-        if (!baseTask || !baseTask.relevantOccurrence) {
-            throw new Error("Routine test fixture is incomplete");
-        }
-        const focusedData: PaginatedRoutineTaskWorkItemsResponse = {
-            ...taskData,
-            tasks: [{
-                ...baseTask,
-                relevantOccurrence: {
-                    ...baseTask.relevantOccurrence,
-                    assignees: [{
-                        employeeId: 42,
-                        role: "OWNER",
-                        employee: {
-                            id: 42,
-                            firstName: "มานะ",
-                            lastName: "ดีใจ",
-                            nickname: null,
-                            displayName: "มานะ ดีใจ",
-                        },
-                    }],
-                },
-            }],
-        };
-
-        renderList(false, vi.fn(), focusedData, 91);
-
-        expect(screen.getByText(/ผู้รับผิดชอบรอบนี้:/)).toHaveTextContent("มานะ ดีใจ");
-        expect(screen.getByText(/ผู้รับผิดชอบ Routine:/)).toHaveTextContent("สมชาย ใจดี");
-    });
-
-    it("indicates an occurrence-only assignee override in the regular list", () => {
+    it("distinguishes occurrence assignee overrides from the master Routine", () => {
         const baseTask = taskData.tasks[0];
         if (!baseTask || !baseTask.relevantOccurrence) {
             throw new Error("Routine test fixture is incomplete");
@@ -215,9 +278,19 @@ describe("RoutineOccurrenceList", () => {
             }],
         };
 
-        renderList(false, vi.fn(), overriddenData);
+        renderList({ data: overriddenData, focusOccurrenceId: 91 });
 
-        expect(screen.getByText("รอบนี้มีการปรับผู้รับผิดชอบเฉพาะกิจ")).toBeInTheDocument();
-        expect(screen.getByText(/ผู้รับผิดชอบ Routine:/)).toHaveTextContent("สมชาย ใจดี");
+        const card = screen.getByRole("article");
+        expect(card).toHaveTextContent("ผู้รับผิดชอบรอบนี้");
+        expect(card).toHaveTextContent("มานะ ดีใจ");
+        expect(card).toHaveTextContent("ปรับเฉพาะรอบ");
+        expect(card).toHaveTextContent("รอบที่เลือก");
+
+        fireEvent.click(screen.getByRole("button", { name: "ดูรายละเอียด" }));
+        const dialog = screen.getByRole("dialog", { name: "ตรวจสอบระบบประจำเดือน" });
+        expect(dialog).toHaveTextContent("ผู้รับผิดชอบรอบนี้");
+        expect(dialog).toHaveTextContent("ผู้รับผิดชอบแม่แบบ Routine");
+        expect(dialog).toHaveTextContent("มานะ ดีใจ");
+        expect(dialog).toHaveTextContent("สมชาย ใจดี");
     });
 });

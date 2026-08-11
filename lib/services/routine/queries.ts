@@ -159,11 +159,18 @@ export interface SerializedRoutineTaskWorkItem {
     title: string;
     description: string | null;
     scheduleType: RoutineScheduleType;
+    scheduleConfig: RoutineTaskRow["scheduleConfig"];
     scheduleText: string | null;
+    contractStartDate: string | null;
+    contractEndDate: string | null;
+    contractText: string | null;
+    extraDetails: string | null;
+    businessDayPolicy: RoutineTaskRow["businessDayPolicy"];
     isActive: boolean;
     unit: { id: number; code: string; name: string };
     category: { id: number; name: string };
     assignees: SerializedRoutineAssignee[];
+    reminderRules: RoutineTaskRow["reminderRules"];
     relevantOccurrence: SerializedRoutineTaskOccurrence | null;
 }
 
@@ -524,7 +531,17 @@ function serializeRoutineTaskWorkItem(
         title: task.title,
         description: task.description,
         scheduleType: task.scheduleType,
+        scheduleConfig: task.scheduleConfig,
         scheduleText: task.scheduleText,
+        contractStartDate: task.contractStartDate
+            ? toBangkokCalendarDate(task.contractStartDate)
+            : null,
+        contractEndDate: task.contractEndDate
+            ? toBangkokCalendarDate(task.contractEndDate)
+            : null,
+        contractText: task.contractText,
+        extraDetails: task.extraDetails,
+        businessDayPolicy: task.businessDayPolicy,
         isActive: task.isActive,
         unit: {
             id: task.unit.id,
@@ -536,6 +553,7 @@ function serializeRoutineTaskWorkItem(
             name: task.category.name,
         },
         assignees: task.assignees.map(serializeAssignee),
+        reminderRules: task.reminderRules,
         relevantOccurrence: serializedOccurrence
             ? {
                   id: serializedOccurrence.id,

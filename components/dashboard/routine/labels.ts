@@ -1,4 +1,8 @@
-import type { RoutineTimingStatus } from "./types";
+import type {
+    RoutineAssignee,
+    RoutineReminderRecipientScope,
+    RoutineTimingStatus,
+} from "./types";
 
 export const ROUTINE_TIMING_STATUS_LABELS: Record<RoutineTimingStatus, string> = {
     OVERDUE: "เกินกำหนด",
@@ -15,6 +19,66 @@ export const ROUTINE_SCHEDULE_LABELS: Record<string, string> = {
     ONE_TIME: "ครั้งเดียว",
     MANUAL: "สร้างเอง",
 };
+
+export const ROUTINE_ASSIGNEE_ROLE_LABELS = {
+    OWNER: "ผู้รับผิดชอบหลัก",
+    CO_OWNER: "ผู้รับผิดชอบร่วม",
+} as const;
+
+export const ROUTINE_BUSINESS_DAY_POLICY_LABELS: Record<string, string> = {
+    NONE: "ไม่เลื่อนวัน",
+    PREVIOUS_BUSINESS_DAY: "เลื่อนเป็นวันทำการก่อนหน้า",
+    NEXT_BUSINESS_DAY: "เลื่อนเป็นวันทำการถัดไป",
+};
+
+export const ROUTINE_REMINDER_RECIPIENT_SCOPE_LABELS: Record<
+    RoutineReminderRecipientScope,
+    string
+> = {
+    ASSIGNEES: "ผู้รับผิดชอบ",
+    ADMINS: "ผู้ดูแลระบบ",
+    ASSIGNEES_AND_ADMINS: "ผู้รับผิดชอบและผู้ดูแลระบบ",
+};
+
+export function formatRoutineAssigneeName(assignee: RoutineAssignee): string {
+    const displayName = assignee.employee.displayName?.trim();
+    if (displayName) return displayName;
+    const fullName = `${assignee.employee.firstName} ${assignee.employee.lastName}`.trim();
+    return fullName || assignee.employee.nickname?.trim() || `รหัสพนักงาน ${assignee.employeeId}`;
+}
+
+export function sortRoutineAssignees(
+    assignees: readonly RoutineAssignee[],
+): RoutineAssignee[] {
+    return [...assignees].sort((left, right) => {
+        if (left.role !== right.role) return left.role === "OWNER" ? -1 : 1;
+        return formatRoutineAssigneeName(left).localeCompare(
+            formatRoutineAssigneeName(right),
+            "th",
+        );
+    });
+}
+
+export function formatRoutineAssigneeSummary(
+    assignees: readonly RoutineAssignee[],
+): string {
+    const [first, ...remaining] = sortRoutineAssignees(assignees);
+    if (!first) return "ยังไม่ได้ระบุ";
+    const name = formatRoutineAssigneeName(first);
+    return remaining.length > 0 ? `${name} +${remaining.length} คน` : name;
+}
+
+export function areRoutineAssigneeSnapshotsEqual(
+    left: readonly RoutineAssignee[],
+    right: readonly RoutineAssignee[],
+): boolean {
+    if (left.length !== right.length) return false;
+    const toKey = (assignee: RoutineAssignee): string =>
+        `${assignee.employeeId}:${assignee.role}`;
+    const leftKeys = left.map(toKey).sort();
+    const rightKeys = right.map(toKey).sort();
+    return leftKeys.every((key, index) => key === rightKeys[index]);
+}
 
 export function formatRoutineUnitLabel(unit: { code: string; name: string }): string {
     const code = unit.code.trim();

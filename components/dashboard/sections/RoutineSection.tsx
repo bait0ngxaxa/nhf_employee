@@ -12,7 +12,6 @@ import { SectionShell } from "@/components/ui/section-shell";
 import { SectionTabs, type SectionTabItem } from "@/components/ui/section-tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { LoadingState } from "@/components/ui/state";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { API_ROUTES } from "@/lib/ssot/routes";
 import { isAdminRole } from "@/lib/ssot/permissions";
@@ -20,7 +19,7 @@ import type { RoutineTaskStatusFilter } from "@/lib/validations/routine";
 
 import { RoutineKpiGrid } from "../routine/RoutineKpiGrid";
 import { RoutineOccurrenceList } from "../routine/RoutineOccurrenceList";
-import { RoutineTaskForm } from "../routine/RoutineTaskForm";
+import { RoutineTaskDialog } from "../routine/RoutineTaskDialog";
 import { RoutineTaskList } from "../routine/RoutineTaskList";
 import { RoutineImportPanel } from "../routine/RoutineImportPanel";
 import { formatRoutineUnitLabel, uniqueRoutineUnits } from "../routine/labels";
@@ -93,6 +92,7 @@ function RoutineOccurrencePanel({
     const {
         data: reference,
         error: referenceError,
+        isLoading: referenceLoading,
         mutate: mutateReference,
     } = useSWR<RoutineReferenceData, Error>(
         API_ROUTES.routines.reference,
@@ -115,45 +115,9 @@ function RoutineOccurrencePanel({
     }, [categoryId, debouncedSearch, occurrenceId, scope, taskId, timingStatus, unitId]);
 
     const filterUnits = uniqueRoutineUnits(reference?.units ?? []);
-
-    if (editingTaskId !== null) {
-        if (referenceError) {
-            return (
-                <div className="space-y-3">
-                    <p className="rounded-lg border border-status-danger-border bg-status-danger-surface px-4 py-3 text-sm text-status-danger-foreground" role="alert">
-                        โหลดข้อมูลอ้างอิงสำหรับแก้ไขไม่สำเร็จ: {referenceError.message}
-                    </p>
-                    <Button type="button" variant="outline" onClick={() => setEditingTaskId(null)}>กลับไปยังรายการ</Button>
-                </div>
-            );
-        }
-        if (editingTaskError) {
-            return (
-                <div className="space-y-3">
-                    <p className="rounded-lg border border-status-danger-border bg-status-danger-surface px-4 py-3 text-sm text-status-danger-foreground" role="alert">
-                        โหลดข้อมูล Routine สำหรับแก้ไขไม่สำเร็จ: {editingTaskError.message}
-                    </p>
-                    <Button type="button" variant="outline" onClick={() => setEditingTaskId(null)}>กลับไปยังรายการ</Button>
-                </div>
-            );
-        }
-        if (editingTaskLoading || !reference || !editingTaskData) {
-            return <LoadingState label="กำลังโหลดข้อมูล Routine สำหรับแก้ไข..." compact />;
-        }
-        return (
-            <RoutineTaskForm
-                reference={reference}
-                initialTask={editingTaskData.task}
-                onSaved={() => {
-                    setEditingTaskId(null);
-                    void mutateEditingTask();
-                    void mutate();
-                    onTaskSaved();
-                }}
-                onCancel={() => setEditingTaskId(null)}
-            />
-        );
-    }
+    const editingTask = editingTaskData?.task.id === editingTaskId
+        ? editingTaskData.task
+        : null;
 
     return (
         <div className="space-y-5">
@@ -275,14 +239,36 @@ function RoutineOccurrencePanel({
                 mutate={mutate}
                 employees={reference?.employees ?? []}
             />
+            <RoutineTaskDialog
+                open={editingTaskId !== null}
+                intent="edit"
+                mode="ADMIN"
+                reference={reference}
+                task={editingTask}
+                error={referenceError ?? editingTaskError}
+                isLoading={referenceLoading || editingTaskLoading || editingTask === null}
+                onRetry={() => {
+                    void mutateReference();
+                    void mutateEditingTask();
+                }}
+                onClose={() => setEditingTaskId(null)}
+                onSaved={() => {
+                    setEditingTaskId(null);
+                    void mutateEditingTask();
+                    void mutate();
+                    onTaskSaved();
+                }}
+            />
         </div>
     );
 }
 
 function RoutineTaskSettings({
     mode,
+    onTaskSaved,
 }: {
     mode: "SELF_SERVICE" | "ADMIN";
+    onTaskSaved: () => void;
 }) {
     const isSelfService = mode === "SELF_SERVICE";
     const [isCreating, setIsCreating] = useState(false);
@@ -295,7 +281,12 @@ function RoutineTaskSettings({
     const debouncedTaskSearch = useDebouncedValue(taskSearch);
     const [pendingTaskId, setPendingTaskId] = useState<number | null>(null);
     const activeMutationLockRef = useRef<Set<number>>(new Set());
-    const { data: reference, error: referenceError, isLoading: referenceLoading } = useSWR<RoutineReferenceData, Error>(API_ROUTES.routines.reference, fetchRoutine);
+    const {
+        data: reference,
+        error: referenceError,
+        isLoading: referenceLoading,
+        mutate: mutateReference,
+    } = useSWR<RoutineReferenceData, Error>(API_ROUTES.routines.reference, fetchRoutine);
     const tasksKey = useMemo(() => {
         const params = new URLSearchParams({
             activeOnly: "0",
@@ -361,20 +352,6 @@ function RoutineTaskSettings({
         }
     }
 
-    if (isCreating || editingTask) {
-        if (referenceError) return <p className="rounded-lg border border-status-danger-border bg-status-danger-surface px-4 py-3 text-sm text-status-danger-foreground" role="alert">{referenceError.message}</p>;
-        if (referenceLoading || !reference) return <LoadingState label="กำลังโหลดข้อมูลสำหรับสร้างแม่แบบงาน..." compact />;
-        return (
-            <RoutineTaskForm
-                reference={reference}
-                initialTask={editingTask}
-                mode={mode}
-                onSaved={() => { setIsCreating(false); setEditingTask(null); void mutateTasks(); }}
-                onCancel={() => { setIsCreating(false); setEditingTask(null); }}
-            />
-        );
-    }
-
     return (
         <div className="space-y-5">
             <div className="space-y-1">
@@ -384,6 +361,7 @@ function RoutineTaskSettings({
             <RoutineTaskList
                 data={tasks}
                 error={tasksError}
+                isAdmin={!isSelfService}
                 isLoading={tasksLoading}
                 onRetry={() => void mutateTasks()}
                 onCreate={() => setIsCreating(true)}
@@ -413,6 +391,26 @@ function RoutineTaskSettings({
                 onStatusChange={(value) => {
                     setTaskStatus(value);
                     setTaskPage(1);
+                }}
+            />
+            <RoutineTaskDialog
+                open={isCreating || editingTask !== null}
+                intent={editingTask ? "edit" : "create"}
+                mode={mode}
+                reference={reference}
+                task={editingTask}
+                error={referenceError}
+                isLoading={referenceLoading || !reference}
+                onRetry={() => void mutateReference()}
+                onClose={() => {
+                    setIsCreating(false);
+                    setEditingTask(null);
+                }}
+                onSaved={() => {
+                    setIsCreating(false);
+                    setEditingTask(null);
+                    void mutateTasks();
+                    onTaskSaved();
                 }}
             />
         </div>
@@ -486,14 +484,14 @@ export function RoutineSection() {
             label: "จัดการงานของฉัน",
             icon: Settings2,
             visible: !isAdmin,
-            content: <RoutineTaskSettings mode="SELF_SERVICE" />,
+            content: <RoutineTaskSettings mode="SELF_SERVICE" onTaskSaved={() => void mutateSummary()} />,
         },
         {
             value: "settings",
             label: "ตั้งค่างานประจำ",
             icon: Settings2,
             visible: isAdmin,
-            content: <RoutineTaskSettings mode="ADMIN" />,
+            content: <RoutineTaskSettings mode="ADMIN" onTaskSaved={() => void mutateSummary()} />,
         },
         {
             value: "import",

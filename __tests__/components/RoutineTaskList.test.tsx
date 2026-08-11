@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { RoutineTaskList } from "@/components/dashboard/routine/RoutineTaskList";
@@ -41,6 +41,7 @@ function makeProps() {
             pagination: { page: 1, limit: 20, total: 1, pages: 1 },
         },
         error: undefined,
+        isAdmin: true,
         isLoading: false,
         onRetry: vi.fn(),
         onCreate: vi.fn(),
@@ -115,12 +116,18 @@ describe("RoutineTaskList", () => {
         expect(screen.getByRole("status")).toHaveTextContent("ลองเปลี่ยนคำค้นหาหรือตัวกรอง");
     });
 
-    it("keeps the task action column sticky and its edit action clickable", () => {
+    it("keeps the task action column sticky and exposes detail and edit actions", () => {
         const props = makeProps();
         const { container } = render(<RoutineTaskList {...props} />);
 
         const actionCell = container.querySelector("tbody td:last-child");
         expect(actionCell).toHaveClass("lg:sticky", "lg:right-0", "bg-surface-raised");
+
+        fireEvent.click(screen.getByRole("button", { name: "ดูรายละเอียด" }));
+        expect(screen.getByRole("dialog", { name: "ตรวจสอบระบบ" })).toHaveTextContent(
+            "ตรวจสอบรายการประจำเดือน",
+        );
+        fireEvent.click(screen.getByRole("button", { name: "ปิด" }));
 
         fireEvent.click(screen.getByRole("button", { name: "แก้ไข" }));
         expect(props.onEdit).toHaveBeenCalledWith(task);
@@ -131,10 +138,60 @@ describe("RoutineTaskList", () => {
         const { container } = render(<RoutineTaskList {...props} />);
 
         const table = screen.getByRole("table");
-        expect(table).toHaveClass("block", "lg:table", "lg:min-w-[780px]");
-        expect(table).not.toHaveClass("min-w-[780px]");
+        expect(table).toHaveClass("block", "lg:table", "lg:min-w-[900px]");
+        expect(table).not.toHaveClass("min-w-[900px]");
         expect(container.querySelector("thead")).toHaveClass("hidden", "lg:table-header-group");
         expect(screen.getByText("หน่วยงาน", { selector: "td span" })).toHaveClass("lg:hidden");
-        expect(screen.getByText("ยังไม่ระบุ")).toBeInTheDocument();
+        expect(screen.getByText("ยังไม่ได้ระบุ")).toBeInTheDocument();
+    });
+
+    it("keeps long detail fields out of the management row", () => {
+        const props = makeProps();
+        render(<RoutineTaskList {...props} />);
+
+        const row = screen.getByRole("row", { name: /ตรวจสอบระบบ/ });
+        expect(row).toHaveTextContent("วันที่ 10 ของเดือน");
+        expect(row).not.toHaveTextContent("ตรวจสอบรายการประจำเดือน");
+        expect(row).not.toHaveTextContent("ทุกเดือน");
+    });
+
+    it("shows import metadata only in an admin detail dialog", () => {
+        const importedTask: RoutineTask = {
+            ...task,
+            sourceFileName: "routine.xlsx",
+            sourceSheet: "งานประจำ",
+            sourceRow: 12,
+        };
+        const props = makeProps();
+        const importedData = {
+            ...props.data,
+            tasks: [importedTask],
+        };
+        const { rerender } = render(
+            <RoutineTaskList {...props} data={importedData} isAdmin={false} />,
+        );
+
+        fireEvent.click(screen.getByRole("button", { name: "ดูรายละเอียด" }));
+        expect(screen.getByRole("dialog")).not.toHaveTextContent("ข้อมูลนำเข้า (ผู้ดูแลระบบ)");
+        fireEvent.click(screen.getByRole("button", { name: "ปิด" }));
+
+        rerender(<RoutineTaskList {...props} data={importedData} isAdmin />);
+        fireEvent.click(screen.getByRole("button", { name: "ดูรายละเอียด" }));
+        expect(screen.getByRole("dialog")).toHaveTextContent("ข้อมูลนำเข้า (ผู้ดูแลระบบ)");
+        expect(screen.getByRole("dialog")).toHaveTextContent("routine.xlsx");
+    });
+
+    it("retains activate/deactivate and delete management actions", async () => {
+        const props = makeProps();
+        render(<RoutineTaskList {...props} />);
+
+        fireEvent.click(screen.getByRole("button", { name: "ปิดใช้งาน" }));
+        expect(props.onToggleActive).toHaveBeenCalledWith(task);
+
+        fireEvent.click(screen.getByRole("button", { name: "ลบ" }));
+        expect(screen.getByRole("alertdialog", { name: "ยืนยันการลบ Routine" })).toBeInTheDocument();
+        fireEvent.click(screen.getByRole("button", { name: "ลบรายการ" }));
+
+        await waitFor(() => expect(props.onDelete).toHaveBeenCalledWith(task));
     });
 });

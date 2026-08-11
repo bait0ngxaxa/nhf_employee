@@ -81,11 +81,18 @@ export interface RoutineTaskWorkItem {
     title: string;
     description: string | null;
     scheduleType: RoutineScheduleType;
+    scheduleConfig: unknown;
     scheduleText: string | null;
+    contractStartDate: string | null;
+    contractEndDate: string | null;
+    contractText: string | null;
+    extraDetails: string | null;
+    businessDayPolicy: string;
     isActive: boolean;
     unit: { id: number; code: string; name: string };
     category: { id: number; name: string };
     assignees: RoutineAssignee[];
+    reminderRules: RoutineReminderRule[];
     relevantOccurrence: RoutineTaskWorkItemOccurrence | null;
 }
 
@@ -95,7 +102,7 @@ export interface RoutineTask {
     categoryId: number;
     title: string;
     description: string | null;
-    scheduleType: string;
+    scheduleType: RoutineScheduleType;
     scheduleConfig: unknown;
     scheduleText: string | null;
     contractStartDate: string | null;

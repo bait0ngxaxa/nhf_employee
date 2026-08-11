@@ -163,7 +163,7 @@ export function RoutineAssigneePicker({
                                     }}
                                 />
                                 <span className="min-w-0 flex-1">
-                                    <span className="block truncate text-sm text-content-body">{name}</span>
+                                    <span className="block break-words text-sm font-medium leading-6 text-content-body [overflow-wrap:anywhere]">{name}</span>
                                     {unavailableText ? <span className="block text-xs text-status-danger-foreground">{unavailableText} · เลือกเพิ่มไม่ได้</span> : null}
                                     {notificationWarning ? (
                                         <span className="mt-0.5 flex items-start gap-1 text-xs leading-5 text-status-warning-foreground">
@@ -205,7 +205,7 @@ export function RoutineAssigneePicker({
                             return (
                                 <div key={employee.id} className="flex min-w-0 items-center gap-2 rounded-lg border border-border-subtle bg-background px-3 py-2">
                                     <span className="min-w-0 flex-1">
-                                        <span className="block break-words text-sm text-content-body">
+                                        <span className="block break-words text-sm font-medium text-content-body">
                                             {name}
                                             {unavailableText ? <span className="ml-1 text-xs text-status-danger-foreground">({unavailableText})</span> : null}
                                         </span>

@@ -1,9 +1,6 @@
-import { useId, useRef, useState } from "react";
-import { Edit3, Power, Plus, Trash2, X } from "lucide-react";
+import { Edit3, Eye, Power, Plus, Trash2, X } from "lucide-react";
+import { useId, useRef, useState, type ReactElement } from "react";
 
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import type { RoutineTaskStatusFilter } from "@/lib/validations/routine";
 import {
     AlertDialog,
     AlertDialogAction,
@@ -14,41 +11,44 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import {
-    EmptyState,
-    ErrorState,
-} from "@/components/ui/state";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { EmptyState, ErrorState } from "@/components/ui/state";
 import { getCurrentBangkokDate } from "@/lib/routine/schedule";
+import type { RoutineTaskStatusFilter } from "@/lib/validations/routine";
 
 import {
+    formatRoutineAssigneeSummary,
+    formatRoutineScheduleSummary,
     formatRoutineUnitLabel,
-    ROUTINE_SCHEDULE_LABELS,
     uniqueRoutineUnits,
 } from "./labels";
-import type { PaginatedTasksResponse, RoutineTask } from "./types";
+import { RoutineDetailsDialog } from "./RoutineDetailsDialog";
 import { RoutineTaskListSkeleton } from "./RoutineSkeletons";
+import type { PaginatedTasksResponse, RoutineTask } from "./types";
 
 interface RoutineTaskListProps {
+    categories: readonly { id: number; name: string }[];
+    categoryId: string;
     data: PaginatedTasksResponse | undefined;
     error: Error | undefined;
+    isAdmin: boolean;
     isLoading: boolean;
-    onRetry: () => void;
-    onCreate: () => void;
-    onEdit: (task: RoutineTask) => void;
-    onToggleActive: (task: RoutineTask) => Promise<void>;
-    onDelete: (task: RoutineTask) => Promise<void>;
-    pendingTaskId?: number | null;
-    onPageChange: (page: number) => void;
-    units: readonly { id: number; code: string; name: string }[];
-    categories: readonly { id: number; name: string }[];
-    search: string;
-    unitId: string;
-    categoryId: string;
-    status: RoutineTaskStatusFilter | "";
-    onSearchChange: (value: string) => void;
-    onUnitChange: (value: string) => void;
     onCategoryChange: (value: string) => void;
+    onCreate: () => void;
+    onDelete: (task: RoutineTask) => Promise<void>;
+    onEdit: (task: RoutineTask) => void;
+    onPageChange: (page: number) => void;
+    onRetry: () => void;
+    onSearchChange: (value: string) => void;
     onStatusChange: (value: RoutineTaskStatusFilter | "") => void;
+    onToggleActive: (task: RoutineTask) => Promise<void>;
+    onUnitChange: (value: string) => void;
+    pendingTaskId?: number | null;
+    search: string;
+    status: RoutineTaskStatusFilter | "";
+    unitId: string;
+    units: readonly { id: number; code: string; name: string }[];
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -69,28 +69,31 @@ function taskInformationBadges(task: RoutineTask, today: string): string[] {
 }
 
 export function RoutineTaskList({
+    categories,
+    categoryId,
     data,
     error,
+    isAdmin,
     isLoading,
-    onRetry,
-    onCreate,
-    onEdit,
-    onToggleActive,
-    onDelete,
-    pendingTaskId = null,
-    onPageChange,
-    units,
-    categories,
-    search,
-    unitId,
-    categoryId,
-    status,
-    onSearchChange,
-    onUnitChange,
     onCategoryChange,
+    onCreate,
+    onDelete,
+    onEdit,
+    onPageChange,
+    onRetry,
+    onSearchChange,
     onStatusChange,
-}: RoutineTaskListProps) {
+    onToggleActive,
+    onUnitChange,
+    pendingTaskId = null,
+    search,
+    status,
+    unitId,
+    units,
+}: RoutineTaskListProps): ReactElement {
     const [deleteTask, setDeleteTask] = useState<RoutineTask | null>(null);
+    const [detailsTask, setDetailsTask] = useState<RoutineTask | null>(null);
+    const [detailsOpen, setDetailsOpen] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
     const deleteLockRef = useRef(false);
     const filterId = useId();
@@ -106,10 +109,15 @@ export function RoutineTaskList({
     const statusId = `${filterId}-status`;
     const isInitialLoading = isLoading && !data;
 
+    function openDetails(task: RoutineTask): void {
+        setDetailsTask(task);
+        setDetailsOpen(true);
+    }
+
     return (
         <div className="space-y-4">
             <div className="grid gap-3 rounded-xl border border-brand-border/70 bg-transparent p-4 sm:grid-cols-2 xl:grid-cols-[minmax(16rem,1fr)_minmax(10rem,0.4fr)_minmax(10rem,0.4fr)_minmax(9rem,0.3fr)_auto] xl:items-end">
-                <div className="grid min-w-0 gap-1 text-sm font-medium text-brand-strong sm:col-span-2 xl:col-span-1">
+                <div className="grid min-w-0 gap-1 text-xs/5 font-semibold text-content-secondary sm:col-span-2 xl:col-span-1">
                     <label htmlFor={searchId}>ค้นหาแม่แบบงาน</label>
                     <div className="relative">
                         <Input
@@ -134,7 +142,7 @@ export function RoutineTaskList({
                         ) : null}
                     </div>
                 </div>
-                <label className="grid min-w-0 gap-1 text-sm font-medium text-brand-strong" htmlFor={unitIdField}>
+                <label className="grid min-w-0 gap-1 text-xs/5 font-semibold text-content-secondary" htmlFor={unitIdField}>
                     หน่วยงาน
                     <select
                         id={unitIdField}
@@ -150,7 +158,7 @@ export function RoutineTaskList({
                         ))}
                     </select>
                 </label>
-                <label className="grid min-w-0 gap-1 text-sm font-medium text-brand-strong" htmlFor={categoryIdField}>
+                <label className="grid min-w-0 gap-1 text-xs/5 font-semibold text-content-secondary" htmlFor={categoryIdField}>
                     หมวดหมู่งาน
                     <select
                         id={categoryIdField}
@@ -160,13 +168,11 @@ export function RoutineTaskList({
                     >
                         <option value="">ทุกหมวดหมู่</option>
                         {categories.map((category) => (
-                            <option key={category.id} value={category.id}>
-                                {category.name}
-                            </option>
+                            <option key={category.id} value={category.id}>{category.name}</option>
                         ))}
                     </select>
                 </label>
-                <label className="grid min-w-0 gap-1 text-sm font-medium text-brand-strong" htmlFor={statusId}>
+                <label className="grid min-w-0 gap-1 text-xs/5 font-semibold text-content-secondary" htmlFor={statusId}>
                     สถานะ
                     <select
                         id={statusId}
@@ -185,7 +191,8 @@ export function RoutineTaskList({
                     </select>
                 </label>
                 <Button type="button" size="sm" className="xl:justify-self-end" onClick={onCreate}>
-                    <Plus aria-hidden="true" /> สร้างแม่แบบงาน
+                    <Plus aria-hidden="true" />
+                    สร้างแม่แบบงาน
                 </Button>
             </div>
 
@@ -198,37 +205,113 @@ export function RoutineTaskList({
                     description={hasFilters ? "ลองเปลี่ยนคำค้นหาหรือตัวกรอง" : "สร้างแม่แบบงานเพื่อให้ระบบสร้างงานแต่ละรอบอัตโนมัติ"}
                 />
             ) : null}
-            {!error && data && data.tasks.length > 0 ? <>
-            <div className="overflow-hidden rounded-xl border border-brand-border/70 bg-surface-raised lg:overflow-x-auto">
-                <table className="block w-full text-left text-sm lg:table lg:min-w-[780px]">
-                    <thead className="hidden border-b border-brand-border/70 bg-brand-surface text-sm text-brand-strong lg:table-header-group">
-                        <tr><th className="px-4 py-3 font-semibold">งาน</th><th className="px-4 py-3 font-semibold">หน่วยงาน</th><th className="px-4 py-3 font-semibold">กำหนดการ</th><th className="px-4 py-3 font-semibold">ผู้รับผิดชอบ</th><th className="px-4 py-3 font-semibold">สถานะ</th><th className="sticky right-0 z-20 border-l border-brand-border/70 bg-brand-surface px-4 py-3"><span className="sr-only">การดำเนินการ</span></th></tr>
-                    </thead>
-                    <tbody className="block divide-y divide-border-subtle lg:table-row-group">
-                        {data.tasks.map((task) => (
-                            <tr key={task.id} className="block p-4 align-top lg:table-row lg:p-0">
-                                <td className="block pb-3 lg:table-cell lg:px-4 lg:py-4"><p className="break-words text-base font-semibold leading-6 text-content-heading">{task.title}</p><p className="mt-1 text-sm text-content-secondary">{task.category.name}</p></td>
-                                <td className="grid min-w-0 grid-cols-[6.5rem_minmax(0,1fr)] gap-3 border-t border-border-subtle py-3 text-content-body lg:table-cell lg:border-0 lg:px-4 lg:py-4"><span className="font-medium text-content-secondary lg:hidden">หน่วยงาน</span><span className="min-w-0 break-words">{formatRoutineUnitLabel(task.unit)}</span></td>
-                                <td className="grid min-w-0 grid-cols-[6.5rem_minmax(0,1fr)] gap-3 border-t border-border-subtle py-3 text-content-body lg:table-cell lg:border-0 lg:px-4 lg:py-4"><span className="font-medium text-content-secondary lg:hidden">กำหนดการ</span><span className="min-w-0 break-words">{ROUTINE_SCHEDULE_LABELS[task.scheduleType] ?? task.scheduleType}<span className="mt-1 block text-sm leading-5 text-content-secondary">{task.scheduleText ?? "ไม่ได้ระบุคำอธิบาย"}</span></span></td>
-                                <td className="grid min-w-0 grid-cols-[6.5rem_minmax(0,1fr)] gap-3 border-t border-border-subtle py-3 text-content-body lg:table-cell lg:max-w-56 lg:border-0 lg:px-4 lg:py-4"><span className="font-medium text-content-secondary lg:hidden">ผู้รับผิดชอบ</span><span className="min-w-0 break-words">{task.assignees.map((assignee) => assignee.employee.displayName ?? `${assignee.employee.firstName} ${assignee.employee.lastName}`).join(", ") || "ยังไม่ระบุ"}</span></td>
-                                <td className="grid min-w-0 grid-cols-[6.5rem_minmax(0,1fr)] gap-3 border-t border-border-subtle py-3 lg:table-cell lg:border-0 lg:px-4 lg:py-4"><span className="font-medium text-content-secondary lg:hidden">สถานะ</span><span className="min-w-0"><span className={task.isActive ? "inline-flex items-center whitespace-nowrap [overflow-wrap:normal] rounded-full bg-emerald-50 px-2.5 py-1 text-sm font-semibold text-emerald-700" : "inline-flex items-center whitespace-nowrap [overflow-wrap:normal] rounded-full bg-slate-100 px-2.5 py-1 text-sm font-semibold text-slate-600"}>{task.isActive ? "ใช้งาน" : "ปิดใช้งาน"}</span><span className="mt-2 flex flex-wrap gap-1">{taskInformationBadges(task, today).map((badge) => <span key={badge} className="inline-flex items-center whitespace-nowrap [overflow-wrap:normal] rounded-full border border-status-warning-border bg-status-warning-surface px-2 py-1 text-xs font-medium text-status-warning-foreground">{badge}</span>)}</span></span></td>
-                                <td className="block border-t border-border-subtle bg-surface-raised pt-3 lg:sticky lg:right-0 lg:z-10 lg:table-cell lg:whitespace-nowrap lg:border-l lg:px-4 lg:py-4 lg:text-right lg:[box-shadow:var(--employee-table-sticky-shadow)]"><div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:justify-end"><Button type="button" variant="outline" size="sm" onClick={() => onEdit(task)} disabled={pendingTaskId === task.id}><Edit3 aria-hidden="true" /> แก้ไข</Button><Button type="button" variant="outline" size="sm" disabled={pendingTaskId === task.id} onClick={() => void onToggleActive(task)}><Power aria-hidden="true" /> {pendingTaskId === task.id ? "กำลังบันทึก..." : task.isActive ? "ปิดใช้งาน" : "เปิดใช้งาน"}</Button><Button type="button" variant="ghost" size="sm" className="col-span-2 text-status-danger-foreground sm:col-auto" disabled={pendingTaskId === task.id} onClick={() => setDeleteTask(task)}><Trash2 aria-hidden="true" /> ลบ</Button></div></td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-            </div>
-            {data.pagination.pages > 1 ? (
-                <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border-subtle pt-4 text-sm text-content-secondary">
-                    <span>หน้า {data.pagination.page} จาก {data.pagination.pages}</span>
-                    <div className="flex gap-2">
-                        <Button type="button" variant="outline" size="sm" disabled={data.pagination.page <= 1} onClick={() => onPageChange(data.pagination.page - 1)}>ก่อนหน้า</Button>
-                        <Button type="button" variant="outline" size="sm" disabled={data.pagination.page >= data.pagination.pages} onClick={() => onPageChange(data.pagination.page + 1)}>ถัดไป</Button>
+
+            {!error && data && data.tasks.length > 0 ? (
+                <>
+                    <div className="overflow-hidden rounded-xl border border-brand-border/70 bg-surface-raised lg:overflow-x-auto">
+                        <table className="block w-full text-left text-sm lg:table lg:min-w-[900px]">
+                            <thead className="hidden border-b border-brand-border/70 bg-brand-surface text-xs/5 font-semibold text-brand-strong lg:table-header-group">
+                                <tr>
+                                    <th className="px-4 py-3 font-semibold">งาน</th>
+                                    <th className="px-4 py-3 font-semibold">หน่วยงาน</th>
+                                    <th className="px-4 py-3 font-semibold">กำหนดการ</th>
+                                    <th className="px-4 py-3 font-semibold">ผู้รับผิดชอบ</th>
+                                    <th className="px-4 py-3 font-semibold">สถานะ</th>
+                                    <th className="sticky right-0 z-20 border-l border-brand-border/70 bg-brand-surface px-4 py-3">
+                                        <span className="sr-only">การดำเนินการ</span>
+                                    </th>
+                                </tr>
+                            </thead>
+                            <tbody className="block divide-y divide-border-subtle lg:table-row-group">
+                                {data.tasks.map((task) => (
+                                    <tr key={task.id} className="block p-4 align-top lg:table-row lg:p-0">
+                                        <td className="block pb-3 lg:table-cell lg:px-4 lg:py-4">
+                                            <p className="break-words text-base font-semibold leading-6 tracking-tight text-content-heading [overflow-wrap:anywhere]">
+                                                {task.title}
+                                            </p>
+                                            <p className="mt-1 break-words text-xs/5 text-content-muted [overflow-wrap:anywhere]">{task.category.name}</p>
+                                        </td>
+                                        <td className="grid min-w-0 grid-cols-[6.5rem_minmax(0,1fr)] gap-3 border-t border-border-subtle py-3 text-sm font-medium text-content-body lg:table-cell lg:border-0 lg:px-4 lg:py-4">
+                                            <span className="text-xs/5 font-semibold text-content-muted lg:hidden">หน่วยงาน</span>
+                                            <span className="min-w-0 break-words">{formatRoutineUnitLabel(task.unit)}</span>
+                                        </td>
+                                        <td className="grid min-w-0 grid-cols-[6.5rem_minmax(0,1fr)] gap-3 border-t border-border-subtle py-3 text-sm font-medium text-content-body lg:table-cell lg:max-w-64 lg:border-0 lg:px-4 lg:py-4">
+                                            <span className="text-xs/5 font-semibold text-content-muted lg:hidden">กำหนดการ</span>
+                                            <span className="min-w-0 break-words leading-6">{formatRoutineScheduleSummary(task)}</span>
+                                        </td>
+                                        <td className="grid min-w-0 grid-cols-[6.5rem_minmax(0,1fr)] gap-3 border-t border-border-subtle py-3 text-sm font-medium text-content-body lg:table-cell lg:max-w-56 lg:border-0 lg:px-4 lg:py-4">
+                                            <span className="text-xs/5 font-semibold text-content-muted lg:hidden">ผู้รับผิดชอบ</span>
+                                            <span className="min-w-0 break-words">{formatRoutineAssigneeSummary(task.assignees)}</span>
+                                        </td>
+                                        <td className="grid min-w-0 grid-cols-[6.5rem_minmax(0,1fr)] gap-3 border-t border-border-subtle py-3 text-sm font-medium text-content-body lg:table-cell lg:border-0 lg:px-4 lg:py-4">
+                                            <span className="text-xs/5 font-semibold text-content-muted lg:hidden">สถานะ</span>
+                                            <span className="min-w-0">
+                                                <span className={task.isActive
+                                                    ? "inline-flex items-center whitespace-nowrap rounded-full bg-emerald-50 px-2.5 py-1 text-xs/5 font-semibold text-emerald-700"
+                                                    : "inline-flex items-center whitespace-nowrap rounded-full bg-slate-100 px-2.5 py-1 text-xs/5 font-semibold text-slate-600"}
+                                                >
+                                                    {task.isActive ? "ใช้งาน" : "ปิดใช้งาน"}
+                                                </span>
+                                                <span className="mt-2 flex flex-wrap gap-1">
+                                                    {taskInformationBadges(task, today).map((badge) => (
+                                                        <span key={badge} className="inline-flex items-center whitespace-nowrap rounded-full border border-status-warning-border bg-status-warning-surface px-2 py-1 text-xs font-medium text-status-warning-foreground">
+                                                            {badge}
+                                                        </span>
+                                                    ))}
+                                                </span>
+                                            </span>
+                                        </td>
+                                        <td className="block border-t border-border-subtle bg-surface-raised pt-3 lg:sticky lg:right-0 lg:z-10 lg:table-cell lg:whitespace-nowrap lg:border-l lg:px-4 lg:py-4 lg:text-right lg:[box-shadow:var(--employee-table-sticky-shadow)]">
+                                            <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:justify-end" role="group" aria-label={`การดำเนินการสำหรับ ${task.title}`}>
+                                                <Button type="button" variant="outline" size="sm" onClick={() => openDetails(task)}>
+                                                    <Eye aria-hidden="true" />
+                                                    ดูรายละเอียด
+                                                </Button>
+                                                <Button type="button" variant="outline" size="sm" onClick={() => onEdit(task)} disabled={pendingTaskId === task.id}>
+                                                    <Edit3 aria-hidden="true" />
+                                                    แก้ไข
+                                                </Button>
+                                                <Button type="button" variant="outline" size="sm" disabled={pendingTaskId === task.id} onClick={() => void onToggleActive(task)}>
+                                                    <Power aria-hidden="true" />
+                                                    {pendingTaskId === task.id ? "กำลังบันทึก..." : task.isActive ? "ปิดใช้งาน" : "เปิดใช้งาน"}
+                                                </Button>
+                                                <Button type="button" variant="ghost" size="sm" className="text-status-danger-foreground" disabled={pendingTaskId === task.id} onClick={() => setDeleteTask(task)}>
+                                                    <Trash2 aria-hidden="true" />
+                                                    ลบ
+                                                </Button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
                     </div>
-                </div>
+
+                    {data.pagination.pages > 1 ? (
+                        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border-subtle pt-4 text-sm text-content-secondary">
+                            <span>หน้า {data.pagination.page} จาก {data.pagination.pages}</span>
+                            <div className="flex gap-2">
+                                <Button type="button" variant="outline" size="sm" disabled={data.pagination.page <= 1} onClick={() => onPageChange(data.pagination.page - 1)}>ก่อนหน้า</Button>
+                                <Button type="button" variant="outline" size="sm" disabled={data.pagination.page >= data.pagination.pages} onClick={() => onPageChange(data.pagination.page + 1)}>ถัดไป</Button>
+                            </div>
+                        </div>
+                    ) : null}
+                </>
             ) : null}
-            </> : null}
-            <AlertDialog open={deleteTask !== null} onOpenChange={(open) => { if (!open && !isDeleting && !deleteLockRef.current) setDeleteTask(null); }}>
+
+            <RoutineDetailsDialog
+                task={detailsTask}
+                open={detailsOpen}
+                onOpenChange={setDetailsOpen}
+                isAdmin={isAdmin}
+            />
+
+            <AlertDialog
+                open={deleteTask !== null}
+                onOpenChange={(open) => {
+                    if (!open && !isDeleting && !deleteLockRef.current) setDeleteTask(null);
+                }}
+            >
                 <AlertDialogContent>
                     <AlertDialogHeader>
                         <AlertDialogTitle>ยืนยันการลบ Routine</AlertDialogTitle>
@@ -254,7 +337,9 @@ export function RoutineTaskList({
                                         deleteLockRef.current = false;
                                     });
                             }}
-                        >{isDeleting ? "กำลังลบ..." : "ลบรายการ"}</AlertDialogAction>
+                        >
+                            {isDeleting ? "กำลังลบ..." : "ลบรายการ"}
+                        </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
