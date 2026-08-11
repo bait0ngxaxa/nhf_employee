@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/dialog";
 import { Loader2 } from "lucide-react";
 import type { PendingLeave } from "@/hooks/useLeaveApprovals";
+import { getEmployeeDisplayName } from "@/lib/helpers/employee-helpers";
 
 interface RejectLeaveDialogProps {
     open: boolean;
@@ -36,7 +37,10 @@ export function RejectLeaveDialog({
                 <DialogHeader>
                     <DialogTitle>เหตุผลที่ไม่อนุมัติ</DialogTitle>
                     <DialogDescription>
-                        กรุณาระบุเหตุผลที่ปฏิเสธการลาของ {selectedLeave?.employee.firstName}
+                        กรุณาระบุเหตุผลที่ปฏิเสธการลาของ{" "}
+                        {selectedLeave
+                            ? getEmployeeDisplayName(selectedLeave.employee)
+                            : "พนักงาน"}
                     </DialogDescription>
                 </DialogHeader>
                 <div className="py-4">

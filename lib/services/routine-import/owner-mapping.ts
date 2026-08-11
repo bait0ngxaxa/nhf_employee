@@ -1,4 +1,8 @@
 import { ROUTINE_IMPORT_REVIEW_REASONS } from "./constants";
+import {
+    getEmployeeDisplayName,
+    getEmployeeFullName,
+} from "@/lib/helpers/employee-helpers";
 import type {
     RoutineImportOwnerMapping,
     RoutineImportReferenceData,
@@ -15,17 +19,6 @@ export function splitOwnerNames(value: string | null): string[] {
         .split(/[,/]/u)
         .map(normalizeOwnerKey)
         .filter((name) => name.length > 0 && !name.startsWith("*"));
-}
-
-function displayEmployeeName(employee: {
-    firstName: string;
-    lastName: string;
-    nickname: string | null;
-}): string {
-    const name = `${employee.firstName} ${employee.lastName}`.trim();
-    return employee.nickname && employee.nickname !== "-"
-        ? `${name} (${employee.nickname})`
-        : name;
 }
 
 export interface RoutineOwnerResolution {
@@ -57,7 +50,7 @@ export function buildExactRoutineOwnerMapping(
         if (employee.status !== "ACTIVE" || employee.deletedAt !== null) continue;
         addExactMapping(
             candidates,
-            `${employee.firstName} ${employee.lastName}`,
+            getEmployeeFullName(employee.firstName, employee.lastName),
             employee.id,
         );
         addExactMapping(candidates, employee.nickname, employee.id);
@@ -122,7 +115,10 @@ export function resolveRoutineOwners(
 
         mappedIds.add(employee.id);
         mappedEmployeeIds.push(employee.id);
-        mappedEmployeeNames.push(displayEmployeeName(employee));
+        mappedEmployeeNames.push(getEmployeeDisplayName({
+            ...employee,
+            nickname: employee.nickname === "-" ? null : employee.nickname,
+        }));
     }
 
     return {

@@ -14,8 +14,32 @@ const STOCK_REQUEST_REPORT_SELECT = {
     createdAt: true,
     projectCode: true,
     issuedAt: true,
-    requester: { select: { name: true, email: true } },
-    issuer: { select: { name: true } },
+    requester: {
+        select: {
+            name: true,
+            email: true,
+            employee: {
+                select: {
+                    firstName: true,
+                    lastName: true,
+                    nickname: true,
+                },
+            },
+        },
+    },
+    issuer: {
+        select: {
+            name: true,
+            email: true,
+            employee: {
+                select: {
+                    firstName: true,
+                    lastName: true,
+                    nickname: true,
+                },
+            },
+        },
+    },
     items: {
         select: {
             quantity: true,

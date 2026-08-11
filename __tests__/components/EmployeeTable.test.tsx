@@ -21,12 +21,21 @@ const employee: Employee = {
 
 describe("EmployeeTable", () => {
     it("keeps full names and email addresses on one line without truncation", () => {
-        render(<EmployeeTable employees={[employee]} />);
+        render(
+            <EmployeeTable
+                employees={[employee]}
+                userRole="ADMIN"
+                onEditEmployee={() => undefined}
+            />,
+        );
 
-        const fullName = "นางสาวสมใจ นามสกุลยาวเพื่อทดสอบการแสดงผล";
+        const fullName = "นางสาวสมใจ นามสกุลยาวเพื่อทดสอบการแสดงผล (สมใจ)";
         const table = screen.getByRole("table");
         const fullNameValue = within(table).getByText(fullName);
         const emailValue = within(table).getByText(employee.email);
+        expect(within(table).getByRole("button", {
+            name: `แก้ไขข้อมูล ${fullName}`,
+        })).toBeInTheDocument();
 
         [fullNameValue, emailValue].forEach((value) => {
             expect(value).toHaveClass("whitespace-nowrap");

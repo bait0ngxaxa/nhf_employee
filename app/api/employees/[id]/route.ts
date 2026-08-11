@@ -3,6 +3,7 @@ import { after, type NextRequest, NextResponse } from "next/server";
 import { requireAdminSession } from "@/lib/auth/api";
 import { logEmployeeEvent } from "@/lib/server/audit";
 import { employeeService } from "@/lib/services/employee";
+import { getEmployeeDisplayName } from "@/lib/helpers/employee-helpers";
 import { jsonError } from "@/lib/ssot/http";
 import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
 import { updateEmployeeSchema } from "@/lib/validations/employee";
@@ -73,6 +74,9 @@ export async function PATCH(
                 await logEmployeeEvent(actionType, employeeId, auth.user.id, auth.user.email, {
                     before: result.beforeData,
                     after: validationResult.data as Record<string, unknown>,
+                    metadata: result.employee
+                        ? { employeeName: getEmployeeDisplayName(result.employee) }
+                        : undefined,
                 });
             });
         }

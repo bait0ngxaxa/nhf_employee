@@ -17,6 +17,10 @@ import { getClientMetadata } from "@/lib/auth/hybrid/session";
 import { prisma } from "@/lib/db/prisma";
 import { lockEmployeeRows } from "@/lib/db/row-locks";
 import { runSerializableTransaction } from "@/lib/db/transaction";
+import {
+    getEmployeeDisplayName,
+    getEmployeeFullName,
+} from "@/lib/helpers/employee-helpers";
 import { isBootstrapAdminEmail } from "@/lib/ssot/admin-bootstrap";
 import { signupSchema } from "@/lib/validations/auth";
 
@@ -30,6 +34,7 @@ const SIGNUP_EMPLOYEE_SELECT = {
     id: true,
     firstName: true,
     lastName: true,
+    nickname: true,
     email: true,
     status: true,
     deletedAt: true,
@@ -118,7 +123,7 @@ export const POST = withTrustedMutation(
             }
 
             const hashedPassword = await bcrypt.hash(password, 12);
-            const { user, assignedRole } = await runSerializableTransaction(async (tx) => {
+            const { user, assignedRole, employeeDisplayName } = await runSerializableTransaction(async (tx) => {
                 await lockEmployeeRows(tx, [matchedEmployee.id]);
 
                 const lockedEmployee = await tx.employee.findUnique({
@@ -142,8 +147,10 @@ export const POST = withTrustedMutation(
                     );
                 }
 
-                const lockedEmployeeName =
-                    `${lockedEmployee.firstName} ${lockedEmployee.lastName}`.trim();
+                const lockedEmployeeName = getEmployeeFullName(
+                    lockedEmployee.firstName,
+                    lockedEmployee.lastName,
+                );
                 const lockedEmployeeRole = isBootstrapAdminEmail(lockedEmployee.email)
                     ? Role.ADMIN
                     : Role.USER;
@@ -161,6 +168,7 @@ export const POST = withTrustedMutation(
                 return {
                     user: createdUser,
                     assignedRole: lockedEmployeeRole,
+                    employeeDisplayName: getEmployeeDisplayName(lockedEmployee),
                 };
             });
 
@@ -181,6 +189,7 @@ export const POST = withTrustedMutation(
                     metadata: {
                         source: "signup",
                         bootstrapAdmin: assignedRole === Role.ADMIN,
+                        employeeName: employeeDisplayName,
                     },
                 },
             });
@@ -192,7 +201,7 @@ export const POST = withTrustedMutation(
                     message: AUTH_SIGNUP_MESSAGES.signupSuccessThai,
                     user: {
                         id: user.id,
-                        name: user.name,
+                        name: employeeDisplayName,
                         email: user.email,
                         role: user.role,
                     },

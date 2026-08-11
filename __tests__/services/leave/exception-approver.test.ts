@@ -49,6 +49,7 @@ describe("resolveLeaveExceptionApprover", () => {
                     id: 30,
                     firstName: "Former",
                     lastName: "Manager",
+                    nickname: null,
                     email: "former@example.com",
                     status: "INACTIVE",
                     deletedAt: null,

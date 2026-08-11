@@ -18,6 +18,7 @@ const baseRequest = {
         id: 7,
         name: "สมชาย",
         email: "user@example.com",
+        employee: null,
     },
     items: [
         {
@@ -93,6 +94,28 @@ describe("stock request result email payload", () => {
         });
     });
 
+    it("prefers a canonical Employee identity for the requester snapshot", () => {
+        const payload = buildStockRequestResultEmailPayload(
+            {
+                ...baseRequest,
+                requester: {
+                    ...baseRequest.requester,
+                    name: "ชื่อเดิม",
+                    employee: {
+                        firstName: "สมชาย",
+                        lastName: "ใจดี",
+                        nickname: "ชาย",
+                    },
+                },
+            },
+            "ISSUED",
+            null,
+            actedAt,
+        );
+
+        expect(payload.recipient.name).toBe("สมชาย ใจดี (ชาย)");
+    });
+
     it("builds a cancelled payload with a cancellation reason", () => {
         const payload = buildStockRequestResultEmailPayload(
             baseRequest,
@@ -116,6 +139,12 @@ describe("stock request result email payload", () => {
         });
 
         expect(parsed.recipient.email).toBe("user@example.com");
+    });
+
+    it("accepts the legacy persisted payload shape", () => {
+        const payload = buildPayload("สมชาย");
+
+        expect(parseStockRequestResultEmailPayload(payload)).toEqual(payload);
     });
 
     it("rejects an invalid recipient email with the safe parser error", () => {

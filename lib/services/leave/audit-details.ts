@@ -1,4 +1,5 @@
 import type { LeaveAuditContext } from "@/lib/audit-log/contracts";
+import { getEmployeeDisplayName } from "@/lib/helpers/employee-helpers";
 import { halfDaysToDays } from "./half-days";
 
 type LeaveAuditSource = {
@@ -12,6 +13,7 @@ type LeaveAuditSource = {
     employee?: {
         firstName: string;
         lastName: string;
+        nickname?: string | null;
     };
 };
 
@@ -31,7 +33,7 @@ export function buildLeaveAuditContext(
 ): LeaveAuditContext {
     const employeeName = options.employeeName
         ?? (request.employee
-            ? `${request.employee.firstName} ${request.employee.lastName}`.trim()
+            ? getEmployeeDisplayName(request.employee)
             : undefined);
 
     return {

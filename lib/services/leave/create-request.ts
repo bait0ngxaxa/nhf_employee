@@ -1,6 +1,7 @@
 import type { Prisma } from "@prisma/client";
 
 import { DEFAULT_LEAVE_QUOTA_HALF_DAYS } from "@/constants/leave";
+import { getEmployeeDisplayName } from "@/lib/helpers/employee-helpers";
 import { prisma } from "@/lib/db/prisma";
 import {
     runSerializableTransaction,
@@ -324,7 +325,7 @@ async function createInTransaction(
         input.userEmail,
         buildCreatedLeaveRequestAuditDetails({
             request: leaveRequest,
-            employeeName: `${employee.firstName} ${employee.lastName}`.trim(),
+            employeeName: getEmployeeDisplayName(employee),
             attachmentCount: input.attachments.length,
         }),
     );

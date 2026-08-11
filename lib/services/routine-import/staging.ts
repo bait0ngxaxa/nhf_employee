@@ -10,6 +10,10 @@ import type {
 import * as XLSX from "xlsx";
 
 import { runSerializableTransaction } from "@/lib/db/transaction";
+import {
+    getEmployeeBackedUserDisplayName,
+    getEmployeeDisplayName,
+} from "@/lib/helpers/employee-helpers";
 import { prisma } from "@/lib/db/prisma";
 import {
     calendarDateToDate,
@@ -85,6 +89,18 @@ const REUSABLE_BATCH_STATUSES: RoutineImportBatchStatus[] = [
     "PREVIEW",
     "APPLYING",
 ];
+const ROUTINE_IMPORT_UPLOADED_BY_SELECT = {
+    id: true,
+    name: true,
+    email: true,
+    employee: {
+        select: {
+            firstName: true,
+            lastName: true,
+            nickname: true,
+        },
+    },
+} as const satisfies Prisma.UserSelect;
 
 export type { RoutineImportRowUpdateInput } from "@/lib/validations/routine-import";
 
@@ -159,7 +175,7 @@ export interface RoutineImportApplyView {
 }
 
 type StoredBatch = Prisma.RoutineImportBatchGetPayload<{
-    include: { uploadedBy: { select: { id: true; name: true } } };
+    include: { uploadedBy: { select: typeof ROUTINE_IMPORT_UPLOADED_BY_SELECT } };
 }>;
 
 type StoredRow = PrismaRoutineImportRow;
@@ -281,7 +297,10 @@ function getBatchView(
         ignoredSheetNames: stringArray(batch.ignoredSheets),
         asOfDate: toBangkokCalendarDate(batch.asOfDate),
         status: batch.status,
-        uploadedBy: batch.uploadedBy,
+        uploadedBy: {
+            id: batch.uploadedBy.id,
+            name: getEmployeeBackedUserDisplayName(batch.uploadedBy),
+        },
         totalRows: batch.totalRows,
         validRows: batch.validRows,
         reviewRows: batch.reviewRows,
@@ -342,7 +361,7 @@ function mapEmployeeNames(
     return ids.flatMap((id) => {
         const employee = employeesById.get(id);
         if (!employee) return [`ไม่พบข้อมูลพนักงาน (ID: ${id})`];
-        return [`${employee.firstName} ${employee.lastName}`.trim()];
+        return [getEmployeeDisplayName(employee)];
     });
 }
 
@@ -473,7 +492,7 @@ async function loadBatchOrThrow(
 ): Promise<StoredBatch> {
     const batch = await prisma.routineImportBatch.findUnique({
         where: { id: batchId },
-        include: { uploadedBy: { select: { id: true, name: true } } },
+        include: { uploadedBy: { select: ROUTINE_IMPORT_UPLOADED_BY_SELECT } },
     });
     if (!batch) throw new RoutineNotFoundError("ไม่พบรายการนำเข้า");
     return batch;
@@ -499,7 +518,7 @@ async function expireBatchIfNeeded(batch: StoredBatch): Promise<StoredBatch> {
     const updated = await prisma.routineImportBatch.update({
         where: { id: batch.id },
         data: { status: "EXPIRED" },
-        include: { uploadedBy: { select: { id: true, name: true } } },
+        include: { uploadedBy: { select: ROUTINE_IMPORT_UPLOADED_BY_SELECT } },
     });
     return updated;
 }
@@ -542,7 +561,7 @@ export async function createRoutineImportPreview(
             status: { in: REUSABLE_BATCH_STATUSES },
         },
         orderBy: { createdAt: "desc" },
-        include: { uploadedBy: { select: { id: true, name: true } } },
+        include: { uploadedBy: { select: ROUTINE_IMPORT_UPLOADED_BY_SELECT } },
     });
     if (existingBatch) {
         const selectedValidRows = await countSelectedValidRows(prisma, existingBatch.id);
@@ -560,7 +579,7 @@ export async function createRoutineImportPreview(
                 status: { in: REUSABLE_BATCH_STATUSES },
             },
             orderBy: { createdAt: "desc" },
-            include: { uploadedBy: { select: { id: true, name: true } } },
+            include: { uploadedBy: { select: ROUTINE_IMPORT_UPLOADED_BY_SELECT } },
         });
         if (concurrentExisting) return { id: concurrentExisting.id, reusedExisting: true };
 
@@ -643,7 +662,7 @@ export async function createRoutineImportPreview(
                     })),
                 },
             },
-            include: { uploadedBy: { select: { id: true, name: true } } },
+            include: { uploadedBy: { select: ROUTINE_IMPORT_UPLOADED_BY_SELECT } },
         });
         await tx.auditLog.create({
             data: {
@@ -1250,7 +1269,7 @@ export async function applyRoutineImportBatch(
                 errorMessage: null,
                 ...counts,
             },
-            include: { uploadedBy: { select: { id: true, name: true } } },
+            include: { uploadedBy: { select: ROUTINE_IMPORT_UPLOADED_BY_SELECT } },
         });
         await tx.auditLog.create({
             data: {
@@ -1315,7 +1334,7 @@ export async function cancelRoutineImportBatch(
         const updated = await tx.routineImportBatch.update({
             where: { id: batchId, version: current.version },
             data: { status: "CANCELLED", version: { increment: 1 } },
-            include: { uploadedBy: { select: { id: true, name: true } } },
+            include: { uploadedBy: { select: ROUTINE_IMPORT_UPLOADED_BY_SELECT } },
         });
         await tx.auditLog.create({
             data: {

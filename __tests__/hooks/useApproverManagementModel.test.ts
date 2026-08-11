@@ -67,6 +67,15 @@ describe("useApproverManagementModel", () => {
         expect(result.current.unassignedCount).toBe(1);
     });
 
+    it("searches and displays approvers by canonical nickname identity", () => {
+        const { result } = renderHook(() => useApproverManagementModel());
+
+        act(() => result.current.setSearch("Bee"));
+
+        expect(result.current.filteredEmployees).toEqual([employees[1]]);
+        expect(result.current.formatName(employees[1])).toBe("B Two (Bee)");
+    });
+
     it("tracks assignment changes and saves successfully", async () => {
         const { result } = renderHook(() => useApproverManagementModel());
 

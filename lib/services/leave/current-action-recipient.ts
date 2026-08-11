@@ -30,6 +30,7 @@ export async function resolveCurrentLeaveAction(
                     id: true,
                     firstName: true,
                     lastName: true,
+                    nickname: true,
                     email: true,
                     status: true,
                     deletedAt: true,

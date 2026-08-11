@@ -18,6 +18,7 @@ interface Comment {
         employee?: {
             firstName: string;
             lastName: string;
+            nickname?: string | null;
         };
     };
 }
@@ -41,6 +42,7 @@ interface TicketDetailData {
         employee?: {
             firstName: string;
             lastName: string;
+            nickname?: string | null;
             dept?: {
                 name: string;
             };
@@ -53,6 +55,7 @@ interface TicketDetailData {
         employee?: {
             firstName: string;
             lastName: string;
+            nickname?: string | null;
         };
     };
     comments: Comment[];

@@ -4,6 +4,7 @@ import {
     defineAuditDetails,
     type AuditDetails,
 } from "@/lib/audit-log/contracts";
+import { getEmployeeBackedUserDisplayName } from "@/lib/helpers/employee-helpers";
 import type { UserContext } from "./types";
 
 type AuditClient = Pick<Prisma.TransactionClient, "auditLog">;
@@ -24,6 +25,7 @@ type TicketWithOptionalAssignee = Ticket & {
         employee: {
             firstName: string;
             lastName: string;
+            nickname: string | null;
         } | null;
     } | null;
 };
@@ -158,8 +160,5 @@ function getAssigneeDisplayName(
     assignee: TicketWithOptionalAssignee["assignedTo"],
 ): string | null {
     if (!assignee) return null;
-    const employeeName = assignee.employee
-        ? `${assignee.employee.firstName} ${assignee.employee.lastName}`.trim()
-        : "";
-    return employeeName || assignee.name.trim() || assignee.email;
+    return getEmployeeBackedUserDisplayName(assignee);
 }

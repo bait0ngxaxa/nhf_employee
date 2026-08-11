@@ -19,10 +19,10 @@ import {
 import {
     buildConfiguredApproverSnapshot,
     buildLeaveRecipientSnapshot,
-    formatEmployeeName,
     type LeaveNotTakenConfirmedPayload,
     type LeaveNotTakenRequestedPayload,
 } from "@/lib/services/leave/notification-payloads";
+import { getEmployeeDisplayName } from "@/lib/helpers/employee-helpers";
 import {
     formatLeaveSummary,
     getLeaveTypeLabel,
@@ -452,7 +452,7 @@ export async function PUT(req: NextRequest): Promise<NextResponse> {
                 decisionActorName: isAdmin
                     ? auth.user.name
                     : currentApprover
-                        ? formatEmployeeName(currentApprover)
+                        ? getEmployeeDisplayName(currentApprover)
                         : null,
                 decisionActorRole: auth.user.role,
                 recoveryOverride: adminOverride,

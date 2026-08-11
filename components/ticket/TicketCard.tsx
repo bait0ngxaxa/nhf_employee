@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { type Ticket } from "@/types/tickets";
 import { formatThaiDate } from "@/lib/helpers/date-helpers";
+import { getEmployeeBackedUserDisplayName } from "@/lib/helpers/employee-helpers";
 import {
     getTicketCategoryLabel,
     getTicketStatusLabel,
@@ -96,10 +97,7 @@ export function TicketCard({
                     icon={<User className="h-4 w-4" />}
                     label="ผู้แจ้ง"
                 >
-                    {ticket.reportedBy.employee?.firstName &&
-                    ticket.reportedBy.employee?.lastName
-                        ? `${ticket.reportedBy.employee.firstName} ${ticket.reportedBy.employee.lastName}`
-                        : ticket.reportedBy.name}
+                    {getEmployeeBackedUserDisplayName(ticket.reportedBy)}
                 </MetaItem>
 
                 <MetaItem
@@ -159,10 +157,7 @@ export function TicketCard({
                     </div>
                     <span className="font-medium">มอบหมายให้:</span>
                     <span>
-                        {ticket.assignedTo.employee?.firstName &&
-                        ticket.assignedTo.employee?.lastName
-                            ? `${ticket.assignedTo.employee.firstName} ${ticket.assignedTo.employee.lastName}`
-                            : ticket.assignedTo.name}
+                        {getEmployeeBackedUserDisplayName(ticket.assignedTo)}
                     </span>
                 </div>
             )}

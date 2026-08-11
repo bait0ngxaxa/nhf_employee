@@ -21,6 +21,7 @@ import { AlertTriangle, CheckCircle } from "lucide-react";
 import { type EditEmployeeFormProps } from "@/types/employees";
 import { EmployeeFormFields } from "../shared";
 import { useEditEmployee } from "./useEditEmployee";
+import { getEmployeeDisplayName } from "@/lib/helpers/employee-helpers";
 
 export function EditEmployeeForm({
     employee,
@@ -50,7 +51,7 @@ export function EditEmployeeForm({
                         <span>แก้ไขข้อมูลพนักงาน</span>
                     </DialogTitle>
                     <DialogDescription>
-                        แก้ไขข้อมูลของ {employee.firstName} {employee.lastName}
+                        แก้ไขข้อมูลของ {getEmployeeDisplayName(employee)}
                     </DialogDescription>
                 </DialogHeader>
 

@@ -7,6 +7,7 @@ import { hasActiveSessionFamily } from "@/lib/auth/hybrid/session-store";
 import { verifyAccessToken } from "@/lib/auth/hybrid/tokens";
 import { hasEligibleEmployeeLifecycle } from "@/lib/auth/ssot";
 import { prisma } from "@/lib/db/prisma";
+import { getEmployeeBackedUserDisplayName } from "@/lib/helpers/employee-helpers";
 
 export type ApiAuthSession = HybridAuthSession;
 
@@ -33,7 +34,7 @@ function toApiAuthSession(user: SessionUser): ApiAuthSession {
             id: String(user.id),
             role: user.role,
             email: user.email,
-            name: user.name,
+            name: getEmployeeBackedUserDisplayName(user),
             department: user.employee?.dept?.name,
             isManager: (user.employee?.subordinates?.length ?? 0) > 0,
             canViewLeaveReports:

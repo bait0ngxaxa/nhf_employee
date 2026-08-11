@@ -66,6 +66,7 @@ function buildTicket(): TicketWithRelations {
             employee: {
                 firstName: "สมชาย",
                 lastName: "ใจดี",
+                nickname: "ชาย",
                 dept: { name: "IT" },
             },
         },
@@ -85,6 +86,21 @@ describe("ticket notification delivery", () => {
         vi.mocked(lineNotificationService.sendITTeamNotification).mockResolvedValue(true);
         vi.mocked(lineNotificationService.sendNewTicketNotification).mockResolvedValue(true);
         vi.mocked(lineNotificationService.sendStatusUpdateNotification).mockResolvedValue(true);
+    });
+
+    it("stores canonical employee names in ticket notification snapshots", () => {
+        const snapshot = buildTicketCreatedNotificationSnapshot(buildTicket());
+
+        expect(snapshot.reportedBy.name).toBe("สมชาย ใจดี (ชาย)");
+    });
+
+    it("falls back to User name when a ticket user has no Employee", () => {
+        const ticket = buildTicket();
+        ticket.reportedBy.employee = null;
+
+        const snapshot = buildTicketCreatedNotificationSnapshot(ticket);
+
+        expect(snapshot.reportedBy.name).toBe("Fallback Reporter");
     });
 
     it("keeps created in-app delivery independent from failed LINE delivery", async () => {

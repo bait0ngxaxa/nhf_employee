@@ -8,9 +8,9 @@ import { runSerializableTransaction } from "@/lib/db/transaction";
 import { isActiveEmployeeInTransaction } from "@/lib/services/leave/active-employee-session";
 import {
     buildLeaveRecipientSnapshot,
-    formatEmployeeName,
     type LeaveResultPayload,
 } from "@/lib/services/leave/notification-payloads";
+import { getEmployeeDisplayName } from "@/lib/helpers/employee-helpers";
 import { getLeaveYearFromDateValue } from "@/lib/services/leave/quota-year";
 import { halfDaysToDays, toLeaveRequestDays } from "@/lib/services/leave/half-days";
 import { calculateAdditionalOverQuotaHalfDays } from "@/lib/services/leave/over-quota";
@@ -169,7 +169,7 @@ export async function POST(req: Request): Promise<NextResponse> {
                 leaveId,
                 employee: buildLeaveRecipientSnapshot(leaveRequest.employee),
                 approverName: leaveRequest.approver
-                    ? formatEmployeeName(leaveRequest.approver)
+                    ? getEmployeeDisplayName(leaveRequest.approver)
                     : auth.user.name,
                 leaveType: leaveRequest.leaveType,
                 startDate: leaveRequest.startDate.toISOString(),

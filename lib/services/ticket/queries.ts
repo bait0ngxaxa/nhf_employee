@@ -46,6 +46,48 @@ function buildWhereClause(
                     contains: filters.search.trim(),
                 },
             },
+            {
+                reportedBy: {
+                    is: {
+                        OR: [
+                            { name: { contains: filters.search.trim() } },
+                            { email: { contains: filters.search.trim() } },
+                            {
+                                employee: {
+                                    is: {
+                                        OR: [
+                                            { firstName: { contains: filters.search.trim() } },
+                                            { lastName: { contains: filters.search.trim() } },
+                                            { nickname: { contains: filters.search.trim() } },
+                                        ],
+                                    },
+                                },
+                            },
+                        ],
+                    },
+                },
+            },
+            {
+                assignedTo: {
+                    is: {
+                        OR: [
+                            { name: { contains: filters.search.trim() } },
+                            { email: { contains: filters.search.trim() } },
+                            {
+                                employee: {
+                                    is: {
+                                        OR: [
+                                            { firstName: { contains: filters.search.trim() } },
+                                            { lastName: { contains: filters.search.trim() } },
+                                            { nickname: { contains: filters.search.trim() } },
+                                        ],
+                                    },
+                                },
+                            },
+                        ],
+                    },
+                },
+            },
         ];
     }
 

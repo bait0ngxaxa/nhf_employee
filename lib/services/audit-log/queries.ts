@@ -12,6 +12,13 @@ const AUDIT_LOG_USER_SELECT = {
     id: true,
     name: true,
     email: true,
+    employee: {
+        select: {
+            firstName: true,
+            lastName: true,
+            nickname: true,
+        },
+    },
 } as const;
 
 /**
@@ -46,6 +53,21 @@ function buildWhereClause(filters: AuditLogFilters): Record<string, unknown> {
                     is: {
                         name: {
                             contains: searchTerm,
+                        },
+                    },
+                },
+            },
+            {
+                user: {
+                    is: {
+                        employee: {
+                            is: {
+                                OR: [
+                                    { firstName: { contains: searchTerm } },
+                                    { lastName: { contains: searchTerm } },
+                                    { nickname: { contains: searchTerm } },
+                                ],
+                            },
                         },
                     },
                 },

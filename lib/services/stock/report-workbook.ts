@@ -1,6 +1,7 @@
 import ExcelJS from "exceljs";
 
 import { toBangkokExcelDate } from "@/lib/helpers/bangkok-time";
+import { getEmployeeBackedUserDisplayName } from "@/lib/helpers/employee-helpers";
 import { finishStockWorksheet } from "@/lib/services/stock/workbook-style";
 
 const SUMMARY_SHEET_NAME = "สรุปการใช้วัสดุ";
@@ -29,9 +30,19 @@ export type StockRequestReportRequest = {
     createdAt: Date;
     projectCode: string;
     issuedAt: Date;
-    requester: { name: string; email: string };
-    issuer: { name: string } | null;
+    requester: StockReportUser;
+    issuer: StockReportUser | null;
     items: StockRequestReportItem[];
+};
+
+type StockReportUser = {
+    name: string;
+    email: string;
+    employee: {
+        firstName: string;
+        lastName: string;
+        nickname: string | null;
+    } | null;
 };
 
 type StockRequestVariantAttributeValues =
@@ -151,9 +162,11 @@ function toCalculationRow(
         issuedAt: toBangkokExcelDate(request.issuedAt),
         requestNumber: request.id,
         projectCode: request.projectCode,
-        requesterName: request.requester.name,
+        requesterName: getEmployeeBackedUserDisplayName(request.requester),
         requesterEmail: request.requester.email,
-        issuerName: request.issuer?.name ?? "-",
+        issuerName: request.issuer
+            ? getEmployeeBackedUserDisplayName(request.issuer, "-")
+            : "-",
         categoryName: item.item.category.name,
         itemName: item.item.name,
         variantSummary: formatVariantSummary(item.variant?.attributeValues),
@@ -172,9 +185,11 @@ function toDetailRow(
         issuedAt: toBangkokExcelDate(request.issuedAt),
         requestNumber: request.id,
         projectCode: request.projectCode,
-        requesterName: request.requester.name,
+        requesterName: getEmployeeBackedUserDisplayName(request.requester),
         requesterEmail: request.requester.email,
-        issuerName: request.issuer?.name ?? "-",
+        issuerName: request.issuer
+            ? getEmployeeBackedUserDisplayName(request.issuer, "-")
+            : "-",
         itemSummary: formatItemsSummary(request.items),
         itemTypeCount: request.items.length,
         totalQuantity: sumRequestQuantity(request.items),

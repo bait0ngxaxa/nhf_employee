@@ -32,6 +32,7 @@ import {
     REQUEST_STATUS_OPTIONS,
 } from "./stockRequest.shared";
 import { getRequestItemDisplayName } from "./stockVariant.shared";
+import { getEmployeeBackedUserDisplayName } from "@/lib/helpers/employee-helpers";
 import { useStockRequestActions } from "./useStockRequestActions";
 import { StockRequestNote } from "./StockRequestNote";
 import { StockEmptyState } from "./StockLoadingState";
@@ -228,7 +229,7 @@ export function StockAdminRequests() {
                                             <TableCell className="w-56 border-r border-border-subtle py-4">
                                                 <div className="flex flex-col">
                                                     <span className="text-sm font-semibold text-content-strong">
-                                                        {req.requester.name}
+                                                        {getEmployeeBackedUserDisplayName(req.requester)}
                                                     </span>
                                                     <span className="text-xs font-medium text-content-subtle">
                                                         {req.requester.email}

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+    buildExactRoutineOwnerMapping,
     resolveRoutineOwners,
     splitOwnerNames,
 } from "@/lib/services/routine-import";
@@ -65,5 +66,47 @@ describe("routine import owner mapping", () => {
             referenceData,
         );
         expect(duplicate.reviewReasons).toContain("DUPLICATE_OWNER:สำเนา");
+    });
+
+    it("matches a unique nickname and preserves canonical display identity", () => {
+        const result = resolveRoutineOwners(
+            ["อ้อย"],
+            { อ้อย: 10 },
+            referenceData,
+        );
+
+        expect(result.mappedEmployeeIds).toEqual([10]);
+        expect(result.mappedEmployeeNames).toEqual([
+            "กัลยาณี ศรีตะพันธ์ (อ้อย)",
+        ]);
+    });
+
+    it("does not auto-map an ambiguous nickname", () => {
+        const ambiguousReferenceData: RoutineImportReferenceData = {
+            ...referenceData,
+            employees: [
+                referenceData.employees[0],
+                {
+                    id: 12,
+                    firstName: "กัลยา",
+                    lastName: "คนละคน",
+                    nickname: "อ้อย",
+                    departmentId: 1,
+                    status: "ACTIVE",
+                    deletedAt: null,
+                },
+            ],
+        };
+
+        const result = resolveRoutineOwners(
+            ["อ้อย"],
+            buildExactRoutineOwnerMapping(ambiguousReferenceData),
+            ambiguousReferenceData,
+        );
+
+        expect(result.mappedEmployeeIds).toEqual([]);
+        expect(result.reviewReasons).toContain(
+            "OWNER_MAPPING_EMPLOYEE_NOT_FOUND:อ้อย",
+        );
     });
 });

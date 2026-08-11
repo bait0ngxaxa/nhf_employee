@@ -39,7 +39,7 @@ describe("ticket audit", () => {
             assignedTo: {
                 name: "Somchai",
                 email: "somchai@example.com",
-                employee: { firstName: "สมชาย", lastName: "ใจดี" },
+                employee: { firstName: "สมชาย", lastName: "ใจดี", nickname: "ชาย" },
             },
         };
         const after = {
@@ -51,7 +51,7 @@ describe("ticket audit", () => {
             assignedTo: {
                 name: "Wichai",
                 email: "wichai@example.com",
-                employee: { firstName: "วิชัย", lastName: "ใจดี" },
+                employee: { firstName: "วิชัย", lastName: "ใจดี", nickname: "ชัย" },
             },
         };
 
@@ -96,7 +96,7 @@ describe("ticket audit", () => {
             entityId: 1,
             details: assignmentDetails,
         }).summary).toBe(
-            "มอบหมาย Ticket #1 “Printer” จาก สมชาย ใจดี → วิชัย ใจดี",
+            "มอบหมาย Ticket #1 “Printer” จาก สมชาย ใจดี (ชาย) → วิชัย ใจดี (ชัย)",
         );
     });
 });

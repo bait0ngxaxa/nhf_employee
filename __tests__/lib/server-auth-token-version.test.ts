@@ -96,6 +96,37 @@ describe("server auth tokenVersion validation", () => {
         expect(session).toBeNull();
     });
 
+    it("uses the canonical Employee identity in an active session", async () => {
+        verifyAccessTokenMock.mockResolvedValue({
+            sub: "1",
+            role: "USER",
+            sessionId: "session-1",
+            tokenVersion: 1,
+        });
+        prismaMock.user.findUnique.mockResolvedValue({
+            id: 1,
+            role: "USER",
+            email: "employee@test.com",
+            name: "ชื่อผู้ใช้เดิม",
+            isActive: true,
+            tokenVersion: 1,
+            employee: {
+                firstName: "สมชาย",
+                lastName: "ใจดี",
+                nickname: "ชาย",
+                status: "ACTIVE",
+                deletedAt: null,
+                dept: null,
+                subordinates: [],
+                approvals: [],
+            },
+        });
+
+        const session = await getApiAuthSession();
+
+        expect(session?.user.name).toBe("สมชาย ใจดี (ชาย)");
+    });
+
     it("returns null when only a refresh token is present", async () => {
         cookiesMock.mockResolvedValue({
             get: vi.fn((name: string) =>

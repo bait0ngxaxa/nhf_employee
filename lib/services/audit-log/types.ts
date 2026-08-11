@@ -28,6 +28,11 @@ export interface AuditLogUserInfo {
     id: number;
     name: string;
     email: string;
+    employee: {
+        firstName: string;
+        lastName: string;
+        nickname: string | null;
+    } | null;
 }
 
 /** Audit log with user and parsed details */

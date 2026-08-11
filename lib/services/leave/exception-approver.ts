@@ -10,6 +10,7 @@ const EXCEPTION_APPROVER_SELECT = {
     id: true,
     firstName: true,
     lastName: true,
+    nickname: true,
     email: true,
     status: true,
     deletedAt: true,

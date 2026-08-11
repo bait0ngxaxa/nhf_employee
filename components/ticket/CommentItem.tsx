@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { User } from "lucide-react";
 import { formatThaiDateTime } from "@/lib/helpers/date-helpers";
+import { getEmployeeBackedUserDisplayName } from "@/lib/helpers/employee-helpers";
 import { isAdminRole } from "@/lib/ssot/permissions";
 
 interface CommentAuthor {
@@ -14,6 +15,7 @@ interface CommentAuthor {
     employee?: {
         firstName: string;
         lastName: string;
+        nickname?: string | null;
     };
 }
 
@@ -31,10 +33,7 @@ export function CommentItem({
     author,
     showSeparator = false,
 }: CommentItemProps) {
-    const authorName =
-        author.employee?.firstName && author.employee?.lastName
-            ? `${author.employee.firstName} ${author.employee.lastName}`
-            : author.name;
+    const authorName = getEmployeeBackedUserDisplayName(author);
 
     return (
         <div>

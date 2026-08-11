@@ -9,11 +9,11 @@ import {
 import {
     buildConfiguredApproverSnapshot,
     buildLeaveRecipientSnapshot,
-    formatEmployeeName,
     type LeaveCancelledPayload,
     type LeaveCancelledAfterApprovalPayload,
     type LeaveCancellationRequestedPayload,
 } from "@/lib/services/leave/notification-payloads";
+import { getEmployeeDisplayName } from "@/lib/helpers/employee-helpers";
 import {
     getEffectiveLeaveApprover,
     getEffectiveLeaveApproverId,
@@ -587,7 +587,7 @@ function getExceptionApproverName(
     leaveRequest: LeaveCancellationRequest,
 ): string | null {
     const approver = getEffectiveLeaveApprover(leaveRequest);
-    return approver ? formatEmployeeName(approver) : null;
+    return approver ? getEmployeeDisplayName(approver) : null;
 }
 
 async function markPendingApprovalNotificationsRead(

@@ -7,6 +7,7 @@ import {
 } from "@/lib/line/liff-session";
 import { LineIdentityVerificationError } from "@/lib/line/errors";
 import { prisma } from "@/lib/db/prisma";
+import { getEmployeeBackedUserDisplayName } from "@/lib/helpers/employee-helpers";
 import { forbidden, serverError, unauthorized } from "@/lib/ssot/http";
 
 export interface LiffWorkforceUser {
@@ -47,6 +48,9 @@ export async function findActiveLiffWorkforceIdentity(
             employee: {
                 select: {
                     id: true,
+                    firstName: true,
+                    lastName: true,
+                    nickname: true,
                     status: true,
                     deletedAt: true,
                 },
@@ -73,7 +77,7 @@ export async function findActiveLiffWorkforceIdentity(
             id: user.id,
             role: user.role,
             email: user.email,
-            name: user.name,
+            name: getEmployeeBackedUserDisplayName(user),
         },
         employeeId: user.employee.id,
     };

@@ -195,15 +195,18 @@ function buildOccurrence(overrides: Record<string, unknown> = {}) {
         assignees: [
             {
                 employee: {
+                    firstName: "สมชาย",
+                    lastName: "ใจดี",
+                    nickname: "ชาย",
                     status: "ACTIVE",
                     deletedAt: null,
-                user: {
-                    id: 17,
-                    name: "สมชาย ใจดี",
-                    email: "somchai@example.com",
-                    isActive: true,
-                    deletedAt: null,
-                },
+                    user: {
+                        id: 17,
+                        name: "สมชาย ใจดี",
+                        email: "somchai@example.com",
+                        isActive: true,
+                        deletedAt: null,
+                    },
                 },
             },
         ],
@@ -219,6 +222,9 @@ function buildAssignee(
     return {
         role,
         employee: {
+            firstName: "ผู้รับผิดชอบ",
+            lastName: String(userId),
+            nickname: null,
             status: "ACTIVE",
             deletedAt: null,
             user: {
@@ -273,7 +279,9 @@ describe("Routine reminder dispatch", () => {
             data: [{
                 type: "ROUTINE_REMINDER_EMAIL",
                 eventKey: "routine:91:rule:31:user:17:version:2:email",
-                payload: JSON.stringify(buildEmailPayload()),
+                payload: JSON.stringify(buildEmailPayload({
+                    recipientName: "สมชาย ใจดี (ชาย)",
+                })),
             }],
             skipDuplicates: true,
         });
@@ -402,6 +410,9 @@ describe("Routine reminder dispatch", () => {
                     {
                         role: "CO_OWNER",
                         employee: {
+                            firstName: "ไม่มี",
+                            lastName: "อีเมล",
+                            nickname: null,
                             status: "ACTIVE",
                             deletedAt: null,
                             user: null,
@@ -410,6 +421,9 @@ describe("Routine reminder dispatch", () => {
                     {
                         role: "CO_OWNER",
                         employee: {
+                            firstName: "อีเมล",
+                            lastName: "ไม่ถูกต้อง",
+                            nickname: null,
                             status: "ACTIVE",
                             deletedAt: null,
                             user: {
@@ -450,6 +464,9 @@ describe("Routine reminder dispatch", () => {
                     buildOccurrence().assignees[0],
                     {
                         employee: {
+                            firstName: "ไม่มี",
+                            lastName: "อีเมล",
+                            nickname: null,
                             status: "ACTIVE",
                             deletedAt: null,
                             user: {
@@ -463,6 +480,9 @@ describe("Routine reminder dispatch", () => {
                     },
                     {
                         employee: {
+                            firstName: "อีเมล",
+                            lastName: "ไม่ถูกต้อง",
+                            nickname: null,
                             status: "ACTIVE",
                             deletedAt: null,
                             user: {
@@ -507,6 +527,9 @@ describe("Routine reminder dispatch", () => {
             asNever(buildOccurrence({
                 assignees: [{
                     employee: {
+                        firstName: "อีเมล",
+                        lastName: "ไม่ถูกต้อง",
+                        nickname: null,
                         status: "ACTIVE",
                         deletedAt: null,
                         user: {
@@ -777,6 +800,9 @@ describe("Routine reminder dispatch", () => {
                     buildOccurrence().assignees[0],
                     {
                         employee: {
+                            firstName: "ผู้ดูแล",
+                            lastName: "ร่วม",
+                            nickname: null,
                             status: "ACTIVE",
                             deletedAt: null,
                             user: {

@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db/prisma";
+import { getEmployeeDisplayName } from "@/lib/helpers/employee-helpers";
 import { DEPARTMENT_CODE_MAP } from "./constants";
 import type { CSVImportEmployee, ImportResult } from "./types";
 import { parseEmployeeStatus } from "@/lib/helpers/csv-helpers";
@@ -134,7 +135,7 @@ export async function importEmployeesFromCSV(
             const normalizedFullName = `${employeeData.firstName.trim().toLowerCase()} ${employeeData.lastName.trim().toLowerCase()}`;
             if (existingNames.has(normalizedFullName)) {
                 throw new Error(
-                    `พนักงานชื่อ "${employeeData.firstName.trim()} ${employeeData.lastName.trim()}" มีอยู่ในระบบแล้ว`,
+                    `พนักงานชื่อ "${getEmployeeDisplayName(employeeData)}" มีอยู่ในระบบแล้ว`,
                 );
             }
 

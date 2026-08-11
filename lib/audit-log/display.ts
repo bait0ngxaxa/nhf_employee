@@ -3,6 +3,7 @@ import {
     getAuditActionLabel,
 } from "@/constants/audit";
 import { formatThaiDate } from "@/lib/helpers/date-helpers";
+import { getEmployeeDisplayName } from "@/lib/helpers/employee-helpers";
 import {
     formatLeaveDateRange,
     formatLeaveDurationDays,
@@ -49,6 +50,7 @@ const FIELD_LABELS: Record<string, string> = {
     managerId: "ผู้อนุมัติการลา",
     minStock: "จำนวนขั้นต่ำ",
     name: "ชื่อ",
+    nickname: "ชื่อเล่น",
     newMinStock: "จำนวนขั้นต่ำใหม่",
     newQty: "จำนวนใหม่",
     period: "ช่วงเวลา",
@@ -328,10 +330,16 @@ function getChangedFields(
 }
 
 function getDisplayName(source: Record<string, unknown>): string | null {
-    const fullName = [getText(source, "firstName"), getText(source, "lastName")]
-        .filter(Boolean)
-        .join(" ");
-    return fullName || getText(source, "name") || getText(source, "title")
+    const firstName = getText(source, "firstName");
+    const lastName = getText(source, "lastName");
+    const employeeName = firstName || lastName
+        ? getEmployeeDisplayName({
+              firstName: firstName ?? "",
+              lastName: lastName ?? "",
+              nickname: getText(source, "nickname"),
+          })
+        : null;
+    return employeeName || getText(source, "name") || getText(source, "title")
         || getText(source, "email") || getText(source, "sku");
 }
 

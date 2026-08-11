@@ -3,6 +3,7 @@ import type { ReactElement } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import type { PendingLeave } from "@/hooks/useLeaveApprovals";
+import { getEmployeeDisplayName } from "@/lib/helpers/employee-helpers";
 import { LEAVE_THEME_BUTTON_CLASS } from "../leaveTheme";
 import { LeaveAttachmentViewerButton } from "./LeaveAttachmentViewerButton";
 
@@ -37,7 +38,7 @@ export function NotTakenPendingList({
                     <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                         <div className="min-w-0">
                             <p className="break-words text-base/6 font-semibold text-content-heading">
-                                {leave.employee.firstName} {leave.employee.lastName}
+                                {getEmployeeDisplayName(leave.employee)}
                                 <span className="ml-2 font-normal text-content-secondary">
                                     แจ้งไม่ได้ใช้วันลา
                                 </span>

@@ -25,6 +25,7 @@ import {
     getTicketStatusIcon,
 } from "@/lib/helpers/ticket-helpers";
 import { formatThaiDateTime } from "@/lib/helpers/date-helpers";
+import { getEmployeeBackedUserDisplayName } from "@/lib/helpers/employee-helpers";
 import { CommentItem } from "./CommentItem";
 import { TicketPriorityBadge, TicketStatusBadge } from "./TicketBadges";
 
@@ -170,10 +171,7 @@ export default function TicketDetail({
                             <CardTitle>{ticket.title}</CardTitle>
                             <CardDescription>
                                 แจ้งโดย{" "}
-                                {ticket.reportedBy.employee?.firstName &&
-                                ticket.reportedBy.employee?.lastName
-                                    ? `${ticket.reportedBy.employee.firstName} ${ticket.reportedBy.employee.lastName}`
-                                    : ticket.reportedBy.name}
+                                {getEmployeeBackedUserDisplayName(ticket.reportedBy)}
                                 {ticket.reportedBy.employee?.dept &&
                                     ` (${ticket.reportedBy.employee.dept.name})`}
                             </CardDescription>
@@ -219,10 +217,7 @@ export default function TicketDetail({
                         <div>
                             <span className="font-medium">มอบหมายให้:</span>
                             <p>
-                                {ticket.assignedTo.employee?.firstName &&
-                                ticket.assignedTo.employee?.lastName
-                                    ? `${ticket.assignedTo.employee.firstName} ${ticket.assignedTo.employee.lastName}`
-                                    : ticket.assignedTo.name}
+                                {getEmployeeBackedUserDisplayName(ticket.assignedTo)}
                             </p>
                         </div>
                     ) : null}

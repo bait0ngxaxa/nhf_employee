@@ -81,10 +81,21 @@ export interface StockRequest {
     cancelledById: number | null;
     cancelledAt: string | null;
     createdAt: string;
-    requester: { id: number; name: string; email: string };
-    issuer: { id: number; name: string } | null;
-    canceller: { id: number; name: string } | null;
+    requester: StockRequestUser;
+    issuer: StockRequestUser | null;
+    canceller: StockRequestUser | null;
     items: StockRequestItemDetail[];
+}
+
+interface StockRequestUser {
+    id: number;
+    name: string;
+    email: string;
+    employee: {
+        firstName: string;
+        lastName: string;
+        nickname: string | null;
+    } | null;
 }
 
 export interface StockDataContextValue {

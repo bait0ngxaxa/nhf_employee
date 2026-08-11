@@ -1,5 +1,6 @@
 import { type CSVEmployee } from "@/types/employees";
 import { EmployeeStatus } from "@prisma/client";
+import { getEmployeeDisplayName } from "@/lib/helpers/employee-helpers";
 
 // CSV header mapping (support both Thai and English headers)
 export const CSV_HEADER_MAPPINGS: Record<string, keyof CSVEmployee> = {
@@ -254,7 +255,7 @@ export function mapLeaveRowToCSV(
 ): Record<string, string | number> {
     return {
         "ลำดับ": index + 1,
-        "ชื่อ-นามสกุล": `${r.employee.firstName} ${r.employee.lastName}${r.employee.nickname ? ` (${r.employee.nickname})` : ""}`,
+        "ชื่อ-นามสกุล": getEmployeeDisplayName(r.employee),
         "แผนก": r.employee.dept?.name ?? "-",
         "ตำแหน่ง": r.employee.position,
         "ประเภทการลา": LEAVE_TYPE_TH[r.leaveType] ?? r.leaveType,

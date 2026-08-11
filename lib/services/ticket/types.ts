@@ -58,6 +58,7 @@ export interface UserWithEmployee {
     employee: {
         firstName: string;
         lastName: string;
+        nickname: string | null;
         dept?: {
             name: string;
         } | null;
@@ -72,6 +73,7 @@ export interface AssignedUserInfo {
     employee: {
         firstName: string;
         lastName: string;
+        nickname: string | null;
     } | null;
 }
 
@@ -84,6 +86,7 @@ export interface CommentAuthorInfo {
     employee: {
         firstName: string;
         lastName: string;
+        nickname: string | null;
     } | null;
 }
 

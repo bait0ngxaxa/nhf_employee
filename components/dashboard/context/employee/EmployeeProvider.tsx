@@ -15,6 +15,7 @@ import { toast } from "sonner";
 import { type Employee } from "@/types/employees";
 import { PAGINATION_DEFAULTS } from "@/constants/ui";
 import { triggerDownload } from "@/lib/helpers/download";
+import { getEmployeeDisplayName } from "@/lib/helpers/employee-helpers";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { EmployeeDataContext, EmployeeUIContext } from "./EmployeeContext";
 import { EXPORT_LIMITS } from "@/lib/ssot/exports";
@@ -190,7 +191,7 @@ export function EmployeeProvider({ children }: EmployeeProviderProps) {
 
     const handleEmployeeUpdate = useCallback(() => {
         const employeeName = employeeToEdit
-            ? `${employeeToEdit.firstName} ${employeeToEdit.lastName}`
+            ? getEmployeeDisplayName(employeeToEdit)
             : "พนักงาน";
 
         setIsEditFormOpen(false);

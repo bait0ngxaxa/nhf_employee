@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import type { PendingLeave } from "@/hooks/useLeaveApprovals";
 import { formatThaiDateTimeWithTimeWord } from "@/lib/helpers/date-helpers";
+import { getEmployeeDisplayName } from "@/lib/helpers/employee-helpers";
 import { LEAVE_THEME_BUTTON_CLASS } from "../leaveTheme";
 import { LeaveAttachmentViewerButton } from "./LeaveAttachmentViewerButton";
 
@@ -90,12 +91,7 @@ function PendingApprovalCard({
                         </div>
                         <div className="min-w-0">
                             <h3 className="break-words text-lg/7 font-semibold tracking-tight text-content-heading">
-                                {leave.employee.firstName} {leave.employee.lastName}
-                                {leave.employee.nickname ? (
-                                    <span className="font-normal text-content-secondary">
-                                        {" "}({leave.employee.nickname})
-                                    </span>
-                                ) : null}
+                                {getEmployeeDisplayName(leave.employee)}
                             </h3>
                             <p className="mt-1 break-words text-sm/6 font-medium text-content-secondary">
                                 {leave.employee.position} · {leave.employee.dept?.name ?? "ไม่ระบุแผนก"}

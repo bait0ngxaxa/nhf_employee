@@ -49,21 +49,26 @@ describe("Employee Queries", () => {
             expect(result.pagination.totalPages).toBe(1);
         });
 
-        it("should apply search filter correctly", async () => {
+        it("should search first name, last name, nickname, and existing identity fields", async () => {
             // Arrange
             prismaMock.employee.count.mockResolvedValue(0);
             prismaMock.employee.findMany.mockResolvedValue([]);
 
             // Act
-            await getEmployees({ page: 1, limit: 10, search: "test" });
+            await getEmployees({ page: 1, limit: 10, search: "ชาย" });
 
             // Assert
             expect(prismaMock.employee.count).toHaveBeenCalledWith(
                 expect.objectContaining({
                     where: expect.objectContaining({
                         OR: expect.arrayContaining([
-                            { firstName: { contains: "test" } },
-                            { email: { contains: "test" } },
+                            { firstName: { contains: "ชาย" } },
+                            { lastName: { contains: "ชาย" } },
+                            { nickname: { contains: "ชาย" } },
+                            { email: { contains: "ชาย" } },
+                            { position: { contains: "ชาย" } },
+                            { affiliation: { contains: "ชาย" } },
+                            { dept: { name: { contains: "ชาย" } } },
                         ]),
                     }),
                 }),

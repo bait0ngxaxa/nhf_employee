@@ -89,6 +89,48 @@ describe("Ticket Queries", () => {
                 OR: [
                     { title: { contains: "printer" } },
                     { description: { contains: "printer" } },
+                    {
+                        reportedBy: {
+                            is: {
+                                OR: [
+                                    { name: { contains: "printer" } },
+                                    { email: { contains: "printer" } },
+                                    {
+                                        employee: {
+                                            is: {
+                                                OR: [
+                                                    { firstName: { contains: "printer" } },
+                                                    { lastName: { contains: "printer" } },
+                                                    { nickname: { contains: "printer" } },
+                                                ],
+                                            },
+                                        },
+                                    },
+                                ],
+                            },
+                        },
+                    },
+                    {
+                        assignedTo: {
+                            is: {
+                                OR: [
+                                    { name: { contains: "printer" } },
+                                    { email: { contains: "printer" } },
+                                    {
+                                        employee: {
+                                            is: {
+                                                OR: [
+                                                    { firstName: { contains: "printer" } },
+                                                    { lastName: { contains: "printer" } },
+                                                    { nickname: { contains: "printer" } },
+                                                ],
+                                            },
+                                        },
+                                    },
+                                ],
+                            },
+                        },
+                    },
                 ],
             };
             expect(prismaMock.ticket.findMany).toHaveBeenCalledWith(

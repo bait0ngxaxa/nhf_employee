@@ -8,6 +8,7 @@ import {
 } from "@/lib/services/leave/approver-eligibility";
 import { runSerializableTransaction } from "@/lib/db/transaction";
 import { lockEmployeeRows } from "@/lib/services/leave/transaction";
+import { getEmployeeDisplayName } from "@/lib/helpers/employee-helpers";
 
 export type ApproverAssignment = {
     employeeId: number;
@@ -48,6 +49,7 @@ type EmployeeRecord = {
     id: number;
     firstName: string;
     lastName: string;
+    nickname: string | null;
     managerId: number | null;
 };
 
@@ -55,6 +57,7 @@ type ApproverRecord = {
     id: number;
     firstName: string;
     lastName: string;
+    nickname: string | null;
     email: string;
     status: string;
     deletedAt: Date | null;
@@ -76,6 +79,7 @@ async function loadApprovers(
             id: true,
             firstName: true,
             lastName: true,
+            nickname: true,
             email: true,
             status: true,
             deletedAt: true,
@@ -92,12 +96,12 @@ async function writeAudit(
     newApprover: ApproverRecord | undefined,
     actor: ApproverAssignmentActor,
 ): Promise<void> {
-    const employeeName = formatEmployeeName(employee);
+    const employeeName = getEmployeeDisplayName(employee);
     const previousApproverName = previousApprover
-        ? formatEmployeeName(previousApprover)
+        ? getEmployeeDisplayName(previousApprover)
         : null;
     const newApproverName = newApprover
-        ? formatEmployeeName(newApprover)
+        ? getEmployeeDisplayName(newApprover)
         : null;
     await tx.auditLog.create({
         data: {
@@ -128,10 +132,6 @@ async function writeAudit(
     });
 }
 
-function formatEmployeeName(employee: { firstName: string; lastName: string }): string {
-    return `${employee.firstName} ${employee.lastName}`.trim();
-}
-
 export async function assignLeaveApprovers(
     assignments: ApproverAssignment[],
     actor: ApproverAssignmentActor,
@@ -153,14 +153,26 @@ export async function assignLeaveApprovers(
                     id: { in: employeeIds },
                     ...ACTIVE_LEAVE_EMPLOYEE_QUERY_WHERE,
                 },
-                select: { id: true, firstName: true, lastName: true, managerId: true },
+                select: {
+                    id: true,
+                    firstName: true,
+                    lastName: true,
+                    nickname: true,
+                    managerId: true,
+                },
             }),
             loadApprovers(tx, managerIds),
             tx.leaveRequest.findMany({
                 where: { employeeId: { in: employeeIds }, status: "PENDING" },
                 select: {
                     employeeId: true,
-                    employee: { select: { firstName: true, lastName: true } },
+                    employee: {
+                        select: {
+                            firstName: true,
+                            lastName: true,
+                            nickname: true,
+                        },
+                    },
                 },
             }),
         ]);
@@ -198,7 +210,7 @@ export async function assignLeaveApprovers(
                 const pendingEmployees = [...pendingByEmployeeId.entries()]
                     .map(([id, pending]) => ({
                         id,
-                        name: pending ? formatEmployeeName(pending) : "ไม่ทราบชื่อ",
+                        name: pending ? getEmployeeDisplayName(pending) : "ไม่ทราบชื่อ",
                     }));
                 throw new ApproverAssignmentError(APPROVER_MESSAGES.pendingRequests(pendingEmployees), 409);
             }

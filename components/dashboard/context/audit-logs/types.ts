@@ -13,6 +13,11 @@ export interface AuditLog {
         id: number;
         name: string;
         email: string;
+        employee: {
+            firstName: string;
+            lastName: string;
+            nickname: string | null;
+        } | null;
     } | null;
 }
 

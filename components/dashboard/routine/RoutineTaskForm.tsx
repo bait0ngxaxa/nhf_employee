@@ -46,6 +46,7 @@ import {
     setRoutineAssigneeRole,
 } from "@/lib/routine/assignees";
 import { createIdempotencyKey } from "@/lib/client/idempotency-key";
+import { getEmployeeDisplayName } from "@/lib/helpers/employee-helpers";
 import {
     routineTaskCreateSchema,
     routineTaskUpdateSchema,
@@ -118,8 +119,7 @@ function dateInputValue(value: string | null | undefined): string {
 
 function routineEmployeeName(employee: RoutineEmployee): string {
     return employee.displayName?.trim()
-        || `${employee.firstName} ${employee.lastName}`.trim()
-        || employee.nickname?.trim()
+        || getEmployeeDisplayName(employee)
         || `รหัสพนักงาน ${employee.id}`;
 }
 

@@ -3,6 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { type Employee } from "@/types/employees";
 import {
     getEmployeeDepartmentBadgeClass,
+    getEmployeeDisplayName,
     getEmployeeStatusLabel,
     getEmployeeStatusBadge,
     formatEmployeePhone,
@@ -12,7 +13,6 @@ import { EmployeeMobileCard } from "./EmployeeMobileCard";
 import {
     EditEmployeeButton,
     EmployeeAvatar,
-    getEmployeeFullName,
     isTemporaryEmail,
 } from "./EmployeeTablePrimitives";
 
@@ -98,7 +98,7 @@ export const EmployeeTable = memo(function EmployeeTable({
                                     <EmployeeAvatar employee={employee} />
                                     <div>
                                         <div className="whitespace-nowrap text-sm font-semibold text-content-heading">
-                                            {getEmployeeFullName(employee)}
+                                            {getEmployeeDisplayName(employee) || "ไม่ระบุชื่อ"}
                                         </div>
                                     </div>
                                 </div>
@@ -168,7 +168,8 @@ export const EmployeeTable = memo(function EmployeeTable({
 });
 
 function NicknameBadge({ nickname }: { nickname?: string }) {
-    if (!nickname) {
+    const normalizedNickname = nickname?.trim();
+    if (!normalizedNickname) {
         return <span className="text-sm text-content-subtle">-</span>;
     }
 
@@ -176,9 +177,9 @@ function NicknameBadge({ nickname }: { nickname?: string }) {
         <Badge
             variant="secondary"
             className="max-w-full border border-violet-200/70 bg-violet-50 px-2.5 font-medium text-violet-700 hover:bg-violet-50"
-            title={nickname}
+            title={normalizedNickname}
         >
-            <span className="truncate">{nickname}</span>
+            <span className="truncate">{normalizedNickname}</span>
         </Badge>
     );
 }

@@ -1,5 +1,6 @@
 import type { Prisma } from "@prisma/client";
 import * as z from "zod";
+import { getEmployeeBackedUserDisplayName } from "@/lib/helpers/employee-helpers";
 
 export function buildVariantLabel(
     attributeValues: Array<{
@@ -68,6 +69,13 @@ export const stockRequestResultEmailSelect = {
             id: true,
             name: true,
             email: true,
+            employee: {
+                select: {
+                    firstName: true,
+                    lastName: true,
+                    nickname: true,
+                },
+            },
         },
     },
     items: {
@@ -113,8 +121,7 @@ export function buildStockRequestResultEmailPayload(
     cancelReason: string | null,
     actedAt: Date,
 ): StockRequestResultEmailPayload {
-    const requesterName = request.requester.name.trim()
-        || request.requester.email;
+    const requesterName = getEmployeeBackedUserDisplayName(request.requester);
 
     return {
         schemaVersion: 1,

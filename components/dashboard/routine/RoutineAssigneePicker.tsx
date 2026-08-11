@@ -5,6 +5,7 @@ import { CircleAlert, Search, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { getEmployeeDisplayName } from "@/lib/helpers/employee-helpers";
 
 import type {
     RoutineAssigneeRole,
@@ -24,10 +25,11 @@ interface RoutineAssigneePickerProps {
 const MAX_VISIBLE_SEARCH_RESULTS = 8;
 
 function employeeName(employee: RoutineEmployee): string {
-    const fullName = `${employee.firstName} ${employee.lastName}`.trim();
-    if (!fullName) return `ไม่พบข้อมูลพนักงาน (ID: ${employee.id})`;
-    if (!employee.nickname || employee.nickname === "-") return fullName;
-    return `${fullName} (${employee.nickname})`;
+    const displayName = getEmployeeDisplayName({
+        ...employee,
+        nickname: employee.nickname === "-" ? null : employee.nickname,
+    });
+    return displayName || `ไม่พบข้อมูลพนักงาน (ID: ${employee.id})`;
 }
 
 function employeeSearchText(employee: RoutineEmployee): string {

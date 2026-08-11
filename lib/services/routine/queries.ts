@@ -1,6 +1,7 @@
 import type { Prisma } from "@prisma/client";
 
 import { prisma } from "@/lib/db/prisma";
+import { getEmployeeDisplayName } from "@/lib/helpers/employee-helpers";
 import {
     addCalendarDays,
     calendarDayDifference,
@@ -174,15 +175,6 @@ export interface SerializedRoutineTaskWorkItem {
     relevantOccurrence: SerializedRoutineTaskOccurrence | null;
 }
 
-function serializeEmployeeName(employee: {
-    firstName: string;
-    lastName: string;
-    nickname: string | null;
-}): string {
-    const name = `${employee.firstName} ${employee.lastName}`.trim();
-    return employee.nickname ? `${name} (${employee.nickname})` : name;
-}
-
 function serializeAssignee(assignee: {
     employeeId: number;
     role: string;
@@ -200,7 +192,7 @@ function serializeAssignee(assignee: {
         role: assignee.role,
         employee: {
             ...assignee.employee,
-            displayName: serializeEmployeeName(assignee.employee),
+            displayName: getEmployeeDisplayName(assignee.employee),
         },
     };
 }

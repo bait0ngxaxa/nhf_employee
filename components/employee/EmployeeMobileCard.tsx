@@ -11,13 +11,13 @@ import {
 import { type Employee } from "@/types/employees";
 import {
     formatEmployeePhone,
+    getEmployeeDisplayName,
     getEmployeeStatusBadge,
     getEmployeeStatusLabel,
 } from "@/lib/helpers/employee-helpers";
 import {
     EmployeeAvatar,
     EditEmployeeButton,
-    getEmployeeFullName,
     isTemporaryEmail,
 } from "./EmployeeTablePrimitives";
 
@@ -39,7 +39,7 @@ export function EmployeeMobileCard({
                     <EmployeeAvatar employee={employee} />
                     <div className="min-w-0">
                         <h3 className="text-sm font-semibold leading-6 text-content-heading [overflow-wrap:anywhere]">
-                            {getEmployeeFullName(employee)}
+                            {getEmployeeDisplayName(employee) || "ไม่ระบุชื่อ"}
                         </h3>
                         <p className="mt-0.5 line-clamp-2 text-xs leading-5 text-content-secondary [overflow-wrap:anywhere]">
                             {employee.position}
@@ -55,7 +55,7 @@ export function EmployeeMobileCard({
                 <MobileDetail
                     icon={UserRound}
                     label="ชื่อเล่น"
-                    value={employee.nickname || "-"}
+                    value={employee.nickname?.trim() || "-"}
                 />
                 <MobileDetail
                     icon={ShieldCheck}

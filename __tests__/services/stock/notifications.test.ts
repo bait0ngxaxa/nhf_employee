@@ -42,8 +42,13 @@ describe("Stock Notifications", () => {
             note: "ด่วน",
             createdAt: new Date("2026-03-30T07:00:00.000Z"),
             requester: {
-                name: "สมชาย",
+                name: "ชื่อเดิม",
                 email: "somchai@example.com",
+                employee: {
+                    firstName: "สมชาย",
+                    lastName: "ใจดี",
+                    nickname: "ชาย",
+                },
             },
             items: [
                 {
@@ -81,7 +86,7 @@ describe("Stock Notifications", () => {
 
         expect(createCall?.data.type).toBe("STOCK_REQUEST_LINE");
         expect(payload.projectCode).toBe("PRJ-2569/01");
-        expect(payload.requesterName).toBe("สมชาย");
+        expect(payload.requesterName).toBe("สมชาย ใจดี (ชาย)");
         expect(payload.itemCount).toBe(1);
         expect(payload.totalQuantity).toBe(2);
         expect(payload.items[0]?.variantLabel).toBe("ขนาด: A4");

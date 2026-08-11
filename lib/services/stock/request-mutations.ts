@@ -43,6 +43,7 @@ import type {
     LowStockAlertCandidate,
     StockCommandActor,
 } from "./types";
+import { getEmployeeBackedUserDisplayName } from "@/lib/helpers/employee-helpers";
 
 export type CreateStockRequestResult = {
     request: StockRequestWithDetails;
@@ -489,7 +490,7 @@ export async function cancelRequest(
         if (!options.isAdmin) {
             await notifyAdminsStockRequestCancelledByRequester(
                 requestId,
-                actor.name,
+                getEmployeeBackedUserDisplayName(request.requester),
                 tx,
             );
         } else {

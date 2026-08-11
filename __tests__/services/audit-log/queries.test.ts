@@ -60,6 +60,35 @@ describe("Audit Log Queries", () => {
             );
         });
 
+        it("searches audit actors by employee nickname on the server", async () => {
+            prismaMock.auditLog.count.mockResolvedValue(0);
+            prismaMock.auditLog.findMany.mockResolvedValue([]);
+
+            await getAuditLogs({ page: 1, limit: 10, search: "ชาย" });
+
+            expect(prismaMock.auditLog.findMany).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    where: expect.objectContaining({
+                        OR: expect.arrayContaining([
+                            {
+                                user: {
+                                    is: {
+                                        employee: {
+                                            is: {
+                                                OR: expect.arrayContaining([
+                                                    { nickname: { contains: "ชาย" } },
+                                                ]),
+                                            },
+                                        },
+                                    },
+                                },
+                            },
+                        ]),
+                    }),
+                }),
+            );
+        });
+
         it("should handle invalid JSON details gracefully", async () => {
             prismaMock.auditLog.count.mockResolvedValue(1);
             prismaMock.auditLog.findMany.mockResolvedValue([

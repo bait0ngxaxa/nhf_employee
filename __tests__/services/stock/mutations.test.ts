@@ -1408,7 +1408,15 @@ describe("Stock Service Mutations", () => {
                 projectCode: "PRJ-MATCH",
                 note: null,
                 createdAt: new Date("2026-01-01T00:00:00.000Z"),
-                requester: { name: "ผู้ใช้ 7", email: "user-7@example.com" },
+                requester: {
+                    name: "ผู้ใช้ 7",
+                    email: "user-7@example.com",
+                    employee: {
+                        firstName: "สมชาย",
+                        lastName: "ใจดี",
+                        nickname: "ชาย",
+                    },
+                },
                 items: [{
                     id: 101,
                     itemId: 50,
@@ -1491,6 +1499,7 @@ describe("Stock Service Mutations", () => {
                     data: expect.objectContaining({
                         userId: 1,
                         type: "STOCK_REQUEST_NEW",
+                        message: "สมชาย ใจดี (ชาย) ส่งคำขอเบิกวัสดุ #1 (PRJ-MATCH)",
                     }),
                 }),
             );
@@ -1748,6 +1757,15 @@ describe("Stock Service Mutations", () => {
                     status: "PENDING_ISSUE",
                     requestedBy: 3,
                     projectCode: "PRJ-CANCEL",
+                    requester: {
+                        name: "ผู้ใช้ 3",
+                        email: "user-3@example.com",
+                        employee: {
+                            firstName: "สมชาย",
+                            lastName: "ใจดี",
+                            nickname: "ชาย",
+                        },
+                    },
                 }),
             );
             prismaMock.stockRequest.findUniqueOrThrow.mockResolvedValue(

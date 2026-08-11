@@ -132,6 +132,19 @@ export async function getRequests(
             { projectCode: { contains: trimmedSearch } },
             { requester: { name: { contains: trimmedSearch } } },
             { requester: { email: { contains: trimmedSearch } } },
+            {
+                requester: {
+                    employee: {
+                        is: {
+                            OR: [
+                                { firstName: { contains: trimmedSearch } },
+                                { lastName: { contains: trimmedSearch } },
+                                { nickname: { contains: trimmedSearch } },
+                            ],
+                        },
+                    },
+                },
+            },
             { items: { some: { item: { name: { contains: trimmedSearch } } } } },
         );
 

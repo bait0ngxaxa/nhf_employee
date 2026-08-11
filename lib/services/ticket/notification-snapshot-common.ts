@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { getEmployeeBackedUserDisplayName } from "@/lib/helpers/employee-helpers";
 import type { TicketWithRelations } from "./types";
 
 export const ticketNotificationUserSchema = z.object({
@@ -14,28 +15,13 @@ export const assignedTicketNotificationUserSchema = z.object({
     name: z.string().min(1),
 });
 
-function getDisplayName(
-    user: {
-        name: string;
-        employee: {
-            firstName: string;
-            lastName: string;
-        } | null;
-    },
-): string {
-    if (user.employee?.firstName && user.employee?.lastName) {
-        return `${user.employee.firstName} ${user.employee.lastName}`;
-    }
-    return user.name;
-}
-
 export function buildTicketNotificationReportedBy(
     ticket: TicketWithRelations,
 ): z.infer<typeof ticketNotificationUserSchema> {
     return {
         id: ticket.reportedById,
         email: ticket.reportedBy.email,
-        name: getDisplayName(ticket.reportedBy),
+        name: getEmployeeBackedUserDisplayName(ticket.reportedBy),
         department: ticket.reportedBy.employee?.dept?.name,
     };
 }
@@ -46,7 +32,7 @@ export function buildTicketNotificationAssignedTo(
     if (!ticket.assignedTo) return undefined;
 
     return {
-        name: getDisplayName(ticket.assignedTo),
+        name: getEmployeeBackedUserDisplayName(ticket.assignedTo),
         email: ticket.assignedTo.email,
     };
 }

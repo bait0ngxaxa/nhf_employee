@@ -675,7 +675,12 @@ describe("Employee Mutations", () => {
             prismaMock.employee.findUnique.mockResolvedValue(employee as never);
             prismaMock.leaveRequest.findMany.mockResolvedValue([{
                 id: "leave-1",
-                employee: { id: 2, firstName: "Leave", lastName: "Requester" },
+                employee: {
+                    id: 2,
+                    firstName: "Leave",
+                    lastName: "Requester",
+                    nickname: null,
+                },
             }] as never);
 
             const result = await offboardEmployee(1, ACTOR);
@@ -738,7 +743,14 @@ describe("Employee Mutations", () => {
                 },
                 select: {
                     id: true,
-                    employee: { select: { id: true, firstName: true, lastName: true } },
+                    employee: {
+                        select: {
+                            id: true,
+                            firstName: true,
+                            lastName: true,
+                            nickname: true,
+                        },
+                    },
                 },
                 orderBy: { id: "asc" },
             });

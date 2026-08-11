@@ -1,6 +1,7 @@
 import { type Prisma, Role } from "@prisma/client";
 
 import { prisma } from "@/lib/db/prisma";
+import { getEmployeeBackedUserDisplayName } from "@/lib/helpers/employee-helpers";
 import { createAdminInAppNotificationsOnce } from "@/lib/services/notifications/in-app";
 import {
     sendStockLowNotification,
@@ -30,6 +31,11 @@ type StockRequestLineSource = {
     requester: {
         name: string;
         email: string;
+        employee?: {
+            firstName: string;
+            lastName: string;
+            nickname: string | null;
+        } | null;
     };
     items: Array<{
         quantity: number;
@@ -118,7 +124,7 @@ function buildStockRequestLinePayload(
     return {
         requestId: stockRequest.id,
         projectCode: stockRequest.projectCode,
-        requesterName: stockRequest.requester.name || stockRequest.requester.email,
+        requesterName: getEmployeeBackedUserDisplayName(stockRequest.requester),
         note: stockRequest.note,
         requestedAt: stockRequest.createdAt.toISOString(),
         itemCount: stockRequest.items.length,

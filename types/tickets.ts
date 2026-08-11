@@ -24,6 +24,7 @@ export interface Ticket {
     employee?: {
       firstName: string;
       lastName: string;
+      nickname?: string | null;
       dept?: {
         name: string;
       };
@@ -36,6 +37,7 @@ export interface Ticket {
     employee?: {
       firstName: string;
       lastName: string;
+      nickname?: string | null;
     };
   } | null;
   _count?: {
@@ -63,6 +65,7 @@ export interface Comment {
     employee?: {
       firstName: string;
       lastName: string;
+      nickname?: string | null;
     };
   };
 }

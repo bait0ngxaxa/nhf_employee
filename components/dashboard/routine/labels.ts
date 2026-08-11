@@ -3,6 +3,7 @@ import type {
     RoutineReminderRecipientScope,
     RoutineTimingStatus,
 } from "./types";
+import { getEmployeeDisplayName } from "@/lib/helpers/employee-helpers";
 
 export const ROUTINE_TIMING_STATUS_LABELS: Record<RoutineTimingStatus, string> = {
     OVERDUE: "เกินกำหนด",
@@ -43,8 +44,8 @@ export const ROUTINE_REMINDER_RECIPIENT_SCOPE_LABELS: Record<
 export function formatRoutineAssigneeName(assignee: RoutineAssignee): string {
     const displayName = assignee.employee.displayName?.trim();
     if (displayName) return displayName;
-    const fullName = `${assignee.employee.firstName} ${assignee.employee.lastName}`.trim();
-    return fullName || assignee.employee.nickname?.trim() || `รหัสพนักงาน ${assignee.employeeId}`;
+    return getEmployeeDisplayName(assignee.employee)
+        || `รหัสพนักงาน ${assignee.employeeId}`;
 }
 
 export function sortRoutineAssignees(

@@ -24,7 +24,10 @@ import { type EditStatusModalProps } from '@/types/employees';
 import { type EmployeeStatusValue } from '@/types/employees';
 import { EMPLOYEE_STATUSES } from '@/constants/employees';
 import { apiPatch } from '@/lib/client/api-client';
-import { getEmployeeStatusInfo } from '@/lib/helpers/employee-helpers';
+import {
+  getEmployeeDisplayName,
+  getEmployeeStatusInfo,
+} from '@/lib/helpers/employee-helpers';
 
 export function EditStatusModal({
   employee,
@@ -51,7 +54,7 @@ export function EditStatusModal({
       if (response.success) {
         onStatusUpdate(employee.id, selectedStatus);
         toast.success("อัปเดตสถานะสำเร็จ", {
-          description: `สถานะของ ${employee.firstName} ${employee.lastName} ถูกเปลี่ยนเป็น "${selectedStatusInfo.label}" เรียบร้อยแล้ว`,
+          description: `สถานะของ ${getEmployeeDisplayName(employee)} ถูกเปลี่ยนเป็น "${selectedStatusInfo.label}" เรียบร้อยแล้ว`,
         });
         onClose();
       } else {
@@ -82,10 +85,7 @@ export function EditStatusModal({
             <span>แก้ไขสถานะพนักงาน</span>
           </DialogTitle>
           <DialogDescription>
-            เปลี่ยนสถานะการทำงานของ {employee.firstName} {employee.lastName}
-            {employee.nickname && (
-              <span className="text-blue-600 ml-1">({employee.nickname})</span>
-            )}
+            เปลี่ยนสถานะการทำงานของ {getEmployeeDisplayName(employee)}
           </DialogDescription>
         </DialogHeader>
 

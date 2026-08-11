@@ -144,7 +144,16 @@ function storedBatch(id: number, status: "READY" | "COMPLETED"): Record<string, 
         version: 1,
         createdAt: new Date("2026-08-04T00:00:00.000Z"),
         updatedAt: new Date("2026-08-04T00:00:00.000Z"),
-        uploadedBy: { id: 7, name: "ผู้ดูแลระบบ" },
+        uploadedBy: {
+            id: 7,
+            name: "ชื่อบัญชีเดิม",
+            email: "admin@example.com",
+            employee: {
+                firstName: "สมชาย",
+                lastName: "ใจดี",
+                nickname: "ชาย",
+            },
+        },
     };
 }
 
@@ -220,7 +229,11 @@ describe("routine import preview reuse", () => {
 
         const result = await createRoutineImportPreview(file, actor(), "2026-08-04");
 
-        expect(result.batch).toEqual(expect.objectContaining({ id: 2, status: "READY" }));
+        expect(result.batch).toEqual(expect.objectContaining({
+            id: 2,
+            status: "READY",
+            uploadedBy: { id: 7, name: "สมชาย ใจดี (ชาย)" },
+        }));
         expect(result.reusedExisting).toBe(true);
         expect(prismaMock.routineImportBatch.findFirst).toHaveBeenNthCalledWith(
             1,

@@ -19,6 +19,9 @@ vi.mock("@/lib/db/prisma", () => ({
 const ACTOR = { userId: 1, email: "admin@thainhf.org" };
 const ACTIVE_APPROVER = {
     id: 20,
+    firstName: "Manager",
+    lastName: "User",
+    nickname: null,
     email: "manager@thainhf.org",
     status: "ACTIVE",
     deletedAt: null,
@@ -32,7 +35,7 @@ const ACTIVE_APPROVER = {
 
 function mockLookup(hasPendingRequest: boolean): void {
     vi.mocked(prisma.employee.findMany)
-        .mockResolvedValueOnce([{ id: 10, managerId: 15 }] as never)
+        .mockResolvedValueOnce([buildEmployee(10)] as never)
         .mockResolvedValueOnce([ACTIVE_APPROVER] as never);
     vi.mocked(prisma.leaveRequest.findMany).mockResolvedValue(
         hasPendingRequest ? [{ employeeId: 10 }] as never : [],
@@ -44,6 +47,7 @@ function buildEmployee(id: number, managerId: number | null = 15) {
         id,
         firstName: `Employee ${id}`,
         lastName: "Test",
+        nickname: null,
         managerId,
     };
 }
@@ -251,6 +255,7 @@ describe("assignLeaveApprovers", () => {
             id: 10,
             firstName: "สมชาย",
             lastName: "ใจดี",
+            nickname: "ชาย",
             managerId: 15,
         };
         const previousApprover = {
@@ -258,12 +263,14 @@ describe("assignLeaveApprovers", () => {
             id: 15,
             firstName: "วิชัย",
             lastName: "ใจดี",
+            nickname: "ชัย",
         };
         const newApprover = {
             ...buildApprover(),
             id: 20,
             firstName: "สุชาติ",
             lastName: "ใจดี",
+            nickname: "ชาติ",
         };
         mockAssignmentLookup({
             employees: [employee],
@@ -283,7 +290,7 @@ describe("assignLeaveApprovers", () => {
             entityId: 10,
             details,
         }).summary).toBe(
-            "เปลี่ยนผู้อนุมัติการลาของ สมชาย ใจดี: วิชัย ใจดี → สุชาติ ใจดี",
+            "เปลี่ยนผู้อนุมัติการลาของ สมชาย ใจดี (ชาย): วิชัย ใจดี (ชัย) → สุชาติ ใจดี (ชาติ)",
         );
     });
 

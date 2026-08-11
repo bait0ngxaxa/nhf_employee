@@ -7,6 +7,7 @@ export const USER_WITH_EMPLOYEE_SELECT = {
         select: {
             firstName: true,
             lastName: true,
+            nickname: true,
             dept: {
                 select: {
                     name: true,
@@ -25,6 +26,7 @@ export const ASSIGNED_USER_SELECT = {
         select: {
             firstName: true,
             lastName: true,
+            nickname: true,
         },
     },
 } as const;
@@ -39,6 +41,7 @@ export const COMMENT_AUTHOR_SELECT = {
         select: {
             firstName: true,
             lastName: true,
+            nickname: true,
         },
     },
 } as const;

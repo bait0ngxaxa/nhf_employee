@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import useSWR from "swr";
 import { toast } from "sonner";
+import { getEmployeeDisplayName } from "@/lib/helpers/employee-helpers";
 import {
     fetchApproverEmployees,
     saveApproverAssignments,
@@ -11,12 +12,6 @@ const NO_APPROVER_VALUE = "";
 const APPROVER_SAVE_SUCCESS_MESSAGE = "บันทึกการกำหนดผู้อนุมัติเรียบร้อยแล้ว";
 const APPROVER_SAVE_ERROR_MESSAGE = "บันทึกไม่สำเร็จ กรุณาลองใหม่อีกครั้ง";
 const APPROVER_ITEMS_PER_PAGE = 25;
-
-const formatName = (employee: {
-    firstName: string;
-    lastName: string;
-    nickname: string | null;
-}): string => `${employee.firstName} ${employee.lastName}${employee.nickname ? ` (${employee.nickname})` : ""}`;
 
 export function useApproverManagementModel() {
     const { data, error: fetchError, isLoading, mutate } = useSWR<ApproverEmployeeItem[]>(
@@ -53,7 +48,7 @@ export function useApproverManagementModel() {
         return employees.filter((employee) => {
             const matchSearch =
                 query === "" ||
-                formatName(employee).toLowerCase().includes(query) ||
+                getEmployeeDisplayName(employee).toLowerCase().includes(query) ||
                 employee.email.toLowerCase().includes(query) ||
                 (employee.dept?.name ?? "").toLowerCase().includes(query);
 
@@ -175,6 +170,6 @@ export function useApproverManagementModel() {
         handleAssign,
         getManagerId,
         handleSave,
-        formatName,
+        formatName: getEmployeeDisplayName,
     };
 }

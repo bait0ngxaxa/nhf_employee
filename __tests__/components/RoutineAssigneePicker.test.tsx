@@ -20,6 +20,23 @@ function employee(overrides: Partial<RoutineEmployee> = {}): RoutineEmployee {
 }
 
 describe("RoutineAssigneePicker notification readiness", () => {
+    it("finds and identifies an employee by nickname", () => {
+        render(
+            <RoutineAssigneePicker
+                employees={[employee({ nickname: "ชาย" })]}
+                assignees={{}}
+                onToggle={vi.fn()}
+                onRoleChange={vi.fn()}
+            />,
+        );
+
+        fireEvent.change(screen.getByLabelText("ค้นหาพนักงาน"), {
+            target: { value: "ชาย" },
+        });
+
+        expect(screen.getByLabelText("เลือก สมชาย ใจดี (ชาย)")).toBeEnabled();
+    });
+
     it("keeps an active employee without a User selectable and shows the warning in search and selection", () => {
         const onToggle = vi.fn();
         const employees = [employee({ notificationReady: false })];

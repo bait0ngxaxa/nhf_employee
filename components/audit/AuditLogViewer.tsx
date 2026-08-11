@@ -31,6 +31,7 @@ import {
     type AuditLogDisplay,
 } from "@/lib/audit-log/display";
 import { formatThaiDateTime } from "@/lib/helpers/date-helpers";
+import { getEmployeeBackedUserDisplayName } from "@/lib/helpers/employee-helpers";
 import { AuditActionBadge } from "./AuditActionBadge";
 import { AuditLogViewerSkeleton } from "./AuditLogSkeletons";
 
@@ -96,7 +97,9 @@ function AuditLogMobileCard({
                     </dt>
                     <dd className="mt-1 min-w-0 text-sm text-content-neutral-primary [overflow-wrap:anywhere]">
                         <span className="font-medium">
-                            {log.user?.name || "-"}
+                            {log.user
+                                ? getEmployeeBackedUserDisplayName(log.user, "-")
+                                : "-"}
                         </span>
                         <span className="mt-0.5 block text-xs text-content-neutral-secondary [overflow-wrap:anywhere]">
                             {log.userEmail || "-"}
@@ -330,7 +333,9 @@ export function AuditLogViewer({ className }: AuditLogViewerProps) {
                                             </td>
                                             <td className="px-4 py-3 text-sm align-top">
                                                 <div className="font-medium text-content-neutral-primary">
-                                                    {log.user?.name || "-"}
+                                                    {log.user
+                                                        ? getEmployeeBackedUserDisplayName(log.user, "-")
+                                                        : "-"}
                                                 </div>
                                                 <div className="text-content-neutral-secondary text-xs">
                                                     {log.userEmail || "-"}

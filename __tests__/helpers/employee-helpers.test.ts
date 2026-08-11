@@ -1,5 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
+    getEmployeeBackedUserDisplayName,
+    getEmployeeDisplayName,
     getEmployeeFullName,
     getEmployeeEmailStatus,
     formatEmployeePhone,
@@ -14,6 +16,54 @@ describe("Employee Helpers", () => {
 
         it("should trim whitespace", () => {
             expect(getEmployeeFullName(" John", "Doe ")).toBe("John Doe");
+        });
+    });
+
+    describe("getEmployeeDisplayName", () => {
+        it("includes a normalized nickname", () => {
+            expect(getEmployeeDisplayName({
+                firstName: "  สมชาย ",
+                lastName: " ใจดี  ",
+                nickname: " ชาย ",
+            })).toBe("สมชาย ใจดี (ชาย)");
+        });
+
+        it.each([null, undefined, "", "   "])(
+            "omits empty nickname parentheses for %s",
+            (nickname) => {
+                expect(getEmployeeDisplayName({
+                    firstName: "สมชาย",
+                    lastName: "ใจดี",
+                    nickname,
+                })).toBe("สมชาย ใจดี");
+            },
+        );
+    });
+
+    describe("getEmployeeBackedUserDisplayName", () => {
+        it("prefers canonical Employee identity", () => {
+            expect(getEmployeeBackedUserDisplayName({
+                name: "ชื่อเดิม",
+                email: "employee@example.com",
+                employee: {
+                    firstName: "สมชาย",
+                    lastName: "ใจดี",
+                    nickname: "ชาย",
+                },
+            })).toBe("สมชาย ใจดี (ชาย)");
+        });
+
+        it("falls back through user name and email", () => {
+            expect(getEmployeeBackedUserDisplayName({
+                name: " ผู้ดูแลระบบ ",
+                email: "admin@example.com",
+                employee: null,
+            })).toBe("ผู้ดูแลระบบ");
+            expect(getEmployeeBackedUserDisplayName({
+                name: " ",
+                email: " admin@example.com ",
+                employee: null,
+            })).toBe("admin@example.com");
         });
     });
 

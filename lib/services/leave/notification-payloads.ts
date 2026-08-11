@@ -1,4 +1,5 @@
 import * as z from "zod";
+import { getEmployeeDisplayName } from "@/lib/helpers/employee-helpers";
 
 const dateStringSchema = z
     .string()
@@ -115,6 +116,7 @@ type EmployeeSnapshotSource = {
     id: number;
     firstName: string;
     lastName: string;
+    nickname?: string | null;
     email: string;
     user?: { id: number } | null;
 };
@@ -123,13 +125,6 @@ type ConfiguredApproverSource = Omit<EmployeeSnapshotSource, "user"> & {
     user?: { id: number; email: string } | null;
 };
 
-export function formatEmployeeName(employee: {
-    firstName: string;
-    lastName: string;
-}): string {
-    return `${employee.firstName} ${employee.lastName}`.trim();
-}
-
 export function buildLeaveRecipientSnapshot(
     employee: EmployeeSnapshotSource,
 ): LeaveNotificationRecipient {
@@ -137,7 +132,7 @@ export function buildLeaveRecipientSnapshot(
         employeeId: employee.id,
         userId: employee.user?.id ?? null,
         email: employee.email,
-        name: formatEmployeeName(employee),
+        name: getEmployeeDisplayName(employee),
     };
 }
 
@@ -152,7 +147,7 @@ export function buildConfiguredApproverSnapshot(
         employeeId: employee.id,
         userId: employee.user.id,
         email: employee.user.email,
-        name: formatEmployeeName(employee),
+        name: getEmployeeDisplayName(employee),
     };
 }
 

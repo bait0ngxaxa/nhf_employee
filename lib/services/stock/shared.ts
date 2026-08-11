@@ -349,9 +349,48 @@ export async function cleanupUnusedUploadUrls(
 
 export function buildRequestInclude() {
     return {
-        requester: { select: { id: true, name: true, email: true } },
-        issuer: { select: { id: true, name: true } },
-        canceller: { select: { id: true, name: true } },
+        requester: {
+            select: {
+                id: true,
+                name: true,
+                email: true,
+                employee: {
+                    select: {
+                        firstName: true,
+                        lastName: true,
+                        nickname: true,
+                    },
+                },
+            },
+        },
+        issuer: {
+            select: {
+                id: true,
+                name: true,
+                email: true,
+                employee: {
+                    select: {
+                        firstName: true,
+                        lastName: true,
+                        nickname: true,
+                    },
+                },
+            },
+        },
+        canceller: {
+            select: {
+                id: true,
+                name: true,
+                email: true,
+                employee: {
+                    select: {
+                        firstName: true,
+                        lastName: true,
+                        nickname: true,
+                    },
+                },
+            },
+        },
         items: {
             include: {
                 item: {

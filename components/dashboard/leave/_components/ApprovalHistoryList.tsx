@@ -2,6 +2,7 @@ import { Clock } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import type { PendingLeave } from "@/hooks/useLeaveApprovals";
 import { formatThaiDateTimeWithTimeWord } from "@/lib/helpers/date-helpers";
+import { getEmployeeDisplayName } from "@/lib/helpers/employee-helpers";
 import { LeaveAttachmentViewerButton } from "./LeaveAttachmentViewerButton";
 import { LeaveStatusBadge } from "./LeaveStatusBadge";
 
@@ -36,7 +37,7 @@ export function ApprovalHistoryList({ history }: ApprovalHistoryListProps) {
                 >
                     <div className="min-w-0">
                         <p className="break-words text-sm font-medium text-content-heading">
-                            {leave.employee.firstName} {leave.employee.lastName}
+                            {getEmployeeDisplayName(leave.employee)}
                             <span className="ml-2 font-normal text-content-secondary">
                                 ยื่นคำขอลา{leaveShortLabel(leave.leaveType)}
                             </span>

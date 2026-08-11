@@ -9,6 +9,7 @@ import {
     CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { getEmployeeDisplayName } from "@/lib/helpers/employee-helpers";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
     formatEmployeePhone,
@@ -87,7 +88,7 @@ export function PreviewStep({
                                         {employee.sourceRow ?? index + 1}
                                     </td>
                                     <td className="max-w-56 px-4 py-4 text-sm font-medium text-content-neutral-primary [overflow-wrap:anywhere]">
-                                        {`${employee.firstName} ${employee.lastName}`.trim() || "-"}
+                                        {getEmployeeDisplayName(employee) || "-"}
                                     </td>
                                     <td className="max-w-64 px-4 py-4 text-sm text-content-neutral-secondary [overflow-wrap:anywhere]">
                                         {employee.email || "-"}
@@ -107,9 +108,9 @@ export function PreviewStep({
                                         {formatEmployeePhone(employee.phone)}
                                     </td>
                                     <td className="max-w-44 px-4 py-4 text-sm text-content-neutral-secondary">
-                                        {employee.nickname ? (
+                                        {employee.nickname?.trim() ? (
                                             <Badge variant="secondary" className="max-w-full border border-violet-200/60 bg-violet-50 px-2.5 font-medium text-violet-700 hover:bg-violet-100 [overflow-wrap:anywhere]">
-                                                {employee.nickname}
+                                                {employee.nickname.trim()}
                                             </Badge>
                                         ) : (
                                             "-"

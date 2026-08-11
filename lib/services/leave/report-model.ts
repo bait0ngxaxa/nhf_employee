@@ -1,6 +1,7 @@
 import type { LeaveStatus, LeaveType } from "@prisma/client";
 
 import { ALL_LEAVE_TYPES, DEFAULT_LEAVE_QUOTAS } from "@/constants/leave";
+import { getEmployeeDisplayName } from "@/lib/helpers/employee-helpers";
 import {
     LEAVE_PERIOD_TH,
     LEAVE_STATUS_TH,
@@ -36,7 +37,7 @@ function buildSummaryRow(employee: LeaveReportEmployee): LeaveSummaryRow {
     const totalQuota = sumLeaveTypeTotals(quotas);
 
     return {
-        employeeName: formatEmployeeName(employee),
+        employeeName: getEmployeeDisplayName(employee),
         department: employee.dept?.name ?? "-",
         position: employee.position,
         sickQuota: quotas.SICK,
@@ -63,7 +64,7 @@ function buildSummaryRow(employee: LeaveReportEmployee): LeaveSummaryRow {
 function buildDetailRows(employee: LeaveReportEmployee): LeaveDetailRow[] {
     const sortedRequests = [...employee.leaveRequests].sort(compareRequests);
     return sortedRequests.map((request) => ({
-        employeeName: formatEmployeeName(employee),
+        employeeName: getEmployeeDisplayName(employee),
         department: employee.dept?.name ?? "-",
         position: employee.position,
         leaveType: LEAVE_TYPE_TH[request.leaveType] ?? request.leaveType,
@@ -236,11 +237,4 @@ function compareRequests(left: LeaveReportRequest, right: LeaveReportRequest): n
 
 function compareText(left: string | null | undefined, right: string | null | undefined): number {
     return (left ?? "").localeCompare(right ?? "", "th");
-}
-
-function formatEmployeeName(
-    employee: Pick<LeaveReportEmployee, "firstName" | "lastName" | "nickname">,
-): string {
-    const nickname = employee.nickname ? ` (${employee.nickname})` : "";
-    return `${employee.firstName} ${employee.lastName}${nickname}`;
 }

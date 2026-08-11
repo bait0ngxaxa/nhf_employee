@@ -1,5 +1,6 @@
 import { CheckCircle } from "lucide-react";
 import type { StockRequest } from "../context/stock/types";
+import { getEmployeeBackedUserDisplayName } from "@/lib/helpers/employee-helpers";
 import { formatStockRequestDate } from "./stockRequest.shared";
 
 /**
@@ -15,7 +16,9 @@ export function StockRequestNote({ request }: { request: StockRequest }) {
                 <CheckCircle className="mt-px h-3.5 w-3.5 shrink-0 text-emerald-500" aria-hidden="true" />
                 <p className="text-xs text-emerald-800">
                     <span className="font-semibold">จ่ายโดย: </span>
-                    {request.issuer?.name ?? "-"}
+                    {request.issuer
+                        ? getEmployeeBackedUserDisplayName(request.issuer, "-")
+                        : "-"}
                     <br />
                     <span className="font-semibold">เมื่อ: </span>
                     {formatStockRequestDate(request.issuedAt)}

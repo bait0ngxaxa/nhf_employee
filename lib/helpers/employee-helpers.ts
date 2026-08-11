@@ -34,14 +34,40 @@ export function isEmployeeSuspended(status: string): boolean {
 }
 
 export function getEmployeeFullName(firstName: string, lastName: string): string {
-  return `${firstName} ${lastName}`.trim();
+  return [firstName.trim(), lastName.trim()].filter(Boolean).join(' ');
 }
 
-export function getEmployeeDisplayName(employee: { firstName: string; lastName: string; nickname?: string }): string {
-  if (employee.nickname) {
-    return `${employee.firstName} ${employee.lastName} (${employee.nickname})`;
-  }
-  return `${employee.firstName} ${employee.lastName}`;
+export interface EmployeeDisplayNameSource {
+  firstName: string;
+  lastName: string;
+  nickname?: string | null;
+}
+
+export interface EmployeeBackedUserDisplayNameSource {
+  name?: string | null;
+  email?: string | null;
+  employee?: EmployeeDisplayNameSource | null;
+}
+
+export function getEmployeeDisplayName(employee: EmployeeDisplayNameSource): string {
+  const fullName = getEmployeeFullName(employee.firstName, employee.lastName);
+  const nickname = employee.nickname?.trim();
+
+  if (!nickname) return fullName;
+  return fullName ? `${fullName} (${nickname})` : nickname;
+}
+
+export function getEmployeeBackedUserDisplayName(
+  user: EmployeeBackedUserDisplayNameSource,
+  fallback = 'ไม่ระบุชื่อ',
+): string {
+  const employeeName = user.employee
+    && typeof user.employee.firstName === 'string'
+    && typeof user.employee.lastName === 'string'
+    ? getEmployeeDisplayName(user.employee)
+    : '';
+
+  return employeeName || user.name?.trim() || user.email?.trim() || fallback;
 }
 
 export function getEmployeeInitials(firstName: string, lastName: string): string {

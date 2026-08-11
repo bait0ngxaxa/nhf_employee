@@ -16,6 +16,10 @@ import {
 } from "@/lib/line/routine-links";
 import { runSerializableTransaction } from "@/lib/db/transaction";
 import {
+    getEmployeeBackedUserDisplayName,
+    type EmployeeDisplayNameSource,
+} from "@/lib/helpers/employee-helpers";
+import {
     createInAppNotificationOnce,
 } from "@/lib/services/notifications/in-app";
 import { APP_DASHBOARD_TABS, APP_ROUTES } from "@/lib/ssot/routes";
@@ -74,6 +78,9 @@ const ROUTINE_REMINDER_OCCURRENCE_SELECT = {
         select: {
             employee: {
                 select: {
+                    firstName: true,
+                    lastName: true,
+                    nickname: true,
                     status: true,
                     deletedAt: true,
                     user: {
@@ -208,12 +215,15 @@ async function resolveRoutineRecipients(
         id: number;
         email: string;
         name: string;
-    }, isAssignee: boolean): void => {
+    }, isAssignee: boolean, employee?: EmployeeDisplayNameSource | null): void => {
         const existing = recipients.get(user.id);
         recipients.set(user.id, {
             userId: user.id,
             email: user.email,
-            name: user.name.trim() || "ผู้รับการแจ้งเตือน",
+            name: getEmployeeBackedUserDisplayName(
+                { ...user, employee },
+                "ผู้รับการแจ้งเตือน",
+            ),
             isAssignee: existing?.isAssignee ?? isAssignee,
         });
     };
@@ -223,15 +233,26 @@ async function resolveRoutineRecipients(
             if (!isActiveEmployee(employee) || !employee.user || !isActiveUser(employee.user)) {
                 return;
             }
-            addRecipient(employee.user, true);
+            addRecipient(employee.user, true, employee);
         });
     }
     if (scope === "ADMINS" || scope === "ASSIGNEES_AND_ADMINS") {
         const admins = await tx.user.findMany({
             where: { role: Role.ADMIN, isActive: true, deletedAt: null },
-            select: { id: true, email: true, name: true },
+            select: {
+                id: true,
+                email: true,
+                name: true,
+                employee: {
+                    select: {
+                        firstName: true,
+                        lastName: true,
+                        nickname: true,
+                    },
+                },
+            },
         });
-        admins.forEach((admin) => addRecipient(admin, false));
+        admins.forEach((admin) => addRecipient(admin, false, admin.employee));
     }
 
     const activeRecipients = [...recipients.values()];

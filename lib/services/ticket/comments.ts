@@ -6,6 +6,7 @@ import {
     runSerializableTransaction,
 } from "@/lib/db/transaction";
 import { isAdminRole } from "@/lib/ssot/permissions";
+import { getEmployeeBackedUserDisplayName } from "@/lib/helpers/employee-helpers";
 import type { CreateTicketCommentInput } from "@/lib/validations/ticket";
 import { createTicketAudit } from "./audit";
 import {
@@ -29,6 +30,7 @@ const COMMENT_INCLUDE = {
                 select: {
                     firstName: true,
                     lastName: true,
+                    nickname: true,
                 },
             },
         },
@@ -102,10 +104,7 @@ async function findReplayedComment(
 }
 
 function getCommentAuthorName(comment: TicketCommentWithAuthor): string {
-    const employee = comment.author.employee;
-    return employee?.firstName && employee.lastName
-        ? `${employee.firstName} ${employee.lastName}`
-        : comment.author.name;
+    return getEmployeeBackedUserDisplayName(comment.author);
 }
 
 async function persistCommentSideEffects(

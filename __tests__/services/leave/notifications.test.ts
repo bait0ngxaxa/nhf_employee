@@ -16,6 +16,11 @@ import type {
     LeaveNotTakenConfirmedPayload,
     LeaveResultPayload,
 } from "@/lib/services/leave/notification-payloads";
+import {
+    buildConfiguredApproverSnapshot,
+    buildLeaveRecipientSnapshot,
+    parseLeaveActionPayload,
+} from "@/lib/services/leave/notification-payloads";
 
 vi.mock("@/lib/db/prisma", () => ({
     prisma: mockDeep<PrismaClient>(),
@@ -111,6 +116,34 @@ describe("leave notification delivery", () => {
         vi.mocked(emailService.sendLeaveResultNotification).mockResolvedValue(true);
         vi.mocked(emailService.sendLeaveCancelledAfterApprovalNotification).mockResolvedValue(true);
         vi.mocked(emailService.sendLeaveNotTakenConfirmedNotification).mockResolvedValue(true);
+    });
+
+    it("builds canonical employee and approver name snapshots", () => {
+        const employee = buildLeaveRecipientSnapshot({
+            id: 10,
+            firstName: "สมชาย",
+            lastName: "ใจดี",
+            nickname: "ชาย",
+            email: "employee@example.com",
+            user: { id: 1 },
+        });
+        const approver = buildConfiguredApproverSnapshot({
+            id: 20,
+            firstName: "สมหญิง",
+            lastName: "ใจดี",
+            nickname: "หญิง",
+            email: "manager@example.com",
+            user: { id: 2, email: "manager@example.com" },
+        });
+
+        expect(employee.name).toBe("สมชาย ใจดี (ชาย)");
+        expect(approver.name).toBe("สมหญิง ใจดี (หญิง)");
+    });
+
+    it("continues to parse legacy leave outbox name snapshots", () => {
+        expect(parseLeaveActionPayload(buildActionPayload())).toEqual(
+            buildActionPayload(),
+        );
     });
 
     it("still creates in-app emergency leave notification when action email delivery fails", async () => {

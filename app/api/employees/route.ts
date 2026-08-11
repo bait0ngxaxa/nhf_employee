@@ -6,6 +6,7 @@ import {
 } from "@/lib/validations/employee";
 import { logEmployeeEvent } from "@/lib/server/audit";
 import { employeeService, type EmployeeFilters } from "@/lib/services/employee";
+import { getEmployeeDisplayName } from "@/lib/helpers/employee-helpers";
 import { operationFailed } from "@/lib/ssot/http";
 import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
 
@@ -102,9 +103,13 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
                     after: {
                         firstName: employee.firstName,
                         lastName: employee.lastName,
+                        nickname: employee.nickname,
                         email: employee.email,
                         position: employee.position,
                         departmentId: employee.departmentId,
+                    },
+                    metadata: {
+                        employeeName: getEmployeeDisplayName(employee),
                     },
                 },
             );

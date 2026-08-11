@@ -6,6 +6,10 @@ import {
     runSerializableTransaction,
 } from "@/lib/db/transaction";
 import { lockEmployeeRows, lockUserRows } from "@/lib/db/row-locks";
+import {
+    getEmployeeDisplayName,
+    getEmployeeFullName,
+} from "@/lib/helpers/employee-helpers";
 import { EMPLOYEE_WITH_RELATIONS_INCLUDE } from "./constants";
 import type {
     CreateEmployeeData,
@@ -32,6 +36,7 @@ type LifecycleEmployee = {
     id: number;
     firstName: string;
     lastName: string;
+    nickname: string | null;
     email: string;
     status: EmployeeStatus;
     deletedAt: Date | null;
@@ -49,6 +54,7 @@ type EmployeeSummary = {
     id: number;
     firstName: string;
     lastName: string;
+    nickname: string | null;
 };
 
 type PendingApprovalSummary = {
@@ -88,14 +94,14 @@ const EMPLOYEE_LIFECYCLE_MESSAGES = {
         if (subordinates.length > 0) {
             details.push(
                 `ผู้ใต้บังคับบัญชาที่ต้องกำหนดผู้จัดการใหม่: ${subordinates
-                    .map((employee) => `${employee.id} (${formatEmployeeName(employee)})`)
+                    .map((employee) => `${employee.id} (${getEmployeeDisplayName(employee)})`)
                     .join(", ")}`,
             );
         }
         if (leaveDependencies.length > 0) {
             details.push(
                 `คำขอลาที่ต้องจัดการก่อนปิดใช้งาน: ${leaveDependencies
-                    .map((request) => `${request.id} (${formatEmployeeName(request.employee)})`)
+                    .map((request) => `${request.id} (${getEmployeeDisplayName(request.employee)})`)
                     .join(", ")}`,
             );
         }
@@ -112,6 +118,7 @@ const LIFECYCLE_EMPLOYEE_SELECT = {
     id: true,
     firstName: true,
     lastName: true,
+    nickname: true,
     email: true,
     status: true,
     deletedAt: true,
@@ -127,14 +134,11 @@ const LIFECYCLE_EMPLOYEE_SELECT = {
     },
 } as const satisfies Prisma.EmployeeSelect;
 
-function formatEmployeeName(employee: EmployeeSummary): string {
-    return `${employee.firstName} ${employee.lastName}`.trim();
-}
-
 function buildLifecycleBeforeData(employee: LifecycleEmployee): Record<string, unknown> {
     return {
         firstName: employee.firstName,
         lastName: employee.lastName,
+        nickname: employee.nickname,
         email: employee.email,
         status: employee.status,
         deletedAt: employee.deletedAt,
@@ -264,7 +268,7 @@ async function assertCanDeactivateEmployee(
     const [subordinates, leaveDependencies] = await Promise.all([
         tx.employee.findMany({
             where: { managerId: employee.id, deletedAt: null },
-            select: { id: true, firstName: true, lastName: true },
+            select: { id: true, firstName: true, lastName: true, nickname: true },
             orderBy: { id: "asc" },
         }),
         tx.leaveRequest.findMany({
@@ -283,7 +287,14 @@ async function assertCanDeactivateEmployee(
             },
             select: {
                 id: true,
-                employee: { select: { id: true, firstName: true, lastName: true } },
+                employee: {
+                    select: {
+                        id: true,
+                        firstName: true,
+                        lastName: true,
+                        nickname: true,
+                    },
+                },
             },
             orderBy: { id: "asc" },
         }),
@@ -308,6 +319,7 @@ async function writeLifecycleAudit(
     actor: EmployeeLifecycleActor,
     beforeData: Record<string, unknown>,
     afterData: Record<string, unknown>,
+    employeeName: string,
 ): Promise<void> {
     await tx.auditLog.create({
         data: {
@@ -316,7 +328,11 @@ async function writeLifecycleAudit(
             entityId: employeeId,
             userId: actor.userId,
             userEmail: actor.email,
-            details: JSON.stringify({ before: beforeData, after: afterData }),
+            details: JSON.stringify({
+                before: beforeData,
+                after: afterData,
+                metadata: { employeeName },
+            }),
         },
     });
 }
@@ -429,6 +445,7 @@ async function runEmployeeLifecycle(
                     userId: lockedEmployee.user?.id ?? null,
                     userIsActive: isDeactivation(operation) ? false : true,
                 },
+                getEmployeeDisplayName(lockedEmployee),
             );
             const committedEmployee = await findCommittedEmployee(
                 tx,
@@ -548,7 +565,7 @@ async function prepareEmployeeUpdate(
     if (data.firstName !== undefined || data.lastName !== undefined) {
         const nextFirstName = data.firstName?.trim() || employee.firstName;
         const nextLastName = data.lastName?.trim() || employee.lastName;
-        const nextName = `${nextFirstName} ${nextLastName}`.trim();
+        const nextName = getEmployeeFullName(nextFirstName, nextLastName);
 
         if (employee.user && employee.user.name !== nextName) {
             userIdentityData.name = nextName;

@@ -418,5 +418,38 @@ describe("Stock Queries", () => {
                 }),
             );
         });
+
+        it("searches requester nickname without widening request scope", async () => {
+            prismaMock.stockRequest.findMany.mockResolvedValue(asNever([]));
+            prismaMock.stockRequest.count.mockResolvedValue(asNever(0));
+
+            await getRequests(
+                { search: "ชาย", page: 1, limit: 10 },
+                7,
+                false,
+                "mine",
+            );
+
+            expect(prismaMock.stockRequest.findMany).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    where: expect.objectContaining({
+                        requestedBy: 7,
+                        OR: expect.arrayContaining([
+                            {
+                                requester: {
+                                    employee: {
+                                        is: {
+                                            OR: expect.arrayContaining([
+                                                { nickname: { contains: "ชาย" } },
+                                            ]),
+                                        },
+                                    },
+                                },
+                            },
+                        ]),
+                    }),
+                }),
+            );
+        });
     });
 });
