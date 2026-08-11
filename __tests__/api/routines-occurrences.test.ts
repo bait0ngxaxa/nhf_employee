@@ -43,12 +43,20 @@ describe("GET /api/routines/occurrences", () => {
 
     it("passes the authenticated employee context to the query service", async () => {
         const response = await GET(new NextRequest(
-            "http://localhost/api/routines/occurrences?scope=all&assigneeId=999&taskId=71&occurrenceId=91&timingStatus=DUE_SOON&limit=20",
+            "http://localhost/api/routines/occurrences?scope=all&assigneeId=999&taskId=71&occurrenceId=91&timingStatus=DUE_SOON&unitId=3&categoryId=5&limit=20",
         ));
 
         expect(response.status).toBe(200);
         expect(mocks.getOccurrences).toHaveBeenCalledWith(
-            expect.objectContaining({ scope: "all", assigneeId: 999, taskId: 71, occurrenceId: 91, timingStatus: "DUE_SOON" }),
+            expect.objectContaining({
+                scope: "all",
+                assigneeId: 999,
+                taskId: 71,
+                occurrenceId: 91,
+                timingStatus: "DUE_SOON",
+                unitId: 3,
+                categoryId: 5,
+            }),
             expect.objectContaining({
                 employeeId: 21,
                 actor: expect.objectContaining({ id: 5, role: "USER" }),
@@ -82,12 +90,12 @@ describe("GET /api/routines/occurrences", () => {
 
     it("supports the task-centric operational view with one row per task", async () => {
         const response = await GET(new NextRequest(
-            "http://localhost/api/routines/occurrences?view=tasks&scope=all",
+            "http://localhost/api/routines/occurrences?view=tasks&scope=all&unitId=3&categoryId=5",
         ));
 
         expect(response.status).toBe(200);
         expect(mocks.getTaskWorkItems).toHaveBeenCalledWith(
-            expect.objectContaining({ scope: "all" }),
+            expect.objectContaining({ scope: "all", unitId: 3, categoryId: 5 }),
             expect.objectContaining({ employeeId: 21 }),
         );
         expect(mocks.getOccurrences).not.toHaveBeenCalled();

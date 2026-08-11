@@ -23,6 +23,7 @@ import { RoutineOccurrenceList } from "../routine/RoutineOccurrenceList";
 import { RoutineTaskForm } from "../routine/RoutineTaskForm";
 import { RoutineTaskList } from "../routine/RoutineTaskList";
 import { RoutineImportPanel } from "../routine/RoutineImportPanel";
+import { formatRoutineUnitLabel, uniqueRoutineUnits } from "../routine/labels";
 import type {
     PaginatedRoutineTaskWorkItemsResponse,
     PaginatedTasksResponse,
@@ -58,10 +59,16 @@ function RoutineOccurrencePanel({
 }) {
     const [searchInput, setSearchInput] = useState("");
     const debouncedSearch = useDebouncedValue(searchInput);
+    const [unitId, setUnitId] = useState("");
+    const [categoryId, setCategoryId] = useState("");
     const [timingStatus, setTimingStatus] = useState<RoutineTimingStatus | "">("");
     const [page, setPage] = useState(1);
     const [editingTaskId, setEditingTaskId] = useState<number | null>(null);
     const searchInputId = useId();
+    const unitFilterId = useId();
+    const categoryFilterId = useId();
+    const timingFilterId = useId();
+    const referenceErrorId = useId();
     const scope = isAdmin ? "all" : "mine";
     const key = useMemo(() => {
         const params = new URLSearchParams({
@@ -74,15 +81,21 @@ function RoutineOccurrencePanel({
         if (occurrenceId !== null) params.set("occurrenceId", String(occurrenceId));
         if (debouncedSearch.trim()) params.set("search", debouncedSearch.trim());
         if (timingStatus) params.set("timingStatus", timingStatus);
+        if (unitId) params.set("unitId", unitId);
+        if (categoryId) params.set("categoryId", categoryId);
         return `${API_ROUTES.routines.occurrences}?${params.toString()}`;
-    }, [debouncedSearch, occurrenceId, page, scope, taskId, timingStatus]);
+    }, [categoryId, debouncedSearch, occurrenceId, page, scope, taskId, timingStatus, unitId]);
     const { data, error, isLoading, mutate } = useSWR<PaginatedRoutineTaskWorkItemsResponse, Error>(
         key,
         fetchRoutine,
         { keepPreviousData: true },
     );
-    const { data: reference, error: referenceError } = useSWR<RoutineReferenceData, Error>(
-        isAdmin ? API_ROUTES.routines.reference : null,
+    const {
+        data: reference,
+        error: referenceError,
+        mutate: mutateReference,
+    } = useSWR<RoutineReferenceData, Error>(
+        API_ROUTES.routines.reference,
         fetchRoutine,
     );
     const {
@@ -99,7 +112,9 @@ function RoutineOccurrencePanel({
 
     useEffect(() => {
         setPage(1);
-    }, [debouncedSearch, timingStatus, isAdmin, occurrenceId, taskId]);
+    }, [categoryId, debouncedSearch, occurrenceId, scope, taskId, timingStatus, unitId]);
+
+    const filterUnits = uniqueRoutineUnits(reference?.units ?? []);
 
     if (editingTaskId !== null) {
         if (referenceError) {
@@ -146,8 +161,8 @@ function RoutineOccurrencePanel({
                 <h2 className="text-xl font-semibold tracking-tight text-brand-strong">ติดตามรายการตามกำหนด</h2>
                 <p className="max-w-prose text-sm leading-6 text-content-secondary">ค้นหารายการ ตรวจสถานะ และปรับเฉพาะรอบที่ต้องการได้จากหน้านี้</p>
             </div>
-            <div className="grid gap-4 rounded-xl border border-brand-border/70 bg-transparent p-4 sm:p-5 md:grid-cols-[minmax(0,1fr)_220px_auto] md:items-end">
-                <div className="grid gap-1 text-sm font-medium text-brand-strong">
+            <div className="grid gap-4 rounded-xl border border-brand-border/70 bg-transparent p-4 sm:grid-cols-2 sm:p-5 xl:grid-cols-[minmax(16rem,1fr)_minmax(10rem,0.45fr)_minmax(10rem,0.45fr)_minmax(10rem,0.4fr)_auto] xl:items-end">
+                <div className="grid min-w-0 gap-1 text-sm font-medium text-brand-strong sm:col-span-2 xl:col-span-1">
                     <label htmlFor={searchInputId}>ค้นหารายการ</label>
                     <div className="relative">
                         <Input
@@ -178,8 +193,59 @@ function RoutineOccurrencePanel({
                         ) : null}
                     </div>
                 </div>
-                <label className="grid gap-1 text-sm font-medium text-brand-strong">ช่วงเวลา
-                    <select className="h-11 rounded-md border border-brand-border bg-surface-raised px-3 text-sm focus-visible:border-brand-solid focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-solid/40" value={timingStatus} onChange={(event) => setTimingStatus(event.target.value as RoutineTimingStatus | "")}>
+                <label className="grid min-w-0 gap-1 text-sm font-medium text-brand-strong" htmlFor={unitFilterId}>
+                    หน่วยงาน
+                    <select
+                        id={unitFilterId}
+                        aria-describedby={referenceError ? referenceErrorId : undefined}
+                        className="h-11 min-w-0 rounded-md border border-brand-border bg-surface-raised px-3 text-sm focus-visible:border-brand-solid focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-solid/40 disabled:cursor-not-allowed disabled:opacity-50"
+                        value={unitId}
+                        disabled={!reference}
+                        onChange={(event) => {
+                            setUnitId(event.target.value);
+                            setPage(1);
+                        }}
+                    >
+                        <option value="">ทุกหน่วยงาน</option>
+                        {filterUnits.map((unit) => (
+                            <option key={unit.id} value={unit.id}>
+                                {formatRoutineUnitLabel(unit)}
+                            </option>
+                        ))}
+                    </select>
+                </label>
+                <label className="grid min-w-0 gap-1 text-sm font-medium text-brand-strong" htmlFor={categoryFilterId}>
+                    หมวดหมู่งาน
+                    <select
+                        id={categoryFilterId}
+                        aria-describedby={referenceError ? referenceErrorId : undefined}
+                        className="h-11 min-w-0 rounded-md border border-brand-border bg-surface-raised px-3 text-sm focus-visible:border-brand-solid focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-solid/40 disabled:cursor-not-allowed disabled:opacity-50"
+                        value={categoryId}
+                        disabled={!reference}
+                        onChange={(event) => {
+                            setCategoryId(event.target.value);
+                            setPage(1);
+                        }}
+                    >
+                        <option value="">ทุกหมวดหมู่</option>
+                        {reference?.categories.map((category) => (
+                            <option key={category.id} value={category.id}>
+                                {category.name}
+                            </option>
+                        ))}
+                    </select>
+                </label>
+                <label className="grid min-w-0 gap-1 text-sm font-medium text-brand-strong" htmlFor={timingFilterId}>
+                    ช่วงเวลา
+                    <select
+                        id={timingFilterId}
+                        className="h-11 min-w-0 rounded-md border border-brand-border bg-surface-raised px-3 text-sm focus-visible:border-brand-solid focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-solid/40"
+                        value={timingStatus}
+                        onChange={(event) => {
+                            setTimingStatus(event.target.value as RoutineTimingStatus | "");
+                            setPage(1);
+                        }}
+                    >
                         <option value="">ทุกช่วงเวลา</option>
                         <option value="OVERDUE">เกินกำหนด</option>
                         <option value="DUE_TODAY">ถึงกำหนดวันนี้</option>
@@ -187,8 +253,16 @@ function RoutineOccurrencePanel({
                         <option value="UPCOMING">ยังไม่ถึงกำหนด</option>
                     </select>
                 </label>
-                <Button type="button" variant="outline" className="border-brand-border text-brand-strong hover:bg-brand-surface-strong hover:text-brand-strong" onClick={() => void mutate()}>รีเฟรช</Button>
+                <Button type="button" variant="outline" className="border-brand-border text-brand-strong hover:bg-brand-surface-strong hover:text-brand-strong sm:justify-self-start xl:justify-self-end" onClick={() => void mutate()}>รีเฟรช</Button>
             </div>
+            {referenceError ? (
+                <div id={referenceErrorId} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-status-danger-border bg-status-danger-surface px-4 py-3 text-sm text-status-danger-foreground" role="alert">
+                    <p>โหลดตัวเลือกหน่วยงานและหมวดหมู่งานไม่สำเร็จ</p>
+                    <Button type="button" variant="outline" size="sm" onClick={() => void mutateReference()}>
+                        ลองโหลดตัวกรองอีกครั้ง
+                    </Button>
+                </div>
+            ) : null}
             <RoutineOccurrenceList
                 data={data}
                 error={error}
@@ -217,6 +291,7 @@ function RoutineTaskSettings({
     const [taskPage, setTaskPage] = useState(1);
     const [taskSearch, setTaskSearch] = useState("");
     const [taskUnitId, setTaskUnitId] = useState("");
+    const [taskCategoryId, setTaskCategoryId] = useState("");
     const [taskStatus, setTaskStatus] = useState<RoutineTaskStatusFilter | "">("");
     const debouncedTaskSearch = useDebouncedValue(taskSearch);
     const [pendingTaskId, setPendingTaskId] = useState<number | null>(null);
@@ -230,9 +305,10 @@ function RoutineTaskSettings({
         });
         if (debouncedTaskSearch.trim()) params.set("search", debouncedTaskSearch.trim());
         if (taskUnitId) params.set("unitId", taskUnitId);
+        if (taskCategoryId) params.set("categoryId", taskCategoryId);
         if (taskStatus) params.set("status", taskStatus);
         return `${API_ROUTES.routines.tasks}?${params.toString()}`;
-    }, [debouncedTaskSearch, taskPage, taskStatus, taskUnitId]);
+    }, [debouncedTaskSearch, taskCategoryId, taskPage, taskStatus, taskUnitId]);
     const { data: tasks, error: tasksError, isLoading: tasksLoading, mutate: mutateTasks } = useSWR<PaginatedTasksResponse, Error>(
         tasksKey,
         fetchRoutine,
@@ -318,8 +394,10 @@ function RoutineTaskSettings({
                 pendingTaskId={pendingTaskId}
                 onPageChange={setTaskPage}
                 units={reference?.units ?? []}
+                categories={reference?.categories ?? []}
                 search={taskSearch}
                 unitId={taskUnitId}
+                categoryId={taskCategoryId}
                 status={taskStatus}
                 onSearchChange={(value) => {
                     setTaskSearch(value);
@@ -327,6 +405,10 @@ function RoutineTaskSettings({
                 }}
                 onUnitChange={(value) => {
                     setTaskUnitId(value);
+                    setTaskPage(1);
+                }}
+                onCategoryChange={(value) => {
+                    setTaskCategoryId(value);
                     setTaskPage(1);
                 }}
                 onStatusChange={(value) => {

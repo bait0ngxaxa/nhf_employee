@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ReactNode } from "react";
 
@@ -7,13 +7,25 @@ import { RoutineSection } from "@/components/dashboard/sections/RoutineSection";
 const mocks = vi.hoisted(() => ({
     useDashboardDataContext: vi.fn(),
     useSearchParams: vi.fn(() => new URLSearchParams()),
-    useSWR: vi.fn(() => ({
-        data: undefined,
-        error: undefined,
+    useSWR: vi.fn((_key: unknown) => ({
+        data: undefined as unknown,
+        error: undefined as Error | undefined,
         isLoading: false,
         mutate: vi.fn(),
     })),
 }));
+
+const routineReference = {
+    units: [
+        { id: 3, code: "FIN", name: "การเงิน" },
+        { id: 4, code: "OPS", name: "ปฏิบัติการ" },
+    ],
+    categories: [
+        { id: 5, name: "รายงานประจำเดือน", sortOrder: 1 },
+        { id: 6, name: "ตรวจสอบระบบ", sortOrder: 2 },
+    ],
+    employees: [],
+};
 
 vi.mock("@/components/dashboard/context/dashboard/DashboardContext", () => ({
     useDashboardDataContext: mocks.useDashboardDataContext,
@@ -67,17 +79,33 @@ vi.mock("@/components/dashboard/routine/RoutineKpiGrid", () => ({
 }));
 
 vi.mock("@/components/dashboard/routine/RoutineOccurrenceList", () => ({
-    RoutineOccurrenceList: () => <div data-testid="routine-occurrence-list" />,
+    RoutineOccurrenceList: ({
+        onPageChange,
+    }: {
+        onPageChange: (page: number) => void;
+    }) => (
+        <div data-testid="routine-occurrence-list">
+            <button type="button" onClick={() => onPageChange(2)}>
+                ไปหน้ารายการ Routine ถัดไป
+            </button>
+        </div>
+    ),
 }));
 
 vi.mock("@/components/dashboard/routine/RoutineTaskList", () => ({
     RoutineTaskList: ({
         search,
+        categories,
+        categoryId,
         onSearchChange,
+        onCategoryChange,
         onPageChange,
     }: {
         search: string;
+        categories: Array<{ id: number; name: string }>;
+        categoryId: string;
         onSearchChange: (value: string) => void;
+        onCategoryChange: (value: string) => void;
         onPageChange: (page: number) => void;
     }) => (
         <div data-testid="routine-task-list">
@@ -86,6 +114,18 @@ vi.mock("@/components/dashboard/routine/RoutineTaskList", () => ({
                 value={search}
                 onChange={(event) => onSearchChange(event.target.value)}
             />
+            <label>
+                หมวดหมู่งาน
+                <select
+                    value={categoryId}
+                    onChange={(event) => onCategoryChange(event.target.value)}
+                >
+                    <option value="">ทุกหมวดหมู่</option>
+                    {categories.map((category) => (
+                        <option key={category.id} value={category.id}>{category.name}</option>
+                    ))}
+                </select>
+            </label>
             <button type="button" onClick={() => onPageChange(2)}>
                 ไปหน้าถัดไป
             </button>
@@ -95,13 +135,14 @@ vi.mock("@/components/dashboard/routine/RoutineTaskList", () => ({
 
 describe("RoutineSection tabs", () => {
     beforeEach(() => {
+        vi.clearAllMocks();
         mocks.useSearchParams.mockReturnValue(new URLSearchParams());
-        mocks.useSWR.mockReturnValue({
-            data: undefined,
+        mocks.useSWR.mockImplementation((key: unknown) => ({
+            data: key === "/api/routines/reference" ? routineReference : undefined,
             error: undefined,
             isLoading: false,
             mutate: vi.fn(),
-        });
+        }));
     });
 
     it("does not expose admin tabs to a regular user", () => {
@@ -121,6 +162,33 @@ describe("RoutineSection tabs", () => {
             expect.any(Function),
             expect.objectContaining({ keepPreviousData: true }),
         );
+        expect(mocks.useSWR).toHaveBeenCalledWith(
+            "/api/routines/reference",
+            expect.any(Function),
+        );
+    });
+
+    it("keeps the operational list available when reference filters fail to load", () => {
+        mocks.useDashboardDataContext.mockReturnValue({
+            user: { role: "USER" },
+        });
+        mocks.useSWR.mockImplementation((key: unknown) => ({
+            data: undefined,
+            error: key === "/api/routines/reference"
+                ? new Error("reference unavailable")
+                : undefined,
+            isLoading: false,
+            mutate: vi.fn(),
+        }));
+
+        render(<RoutineSection />);
+
+        expect(screen.getByTestId("routine-occurrence-list")).toBeInTheDocument();
+        expect(screen.getByRole("alert")).toHaveTextContent(
+            "โหลดตัวเลือกหน่วยงานและหมวดหมู่งานไม่สำเร็จ",
+        );
+        expect(screen.getByRole("combobox", { name: "หน่วยงาน" })).toBeDisabled();
+        expect(screen.getByRole("combobox", { name: "หมวดหมู่งาน" })).toBeDisabled();
     });
 
     it("exposes task settings and all-occurrence tabs to an admin", () => {
@@ -169,6 +237,11 @@ describe("RoutineSection tabs", () => {
             expect.any(Function),
             expect.objectContaining({ keepPreviousData: true }),
         ));
+        await waitFor(() => expect(mocks.useSWR).toHaveBeenCalledWith(
+            "/api/routines/occurrences?scope=all&page=1&limit=12&view=tasks",
+            expect.any(Function),
+            expect.objectContaining({ keepPreviousData: true }),
+        ));
     });
 
     it("opens an admin deep link with the all-scope KPI", async () => {
@@ -184,6 +257,90 @@ describe("RoutineSection tabs", () => {
             expect.any(Function),
             expect.objectContaining({ keepPreviousData: true }),
         ));
+        await waitFor(() => expect(mocks.useSWR).toHaveBeenCalledWith(
+            "/api/routines/occurrences?scope=all&page=1&limit=12&view=tasks&taskId=71&occurrenceId=91",
+            expect.any(Function),
+            expect.objectContaining({ keepPreviousData: true }),
+        ));
+    });
+
+    it("combines operational filters and resets pagination when each filter changes", () => {
+        vi.useFakeTimers();
+        mocks.useDashboardDataContext.mockReturnValue({
+            user: { role: "USER" },
+        });
+
+        const occurrenceKeys = (): string[] => (mocks.useSWR.mock.calls as unknown as Array<[unknown]>)
+            .map(([key]) => typeof key === "string" ? key : "")
+            .filter((key) => key.includes("/api/routines/occurrences"));
+
+        render(<RoutineSection />);
+
+        fireEvent.click(screen.getByRole("button", { name: "ไปหน้ารายการ Routine ถัดไป" }));
+        expect(occurrenceKeys()).toContain(
+            "/api/routines/occurrences?scope=mine&page=2&limit=12&view=tasks",
+        );
+
+        fireEvent.change(screen.getByRole("combobox", { name: "หน่วยงาน" }), {
+            target: { value: "3" },
+        });
+        expect(occurrenceKeys().at(-1)).toBe(
+            "/api/routines/occurrences?scope=mine&page=1&limit=12&view=tasks&unitId=3",
+        );
+
+        fireEvent.click(screen.getByRole("button", { name: "ไปหน้ารายการ Routine ถัดไป" }));
+        expect(occurrenceKeys().at(-1)).toBe(
+            "/api/routines/occurrences?scope=mine&page=2&limit=12&view=tasks&unitId=3",
+        );
+
+        fireEvent.change(screen.getByRole("combobox", { name: "หมวดหมู่งาน" }), {
+            target: { value: "5" },
+        });
+        expect(occurrenceKeys().at(-1)).toBe(
+            "/api/routines/occurrences?scope=mine&page=1&limit=12&view=tasks&unitId=3&categoryId=5",
+        );
+
+        fireEvent.change(screen.getByRole("combobox", { name: "ช่วงเวลา" }), {
+            target: { value: "OVERDUE" },
+        });
+        expect(occurrenceKeys().at(-1)).toBe(
+            "/api/routines/occurrences?scope=mine&page=1&limit=12&view=tasks&timingStatus=OVERDUE&unitId=3&categoryId=5",
+        );
+
+        fireEvent.click(screen.getByRole("button", { name: "ไปหน้ารายการ Routine ถัดไป" }));
+        fireEvent.change(screen.getByRole("searchbox", { name: "ค้นหารายการ" }), {
+            target: { value: "VAT" },
+        });
+        act(() => {
+            vi.advanceTimersByTime(300);
+        });
+        expect(occurrenceKeys().at(-1)).toBe(
+            "/api/routines/occurrences?scope=mine&page=1&limit=12&view=tasks&search=VAT&timingStatus=OVERDUE&unitId=3&categoryId=5",
+        );
+        vi.useRealTimers();
+    });
+
+    it("adds task category filtering and resets task pagination", () => {
+        mocks.useDashboardDataContext.mockReturnValue({
+            user: { role: "ADMIN" },
+        });
+
+        const taskKeys = (): string[] => (mocks.useSWR.mock.calls as unknown as Array<[unknown]>)
+            .map(([key]) => typeof key === "string" ? key : "")
+            .filter((key) => key.includes("/api/routines/tasks"));
+
+        render(<RoutineSection />);
+
+        const taskList = screen.getByTestId("routine-task-list");
+        fireEvent.click(within(taskList).getByRole("button", { name: "ไปหน้าถัดไป" }));
+        expect(taskKeys()).toContain("/api/routines/tasks?activeOnly=0&page=2&limit=20");
+
+        fireEvent.change(within(taskList).getByRole("combobox", { name: "หมวดหมู่งาน" }), {
+            target: { value: "5" },
+        });
+        expect(taskKeys().at(-1)).toBe(
+            "/api/routines/tasks?activeOnly=0&page=1&limit=20&categoryId=5",
+        );
     });
 
     it("debounces task settings search, resets pagination, and clears the query", () => {
@@ -199,7 +356,7 @@ describe("RoutineSection tabs", () => {
         render(<RoutineSection />);
 
         const searchInput = screen.getByRole("textbox", { name: "ค้นหาแม่แบบงาน" });
-        fireEvent.click(screen.getByRole("button", { name: "ไปหน้าถัดไป" }));
+        fireEvent.click(within(screen.getByTestId("routine-task-list")).getByRole("button", { name: "ไปหน้าถัดไป" }));
         expect(taskKeys()).toContain("/api/routines/tasks?activeOnly=0&page=2&limit=20");
 
         fireEvent.change(searchInput, { target: { value: "ต" } });

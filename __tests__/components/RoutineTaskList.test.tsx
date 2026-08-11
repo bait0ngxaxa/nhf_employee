@@ -50,11 +50,17 @@ function makeProps() {
         pendingTaskId: null,
         onPageChange: vi.fn(),
         units: [{ id: 1, code: "มสช.", name: "มสช." }],
+        categories: [
+            { id: 1, name: "ระบบคอมพิวเตอร์" },
+            { id: 2, name: "รายงานประจำเดือน" },
+        ],
         search: "",
         unitId: "",
+        categoryId: "",
         status: "" as const,
         onSearchChange: vi.fn(),
         onUnitChange: vi.fn(),
+        onCategoryChange: vi.fn(),
         onStatusChange: vi.fn(),
     };
 }
@@ -76,7 +82,7 @@ describe("RoutineTaskList", () => {
         expect(props.onSearchChange).toHaveBeenCalledWith("");
     });
 
-    it("exposes labelled search and status filters and separates filtered empty state", () => {
+    it("exposes labelled unit, category, and status filters and separates filtered empty state", () => {
         const props = makeProps();
         const { rerender } = render(
             <RoutineTaskList {...props} data={{ ...props.data, tasks: [] }} />,
@@ -84,17 +90,24 @@ describe("RoutineTaskList", () => {
 
         expect(screen.getByRole("searchbox", { name: "ค้นหาแม่แบบงาน" })).toBeInTheDocument();
         expect(screen.getByRole("combobox", { name: "หน่วยงาน" })).toHaveValue("");
+        expect(screen.getByRole("combobox", { name: "หมวดหมู่งาน" })).toHaveValue("");
         expect(screen.getByRole("combobox", { name: "สถานะ" })).toHaveValue("");
+        expect(screen.getByRole("option", { name: "รายงานประจำเดือน" })).toBeInTheDocument();
         expect(screen.getByRole("option", { name: "ใช้งาน" })).toBeInTheDocument();
         expect(screen.getByRole("option", { name: "ปิดใช้งาน" })).toBeInTheDocument();
         expect(screen.getByRole("status")).toHaveTextContent("ยังไม่มีแม่แบบงานประจำ");
         expect(within(screen.getByRole("status")).queryByRole("button", { name: "สร้างแม่แบบงาน" })).not.toBeInTheDocument();
 
+        fireEvent.change(screen.getByRole("combobox", { name: "หมวดหมู่งาน" }), {
+            target: { value: "2" },
+        });
+        expect(props.onCategoryChange).toHaveBeenCalledWith("2");
+
         rerender(
             <RoutineTaskList
                 {...props}
                 data={{ ...props.data, tasks: [] }}
-                search="ไม่มีรายการนี้"
+                categoryId="2"
             />,
         );
 

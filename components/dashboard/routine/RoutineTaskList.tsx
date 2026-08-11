@@ -40,11 +40,14 @@ interface RoutineTaskListProps {
     pendingTaskId?: number | null;
     onPageChange: (page: number) => void;
     units: readonly { id: number; code: string; name: string }[];
+    categories: readonly { id: number; name: string }[];
     search: string;
     unitId: string;
+    categoryId: string;
     status: RoutineTaskStatusFilter | "";
     onSearchChange: (value: string) => void;
     onUnitChange: (value: string) => void;
+    onCategoryChange: (value: string) => void;
     onStatusChange: (value: RoutineTaskStatusFilter | "") => void;
 }
 
@@ -77,11 +80,14 @@ export function RoutineTaskList({
     pendingTaskId = null,
     onPageChange,
     units,
+    categories,
     search,
     unitId,
+    categoryId,
     status,
     onSearchChange,
     onUnitChange,
+    onCategoryChange,
     onStatusChange,
 }: RoutineTaskListProps) {
     const [deleteTask, setDeleteTask] = useState<RoutineTask | null>(null);
@@ -89,17 +95,21 @@ export function RoutineTaskList({
     const deleteLockRef = useRef(false);
     const filterId = useId();
     const today = getCurrentBangkokDate();
-    const hasFilters = search.trim().length > 0 || unitId.length > 0 || status.length > 0;
+    const hasFilters = search.trim().length > 0
+        || unitId.length > 0
+        || categoryId.length > 0
+        || status.length > 0;
     const taskUnits = uniqueRoutineUnits(units);
     const searchId = `${filterId}-search`;
     const unitIdField = `${filterId}-unit`;
+    const categoryIdField = `${filterId}-category`;
     const statusId = `${filterId}-status`;
     const isInitialLoading = isLoading && !data;
 
     return (
         <div className="space-y-4">
-            <div className="grid gap-3 rounded-xl border border-brand-border/70 bg-transparent p-4 sm:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_minmax(11rem,0.4fr)_minmax(9rem,0.3fr)_auto] xl:items-end">
-                <div className="grid min-w-0 gap-1 text-sm font-medium text-brand-strong">
+            <div className="grid gap-3 rounded-xl border border-brand-border/70 bg-transparent p-4 sm:grid-cols-2 xl:grid-cols-[minmax(16rem,1fr)_minmax(10rem,0.4fr)_minmax(10rem,0.4fr)_minmax(9rem,0.3fr)_auto] xl:items-end">
+                <div className="grid min-w-0 gap-1 text-sm font-medium text-brand-strong sm:col-span-2 xl:col-span-1">
                     <label htmlFor={searchId}>ค้นหาแม่แบบงาน</label>
                     <div className="relative">
                         <Input
@@ -136,6 +146,22 @@ export function RoutineTaskList({
                         {taskUnits.map((unit) => (
                             <option key={unit.id} value={unit.id}>
                                 {formatRoutineUnitLabel(unit)}
+                            </option>
+                        ))}
+                    </select>
+                </label>
+                <label className="grid min-w-0 gap-1 text-sm font-medium text-brand-strong" htmlFor={categoryIdField}>
+                    หมวดหมู่งาน
+                    <select
+                        id={categoryIdField}
+                        className="h-11 min-w-0 rounded-md border border-brand-border bg-surface-raised px-3 text-sm focus-visible:border-brand-solid focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-solid/40"
+                        value={categoryId}
+                        onChange={(event) => onCategoryChange(event.target.value)}
+                    >
+                        <option value="">ทุกหมวดหมู่</option>
+                        {categories.map((category) => (
+                            <option key={category.id} value={category.id}>
+                                {category.name}
                             </option>
                         ))}
                     </select>

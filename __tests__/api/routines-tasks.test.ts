@@ -63,6 +63,18 @@ describe("GET /api/routines/tasks active filter semantics", () => {
         expect(mocks.getTasks.mock.calls[0]?.[0]?.status).toBe(status);
     });
 
+    it("passes unit and category filters to the service together", async () => {
+        const response = await GET(
+            new NextRequest("http://localhost/api/routines/tasks?unitId=3&categoryId=5"),
+        );
+
+        expect(response.status).toBe(200);
+        expect(mocks.getTasks).toHaveBeenCalledWith(
+            expect.objectContaining({ unitId: 3, categoryId: 5 }),
+            expect.any(Object),
+        );
+    });
+
     it("passes a regular user's actor scope to the management query", async () => {
         mocks.requireActiveWorkforceOrAdminSession.mockResolvedValue({
             ok: true,

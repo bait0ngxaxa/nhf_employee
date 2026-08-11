@@ -718,12 +718,12 @@ describe("NHF Routine query authorization", () => {
         expect(prismaMock.routineTask.findMany).not.toHaveBeenCalled();
     });
 
-    it("scopes regular users by current Task assignee even when scope=all is requested", async () => {
+    it("combines unit and category filters with the regular user's Task scope", async () => {
         prismaMock.routineTask.findMany.mockResolvedValue(asNever([taskRow(71)]));
         prismaMock.routineTask.count.mockResolvedValue(1);
 
         await getRoutineTaskWorkItems(
-            { scope: "all", page: 1, limit: 20 },
+            { scope: "all", unitId: 3, categoryId: 5, page: 1, limit: 20 },
             { actor: { id: 5, email: "user@example.com", role: "USER" }, employeeId: 21 },
         );
 
@@ -731,6 +731,8 @@ describe("NHF Routine query authorization", () => {
             expect.objectContaining({
                 where: {
                     isActive: true,
+                    unitId: 3,
+                    categoryId: 5,
                     assignees: { some: { employeeId: 21 } },
                 },
             }),
@@ -783,9 +785,15 @@ describe("NHF Routine query authorization", () => {
         });
     });
 
-    it("scopes routine management queries to the creator for regular users", async () => {
+    it("combines unit and category filters with management ownership scope", async () => {
         await getRoutineTasks(
-            { activeOnly: undefined, page: 1, limit: 20 },
+            {
+                activeOnly: undefined,
+                unitId: 3,
+                categoryId: 5,
+                page: 1,
+                limit: 20,
+            },
             {
                 actor: { id: 5, email: "user@example.com", role: "USER" },
                 employeeId: 21,
@@ -793,10 +801,12 @@ describe("NHF Routine query authorization", () => {
         );
 
         expect(prismaMock.routineTask.findMany).toHaveBeenCalledWith(
-            expect.objectContaining({ where: { createdById: 5 } }),
+            expect.objectContaining({
+                where: { createdById: 5, unitId: 3, categoryId: 5 },
+            }),
         );
         expect(prismaMock.routineTask.count).toHaveBeenCalledWith({
-            where: { createdById: 5 },
+            where: { createdById: 5, unitId: 3, categoryId: 5 },
         });
     });
 
