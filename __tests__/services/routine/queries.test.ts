@@ -419,6 +419,27 @@ describe("NHF Routine query authorization", () => {
         expect(result.tasks[0]?.relevantOccurrence).toBeNull();
     });
 
+    it("keeps a task with only historical occurrences without a relevant occurrence", async () => {
+        const today = getCurrentBangkokDate();
+        prismaMock.routineTask.findMany.mockResolvedValue(asNever([
+            taskRow(71),
+        ]));
+        prismaMock.routineTask.count.mockResolvedValue(1);
+        prismaMock.routineOccurrence.findMany.mockResolvedValue(asNever([
+            occurrenceRow(1, 71, addCalendarDays(today, -10)),
+            occurrenceRow(2, 71, addCalendarDays(today, -1)),
+        ]));
+
+        const result = await getRoutineTaskWorkItems(
+            { scope: "all", page: 1, limit: 20 },
+            { actor: { id: 99, email: "admin@example.com", role: "ADMIN" }, employeeId: null },
+        );
+
+        expect(result.tasks).toHaveLength(1);
+        expect(result.tasks[0]?.relevantOccurrence).toBeNull();
+        expect(result.pagination.total).toBe(1);
+    });
+
     it("returns two Task rows when each task has multiple occurrences", async () => {
         const today = getCurrentBangkokDate();
         prismaMock.routineTask.findMany.mockResolvedValue(asNever([
@@ -444,7 +465,7 @@ describe("NHF Routine query authorization", () => {
         expect(result.tasks[1]?.relevantOccurrence?.id).toBe(3);
     });
 
-    it("uses a valid notification focus occurrence only within an authorized Task", async () => {
+    it("uses an authorized historical notification focus instead of the future occurrence", async () => {
         const today = getCurrentBangkokDate();
         prismaMock.routineOccurrence.findUnique.mockResolvedValue(
             asNever({ taskId: 71, task: { isActive: true } }),
@@ -453,7 +474,7 @@ describe("NHF Routine query authorization", () => {
         prismaMock.routineTask.count.mockResolvedValue(1);
         prismaMock.routineOccurrence.findMany.mockResolvedValue(asNever([
             occurrenceRow(1, 71, addCalendarDays(today, 3)),
-            occurrenceRow(99, 71, addCalendarDays(today, 10)),
+            occurrenceRow(99, 71, addCalendarDays(today, -10)),
         ]));
 
         const result = await getRoutineTaskWorkItems(
@@ -739,24 +760,24 @@ describe("NHF Routine query authorization", () => {
         );
     });
 
-    it("counts and filters by Task rather than occurrence rows", async () => {
+    it("filters resolved occurrences before paginating task totals", async () => {
         const today = getCurrentBangkokDate();
         prismaMock.routineTask.findMany
-            .mockResolvedValueOnce(asNever([{ id: 71 }, { id: 72 }]))
-            .mockResolvedValueOnce(asNever([taskRow(72)]));
+            .mockResolvedValueOnce(asNever([{ id: 71 }, { id: 72 }, { id: 73 }]))
+            .mockResolvedValueOnce(asNever([taskRow(73)]));
         prismaMock.routineOccurrence.findMany.mockResolvedValue(asNever([
             occurrenceRow(1, 71, addCalendarDays(today, -2)),
-            occurrenceRow(2, 71, addCalendarDays(today, 10)),
-            occurrenceRow(3, 72, addCalendarDays(today, 4)),
+            occurrenceRow(2, 72, addCalendarDays(today, 4)),
+            occurrenceRow(3, 73, addCalendarDays(today, 5)),
         ]));
 
         const result = await getRoutineTaskWorkItems(
-            { scope: "all", timingStatus: "DUE_SOON", page: 1, limit: 20 },
+            { scope: "all", timingStatus: "DUE_SOON", page: 2, limit: 1 },
             { actor: { id: 99, email: "admin@example.com", role: "ADMIN" }, employeeId: null },
         );
 
-        expect(result.tasks.map((task) => task.id)).toEqual([72]);
-        expect(result.pagination.total).toBe(1);
+        expect(result.tasks.map((task) => task.id)).toEqual([73]);
+        expect(result.pagination).toEqual({ page: 2, limit: 1, total: 2, pages: 2 });
         expect(prismaMock.routineTask.count).not.toHaveBeenCalled();
     });
 

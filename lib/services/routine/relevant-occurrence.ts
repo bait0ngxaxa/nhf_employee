@@ -17,14 +17,6 @@ function compareFutureCandidates(
     return dateComparison !== 0 ? dateComparison : left.id - right.id;
 }
 
-function compareHistoricalCandidates(
-    left: RoutineRelevantOccurrenceCandidate,
-    right: RoutineRelevantOccurrenceCandidate,
-): number {
-    const dateComparison = compareCalendarDates(right.dueDate, left.dueDate);
-    return dateComparison !== 0 ? dateComparison : right.id - left.id;
-}
-
 export function resolveRelevantRoutineOccurrence<
     T extends RoutineRelevantOccurrenceCandidate,
 >(
@@ -42,12 +34,7 @@ export function resolveRelevantRoutineOccurrence<
     const future = occurrences
         .filter((occurrence) => compareCalendarDates(occurrence.dueDate, today) >= 0)
         .sort(compareFutureCandidates);
-    if (future[0]) return future[0];
-
-    const historical = occurrences
-        .filter((occurrence) => compareCalendarDates(occurrence.dueDate, today) < 0)
-        .sort(compareHistoricalCandidates);
-    return historical[0] ?? null;
+    return future[0] ?? null;
 }
 
 export function resolveRelevantRoutineOccurrences<

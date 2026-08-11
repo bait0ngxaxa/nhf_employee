@@ -204,6 +204,21 @@ describe("RoutineSection tabs", () => {
         expect(screen.getByText("นำเข้าจาก Excel")).toBeInTheDocument();
     });
 
+    it("exposes only current and future timing options in the operational filter", () => {
+        mocks.useDashboardDataContext.mockReturnValue({
+            user: { role: "USER" },
+        });
+
+        render(<RoutineSection />);
+
+        const timingFilter = screen.getByRole("combobox", { name: "ช่วงเวลา" });
+        expect(within(timingFilter).queryByRole("option", { name: "เกินกำหนด" })).not.toBeInTheDocument();
+        expect(within(timingFilter).getByRole("option", { name: "ทุกช่วงเวลา" })).toBeInTheDocument();
+        expect(within(timingFilter).getByRole("option", { name: "ถึงกำหนดวันนี้" })).toBeInTheDocument();
+        expect(within(timingFilter).getByRole("option", { name: "ใกล้ถึงกำหนด" })).toBeInTheDocument();
+        expect(within(timingFilter).getByRole("option", { name: "ยังไม่ถึงกำหนด" })).toBeInTheDocument();
+    });
+
     it("requests all tasks for the admin settings list", () => {
         mocks.useDashboardDataContext.mockReturnValue({
             user: { role: "ADMIN" },
@@ -301,10 +316,10 @@ describe("RoutineSection tabs", () => {
         );
 
         fireEvent.change(screen.getByRole("combobox", { name: "ช่วงเวลา" }), {
-            target: { value: "OVERDUE" },
+            target: { value: "DUE_SOON" },
         });
         expect(occurrenceKeys().at(-1)).toBe(
-            "/api/routines/occurrences?scope=mine&page=1&limit=12&view=tasks&timingStatus=OVERDUE&unitId=3&categoryId=5",
+            "/api/routines/occurrences?scope=mine&page=1&limit=12&view=tasks&timingStatus=DUE_SOON&unitId=3&categoryId=5",
         );
 
         fireEvent.click(screen.getByRole("button", { name: "ไปหน้ารายการ Routine ถัดไป" }));
@@ -315,7 +330,7 @@ describe("RoutineSection tabs", () => {
             vi.advanceTimersByTime(300);
         });
         expect(occurrenceKeys().at(-1)).toBe(
-            "/api/routines/occurrences?scope=mine&page=1&limit=12&view=tasks&search=VAT&timingStatus=OVERDUE&unitId=3&categoryId=5",
+            "/api/routines/occurrences?scope=mine&page=1&limit=12&view=tasks&search=VAT&timingStatus=DUE_SOON&unitId=3&categoryId=5",
         );
         vi.useRealTimers();
     });

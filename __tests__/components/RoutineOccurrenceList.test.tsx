@@ -96,6 +96,21 @@ describe("RoutineOccurrenceList", () => {
         expect(screen.queryByText("ปรับเฉพาะรอบนี้")).not.toBeInTheDocument();
     });
 
+    it("renders the neutral no-current-round state when no relevant occurrence exists", () => {
+        const baseTask = taskData.tasks[0];
+        if (!baseTask) throw new Error("Routine test fixture is incomplete");
+        const data: PaginatedRoutineTaskWorkItemsResponse = {
+            ...taskData,
+            tasks: [{ ...baseTask, relevantOccurrence: null }],
+        };
+
+        renderList(false, vi.fn(), data);
+
+        expect(screen.getByRole("article")).toHaveTextContent("กำหนด: ยังไม่มีรอบกำหนด");
+        expect(screen.getAllByText("ยังไม่มีรอบกำหนด")).toHaveLength(2);
+        expect(screen.queryByText("เกินกำหนด")).not.toBeInTheDocument();
+    });
+
     it("separates primary Task edit from the occurrence-only override", () => {
         renderList(true);
 

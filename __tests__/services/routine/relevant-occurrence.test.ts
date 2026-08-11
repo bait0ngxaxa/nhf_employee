@@ -42,6 +42,18 @@ describe("Routine relevant occurrence resolver", () => {
         expect(result?.id).toBe(3);
     });
 
+    it("uses the lowest occurrence id to break equal future due dates", () => {
+        const result = resolveRelevantRoutineOccurrence(
+            [
+                occurrence(5, 71, "2026-08-10"),
+                occurrence(3, 71, "2026-08-10"),
+            ],
+            today,
+        );
+
+        expect(result?.id).toBe(3);
+    });
+
     it("prefers an occurrence due today", () => {
         const result = resolveRelevantRoutineOccurrence(
             [
@@ -55,7 +67,7 @@ describe("Routine relevant occurrence resolver", () => {
         expect(result?.id).toBe(2);
     });
 
-    it("falls back to the latest historical occurrence with a descending id tie-break", () => {
+    it("returns null when every occurrence is historical", () => {
         const result = resolveRelevantRoutineOccurrence(
             [
                 occurrence(1, 71, "2026-08-01"),
@@ -65,11 +77,34 @@ describe("Routine relevant occurrence resolver", () => {
             today,
         );
 
-        expect(result?.id).toBe(5);
+        expect(result).toBeNull();
     });
 
     it("returns null when a task has no occurrence", () => {
         expect(resolveRelevantRoutineOccurrence([], today)).toBeNull();
+    });
+
+    it("returns an explicitly focused historical occurrence", () => {
+        const result = resolveRelevantRoutineOccurrence(
+            [
+                occurrence(1, 71, "2026-08-01"),
+                occurrence(2, 71, "2026-08-10"),
+            ],
+            today,
+            1,
+        );
+
+        expect(result?.id).toBe(1);
+    });
+
+    it("does not fall back to history when the focus id is missing", () => {
+        const result = resolveRelevantRoutineOccurrence(
+            [occurrence(1, 71, "2026-08-01")],
+            today,
+            999,
+        );
+
+        expect(result).toBeNull();
     });
 
     it("resolves one occurrence per task and honors notification focus", () => {

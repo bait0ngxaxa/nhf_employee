@@ -247,7 +247,6 @@ function RoutineOccurrencePanel({
                         }}
                     >
                         <option value="">ทุกช่วงเวลา</option>
-                        <option value="OVERDUE">เกินกำหนด</option>
                         <option value="DUE_TODAY">ถึงกำหนดวันนี้</option>
                         <option value="DUE_SOON">ใกล้ถึงกำหนด</option>
                         <option value="UPCOMING">ยังไม่ถึงกำหนด</option>
