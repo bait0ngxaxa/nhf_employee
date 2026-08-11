@@ -22,6 +22,7 @@ export const routineImportEmployeeReferenceSchema = z.object({
     departmentId: z.number().int().positive(),
     status: z.string().min(1),
     deletedAt: z.iso.datetime().nullable(),
+    notificationReady: z.boolean().optional(),
 }).strict();
 
 export const routineImportReferenceDataSchema = z.object({

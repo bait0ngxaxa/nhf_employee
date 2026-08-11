@@ -31,6 +31,7 @@ interface RoutineScheduleFieldsProps {
     onContractTextChange: (value: string) => void;
     errors?: Record<string, string>;
     disabled?: boolean;
+    allowManual?: boolean;
 }
 
 function numberValue(value: unknown, fallback = 0): number {
@@ -72,6 +73,7 @@ export function RoutineScheduleFields({
     onContractTextChange,
     errors = {},
     disabled = false,
+    allowManual = true,
 }: RoutineScheduleFieldsProps) {
     function updateNumber(
         key: string,
@@ -140,11 +142,13 @@ export function RoutineScheduleFields({
                             onScheduleConfigChange(getDefaultRoutineScheduleConfig(nextType));
                         }}
                     >
-                        {ROUTINE_SCHEDULE_TYPES.map((type) => (
-                            <option key={type} value={type}>
-                                {ROUTINE_SCHEDULE_LABELS[type]}
-                            </option>
-                        ))}
+                        {ROUTINE_SCHEDULE_TYPES
+                            .filter((type) => allowManual || type !== "MANUAL")
+                            .map((type) => (
+                                <option key={type} value={type}>
+                                    {ROUTINE_SCHEDULE_LABELS[type]}
+                                </option>
+                            ))}
                     </select>
                 </label>
                 <label className="grid gap-1 text-sm font-medium text-content-body">

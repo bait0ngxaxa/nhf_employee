@@ -172,6 +172,7 @@ const activeEmployee = {
     departmentId: 3,
     status: "ACTIVE",
     deletedAt: null,
+    user: { isActive: true, deletedAt: null },
 };
 
 const inactiveEmployee = {
@@ -182,6 +183,7 @@ const inactiveEmployee = {
     departmentId: 3,
     status: "INACTIVE",
     deletedAt: null,
+    user: { isActive: true, deletedAt: null },
 };
 
 describe("routine import preview reuse", () => {
@@ -265,15 +267,31 @@ describe("routine import staging row updates", () => {
         prismaMock.auditLog.create.mockResolvedValue(asNever({ id: 1 }));
     });
 
-    it("returns import reference employees with status, deletedAt, and departmentId", async () => {
+    it("returns import reference employees with lifecycle and notification readiness", async () => {
         const result = await getRoutineImportReferenceData();
 
         expect(result.employees).toEqual(expect.arrayContaining([
-            expect.objectContaining({ id: 10, status: "ACTIVE", departmentId: 3 }),
-            expect.objectContaining({ id: 11, status: "INACTIVE", deletedAt: null, departmentId: 3 }),
+            expect.objectContaining({
+                id: 10,
+                status: "ACTIVE",
+                departmentId: 3,
+                notificationReady: true,
+            }),
+            expect.objectContaining({
+                id: 11,
+                status: "INACTIVE",
+                deletedAt: null,
+                departmentId: 3,
+                notificationReady: false,
+            }),
         ]));
         expect(prismaMock.employee.findMany).toHaveBeenCalledWith(expect.objectContaining({
-            select: expect.objectContaining({ departmentId: true, status: true, deletedAt: true }),
+            select: expect.objectContaining({
+                departmentId: true,
+                status: true,
+                deletedAt: true,
+                user: { select: { isActive: true, deletedAt: true } },
+            }),
         }));
     });
 

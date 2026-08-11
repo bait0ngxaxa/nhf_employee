@@ -1080,6 +1080,41 @@ describe("NHF Routine occurrence generation", () => {
         });
     });
 
+    it("adds a new task co-owner to future occurrences that still match the old snapshot", async () => {
+        prismaMock.routineTask.findUnique.mockResolvedValue(
+            asNever(activeTask({
+                assignees: [
+                    { employeeId: 11, role: "OWNER" },
+                    { employeeId: 12, role: "CO_OWNER" },
+                ],
+                version: 5,
+            })),
+        );
+        prismaMock.routineOccurrence.findMany.mockResolvedValue(asNever([
+            generatedOccurrence({
+                assignees: [{ employeeId: 11, role: "OWNER" }],
+            }),
+        ]));
+
+        await generateRoutineTaskOccurrences(
+            71,
+            new Date("2026-08-04T04:00:00.000Z"),
+            {
+                previousAssignees: [{ employeeId: 11, role: "OWNER" }],
+            },
+        );
+
+        expect(prismaMock.routineOccurrenceAssignee.deleteMany).toHaveBeenCalledWith({
+            where: { occurrenceId: 100 },
+        });
+        expect(prismaMock.routineOccurrenceAssignee.createMany).toHaveBeenCalledWith({
+            data: [
+                { occurrenceId: 100, employeeId: 11, role: "OWNER" },
+                { occurrenceId: 100, employeeId: 12, role: "CO_OWNER" },
+            ],
+        });
+    });
+
     it("preserves a future occurrence snapshot that differs from the old template", async () => {
         prismaMock.routineTask.findUnique.mockResolvedValue(
             asNever(activeTask({

@@ -1,7 +1,7 @@
 "use client";
 
 import { useId, useMemo, useState, type JSX } from "react";
-import { Search, X } from "lucide-react";
+import { CircleAlert, Search, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -55,6 +55,12 @@ function unavailableLabel(employee: RoutineEmployee): string | null {
     if (employee.deletedAt) return "ถูกลบแล้ว";
     if (employee.status && employee.status !== "ACTIVE") return "ไม่พร้อมใช้งาน";
     return null;
+}
+
+function notificationWarningLabel(employee: RoutineEmployee): string | null {
+    return employee.notificationReady === false
+        ? "บัญชียังไม่พร้อมใช้งาน · จะยังไม่ได้รับการแจ้งเตือน"
+        : null;
 }
 
 function isAssigneeRole(value: string): value is RoutineAssigneeRole {
@@ -134,6 +140,9 @@ export function RoutineAssigneePicker({
                         const unavailable = isUnavailable(employee);
                         const name = employeeName(employee);
                         const unavailableText = unavailableLabel(employee);
+                        const notificationWarning = unavailable
+                            ? null
+                            : notificationWarningLabel(employee);
                         return (
                             <label
                                 key={employee.id}
@@ -148,6 +157,7 @@ export function RoutineAssigneePicker({
                                     disabled={disabled || unavailable}
                                     aria-label={`เลือก ${name}`}
                                     onChange={() => {
+                                        if (disabled || unavailable) return;
                                         onToggle(employee.id);
                                         setSearchQuery("");
                                     }}
@@ -155,6 +165,12 @@ export function RoutineAssigneePicker({
                                 <span className="min-w-0 flex-1">
                                     <span className="block truncate text-sm text-content-body">{name}</span>
                                     {unavailableText ? <span className="block text-xs text-status-danger-foreground">{unavailableText} · เลือกเพิ่มไม่ได้</span> : null}
+                                    {notificationWarning ? (
+                                        <span className="mt-0.5 flex items-start gap-1 text-xs leading-5 text-status-warning-foreground">
+                                            <CircleAlert className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
+                                            <span>{notificationWarning}</span>
+                                        </span>
+                                    ) : null}
                                 </span>
                             </label>
                         );
@@ -183,11 +199,22 @@ export function RoutineAssigneePicker({
                         {selectedEmployees.map((employee) => {
                             const name = employeeName(employee);
                             const unavailableText = unavailableLabel(employee);
+                            const notificationWarning = unavailableText
+                                ? null
+                                : notificationWarningLabel(employee);
                             return (
                                 <div key={employee.id} className="flex min-w-0 items-center gap-2 rounded-lg border border-border-subtle bg-background px-3 py-2">
-                                    <span className="min-w-0 flex-1 break-words text-sm text-content-body">
-                                        {name}
-                                        {unavailableText ? <span className="ml-1 text-xs text-status-danger-foreground">({unavailableText})</span> : null}
+                                    <span className="min-w-0 flex-1">
+                                        <span className="block break-words text-sm text-content-body">
+                                            {name}
+                                            {unavailableText ? <span className="ml-1 text-xs text-status-danger-foreground">({unavailableText})</span> : null}
+                                        </span>
+                                        {notificationWarning ? (
+                                            <span className="mt-0.5 flex items-start gap-1 text-xs leading-5 text-status-warning-foreground">
+                                                <CircleAlert className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
+                                                <span>{notificationWarning}</span>
+                                            </span>
+                                        ) : null}
                                     </span>
                                     <select
                                         className="h-11 max-w-40 rounded-md border border-input bg-background px-2 text-sm sm:h-9 sm:text-xs"

@@ -28,6 +28,7 @@ export interface RoutineEmployee {
     deletedAt?: string | null;
     displayName?: string;
     departmentId?: number;
+    notificationReady?: boolean;
 }
 
 export interface RoutineAssignee {

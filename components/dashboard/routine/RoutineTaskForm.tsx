@@ -492,6 +492,7 @@ export function RoutineTaskForm({
                 onContractTextChange={(value) => updateField("contractText", value)}
                 errors={fieldErrors}
                 disabled={isSubmitting}
+                allowManual={initialTask !== null}
             />
             <label className="grid gap-1 text-sm font-medium text-content-body">
                 คำอธิบายกำหนดการ

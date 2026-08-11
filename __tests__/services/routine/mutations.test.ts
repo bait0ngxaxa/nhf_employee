@@ -472,6 +472,83 @@ describe("NHF Routine mutations", () => {
         expect(prismaMock.auditLog.create).not.toHaveBeenCalled();
     });
 
+    it("passes the previous assignee snapshot when an admin adds a co-owner", async () => {
+        const owner = { employeeId: 11, role: "OWNER" as const };
+        const coOwner = { employeeId: 12, role: "CO_OWNER" as const };
+        const current = {
+            id: 71,
+            unitId: 1,
+            categoryId: 1,
+            title: "งานเดิม",
+            description: null,
+            scheduleType: "MONTHLY_DAY",
+            scheduleConfig: { day: 10, monthOffset: 0 },
+            scheduleText: null,
+            contractStartDate: null,
+            contractEndDate: null,
+            contractText: null,
+            extraDetails: null,
+            businessDayPolicy: "NONE",
+            isActive: true,
+            version: 1,
+            sourceFileName: null,
+            sourceSheet: null,
+            sourceRow: null,
+            createdById: 99,
+            updatedById: 99,
+            createdAt: new Date("2026-01-01T00:00:00.000Z"),
+            updatedAt: new Date("2026-01-01T00:00:00.000Z"),
+            unit: { id: 1, code: "มสช.", name: "มสช.", isActive: true },
+            category: { id: 1, name: "อื่น ๆ", sortOrder: 1, isActive: true },
+            assignees: [owner],
+            reminderRules: [{
+                id: 31,
+                daysBefore: 2,
+                sendHour: 9,
+                channel: "IN_APP",
+                recipientScope: "ASSIGNEES",
+                isActive: true,
+            }],
+        };
+        prismaMock.user.findUnique.mockResolvedValue(
+            asNever(activeUser("ADMIN", 99)),
+        );
+        prismaMock.routineUnit.findFirst.mockResolvedValue(asNever({ id: 1 }));
+        prismaMock.routineCategory.findFirst.mockResolvedValue(asNever({ id: 1 }));
+        prismaMock.employee.findMany.mockResolvedValue(asNever([
+            { id: 11 },
+            { id: 12 },
+        ]));
+        prismaMock.routineTask.findUnique.mockResolvedValue(asNever(current));
+        prismaMock.routineTask.updateMany.mockResolvedValue(asNever({ count: 1 }));
+        prismaMock.routineTask.findUniqueOrThrow.mockResolvedValue(
+            asNever({ ...current, version: 2, assignees: [owner, coOwner] }),
+        );
+
+        await updateRoutineTask(
+            71,
+            { version: 1, assignees: [owner, coOwner] },
+            actor(99, "ADMIN"),
+        );
+
+        expect(prismaMock.routineTaskAssignee.createMany).toHaveBeenCalledWith({
+            data: [
+                { taskId: 71, employeeId: 11, role: "OWNER" },
+                { taskId: 71, employeeId: 12, role: "CO_OWNER" },
+            ],
+        });
+        expect(prismaMock.routineOccurrence.updateMany).toHaveBeenCalledWith({
+            where: { taskId: 71 },
+            data: { reminderVersion: { increment: 1 } },
+        });
+        expect(generateRoutineTaskOccurrencesInTransactionMock).toHaveBeenCalledWith(
+            prismaMock,
+            71,
+            undefined,
+            { previousAssignees: [owner] },
+        );
+    });
+
     it("reconciles the expanded reminder horizon during a Task update", async () => {
         const current = {
             id: 71,

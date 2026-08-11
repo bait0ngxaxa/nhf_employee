@@ -9,6 +9,7 @@ import {
     buildRoutineReminderLineEventKey,
     dispatchRoutineReminderOutbox,
 } from "@/lib/services/routine/reminders";
+import { routineReminderEmailOutboxPayloadSchema } from "@/lib/validations/routine";
 
 const createInAppNotificationOnceMock = vi.hoisted(() => vi.fn());
 const sendRoutineReminderNotificationMock = vi.hoisted(() => vi.fn());
@@ -210,6 +211,27 @@ function buildOccurrence(overrides: Record<string, unknown> = {}) {
     };
 }
 
+function buildAssignee(
+    userId: number,
+    email: string,
+    role: "OWNER" | "CO_OWNER",
+) {
+    return {
+        role,
+        employee: {
+            status: "ACTIVE",
+            deletedAt: null,
+            user: {
+                id: userId,
+                name: `ผู้รับผิดชอบ ${userId}`,
+                email,
+                isActive: true,
+                deletedAt: null,
+            },
+        },
+    };
+}
+
 describe("Routine reminder dispatch", () => {
     beforeEach(() => {
         mockReset(prismaMock);
@@ -257,6 +279,168 @@ describe("Routine reminder dispatch", () => {
         });
         expect(sendRoutineReminderNotificationMock).not.toHaveBeenCalled();
         expect(prismaMock.notificationOutbox.updateMany).not.toHaveBeenCalled();
+    });
+
+    it("creates independent in-app and email deliveries for an owner and co-owner", async () => {
+        prismaMock.routineOccurrence.findUnique.mockResolvedValue(
+            asNever(buildOccurrence({
+                assignees: [
+                    buildAssignee(17, "owner@example.com", "OWNER"),
+                    buildAssignee(18, "co-owner@example.com", "CO_OWNER"),
+                ],
+            })),
+        );
+
+        const result = await dispatchRoutineReminderOutbox(
+            buildNotification(buildPayload()),
+            buildPayload(),
+            new Date("2026-08-03T02:00:00.000Z"),
+        );
+
+        expect(result).toBe("SENT");
+        expect(createInAppNotificationOnceMock.mock.calls.map(([value]) => value.userId))
+            .toEqual([17, 18]);
+
+        const rows = getOutboxCreateManyRows(
+            prismaMock.notificationOutbox.createMany.mock.calls[0]?.[0],
+        );
+        expect(rows).toHaveLength(2);
+        expect(rows.map((row) => row.eventKey)).toEqual([
+            "routine:91:rule:31:user:17:version:2:email",
+            "routine:91:rule:31:user:18:version:2:email",
+        ]);
+        expect(rows.map((row): unknown => JSON.parse(row.payload ?? "{}") as unknown)).toEqual([
+            expect.objectContaining({ userId: 17, to: "owner@example.com" }),
+            expect.objectContaining({ userId: 18, to: "co-owner@example.com" }),
+        ]);
+
+        const emailPayloads = rows.map((row) =>
+            routineReminderEmailOutboxPayloadSchema.parse(
+                JSON.parse(row.payload ?? "{}") as unknown,
+            ),
+        );
+        for (const emailPayload of emailPayloads) {
+            await dispatchRoutineReminderOutbox(
+                buildEmailNotification(emailPayload),
+                emailPayload,
+            );
+        }
+        expect(sendRoutineReminderNotificationMock.mock.calls.map(([value]) => ({
+            userId: value.userId,
+            to: value.to,
+        }))).toEqual([
+            { userId: 17, to: "owner@example.com" },
+            { userId: 18, to: "co-owner@example.com" },
+        ]);
+    });
+
+    it("creates one recipient delivery for an owner and two co-owners", async () => {
+        prismaMock.routineOccurrence.findUnique.mockResolvedValue(
+            asNever(buildOccurrence({
+                assignees: [
+                    buildAssignee(17, "owner@example.com", "OWNER"),
+                    buildAssignee(18, "co-owner-a@example.com", "CO_OWNER"),
+                    buildAssignee(19, "co-owner-b@example.com", "CO_OWNER"),
+                ],
+            })),
+        );
+
+        const result = await dispatchRoutineReminderOutbox(
+            buildNotification(buildPayload()),
+            buildPayload(),
+            new Date("2026-08-03T02:00:00.000Z"),
+        );
+
+        expect(result).toBe("SENT");
+        expect(createInAppNotificationOnceMock.mock.calls.map(([value]) => value.userId))
+            .toEqual([17, 18, 19]);
+        const rows = getOutboxCreateManyRows(
+            prismaMock.notificationOutbox.createMany.mock.calls[0]?.[0],
+        );
+        expect(rows).toHaveLength(3);
+        expect(new Set(rows.map((row) => row.eventKey)).size).toBe(3);
+    });
+
+    it("creates LINE deliveries independently for every linked assignee", async () => {
+        prismaMock.routineOccurrence.findUnique.mockResolvedValue(
+            asNever(buildOccurrence({
+                assignees: [
+                    buildAssignee(17, "owner@example.com", "OWNER"),
+                    buildAssignee(18, "co-owner-a@example.com", "CO_OWNER"),
+                    buildAssignee(19, "co-owner-b@example.com", "CO_OWNER"),
+                ],
+            })),
+        );
+        prismaMock.lineAccountLink.findMany.mockResolvedValue(asNever([
+            { userId: 17 },
+            { userId: 19 },
+        ]));
+
+        const result = await dispatchRoutineReminderOutbox(
+            buildNotification(buildPayload()),
+            buildPayload(),
+            new Date("2026-08-03T02:00:00.000Z"),
+        );
+
+        expect(result).toBe("SENT");
+        const rows = prismaMock.notificationOutbox.createMany.mock.calls
+            .flatMap(([value]) => getOutboxCreateManyRows(value))
+            .filter((row) => row.type === "ROUTINE_REMINDER_LINE");
+        expect(rows).toHaveLength(2);
+        expect(rows.map((row) => row.eventKey)).toEqual([
+            "routine:91:rule:31:user:17:version:2:line",
+            "routine:91:rule:31:user:19:version:2:line",
+        ]);
+    });
+
+    it("skips unavailable assignees without blocking eligible co-assignees", async () => {
+        prismaMock.routineOccurrence.findUnique.mockResolvedValue(
+            asNever(buildOccurrence({
+                assignees: [
+                    buildAssignee(17, "owner@example.com", "OWNER"),
+                    buildAssignee(18, "co-owner@example.com", "CO_OWNER"),
+                    {
+                        role: "CO_OWNER",
+                        employee: {
+                            status: "ACTIVE",
+                            deletedAt: null,
+                            user: null,
+                        },
+                    },
+                    {
+                        role: "CO_OWNER",
+                        employee: {
+                            status: "ACTIVE",
+                            deletedAt: null,
+                            user: {
+                                id: 20,
+                                name: "บัญชีปิดใช้งาน",
+                                email: "inactive@example.com",
+                                isActive: false,
+                                deletedAt: null,
+                            },
+                        },
+                    },
+                ],
+            })),
+        );
+
+        const result = await dispatchRoutineReminderOutbox(
+            buildNotification(buildPayload()),
+            buildPayload(),
+            new Date("2026-08-03T02:00:00.000Z"),
+        );
+
+        expect(result).toBe("SENT");
+        expect(createInAppNotificationOnceMock.mock.calls.map(([value]) => value.userId))
+            .toEqual([17, 18]);
+        const rows = getOutboxCreateManyRows(
+            prismaMock.notificationOutbox.createMany.mock.calls[0]?.[0],
+        );
+        expect(rows.map((row): unknown => JSON.parse(row.payload ?? "{}") as unknown)).toEqual([
+            expect.objectContaining({ userId: 17, to: "owner@example.com" }),
+            expect.objectContaining({ userId: 18, to: "co-owner@example.com" }),
+        ]);
     });
 
     it("keeps active recipients in-app when email is missing or invalid", async () => {

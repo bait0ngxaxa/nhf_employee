@@ -17,6 +17,7 @@ import {
     isCalendarDate,
     toBangkokCalendarDate,
 } from "@/lib/routine/schedule";
+import { isRoutineNotificationReady } from "@/lib/routine/notification-readiness";
 import { assertActiveAdminInTransaction } from "@/lib/services/routine/authorization";
 import { createRoutineTaskInTransaction } from "@/lib/services/routine/mutations";
 import type { RoutineCommandActor } from "@/lib/services/routine/types";
@@ -693,6 +694,12 @@ async function loadRoutineReferenceDataForImport(): Promise<RoutineImportReferen
                 departmentId: true,
                 status: true,
                 deletedAt: true,
+                user: {
+                    select: {
+                        isActive: true,
+                        deletedAt: true,
+                    },
+                },
             },
             orderBy: [{ firstName: "asc" }, { lastName: "asc" }],
         }),
@@ -701,9 +708,14 @@ async function loadRoutineReferenceDataForImport(): Promise<RoutineImportReferen
         units,
         categories,
         employees: employees.map((employee) => ({
-            ...employee,
+            id: employee.id,
+            firstName: employee.firstName,
+            lastName: employee.lastName,
+            nickname: employee.nickname,
+            departmentId: employee.departmentId,
             status: employee.status.toString(),
             deletedAt: employee.deletedAt?.toISOString() ?? null,
+            notificationReady: isRoutineNotificationReady(employee),
         })),
     });
 }

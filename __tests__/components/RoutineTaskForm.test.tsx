@@ -49,6 +49,68 @@ describe("RoutineTaskForm reminder rules", () => {
         );
     });
 
+    it("does not offer the manual schedule when creating a Routine", () => {
+        render(
+            <RoutineTaskForm
+                reference={{ units: [], categories: [], employees: [] }}
+                initialTask={null}
+                onSaved={vi.fn()}
+                onCancel={vi.fn()}
+            />,
+        );
+
+        expect(screen.queryByRole("option", { name: "สร้างเอง" })).not.toBeInTheDocument();
+    });
+
+    it("keeps an existing manual Routine editable", () => {
+        const manualTask = {
+            id: 81,
+            unitId: 1,
+            categoryId: 1,
+            title: "งานเดิมแบบสร้างเอง",
+            description: null,
+            scheduleType: "MANUAL",
+            scheduleConfig: {},
+            scheduleText: null,
+            contractStartDate: null,
+            contractEndDate: null,
+            contractText: null,
+            extraDetails: null,
+            businessDayPolicy: "NONE",
+            isActive: true,
+            version: 1,
+            sourceFileName: null,
+            sourceSheet: null,
+            sourceRow: null,
+            createdById: 99,
+            updatedById: 99,
+            createdAt: "2026-01-01T00:00:00.000Z",
+            updatedAt: "2026-08-01T00:00:00.000Z",
+            unit: { id: 1, code: "มสช.", name: "มสช.", isActive: true },
+            category: { id: 1, name: "ระบบคอมพิวเตอร์", sortOrder: 1, isActive: true },
+            assignees: [],
+            reminderRules: [],
+            _count: { occurrences: 0 },
+        } satisfies RoutineTask;
+
+        render(
+            <RoutineTaskForm
+                reference={{
+                    units: [{ id: 1, code: "มสช.", name: "มสช." }],
+                    categories: [{ id: 1, name: "ระบบคอมพิวเตอร์", sortOrder: 1 }],
+                    employees: [],
+                }}
+                initialTask={manualTask}
+                onSaved={vi.fn()}
+                onCancel={vi.fn()}
+            />,
+        );
+
+        expect(screen.getByLabelText("รูปแบบการเกิดงาน")).toHaveValue("MANUAL");
+        expect(screen.getByRole("option", { name: "สร้างเอง" })).toBeInTheDocument();
+        expect(screen.getByText("งานแบบสร้างเองจะไม่สร้างงานแต่ละรอบโดยอัตโนมัติ")).toBeInTheDocument();
+    });
+
     it("cancels a pristine form without opening a confirmation", () => {
         const onCancel = vi.fn();
         render(

@@ -844,6 +844,102 @@ describe("NHF Routine query authorization", () => {
         );
     });
 
+    it("derives notification readiness without returning linked User data", async () => {
+        prismaMock.routineUnit.findMany.mockResolvedValue(asNever([]));
+        prismaMock.routineCategory.findMany.mockResolvedValue(asNever([]));
+        prismaMock.employee.findMany.mockResolvedValue(asNever([
+            {
+                id: 21,
+                firstName: "สมชาย",
+                lastName: "ใจดี",
+                nickname: null,
+                departmentId: 1,
+                status: "ACTIVE",
+                deletedAt: null,
+                user: null,
+            },
+            {
+                id: 22,
+                firstName: "สมหญิง",
+                lastName: "ใจดี",
+                nickname: null,
+                departmentId: 1,
+                status: "ACTIVE",
+                deletedAt: null,
+                user: { isActive: false, deletedAt: null },
+            },
+            {
+                id: 23,
+                firstName: "มานะ",
+                lastName: "พร้อม",
+                nickname: null,
+                departmentId: 1,
+                status: "ACTIVE",
+                deletedAt: null,
+                user: { isActive: true, deletedAt: new Date("2026-08-01T00:00:00.000Z") },
+            },
+            {
+                id: 24,
+                firstName: "มานี",
+                lastName: "พร้อม",
+                nickname: null,
+                departmentId: 1,
+                status: "ACTIVE",
+                deletedAt: null,
+                user: { isActive: true, deletedAt: null },
+            },
+        ]));
+
+        const reference = await getRoutineReferenceData({
+            actor: { id: 99, email: "admin@example.com", role: "ADMIN" },
+            employeeId: null,
+        });
+
+        expect(reference.employees).toEqual([
+            {
+                id: 21,
+                firstName: "สมชาย",
+                lastName: "ใจดี",
+                nickname: null,
+                departmentId: 1,
+                notificationReady: false,
+            },
+            {
+                id: 22,
+                firstName: "สมหญิง",
+                lastName: "ใจดี",
+                nickname: null,
+                departmentId: 1,
+                notificationReady: false,
+            },
+            {
+                id: 23,
+                firstName: "มานะ",
+                lastName: "พร้อม",
+                nickname: null,
+                departmentId: 1,
+                notificationReady: false,
+            },
+            {
+                id: 24,
+                firstName: "มานี",
+                lastName: "พร้อม",
+                nickname: null,
+                departmentId: 1,
+                notificationReady: true,
+            },
+        ]);
+        expect(prismaMock.employee.findMany).toHaveBeenCalledWith(
+            expect.objectContaining({
+                select: expect.objectContaining({
+                    user: {
+                        select: { isActive: true, deletedAt: true },
+                    },
+                }),
+            }),
+        );
+    });
+
     it("parses task filter zero as no active predicate and one as active-only", () => {
         expect(routineTaskFiltersSchema.parse({}).activeOnly).toBeUndefined();
         expect(

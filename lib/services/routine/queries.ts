@@ -13,6 +13,7 @@ import {
     getRoutineTimingStatus,
     type RoutineTimingStatus,
 } from "@/lib/routine/timing";
+import { isRoutineNotificationReady } from "@/lib/routine/notification-readiness";
 import type {
     RoutineOccurrenceFilters,
     RoutineSummaryScope,
@@ -991,6 +992,7 @@ export async function getRoutineReferenceData(
         lastName: string;
         nickname: string | null;
         departmentId: number;
+        notificationReady: boolean;
     }>;
 }> {
     const [units, categories, employees] = await Promise.all([
@@ -1024,9 +1026,28 @@ export async function getRoutineReferenceData(
                 lastName: true,
                 nickname: true,
                 departmentId: true,
+                status: true,
+                deletedAt: true,
+                user: {
+                    select: {
+                        isActive: true,
+                        deletedAt: true,
+                    },
+                },
             },
             orderBy: [{ firstName: "asc" }, { lastName: "asc" }],
         }),
     ]);
-    return { units, categories, employees };
+    return {
+        units,
+        categories,
+        employees: employees.map((employee) => ({
+            id: employee.id,
+            firstName: employee.firstName,
+            lastName: employee.lastName,
+            nickname: employee.nickname,
+            departmentId: employee.departmentId,
+            notificationReady: isRoutineNotificationReady(employee),
+        })),
+    };
 }
