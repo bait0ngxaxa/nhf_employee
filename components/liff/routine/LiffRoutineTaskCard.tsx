@@ -35,7 +35,7 @@ export function LiffRoutineTaskCard({
 
     return (
         <Card
-            className={`gap-4 rounded-2xl border bg-surface-raised px-4 py-4 shadow-sm sm:px-5 ${
+            className={`gap-3 rounded-2xl border bg-surface-raised px-4 py-4 shadow-sm sm:gap-4 sm:px-5 ${
                 isFocused
                     ? "border-brand-solid ring-2 ring-brand-solid/20"
                     : "border-border-subtle"
@@ -46,7 +46,7 @@ export function LiffRoutineTaskCard({
                     งานจากการแจ้งเตือน
                 </p>
             ) : null}
-            <div className="flex items-start justify-between gap-3">
+            <div className="flex min-w-0 flex-col items-start gap-2.5 min-[400px]:flex-row min-[400px]:justify-between min-[400px]:gap-3">
                 <div className="min-w-0">
                     <h3 className="break-words text-base font-bold leading-6 text-content-heading">
                         {task.title}
@@ -56,13 +56,13 @@ export function LiffRoutineTaskCard({
                     </p>
                 </div>
                 <span
-                    className={`shrink-0 rounded-full border px-2.5 py-1 text-xs font-semibold leading-5 ${statusClass}`}
+                    className={`max-w-full shrink-0 whitespace-normal rounded-full border px-2.5 py-1 text-left text-xs font-semibold leading-5 min-[400px]:whitespace-nowrap ${statusClass}`}
                 >
                     {statusLabel}
                 </span>
             </div>
 
-            <dl className="grid gap-2 text-sm text-content-secondary sm:grid-cols-2">
+            <dl className="grid gap-2.5 text-sm text-content-secondary min-[420px]:grid-cols-2">
                 <div className="flex min-w-0 items-start gap-2">
                     <Layers3 className="mt-0.5 size-4 shrink-0 text-content-muted" aria-hidden="true" />
                     <div className="min-w-0">

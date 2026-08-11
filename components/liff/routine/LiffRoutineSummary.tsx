@@ -38,16 +38,21 @@ export function LiffRoutineSummary({
             <h2 id="liff-routine-summary-heading" className="sr-only">
                 สรุปงาน Routine
             </h2>
-            <div className="grid grid-cols-3 gap-2 sm:gap-3">
+            <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 sm:gap-3">
                 {SUMMARY_ITEMS.map((item) => {
                     const Icon = item.icon;
+                    const isWideMobileItem = item.key === "within30Days";
                     return (
                         <Card
                             key={item.key}
-                            className={`gap-2 rounded-2xl border px-3 py-3 shadow-sm sm:gap-3 sm:px-4 sm:py-4 ${item.className}`}
+                            className={`min-w-0 gap-2 rounded-2xl border px-3 py-3 shadow-sm sm:gap-3 sm:px-4 sm:py-4 ${
+                                isWideMobileItem
+                                    ? "col-span-2 flex-row items-center justify-between sm:col-span-1 sm:flex-col sm:items-stretch"
+                                    : ""
+                            } ${item.className}`}
                         >
-                            <div className="flex items-center justify-between gap-2">
-                                <p className="text-xs font-semibold leading-5 sm:text-sm">
+                            <div className="flex min-w-0 items-center justify-between gap-2">
+                                <p className="break-words text-sm font-semibold leading-5">
                                     {item.label}
                                 </p>
                                 <Icon
@@ -56,7 +61,7 @@ export function LiffRoutineSummary({
                                 />
                             </div>
                             <p
-                                className="text-2xl font-bold tabular-nums sm:text-3xl"
+                                className="shrink-0 text-2xl font-bold leading-none tabular-nums sm:text-3xl"
                                 aria-label={`${item.label} ${summary[item.key]} งาน`}
                             >
                                 {summary[item.key]}

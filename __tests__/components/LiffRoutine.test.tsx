@@ -1,4 +1,4 @@
-import { render, screen, waitFor, fireEvent } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => {
@@ -116,6 +116,8 @@ describe("LiffRoutineApp", () => {
         expect(screen.getByText("IT · ฝ่าย IT")).toBeInTheDocument();
         expect(screen.getByText("ระบบคอมพิวเตอร์")).toBeInTheDocument();
         expect(screen.getByLabelText("ถึงกำหนดวันนี้ 1 งาน")).toBeInTheDocument();
+        expect(screen.getByLabelText("ใกล้ถึงกำหนด 2 งาน")).toBeInTheDocument();
+        expect(screen.getByLabelText("ภายใน 30 วัน 3 งาน")).toBeInTheDocument();
         expect(screen.getByText("ยังไม่มีกำหนดรอบถัดไป")).toBeInTheDocument();
     });
 
@@ -137,6 +139,36 @@ describe("LiffRoutineApp", () => {
         await waitFor(() => expect(screen.getByText("ตรวจสอบระบบ")).toBeInTheDocument());
         expect(screen.getByText("วันนี้")).toBeInTheDocument();
         expect(screen.getByText("10 สิงหาคม 2569 · วันนี้")).toBeInTheDocument();
+    });
+
+    it("keeps a long Thai task title and its timing status available together", async () => {
+        const longTitle =
+            "ตรวจสอบและสรุปผลการบำรุงรักษาระบบเครือข่ายประจำสำนักงานประจำเดือน";
+        mocks.fetchLiffRoutineTasks.mockResolvedValueOnce(
+            tasksResponse([{
+                ...TASK,
+                title: longTitle,
+                relevantOccurrence: {
+                    dueDate: "2026-08-13",
+                    timingStatus: "DUE_SOON" as const,
+                    isOverdue: false,
+                    daysUntilDue: 3,
+                },
+            }]),
+        );
+
+        render(<LiffRoutineApp />);
+
+        const title = await screen.findByRole("heading", { name: longTitle });
+        const taskCard = title.closest('[data-slot="card"]');
+        if (!(taskCard instanceof HTMLElement)) {
+            throw new Error("Expected the task heading to be inside a card");
+        }
+
+        expect(within(taskCard).getByText("ใกล้ถึงกำหนด")).toBeInTheDocument();
+        expect(
+            within(taskCard).getByText("13 สิงหาคม 2569 · อีก 3 วัน"),
+        ).toBeInTheDocument();
     });
 
     it("focuses a task from a LINE deep link without bypassing the normal list", async () => {
@@ -292,7 +324,8 @@ describe("LiffRoutineApp", () => {
         render(<LiffRoutineApp />);
         await waitFor(() => expect(screen.getByText("ตรวจสอบระบบ")).toBeInTheDocument());
 
-        fireEvent.click(screen.getByRole("button", { name: "วันนี้" }));
+        const todayFilter = screen.getByRole("button", { name: "วันนี้" });
+        fireEvent.click(todayFilter);
 
         await waitFor(() => {
             expect(mocks.fetchLiffRoutineTasks).toHaveBeenLastCalledWith({
@@ -301,6 +334,7 @@ describe("LiffRoutineApp", () => {
                 timingStatus: "DUE_TODAY",
             });
         });
+        expect(todayFilter).toHaveAttribute("aria-pressed", "true");
         expect(screen.getByText("ไม่พบงานตามตัวกรองนี้")).toBeInTheDocument();
     });
 

@@ -157,13 +157,10 @@ function initialPagination(): LiffRoutineTasksResponse["pagination"] {
 
 function LinkRequiredView({ onConnect }: { onConnect: () => void }): ReactElement {
     return (
-        <main className="min-h-svh bg-surface-subtle px-4 py-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))] sm:px-6">
-            <div className="mx-auto flex min-h-[calc(100svh-3rem)] w-full max-w-lg items-center">
-                <Card className="w-full gap-5 rounded-3xl border-brand-border bg-surface-raised p-6 shadow-sm sm:p-8">
+        <main className="flex min-h-svh items-center bg-surface-subtle pb-[calc(1rem+env(safe-area-inset-bottom))] pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] pt-[calc(1rem+env(safe-area-inset-top))] sm:pb-[calc(1.5rem+env(safe-area-inset-bottom))] sm:pl-[max(1.5rem,env(safe-area-inset-left))] sm:pr-[max(1.5rem,env(safe-area-inset-right))] sm:pt-[calc(1.5rem+env(safe-area-inset-top))]">
+            <div className="mx-auto w-full max-w-lg">
+                <Card className="w-full gap-4 rounded-2xl border-brand-border bg-surface-raised p-5 shadow-sm sm:gap-5 sm:p-8">
                     <div className="space-y-2">
-                        <p className="text-sm font-semibold tracking-wide text-brand-foreground">
-                            NHF Routine
-                        </p>
                         <h1 className="text-2xl font-bold tracking-tight text-content-heading">
                             เชื่อมบัญชี NHF
                         </h1>
@@ -436,7 +433,7 @@ export function LiffRoutineApp(): ReactElement {
                 title="เปิด My Routine ไม่สำเร็จ"
                 description={viewError?.message ?? "กรุณาลองใหม่อีกครั้ง"}
                 action={errorAction}
-                className="min-h-svh rounded-none border-0 bg-surface-subtle px-4 py-10"
+                className="min-h-svh rounded-none border-0 bg-surface-subtle pb-[calc(1rem+env(safe-area-inset-bottom))] pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] pt-[calc(1rem+env(safe-area-inset-top))] sm:pb-[calc(2.5rem+env(safe-area-inset-bottom))] sm:pl-[max(1.5rem,env(safe-area-inset-left))] sm:pr-[max(1.5rem,env(safe-area-inset-right))] sm:pt-[calc(2.5rem+env(safe-area-inset-top))]"
             />
         );
     }
@@ -445,18 +442,15 @@ export function LiffRoutineApp(): ReactElement {
         return (
             <LoadingState
                 label={loadingLabel(state)}
-                className="min-h-svh rounded-none border-0 bg-surface-subtle px-4 py-10"
+                className="min-h-svh rounded-none border-0 bg-surface-subtle pb-[calc(1rem+env(safe-area-inset-bottom))] pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] pt-[calc(1rem+env(safe-area-inset-top))] sm:pb-[calc(2.5rem+env(safe-area-inset-bottom))] sm:pl-[max(1.5rem,env(safe-area-inset-left))] sm:pr-[max(1.5rem,env(safe-area-inset-right))] sm:pt-[calc(2.5rem+env(safe-area-inset-top))]"
             />
         );
     }
 
     return (
-        <main className="min-h-svh bg-surface-subtle px-4 py-5 pb-[calc(1.5rem+env(safe-area-inset-bottom))] sm:px-6 sm:py-8">
-            <div className="mx-auto w-full max-w-lg space-y-5">
+        <main className="min-h-svh bg-surface-subtle pb-[calc(1.25rem+env(safe-area-inset-bottom))] pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] pt-[calc(1rem+env(safe-area-inset-top))] sm:pb-[calc(2rem+env(safe-area-inset-bottom))] sm:pl-[max(1.5rem,env(safe-area-inset-left))] sm:pr-[max(1.5rem,env(safe-area-inset-right))] sm:pt-[calc(2rem+env(safe-area-inset-top))]">
+            <div className="mx-auto w-full max-w-lg space-y-4 sm:space-y-5">
                 <header className="space-y-1">
-                    <p className="text-sm font-semibold tracking-wide text-brand-foreground">
-                        NHF Routine
-                    </p>
                     <h1 className="text-2xl font-bold tracking-tight text-content-heading sm:text-3xl">
                         งาน Routine ของฉัน
                     </h1>
@@ -488,7 +482,7 @@ export function LiffRoutineApp(): ReactElement {
                     onLoadMore={() => void handleLoadMore()}
                 />
             </div>
-            <p className="mx-auto mt-6 max-w-lg text-center text-xs text-content-muted">
+            <p className="mx-auto mt-5 max-w-lg text-center text-xs text-content-muted sm:mt-6">
                 ข้อมูลสรุป ณ วันที่ {formatDate(summary.asOfDate)}
             </p>
         </main>
