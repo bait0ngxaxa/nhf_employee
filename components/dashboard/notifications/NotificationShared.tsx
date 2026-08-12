@@ -4,6 +4,7 @@ import type React from "react";
 import {
     AlertCircle,
     Bell,
+    CalendarClock,
     Check,
     ClipboardCheck,
     Info,
@@ -101,6 +102,8 @@ export function NotificationIcon({
             return <Bell className={cn("text-amber-500", className)} />;
         case "ROUTINE_REMINDER":
             return <ClipboardCheck className={cn("text-violet-500", className)} />;
+        case "ROUTINE_CONTRACT_EXPIRY":
+            return <CalendarClock className={cn("text-orange-600", className)} />;
         case "STOCK_ISSUED":
         case "LEAVE_APPROVED":
         case "LEAVE_NOT_TAKEN_CONFIRMED":

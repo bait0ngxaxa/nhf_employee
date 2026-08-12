@@ -23,6 +23,10 @@ function emptySchedulerResult(): RoutineSchedulerResult {
         duplicatesSkipped: 0,
         inactiveSkipped: 0,
         noRecipientSkipped: 0,
+        contractRemindersConsidered: 0,
+        contractOutboxEnqueued: 0,
+        contractDuplicatesSkipped: 0,
+        contractNoRecipientSkipped: 0,
         errors: 0,
     };
 }

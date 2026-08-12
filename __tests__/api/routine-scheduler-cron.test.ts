@@ -26,6 +26,10 @@ const result = {
     duplicatesSkipped: 1,
     inactiveSkipped: 0,
     noRecipientSkipped: 0,
+    contractRemindersConsidered: 1,
+    contractOutboxEnqueued: 1,
+    contractDuplicatesSkipped: 0,
+    contractNoRecipientSkipped: 0,
     errors: 0,
 };
 
@@ -107,6 +111,10 @@ describe("Routine scheduler cron route", () => {
             duplicatesSkipped: 0,
             inactiveSkipped: 0,
             noRecipientSkipped: 0,
+            contractRemindersConsidered: 0,
+            contractOutboxEnqueued: 0,
+            contractDuplicatesSkipped: 0,
+            contractNoRecipientSkipped: 0,
             errors: 0,
         });
         expect(runRoutineSchedulerMock).not.toHaveBeenCalled();

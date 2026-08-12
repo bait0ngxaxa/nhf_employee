@@ -30,6 +30,15 @@ export {
     ROUTINE_REMINDER_LINE_OUTBOX_TYPE,
 } from "./reminders";
 export {
+    buildRoutineContractExpiryEventKey,
+    dispatchRoutineContractExpiryOutbox,
+    enqueueDueRoutineContractExpiryReminders,
+    getRoutineContractExpiryNotificationDate,
+    ROUTINE_CONTRACT_EXPIRY_EMAIL_OUTBOX_TYPE,
+    ROUTINE_CONTRACT_EXPIRY_LINE_OUTBOX_TYPE,
+    ROUTINE_CONTRACT_EXPIRY_OUTBOX_TYPE,
+} from "./contract-reminders";
+export {
     getRoutineOccurrenceById,
     getRoutineOccurrences,
     getRoutineReferenceData,

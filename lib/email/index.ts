@@ -9,6 +9,7 @@ import {
     type EmailData,
     type LeaveActionPayload,
     type LeaveResultPayload,
+    type RoutineContractExpiryEmailData,
     type RoutineReminderEmailData,
 } from "./types";
 import type {
@@ -32,6 +33,10 @@ import {
     generateRoutineReminderEmailHTML,
     generateRoutineReminderEmailText,
 } from "./templates/routine-reminder";
+import {
+    generateRoutineContractExpiryEmailHTML,
+    generateRoutineContractExpiryEmailText,
+} from "./templates/routine-contract-expiry";
 import {
     APP_DASHBOARD_TABS,
     STOCK_DASHBOARD_TABS,
@@ -268,6 +273,29 @@ export async function sendRoutineReminderNotification(
         html: generateRoutineReminderEmailHTML({ ...data, actionUrl }),
         text: generateRoutineReminderEmailText({ ...data, actionUrl }),
         messageId: buildRoutineReminderMessageId(data),
+        fromName: ROUTINE_EMAIL_FROM_NAME,
+    });
+}
+
+function buildRoutineContractExpiryMessageId(
+    data: RoutineContractExpiryEmailData,
+): string {
+    const safePart = (value: number | string): string =>
+        String(value).replace(/[^a-zA-Z0-9._-]/g, "-");
+    return `<nhf-routine-contract-${safePart(data.taskId)}-end-${safePart(data.contractEndDate)}-user-${safePart(data.userId)}@notifications.thainhf.org>`;
+}
+
+export async function sendRoutineContractExpiryNotification(
+    data: RoutineContractExpiryEmailData,
+): Promise<boolean> {
+    const actionUrl = buildRoutineReminderActionUrl(data.actionUrl);
+    const subjectTitle = data.taskTitle.replace(/[\r\n]+/g, " ").trim();
+    return sendEmail({
+        to: data.to,
+        subject: `[NHF Routine] สัญญาใกล้สิ้นสุด: ${subjectTitle}`,
+        html: generateRoutineContractExpiryEmailHTML({ ...data, actionUrl }),
+        text: generateRoutineContractExpiryEmailText({ ...data, actionUrl }),
+        messageId: buildRoutineContractExpiryMessageId(data),
         fromName: ROUTINE_EMAIL_FROM_NAME,
     });
 }
@@ -514,6 +542,7 @@ export async function sendLeaveNotTakenConfirmedNotification(
 export const emailService = {
     sendEmail,
     sendStockRequestResultNotification,
+    sendRoutineContractExpiryNotification,
     sendRoutineReminderNotification,
     sendNewTicketNotification,
     sendStatusUpdateNotification,
@@ -527,4 +556,8 @@ export const emailService = {
     sendLeaveNotTakenConfirmedNotification,
 };
 
-export type { EmailData, RoutineReminderEmailData };
+export type {
+    EmailData,
+    RoutineContractExpiryEmailData,
+    RoutineReminderEmailData,
+};

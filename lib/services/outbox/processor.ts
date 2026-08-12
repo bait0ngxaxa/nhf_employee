@@ -31,6 +31,7 @@ import {
     type SharedDriveOption,
 } from "@/constants/email-request";
 import { dispatchRoutineReminderOutbox } from "@/lib/services/routine/reminders";
+import { dispatchRoutineContractExpiryOutbox } from "@/lib/services/routine/contract-reminders";
 import {
     MAX_OUTBOX_ATTEMPTS,
     OUTBOX_RETRY_BASE_DELAY_MS,
@@ -328,6 +329,11 @@ async function dispatchNotification(
             null,
         );
         if (routineOutcome) return routineOutcome;
+        const routineContractOutcome = await dispatchRoutineContractExpiryOutbox(
+            notification,
+            null,
+        );
+        if (routineContractOutcome) return routineContractOutcome;
         throw error;
     }
     const routineOutcome = await dispatchRoutineReminderOutbox(
@@ -335,6 +341,12 @@ async function dispatchNotification(
         payload,
     );
     if (routineOutcome) return routineOutcome;
+
+    const routineContractOutcome = await dispatchRoutineContractExpiryOutbox(
+        notification,
+        payload,
+    );
+    if (routineContractOutcome) return routineContractOutcome;
 
     const ticketOutcome = await dispatchTicketOutbox(notification, payload);
     if (ticketOutcome) return ticketOutcome;

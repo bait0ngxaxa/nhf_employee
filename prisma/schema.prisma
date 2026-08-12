@@ -260,6 +260,9 @@ enum NotificationOutboxType {
   ROUTINE_REMINDER_IN_APP
   ROUTINE_REMINDER_EMAIL
   ROUTINE_REMINDER_LINE
+  ROUTINE_CONTRACT_EXPIRY_IN_APP
+  ROUTINE_CONTRACT_EXPIRY_EMAIL
+  ROUTINE_CONTRACT_EXPIRY_LINE
 }
 
 enum NotificationOutboxStatus {
@@ -467,6 +470,7 @@ enum NotificationType {
   STOCK_ISSUED              @map("STOCK_APPROVED")
   STOCK_CANCELLED           @map("STOCK_REJECTED")
   ROUTINE_REMINDER
+  ROUTINE_CONTRACT_EXPIRY
 }
 
 // ==========================================

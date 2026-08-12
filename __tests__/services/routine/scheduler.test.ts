@@ -6,6 +6,7 @@ import { prisma } from "@/lib/db/prisma";
 import { runRoutineScheduler } from "@/lib/services/routine/scheduler";
 
 const generateRoutineTaskOccurrencesMock = vi.hoisted(() => vi.fn());
+const enqueueDueRoutineContractExpiryRemindersMock = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/db/prisma", () => ({
     prisma: mockDeep<PrismaClient>(),
@@ -13,6 +14,11 @@ vi.mock("@/lib/db/prisma", () => ({
 
 vi.mock("@/lib/services/routine/generation", () => ({
     generateRoutineTaskOccurrences: generateRoutineTaskOccurrencesMock,
+}));
+
+vi.mock("@/lib/services/routine/contract-reminders", () => ({
+    enqueueDueRoutineContractExpiryReminders:
+        enqueueDueRoutineContractExpiryRemindersMock,
 }));
 
 const prismaMock = prisma as unknown as ReturnType<typeof mockDeep<PrismaClient>>;
@@ -59,6 +65,13 @@ describe("Routine scheduler", () => {
             created: 3,
             existing: 0,
         });
+        enqueueDueRoutineContractExpiryRemindersMock.mockResolvedValue({
+            considered: 0,
+            enqueued: 0,
+            duplicatesSkipped: 0,
+            noRecipientSkipped: 0,
+            errors: 0,
+        });
         prismaMock.routineTask.findMany.mockResolvedValue(asNever([{ id: 71 }]));
         prismaMock.routineOccurrence.findMany.mockResolvedValue(
             asNever([buildOccurrence()]),
@@ -81,6 +94,10 @@ describe("Routine scheduler", () => {
             duplicatesSkipped: 0,
             inactiveSkipped: 0,
             noRecipientSkipped: 0,
+            contractRemindersConsidered: 0,
+            contractOutboxEnqueued: 0,
+            contractDuplicatesSkipped: 0,
+            contractNoRecipientSkipped: 0,
             errors: 0,
         });
         expect(generateRoutineTaskOccurrencesMock).toHaveBeenCalledWith(71, now);
@@ -93,6 +110,9 @@ describe("Routine scheduler", () => {
                 ),
             }),
         });
+        expect(enqueueDueRoutineContractExpiryRemindersMock).toHaveBeenCalledWith(
+            now,
+        );
     });
 
     it("finds a 70-day reminder for a month-end date shifted into November", async () => {

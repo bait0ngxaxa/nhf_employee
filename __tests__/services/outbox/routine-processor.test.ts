@@ -6,6 +6,7 @@ import { prisma } from "@/lib/db/prisma";
 import { processOutbox } from "@/lib/services/outbox/processor";
 
 const dispatchRoutineReminderOutboxMock = vi.hoisted(() => vi.fn());
+const dispatchRoutineContractExpiryOutboxMock = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/db/prisma", () => ({
     prisma: mockDeep<PrismaClient>(),
@@ -13,6 +14,11 @@ vi.mock("@/lib/db/prisma", () => ({
 
 vi.mock("@/lib/services/routine/reminders", () => ({
     dispatchRoutineReminderOutbox: dispatchRoutineReminderOutboxMock,
+}));
+
+vi.mock("@/lib/services/routine/contract-reminders", () => ({
+    dispatchRoutineContractExpiryOutbox:
+        dispatchRoutineContractExpiryOutboxMock,
 }));
 
 const prismaMock = prisma as unknown as ReturnType<typeof mockDeep<PrismaClient>>;
@@ -56,6 +62,16 @@ function buildLineNotification(): NotificationOutbox {
     };
 }
 
+function buildContractNotification(): NotificationOutbox {
+    return {
+        ...buildNotification(),
+        id: 704,
+        type: "ROUTINE_CONTRACT_EXPIRY_IN_APP",
+        eventKey: "routine-contract:71:end:2026-12-31",
+        payload: JSON.stringify({ taskId: 71, contractEndDate: "2026-12-31" }),
+    };
+}
+
 describe("notification outbox Routine dispatch", () => {
     beforeEach(() => {
         mockReset(prismaMock);
@@ -67,6 +83,7 @@ describe("notification outbox Routine dispatch", () => {
             asNever([buildNotification()]),
         );
         dispatchRoutineReminderOutboxMock.mockResolvedValue("SENT");
+        dispatchRoutineContractExpiryOutboxMock.mockResolvedValue(null);
     });
 
     it("routes Routine reminders through the existing processor", async () => {
@@ -133,6 +150,25 @@ describe("notification outbox Routine dispatch", () => {
                 type: "ROUTINE_REMINDER_LINE",
             }),
             { userId: 17, retryKey: "retry-key" },
+        );
+    });
+
+    it("routes contract expiry events through the existing outbox processor", async () => {
+        prismaMock.notificationOutbox.findMany.mockResolvedValue(
+            asNever([buildContractNotification()]),
+        );
+        dispatchRoutineReminderOutboxMock.mockResolvedValue(null);
+        dispatchRoutineContractExpiryOutboxMock.mockResolvedValue("SENT");
+
+        const result = await processOutbox();
+
+        expect(result).toEqual({ processed: 1, failed: 0 });
+        expect(dispatchRoutineContractExpiryOutboxMock).toHaveBeenCalledWith(
+            expect.objectContaining({
+                id: 704,
+                type: "ROUTINE_CONTRACT_EXPIRY_IN_APP",
+            }),
+            { taskId: 71, contractEndDate: "2026-12-31" },
         );
     });
 });

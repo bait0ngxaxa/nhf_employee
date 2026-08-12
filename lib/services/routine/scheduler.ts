@@ -9,6 +9,7 @@ import {
 } from "@/lib/routine/schedule";
 
 import { generateRoutineTaskOccurrences } from "./generation";
+import { enqueueDueRoutineContractExpiryReminders } from "./contract-reminders";
 import {
     buildRoutineReminderEventKey,
     ROUTINE_REMINDER_OUTBOX_TYPE,
@@ -21,6 +22,10 @@ export interface RoutineSchedulerResult {
     duplicatesSkipped: number;
     inactiveSkipped: number;
     noRecipientSkipped: number;
+    contractRemindersConsidered: number;
+    contractOutboxEnqueued: number;
+    contractDuplicatesSkipped: number;
+    contractNoRecipientSkipped: number;
     errors: number;
 }
 
@@ -249,6 +254,10 @@ export async function runRoutineScheduler(
         duplicatesSkipped: 0,
         inactiveSkipped: 0,
         noRecipientSkipped: 0,
+        contractRemindersConsidered: 0,
+        contractOutboxEnqueued: 0,
+        contractDuplicatesSkipped: 0,
+        contractNoRecipientSkipped: 0,
         errors: 0,
     };
 
@@ -310,6 +319,20 @@ export async function runRoutineScheduler(
                 });
             }
         }
+    }
+
+    try {
+        const contractResult = await enqueueDueRoutineContractExpiryReminders(now);
+        result.contractRemindersConsidered = contractResult.considered;
+        result.contractOutboxEnqueued = contractResult.enqueued;
+        result.contractDuplicatesSkipped = contractResult.duplicatesSkipped;
+        result.contractNoRecipientSkipped = contractResult.noRecipientSkipped;
+        result.errors += contractResult.errors;
+    } catch (error) {
+        result.errors += 1;
+        console.error("Routine scheduler contract expiry evaluation failed", {
+            errorType: error instanceof Error ? error.name : "UnknownError",
+        });
     }
 
     return result;

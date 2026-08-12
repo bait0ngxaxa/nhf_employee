@@ -12,7 +12,7 @@ import {
 
 import type { RoutineReminderRecipientScope } from "./types";
 
-export type RoutineReminderPreset = "monthly" | "yearly" | "contract";
+export type RoutineReminderPreset = "monthly" | "yearly";
 
 export interface RoutineReminderRuleForm {
     daysBefore: string;
@@ -28,7 +28,6 @@ export const ROUTINE_REMINDER_PRESETS: ReadonlyArray<{
 }> = [
     { value: "monthly", label: "งานรายเดือน: 3 และ 1 วัน", daysBefore: [3, 1] },
     { value: "yearly", label: "งานรายปี: 14, 7 และ 1 วัน", daysBefore: [14, 7, 1] },
-    { value: "contract", label: "งานต่อสัญญา: 30, 7 และ 1 วัน", daysBefore: [30, 7, 1] },
 ];
 
 export function getRoutineReminderPresetDays(
@@ -108,7 +107,7 @@ export function RoutineReminderFields({
                 <div className="min-w-0">
                     <p className="text-base font-semibold text-content-heading">ตั้งค่ารอบการแจ้งเตือน</p>
                     <p className="mt-1 max-w-prose text-sm leading-6 text-content-secondary">
-                        ตรวจตามเวลาไทย (Asia/Bangkok) และแจ้งเตือนทั้งในระบบและอีเมล
+                        ตรวจตามเวลาไทย (Asia/Bangkok) และแจ้งเตือนในระบบ อีเมล และ LINE เมื่อผู้รับเชื่อมบัญชีไว้
                     </p>
                 </div>
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
@@ -141,7 +140,7 @@ export function RoutineReminderFields({
             </div>
             {rules.length === 0 ? (
                 <p className="rounded-lg border border-dashed border-border-subtle bg-background px-4 py-3 text-sm leading-6 text-content-secondary" aria-live="polite">
-                    ยังไม่มีกฎ ระบบจะไม่ส่งการแจ้งเตือนสำหรับแม่แบบนี้
+                    ยังไม่มีกฎ ระบบจะไม่ส่งการแจ้งเตือนล่วงหน้าสำหรับวันครบกำหนดของงานแต่ละรอบ
                 </p>
             ) : (
                 <div className="space-y-3">

@@ -427,6 +427,25 @@ export const routineReminderLineOutboxPayloadSchema = z.object({
     retryKey: lineRetryKeySchema,
 });
 
+export const routineContractExpiryOutboxPayloadSchema = z.object({
+    taskId: z.number().int().positive(),
+    contractEndDate: dateSchema,
+    notificationDate: dateSchema,
+    scheduledFor: z.iso.datetime(),
+    createdAt: z.iso.datetime(),
+});
+
+export const routineContractExpiryEmailOutboxPayloadSchema = z.object({
+    taskId: z.number().int().positive(),
+    userId: z.number().int().positive(),
+    contractEndDate: dateSchema,
+});
+
+export const routineContractExpiryLineOutboxPayloadSchema =
+    routineContractExpiryEmailOutboxPayloadSchema.extend({
+        retryKey: lineRetryKeySchema,
+    });
+
 export type RoutineTaskCreateInput = z.infer<typeof routineTaskCreateSchema>;
 export type RoutineTaskUpdateInput = z.infer<typeof routineTaskUpdateSchema>;
 export type RoutineOccurrenceFilters = z.infer<
@@ -450,6 +469,15 @@ export type RoutineReminderEmailOutboxPayload = z.infer<
 >;
 export type RoutineReminderLineOutboxPayload = z.infer<
     typeof routineReminderLineOutboxPayloadSchema
+>;
+export type RoutineContractExpiryOutboxPayload = z.infer<
+    typeof routineContractExpiryOutboxPayloadSchema
+>;
+export type RoutineContractExpiryEmailOutboxPayload = z.infer<
+    typeof routineContractExpiryEmailOutboxPayloadSchema
+>;
+export type RoutineContractExpiryLineOutboxPayload = z.infer<
+    typeof routineContractExpiryLineOutboxPayloadSchema
 >;
 
 export function parseRoutineScheduleConfig(

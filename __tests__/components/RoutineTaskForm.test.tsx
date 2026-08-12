@@ -256,9 +256,15 @@ describe("RoutineTaskForm reminder rules", () => {
         expect(screen.getByText("วันที่ของเดือน")).toBeInTheDocument();
         expect(screen.queryByText("เดือนที่เลื่อนจากรอบปกติ")).not.toBeInTheDocument();
         expect(screen.getByText("ช่วงสัญญา")).toBeInTheDocument();
+        expect(screen.getByText(
+            "เมื่อระบุวันสิ้นสุดสัญญา ระบบจะแจ้งผู้รับผิดชอบอัตโนมัติล่วงหน้า 1 เดือนตามปฏิทิน",
+        )).toBeInTheDocument();
         expect(screen.getAllByRole("option", { name: "มสช." })).toHaveLength(1);
         expect(screen.getByRole("option", { name: "เลือกรูปแบบการแจ้งเตือน" })).toBeInTheDocument();
         expect(screen.getByLabelText("เลือกชุดกฎการแจ้งเตือน")).toHaveValue("");
+        expect(screen.queryByRole("option", {
+            name: "งานต่อสัญญา: 30, 7 และ 1 วัน",
+        })).not.toBeInTheDocument();
 
         fireEvent.change(screen.getByDisplayValue("เลือกหน่วยงาน"), {
             target: { value: "1" },
@@ -365,7 +371,9 @@ describe("RoutineTaskForm reminder rules", () => {
         expect(screen.getByText("ผู้รับผิดชอบคือคุณ และการแจ้งเตือนจะส่งทั้งในระบบและอีเมล")).toBeInTheDocument();
         expect(screen.getByText("สมชาย ใจดี")).toBeInTheDocument();
         expect(screen.queryByLabelText("ค้นหาพนักงาน")).not.toBeInTheDocument();
-        expect(screen.getByText(/แจ้งเตือนทั้งในระบบและอีเมล/)).toBeInTheDocument();
+        expect(screen.getByText(
+            "ตรวจตามเวลาไทย (Asia/Bangkok) และแจ้งเตือนในระบบ อีเมล และ LINE เมื่อผู้รับเชื่อมบัญชีไว้",
+        )).toBeInTheDocument();
 
         fireEvent.change(screen.getByDisplayValue("เลือกหน่วยงาน"), { target: { value: "1" } });
         fireEvent.change(screen.getByDisplayValue("เลือกหมวดหมู่"), { target: { value: "1" } });

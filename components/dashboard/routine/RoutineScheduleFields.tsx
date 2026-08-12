@@ -235,6 +235,9 @@ export function RoutineScheduleFields({
                 <p className="mt-1 text-sm leading-6 text-content-secondary">
                     ระบุเมื่อรายการนี้มีช่วงเวลาตามสัญญา
                 </p>
+                <p className="mt-2 max-w-prose text-sm leading-6 text-brand-strong">
+                    เมื่อระบุวันสิ้นสุดสัญญา ระบบจะแจ้งผู้รับผิดชอบอัตโนมัติล่วงหน้า 1 เดือนตามปฏิทิน
+                </p>
                 <div className="mt-4 grid gap-4 sm:grid-cols-2">
                     <label className="grid gap-1 text-sm font-medium text-content-body">
                         วันเริ่มสัญญา

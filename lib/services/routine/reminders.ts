@@ -2,7 +2,6 @@ import { randomUUID } from "node:crypto";
 
 import type { NotificationOutbox, Prisma } from "@prisma/client";
 import { Role } from "@prisma/client";
-import { z } from "zod";
 
 import {
     sendRoutineReminderNotification,
@@ -15,10 +14,6 @@ import {
     buildRoutineLiffTaskUrl,
 } from "@/lib/line/routine-links";
 import { runSerializableTransaction } from "@/lib/db/transaction";
-import {
-    getEmployeeBackedUserDisplayName,
-    type EmployeeDisplayNameSource,
-} from "@/lib/helpers/employee-helpers";
 import {
     createInAppNotificationOnce,
 } from "@/lib/services/notifications/in-app";
@@ -37,6 +32,12 @@ import {
     type RoutineReminderLineOutboxPayload,
     type RoutineReminderOutboxPayload,
 } from "@/lib/validations/routine";
+import {
+    isActiveRoutineEmployee,
+    isActiveRoutineUser,
+    resolveLinkedRoutineLineRecipients,
+    resolveRoutineNotificationRecipients,
+} from "./recipients";
 
 export const ROUTINE_REMINDER_OUTBOX_TYPE = "ROUTINE_REMINDER_IN_APP" as const;
 export const ROUTINE_REMINDER_EMAIL_OUTBOX_TYPE = "ROUTINE_REMINDER_EMAIL" as const;
@@ -101,34 +102,6 @@ const ROUTINE_REMINDER_OCCURRENCE_SELECT = {
 type RoutineReminderOccurrence = Prisma.RoutineOccurrenceGetPayload<{
     select: typeof ROUTINE_REMINDER_OCCURRENCE_SELECT;
 }>;
-
-type RoutineReminderRecipient = {
-    userId: number;
-    email: string;
-    name: string;
-    isAssignee: boolean;
-};
-
-type RoutineReminderRecipients = {
-    activeRecipients: RoutineReminderRecipient[];
-    emailRecipients: RoutineReminderRecipient[];
-};
-
-const routineReminderEmailSchema = z.string().trim().email();
-
-function isActiveUser(user: {
-    isActive: boolean;
-    deletedAt: Date | null;
-}): boolean {
-    return user.isActive && user.deletedAt === null;
-}
-
-function isActiveEmployee(employee: {
-    status: string;
-    deletedAt: Date | null;
-}): boolean {
-    return employee.status === "ACTIVE" && employee.deletedAt === null;
-}
 
 export function buildRoutineReminderEventKey(
     occurrenceId: number,
@@ -203,93 +176,6 @@ export function formatRoutineReminderTiming(daysBefore: number): string {
     return daysBefore === 0
         ? "ครบกำหนดวันนี้"
         : `เหลือเวลา ${daysBefore} วัน`;
-}
-
-async function resolveRoutineRecipients(
-    tx: Pick<Prisma.TransactionClient, "user">,
-    scope: "ASSIGNEES" | "ADMINS" | "ASSIGNEES_AND_ADMINS",
-    snapshot: RoutineReminderOccurrence,
-): Promise<RoutineReminderRecipients> {
-    const recipients = new Map<number, RoutineReminderRecipient>();
-    const addRecipient = (user: {
-        id: number;
-        email: string;
-        name: string;
-    }, isAssignee: boolean, employee?: EmployeeDisplayNameSource | null): void => {
-        const existing = recipients.get(user.id);
-        recipients.set(user.id, {
-            userId: user.id,
-            email: user.email,
-            name: getEmployeeBackedUserDisplayName(
-                { ...user, employee },
-                "ผู้รับการแจ้งเตือน",
-            ),
-            isAssignee: existing?.isAssignee ?? isAssignee,
-        });
-    };
-
-    if (scope === "ASSIGNEES" || scope === "ASSIGNEES_AND_ADMINS") {
-        snapshot.assignees.forEach(({ employee }) => {
-            if (!isActiveEmployee(employee) || !employee.user || !isActiveUser(employee.user)) {
-                return;
-            }
-            addRecipient(employee.user, true, employee);
-        });
-    }
-    if (scope === "ADMINS" || scope === "ASSIGNEES_AND_ADMINS") {
-        const admins = await tx.user.findMany({
-            where: { role: Role.ADMIN, isActive: true, deletedAt: null },
-            select: {
-                id: true,
-                email: true,
-                name: true,
-                employee: {
-                    select: {
-                        firstName: true,
-                        lastName: true,
-                        nickname: true,
-                    },
-                },
-            },
-        });
-        admins.forEach((admin) => addRecipient(admin, false, admin.employee));
-    }
-
-    const activeRecipients = [...recipients.values()];
-    const emailRecipients = activeRecipients.flatMap((recipient) => {
-        if (/[\r\n]/.test(recipient.email)) {
-            console.warn("Routine reminder recipient email is unavailable", {
-                userId: recipient.userId,
-            });
-            return [];
-        }
-
-        const parsedEmail = routineReminderEmailSchema.safeParse(recipient.email);
-        if (!parsedEmail.success) {
-            console.warn("Routine reminder recipient email is unavailable", {
-                userId: recipient.userId,
-            });
-            return [];
-        }
-
-        return [{ ...recipient, email: parsedEmail.data }];
-    });
-
-    return { activeRecipients, emailRecipients };
-}
-
-async function resolveLinkedRoutineLineRecipients(
-    tx: Pick<Prisma.TransactionClient, "lineAccountLink">,
-    recipients: readonly RoutineReminderRecipient[],
-): Promise<RoutineReminderRecipient[]> {
-    if (recipients.length === 0) return [];
-
-    const links = (await tx.lineAccountLink.findMany({
-        where: { userId: { in: recipients.map((recipient) => recipient.userId) } },
-        select: { userId: true },
-    })) ?? [];
-    const linkedUserIds = new Set(links.map((link) => link.userId));
-    return recipients.filter((recipient) => linkedUserIds.has(recipient.userId));
 }
 
 async function markRoutineReminderSuperseded(
@@ -563,8 +449,8 @@ async function dispatchRoutineReminderLineOutbox(
         const lineUserId = recipient?.lineAccountLink?.lineUserId.trim();
         if (
             !recipient
-            || !isActiveUser(recipient)
-            || (recipient.employee !== null && !isActiveEmployee(recipient.employee))
+            || !isActiveRoutineUser(recipient)
+            || (recipient.employee !== null && !isActiveRoutineEmployee(recipient.employee))
             || (recipient.employeeId !== null && recipient.employee === null)
             || !lineUserId
         ) {
@@ -745,10 +631,10 @@ export async function dispatchRoutineReminderOutbox(
             return "DEFERRED";
         }
 
-        const { activeRecipients, emailRecipients } = await resolveRoutineRecipients(
+        const { activeRecipients, emailRecipients } = await resolveRoutineNotificationRecipients(
             tx,
             rule.recipientScope,
-            occurrence,
+            occurrence.assignees,
         );
         if (activeRecipients.length === 0) {
             console.warn("Routine reminder has no active recipients", {

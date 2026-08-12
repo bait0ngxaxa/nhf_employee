@@ -16,6 +16,9 @@ describe("NotificationIcon", () => {
                 <span data-testid="cancelled">
                     <NotificationIcon type="LEAVE_CANCELLED" />
                 </span>
+                <span data-testid="contract-expiry">
+                    <NotificationIcon type="ROUTINE_CONTRACT_EXPIRY" />
+                </span>
             </div>,
         );
 
@@ -27,6 +30,9 @@ describe("NotificationIcon", () => {
         );
         expect(screen.getByTestId("cancelled").querySelector("svg")).toHaveClass(
             "text-rose-500",
+        );
+        expect(screen.getByTestId("contract-expiry").querySelector("svg")).toHaveClass(
+            "text-orange-600",
         );
     });
 });

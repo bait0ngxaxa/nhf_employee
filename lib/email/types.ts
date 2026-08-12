@@ -22,6 +22,18 @@ export interface RoutineReminderEmailData {
     reminderVersion: number;
 }
 
+export interface RoutineContractExpiryEmailData {
+    to: string;
+    recipientName: string;
+    taskTitle: string;
+    unitName: string;
+    categoryName: string;
+    contractEndDate: string;
+    actionUrl: string;
+    taskId: number;
+    userId: number;
+}
+
 export type {
     LeaveActionPayload,
     LeaveCancelledPayload,
