@@ -132,6 +132,52 @@ describe("leave report export queries", () => {
         );
     });
 
+    it("derives report entitlement across a missing quota year", async () => {
+        const historicalRequest = createHistoricalRequest(101, 301);
+        const { employee: employeeProfile, ...request } = historicalRequest;
+        vi.mocked(prisma.employee.findMany).mockResolvedValue([{
+            ...employeeProfile,
+            leaveQuotas: [{
+                leaveType: "PERSONAL",
+                year: 2029,
+                totalHalfDays: 20,
+                carryBalanceHalfDays: 0,
+                usedHalfDays: 12,
+            }],
+            leaveRequests: [request],
+        }] as never);
+
+        const employees = await loadCurrentTeamReportEmployees(101, 2031);
+
+        expect(employees[0]?.leaveQuotas).toContainEqual({
+            leaveType: "PERSONAL",
+            effectiveTotalDays: 24,
+        });
+    });
+
+    it("keeps negative effective entitlement in report quota data", async () => {
+        const historicalRequest = createHistoricalRequest(101, 301);
+        const { employee: employeeProfile, ...request } = historicalRequest;
+        vi.mocked(prisma.employee.findMany).mockResolvedValue([{
+            ...employeeProfile,
+            leaveQuotas: [{
+                leaveType: "PERSONAL",
+                year: 2031,
+                totalHalfDays: 20,
+                carryBalanceHalfDays: -24,
+                usedHalfDays: 0,
+            }],
+            leaveRequests: [request],
+        }] as never);
+
+        const employees = await loadCurrentTeamReportEmployees(101, 2031);
+
+        expect(employees[0]?.leaveQuotas).toContainEqual({
+            leaveType: "PERSONAL",
+            effectiveTotalDays: -2,
+        });
+    });
+
     it("exports current-team reports with summary and detail sheets", async () => {
         const historicalRequest = createHistoricalRequest(101, 301);
         const { employee: employeeProfile, ...request } = historicalRequest;

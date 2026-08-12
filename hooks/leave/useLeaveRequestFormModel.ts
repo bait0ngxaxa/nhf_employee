@@ -25,8 +25,9 @@ type LeaveTypeValue = LeaveRequestValues["leaveType"];
 
 interface LeaveQuotaSnapshot {
     leaveType: LeaveTypeValue;
-    totalDays: number;
+    effectiveTotalDays: number;
     usedDays: number;
+    remainingDays: number;
 }
 
 interface UseLeaveRequestFormModelArgs {
@@ -141,10 +142,14 @@ export function useLeaveRequestFormModel({
     const periodValue = form.watch("period");
 
     const quota = quotas.find((item) => item.leaveType === leaveType);
-    const remainingQuota = quota ? quota.totalDays - quota.usedDays : 0;
+    const remainingQuota = quota?.remainingDays ?? 0;
     const requestedDays = getRequestedDays(startDateValue, endDateValue, periodValue);
     const overQuotaDays = quota
-        ? calculateAdditionalOverQuotaDays(quota.totalDays, quota.usedDays, requestedDays)
+        ? calculateAdditionalOverQuotaDays(
+            quota.effectiveTotalDays,
+            quota.usedDays,
+            requestedDays,
+        )
         : 0;
     const needsSpecialReason = overQuotaDays > 0;
     const needsEmergencyReason = isValidDateString(startDateValue)
@@ -217,7 +222,7 @@ export function useLeaveRequestFormModel({
         const submitRequestedDays = getRequestedDays(data.startDate, data.endDate, data.period);
         const submitOverQuotaDays = submitQuota
             ? calculateAdditionalOverQuotaDays(
-                submitQuota.totalDays,
+                submitQuota.effectiveTotalDays,
                 submitQuota.usedDays,
                 submitRequestedDays,
             )

@@ -1,23 +1,29 @@
 export function calculateAdditionalOverQuotaHalfDays(
-    totalHalfDays: number,
+    effectiveTotalHalfDays: number,
     usedHalfDays: number,
     requestedHalfDays: number,
 ): number {
-    const currentOverQuotaHalfDays = Math.max(0, usedHalfDays - totalHalfDays);
+    const currentOverQuotaHalfDays = Math.max(
+        0,
+        usedHalfDays - effectiveTotalHalfDays,
+    );
     const nextOverQuotaHalfDays = Math.max(
         0,
-        usedHalfDays + requestedHalfDays - totalHalfDays,
+        usedHalfDays + requestedHalfDays - effectiveTotalHalfDays,
     );
 
     return nextOverQuotaHalfDays - currentOverQuotaHalfDays;
 }
 
 export function calculateAdditionalOverQuotaDays(
-    totalDays: number,
+    effectiveTotalDays: number,
     usedDays: number,
     requestedDays: number,
 ): number {
-    const currentOverQuotaDays = Math.max(0, usedDays - totalDays);
-    const nextOverQuotaDays = Math.max(0, usedDays + requestedDays - totalDays);
+    const currentOverQuotaDays = Math.max(0, usedDays - effectiveTotalDays);
+    const nextOverQuotaDays = Math.max(
+        0,
+        usedDays + requestedDays - effectiveTotalDays,
+    );
     return nextOverQuotaDays - currentOverQuotaDays;
 }

@@ -373,12 +373,13 @@ enum NotificationType {
 // ==========================================
 
 model LeaveQuota {
-  id            String    @id @default(cuid())
-  employeeId    Int
-  year          Int // ปี ค.ศ. (เช่น 2026)
-  leaveType     LeaveType
-  totalHalfDays Int // โควตาทั้งหมด หน่วยครึ่งวัน (1 = ครึ่งวัน, 2 = หนึ่งวัน)
-  usedHalfDays  Int       @default(0) // โควตาที่ใช้แล้ว หน่วยครึ่งวัน
+  id                   String    @id @default(cuid())
+  employeeId           Int
+  year                 Int // ปี ค.ศ. (เช่น 2026)
+  leaveType            LeaveType
+  totalHalfDays        Int // สิทธิประจำปี หน่วยครึ่งวัน (1 = ครึ่งวัน, 2 = หนึ่งวัน)
+  carryBalanceHalfDays Int       @default(0) // ยอดยกมาต้นปีแบบมีเครื่องหมาย หน่วยครึ่งวัน
+  usedHalfDays         Int       @default(0) // โควตาที่ใช้แล้ว หน่วยครึ่งวัน
 
   employee Employee @relation(fields: [employeeId], references: [id])
 

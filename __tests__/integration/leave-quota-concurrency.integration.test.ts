@@ -252,9 +252,20 @@ describe.sequential("leave quota creation concurrency with real MySQL", () => {
                 year: LEAVE_YEAR,
                 leaveType: "PERSONAL",
             },
-            select: { id: true },
+            select: {
+                id: true,
+                totalHalfDays: true,
+                carryBalanceHalfDays: true,
+                usedHalfDays: true,
+            },
         });
-        expect(quotaRows).toHaveLength(1);
+        expect(quotaRows).toEqual([
+            expect.objectContaining({
+                totalHalfDays: 20,
+                carryBalanceHalfDays: 0,
+                usedHalfDays: 0,
+            }),
+        ]);
 
         await expect(
             prisma.leaveRequest.count({ where: { employeeId: fixture.employeeId } }),

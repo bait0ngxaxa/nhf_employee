@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
 
-import { ALL_LEAVE_TYPES, DEFAULT_LEAVE_QUOTA_HALF_DAYS } from "@/constants/leave";
 import { requireActiveWorkforceSession } from "@/lib/auth/workforce";
 import { prisma } from "@/lib/db/prisma";
+import { runSerializableTransaction } from "@/lib/db/transaction";
 import { getCurrentLeaveYear } from "@/lib/services/leave/quota-year";
 import { toLeaveQuotaDays, toLeaveRequestDays } from "@/lib/services/leave/half-days";
+import { ensureLeaveQuotasForYear } from "@/lib/services/leave/quota-entitlement";
 import {
     leaveAttachmentSummaryOrderBy,
     leaveAttachmentSummarySelect,
@@ -31,30 +32,9 @@ export async function GET(req: Request) {
         const { employeeId } = auth;
 
         const currentYear = getCurrentLeaveYear();
-        const existingQuotas = await prisma.leaveQuota.findMany({
-            where: { employeeId, year: currentYear },
-        });
-
-        const existingTypes = new Set(existingQuotas.map((q) => q.leaveType));
-        const missingTypes = ALL_LEAVE_TYPES.filter((type) => !existingTypes.has(type));
-
-        if (missingTypes.length > 0) {
-            await prisma.leaveQuota.createMany({
-                data: missingTypes.map((leaveType) => ({
-                    employeeId,
-                    year: currentYear,
-                    leaveType,
-                    totalHalfDays: DEFAULT_LEAVE_QUOTA_HALF_DAYS[leaveType],
-                    usedHalfDays: 0,
-                })),
-                skipDuplicates: true,
-            });
-        }
-
-        const quotas =
-            missingTypes.length > 0
-                ? await prisma.leaveQuota.findMany({ where: { employeeId, year: currentYear } })
-                : existingQuotas;
+        const quotas = await runSerializableTransaction((tx) =>
+            ensureLeaveQuotasForYear(tx, employeeId, currentYear),
+        );
 
         const url = new URL(req.url);
         const page = Number.parseInt(url.searchParams.get("page") || "1", 10);

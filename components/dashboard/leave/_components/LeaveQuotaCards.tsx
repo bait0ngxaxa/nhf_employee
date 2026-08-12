@@ -1,13 +1,13 @@
 import type { ComponentType } from "react";
 import { Briefcase, Palmtree, Thermometer } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
-import type { LeaveQuota } from "@/hooks/useLeaveProfile";
+import type { LeaveQuotaBalance } from "@/hooks/useLeaveProfile";
 import { cn } from "@/lib/ui/utils";
 
 interface LeaveQuotaCardsProps {
-    sickQuota: LeaveQuota | { totalDays: number; usedDays: number };
-    personalQuota: LeaveQuota | { totalDays: number; usedDays: number };
-    vacationQuota: LeaveQuota | { totalDays: number; usedDays: number };
+    sickQuota: LeaveQuotaBalance;
+    personalQuota: LeaveQuotaBalance;
+    vacationQuota: LeaveQuotaBalance;
 }
 
 interface QuotaCardProps {
@@ -15,6 +15,8 @@ interface QuotaCardProps {
     remain: number;
     used: number;
     total: number;
+    annualTotal: number;
+    carryBalance?: number;
     note: string;
     icon: ComponentType<{ className?: string }>;
     theme: {
@@ -25,20 +27,36 @@ interface QuotaCardProps {
     };
 }
 
-function QuotaCard({ title, remain, used, total, note, icon: Icon, theme }: QuotaCardProps) {
+function QuotaCard({
+    title,
+    remain,
+    used,
+    total,
+    annualTotal,
+    carryBalance,
+    note,
+    icon: Icon,
+    theme,
+}: QuotaCardProps) {
     const isOverQuota = remain < 0;
     const displayedRemain = isOverQuota ? Math.abs(remain) : remain;
     const progress = getQuotaProgress(used, total);
+    const showCarry = carryBalance !== undefined;
 
     return (
-        <Card className="border-border-subtle shadow-sm">
-            <CardContent className="p-5">
+        <Card className="h-full border-border-subtle shadow-sm">
+            <CardContent className="flex h-full flex-col p-5">
                 <div className="flex items-start justify-between gap-4">
                     <div className="min-w-0">
                         <p className="text-base/6 font-semibold text-content-heading">{title}</p>
                         <p className="mt-1 text-xs/5 font-medium text-content-muted">{note}</p>
                         <div className="mt-4 flex items-baseline gap-2">
-                            <p className={cn("tabular-nums text-4xl font-bold tracking-tight", isOverQuota ? "text-rose-700" : theme.valueColor)}>
+                            <p
+                                className={cn(
+                                    "tabular-nums text-4xl font-bold tracking-tight",
+                                    isOverQuota ? "text-rose-700" : theme.valueColor,
+                                )}
+                            >
                                 {displayedRemain}
                             </p>
                             <p className="text-sm/6 font-semibold text-content-secondary">
@@ -51,14 +69,41 @@ function QuotaCard({ title, remain, used, total, note, icon: Icon, theme }: Quot
                     </div>
                 </div>
 
-                <div className="mt-5">
+                <div className="mt-4 space-y-1 text-xs/5 text-content-secondary">
+                    <p>
+                        สิทธิประจำปี <span className="tabular-nums">{annualTotal} วัน</span>
+                    </p>
+                    {showCarry ? (
+                        <p
+                            className={cn(
+                                "break-words tabular-nums font-medium",
+                                carryBalance < 0 && "text-rose-700",
+                            )}
+                        >
+                            {carryBalance < 0 ? "ยอดเกินสิทธิ์ยกมา" : "ยอดยกมา"}{" "}
+                            {formatSignedDays(carryBalance)} วัน
+                        </p>
+                    ) : null}
+                </div>
+
+                <div className="mt-auto pt-5">
                     <div className="flex items-center justify-between gap-3 text-xs/5 font-medium text-content-secondary">
                         <span>ใช้ไปแล้ว</span>
-                        <span className="tabular-nums">{used}/{total} วัน</span>
+                        <span className="tabular-nums">
+                            {total > 0 ? `${used}/${total} วัน` : `${used} วัน`}
+                        </span>
                     </div>
                     <div
                         className="mt-2 h-2 overflow-hidden rounded-full bg-surface-muted"
-                        aria-label={`ใช้วันลาไปแล้ว ${used} จาก ${total} วัน`}
+                        role="progressbar"
+                        aria-valuemin={0}
+                        aria-valuemax={100}
+                        aria-valuenow={progress}
+                        aria-label={
+                            total > 0
+                                ? `ใช้วันลาไปแล้ว ${used} จาก ${total} วัน`
+                                : `ใช้วันลาไปแล้ว ${used} วัน โดยสิทธิรวมไม่เป็นบวก`
+                        }
                     >
                         <div
                             className={cn("h-full rounded-full", isOverQuota ? "bg-rose-500" : theme.barColor)}
@@ -73,13 +118,14 @@ function QuotaCard({ title, remain, used, total, note, icon: Icon, theme }: Quot
 
 export function LeaveQuotaCards({ sickQuota, personalQuota, vacationQuota }: LeaveQuotaCardsProps) {
     return (
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
             <QuotaCard
                 title="ลาป่วย"
-                remain={sickQuota.totalDays - sickQuota.usedDays}
+                remain={sickQuota.remainingDays}
                 used={sickQuota.usedDays}
-                total={sickQuota.totalDays}
-                note="โควต้า 30 วัน/ปี"
+                total={sickQuota.effectiveTotalDays}
+                annualTotal={sickQuota.totalDays}
+                note="สิทธิประจำปี"
                 icon={Thermometer}
                 theme={{
                     iconSurface: "bg-emerald-50",
@@ -90,10 +136,12 @@ export function LeaveQuotaCards({ sickQuota, personalQuota, vacationQuota }: Lea
             />
             <QuotaCard
                 title="ลากิจ"
-                remain={personalQuota.totalDays - personalQuota.usedDays}
+                remain={personalQuota.remainingDays}
                 used={personalQuota.usedDays}
-                total={personalQuota.totalDays}
-                note="สิทธิปีนี้"
+                total={personalQuota.effectiveTotalDays}
+                annualTotal={personalQuota.totalDays}
+                carryBalance={personalQuota.carryBalanceDays}
+                note="สิทธิรวมหลังยอดยกมา"
                 icon={Briefcase}
                 theme={{
                     iconSurface: "bg-sky-50",
@@ -104,10 +152,12 @@ export function LeaveQuotaCards({ sickQuota, personalQuota, vacationQuota }: Lea
             />
             <QuotaCard
                 title="ลาพักร้อน"
-                remain={vacationQuota.totalDays - vacationQuota.usedDays}
+                remain={vacationQuota.remainingDays}
                 used={vacationQuota.usedDays}
-                total={vacationQuota.totalDays}
-                note="สิทธิปีนี้"
+                total={vacationQuota.effectiveTotalDays}
+                annualTotal={vacationQuota.totalDays}
+                carryBalance={vacationQuota.carryBalanceDays}
+                note="สิทธิรวมหลังยอดยกมา"
                 icon={Palmtree}
                 theme={{
                     iconSurface: "bg-amber-50",
@@ -122,8 +172,15 @@ export function LeaveQuotaCards({ sickQuota, personalQuota, vacationQuota }: Lea
 
 function getQuotaProgress(used: number, total: number): number {
     if (total <= 0) {
-        return 0;
+        return 100;
     }
 
     return Math.min(100, Math.max(0, (used / total) * 100));
+}
+
+function formatSignedDays(days: number): string {
+    if (days > 0) {
+        return `+${days}`;
+    }
+    return String(days);
 }

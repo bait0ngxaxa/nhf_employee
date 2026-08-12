@@ -15,15 +15,25 @@ const fetcher = async <T,>(url: string): Promise<T> => {
 };
 
 export interface LeaveQuota {
-    id: number;
+    id: string;
     year: number;
     employeeId: number;
     leaveType: "SICK" | "PERSONAL" | "VACATION";
     totalDays: number;
+    carryBalanceDays: number;
+    effectiveTotalDays: number;
     usedDays: number;
-    createdAt: string;
-    updatedAt: string;
+    remainingDays: number;
 }
+
+export type LeaveQuotaBalance = Pick<
+    LeaveQuota,
+    | "totalDays"
+    | "carryBalanceDays"
+    | "effectiveTotalDays"
+    | "usedDays"
+    | "remainingDays"
+>;
 
 export interface LeaveRequest {
     id: string;

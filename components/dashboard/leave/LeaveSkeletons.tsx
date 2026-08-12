@@ -17,6 +17,10 @@ function LeaveQuotaSkeleton(): ReactElement {
                         <Skeleton className="h-10 w-16" />
                         <Skeleton className="h-5 w-20" />
                     </div>
+                    <div className="pt-2">
+                        <Skeleton className="h-4 w-32" />
+                        <Skeleton className="mt-1 h-4 w-36" />
+                    </div>
                 </div>
                 <Skeleton className="h-10 w-10 rounded-lg" />
             </div>
@@ -63,7 +67,7 @@ function EmployeeLeaveDashboardSkeletonContent(): ReactElement {
                 <Skeleton className="h-10 w-32" />
             </div>
 
-            <div className="grid gap-4 md:grid-cols-3">
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
                 {Array.from({ length: 3 }).map((_, index) => (
                     <LeaveQuotaSkeleton key={index} />
                 ))}

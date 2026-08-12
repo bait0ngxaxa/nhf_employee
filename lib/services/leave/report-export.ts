@@ -1,5 +1,12 @@
-import { EmployeeStatus, type LeaveStatus, type Prisma } from "@prisma/client";
+import {
+    EmployeeStatus,
+    type LeaveQuota,
+    type LeaveStatus,
+    type LeaveType,
+    type Prisma,
+} from "@prisma/client";
 
+import { ALL_LEAVE_TYPES } from "@/constants/leave";
 import { generateFilename } from "@/lib/helpers/date-helpers";
 import { prisma } from "@/lib/db/prisma";
 import { createXlsxDownloadResponse } from "@/lib/server/xlsx";
@@ -10,7 +17,11 @@ import {
     getCurrentLeaveYear,
     getLeaveYearFromDateValue,
 } from "@/lib/services/leave/quota-year";
-import { toLeaveQuotaDays, toLeaveRequestDays } from "@/lib/services/leave/half-days";
+import {
+    signedHalfDaysToDays,
+    toLeaveRequestDays,
+} from "@/lib/services/leave/half-days";
+import { calculateEffectiveEntitlementForYearHalfDays } from "@/lib/services/leave/quota-entitlement";
 import {
     DEFAULT_LEAVE_REPORT_SCOPE,
     type LeaveReportScope,
@@ -198,7 +209,7 @@ export async function loadCurrentTeamReportEmployees(
 
     return employees.map((employee) => ({
         ...employee,
-        leaveQuotas: employee.leaveQuotas.map(toLeaveQuotaDays),
+        leaveQuotas: toLeaveReportQuotaDays(employee.leaveQuotas, year),
         leaveRequests: employee.leaveRequests.map(toLeaveRequestDays),
     }));
 }
@@ -229,7 +240,10 @@ export async function loadApproverHistoryReportEmployees(
 
         employees.set(request.employee.id, {
             ...request.employee,
-            leaveQuotas: request.employee.leaveQuotas.map(toLeaveQuotaDays),
+            leaveQuotas: toLeaveReportQuotaDays(
+                request.employee.leaveQuotas,
+                year,
+            ),
             leaveRequests: [reportRequest],
         });
     }
@@ -274,14 +288,49 @@ function createEmployeeReportSelect(year: number) {
         position: true,
         dept: { select: { name: true } },
         leaveQuotas: {
-            where: { year },
+            where: { year: { lte: year } },
             select: {
                 leaveType: true,
+                year: true,
                 totalHalfDays: true,
+                carryBalanceHalfDays: true,
                 usedHalfDays: true,
             },
         },
     } as const;
+}
+
+type LeaveReportQuotaSnapshot = Pick<
+    LeaveQuota,
+    | "leaveType"
+    | "year"
+    | "totalHalfDays"
+    | "carryBalanceHalfDays"
+    | "usedHalfDays"
+>;
+
+function toLeaveReportQuotaDays(
+    quotas: readonly LeaveReportQuotaSnapshot[],
+    year: number,
+): LeaveReportEmployee["leaveQuotas"] {
+    const latestByType = new Map<LeaveType, LeaveReportQuotaSnapshot>();
+    for (const quota of quotas) {
+        const currentLatest = latestByType.get(quota.leaveType);
+        if (!currentLatest || quota.year > currentLatest.year) {
+            latestByType.set(quota.leaveType, quota);
+        }
+    }
+
+    return ALL_LEAVE_TYPES.map((leaveType) => ({
+        leaveType,
+        effectiveTotalDays: signedHalfDaysToDays(
+            calculateEffectiveEntitlementForYearHalfDays({
+                leaveType,
+                year,
+                latestQuota: latestByType.get(leaveType),
+            }),
+        ),
+    }));
 }
 
 function createLeaveRequestReportSelect() {

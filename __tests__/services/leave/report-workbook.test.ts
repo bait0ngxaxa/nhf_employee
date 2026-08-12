@@ -17,6 +17,9 @@ describe("leave report workbook", () => {
             "รายละเอียดคำขอลา",
         ]);
         const summarySheet = loaded.getWorksheet("สรุปรายคน");
+        expect(summarySheet?.getCell("D1").value).toBe("ลาป่วยสิทธิรวม");
+        expect(summarySheet?.getCell("G1").value).toBe("ลากิจสิทธิรวม");
+        expect(summarySheet?.getCell("J1").value).toBe("พักร้อนสิทธิรวม");
         expect(summarySheet?.getCell("A2").value).toBe("สมหญิง รักงาน");
         expect(summarySheet?.getCell("D2").value).toBe(30);
         expect(summarySheet?.getCell("E2").value).toBe(1);
@@ -56,7 +59,7 @@ describe("leave report workbook", () => {
         expect(detailSheet?.getCell("I1").value).toBe("สถานะ");
         expect(detailSheet?.getCell("J1").value).toBe("จำนวนวันตามคำขอ");
         expect(detailSheet?.getCell("K1").value).toBe("วันลาสุทธิที่นับใช้");
-        expect(cellValues).not.toContain("ลาป่วยโควต้า");
+        expect(cellValues).not.toContain("ลาป่วยสิทธิรวม");
         expect(cellValues).not.toContain("ลาป่วยคงเหลือ");
         expect(cellValues).not.toContain("รวมคงเหลือ");
         expect(cellValues).not.toContain("รวมทั้งทีม");

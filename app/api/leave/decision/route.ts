@@ -14,6 +14,11 @@ import { getEmployeeDisplayName } from "@/lib/helpers/employee-helpers";
 import { getLeaveYearFromDateValue } from "@/lib/services/leave/quota-year";
 import { halfDaysToDays, toLeaveRequestDays } from "@/lib/services/leave/half-days";
 import { calculateAdditionalOverQuotaHalfDays } from "@/lib/services/leave/over-quota";
+import { calculateEffectiveEntitlementHalfDays } from "@/lib/services/leave/quota-accounting";
+import {
+    ensureLeaveQuotaForYear,
+    reconcileLeaveQuotaForward,
+} from "@/lib/services/leave/quota-entitlement";
 import { jsonError, notFound } from "@/lib/ssot/http";
 import { FEATURE_KEYS, isFeatureEnabled } from "@/lib/ssot/features";
 import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
@@ -26,7 +31,6 @@ const LEAVE_APPROVAL_MESSAGES = {
     requestNotFound: "ไม่พบคำขอลา",
     alreadyProcessed: "คำขอนี้ถูกดำเนินการไปแล้ว",
     forbidden: "คุณไม่มีสิทธิ์อนุมัติคำขอนี้",
-    quotaNotFound: "ไม่สามารถตรวจสอบสิทธิ์ลาของคำขอนี้ได้ กรุณาติดต่อผู้ดูแลระบบ",
     specialReasonRequired: "สิทธิ์ลาคงเหลือไม่เพียงพอ ต้องมีเหตุผลพิเศษก่อนอนุมัติ",
 } as const;
 
@@ -111,23 +115,17 @@ export async function POST(req: Request): Promise<NextResponse> {
             }
 
             if (action === "APPROVE") {
-                const quota = await tx.leaveQuota.findFirst({
-                    where: {
-                        employeeId: leaveRequest.employeeId,
-                        leaveType: leaveRequest.leaveType,
-                        year: getLeaveYearFromDateValue(leaveRequest.startDate),
-                    },
+                const quota = await ensureLeaveQuotaForYear(tx, {
+                    employeeId: leaveRequest.employeeId,
+                    leaveType: leaveRequest.leaveType,
+                    year: getLeaveYearFromDateValue(leaveRequest.startDate),
                 });
-
-                if (!quota) {
-                    throw new LeaveApprovalError(
-                        LEAVE_APPROVAL_MESSAGES.quotaNotFound,
-                        409,
-                    );
-                }
-
-                const overQuotaHalfDays = calculateAdditionalOverQuotaHalfDays(
+                const effectiveTotalHalfDays = calculateEffectiveEntitlementHalfDays(
                     quota.totalHalfDays,
+                    quota.carryBalanceHalfDays,
+                );
+                const overQuotaHalfDays = calculateAdditionalOverQuotaHalfDays(
+                    effectiveTotalHalfDays,
                     quota.usedHalfDays,
                     leaveRequest.durationHalfDays,
                 );
@@ -143,6 +141,11 @@ export async function POST(req: Request): Promise<NextResponse> {
                     data: {
                         usedHalfDays: { increment: leaveRequest.durationHalfDays },
                     },
+                });
+                await reconcileLeaveQuotaForward(tx, {
+                    ...quota,
+                    usedHalfDays:
+                        quota.usedHalfDays + leaveRequest.durationHalfDays,
                 });
 
                 if (overQuotaHalfDays !== leaveRequest.overQuotaHalfDays) {

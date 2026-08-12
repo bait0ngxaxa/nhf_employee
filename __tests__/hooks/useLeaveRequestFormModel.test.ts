@@ -63,6 +63,50 @@ describe("useLeaveRequestFormModel", () => {
         expect(result.current.form.getValues("endDate")).toBe("2031-03-10");
     });
 
+    it("uses effective entitlement and authoritative remaining quota", () => {
+        const { result } = renderHook(() => useLeaveRequestFormModel({
+            onSuccess,
+            quotas: [{
+                leaveType: "PERSONAL",
+                effectiveTotalDays: 15,
+                usedDays: 14,
+                remainingDays: 1,
+            }],
+        }));
+
+        act(() => {
+            result.current.form.setValue("leaveType", "PERSONAL");
+            result.current.form.setValue("startDate", "2030-05-09");
+            result.current.form.setValue("endDate", "2030-05-10");
+        });
+
+        expect(result.current.remainingQuota).toBe(1);
+        expect(result.current.requestedDays).toBe(2);
+        expect(result.current.overQuotaDays).toBe(1);
+        expect(result.current.needsSpecialReason).toBe(true);
+    });
+
+    it("requires a special reason when the year starts over quota", () => {
+        const { result } = renderHook(() => useLeaveRequestFormModel({
+            onSuccess,
+            quotas: [{
+                leaveType: "PERSONAL",
+                effectiveTotalDays: -2,
+                usedDays: 0,
+                remainingDays: -2,
+            }],
+        }));
+
+        act(() => {
+            result.current.form.setValue("leaveType", "PERSONAL");
+            result.current.form.setValue("startDate", "2030-05-10");
+            result.current.form.setValue("endDate", "2030-05-10");
+        });
+
+        expect(result.current.overQuotaDays).toBe(1);
+        expect(result.current.needsSpecialReason).toBe(true);
+    });
+
     it("resets multi-day state and clears form values", () => {
         const { result } = renderHook(() => useLeaveRequestFormModel({ onSuccess }));
         const attachment = new File(["image"], "proof.jpg", {

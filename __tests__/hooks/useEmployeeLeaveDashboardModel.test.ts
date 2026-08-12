@@ -53,9 +53,30 @@ describe("useEmployeeLeaveDashboardModel", () => {
         vi.clearAllMocks();
         vi.mocked(useLeaveProfile).mockReturnValue({
             quotas: [
-                { leaveType: "SICK", totalDays: 10, usedDays: 2 },
-                { leaveType: "PERSONAL", totalDays: 7, usedDays: 1 },
-                { leaveType: "VACATION", totalDays: 6, usedDays: 0 },
+                {
+                    leaveType: "SICK",
+                    totalDays: 10,
+                    carryBalanceDays: 0,
+                    effectiveTotalDays: 10,
+                    usedDays: 2,
+                    remainingDays: 8,
+                },
+                {
+                    leaveType: "PERSONAL",
+                    totalDays: 10,
+                    carryBalanceDays: -3,
+                    effectiveTotalDays: 7,
+                    usedDays: 1,
+                    remainingDays: 6,
+                },
+                {
+                    leaveType: "VACATION",
+                    totalDays: 6,
+                    carryBalanceDays: 0,
+                    effectiveTotalDays: 6,
+                    usedDays: 0,
+                    remainingDays: 6,
+                },
             ] as unknown as ReturnType<typeof useLeaveProfile>["quotas"],
             history: [],
             metadata: { currentPage: 1, totalPages: 1, totalItems: 0, itemsPerPage: 10 },

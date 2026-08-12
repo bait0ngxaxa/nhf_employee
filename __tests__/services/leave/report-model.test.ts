@@ -34,6 +34,23 @@ describe("leave report model", () => {
         expect(rows.detailRows).toHaveLength(5);
         expect(rows.detailRows.map((row) => row.effectiveDays)).toEqual([1, 1.5, 0, 0, 0]);
     });
+
+    it("preserves negative effective entitlement in remaining totals", () => {
+        const employee = createEmployee();
+        employee.leaveQuotas = [{
+            leaveType: "PERSONAL",
+            effectiveTotalDays: -2,
+        }];
+        employee.leaveRequests = [];
+
+        const [employeeSummary] = buildLeaveReportRows([employee]).summaryRows;
+
+        expect(employeeSummary).toEqual(expect.objectContaining({
+            personalQuota: -2,
+            personalRemaining: -2,
+            totalRemaining: 34,
+        }));
+    });
 });
 
 function createEmployee(): LeaveReportEmployee {
@@ -44,7 +61,7 @@ function createEmployee(): LeaveReportEmployee {
         nickname: "ชาย",
         position: "เจ้าหน้าที่",
         dept: { name: "งานบุคคล" },
-        leaveQuotas: [{ leaveType: "PERSONAL", totalDays: 8 }],
+        leaveQuotas: [{ leaveType: "PERSONAL", effectiveTotalDays: 8 }],
         leaveRequests: [
             createRequest("leave-1", "SICK", "APPROVED", 1, 0),
             createRequest("leave-2", "VACATION", "APPROVED", 1.5, 1),

@@ -142,7 +142,7 @@ function createEmptyTeamTotalRow(): LeaveSummaryRow {
 function getQuotaTotals(quotas: LeaveReportQuota[]): LeaveTypeTotals {
     const totals = createDefaultQuotaTotals();
     for (const quota of quotas) {
-        totals[quota.leaveType] = quota.totalDays;
+        totals[quota.leaveType] = quota.effectiveTotalDays;
     }
     return totals;
 }

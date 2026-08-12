@@ -32,6 +32,7 @@ import {
 import { isBeforeLeaveStart } from "@/lib/services/leave/utils";
 import { halfDaysToDays } from "@/lib/services/leave/half-days";
 import { buildLeaveAuditContext } from "@/lib/services/leave/audit-details";
+import { reconcileLeaveQuotaForward } from "@/lib/services/leave/quota-entitlement";
 import {
     formatLeaveSummary,
     getLeaveTypeLabel,
@@ -342,6 +343,10 @@ export async function confirmLeaveCancellation(
         if (updatedQuota.usedHalfDays < 0) {
             throw new LeaveCancellationError(LEAVE_CANCELLATION_MESSAGES.quotaNotFound, 409);
         }
+        await reconcileLeaveQuotaForward(tx, {
+            ...quota,
+            usedHalfDays: updatedQuota.usedHalfDays,
+        });
 
         const exceptionApproverUserId = getExceptionApproverUserId(leaveRequest);
         if (exceptionApproverUserId) {

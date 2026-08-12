@@ -53,6 +53,7 @@ vi.mock("@/lib/db/prisma", () => ({
         },
         leaveQuota: {
             findFirst: vi.fn(),
+            findMany: vi.fn(),
             update: vi.fn(),
         },
         auditLog: {
@@ -95,6 +96,7 @@ describe("/api/leave/not-taken", () => {
             },
         }] as never);
         vi.mocked(prisma.$queryRaw).mockResolvedValue([] as never);
+        vi.mocked(prisma.leaveQuota.findMany).mockResolvedValue([]);
         vi.mocked(processOutbox).mockResolvedValue({ processed: 0, failed: 0 });
         vi.mocked(prisma.$transaction).mockImplementation(async (callback) => {
             if (typeof callback === "function") {
@@ -392,6 +394,7 @@ describe("/api/leave/not-taken", () => {
             year: 2000,
             leaveType: "VACATION",
             totalHalfDays: 12,
+            carryBalanceHalfDays: 0,
             usedHalfDays: 6,
         });
         vi.mocked(prisma.leaveRequest.updateMany).mockResolvedValue({ count: 1 });
@@ -422,6 +425,14 @@ describe("/api/leave/not-taken", () => {
         expect(prisma.leaveQuota.update).toHaveBeenCalledWith({
             where: { id: "quota-1" },
             data: { usedHalfDays: { decrement: 2 } },
+        });
+        expect(prisma.leaveQuota.findMany).toHaveBeenCalledWith({
+            where: {
+                employeeId: 10,
+                leaveType: "VACATION",
+                year: { gt: 2000 },
+            },
+            orderBy: { year: "asc" },
         });
         expect(prisma.notification.updateMany).toHaveBeenCalledWith({
             where: {
@@ -513,6 +524,7 @@ describe("/api/leave/not-taken", () => {
             year: 2000,
             leaveType: "VACATION",
             totalHalfDays: 12,
+            carryBalanceHalfDays: 0,
             usedHalfDays: 4,
         });
         vi.mocked(prisma.leaveQuota.update).mockResolvedValue({
@@ -781,6 +793,7 @@ describe("/api/leave/not-taken", () => {
             year: 2000,
             leaveType: "VACATION",
             totalHalfDays: 12,
+            carryBalanceHalfDays: 0,
             usedHalfDays: 4,
         });
         vi.mocked(prisma.leaveQuota.update).mockResolvedValue({
@@ -916,6 +929,7 @@ describe("/api/leave/not-taken", () => {
             year: 2000,
             leaveType: "VACATION",
             totalHalfDays: 12,
+            carryBalanceHalfDays: 0,
             usedHalfDays: 1,
         });
         vi.mocked(prisma.leaveRequest.updateMany).mockResolvedValue({ count: 1 });

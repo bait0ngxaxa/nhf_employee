@@ -14,10 +14,13 @@ vi.mock("@/lib/services/leave/get-employee-id", () => ({
 
 vi.mock("@/lib/db/prisma", () => ({
     prisma: {
+        $transaction: vi.fn(),
         user: { findUnique: vi.fn() },
         leaveQuota: {
+            findFirst: vi.fn(),
             findMany: vi.fn(),
-            createMany: vi.fn(),
+            upsert: vi.fn(),
+            update: vi.fn(),
         },
         leaveRequest: {
             findMany: vi.fn(),
@@ -48,8 +51,42 @@ describe("GET /api/leave/me", () => {
             isActive: true,
             employee: { id: 100, status: "ACTIVE", deletedAt: null },
         } as never);
-        vi.mocked(prisma.leaveQuota.findMany).mockResolvedValueOnce([]).mockResolvedValueOnce([]);
-        vi.mocked(prisma.leaveQuota.createMany).mockResolvedValue({ count: 3 });
+        vi.mocked(prisma.$transaction).mockImplementation(async (callback) => {
+            if (typeof callback === "function") {
+                return callback(prisma);
+            }
+            return callback;
+        });
+        vi.mocked(prisma.leaveQuota.findFirst).mockResolvedValue(null);
+        vi.mocked(prisma.leaveQuota.findMany).mockResolvedValue([]);
+        vi.mocked(prisma.leaveQuota.upsert)
+            .mockResolvedValueOnce({
+                id: "quota-SICK",
+                employeeId: 100,
+                year: 2027,
+                leaveType: "SICK",
+                totalHalfDays: 60,
+                carryBalanceHalfDays: 0,
+                usedHalfDays: 0,
+            })
+            .mockResolvedValueOnce({
+                id: "quota-PERSONAL",
+                employeeId: 100,
+                year: 2027,
+                leaveType: "PERSONAL",
+                totalHalfDays: 20,
+                carryBalanceHalfDays: 0,
+                usedHalfDays: 0,
+            })
+            .mockResolvedValueOnce({
+                id: "quota-VACATION",
+                employeeId: 100,
+                year: 2027,
+                leaveType: "VACATION",
+                totalHalfDays: 12,
+                carryBalanceHalfDays: 0,
+                usedHalfDays: 0,
+            });
         vi.mocked(prisma.leaveRequest.findMany).mockResolvedValue([]);
         vi.mocked(prisma.leaveRequest.count).mockResolvedValue(0);
     });
@@ -70,14 +107,110 @@ describe("GET /api/leave/me", () => {
         );
 
         expect(response.status).toBe(200);
-        expect(prisma.leaveQuota.createMany).toHaveBeenCalledWith({
-            data: [
-                expect.objectContaining({ year: 2027, leaveType: "SICK" }),
-                expect.objectContaining({ year: 2027, leaveType: "PERSONAL" }),
-                expect.objectContaining({ year: 2027, leaveType: "VACATION" }),
-            ],
-            skipDuplicates: true,
-        });
+        expect(prisma.leaveQuota.upsert).toHaveBeenCalledTimes(3);
+        for (const leaveType of ["SICK", "PERSONAL", "VACATION"] as const) {
+            expect(prisma.leaveQuota.upsert).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    where: {
+                        employeeId_year_leaveType: {
+                            employeeId: 100,
+                            year: 2027,
+                            leaveType,
+                        },
+                    },
+                    create: expect.objectContaining({
+                        year: 2027,
+                        leaveType,
+                        carryBalanceHalfDays: 0,
+                        usedHalfDays: 0,
+                    }),
+                }),
+            );
+        }
+    });
+
+    it("returns signed carry, effective entitlement, and remaining balance", async () => {
+        vi.mocked(prisma.leaveQuota.findFirst)
+            .mockReset()
+            .mockResolvedValueOnce({
+                id: "personal-2026",
+                employeeId: 100,
+                year: 2026,
+                leaveType: "PERSONAL",
+                totalHalfDays: 20,
+                carryBalanceHalfDays: 0,
+                usedHalfDays: 6,
+            })
+            .mockResolvedValueOnce({
+                id: "vacation-2026",
+                employeeId: 100,
+                year: 2026,
+                leaveType: "VACATION",
+                totalHalfDays: 12,
+                carryBalanceHalfDays: 0,
+                usedHalfDays: 16,
+            });
+        vi.mocked(prisma.leaveQuota.upsert)
+            .mockReset()
+            .mockResolvedValueOnce({
+                id: "sick-2027",
+                employeeId: 100,
+                year: 2027,
+                leaveType: "SICK",
+                totalHalfDays: 60,
+                carryBalanceHalfDays: 0,
+                usedHalfDays: 0,
+            })
+            .mockResolvedValueOnce({
+                id: "personal-2027",
+                employeeId: 100,
+                year: 2027,
+                leaveType: "PERSONAL",
+                totalHalfDays: 20,
+                carryBalanceHalfDays: 14,
+                usedHalfDays: 10,
+            })
+            .mockResolvedValueOnce({
+                id: "vacation-2027",
+                employeeId: 100,
+                year: 2027,
+                leaveType: "VACATION",
+                totalHalfDays: 12,
+                carryBalanceHalfDays: -4,
+                usedHalfDays: 2,
+            });
+
+        const response = await getLeaveProfile(
+            new Request("http://localhost/api/leave/me?page=1&limit=10"),
+        );
+        const body = await response.json();
+
+        expect(body.quotas).toEqual([
+            expect.objectContaining({
+                leaveType: "SICK",
+                totalDays: 30,
+                carryBalanceDays: 0,
+                effectiveTotalDays: 30,
+                usedDays: 0,
+                remainingDays: 30,
+            }),
+            expect.objectContaining({
+                leaveType: "PERSONAL",
+                totalDays: 10,
+                carryBalanceDays: 7,
+                effectiveTotalDays: 17,
+                usedDays: 5,
+                remainingDays: 12,
+            }),
+            expect.objectContaining({
+                leaveType: "VACATION",
+                totalDays: 6,
+                carryBalanceDays: -2,
+                effectiveTotalDays: 4,
+                usedDays: 1,
+                remainingDays: 3,
+            }),
+        ]);
     });
 
     it("returns private attachment summaries without storage metadata", async () => {

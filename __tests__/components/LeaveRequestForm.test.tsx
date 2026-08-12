@@ -24,14 +24,15 @@ vi.mock("sonner", () => ({
 
 function createQuota(totalDays: number, usedDays: number): LeaveQuota {
     return {
-        id: 1,
+        id: "quota-1",
         year: 2031,
         employeeId: 1,
         leaveType: "SICK",
         totalDays,
+        carryBalanceDays: 0,
+        effectiveTotalDays: totalDays,
         usedDays,
-        createdAt: "2031-01-01T00:00:00.000Z",
-        updatedAt: "2031-01-01T00:00:00.000Z",
+        remainingDays: totalDays - usedDays,
     };
 }
 

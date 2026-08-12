@@ -1,6 +1,18 @@
 import { useState } from "react";
 import { toast } from "sonner";
-import { useLeaveProfile, type LeaveRequest } from "@/hooks/useLeaveProfile";
+import {
+    useLeaveProfile,
+    type LeaveQuotaBalance,
+    type LeaveRequest,
+} from "@/hooks/useLeaveProfile";
+
+const EMPTY_LEAVE_QUOTA: LeaveQuotaBalance = {
+    totalDays: 0,
+    carryBalanceDays: 0,
+    effectiveTotalDays: 0,
+    usedDays: 0,
+    remainingDays: 0,
+};
 
 export function useEmployeeLeaveDashboardModel() {
     const [isRequestFormOpen, setIsRequestFormOpen] = useState(false);
@@ -22,7 +34,7 @@ export function useEmployeeLeaveDashboardModel() {
     } = useLeaveProfile(page);
 
     const getQuota = (type: "SICK" | "PERSONAL" | "VACATION") =>
-        quotas.find((quota) => quota.leaveType === type) || { totalDays: 0, usedDays: 0 };
+        quotas.find((quota) => quota.leaveType === type) ?? EMPTY_LEAVE_QUOTA;
 
     const closeRequestForm = (): void => {
         setIsRequestFormOpen(false);

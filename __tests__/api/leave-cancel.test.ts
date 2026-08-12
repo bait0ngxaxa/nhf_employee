@@ -30,7 +30,7 @@ vi.mock("@/lib/db/prisma", () => ({
         employee: { findUnique: vi.fn(), findMany: vi.fn() },
         notification: { updateMany: vi.fn(), create: vi.fn() },
         notificationOutbox: { create: vi.fn() },
-        leaveQuota: { findFirst: vi.fn(), update: vi.fn() },
+        leaveQuota: { findFirst: vi.fn(), findMany: vi.fn(), update: vi.fn() },
         auditLog: { create: vi.fn() },
     },
 }));
@@ -109,6 +109,7 @@ describe("POST /api/leave/cancel", () => {
         vi.mocked(prisma.employee.findUnique).mockResolvedValue({ manager: null } as never);
         vi.mocked(prisma.employee.findMany).mockResolvedValue([] as never);
         vi.mocked(prisma.$queryRaw).mockResolvedValue([] as never);
+        vi.mocked(prisma.leaveQuota.findMany).mockResolvedValue([]);
         vi.mocked(prisma.auditLog.create).mockResolvedValue({ id: 1 } as never);
         vi.mocked(processOutbox).mockResolvedValue({ processed: 0, failed: 0 });
         vi.mocked(prisma.$transaction).mockImplementation(async (callback) => {
@@ -454,6 +455,7 @@ describe("POST /api/leave/cancel", () => {
             year: 2099,
             leaveType: "VACATION",
             totalHalfDays: 12,
+            carryBalanceHalfDays: 0,
             usedHalfDays: 4,
         });
         vi.mocked(prisma.leaveQuota.update).mockResolvedValue({
@@ -462,6 +464,7 @@ describe("POST /api/leave/cancel", () => {
             year: 2099,
             leaveType: "VACATION",
             totalHalfDays: 12,
+            carryBalanceHalfDays: 0,
             usedHalfDays: 2,
         });
         vi.mocked(prisma.leaveRequest.findUniqueOrThrow).mockResolvedValue({
@@ -480,6 +483,14 @@ describe("POST /api/leave/cancel", () => {
         expect(prisma.leaveQuota.update).toHaveBeenCalledWith({
             where: { id: "quota-1" },
             data: { usedHalfDays: { decrement: 2 } },
+        });
+        expect(prisma.leaveQuota.findMany).toHaveBeenCalledWith({
+            where: {
+                employeeId: 10,
+                leaveType: "VACATION",
+                year: { gt: 2099 },
+            },
+            orderBy: { year: "asc" },
         });
         expect(prisma.notificationOutbox.create).toHaveBeenCalledWith({
             data: expect.objectContaining({ type: "LEAVE_CANCELLED_AFTER_APPROVAL" }),
@@ -566,6 +577,7 @@ describe("POST /api/leave/cancel", () => {
             year: 2099,
             leaveType: "VACATION",
             totalHalfDays: 12,
+            carryBalanceHalfDays: 0,
             usedHalfDays: 4,
         });
         vi.mocked(prisma.leaveQuota.update).mockResolvedValue({
@@ -1149,6 +1161,7 @@ describe("POST /api/leave/cancel", () => {
             year: 2099,
             leaveType: "VACATION",
             totalHalfDays: 12,
+            carryBalanceHalfDays: 0,
             usedHalfDays: 4,
         });
         vi.mocked(prisma.leaveQuota.update).mockResolvedValue({

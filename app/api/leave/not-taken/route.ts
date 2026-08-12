@@ -46,6 +46,7 @@ import {
     lockLeaveRequestRow,
 } from "@/lib/services/leave/transaction";
 import { buildLeaveAuditContext } from "@/lib/services/leave/audit-details";
+import { reconcileLeaveQuotaForward } from "@/lib/services/leave/quota-entitlement";
 import {
     enforceAuthenticatedMutationRateLimit,
     enforcePreAuthIpRateLimit,
@@ -428,6 +429,10 @@ export async function PUT(req: NextRequest): Promise<NextResponse> {
             if (updatedQuota.usedHalfDays < 0) {
                 throw new LeaveNotTakenError(NOT_TAKEN_MESSAGES.quotaNotFound, 409);
             }
+            await reconcileLeaveQuotaForward(tx, {
+                ...quota,
+                usedHalfDays: updatedQuota.usedHalfDays,
+            });
             const updatedRequest = await tx.leaveRequest.findUniqueOrThrow({
                 where: { id: leaveRequest.id },
             });

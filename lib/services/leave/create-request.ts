@@ -1,6 +1,5 @@
 import type { Prisma } from "@prisma/client";
 
-import { DEFAULT_LEAVE_QUOTA_HALF_DAYS } from "@/constants/leave";
 import { getEmployeeDisplayName } from "@/lib/helpers/employee-helpers";
 import { prisma } from "@/lib/db/prisma";
 import {
@@ -30,6 +29,11 @@ import {
     type LeaveActionPayload,
 } from "@/lib/services/leave/notification-payloads";
 import { calculateAdditionalOverQuotaHalfDays } from "@/lib/services/leave/over-quota";
+import { calculateEffectiveEntitlementHalfDays } from "@/lib/services/leave/quota-accounting";
+import {
+    ensureLeaveQuotaForYear,
+    reconcileLeaveQuotaForward,
+} from "@/lib/services/leave/quota-entitlement";
 import { getLeaveYearFromDateValue } from "@/lib/services/leave/quota-year";
 import { calculateLeaveDurationHalfDays, isWorkingDay } from "@/lib/services/leave/utils";
 import { toUtcDate } from "@/lib/services/leave/business-date";
@@ -192,37 +196,20 @@ async function assertNoOverlap(
     }
 }
 
-async function getOrCreateQuota(
-    tx: Prisma.TransactionClient,
-    input: CreateLeaveRequestInput,
-    prepared: PreparedLeaveRequest,
-): Promise<{ totalHalfDays: number; usedHalfDays: number }> {
-    const { leaveType } = prepared.payload;
-    return tx.leaveQuota.upsert({
-        where: {
-            employeeId_year_leaveType: {
-                employeeId: input.employeeId,
-                year: prepared.currentYear,
-                leaveType,
-            },
-        },
-        update: {},
-        create: {
-            employeeId: input.employeeId,
-            year: prepared.currentYear,
-            leaveType,
-            totalHalfDays: DEFAULT_LEAVE_QUOTA_HALF_DAYS[leaveType],
-            usedHalfDays: 0,
-        },
-    });
-}
-
 function getOverQuotaHalfDays(
-    quota: { totalHalfDays: number; usedHalfDays: number },
+    quota: {
+        totalHalfDays: number;
+        carryBalanceHalfDays: number;
+        usedHalfDays: number;
+    },
     prepared: PreparedLeaveRequest,
 ): number {
-    const overQuotaHalfDays = calculateAdditionalOverQuotaHalfDays(
+    const effectiveTotalHalfDays = calculateEffectiveEntitlementHalfDays(
         quota.totalHalfDays,
+        quota.carryBalanceHalfDays,
+    );
+    const overQuotaHalfDays = calculateAdditionalOverQuotaHalfDays(
+        effectiveTotalHalfDays,
         quota.usedHalfDays,
         prepared.durationHalfDays,
     );
@@ -276,7 +263,17 @@ async function createInTransaction(
 
     const employee = await getEligibleEmployee(tx, input);
     await assertNoOverlap(tx, input.employeeId, prepared.start, prepared.end);
-    const quota = await getOrCreateQuota(tx, input, prepared);
+    const quota = await ensureLeaveQuotaForYear(tx, {
+        employeeId: input.employeeId,
+        year: prepared.currentYear,
+        leaveType: prepared.payload.leaveType,
+    });
+    await reconcileLeaveQuotaForward(tx, {
+        ...quota,
+        employeeId: input.employeeId,
+        year: prepared.currentYear,
+        leaveType: prepared.payload.leaveType,
+    });
     const overQuotaHalfDays = getOverQuotaHalfDays(quota, prepared);
     const attachmentData = input.attachments.map((attachment) => ({
         storageKey: attachment.storageKey,

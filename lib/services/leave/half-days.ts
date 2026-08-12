@@ -1,3 +1,8 @@
+import {
+    calculateEffectiveEntitlementHalfDays,
+    calculateRemainingBalanceHalfDays,
+} from "@/lib/services/leave/quota-accounting";
+
 export const HALF_DAYS_PER_DAY = 2;
 
 export function daysToHalfDays(days: number): number {
@@ -15,8 +20,16 @@ export function halfDaysToDays(halfDays: number): number {
     return halfDays / HALF_DAYS_PER_DAY;
 }
 
+export function signedHalfDaysToDays(halfDays: number): number {
+    if (!Number.isSafeInteger(halfDays)) {
+        throw new RangeError("หน่วยครึ่งวันแบบมีเครื่องหมายต้องเป็นจำนวนเต็มที่ปลอดภัย");
+    }
+    return halfDays / HALF_DAYS_PER_DAY;
+}
+
 type StoredLeaveQuota = {
     totalHalfDays: number;
+    carryBalanceHalfDays: number;
     usedHalfDays: number;
 };
 
@@ -27,12 +40,35 @@ type StoredLeaveRequest = {
 
 export function toLeaveQuotaDays<T extends StoredLeaveQuota>(
     quota: T,
-): Omit<T, keyof StoredLeaveQuota> & { totalDays: number; usedDays: number } {
-    const { totalHalfDays, usedHalfDays, ...rest } = quota;
+): Omit<T, keyof StoredLeaveQuota> & {
+    totalDays: number;
+    carryBalanceDays: number;
+    effectiveTotalDays: number;
+    usedDays: number;
+    remainingDays: number;
+} {
+    const {
+        totalHalfDays,
+        carryBalanceHalfDays,
+        usedHalfDays,
+        ...rest
+    } = quota;
+    const effectiveTotalHalfDays = calculateEffectiveEntitlementHalfDays(
+        totalHalfDays,
+        carryBalanceHalfDays,
+    );
+    const remainingHalfDays = calculateRemainingBalanceHalfDays(
+        totalHalfDays,
+        carryBalanceHalfDays,
+        usedHalfDays,
+    );
     return {
         ...rest,
         totalDays: halfDaysToDays(totalHalfDays),
+        carryBalanceDays: signedHalfDaysToDays(carryBalanceHalfDays),
+        effectiveTotalDays: signedHalfDaysToDays(effectiveTotalHalfDays),
         usedDays: halfDaysToDays(usedHalfDays),
+        remainingDays: signedHalfDaysToDays(remainingHalfDays),
     };
 }
 

@@ -2,7 +2,7 @@ import type { LeavePeriod, LeaveStatus, LeaveType } from "@prisma/client";
 
 export type LeaveReportQuota = {
     leaveType: LeaveType;
-    totalDays: number;
+    effectiveTotalDays: number;
 };
 
 export type LeaveReportRequest = {

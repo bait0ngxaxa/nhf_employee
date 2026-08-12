@@ -46,6 +46,8 @@ vi.mock("@/lib/db/prisma", () => ({
         },
         leaveQuota: {
             findFirst: vi.fn(),
+            findMany: vi.fn(),
+            upsert: vi.fn(),
             update: vi.fn(),
         },
         notification: {
@@ -88,6 +90,8 @@ describe("POST /api/leave/decision", () => {
         } as never);
         vi.mocked(prisma.user.findFirst).mockResolvedValue({ id: 20 } as never);
         vi.mocked(prisma.$queryRaw).mockResolvedValue([] as never);
+        vi.mocked(prisma.leaveQuota.findFirst).mockResolvedValue(null);
+        vi.mocked(prisma.leaveQuota.findMany).mockResolvedValue([]);
         vi.mocked(processOutbox).mockResolvedValue({ processed: 0, failed: 0 });
         vi.mocked(prisma.$transaction).mockImplementation(async (callback) => {
             if (typeof callback === "function") {
@@ -276,12 +280,22 @@ describe("POST /api/leave/decision", () => {
             overQuotaHalfDays: 0,
         } as Awaited<ReturnType<typeof prisma.leaveRequest.findUniqueOrThrow>>);
         vi.mocked(prisma.leaveQuota.findFirst).mockResolvedValue({
+            id: "quota-2030",
+            employeeId: 10,
+            year: 2030,
+            leaveType: "VACATION",
+            totalHalfDays: 12,
+            carryBalanceHalfDays: 0,
+            usedHalfDays: 8,
+        });
+        vi.mocked(prisma.leaveQuota.upsert).mockResolvedValue({
             id: "quota-1",
             employeeId: 10,
             year: 2031,
             leaveType: "VACATION",
             totalHalfDays: 12,
-            usedHalfDays: 10,
+            carryBalanceHalfDays: 4,
+            usedHalfDays: 14,
         });
         vi.mocked(prisma.leaveQuota.update).mockResolvedValue({
             id: "quota-1",
@@ -378,7 +392,7 @@ describe("POST /api/leave/decision", () => {
         expect(display.summary).toContain("เอกสารไม่ครบ");
     });
 
-    it("records only the additional over-quota days when quota is already exceeded", async () => {
+    it("records the full request when signed carry starts the year over quota", async () => {
         vi.mocked(prisma.leaveRequest.findUnique).mockResolvedValue({
             id: "leave-already-over-quota",
             employeeId: 10,
@@ -429,12 +443,22 @@ describe("POST /api/leave/decision", () => {
             overQuotaHalfDays: 4,
         } as Awaited<ReturnType<typeof prisma.leaveRequest.findUniqueOrThrow>>);
         vi.mocked(prisma.leaveQuota.findFirst).mockResolvedValue({
+            id: "quota-2030",
+            employeeId: 10,
+            year: 2030,
+            leaveType: "VACATION",
+            totalHalfDays: 12,
+            carryBalanceHalfDays: 0,
+            usedHalfDays: 28,
+        });
+        vi.mocked(prisma.leaveQuota.upsert).mockResolvedValue({
             id: "quota-1",
             employeeId: 10,
             year: 2031,
             leaveType: "VACATION",
-            totalHalfDays: 20,
-            usedHalfDays: 24,
+            totalHalfDays: 12,
+            carryBalanceHalfDays: -16,
+            usedHalfDays: 0,
         });
 
         const req = new NextRequest("http://localhost/api/leave/decision", {
