@@ -108,55 +108,6 @@ export function DashboardHomeSkeleton(): ReactElement {
     );
 }
 
-export function ITSupportSectionSkeleton(): ReactElement {
-    return (
-        <div
-            className="relative min-h-[calc(100dvh-6rem)] min-w-0 rounded-xl border border-border-soft bg-surface sm:rounded-2xl"
-            role="status"
-            aria-live="polite"
-            aria-busy="true"
-            aria-label="กำลังโหลดหน้า IT Support"
-        >
-            <div className="space-y-8 p-4 sm:space-y-10 sm:p-6 lg:p-10">
-                <SectionHeaderSkeleton showBadge />
-
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-3 xl:grid-cols-5 xl:gap-5">
-                    {Array.from({ length: 5 }).map((_, index) => (
-                        <div
-                            key={index}
-                            className="rounded-2xl border border-border-subtle bg-surface-raised p-5"
-                        >
-                            <div className="flex items-start justify-between gap-3">
-                                <div className="space-y-3">
-                                    <Skeleton className="h-3 w-24" />
-                                    <Skeleton className="h-8 w-20" />
-                                </div>
-                                <Skeleton className="h-10 w-10 rounded-xl" />
-                            </div>
-                        </div>
-                    ))}
-                </div>
-
-                <Skeleton className="h-12 w-full rounded-2xl md:max-w-md" />
-                <div className="overflow-hidden rounded-2xl border border-border-subtle bg-surface-raised">
-                    <div className="flex flex-col justify-between gap-4 border-b border-border-subtle p-5 sm:flex-row sm:items-center">
-                        <div className="space-y-2">
-                            <Skeleton className="h-6 w-64 max-w-full" />
-                            <Skeleton className="h-4 w-80 max-w-full" />
-                        </div>
-                        <Skeleton className="h-10 w-full sm:w-36" />
-                    </div>
-                    <div className="space-y-4 p-5 sm:p-6">
-                        {Array.from({ length: 4 }).map((_, index) => (
-                            <Skeleton key={index} className="h-28 rounded-xl" />
-                        ))}
-                    </div>
-                </div>
-            </div>
-        </div>
-    );
-}
-
 export function FormSectionSkeleton(): ReactElement {
     return (
         <div

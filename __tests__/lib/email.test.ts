@@ -4,7 +4,6 @@ import {
     sendLeaveCancelledAfterApprovalNotification,
     sendLeaveActionNotification,
     sendLeaveNotTakenConfirmedNotification,
-    sendNewTicketNotification,
     sendRoutineReminderNotification,
     sendStockRequestResultNotification,
 } from "@/lib/email";
@@ -13,7 +12,6 @@ import type {
     LeaveCancelledAfterApprovalPayload,
     LeaveNotTakenConfirmedPayload,
 } from "@/lib/services/leave/notification-payloads";
-import type { TicketEmailData } from "@/types/api";
 
 // Mock nodemailer with factory
 const sendMailMock = vi.fn();
@@ -114,7 +112,7 @@ describe("Email Service", () => {
             });
             expect(result).toBe(true);
             expect(sendMailMock).toHaveBeenCalledWith(expect.objectContaining({
-                from: '"NHF IT Support" <user>',
+                from: '"NHFapp" <user>',
                 messageId: undefined,
             }));
         });
@@ -201,46 +199,6 @@ describe("Email Service", () => {
                 consoleErrorSpy.mockRestore();
                 vi.useRealTimers();
             }
-        });
-    });
-
-    describe("sendNewTicketNotification", () => {
-        it("should send notification", async () => {
-            const ticketData: TicketEmailData = {
-                ticketId: 1,
-                title: "Issue",
-                description: "Desc",
-                category: "HARDWARE",
-                status: "OPEN",
-                priority: "HIGH",
-                reportedBy: { email: "u@t.c", name: "User" },
-                createdAt: new Date().toISOString(),
-            };
-            await sendNewTicketNotification(ticketData);
-            expect(sendMailMock).toHaveBeenCalledWith(
-                expect.objectContaining({ to: "u@t.c" }),
-            );
-        });
-
-        it("reuses the provider Message-ID supplied by the outbox", async () => {
-            const ticketData: TicketEmailData = {
-                ticketId: 1,
-                title: "Issue",
-                description: "Desc",
-                category: "HARDWARE",
-                status: "OPEN",
-                priority: "HIGH",
-                reportedBy: { email: "u@t.c", name: "User" },
-                createdAt: new Date().toISOString(),
-            };
-            const messageId =
-                "<nhf-123e4567-e89b-52d3-a456-426614174000@notifications.thainhf.org>";
-
-            await sendNewTicketNotification(ticketData, messageId);
-
-            expect(sendMailMock).toHaveBeenCalledWith(
-                expect.objectContaining({ messageId }),
-            );
         });
     });
 

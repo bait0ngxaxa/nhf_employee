@@ -1,5 +1,3 @@
-import { type TicketCategoryValue, type TicketPriorityValue, type TicketStatusValue } from '@/constants/tickets';
-import { type Ticket, } from '@/types/tickets';
 import { type Employee, } from '@/types/employees';
 import type { SharedDriveOption } from '@/constants/email-request';
 
@@ -11,41 +9,6 @@ export interface EmailRequestBody {
 export interface EmailResponse {
   success: boolean;
   message: string;
-}
-
-export interface TicketEmailData {
-  ticketId: number;
-  title: string;
-  description: string;
-  category: TicketCategoryValue;
-  priority: TicketPriorityValue;
-  status: TicketStatusValue;
-  reportedBy: {
-    name: string;
-    email: string;
-    department?: string;
-  };
-  assignedTo?: {
-    name: string;
-    email: string;
-  };
-  createdAt: string;
-  updatedAt?: string;
-}
-
-export interface LineNotificationData {
-  ticketId: number;
-  title: string;
-  description: string;
-  category: string;
-  priority: string;
-  status: string;
-  reportedBy: {
-    name: string;
-    email: string;
-    department?: string;
-  };
-  createdAt: string;
 }
 
 export interface EmailRequestData {
@@ -167,39 +130,6 @@ export interface LineFlexMessage {
   };
 }
 
-export interface LineWebhookData {
-  type: 'new_ticket' | 'status_update' | 'it_team_urgent' | 'email_request';
-  ticket?: LineNotificationData;
-  emailRequest?: EmailRequestData;
-  oldStatus?: string;
-  flexMessage: LineFlexMessage;
-}
-
-export interface CreateTicketResponse {
-  success: boolean;
-  ticket?: {
-    id: number;
-    title: string;
-    description: string;
-    category: string;
-    priority: string;
-    status: string;
-    createdAt: string;
-    updatedAt: string;
-  };
-  error?: string;
-}
-
-export interface GetTicketsResponse {
-  tickets: Ticket[];
-  pagination: {
-    page: number;
-    limit: number;
-    total: number;
-    pages: number;
-  };
-}
-
 export interface GetEmployeesResponse {
   employees: Employee[];
   total: number;
@@ -210,29 +140,4 @@ export interface DepartmentResponse {
   name: string;
   code: string;
   description?: string;
-}
-
-export interface TicketCommentFormData {
-  content: string;
-}
-
-export interface TicketCommentResponse {
-  success: boolean;
-  comment?: {
-    id: number;
-    content: string;
-    createdAt: string;
-    authorId: number;
-    ticketId: number;
-  };
-  error?: string;
-}
-
-export interface UpdateTicketData {
-  title?: string;
-  description?: string;
-  category?: TicketCategoryValue;
-  priority?: TicketPriorityValue;
-  status?: TicketStatusValue;
-  assignedToId?: number | null;
 }

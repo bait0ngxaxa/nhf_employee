@@ -37,6 +37,13 @@ interface DashboardProviderProps {
 
 const STOCK_BROWSE_CART_STORAGE_KEY_PREFIX = "stock:browse-cart:v1:user:";
 const STOCK_BROWSE_CART_LEGACY_KEY = "stock:browse-cart:v1";
+const DASHBOARD_SYSTEM_TABS = new Set([
+    "dashboard",
+    "notifications",
+    "sessions",
+    "manager-approval",
+    "leave-history",
+]);
 
 const defaultStats: EmployeeStats = {
     total: 0,
@@ -51,7 +58,13 @@ function normalizeDashboardTab(tab: string | null): string {
     }
 
     const normalizedTab = tab ?? "dashboard";
-    return isDashboardTabEnabled(normalizedTab) ? normalizedTab : "dashboard";
+    const isKnownTab =
+        DASHBOARD_SYSTEM_TABS.has(normalizedTab) ||
+        DASHBOARD_MENU_ITEMS.some((item) => item.id === normalizedTab);
+
+    return isKnownTab && isDashboardTabEnabled(normalizedTab)
+        ? normalizedTab
+        : "dashboard";
 }
 
 function clearStockCartStorage(userId: string): void {

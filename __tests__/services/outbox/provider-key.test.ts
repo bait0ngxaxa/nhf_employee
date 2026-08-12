@@ -7,7 +7,7 @@ import {
 
 describe("outbox provider keys", () => {
     it("derives stable provider-safe keys from an event key", () => {
-        const eventKey = "ticket:44:status:2026-07-24T04:00:00.000Z:line:it";
+        const eventKey = "routine:44:reminder:2026-07-24T04:00:00.000Z:line:user:7";
 
         expect(createLineRetryKey(eventKey)).toBe(
             createLineRetryKey(eventKey),

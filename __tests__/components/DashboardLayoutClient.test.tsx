@@ -80,7 +80,7 @@ describe("DashboardLayoutClient page navigation", () => {
             </DashboardLayoutClient>,
         );
 
-        dashboardContext.selectedMenu = "it-support";
+        dashboardContext.selectedMenu = "routine";
         rerender(
             <DashboardLayoutClient>
                 <div>กำลังโหลด</div>
@@ -92,7 +92,7 @@ describe("DashboardLayoutClient page navigation", () => {
         rerender(
             <DashboardLayoutClient>
                 <h1 data-page-heading tabIndex={-1}>
-                    NHF IT-Support
+                    NHF Routine
                 </h1>
             </DashboardLayoutClient>,
         );
@@ -101,7 +101,7 @@ describe("DashboardLayoutClient page navigation", () => {
             expect(
                 screen.getByRole("heading", {
                     level: 1,
-                    name: "NHF IT-Support",
+                    name: "NHF Routine",
                 }),
             ).toHaveFocus();
         });

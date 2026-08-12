@@ -19,7 +19,7 @@ export type AuditLogDetails = AuditDetails;
 export interface CreateAuditLogParams {
     /** Action type from AuditAction enum */
     action: AuditAction;
-    /** Entity type (e.g., "Employee", "Ticket", "User") */
+    /** Entity type (e.g., "Employee" or "User") */
     entityType: string;
     /** ID of the affected entity */
     entityId?: number;
@@ -146,32 +146,6 @@ export async function logEmployeeEvent(
     await createAuditLog({
         action,
         entityType: "Employee",
-        entityId,
-        userId,
-        userEmail,
-        details,
-    });
-}
-
-/**
- * Create audit log for ticket management events
- */
-export async function logTicketEvent(
-    action:
-        | "TICKET_CREATE"
-        | "TICKET_UPDATE"
-        | "TICKET_STATUS_CHANGE"
-        | "TICKET_ASSIGN"
-        | "TICKET_COMMENT"
-        | "TICKET_DELETE",
-    entityId: number,
-    userId: number,
-    userEmail: string,
-    details?: AuditLogDetails,
-): Promise<void> {
-    await createAuditLog({
-        action,
-        entityType: "Ticket",
         entityId,
         userId,
         userEmail,

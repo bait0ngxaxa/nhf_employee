@@ -2,10 +2,9 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
     sendLineMessage,
     sendLineBroadcast,
-    sendNewTicketNotification,
 } from "@/lib/line";
 import { sendLineAppMessage } from "@/lib/line/messaging";
-import type { LineFlexMessage, TicketEmailData } from "@/types/api";
+import type { LineFlexMessage } from "@/types/api";
 
 // Mock fetch
 const fetchMock = vi.fn();
@@ -165,48 +164,4 @@ describe("LINE Notification Service", () => {
         });
     });
 
-    describe("sendNewTicketNotification", () => {
-        it("should use IT Team User ID if present (Push)", async () => {
-            process.env.LINE_IT_TEAM_USER_ID = "it_user";
-            const ticket: TicketEmailData = {
-                ticketId: 1,
-                title: "T",
-                description: "D",
-                category: "HARDWARE",
-                status: "OPEN",
-                priority: "HIGH",
-                reportedBy: { name: "U", email: "u@test.com" },
-                createdAt: new Date().toISOString(),
-            };
-
-            await sendNewTicketNotification(ticket);
-
-            // Should verify it called sendLineMessage (Push)
-            expect(fetchMock).toHaveBeenCalledWith(
-                "https://api.line.me/v2/bot/message/push",
-                expect.anything(),
-            );
-        });
-
-        it("should use Broadcast if IT Team ID missing", async () => {
-            delete process.env.LINE_IT_TEAM_USER_ID;
-            const ticket: TicketEmailData = {
-                ticketId: 1,
-                title: "T",
-                description: "D",
-                category: "HARDWARE",
-                status: "OPEN",
-                priority: "HIGH",
-                reportedBy: { name: "U", email: "u@test.com" },
-                createdAt: new Date().toISOString(),
-            };
-
-            await sendNewTicketNotification(ticket);
-
-            expect(fetchMock).toHaveBeenCalledWith(
-                "https://api.line.me/v2/bot/message/broadcast",
-                expect.anything(),
-            );
-        });
-    });
 });

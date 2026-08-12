@@ -173,8 +173,6 @@ const ROUTINE_ACTIONS = new Set([
 const GENERIC_DIFF_ACTIONS = new Set([
     "EMPLOYEE_UPDATE",
     "EMPLOYEE_STATUS_CHANGE",
-    "TICKET_UPDATE",
-    "TICKET_STATUS_CHANGE",
     "USER_UPDATE",
     "USER_ROLE_CHANGE",
     "SETTINGS_UPDATE",
@@ -592,34 +590,6 @@ function formatEmployeeApproverChange(
     return `เปลี่ยนผู้อนุมัติการลา${employee}: ${previousName ?? "ไม่ได้กำหนด"} → ${newName ?? "ไม่ได้กำหนด"}`;
 }
 
-function formatTicketAction(
-    action: string,
-    entityId: number | null,
-    before: Record<string, unknown>,
-    after: Record<string, unknown>,
-    metadata: Record<string, unknown>,
-): string {
-    const reference = entityId === null ? "" : ` #${entityId}`;
-    const title = firstText("ticketTitle", metadata, after, before)
-        ?? firstText("title", after, before);
-    const titleText = title ? ` ${quote(title)}` : "";
-
-    if (action === "TICKET_ASSIGN") {
-        const previousName = getText(metadata, "previousAssigneeName");
-        const newName = getText(metadata, "newAssigneeName");
-        const assignment = previousName || newName
-            ? ` จาก ${previousName ?? "ยังไม่มอบหมาย"} → ${newName ?? "ยังไม่มอบหมาย"}`
-            : "";
-        return `มอบหมาย Ticket${reference}${titleText}${assignment}`;
-    }
-    if (action === "TICKET_COMMENT") {
-        return `เพิ่มความคิดเห็นใน Ticket${reference}${titleText}`;
-    }
-
-    const reason = firstText("deleteReason", after, metadata);
-    return `ลบ Ticket${reference}${titleText}${reason ? `: ${truncateText(reason)}` : ""}`;
-}
-
 function formatRoutineAction(
     action: string,
     entityId: number | null,
@@ -745,19 +715,6 @@ function buildActionSummary(input: AuditLogDisplayInput): string {
     if (input.action === "EMPLOYEE_UPDATE" && input.entityType === "EmployeeApprover") {
         return formatEmployeeApproverChange(before, after, metadata);
     }
-    if (
-        input.action === "TICKET_ASSIGN"
-        || input.action === "TICKET_COMMENT"
-        || input.action === "TICKET_DELETE"
-    ) {
-        return formatTicketAction(
-            input.action,
-            input.entityId,
-            before,
-            after,
-            metadata,
-        );
-    }
     if (ROUTINE_ACTIONS.has(input.action)) {
         return formatRoutineAction(
             input.action,
@@ -784,12 +741,6 @@ function getActionChangedFields(
     after: Record<string, unknown>,
     metadata: Record<string, unknown>,
 ): string[] {
-    if (input.action === "TICKET_COMMENT") return [];
-    if (input.action === "TICKET_ASSIGN") {
-        const previousName = getText(metadata, "previousAssigneeName") ?? "ยังไม่มอบหมาย";
-        const newName = getText(metadata, "newAssigneeName") ?? "ยังไม่มอบหมาย";
-        return previousName === newName ? [] : [`ผู้รับผิดชอบ: ${previousName} → ${newName}`];
-    }
     if (input.action === "EMPLOYEE_UPDATE" && input.entityType === "EmployeeApprover") {
         const previousName = firstText("previousApproverName", metadata)
             ?? firstText("managerName", before)

@@ -2,7 +2,7 @@ import { DashboardContent } from "@/components/dashboard/layout/DashboardContent
 
 export const metadata = {
     title: "Dashboard | NHFapp",
-    description: "IT Management Dashboard for NHF",
+    description: "Employee Management Dashboard for NHF",
 };
 
 export default function DashboardPage() {

@@ -1,9 +1,4 @@
 import nodemailer from "nodemailer";
-import type { TicketEmailData } from "@/types/api";
-import {
-    getTicketStatusLabel,
-    getTicketPriorityLabel,
-} from "@/lib/helpers/ticket-helpers";
 import type { StockRequestResultEmailPayload } from "@/lib/services/stock/notification-payloads";
 import {
     type EmailData,
@@ -19,8 +14,6 @@ import type {
     LeaveNotTakenConfirmedPayload,
     LeaveNotTakenRequestedPayload,
 } from "./types";
-import { generateNewTicketEmailHTML } from "./templates/new-ticket";
-import { generateStatusUpdateEmailHTML } from "./templates/status-update";
 import { generateLeaveActionEmailHTML } from "./templates/leave-action";
 import { generateLeaveResultEmailHTML } from "./templates/leave-result";
 import { generateLeaveEventEmailHTML } from "./templates/leave-event";
@@ -50,7 +43,7 @@ import {
 
 let transporter: nodemailer.Transporter | null = null;
 let isTransporterReady = false;
-const DEFAULT_EMAIL_FROM_NAME = "NHF IT Support";
+const DEFAULT_EMAIL_FROM_NAME = "NHFapp";
 const LEAVE_EMAIL_FROM_NAME = "ระบบลา NHFapp";
 const STOCK_EMAIL_FROM_NAME = "ระบบเบิกวัสดุ NHFapp";
 const ROUTINE_EMAIL_FROM_NAME = "ระบบ NHF Routine";
@@ -300,84 +293,6 @@ export async function sendRoutineContractExpiryNotification(
     });
 }
 
-export async function sendNewTicketNotification(
-    ticketData: TicketEmailData,
-    messageId?: string,
-): Promise<boolean> {
-    const ticketUrl = `${getPublicOrigin()}/dashboard/it-issues`;
-    const emailData: EmailData = {
-        to: ticketData.reportedBy.email,
-        subject: `[NHF IT] Ticket #${ticketData.ticketId} ถูกสร้างแล้ว - ${ticketData.title}`,
-        html: generateNewTicketEmailHTML(ticketData, ticketUrl),
-        messageId,
-        text: `Ticket #${ticketData.ticketId} ถูกสร้างแล้ว\n\nหัวข้อ: ${
-            ticketData.title
-        }\nคำอธิบาย: ${ticketData.description}\nสถานะ: ${getTicketStatusLabel(
-            ticketData.status
-        )}\nความสำคัญ: ${getTicketPriorityLabel(
-            ticketData.priority
-        )}\n\nดู Ticket ได้ที่: ${ticketUrl}`,
-    };
-
-    return await sendEmail(emailData);
-}
-
-export async function sendStatusUpdateNotification(
-    ticketData: TicketEmailData,
-    oldStatus: string,
-    messageId?: string,
-): Promise<boolean> {
-    const ticketUrl = `${getPublicOrigin()}/dashboard/it-issues`;
-    const emailData: EmailData = {
-        to: ticketData.reportedBy.email,
-        subject: `[NHF IT] อัพเดทสถานะ Ticket #${
-            ticketData.ticketId
-        } - ${getTicketStatusLabel(ticketData.status)}`,
-        html: generateStatusUpdateEmailHTML(ticketData, oldStatus, ticketUrl),
-        messageId,
-        text: `สถานะ Ticket #${
-            ticketData.ticketId
-        } ได้รับการอัพเดท\n\nหัวข้อ: ${
-            ticketData.title
-        }\nสถานะเดิม: ${getTicketStatusLabel(
-            oldStatus
-        )}\nสถานะใหม่: ${getTicketStatusLabel(
-            ticketData.status
-        )}\n\nดู Ticket ได้ที่: ${ticketUrl}`,
-    };
-
-    return await sendEmail(emailData);
-}
-
-export async function sendITTeamNotification(
-    ticketData: TicketEmailData,
-    messageId?: string,
-): Promise<boolean> {
-    const itTeamEmail = process.env.IT_TEAM_EMAIL;
-    if (!itTeamEmail) {
-        return false;
-    }
-
-    const ticketUrl = `${getPublicOrigin()}/dashboard/it-issues`;
-    const emailData: EmailData = {
-        to: itTeamEmail,
-        subject: `[NHF IT] Ticket ${
-            ticketData.priority === "URGENT" ? "เร่งด่วน" : "ความสำคัญสูง"
-        } #${ticketData.ticketId} - ${ticketData.title}`,
-        html: generateNewTicketEmailHTML(ticketData, ticketUrl),
-        messageId,
-        text: `Ticket ใหม่ที่ต้องให้ความสำคัญ\n\nTicket #${
-            ticketData.ticketId
-        }\nหัวข้อ: ${ticketData.title}\nผู้แจ้ง: ${
-            ticketData.reportedBy.name
-        }\nความสำคัญ: ${getTicketPriorityLabel(
-            ticketData.priority
-        )}\n\nดู Ticket ได้ที่: ${ticketUrl}`,
-    };
-
-    return await sendEmail(emailData);
-}
-
 export async function sendLeaveActionNotification(
     data: LeaveActionPayload,
     dashboardLink: string
@@ -544,9 +459,6 @@ export const emailService = {
     sendStockRequestResultNotification,
     sendRoutineContractExpiryNotification,
     sendRoutineReminderNotification,
-    sendNewTicketNotification,
-    sendStatusUpdateNotification,
-    sendITTeamNotification,
     sendLeaveActionNotification,
     sendLeaveResultNotification,
     sendLeaveCancelledNotification,

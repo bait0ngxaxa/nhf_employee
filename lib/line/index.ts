@@ -1,13 +1,10 @@
 import {
-    type LineNotificationData,
     type EmailRequestData,
-    type TicketEmailData,
     type LineFlexMessage,
     type StockLowLineData,
     type StockRequestLineData,
 } from "@/types/api";
 import { type LineWebhookData } from "./types";
-import { generateTicketFlexMessage } from "./flex-messages/ticket";
 import { generateEmailRequestFlexMessage } from "./flex-messages/email-request";
 import { generateStockLowFlexMessage } from "./flex-messages/stock-low";
 import { generateStockRequestFlexMessage } from "./flex-messages/stock";
@@ -80,15 +77,15 @@ export async function sendLineWebhook(data: LineWebhookData): Promise<boolean> {
 
         if (response.ok) {
             return true;
-        } else {
-            const errorText = await response.text();
-            console.error(
-                "❌ LINE Webhook ส่งไม่สำเร็จ:",
-                response.status,
-                errorText
-            );
-            return false;
         }
+
+        const errorText = await response.text();
+        console.error(
+            "❌ LINE Webhook ส่งไม่สำเร็จ:",
+            response.status,
+            errorText
+        );
+        return false;
     } catch (error) {
         console.error("❌ เกิดข้อผิดพลาดใน LINE Webhook:", error);
         return false;
@@ -106,47 +103,6 @@ async function sendToITTeamOrBroadcast(
     } else {
         return await sendLineBroadcast(flexMessage, retryKey);
     }
-}
-
-export async function sendNewTicketNotification(
-    ticketData: TicketEmailData,
-    retryKey?: string,
-): Promise<boolean> {
-    const { baseUrl } = getConfig();
-    const lineData: LineNotificationData = { ...ticketData };
-    const flexMessage = generateTicketFlexMessage(
-        lineData,
-        "new_ticket",
-        baseUrl
-    );
-
-    return await sendToITTeamOrBroadcast(flexMessage, retryKey);
-}
-
-export async function sendStatusUpdateNotification(
-    ticketData: TicketEmailData,
-    retryKey?: string,
-): Promise<boolean> {
-    const { baseUrl } = getConfig();
-    const lineData: LineNotificationData = { ...ticketData };
-    const flexMessage = generateTicketFlexMessage(
-        lineData,
-        "status_update",
-        baseUrl
-    );
-
-    return await sendToITTeamOrBroadcast(flexMessage, retryKey);
-}
-
-export async function sendITTeamNotification(
-    ticketData: TicketEmailData,
-    retryKey?: string,
-): Promise<boolean> {
-    const { baseUrl } = getConfig();
-    const lineData: LineNotificationData = { ...ticketData };
-    const flexMessage = generateTicketFlexMessage(lineData, "it_team", baseUrl);
-
-    return await sendToITTeamOrBroadcast(flexMessage, retryKey);
 }
 
 export async function sendEmailRequestNotification(
@@ -188,9 +144,6 @@ export const lineNotificationService = {
     sendLineBroadcast,
     sendStockLineBroadcast,
     sendLineWebhook,
-    sendNewTicketNotification,
-    sendStatusUpdateNotification,
-    sendITTeamNotification,
     sendEmailRequestNotification,
     sendStockLowNotification,
     sendStockRequestNotification,

@@ -10,18 +10,6 @@ export type {
     DashboardUIContextValue,
 } from "./dashboard";
 
-// IT Support Context
-export { ITSupportProvider } from "./it-support";
-export {
-    useITSupportDataContext,
-    useITSupportUIContext,
-    useITSupportContext,
-} from "./it-support";
-export type {
-    ITSupportDataContextValue,
-    ITSupportUIContextValue,
-} from "./it-support";
-
 // Employee Context
 export { EmployeeProvider } from "./employee";
 export {

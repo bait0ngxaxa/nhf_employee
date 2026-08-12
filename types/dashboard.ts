@@ -25,10 +25,3 @@ export interface DashboardStats {
     admin: number;
     academic: number;
 }
-
-export interface TicketStats {
-    total: number;
-    open: number;
-    inProgress: number;
-    assignedToMe: number;
-}

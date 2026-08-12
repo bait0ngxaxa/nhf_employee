@@ -320,51 +320,6 @@ describe("formatAuditLogDisplay", () => {
         expect(result.summary).not.toContain("managerId");
     });
 
-    it("formats ticket deletion, assignment, and comments without comment content", () => {
-        const deleted = formatAuditLogDisplay({
-            action: "TICKET_DELETE",
-            entityType: "Ticket",
-            entityId: 84,
-            details: {
-                before: { title: "เครื่องพิมพ์ใช้งานไม่ได้" },
-                after: { deleteReason: "ข้อมูลซ้ำ" },
-            },
-        });
-        const assigned = formatAuditLogDisplay({
-            action: "TICKET_ASSIGN",
-            entityType: "Ticket",
-            entityId: 84,
-            details: {
-                before: { assignedToId: 1 },
-                after: { assignedToId: 2 },
-                metadata: {
-                    ticketTitle: "เครื่องพิมพ์ใช้งานไม่ได้",
-                    previousAssigneeName: "สมชาย",
-                    newAssigneeName: "วิชัย",
-                },
-            },
-        });
-        const comment = formatAuditLogDisplay({
-            action: "TICKET_COMMENT",
-            entityType: "Ticket",
-            entityId: 84,
-            details: {
-                after: { content: "ข้อความความคิดเห็นที่ไม่ควรแสดงทั้งหมด" },
-                metadata: { ticketTitle: "เครื่องพิมพ์ใช้งานไม่ได้" },
-            },
-        });
-
-        expect(deleted.summary).toContain("ลบ Ticket #84 “เครื่องพิมพ์ใช้งานไม่ได้”");
-        expect(assigned.summary).toBe(
-            "มอบหมาย Ticket #84 “เครื่องพิมพ์ใช้งานไม่ได้” จาก สมชาย → วิชัย",
-        );
-        expect(comment.summary).toBe(
-            "เพิ่มความคิดเห็นใน Ticket #84 “เครื่องพิมพ์ใช้งานไม่ได้”",
-        );
-        expect(comment.summary).not.toContain("ข้อความความคิดเห็น");
-        expect(comment.changedFields).toEqual([]);
-    });
-
     it.each([
         ["ROUTINE_TASK_CREATE", "RoutineTask", { taskId: 1, title: "ตรวจอุปกรณ์" }, "สร้างแม่แบบงานประจำ “ตรวจอุปกรณ์”"],
         ["ROUTINE_TASK_DEACTIVATE", "RoutineTask", { before: { title: "ตรวจอุปกรณ์", isActive: true }, after: { title: "ตรวจอุปกรณ์", isActive: false } }, "ปิดใช้งานแม่แบบงานประจำ “ตรวจอุปกรณ์”"],

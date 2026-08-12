@@ -8,7 +8,6 @@ import {
     DashboardHomeSkeleton,
     FormSectionSkeleton,
     ImportSectionSkeleton,
-    ITSupportSectionSkeleton,
     NotificationSectionSkeleton,
 } from "@/components/dashboard/feedback/SectionSkeleton";
 import { EmailRequestSectionSkeleton } from "@/components/dashboard/feedback/EmailRequestSectionSkeleton";
@@ -31,13 +30,6 @@ const StockSection = dynamic(
             (mod) => mod.StockSection,
         ),
     { loading: () => <StockSectionSkeleton />, ssr: false },
-);
-const ITSupportSection = dynamic(
-    () =>
-        import("@/components/dashboard/sections/ITSupportSection").then(
-            (mod) => mod.ITSupportSection,
-        ),
-    { loading: () => <ITSupportSectionSkeleton /> },
 );
 const EmailRequestSection = dynamic(
     () =>
@@ -115,7 +107,6 @@ function getPageTitle(menu: string): string {
         case "dashboard": return "Dashboard | NHFapp";
         case "leave-management": return "Leave Management | NHFapp";
         case "stock": return "Stock | NHFapp";
-        case "it-support": return "IT Support | NHFapp";
         case "email-request": return "New Employee Request | NHFapp";
         case "employee-management": return "Employee Management | NHFapp";
         case "add-employee": return "Add Employee | NHFapp";
@@ -163,13 +154,6 @@ export function DashboardContent() {
                 return (
                     <Suspense fallback={<StockSectionSkeleton />}>
                         <StockSection />
-                    </Suspense>
-                );
-
-            case "it-support":
-                return (
-                    <Suspense fallback={<ITSupportSectionSkeleton />}>
-                        <ITSupportSection />
                     </Suspense>
                 );
 

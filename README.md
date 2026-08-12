@@ -1,13 +1,14 @@
-# Employee & IT Management System (NHF)
+# Employee Management System (NHF)
 
-ระบบจัดการข้อมูลพนักงาน งานบริการด้านไอที การลา สต็อก และการแจ้งเตือน สำหรับมูลนิธิสาธารณสุขแห่งชาติ (National Health Foundation — NHF)
+ระบบจัดการข้อมูลพนักงาน การลา สต็อก งานประจำ คำร้องพนักงานใหม่ และการแจ้งเตือน สำหรับมูลนิธิสาธารณสุขแห่งชาติ (National Health Foundation — NHF)
 
 ## ภาพรวมระบบ
 
 - Employee Directory: จัดการข้อมูลพนักงาน แผนก ตำแหน่ง สถานะ และสายบังคับบัญชา
-- IT Service Desk: รับแจ้งและติดตามปัญหาไอที พร้อมความคิดเห็นและการมอบหมายงาน
 - Leave Management: ยื่น อนุมัติ ปฏิเสธ ยกเลิก และคืนโควตาวันลา
 - Stock & Requisition: จัดการสินค้า ตัวเลือกสินค้า ยอดคงเหลือ และใบเบิก
+- Routine Management: กำหนดและติดตามงานประจำขององค์กร
+- New Employee Request: ส่งคำร้องอีเมล สารบรรณ และ Shared Drive ให้ทีมไอที
 - Notification: แจ้งเตือนในระบบ, Email และ LINE ผ่าน transactional outbox
 - Security: JWT access token, refresh-token rotation, RBAC และ audit log
 
@@ -133,7 +134,6 @@ openssl rand -base64 48
 | `SMTP_PORT` | ปกติ `587` สำหรับ STARTTLS หรือ `465` สำหรับ TLS |
 | `SMTP_SECURE` | `true` เมื่อใช้ implicit TLS; กรณี port 587 ใช้ `false` |
 | `SMTP_USER` / `SMTP_PASS` | บัญชี SMTP |
-| `IT_TEAM_EMAIL` | email ปลายทางของทีมไอที |
 | `EMAIL_REQUEST_INAPP_RECIPIENT_EMAILS` | email ผู้รับ in-app notification คั่นด้วย comma |
 
 ถ้าไม่ตั้ง `SMTP_USER` หรือ `SMTP_PASS` ระบบจะส่ง email ไม่ได้ และ event ที่ต้องส่ง email จะเข้า retry/dead ตาม policy ของ notification outbox; สำหรับ Routine production ต้องตั้งค่า SMTP ให้ครบ
@@ -142,12 +142,12 @@ openssl rand -base64 48
 
 | Variable | หน้าที่ |
 | --- | --- |
-| `LINE_IT_CHANNEL_ACCESS_TOKEN` | channel access token สำหรับ IT |
-| `LINE_IT_CHANNEL_SECRET` | ใช้ตรวจ signature ของ IT webhook |
+| `LINE_IT_CHANNEL_ACCESS_TOKEN` | channel access token สำหรับคำร้องพนักงานใหม่ |
+| `LINE_IT_CHANNEL_SECRET` | ใช้ตรวจ signature ของ channel คำร้องพนักงานใหม่ |
 | `LINE_STOCK_CHANNEL_ACCESS_TOKEN` | channel access token สำหรับ Stock |
 | `LINE_STOCK_CHANNEL_SECRET` | ใช้ตรวจ signature ของ Stock webhook |
-| `LINE_IT_TEAM_USER_ID` | LINE user/group ID ของทีมไอที |
-| `LINE_WEBHOOK_URL` | URL ปลายทางเสริมที่ integration ใช้ |
+| `LINE_IT_TEAM_USER_ID` | LINE user/group ID ผู้รับคำร้องพนักงานใหม่ |
+| `LINE_WEBHOOK_URL` | URL ปลายทางเสริมสำหรับ integration ของ Email Request |
 
 Webhook route ของแอปคือ `/api/line/webhook`
 
@@ -156,7 +156,6 @@ Webhook route ของแอปคือ `/api/line/webhook`
 | Variable | Production default | หน้าที่ |
 | --- | --- | --- |
 | `NEXT_PUBLIC_FEATURE_LEAVE` | ปิด | เปิดโมดูล Leave เมื่อเป็น `true` |
-| `NEXT_PUBLIC_FEATURE_ITSUPPORT` | ปิด | เปิดโมดูล IT Support เมื่อเป็น `true` |
 | `NEXT_PUBLIC_FEATURE_ROUTINE` | ปิด | เปิดโมดูล Routine เมื่อเป็น `true` |
 
 ค่า `NEXT_PUBLIC_*` ถูกฝังใน client bundle ตอน build ดังนั้นต้องตั้งค่าก่อน `npm run build` และ build ใหม่ทุกครั้งที่เปลี่ยนค่า

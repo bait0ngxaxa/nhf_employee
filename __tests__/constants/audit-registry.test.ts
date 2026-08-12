@@ -8,16 +8,26 @@ import {
 } from "@/constants/audit";
 
 describe("audit registry", () => {
-    it("registers metadata and a filter option for every Prisma AuditAction", () => {
-        const prismaActions = Object.values(AuditAction).sort();
+    it("registers metadata and a filter option for every active AuditAction", () => {
+        const legacyActions = new Set<AuditAction>([
+            AuditAction.TICKET_CREATE,
+            AuditAction.TICKET_UPDATE,
+            AuditAction.TICKET_STATUS_CHANGE,
+            AuditAction.TICKET_ASSIGN,
+            AuditAction.TICKET_COMMENT,
+            AuditAction.TICKET_DELETE,
+        ]);
+        const activeActions = Object.values(AuditAction)
+            .filter((action) => !legacyActions.has(action))
+            .sort();
         const registeredActions = Object.keys(AUDIT_ACTION_META).sort();
         const filterActions = AUDIT_ACTION_FILTER_OPTIONS
             .map(({ value }) => value)
             .filter((value) => value !== "all")
             .sort();
 
-        expect(registeredActions).toEqual(prismaActions);
-        expect(filterActions).toEqual(prismaActions);
+        expect(registeredActions).toEqual(activeActions);
+        expect(filterActions).toEqual(activeActions);
     });
 
     it("registers business labels for emitted non-model entity types", () => {

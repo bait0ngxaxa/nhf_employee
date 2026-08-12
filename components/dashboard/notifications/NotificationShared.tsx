@@ -2,14 +2,12 @@
 
 import type React from "react";
 import {
-    AlertCircle,
     Bell,
     CalendarClock,
     Check,
     ClipboardCheck,
     Info,
     Loader2,
-    MessageSquare,
     RefreshCcw,
     XCircle,
 } from "lucide-react";
@@ -95,9 +93,6 @@ export function NotificationIcon({
     className?: string;
 }): React.ReactElement {
     switch (type) {
-        case "TICKET_CREATED":
-        case "TICKET_UPDATED":
-            return <AlertCircle className={cn("text-orange-500", className)} />;
         case "STOCK_REQUEST_NEW":
             return <Bell className={cn("text-amber-500", className)} />;
         case "ROUTINE_REMINDER":
@@ -117,8 +112,6 @@ export function NotificationIcon({
         case "LEAVE_NOT_TAKEN_REQUESTED":
         case "LEAVE_CANCELLATION_REQUESTED":
             return <Bell className={cn("text-sky-500", className)} />;
-        case "NEW_COMMENT":
-            return <MessageSquare className={cn("text-sky-500", className)} />;
         case "SYSTEM_ALERT":
         default:
             return <Info className={cn("text-content-muted", className)} />;

@@ -26,7 +26,6 @@ export const APP_DASHBOARD_TABS = {
     leaveHistory: "leave-history",
     managerApproval: "manager-approval",
     stock: "stock",
-    itSupport: "it-support",
     routine: "routine",
 } as const;
 
@@ -72,11 +71,6 @@ export const API_ROUTES = {
         import: "/api/employees/import",
         departments: "/api/departments",
         byId: (id: number | string): string => `/api/employees/${id}`,
-    },
-    tickets: {
-        list: "/api/tickets",
-        stats: "/api/tickets/stats",
-        byId: (id: number | string): string => `/api/tickets/${id}`,
     },
     notifications: {
         list: "/api/notifications",

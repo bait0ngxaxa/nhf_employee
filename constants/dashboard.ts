@@ -1,6 +1,5 @@
 import {
     Boxes,
-    AlertTriangle,
     Mail,
     Users,
     UserPlus,
@@ -35,13 +34,6 @@ export const DASHBOARD_MENU_ITEMS: MenuItem[] = [
         icon: ClipboardCheck,
         description: "บันทึกและติดตามงานประจำขององค์กร",
         feature: FEATURE_KEYS.routine,
-    },
-    {
-        id: "it-support",
-        label: "NHF IT-Support",
-        icon: AlertTriangle,
-        description: "แจ้งปัญหาไอทีและติดตามสถานะ",
-        feature: FEATURE_KEYS.itSupport,
     },
     {
         id: "email-request",
@@ -79,6 +71,15 @@ export const DASHBOARD_MENU_ITEMS: MenuItem[] = [
     },
 ];
 
+function getDashboardMenuItem(menuId: string): MenuItem {
+    const menuItem = DASHBOARD_MENU_ITEMS.find((item) => item.id === menuId);
+    if (!menuItem) {
+        throw new Error(`Unknown dashboard menu item: ${menuId}`);
+    }
+
+    return menuItem;
+}
+
 const DASHBOARD_PAGE_LABELS: Readonly<Record<string, string>> = {
     dashboard: "หน้าหลัก",
     "manager-approval": "อนุมัติการลา",
@@ -102,10 +103,9 @@ export const DASHBOARD_MENU_GROUPS: MenuGroup[] = [
         label: "แอปพลิเคชัน",
         icon: AppWindow,
         items: [
-            DASHBOARD_MENU_ITEMS[0], // ระบบลางาน
-            DASHBOARD_MENU_ITEMS[1], // ระบบคลังวัสดุ
-            DASHBOARD_MENU_ITEMS[2], // NHF Routine
-            DASHBOARD_MENU_ITEMS[3], // IT Support
+            getDashboardMenuItem("leave-management"),
+            getDashboardMenuItem("stock"),
+            getDashboardMenuItem("routine"),
         ],
     },
     {
@@ -113,10 +113,10 @@ export const DASHBOARD_MENU_GROUPS: MenuGroup[] = [
         label: "การจัดการระบบ",
         icon: ShieldCheck,
         items: [
-            DASHBOARD_MENU_ITEMS[4], // ส่งคำร้องพนักงานใหม่ (ADMIN)
-            DASHBOARD_MENU_ITEMS[5], // ข้อมูลพนักงาน
-            DASHBOARD_MENU_ITEMS[6], // เพิ่มพนักงาน (ADMIN)
-            DASHBOARD_MENU_ITEMS[8], // บันทึกการใช้งาน (ADMIN)
+            getDashboardMenuItem("email-request"),
+            getDashboardMenuItem("employee-management"),
+            getDashboardMenuItem("add-employee"),
+            getDashboardMenuItem("audit-logs"),
         ],
     },
 ];
@@ -148,16 +148,6 @@ export const getMenuTheme = (menuId: string) => {
                 hover: "hover:bg-blue-50",
                 activeBg: "bg-blue-50/80",
                 glow: "from-blue-400 via-cyan-400 to-teal-400",
-            };
-        case "it-support":
-            return {
-                gradient: "from-emerald-500 to-green-500",
-                lightBg: "bg-emerald-50",
-                text: "text-emerald-600",
-                border: "border-emerald-600",
-                hover: "hover:bg-emerald-50",
-                activeBg: "bg-emerald-50/80",
-                glow: "from-emerald-400 via-green-400 to-lime-400",
             };
         case "employee-management":
             return {

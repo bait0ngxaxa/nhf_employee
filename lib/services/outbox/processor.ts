@@ -2,7 +2,6 @@ import type { NotificationOutbox } from "@prisma/client";
 import { sendStockRequestResultNotification } from "@/lib/email";
 import { lineNotificationService } from "@/lib/line";
 import { prisma } from "@/lib/db/prisma";
-import { dispatchTicketOutbox } from "@/lib/services/ticket/outbox-dispatch";
 import type {
     EmailRequestData,
     StockLowLineData,
@@ -348,9 +347,6 @@ async function dispatchNotification(
     );
     if (routineContractOutcome) return routineContractOutcome;
 
-    const ticketOutcome = await dispatchTicketOutbox(notification, payload);
-    if (ticketOutcome) return ticketOutcome;
-
     switch (notification.type) {
         case "EMAIL_REQUEST": {
             const parsedPayload = parseEmailRequestPayload(payload);
@@ -495,7 +491,7 @@ export async function processOutbox(batchSize = 10): Promise<OutboxProcessResult
                     lastError:
                         outcome === OUTBOX_STATUS_SENT
                             ? null
-                            : "Superseded legacy bundled ticket notification",
+                            : "Superseded notification",
                 },
             });
             processedCount++;

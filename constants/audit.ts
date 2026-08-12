@@ -51,30 +51,6 @@ export const AUDIT_ACTION_META = {
         label: "นำเข้าพนักงาน",
         badgeClassName: "bg-indigo-100 text-indigo-700 border border-indigo-200",
     },
-    TICKET_CREATE: {
-        label: "สร้าง Ticket",
-        badgeClassName: "bg-lime-100 text-lime-700 border border-lime-200",
-    },
-    TICKET_UPDATE: {
-        label: "แก้ไข Ticket",
-        badgeClassName: "bg-blue-100 text-blue-700 border border-blue-200",
-    },
-    TICKET_STATUS_CHANGE: {
-        label: "เปลี่ยนสถานะ Ticket",
-        badgeClassName: "bg-amber-100 text-amber-700 border border-amber-200",
-    },
-    TICKET_ASSIGN: {
-        label: "มอบหมาย Ticket",
-        badgeClassName: "bg-purple-100 text-purple-700 border border-purple-200",
-    },
-    TICKET_COMMENT: {
-        label: "เพิ่มความคิดเห็นใน Ticket",
-        badgeClassName: "bg-orange-100 text-orange-700 border border-orange-200",
-    },
-    TICKET_DELETE: {
-        label: "ลบ Ticket",
-        badgeClassName: "bg-rose-100 text-rose-700 border border-rose-200",
-    },
     USER_CREATE: {
         label: "สร้างผู้ใช้",
         badgeClassName: "bg-emerald-100 text-emerald-700 border border-emerald-200",
@@ -211,14 +187,14 @@ export const AUDIT_ACTION_META = {
         label: "ยกเลิกการนำเข้างานประจำ",
         badgeClassName: "bg-orange-100 text-orange-700 border border-orange-200",
     },
-} as const satisfies Record<AuditAction, AuditActionMeta>;
+} as const satisfies Partial<Record<AuditAction, AuditActionMeta>>;
 
 export const AUDIT_ACTION_LABELS = Object.fromEntries(
     Object.entries(AUDIT_ACTION_META).map(([action, metadata]) => [
         action,
         metadata.label,
     ]),
-) as Record<AuditAction, string>;
+) as Partial<Record<AuditAction, string>>;
 
 export const AUDIT_ACTION_FILTER_OPTIONS = [
     { value: "all", label: "ทั้งหมด" },
@@ -232,7 +208,6 @@ export const AUDIT_ENTITY_LABELS = {
     User: "ผู้ใช้ระบบ",
     Employee: "พนักงาน",
     EmployeeApprover: "ผู้อนุมัติการลา",
-    Ticket: "งานบริการ IT",
     EmailRequest: "คำร้องพนักงานใหม่",
     Stock: "สต็อก",
     StockItem: "วัสดุ",

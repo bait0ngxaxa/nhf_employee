@@ -1,6 +1,6 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import { type ReactElement } from "react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { DashboardProvider } from "@/components/dashboard/context/dashboard/DashboardProvider";
 import { useDashboardUIContext } from "@/components/dashboard/context/dashboard/DashboardContext";
 
@@ -38,11 +38,12 @@ vi.mock("@/components/auth/HybridAuthProvider", () => ({
 }));
 
 function DashboardNavigationState(): ReactElement {
-    const { mobileNavOpen, desktopSidebarCollapsed } =
+    const { selectedMenu, mobileNavOpen, desktopSidebarCollapsed } =
         useDashboardUIContext();
 
     return (
         <>
+            <output data-testid="selected-menu">{selectedMenu}</output>
             <output data-testid="mobile-nav-open">
                 {String(mobileNavOpen)}
             </output>
@@ -54,6 +55,12 @@ function DashboardNavigationState(): ReactElement {
 }
 
 describe("DashboardProvider navigation state", () => {
+    beforeEach(() => {
+        navigationMocks.router.push.mockReset();
+        navigationMocks.router.replace.mockReset();
+        navigationMocks.searchParams = new URLSearchParams();
+    });
+
     it("starts with mobile navigation closed and desktop sidebar expanded", () => {
         render(
             <DashboardProvider>
@@ -67,5 +74,25 @@ describe("DashboardProvider navigation state", () => {
         expect(
             screen.getByTestId("desktop-sidebar-collapsed"),
         ).toHaveTextContent("false");
+    });
+
+    it("falls back to the dashboard for a removed IT Support URL", async () => {
+        navigationMocks.searchParams = new URLSearchParams("tab=it-support");
+
+        render(
+            <DashboardProvider>
+                <DashboardNavigationState />
+            </DashboardProvider>,
+        );
+
+        await waitFor(() => {
+            expect(screen.getByTestId("selected-menu")).toHaveTextContent(
+                "dashboard",
+            );
+            expect(navigationMocks.router.replace).toHaveBeenCalledWith(
+                "/dashboard?tab=dashboard",
+                { scroll: false },
+            );
+        });
     });
 });

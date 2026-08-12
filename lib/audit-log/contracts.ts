@@ -173,16 +173,6 @@ export interface EmployeeApproverAuditDetails extends AuditDetails {
     };
 }
 
-export interface TicketAssignmentAuditDetails extends AuditDetails {
-    before: { assignedToId: number | null };
-    after: { assignedToId: number | null };
-    metadata: {
-        ticketTitle: string;
-        previousAssigneeName: string | null;
-        newAssigneeName: string | null;
-    };
-}
-
 export interface AuditDetailsByAction {
     STOCK_ITEM_CREATE: StockItemMutationAuditDetails;
     STOCK_ITEM_UPDATE: StockItemMutationAuditDetails;
@@ -199,9 +189,6 @@ export interface AuditDetailsByAction {
     LEAVE_REQUEST_CANCELLATION_CONFIRM: LeaveMutationAuditDetails;
     LEAVE_REQUEST_NOT_TAKEN_REQUEST: LeaveMutationAuditDetails;
     LEAVE_REQUEST_NOT_TAKEN_CONFIRM: LeaveMutationAuditDetails;
-    TICKET_ASSIGN: TicketAssignmentAuditDetails;
-    TICKET_COMMENT: AuditDetails;
-    TICKET_DELETE: AuditDetails;
     EMPLOYEE_UPDATE: AuditDetails | EmployeeApproverAuditDetails;
     ROUTINE_TASK_CREATE: AuditDetails;
     ROUTINE_TASK_UPDATE: AuditDetails;

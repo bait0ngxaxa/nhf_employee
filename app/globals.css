@@ -103,24 +103,6 @@
     --color-status-warning-foreground: var(--status-warning-foreground);
     --color-status-warning-solid: var(--status-warning-solid);
     --color-status-warning-strong: var(--status-warning-strong);
-    --color-module-it-start: var(--module-it-start);
-    --color-module-it-end: var(--module-it-end);
-    --color-module-it-glow-end: var(--module-it-glow-end);
-    --color-module-it-tabs-start: var(--module-it-tabs-start);
-    --color-module-it-tabs-mid: var(--module-it-tabs-mid);
-    --color-module-it-tabs-end: var(--module-it-tabs-end);
-    --color-module-it-tab-active: var(--module-it-tab-active);
-    --color-module-it-tab-border: var(--module-it-tab-border);
-    --color-module-it-indigo-glow: var(--module-it-indigo-glow);
-    --color-module-it-sky-glow: var(--module-it-sky-glow);
-    --color-module-it-action-start: var(--module-it-action-start);
-    --color-module-it-action-end: var(--module-it-action-end);
-    --color-module-it-action-hover-start: var(--module-it-action-hover-start);
-    --color-module-it-action-hover-end: var(--module-it-action-hover-end);
-    --color-module-it-action-shadow: var(--module-it-action-shadow);
-    --color-module-it-badge-surface: var(--module-it-badge-surface);
-    --color-module-it-badge-foreground: var(--module-it-badge-foreground);
-    --color-module-it-badge-border: var(--module-it-badge-border);
     --color-module-leave-start: var(--module-leave-start);
     --color-module-leave-end: var(--module-leave-end);
     --color-module-leave-glow-end: var(--module-leave-glow-end);
@@ -246,28 +228,6 @@
     --status-warning-foreground: #b45309;
     --status-warning-solid: #d97706;
     --status-warning-strong: #92400e;
-    --module-it-start: #10b981;
-    --module-it-end: #0f766e;
-    --module-it-glow-end: #14b8a6;
-    --module-it-tabs-start: #f1f5f9;
-    --module-it-tabs-mid: #eef2ff;
-    --module-it-tabs-end: #e0f2fe;
-    --module-it-tab-active: #4f46e5;
-    --module-it-tab-border: #e0e7ff;
-    --module-it-indigo-glow: #c7d2fe;
-    --module-it-sky-glow: #bae6fd;
-    --module-it-action-start: #4f46e5;
-    --module-it-action-end: #2563eb;
-    --module-it-action-hover-start: #4338ca;
-    --module-it-action-hover-end: #1d4ed8;
-    --module-it-action-shadow: #6366f1;
-    --module-it-badge-surface: #eef2ff;
-    --module-it-badge-foreground: #4338ca;
-    --module-it-badge-border: #e0e7ff;
-    --module-it-shell-from: rgb(219 234 254 / 60%);
-    --module-it-shell-to: rgb(224 231 255 / 60%);
-    --module-it-ticket-shadow: 0 30px 70px -38px rgb(30 41 59 / 45%);
-    --module-it-detail-shadow: 0 24px 64px -40px rgb(30 41 59 / 52%);
     --module-leave-start: #6366f1;
     --module-leave-end: #2563eb;
     --module-leave-glow-end: #3b82f6;
@@ -302,8 +262,6 @@
     --sidebar-toggle-shadow: 0 4px 8px rgb(15 23 42 / 18%), 0 1px 2px rgb(15 23 42 / 12%);
     --brand-logo-shadow: 0 4px 8px rgb(15 23 42 / 18%), 0 1px 2px rgb(15 23 42 / 12%);
     --employee-table-sticky-shadow: -10px 0 18px -18px rgb(15 23 42 / 45%);
-    --ticket-filters-shadow: 0 22px 50px -40px rgb(30 41 59 / 42%);
-    --ticket-list-shadow: 0 24px 62px -42px rgb(30 41 59 / 46%);
     --brand-sheen-subtle: linear-gradient(135deg, rgb(255 255 255 / 16%), rgb(255 255 255 / 0%) 45%);
     --brand-sheen-strong: linear-gradient(135deg, rgb(255 255 255 / 18%), rgb(255 255 255 / 0%) 50%);
     --audit-logs-background: radial-gradient(circle at 100% 0%, rgb(255 228 230 / 60%) 0%, transparent 34%), radial-gradient(circle at 0% 100%, rgb(255 237 213 / 60%) 0%, transparent 38%);
@@ -411,28 +369,6 @@
     --status-warning-foreground: #fbbf24;
     --status-warning-solid: #f59e0b;
     --status-warning-strong: #fcd34d;
-    --module-it-start: var(--primary);
-    --module-it-end: var(--primary);
-    --module-it-glow-end: var(--primary);
-    --module-it-tabs-start: var(--muted);
-    --module-it-tabs-mid: var(--accent);
-    --module-it-tabs-end: var(--accent);
-    --module-it-tab-active: var(--primary);
-    --module-it-tab-border: var(--border);
-    --module-it-indigo-glow: var(--accent);
-    --module-it-sky-glow: var(--accent);
-    --module-it-action-start: var(--primary);
-    --module-it-action-end: var(--primary);
-    --module-it-action-hover-start: var(--primary);
-    --module-it-action-hover-end: var(--primary);
-    --module-it-action-shadow: var(--primary);
-    --module-it-badge-surface: var(--accent);
-    --module-it-badge-foreground: var(--primary);
-    --module-it-badge-border: var(--border);
-    --module-it-shell-from: transparent;
-    --module-it-shell-to: transparent;
-    --module-it-ticket-shadow: 0 30px 70px -38px rgb(0 0 0 / 40%);
-    --module-it-detail-shadow: 0 24px 64px -40px rgb(0 0 0 / 45%);
     --module-leave-start: var(--primary);
     --module-leave-end: var(--primary);
     --module-leave-glow-end: var(--primary);
@@ -462,8 +398,6 @@
     --sidebar-toggle-shadow: 0 4px 8px rgb(0 0 0 / 30%), 0 1px 2px rgb(0 0 0 / 20%);
     --brand-logo-shadow: 0 4px 8px rgb(0 0 0 / 30%), 0 1px 2px rgb(0 0 0 / 20%);
     --employee-table-sticky-shadow: -10px 0 18px -18px rgb(0 0 0 / 45%);
-    --ticket-filters-shadow: 0 22px 50px -40px rgb(0 0 0 / 42%);
-    --ticket-list-shadow: 0 24px 62px -42px rgb(0 0 0 / 46%);
     --brand-sheen-subtle: linear-gradient(135deg, rgb(255 255 255 / 10%), rgb(255 255 255 / 0%) 45%);
     --brand-sheen-strong: linear-gradient(135deg, rgb(255 255 255 / 12%), rgb(255 255 255 / 0%) 50%);
     --audit-logs-background: linear-gradient(var(--background), var(--background));
@@ -529,14 +463,6 @@
         box-shadow: var(--employee-table-sticky-shadow);
     }
 
-    .ticket-filters-shadow {
-        box-shadow: var(--ticket-filters-shadow);
-    }
-
-    .ticket-list-shadow {
-        box-shadow: var(--ticket-list-shadow);
-    }
-
     .brand-sheen-subtle {
         background: var(--brand-sheen-subtle);
     }
@@ -557,13 +483,6 @@
         background: var(--employee-management-glow-accent);
     }
 
-    .module-it-ticket-shadow {
-        box-shadow: var(--module-it-ticket-shadow);
-    }
-
-    .module-it-detail-shadow {
-        box-shadow: var(--module-it-detail-shadow);
-    }
 }
 
 /* Prevent loading spinner flash */

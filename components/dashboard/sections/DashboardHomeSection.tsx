@@ -75,12 +75,6 @@ const MENU_ITEM_CONFIG: Record<
         featuredCorner: "bg-cyan-500/40",
         featuredFocus: "focus-visible:ring-teal-300",
     },
-    "it-support": {
-        text: "text-emerald-950",
-        bg: "bg-emerald-50/70",
-        icon: "text-emerald-600",
-        border: "border-emerald-100",
-    },
     "email-request": {
         text: "text-blue-950",
         bg: "bg-blue-50/70",

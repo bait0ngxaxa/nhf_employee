@@ -1,12 +1,9 @@
 import { describe, expect, it } from "vitest";
-import type { TicketEmailData } from "@/types/api";
 import { generateLeaveActionEmailHTML } from "@/lib/email/templates/leave-action";
 import { generateLeaveEventEmailHTML } from "@/lib/email/templates/leave-event";
 import { generateLeaveResultEmailHTML } from "@/lib/email/templates/leave-result";
-import { generateNewTicketEmailHTML } from "@/lib/email/templates/new-ticket";
 import { generatePasswordResetEmailHTML } from "@/lib/email/templates/password-reset";
 import { generateRoutineReminderEmailHTML } from "@/lib/email/templates/routine-reminder";
-import { generateStatusUpdateEmailHTML } from "@/lib/email/templates/status-update";
 import { generateStockRequestResultEmailHTML } from "@/lib/email/templates/stock-request-result";
 
 const XSS_PAYLOAD = `<script>alert("xss")</script><img src=x onerror="alert('x')">`;
@@ -20,50 +17,7 @@ function expectEscapedHtml(html: string): void {
     expect(html).toContain("&lt;img src=x");
 }
 
-function buildTicketEmailData(): TicketEmailData {
-    return {
-        ticketId: 1,
-        title: XSS_PAYLOAD,
-        description: `${XSS_PAYLOAD}\nรายละเอียดบรรทัดสอง`,
-        category: "HARDWARE",
-        priority: "HIGH",
-        status: "OPEN",
-        reportedBy: {
-            email: "user@example.com",
-            name: XSS_PAYLOAD,
-            department: XSS_PAYLOAD,
-        },
-        assignedTo: {
-            email: "agent@example.com",
-            name: XSS_PAYLOAD,
-        },
-        createdAt: "2026-05-28T00:00:00.000Z",
-        updatedAt: "2026-05-28T01:00:00.000Z",
-    };
-}
-
 describe("email template XSS escaping", () => {
-    it("escapes user controlled ticket fields in new ticket emails", () => {
-        const html = generateNewTicketEmailHTML(
-            buildTicketEmailData(),
-            "https://example.com/dashboard/it-issues",
-        );
-
-        expectEscapedHtml(html);
-        expect(html).toContain("รายละเอียดบรรทัดสอง");
-        expect(html).toContain("<br>");
-    });
-
-    it("escapes user controlled ticket fields in status update emails", () => {
-        const html = generateStatusUpdateEmailHTML(
-            buildTicketEmailData(),
-            "OPEN",
-            "https://example.com/dashboard/it-issues",
-        );
-
-        expectEscapedHtml(html);
-    });
-
     it("escapes leave action and result free-text fields", () => {
         const actionHtml = generateLeaveActionEmailHTML(
             {

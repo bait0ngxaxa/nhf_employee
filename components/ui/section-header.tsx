@@ -2,7 +2,7 @@ import { type ReactElement, type ReactNode } from "react";
 import { type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/ui/utils";
 
-export type SectionHeaderTone = "brand" | "it" | "leave" | "stock";
+export type SectionHeaderTone = "brand" | "leave" | "stock";
 
 const SECTION_HEADER_TONES: Record<
     SectionHeaderTone,
@@ -18,13 +18,6 @@ const SECTION_HEADER_TONES: Record<
         iconGlow: "from-brand-start/20 to-brand-end/10",
         iconShadow: "shadow-brand-shadow",
         badgeColor: "bg-brand-surface text-brand-foreground border-brand-border/50",
-    },
-    it: {
-        iconGradient: "from-module-it-start to-module-it-end",
-        iconGlow: "from-module-it-start/40 to-module-it-glow-end/40",
-        iconShadow: "shadow-module-it-start/25",
-        badgeColor:
-            "bg-module-it-badge-surface text-module-it-badge-foreground border-module-it-badge-border",
     },
     leave: {
         iconGradient: "from-module-leave-start to-module-leave-end",

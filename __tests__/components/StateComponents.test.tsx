@@ -11,11 +11,11 @@ import {
 
 describe("shared state components", () => {
     it("exposes loading feedback for screen readers", () => {
-        render(<LoadingState label="กำลังโหลดรายการ tickets" />);
+        render(<LoadingState label="กำลังโหลดรายการข้อมูล" />);
 
         expect(
             screen.getByRole("status", {
-                name: "กำลังโหลดรายการ tickets",
+                name: "กำลังโหลดรายการข้อมูล",
             }),
         ).toHaveAttribute("aria-busy", "true");
     });
@@ -25,13 +25,13 @@ describe("shared state components", () => {
 
         render(
             <ErrorState
-                title="โหลดรายการ tickets ไม่สำเร็จ"
+                title="โหลดรายการข้อมูลไม่สำเร็จ"
                 action={{ label: "ลองใหม่", onClick: onRetry }}
             />,
         );
 
         expect(screen.getByRole("alert")).toHaveTextContent(
-            "โหลดรายการ tickets ไม่สำเร็จ",
+            "โหลดรายการข้อมูลไม่สำเร็จ",
         );
         fireEvent.click(screen.getByRole("button", { name: "ลองใหม่" }));
 
@@ -41,13 +41,13 @@ describe("shared state components", () => {
     it("provides consistent empty, permission, and offline messages", () => {
         render(
             <>
-                <EmptyState title="ไม่พบ tickets" />
+                <EmptyState title="ไม่พบรายการข้อมูล" />
                 <PermissionState title="กรุณาเข้าสู่ระบบ" />
                 <OfflineState title="ไม่มีการเชื่อมต่อ" />
             </>,
         );
 
-        expect(screen.getByRole("heading", { name: "ไม่พบ tickets" })).toBeInTheDocument();
+        expect(screen.getByRole("heading", { name: "ไม่พบรายการข้อมูล" })).toBeInTheDocument();
         expect(screen.getByRole("heading", { name: "กรุณาเข้าสู่ระบบ" })).toBeInTheDocument();
         expect(screen.getByRole("heading", { name: "ไม่มีการเชื่อมต่อ" })).toBeInTheDocument();
     });

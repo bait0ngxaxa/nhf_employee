@@ -19,11 +19,6 @@ model User {
   employeeId                  Int?                        @unique
   isActive                    Boolean                     @default(true)
   deletedAt                   DateTime?
-  comments                    TicketComment[]
-  ticketViews                 TicketView[]
-  assignedTickets             Ticket[]                    @relation("AssignedTickets")
-  reportedTickets             Ticket[]                    @relation("ReportedTickets")
-  deletedTickets              Ticket[]                    @relation("DeletedTickets")
   employee                    Employee?                   @relation(fields: [employeeId], references: [id])
   auditLogs                   AuditLog[]
   emailRequests               EmailRequest[]
@@ -34,7 +29,6 @@ model User {
   stockRequests               StockRequest[]              @relation("StockRequester")
   stockIssuedRequests         StockRequest[]              @relation("StockIssuer")
   stockCancelledRequests      StockRequest[]              @relation("StockCanceller")
-  ticketMutationIdempotencies TicketMutationIdempotency[]
   leaveRequestIdempotencies    LeaveRequestIdempotency[]
   routineTaskCreateIdempotencies RoutineTaskCreateIdempotency[]
   createdRoutineTasks         RoutineTask[]               @relation("RoutineTaskCreatedBy")
@@ -128,114 +122,14 @@ model Department {
   @@map("departments")
 }
 
-model Ticket {
-  id           Int             @id @default(autoincrement())
-  title        String
-  description  String          @db.Text
-  category     TicketCategory
-  priority     TicketPriority  @default(MEDIUM)
-  status       TicketStatus    @default(OPEN)
-  createdAt    DateTime        @default(now())
-  updatedAt    DateTime        @updatedAt
-  resolvedAt   DateTime?
-  closedAt     DateTime?
-  cancelledAt  DateTime?
-  deletedAt    DateTime?
-  deletedById  Int?
-  deleteReason String?         @db.VarChar(500)
-  reportedById Int
-  assignedToId Int?
-  comments     TicketComment[]
-  views        TicketView[]
-  assignedTo   User?           @relation("AssignedTickets", fields: [assignedToId], references: [id])
-  reportedBy   User            @relation("ReportedTickets", fields: [reportedById], references: [id])
-  deletedBy    User?           @relation("DeletedTickets", fields: [deletedById], references: [id], onDelete: SetNull)
-
-  @@index([assignedToId], map: "tickets_assignedToId_fkey")
-  @@index([deletedById], map: "tickets_deletedById_fkey")
-  @@index([reportedById], map: "tickets_reportedById_fkey")
-  @@map("tickets")
-}
-
-model TicketComment {
-  id        Int      @id @default(autoincrement())
-  content   String   @db.Text
-  createdAt DateTime @default(now())
-  ticketId  Int
-  authorId  Int
-  author    User     @relation(fields: [authorId], references: [id])
-  ticket    Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
-
-  @@index([authorId], map: "ticket_comments_authorId_fkey")
-  @@index([ticketId], map: "ticket_comments_ticketId_fkey")
-  @@map("ticket_comments")
-}
-
-model TicketView {
-  id       Int      @id @default(autoincrement())
-  viewedAt DateTime @default(now())
-  ticketId Int
-  userId   Int
-  ticket   Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
-  user     User     @relation(fields: [userId], references: [id])
-
-  @@unique([ticketId, userId])
-  @@index([userId], map: "ticket_views_userId_fkey")
-  @@map("ticket_views")
-}
-
 enum EmployeeStatus {
   ACTIVE
   INACTIVE
   SUSPENDED
 }
 
-enum TicketCategory {
-  HARDWARE
-  SOFTWARE
-  NETWORK
-  ACCOUNT
-  EMAIL
-  PRINTER
-  OTHER
-}
-
-enum TicketPriority {
-  LOW
-  MEDIUM
-  HIGH
-  URGENT
-}
-
-enum TicketStatus {
-  OPEN
-  IN_PROGRESS
-  RESOLVED
-  CLOSED
-  CANCELLED
-}
-
-model TicketMutationIdempotency {
-  id             String                     @id @default(cuid())
-  userId         Int
-  idempotencyKey String                     @db.VarChar(255)
-  operation      TicketIdempotencyOperation
-  requestHash    String                     @db.Char(64)
-  resourceId     Int
-  createdAt      DateTime                   @default(now())
-  user           User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, idempotencyKey])
-  @@index([createdAt])
-  @@map("ticket_mutation_idempotency")
-}
-
-enum TicketIdempotencyOperation {
-  TICKET_CREATE
-  TICKET_COMMENT
-}
-
 enum NotificationOutboxType {
+  // Legacy IT Support values retained to preserve shared outbox history safely.
   TICKET_CREATED
   TICKET_UPDATED
   TICKET_CREATED_IN_APP
@@ -278,7 +172,7 @@ enum NotificationOutboxStatus {
 model AuditLog {
   id         Int         @id @default(autoincrement())
   action     AuditAction
-  entityType String // e.g., "User", "Employee", "Ticket"
+  entityType String // e.g., "User" or "Employee"
   entityId   Int? // ID of the affected entity
   userId     Int? // User who performed the action
   userEmail  String? // Email for reference even if user deleted
@@ -310,7 +204,7 @@ enum AuditAction {
   EMPLOYEE_STATUS_CHANGE
   EMPLOYEE_IMPORT
 
-  // Ticket management
+  // Legacy IT Support values retained to preserve shared audit history safely.
   TICKET_CREATE
   TICKET_UPDATE
   TICKET_STATUS_CHANGE
@@ -444,7 +338,7 @@ model Notification {
   message     String           @db.Text
   isRead      Boolean          @default(false)
   actionUrl   String?
-  referenceId String? // ID of Ticket, Comment, etc.
+  referenceId String? // ID of the related domain record
   dedupeKey   String?          @unique
   createdAt   DateTime         @default(now())
 
@@ -454,6 +348,7 @@ model Notification {
 }
 
 enum NotificationType {
+  // Legacy IT Support values retained to preserve shared notification history safely.
   TICKET_CREATED
   NEW_COMMENT
   TICKET_UPDATED

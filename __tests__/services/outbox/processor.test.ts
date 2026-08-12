@@ -12,19 +12,6 @@ import { prisma } from "@/lib/db/prisma";
 import { processOutbox } from "@/lib/services/outbox/processor";
 import { EMAIL_REQUEST_INAPP_RECIPIENTS_ENV } from "@/lib/services/email-request/notifications";
 import {
-    sendTicketCommentInAppNotification,
-    sendTicketCreatedInAppNotification,
-    sendTicketCreatedLineNotification,
-    sendTicketCreatedReporterEmailNotification,
-    sendTicketUpdatedReporterEmailNotification,
-} from "@/lib/services/ticket/notifications";
-import type {
-    TicketCreatedNotificationSnapshot,
-} from "@/lib/services/ticket/created-notification-snapshot";
-import type {
-    TicketUpdatedNotificationSnapshot,
-} from "@/lib/services/ticket/update-notification-snapshot";
-import {
     sendLeaveActionNotifications,
     sendLeaveCancellationRequestedNotifications,
     sendLeaveCancelledAfterApprovalNotifications,
@@ -40,17 +27,6 @@ vi.mock("@/lib/db/prisma", () => ({
 
 vi.mock("@/lib/email", () => ({
     sendStockRequestResultNotification: vi.fn(),
-}));
-
-vi.mock("@/lib/services/ticket/notifications", () => ({
-    sendTicketCommentInAppNotification: vi.fn(),
-    sendTicketCreatedITEmailNotification: vi.fn(),
-    sendTicketCreatedInAppNotification: vi.fn(),
-    sendTicketCreatedLineNotification: vi.fn(),
-    sendTicketCreatedReporterEmailNotification: vi.fn(),
-    sendTicketUpdatedInAppNotification: vi.fn(),
-    sendTicketUpdatedLineNotification: vi.fn(),
-    sendTicketUpdatedReporterEmailNotification: vi.fn(),
 }));
 
 vi.mock("@/lib/services/leave/notifications", () => ({
@@ -111,43 +87,6 @@ function buildNotification(
 
 function asNever<T>(value: T): never {
     return value as unknown as never;
-}
-
-function buildTicketUpdatedSnapshot(): TicketUpdatedNotificationSnapshot {
-    return {
-        ticketId: 1,
-        oldStatus: "OPEN",
-        newStatus: "IN_PROGRESS",
-        title: "Test Ticket",
-        description: "desc",
-        category: "HARDWARE",
-        priority: "LOW",
-        reportedBy: {
-            id: 1,
-            name: "U",
-            email: "u@test.com",
-        },
-        createdAt: "2026-07-24T01:00:00.000Z",
-        occurredAt: "2026-07-24T02:00:00.000Z",
-    };
-}
-
-function buildTicketCreatedSnapshot(): TicketCreatedNotificationSnapshot {
-    return {
-        ticketId: 1,
-        title: "Test Ticket",
-        description: "desc",
-        category: "HARDWARE",
-        priority: "LOW",
-        status: "OPEN",
-        reportedBy: {
-            id: 1,
-            name: "U",
-            email: "u@test.com",
-        },
-        assignedTo: null,
-        createdAt: "2026-07-24T01:00:00.000Z",
-    };
 }
 
 function buildLeavePayload() {
@@ -235,173 +174,6 @@ describe("processOutbox", () => {
 
         expect(result).toEqual({ processed: 0, failed: 0 });
         expect(prismaMock.notificationOutbox.updateMany).toHaveBeenCalledTimes(2);
-    });
-
-    it("processes only the requested ticket-created provider", async () => {
-        prismaMock.notificationOutbox.findMany.mockResolvedValue(
-            asNever([
-                buildNotification(
-                    100,
-                    "TICKET_CREATED_EMAIL_REPORTER",
-                    JSON.stringify(buildTicketCreatedSnapshot()),
-                    "ticket:1:created:email:reporter:1",
-                ),
-            ]),
-        );
-        const result = await processOutbox();
-
-        expect(result).toEqual({ processed: 1, failed: 0 });
-        expect(sendTicketCreatedReporterEmailNotification).toHaveBeenCalledTimes(1);
-        expect(sendTicketCreatedReporterEmailNotification).toHaveBeenCalledWith(
-            buildTicketCreatedSnapshot(),
-            "ticket:1:created:email:reporter:1",
-        );
-        expect(sendTicketCreatedLineNotification).not.toHaveBeenCalled();
-        expect(sendTicketCreatedInAppNotification).not.toHaveBeenCalled();
-        expect(prismaMock.ticket.findUnique).not.toHaveBeenCalled();
-        expect(prismaMock.notificationOutbox.updateMany).toHaveBeenCalledWith(
-            expect.objectContaining({
-                where: { id: 100, status: "PROCESSING" },
-                data: expect.objectContaining({ status: "SENT" }),
-            }),
-        );
-    });
-
-    it("dispatches the immutable status snapshot without reading current ticket state", async () => {
-        prismaMock.notificationOutbox.findMany.mockResolvedValue(
-            asNever([
-                buildNotification(
-                    101,
-                    "TICKET_UPDATED_EMAIL_REPORTER",
-                    JSON.stringify(buildTicketUpdatedSnapshot()),
-                    "ticket:1:status:v1:email:reporter:1",
-                ),
-            ]),
-        );
-
-        const result = await processOutbox();
-
-        expect(result).toEqual({ processed: 1, failed: 0 });
-        expect(sendTicketUpdatedReporterEmailNotification).toHaveBeenCalledWith(
-            expect.objectContaining({
-                ticketId: 1,
-                oldStatus: "OPEN",
-                newStatus: "IN_PROGRESS",
-            }),
-            "ticket:1:status:v1:email:reporter:1",
-        );
-        expect(prismaMock.ticket.findUnique).not.toHaveBeenCalled();
-    });
-
-    it("supersedes legacy created events that cannot be delivered accurately", async () => {
-        prismaMock.notificationOutbox.findMany.mockResolvedValue(
-            asNever([
-                buildNotification(
-                    123,
-                    "TICKET_CREATED_EMAIL_REPORTER",
-                    JSON.stringify({ ticketId: 1 }),
-                    "ticket:1:created:email:reporter:1",
-                ),
-            ]),
-        );
-
-        const result = await processOutbox();
-
-        expect(result).toEqual({ processed: 1, failed: 0 });
-        expect(sendTicketCreatedReporterEmailNotification).not.toHaveBeenCalled();
-        expect(prismaMock.ticket.findUnique).not.toHaveBeenCalled();
-        expect(prismaMock.notificationOutbox.updateMany).toHaveBeenCalledWith(
-            expect.objectContaining({
-                where: { id: 123, status: "PROCESSING" },
-                data: expect.objectContaining({ status: "SUPERSEDED" }),
-            }),
-        );
-    });
-
-    it("supersedes legacy status events that cannot be delivered accurately", async () => {
-        prismaMock.notificationOutbox.findMany.mockResolvedValue(
-            asNever([
-                buildNotification(
-                    102,
-                    "TICKET_UPDATED_EMAIL_REPORTER",
-                    JSON.stringify({ ticketId: 1, oldStatus: "OPEN" }),
-                    "ticket:1:status:legacy:email:reporter:1",
-                ),
-            ]),
-        );
-
-        const result = await processOutbox();
-
-        expect(result).toEqual({ processed: 1, failed: 0 });
-        expect(sendTicketUpdatedReporterEmailNotification).not.toHaveBeenCalled();
-        expect(prismaMock.ticket.findUnique).not.toHaveBeenCalled();
-        expect(prismaMock.notificationOutbox.updateMany).toHaveBeenCalledWith(
-            expect.objectContaining({
-                where: { id: 102, status: "PROCESSING" },
-                data: expect.objectContaining({ status: "SUPERSEDED" }),
-            }),
-        );
-    });
-
-    it("retries failed ticket email without sending LINE again", async () => {
-        const payload = JSON.stringify(buildTicketCreatedSnapshot());
-        const lineEvent = buildNotification(
-            121,
-            "TICKET_CREATED_LINE",
-            payload,
-            "ticket:1:created:line:it",
-        );
-        const emailEvent = buildNotification(
-            122,
-            "TICKET_CREATED_EMAIL_REPORTER",
-            payload,
-            "ticket:1:created:email:reporter:1",
-        );
-        prismaMock.notificationOutbox.findMany
-            .mockResolvedValueOnce(asNever([lineEvent, emailEvent]))
-            .mockResolvedValueOnce(asNever([
-                { ...emailEvent, status: "FAILED", attempts: 1 },
-            ]));
-        vi.mocked(sendTicketCreatedReporterEmailNotification)
-            .mockRejectedValueOnce(new Error("SMTP unavailable"))
-            .mockResolvedValueOnce();
-
-        await processOutbox();
-        await processOutbox();
-
-        expect(sendTicketCreatedLineNotification).toHaveBeenCalledTimes(1);
-        expect(sendTicketCreatedReporterEmailNotification).toHaveBeenCalledTimes(2);
-    });
-
-    it("processes comment notification with its provider dedupe key", async () => {
-        const payload = {
-            ticketId: 1,
-            commentId: 88,
-            recipientId: 9,
-            authorId: 1,
-            authorName: "Admin",
-            ticketTitle: "Printer issue",
-            authorIsOwner: false,
-        };
-        const eventKey = "ticket:1:comment:88:in-app:user:9";
-        prismaMock.notificationOutbox.findMany.mockResolvedValue(
-            asNever([
-                buildNotification(
-                    120,
-                    "TICKET_COMMENT_IN_APP",
-                    JSON.stringify(payload),
-                    eventKey,
-                ),
-            ]),
-        );
-
-        const result = await processOutbox();
-
-        expect(result).toEqual({ processed: 1, failed: 0 });
-        expect(sendTicketCommentInAppNotification).toHaveBeenCalledWith(
-            payload,
-            eventKey,
-        );
     });
 
     it("processes EMAIL_REQUEST successfully", async () => {
@@ -559,13 +331,12 @@ describe("processOutbox", () => {
             asNever([
                 buildNotification(
                     103,
-                    "TICKET_CREATED_EMAIL_REPORTER",
-                    JSON.stringify(buildTicketCreatedSnapshot()),
-                    "ticket:1:created:email:reporter:1",
+                    "LEAVE_CANCELLED",
+                    JSON.stringify(buildLeavePayload()),
                 ),
             ]),
         );
-        vi.mocked(sendTicketCreatedReporterEmailNotification).mockRejectedValue(
+        vi.mocked(sendLeaveCancelledNotifications).mockRejectedValueOnce(
             new Error("Network failure"),
         );
 
@@ -1198,9 +969,8 @@ describe("processOutbox", () => {
             asNever([
                 buildNotification(
                     104,
-                    "TICKET_CREATED_LINE",
-                    JSON.stringify(buildTicketCreatedSnapshot()),
-                    "ticket:1:created:line:it",
+                    "LEAVE_CANCELLED",
+                    JSON.stringify(buildLeavePayload()),
                 ),
             ]),
         );
@@ -1212,7 +982,7 @@ describe("processOutbox", () => {
         const result = await processOutbox();
 
         expect(result).toEqual({ processed: 0, failed: 0 });
-        expect(sendTicketCreatedLineNotification).not.toHaveBeenCalled();
+        expect(sendLeaveCancelledNotifications).not.toHaveBeenCalled();
     });
 
     it("only selects retries whose backoff has elapsed", async () => {
@@ -1241,13 +1011,12 @@ describe("processOutbox", () => {
             asNever([
                 buildNotification(
                     115,
-                    "TICKET_CREATED_EMAIL_REPORTER",
-                    JSON.stringify(buildTicketCreatedSnapshot()),
-                    "ticket:1:created:email:reporter:1",
+                    "LEAVE_CANCELLED",
+                    JSON.stringify(buildLeavePayload()),
                 ),
             ]),
         );
-        vi.mocked(sendTicketCreatedReporterEmailNotification).mockRejectedValue(
+        vi.mocked(sendLeaveCancelledNotifications).mockRejectedValueOnce(
             new Error("SMTP unavailable"),
         );
 
@@ -1299,15 +1068,14 @@ describe("processOutbox", () => {
                 {
                     ...buildNotification(
                         116,
-                        "TICKET_CREATED_EMAIL_REPORTER",
-                        JSON.stringify(buildTicketCreatedSnapshot()),
-                        "ticket:1:created:email:reporter:1",
+                        "LEAVE_CANCELLED",
+                        JSON.stringify(buildLeavePayload()),
                     ),
                     attempts: 2,
                 },
             ]),
         );
-        vi.mocked(sendTicketCreatedReporterEmailNotification).mockRejectedValue(
+        vi.mocked(sendLeaveCancelledNotifications).mockRejectedValueOnce(
             new Error("Permanent failure"),
         );
 
