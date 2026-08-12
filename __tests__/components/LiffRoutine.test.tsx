@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => {
     class MockLiffApiError extends Error {
@@ -13,33 +13,24 @@ const mocks = vi.hoisted(() => {
     }
 
     return {
-        liff: {
-            init: vi.fn(),
-            isLoggedIn: vi.fn(),
-            login: vi.fn(),
-            getIDToken: vi.fn(),
-        },
         useSearchParams: vi.fn(),
-        establishLiffSession: vi.fn(),
         fetchLiffRoutineSummary: vi.fn(),
         fetchLiffRoutineTasks: vi.fn(),
-        linkLiffAccount: vi.fn(),
         MockLiffApiError,
     };
 });
-
-vi.mock("@line/liff", () => ({ default: mocks.liff }));
 
 vi.mock("next/navigation", () => ({
     useSearchParams: mocks.useSearchParams,
 }));
 
-vi.mock("@/lib/client/liff-routine", () => ({
+vi.mock("@/lib/client/liff", () => ({
     LiffApiError: mocks.MockLiffApiError,
-    establishLiffSession: mocks.establishLiffSession,
+}));
+
+vi.mock("@/lib/client/liff-routine", () => ({
     fetchLiffRoutineSummary: mocks.fetchLiffRoutineSummary,
     fetchLiffRoutineTasks: mocks.fetchLiffRoutineTasks,
-    linkLiffAccount: mocks.linkLiffAccount,
 }));
 
 import { LiffRoutineApp } from "@/components/liff/routine/LiffRoutineApp";
@@ -84,34 +75,25 @@ function tasksResponse(
 describe("LiffRoutineApp", () => {
     beforeEach(() => {
         vi.clearAllMocks();
-        vi.stubEnv("NEXT_PUBLIC_LINE_ROUTINE_LIFF_ID", "routine-liff-id");
         mocks.useSearchParams.mockReturnValue(new URLSearchParams());
-        mocks.liff.init.mockResolvedValue(undefined);
-        mocks.liff.isLoggedIn.mockReturnValue(true);
-        mocks.liff.login.mockReturnValue(undefined);
-        mocks.liff.getIDToken.mockReturnValue("line-id-token");
-        mocks.establishLiffSession.mockResolvedValue({ linked: true });
         mocks.fetchLiffRoutineSummary.mockResolvedValue(SUMMARY);
         mocks.fetchLiffRoutineTasks.mockResolvedValue(tasksResponse());
-        mocks.linkLiffAccount.mockResolvedValue({ linked: true });
     });
 
-    afterEach(() => {
-        vi.unstubAllEnvs();
-    });
-
-    it("initializes LIFF, establishes a session, and reaches READY", async () => {
+    it("loads the Routine summary and task list", async () => {
         render(<LiffRoutineApp />);
 
         await waitFor(() => {
-            expect(screen.getByRole("heading", { name: "งาน Routine ของฉัน" })).toBeInTheDocument();
+            expect(
+                screen.getByRole("heading", { name: "งาน Routine ของฉัน" }),
+            ).toBeInTheDocument();
         });
 
-        expect(mocks.liff.init).toHaveBeenCalledWith({ liffId: "routine-liff-id" });
-        expect(mocks.liff.getIDToken).toHaveBeenCalled();
-        expect(mocks.establishLiffSession).toHaveBeenCalledWith("line-id-token");
         expect(mocks.fetchLiffRoutineSummary).toHaveBeenCalledTimes(1);
-        expect(mocks.fetchLiffRoutineTasks).toHaveBeenCalledWith({ page: 1, limit: 12 });
+        expect(mocks.fetchLiffRoutineTasks).toHaveBeenCalledWith({
+            page: 1,
+            limit: 12,
+        });
         expect(screen.getByText("ตรวจสอบระบบ")).toBeInTheDocument();
         expect(screen.getByText("IT · ฝ่าย IT")).toBeInTheDocument();
         expect(screen.getByText("ระบบคอมพิวเตอร์")).toBeInTheDocument();
@@ -204,115 +186,56 @@ describe("LiffRoutineApp", () => {
         });
     });
 
+    it("falls back to the authorized list when a focused task is unavailable", async () => {
+        mocks.useSearchParams.mockReturnValue(
+            new URLSearchParams("taskId=999&occurrenceId=998"),
+        );
+        mocks.fetchLiffRoutineTasks
+            .mockResolvedValueOnce(tasksResponse([]))
+            .mockResolvedValueOnce(tasksResponse());
+
+        render(<LiffRoutineApp />);
+
+        expect(
+            await screen.findByText(
+                "ไม่พบงานนี้ หรือคุณไม่มีสิทธิ์เข้าถึงรายการดังกล่าว กำลังแสดงงาน Routine ของคุณตามปกติ",
+            ),
+        ).toBeInTheDocument();
+        expect(screen.getByText("ตรวจสอบระบบ")).toBeInTheDocument();
+    });
+
     it("shows a distinct empty state when the employee has no assigned tasks", async () => {
         mocks.fetchLiffRoutineTasks.mockResolvedValueOnce(tasksResponse([]));
 
         render(<LiffRoutineApp />);
 
-        await waitFor(() => {
-            expect(screen.getByText("ยังไม่มีงาน Routine ที่ได้รับมอบหมาย")).toBeInTheDocument();
-        });
-    });
-
-    it("shows the NHF account-link action for an unlinked LINE identity", async () => {
-        mocks.establishLiffSession.mockResolvedValueOnce({ linked: false });
-
-        render(<LiffRoutineApp />);
-
-        await waitFor(() => {
-            expect(screen.getByRole("heading", { name: "เชื่อมบัญชี NHF" })).toBeInTheDocument();
-        });
-
-        expect(screen.getByRole("button", { name: "เชื่อมบัญชี NHF" })).toBeInTheDocument();
-        expect(mocks.fetchLiffRoutineSummary).not.toHaveBeenCalled();
-    });
-
-    it("resumes an explicit link intent after NHF login", async () => {
-        mocks.useSearchParams.mockReturnValue(
-            new URLSearchParams("link=1&loginReturn=1"),
-        );
-
-        render(<LiffRoutineApp />);
-
-        await waitFor(() => {
-            expect(screen.getByRole("heading", { name: "งาน Routine ของฉัน" })).toBeInTheDocument();
-        });
-
-        expect(mocks.linkLiffAccount).toHaveBeenCalledWith("line-id-token");
-        expect(mocks.establishLiffSession).not.toHaveBeenCalled();
-    });
-
-    it("starts LINE login when the LIFF user is not logged in", async () => {
-        mocks.liff.isLoggedIn.mockReturnValueOnce(false);
-
-        render(<LiffRoutineApp />);
-
-        await waitFor(() => {
-            expect(screen.getByText("กำลังยืนยันตัวตนกับ LINE...")).toBeInTheDocument();
-        });
-        expect(mocks.liff.login).toHaveBeenCalledWith({
-            redirectUri: expect.stringContaining("lineLogin=1"),
-        });
-        expect(mocks.liff.getIDToken).not.toHaveBeenCalled();
-    });
-
-    it("stops after an incomplete LINE login instead of redirecting in a loop", async () => {
-        mocks.useSearchParams.mockReturnValue(new URLSearchParams("lineLogin=1"));
-        mocks.liff.isLoggedIn.mockReturnValue(false);
-
-        render(<LiffRoutineApp />);
-
-        await waitFor(() => {
-            expect(screen.getByRole("heading", { name: "เปิด My Routine ไม่สำเร็จ" })).toBeInTheDocument();
-        });
-        expect(screen.getByText("การเข้าสู่ระบบ LINE ไม่สำเร็จ กรุณาลองใหม่อีกครั้ง")).toBeInTheDocument();
-        expect(mocks.liff.login).not.toHaveBeenCalled();
-    });
-
-    it("shows a retryable state when LIFF initialization fails", async () => {
-        mocks.liff.init.mockRejectedValueOnce(new Error("LIFF init failed"));
-
-        render(<LiffRoutineApp />);
-
-        await waitFor(() => {
-            expect(screen.getByRole("heading", { name: "เปิด My Routine ไม่สำเร็จ" })).toBeInTheDocument();
-        });
-        expect(screen.getByText("ไม่สามารถเปิด My Routine ได้ กรุณาลองใหม่อีกครั้ง")).toBeInTheDocument();
-        expect(screen.getByRole("button", { name: "ลองใหม่" })).toBeInTheDocument();
-    });
-
-    it("shows a safe error when LINE cannot provide an ID token", async () => {
-        mocks.liff.getIDToken.mockReturnValueOnce(null);
-
-        render(<LiffRoutineApp />);
-
-        await waitFor(() => {
-            expect(screen.getByRole("heading", { name: "เปิด My Routine ไม่สำเร็จ" })).toBeInTheDocument();
-        });
         expect(
-            screen.getByText("ไม่สามารถเปิด My Routine ได้ กรุณาลองใหม่อีกครั้ง"),
+            await screen.findByText("ยังไม่มีงาน Routine ที่ได้รับมอบหมาย"),
         ).toBeInTheDocument();
-        expect(mocks.establishLiffSession).not.toHaveBeenCalled();
     });
 
-    it("shows a safe message for an account-link conflict", async () => {
-        mocks.useSearchParams.mockReturnValue(
-            new URLSearchParams("link=1&loginReturn=1"),
-        );
-        mocks.linkLiffAccount.mockRejectedValueOnce(
-            new mocks.MockLiffApiError(
-                "บัญชี LINE หรือบัญชี NHF นี้ถูกเชื่อมกับบัญชีอื่นอยู่แล้ว กรุณาติดต่อผู้ดูแลระบบ",
-                409,
-            ),
-        );
+    it("shows a safe Routine error and supports retry", async () => {
+        mocks.fetchLiffRoutineSummary
+            .mockRejectedValueOnce(
+                new mocks.MockLiffApiError(
+                    "บัญชี NHF นี้ยังไม่สามารถเข้าถึง Routine ได้",
+                    403,
+                ),
+            )
+            .mockResolvedValueOnce(SUMMARY);
 
         render(<LiffRoutineApp />);
 
-        await waitFor(() => {
-            expect(screen.getByRole("heading", { name: "เปิด My Routine ไม่สำเร็จ" })).toBeInTheDocument();
-        });
         expect(
-            screen.getByText("บัญชี LINE หรือบัญชี NHF นี้ถูกเชื่อมกับบัญชีอื่นอยู่แล้ว กรุณาติดต่อผู้ดูแลระบบ"),
+            await screen.findByRole("heading", { name: "เปิด My Routine ไม่สำเร็จ" }),
+        ).toBeInTheDocument();
+        expect(
+            screen.getByText("บัญชี NHF นี้ยังไม่สามารถเข้าถึง Routine ได้"),
+        ).toBeInTheDocument();
+
+        fireEvent.click(screen.getByRole("button", { name: "ลองใหม่" }));
+        expect(
+            await screen.findByRole("heading", { name: "งาน Routine ของฉัน" }),
         ).toBeInTheDocument();
     });
 

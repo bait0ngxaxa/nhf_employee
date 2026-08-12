@@ -15,7 +15,7 @@ import {
 
 const createInAppNotificationOnceMock = vi.hoisted(() => vi.fn());
 const sendRoutineContractExpiryNotificationMock = vi.hoisted(() => vi.fn());
-const sendRoutineLineMessageMock = vi.hoisted(() => vi.fn());
+const sendLineAppMessageMock = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/db/prisma", () => ({
     prisma: mockDeep<PrismaClient>(),
@@ -41,8 +41,8 @@ vi.mock("@/lib/email", () => ({
         sendRoutineContractExpiryNotificationMock,
 }));
 
-vi.mock("@/lib/line", () => ({
-    sendRoutineLineMessage: sendRoutineLineMessageMock,
+vi.mock("@/lib/line/messaging", () => ({
+    sendLineAppMessage: sendLineAppMessageMock,
 }));
 
 const prismaMock = prisma as unknown as ReturnType<typeof mockDeep<PrismaClient>>;
@@ -275,7 +275,7 @@ describe("Routine contract expiry dispatch", () => {
         );
         prismaMock.lineAccountLink.findMany.mockResolvedValue(asNever([]));
         sendRoutineContractExpiryNotificationMock.mockResolvedValue(true);
-        sendRoutineLineMessageMock.mockResolvedValue(true);
+        sendLineAppMessageMock.mockResolvedValue(true);
     });
 
     it("notifies active owners and co-owners while excluding inactive or deleted records", async () => {
@@ -451,12 +451,12 @@ describe("Routine contract expiry dispatch", () => {
         );
 
         expect(result).toBe("SENT");
-        expect(sendRoutineLineMessageMock).toHaveBeenCalledWith(
+        expect(sendLineAppMessageMock).toHaveBeenCalledWith(
             "U-contract-owner",
             expect.objectContaining({ type: "flex" }),
             payload.retryKey,
         );
-        expect(JSON.stringify(sendRoutineLineMessageMock.mock.calls[0]?.[1]))
+        expect(JSON.stringify(sendLineAppMessageMock.mock.calls[0]?.[1]))
             .toContain("https://employee.example.com/dashboard?tab=routine&taskId=71");
     });
 });

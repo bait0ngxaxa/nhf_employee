@@ -28,7 +28,7 @@ function printProvisioningPlan(result: RoutineRichMenuProvisionResult): void {
 }
 
 function printStatus(status: RoutineRichMenuStatus): void {
-    console.log("LINE Routine configuration");
+    console.log("NHFapp LINE configuration (Routine Rich Menu)");
     console.log(`  LIFF ID configured: ${yesNo(status.liffIdConfigured)}`);
     console.log(`  Login channel configured: ${yesNo(status.loginChannelConfigured)}`);
     console.log(

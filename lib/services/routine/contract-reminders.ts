@@ -8,7 +8,7 @@ import {
 } from "@/lib/email";
 import { prisma } from "@/lib/db/prisma";
 import { hasPrismaErrorCode, runSerializableTransaction } from "@/lib/db/transaction";
-import { sendRoutineLineMessage } from "@/lib/line";
+import { sendLineAppMessage } from "@/lib/line/messaging";
 import { generateRoutineContractExpiryFlexMessage } from "@/lib/line/flex-messages/routine-contract-expiry";
 import { getPublicOrigin } from "@/lib/network/public-url";
 import {
@@ -496,7 +496,7 @@ async function dispatchRoutineContractExpiryLineOutbox(
         ),
         actionUrl: getRoutineContractExpiryAbsoluteActionUrl(payload.taskId),
     });
-    const sent = await sendRoutineLineMessage(
+    const sent = await sendLineAppMessage(
         lineUserId,
         message,
         payload.retryKey,

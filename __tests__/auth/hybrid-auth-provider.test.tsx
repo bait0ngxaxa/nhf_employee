@@ -106,6 +106,22 @@ describe("HybridAuthProvider", () => {
         expect(calledUrls).not.toContain(API_ROUTES.auth.refresh);
     });
 
+    it("does not bootstrap hybrid auth for modules under the global LIFF boundary", async () => {
+        usePathnameMock.mockReturnValue(`${APP_ROUTES.line.root}/future-module`);
+        const fetchMock = vi
+            .spyOn(globalThis, "fetch")
+            .mockResolvedValue(createJsonResponse(401));
+
+        renderAuthProvider(<AuthStatusProbe />);
+
+        await waitFor(() => {
+            expect(screen.getByTestId("auth-status")).toHaveTextContent(
+                "unauthenticated",
+            );
+        });
+        expect(fetchMock).not.toHaveBeenCalled();
+    });
+
     it("checks current user on protected routes", async () => {
         usePathnameMock.mockReturnValue(APP_ROUTES.dashboard);
         const fetchMock = vi

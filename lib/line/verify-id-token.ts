@@ -1,4 +1,4 @@
-import { getLineRoutineConfig } from "./config";
+import { getLineConfig } from "./config";
 import { LineIdentityVerificationError } from "./errors";
 import type { VerifiedLineIdentity } from "./types";
 
@@ -50,7 +50,7 @@ export async function verifyLineIdToken(
         throw invalidTokenError();
     }
 
-    const { loginChannelId } = getLineRoutineConfig();
+    const { loginChannelId } = getLineConfig();
     const requestBody = new URLSearchParams({
         id_token: token,
         client_id: loginChannelId,

@@ -4,21 +4,68 @@ const DEFAULT_LINE_LIFF_SESSION_TTL_SECONDS = 60 * 60;
 const MAX_LINE_LIFF_SESSION_TTL_SECONDS = 24 * 60 * 60;
 const MIN_LINE_LIFF_SESSION_SECRET_LENGTH = 32;
 
-export interface LineRoutineConfig {
+export interface LineConfig {
     loginChannelId: string;
 }
 
-export interface LineRoutineMessagingConfig {
+export interface LineMessagingConfig {
     channelAccessToken: string;
+    channelSecret: string | null;
 }
 
-export function getLineRoutineLiffId(): string {
-    const liffId = process.env.NEXT_PUBLIC_LINE_ROUTINE_LIFF_ID?.trim();
+export interface LineConfigurationStatus {
+    liffIdConfigured: boolean;
+    loginChannelConfigured: boolean;
+    channelAccessTokenConfigured: boolean;
+    channelSecretConfigured: boolean;
+}
+
+function preferCanonicalValue(
+    canonicalValue: string | undefined,
+    legacyValue: string | undefined,
+): string | undefined {
+    return canonicalValue?.trim() || legacyValue?.trim() || undefined;
+}
+
+function getConfiguredLiffId(): string | undefined {
+    return preferCanonicalValue(
+        process.env.NEXT_PUBLIC_LINE_LIFF_ID,
+        // Deprecated: remove after all deployments use NEXT_PUBLIC_LINE_LIFF_ID.
+        process.env.NEXT_PUBLIC_LINE_ROUTINE_LIFF_ID,
+    );
+}
+
+function getConfiguredLoginChannelId(): string | undefined {
+    return preferCanonicalValue(
+        process.env.LINE_LOGIN_CHANNEL_ID,
+        // Deprecated: remove after all deployments use LINE_LOGIN_CHANNEL_ID.
+        process.env.LINE_ROUTINE_LOGIN_CHANNEL_ID,
+    );
+}
+
+function getConfiguredMessagingChannelAccessToken(): string | undefined {
+    return preferCanonicalValue(
+        process.env.LINE_APP_CHANNEL_ACCESS_TOKEN,
+        // Deprecated: remove after all deployments use LINE_APP_CHANNEL_ACCESS_TOKEN.
+        process.env.LINE_ROUTINE_CHANNEL_ACCESS_TOKEN,
+    );
+}
+
+function getConfiguredMessagingChannelSecret(): string | undefined {
+    return preferCanonicalValue(
+        process.env.LINE_APP_CHANNEL_SECRET,
+        // Deprecated: remove after all deployments use LINE_APP_CHANNEL_SECRET.
+        process.env.LINE_ROUTINE_CHANNEL_SECRET,
+    );
+}
+
+export function getLineLiffId(): string {
+    const liffId = getConfiguredLiffId();
 
     if (!liffId) {
         throw new LineIdentityVerificationError(
             "MISCONFIGURED",
-            "LINE Routine LIFF ID is not configured",
+            "NHFapp LINE LIFF ID is not configured",
         );
     }
 
@@ -30,30 +77,44 @@ export interface LineLiffSessionConfig {
     ttlSeconds: number;
 }
 
-export function getLineRoutineConfig(): LineRoutineConfig {
-    const loginChannelId = process.env.LINE_ROUTINE_LOGIN_CHANNEL_ID?.trim();
+export function getLineConfig(): LineConfig {
+    const loginChannelId = getConfiguredLoginChannelId();
 
     if (!loginChannelId) {
         throw new LineIdentityVerificationError(
             "MISCONFIGURED",
-            "LINE Routine login channel is not configured",
+            "NHFapp LINE Login channel is not configured",
         );
     }
 
     return { loginChannelId };
 }
 
-export function getLineRoutineMessagingConfig(): LineRoutineMessagingConfig {
-    const channelAccessToken = process.env.LINE_ROUTINE_CHANNEL_ACCESS_TOKEN?.trim();
+export function getLineMessagingConfig(): LineMessagingConfig {
+    const channelAccessToken = getConfiguredMessagingChannelAccessToken();
 
     if (!channelAccessToken) {
         throw new LineIdentityVerificationError(
             "MISCONFIGURED",
-            "LINE Routine Messaging API channel is not configured",
+            "NHFapp LINE Messaging API channel is not configured",
         );
     }
 
-    return { channelAccessToken };
+    return {
+        channelAccessToken,
+        channelSecret: getConfiguredMessagingChannelSecret() ?? null,
+    };
+}
+
+export function getLineConfigurationStatus(): LineConfigurationStatus {
+    return {
+        liffIdConfigured: getConfiguredLiffId() !== undefined,
+        loginChannelConfigured: getConfiguredLoginChannelId() !== undefined,
+        channelAccessTokenConfigured:
+            getConfiguredMessagingChannelAccessToken() !== undefined,
+        channelSecretConfigured:
+            getConfiguredMessagingChannelSecret() !== undefined,
+    };
 }
 
 function getLineLiffSessionTtlSeconds(): number {

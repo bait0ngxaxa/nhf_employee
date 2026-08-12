@@ -2,9 +2,9 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
     sendLineMessage,
     sendLineBroadcast,
-    sendRoutineLineMessage,
     sendNewTicketNotification,
 } from "@/lib/line";
+import { sendLineAppMessage } from "@/lib/line/messaging";
 import type { LineFlexMessage, TicketEmailData } from "@/types/api";
 
 // Mock fetch
@@ -27,10 +27,11 @@ const flexMessage: LineFlexMessage = {
 describe("LINE Notification Service", () => {
     beforeEach(() => {
         vi.clearAllMocks();
-        process.env.LINE_IT_CHANNEL_ACCESS_TOKEN = "test_token";
-        process.env.LINE_ROUTINE_CHANNEL_ACCESS_TOKEN = "routine_test_token";
-        process.env.LINE_IT_TEAM_USER_ID = "user_123";
-        process.env.PUBLIC_APPROVE_URL = "http://localhost:3000";
+        vi.stubEnv("LINE_IT_CHANNEL_ACCESS_TOKEN", "test_token");
+        vi.stubEnv("LINE_APP_CHANNEL_ACCESS_TOKEN", "nhfapp_test_token");
+        vi.stubEnv("LINE_ROUTINE_CHANNEL_ACCESS_TOKEN", "");
+        vi.stubEnv("LINE_IT_TEAM_USER_ID", "user_123");
+        vi.stubEnv("PUBLIC_APPROVE_URL", "http://localhost:3000");
 
         fetchMock.mockResolvedValue({
             ok: true,
@@ -40,8 +41,7 @@ describe("LINE Notification Service", () => {
     });
 
     afterEach(() => {
-        process.env = { ...process.env }; // Restore env ? No, Node process.env is object reference usually
-        // Better to not mess up cleaning, but beforeEach sets what we need.
+        vi.unstubAllEnvs();
     });
 
     describe("sendLineMessage", () => {
@@ -114,11 +114,11 @@ describe("LINE Notification Service", () => {
         });
     });
 
-    describe("sendRoutineLineMessage", () => {
-        it("uses the Routine token and preserves the retry key", async () => {
+    describe("sendLineAppMessage", () => {
+        it("uses the NHFapp token and preserves the retry key", async () => {
             const retryKey = "123e4567-e89b-42d3-a456-426614174000";
 
-            const result = await sendRoutineLineMessage(
+            const result = await sendLineAppMessage(
                 "routine-user",
                 flexMessage,
                 retryKey,
@@ -129,7 +129,7 @@ describe("LINE Notification Service", () => {
                 "https://api.line.me/v2/bot/message/push",
                 expect.objectContaining({
                     headers: expect.objectContaining({
-                        Authorization: "Bearer routine_test_token",
+                        Authorization: "Bearer nhfapp_test_token",
                         "X-Line-Retry-Key": retryKey,
                     }),
                     body: expect.stringContaining("routine-user"),
@@ -137,10 +137,11 @@ describe("LINE Notification Service", () => {
             );
         });
 
-        it("does not fall back to the IT token when Routine configuration is missing", async () => {
+        it("does not fall back to the IT token when NHFapp configuration is missing", async () => {
+            delete process.env.LINE_APP_CHANNEL_ACCESS_TOKEN;
             delete process.env.LINE_ROUTINE_CHANNEL_ACCESS_TOKEN;
 
-            const result = await sendRoutineLineMessage(
+            const result = await sendLineAppMessage(
                 "routine-user",
                 flexMessage,
                 "123e4567-e89b-42d3-a456-426614174000",
@@ -156,7 +157,7 @@ describe("LINE Notification Service", () => {
                 status: 409,
             });
 
-            const result = await sendRoutineLineMessage(
+            const result = await sendLineAppMessage(
                 "routine-user",
                 flexMessage,
                 "123e4567-e89b-42d3-a456-426614174000",

@@ -8,7 +8,7 @@ import {
     getHybridSecretKey,
 } from "@/lib/auth/hybrid/constants";
 import { buildPublicUrl } from "@/lib/network/public-url";
-import { APP_ROUTES } from "@/lib/ssot/routes";
+import { APP_ROUTES, isLiffAppPath } from "@/lib/ssot/routes";
 
 const PUBLIC_ROUTES = new Set([
     "/",
@@ -19,7 +19,6 @@ const PUBLIC_ROUTES = new Set([
     "/forgot-password",
     "/reset-password",
     "/leave/action",
-    APP_ROUTES.line.routine,
 ]);
 
 async function hasValidHybridAccessToken(request: NextRequest): Promise<boolean> {
@@ -49,7 +48,7 @@ function buildRefreshSessionUrl(
 
 export default async function middleware(request: NextRequest): Promise<NextResponse> {
     const { pathname } = request.nextUrl;
-    const isPublicRoute = PUBLIC_ROUTES.has(pathname);
+    const isPublicRoute = PUBLIC_ROUTES.has(pathname) || isLiffAppPath(pathname);
 
     const isAuthenticated = await hasValidHybridAccessToken(request);
     const hasRefreshToken = Boolean(request.cookies.get(HYBRID_REFRESH_COOKIE_NAME)?.value);

@@ -131,7 +131,14 @@ describe("LINE authentication routes", () => {
         );
 
         expect(response.status).toBe(200);
-        await expect(response.json()).resolves.toEqual({ linked: true });
+        await expect(response.json()).resolves.toEqual({
+            linked: true,
+            workforce: {
+                userId: 10,
+                employeeId: 20,
+                name: "Employee",
+            },
+        });
         expect(linkLineAccountMock).toHaveBeenCalledWith(10, "line-a");
         expect(issueLiffSessionMock).toHaveBeenCalledWith({
             userId: 10,
@@ -257,7 +264,14 @@ describe("LINE authentication routes", () => {
         );
 
         expect(response.status).toBe(200);
-        await expect(response.json()).resolves.toEqual({ linked: true });
+        await expect(response.json()).resolves.toEqual({
+            linked: true,
+            workforce: {
+                userId: 10,
+                employeeId: 20,
+                name: "Employee",
+            },
+        });
         expect(findActiveLiffWorkforceIdentityMock).toHaveBeenCalledWith(10);
         expect(issueLiffSessionMock).toHaveBeenCalledWith({
             userId: 10,

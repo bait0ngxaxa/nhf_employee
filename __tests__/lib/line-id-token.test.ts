@@ -6,7 +6,7 @@ import {
     it,
     vi,
 } from "vitest";
-import { getLineRoutineConfig } from "@/lib/line/config";
+import { getLineConfig } from "@/lib/line/config";
 import {
     LineIdentityVerificationError,
     verifyLineIdToken,
@@ -26,10 +26,10 @@ function mockVerificationResponse(
     );
 }
 
-describe("LINE Routine ID token verification", () => {
+describe("NHFapp LINE ID token verification", () => {
     beforeEach(() => {
         vi.stubGlobal("fetch", fetchMock);
-        vi.stubEnv("LINE_ROUTINE_LOGIN_CHANNEL_ID", "routine-channel-id");
+        vi.stubEnv("LINE_LOGIN_CHANNEL_ID", "nhfapp-channel-id");
         fetchMock.mockReset();
     });
 
@@ -42,7 +42,7 @@ describe("LINE Routine ID token verification", () => {
         mockVerificationResponse({
             iss: "https://access.line.me",
             sub: "U1234567890abcdef1234567890abcdef",
-            aud: "routine-channel-id",
+            aud: "nhfapp-channel-id",
             exp: Math.floor(Date.now() / 1000) + 60,
         });
 
@@ -54,7 +54,7 @@ describe("LINE Routine ID token verification", () => {
     it("sends the configured channel ID as client_id", async () => {
         mockVerificationResponse({
             sub: "U123",
-            aud: "routine-channel-id",
+            aud: "nhfapp-channel-id",
             exp: Math.floor(Date.now() / 1000) + 60,
         });
 
@@ -69,7 +69,7 @@ describe("LINE Routine ID token verification", () => {
 
         const requestParams = new URLSearchParams(String(request?.body));
         expect(requestParams.get("id_token")).toBe("token with spaces");
-        expect(requestParams.get("client_id")).toBe("routine-channel-id");
+        expect(requestParams.get("client_id")).toBe("nhfapp-channel-id");
     });
 
     it.each([
@@ -84,7 +84,7 @@ describe("LINE Routine ID token verification", () => {
     });
 
     it("rejects a malformed successful response", async () => {
-        mockVerificationResponse({ aud: "routine-channel-id" });
+        mockVerificationResponse({ aud: "nhfapp-channel-id" });
 
         await expect(verifyLineIdToken("token")).rejects.toBeInstanceOf(
             LineIdentityVerificationError,
@@ -94,7 +94,7 @@ describe("LINE Routine ID token verification", () => {
     it("rejects an expired successful response", async () => {
         mockVerificationResponse({
             sub: "U123",
-            aud: "routine-channel-id",
+            aud: "nhfapp-channel-id",
             exp: Math.floor(Date.now() / 1000) - 1,
         });
 
@@ -140,10 +140,11 @@ describe("LINE Routine ID token verification", () => {
         });
     });
 
-    it("fails explicitly when the LINE Routine configuration is missing", () => {
+    it("fails explicitly when the NHFapp LINE configuration is missing", () => {
+        vi.stubEnv("LINE_LOGIN_CHANNEL_ID", "   ");
         vi.stubEnv("LINE_ROUTINE_LOGIN_CHANNEL_ID", "   ");
 
-        expect(() => getLineRoutineConfig()).toThrowError(
+        expect(() => getLineConfig()).toThrowError(
             expect.objectContaining({
                 code: "MISCONFIGURED",
                 statusCode: 500,
@@ -155,6 +156,19 @@ describe("LINE Routine ID token verification", () => {
         mockVerificationResponse({
             sub: "U123",
             aud: "different-channel-id",
+            exp: Math.floor(Date.now() / 1000) + 60,
+        });
+
+        await expect(verifyLineIdToken("token")).rejects.toMatchObject({
+            code: "INVALID_TOKEN",
+        });
+    });
+
+    it("rejects a response from an unexpected issuer", async () => {
+        mockVerificationResponse({
+            iss: "https://attacker.example",
+            sub: "U123",
+            aud: "nhfapp-channel-id",
             exp: Math.floor(Date.now() / 1000) + 60,
         });
 

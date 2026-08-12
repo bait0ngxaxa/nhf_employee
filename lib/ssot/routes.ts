@@ -8,9 +8,15 @@ export const APP_ROUTES = {
     forgotPassword: "/forgot-password",
     resetPassword: "/reset-password",
     line: {
+        root: "/liff",
         routine: "/liff/routine",
     },
 } as const;
+
+export function isLiffAppPath(pathname: string | null | undefined): boolean {
+    return pathname === APP_ROUTES.line.root
+        || Boolean(pathname?.startsWith(`${APP_ROUTES.line.root}/`));
+}
 
 export const APP_DASHBOARD_TABS = {
     dashboard: "dashboard",

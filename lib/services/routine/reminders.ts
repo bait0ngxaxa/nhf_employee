@@ -7,7 +7,7 @@ import {
     sendRoutineReminderNotification,
     type RoutineReminderEmailData,
 } from "@/lib/email";
-import { sendRoutineLineMessage } from "@/lib/line";
+import { sendLineAppMessage } from "@/lib/line/messaging";
 import { generateRoutineReminderFlexMessage } from "@/lib/line/flex-messages/routine-reminder";
 import {
     buildRoutineDashboardTaskUrl,
@@ -507,7 +507,7 @@ async function dispatchRoutineReminderLineOutbox(
         timingLabel: formatRoutineReminderTiming(prepared.context.daysBefore),
         actionUrl,
     });
-    const sent = await sendRoutineLineMessage(
+    const sent = await sendLineAppMessage(
         prepared.context.lineUserId,
         message,
         payload.retryKey,

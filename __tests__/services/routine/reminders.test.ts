@@ -13,7 +13,7 @@ import { routineReminderEmailOutboxPayloadSchema } from "@/lib/validations/routi
 
 const createInAppNotificationOnceMock = vi.hoisted(() => vi.fn());
 const sendRoutineReminderNotificationMock = vi.hoisted(() => vi.fn());
-const sendRoutineLineMessageMock = vi.hoisted(() => vi.fn());
+const sendLineAppMessageMock = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/db/prisma", () => ({
     prisma: mockDeep<PrismaClient>(),
@@ -33,8 +33,8 @@ vi.mock("@/lib/email", () => ({
     sendRoutineReminderNotification: sendRoutineReminderNotificationMock,
 }));
 
-vi.mock("@/lib/line", () => ({
-    sendRoutineLineMessage: sendRoutineLineMessageMock,
+vi.mock("@/lib/line/messaging", () => ({
+    sendLineAppMessage: sendLineAppMessageMock,
 }));
 
 const prismaMock = prisma as unknown as ReturnType<typeof mockDeep<PrismaClient>>;
@@ -249,7 +249,7 @@ describe("Routine reminder dispatch", () => {
             asNever({ count: 1 }),
         );
         sendRoutineReminderNotificationMock.mockResolvedValue(true);
-        sendRoutineLineMessageMock.mockResolvedValue(true);
+        sendLineAppMessageMock.mockResolvedValue(true);
     });
 
     it("revalidates current state and creates a deduplicated in-app notification", async () => {
@@ -1027,8 +1027,8 @@ describe("Routine reminder dispatch", () => {
     });
 
     it("dispatches an assignee LINE child through LIFF with the original retry key", async () => {
-        vi.stubEnv("NEXT_PUBLIC_LINE_ROUTINE_LIFF_ID", "routine-liff-id");
-        vi.stubEnv("LINE_ROUTINE_CHANNEL_ACCESS_TOKEN", "routine-token");
+        vi.stubEnv("NEXT_PUBLIC_LINE_LIFF_ID", "nhfapp-liff-id");
+        vi.stubEnv("LINE_APP_CHANNEL_ACCESS_TOKEN", "nhfapp-token");
         vi.stubEnv("PUBLIC_APPROVE_URL", "https://employee.example.com");
         prismaMock.routineOccurrence.findUnique.mockResolvedValue(
             asNever(buildOccurrence()),
@@ -1054,14 +1054,14 @@ describe("Routine reminder dispatch", () => {
         );
 
         expect(result).toBe("SENT");
-        expect(sendRoutineLineMessageMock).toHaveBeenCalledWith(
+        expect(sendLineAppMessageMock).toHaveBeenCalledWith(
             "U-assignee",
             expect.objectContaining({ type: "flex" }),
             payload.retryKey,
         );
-        const message = sendRoutineLineMessageMock.mock.calls[0]?.[1];
+        const message = sendLineAppMessageMock.mock.calls[0]?.[1];
         expect(JSON.stringify(message)).toContain(
-            "https://liff.line.me/routine-liff-id?taskId=71&occurrenceId=91",
+            "https://liff.line.me/nhfapp-liff-id/routine?taskId=71&occurrenceId=91",
         );
 
         await dispatchRoutineReminderOutbox(
@@ -1069,13 +1069,13 @@ describe("Routine reminder dispatch", () => {
             payload,
             new Date("2026-08-03T02:01:00.000Z"),
         );
-        expect(sendRoutineLineMessageMock.mock.calls[1]?.[2]).toBe(
+        expect(sendLineAppMessageMock.mock.calls[1]?.[2]).toBe(
             payload.retryKey,
         );
     });
 
     it("uses the Dashboard action for an admin-only LINE recipient", async () => {
-        vi.stubEnv("LINE_ROUTINE_CHANNEL_ACCESS_TOKEN", "routine-token");
+        vi.stubEnv("LINE_APP_CHANNEL_ACCESS_TOKEN", "nhfapp-token");
         vi.stubEnv("PUBLIC_APPROVE_URL", "https://employee.example.com");
         prismaMock.routineOccurrence.findUnique.mockResolvedValue(
             asNever(buildOccurrence()),
@@ -1100,7 +1100,7 @@ describe("Routine reminder dispatch", () => {
         );
 
         expect(result).toBe("SENT");
-        const message = sendRoutineLineMessageMock.mock.calls[0]?.[1];
+        const message = sendLineAppMessageMock.mock.calls[0]?.[1];
         expect(JSON.stringify(message)).toContain(
             "https://employee.example.com/dashboard?tab=routine&taskId=71&occurrenceId=91",
         );
@@ -1131,7 +1131,7 @@ describe("Routine reminder dispatch", () => {
         );
 
         expect(result).toBe("SUPERSEDED");
-        expect(sendRoutineLineMessageMock).not.toHaveBeenCalled();
+        expect(sendLineAppMessageMock).not.toHaveBeenCalled();
         expect(prismaMock.notificationOutbox.updateMany).toHaveBeenCalledWith({
             where: { id: 503, status: "PROCESSING" },
             data: {
@@ -1161,12 +1161,12 @@ describe("Routine reminder dispatch", () => {
             payload,
         );
         expect(mismatchedResult).toBe("SUPERSEDED");
-        expect(sendRoutineLineMessageMock).not.toHaveBeenCalled();
+        expect(sendLineAppMessageMock).not.toHaveBeenCalled();
     });
 
     it("throws on a LINE provider failure so the generic outbox can retry", async () => {
-        vi.stubEnv("NEXT_PUBLIC_LINE_ROUTINE_LIFF_ID", "routine-liff-id");
-        vi.stubEnv("LINE_ROUTINE_CHANNEL_ACCESS_TOKEN", "routine-token");
+        vi.stubEnv("NEXT_PUBLIC_LINE_LIFF_ID", "nhfapp-liff-id");
+        vi.stubEnv("LINE_APP_CHANNEL_ACCESS_TOKEN", "nhfapp-token");
         vi.stubEnv("PUBLIC_APPROVE_URL", "https://employee.example.com");
         prismaMock.routineOccurrence.findUnique.mockResolvedValue(
             asNever(buildOccurrence()),
@@ -1182,7 +1182,7 @@ describe("Routine reminder dispatch", () => {
                 lineAccountLink: { lineUserId: "U-assignee" },
             }),
         );
-        sendRoutineLineMessageMock.mockResolvedValueOnce(false);
+        sendLineAppMessageMock.mockResolvedValueOnce(false);
 
         const payload = buildLinePayload();
         await expect(

@@ -1,10 +1,10 @@
 # LINE Routine Reminder — Manual Acceptance Test
 
-ใช้กับ staging/dev ที่มีการตั้งค่า LINE Routine Messaging API และ LIFF แล้ว
+ใช้กับ staging/dev ที่มีการตั้งค่า NHFapp LINE Messaging API และ LIFF แล้ว
 
 ## ก่อนเริ่ม
 
-- ตั้งค่า `LINE_ROUTINE_CHANNEL_ACCESS_TOKEN` และ `NEXT_PUBLIC_LINE_ROUTINE_LIFF_ID`
+- ตั้งค่า `LINE_APP_CHANNEL_ACCESS_TOKEN` และ `NEXT_PUBLIC_LINE_LIFF_ID`
 - รัน migration ล่าสุดด้วย `npx prisma migrate deploy`
 - เปิด Routine feature flag
 - ผู้ทดสอบเพิ่ม NHF Official Account เป็นเพื่อนใน LINE แล้ว

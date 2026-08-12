@@ -1,10 +1,10 @@
 import { APP_DASHBOARD_TABS, APP_ROUTES } from "@/lib/ssot/routes";
 import { getPublicOrigin } from "@/lib/network/public-url";
 
-import { getLineRoutineLiffId } from "./config";
+import { getLineLiffId } from "./config";
 
 export function buildRoutineLiffUrl(): string {
-    return `https://liff.line.me/${encodeURIComponent(getLineRoutineLiffId())}`;
+    return `https://liff.line.me/${encodeURIComponent(getLineLiffId())}/routine`;
 }
 
 export function buildRoutineLiffTaskUrl(

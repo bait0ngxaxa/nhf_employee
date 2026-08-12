@@ -12,70 +12,20 @@ import { generateEmailRequestFlexMessage } from "./flex-messages/email-request";
 import { generateStockLowFlexMessage } from "./flex-messages/stock-low";
 import { generateStockRequestFlexMessage } from "./flex-messages/stock";
 import { getPublicOrigin } from "@/lib/network/public-url";
+import {
+    sendLineApiRequest,
+    sendLineAppMessage,
+    sendLinePushMessage,
+} from "./messaging";
 
 // Configuration (read once)
 const getConfig = () => ({
     channelAccessToken: process.env.LINE_IT_CHANNEL_ACCESS_TOKEN || "",
     stockChannelAccessToken: process.env.LINE_STOCK_CHANNEL_ACCESS_TOKEN || "",
-    routineChannelAccessToken: process.env.LINE_ROUTINE_CHANNEL_ACCESS_TOKEN || "",
     lineWebhookUrl: process.env.LINE_WEBHOOK_URL || "",
     baseUrl: getPublicOrigin(),
     itTeamUserId: process.env.LINE_IT_TEAM_USER_ID || "",
 });
-
-async function sendLineApiRequest(
-    endpoint: string,
-    channelAccessToken: string,
-    body: unknown,
-    retryKey?: string,
-): Promise<boolean> {
-    if (!channelAccessToken) return false;
-
-    const headers: Record<string, string> = {
-        Authorization: `Bearer ${channelAccessToken}`,
-        "Content-Type": "application/json",
-    };
-    if (retryKey) headers["X-Line-Retry-Key"] = retryKey;
-
-    try {
-        const response = await fetch(endpoint, {
-            method: "POST",
-            headers,
-            body: JSON.stringify(body),
-        });
-
-        if (response.ok || (retryKey !== undefined && response.status === 409)) {
-            return true;
-        }
-
-        console.error("LINE API request failed", {
-            endpoint,
-            status: response.status,
-            hasRetryKey: retryKey !== undefined,
-        });
-        return false;
-    } catch (error) {
-        console.error("LINE API request error", {
-            endpoint,
-            errorType: error instanceof Error ? error.name : "UnknownError",
-        });
-        return false;
-    }
-}
-
-export async function sendLinePushMessage(input: {
-    channelAccessToken: string;
-    userId: string;
-    message: LineFlexMessage;
-    retryKey?: string;
-}): Promise<boolean> {
-    return sendLineApiRequest(
-        "https://api.line.me/v2/bot/message/push",
-        input.channelAccessToken,
-        { to: input.userId, messages: [input.message] },
-        input.retryKey,
-    );
-}
 
 export async function sendLineMessage(
     userId: string,
@@ -84,19 +34,6 @@ export async function sendLineMessage(
 ): Promise<boolean> {
     return sendLinePushMessage({
         channelAccessToken: getConfig().channelAccessToken,
-        userId,
-        message,
-        retryKey,
-    });
-}
-
-export async function sendRoutineLineMessage(
-    userId: string,
-    message: LineFlexMessage,
-    retryKey: string,
-): Promise<boolean> {
-    return sendLinePushMessage({
-        channelAccessToken: getConfig().routineChannelAccessToken,
         userId,
         message,
         retryKey,
@@ -248,7 +185,6 @@ export async function sendStockLowNotification(
 // Export as object for backward compatibility
 export const lineNotificationService = {
     sendLineMessage,
-    sendRoutineLineMessage,
     sendLineBroadcast,
     sendStockLineBroadcast,
     sendLineWebhook,
@@ -260,4 +196,5 @@ export const lineNotificationService = {
     sendStockRequestNotification,
 };
 
+export { sendLineAppMessage, sendLinePushMessage };
 export type { LineWebhookData };

@@ -36,10 +36,10 @@ function emptyResponse(status = 200): Response {
 
 describe("Routine Rich Menu definition", () => {
     beforeEach(() => {
-        vi.stubEnv("NEXT_PUBLIC_LINE_ROUTINE_LIFF_ID", "routine-liff-id");
-        vi.stubEnv("LINE_ROUTINE_CHANNEL_ACCESS_TOKEN", "routine-token");
-        vi.stubEnv("LINE_ROUTINE_LOGIN_CHANNEL_ID", "login-channel-id");
-        vi.stubEnv("LINE_ROUTINE_CHANNEL_SECRET", "routine-secret");
+        vi.stubEnv("NEXT_PUBLIC_LINE_LIFF_ID", "nhfapp-liff-id");
+        vi.stubEnv("LINE_APP_CHANNEL_ACCESS_TOKEN", "nhfapp-token");
+        vi.stubEnv("LINE_LOGIN_CHANNEL_ID", "login-channel-id");
+        vi.stubEnv("LINE_APP_CHANNEL_SECRET", "nhfapp-secret");
         vi.stubEnv("LINE_LIFF_SESSION_SECRET", "a-long-enough-session-secret");
         vi.stubEnv("LINE_LIFF_SESSION_TTL_SECONDS", "3600");
     });
@@ -51,7 +51,9 @@ describe("Routine Rich Menu definition", () => {
     it("uses the configured base LIFF URL for the complete tappable area", () => {
         const definition = buildRoutineRichMenuDefinition();
 
-        expect(buildRoutineLiffUrl()).toBe("https://liff.line.me/routine-liff-id");
+        expect(buildRoutineLiffUrl()).toBe(
+            "https://liff.line.me/nhfapp-liff-id/routine",
+        );
         expect(definition.size).toEqual({ width: 2500, height: 843 });
         expect(definition.areas).toHaveLength(1);
         expect(definition.areas[0]?.bounds).toEqual({
@@ -66,15 +68,16 @@ describe("Routine Rich Menu definition", () => {
 
     it("keeps task deep links on the same centralized LIFF origin", () => {
         expect(buildRoutineLiffTaskUrl(71, 91)).toBe(
-            "https://liff.line.me/routine-liff-id?taskId=71&occurrenceId=91",
+            "https://liff.line.me/nhfapp-liff-id/routine?taskId=71&occurrenceId=91",
         );
     });
 
     it("rejects a missing LIFF ID", () => {
+        vi.stubEnv("NEXT_PUBLIC_LINE_LIFF_ID", "");
         vi.stubEnv("NEXT_PUBLIC_LINE_ROUTINE_LIFF_ID", "");
 
         expect(() => buildRoutineRichMenuDefinition()).toThrow(
-            "LINE Routine LIFF ID is not configured",
+            "NHFapp LINE LIFF ID is not configured",
         );
     });
 
@@ -120,8 +123,8 @@ describe("Routine Rich Menu provisioning", () => {
     const fetchMock = vi.fn<typeof fetch>();
 
     beforeEach(() => {
-        vi.stubEnv("NEXT_PUBLIC_LINE_ROUTINE_LIFF_ID", "routine-liff-id");
-        vi.stubEnv("LINE_ROUTINE_CHANNEL_ACCESS_TOKEN", "routine-token");
+        vi.stubEnv("NEXT_PUBLIC_LINE_LIFF_ID", "nhfapp-liff-id");
+        vi.stubEnv("LINE_APP_CHANNEL_ACCESS_TOKEN", "nhfapp-token");
         vi.stubEnv("NEXT_PUBLIC_FEATURE_ROUTINE", "true");
         fetchMock.mockReset();
         loadEnvConfigMock.mockReset();
@@ -213,7 +216,7 @@ describe("Routine Rich Menu provisioning", () => {
         expect(fetchMock.mock.calls[0]?.[1]).toEqual(
             expect.objectContaining({
                 headers: expect.objectContaining({
-                    Authorization: "Bearer routine-token",
+                    Authorization: "Bearer nhfapp-token",
                 }),
             }),
         );
@@ -289,7 +292,7 @@ describe("Routine Rich Menu provisioning", () => {
         const status = await getRoutineRichMenuStatus(fetchMock);
 
         expect(status.defaultRichMenuStatus).toBe("not-set");
-        expect(JSON.stringify(status)).not.toContain("routine-token");
+        expect(JSON.stringify(status)).not.toContain("nhfapp-token");
     });
 
     it("does not print the channel access token during dry-run", async () => {
@@ -298,7 +301,7 @@ describe("Routine Rich Menu provisioning", () => {
         await expect(runRoutineRichMenuCli(["provision"])).resolves.toBe(0);
 
         const output = logSpy.mock.calls.flat().join(" ");
-        expect(output).not.toContain("routine-token");
+        expect(output).not.toContain("nhfapp-token");
         logSpy.mockRestore();
     });
 });

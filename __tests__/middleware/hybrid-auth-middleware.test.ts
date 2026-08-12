@@ -78,6 +78,16 @@ describe("hybrid auth middleware", () => {
         expect(response.headers.get("location")).toBeNull();
     });
 
+    it.each([
+        APP_ROUTES.line.root,
+        `${APP_ROUTES.line.root}/future-module`,
+    ])("allows the global LIFF boundary %s without hybrid authentication", async (path) => {
+        const response = await middleware(buildRequest(`http://localhost${path}`));
+
+        expect(response.status).toBe(200);
+        expect(response.headers.get("location")).toBeNull();
+    });
+
     it("allows LIFF Routine query parameters without redirecting", async () => {
         const request = buildRequest(
             `http://localhost${APP_ROUTES.line.routine}?taskId=71&occurrenceId=91`,

@@ -15,7 +15,7 @@ import useSWR from "swr";
 import type { AuthenticatedUser } from "@/lib/auth/types";
 import { apiGet } from "@/lib/client/api-client";
 import { logoutHybridSession, refreshHybridSession } from "@/lib/auth/client";
-import { API_ROUTES, APP_ROUTES } from "@/lib/ssot/routes";
+import { API_ROUTES, APP_ROUTES, isLiffAppPath } from "@/lib/ssot/routes";
 
 export type HybridAuthStatus = "loading" | "authenticated" | "unauthenticated";
 
@@ -45,11 +45,11 @@ const PUBLIC_AUTH_PATHS: ReadonlySet<string> = new Set<string>([
     APP_ROUTES.accessDenied,
     APP_ROUTES.forgotPassword,
     APP_ROUTES.resetPassword,
-    APP_ROUTES.line.routine,
 ]);
 
 function shouldBootstrapAuth(pathname: string | null): boolean {
-    return !pathname || !PUBLIC_AUTH_PATHS.has(pathname);
+    return !pathname
+        || (!PUBLIC_AUTH_PATHS.has(pathname) && !isLiffAppPath(pathname));
 }
 
 async function fetchCurrentUser(

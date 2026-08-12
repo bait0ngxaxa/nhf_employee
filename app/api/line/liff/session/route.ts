@@ -67,7 +67,14 @@ async function handleLiffSession(request: NextRequest): Promise<NextResponse> {
             userId: identity.user.id,
             employeeId: identity.employeeId,
         });
-        const response = NextResponse.json({ linked: true });
+        const response = NextResponse.json({
+            linked: true,
+            workforce: {
+                userId: identity.user.id,
+                employeeId: identity.employeeId,
+                name: identity.user.name,
+            },
+        });
         setLiffSessionCookie(response, liffSession);
         return response;
     } catch (error) {

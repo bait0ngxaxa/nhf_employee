@@ -55,7 +55,14 @@ async function handleAccountLink(
             userId: auth.user.id,
             employeeId: auth.employeeId,
         });
-        const response = NextResponse.json({ linked: true });
+        const response = NextResponse.json({
+            linked: true,
+            workforce: {
+                userId: auth.user.id,
+                employeeId: auth.employeeId,
+                name: auth.user.name,
+            },
+        });
         setLiffSessionCookie(response, liffSession);
         return response;
     } catch (error) {

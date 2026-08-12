@@ -6,8 +6,9 @@ import sharp from "sharp";
 import { isFeatureEnabled, FEATURE_KEYS } from "@/lib/ssot/features";
 
 import {
+    getLineConfigurationStatus,
     getLineLiffSessionConfig,
-    getLineRoutineMessagingConfig,
+    getLineMessagingConfig,
 } from "./config";
 import { buildRoutineLiffUrl } from "./routine-links";
 
@@ -404,11 +405,11 @@ export async function prepareRoutineRichMenu(
 ): Promise<RoutineRichMenuPreparation & { imageBytes: Buffer }> {
     let channelAccessToken: string;
     try {
-        ({ channelAccessToken } = getLineRoutineMessagingConfig());
+        ({ channelAccessToken } = getLineMessagingConfig());
     } catch {
         throw new RichMenuProvisioningError(
             "configuration",
-            "LINE Routine channel access token is not configured",
+            "NHFapp LINE channel access token is not configured",
         );
     }
 
@@ -452,11 +453,11 @@ export async function getRoutineRichMenuDefaultId(
 ): Promise<string | null> {
     let channelAccessToken: string;
     try {
-        ({ channelAccessToken } = getLineRoutineMessagingConfig());
+        ({ channelAccessToken } = getLineMessagingConfig());
     } catch {
         throw new RichMenuProvisioningError(
             "configuration",
-            "LINE Routine channel access token is not configured",
+            "NHFapp LINE channel access token is not configured",
         );
     }
 
@@ -587,11 +588,9 @@ function hasValue(value: string | undefined): boolean {
 export async function getRoutineRichMenuStatus(
     fetchImpl: FetchImplementation = fetch,
 ): Promise<RoutineRichMenuStatus> {
-    const liffIdConfigured = hasValue(process.env.NEXT_PUBLIC_LINE_ROUTINE_LIFF_ID);
+    const lineConfiguration = getLineConfigurationStatus();
+    const { liffIdConfigured, channelAccessTokenConfigured } = lineConfiguration;
     const liffUrl = liffIdConfigured ? buildRoutineLiffUrl() : null;
-    const channelAccessTokenConfigured = hasValue(
-        process.env.LINE_ROUTINE_CHANNEL_ACCESS_TOKEN,
-    );
     const sessionSecretConfigured = hasValue(process.env.LINE_LIFF_SESSION_SECRET);
     const sessionTtlConfigured = hasValue(process.env.LINE_LIFF_SESSION_TTL_SECONDS);
     let sessionConfigValid = false;
@@ -604,9 +603,9 @@ export async function getRoutineRichMenuStatus(
 
     const status: RoutineRichMenuStatus = {
         liffIdConfigured,
-        loginChannelConfigured: hasValue(process.env.LINE_ROUTINE_LOGIN_CHANNEL_ID),
+        loginChannelConfigured: lineConfiguration.loginChannelConfigured,
         channelAccessTokenConfigured,
-        channelSecretConfigured: hasValue(process.env.LINE_ROUTINE_CHANNEL_SECRET),
+        channelSecretConfigured: lineConfiguration.channelSecretConfigured,
         sessionSecretConfigured,
         sessionTtlConfigured,
         sessionConfigValid,
@@ -619,7 +618,7 @@ export async function getRoutineRichMenuStatus(
 
     if (!channelAccessTokenConfigured) {
         status.defaultRichMenuStatus = "unavailable";
-        status.defaultRichMenuError = "LINE Routine channel access token is missing";
+        status.defaultRichMenuError = "NHFapp LINE channel access token is missing";
         return status;
     }
 

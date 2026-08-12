@@ -1,4 +1,8 @@
-import { apiGet, apiPost, type ApiResponse } from "@/lib/client/api-client";
+import { apiGet, type ApiResponse } from "@/lib/client/api-client";
+import {
+    LIFF_API_REQUEST_OPTIONS,
+    unwrapLiffResponse,
+} from "@/lib/client/liff";
 import type {
     LiffRoutineSummary,
     LiffRoutineTasksResponse,
@@ -13,21 +17,7 @@ export type {
     LiffRoutineTimingFilter,
 } from "@/lib/line/routine-types";
 
-export interface LiffSessionResponse {
-    linked: boolean;
-}
-
-export class LiffApiError extends Error {
-    readonly status: number | undefined;
-
-    constructor(message: string, status: number | undefined) {
-        super(message);
-        this.name = "LiffApiError";
-        this.status = status;
-    }
-}
-
-function getSafeApiErrorMessage(
+function getRoutineApiErrorMessage(
     response: Extract<ApiResponse<unknown>, { success: false }>,
 ): string {
     switch (response.status) {
@@ -44,51 +34,15 @@ function getSafeApiErrorMessage(
     }
 }
 
-async function unwrapResponse<T>(response: ApiResponse<T>): Promise<T> {
-    if (response.success) return response.data;
-    throw new LiffApiError(
-        getSafeApiErrorMessage(response),
-        response.status,
-    );
-}
-
-const NO_HYBRID_REFRESH = {
-    retryCount: 0,
-    skipAuthRefresh: true,
-} as const;
-
-export async function establishLiffSession(
-    idToken: string,
-): Promise<LiffSessionResponse> {
-    return unwrapResponse(
-        await apiPost<LiffSessionResponse>(
-            API_ROUTES.line.liffSession,
-            { idToken },
-            NO_HYBRID_REFRESH,
-        ),
-    );
-}
-
-export async function linkLiffAccount(
-    idToken: string,
-): Promise<LiffSessionResponse> {
-    return unwrapResponse(
-        await apiPost<LiffSessionResponse>(
-            API_ROUTES.line.accountLink,
-            { idToken },
-            NO_HYBRID_REFRESH,
-        ),
-    );
-}
-
 export async function fetchLiffRoutineSummary(): Promise<{
     summary: LiffRoutineSummary;
 }> {
-    return unwrapResponse(
+    return unwrapLiffResponse(
         await apiGet<{ summary: LiffRoutineSummary }>(
             API_ROUTES.line.routineSummary,
-            NO_HYBRID_REFRESH,
+            LIFF_API_REQUEST_OPTIONS,
         ),
+        getRoutineApiErrorMessage,
     );
 }
 
@@ -113,10 +67,11 @@ export async function fetchLiffRoutineTasks(input: {
         params.set("occurrenceId", String(input.occurrenceId));
     }
 
-    return unwrapResponse(
+    return unwrapLiffResponse(
         await apiGet<LiffRoutineTasksResponse>(
             `${API_ROUTES.line.routineTasks}?${params.toString()}`,
-            NO_HYBRID_REFRESH,
+            LIFF_API_REQUEST_OPTIONS,
         ),
+        getRoutineApiErrorMessage,
     );
 }

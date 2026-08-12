@@ -1,6 +1,6 @@
-# LINE Routine Launch Runbook
+# NHFapp LINE / LIFF และ Routine Launch Runbook
 
-เอกสารนี้ใช้สำหรับเปิดใช้งาน LINE Routine ใน environment จริง หลังจาก deploy แอปพลิเคชันและตรวจสอบ LIFF แล้ว
+เอกสารนี้ใช้สำหรับเปิดใช้งาน LINE / LIFF กลางของ NHFapp และ Routine ใน environment จริง หลังจาก deploy แอปพลิเคชันและตรวจสอบ LIFF แล้ว
 
 ## Architecture
 
@@ -9,9 +9,9 @@ NHF Official Account
         ↓
 Rich Menu: งานของฉัน
         ↓
-https://liff.line.me/{LIFF_ID}
+https://liff.line.me/{LIFF_ID}/routine
         ↓
-LIFF authentication / NHF account link
+NHFapp LIFF authentication / account link
         ↓
 HttpOnly LIFF session
         ↓
@@ -26,9 +26,9 @@ Reminder ใช้ scheduler และ outbox เดิมของ Routine แ�
 
 ```text
 LINE Provider
-├── Messaging API channel (Routine OA)
+├── Messaging API channel (NHFapp OA)
 └── LINE Login channel
-     └── Routine LIFF app
+     └── NHFapp LIFF app
 ```
 
 LINE Login channel และ Messaging API channel ต้องอยู่ภายใต้ Provider ที่ถูกต้องตามที่ LIFF ใช้งาน
@@ -38,10 +38,10 @@ LINE Login channel และ Messaging API channel ต้องอยู่ภ�
 ตั้งค่าใน production โดยไม่ใส่ secret ใน `NEXT_PUBLIC_*`:
 
 ```env
-NEXT_PUBLIC_LINE_ROUTINE_LIFF_ID="<production-liff-id>"
-LINE_ROUTINE_LOGIN_CHANNEL_ID="<line-login-channel-id>"
-LINE_ROUTINE_CHANNEL_ACCESS_TOKEN="<routine-messaging-api-token>"
-LINE_ROUTINE_CHANNEL_SECRET="<routine-messaging-api-secret>"
+NEXT_PUBLIC_LINE_LIFF_ID="<production-liff-id>"
+LINE_LOGIN_CHANNEL_ID="<line-login-channel-id>"
+LINE_APP_CHANNEL_ACCESS_TOKEN="<nhfapp-messaging-api-token>"
+LINE_APP_CHANNEL_SECRET="<nhfapp-messaging-api-secret>"
 LINE_LIFF_SESSION_SECRET="<long-random-server-secret>"
 LINE_LIFF_SESSION_TTL_SECONDS="3600"
 NEXT_PUBLIC_FEATURE_ROUTINE="true"
@@ -51,14 +51,26 @@ NEXT_PUBLIC_FEATURE_ROUTINE="true"
 
 - LIFF ID เป็นของ production LIFF และชี้ไปยัง production LIFF Endpoint URL
 - Login Channel ID เป็น channel เดียวกับที่ใช้สร้าง LIFF app
-- Messaging API access token เป็นของ Routine Official Account และไม่ใช้ token ของ IT/Stock
+- Messaging API access token เป็นของ NHFapp Official Account สำหรับ targeted employee delivery และไม่ใช้ token ของ IT/Stock
 - `LINE_LIFF_SESSION_SECRET` ยาวและสุ่มเพียงพอ
 - Routine feature เปิดอยู่ก่อนจะเปิด Rich Menu ให้ผู้ใช้
 
 LIFF Endpoint URL ที่ตั้งใน LINE Developers Console ต้องตรงกับ URL ที่ deploy จริง เช่น:
 
 ```text
-https://<production-domain>/liff/routine
+https://<production-domain>/liff
+```
+
+ค่าที่ถูกต้องคือ `/liff` เพียงค่าเดียว บริการ Routine ใช้ LIFF deep link
+`https://liff.line.me/{LIFF_ID}/routine` ซึ่งเปิด `/liff/routine` ภายใต้ Endpoint เดียวกัน
+
+ชื่อ environment เดิมยังรองรับชั่วคราวโดย config กลาง และค่าชื่อใหม่มีลำดับความสำคัญสูงกว่า:
+
+```text
+NEXT_PUBLIC_LINE_ROUTINE_LIFF_ID     → NEXT_PUBLIC_LINE_LIFF_ID
+LINE_ROUTINE_LOGIN_CHANNEL_ID        → LINE_LOGIN_CHANNEL_ID
+LINE_ROUTINE_CHANNEL_ACCESS_TOKEN    → LINE_APP_CHANNEL_ACCESS_TOKEN
+LINE_ROUTINE_CHANNEL_SECRET          → LINE_APP_CHANNEL_SECRET
 ```
 
 ## Rich Menu asset and definition
@@ -73,7 +85,7 @@ assets/line/routine-rich-menu.png
 
 - PNG ขนาด 2500×843 pixels
 - พื้นที่กดหนึ่งพื้นที่ ครอบคลุมทั้งภาพ
-- URI action เปิด `https://liff.line.me/{LIFF_ID}`
+- URI action เปิด `https://liff.line.me/{LIFF_ID}/routine`
 - ไม่มีข้อมูลพนักงาน, LINE user ID, NHF user ID หรือ secret ในภาพ/definition
 
 หากแก้ไข artwork ให้สร้าง asset ใหม่ด้วยคำสั่ง:
@@ -145,7 +157,7 @@ Rich Menu ไม่แสดงบน LINE desktop client ควรทดสอ�
 ```bash
 curl --request DELETE \
   --url https://api.line.me/v2/bot/user/all/richmenu \
-  --header 'Authorization: Bearer <LINE_ROUTINE_CHANNEL_ACCESS_TOKEN>'
+  --header 'Authorization: Bearer <LINE_APP_CHANNEL_ACCESS_TOKEN>'
 ```
 
 การ set default ไม่ลบ menu เดิม และการ rollback ไม่ควรลบ `LineAccountLink` หรือข้อมูล Routine
@@ -195,7 +207,7 @@ curl --request DELETE \
 
 ### Rich Menu เปิดผิด environment
 
-ตรวจ `NEXT_PUBLIC_LINE_ROUTINE_LIFF_ID`, LIFF Endpoint URL และการแยก channel ระหว่าง staging/production
+ตรวจ `NEXT_PUBLIC_LINE_LIFF_ID`, LIFF Endpoint URL `/liff` และการแยก channel ระหว่าง staging/production
 
 ### LIFF เปิดแต่เชื่อมบัญชีไม่ได้
 
@@ -208,7 +220,7 @@ curl --request DELETE \
 - ผู้ใช้เพิ่ม OA เป็นเพื่อนและไม่ได้ block
 - `LineAccountLink` ยังมีอยู่
 - Routine LINE outbox ถูกสร้างและ processor ทำงาน
-- ใช้ `LINE_ROUTINE_CHANNEL_ACCESS_TOKEN`
+- ใช้ `LINE_APP_CHANNEL_ACCESS_TOKEN`
 - provider response และ outbox status ไม่เป็น `DEAD`
 
 การที่ LINE API ตอบรับไม่ได้รับประกันว่าผู้ใช้เห็นข้อความ หากผู้ใช้ยังไม่ได้เป็นเพื่อนกับ OA
