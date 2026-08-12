@@ -9,13 +9,9 @@ import {
 
 const LINE_CONFIGURATION_ENV_KEYS = [
     "NEXT_PUBLIC_LINE_LIFF_ID",
-    "NEXT_PUBLIC_LINE_ROUTINE_LIFF_ID",
     "LINE_LOGIN_CHANNEL_ID",
-    "LINE_ROUTINE_LOGIN_CHANNEL_ID",
     "LINE_APP_CHANNEL_ACCESS_TOKEN",
-    "LINE_ROUTINE_CHANNEL_ACCESS_TOKEN",
     "LINE_APP_CHANNEL_SECRET",
-    "LINE_ROUTINE_CHANNEL_SECRET",
 ] as const;
 
 describe("NHFapp LINE configuration", () => {
@@ -29,15 +25,11 @@ describe("NHFapp LINE configuration", () => {
         vi.unstubAllEnvs();
     });
 
-    it("prefers canonical NHFapp variables over deprecated Routine variables", () => {
+    it("reads the canonical NHFapp variables", () => {
         vi.stubEnv("NEXT_PUBLIC_LINE_LIFF_ID", "global-liff-id");
-        vi.stubEnv("NEXT_PUBLIC_LINE_ROUTINE_LIFF_ID", "legacy-liff-id");
         vi.stubEnv("LINE_LOGIN_CHANNEL_ID", "global-login-channel");
-        vi.stubEnv("LINE_ROUTINE_LOGIN_CHANNEL_ID", "legacy-login-channel");
         vi.stubEnv("LINE_APP_CHANNEL_ACCESS_TOKEN", "global-access-token");
-        vi.stubEnv("LINE_ROUTINE_CHANNEL_ACCESS_TOKEN", "legacy-access-token");
         vi.stubEnv("LINE_APP_CHANNEL_SECRET", "global-channel-secret");
-        vi.stubEnv("LINE_ROUTINE_CHANNEL_SECRET", "legacy-channel-secret");
 
         expect(getLineLiffId()).toBe("global-liff-id");
         expect(getLineConfig()).toEqual({
@@ -46,22 +38,6 @@ describe("NHFapp LINE configuration", () => {
         expect(getLineMessagingConfig()).toEqual({
             channelAccessToken: "global-access-token",
             channelSecret: "global-channel-secret",
-        });
-    });
-
-    it("uses deprecated Routine variables only as centralized fallbacks", () => {
-        vi.stubEnv("NEXT_PUBLIC_LINE_ROUTINE_LIFF_ID", "legacy-liff-id");
-        vi.stubEnv("LINE_ROUTINE_LOGIN_CHANNEL_ID", "legacy-login-channel");
-        vi.stubEnv("LINE_ROUTINE_CHANNEL_ACCESS_TOKEN", "legacy-access-token");
-        vi.stubEnv("LINE_ROUTINE_CHANNEL_SECRET", "legacy-channel-secret");
-
-        expect(getLineLiffId()).toBe("legacy-liff-id");
-        expect(getLineConfig()).toEqual({
-            loginChannelId: "legacy-login-channel",
-        });
-        expect(getLineMessagingConfig()).toEqual({
-            channelAccessToken: "legacy-access-token",
-            channelSecret: "legacy-channel-secret",
         });
         expect(getLineConfigurationStatus()).toEqual({
             liffIdConfigured: true,

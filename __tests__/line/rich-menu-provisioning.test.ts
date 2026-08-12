@@ -74,7 +74,6 @@ describe("Routine Rich Menu definition", () => {
 
     it("rejects a missing LIFF ID", () => {
         vi.stubEnv("NEXT_PUBLIC_LINE_LIFF_ID", "");
-        vi.stubEnv("NEXT_PUBLIC_LINE_ROUTINE_LIFF_ID", "");
 
         expect(() => buildRoutineRichMenuDefinition()).toThrow(
             "NHFapp LINE LIFF ID is not configured",

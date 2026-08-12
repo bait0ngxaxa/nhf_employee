@@ -29,7 +29,6 @@ describe("LINE Notification Service", () => {
         vi.clearAllMocks();
         vi.stubEnv("LINE_IT_CHANNEL_ACCESS_TOKEN", "test_token");
         vi.stubEnv("LINE_APP_CHANNEL_ACCESS_TOKEN", "nhfapp_test_token");
-        vi.stubEnv("LINE_ROUTINE_CHANNEL_ACCESS_TOKEN", "");
         vi.stubEnv("LINE_IT_TEAM_USER_ID", "user_123");
         vi.stubEnv("PUBLIC_APPROVE_URL", "http://localhost:3000");
 
@@ -139,7 +138,6 @@ describe("LINE Notification Service", () => {
 
         it("does not fall back to the IT token when NHFapp configuration is missing", async () => {
             delete process.env.LINE_APP_CHANNEL_ACCESS_TOKEN;
-            delete process.env.LINE_ROUTINE_CHANNEL_ACCESS_TOKEN;
 
             const result = await sendLineAppMessage(
                 "routine-user",

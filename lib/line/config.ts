@@ -20,43 +20,24 @@ export interface LineConfigurationStatus {
     channelSecretConfigured: boolean;
 }
 
-function preferCanonicalValue(
-    canonicalValue: string | undefined,
-    legacyValue: string | undefined,
-): string | undefined {
-    return canonicalValue?.trim() || legacyValue?.trim() || undefined;
+function getConfiguredValue(value: string | undefined): string | undefined {
+    return value?.trim() || undefined;
 }
 
 function getConfiguredLiffId(): string | undefined {
-    return preferCanonicalValue(
-        process.env.NEXT_PUBLIC_LINE_LIFF_ID,
-        // Deprecated: remove after all deployments use NEXT_PUBLIC_LINE_LIFF_ID.
-        process.env.NEXT_PUBLIC_LINE_ROUTINE_LIFF_ID,
-    );
+    return getConfiguredValue(process.env.NEXT_PUBLIC_LINE_LIFF_ID);
 }
 
 function getConfiguredLoginChannelId(): string | undefined {
-    return preferCanonicalValue(
-        process.env.LINE_LOGIN_CHANNEL_ID,
-        // Deprecated: remove after all deployments use LINE_LOGIN_CHANNEL_ID.
-        process.env.LINE_ROUTINE_LOGIN_CHANNEL_ID,
-    );
+    return getConfiguredValue(process.env.LINE_LOGIN_CHANNEL_ID);
 }
 
 function getConfiguredMessagingChannelAccessToken(): string | undefined {
-    return preferCanonicalValue(
-        process.env.LINE_APP_CHANNEL_ACCESS_TOKEN,
-        // Deprecated: remove after all deployments use LINE_APP_CHANNEL_ACCESS_TOKEN.
-        process.env.LINE_ROUTINE_CHANNEL_ACCESS_TOKEN,
-    );
+    return getConfiguredValue(process.env.LINE_APP_CHANNEL_ACCESS_TOKEN);
 }
 
 function getConfiguredMessagingChannelSecret(): string | undefined {
-    return preferCanonicalValue(
-        process.env.LINE_APP_CHANNEL_SECRET,
-        // Deprecated: remove after all deployments use LINE_APP_CHANNEL_SECRET.
-        process.env.LINE_ROUTINE_CHANNEL_SECRET,
-    );
+    return getConfiguredValue(process.env.LINE_APP_CHANNEL_SECRET);
 }
 
 export function getLineLiffId(): string {

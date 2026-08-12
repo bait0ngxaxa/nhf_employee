@@ -142,7 +142,6 @@ describe("NHFapp LINE ID token verification", () => {
 
     it("fails explicitly when the NHFapp LINE configuration is missing", () => {
         vi.stubEnv("LINE_LOGIN_CHANNEL_ID", "   ");
-        vi.stubEnv("LINE_ROUTINE_LOGIN_CHANNEL_ID", "   ");
 
         expect(() => getLineConfig()).toThrowError(
             expect.objectContaining({

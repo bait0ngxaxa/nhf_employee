@@ -64,15 +64,6 @@ https://<production-domain>/liff
 ค่าที่ถูกต้องคือ `/liff` เพียงค่าเดียว บริการ Routine ใช้ LIFF deep link
 `https://liff.line.me/{LIFF_ID}/routine` ซึ่งเปิด `/liff/routine` ภายใต้ Endpoint เดียวกัน
 
-ชื่อ environment เดิมยังรองรับชั่วคราวโดย config กลาง และค่าชื่อใหม่มีลำดับความสำคัญสูงกว่า:
-
-```text
-NEXT_PUBLIC_LINE_ROUTINE_LIFF_ID     → NEXT_PUBLIC_LINE_LIFF_ID
-LINE_ROUTINE_LOGIN_CHANNEL_ID        → LINE_LOGIN_CHANNEL_ID
-LINE_ROUTINE_CHANNEL_ACCESS_TOKEN    → LINE_APP_CHANNEL_ACCESS_TOKEN
-LINE_ROUTINE_CHANNEL_SECRET          → LINE_APP_CHANNEL_SECRET
-```
-
 ## Rich Menu asset and definition
 
 Asset อยู่ที่:

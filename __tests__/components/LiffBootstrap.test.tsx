@@ -60,7 +60,6 @@ describe("LiffBootstrap", () => {
     beforeEach(() => {
         vi.clearAllMocks();
         vi.stubEnv("NEXT_PUBLIC_LINE_LIFF_ID", "nhfapp-liff-id");
-        vi.stubEnv("NEXT_PUBLIC_LINE_ROUTINE_LIFF_ID", "");
         window.history.replaceState(null, "", "/liff/routine");
         mocks.usePathname.mockReturnValue("/liff/routine");
         mocks.liff.init.mockResolvedValue(undefined);
