@@ -74,6 +74,8 @@
     --color-surface-neutral-subtle: var(--surface-neutral-subtle);
     --color-surface-neutral-muted: var(--surface-neutral-muted);
     --color-surface-neutral-border: var(--surface-neutral-border);
+    --color-brand-start: var(--brand-start);
+    --color-brand-end: var(--brand-end);
     --color-brand-surface: var(--brand-surface);
     --color-brand-surface-strong: var(--brand-surface-strong);
     --color-brand-border: var(--brand-border);
@@ -81,6 +83,10 @@
     --color-brand-strong: var(--brand-strong);
     --color-brand-solid: var(--brand-solid);
     --color-brand-solid-hover: var(--brand-solid-hover);
+    --color-action-gradient-start: var(--action-gradient-start);
+    --color-action-gradient-end: var(--action-gradient-end);
+    --color-action-gradient-hover-start: var(--action-gradient-hover-start);
+    --color-action-gradient-hover-end: var(--action-gradient-hover-end);
     --color-status-danger-surface: var(--status-danger-surface);
     --color-status-danger-border: var(--status-danger-border);
     --color-status-danger-foreground: var(--status-danger-foreground);
@@ -186,6 +192,8 @@
     --surface-inverted: #020617;
     --surface-inverted-strong: #0f172a;
     --surface-inverted-muted: #334155;
+    --brand-start: #0ea5e9;
+    --brand-end: #4f46e5;
     --brand-surface: #f0f9ff;
     --brand-surface-strong: #e0f2fe;
     --brand-border: #e0f2fe;
@@ -193,6 +201,10 @@
     --brand-strong: #0c4a6e;
     --brand-solid: #0ea5e9;
     --brand-solid-hover: #0284c7;
+    --action-gradient-start: #2563eb;
+    --action-gradient-end: #0891b2;
+    --action-gradient-hover-start: #1d4ed8;
+    --action-gradient-hover-end: #0e7490;
     --status-danger-surface: #fff1f2;
     --status-danger-border: #fecdd3;
     --status-danger-foreground: #e11d48;
@@ -221,7 +233,12 @@
     --module-stock-solid: #ea580c;
     --module-stock-solid-hover: #c2410c;
     --brand-tab: #0369a1;
-    --app-shell-background: var(--surface-subtle);
+    --app-shell-background: linear-gradient(
+        to bottom right,
+        #f8fafc,
+        #eff6ff,
+        #eef2ff
+    );
     --sidebar-toggle-shadow: 0 4px 8px rgb(15 23 42 / 18%), 0 1px 2px rgb(15 23 42 / 12%);
     --brand-logo-shadow: 0 4px 8px rgb(15 23 42 / 18%), 0 1px 2px rgb(15 23 42 / 12%);
     --employee-table-sticky-shadow: -10px 0 18px -18px rgb(15 23 42 / 45%);
@@ -299,6 +316,8 @@
     --surface-inverted: #020617;
     --surface-inverted-strong: #0f172a;
     --surface-inverted-muted: #334155;
+    --brand-start: var(--primary);
+    --brand-end: var(--primary);
     --brand-surface: var(--accent);
     --brand-surface-strong: var(--accent);
     --brand-border: var(--border);
@@ -306,6 +325,10 @@
     --brand-strong: var(--primary);
     --brand-solid: var(--primary);
     --brand-solid-hover: var(--primary);
+    --action-gradient-start: var(--primary);
+    --action-gradient-end: var(--primary);
+    --action-gradient-hover-start: var(--primary);
+    --action-gradient-hover-end: var(--primary);
     --status-danger-surface: color-mix(in oklch, var(--destructive) 16%, var(--background));
     --status-danger-border: color-mix(in oklch, var(--destructive) 35%, var(--background));
     --status-danger-foreground: var(--destructive);

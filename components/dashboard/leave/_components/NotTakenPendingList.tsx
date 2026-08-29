@@ -3,6 +3,7 @@ import type { ReactElement } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import type { PendingLeave } from "@/hooks/useLeaveApprovals";
+import { formatThaiDateTimeWithTimeWord } from "@/lib/helpers/date-helpers";
 import { getEmployeeDisplayName } from "@/lib/helpers/employee-helpers";
 import { LEAVE_THEME_BUTTON_CLASS } from "../leaveTheme";
 import { LeaveAttachmentViewerButton } from "./LeaveAttachmentViewerButton";
@@ -43,13 +44,27 @@ export function NotTakenPendingList({
                                     แจ้งไม่ได้ใช้วันลา
                                 </span>
                             </p>
-                            <p className="mt-1 text-sm/6 font-medium text-content-secondary">
-                                วันที่ {new Date(leave.startDate).toLocaleDateString("th-TH")}
-                                {leave.startDate !== leave.endDate
-                                    ? ` - ${new Date(leave.endDate).toLocaleDateString("th-TH")}`
-                                    : ""}{" "}
-                                ({leave.durationDays} วัน)
-                            </p>
+                            <div className="mt-3 grid gap-3 border-t border-cyan-200 pt-3 sm:grid-cols-2">
+                                <div className="min-w-0 space-y-1">
+                                    <p className="text-xs/5 font-semibold text-cyan-800">วันที่ลา</p>
+                                    <p className="break-words text-sm/6 font-medium text-content-secondary">
+                                        {formatLeaveDateRange(leave.startDate, leave.endDate)}
+                                    </p>
+                                    <p className="text-xs/5 font-medium text-cyan-800">
+                                        ({leave.durationDays} วัน)
+                                    </p>
+                                </div>
+                                {leave.notTakenRequestedAt ? (
+                                    <div className="min-w-0 space-y-1">
+                                        <p className="text-xs/5 font-semibold text-cyan-800">
+                                            แจ้งไม่ได้ใช้เมื่อ
+                                        </p>
+                                        <p className="break-words text-sm/6 font-medium text-content-secondary">
+                                            {formatThaiDateTimeWithTimeWord(leave.notTakenRequestedAt)}
+                                        </p>
+                                    </div>
+                                ) : null}
+                            </div>
                             {leave.notTakenReason ? (
                                 <p className="mt-2 max-w-[75ch] break-words rounded-md border border-cyan-200 bg-surface-raised p-2 text-sm/6 text-cyan-900">
                                     {leave.notTakenReason}
@@ -72,4 +87,19 @@ export function NotTakenPendingList({
             ))}
         </div>
     );
+}
+
+function formatLeaveDateRange(startDate: string, endDate: string): string {
+    const formatter = new Intl.DateTimeFormat("th-TH", {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+    });
+    const start = formatter.format(new Date(startDate));
+
+    if (startDate === endDate) {
+        return start;
+    }
+
+    return `${start} - ${formatter.format(new Date(endDate))}`;
 }

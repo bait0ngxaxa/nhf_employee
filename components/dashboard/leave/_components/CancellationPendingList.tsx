@@ -1,9 +1,10 @@
-import { CalendarRange, CheckCircle2, Clock3, RotateCcw } from "lucide-react";
+import { CheckCircle2, RotateCcw } from "lucide-react";
 import type { ReactElement } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import type { PendingLeave } from "@/hooks/useLeaveApprovals";
+import { formatThaiDateTimeWithTimeWord } from "@/lib/helpers/date-helpers";
 import { getEmployeeDisplayName } from "@/lib/helpers/employee-helpers";
 import { LEAVE_THEME_BUTTON_CLASS } from "../leaveTheme";
 import { LeaveAttachmentViewerButton } from "./LeaveAttachmentViewerButton";
@@ -73,24 +74,32 @@ function CancellationPendingItem({
                             ขอยกเลิกวันลาที่อนุมัติแล้ว
                         </span>
                     </p>
-                    <p className="mt-1 flex items-center gap-1.5 text-sm/6 font-medium text-content-secondary">
-                        <CalendarRange className="h-4 w-4 text-amber-700" aria-hidden="true" />
-                        {new Date(leave.startDate).toLocaleDateString("th-TH")}
-                        {leave.startDate !== leave.endDate
-                            ? ` - ${new Date(leave.endDate).toLocaleDateString("th-TH")}`
-                            : ""} ({leave.durationDays} วัน)
-                    </p>
+                    <div className="mt-3 grid gap-3 border-t border-amber-200 pt-3 sm:grid-cols-2">
+                        <div className="min-w-0 space-y-1">
+                            <p className="text-xs/5 font-semibold text-amber-800">วันที่ลา</p>
+                            <p className="break-words text-sm/6 font-medium text-content-secondary">
+                                {formatLeaveDateRange(leave.startDate, leave.endDate)}
+                            </p>
+                            <p className="text-xs/5 font-medium text-amber-800">
+                                ({leave.durationDays} วัน)
+                            </p>
+                        </div>
+                        <div className="min-w-0 space-y-1">
+                            <p className="text-xs/5 font-semibold text-amber-800">
+                                ส่งคำขอยกเลิกเมื่อ
+                            </p>
+                            <p className="break-words text-sm/6 font-medium text-content-secondary">
+                                {leave.cancellationRequestedAt
+                                    ? formatThaiDateTimeWithTimeWord(leave.cancellationRequestedAt)
+                                    : "-"}
+                            </p>
+                        </div>
+                    </div>
                     {leave.cancellationReason ? (
                         <p className="mt-2 max-w-[75ch] break-words rounded-md border border-amber-200 bg-surface-raised p-2 text-sm/6 text-amber-900">
                             เหตุผล: {leave.cancellationReason}
                         </p>
                     ) : null}
-                    <p className="mt-2 flex items-center gap-1.5 text-xs/5 font-medium text-content-muted">
-                        <Clock3 className="h-3.5 w-3.5" aria-hidden="true" />
-                        รอยืนยันตั้งแต่ {leave.cancellationRequestedAt
-                            ? new Date(leave.cancellationRequestedAt).toLocaleDateString("th-TH")
-                            : "-"}
-                    </p>
                     {!canConfirm ? (
                         <p className="mt-2 text-sm/6 font-medium text-amber-900">
                             วันลาเริ่มแล้ว ไม่สามารถยืนยันการยกเลิกและคืนโควต้าได้
@@ -120,4 +129,19 @@ function CancellationPendingItem({
             </div>
         </Card>
     );
+}
+
+function formatLeaveDateRange(startDate: string, endDate: string): string {
+    const formatter = new Intl.DateTimeFormat("th-TH", {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+    });
+    const start = formatter.format(new Date(startDate));
+
+    if (startDate === endDate) {
+        return start;
+    }
+
+    return `${start} - ${formatter.format(new Date(endDate))}`;
 }

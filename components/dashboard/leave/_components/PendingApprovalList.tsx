@@ -1,9 +1,7 @@
 import {
     AlertTriangle,
     Briefcase,
-    CalendarRange,
     CheckCircle,
-    Clock,
     Palmtree,
     Thermometer,
     UserCircle2,
@@ -105,11 +103,15 @@ function PendingApprovalCard({
                             label="ประเภทการลา"
                             value={leaveTypeLabel(leave.leaveType)}
                         />
-                        <InfoRow
-                            icon={CalendarRange}
-                            label="ระยะเวลา"
-                            value={`${formatLeaveDateRange(leave.startDate, leave.endDate)} (${leave.durationDays} วัน, ${periodLabel(leave.period)})`}
-                        />
+                        <div className="min-w-0">
+                            <p className="text-xs/5 font-medium text-indigo-700">วันที่ลา</p>
+                            <p className="mt-1 break-words text-base/6 font-semibold text-content-heading">
+                                {formatLeaveDateRange(leave.startDate, leave.endDate)}
+                            </p>
+                            <p className="mt-1 text-sm/6 font-medium text-content-secondary">
+                                {periodLabel(leave.period)} ({leave.durationDays} วัน)
+                            </p>
+                        </div>
                     </div>
 
                     {leave.reason ? (
@@ -134,10 +136,12 @@ function PendingApprovalCard({
                         </div>
                     ) : null}
 
-                    <p className="flex items-center gap-1.5 text-xs/5 font-medium text-content-muted">
-                        <Clock className="h-3.5 w-3.5" aria-hidden="true" />
-                        ยื่นคำขอเมื่อ {formatThaiDateTimeWithTimeWord(leave.createdAt)}
-                    </p>
+                    <div className="border-t border-border-subtle pt-4">
+                        <p className="text-xs/5 font-semibold text-content-muted">ส่งคำขอเมื่อ</p>
+                        <p className="mt-1 text-sm/6 font-medium text-content-secondary">
+                            {formatThaiDateTimeWithTimeWord(leave.createdAt)}
+                        </p>
+                    </div>
                 </div>
 
                 <div className="flex flex-col gap-2 sm:flex-row lg:w-40 lg:flex-col">
@@ -211,6 +215,7 @@ function formatLeaveDateRange(startDate: string, endDate: string): string {
     const formatter = new Intl.DateTimeFormat("th-TH", {
         day: "numeric",
         month: "short",
+        year: "numeric",
     });
     const start = formatter.format(new Date(startDate));
 

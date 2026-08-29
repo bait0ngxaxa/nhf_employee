@@ -177,7 +177,7 @@ export function LoginForm({
                             <div className="flex flex-col gap-3">
                                 <Button
                                     type="submit"
-                                    className="w-full rounded-xl bg-brand-solid text-content-on-brand hover:bg-brand-solid-hover disabled:opacity-70"
+                                    className="w-full rounded-xl bg-gradient-to-r from-action-gradient-start to-action-gradient-end text-content-on-brand hover:from-action-gradient-hover-start hover:to-action-gradient-hover-end disabled:opacity-70"
                                     disabled={isLoading}
                                 >
                                     {isLoading ? (

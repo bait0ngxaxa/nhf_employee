@@ -165,7 +165,7 @@ export function DashboardNavbar(): ReactElement {
                                     "hidden sm:flex group",
                                 )}
                             >
-                                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-solid">
+                                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-brand-start to-brand-end">
                                     <User className="h-5 w-5 text-content-on-brand" />
                                 </div>
                                 <div className="flex flex-col items-start text-left">
@@ -231,7 +231,7 @@ export function DashboardNavbar(): ReactElement {
                                 className="rounded-2xl border border-border-muted bg-surface sm:hidden"
                                 aria-label="เมนูผู้ใช้"
                             >
-                                <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-brand-solid">
+                                <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-brand-start to-brand-end">
                                     <User className="h-4 w-4 text-content-on-brand" />
                                 </div>
                             </Button>

@@ -114,7 +114,7 @@ function AccessPanel() {
                 <Button
                     asChild
                     size="lg"
-                    className="rounded-xl bg-brand-solid text-content-on-brand hover:bg-brand-solid-hover"
+                    className="rounded-xl bg-gradient-to-r from-action-gradient-start to-action-gradient-end text-content-on-brand hover:from-action-gradient-hover-start hover:to-action-gradient-hover-end"
                 >
                     <Link href={APP_ROUTES.login}>
                         เข้าสู่ระบบ

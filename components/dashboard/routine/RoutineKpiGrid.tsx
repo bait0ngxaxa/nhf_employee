@@ -12,18 +12,21 @@ const KPI_ITEMS = [
         key: "today",
         label: "งานถึงกำหนดวันนี้",
         accentClass: "bg-brand-solid",
+        cardClass: "border-brand-border bg-brand-surface",
         valueClass: "text-brand-strong",
     },
     {
         key: "dueSoon",
         label: "งานใกล้ถึงกำหนด 7 วัน",
         accentClass: "bg-status-warning-solid",
+        cardClass: "border-status-warning-border bg-status-warning-surface",
         valueClass: "text-status-warning-strong",
     },
     {
         key: "within30Days",
         label: "งานภายใน 30 วัน",
         accentClass: "bg-status-success-solid",
+        cardClass: "border-status-success-border bg-status-success-surface",
         valueClass: "text-status-success-strong",
     },
 ] as const;
@@ -41,7 +44,7 @@ export function RoutineKpiGrid({
                 return (
                     <Card
                         key={item.key}
-                        className="h-full border-border-subtle shadow-none"
+                        className={`h-full shadow-none ${item.cardClass}`}
                     >
                         <CardContent className="flex h-full flex-col p-5">
                             <div
