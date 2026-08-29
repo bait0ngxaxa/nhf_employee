@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { GET as getLeaveApprovals } from "@/app/api/leave/approvals/route";
 import { requireActiveWorkforceSession } from "@/lib/auth/workforce";
 import { prisma } from "@/lib/db/prisma";
+import { getAssignedLeaveApproverWhere } from "@/lib/services/leave/approval-queries";
 
 vi.mock("@/lib/auth/workforce", () => ({
     requireActiveWorkforceSession: vi.fn(),
@@ -17,7 +18,11 @@ vi.mock("@/lib/db/prisma", () => ({
     },
 }));
 
-function createLeaveRequest(id: string, status: "PENDING" | "APPROVED") {
+function createLeaveRequest(
+    id: string,
+    status: "PENDING" | "APPROVED",
+    exceptionApproverId: number | null = null,
+) {
     return {
         id,
         employeeId: 100,
@@ -32,6 +37,7 @@ function createLeaveRequest(id: string, status: "PENDING" | "APPROVED") {
         overQuotaHalfDays: 0,
         status,
         approverId: 200,
+        exceptionApproverId,
         approvedAt: status === "APPROVED" ? new Date("2027-01-02T00:00:00.000Z") : null,
         rejectReason: null,
         notTakenReason: null,
@@ -151,6 +157,18 @@ describe("GET /api/leave/approvals", () => {
                 skip: 20,
                 take: 10,
                 orderBy: { updatedAt: "desc" },
+                where: {
+                    AND: [
+                        {
+                            employeeId: { not: 200 },
+                            OR: [
+                                { exceptionApproverId: 200 },
+                                { exceptionApproverId: null, approverId: 200 },
+                            ],
+                        },
+                        expect.objectContaining({ OR: expect.any(Array) }),
+                    ],
+                },
             }),
         );
         expect(vi.mocked(prisma.leaveRequest.findMany).mock.calls[3][0]).toEqual(
@@ -212,12 +230,83 @@ describe("GET /api/leave/approvals", () => {
         );
         expect(vi.mocked(prisma.leaveRequest.findMany).mock.calls[2][0]).toEqual(
             expect.objectContaining({
-                where: expect.objectContaining({
-                    employeeId: { not: 999 },
-                    approverId: 999,
-                }),
+                where: {
+                    AND: [
+                        {
+                            employeeId: { not: 999 },
+                            OR: [
+                                { exceptionApproverId: 999 },
+                                { exceptionApproverId: null, approverId: 999 },
+                            ],
+                        },
+                        expect.objectContaining({ OR: expect.any(Array) }),
+                    ],
+                },
             }),
         );
         expect(JSON.stringify(await response.json())).not.toContain("__admin_recovery_");
+    });
+
+    it("keeps approval history scoped to the effective approver", async () => {
+        vi.mocked(requireActiveWorkforceSession).mockResolvedValue({
+            ok: true,
+            employeeId: 50,
+            user: { role: "USER" },
+        } as never);
+        const historicalExceptionAssignment = {
+            ...createLeaveRequest("history-exception-1", "APPROVED", 50),
+            status: "NOT_TAKEN",
+            notTakenRequestedAt: new Date("2027-01-05T00:00:00.000Z"),
+            notTakenConfirmedAt: new Date("2027-01-06T00:00:00.000Z"),
+        };
+        vi.mocked(prisma.leaveRequest.findMany).mockReset();
+        vi.mocked(prisma.leaveRequest.findMany)
+            .mockResolvedValueOnce([] as never)
+            .mockResolvedValueOnce([] as never)
+            .mockResolvedValueOnce([historicalExceptionAssignment] as never)
+            .mockResolvedValueOnce([] as never);
+        vi.mocked(prisma.leaveRequest.count).mockReset();
+        vi.mocked(prisma.leaveRequest.count)
+            .mockResolvedValueOnce(0)
+            .mockResolvedValueOnce(0)
+            .mockResolvedValueOnce(1)
+            .mockResolvedValueOnce(0);
+
+        const response = await getLeaveApprovals(
+            new Request("http://localhost/api/leave/approvals"),
+        );
+        const body = await response.json();
+
+        expect(response.status).toBe(200);
+        expect(body.history).toEqual([
+            expect.objectContaining({ id: "history-exception-1", status: "NOT_TAKEN" }),
+        ]);
+        const historyWhere = vi.mocked(prisma.leaveRequest.findMany).mock.calls[2]?.[0]?.where;
+        expect(historyWhere).toEqual({
+            AND: [
+                getAssignedLeaveApproverWhere(50),
+                {
+                    OR: [
+                        { status: { in: ["REJECTED", "NOT_TAKEN", "CANCELLED_AFTER_APPROVAL"] } },
+                        {
+                            status: "APPROVED",
+                            OR: [
+                                { notTakenRequestedAt: null },
+                                { notTakenConfirmedAt: { not: null } },
+                            ],
+                        },
+                    ],
+                },
+            ],
+        });
+
+        const originalApproverWhere = getAssignedLeaveApproverWhere(10);
+        expect(originalApproverWhere).toEqual({
+            employeeId: { not: 10 },
+            OR: [
+                { exceptionApproverId: 10 },
+                { exceptionApproverId: null, approverId: 10 },
+            ],
+        });
     });
 });

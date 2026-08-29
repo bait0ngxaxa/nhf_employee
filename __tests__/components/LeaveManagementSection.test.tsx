@@ -46,6 +46,7 @@ vi.mock("@/components/dashboard/leave/LeaveReportsDashboard", () => ({
 function mockDashboardUser(user: {
     role: "USER" | "ADMIN";
     isManager?: boolean;
+    canApproveLeave?: boolean;
     canViewLeaveReports?: boolean;
 }): void {
     vi.mocked(useDashboardDataContext).mockReturnValue({
@@ -65,7 +66,7 @@ describe("LeaveManagementSection permissions", () => {
     });
 
     it("hides both approval and recovery tabs for a normal employee", async () => {
-        mockDashboardUser({ role: "USER" });
+        mockDashboardUser({ role: "USER", isManager: false, canApproveLeave: false });
 
         render(<LeaveManagementSection />);
 
@@ -77,7 +78,7 @@ describe("LeaveManagementSection permissions", () => {
     });
 
     it("shows only normal approval for a non-admin approver", async () => {
-        mockDashboardUser({ role: "USER", isManager: true });
+        mockDashboardUser({ role: "USER", isManager: true, canApproveLeave: true });
 
         render(<LeaveManagementSection />);
 
@@ -89,7 +90,11 @@ describe("LeaveManagementSection permissions", () => {
     });
 
     it("shows only recovery for an admin who is not an approver", async () => {
-        mockDashboardUser({ role: "ADMIN" });
+        mockDashboardUser({
+            role: "ADMIN",
+            isManager: false,
+            canApproveLeave: false,
+        });
 
         render(<LeaveManagementSection />);
 
@@ -100,8 +105,12 @@ describe("LeaveManagementSection permissions", () => {
         expect(screen.getByRole("button", { name: "กู้คืนรายการลา" })).toBeInTheDocument();
     });
 
-    it("shows both workflows for an admin who is also an approver", async () => {
-        mockDashboardUser({ role: "ADMIN", isManager: true });
+    it("shows both workflows for an admin exception approver without subordinates", async () => {
+        mockDashboardUser({
+            role: "ADMIN",
+            isManager: false,
+            canApproveLeave: true,
+        });
 
         render(<LeaveManagementSection />);
 

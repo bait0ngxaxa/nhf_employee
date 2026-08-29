@@ -144,12 +144,12 @@ export function DashboardContent() {
                             <LeaveManagementSectionSkeleton
                                 showApprovals={
                                     defaultLeaveTab === "approvals"
-                                    && user?.isManager === true
+                                    && user?.canApproveLeave === true
                                 }
                                 showRecovery={
                                     defaultLeaveTab === "approvals"
                                     && isAdminRole(user?.role)
-                                    && user?.isManager !== true
+                                    && user?.canApproveLeave !== true
                                 }
                             />
                         }

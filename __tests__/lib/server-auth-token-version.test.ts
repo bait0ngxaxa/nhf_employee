@@ -88,6 +88,7 @@ describe("server auth tokenVersion validation", () => {
                 dept: null,
                 subordinates: [],
                 approvals: [],
+                exceptionApprovals: [],
             },
         });
 
@@ -119,12 +120,133 @@ describe("server auth tokenVersion validation", () => {
                 dept: null,
                 subordinates: [],
                 approvals: [],
+                exceptionApprovals: [],
             },
         });
 
         const session = await getApiAuthSession();
 
         expect(session?.user.name).toBe("สมชาย ใจดี (ชาย)");
+    });
+
+    it("derives leave approval capability from an exception assignment without subordinates", async () => {
+        verifyAccessTokenMock.mockResolvedValue({
+            sub: "1",
+            role: "ADMIN",
+            sessionId: "session-1",
+            tokenVersion: 1,
+        });
+        prismaMock.user.findUnique.mockResolvedValue({
+            id: 1,
+            role: "ADMIN",
+            email: "admin@test.com",
+            name: "Admin",
+            isActive: true,
+            tokenVersion: 1,
+            employee: {
+                status: "ACTIVE",
+                deletedAt: null,
+                dept: null,
+                subordinates: [],
+                approvals: [],
+                exceptionApprovals: [{ id: "leave-1" }],
+            },
+        });
+
+        const session = await getApiAuthSession();
+
+        expect(session?.user.isManager).toBe(false);
+        expect(session?.user.canApproveLeave).toBe(true);
+    });
+
+    it("does not grant leave approval capability to an unassigned admin", async () => {
+        verifyAccessTokenMock.mockResolvedValue({
+            sub: "1",
+            role: "ADMIN",
+            sessionId: "session-1",
+            tokenVersion: 1,
+        });
+        prismaMock.user.findUnique.mockResolvedValue({
+            id: 1,
+            role: "ADMIN",
+            email: "admin@test.com",
+            name: "Admin",
+            isActive: true,
+            tokenVersion: 1,
+            employee: {
+                status: "ACTIVE",
+                deletedAt: null,
+                dept: null,
+                subordinates: [],
+                approvals: [],
+                exceptionApprovals: [],
+            },
+        });
+
+        const session = await getApiAuthSession();
+
+        expect(session?.user.isManager).toBe(false);
+        expect(session?.user.canApproveLeave).toBe(false);
+    });
+
+    it("preserves leave approval capability for an organizational manager", async () => {
+        verifyAccessTokenMock.mockResolvedValue({
+            sub: "1",
+            role: "USER",
+            sessionId: "session-1",
+            tokenVersion: 1,
+        });
+        prismaMock.user.findUnique.mockResolvedValue({
+            id: 1,
+            role: "USER",
+            email: "manager@test.com",
+            name: "Manager",
+            isActive: true,
+            tokenVersion: 1,
+            employee: {
+                status: "ACTIVE",
+                deletedAt: null,
+                dept: null,
+                subordinates: [{ id: 2 }],
+                approvals: [],
+                exceptionApprovals: [],
+            },
+        });
+
+        const session = await getApiAuthSession();
+
+        expect(session?.user.isManager).toBe(true);
+        expect(session?.user.canApproveLeave).toBe(true);
+    });
+
+    it("derives leave approval capability from an original approver assignment", async () => {
+        verifyAccessTokenMock.mockResolvedValue({
+            sub: "1",
+            role: "USER",
+            sessionId: "session-1",
+            tokenVersion: 1,
+        });
+        prismaMock.user.findUnique.mockResolvedValue({
+            id: 1,
+            role: "USER",
+            email: "approver@test.com",
+            name: "Approver",
+            isActive: true,
+            tokenVersion: 1,
+            employee: {
+                status: "ACTIVE",
+                deletedAt: null,
+                dept: null,
+                subordinates: [],
+                approvals: [{ id: "leave-1" }],
+                exceptionApprovals: [],
+            },
+        });
+
+        const session = await getApiAuthSession();
+
+        expect(session?.user.isManager).toBe(false);
+        expect(session?.user.canApproveLeave).toBe(true);
     });
 
     it("returns null when only a refresh token is present", async () => {

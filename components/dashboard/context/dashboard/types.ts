@@ -15,6 +15,7 @@ export interface DashboardUser {
     role?: string;
     department?: string;
     isManager?: boolean;
+    canApproveLeave?: boolean;
     canViewLeaveReports?: boolean;
 }
 

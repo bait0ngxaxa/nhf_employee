@@ -22,6 +22,7 @@ async function findActiveUser(userId: number) {
                     dept: { select: { name: true } },
                     subordinates: { select: { id: true }, take: 1 },
                     approvals: { select: { id: true }, take: 1 },
+                    exceptionApprovals: { select: { id: true }, take: 1 },
                 },
             },
         },
@@ -37,6 +38,10 @@ function toApiAuthSession(user: SessionUser): ApiAuthSession {
             name: getEmployeeBackedUserDisplayName(user),
             department: user.employee?.dept?.name,
             isManager: (user.employee?.subordinates?.length ?? 0) > 0,
+            canApproveLeave:
+                (user.employee?.subordinates?.length ?? 0) > 0
+                || (user.employee?.approvals?.length ?? 0) > 0
+                || (user.employee?.exceptionApprovals?.length ?? 0) > 0,
             canViewLeaveReports:
                 (user.employee?.subordinates?.length ?? 0) > 0
                 || (user.employee?.approvals?.length ?? 0) > 0,

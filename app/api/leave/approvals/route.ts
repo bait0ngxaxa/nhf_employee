@@ -58,15 +58,18 @@ export async function GET(req: Request): Promise<NextResponse> {
             notTakenConfirmedAt: null,
         };
         const historyWhere: Prisma.LeaveRequestWhereInput = {
-            employeeId: { not: managerId },
-            approverId: managerId,
-            OR: [
-                { status: { in: ["REJECTED", "NOT_TAKEN", "CANCELLED_AFTER_APPROVAL"] } },
+            AND: [
+                assignedApproverWhere,
                 {
-                    status: "APPROVED",
                     OR: [
-                        { notTakenRequestedAt: null },
-                        { notTakenConfirmedAt: { not: null } },
+                        { status: { in: ["REJECTED", "NOT_TAKEN", "CANCELLED_AFTER_APPROVAL"] } },
+                        {
+                            status: "APPROVED",
+                            OR: [
+                                { notTakenRequestedAt: null },
+                                { notTakenConfirmedAt: { not: null } },
+                            ],
+                        },
                     ],
                 },
             ],

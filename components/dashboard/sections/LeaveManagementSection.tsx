@@ -19,10 +19,9 @@ interface LeaveManagementSectionProps {
 
 export function LeaveManagementSection({ defaultTab = "my-leave" }: LeaveManagementSectionProps) {
     const { user } = useDashboardDataContext();
-    const isManager = user?.isManager === true;
+    const canApproveLeave = user?.canApproveLeave === true;
     const canViewLeaveReports = user?.canViewLeaveReports === true;
     const isAdmin = isAdminRole(user?.role);
-    const canApproveLeave = isManager;
     const canRecoverLeave = isAdmin;
 
     const [activeTab, setActiveTab] = useState(defaultTab);
