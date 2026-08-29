@@ -1,7 +1,6 @@
 import {
     EmployeeStatus,
     type LeaveQuota,
-    type LeaveStatus,
     type LeaveType,
     type Prisma,
 } from "@prisma/client";
@@ -23,6 +22,10 @@ import {
 } from "@/lib/services/leave/half-days";
 import { calculateEffectiveEntitlementForYearHalfDays } from "@/lib/services/leave/quota-entitlement";
 import {
+    getApproverHistoryReportWhere,
+    LEAVE_REPORT_STATUSES,
+} from "@/lib/services/leave/approval-queries";
+import {
     DEFAULT_LEAVE_REPORT_SCOPE,
     type LeaveReportScope,
 } from "@/lib/validations/leave-report";
@@ -34,16 +37,6 @@ export type LeaveReportMeta = {
     requestCount: number;
     maxRows: number;
 };
-
-const REPORT_STATUSES: LeaveStatus[] = [
-    "PENDING",
-    "APPROVED",
-    "REJECTED",
-    "CANCELLED",
-    "NOT_TAKEN",
-    "CANCELLATION_REQUESTED",
-    "CANCELLED_AFTER_APPROVAL",
-];
 
 export async function getLeaveReportYears(
     currentEmployeeId: number,
@@ -62,10 +55,7 @@ export async function getApproverHistoryReportYears(
     currentEmployeeId: number,
 ): Promise<Array<{ startDate: Date }>> {
     return prisma.leaveRequest.findMany({
-        where: {
-            approverId: currentEmployeeId,
-            status: { in: REPORT_STATUSES },
-        },
+        where: getApproverHistoryReportWhere(currentEmployeeId),
         select: { startDate: true },
         distinct: ["startDate"],
     });
@@ -81,7 +71,7 @@ export async function getCurrentTeamReportYears(
                 status: EmployeeStatus.ACTIVE,
                 deletedAt: null,
             },
-            status: { in: REPORT_STATUSES },
+            status: { in: LEAVE_REPORT_STATUSES },
         },
         select: { startDate: true },
         distinct: ["startDate"],
@@ -200,7 +190,7 @@ export async function loadCurrentTeamReportEmployees(
             leaveRequests: {
                 where: {
                     startDate: { gte: startOfYear, lt: endOfYear },
-                    status: { in: REPORT_STATUSES },
+                    status: { in: LEAVE_REPORT_STATUSES },
                 },
                 select: createLeaveRequestReportSelect(),
             },
@@ -257,9 +247,8 @@ function createApproverHistoryWhere(
 ): Prisma.LeaveRequestWhereInput {
     const { startOfYear, endOfYear } = createYearRange(year);
     return {
-        approverId: currentEmployeeId,
+        ...getApproverHistoryReportWhere(currentEmployeeId),
         startDate: { gte: startOfYear, lt: endOfYear },
-        status: { in: REPORT_STATUSES },
     };
 }
 
@@ -275,7 +264,7 @@ function createCurrentTeamRequestWhere(
             deletedAt: null,
         },
         startDate: { gte: startOfYear, lt: endOfYear },
-        status: { in: REPORT_STATUSES },
+        status: { in: LEAVE_REPORT_STATUSES },
     };
 }
 

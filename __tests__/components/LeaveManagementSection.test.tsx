@@ -65,8 +65,13 @@ describe("LeaveManagementSection permissions", () => {
         vi.clearAllMocks();
     });
 
-    it("hides both approval and recovery tabs for a normal employee", async () => {
-        mockDashboardUser({ role: "USER", isManager: false, canApproveLeave: false });
+    it("hides approval, recovery, and report tabs for a normal employee", async () => {
+        mockDashboardUser({
+            role: "USER",
+            isManager: false,
+            canApproveLeave: false,
+            canViewLeaveReports: false,
+        });
 
         render(<LeaveManagementSection />);
 
@@ -75,10 +80,16 @@ describe("LeaveManagementSection permissions", () => {
         });
         expect(screen.queryByRole("button", { name: "อนุมัติการลา" })).not.toBeInTheDocument();
         expect(screen.queryByRole("button", { name: "กู้คืนรายการลา" })).not.toBeInTheDocument();
+        expect(screen.queryByRole("button", { name: "รีพอร์ต" })).not.toBeInTheDocument();
     });
 
-    it("shows only normal approval for a non-admin approver", async () => {
-        mockDashboardUser({ role: "USER", isManager: true, canApproveLeave: true });
+    it("shows approval and reports for an organizational manager", async () => {
+        mockDashboardUser({
+            role: "USER",
+            isManager: true,
+            canApproveLeave: true,
+            canViewLeaveReports: true,
+        });
 
         render(<LeaveManagementSection />);
 
@@ -87,6 +98,25 @@ describe("LeaveManagementSection permissions", () => {
         });
         expect(screen.getByRole("button", { name: "อนุมัติการลา" })).toBeInTheDocument();
         expect(screen.queryByRole("button", { name: "กู้คืนรายการลา" })).not.toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "รีพอร์ต" })).toBeInTheDocument();
+    });
+
+    it("shows reports without approval for a historical approver", async () => {
+        mockDashboardUser({
+            role: "USER",
+            isManager: false,
+            canApproveLeave: false,
+            canViewLeaveReports: true,
+        });
+
+        render(<LeaveManagementSection />);
+
+        await waitFor(() => {
+            expect(screen.getByTestId("leave-tabs")).toBeInTheDocument();
+        });
+        expect(screen.queryByRole("button", { name: "อนุมัติการลา" })).not.toBeInTheDocument();
+        expect(screen.queryByRole("button", { name: "กู้คืนรายการลา" })).not.toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "รีพอร์ต" })).toBeInTheDocument();
     });
 
     it("shows only recovery for an admin who is not an approver", async () => {
@@ -94,6 +124,7 @@ describe("LeaveManagementSection permissions", () => {
             role: "ADMIN",
             isManager: false,
             canApproveLeave: false,
+            canViewLeaveReports: false,
         });
 
         render(<LeaveManagementSection />);
@@ -103,6 +134,25 @@ describe("LeaveManagementSection permissions", () => {
         });
         expect(screen.queryByRole("button", { name: "อนุมัติการลา" })).not.toBeInTheDocument();
         expect(screen.getByRole("button", { name: "กู้คืนรายการลา" })).toBeInTheDocument();
+        expect(screen.queryByRole("button", { name: "รีพอร์ต" })).not.toBeInTheDocument();
+    });
+
+    it("shows recovery and reports without approval for an admin with historical approval", async () => {
+        mockDashboardUser({
+            role: "ADMIN",
+            isManager: false,
+            canApproveLeave: false,
+            canViewLeaveReports: true,
+        });
+
+        render(<LeaveManagementSection />);
+
+        await waitFor(() => {
+            expect(screen.getByTestId("leave-tabs")).toBeInTheDocument();
+        });
+        expect(screen.queryByRole("button", { name: "อนุมัติการลา" })).not.toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "กู้คืนรายการลา" })).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "รีพอร์ต" })).toBeInTheDocument();
     });
 
     it("shows both workflows for an admin exception approver without subordinates", async () => {
@@ -110,6 +160,7 @@ describe("LeaveManagementSection permissions", () => {
             role: "ADMIN",
             isManager: false,
             canApproveLeave: true,
+            canViewLeaveReports: false,
         });
 
         render(<LeaveManagementSection />);
@@ -119,5 +170,6 @@ describe("LeaveManagementSection permissions", () => {
         });
         expect(screen.getByRole("button", { name: "อนุมัติการลา" })).toBeInTheDocument();
         expect(screen.getByRole("button", { name: "กู้คืนรายการลา" })).toBeInTheDocument();
+        expect(screen.queryByRole("button", { name: "รีพอร์ต" })).not.toBeInTheDocument();
     });
 });

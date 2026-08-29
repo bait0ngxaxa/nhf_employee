@@ -8,7 +8,10 @@ import { verifyAccessToken } from "@/lib/auth/hybrid/tokens";
 import { hasEligibleEmployeeLifecycle } from "@/lib/auth/ssot";
 import { prisma } from "@/lib/db/prisma";
 import { getEmployeeBackedUserDisplayName } from "@/lib/helpers/employee-helpers";
-import { getActionableLeaveApprovalWhere } from "@/lib/services/leave/approval-queries";
+import {
+    getActionableLeaveApprovalWhere,
+    getApproverHistoryReportWhere,
+} from "@/lib/services/leave/approval-queries";
 
 export type ApiAuthSession = HybridAuthSession;
 
@@ -41,7 +44,19 @@ async function findActiveUser(userId: number) {
     });
 }
 
-function toApiAuthSession(user: SessionUser): ApiAuthSession {
+async function hasLeaveApprovalReportHistory(employeeId: number): Promise<boolean> {
+    const approval = await prisma.leaveRequest.findFirst({
+        where: getApproverHistoryReportWhere(employeeId),
+        select: { id: true },
+    });
+
+    return approval !== null;
+}
+
+function toApiAuthSession(
+    user: SessionUser,
+    hasApprovalReportHistory: boolean,
+): ApiAuthSession {
     return {
         user: {
             id: String(user.id),
@@ -56,7 +71,7 @@ function toApiAuthSession(user: SessionUser): ApiAuthSession {
                 || (user.employee?.exceptionApprovals?.length ?? 0) > 0,
             canViewLeaveReports:
                 (user.employee?.subordinates?.length ?? 0) > 0
-                || (user.employee?.approvals?.length ?? 0) > 0,
+                || hasApprovalReportHistory,
         },
     };
 }
@@ -83,6 +98,7 @@ export async function getApiAuthSession(): Promise<ApiAuthSession | null> {
 
         if (
             !user
+            || !user.employee
             || !hasEligibleEmployeeLifecycle(user.employee)
             || !hasActiveSession
             || claims.tokenVersion !== user.tokenVersion
@@ -90,7 +106,8 @@ export async function getApiAuthSession(): Promise<ApiAuthSession | null> {
             return null;
         }
 
-        return toApiAuthSession(user);
+        const hasApprovalReportHistory = await hasLeaveApprovalReportHistory(user.employee.id);
+        return toApiAuthSession(user, hasApprovalReportHistory);
     } catch {
         return null;
     }

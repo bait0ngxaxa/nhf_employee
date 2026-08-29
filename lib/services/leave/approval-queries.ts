@@ -1,8 +1,18 @@
-import type { Prisma } from "@prisma/client";
+import type { LeaveStatus, Prisma } from "@prisma/client";
 
 import { ACTIVE_LEAVE_APPROVER_QUERY_WHERE } from "@/lib/services/leave/approver-eligibility";
 
 export const LEAVE_APPROVALS_PAGE_SIZE = 10;
+
+export const LEAVE_REPORT_STATUSES = [
+    "PENDING",
+    "APPROVED",
+    "REJECTED",
+    "CANCELLED",
+    "NOT_TAKEN",
+    "CANCELLATION_REQUESTED",
+    "CANCELLED_AFTER_APPROVAL",
+] satisfies LeaveStatus[];
 
 /**
  * Matches leave requests that still need a normal approver action.
@@ -19,6 +29,18 @@ export function getActionableLeaveApprovalWhere(): Prisma.LeaveRequestWhereInput
             },
             { status: "CANCELLATION_REQUESTED" },
         ],
+    };
+}
+
+/**
+ * Matches the original approver ownership exposed by the approver-history report.
+ */
+export function getApproverHistoryReportWhere(
+    employeeId: number,
+): Prisma.LeaveRequestWhereInput {
+    return {
+        approverId: employeeId,
+        status: { in: LEAVE_REPORT_STATUSES },
     };
 }
 
