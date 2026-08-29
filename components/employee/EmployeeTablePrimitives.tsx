@@ -25,7 +25,7 @@ export function isTemporaryEmail(email: string): boolean {
 export function EmployeeAvatar({ employee }: { employee: Employee }) {
     return (
         <div
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-sky-50 text-xs font-bold text-sky-700 ring-1 ring-sky-100 transition-colors group-hover:bg-sky-100"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand-surface text-xs font-bold text-brand-foreground ring-1 ring-brand-solid transition-colors group-hover:bg-brand-surface"
             aria-hidden="true"
         >
             {getEmployeeAvatarLetter(employee)}
@@ -46,7 +46,7 @@ export function EditEmployeeButton({
             size="sm"
             onClick={() => onEditEmployee(employee)}
             aria-label={`แก้ไขข้อมูล ${getEmployeeDisplayName(employee) || "ไม่ระบุชื่อ"}`}
-            className="h-11 rounded-lg bg-emerald-50 px-3 text-sm text-emerald-700 transition-colors duration-200 hover:bg-emerald-100 hover:text-emerald-800"
+            className="h-11 rounded-lg bg-status-success-surface px-3 text-sm text-status-success-foreground transition-colors duration-200 hover:bg-status-success-surface hover:text-status-success-strong"
         >
             <Edit className="h-3.5 w-3.5" aria-hidden="true" />
             <span>แก้ไข</span>

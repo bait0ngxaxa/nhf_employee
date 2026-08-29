@@ -91,7 +91,7 @@ export const EmployeeTable = memo(function EmployeeTable({
                     {employees.map((employee) => (
                         <tr
                             key={employee.id}
-                            className="group border-b border-border-muted transition-colors hover:bg-sky-50/40 last:border-0"
+                            className="group border-b border-border-muted transition-colors hover:bg-brand-surface/40 last:border-0"
                         >
                             <td className="px-5 py-4">
                                 <div className="flex items-center gap-3">
@@ -151,7 +151,7 @@ export const EmployeeTable = memo(function EmployeeTable({
                                 </Badge>
                             </td>
                             {canEdit && onEditEmployee ? (
-                                <td className="sticky right-0 bg-surface-raised px-4 py-4 employee-table-sticky-shadow group-hover:bg-sky-50">
+                                <td className="sticky right-0 bg-surface-raised px-4 py-4 employee-table-sticky-shadow group-hover:bg-brand-surface">
                                     <EditEmployeeButton
                                         employee={employee}
                                         onEditEmployee={onEditEmployee}
@@ -176,7 +176,7 @@ function NicknameBadge({ nickname }: { nickname?: string }) {
     return (
         <Badge
             variant="secondary"
-            className="max-w-full border border-violet-200/70 bg-violet-50 px-2.5 font-medium text-violet-700 hover:bg-violet-50"
+            className="max-w-full border border-brand-border/70 bg-brand-surface px-2.5 font-medium text-brand-foreground hover:bg-brand-surface"
             title={normalizedNickname}
         >
             <span className="truncate">{normalizedNickname}</span>

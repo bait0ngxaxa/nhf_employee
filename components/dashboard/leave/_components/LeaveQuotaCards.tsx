@@ -47,7 +47,7 @@ function QuotaCard({
                         <p
                             className={cn(
                                 "tabular-nums text-4xl font-bold tracking-tight",
-                                isOverQuota ? "text-rose-700" : theme.valueColor,
+                                isOverQuota ? "text-status-danger-foreground" : theme.valueColor,
                             )}
                         >
                             {displayedRemain}
@@ -66,7 +66,7 @@ function QuotaCard({
                         <p
                             className={cn(
                                 "break-words tabular-nums font-medium",
-                                carryBalance < 0 && "text-rose-700",
+                                carryBalance < 0 && "text-status-danger-foreground",
                             )}
                         >
                             {carryBalance < 0 ? "ยอดเกินสิทธิ์ยกมา" : "ยอดยกมา"}{" "}
@@ -95,7 +95,7 @@ function QuotaCard({
                         }
                     >
                         <div
-                            className={cn("h-full rounded-full", isOverQuota ? "bg-rose-500" : theme.barColor)}
+                            className={cn("h-full rounded-full", isOverQuota ? "bg-status-danger-solid" : theme.barColor)}
                             style={{ width: `${progress}%` }}
                         />
                     </div>
@@ -116,8 +116,8 @@ export function LeaveQuotaCards({ sickQuota, personalQuota, vacationQuota }: Lea
                 annualTotal={sickQuota.totalDays}
                 note="สิทธิประจำปี"
                 theme={{
-                    valueColor: "text-emerald-700",
-                    barColor: "bg-emerald-500",
+                    valueColor: "text-status-success-foreground",
+                    barColor: "bg-status-success-solid",
                 }}
             />
             <QuotaCard
@@ -129,8 +129,8 @@ export function LeaveQuotaCards({ sickQuota, personalQuota, vacationQuota }: Lea
                 carryBalance={personalQuota.carryBalanceDays}
                 note="สิทธิรวมหลังยอดยกมา"
                 theme={{
-                    valueColor: "text-sky-700",
-                    barColor: "bg-sky-500",
+                    valueColor: "text-brand-foreground",
+                    barColor: "bg-brand-solid",
                 }}
             />
             <QuotaCard
@@ -142,8 +142,8 @@ export function LeaveQuotaCards({ sickQuota, personalQuota, vacationQuota }: Lea
                 carryBalance={vacationQuota.carryBalanceDays}
                 note="สิทธิรวมหลังยอดยกมา"
                 theme={{
-                    valueColor: "text-amber-700",
-                    barColor: "bg-amber-500",
+                    valueColor: "text-status-warning-foreground",
+                    barColor: "bg-status-warning-solid",
                 }}
             />
         </div>

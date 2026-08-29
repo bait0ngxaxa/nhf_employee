@@ -60,7 +60,7 @@ export function AdminLeaveRecoveryDashboard(): ReactElement {
     if (model.isError) {
         return (
             <div
-                className="rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm/6 text-rose-900"
+                className="rounded-lg border border-status-danger-border bg-status-danger-surface p-4 text-sm/6 text-status-danger-strong"
                 role="alert"
             >
                 <p className="font-semibold">ไม่สามารถโหลดรายการกู้คืนได้</p>
@@ -68,7 +68,7 @@ export function AdminLeaveRecoveryDashboard(): ReactElement {
                 <Button
                     type="button"
                     variant="outline"
-                    className="mt-3 border-rose-300 bg-white text-rose-800 hover:bg-rose-100 hover:text-rose-900"
+                    className="mt-3 border-status-danger-border bg-surface-raised text-status-danger-strong hover:bg-status-danger-surface hover:text-status-danger-strong"
                     onClick={() => void model.refresh()}
                     disabled={model.isProcessing}
                 >
@@ -80,7 +80,7 @@ export function AdminLeaveRecoveryDashboard(): ReactElement {
 
     return (
         <div className="space-y-6">
-            <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm/6 text-amber-950">
+            <div className="rounded-lg border border-status-warning-border bg-status-warning-surface p-4 text-sm/6 text-status-warning-strong">
                 <p className="font-semibold">การกู้คืนรายการลาโดยผู้ดูแลระบบ</p>
                 <p className="mt-1">
                     ใช้เฉพาะกรณีผู้อนุมัติที่มีผลไม่พร้อมใช้งาน การดำเนินการทุกครั้งต้องระบุเหตุผลและถูกบันทึกเพื่อตรวจสอบย้อนหลัง

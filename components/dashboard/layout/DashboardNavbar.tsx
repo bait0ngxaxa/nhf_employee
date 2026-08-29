@@ -40,6 +40,7 @@ import {
 } from "@/components/dashboard/context/dashboard/DashboardContext";
 import { NotificationDropdown } from "@/components/dashboard/notifications/NotificationDropdown";
 import { DashboardSidebar } from "@/components/dashboard/layout/DashboardSidebar";
+import { ThemeSelector } from "@/components/theme/ThemeSelector";
 import { getRoleLabelThai } from "@/lib/ssot/permissions";
 
 const DESKTOP_MEDIA_QUERY = "(min-width: 1024px)";
@@ -210,6 +211,8 @@ export function DashboardNavbar(): ReactElement {
                                 </span>
                             </DropdownMenuItem>
                             <DropdownMenuSeparator className="my-1 bg-surface-subtle" />
+                            <ThemeSelector />
+                            <DropdownMenuSeparator className="my-1 bg-surface-subtle" />
                             <DropdownMenuItem
                                 onClick={openLogoutDialog}
                                 className="h-11 cursor-pointer rounded-xl text-status-danger-foreground focus:bg-status-danger-surface focus:text-status-danger-foreground"
@@ -249,6 +252,8 @@ export function DashboardNavbar(): ReactElement {
                                     จัดการเซสชัน
                                 </span>
                             </DropdownMenuItem>
+                            <DropdownMenuSeparator className="my-1 bg-surface-subtle" />
+                            <ThemeSelector />
                             <DropdownMenuSeparator className="my-1 bg-surface-subtle" />
                             <DropdownMenuItem
                                 onClick={openLogoutDialog}
@@ -329,7 +334,7 @@ export function DashboardNavbar(): ReactElement {
                             type="button"
                             onClick={() => void confirmLogout()}
                             disabled={isLoggingOut}
-                            className="h-11 rounded-lg bg-status-danger-solid px-6 font-semibold text-content-on-brand hover:bg-status-danger-strong disabled:opacity-80"
+                            className="h-11 rounded-lg bg-status-danger-solid px-6 font-semibold text-content-on-brand hover:bg-status-danger-solid-hover disabled:opacity-80"
                             aria-busy={isLoggingOut}
                         >
                             {isLoggingOut ? (

@@ -15,16 +15,16 @@ interface StatCardProps {
 function StatCard({ label, value, color }: StatCardProps) {
     const colorMap: Record<StatCardProps["color"], { card: string; text: string }> = {
         sky: {
-            card: "border-sky-200 bg-sky-50",
-            text: "text-sky-800",
+            card: "border-brand-border bg-brand-surface",
+            text: "text-brand-strong",
         },
         emerald: {
-            card: "border-emerald-200 bg-emerald-50",
-            text: "text-emerald-800",
+            card: "border-status-success-border bg-status-success-surface",
+            text: "text-status-success-strong",
         },
         amber: {
-            card: "border-amber-200 bg-amber-50",
-            text: "text-amber-800",
+            card: "border-status-warning-border bg-status-warning-surface",
+            text: "text-status-warning-strong",
         },
         gray: {
             card: "border-border-subtle bg-surface-subtle",

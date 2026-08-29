@@ -162,7 +162,7 @@ export function AuditLogViewer({ className }: AuditLogViewerProps) {
     if (error) {
         return (
             <div className="text-center p-8">
-                <div className="text-red-600 bg-red-50 p-4 rounded-md">
+                <div className="text-status-danger-foreground bg-status-danger-surface p-4 rounded-md">
                     {error}
                 </div>
             </div>

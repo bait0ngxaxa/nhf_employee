@@ -111,7 +111,7 @@ export function AdjustDialog({ item, onClose, onSuccess }: AdjustDialogProps) {
                             {item.name}
                         </span>
                         <span className="flex items-center gap-1.5 text-sm font-medium text-content-secondary">
-                            <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-blue-500" />
+                            <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-brand-solid" />
                             {STOCK_ADMIN_TEXT.currentStock}: {item.quantity} {item.unit}
                         </span>
                     </div>
@@ -155,14 +155,14 @@ function AdjustVariantField(props: {
     return (
         <div className="space-y-1.5">
             <Label className="text-sm font-semibold text-content-body">
-                รายการย่อยที่จะรับเข้า <span className="text-rose-500">*</span>
+                รายการย่อยที่จะรับเข้า <span className="text-status-danger-foreground">*</span>
             </Label>
             <Select
                 name="variantId"
                 value={props.value}
                 onValueChange={props.onValueChange}
             >
-                <SelectTrigger className="h-11 w-full focus:ring-blue-500">
+                <SelectTrigger className="h-11 w-full focus:ring-brand-solid">
                     <SelectValue placeholder="เลือกรายการย่อย" />
                 </SelectTrigger>
                 <SelectContent>
@@ -264,13 +264,13 @@ function DialogTextField(props: {
         <div className="space-y-1.5">
             <Label htmlFor={props.id} className="text-sm font-semibold text-content-body">
                 {props.label}{" "}
-                {props.required && <span className="text-rose-500">*</span>}
+                {props.required && <span className="text-status-danger-foreground">*</span>}
             </Label>
             <Input
                 id={props.id}
                 name={props.name}
                 required={props.required}
-                className="h-11 focus-visible:ring-blue-500"
+                className="h-11 focus-visible:ring-brand-solid"
             />
         </div>
     );
@@ -287,7 +287,7 @@ function DialogNumberField(props: {
     return (
         <div className="space-y-1.5">
             <Label htmlFor={props.id} className="text-sm font-semibold text-content-body">
-                {props.label} <span className="text-rose-500">*</span>
+                {props.label} <span className="text-status-danger-foreground">*</span>
             </Label>
             <Input
                 id={props.id}
@@ -301,7 +301,7 @@ function DialogNumberField(props: {
                       }
                     : { defaultValue: props.defaultValue })}
                 required
-                className="h-11 focus-visible:ring-blue-500"
+                className="h-11 focus-visible:ring-brand-solid"
             />
         </div>
     );
@@ -326,7 +326,7 @@ function DialogActions(props: {
             <Button
                 type="submit"
                 disabled={props.loading}
-                className="h-11 bg-blue-600 px-7 font-bold text-content-on-brand shadow-sm transition-colors hover:bg-blue-700"
+                className="h-11 bg-brand-solid px-7 font-bold text-content-on-brand shadow-sm transition-colors hover:bg-brand-solid-hover"
             >
                 {props.loading ? STOCK_ADMIN_TEXT.saving : props.submitLabel}
             </Button>

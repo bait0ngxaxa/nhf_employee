@@ -25,10 +25,10 @@ export function StockAdminReports() {
                 selectAriaLabel="เลือกปีรีพอร์ตวัสดุ"
                 layout="card"
                 selectClassName="h-11"
-                buttonClassName="h-11 bg-orange-600 text-content-on-brand shadow-sm transition-colors duration-200 hover:bg-orange-700 hover:text-content-on-brand"
+                buttonClassName="h-11 bg-module-stock-solid text-content-on-brand shadow-sm transition-colors duration-200 hover:bg-module-stock-solid-hover hover:text-content-on-brand"
                 exportLabel={reports.reportExportLabel}
                 badge={
-                    <div className="inline-flex rounded-full border border-orange-100 bg-surface-raised/80 px-3 py-1 text-xs font-semibold text-orange-700 shadow-sm">
+                    <div className="inline-flex rounded-full border border-module-stock-badge-border bg-surface-raised/80 px-3 py-1 text-xs font-semibold text-module-stock-badge-foreground shadow-sm">
                         รายงานผู้ดูแล
                     </div>
                 }
@@ -53,7 +53,7 @@ export function StockAdminReports() {
             <div className="rounded-2xl border border-border-subtle bg-surface-raised p-5 shadow-sm">
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                     <div className="space-y-2">
-                        <div className="inline-flex rounded-full border border-emerald-100 bg-surface-raised/80 px-3 py-1 text-xs font-semibold text-emerald-700 shadow-sm">
+                        <div className="inline-flex rounded-full border border-status-success-border bg-surface-raised/80 px-3 py-1 text-xs font-semibold text-status-success-foreground shadow-sm">
                             ยอดคงเหลือ
                         </div>
                         <div>
@@ -72,7 +72,7 @@ export function StockAdminReports() {
                         disabled={reports.isBalanceDisabled}
                         onClick={() => void reports.handleBalanceExport()}
                         aria-busy={reports.isExportingBalance}
-                        className="h-11 rounded-2xl bg-emerald-700 px-5 text-sm font-semibold text-content-on-brand shadow-sm transition-colors duration-200 hover:bg-emerald-800 hover:text-content-on-brand disabled:text-content-on-brand/80"
+                        className="h-11 rounded-2xl bg-status-success-solid px-5 text-sm font-semibold text-content-on-brand shadow-sm transition-colors duration-200 hover:bg-status-success-solid-hover hover:text-content-on-brand disabled:text-content-on-brand/80"
                     >
                         {reports.isExportingBalance ? (
                             <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />

@@ -247,8 +247,8 @@ export function RoutineTaskList({
                                             <span className="text-xs/5 font-semibold text-content-muted lg:hidden">สถานะ</span>
                                             <span className="min-w-0">
                                                 <span className={task.isActive
-                                                    ? "inline-flex items-center whitespace-nowrap rounded-full bg-emerald-50 px-2.5 py-1 text-xs/5 font-semibold text-emerald-700"
-                                                    : "inline-flex items-center whitespace-nowrap rounded-full bg-slate-100 px-2.5 py-1 text-xs/5 font-semibold text-slate-600"}
+                                                    ? "inline-flex items-center whitespace-nowrap rounded-full bg-status-success-surface px-2.5 py-1 text-xs/5 font-semibold text-status-success-foreground"
+                                                    : "inline-flex items-center whitespace-nowrap rounded-full bg-surface-subtle px-2.5 py-1 text-xs/5 font-semibold text-content-secondary"}
                                                 >
                                                     {task.isActive ? "ใช้งาน" : "ปิดใช้งาน"}
                                                 </span>

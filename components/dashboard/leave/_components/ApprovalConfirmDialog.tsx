@@ -28,7 +28,7 @@ export function ApprovalConfirmDialog({
         <Dialog open={Boolean(leave)} onOpenChange={onOpenChange}>
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle className="flex items-center gap-2 text-amber-700">
+                    <DialogTitle className="flex items-center gap-2 text-status-warning-foreground">
                         <AlertTriangle className="h-5 w-5" />
                         ยืนยันการอนุมัติคำขอพิเศษ
                     </DialogTitle>
@@ -37,7 +37,7 @@ export function ApprovalConfirmDialog({
                     </DialogDescription>
                 </DialogHeader>
                 {leave ? (
-                    <div className="space-y-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm leading-6 text-amber-950">
+                    <div className="space-y-2 rounded-lg border border-status-warning-border bg-status-warning-surface p-3 text-sm leading-6 text-status-warning-strong">
                         {leave.emergencyReason ? (
                             <p className="break-words">
                                 <span className="font-semibold">เหตุผลในการลาย้อนหลัง:</span>{" "}

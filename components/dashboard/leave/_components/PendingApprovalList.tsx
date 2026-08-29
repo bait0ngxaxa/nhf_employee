@@ -84,7 +84,7 @@ function PendingApprovalCard({
             <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
                 <div className="min-w-0 flex-1 space-y-4">
                     <div className="flex min-w-0 items-start gap-3">
-                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-indigo-50 text-indigo-700">
+                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-module-leave-badge-surface text-module-leave-badge-foreground">
                             <UserCircle2 className="h-5 w-5" aria-hidden="true" />
                         </div>
                         <div className="min-w-0">
@@ -97,14 +97,14 @@ function PendingApprovalCard({
                         </div>
                     </div>
 
-                    <div className="grid gap-4 rounded-xl border border-indigo-100 bg-indigo-50/60 p-4 sm:grid-cols-2">
+                    <div className="grid gap-4 rounded-xl border border-module-leave-badge-border bg-module-leave-badge-surface/60 p-4 sm:grid-cols-2">
                         <InfoRow
                             icon={LeaveTypeIcon}
                             label="ประเภทการลา"
                             value={leaveTypeLabel(leave.leaveType)}
                         />
                         <div className="min-w-0">
-                            <p className="text-xs/5 font-medium text-indigo-700">วันที่ลา</p>
+                            <p className="text-xs/5 font-medium text-module-leave-badge-foreground">วันที่ลา</p>
                             <p className="mt-1 break-words text-base/6 font-semibold text-content-heading">
                                 {formatLeaveDateRange(leave.startDate, leave.endDate)}
                             </p>
@@ -161,7 +161,7 @@ function PendingApprovalCard({
                         onClick={() => onOpenReject(leave)}
                         disabled={isProcessing}
                         variant="outline"
-                        className="border-rose-200 text-rose-700 hover:bg-rose-50 hover:text-rose-800"
+                        className="border-status-danger-border text-status-danger-foreground hover:bg-status-danger-surface hover:text-status-danger-strong"
                     >
                         <XCircle className="h-4 w-4" aria-hidden="true" />
                         ไม่อนุมัติ
@@ -183,9 +183,9 @@ function InfoRow({
 }) {
     return (
         <div className="min-w-0">
-            <p className="text-xs/5 font-medium text-indigo-700">{label}</p>
+            <p className="text-xs/5 font-medium text-module-leave-badge-foreground">{label}</p>
             <p className="mt-1 flex items-start gap-2 break-words text-base/6 font-semibold text-content-heading">
-                <Icon className="mt-0.5 h-4 w-4 shrink-0 text-indigo-600" aria-hidden="true" />
+                <Icon className="mt-0.5 h-4 w-4 shrink-0 text-module-leave-badge-foreground" aria-hidden="true" />
                 <span>{value}</span>
             </p>
         </div>
@@ -194,7 +194,7 @@ function InfoRow({
 
 function SpecialFlag({ label }: { label: string }) {
     return (
-        <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-800">
+        <span className="inline-flex items-center rounded-full border border-status-warning-border bg-status-warning-surface px-2.5 py-1 text-xs font-medium text-status-warning-strong">
             <AlertTriangle className="mr-1 h-3.5 w-3.5" aria-hidden="true" />
             {label}
         </span>
@@ -204,7 +204,7 @@ function SpecialFlag({ label }: { label: string }) {
 function EmptyPendingApproval() {
     return (
         <Card className="border-dashed border-border-strong p-8 text-center shadow-none">
-            <CheckCircle className="mx-auto h-8 w-8 text-emerald-600" aria-hidden="true" />
+            <CheckCircle className="mx-auto h-8 w-8 text-status-success-foreground" aria-hidden="true" />
             <p className="mt-3 text-base/6 font-semibold text-content-primary">ไม่มีคำขอที่ต้องพิจารณา</p>
             <p className="mt-1 text-sm/6 text-content-muted">คำขอใหม่จากทีมจะแสดงที่นี่</p>
         </Card>

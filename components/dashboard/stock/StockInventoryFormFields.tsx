@@ -26,7 +26,7 @@ export function InventoryTextField(props: {
         <div className="space-y-1.5">
             <Label htmlFor={props.id} className="text-sm font-semibold text-content-body">
                 {props.label}{" "}
-                {props.required && <span className="text-rose-500">*</span>}
+                {props.required && <span className="text-status-danger-foreground">*</span>}
             </Label>
             <Input
                 id={props.id}
@@ -34,7 +34,7 @@ export function InventoryTextField(props: {
                 required={props.required}
                 type={props.type}
                 placeholder={props.placeholder}
-                className="h-11 focus-visible:ring-blue-500"
+                className="h-11 focus-visible:ring-brand-solid"
             />
         </div>
     );
@@ -49,7 +49,7 @@ export function InventoryNumberField(props: {
     return (
         <div className="space-y-1.5">
             <Label htmlFor={props.id} className="text-sm font-semibold text-content-body">
-                {props.label} <span className="text-rose-500">*</span>
+                {props.label} <span className="text-status-danger-foreground">*</span>
             </Label>
             <Input
                 id={props.id}
@@ -58,7 +58,7 @@ export function InventoryNumberField(props: {
                 min={1}
                 defaultValue={props.defaultValue}
                 required
-                className="h-11 focus-visible:ring-blue-500"
+                className="h-11 focus-visible:ring-brand-solid"
             />
         </div>
     );
@@ -74,10 +74,10 @@ export function InventoryCategoryField(props: {
         <div className="space-y-1.5">
             <Label htmlFor="categoryId" className="text-sm font-semibold text-content-body">
                 {STOCK_ADMIN_TEXT.category}{" "}
-                {props.required && <span className="text-rose-500">*</span>}
+                {props.required && <span className="text-status-danger-foreground">*</span>}
             </Label>
             <Select name="categoryId" value={props.value} onValueChange={props.onChange}>
-                <SelectTrigger className="h-11 focus:ring-blue-500">
+                <SelectTrigger className="h-11 focus:ring-brand-solid">
                     <SelectValue placeholder={STOCK_ADMIN_TEXT.categoryPlaceholder} />
                 </SelectTrigger>
                 <SelectContent>
@@ -111,7 +111,7 @@ export function InventoryDialogActions(props: {
             <Button
                 type="submit"
                 disabled={props.loading}
-                className="h-11 bg-blue-600 px-7 font-bold text-content-on-brand shadow-sm transition-colors hover:bg-blue-700"
+                className="h-11 bg-brand-solid px-7 font-bold text-content-on-brand shadow-sm transition-colors hover:bg-brand-solid-hover"
             >
                 {props.loading ? STOCK_ADMIN_TEXT.saving : props.submitLabel}
             </Button>

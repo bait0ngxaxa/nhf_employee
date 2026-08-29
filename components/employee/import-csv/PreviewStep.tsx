@@ -43,7 +43,7 @@ export function PreviewStep({
                 </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-                <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm leading-6 text-blue-900 [overflow-wrap:anywhere]">
+                <div className="rounded-xl border border-brand-border bg-brand-surface px-4 py-3 text-sm leading-6 text-brand-strong [overflow-wrap:anywhere]">
                     แสดงตัวอย่าง {visibleRows.length.toLocaleString("th-TH")} รายการแรก
                     {hiddenRowCount > 0
                         ? ` ยังมีอีก ${hiddenRowCount.toLocaleString("th-TH")} รายการที่จะถูกนำเข้าพร้อมกัน`
@@ -108,7 +108,7 @@ export function PreviewStep({
                                     </td>
                                     <td className="max-w-44 px-4 py-4 text-sm text-content-neutral-secondary">
                                         {employee.nickname?.trim() ? (
-                                            <Badge variant="secondary" className="max-w-full border border-violet-200/60 bg-violet-50 px-2.5 font-medium text-violet-700 hover:bg-violet-100 [overflow-wrap:anywhere]">
+                                            <Badge variant="secondary" className="max-w-full border border-brand-border/60 bg-brand-surface px-2.5 font-medium text-brand-foreground hover:bg-brand-surface [overflow-wrap:anywhere]">
                                                 {employee.nickname.trim()}
                                             </Badge>
                                         ) : (
@@ -122,12 +122,12 @@ export function PreviewStep({
                 </div>
 
                 {error && (
-                    <Alert className="border-red-200 bg-red-50" aria-live="assertive">
-                        <XCircle className="h-4 w-4 text-red-600" />
-                        <AlertTitle className="text-red-800">
+                    <Alert className="border-status-danger-border bg-status-danger-surface" aria-live="assertive">
+                        <XCircle className="h-4 w-4 text-status-danger-foreground" />
+                        <AlertTitle className="text-status-danger-strong">
                             นำเข้าข้อมูลไม่สำเร็จ
                         </AlertTitle>
-                        <AlertDescription className="whitespace-pre-line text-red-700 [overflow-wrap:anywhere]">
+                        <AlertDescription className="whitespace-pre-line text-status-danger-foreground [overflow-wrap:anywhere]">
                             {error}
                         </AlertDescription>
                     </Alert>

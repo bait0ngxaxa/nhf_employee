@@ -32,9 +32,9 @@ function EmployeeRow({
         <div
             className={`flex flex-col gap-3 rounded-xl border p-3 transition-colors sm:flex-row sm:items-center ${
                 hasChange
-                    ? "border-sky-300 bg-sky-50"
+                    ? "border-brand-border bg-brand-surface"
                     : !managerId
-                      ? "border-amber-200 bg-amber-50"
+                      ? "border-status-warning-border bg-status-warning-surface"
                       : "border-border-subtle bg-surface-raised hover:bg-surface-subtle"
             }`}
         >
@@ -42,12 +42,12 @@ function EmployeeRow({
                 <div className="flex items-center gap-2 flex-wrap">
                     <span className="break-words font-medium text-content-heading">{formatName(employee)}</span>
                     {hasChange ? (
-                        <Badge variant="outline" className="border-sky-300 text-xs text-sky-700">
+                        <Badge variant="outline" className="border-brand-border text-xs text-brand-foreground">
                             แก้ไขแล้ว
                         </Badge>
                     ) : null}
                     {!managerId && !hasChange ? (
-                        <Badge variant="outline" className="border-amber-300 text-xs text-amber-700">
+                        <Badge variant="outline" className="border-status-warning-border text-xs text-status-warning-foreground">
                             ยังไม่กำหนด
                         </Badge>
                     ) : null}

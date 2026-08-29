@@ -512,7 +512,7 @@ export function RoutineSection() {
                 value={safeTab}
                 onValueChange={setActiveTab}
                 tabs={tabs}
-                activeColor="var(--brand-tab)"
+                activeColor="var(--module-routine-tab)"
                 listClassName="border-brand-border/70 bg-transparent"
                 ariaLabel="แท็บ NHF Routine"
             />

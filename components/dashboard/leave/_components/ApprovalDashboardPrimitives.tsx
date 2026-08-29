@@ -41,8 +41,8 @@ export function ApprovalSectionHeader({
     tone: "attention" | "info" | "neutral";
 }): ReactElement {
     const toneClassName = {
-        attention: "border-indigo-100 bg-indigo-50 text-indigo-700",
-        info: "border-cyan-100 bg-cyan-50 text-cyan-800",
+        attention: "border-module-leave-badge-border bg-module-leave-badge-surface text-module-leave-badge-foreground",
+        info: "border-brand-border bg-brand-surface text-brand-strong",
         neutral: "border-border-subtle bg-surface-subtle text-content-body",
     }[tone];
 

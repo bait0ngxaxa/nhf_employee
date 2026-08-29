@@ -5,7 +5,7 @@ import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "@/lib/ui/utils"
 
 const badgeVariants = cva(
-  "inline-flex max-w-full min-w-0 items-center justify-center rounded-md border px-2 py-0.5 text-center text-xs font-medium leading-5 [overflow-wrap:anywhere] [&>svg]:size-3 [&>svg]:shrink-0 gap-1 [&>svg]:pointer-events-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive transition-[color,box-shadow] overflow-hidden",
+  "inline-flex max-w-full min-w-0 items-center justify-center rounded-md border px-2 py-0.5 text-center text-xs font-medium leading-5 [overflow-wrap:anywhere] [&>svg]:size-3 [&>svg]:shrink-0 gap-1 [&>svg]:pointer-events-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-status-danger-solid/20 aria-invalid:border-status-danger-solid transition-[color,box-shadow] overflow-hidden",
   {
     variants: {
       variant: {
@@ -14,7 +14,7 @@ const badgeVariants = cva(
         secondary:
           "border-transparent bg-secondary text-secondary-foreground [a&]:hover:bg-secondary/90",
         destructive:
-          "border-transparent bg-destructive text-content-on-brand [a&]:hover:bg-destructive/90 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40 dark:bg-destructive/60",
+          "border-transparent bg-status-danger-solid text-content-on-brand [a&]:hover:bg-status-danger-solid-hover focus-visible:ring-status-danger-solid/30",
         outline:
           "text-foreground [a&]:hover:bg-accent [a&]:hover:text-accent-foreground",
       },

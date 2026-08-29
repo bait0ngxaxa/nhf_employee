@@ -94,14 +94,14 @@ export function EmployeeList({ userRole }: EmployeeListProps) {
                     จาก {totalEmployees} คน
                     <div className="mt-2 flex flex-wrap gap-2">
                         {statusFilter !== "all" ? (
-                            <span className="inline-flex max-w-full items-center rounded-full bg-sky-100 px-2.5 py-1 text-xs font-medium text-sky-800">
+                            <span className="inline-flex max-w-full items-center rounded-full bg-brand-surface px-2.5 py-1 text-xs font-medium text-brand-strong">
                                 <span className="truncate">
                                     สถานะ: {getEmployeeStatusLabel(statusFilter)}
                                 </span>
                             </span>
                         ) : null}
                         {debouncedSearchTerm ? (
-                            <span className="inline-flex max-w-full items-center rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-medium text-emerald-800">
+                            <span className="inline-flex max-w-full items-center rounded-full bg-status-success-surface px-2.5 py-1 text-xs font-medium text-status-success-strong">
                                 <span className="truncate">
                                     ค้นหา: &quot;{debouncedSearchTerm}&quot;
                                 </span>
@@ -169,14 +169,14 @@ function EmployeeEmptyState({
         type === "error" ? AlertCircle : type === "filtered" ? SearchX : UsersRound;
     const toneClass =
         type === "error"
-            ? "border-red-200 bg-red-50 text-red-700"
+            ? "border-status-danger-border bg-status-danger-surface text-status-danger-foreground"
             : "border-border-subtle bg-surface-raised text-content-body";
     const iconClass =
         type === "error"
-            ? "bg-red-100 text-red-700"
+            ? "bg-status-danger-surface text-status-danger-foreground"
             : type === "filtered"
-              ? "bg-amber-100 text-amber-700"
-              : "bg-sky-100 text-sky-700";
+              ? "bg-status-warning-surface text-status-warning-foreground"
+              : "bg-brand-surface text-brand-foreground";
 
     return (
         <div className={`rounded-xl border p-8 text-center ${toneClass}`}>
@@ -193,7 +193,7 @@ function EmployeeEmptyState({
                     {message}
                 </p>
                 {type === "empty" ? (
-                    <div className="mt-4 inline-flex items-center gap-2 rounded-full bg-sky-50 px-3 py-1.5 text-xs font-medium text-sky-800">
+                    <div className="mt-4 inline-flex items-center gap-2 rounded-full bg-brand-surface px-3 py-1.5 text-xs font-medium text-brand-strong">
                         <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />
                         พร้อมจัดระเบียบทีมเมื่อมีข้อมูลแรก
                     </div>
@@ -202,7 +202,7 @@ function EmployeeEmptyState({
                     <Button
                         type="button"
                         variant="outline"
-                        className="mt-5 rounded-lg border-red-200 bg-surface-raised text-red-700 hover:bg-red-50 hover:text-red-800"
+                        className="mt-5 rounded-lg border-status-danger-border bg-surface-raised text-status-danger-foreground hover:bg-status-danger-surface hover:text-status-danger-strong"
                         onClick={() => void onRetry()}
                     >
                         โหลดอีกครั้ง

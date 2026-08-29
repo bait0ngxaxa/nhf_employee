@@ -12,9 +12,9 @@ import { formatStockRequestDate } from "./stockRequest.shared";
 export function StockRequestNote({ request }: { request: StockRequest }) {
     if (request.status === "ISSUED" && request.issuedAt) {
         return (
-            <div className="flex items-start gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1.5">
-                <CheckCircle className="mt-px h-3.5 w-3.5 shrink-0 text-emerald-500" aria-hidden="true" />
-                <p className="text-xs text-emerald-800">
+            <div className="flex items-start gap-1.5 rounded-lg border border-status-success-border bg-status-success-surface px-2.5 py-1.5">
+                <CheckCircle className="mt-px h-3.5 w-3.5 shrink-0 text-status-success-foreground" aria-hidden="true" />
+                <p className="text-xs text-status-success-strong">
                     <span className="font-semibold">จ่ายโดย: </span>
                     {request.issuer
                         ? getEmployeeBackedUserDisplayName(request.issuer, "-")
@@ -33,9 +33,9 @@ export function StockRequestNote({ request }: { request: StockRequest }) {
 
     if (isCancelledWithReason) {
         return (
-            <div className="flex items-start gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1.5">
-                <span className="mt-px shrink-0 text-amber-500" aria-hidden="true">⚠</span>
-                <p className="text-xs text-amber-800">
+            <div className="flex items-start gap-1.5 rounded-lg border border-status-warning-border bg-status-warning-surface px-2.5 py-1.5">
+                <span className="mt-px shrink-0 text-status-warning-foreground" aria-hidden="true">⚠</span>
+                <p className="text-xs text-status-warning-strong">
                     <span className="font-semibold">หมายเหตุยกเลิก: </span>
                     {request.cancelReason}
                 </p>

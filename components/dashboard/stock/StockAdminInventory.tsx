@@ -44,14 +44,14 @@ export function StockAdminInventory() {
         <div className="space-y-4">
             <div className="flex flex-wrap gap-3">
                 <Button
-                    className="h-11 bg-blue-600 px-5 font-semibold text-content-on-brand shadow-sm transition-colors hover:bg-blue-700"
+                    className="h-11 bg-brand-solid px-5 font-semibold text-content-on-brand shadow-sm transition-colors hover:bg-brand-solid-hover"
                     onClick={() => setShowAddItem(true)}
                 >
                     <Plus className="mr-1.5 h-4 w-4" /> {STOCK_ADMIN_TEXT.addItem}
                 </Button>
                 <Button
                     variant="outline"
-                    className="h-11 border-border-subtle px-5 font-medium text-content-secondary transition-colors hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700"
+                    className="h-11 border-border-subtle px-5 font-medium text-content-secondary transition-colors hover:border-brand-border hover:bg-brand-surface hover:text-brand-foreground"
                     onClick={() => setShowAddCategory(true)}
                 >
                     <PackagePlus className="mr-1.5 h-4 w-4" />

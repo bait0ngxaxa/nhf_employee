@@ -108,15 +108,15 @@ export function EmailRequestHistory(): ReactElement | null {
                         </div>
                     </div>
                 ) : error ? (
-                    <div className="flex flex-col items-center gap-4 rounded-xl border border-red-200 bg-red-50 px-4 py-8 text-center text-red-700">
-                        <AlertCircle className="h-6 w-6 text-red-600" />
+                    <div className="flex flex-col items-center gap-4 rounded-xl border border-status-danger-border bg-status-danger-surface px-4 py-8 text-center text-status-danger-foreground">
+                        <AlertCircle className="h-6 w-6 text-status-danger-foreground" />
                         <p className="max-w-xl text-sm leading-6 [overflow-wrap:anywhere]">
                             {error}
                         </p>
                         <Button
                             type="button"
                             variant="outline"
-                            className="border-red-200 bg-surface-raised text-red-700 hover:bg-red-50"
+                            className="border-status-danger-border bg-surface-raised text-status-danger-foreground hover:bg-status-danger-surface"
                             onClick={refresh}
                         >
                             <RefreshCw className="mr-2 h-4 w-4" />
@@ -217,7 +217,7 @@ export function EmailRequestHistory(): ReactElement | null {
                                                 {formatThaiDateTime(request.createdAt)}
                                             </TableCell>
                                             <TableCell className="align-top">
-                                                <Badge className="flex w-fit items-center gap-1 bg-green-100 text-green-800 hover:bg-green-100">
+                                                <Badge className="flex w-fit items-center gap-1 bg-status-success-surface text-status-success-strong hover:bg-status-success-surface">
                                                     <CheckCircle className="h-3 w-3" />
                                                     เสร็จสิ้น
                                                 </Badge>

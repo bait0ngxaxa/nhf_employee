@@ -142,10 +142,10 @@ function BrowseCardBase(props: BrowseCardProps) {
     return (
         <Card className={`group relative h-full overflow-hidden rounded-2xl border bg-surface-raised transition-colors duration-200 ${
             isRecentlyAdded
-                ? "border-emerald-300 ring-2 ring-emerald-300/70"
+                ? "border-status-success-border ring-2 ring-status-success-solid/70"
                 : availableQuantity === 0
                     ? "border-border-subtle/80"
-                    : "border-blue-100/80 hover:border-blue-300"
+                    : "border-brand-border/80 hover:border-brand-border"
         }`}>
             <CardContent className="flex h-full flex-col gap-2.5 p-3">
                 <div className="overflow-hidden rounded-2xl bg-surface-subtle ring-1 ring-border-subtle">
@@ -162,7 +162,7 @@ function BrowseCardBase(props: BrowseCardProps) {
                         <button
                             type="button"
                             onClick={() => props.onPreviewImage(imageUrl, item.name)}
-                            className="group/preview relative block h-32 w-full overflow-hidden text-left outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-2"
+                            className="group/preview relative block h-32 w-full overflow-hidden text-left outline-none focus-visible:ring-2 focus-visible:ring-brand-solid focus-visible:ring-offset-2"
                             aria-label={`ดูรูป ${item.name} แบบพรีวิว`}
                         >
                             <Image
@@ -177,7 +177,7 @@ function BrowseCardBase(props: BrowseCardProps) {
                                 className="h-full w-full object-cover transition-transform duration-200 group-hover/preview:scale-[1.03]"
                             />
                             <span className="absolute inset-0 bg-surface-inverted/0 transition-colors duration-300 group-hover/preview:bg-surface-inverted/20" />
-                            <span className="absolute bottom-2 right-2 flex h-8 w-8 items-center justify-center rounded-full bg-surface-raised/90 text-content-body opacity-0 shadow-sm transition-opacity duration-200 group-hover/preview:opacity-100 group-hover/preview:text-blue-700 group-focus-visible/preview:opacity-100 group-focus-visible/preview:text-blue-700">
+                            <span className="absolute bottom-2 right-2 flex h-8 w-8 items-center justify-center rounded-full bg-surface-raised/90 text-content-body opacity-0 shadow-sm transition-opacity duration-200 group-hover/preview:opacity-100 group-hover/preview:text-brand-foreground group-focus-visible/preview:opacity-100 group-focus-visible/preview:text-brand-foreground">
                                 <ZoomIn className="h-4 w-4" aria-hidden="true" />
                             </span>
                         </button>
@@ -234,7 +234,7 @@ function BrowseCardBase(props: BrowseCardProps) {
                         <div
                             className={`min-h-5 text-xs font-medium leading-5 ${
                                 item.reservedQuantity > 0
-                                    ? "text-amber-600"
+                                    ? "text-status-warning-foreground"
                                     : "text-transparent"
                             }`}
                         >
@@ -247,19 +247,19 @@ function BrowseCardBase(props: BrowseCardProps) {
 
                 <div className="mt-auto space-y-2">
                     {totalInCart > 0 && (
-                        <div className="flex min-h-9 items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-sm font-medium leading-5 text-amber-800">
+                        <div className="flex min-h-9 items-center gap-2 rounded-xl border border-status-warning-border bg-status-warning-surface px-2.5 py-1.5 text-sm font-medium leading-5 text-status-warning-strong">
                             <ShoppingCart className="h-4 w-4" aria-hidden="true" />
                             อยู่ในรายการเบิกแล้ว {totalInCart} {item.unit}
                         </div>
                     )}
                     <Button
                         variant="default"
-                        className={`group/button relative isolate w-full overflow-hidden rounded-xl shadow-sm ring-offset-2 transition-colors duration-200 focus-visible:ring-2 focus-visible:ring-blue-400 active:translate-y-0.5 active:scale-[0.98] ${
+                        className={`group/button relative isolate w-full overflow-hidden rounded-xl shadow-sm ring-offset-2 transition-colors duration-200 focus-visible:ring-2 focus-visible:ring-brand-solid active:translate-y-0.5 active:scale-[0.98] ${
                             availableQuantity === 0
                                 ? "border-border-subtle bg-surface-subtle/50 text-content-subtle"
                                 : isRecentlyAdded
-                                  ? "border border-emerald-600 bg-emerald-600 text-content-on-brand hover:bg-emerald-700"
-                                : "border border-blue-600 bg-blue-600 text-content-on-brand hover:border-blue-700 hover:bg-blue-700"
+                                  ? "border border-status-success-border bg-status-success-solid text-content-on-brand hover:bg-status-success-solid-hover"
+                                : "border border-brand-border bg-brand-solid text-content-on-brand hover:border-brand-border hover:bg-brand-solid-hover"
                         }`}
                         onClick={() =>
                             hasSelectableVariants(item)

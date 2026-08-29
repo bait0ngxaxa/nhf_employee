@@ -35,7 +35,7 @@ export function NotTakenPendingList({
     return (
         <div className="space-y-3">
             {items.map((leave) => (
-                <Card key={leave.id} className="border-cyan-200 bg-cyan-50 p-5 shadow-sm">
+                <Card key={leave.id} className="border-brand-border bg-brand-surface p-5 shadow-sm">
                     <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                         <div className="min-w-0">
                             <p className="break-words text-base/6 font-semibold text-content-heading">
@@ -44,19 +44,19 @@ export function NotTakenPendingList({
                                     แจ้งไม่ได้ใช้วันลา
                                 </span>
                             </p>
-                            <div className="mt-3 grid gap-3 border-t border-cyan-200 pt-3 sm:grid-cols-2">
+                            <div className="mt-3 grid gap-3 border-t border-brand-border pt-3 sm:grid-cols-2">
                                 <div className="min-w-0 space-y-1">
-                                    <p className="text-xs/5 font-semibold text-cyan-800">วันที่ลา</p>
+                                    <p className="text-xs/5 font-semibold text-brand-strong">วันที่ลา</p>
                                     <p className="break-words text-sm/6 font-medium text-content-secondary">
                                         {formatLeaveDateRange(leave.startDate, leave.endDate)}
                                     </p>
-                                    <p className="text-xs/5 font-medium text-cyan-800">
+                                    <p className="text-xs/5 font-medium text-brand-strong">
                                         ({leave.durationDays} วัน)
                                     </p>
                                 </div>
                                 {leave.notTakenRequestedAt ? (
                                     <div className="min-w-0 space-y-1">
-                                        <p className="text-xs/5 font-semibold text-cyan-800">
+                                        <p className="text-xs/5 font-semibold text-brand-strong">
                                             แจ้งไม่ได้ใช้เมื่อ
                                         </p>
                                         <p className="break-words text-sm/6 font-medium text-content-secondary">
@@ -66,7 +66,7 @@ export function NotTakenPendingList({
                                 ) : null}
                             </div>
                             {leave.notTakenReason ? (
-                                <p className="mt-2 max-w-[75ch] break-words rounded-md border border-cyan-200 bg-surface-raised p-2 text-sm/6 text-cyan-900">
+                                <p className="mt-2 max-w-[75ch] break-words rounded-md border border-brand-border bg-surface-raised p-2 text-sm/6 text-brand-strong">
                                     {leave.notTakenReason}
                                 </p>
                             ) : null}

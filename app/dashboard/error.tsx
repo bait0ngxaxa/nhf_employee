@@ -25,10 +25,10 @@ export default function DashboardError({ error, reset }: ErrorProps) {
 
     return (
         <div className="flex items-center justify-center min-h-[60vh] p-4">
-            <Card className="w-full max-w-md border-orange-100 shadow-sm">
+            <Card className="w-full max-w-md border-status-warning-border shadow-sm">
                 <CardHeader className="text-center pb-2">
-                    <div className="mx-auto mb-4 w-14 h-14 bg-orange-100 rounded-full flex items-center justify-center">
-                        <AlertTriangle className="w-7 h-7 text-orange-600" />
+                    <div className="mx-auto mb-4 w-14 h-14 bg-status-warning-surface rounded-full flex items-center justify-center">
+                        <AlertTriangle className="w-7 h-7 text-status-warning-foreground" />
                     </div>
                     <CardTitle className="text-lg text-content-neutral-strong">
                         ไม่สามารถโหลดข้อมูลได้
@@ -40,8 +40,8 @@ export default function DashboardError({ error, reset }: ErrorProps) {
                     </p>
 
                     {process.env.NODE_ENV === "development" && (
-                        <div className="bg-orange-50 border border-orange-200 rounded-lg p-2 text-left">
-                            <p className="text-xs font-mono text-orange-700 break-all">
+                        <div className="bg-status-warning-surface border border-status-warning-border rounded-lg p-2 text-left">
+                            <p className="text-xs font-mono text-status-warning-foreground break-all">
                                 {error.message}
                             </p>
                         </div>

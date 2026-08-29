@@ -32,19 +32,19 @@ function buildStatItems(stats: EmployeeStats): StatItem[] {
             label: "กำลังปฏิบัติงาน",
             value: stats.active,
             detail: "สถานะ Active",
-            valueClassName: "text-emerald-700",
+            valueClassName: "text-status-success-foreground",
         },
         {
             label: "ฝ่ายบริหาร",
             value: stats.admin,
             detail: "บุคลากรสายบริหาร",
-            valueClassName: "text-amber-700",
+            valueClassName: "text-status-warning-foreground",
         },
         {
             label: "ฝ่ายวิชาการ",
             value: stats.academic,
             detail: "บุคลากรสายวิชาการ",
-            valueClassName: "text-sky-700",
+            valueClassName: "text-brand-foreground",
         },
     ];
 }

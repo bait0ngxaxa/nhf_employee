@@ -64,7 +64,7 @@ function InventoryMobileCard({
                     </div>
                     <Badge
                         variant="secondary"
-                        className="max-w-full justify-start whitespace-normal border-none bg-indigo-50/80 text-left font-medium leading-snug text-indigo-700 [overflow-wrap:anywhere]"
+                        className="max-w-full justify-start whitespace-normal border-none bg-brand-surface/80 text-left font-medium leading-snug text-brand-foreground [overflow-wrap:anywhere]"
                     >
                         {item.category.name}
                     </Badge>
@@ -88,7 +88,7 @@ function InventoryMobileCard({
             <div className="mt-4 flex justify-end gap-2">
                 <Button
                     variant="outline"
-                    className="h-11 px-3 text-blue-700"
+                    className="h-11 px-3 text-brand-foreground"
                     onClick={() => onAdjust(item)}
                 >
                     <Pencil className="mr-1.5 h-4 w-4" aria-hidden="true" />
@@ -96,7 +96,7 @@ function InventoryMobileCard({
                 </Button>
                 <Button
                     variant="outline"
-                    className="h-11 px-3 text-rose-600 hover:bg-rose-50 hover:text-rose-700"
+                    className="h-11 px-3 text-status-danger-foreground hover:bg-status-danger-surface hover:text-status-danger-foreground"
                     onClick={() => onDelete(item)}
                     disabled={deleteDisabled}
                 >
@@ -120,7 +120,7 @@ function Metric({
     return (
         <div className="rounded-xl border border-border-subtle bg-surface-subtle px-3 py-2">
             <div className="text-xs text-content-muted">{label}</div>
-            <div className={`mt-1 flex items-center gap-1 font-semibold ${danger ? "text-rose-700" : "text-content-strong"}`}>
+            <div className={`mt-1 flex items-center gap-1 font-semibold ${danger ? "text-status-danger-foreground" : "text-content-strong"}`}>
                 {value}
                 {danger ? <AlertTriangle className="h-3.5 w-3.5" aria-hidden="true" /> : null}
             </div>

@@ -180,8 +180,8 @@ export function RoutineDetailsDialog({
                             {task.category.name}
                         </span>
                         <span className={task.isActive
-                            ? "rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700"
-                            : "rounded-full bg-slate-200 px-2.5 py-1 text-xs font-semibold text-slate-700"}
+                            ? "rounded-full bg-status-success-surface px-2.5 py-1 text-xs font-semibold text-status-success-foreground"
+                            : "rounded-full bg-surface-muted px-2.5 py-1 text-xs font-semibold text-content-secondary"}
                         >
                             {task.isActive ? "ใช้งาน" : "ปิดใช้งาน"}
                         </span>
@@ -292,8 +292,8 @@ export function RoutineDetailsDialog({
                                                 </p>
                                             </div>
                                             <span className={rule.isActive
-                                                ? "w-fit rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700"
-                                                : "w-fit rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600"}
+                                                ? "w-fit rounded-full bg-status-success-surface px-2.5 py-1 text-xs font-semibold text-status-success-foreground"
+                                                : "w-fit rounded-full bg-surface-subtle px-2.5 py-1 text-xs font-semibold text-content-secondary"}
                                             >
                                                 {rule.isActive ? "เปิดใช้" : "ปิดใช้"}
                                             </span>

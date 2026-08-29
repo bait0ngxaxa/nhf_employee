@@ -22,7 +22,7 @@ export function EmployeeLeaveDashboard() {
         <div className="flex flex-col gap-6">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="min-w-0">
-                    <p className="text-sm/6 font-medium text-indigo-700">วันลาของฉัน</p>
+                    <p className="text-sm/6 font-medium text-module-leave-badge-foreground">วันลาของฉัน</p>
                     <h2 className="mt-1 text-xl/7 font-semibold tracking-tight text-content-heading">
                         โควต้าวันลาของคุณ
                     </h2>
@@ -58,7 +58,7 @@ export function EmployeeLeaveDashboard() {
                             รายการล่าสุดพร้อมสถานะและการดำเนินการที่ยังทำได้
                         </p>
                     </div>
-                    <span className="w-fit rounded-full border border-indigo-100 bg-indigo-50 px-3 py-1 text-sm font-medium text-indigo-700">
+                    <span className="w-fit rounded-full border border-module-leave-badge-border bg-module-leave-badge-surface px-3 py-1 text-sm font-medium text-module-leave-badge-foreground">
                         {model.metadata?.totalItems ?? model.history.length} รายการ
                     </span>
                 </div>

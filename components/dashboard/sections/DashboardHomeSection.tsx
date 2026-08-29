@@ -15,6 +15,7 @@ const MENU_ITEM_CONFIG: Record<
         icon?: string;
         featured?: boolean;
         featuredSurface?: string;
+        featuredControlSurface?: string;
         featuredBorder?: string;
         featuredShadow?: string;
         featuredIconHover?: string;
@@ -26,61 +27,64 @@ const MENU_ITEM_CONFIG: Record<
     }
 > = {
     "leave-management": {
-        text: "text-indigo-900",
+        text: "text-module-leave-dashboard-strong",
         featured: true,
-        icon: "text-indigo-600",
-        featuredSurface: "bg-indigo-600",
-        featuredBorder: "border-indigo-500 hover:border-indigo-400",
-        featuredShadow: "shadow-indigo-900/15 hover:shadow-indigo-900/20",
-        featuredIconHover: "group-hover:text-indigo-700",
-        featuredArrowHover: "group-hover:bg-indigo-50",
-        featuredBadge: "text-indigo-700",
-        featuredDescription: "text-indigo-50",
-        featuredCorner: "bg-blue-500/40",
-        featuredFocus: "focus-visible:ring-indigo-300",
+        icon: "text-module-leave-dashboard-control-foreground",
+        featuredSurface: "bg-module-leave-dashboard-surface",
+        featuredControlSurface: "bg-dashboard-featured-control-surface",
+        featuredBorder: "border-module-leave-dashboard-accent hover:border-module-leave-dashboard-accent-hover",
+        featuredShadow: "shadow-module-leave-dashboard-strong/15 hover:shadow-module-leave-dashboard-strong/20",
+        featuredIconHover: "group-hover:bg-dashboard-featured-control-surface group-hover:text-module-leave-badge-foreground",
+        featuredArrowHover: "group-hover:bg-dashboard-featured-control-surface",
+        featuredBadge: "text-module-leave-badge-foreground",
+        featuredDescription: "text-module-leave-dashboard-muted",
+        featuredCorner: "bg-module-leave-dashboard-corner/40",
+        featuredFocus: "focus-visible:ring-module-leave-dashboard-focus",
     },
     stock: {
-        text: "text-orange-700",
+        text: "text-module-stock-badge-foreground",
         featured: true,
-        icon: "text-orange-600",
-        featuredSurface: "bg-orange-600",
-        featuredBorder: "border-orange-500 hover:border-orange-400",
-        featuredShadow: "shadow-orange-900/15 hover:shadow-orange-900/20",
-        featuredIconHover: "group-hover:text-orange-700",
-        featuredArrowHover: "group-hover:bg-orange-50",
-        featuredBadge: "text-orange-700",
-        featuredDescription: "text-orange-50",
-        featuredCorner: "bg-orange-500/40",
-        featuredFocus: "focus-visible:ring-orange-300",
+        icon: "text-module-stock-dashboard-control-foreground",
+        featuredSurface: "bg-module-stock-dashboard-surface",
+        featuredControlSurface: "bg-dashboard-featured-control-surface",
+        featuredBorder: "border-module-stock-dashboard-accent hover:border-module-stock-dashboard-accent-hover",
+        featuredShadow: "shadow-module-stock-dashboard-strong/15 hover:shadow-module-stock-dashboard-strong/20",
+        featuredIconHover: "group-hover:bg-dashboard-featured-control-surface group-hover:text-module-stock-badge-foreground",
+        featuredArrowHover: "group-hover:bg-dashboard-featured-control-surface",
+        featuredBadge: "text-module-stock-badge-foreground",
+        featuredDescription: "text-module-stock-dashboard-muted",
+        featuredCorner: "bg-module-stock-dashboard-corner/40",
+        featuredFocus: "focus-visible:ring-module-stock-dashboard-focus",
     },
     routine: {
-        text: "text-teal-900",
+        text: "text-module-routine-dashboard-strong",
         featured: true,
-        icon: "text-teal-600",
-        featuredSurface: "bg-teal-600",
-        featuredBorder: "border-teal-500 hover:border-teal-400",
-        featuredShadow: "shadow-teal-900/15 hover:shadow-teal-900/20",
-        featuredIconHover: "group-hover:text-teal-700",
-        featuredArrowHover: "group-hover:bg-teal-50",
-        featuredBadge: "text-teal-700",
-        featuredDescription: "text-teal-50",
-        featuredCorner: "bg-cyan-500/40",
-        featuredFocus: "focus-visible:ring-teal-300",
+        icon: "text-module-routine-dashboard-control-foreground",
+        featuredSurface: "bg-module-routine-dashboard-surface",
+        featuredControlSurface: "bg-dashboard-featured-control-surface",
+        featuredBorder: "border-module-routine-dashboard-accent hover:border-module-routine-dashboard-accent-hover",
+        featuredShadow: "shadow-module-routine-dashboard-strong/15 hover:shadow-module-routine-dashboard-strong/20",
+        featuredIconHover: "group-hover:bg-dashboard-featured-control-surface group-hover:text-module-routine-badge-foreground",
+        featuredArrowHover: "group-hover:bg-dashboard-featured-control-surface",
+        featuredBadge: "text-module-routine-badge-foreground",
+        featuredDescription: "text-module-routine-dashboard-muted",
+        featuredCorner: "bg-module-routine-dashboard-corner/40",
+        featuredFocus: "focus-visible:ring-module-routine-dashboard-focus",
     },
     "email-request": {
-        text: "text-blue-950",
+        text: "text-dashboard-menu-email",
     },
     "employee-management": {
-        text: "text-sky-950",
+        text: "text-dashboard-menu-employee",
     },
     "add-employee": {
-        text: "text-pink-950",
+        text: "text-dashboard-menu-add-employee",
     },
     "import-employee": {
-        text: "text-teal-950",
+        text: "text-dashboard-menu-import-employee",
     },
     "audit-logs": {
-        text: "text-amber-950",
+        text: "text-dashboard-menu-audit",
     },
 };
 
@@ -144,7 +148,7 @@ function FeaturedCard({ item, onClick, animationDelay }: FeaturedCardProps) {
 
             <div
                 className={cn(
-                    "relative z-10 flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl border border-content-on-brand/25 bg-content-on-brand/15 text-content-on-brand ring-1 ring-content-on-brand/10 transition-colors duration-200 group-hover:bg-content-on-brand sm:h-20 sm:w-20",
+                    "relative z-10 flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl border border-content-on-brand/25 bg-content-on-brand/15 text-content-on-brand ring-1 ring-content-on-brand/10 transition-colors duration-200 sm:h-20 sm:w-20",
                     config.featuredIconHover,
                 )}
             >
@@ -155,7 +159,8 @@ function FeaturedCard({ item, onClick, animationDelay }: FeaturedCardProps) {
                 <div className="mb-2 flex items-center gap-2">
                     <span
                         className={cn(
-                            "rounded-full border border-content-on-brand/25 bg-content-on-brand px-2.5 py-1 text-xs font-bold leading-5 shadow-sm",
+                            "rounded-full border border-content-on-brand/25 px-2.5 py-1 text-xs font-bold leading-5 shadow-sm",
+                            config.featuredControlSurface,
                             config.featuredBadge,
                         )}
                     >
@@ -178,7 +183,8 @@ function FeaturedCard({ item, onClick, animationDelay }: FeaturedCardProps) {
 
             <div
                 className={cn(
-                    "relative z-10 flex h-12 w-12 shrink-0 items-center justify-center self-end rounded-2xl border border-content-on-brand/25 bg-content-on-brand shadow-sm transition-[background-color,transform] duration-200 group-hover:-translate-y-0.5 group-hover:translate-x-0.5 sm:self-auto",
+                    "relative z-10 flex h-12 w-12 shrink-0 items-center justify-center self-end rounded-2xl border border-content-on-brand/25 shadow-sm transition-[background-color,transform] duration-200 group-hover:-translate-y-0.5 group-hover:translate-x-0.5 sm:self-auto",
+                    config.featuredControlSurface,
                     config.icon,
                     config.featuredArrowHover,
                 )}
@@ -213,7 +219,7 @@ function RegularCard({
             onClick={disabled ? undefined : onClickFn}
             className={cn(
                 "relative flex min-h-[180px] w-full flex-col rounded-2xl bg-surface-raised text-left transition-[background-color,border-color,opacity] duration-200",
-                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300 focus-visible:ring-offset-2",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-dashboard-focus focus-visible:ring-offset-2",
                 disabled
                     ? "cursor-not-allowed border border-border-muted opacity-60"
                     : cn(
@@ -291,11 +297,11 @@ export function DashboardHomeSection() {
         <div className="relative min-h-[calc(100dvh-6rem)] rounded-2xl border border-border-subtle/70 bg-surface-subtle p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:rounded-3xl md:p-8 md:pb-[calc(2rem+env(safe-area-inset-bottom))]">
             <div className="relative z-10 mx-auto max-w-7xl space-y-6">
                 <div>
-                    <div className="relative min-w-0 overflow-hidden rounded-2xl border border-sky-500 bg-sky-600 p-5 text-content-on-brand shadow-lg shadow-sky-900/15 sm:rounded-3xl md:p-8">
+                    <div className="relative min-w-0 overflow-hidden rounded-2xl border border-dashboard-hero-border bg-dashboard-hero-surface p-5 text-content-on-brand shadow-lg shadow-dashboard-hero-shadow/15 sm:rounded-3xl md:p-8">
                         <div className="flex flex-col justify-between gap-6 md:flex-row md:items-center">
                             <div className="relative z-10 min-w-0 max-w-2xl space-y-4">
                                 <div className="flex flex-wrap items-center gap-2">
-                                    <div className="rounded-full border border-content-on-brand/20 bg-content-on-brand px-3 py-1 text-xs font-bold text-sky-700 shadow-sm">
+                                    <div className="rounded-full border border-content-on-brand/20 bg-dashboard-featured-control-surface px-3 py-1 text-xs font-bold text-dashboard-hero-badge-foreground shadow-sm">
                                         NHFapp
                                     </div>
                                 </div>
@@ -307,11 +313,11 @@ export function DashboardHomeSection() {
                                         className="text-3xl font-bold leading-tight text-content-on-brand sm:text-4xl md:text-5xl [overflow-wrap:anywhere]"
                                     >
                                         {greeting},{" "}
-                                        <span className="text-sky-50 [overflow-wrap:anywhere]">
+                                        <span className="text-dashboard-hero-muted [overflow-wrap:anywhere]">
                                             {userName}
                                         </span>
                                     </h1>
-                                    <p className="max-w-[64ch] text-sm font-medium leading-6 text-sky-50/90">
+                                    <p className="max-w-[64ch] text-sm font-medium leading-6 text-dashboard-hero-muted/90">
                                         National Health Foundation 
                                     </p>
                                 </div>
@@ -323,7 +329,7 @@ export function DashboardHomeSection() {
                                     <span className="min-w-0 truncate">{userRole}</span>
                                 </div>
                                 <div className="flex min-w-0 max-w-full items-center gap-2.5 rounded-xl border border-content-on-brand/20 bg-content-on-brand/15 px-3 py-2 text-xs font-bold text-content-on-brand shadow-sm sm:px-4">
-                                    <div className="h-2 w-2 shrink-0 rounded-full bg-sky-100" />
+                                    <div className="h-2 w-2 shrink-0 rounded-full bg-dashboard-hero-dot" />
                                     <span className="min-w-0 truncate">{userDepartment}</span>
                                 </div>
                             </div>
@@ -341,7 +347,7 @@ export function DashboardHomeSection() {
                     {featuredItems.length > 0 && (
                         <div className="mb-10">
                             <h2 className="mb-6 flex items-center gap-2 px-2 text-xl font-bold leading-7 text-content-strong">
-                                <span className="inline-block h-6 w-1.5 rounded-full bg-orange-500" />
+                                <span className="inline-block h-6 w-1.5 rounded-full bg-module-stock-dashboard-accent" />
                                 Recommended
                             </h2>
                             <div className="grid grid-cols-1 gap-4 md:gap-6 lg:grid-cols-2">
@@ -360,7 +366,7 @@ export function DashboardHomeSection() {
                     {regularItems.length > 0 && (
                         <div>
                             <h2 className="mb-6 flex items-center gap-2 px-2 text-lg font-bold leading-7 text-content-strong">
-                                <span className="inline-block h-6 w-1.5 rounded-full bg-sky-500" />
+                                <span className="inline-block h-6 w-1.5 rounded-full bg-dashboard-hero-border" />
                                 บริการอื่นๆ
                             </h2>
                             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 md:gap-6 xl:grid-cols-4">

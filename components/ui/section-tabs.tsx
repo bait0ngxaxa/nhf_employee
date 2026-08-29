@@ -17,7 +17,7 @@ interface SectionTabsProps {
     value: string;
     onValueChange: (value: string) => void;
     tabs: SectionTabItem[];
-    /** CSS color for the active tab background (any valid CSS value, e.g. "#ea580c") */
+    /** Semantic CSS token for the active tab background. */
     activeColor?: string;
     /** Optional class override for the tab rail surface and border. */
     listClassName?: string;

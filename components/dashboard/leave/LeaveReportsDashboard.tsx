@@ -148,7 +148,7 @@ export function LeaveReportsDashboard() {
                 exportLabel="ดาวน์โหลด Excel"
                 badge={
                     <div className="space-y-3">
-                        <div className="inline-flex rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-medium text-sky-800">
+                        <div className="inline-flex rounded-full border border-brand-border bg-brand-surface px-3 py-1 text-xs font-medium text-brand-strong">
                             {getScopeLabel(scope)}
                         </div>
                         <div className="space-y-1.5">

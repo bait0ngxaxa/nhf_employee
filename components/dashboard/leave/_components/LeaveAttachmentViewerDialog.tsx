@@ -310,9 +310,9 @@ export function LeaveAttachmentViewerDialog({
                                             key={attachment.id}
                                             type="button"
                                             className={cn(
-                                                "relative h-16 w-16 shrink-0 overflow-hidden rounded-lg border-2 bg-surface-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 focus-visible:ring-offset-2",
+                                                "relative h-16 w-16 shrink-0 overflow-hidden rounded-lg border-2 bg-surface-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-module-leave-solid focus-visible:ring-offset-2",
                                                 index === safeActiveIndex
-                                                    ? "border-indigo-600"
+                                                    ? "border-module-leave-badge-border"
                                                     : "border-transparent hover:border-border-contrast",
                                             )}
                                             aria-label={`ดูไฟล์แนบรูปที่ ${index + 1}`}

@@ -119,7 +119,7 @@ export function SignupForm({
         <div className={cn("flex flex-col gap-6", className)} {...props}>
             <Card className="rounded-2xl border-border-neutral-default/70 bg-surface-raised/90 shadow-sm">
                 <CardHeader className="text-center pb-2">
-                    <CardTitle className="text-2xl font-bold text-blue-700">
+                    <CardTitle className="text-2xl font-bold text-brand-foreground">
                         สร้างบัญชีใหม่
                     </CardTitle>
                     <CardDescription className="text-content-neutral-secondary">
@@ -131,7 +131,7 @@ export function SignupForm({
                         <div className="flex flex-col gap-6">
                             {error && (
                                 <div
-                                    className="rounded-md bg-red-50 p-3 text-sm font-medium text-red-700"
+                                    className="rounded-md bg-status-danger-surface p-3 text-sm font-medium text-status-danger-foreground"
                                     role="alert"
                                     aria-live="polite"
                                 >
@@ -161,7 +161,7 @@ export function SignupForm({
                                     }
                                     required
                                     aria-invalid={error ? true : undefined}
-                                    className="rounded-xl border-border-neutral-default bg-surface-raised/70 focus:border-blue-500 focus:ring-blue-500/20"
+                                    className="rounded-xl border-border-neutral-default bg-surface-raised/70 focus:border-brand-border focus:ring-brand-solid/20"
                                 />
                             </div>
 
@@ -186,7 +186,7 @@ export function SignupForm({
                                     }
                                     required
                                     aria-invalid={error ? true : undefined}
-                                    className="rounded-xl border-border-neutral-default bg-surface-raised/70 focus:border-blue-500 focus:ring-blue-500/20"
+                                    className="rounded-xl border-border-neutral-default bg-surface-raised/70 focus:border-brand-border focus:ring-brand-solid/20"
                                 />
                             </div>
 
@@ -211,7 +211,7 @@ export function SignupForm({
                                     }
                                     required
                                     aria-invalid={error ? true : undefined}
-                                    className="rounded-xl border-border-neutral-default bg-surface-raised/70 focus:border-blue-500 focus:ring-blue-500/20"
+                                    className="rounded-xl border-border-neutral-default bg-surface-raised/70 focus:border-brand-border focus:ring-brand-solid/20"
                                 />
                             </div>
 
@@ -235,7 +235,7 @@ export function SignupForm({
                             มีบัญชีอยู่แล้ว?{" "}
                             <Link
                                 href={APP_ROUTES.login}
-                                className="text-blue-600 hover:text-blue-700 font-medium"
+                                className="text-brand-foreground hover:text-brand-foreground font-medium"
                             >
                                 เข้าสู่ระบบ
                             </Link>

@@ -54,7 +54,7 @@ export function AuthStatus() {
             <Link href={APP_ROUTES.signup}>
                 <Button
                     variant="outline"
-                    className="hidden border-blue-200 text-blue-700 hover:bg-blue-50 hover:text-blue-800 sm:inline-flex"
+                    className="hidden border-brand-border text-brand-foreground hover:bg-brand-surface hover:text-brand-strong sm:inline-flex"
                 >
                     <User className="h-4 w-4" />
                     <span>ลงทะเบียน</span>

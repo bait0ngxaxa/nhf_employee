@@ -120,7 +120,7 @@ function LeaveExceptionNotice({ model }: { model: LeaveRequestFormModel }) {
     }
 
     return (
-        <Alert className="border-amber-200 bg-amber-50 text-amber-950 [&>svg]:text-amber-700">
+        <Alert className="border-status-warning-border bg-status-warning-surface text-status-warning-strong [&>svg]:text-status-warning-foreground">
             <AlertCircle className="size-4" />
             <AlertTitle>รายการนี้ต้องระบุเหตุผลเพิ่มเติม</AlertTitle>
             <AlertDescription className="flex flex-col gap-1 leading-6">

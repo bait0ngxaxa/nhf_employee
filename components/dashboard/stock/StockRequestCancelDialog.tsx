@@ -47,8 +47,8 @@ export function StockRequestCancelDialog({
             }}
         >
             <DialogContent className="overflow-hidden p-0 sm:max-w-[420px]">
-                <div className="border-b border-rose-100 bg-rose-50/50 px-5 py-4 sm:px-6">
-                    <DialogTitle className="text-lg font-semibold text-rose-800">
+                <div className="border-b border-status-danger-border bg-status-danger-surface/50 px-5 py-4 sm:px-6">
+                    <DialogTitle className="text-lg font-semibold text-status-danger-strong">
                         ยืนยันการยกเลิกคำขอ #{request.id}
                     </DialogTitle>
                 </div>
@@ -70,7 +70,7 @@ export function StockRequestCancelDialog({
                             value={reason}
                             onChange={(event) => setReason(event.target.value)}
                             placeholder="ระบุเหตุผลเพิ่มเติมเพื่อให้เจ้าหน้าที่ทราบ"
-                            className="h-11 focus-visible:ring-rose-500"
+                            className="h-11 focus-visible:ring-status-danger-solid"
                         />
                     </div>
                     <div className="flex flex-col-reverse gap-2 pt-3 sm:flex-row sm:justify-end">
@@ -86,7 +86,7 @@ export function StockRequestCancelDialog({
                             variant="destructive"
                             disabled={loading}
                             onClick={() => void onConfirm(request.id, reason.trim())}
-                            className="h-11 bg-rose-600 px-7 font-bold text-content-on-brand shadow-sm transition-colors hover:bg-rose-700"
+                            className="h-11 bg-status-danger-solid px-7 font-bold text-content-on-brand shadow-sm transition-colors hover:bg-status-danger-solid-hover"
                         >
                             {loading ? (
                                 <>

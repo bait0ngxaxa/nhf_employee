@@ -65,7 +65,7 @@ function CancellationPendingItem({
     const canConfirm = isBeforeLeaveStart(leave.startDate);
 
     return (
-        <Card className="border-amber-200 bg-amber-50 p-5 shadow-sm">
+        <Card className="border-status-warning-border bg-status-warning-surface p-5 shadow-sm">
             <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                 <div className="min-w-0">
                     <p className="break-words text-base/6 font-semibold text-content-heading">
@@ -74,18 +74,18 @@ function CancellationPendingItem({
                             ขอยกเลิกวันลาที่อนุมัติแล้ว
                         </span>
                     </p>
-                    <div className="mt-3 grid gap-3 border-t border-amber-200 pt-3 sm:grid-cols-2">
+                    <div className="mt-3 grid gap-3 border-t border-status-warning-border pt-3 sm:grid-cols-2">
                         <div className="min-w-0 space-y-1">
-                            <p className="text-xs/5 font-semibold text-amber-800">วันที่ลา</p>
+                            <p className="text-xs/5 font-semibold text-status-warning-strong">วันที่ลา</p>
                             <p className="break-words text-sm/6 font-medium text-content-secondary">
                                 {formatLeaveDateRange(leave.startDate, leave.endDate)}
                             </p>
-                            <p className="text-xs/5 font-medium text-amber-800">
+                            <p className="text-xs/5 font-medium text-status-warning-strong">
                                 ({leave.durationDays} วัน)
                             </p>
                         </div>
                         <div className="min-w-0 space-y-1">
-                            <p className="text-xs/5 font-semibold text-amber-800">
+                            <p className="text-xs/5 font-semibold text-status-warning-strong">
                                 ส่งคำขอยกเลิกเมื่อ
                             </p>
                             <p className="break-words text-sm/6 font-medium text-content-secondary">
@@ -96,12 +96,12 @@ function CancellationPendingItem({
                         </div>
                     </div>
                     {leave.cancellationReason ? (
-                        <p className="mt-2 max-w-[75ch] break-words rounded-md border border-amber-200 bg-surface-raised p-2 text-sm/6 text-amber-900">
+                        <p className="mt-2 max-w-[75ch] break-words rounded-md border border-status-warning-border bg-surface-raised p-2 text-sm/6 text-status-warning-strong">
                             เหตุผล: {leave.cancellationReason}
                         </p>
                     ) : null}
                     {!canConfirm ? (
-                        <p className="mt-2 text-sm/6 font-medium text-amber-900">
+                        <p className="mt-2 text-sm/6 font-medium text-status-warning-strong">
                             วันลาเริ่มแล้ว ไม่สามารถยืนยันการยกเลิกและคืนโควต้าได้
                         </p>
                     ) : null}

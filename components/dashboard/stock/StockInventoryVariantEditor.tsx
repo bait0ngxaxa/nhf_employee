@@ -95,7 +95,7 @@ export function StockInventoryVariantEditor(
                             <Button
                                 type="button"
                                 onClick={props.onAddVariant}
-                                className="bg-blue-600 text-content-on-brand hover:bg-blue-700"
+                                className="bg-brand-solid text-content-on-brand hover:bg-brand-solid-hover"
                             >
                                 <Plus className="mr-1 h-4 w-4" />
                                 {STOCK_ADMIN_TEXT.addVariant}
@@ -137,7 +137,7 @@ function VariantCard(props: {
                     variant="ghost"
                     size="sm"
                     onClick={props.onRemove}
-                    className="text-rose-600 hover:bg-rose-50 hover:text-rose-700"
+                    className="text-status-danger-foreground hover:bg-status-danger-surface hover:text-status-danger-foreground"
                 >
                     <Trash2 className="mr-1 h-4 w-4" aria-hidden="true" />
                     {STOCK_ADMIN_TEXT.remove}
@@ -163,7 +163,7 @@ function VariantCard(props: {
                                     sku: event.target.value,
                                 })
                             }
-                            className="h-11 focus-visible:ring-blue-500"
+                            className="h-11 focus-visible:ring-brand-solid"
                         />
                     </FieldShell>
                 )}
@@ -189,7 +189,7 @@ function VariantCard(props: {
                                 unit: event.target.value,
                             })
                         }
-                        className="h-11 focus-visible:ring-blue-500"
+                        className="h-11 focus-visible:ring-brand-solid"
                     />
                 </FieldShell>
                 <FieldShell label={STOCK_ADMIN_TEXT.initialQuantity}>
@@ -203,7 +203,7 @@ function VariantCard(props: {
                                 quantity: event.target.value,
                             })
                         }
-                        className="h-11 focus-visible:ring-blue-500"
+                        className="h-11 focus-visible:ring-brand-solid"
                     />
                 </FieldShell>
                 <FieldShell label={STOCK_ADMIN_TEXT.minStock}>
@@ -217,7 +217,7 @@ function VariantCard(props: {
                                 minStock: event.target.value,
                             })
                         }
-                        className="h-11 focus-visible:ring-blue-500"
+                        className="h-11 focus-visible:ring-brand-solid"
                     />
                 </FieldShell>
             </div>
@@ -275,7 +275,7 @@ function AttributeEditor(props: {
                                     event.target.value,
                                 )
                             }
-                            className="h-11 focus-visible:ring-blue-500"
+                            className="h-11 focus-visible:ring-brand-solid"
                         />
                         <Input
                             value={attribute.value}
@@ -289,7 +289,7 @@ function AttributeEditor(props: {
                                     event.target.value,
                                 )
                             }
-                            className="h-11 focus-visible:ring-blue-500"
+                            className="h-11 focus-visible:ring-brand-solid"
                         />
                         <Button
                             type="button"
@@ -299,7 +299,7 @@ function AttributeEditor(props: {
                                 props.onRemoveAttribute(attributeIndex)
                             }
                             disabled={props.variant.attributes.length === 1}
-                            className="h-11 w-full text-rose-600 hover:bg-rose-50 hover:text-rose-700 sm:w-11"
+                            className="h-11 w-full text-status-danger-foreground hover:bg-status-danger-surface hover:text-status-danger-foreground sm:w-11"
                             aria-label={`ลบคุณสมบัติที่ ${attributeIndex + 1}`}
                         >
                             <Trash2 className="h-4 w-4" aria-hidden="true" />

@@ -47,7 +47,7 @@ export function StockBrowseFilters({
                         placeholder="ค้นหาวัสดุ…"
                         value={searchQuery}
                         onChange={(event) => onSearchChange(event.target.value)}
-                        className="h-12 rounded-2xl border-border-subtle bg-surface-raised pl-11 pr-11 text-content-primary placeholder:text-content-muted focus-visible:border-blue-300 focus-visible:ring-blue-200"
+                        className="h-12 rounded-2xl border-border-subtle bg-surface-raised pl-11 pr-11 text-content-primary placeholder:text-content-muted focus-visible:border-brand-border focus-visible:ring-brand-solid"
                     />
                     {searchQuery.trim().length > 0 && (
                         <Button
@@ -74,7 +74,7 @@ export function StockBrowseFilters({
                         }
                     >
                         <SelectTrigger
-                            className="h-12 rounded-2xl border-border-subtle bg-surface-raised text-content-primary focus:ring-blue-200"
+                            className="h-12 rounded-2xl border-border-subtle bg-surface-raised text-content-primary focus:ring-brand-solid"
                             aria-label="กรองหมวดหมู่วัสดุ"
                         >
                             <SelectValue placeholder="เลือกหมวดหมู่" />

@@ -40,7 +40,7 @@ function FormField({
         <div className="grid min-w-0 gap-3">
             <Label
                 htmlFor={id}
-                className={error ? "text-red-700 [overflow-wrap:anywhere]" : "[overflow-wrap:anywhere]"}
+                className={error ? "text-status-danger-foreground [overflow-wrap:anywhere]" : "[overflow-wrap:anywhere]"}
             >
                 {label}
             </Label>
@@ -57,12 +57,12 @@ function FormField({
                 onChange={(e) => onChange(e.target.value)}
                 className={
                     error
-                        ? "border-red-500 focus-visible:ring-red-500"
+                        ? "border-status-danger-border focus-visible:ring-status-danger-solid"
                         : ""
                 }
             />
             {error && (
-                <p id={errorId} className="text-xs leading-5 text-red-700 [overflow-wrap:anywhere]">
+                <p id={errorId} className="text-xs leading-5 text-status-danger-foreground [overflow-wrap:anywhere]">
                     {error}
                 </p>
             )}
@@ -170,7 +170,7 @@ export function EmployeeFormFields({
             <div className="grid min-w-0 gap-3">
                 <Label
                     htmlFor="departmentId"
-                    className={fieldErrors.departmentId ? "text-red-700" : ""}
+                    className={fieldErrors.departmentId ? "text-status-danger-foreground" : ""}
                 >
                     แผนก
                 </Label>
@@ -190,7 +190,7 @@ export function EmployeeFormFields({
                         }
                         className={
                             fieldErrors.departmentId
-                                ? "border-red-500 focus:ring-red-500"
+                                ? "border-status-danger-border focus:ring-status-danger-solid"
                                 : ""
                         }
                     >
@@ -217,7 +217,7 @@ export function EmployeeFormFields({
                 {fieldErrors.departmentId && (
                     <p
                         id="departmentId-error"
-                        className="text-xs leading-5 text-red-700 [overflow-wrap:anywhere]"
+                        className="text-xs leading-5 text-status-danger-foreground [overflow-wrap:anywhere]"
                     >
                         {fieldErrors.departmentId}
                     </p>

@@ -32,11 +32,11 @@ export function ApproverManagement() {
 
     if (model.fetchError) {
         return (
-            <Card className="border-rose-200 bg-rose-50 p-8 text-center shadow-none">
-                <p className="text-sm font-medium text-rose-800">
+            <Card className="border-status-danger-border bg-status-danger-surface p-8 text-center shadow-none">
+                <p className="text-sm font-medium text-status-danger-strong">
                     ไม่สามารถโหลดข้อมูลผู้อนุมัติได้
                 </p>
-                <p className="mt-1 text-sm text-rose-700">
+                <p className="mt-1 text-sm text-status-danger-foreground">
                     กรุณาลองรีเฟรชหน้าอีกครั้ง หากยังพบปัญหาให้ติดต่อผู้ดูแลระบบ
                 </p>
             </Card>
@@ -81,8 +81,8 @@ export function ApproverManagement() {
                             role="status"
                             className={`px-4 py-2 rounded-lg text-sm mt-2 border ${
                                 model.saveMsg.type === "ok"
-                                    ? "bg-emerald-50 border-emerald-200 text-emerald-700"
-                                    : "bg-red-50 border-red-200 text-red-700"
+                                    ? "bg-status-success-surface border-status-success-border text-status-success-foreground"
+                                    : "bg-status-danger-surface border-status-danger-border text-status-danger-foreground"
                             }`}
                         >
                             {model.saveMsg.text}
@@ -127,10 +127,10 @@ export function ApproverManagement() {
                 <div className="fixed bottom-4 left-1/2 z-50 w-[calc(100vw-1.5rem)] max-w-3xl -translate-x-1/2">
                     <div
                         role="status"
-                        className="flex items-center justify-between gap-3 rounded-lg border border-indigo-200 bg-surface-raised px-4 py-3 shadow-md"
+                        className="flex items-center justify-between gap-3 rounded-lg border border-module-leave-badge-border bg-surface-raised px-4 py-3 shadow-md"
                     >
                         <div className="min-w-0">
-                            <p className="text-sm font-semibold text-indigo-700">
+                            <p className="text-sm font-semibold text-module-leave-badge-foreground">
                                 มีรายการที่ยังไม่บันทึก {model.assignments.size} รายการ
                             </p>
                             <p className="text-xs text-content-secondary">

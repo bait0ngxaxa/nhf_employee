@@ -23,16 +23,16 @@ describe("NotificationIcon", () => {
         );
 
         expect(screen.getByTestId("pending").querySelector("svg")).toHaveClass(
-            "text-sky-500",
+            "text-brand-foreground",
         );
         expect(screen.getByTestId("success").querySelector("svg")).toHaveClass(
-            "text-emerald-500",
+            "text-status-success-foreground",
         );
         expect(screen.getByTestId("cancelled").querySelector("svg")).toHaveClass(
-            "text-rose-500",
+            "text-status-danger-foreground",
         );
         expect(screen.getByTestId("contract-expiry").querySelector("svg")).toHaveClass(
-            "text-orange-600",
+            "text-status-warning-foreground",
         );
     });
 });

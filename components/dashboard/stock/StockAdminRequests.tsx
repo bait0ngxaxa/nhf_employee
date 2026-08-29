@@ -97,7 +97,7 @@ export function StockAdminRequests() {
                             value={requestSearchQuery}
                             onChange={(event) => setRequestSearchQuery(event.target.value)}
                             placeholder="ค้นหาเลขที่คำขอ รหัสโครงการ ชื่อ อีเมล หรือรายการ"
-                            className="h-12 rounded-2xl border-border-subtle bg-surface-raised pl-11 pr-11 text-content-primary placeholder:text-content-muted focus-visible:border-blue-300 focus-visible:ring-blue-200"
+                            className="h-12 rounded-2xl border-border-subtle bg-surface-raised pl-11 pr-11 text-content-primary placeholder:text-content-muted focus-visible:border-brand-border focus-visible:ring-brand-solid"
                         />
                         {requestSearchQuery.trim().length > 0 && (
                             <Button
@@ -124,7 +124,7 @@ export function StockAdminRequests() {
                             }
                         >
                             <SelectTrigger
-                                className="h-12 rounded-2xl border-border-subtle bg-surface-raised text-content-primary focus:ring-blue-200"
+                                className="h-12 rounded-2xl border-border-subtle bg-surface-raised text-content-primary focus:ring-brand-solid"
                                 aria-label="กรองสถานะคำขอเบิกวัสดุ"
                             >
                                 <SelectValue placeholder="กรองสถานะ" />
@@ -162,7 +162,7 @@ export function StockAdminRequests() {
                                 <>
                                     <Button
                                         size="sm"
-                                        className="h-11 bg-emerald-600 text-content-on-brand shadow-sm transition-colors hover:bg-emerald-700"
+                                        className="h-11 bg-status-success-solid text-content-on-brand shadow-sm transition-colors hover:bg-status-success-solid-hover"
                                         disabled={processingRequestId === req.id}
                                         onClick={() => void handleIssue(req.id)}
                                     >
@@ -172,7 +172,7 @@ export function StockAdminRequests() {
                                     <Button
                                         size="sm"
                                         variant="outline"
-                                        className="h-11 border-rose-200 text-rose-600 transition-colors hover:border-rose-300 hover:bg-rose-50 hover:text-rose-700"
+                                        className="h-11 border-status-danger-border text-status-danger-foreground transition-colors hover:border-status-danger-border hover:bg-status-danger-surface hover:text-status-danger-foreground"
                                         disabled={processingRequestId === req.id}
                                         onClick={() => setCancelTarget(req)}
                                     >
@@ -215,7 +215,7 @@ export function StockAdminRequests() {
                                     return (
                                         <TableRow
                                             key={req.id}
-                                            className="border-b border-border-subtle transition-colors hover:bg-blue-50/60"
+                                            className="border-b border-border-subtle transition-colors hover:bg-brand-surface/60"
                                         >
                                             <TableCell className="border-r border-border-subtle py-4 font-medium text-content-strong">
                                                 #{req.id}
@@ -261,7 +261,7 @@ export function StockAdminRequests() {
                                                     <div className="flex justify-end gap-2">
                                                         <Button
                                                             size="sm"
-                                                            className="bg-emerald-600 text-content-on-brand shadow-sm transition-colors hover:bg-emerald-700"
+                                                            className="bg-status-success-solid text-content-on-brand shadow-sm transition-colors hover:bg-status-success-solid-hover"
                                                             disabled={processingRequestId === req.id}
                                                             onClick={() => void handleIssue(req.id)}
                                                         >
@@ -271,7 +271,7 @@ export function StockAdminRequests() {
                                                         <Button
                                                             size="sm"
                                                             variant="outline"
-                                                            className="border-rose-200 text-rose-600 transition-colors hover:border-rose-300 hover:bg-rose-50 hover:text-rose-700"
+                                                            className="border-status-danger-border text-status-danger-foreground transition-colors hover:border-status-danger-border hover:bg-status-danger-surface hover:text-status-danger-foreground"
                                                             disabled={processingRequestId === req.id}
                                                             onClick={() => setCancelTarget(req)}
                                                         >
@@ -342,8 +342,8 @@ function CancelDialog({
             }}
         >
             <DialogContent className="overflow-hidden p-0 sm:max-w-[400px]">
-                <div className="border-b border-rose-100 bg-rose-50/50 px-5 py-4 sm:px-6">
-                    <DialogTitle className="text-lg font-semibold text-rose-800">
+                <div className="border-b border-status-danger-border bg-status-danger-surface/50 px-5 py-4 sm:px-6">
+                    <DialogTitle className="text-lg font-semibold text-status-danger-strong">
                         ยกเลิกคำขอ #{request.id}
                     </DialogTitle>
                 </div>
@@ -362,7 +362,7 @@ function CancelDialog({
                             value={reason}
                             onChange={(e) => setReason(e.target.value)}
                             placeholder="ระบุเหตุผลที่ยกเลิกเพื่อแจ้งผู้เบิก"
-                            className="h-11 focus-visible:ring-rose-500"
+                            className="h-11 focus-visible:ring-status-danger-solid"
                         />
                     </div>
                     <div className="flex flex-col-reverse gap-2 pt-3 sm:flex-row sm:justify-end">
@@ -378,7 +378,7 @@ function CancelDialog({
                             variant="destructive"
                             disabled={loading}
                             onClick={() => onCancel(request.id, reason.trim())}
-                            className="h-11 bg-rose-600 px-7 font-bold text-content-on-brand shadow-sm transition-colors hover:bg-rose-700"
+                            className="h-11 bg-status-danger-solid px-7 font-bold text-content-on-brand shadow-sm transition-colors hover:bg-status-danger-solid-hover"
                         >
                             {loading ? (
                                 <>

@@ -96,7 +96,7 @@ export function ApprovalHistoryList({ history }: ApprovalHistoryListProps) {
                         </div>
 
                         {leave.status === "NOT_TAKEN" && leave.notTakenReason ? (
-                            <p className="break-words rounded-md border border-cyan-200 bg-cyan-50 p-2 text-sm leading-6 text-cyan-900">
+                            <p className="break-words rounded-md border border-brand-border bg-brand-surface p-2 text-sm leading-6 text-brand-strong">
                                 ไม่ได้ใช้วันลา: {leave.notTakenReason}
                             </p>
                         ) : null}
