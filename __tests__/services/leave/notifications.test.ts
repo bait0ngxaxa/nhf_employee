@@ -214,4 +214,23 @@ describe("leave notification delivery", () => {
             }),
         });
     });
+
+    it("does not label an assigned admin decision as a recovery override", async () => {
+        await sendLeaveNotTakenConfirmedNotifications({
+            ...buildNotTakenDecisionPayload(),
+            recoveryOverride: false,
+        });
+
+        expect(prismaMock.notification.create).toHaveBeenCalledWith({
+            data: expect.objectContaining({
+                type: "LEAVE_NOT_TAKEN_CONFIRMED",
+                message: expect.stringContaining("Admin User ยืนยันไม่ได้ใช้วันลา"),
+            }),
+        });
+        expect(prismaMock.notification.create).not.toHaveBeenCalledWith({
+            data: expect.objectContaining({
+                message: expect.stringContaining("ผู้ดูแลระบบ Admin User"),
+            }),
+        });
+    });
 });

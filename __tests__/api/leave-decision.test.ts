@@ -181,6 +181,162 @@ describe("POST /api/leave/decision", () => {
         expect(prisma.auditLog.create).not.toHaveBeenCalled();
     });
 
+    it("allows an admin who is the assigned approver to make a normal decision", async () => {
+        vi.mocked(requireApiSession).mockResolvedValue({
+            ok: true,
+            session: {
+                user: {
+                    id: "20",
+                    email: "admin-manager@example.com",
+                    name: "Admin Manager",
+                    role: "ADMIN",
+                },
+            },
+            user: {
+                id: 20,
+                email: "admin-manager@example.com",
+                name: "Admin Manager",
+                role: "ADMIN",
+            },
+        });
+        vi.mocked(prisma.leaveRequest.findUnique).mockResolvedValue({
+            id: "leave-admin-assigned",
+            employeeId: 10,
+            leaveType: "SICK",
+            startDate: new Date("2031-05-05T00:00:00.000Z"),
+            endDate: new Date("2031-05-05T00:00:00.000Z"),
+            period: "FULL_DAY",
+            durationHalfDays: 2,
+            reason: "พักรักษาตัว",
+            emergencyReason: null,
+            specialReason: null,
+            overQuotaHalfDays: 0,
+            status: "PENDING",
+            approverId: 20,
+            exceptionApproverId: null,
+            exceptionApproverAssignedAt: null,
+            employee: {
+                id: 10,
+                firstName: "Employee",
+                lastName: "User",
+                email: "employee@example.com",
+                user: { id: 10 },
+            },
+            approver: {
+                id: 20,
+                firstName: "Admin",
+                lastName: "Manager",
+                email: "admin-manager@example.com",
+            },
+            exceptionApprover: null,
+        } as never);
+        vi.mocked(prisma.leaveRequest.updateMany).mockResolvedValue({ count: 1 });
+        vi.mocked(prisma.leaveRequest.findUniqueOrThrow).mockResolvedValue({
+            id: "leave-admin-assigned",
+            durationHalfDays: 2,
+            overQuotaHalfDays: 0,
+            status: "REJECTED",
+        } as never);
+
+        const response = await POST(new NextRequest("http://localhost/api/leave/decision", {
+            method: "POST",
+            body: JSON.stringify({
+                leaveId: "leave-admin-assigned",
+                action: "REJECT",
+                reason: "เอกสารไม่ครบ",
+            }),
+        }));
+
+        expect(response.status).toBe(200);
+        expect(prisma.leaveRequest.updateMany).toHaveBeenCalledWith({
+            where: {
+                id: "leave-admin-assigned",
+                status: "PENDING",
+                employeeId: { not: 20 },
+                OR: [
+                    { exceptionApproverId: 20 },
+                    { exceptionApproverId: null, approverId: 20 },
+                ],
+            },
+            data: expect.objectContaining({ status: "REJECTED" }),
+        });
+        const auditDetails = JSON.parse(
+            String(vi.mocked(prisma.auditLog.create).mock.calls[0]?.[0].data.details),
+        ) as Record<string, unknown>;
+        expect(auditDetails.metadata).not.toHaveProperty("adminOverride");
+    });
+
+    it("does not let an unassigned admin approve another approver's pending request", async () => {
+        vi.mocked(requireApiSession).mockResolvedValue({
+            ok: true,
+            session: {
+                user: {
+                    id: "20",
+                    email: "admin@example.com",
+                    name: "Admin",
+                    role: "ADMIN",
+                },
+            },
+            user: {
+                id: 20,
+                email: "admin@example.com",
+                name: "Admin",
+                role: "ADMIN",
+            },
+        });
+        vi.mocked(prisma.leaveRequest.findUnique).mockResolvedValue({
+            id: "leave-admin-unassigned",
+            employeeId: 10,
+            leaveType: "SICK",
+            startDate: new Date("2031-05-05T00:00:00.000Z"),
+            endDate: new Date("2031-05-05T00:00:00.000Z"),
+            period: "FULL_DAY",
+            durationHalfDays: 2,
+            reason: "พักรักษาตัว",
+            emergencyReason: null,
+            specialReason: null,
+            overQuotaHalfDays: 0,
+            status: "PENDING",
+            approverId: 30,
+            exceptionApproverId: null,
+            exceptionApproverAssignedAt: null,
+            employee: {
+                id: 10,
+                firstName: "Employee",
+                lastName: "User",
+                email: "employee@example.com",
+                user: { id: 10 },
+            },
+            approver: {
+                id: 30,
+                firstName: "Assigned",
+                lastName: "Manager",
+                email: "assigned-manager@example.com",
+                status: "ACTIVE",
+                deletedAt: null,
+                user: {
+                    id: 30,
+                    email: "assigned-manager@example.com",
+                    isActive: true,
+                    deletedAt: null,
+                },
+            },
+            exceptionApprover: null,
+        } as never);
+
+        const response = await POST(new NextRequest("http://localhost/api/leave/decision", {
+            method: "POST",
+            body: JSON.stringify({
+                leaveId: "leave-admin-unassigned",
+                action: "APPROVE",
+            }),
+        }));
+
+        expect(response.status).toBe(403);
+        expect(prisma.leaveRequest.updateMany).not.toHaveBeenCalled();
+        expect(prisma.notificationOutbox.create).not.toHaveBeenCalled();
+    });
+
     it("returns 403 instead of disclosing a processed request to a non-approver", async () => {
         vi.mocked(prisma.leaveRequest.findUnique).mockResolvedValue({
             id: "leave-processed-other-approver",
@@ -317,7 +473,15 @@ describe("POST /api/leave/decision", () => {
             data: { usedHalfDays: { increment: 2 } },
         });
         expect(prisma.leaveRequest.updateMany).toHaveBeenCalledWith({
-            where: { id: "leave-1", status: "PENDING", approverId: 20 },
+            where: {
+                id: "leave-1",
+                status: "PENDING",
+                employeeId: { not: 20 },
+                OR: [
+                    { exceptionApproverId: 20 },
+                    { exceptionApproverId: null, approverId: 20 },
+                ],
+            },
             data: expect.objectContaining({
                 status: "APPROVED",
             }),

@@ -1,11 +1,8 @@
 "use client";
 
-import { useState, type ReactElement } from "react";
+import type { ReactElement } from "react";
 
-import { Pagination } from "@/components/Pagination";
-import { cn } from "@/lib/ui/utils";
 import { useManagerApprovalModel } from "@/hooks/leave/useManagerApprovalModel";
-import type { LeaveApprovalPaginationMetadata } from "@/hooks/useLeaveApprovals";
 import { PendingApprovalList } from "./_components/PendingApprovalList";
 import { ApprovalHistoryList } from "./_components/ApprovalHistoryList";
 import { RejectLeaveDialog } from "./_components/RejectLeaveDialog";
@@ -13,111 +10,50 @@ import { ApprovalConfirmDialog } from "./_components/ApprovalConfirmDialog";
 import { NotTakenPendingList } from "./_components/NotTakenPendingList";
 import { CancellationPendingList } from "./_components/CancellationPendingList";
 import {
-    AdminRecoveryReasonDialog,
-    type AdminRecoveryDecision,
-} from "./_components/AdminRecoveryReasonDialog";
+    ApprovalPagination,
+    ApprovalSectionHeader,
+} from "./_components/ApprovalDashboardPrimitives";
 import { ManagerApprovalDashboardSkeleton } from "./LeaveSkeletons";
 
-export function ManagerApprovalDashboard({ isAdmin = false }: { isAdmin?: boolean }): ReactElement {
+export function ManagerApprovalDashboard(): ReactElement {
     const model = useManagerApprovalModel();
-    const [recoveryAction, setRecoveryAction] = useState<{
-        decision: AdminRecoveryDecision;
-        leaveId: string;
-    } | null>(null);
-    const [recoveryReason, setRecoveryReason] = useState("");
-
-    const openRecoveryDialog = (
-        decision: AdminRecoveryDecision,
-        leaveId: string,
-    ): Promise<boolean> => {
-        setRecoveryAction({ decision, leaveId });
-        setRecoveryReason("");
-        return Promise.resolve(true);
-    };
-
-    const closeRecoveryDialog = (): void => {
-        if (model.isProcessing) return;
-        setRecoveryAction(null);
-        setRecoveryReason("");
-    };
-
-    const submitRecoveryDecision = async (): Promise<void> => {
-        if (!recoveryAction || !recoveryReason.trim()) return;
-
-        const { decision, leaveId } = recoveryAction;
-        const succeeded = decision === "NOT_TAKEN"
-            ? await model.confirmNotTaken(leaveId, recoveryReason)
-            : decision === "CONFIRM_CANCELLATION"
-                ? await model.confirmCancellation(leaveId, recoveryReason)
-                : await model.rejectCancellation(leaveId, recoveryReason);
-        if (succeeded) {
-            closeRecoveryDialog();
-        }
-    };
-
-    const onNotTakenConfirm = (leaveId: string): Promise<boolean> =>
-        isAdmin
-            ? openRecoveryDialog("NOT_TAKEN", leaveId)
-            : model.confirmNotTaken(leaveId);
-    const onCancellationConfirm = (leaveId: string): Promise<boolean> =>
-        isAdmin
-            ? openRecoveryDialog("CONFIRM_CANCELLATION", leaveId)
-            : model.confirmCancellation(leaveId);
-    const onCancellationReject = (leaveId: string): Promise<boolean> =>
-        isAdmin
-            ? openRecoveryDialog("REJECT_CANCELLATION", leaveId)
-            : model.rejectCancellation(leaveId);
 
     if (model.isLoading) {
-        return <ManagerApprovalDashboardSkeleton isAdmin={isAdmin} />;
+        return <ManagerApprovalDashboardSkeleton />;
     }
 
     return (
         <div className="space-y-6">
-            {!isAdmin ? (
-                <>
-                    <ApprovalSectionHeader
-                        title="รายการรอพิจารณา"
-                        description="คำขอลาคงค้างของพนักงานในทีมที่รอรับการอนุมัติ"
-                        count={model.metadata?.pending.totalItems ?? model.pending.length}
-                        tone="attention"
-                    />
-
-                    <div className="space-y-3">
-                        <PendingApprovalList
-                            pending={model.pending}
-                            isProcessing={model.isProcessing}
-                            onApprove={model.approveLeave}
-                            onOpenReject={model.openRejectDialog}
-                        />
-                        <ApprovalPagination
-                            metadata={model.metadata?.pending}
-                            onPageChange={model.setPendingPage}
-                        />
-                    </div>
-                </>
-            ) : (
-                <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm/6 text-amber-950">
-                    <p className="font-semibold">โหมดกู้คืนรายการลาโดยผู้ดูแลระบบ</p>
-                    <p className="mt-1">
-                        ใช้สำหรับรายการที่ผู้อนุมัติเดิมไม่พร้อมใช้งาน การยืนยันหรือปิดคำขอจะถูกบันทึกว่าเป็นการแก้ไขโดยผู้ดูแลระบบ
-                    </p>
-                </div>
-            )}
+            <div className="space-y-3">
+                <ApprovalSectionHeader
+                    title="รายการรอพิจารณา"
+                    description="คำขอลาคงค้างของพนักงานที่รอรับการอนุมัติจากคุณ"
+                    count={model.metadata?.pending.totalItems ?? model.pending.length}
+                    tone="attention"
+                />
+                <PendingApprovalList
+                    pending={model.pending}
+                    isProcessing={model.isProcessing}
+                    onApprove={model.approveLeave}
+                    onOpenReject={model.openRejectDialog}
+                />
+                <ApprovalPagination
+                    metadata={model.metadata?.pending}
+                    onPageChange={model.setPendingPage}
+                />
+            </div>
 
             <div className="space-y-3">
                 <ApprovalSectionHeader
-                    title={isAdmin ? "รายการกู้คืนไม่ได้ใช้วันลา" : "รายการรอยืนยันไม่ได้ใช้วันลา"}
-                    description={isAdmin
-                        ? "ผู้ดูแลระบบยืนยันได้เมื่อผู้อนุมัติเดิมพ้นสภาพ"
-                        : "เมื่อยืนยันแล้วระบบจะคืนโควต้าตามวันลาสุทธิของคำขอเดิม"}
+                    title="รายการรอยืนยันไม่ได้ใช้วันลา"
+                    description="เมื่อยืนยันแล้วระบบจะคืนโควต้าตามวันลาสุทธิของคำขอเดิม"
                     count={model.metadata?.notTakenPending.totalItems ?? model.notTakenPending.length}
                     tone="info"
                 />
                 <NotTakenPendingList
                     items={model.notTakenPending}
                     isProcessing={model.isProcessing}
-                    onConfirm={onNotTakenConfirm}
+                    onConfirm={model.confirmNotTaken}
                 />
                 <ApprovalPagination
                     metadata={model.metadata?.notTakenPending}
@@ -127,18 +63,16 @@ export function ManagerApprovalDashboard({ isAdmin = false }: { isAdmin?: boolea
 
             <div className="space-y-3 pt-2">
                 <ApprovalSectionHeader
-                    title={isAdmin ? "รายการกู้คืนคำขอยกเลิกวันลา" : "รายการรอยืนยันยกเลิกวันลา"}
-                    description={isAdmin
-                        ? "ยืนยันเพื่อคืนโควต้า หรือปิดคำขอเพื่อคงสถานะอนุมัติเดิม"
-                        : "ยืนยันเพื่อยกเลิกและคืนโควต้า หรือปิดคำขอเพื่อคงสถานะอนุมัติเดิม"}
+                    title="รายการรอยืนยันยกเลิกวันลา"
+                    description="ยืนยันเพื่อยกเลิกและคืนโควต้า หรือปิดคำขอเพื่อคงสถานะอนุมัติเดิม"
                     count={model.metadata?.cancellationPending.totalItems ?? model.cancellationPending.length}
                     tone="attention"
                 />
                 <CancellationPendingList
                     items={model.cancellationPending}
                     isProcessing={model.isProcessing}
-                    onConfirm={onCancellationConfirm}
-                    onReject={onCancellationReject}
+                    onConfirm={model.confirmCancellation}
+                    onReject={model.rejectCancellation}
                 />
                 <ApprovalPagination
                     metadata={model.metadata?.cancellationPending}
@@ -146,21 +80,19 @@ export function ManagerApprovalDashboard({ isAdmin = false }: { isAdmin?: boolea
                 />
             </div>
 
-            {!isAdmin ? (
-                <div className="space-y-3 pt-2">
-                    <ApprovalSectionHeader
-                        title="ประวัติการพิจารณา"
-                        description="รายการที่มีการตัดสินใจแล้ว"
-                        count={model.metadata?.history.totalItems ?? model.history.length}
-                        tone="neutral"
-                    />
-                    <ApprovalHistoryList history={model.history} />
-                    <ApprovalPagination
-                        metadata={model.metadata?.history}
-                        onPageChange={model.setHistoryPage}
-                    />
-                </div>
-            ) : null}
+            <div className="space-y-3 pt-2">
+                <ApprovalSectionHeader
+                    title="ประวัติการพิจารณา"
+                    description="รายการที่มีการตัดสินใจแล้ว"
+                    count={model.metadata?.history.totalItems ?? model.history.length}
+                    tone="neutral"
+                />
+                <ApprovalHistoryList history={model.history} />
+                <ApprovalPagination
+                    metadata={model.metadata?.history}
+                    onPageChange={model.setHistoryPage}
+                />
+            </div>
 
             <RejectLeaveDialog
                 open={model.isRejectDialogOpen}
@@ -186,73 +118,6 @@ export function ManagerApprovalDashboard({ isAdmin = false }: { isAdmin?: boolea
                 }}
                 onConfirm={model.confirmApproveLeave}
             />
-
-            {isAdmin ? (
-                <AdminRecoveryReasonDialog
-                    open={recoveryAction !== null}
-                    decision={recoveryAction?.decision ?? null}
-                    reason={recoveryReason}
-                    isProcessing={model.isProcessing}
-                    onOpenChange={(open) => {
-                        if (!open) closeRecoveryDialog();
-                    }}
-                    onReasonChange={setRecoveryReason}
-                    onConfirm={submitRecoveryDecision}
-                />
-            ) : null}
-        </div>
-    );
-}
-function ApprovalPagination({
-    metadata,
-    onPageChange,
-}: {
-    metadata?: LeaveApprovalPaginationMetadata;
-    onPageChange: (page: number) => void;
-}) {
-    if (!metadata || metadata.totalPages <= 1) {
-        return null;
-    }
-
-    return (
-        <div className="pt-1">
-            <Pagination
-                currentPage={metadata.currentPage}
-                totalPages={metadata.totalPages}
-                itemsPerPage={metadata.itemsPerPage}
-                onPageChange={onPageChange}
-                onPreviousPage={() => onPageChange(Math.max(1, metadata.currentPage - 1))}
-                onNextPage={() => onPageChange(Math.min(metadata.totalPages, metadata.currentPage + 1))}
-            />
-        </div>
-    );
-}
-function ApprovalSectionHeader({
-    title,
-    description,
-    count,
-    tone,
-}: {
-    title: string;
-    description: string;
-    count: number;
-    tone: "attention" | "info" | "neutral";
-}) {
-    const toneClassName = {
-        attention: "border-indigo-100 bg-indigo-50 text-indigo-700",
-        info: "border-cyan-100 bg-cyan-50 text-cyan-800",
-        neutral: "border-border-subtle bg-surface-subtle text-content-body",
-    }[tone];
-
-    return (
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-            <div className="min-w-0">
-                <h2 className="text-xl/7 font-semibold tracking-tight text-content-heading">{title}</h2>
-                <p className="mt-1 max-w-2xl text-sm/6 text-content-secondary">{description}</p>
-            </div>
-            <span className={cn("w-fit rounded-full border px-3 py-1 text-sm font-medium", toneClassName)}>
-                {count} รายการ
-            </span>
         </div>
     );
 }

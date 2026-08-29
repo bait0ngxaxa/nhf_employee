@@ -1,5 +1,4 @@
 import type { LeavePeriodValue } from "@/lib/services/leave/utils";
-import { isAdminRole } from "@/lib/ssot/permissions";
 
 export type LeaveTypeValue = "SICK" | "PERSONAL" | "VACATION";
 
@@ -74,13 +73,12 @@ export function formatLeaveSummary(input: LeaveSummaryInput): string {
 export function formatLeaveDecisionActor(
     input: LeaveDecisionActorInput,
 ): string {
-    const isAdminDecision = input.recoveryOverride || isAdminRole(input.decisionActorRole);
     const actorName = input.decisionActorName?.trim();
     if (!actorName) {
-        return isAdminDecision ? "ผู้ดูแลระบบ" : "ผู้ยืนยัน";
+        return input.recoveryOverride ? "ผู้ดูแลระบบ" : "ผู้ยืนยัน";
     }
 
-    return isAdminDecision ? `ผู้ดูแลระบบ ${actorName}` : actorName;
+    return input.recoveryOverride ? `ผู้ดูแลระบบ ${actorName}` : actorName;
 }
 
 export function getLeaveFlagLabels(input: LeaveFlagInput): string[] {

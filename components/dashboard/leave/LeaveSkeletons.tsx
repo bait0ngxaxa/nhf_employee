@@ -121,21 +121,23 @@ function ApprovalGroupSkeleton({ large = false }: { large?: boolean }): ReactEle
     );
 }
 
-function ManagerApprovalDashboardSkeletonContent({
-    isAdmin,
-}: {
-    isAdmin: boolean;
-}): ReactElement {
+function ManagerApprovalDashboardSkeletonContent(): ReactElement {
     return (
         <div className="space-y-6">
-            {isAdmin ? (
-                <Skeleton className="h-24 w-full rounded-lg" />
-            ) : (
-                <ApprovalGroupSkeleton large />
-            )}
+            <ApprovalGroupSkeleton large />
             <ApprovalGroupSkeleton />
             <ApprovalGroupSkeleton />
-            {!isAdmin ? <ApprovalGroupSkeleton /> : null}
+            <ApprovalGroupSkeleton />
+        </div>
+    );
+}
+
+function AdminLeaveRecoveryDashboardSkeletonContent(): ReactElement {
+    return (
+        <div className="space-y-6">
+            <Skeleton className="h-24 w-full rounded-lg" />
+            <ApprovalGroupSkeleton large />
+            <ApprovalGroupSkeleton />
         </div>
     );
 }
@@ -153,11 +155,7 @@ export function EmployeeLeaveDashboardSkeleton(): ReactElement {
     );
 }
 
-export function ManagerApprovalDashboardSkeleton({
-    isAdmin = false,
-}: {
-    isAdmin?: boolean;
-}): ReactElement {
+export function ManagerApprovalDashboardSkeleton(): ReactElement {
     return (
         <div
             role="status"
@@ -165,15 +163,30 @@ export function ManagerApprovalDashboardSkeleton({
             aria-busy="true"
             aria-label="กำลังโหลดรายการอนุมัติการลา"
         >
-            <ManagerApprovalDashboardSkeletonContent isAdmin={isAdmin} />
+            <ManagerApprovalDashboardSkeletonContent />
+        </div>
+    );
+}
+
+export function AdminLeaveRecoveryDashboardSkeleton(): ReactElement {
+    return (
+        <div
+            role="status"
+            aria-live="polite"
+            aria-busy="true"
+            aria-label="กำลังโหลดรายการกู้คืนวันลา"
+        >
+            <AdminLeaveRecoveryDashboardSkeletonContent />
         </div>
     );
 }
 
 export function LeaveManagementSectionSkeleton({
     showApprovals = false,
+    showRecovery = false,
 }: {
     showApprovals?: boolean;
+    showRecovery?: boolean;
 }): ReactElement {
     return (
         <div
@@ -186,9 +199,11 @@ export function LeaveManagementSectionSkeleton({
             <div className="space-y-8 p-4 sm:space-y-10 sm:p-6 lg:p-10">
                 <SectionHeaderSkeleton />
                 <div className="space-y-6">
-                    <TabsSkeleton count={4} />
+                    <TabsSkeleton count={5} />
                     {showApprovals ? (
-                        <ManagerApprovalDashboardSkeletonContent isAdmin={false} />
+                        <ManagerApprovalDashboardSkeletonContent />
+                    ) : showRecovery ? (
+                        <AdminLeaveRecoveryDashboardSkeletonContent />
                     ) : (
                         <EmployeeLeaveDashboardSkeletonContent />
                     )}

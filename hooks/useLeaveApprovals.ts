@@ -2,6 +2,9 @@ import useSWR from "swr";
 import { apiGet } from "@/lib/client/api-client";
 import { API_ROUTES } from "@/lib/ssot/routes";
 import type { LeaveAttachmentSummary } from "@/lib/types/leave";
+import type { LeaveApprovalPaginationMetadata } from "@/lib/services/leave/approval-queries";
+
+export type { LeaveApprovalPaginationMetadata } from "@/lib/services/leave/approval-queries";
 
 const fetcher = async <T,>(url: string): Promise<T> => {
     const res = await apiGet<T>(url);
@@ -48,13 +51,6 @@ export interface PendingLeave {
             name: string;
         };
     };
-}
-
-export interface LeaveApprovalPaginationMetadata {
-    currentPage: number;
-    totalPages: number;
-    totalItems: number;
-    itemsPerPage: number;
 }
 
 export interface LeaveApprovalsResponse {

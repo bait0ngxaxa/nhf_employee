@@ -84,6 +84,7 @@ export const API_ROUTES = {
     leave: {
         me: "/api/leave/me",
         approvals: "/api/leave/approvals",
+        adminRecovery: "/api/leave/admin/recovery",
         cancel: "/api/leave/cancel",
         request: "/api/leave/request",
         notTaken: "/api/leave/not-taken",

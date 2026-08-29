@@ -25,6 +25,8 @@ import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
 import { isAdminRole } from "@/lib/ssot/permissions";
 import { leaveActionSchema } from "@/lib/validations/leave";
 import { buildLeaveAuditContext } from "@/lib/services/leave/audit-details";
+import { getAssignedLeaveApproverWhere } from "@/lib/services/leave/approval-queries";
+import { getLeaveDecisionAuthorization } from "@/lib/services/leave/exception-approver";
 import { createLeaveAuditInTransaction } from "@/lib/services/leave/transaction";
 
 const LEAVE_APPROVAL_MESSAGES = {
@@ -52,9 +54,6 @@ export async function POST(req: Request): Promise<NextResponse> {
 
         const auth = await requireActiveWorkforceSession();
         if (!auth.ok) return auth.response;
-        if (isAdminRole(auth.user.role)) {
-            return jsonError(COMMON_API_MESSAGES.forbidden, 403);
-        }
 
         const userId = auth.user.id;
         const managerId = auth.employeeId;
@@ -83,16 +82,19 @@ export async function POST(req: Request): Promise<NextResponse> {
                         include: { user: { select: { id: true } } },
                     },
                     approver: true,
+                    exceptionApprover: true,
                 },
             });
 
             if (!leaveRequest) {
                 throw new LeaveApprovalError(LEAVE_APPROVAL_MESSAGES.requestNotFound, 404);
             }
-            if (leaveRequest.employeeId === managerId) {
-                throw new LeaveApprovalError(LEAVE_APPROVAL_MESSAGES.forbidden, 403);
-            }
-            if (leaveRequest.approverId !== managerId) {
+            const decisionAuthorization = getLeaveDecisionAuthorization(
+                managerId,
+                isAdminRole(auth.user.role),
+                leaveRequest,
+            );
+            if (decisionAuthorization !== "ASSIGNED_APPROVER") {
                 throw new LeaveApprovalError(LEAVE_APPROVAL_MESSAGES.forbidden, 403);
             }
             if (leaveRequest.status !== "PENDING") {
@@ -107,7 +109,11 @@ export async function POST(req: Request): Promise<NextResponse> {
             };
 
             const claimedRequest = await tx.leaveRequest.updateMany({
-                where: { id: leaveId, status: "PENDING", approverId: managerId },
+                where: {
+                    id: leaveId,
+                    status: "PENDING",
+                    ...getAssignedLeaveApproverWhere(managerId),
+                },
                 data: updateData,
             });
             if (claimedRequest.count !== 1) {

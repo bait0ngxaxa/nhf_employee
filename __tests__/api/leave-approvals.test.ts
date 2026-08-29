@@ -173,7 +173,7 @@ describe("GET /api/leave/approvals", () => {
         }
     });
 
-    it("scopes admin recovery lists to assigned or unavailable approvers", async () => {
+    it("keeps an admin in the normal assigned-approver workload", async () => {
         vi.mocked(requireActiveWorkforceSession).mockResolvedValue({
             ok: true,
             employeeId: 999,
@@ -187,6 +187,18 @@ describe("GET /api/leave/approvals", () => {
         expect(response.status).toBe(200);
         expect(prisma.leaveRequest.findMany).toHaveBeenCalledTimes(4);
         expect(prisma.leaveRequest.count).toHaveBeenCalledTimes(4);
+        expect(vi.mocked(prisma.leaveRequest.findMany).mock.calls[0][0]).toEqual(
+            expect.objectContaining({
+                where: {
+                    employeeId: { not: 999 },
+                    OR: [
+                        { exceptionApproverId: 999 },
+                        { exceptionApproverId: null, approverId: 999 },
+                    ],
+                    status: "PENDING",
+                },
+            }),
+        );
         expect(vi.mocked(prisma.leaveRequest.findMany).mock.calls[1][0]).toEqual(
             expect.objectContaining({
                 where: expect.objectContaining({
@@ -198,16 +210,14 @@ describe("GET /api/leave/approvals", () => {
                 }),
             }),
         );
-        expect(vi.mocked(prisma.leaveRequest.findMany).mock.calls[3][0]).toEqual(
+        expect(vi.mocked(prisma.leaveRequest.findMany).mock.calls[2][0]).toEqual(
             expect.objectContaining({
                 where: expect.objectContaining({
                     employeeId: { not: 999 },
-                    OR: expect.arrayContaining([
-                        { exceptionApproverId: 999 },
-                        { exceptionApproverId: null, approverId: 999 },
-                    ]),
+                    approverId: 999,
                 }),
             }),
         );
+        expect(JSON.stringify(await response.json())).not.toContain("__admin_recovery_");
     });
 });

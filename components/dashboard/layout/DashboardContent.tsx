@@ -22,6 +22,7 @@ import {
     useDashboardDataContext,
 } from "@/components/dashboard/context/dashboard/DashboardContext";
 import { isDashboardTabEnabled } from "@/lib/ssot/features";
+import { isAdminRole } from "@/lib/ssot/permissions";
 
 // Dynamically import Dashboard Sections for code splitting
 const StockSection = dynamic(
@@ -121,7 +122,7 @@ function getPageTitle(menu: string): string {
 
 export function DashboardContent() {
     const { selectedMenu, handleMenuClick } = useDashboardUIContext();
-    const { handleEmployeeAdded } = useDashboardDataContext();
+    const { handleEmployeeAdded, user } = useDashboardDataContext();
     const activeMenu = isDashboardTabEnabled(selectedMenu)
         ? selectedMenu
         : "dashboard";
@@ -141,7 +142,15 @@ export function DashboardContent() {
                     <Suspense
                         fallback={
                             <LeaveManagementSectionSkeleton
-                                showApprovals={defaultLeaveTab === "approvals"}
+                                showApprovals={
+                                    defaultLeaveTab === "approvals"
+                                    && user?.isManager === true
+                                }
+                                showRecovery={
+                                    defaultLeaveTab === "approvals"
+                                    && isAdminRole(user?.role)
+                                    && user?.isManager !== true
+                                }
                             />
                         }
                     >

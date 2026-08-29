@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useDashboardDataContext } from "@/components/dashboard/context/dashboard/DashboardContext";
 import { EmployeeLeaveDashboard } from "@/components/dashboard/leave/EmployeeLeaveDashboard";
 import { ManagerApprovalDashboard } from "@/components/dashboard/leave/ManagerApprovalDashboard";
+import { AdminLeaveRecoveryDashboard } from "@/components/dashboard/leave/AdminLeaveRecoveryDashboard";
 import { ApproverManagement } from "@/components/dashboard/leave/ApproverManagement";
 import { LeaveReportsDashboard } from "@/components/dashboard/leave/LeaveReportsDashboard";
 import { LEAVE_THEME_COLOR } from "@/components/dashboard/leave/leaveTheme";
@@ -21,7 +22,8 @@ export function LeaveManagementSection({ defaultTab = "my-leave" }: LeaveManagem
     const isManager = user?.isManager === true;
     const canViewLeaveReports = user?.canViewLeaveReports === true;
     const isAdmin = isAdminRole(user?.role);
-    const showApprovalTab = isManager || isAdmin;
+    const canApproveLeave = isManager;
+    const canRecoverLeave = isAdmin;
 
     const [activeTab, setActiveTab] = useState(defaultTab);
     const [isMounted, setIsMounted] = useState(false);
@@ -37,10 +39,14 @@ export function LeaveManagementSection({ defaultTab = "my-leave" }: LeaveManagem
         setIsMounted(true);
     }, []);
 
-    const tabs = getLeaveTabs(showApprovalTab, canViewLeaveReports, isAdmin);
-    const hasTabs = showApprovalTab || canViewLeaveReports || isAdmin;
+    const tabs = getLeaveTabs(canApproveLeave, canViewLeaveReports, canRecoverLeave);
+    const hasTabs = canApproveLeave || canViewLeaveReports || canRecoverLeave;
     const activeTabIsVisible = tabs.some((tab) => tab.value === activeTab && tab.visible !== false);
-    const safeActiveTab = activeTabIsVisible ? activeTab : "my-leave";
+    const safeActiveTab = activeTabIsVisible
+        ? activeTab
+        : canRecoverLeave
+            ? "recovery"
+            : "my-leave";
 
     return (
         <SectionShell className="border-border-subtle/70 bg-surface shadow-sm">
@@ -64,9 +70,9 @@ export function LeaveManagementSection({ defaultTab = "my-leave" }: LeaveManagem
 }
 
 function getLeaveTabs(
-    showApprovalTab: boolean,
+    canApproveLeave: boolean,
     canViewLeaveReports: boolean,
-    isAdmin: boolean,
+    canRecoverLeave: boolean,
 ): SectionTabItem[] {
     return [
         {
@@ -77,8 +83,14 @@ function getLeaveTabs(
         {
             value: "approvals",
             label: "อนุมัติการลา",
-            content: <ManagerApprovalDashboard isAdmin={isAdmin} />,
-            visible: showApprovalTab,
+            content: <ManagerApprovalDashboard />,
+            visible: canApproveLeave,
+        },
+        {
+            value: "recovery",
+            label: "กู้คืนรายการลา",
+            content: <AdminLeaveRecoveryDashboard />,
+            visible: canRecoverLeave,
         },
         {
             value: "reports",
@@ -90,7 +102,7 @@ function getLeaveTabs(
             value: "approver-settings",
             label: "จัดการผู้อนุมัติ",
             content: <ApproverManagement />,
-            visible: isAdmin,
+            visible: canRecoverLeave,
         },
     ];
 }
