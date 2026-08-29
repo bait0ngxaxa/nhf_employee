@@ -4,6 +4,24 @@ import { ACTIVE_LEAVE_APPROVER_QUERY_WHERE } from "@/lib/services/leave/approver
 
 export const LEAVE_APPROVALS_PAGE_SIZE = 10;
 
+/**
+ * Matches leave requests that still need a normal approver action.
+ * Historical approval records are intentionally excluded.
+ */
+export function getActionableLeaveApprovalWhere(): Prisma.LeaveRequestWhereInput {
+    return {
+        OR: [
+            { status: "PENDING" },
+            {
+                status: "APPROVED",
+                notTakenRequestedAt: { not: null },
+                notTakenConfirmedAt: null,
+            },
+            { status: "CANCELLATION_REQUESTED" },
+        ],
+    };
+}
+
 export interface LeaveApprovalPaginationMetadata {
     currentPage: number;
     totalPages: number;

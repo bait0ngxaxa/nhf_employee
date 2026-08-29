@@ -8,6 +8,7 @@ import { verifyAccessToken } from "@/lib/auth/hybrid/tokens";
 import { hasEligibleEmployeeLifecycle } from "@/lib/auth/ssot";
 import { prisma } from "@/lib/db/prisma";
 import { getEmployeeBackedUserDisplayName } from "@/lib/helpers/employee-helpers";
+import { getActionableLeaveApprovalWhere } from "@/lib/services/leave/approval-queries";
 
 export type ApiAuthSession = HybridAuthSession;
 
@@ -21,8 +22,19 @@ async function findActiveUser(userId: number) {
                 include: {
                     dept: { select: { name: true } },
                     subordinates: { select: { id: true }, take: 1 },
-                    approvals: { select: { id: true }, take: 1 },
-                    exceptionApprovals: { select: { id: true }, take: 1 },
+                    approvals: {
+                        where: {
+                            exceptionApproverId: null,
+                            ...getActionableLeaveApprovalWhere(),
+                        },
+                        select: { id: true },
+                        take: 1,
+                    },
+                    exceptionApprovals: {
+                        where: getActionableLeaveApprovalWhere(),
+                        select: { id: true },
+                        take: 1,
+                    },
                 },
             },
         },

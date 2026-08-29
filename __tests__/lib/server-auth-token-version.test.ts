@@ -33,6 +33,43 @@ import {
     HYBRID_REFRESH_COOKIE_NAME,
 } from "@/lib/auth/hybrid/constants";
 
+type CapabilityFixture = {
+    role?: "USER" | "ADMIN";
+    subordinates?: Array<{ id: number }>;
+    approvals?: Array<{ id: string }>;
+    exceptionApprovals?: Array<{ id: string }>;
+};
+
+function mockActiveCapabilityUser({
+    role = "USER",
+    subordinates = [],
+    approvals = [],
+    exceptionApprovals = [],
+}: CapabilityFixture = {}): void {
+    verifyAccessTokenMock.mockResolvedValue({
+        sub: "1",
+        role,
+        sessionId: "session-1",
+        tokenVersion: 1,
+    });
+    prismaMock.user.findUnique.mockResolvedValue({
+        id: 1,
+        role,
+        email: "employee@test.com",
+        name: "Employee",
+        isActive: true,
+        tokenVersion: 1,
+        employee: {
+            status: "ACTIVE",
+            deletedAt: null,
+            dept: null,
+            subordinates,
+            approvals,
+            exceptionApprovals,
+        },
+    });
+}
+
 describe("server auth tokenVersion validation", () => {
     beforeEach(() => {
         vi.clearAllMocks();
@@ -129,28 +166,56 @@ describe("server auth tokenVersion validation", () => {
         expect(session?.user.name).toBe("สมชาย ใจดี (ชาย)");
     });
 
-    it("derives leave approval capability from an exception assignment without subordinates", async () => {
-        verifyAccessTokenMock.mockResolvedValue({
-            sub: "1",
-            role: "ADMIN",
-            sessionId: "session-1",
-            tokenVersion: 1,
-        });
-        prismaMock.user.findUnique.mockResolvedValue({
-            id: 1,
-            role: "ADMIN",
-            email: "admin@test.com",
-            name: "Admin",
-            isActive: true,
-            tokenVersion: 1,
-            employee: {
-                status: "ACTIVE",
-                deletedAt: null,
-                dept: null,
-                subordinates: [],
-                approvals: [],
-                exceptionApprovals: [{ id: "leave-1" }],
+    it("queries only actionable effective approver assignments for leave capability", async () => {
+        mockActiveCapabilityUser();
+
+        await getApiAuthSession();
+
+        expect(prismaMock.user.findUnique).toHaveBeenCalledWith(expect.objectContaining({
+            include: {
+                employee: expect.objectContaining({
+                    include: expect.objectContaining({
+                        approvals: {
+                            where: {
+                                exceptionApproverId: null,
+                                OR: [
+                                    { status: "PENDING" },
+                                    {
+                                        status: "APPROVED",
+                                        notTakenRequestedAt: { not: null },
+                                        notTakenConfirmedAt: null,
+                                    },
+                                    { status: "CANCELLATION_REQUESTED" },
+                                ],
+                            },
+                            select: { id: true },
+                            take: 1,
+                        },
+                        exceptionApprovals: {
+                            where: {
+                                OR: [
+                                    { status: "PENDING" },
+                                    {
+                                        status: "APPROVED",
+                                        notTakenRequestedAt: { not: null },
+                                        notTakenConfirmedAt: null,
+                                    },
+                                    { status: "CANCELLATION_REQUESTED" },
+                                ],
+                            },
+                            select: { id: true },
+                            take: 1,
+                        },
+                    }),
+                }),
             },
+        }));
+    });
+
+    it("grants capability for current exception approver work", async () => {
+        mockActiveCapabilityUser({
+            role: "ADMIN",
+            exceptionApprovals: [{ id: "cancellation-leave" }],
         });
 
         const session = await getApiAuthSession();
@@ -160,28 +225,7 @@ describe("server auth tokenVersion validation", () => {
     });
 
     it("does not grant leave approval capability to an unassigned admin", async () => {
-        verifyAccessTokenMock.mockResolvedValue({
-            sub: "1",
-            role: "ADMIN",
-            sessionId: "session-1",
-            tokenVersion: 1,
-        });
-        prismaMock.user.findUnique.mockResolvedValue({
-            id: 1,
-            role: "ADMIN",
-            email: "admin@test.com",
-            name: "Admin",
-            isActive: true,
-            tokenVersion: 1,
-            employee: {
-                status: "ACTIVE",
-                deletedAt: null,
-                dept: null,
-                subordinates: [],
-                approvals: [],
-                exceptionApprovals: [],
-            },
-        });
+        mockActiveCapabilityUser({ role: "ADMIN" });
 
         const session = await getApiAuthSession();
 
@@ -190,28 +234,7 @@ describe("server auth tokenVersion validation", () => {
     });
 
     it("preserves leave approval capability for an organizational manager", async () => {
-        verifyAccessTokenMock.mockResolvedValue({
-            sub: "1",
-            role: "USER",
-            sessionId: "session-1",
-            tokenVersion: 1,
-        });
-        prismaMock.user.findUnique.mockResolvedValue({
-            id: 1,
-            role: "USER",
-            email: "manager@test.com",
-            name: "Manager",
-            isActive: true,
-            tokenVersion: 1,
-            employee: {
-                status: "ACTIVE",
-                deletedAt: null,
-                dept: null,
-                subordinates: [{ id: 2 }],
-                approvals: [],
-                exceptionApprovals: [],
-            },
-        });
+        mockActiveCapabilityUser({ subordinates: [{ id: 2 }] });
 
         const session = await getApiAuthSession();
 
@@ -219,34 +242,47 @@ describe("server auth tokenVersion validation", () => {
         expect(session?.user.canApproveLeave).toBe(true);
     });
 
-    it("derives leave approval capability from an original approver assignment", async () => {
-        verifyAccessTokenMock.mockResolvedValue({
-            sub: "1",
-            role: "USER",
-            sessionId: "session-1",
-            tokenVersion: 1,
-        });
-        prismaMock.user.findUnique.mockResolvedValue({
-            id: 1,
-            role: "USER",
-            email: "approver@test.com",
-            name: "Approver",
-            isActive: true,
-            tokenVersion: 1,
-            employee: {
-                status: "ACTIVE",
-                deletedAt: null,
-                dept: null,
-                subordinates: [],
-                approvals: [{ id: "leave-1" }],
-                exceptionApprovals: [],
-            },
-        });
+    it("grants capability for current pending original approver work", async () => {
+        mockActiveCapabilityUser({ approvals: [{ id: "pending-leave" }] });
 
         const session = await getApiAuthSession();
 
         expect(session?.user.isManager).toBe(false);
         expect(session?.user.canApproveLeave).toBe(true);
+    });
+
+    it("does not grant capability for a historical original approver assignment", async () => {
+        mockActiveCapabilityUser();
+
+        const session = await getApiAuthSession();
+
+        expect(session?.user.canApproveLeave).toBe(false);
+    });
+
+    it("does not grant capability for a historical not-taken exception assignment", async () => {
+        mockActiveCapabilityUser({ role: "ADMIN" });
+
+        const session = await getApiAuthSession();
+
+        expect(session?.user.isManager).toBe(false);
+        expect(session?.user.canApproveLeave).toBe(false);
+    });
+
+    it("does not grant capability for a historical cancelled exception assignment", async () => {
+        mockActiveCapabilityUser({ role: "ADMIN" });
+
+        const session = await getApiAuthSession();
+
+        expect(session?.user.canApproveLeave).toBe(false);
+    });
+
+    it("does not retain original approver capability after an exception replacement", async () => {
+        mockActiveCapabilityUser();
+
+        const session = await getApiAuthSession();
+
+        expect(session?.user.isManager).toBe(false);
+        expect(session?.user.canApproveLeave).toBe(false);
     });
 
     it("returns null when only a refresh token is present", async () => {
