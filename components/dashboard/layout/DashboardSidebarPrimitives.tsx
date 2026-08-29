@@ -83,7 +83,7 @@ function SidebarMenuItem({
                     aria-label={sidebarOpen ? undefined : itemLabel}
                     title={sidebarOpen ? undefined : itemLabel}
                     className={cn(
-                        "group/sidebar-item h-11 min-h-11 w-full cursor-pointer justify-start gap-3 rounded-xl border border-transparent text-sm font-medium transition-[background-color,border-color,color,opacity,transform] duration-150 ease-out focus-visible:ring-sidebar-ring/50 focus-visible:ring-[3px] motion-safe:hover:-translate-y-px motion-safe:active:scale-[0.985]",
+                        "group/sidebar-item h-11 min-h-11 w-full cursor-pointer justify-start gap-3 rounded-xl border border-transparent text-sm font-medium transition-[background-color,border-color,color,opacity] duration-150 ease-out focus-visible:ring-sidebar-ring/50 focus-visible:ring-[3px]",
                         isActive ? "border-sidebar-border bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground/75 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
                         !sidebarOpen && "justify-center px-0",
                         indented && sidebarOpen && "h-11 pl-9",
@@ -93,9 +93,9 @@ function SidebarMenuItem({
                 >
                     <span
                         className={cn(
-                            "flex shrink-0 items-center justify-center rounded-lg transition-[background-color,color,transform] duration-150 ease-out motion-safe:group-hover/sidebar-item:scale-105 motion-safe:group-active/sidebar-item:scale-95",
+                            "flex shrink-0 items-center justify-center rounded-lg transition-colors duration-150 ease-out",
                             indented && sidebarOpen ? "size-5" : "size-7",
-                            isActive ? "bg-gradient-to-br from-brand-start to-brand-end text-content-on-brand" : "text-sidebar-foreground/60 group-hover/sidebar-item:text-sidebar-accent-foreground",
+                            isActive ? "bg-brand-solid text-content-on-brand" : "text-sidebar-foreground/60 group-hover/sidebar-item:text-sidebar-accent-foreground",
                         )}
                     >
                         <IconComponent aria-hidden="true" className={indented && sidebarOpen ? "size-3.5" : "size-4"} />
@@ -144,7 +144,7 @@ function SidebarMenuGroup({
                 aria-controls={contentId}
                 onClick={onToggle}
                 className={cn(
-                    "flex h-11 min-h-11 w-full cursor-pointer items-center gap-2 rounded-lg px-5 text-left text-xs font-semibold transition-[background-color,color,transform] duration-150 ease-out focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-sidebar-ring/50 motion-safe:hover:translate-x-0.5",
+                    "flex h-11 min-h-11 w-full cursor-pointer items-center gap-2 rounded-lg px-5 text-left text-xs font-semibold transition-[background-color,color] duration-150 ease-out focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-sidebar-ring/50",
                     active ? "text-sidebar-foreground" : "text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
                 )}
             >
@@ -210,7 +210,7 @@ function CollapsedSidebarToggleButton({
                 type="button"
                 variant="ghost"
                 size="icon-lg"
-                className="group/sidebar-logo relative cursor-pointer rounded-[13%] p-0 hover:bg-transparent focus-visible:ring-[3px] focus-visible:ring-sidebar-ring/50 motion-safe:transition-transform motion-safe:duration-150 motion-safe:ease-out motion-safe:hover:scale-[1.03] motion-safe:active:scale-[0.97]"
+                className="group/sidebar-logo relative cursor-pointer rounded-[13%] p-0 hover:bg-transparent focus-visible:ring-[3px] focus-visible:ring-sidebar-ring/50"
                 aria-label="ขยายเมนู"
                 aria-expanded={false}
                 onClick={onToggle}

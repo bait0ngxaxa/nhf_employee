@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
-import { AlertCircle, Loader2, Mail, Send } from "lucide-react";
+import { AlertCircle, Loader2, Send } from "lucide-react";
 import { EmailRequestAccessFields } from "./EmailRequestAccessFields";
 import { useEmailRequestContext } from "@/components/dashboard/context/email-request/EmailRequestContext";
 import type { EmailRequestFormData } from "@/components/dashboard/context/email-request/types";
@@ -253,10 +253,7 @@ export function EmailRequestForm({ onCancel, onSuccess }: EmailRequestFormProps)
                         </div>
                     </form>
 
-                    <div className="mt-8 flex items-start gap-3 rounded-xl border border-primary/15 bg-primary/5 p-4">
-                        <div className="flex-shrink-0 rounded-lg bg-primary/10 p-2">
-                            <Mail className="h-5 w-5 text-primary" />
-                        </div>
+                    <div className="mt-8 rounded-xl border border-primary/15 bg-primary/5 p-4">
                         <div className="min-w-0">
                             <p className="text-sm font-medium text-foreground">
                                 หมายเหตุ

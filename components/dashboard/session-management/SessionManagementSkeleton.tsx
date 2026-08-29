@@ -38,12 +38,9 @@ export function SessionManagementSkeleton(): ReactElement {
         >
             <div className="mx-auto max-w-6xl space-y-5">
                 <header className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                    <div className="flex min-w-0 items-center gap-3">
-                        <Skeleton className="h-11 w-11 shrink-0 rounded-xl" />
-                        <div className="min-w-0 flex-1 space-y-2">
-                            <Skeleton className="h-8 w-44 max-w-full" />
-                            <Skeleton className="h-4 w-80 max-w-full" />
-                        </div>
+                    <div className="min-w-0 space-y-2">
+                        <Skeleton className="h-8 w-44 max-w-full" />
+                        <Skeleton className="h-4 w-80 max-w-full" />
                     </div>
                     <div className="flex flex-col gap-2 sm:flex-row">
                         <Skeleton className="h-11 w-full sm:w-40" />

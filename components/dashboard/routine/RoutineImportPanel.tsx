@@ -1127,7 +1127,7 @@ export function RoutineImportPanel() {
                 </div>
             ) : null}
 
-            <div className="sticky bottom-3 z-10 flex flex-col gap-3 rounded-xl border border-brand-border/70 bg-brand-surface/95 p-4 shadow-md backdrop-blur-sm sm:flex-row sm:items-center sm:justify-between">
+            <div className="sticky bottom-3 z-10 flex flex-col gap-3 rounded-xl border border-brand-border/70 bg-brand-surface p-4 shadow-md sm:flex-row sm:items-center sm:justify-between">
                 <div className="text-sm">
                     <p className="text-base font-semibold text-brand-strong">
                         เลือกไว้สำหรับนำเข้า {batch.selectedRows} รายการ

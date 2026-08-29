@@ -9,7 +9,7 @@ export default function AccessDenied() {
   const router = useRouter();
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-red-50 to-orange-100 flex items-center justify-center p-4">
+    <div className="flex min-h-screen items-center justify-center bg-surface-subtle p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <div className="mx-auto bg-red-100 p-3 rounded-full w-16 h-16 flex items-center justify-center mb-4">

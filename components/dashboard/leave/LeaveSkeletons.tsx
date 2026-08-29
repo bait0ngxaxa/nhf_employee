@@ -8,21 +8,18 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 function LeaveQuotaSkeleton(): ReactElement {
     return (
-        <div className="rounded-xl border border-border-subtle bg-surface-raised p-5 shadow-sm">
-            <div className="flex items-start justify-between gap-4">
-                <div className="min-w-0 flex-1 space-y-2">
-                    <Skeleton className="h-5 w-24" />
-                    <Skeleton className="h-4 w-28" />
-                    <div className="mt-4 flex items-end gap-2">
-                        <Skeleton className="h-10 w-16" />
-                        <Skeleton className="h-5 w-20" />
-                    </div>
-                    <div className="pt-2">
-                        <Skeleton className="h-4 w-32" />
-                        <Skeleton className="mt-1 h-4 w-36" />
-                    </div>
+        <div className="rounded-xl border border-border-subtle bg-surface-raised p-5 shadow-none">
+            <div className="min-w-0 space-y-2">
+                <Skeleton className="h-5 w-24" />
+                <Skeleton className="h-4 w-28" />
+                <div className="mt-4 flex items-end gap-2">
+                    <Skeleton className="h-10 w-16" />
+                    <Skeleton className="h-5 w-20" />
                 </div>
-                <Skeleton className="h-10 w-10 rounded-lg" />
+                <div className="pt-2">
+                    <Skeleton className="h-4 w-32" />
+                    <Skeleton className="mt-1 h-4 w-36" />
+                </div>
             </div>
             <div className="mt-5 flex items-center justify-between gap-3">
                 <Skeleton className="h-4 w-20" />

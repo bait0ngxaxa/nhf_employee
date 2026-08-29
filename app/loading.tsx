@@ -2,17 +2,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 export default function Loading() {
     return (
-        <div className="app-shell-background relative flex min-h-screen items-center justify-center overflow-hidden">
-            {/* Background Effects */}
-            <div className="absolute inset-0 overflow-hidden pointer-events-none">
-                <div className="absolute -top-40 -right-40 w-80 h-80 bg-blue-200/50 rounded-full blur-3xl" />
-                <div className="absolute top-1/2 -left-40 w-96 h-96 bg-purple-200/40 rounded-full blur-3xl" />
-                <div className="absolute bottom-20 right-1/4 w-72 h-72 bg-cyan-200/30 rounded-full blur-3xl" />
-            </div>
-
-            {/* Skeleton Content */}
-            <div className="relative z-10 w-full max-w-md mx-4 space-y-6">
-            <div className="rounded-2xl border border-border-neutral-muted bg-surface/60 p-8 shadow-lg backdrop-blur-md">
+        <div className="app-shell-background flex min-h-screen items-center justify-center">
+            <div className="w-full max-w-md px-4">
+                <div className="rounded-2xl border border-border-neutral-muted bg-surface-raised p-8 shadow-sm">
                     <div className="flex flex-col items-center space-y-4">
                         <Skeleton className="h-12 w-12 rounded-xl" />
                         <Skeleton className="h-6 w-40" />

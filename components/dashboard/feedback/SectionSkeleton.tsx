@@ -9,12 +9,9 @@ export function SectionHeaderSkeleton({
 }): ReactElement {
     return (
         <div className="flex min-w-0 flex-col justify-between gap-4 sm:gap-6 lg:flex-row lg:items-end">
-            <div className="flex min-w-0 items-center gap-4 sm:gap-5 lg:gap-6">
-                <Skeleton className="h-12 w-12 shrink-0 rounded-xl sm:h-14 sm:w-14 sm:rounded-2xl lg:h-16 lg:w-16" />
-                <div className="min-w-0 flex-1 space-y-2">
-                    <Skeleton className="h-8 w-56 max-w-full sm:h-9" />
-                    <Skeleton className="h-4 w-96 max-w-full" />
-                </div>
+            <div className="min-w-0 flex-1 space-y-2">
+                <Skeleton className="h-8 w-56 max-w-full sm:h-9" />
+                <Skeleton className="h-4 w-96 max-w-full" />
             </div>
             {showBadge ? (
                 <Skeleton className="h-8 w-28 rounded-full" />
@@ -59,7 +56,7 @@ export function PaginationSkeleton(): ReactElement {
 export function DashboardHomeSkeleton(): ReactElement {
     return (
         <div
-            className="relative min-h-[calc(100dvh-6rem)] overflow-hidden rounded-2xl border border-border-subtle/70 bg-surface-subtle p-4 shadow-inner sm:rounded-3xl md:p-8"
+            className="relative min-h-[calc(100dvh-6rem)] rounded-2xl border border-border-subtle/70 bg-surface-subtle p-4 sm:rounded-3xl md:p-8"
             role="status"
             aria-live="polite"
             aria-busy="true"
@@ -119,12 +116,9 @@ export function FormSectionSkeleton(): ReactElement {
         >
             <div className="space-y-8 p-4 md:p-8">
                 <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-                    <div className="flex min-w-0 items-center gap-4">
-                        <Skeleton className="h-12 w-12 shrink-0 rounded-2xl" />
-                        <div className="min-w-0 flex-1 space-y-2">
-                            <Skeleton className="h-8 w-56 max-w-full" />
-                            <Skeleton className="h-4 w-72 max-w-full" />
-                        </div>
+                    <div className="min-w-0 space-y-2">
+                        <Skeleton className="h-8 w-56 max-w-full" />
+                        <Skeleton className="h-4 w-72 max-w-full" />
                     </div>
                     <Skeleton className="h-11 w-full sm:w-36" />
                 </div>
@@ -159,12 +153,9 @@ export function ImportSectionSkeleton(): ReactElement {
             aria-label="กำลังโหลดหน้านำเข้าพนักงาน"
         >
             <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-                <div className="flex items-center gap-4">
-                    <Skeleton className="h-12 w-12 rounded-2xl" />
-                    <div className="space-y-2">
-                        <Skeleton className="h-8 w-64 max-w-full" />
-                        <Skeleton className="h-4 w-80 max-w-full" />
-                    </div>
+                <div className="space-y-2">
+                    <Skeleton className="h-8 w-64 max-w-full" />
+                    <Skeleton className="h-4 w-80 max-w-full" />
                 </div>
                 <Skeleton className="h-11 w-full sm:w-36" />
             </div>
@@ -198,12 +189,9 @@ export function NotificationSectionSkeleton(): ReactElement {
         >
             <div className="mx-auto max-w-6xl space-y-5">
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                    <div className="flex items-center gap-3">
-                        <Skeleton className="h-11 w-11 rounded-xl" />
-                        <div className="space-y-2">
-                            <Skeleton className="h-8 w-40" />
-                            <Skeleton className="h-4 w-32" />
-                        </div>
+                    <div className="space-y-2">
+                        <Skeleton className="h-8 w-40" />
+                        <Skeleton className="h-4 w-32" />
                     </div>
                     <Skeleton className="h-9 w-32" />
                 </div>

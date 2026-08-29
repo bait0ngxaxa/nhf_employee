@@ -4,7 +4,6 @@ import {
     Loader2,
     Monitor,
     RefreshCw,
-    ShieldCheck,
     Smartphone,
     Trash2,
 } from "lucide-react";
@@ -143,11 +142,7 @@ export function SessionManagementView({
         <section className="min-h-[calc(100dvh-6rem)] bg-surface-subtle px-4 py-6 md:px-8 md:py-8">
             <div className="mx-auto max-w-6xl space-y-5">
                 <header className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                    <div className="flex min-w-0 items-center gap-3">
-                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-cyan-100 text-cyan-700">
-                            <ShieldCheck className="h-5 w-5" aria-hidden="true" />
-                        </div>
-                        <div className="min-w-0">
+                    <div className="min-w-0">
                             <h1
                                 data-page-heading
                                 tabIndex={-1}
@@ -158,7 +153,6 @@ export function SessionManagementView({
                             <p className="mt-0.5 text-sm text-content-secondary">
                                 ตรวจสอบอุปกรณ์ที่กำลังเข้าถึงบัญชีของคุณ
                             </p>
-                        </div>
                     </div>
                     <div className="flex flex-col gap-2 sm:flex-row">
                         <Button

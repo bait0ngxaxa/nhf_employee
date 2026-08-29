@@ -1,11 +1,4 @@
 import React from "react";
-import {
-    Building2,
-    GraduationCap,
-    UserCheck,
-    Users,
-    type LucideIcon,
-} from "lucide-react";
 
 import { cn } from "@/lib/ui/utils";
 
@@ -13,8 +6,7 @@ interface StatItem {
     label: string;
     value: number;
     detail: string;
-    icon: LucideIcon;
-    iconClassName: string;
+    valueClassName: string;
 }
 
 interface EmployeeStats {
@@ -34,29 +26,25 @@ function buildStatItems(stats: EmployeeStats): StatItem[] {
             label: "พนักงานทั้งหมด",
             value: stats.total,
             detail: "รายชื่อในระบบ",
-            icon: Users,
-            iconClassName: "bg-surface-muted text-content-body",
+            valueClassName: "text-content-heading",
         },
         {
             label: "กำลังปฏิบัติงาน",
             value: stats.active,
             detail: "สถานะ Active",
-            icon: UserCheck,
-            iconClassName: "bg-emerald-50 text-emerald-700",
+            valueClassName: "text-emerald-700",
         },
         {
             label: "ฝ่ายบริหาร",
             value: stats.admin,
             detail: "บุคลากรสายบริหาร",
-            icon: Building2,
-            iconClassName: "bg-amber-50 text-amber-700",
+            valueClassName: "text-amber-700",
         },
         {
             label: "ฝ่ายวิชาการ",
             value: stats.academic,
             detail: "บุคลากรสายวิชาการ",
-            icon: GraduationCap,
-            iconClassName: "bg-sky-50 text-sky-700",
+            valueClassName: "text-sky-700",
         },
     ];
 }
@@ -74,8 +62,6 @@ export const EmployeeStatsCards = React.memo(function EmployeeStatsCards({
             </div>
             <dl className="grid grid-cols-2 lg:grid-cols-4">
                 {statItems.map((item, index) => {
-                    const Icon = item.icon;
-
                     return (
                         <div
                             key={item.label}
@@ -86,16 +72,11 @@ export const EmployeeStatsCards = React.memo(function EmployeeStatsCards({
                                 index < 3 && "lg:border-r lg:border-border-muted",
                             )}
                         >
-                            <div className="flex items-center gap-2.5">
-                                <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${item.iconClassName}`}>
-                                    <Icon className="h-4 w-4" aria-hidden="true" />
-                                </span>
-                                <dt className="min-w-0 text-sm font-medium text-content-body">
-                                    {item.label}
-                                </dt>
-                            </div>
+                            <dt className="min-w-0 text-sm font-medium text-content-body">
+                                {item.label}
+                            </dt>
                             <dd className="mt-4 flex items-baseline gap-2">
-                                <span className="text-2xl font-semibold tracking-tight text-content-heading">
+                                <span className={cn("text-2xl font-semibold tracking-tight", item.valueClassName)}>
                                     {item.value}
                                 </span>
                                 <span className="text-sm text-content-muted">คน</span>

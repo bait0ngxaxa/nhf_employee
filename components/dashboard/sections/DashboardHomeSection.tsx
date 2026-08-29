@@ -12,9 +12,7 @@ const MENU_ITEM_CONFIG: Record<
     string,
     {
         text: string;
-        bg: string;
-        icon: string;
-        border: string;
+        icon?: string;
         featured?: boolean;
         featuredSurface?: string;
         featuredBorder?: string;
@@ -29,10 +27,8 @@ const MENU_ITEM_CONFIG: Record<
 > = {
     "leave-management": {
         text: "text-indigo-900",
-        bg: "bg-indigo-50/70",
-        icon: "text-indigo-600",
-        border: "border-indigo-100",
         featured: true,
+        icon: "text-indigo-600",
         featuredSurface: "bg-indigo-600",
         featuredBorder: "border-indigo-500 hover:border-indigo-400",
         featuredShadow: "shadow-indigo-900/15 hover:shadow-indigo-900/20",
@@ -45,10 +41,8 @@ const MENU_ITEM_CONFIG: Record<
     },
     stock: {
         text: "text-orange-700",
-        bg: "bg-orange-50",
-        icon: "text-orange-600",
-        border: "border-orange-100",
         featured: true,
+        icon: "text-orange-600",
         featuredSurface: "bg-orange-600",
         featuredBorder: "border-orange-500 hover:border-orange-400",
         featuredShadow: "shadow-orange-900/15 hover:shadow-orange-900/20",
@@ -61,10 +55,8 @@ const MENU_ITEM_CONFIG: Record<
     },
     routine: {
         text: "text-teal-900",
-        bg: "bg-teal-50/70",
-        icon: "text-teal-600",
-        border: "border-teal-100",
         featured: true,
+        icon: "text-teal-600",
         featuredSurface: "bg-teal-600",
         featuredBorder: "border-teal-500 hover:border-teal-400",
         featuredShadow: "shadow-teal-900/15 hover:shadow-teal-900/20",
@@ -77,41 +69,23 @@ const MENU_ITEM_CONFIG: Record<
     },
     "email-request": {
         text: "text-blue-950",
-        bg: "bg-blue-50/70",
-        icon: "text-blue-600",
-        border: "border-blue-100",
     },
     "employee-management": {
         text: "text-sky-950",
-        bg: "bg-sky-50/70",
-        icon: "text-sky-600",
-        border: "border-sky-100",
     },
     "add-employee": {
         text: "text-pink-950",
-        bg: "bg-pink-50/70",
-        icon: "text-pink-600",
-        border: "border-pink-100",
     },
     "import-employee": {
         text: "text-teal-950",
-        bg: "bg-teal-50/70",
-        icon: "text-teal-600",
-        border: "border-teal-100",
     },
     "audit-logs": {
         text: "text-amber-950",
-        bg: "bg-amber-50/70",
-        icon: "text-amber-600",
-        border: "border-amber-100",
     },
 };
 
 const DEFAULT_MENU_CONFIG = {
     text: "text-content-primary",
-    bg: "bg-surface-subtle/70",
-    icon: "text-content-secondary",
-    border: "border-border-subtle",
 };
 
 function getGreeting(): string {
@@ -138,6 +112,9 @@ interface FeaturedCardProps {
     animationDelay: string;
 }
 
+// Intentional visual exception:
+// Core NHF module quick actions retain the branded rich-card treatment.
+// Do not simplify these cards as part of generic UI de-slop cleanup.
 function FeaturedCard({ item, onClick, animationDelay }: FeaturedCardProps) {
     const IconComponent = item.icon;
     const config = MENU_ITEM_CONFIG[item.id] ?? DEFAULT_MENU_CONFIG;
@@ -217,63 +194,41 @@ interface RegularCardProps {
         id: string;
         label: string;
         description?: string;
-        icon: React.ElementType;
         comingSoon?: boolean;
     };
     config: (typeof MENU_ITEM_CONFIG)[string];
     onClickFn: () => void;
-    animationDelay: string;
 }
 
 function RegularCard({
     item,
     config,
     onClickFn,
-    animationDelay,
 }: RegularCardProps) {
-    const IconComponent = item.icon;
     const disabled = item.comingSoon === true;
 
     return (
         <button
             disabled={disabled}
             onClick={disabled ? undefined : onClickFn}
-            style={{ animationDelay }}
             className={cn(
-                "group relative flex min-h-[180px] w-full flex-col overflow-hidden rounded-3xl bg-surface-raised text-left transition-[border-color,box-shadow,transform,opacity] duration-200",
+                "relative flex min-h-[180px] w-full flex-col rounded-2xl bg-surface-raised text-left transition-[background-color,border-color,opacity] duration-200",
                 "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300 focus-visible:ring-offset-2",
                 disabled
                     ? "cursor-not-allowed border border-border-muted opacity-60"
                     : cn(
-                          "border border-border-muted shadow-sm hover:border-border-subtle hover:shadow-md",
-                      ),
+                        "border border-border-muted hover:border-border-subtle hover:bg-surface-subtle",
+                    ),
             )}
         >
-            {!disabled && (
-                <div className="absolute right-4 top-4 z-10 flex h-9 w-9 items-center justify-center rounded-xl border border-border-muted bg-surface-raised text-content-muted opacity-0 shadow-sm transition-opacity duration-200 group-hover:opacity-100">
-                    <ArrowUpRight className={cn("h-4 w-4", config.icon)} aria-hidden="true" />
-                </div>
-            )}
-
             {disabled && (
                 <span className="absolute right-4 top-4 z-10 rounded-full border border-border-subtle bg-surface-muted px-3 py-1 text-xs font-semibold text-content-muted">
                     เร็วๆ นี้
                 </span>
             )}
 
-            <div className="relative z-10 flex h-full flex-col p-5 md:p-6">
-                <div
-                    className={cn(
-                        "mb-auto flex h-12 w-12 items-center justify-center rounded-2xl border transition-colors duration-200",
-                        config.bg,
-                        config.border,
-                        "shadow-sm",
-                    )}
-                >
-                    <IconComponent className={cn("h-6 w-6", config.icon)} aria-hidden="true" />
-                </div>
-
-                <div className="mt-4">
+            <div className="flex h-full flex-col p-5 md:p-6">
+                <div className="mt-auto">
                     <h3
                         className={cn(
                             "mb-1 line-clamp-2 text-base font-bold leading-6 [overflow-wrap:anywhere] transition-colors duration-200",
@@ -287,15 +242,6 @@ function RegularCard({
                     </p>
                 </div>
             </div>
-
-            {!disabled && (
-                <div
-                    className={cn(
-                        "pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-200 group-hover:opacity-100",
-                        config.bg,
-                    )}
-                />
-            )}
         </button>
     );
 }
@@ -342,20 +288,16 @@ export function DashboardHomeSection() {
     const userDepartment = getDisplayText(user?.department, "ฝ่ายทั่วไป");
 
     return (
-            <div className="relative min-h-[calc(100dvh-6rem)] overflow-hidden rounded-2xl border border-border-subtle/70 bg-surface-subtle p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] shadow-inner shadow-content-on-brand sm:rounded-3xl md:p-8 md:pb-[calc(2rem+env(safe-area-inset-bottom))]">
+        <div className="relative min-h-[calc(100dvh-6rem)] rounded-2xl border border-border-subtle/70 bg-surface-subtle p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:rounded-3xl md:p-8 md:pb-[calc(2rem+env(safe-area-inset-bottom))]">
             <div className="relative z-10 mx-auto max-w-7xl space-y-6">
                 <div>
-                    <div className="dashboard-card-enter relative min-w-0 overflow-hidden rounded-2xl border border-sky-500 bg-sky-600 p-5 text-content-on-brand shadow-lg shadow-sky-900/15 sm:rounded-3xl md:p-8">
-                        <div className="brand-sheen-strong pointer-events-none absolute inset-0" />
-                        <div className="dashboard-card-drift pointer-events-none absolute -right-10 -top-10 h-44 w-44 rounded-full border border-content-on-brand/15" />
-                        <div className="dashboard-card-drift pointer-events-none absolute -bottom-14 right-20 h-36 w-36 rounded-full bg-sky-500/40 [animation-delay:900ms]" />
+                    <div className="relative min-w-0 overflow-hidden rounded-2xl border border-sky-500 bg-sky-600 p-5 text-content-on-brand shadow-lg shadow-sky-900/15 sm:rounded-3xl md:p-8">
                         <div className="flex flex-col justify-between gap-6 md:flex-row md:items-center">
                             <div className="relative z-10 min-w-0 max-w-2xl space-y-4">
                                 <div className="flex flex-wrap items-center gap-2">
                                     <div className="rounded-full border border-content-on-brand/20 bg-content-on-brand px-3 py-1 text-xs font-bold text-sky-700 shadow-sm">
                                         NHFapp
                                     </div>
-                                   
                                 </div>
 
                                 <div className="space-y-2">
@@ -397,32 +339,32 @@ export function DashboardHomeSection() {
                     )}
 
                     {featuredItems.length > 0 && (
-                    <div className="mb-10">
-                        <h2 className="mb-6 flex items-center gap-2 px-2 text-xl font-bold leading-7 text-content-strong">
-                            <span className="inline-block h-6 w-1.5 rounded-full bg-orange-500" />
-                            Recommended
-                        </h2>
-                        <div className="grid grid-cols-1 gap-4 md:gap-6 lg:grid-cols-2">
-                            {featuredItems.map((item, i) => (
+                        <div className="mb-10">
+                            <h2 className="mb-6 flex items-center gap-2 px-2 text-xl font-bold leading-7 text-content-strong">
+                                <span className="inline-block h-6 w-1.5 rounded-full bg-orange-500" />
+                                Recommended
+                            </h2>
+                            <div className="grid grid-cols-1 gap-4 md:gap-6 lg:grid-cols-2">
+                                {featuredItems.map((item, i) => (
                                     <FeaturedCard
                                         key={item.id}
                                         item={item}
                                         onClick={() => handleMenuClick(item.id)}
                                         animationDelay={`${200 + i * 50}ms`}
                                     />
-                            ))}
+                                ))}
+                            </div>
                         </div>
-                    </div>
                     )}
 
                     {regularItems.length > 0 && (
-                    <div>
-                        <h2 className="mb-6 flex items-center gap-2 px-2 text-lg font-bold leading-7 text-content-strong">
-                            <span className="inline-block h-6 w-1.5 rounded-full bg-sky-500" />
-                            บริการอื่นๆ
-                        </h2>
-                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 md:gap-6 xl:grid-cols-4">
-                            {regularItems.map((item, i) => (
+                        <div>
+                            <h2 className="mb-6 flex items-center gap-2 px-2 text-lg font-bold leading-7 text-content-strong">
+                                <span className="inline-block h-6 w-1.5 rounded-full bg-sky-500" />
+                                บริการอื่นๆ
+                            </h2>
+                            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 md:gap-6 xl:grid-cols-4">
+                                {regularItems.map((item) => (
                                     <RegularCard
                                         key={item.id}
                                         item={item}
@@ -433,11 +375,10 @@ export function DashboardHomeSection() {
                                         onClickFn={() =>
                                             handleMenuClick(item.id)
                                         }
-                                        animationDelay={`${250 + i * 50}ms`}
                                     />
-                            ))}
+                                ))}
+                            </div>
                         </div>
-                    </div>
                     )}
 
                     {disabledItems.length > 0 && (
@@ -447,7 +388,7 @@ export function DashboardHomeSection() {
                                 เร็วๆ นี้
                             </h3>
                             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 md:gap-6 xl:grid-cols-4">
-                                {disabledItems.map((item, i) => {
+                                {disabledItems.map((item) => {
                                     const config =
                                         MENU_ITEM_CONFIG[item.id] ??
                                         DEFAULT_MENU_CONFIG;
@@ -457,7 +398,6 @@ export function DashboardHomeSection() {
                                             item={item}
                                             config={config}
                                             onClickFn={() => {}}
-                                            animationDelay={`${400 + i * 50}ms`}
                                         />
                                     );
                                 })}

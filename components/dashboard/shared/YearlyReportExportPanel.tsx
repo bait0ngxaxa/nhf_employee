@@ -26,7 +26,6 @@ type YearlyReportExportPanelProps = {
     description?: string;
     badge?: ReactNode;
     stats?: Array<{
-        icon?: ReactNode;
         label: string;
         value: string;
     }>;
@@ -91,10 +90,7 @@ export function YearlyReportExportPanel({
                                 key={stat.label}
                                 className="rounded-lg border border-border-subtle bg-surface-subtle p-4"
                             >
-                                <div className="flex items-center gap-2 text-xs font-semibold text-content-muted">
-                                    {stat.icon}
-                                    {stat.label}
-                                </div>
+                                <div className="text-xs font-semibold text-content-muted">{stat.label}</div>
                                 <div className="mt-2 text-base font-bold text-content-strong">
                                     {stat.value}
                                 </div>

@@ -1,7 +1,7 @@
 "use client";
 
 import type React from "react";
-import { Bell, Check, Filter, Loader2 } from "lucide-react";
+import { Check, Loader2 } from "lucide-react";
 
 import { cn } from "@/lib/ui/utils";
 import { getRelativeTime } from "@/lib/helpers/date-helpers";
@@ -35,20 +35,15 @@ export function NotificationsHeader({
 
     return (
         <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex min-w-0 items-center gap-3">
-                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-brand-surface-strong text-brand-foreground">
-                    <Bell className="h-5 w-5" aria-hidden="true" />
-                </div>
-                <div className="min-w-0">
-                    <h1
-                        data-page-heading
-                        tabIndex={-1}
-                        className="text-2xl font-bold tracking-tight text-content-heading"
-                    >
-                        การแจ้งเตือน
-                    </h1>
-                    <p className="mt-0.5 text-sm text-content-secondary">{countLabel}</p>
-                </div>
+            <div className="min-w-0">
+                <h1
+                    data-page-heading
+                    tabIndex={-1}
+                    className="text-2xl font-bold tracking-tight text-content-heading"
+                >
+                    การแจ้งเตือน
+                </h1>
+                <p className="mt-0.5 text-sm text-content-secondary">{countLabel}</p>
             </div>
             <Button
                 type="button"
@@ -81,10 +76,7 @@ export function NotificationFilterTabs({
 }): React.ReactElement {
     return (
         <div className="flex flex-wrap items-center gap-3 rounded-xl border border-border-subtle bg-surface px-3 py-2">
-            <span className="flex items-center gap-2 text-sm font-medium text-content-secondary">
-                <Filter className="h-4 w-4" aria-hidden="true" />
-                แสดง
-            </span>
+            <span className="text-sm font-medium text-content-secondary">แสดง</span>
             <div className="inline-flex rounded-lg bg-surface-muted p-1">
                 <FilterButton
                     isActive={filter === "all"}

@@ -21,8 +21,8 @@ export default function GlobalError({ error, reset }: ErrorProps) {
     }, [error]);
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100 p-4">
-            <Card className="w-full max-w-md shadow-xl border-red-100">
+        <div className="flex min-h-screen items-center justify-center bg-surface-subtle p-4">
+            <Card className="w-full max-w-md border-red-100 shadow-sm">
                 <CardHeader className="text-center pb-2">
                     <div className="mx-auto mb-4 w-16 h-16 bg-red-100 rounded-full flex items-center justify-center">
                         <AlertTriangle className="w-8 h-8 text-red-600" />

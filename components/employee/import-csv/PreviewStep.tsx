@@ -16,7 +16,7 @@ import {
     getEmployeeDepartmentBadgeClass,
     getEmployeeDepartmentLabel,
 } from "@/lib/helpers/employee-helpers";
-import { FileText, CheckCircle, Loader2, XCircle } from "lucide-react";
+import { CheckCircle, Loader2, XCircle } from "lucide-react";
 import { type PreviewStepProps } from "./types";
 
 const PREVIEW_ROW_LIMIT = 100;
@@ -34,9 +34,8 @@ export function PreviewStep({
     return (
         <Card className="rounded-2xl border-border-subtle bg-surface-raised shadow-sm">
             <CardHeader>
-                <CardTitle className="flex min-w-0 items-center gap-2 text-xl font-bold text-content-heading">
-                    <FileText className="h-5 w-5 shrink-0" />
-                    <span>ตรวจสอบข้อมูลก่อนนำเข้า</span>
+                <CardTitle className="text-xl font-bold text-content-heading">
+                    ตรวจสอบข้อมูลก่อนนำเข้า
                 </CardTitle>
                 <CardDescription className="text-sm leading-6 text-content-secondary [overflow-wrap:anywhere]">
                     พบข้อมูล {parsedData.length.toLocaleString("th-TH")} รายการ

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useId, useMemo, useRef, useState } from "react";
-import { CalendarClock, FileSpreadsheet, List, Settings2, Users, X } from "lucide-react";
+import { X } from "lucide-react";
 import { toast } from "sonner";
 import { useSearchParams } from "next/navigation";
 import useSWR from "swr";
@@ -469,50 +469,39 @@ export function RoutineSection() {
         {
             value: "mine",
             label: "รายการของฉัน",
-            icon: List,
             content: <RoutineOccurrencePanel isAdmin={false} taskId={taskId} occurrenceId={occurrenceId} onTaskSaved={() => undefined} />,
         },
         {
             value: "all",
             label: "รายการทั้งหมด (Admin)",
-            icon: Users,
             visible: isAdmin,
             content: <RoutineOccurrencePanel isAdmin taskId={taskId} occurrenceId={occurrenceId} onTaskSaved={() => void mutateSummary()} />,
         },
         {
             value: "manage",
             label: "จัดการงานของฉัน",
-            icon: Settings2,
             visible: !isAdmin,
             content: <RoutineTaskSettings mode="SELF_SERVICE" onTaskSaved={() => void mutateSummary()} />,
         },
         {
             value: "settings",
             label: "ตั้งค่างานประจำ",
-            icon: Settings2,
             visible: isAdmin,
             content: <RoutineTaskSettings mode="ADMIN" onTaskSaved={() => void mutateSummary()} />,
         },
         {
             value: "import",
             label: "นำเข้าจาก Excel",
-            icon: FileSpreadsheet,
             visible: isAdmin,
             content: <RoutineImportPanel />,
         },
     ];
 
     return (
-        <SectionShell
-            gradientFrom="var(--brand-surface-strong)"
-            gradientTo="var(--brand-surface)"
-            className="routine-section border-brand-border/70 bg-surface shadow-sm lg:rounded-2xl"
-        >
+        <SectionShell className="routine-section border-brand-border/70 bg-surface shadow-sm lg:rounded-2xl">
             <SectionHeader
-                icon={CalendarClock}
                 title="NHF Routine"
                 subtitle="รวมรายการ Routine ตามกำหนดเวลา ผู้รับผิดชอบ และการแจ้งเตือนที่เกี่ยวข้อง"
-                tone="brand"
             />
             <RoutineKpiGrid
                 summary={summaryData?.summary}

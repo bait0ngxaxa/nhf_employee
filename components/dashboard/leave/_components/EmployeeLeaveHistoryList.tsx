@@ -1,4 +1,4 @@
-import { CalendarClock, Clock, RotateCcw, X } from "lucide-react";
+import { RotateCcw, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Pagination } from "@/components/Pagination";
@@ -87,26 +87,46 @@ function LeaveHistoryItem({
     onCancelRequest: (request: LeaveRequest) => void;
     onNotTakenRequest: (leaveId: string) => void;
 }) {
+    const canCancel =
+        request.status === "PENDING" || canRequestApprovedCancellation(request);
+    const canRequestNotTakenAction = canRequestNotTaken(request);
+    const hasActions =
+        request.attachments.length > 0 || canCancel || canRequestNotTakenAction;
+
     return (
         <Card className="border-border-subtle p-5 shadow-sm">
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                <div className="min-w-0 space-y-3">
+            <div className="space-y-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div className="flex flex-wrap items-center gap-2">
                         <h3 className="text-base/6 font-semibold tracking-tight text-content-heading">
                             {leaveTypeLabel(request.leaveType)}
                         </h3>
-                        <span className="rounded-md border border-border-subtle bg-surface-subtle px-2 py-0.5 text-xs/5 font-medium text-content-body">
-                            {periodLabel(request.period)} ({request.durationDays} วัน)
-                        </span>
                     </div>
-                    <p className="flex flex-wrap items-center gap-1.5 text-sm/6 font-medium text-content-secondary">
-                        <CalendarClock className="h-4 w-4 text-content-subtle" aria-hidden="true" />
-                        <span>{formatLeaveDateRange(request.startDate, request.endDate)}</span>
-                    </p>
-                    <p className="flex flex-wrap items-center gap-1.5 text-xs/5 font-medium text-content-muted">
-                        <Clock className="h-3.5 w-3.5 text-content-subtle" aria-hidden="true" />
-                        <span>ยื่นคำขอเมื่อ {formatThaiDateTimeWithTimeWord(request.createdAt)}</span>
-                    </p>
+                    <div className="flex shrink-0 items-center gap-2 sm:justify-end">
+                        <span className="text-xs/5 font-semibold text-content-muted">สถานะคำขอ</span>
+                        <LeaveStatusBadge status={request.status} />
+                    </div>
+                </div>
+
+                <div className="grid gap-4 border-t border-border-subtle pt-4 sm:grid-cols-2">
+                    <div className="min-w-0 space-y-1">
+                        <p className="text-xs/5 font-semibold text-content-muted">วันที่ลา</p>
+                        <p className="break-words text-sm/6 font-medium text-content-secondary">
+                            {formatLeaveDateRange(request.startDate, request.endDate)}
+                        </p>
+                        <p className="text-xs/5 font-medium text-content-muted">
+                            {periodLabel(request.period)} ({request.durationDays} วัน)
+                        </p>
+                    </div>
+                    <div className="min-w-0 space-y-1 sm:text-right">
+                        <p className="text-xs/5 font-semibold text-content-muted">ส่งคำขอเมื่อ</p>
+                        <p className="break-words text-sm/6 font-medium text-content-secondary">
+                            {formatThaiDateTimeWithTimeWord(request.createdAt)}
+                        </p>
+                    </div>
+                </div>
+
+                <div className="space-y-3">
                     <LeaveNote label="เหตุผล" text={request.reason} />
                     {request.status === "REJECTED" && request.rejectReason ? (
                         <LeaveNote tone="danger" label="เหตุผลที่ไม่อนุมัติ" text={request.rejectReason} />
@@ -137,34 +157,39 @@ function LeaveHistoryItem({
                         <LeaveNote tone="info" label="ไม่ได้ใช้วันลา" text={request.notTakenReason} />
                     ) : null}
                 </div>
-                <div className="flex flex-wrap items-center gap-2 lg:justify-end">
-                    <LeaveStatusBadge status={request.status} />
-                    <LeaveAttachmentViewerButton attachments={request.attachments} />
-                    {request.status === "PENDING" || canRequestApprovedCancellation(request) ? (
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            className="border-rose-200 text-rose-700 hover:bg-rose-50 hover:text-rose-800"
-                            disabled={isSubmitting}
-                            onClick={() => onCancelRequest(request)}
-                        >
-                            <X className="h-4 w-4" aria-hidden="true" />
-                            {request.status === "PENDING" ? "ยกเลิก" : "ขอยกเลิก"}
-                        </Button>
-                    ) : null}
-                    {canRequestNotTaken(request) ? (
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            className="border-cyan-200 text-cyan-700 hover:bg-cyan-50 hover:text-cyan-800"
-                            disabled={isSubmitting}
-                            onClick={() => onNotTakenRequest(request.id)}
-                        >
-                            <RotateCcw className="h-4 w-4" aria-hidden="true" />
-                            แจ้งไม่ได้ใช้วันลา
-                        </Button>
-                    ) : null}
-                </div>
+
+                {hasActions ? (
+                    <div className="flex flex-col gap-3 border-t border-border-subtle pt-4 sm:flex-row sm:items-center sm:justify-between">
+                        <p className="text-xs/5 font-semibold text-content-muted">การดำเนินการ</p>
+                        <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+                            <LeaveAttachmentViewerButton attachments={request.attachments} />
+                            {canCancel ? (
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="border-rose-200 text-rose-700 hover:bg-rose-50 hover:text-rose-800"
+                                    disabled={isSubmitting}
+                                    onClick={() => onCancelRequest(request)}
+                                >
+                                    <X className="h-4 w-4" aria-hidden="true" />
+                                    {request.status === "PENDING" ? "ยกเลิก" : "ขอยกเลิก"}
+                                </Button>
+                            ) : null}
+                            {canRequestNotTakenAction ? (
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="border-cyan-200 text-cyan-700 hover:bg-cyan-50 hover:text-cyan-800"
+                                    disabled={isSubmitting}
+                                    onClick={() => onNotTakenRequest(request.id)}
+                                >
+                                    <RotateCcw className="h-4 w-4" aria-hidden="true" />
+                                    แจ้งไม่ได้ใช้วันลา
+                                </Button>
+                            ) : null}
+                        </div>
+                    </div>
+                ) : null}
             </div>
         </Card>
     );

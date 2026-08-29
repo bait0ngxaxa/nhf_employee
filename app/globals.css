@@ -74,20 +74,13 @@
     --color-surface-neutral-subtle: var(--surface-neutral-subtle);
     --color-surface-neutral-muted: var(--surface-neutral-muted);
     --color-surface-neutral-border: var(--surface-neutral-border);
-    --color-brand-start: var(--brand-start);
-    --color-brand-end: var(--brand-end);
     --color-brand-surface: var(--brand-surface);
     --color-brand-surface-strong: var(--brand-surface-strong);
     --color-brand-border: var(--brand-border);
-    --color-brand-shadow: var(--brand-shadow);
     --color-brand-foreground: var(--brand-foreground);
     --color-brand-strong: var(--brand-strong);
     --color-brand-solid: var(--brand-solid);
     --color-brand-solid-hover: var(--brand-solid-hover);
-    --color-action-gradient-start: var(--action-gradient-start);
-    --color-action-gradient-end: var(--action-gradient-end);
-    --color-action-gradient-hover-start: var(--action-gradient-hover-start);
-    --color-action-gradient-hover-end: var(--action-gradient-hover-end);
     --color-status-danger-surface: var(--status-danger-surface);
     --color-status-danger-border: var(--status-danger-border);
     --color-status-danger-foreground: var(--status-danger-foreground);
@@ -103,17 +96,11 @@
     --color-status-warning-foreground: var(--status-warning-foreground);
     --color-status-warning-solid: var(--status-warning-solid);
     --color-status-warning-strong: var(--status-warning-strong);
-    --color-module-leave-start: var(--module-leave-start);
-    --color-module-leave-end: var(--module-leave-end);
-    --color-module-leave-glow-end: var(--module-leave-glow-end);
     --color-module-leave-badge-surface: var(--module-leave-badge-surface);
     --color-module-leave-badge-foreground: var(--module-leave-badge-foreground);
     --color-module-leave-badge-border: var(--module-leave-badge-border);
     --color-module-leave-solid: var(--module-leave-solid);
     --color-module-leave-solid-hover: var(--module-leave-solid-hover);
-    --color-module-stock-start: var(--module-stock-start);
-    --color-module-stock-end: var(--module-stock-end);
-    --color-module-stock-glow-end: var(--module-stock-glow-end);
     --color-module-stock-badge-surface: var(--module-stock-badge-surface);
     --color-module-stock-badge-foreground: var(--module-stock-badge-foreground);
     --color-module-stock-badge-border: var(--module-stock-badge-border);
@@ -199,20 +186,13 @@
     --surface-inverted: #020617;
     --surface-inverted-strong: #0f172a;
     --surface-inverted-muted: #334155;
-    --brand-start: #0ea5e9;
-    --brand-end: #4f46e5;
     --brand-surface: #f0f9ff;
     --brand-surface-strong: #e0f2fe;
     --brand-border: #e0f2fe;
-    --brand-shadow: #e0f2fe;
     --brand-foreground: #0284c7;
     --brand-strong: #0c4a6e;
     --brand-solid: #0ea5e9;
     --brand-solid-hover: #0284c7;
-    --action-gradient-start: #2563eb;
-    --action-gradient-end: #0891b2;
-    --action-gradient-hover-start: #1d4ed8;
-    --action-gradient-hover-end: #0e7490;
     --status-danger-surface: #fff1f2;
     --status-danger-border: #fecdd3;
     --status-danger-foreground: #e11d48;
@@ -228,18 +208,12 @@
     --status-warning-foreground: #b45309;
     --status-warning-solid: #d97706;
     --status-warning-strong: #92400e;
-    --module-leave-start: #6366f1;
-    --module-leave-end: #2563eb;
-    --module-leave-glow-end: #3b82f6;
     --module-leave-badge-surface: #eef2ff;
     --module-leave-badge-foreground: #4338ca;
     --module-leave-badge-border: #e0e7ff;
     --module-leave-tab: #4f46e5;
     --module-leave-solid: #4f46e5;
     --module-leave-solid-hover: #4338ca;
-    --module-stock-start: #f97316;
-    --module-stock-end: #dc2626;
-    --module-stock-glow-end: #ef4444;
     --module-stock-badge-surface: #fff7ed;
     --module-stock-badge-foreground: #c2410c;
     --module-stock-badge-border: #ffedd5;
@@ -247,26 +221,11 @@
     --module-stock-solid: #ea580c;
     --module-stock-solid-hover: #c2410c;
     --brand-tab: #0369a1;
-    --app-shell-background: linear-gradient(
-        to bottom right,
-        #f8fafc,
-        #eff6ff,
-        #eef2ff
-    );
-    --section-shell-gradient-from: rgb(248 250 252 / 80%);
-    --section-shell-gradient-to: rgb(241 245 249 / 80%);
-    --section-shell-overlay: rgb(255 255 255 / 40%);
-    --section-shell-shadow: 0 20px 50px -12px rgb(0 0 0 / 3%);
-    --dashboard-glow-info: rgb(191 219 254 / 20%);
-    --dashboard-glow-accent: rgb(233 213 255 / 20%);
+    --app-shell-background: var(--surface-subtle);
     --sidebar-toggle-shadow: 0 4px 8px rgb(15 23 42 / 18%), 0 1px 2px rgb(15 23 42 / 12%);
     --brand-logo-shadow: 0 4px 8px rgb(15 23 42 / 18%), 0 1px 2px rgb(15 23 42 / 12%);
     --employee-table-sticky-shadow: -10px 0 18px -18px rgb(15 23 42 / 45%);
     --brand-sheen-subtle: linear-gradient(135deg, rgb(255 255 255 / 16%), rgb(255 255 255 / 0%) 45%);
-    --brand-sheen-strong: linear-gradient(135deg, rgb(255 255 255 / 18%), rgb(255 255 255 / 0%) 50%);
-    --audit-logs-background: radial-gradient(circle at 100% 0%, rgb(255 228 230 / 60%) 0%, transparent 34%), radial-gradient(circle at 0% 100%, rgb(255 237 213 / 60%) 0%, transparent 38%);
-    --employee-management-glow-info: radial-gradient(circle at center, rgb(219 234 254 / 60%) 0%, transparent 70%);
-    --employee-management-glow-accent: radial-gradient(circle at center, rgb(207 250 254 / 60%) 0%, transparent 70%);
 }
 
 .dark {
@@ -340,20 +299,13 @@
     --surface-inverted: #020617;
     --surface-inverted-strong: #0f172a;
     --surface-inverted-muted: #334155;
-    --brand-start: var(--primary);
-    --brand-end: var(--primary);
     --brand-surface: var(--accent);
     --brand-surface-strong: var(--accent);
     --brand-border: var(--border);
-    --brand-shadow: var(--border);
     --brand-foreground: var(--primary);
     --brand-strong: var(--primary);
     --brand-solid: var(--primary);
     --brand-solid-hover: var(--primary);
-    --action-gradient-start: var(--primary);
-    --action-gradient-end: var(--primary);
-    --action-gradient-hover-start: var(--primary);
-    --action-gradient-hover-end: var(--primary);
     --status-danger-surface: color-mix(in oklch, var(--destructive) 16%, var(--background));
     --status-danger-border: color-mix(in oklch, var(--destructive) 35%, var(--background));
     --status-danger-foreground: var(--destructive);
@@ -369,18 +321,12 @@
     --status-warning-foreground: #fbbf24;
     --status-warning-solid: #f59e0b;
     --status-warning-strong: #fcd34d;
-    --module-leave-start: var(--primary);
-    --module-leave-end: var(--primary);
-    --module-leave-glow-end: var(--primary);
     --module-leave-badge-surface: var(--accent);
     --module-leave-badge-foreground: var(--primary);
     --module-leave-badge-border: var(--border);
     --module-leave-tab: var(--primary);
     --module-leave-solid: var(--primary);
     --module-leave-solid-hover: var(--primary);
-    --module-stock-start: var(--primary);
-    --module-stock-end: var(--primary);
-    --module-stock-glow-end: var(--primary);
     --module-stock-badge-surface: var(--accent);
     --module-stock-badge-foreground: var(--primary);
     --module-stock-badge-border: var(--border);
@@ -389,20 +335,10 @@
     --module-stock-solid-hover: var(--primary);
     --brand-tab: var(--primary);
     --app-shell-background: var(--background);
-    --section-shell-gradient-from: transparent;
-    --section-shell-gradient-to: transparent;
-    --section-shell-overlay: transparent;
-    --section-shell-shadow: none;
-    --dashboard-glow-info: transparent;
-    --dashboard-glow-accent: transparent;
     --sidebar-toggle-shadow: 0 4px 8px rgb(0 0 0 / 30%), 0 1px 2px rgb(0 0 0 / 20%);
     --brand-logo-shadow: 0 4px 8px rgb(0 0 0 / 30%), 0 1px 2px rgb(0 0 0 / 20%);
     --employee-table-sticky-shadow: -10px 0 18px -18px rgb(0 0 0 / 45%);
     --brand-sheen-subtle: linear-gradient(135deg, rgb(255 255 255 / 10%), rgb(255 255 255 / 0%) 45%);
-    --brand-sheen-strong: linear-gradient(135deg, rgb(255 255 255 / 12%), rgb(255 255 255 / 0%) 50%);
-    --audit-logs-background: linear-gradient(var(--background), var(--background));
-    --employee-management-glow-info: none;
-    --employee-management-glow-accent: none;
 }
 
 @layer base {
@@ -435,22 +371,6 @@
         background: var(--app-shell-background);
     }
 
-    .section-shell-overlay {
-        background: var(--section-shell-overlay);
-    }
-
-    .section-shell-shadow {
-        box-shadow: var(--section-shell-shadow);
-    }
-
-    .dashboard-glow-info {
-        background: var(--dashboard-glow-info);
-    }
-
-    .dashboard-glow-accent {
-        background: var(--dashboard-glow-accent);
-    }
-
     .sidebar-toggle-shadow {
         box-shadow: var(--sidebar-toggle-shadow);
     }
@@ -465,22 +385,6 @@
 
     .brand-sheen-subtle {
         background: var(--brand-sheen-subtle);
-    }
-
-    .brand-sheen-strong {
-        background: var(--brand-sheen-strong);
-    }
-
-    .audit-logs-background {
-        background-image: var(--audit-logs-background);
-    }
-
-    .employee-management-glow-info {
-        background: var(--employee-management-glow-info);
-    }
-
-    .employee-management-glow-accent {
-        background: var(--employee-management-glow-accent);
     }
 
 }
@@ -509,16 +413,6 @@ a,
     }
 }
 
-@keyframes dashboard-soft-drift {
-    0%,
-    100% {
-        transform: translate3d(0, 0, 0) scale(1);
-    }
-    50% {
-        transform: translate3d(-8px, 6px, 0) scale(1.04);
-    }
-}
-
 @keyframes dashboard-stock-sheen {
     from {
         transform: translateX(-130%) skewX(-18deg);
@@ -539,10 +433,6 @@ a,
 
 .dashboard-card-enter {
     animation: dashboard-card-enter 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
-}
-
-.dashboard-card-drift {
-    animation: dashboard-soft-drift 7s ease-in-out infinite;
 }
 
 .dashboard-stock-sheen {

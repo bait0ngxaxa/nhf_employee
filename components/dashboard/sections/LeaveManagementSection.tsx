@@ -1,6 +1,5 @@
 "use client";
 
-import { CalendarRange, CalendarDays, CheckSquare, Settings2, BarChart3 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useDashboardDataContext } from "@/components/dashboard/context/dashboard/DashboardContext";
 import { EmployeeLeaveDashboard } from "@/components/dashboard/leave/EmployeeLeaveDashboard";
@@ -44,16 +43,10 @@ export function LeaveManagementSection({ defaultTab = "my-leave" }: LeaveManagem
     const safeActiveTab = activeTabIsVisible ? activeTab : "my-leave";
 
     return (
-        <SectionShell
-            gradientFrom="transparent"
-            gradientTo="transparent"
-            className="border-border-subtle/70 bg-surface shadow-sm"
-        >
+        <SectionShell className="border-border-subtle/70 bg-surface shadow-sm">
             <SectionHeader
-                icon={CalendarRange}
                 title="NHF Leave"
                 subtitle="จัดการวันลาพักผ่อน ลากิจ ลาป่วย และตรวจสอบโควต้าของคุณ"
-                tone="leave"
             />
             {isMounted && hasTabs ? (
                 <SectionTabs
@@ -79,27 +72,23 @@ function getLeaveTabs(
         {
             value: "my-leave",
             label: "วันลาของฉัน",
-            icon: CalendarDays,
             content: <EmployeeLeaveDashboard />,
         },
         {
             value: "approvals",
             label: "อนุมัติการลา",
-            icon: CheckSquare,
             content: <ManagerApprovalDashboard isAdmin={isAdmin} />,
             visible: showApprovalTab,
         },
         {
             value: "reports",
             label: "รีพอร์ต",
-            icon: BarChart3,
             content: <LeaveReportsDashboard />,
             visible: canViewLeaveReports,
         },
         {
             value: "approver-settings",
             label: "จัดการผู้อนุมัติ",
-            icon: Settings2,
             content: <ApproverManagement />,
             visible: isAdmin,
         },

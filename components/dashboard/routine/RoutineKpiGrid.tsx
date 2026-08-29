@@ -1,6 +1,4 @@
-import { CalendarClock, CalendarDays, CalendarRange } from "lucide-react";
-
-import { Card } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { RoutineSummary } from "./types";
 
@@ -13,25 +11,19 @@ const KPI_ITEMS = [
     {
         key: "today",
         label: "งานถึงกำหนดวันนี้",
-        icon: CalendarDays,
-        cardClass: "border-brand-border bg-brand-surface",
-        iconClass: "bg-brand-surface-strong text-brand-strong",
+        accentClass: "bg-brand-solid",
         valueClass: "text-brand-strong",
     },
     {
         key: "dueSoon",
         label: "งานใกล้ถึงกำหนด 7 วัน",
-        icon: CalendarClock,
-        cardClass: "border-status-warning-border bg-status-warning-surface",
-        iconClass: "bg-status-warning-border text-status-warning-strong",
+        accentClass: "bg-status-warning-solid",
         valueClass: "text-status-warning-strong",
     },
     {
         key: "within30Days",
         label: "งานภายใน 30 วัน",
-        icon: CalendarRange,
-        cardClass: "border-status-success-border bg-status-success-surface",
-        iconClass: "bg-status-success-border text-status-success-strong",
+        accentClass: "bg-status-success-solid",
         valueClass: "text-status-success-strong",
     },
 ] as const;
@@ -46,30 +38,33 @@ export function RoutineKpiGrid({
             aria-busy={isLoading}
         >
             {KPI_ITEMS.map((item) => {
-                const Icon = item.icon;
                 return (
                     <Card
                         key={item.key}
-                        className={`gap-4 rounded-xl border px-5 py-5 shadow-sm ${item.cardClass}`}
+                        className="h-full border-border-subtle shadow-none"
                     >
-                        <div className="flex items-center justify-between gap-3">
-                            <p className="max-w-[18ch] text-sm font-semibold leading-5 text-content-secondary">
+                        <CardContent className="flex h-full flex-col p-5">
+                            <div
+                                className="mb-4 flex items-center gap-2"
+                                aria-hidden="true"
+                            >
+                                <span className={`h-1 w-8 rounded-full ${item.accentClass}`} />
+                                <span className="h-px flex-1 bg-border-muted" />
+                            </div>
+                            <p className="text-base/6 font-semibold text-content-heading">
                                 {item.label}
                             </p>
-                            <span className={`flex size-10 shrink-0 items-center justify-center rounded-xl ${item.iconClass}`}>
-                                <Icon className="size-5" aria-hidden="true" />
-                            </span>
-                        </div>
-                        <div
-                            className={`min-h-9 text-3xl font-bold tracking-tight tabular-nums ${item.valueClass}`}
-                            aria-live="polite"
-                        >
-                            {isLoading ? (
-                                <Skeleton className="h-9 w-16" />
-                            ) : (
-                                summary?.[item.key] ?? 0
-                            )}
-                        </div>
+                            <div
+                                className={`mt-4 min-h-9 text-3xl font-bold tracking-tight tabular-nums ${item.valueClass}`}
+                                aria-live="polite"
+                            >
+                                {isLoading ? (
+                                    <Skeleton className="h-9 w-16" />
+                                ) : (
+                                    summary?.[item.key] ?? 0
+                                )}
+                            </div>
+                        </CardContent>
                     </Card>
                 );
             })}

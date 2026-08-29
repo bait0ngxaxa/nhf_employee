@@ -60,12 +60,9 @@ function HistorySkeleton(): ReactElement {
     return (
         <div className="rounded-2xl border border-border bg-card p-6 shadow-sm">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                <div className="flex min-w-0 items-center gap-3">
-                    <Skeleton className="h-10 w-10 rounded-xl" />
-                    <div className="space-y-2">
-                        <Skeleton className="h-5 w-56" />
-                        <Skeleton className="h-4 w-64 max-w-full" />
-                    </div>
+                <div className="space-y-2">
+                    <Skeleton className="h-5 w-56" />
+                    <Skeleton className="h-4 w-64 max-w-full" />
                 </div>
                 <Skeleton className="h-10 w-24" />
             </div>

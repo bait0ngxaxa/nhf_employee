@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { BarChart3, CalendarRange } from "lucide-react";
 import { toast } from "sonner";
 import { YearlyReportExportPanel } from "@/components/dashboard/shared/YearlyReportExportPanel";
 import {
@@ -149,8 +148,7 @@ export function LeaveReportsDashboard() {
                 exportLabel="ดาวน์โหลด Excel"
                 badge={
                     <div className="space-y-3">
-                        <div className="inline-flex items-center gap-2 rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-medium text-sky-800">
-                            <BarChart3 className="h-3.5 w-3.5" aria-hidden="true" />
+                        <div className="inline-flex rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-medium text-sky-800">
                             {getScopeLabel(scope)}
                         </div>
                         <div className="space-y-1.5">
@@ -185,12 +183,10 @@ export function LeaveReportsDashboard() {
                 description={getScopeDescription(scope)}
                 stats={[
                     {
-                        icon: <CalendarRange className="h-4 w-4" aria-hidden="true" />,
                         label: "ปีที่เลือก",
                         value: String(selectedYear),
                     },
                     {
-                        icon: <BarChart3 className="h-4 w-4" aria-hidden="true" />,
                         label: "ข้อมูลรายงาน",
                         value: isLoadingMeta
                             ? "กำลังโหลด..."

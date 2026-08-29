@@ -1,13 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import type { ElementType, ReactElement } from "react";
+import type { ReactElement } from "react";
 import {
     ArrowRight,
-    Building2,
     CheckCircle2,
-    ShieldCheck,
-    Sparkles,
-    UsersRound,
 } from "lucide-react";
 import { redirect } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -23,39 +19,24 @@ export const metadata: Metadata = {
 interface IntroPoint {
     title: string;
     description: string;
-    icon: ElementType;
-    cardClassName: string;
-    iconClassName: string;
 }
 
 const INTRO_POINTS: IntroPoint[] = [
     {
         title: "พื้นที่เดียวขององค์กร",
         description: "จุดเริ่มต้นสำหรับผู้ใช้งาน NHF",
-        icon: Building2,
-        cardClassName: "bg-blue-50 ring-blue-100",
-        iconClassName: "bg-surface-raised text-blue-700 ring-1 ring-blue-200",
     },
     {
         title: "เข้าถึงตามบทบาท",
         description: "เหมาะกับผู้ใช้งานในแต่ละบทบาทขององค์กร",
-        icon: ShieldCheck,
-        cardClassName: "bg-indigo-50 ring-indigo-100",
-        iconClassName: "bg-surface-raised text-indigo-700 ring-1 ring-indigo-200",
     },
     {
         title: "ใช้งานง่าย",
         description: "หน้าจอเรียบง่าย อ่านสบาย และไม่ซับซ้อนเกินจำเป็น",
-        icon: Sparkles,
-        cardClassName: "bg-cyan-50 ring-cyan-100",
-        iconClassName: "bg-surface-raised text-cyan-700 ring-1 ring-cyan-200",
     },
     {
         title: "สำหรับพนักงาน NHF",
         description: "สร้างขึ้นเพื่อรองรับการทำงานร่วมกันของคนในองค์กร",
-        icon: UsersRound,
-        cardClassName: "bg-surface-subtle ring-border-subtle",
-        iconClassName: "bg-surface-raised text-blue-700 ring-1 ring-blue-200",
     },
 ];
 
@@ -86,27 +67,19 @@ function BrandMark(): ReactElement {
 function IntroPointList() {
     return (
         <div className="grid gap-3 sm:grid-cols-2">
-            {INTRO_POINTS.map((point) => {
-                const Icon = point.icon;
-                return (
-                    <div
-                        key={point.title}
-                        className={`rounded-xl p-4 ring-1 ${point.cardClassName}`}
-                    >
-                        <div
-                            className={`mb-3 flex h-10 w-10 items-center justify-center rounded-lg ${point.iconClassName}`}
-                        >
-                            <Icon className="h-5 w-5" aria-hidden="true" />
-                        </div>
-                        <h3 className="text-base font-bold leading-6 text-content-heading [overflow-wrap:anywhere]">
-                            {point.title}
-                        </h3>
-                        <p className="mt-1 text-sm font-medium leading-6 text-content-body [overflow-wrap:anywhere]">
-                            {point.description}
-                        </p>
-                    </div>
-                );
-            })}
+            {INTRO_POINTS.map((point) => (
+                <div
+                    key={point.title}
+                    className="border-t border-border-neutral-default/60 pt-3"
+                >
+                    <h3 className="text-base font-bold leading-6 text-content-heading [overflow-wrap:anywhere]">
+                        {point.title}
+                    </h3>
+                    <p className="mt-1 text-sm font-medium leading-6 text-content-body [overflow-wrap:anywhere]">
+                        {point.description}
+                    </p>
+                </div>
+            ))}
         </div>
     );
 }
@@ -114,18 +87,13 @@ function IntroPointList() {
 function AccessPanel() {
     return (
         <aside className="rounded-2xl border border-border-neutral-default/70 bg-surface-raised/90 p-6 text-content-heading shadow-sm md:p-8">
-            <div className="flex items-start justify-between gap-4">
-                <div>
-                    <p className="text-sm font-semibold text-blue-700">
-                        แอปสำหรับพนักงาน
-                    </p>
-                    <h2 className="mt-3 text-2xl font-bold leading-tight text-content-heading text-balance">
-                        เริ่มต้นใช้งาน NHFapp
-                    </h2>
-                </div>
-                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-700 ring-1 ring-blue-100">
-                    <ShieldCheck className="h-5 w-5" aria-hidden="true" />
-                </div>
+            <div>
+                <p className="text-sm font-semibold text-blue-700">
+                    แอปสำหรับพนักงาน
+                </p>
+                <h2 className="mt-3 text-2xl font-bold leading-tight text-content-heading text-balance">
+                    เริ่มต้นใช้งาน NHFapp
+                </h2>
             </div>
 
             <div className="mt-6 space-y-3">
@@ -146,7 +114,7 @@ function AccessPanel() {
                 <Button
                     asChild
                     size="lg"
-                    className="rounded-xl bg-gradient-to-r from-action-gradient-start to-action-gradient-end text-content-on-brand hover:from-action-gradient-hover-start hover:to-action-gradient-hover-end"
+                    className="rounded-xl bg-brand-solid text-content-on-brand hover:bg-brand-solid-hover"
                 >
                     <Link href={APP_ROUTES.login}>
                         เข้าสู่ระบบ

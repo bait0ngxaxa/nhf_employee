@@ -406,11 +406,11 @@ export function StockVariantPickerDialog({
                             ยกเลิก
                         </Button>
                         <Button
-                            className="group/confirm h-11 bg-blue-600 font-bold text-content-on-brand shadow-sm transition-colors duration-200 hover:bg-blue-700"
+                            className="h-11 bg-blue-600 font-bold text-content-on-brand shadow-sm transition-colors duration-200 hover:bg-blue-700"
                             onClick={() => onConfirm(selections)}
                             disabled={selections.length === 0}
                         >
-                            <Plus className="mr-1 h-4 w-4 transition-transform duration-300 group-hover/confirm:translate-x-0.5 group-hover/confirm:scale-110" aria-hidden="true" />
+                            <Plus className="mr-1 h-4 w-4" aria-hidden="true" />
                             เพิ่ม {selectedVariantCount} รายการ ({selectedTotalQuantity} ชิ้น)
                         </Button>
                     </div>

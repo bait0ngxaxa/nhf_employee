@@ -106,7 +106,7 @@ export function AdjustDialog({ item, onClose, onSuccess }: AdjustDialogProps) {
                     </DialogTitle>
                 </div>
                 <form onSubmit={handleSubmit} className="space-y-5 px-5 py-5 sm:px-6">
-                    <div className="flex flex-col gap-0.5 rounded-xl border border-border-subtle bg-surface-subtle p-3.5 shadow-inner">
+            <div className="flex flex-col gap-0.5 rounded-xl border border-border-subtle bg-surface-subtle p-3.5">
                         <span className="text-sm font-semibold text-content-primary">
                             {item.name}
                         </span>

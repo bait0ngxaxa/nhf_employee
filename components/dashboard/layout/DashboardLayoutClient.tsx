@@ -83,20 +83,6 @@ export function DashboardLayoutClient({
 
             {/* Main Content Area */}
             <div className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-            {/* Background Effects - Optimized with contain */}
-                <div 
-                    className="absolute inset-0 overflow-hidden pointer-events-none contain-paint"
-                    style={{ willChange: 'transform' }}
-                >
-                    <div 
-                        className="dashboard-glow-info absolute top-0 right-0 h-[400px] w-[400px] rounded-full"
-                        style={{ filter: 'blur(80px)' }}
-                    />
-                    <div 
-                        className="dashboard-glow-accent absolute bottom-0 left-0 h-[400px] w-[400px] rounded-full"
-                        style={{ filter: 'blur(80px)' }}
-                    />
-                </div>
 
                 {/* Navbar */}
                 <DashboardNavbar />

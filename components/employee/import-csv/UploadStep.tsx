@@ -12,7 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Separator } from "@/components/ui/separator";
-import { Upload, XCircle, Download } from "lucide-react";
+import { XCircle, Download } from "lucide-react";
 import { type UploadStepProps } from "./types";
 
 export function UploadStep({
@@ -24,9 +24,8 @@ export function UploadStep({
     return (
         <Card className="rounded-2xl border-border-subtle bg-surface-raised shadow-sm">
             <CardHeader>
-                <CardTitle className="flex min-w-0 items-center gap-2 text-xl font-bold text-content-heading">
-                    <Upload className="h-5 w-5 shrink-0" />
-                    <span>อัพโหลดไฟล์ CSV</span>
+                <CardTitle className="text-xl font-bold text-content-heading">
+                    อัพโหลดไฟล์ CSV
                 </CardTitle>
                 <CardDescription className="text-sm leading-6 text-content-secondary [overflow-wrap:anywhere]">
                     เลือกไฟล์ CSV ที่มีข้อมูลพนักงาน (ขนาดไฟล์สูงสุด 5MB)

@@ -1,13 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
-import {
-    Archive,
-    BarChart3,
-    FileSpreadsheet,
-    Loader2,
-    Package,
-} from "lucide-react";
+import { FileSpreadsheet, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { YearlyReportExportPanel } from "@/components/dashboard/shared/YearlyReportExportPanel";
 import { StockReportsSkeleton } from "./StockSkeletons";
@@ -35,8 +28,7 @@ export function StockAdminReports() {
                 buttonClassName="h-11 bg-orange-600 text-content-on-brand shadow-sm transition-colors duration-200 hover:bg-orange-700 hover:text-content-on-brand"
                 exportLabel={reports.reportExportLabel}
                 badge={
-                    <div className="inline-flex items-center gap-2 rounded-full border border-orange-100 bg-surface-raised/80 px-3 py-1 text-xs font-semibold text-orange-700 shadow-sm">
-                        <BarChart3 className="h-3.5 w-3.5" aria-hidden="true" />
+                    <div className="inline-flex rounded-full border border-orange-100 bg-surface-raised/80 px-3 py-1 text-xs font-semibold text-orange-700 shadow-sm">
                         รายงานผู้ดูแล
                     </div>
                 }
@@ -44,17 +36,14 @@ export function StockAdminReports() {
                 description="ดาวน์โหลด Excel สรุปยอดจ่ายจริงแยกตามวัสดุและรายการย่อย"
                 stats={[
                     {
-                        icon: <FileSpreadsheet className="h-4 w-4" aria-hidden="true" />,
                         label: "ปีที่เลือก",
                         value: String(reports.selectedYear),
                     },
                     {
-                        icon: <BarChart3 className="h-4 w-4" aria-hidden="true" />,
                         label: "จำนวนรายการที่จ่าย",
                         value: `${reports.meta?.count ?? 0} รายการ`,
                     },
                     {
-                        icon: <FileSpreadsheet className="h-4 w-4" aria-hidden="true" />,
                         label: "สถานะการส่งออก",
                         value: reports.reportExportState,
                     },
@@ -64,8 +53,7 @@ export function StockAdminReports() {
             <div className="rounded-2xl border border-border-subtle bg-surface-raised p-5 shadow-sm">
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                     <div className="space-y-2">
-                        <div className="inline-flex items-center gap-2 rounded-full border border-emerald-100 bg-surface-raised/80 px-3 py-1 text-xs font-semibold text-emerald-700 shadow-sm">
-                            <Archive className="h-3.5 w-3.5" aria-hidden="true" />
+                        <div className="inline-flex rounded-full border border-emerald-100 bg-surface-raised/80 px-3 py-1 text-xs font-semibold text-emerald-700 shadow-sm">
                             ยอดคงเหลือ
                         </div>
                         <div>
@@ -97,17 +85,14 @@ export function StockAdminReports() {
 
                 <div className="mt-5 grid gap-3 md:grid-cols-3">
                     <ReportStatCard
-                        icon={<Package className="h-4 w-4" aria-hidden="true" />}
                         label="จำนวนวัสดุ"
                         value={`${reports.balanceMeta?.count ?? 0} รายการ`}
                     />
                     <ReportStatCard
-                        icon={<Archive className="h-4 w-4" aria-hidden="true" />}
                         label="ขอบเขตข้อมูล"
                         value="ยอดคงเหลือปัจจุบัน"
                     />
                     <ReportStatCard
-                        icon={<FileSpreadsheet className="h-4 w-4" aria-hidden="true" />}
                         label="สถานะการส่งออก"
                         value={reports.balanceExportState}
                     />
@@ -118,20 +103,15 @@ export function StockAdminReports() {
 }
 
 function ReportStatCard({
-    icon,
     label,
     value,
 }: {
-    icon: ReactNode;
     label: string;
     value: string;
 }) {
     return (
         <div className="rounded-2xl border border-border-subtle bg-surface-subtle/70 p-4">
-            <div className="flex items-center gap-2 text-xs font-semibold text-content-muted">
-                {icon}
-                {label}
-            </div>
+            <div className="text-xs font-semibold text-content-muted">{label}</div>
             <div className="mt-2 text-base font-bold text-content-strong">{value}</div>
         </div>
     );

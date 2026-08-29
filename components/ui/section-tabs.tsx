@@ -1,5 +1,4 @@
 import { useEffect, useRef, type CSSProperties, type ReactNode } from "react";
-import { type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/ui/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
@@ -9,7 +8,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 export interface SectionTabItem {
     value: string;
     label: string;
-    icon?: LucideIcon;
     content: ReactNode;
     /** Whether this tab is conditionally shown */
     visible?: boolean;
@@ -71,7 +69,6 @@ export function SectionTabs({
                     data-section-tabs=""
                 >
                     {visibleTabs.map((tab) => {
-                        const TabIcon = tab.icon;
                         return (
                             <TabsTrigger
                                 key={tab.value}
@@ -87,9 +84,6 @@ export function SectionTabs({
                                     triggerRefs.current[tab.value] = node;
                                 }}
                             >
-                                {TabIcon && (
-                                    <TabIcon className="h-4 w-4 shrink-0" aria-hidden="true" />
-                                )}
                                 <span className="min-w-0 max-w-full md:line-clamp-2 md:whitespace-normal">
                                     {tab.label}
                                 </span>

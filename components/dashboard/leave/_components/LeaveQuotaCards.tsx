@@ -1,5 +1,3 @@
-import type { ComponentType } from "react";
-import { Briefcase, Palmtree, Thermometer } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import type { LeaveQuotaBalance } from "@/hooks/useLeaveProfile";
 import { cn } from "@/lib/ui/utils";
@@ -18,10 +16,7 @@ interface QuotaCardProps {
     annualTotal: number;
     carryBalance?: number;
     note: string;
-    icon: ComponentType<{ className?: string }>;
     theme: {
-        iconSurface: string;
-        iconColor: string;
         valueColor: string;
         barColor: string;
     };
@@ -35,7 +30,6 @@ function QuotaCard({
     annualTotal,
     carryBalance,
     note,
-    icon: Icon,
     theme,
 }: QuotaCardProps) {
     const isOverQuota = remain < 0;
@@ -44,28 +38,23 @@ function QuotaCard({
     const showCarry = carryBalance !== undefined;
 
     return (
-        <Card className="h-full border-border-subtle shadow-sm">
+        <Card className="h-full border-border-subtle shadow-none">
             <CardContent className="flex h-full flex-col p-5">
-                <div className="flex items-start justify-between gap-4">
-                    <div className="min-w-0">
-                        <p className="text-base/6 font-semibold text-content-heading">{title}</p>
-                        <p className="mt-1 text-xs/5 font-medium text-content-muted">{note}</p>
-                        <div className="mt-4 flex items-baseline gap-2">
-                            <p
-                                className={cn(
-                                    "tabular-nums text-4xl font-bold tracking-tight",
-                                    isOverQuota ? "text-rose-700" : theme.valueColor,
-                                )}
-                            >
-                                {displayedRemain}
-                            </p>
-                            <p className="text-sm/6 font-semibold text-content-secondary">
-                                {isOverQuota ? "วันเกินสิทธิ์" : "วันคงเหลือ"}
-                            </p>
-                        </div>
-                    </div>
-                    <div className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-lg", theme.iconSurface)}>
-                        <Icon className={cn("h-5 w-5", theme.iconColor)} aria-hidden="true" />
+                <div className="min-w-0">
+                    <p className="text-base/6 font-semibold text-content-heading">{title}</p>
+                    <p className="mt-1 text-xs/5 font-medium text-content-muted">{note}</p>
+                    <div className="mt-4 flex items-baseline gap-2">
+                        <p
+                            className={cn(
+                                "tabular-nums text-4xl font-bold tracking-tight",
+                                isOverQuota ? "text-rose-700" : theme.valueColor,
+                            )}
+                        >
+                            {displayedRemain}
+                        </p>
+                        <p className="text-sm/6 font-semibold text-content-secondary">
+                            {isOverQuota ? "วันเกินสิทธิ์" : "วันคงเหลือ"}
+                        </p>
                     </div>
                 </div>
 
@@ -126,10 +115,7 @@ export function LeaveQuotaCards({ sickQuota, personalQuota, vacationQuota }: Lea
                 total={sickQuota.effectiveTotalDays}
                 annualTotal={sickQuota.totalDays}
                 note="สิทธิประจำปี"
-                icon={Thermometer}
                 theme={{
-                    iconSurface: "bg-emerald-50",
-                    iconColor: "text-emerald-700",
                     valueColor: "text-emerald-700",
                     barColor: "bg-emerald-500",
                 }}
@@ -142,10 +128,7 @@ export function LeaveQuotaCards({ sickQuota, personalQuota, vacationQuota }: Lea
                 annualTotal={personalQuota.totalDays}
                 carryBalance={personalQuota.carryBalanceDays}
                 note="สิทธิรวมหลังยอดยกมา"
-                icon={Briefcase}
                 theme={{
-                    iconSurface: "bg-sky-50",
-                    iconColor: "text-sky-700",
                     valueColor: "text-sky-700",
                     barColor: "bg-sky-500",
                 }}
@@ -158,10 +141,7 @@ export function LeaveQuotaCards({ sickQuota, personalQuota, vacationQuota }: Lea
                 annualTotal={vacationQuota.totalDays}
                 carryBalance={vacationQuota.carryBalanceDays}
                 note="สิทธิรวมหลังยอดยกมา"
-                icon={Palmtree}
                 theme={{
-                    iconSurface: "bg-amber-50",
-                    iconColor: "text-amber-700",
                     valueColor: "text-amber-700",
                     barColor: "bg-amber-500",
                 }}

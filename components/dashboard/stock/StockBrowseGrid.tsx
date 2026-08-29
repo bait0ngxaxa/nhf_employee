@@ -148,7 +148,7 @@ function BrowseCardBase(props: BrowseCardProps) {
                     : "border-blue-100/80 hover:border-blue-300"
         }`}>
             <CardContent className="flex h-full flex-col gap-2.5 p-3">
-                <div className="overflow-hidden rounded-2xl bg-surface-subtle ring-1 ring-border-subtle shadow-inner shadow-white/70">
+                <div className="overflow-hidden rounded-2xl bg-surface-subtle ring-1 ring-border-subtle">
                     <div className="flex min-h-10 items-start border-b border-border-subtle bg-surface-subtle px-2 py-1">
                         <Badge
                             variant="secondary"
@@ -208,7 +208,7 @@ function BrowseCardBase(props: BrowseCardProps) {
                     ) : null}
                 </div>
 
-                <div className="flex min-h-[5.75rem] flex-col justify-between rounded-2xl border border-border-subtle bg-surface-subtle/80 p-2.5 shadow-inner shadow-white">
+                <div className="flex min-h-[5.75rem] flex-col justify-between rounded-2xl border border-border-subtle bg-surface-subtle/80 p-2.5">
                     <div className="min-h-5 text-sm font-semibold leading-5 text-content-strong">
                         {hasSelectableVariants(item) ? (
                             <>มี {variantCount} ตัวเลือก</>

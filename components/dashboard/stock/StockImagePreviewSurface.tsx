@@ -47,7 +47,7 @@ export function StockImagePreviewSurface({
                     </button>
                 </div>
                 <div className="flex min-h-0 flex-1 items-center justify-center bg-surface-subtle p-3 sm:p-5">
-                    <div className="flex max-h-full w-full items-center justify-center rounded-2xl border border-border-subtle bg-surface-raised p-2 shadow-inner shadow-slate-200/70 sm:p-3">
+                    <div className="flex max-h-full w-full items-center justify-center rounded-2xl border border-border-subtle bg-surface-raised p-2 sm:p-3">
                         <Image
                             src={imageUrl}
                             alt={itemName}

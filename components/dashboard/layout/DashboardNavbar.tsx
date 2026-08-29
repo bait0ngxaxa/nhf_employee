@@ -150,9 +150,7 @@ export function DashboardNavbar(): ReactElement {
                 {/* Right: User menu */}
                 <div className="flex shrink-0 items-center gap-2 sm:gap-4">
                     {/* Notifications */}
-                    <div className="rounded-2xl border border-border-muted bg-surface p-1 shadow-sm transition-transform hover:-translate-y-0.5">
-                        <NotificationDropdown />
-                    </div>
+                    <NotificationDropdown />
 
                     <div className="mx-1 hidden h-8 w-px bg-border-muted sm:block" />
 
@@ -163,11 +161,11 @@ export function DashboardNavbar(): ReactElement {
                                 variant="ghost"
                                 className={cn(
                                     "h-12 gap-3 px-1 pr-4 rounded-[1.25rem] transition-colors",
-                                    "border border-border-muted bg-surface shadow-sm hover:border-brand-border hover:shadow-md",
+                                    "border border-border-muted bg-surface hover:border-brand-border",
                                     "hidden sm:flex group",
                                 )}
                             >
-                                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-brand-start to-brand-end shadow-lg shadow-brand-shadow">
+                                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-solid">
                                     <User className="h-5 w-5 text-content-on-brand" />
                                 </div>
                                 <div className="flex flex-col items-start text-left">
@@ -233,7 +231,7 @@ export function DashboardNavbar(): ReactElement {
                                 className="rounded-2xl border border-border-muted bg-surface sm:hidden"
                                 aria-label="เมนูผู้ใช้"
                             >
-                                <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-brand-start to-brand-end">
+                                <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-brand-solid">
                                     <User className="h-4 w-4 text-content-on-brand" />
                                 </div>
                             </Button>

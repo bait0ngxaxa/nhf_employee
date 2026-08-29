@@ -79,23 +79,18 @@ export function AuditLogViewerSkeleton(): ReactElement {
 export function AuditLogsSectionSkeleton(): ReactElement {
     return (
         <div
-            className="relative min-h-[calc(100dvh-6rem)] overflow-hidden rounded-3xl border border-content-on-brand/60 bg-surface-subtle/50 shadow-inner"
+            className="min-h-[calc(100dvh-6rem)] overflow-hidden rounded-2xl border border-border-subtle bg-surface-subtle"
             role="status"
             aria-live="polite"
             aria-busy="true"
             aria-label="กำลังโหลดหน้าบันทึกการใช้งาน"
         >
-            <div className="relative z-10 min-w-0 space-y-8 p-4 md:p-8">
-                <div className="flex min-w-0 items-center gap-4 sm:gap-5">
-                    <Skeleton className="h-14 w-14 shrink-0 rounded-2xl" />
-                    <div className="min-w-0 flex-1 space-y-2">
-                        <Skeleton className="h-8 w-56 max-w-full" />
-                        <Skeleton className="h-4 w-72 max-w-full" />
-                    </div>
+            <div className="min-w-0 space-y-8 p-4 md:p-8">
+                <div className="min-w-0 space-y-2">
+                    <Skeleton className="h-8 w-56 max-w-full" />
+                    <Skeleton className="h-4 w-72 max-w-full" />
                 </div>
-                <div className="rounded-2xl bg-surface/95 p-1 shadow-lg ring-1 ring-surface-neutral-border">
-                    <AuditLogViewerSkeletonContent />
-                </div>
+                <AuditLogViewerSkeletonContent />
             </div>
         </div>
     );

@@ -154,7 +154,7 @@ export function StockBrowseCartPanel({
                             type="button"
                             onClick={onSubmit}
                             disabled={!canSubmit}
-                            className="group/submit h-11 w-full bg-blue-600 font-bold text-content-on-brand shadow-sm transition-colors duration-200 hover:bg-blue-700"
+                            className="h-11 w-full bg-blue-600 font-bold text-content-on-brand shadow-sm transition-colors duration-200 hover:bg-blue-700"
                         >
                             {submitting ? (
                                 <Loader2
@@ -163,7 +163,7 @@ export function StockBrowseCartPanel({
                                 />
                             ) : (
                                 <CheckCircle2
-                                    className="mr-1.5 h-4 w-4 transition-transform duration-300 group-hover/submit:scale-110"
+                                    className="mr-1.5 h-4 w-4"
                                     aria-hidden="true"
                                 />
                             )}
@@ -174,10 +174,10 @@ export function StockBrowseCartPanel({
                             variant="ghost"
                             onClick={() => setIsClearConfirmOpen(true)}
                             disabled={submitting || cartSize === 0}
-                            className="group/clear h-11 w-full border border-rose-100 text-rose-600 transition-colors duration-200 hover:border-rose-200 hover:bg-rose-50 hover:text-rose-700"
+                            className="h-11 w-full border border-rose-100 text-rose-600 transition-colors duration-200 hover:border-rose-200 hover:bg-rose-50 hover:text-rose-700"
                         >
                             <XCircle
-                                className="mr-1.5 h-4 w-4 transition-transform duration-300 group-hover/clear:scale-110"
+                                className="mr-1.5 h-4 w-4"
                                 aria-hidden="true"
                             />
                             ยกเลิกทั้งหมด
@@ -242,7 +242,7 @@ function CartRow(props: {
 
     return (
         <div className="flex items-start gap-3 rounded-2xl border border-border-subtle/80 bg-surface-raised p-3 shadow-sm sm:items-center">
-            <div className="shrink-0 overflow-hidden rounded-xl bg-surface-raised ring-1 ring-border-subtle shadow-inner shadow-white">
+                            <div className="shrink-0 overflow-hidden rounded-xl bg-surface-raised ring-1 ring-border-subtle">
                 {imageUrl ? (
                     <Image
                         src={imageUrl}

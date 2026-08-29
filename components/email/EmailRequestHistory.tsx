@@ -18,7 +18,6 @@ import {
     ChevronRight,
     CheckCircle,
     AlertCircle,
-    History,
     RefreshCw,
 } from "lucide-react";
 import { useEmailRequestHistory } from "@/hooks/useEmailRequestHistory";
@@ -59,18 +58,13 @@ export function EmailRequestHistory(): ReactElement | null {
         <Card className="rounded-2xl border-border bg-card shadow-sm">
             <CardHeader>
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                    <div className="flex min-w-0 items-center gap-3">
-                        <div className="rounded-xl bg-primary/10 p-2">
-                            <History className="h-5 w-5 text-primary" />
-                        </div>
-                        <div className="min-w-0">
-                            <CardTitle className="text-xl [overflow-wrap:anywhere]">
-                                ประวัติคำร้องพนักงานใหม่
-                            </CardTitle>
-                            <p className="text-sm leading-6 text-muted-foreground [overflow-wrap:anywhere]">
-                                รายการคำร้องพนักงานใหม่ที่เคยส่งไปแล้ว
-                            </p>
-                        </div>
+                    <div className="min-w-0">
+                        <CardTitle className="text-xl [overflow-wrap:anywhere]">
+                            ประวัติคำร้องพนักงานใหม่
+                        </CardTitle>
+                        <p className="text-sm leading-6 text-muted-foreground [overflow-wrap:anywhere]">
+                            รายการคำร้องพนักงานใหม่ที่เคยส่งไปแล้ว
+                        </p>
                     </div>
                     <Button
                         type="button"

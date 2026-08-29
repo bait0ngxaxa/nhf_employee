@@ -179,7 +179,6 @@ export function RoutineSectionSkeleton(): ReactElement {
                         >
                             <div className="flex items-center justify-between gap-3">
                                 <Skeleton className="h-5 w-36" />
-                                <Skeleton className="h-10 w-10 rounded-xl" />
                             </div>
                             <Skeleton className="h-9 w-20" />
                         </div>

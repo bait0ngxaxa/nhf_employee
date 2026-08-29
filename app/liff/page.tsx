@@ -28,7 +28,7 @@ export default function Page(): ReactElement {
                     </div>
                     <Button
                         asChild
-                        className="min-h-12 w-full rounded-xl bg-gradient-to-r from-action-gradient-start to-action-gradient-end text-base font-semibold text-content-on-brand hover:from-action-gradient-hover-start hover:to-action-gradient-hover-end"
+                        className="min-h-12 w-full rounded-xl bg-brand-solid text-base font-semibold text-content-on-brand hover:bg-brand-solid-hover"
                     >
                         <Link href={APP_ROUTES.line.routine}>
                             เปิดงาน Routine ของฉัน

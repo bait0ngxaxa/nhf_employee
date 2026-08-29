@@ -126,20 +126,17 @@ export function EmployeeListSkeleton(): ReactElement {
 export function EmployeeManagementSectionSkeleton(): ReactElement {
     return (
         <div
-            className="relative min-h-[calc(100dvh-6rem)] overflow-hidden rounded-3xl border border-content-on-brand/60 bg-surface-subtle/50 shadow-inner"
+            className="min-h-[calc(100dvh-6rem)] overflow-hidden rounded-2xl border border-border-subtle bg-surface-subtle"
             role="status"
             aria-live="polite"
             aria-busy="true"
             aria-label="กำลังโหลดหน้าจัดการพนักงาน"
         >
-            <div className="relative z-10 min-w-0 space-y-8 p-4 md:p-8">
+            <div className="min-w-0 space-y-8 p-4 md:p-8">
                 <div className="flex min-w-0 flex-col justify-between gap-4 lg:flex-row lg:items-center">
-                    <div className="flex min-w-0 items-center gap-4 sm:gap-5">
-                        <Skeleton className="h-14 w-14 shrink-0 rounded-2xl" />
-                        <div className="min-w-0 flex-1 space-y-2">
-                            <Skeleton className="h-8 w-56 max-w-full" />
-                            <Skeleton className="h-4 w-80 max-w-full" />
-                        </div>
+                    <div className="min-w-0 space-y-2">
+                        <Skeleton className="h-8 w-56 max-w-full" />
+                        <Skeleton className="h-4 w-80 max-w-full" />
                     </div>
                     <div className="flex w-full flex-wrap gap-3 lg:w-auto lg:justify-end">
                         {Array.from({ length: 3 }).map((_, index) => (
@@ -159,10 +156,7 @@ export function EmployeeManagementSectionSkeleton(): ReactElement {
                     <div className="grid grid-cols-2 lg:grid-cols-4">
                         {Array.from({ length: 4 }).map((_, index) => (
                             <div key={index} className="space-y-4 border-border-muted p-4 sm:p-5">
-                                <div className="flex items-center gap-2.5">
-                                    <Skeleton className="h-8 w-8 rounded-lg" />
-                                    <Skeleton className="h-4 w-24" />
-                                </div>
+                                <Skeleton className="h-4 w-24" />
                                 <Skeleton className="h-8 w-20" />
                                 <Skeleton className="h-3 w-28" />
                             </div>
@@ -170,7 +164,7 @@ export function EmployeeManagementSectionSkeleton(): ReactElement {
                     </div>
                 </section>
 
-                <div className="rounded-2xl bg-surface/95 p-1 shadow-lg ring-1 ring-surface-neutral-border">
+                <section className="overflow-hidden rounded-xl border border-border-neutral-default bg-surface-raised">
                     <div className="border-b border-border-neutral-muted bg-surface-neutral-subtle/50 px-6 py-5">
                         <Skeleton className="h-6 w-40" />
                         <Skeleton className="mt-2 h-4 w-56" />
@@ -178,7 +172,7 @@ export function EmployeeManagementSectionSkeleton(): ReactElement {
                     <div className="p-0 sm:p-6">
                         <EmployeeListSkeletonContent />
                     </div>
-                </div>
+                </section>
             </div>
         </div>
     );
