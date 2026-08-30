@@ -158,16 +158,28 @@ describe("Routine Rich Menu provisioning", () => {
         expect(fetchMock).not.toHaveBeenCalled();
     });
 
-    it("fails before any API call when applying while Routine is disabled", async () => {
+    it("allows the unified provisioning wrapper to apply while Routine is disabled", async () => {
         vi.stubEnv("NEXT_PUBLIC_FEATURE_ROUTINE", "false");
 
-        await expect(
-            provisionRoutineRichMenu({ apply: true, fetchImpl: fetchMock }),
-        ).rejects.toMatchObject({
-            phase: "configuration",
-            message: expect.stringContaining("Routine feature is disabled"),
+        fetchMock
+            .mockResolvedValueOnce(emptyResponse())
+            .mockResolvedValueOnce(jsonResponse({ richMenuId: "richmenu-test" }))
+            .mockResolvedValueOnce(emptyResponse())
+            .mockResolvedValueOnce(emptyResponse())
+            .mockResolvedValueOnce(jsonResponse({ richMenuId: "richmenu-test" }));
+
+        const result = await provisionRoutineRichMenu({
+            apply: true,
+            fetchImpl: fetchMock,
         });
-        expect(fetchMock).not.toHaveBeenCalled();
+
+        expect(result).toMatchObject({
+            mode: "applied",
+            routineFeatureEnabled: false,
+            richMenuId: "richmenu-test",
+            verifiedDefaultRichMenuId: "richmenu-test",
+        });
+        expect(fetchMock).toHaveBeenCalledTimes(5);
     });
 
     it("loads the project environment with Next.js env semantics", () => {

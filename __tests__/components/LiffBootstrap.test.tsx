@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import type { ReactElement } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -95,6 +95,78 @@ describe("LiffBootstrap", () => {
         });
         expect(mocks.liff.getIDToken).toHaveBeenCalled();
         expect(mocks.establishLiffSession).toHaveBeenCalledWith("line-id-token");
+    });
+
+    it("keeps one authenticated bootstrap across persistent LIFF module navigation", async () => {
+        window.history.replaceState(null, "", "/liff");
+        mocks.usePathname.mockReturnValue("/liff");
+
+        const { rerender } = render(
+            <LiffBootstrap>
+                <div>Home</div>
+            </LiffBootstrap>,
+        );
+
+        expect(await screen.findByText("Home")).toBeInTheDocument();
+
+        for (const [pathname, label] of [
+            ["/liff/stock", "Stock"],
+            ["/liff/leave", "Leave"],
+            ["/liff/routine", "Routine"],
+        ] as const) {
+            window.history.replaceState(null, "", pathname);
+            mocks.usePathname.mockReturnValue(pathname);
+            rerender(
+                <LiffBootstrap>
+                    <div>{label}</div>
+                </LiffBootstrap>,
+            );
+            expect(screen.getByText(label)).toBeInTheDocument();
+        }
+
+        expect(mocks.liff.init).toHaveBeenCalledTimes(1);
+        expect(mocks.establishLiffSession).toHaveBeenCalledTimes(1);
+    });
+
+    it("does not bind session establishment to a route that changes while bootstrapping", async () => {
+        window.history.replaceState(null, "", "/liff");
+        mocks.usePathname.mockReturnValue("/liff");
+
+        let resolveSession: (() => void) | undefined;
+        const sessionReady = new Promise<void>((resolve) => {
+            resolveSession = resolve;
+        });
+        mocks.establishLiffSession.mockImplementationOnce(async () => {
+            await sessionReady;
+            return { linked: true, workforce: WORKFORCE };
+        });
+
+        const { rerender } = render(
+            <LiffBootstrap>
+                <div>Home</div>
+            </LiffBootstrap>,
+        );
+
+        await waitFor(() => {
+            expect(mocks.establishLiffSession).toHaveBeenCalledTimes(1);
+        });
+
+        window.history.replaceState(null, "", "/liff/stock");
+        mocks.usePathname.mockReturnValue("/liff/stock");
+        rerender(
+            <LiffBootstrap>
+                <div>Stock</div>
+            </LiffBootstrap>,
+        );
+
+        if (!resolveSession) {
+            throw new Error("Expected the LIFF session promise to be pending");
+        }
+        resolveSession();
+
+        expect(await screen.findByText("Stock")).toBeInTheDocument();
+        expect(mocks.liff.init).toHaveBeenCalledTimes(1);
+        expect(mocks.establishLiffSession).toHaveBeenCalledTimes(1);
     });
 
     it("starts LINE Login with the current LIFF path as the redirect URI", async () => {

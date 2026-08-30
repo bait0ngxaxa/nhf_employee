@@ -9,7 +9,10 @@ import { LineIdentityVerificationError } from "@/lib/line/errors";
 import { prisma } from "@/lib/db/prisma";
 import { getEmployeeBackedUserDisplayName } from "@/lib/helpers/employee-helpers";
 import type { LiffCapabilities } from "@/lib/line/liff-types";
-import { getActionableLeaveApprovalWhere } from "@/lib/services/leave/approval-queries";
+import {
+    getActionableLeaveApprovalWhere,
+    getAssignedLeaveApproverWhere,
+} from "@/lib/services/leave/approval-queries";
 import { isFeatureEnabled, FEATURE_KEYS } from "@/lib/ssot/features";
 import { forbidden, serverError, unauthorized } from "@/lib/ssot/http";
 import { isAdminRole } from "@/lib/ssot/permissions";
@@ -32,35 +35,19 @@ export async function getLiffCapabilities(
     const leaveEnabled = isFeatureEnabled(FEATURE_KEYS.leave);
     const routineEnabled = isFeatureEnabled(FEATURE_KEYS.routine);
 
-    const employee = leaveEnabled
-        ? await prisma.employee.findUnique({
-              where: { id: session.employeeId },
-              select: {
-                  subordinates: { select: { id: true }, take: 1 },
-                  approvals: {
-                      where: {
-                          exceptionApproverId: null,
-                          ...getActionableLeaveApprovalWhere(),
-                      },
-                      select: { id: true },
-                      take: 1,
-                  },
-                  exceptionApprovals: {
-                      where: getActionableLeaveApprovalWhere(),
-                      select: { id: true },
-                      take: 1,
-                  },
+    const actionableLeaveApproval = leaveEnabled
+        ? await prisma.leaveRequest.findFirst({
+              where: {
+                  AND: [
+                      getAssignedLeaveApproverWhere(session.employeeId),
+                      getActionableLeaveApprovalWhere(),
+                  ],
               },
+              select: { id: true },
           })
         : null;
 
-    const canApproveLeave = leaveEnabled
-        && (
-            isAdminRole(session.user.role)
-            || (employee?.subordinates.length ?? 0) > 0
-            || (employee?.approvals.length ?? 0) > 0
-            || (employee?.exceptionApprovals.length ?? 0) > 0
-        );
+    const canApproveLeave = leaveEnabled && actionableLeaveApproval !== null;
 
     return {
         canRequestStock: true,

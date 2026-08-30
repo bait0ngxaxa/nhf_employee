@@ -104,26 +104,50 @@ describe("NHFapp Rich Menu provisioning", () => {
         expect(fetchMock).not.toHaveBeenCalled();
     });
 
-    it("keeps disabled Leave safe in the plan while requiring Routine for apply", async () => {
+    it("allows unified Rich Menu apply when Leave is disabled", async () => {
         vi.stubEnv("NEXT_PUBLIC_FEATURE_LEAVE", "false");
 
-        const dryRun = await provisionNhfRichMenu({
-            apply: false,
+        fetchMock
+            .mockResolvedValueOnce(emptyResponse())
+            .mockResolvedValueOnce(jsonResponse({ richMenuId: "richmenu-test" }))
+            .mockResolvedValueOnce(emptyResponse())
+            .mockResolvedValueOnce(emptyResponse())
+            .mockResolvedValueOnce(jsonResponse({ richMenuId: "richmenu-test" }));
+
+        const result = await provisionNhfRichMenu({
+            apply: true,
             fetchImpl: fetchMock,
         });
-        expect(dryRun.modules.leave).toEqual({
+
+        expect(result.modules.leave).toEqual({
             enabled: false,
             status: "unavailable",
         });
+        expect(result.definition.areas).toHaveLength(3);
+        expect(fetchMock).toHaveBeenCalledTimes(5);
+    });
 
+    it("allows unified Rich Menu apply when Routine is disabled", async () => {
         vi.stubEnv("NEXT_PUBLIC_FEATURE_ROUTINE", "false");
-        await expect(
-            provisionNhfRichMenu({ apply: true, fetchImpl: fetchMock }),
-        ).rejects.toMatchObject({
-            phase: "configuration",
-            message: expect.stringContaining("Routine feature is disabled"),
+
+        fetchMock
+            .mockResolvedValueOnce(emptyResponse())
+            .mockResolvedValueOnce(jsonResponse({ richMenuId: "richmenu-test" }))
+            .mockResolvedValueOnce(emptyResponse())
+            .mockResolvedValueOnce(emptyResponse())
+            .mockResolvedValueOnce(jsonResponse({ richMenuId: "richmenu-test" }));
+
+        const result = await provisionNhfRichMenu({
+            apply: true,
+            fetchImpl: fetchMock,
         });
-        expect(fetchMock).not.toHaveBeenCalled();
+
+        expect(result.modules.routine).toEqual({
+            enabled: false,
+            status: "unavailable",
+        });
+        expect(result.definition.areas).toHaveLength(3);
+        expect(fetchMock).toHaveBeenCalledTimes(5);
     });
 
     it("validates, creates, uploads, sets, and verifies the unified menu", async () => {

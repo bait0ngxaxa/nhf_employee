@@ -795,12 +795,6 @@ export async function provisionNhfRichMenu(
     if (!options.apply) {
         return toNhfProvisionResult(prepared, "dry-run");
     }
-    if (!prepared.modules.routine.enabled) {
-        throw new RichMenuProvisioningError(
-            "configuration",
-            "Routine feature is disabled; unified Rich Menu provisioning cannot be applied",
-        );
-    }
 
     const fetchImpl = options.fetchImpl ?? fetch;
     await requestLineApi({

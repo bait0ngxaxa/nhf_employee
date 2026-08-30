@@ -1,7 +1,6 @@
 "use client";
 
 import liff from "@line/liff";
-import { usePathname } from "next/navigation";
 import {
     createContext,
     useContext,
@@ -161,12 +160,9 @@ function LiffLinkRequiredView({ loginUrl }: { loginUrl: string }): ReactElement 
 }
 
 export function LiffBootstrap({ children }: LiffBootstrapProps): ReactElement {
-    const pathname = usePathname();
     const [state, setState] = useState<LiffBootstrapState>("INITIALIZING");
     const [viewError, setViewError] = useState<LiffBootstrapError | null>(null);
     const [workforce, setWorkforce] = useState<LiffWorkforceIdentity | null>(null);
-    const [authenticatedPathname, setAuthenticatedPathname] =
-        useState<string | null>(null);
     const [loginUrl, setLoginUrl] = useState<string>(APP_ROUTES.login);
     const [retryNonce, setRetryNonce] = useState(0);
 
@@ -177,7 +173,6 @@ export function LiffBootstrap({ children }: LiffBootstrapProps): ReactElement {
             setState("INITIALIZING");
             setViewError(null);
             setWorkforce(null);
-            setAuthenticatedPathname(null);
 
             try {
                 await liff.init({ liffId: getLineLiffId() });
@@ -245,7 +240,6 @@ export function LiffBootstrap({ children }: LiffBootstrapProps): ReactElement {
                     setWorkforce(session.workforce);
                 }
 
-                setAuthenticatedPathname(pathname);
                 setState("READY");
             } catch (error) {
                 if (cancelled) return;
@@ -258,7 +252,7 @@ export function LiffBootstrap({ children }: LiffBootstrapProps): ReactElement {
         return () => {
             cancelled = true;
         };
-    }, [pathname, retryNonce]);
+    }, [retryNonce]);
 
     const contextValue = useMemo(() => workforce, [workforce]);
 
@@ -291,7 +285,6 @@ export function LiffBootstrap({ children }: LiffBootstrapProps): ReactElement {
     if (
         state !== "READY"
         || !contextValue
-        || authenticatedPathname !== pathname
     ) {
         return (
             <LoadingState
