@@ -2,9 +2,11 @@
 
 import type { ReactElement } from "react";
 
+import { APPROVER_LEAVE_HISTORY_STATUSES } from "@/constants/leave";
 import { useManagerApprovalModel } from "@/hooks/leave/useManagerApprovalModel";
 import { PendingApprovalList } from "./_components/PendingApprovalList";
 import { ApprovalHistoryList } from "./_components/ApprovalHistoryList";
+import { LeaveHistoryFilters } from "./_components/LeaveHistoryFilters";
 import { RejectLeaveDialog } from "./_components/RejectLeaveDialog";
 import { ApprovalConfirmDialog } from "./_components/ApprovalConfirmDialog";
 import { NotTakenPendingList } from "./_components/NotTakenPendingList";
@@ -87,7 +89,26 @@ export function ManagerApprovalDashboard(): ReactElement {
                     count={model.metadata?.history.totalItems ?? model.history.length}
                     tone="neutral"
                 />
-                <ApprovalHistoryList history={model.history} />
+                <LeaveHistoryFilters
+                    query={model.historyQuery}
+                    queryPlaceholder="ค้นหาชื่อพนักงาน..."
+                    queryLabel="ค้นหาชื่อพนักงานในประวัติการพิจารณา"
+                    leaveType={model.historyLeaveType}
+                    status={model.historyStatus}
+                    year={model.historyYear}
+                    yearOptions={model.metadata?.history.availableYears ?? []}
+                    statusOptions={APPROVER_LEAVE_HISTORY_STATUSES}
+                    hasActiveFilters={model.hasHistoryFilters}
+                    onQueryChange={model.setHistoryQuery}
+                    onLeaveTypeChange={model.setHistoryLeaveType}
+                    onStatusChange={model.setHistoryStatus}
+                    onYearChange={model.setHistoryYear}
+                    onReset={model.resetHistoryFilters}
+                />
+                <ApprovalHistoryList
+                    history={model.history}
+                    isFiltered={model.hasHistoryFilters}
+                />
                 <ApprovalPagination
                     metadata={model.metadata?.history}
                     onPageChange={model.setHistoryPage}

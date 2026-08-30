@@ -3,7 +3,7 @@ import type { Prisma } from "@prisma/client";
 
 import { requireActiveWorkforceSession } from "@/lib/auth/workforce";
 import { prisma } from "@/lib/db/prisma";
-import { notFound } from "@/lib/ssot/http";
+import { jsonError, notFound } from "@/lib/ssot/http";
 import { FEATURE_KEYS, isFeatureEnabled } from "@/lib/ssot/features";
 import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
 import { toLeaveRequestDays } from "@/lib/services/leave/half-days";
@@ -17,6 +17,11 @@ import {
 import {
     withLeaveAttachmentSummaries,
 } from "@/lib/services/leave/attachment-summary";
+import {
+    buildApproverLeaveHistoryFilterWhere,
+    getAvailableLeaveHistoryYears,
+    parseApproverLeaveHistoryFilters,
+} from "@/lib/services/leave/history-filters";
 
 const APPROVALS_PAGINATION_MESSAGES = {
     invalidPage: "หมายเลขหน้าต้องเป็นจำนวนเต็มที่มากกว่าหรือเท่ากับ 1",
@@ -45,6 +50,11 @@ export async function GET(req: Request): Promise<NextResponse> {
             );
         }
 
+        const filtersResult = parseApproverLeaveHistoryFilters(url);
+        if (!filtersResult.success) {
+            return jsonError(filtersResult.error, 400);
+        }
+
         const assignedApproverWhere = getAssignedLeaveApproverWhere(managerId);
         const pendingWhere: Prisma.LeaveRequestWhereInput = {
             ...assignedApproverWhere,
@@ -57,23 +67,30 @@ export async function GET(req: Request): Promise<NextResponse> {
             notTakenRequestedAt: { not: null },
             notTakenConfirmedAt: null,
         };
-        const historyWhere: Prisma.LeaveRequestWhereInput = {
-            AND: [
-                assignedApproverWhere,
-                {
-                    OR: [
-                        { status: { in: ["REJECTED", "NOT_TAKEN", "CANCELLED_AFTER_APPROVAL"] } },
-                        {
-                            status: "APPROVED",
-                            OR: [
-                                { notTakenRequestedAt: null },
-                                { notTakenConfirmedAt: { not: null } },
-                            ],
-                        },
-                    ],
-                },
-            ],
+        const historyScopeConditions: Prisma.LeaveRequestWhereInput[] = [
+            assignedApproverWhere,
+            {
+                OR: [
+                    { status: { in: ["REJECTED", "NOT_TAKEN", "CANCELLED_AFTER_APPROVAL"] } },
+                    {
+                        status: "APPROVED",
+                        OR: [
+                            { notTakenRequestedAt: null },
+                            { notTakenConfirmedAt: { not: null } },
+                        ],
+                    },
+                ],
+            },
+        ];
+        const historyScopeWhere: Prisma.LeaveRequestWhereInput = {
+            AND: historyScopeConditions,
         };
+        const historyFilterWhere = buildApproverLeaveHistoryFilterWhere(
+            filtersResult.filters,
+        );
+        const historyWhere: Prisma.LeaveRequestWhereInput = historyFilterWhere
+            ? { AND: [...historyScopeConditions, historyFilterWhere] }
+            : historyScopeWhere;
         const cancellationWhere: Prisma.LeaveRequestWhereInput = {
             ...exceptionActionApproverWhere,
             status: "CANCELLATION_REQUESTED",
@@ -88,6 +105,7 @@ export async function GET(req: Request): Promise<NextResponse> {
             historyCount,
             cancellationPending,
             cancellationCount,
+            availableYearRecords,
         ] = await Promise.all([
             prisma.leaveRequest.findMany({
                 where: pendingWhere,
@@ -127,6 +145,10 @@ export async function GET(req: Request): Promise<NextResponse> {
                 include: LEAVE_APPROVAL_REQUEST_INCLUDE,
             }),
             prisma.leaveRequest.count({ where: cancellationWhere }),
+            prisma.leaveRequest.findMany({
+                where: historyScopeWhere,
+                select: { startDate: true },
+            }),
         ]);
 
         return NextResponse.json({
@@ -145,7 +167,12 @@ export async function GET(req: Request): Promise<NextResponse> {
             metadata: {
                 pending: createLeaveApprovalMetadata(pendingPage, pendingCount),
                 notTakenPending: createLeaveApprovalMetadata(notTakenPage, notTakenCount),
-                history: createLeaveApprovalMetadata(historyPage, historyCount),
+                history: {
+                    ...createLeaveApprovalMetadata(historyPage, historyCount),
+                    availableYears: getAvailableLeaveHistoryYears(
+                        availableYearRecords.map(({ startDate }) => startDate),
+                    ),
+                },
                 cancellationPending: createLeaveApprovalMetadata(cancellationPage, cancellationCount),
             },
         });

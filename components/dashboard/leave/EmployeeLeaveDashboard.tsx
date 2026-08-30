@@ -2,11 +2,13 @@
 
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ALL_LEAVE_STATUSES } from "@/constants/leave";
 import { LeaveRequestForm } from "./LeaveRequestForm";
 import { LEAVE_THEME_BUTTON_CLASS } from "./leaveTheme";
 import { useEmployeeLeaveDashboardModel } from "@/hooks/leave/useEmployeeLeaveDashboardModel";
 import { LeaveQuotaCards } from "./_components/LeaveQuotaCards";
 import { EmployeeLeaveHistoryList } from "./_components/EmployeeLeaveHistoryList";
+import { LeaveHistoryFilters } from "./_components/LeaveHistoryFilters";
 import { CancelLeaveDialog } from "./_components/CancelLeaveDialog";
 import { NotTakenRequestDialog } from "./_components/NotTakenRequestDialog";
 import { EmployeeLeaveDashboardSkeleton } from "./LeaveSkeletons";
@@ -62,9 +64,26 @@ export function EmployeeLeaveDashboard() {
                         {model.metadata?.totalItems ?? model.history.length} รายการ
                     </span>
                 </div>
+                <LeaveHistoryFilters
+                    query={model.historyQuery}
+                    queryPlaceholder="ค้นหาเหตุผลหรือรายละเอียด..."
+                    queryLabel="ค้นหาประวัติการลา"
+                    leaveType={model.historyLeaveType}
+                    status={model.historyStatus}
+                    year={model.historyYear}
+                    yearOptions={model.metadata?.availableYears ?? []}
+                    statusOptions={ALL_LEAVE_STATUSES}
+                    hasActiveFilters={model.hasHistoryFilters}
+                    onQueryChange={model.setHistoryQuery}
+                    onLeaveTypeChange={model.setHistoryLeaveType}
+                    onStatusChange={model.setHistoryStatus}
+                    onYearChange={model.setHistoryYear}
+                    onReset={model.resetHistoryFilters}
+                />
                 <EmployeeLeaveHistoryList
                     history={model.history}
                     metadata={model.metadata}
+                    isFiltered={model.hasHistoryFilters}
                     isSubmitting={model.isSubmitting}
                     onCancelRequest={model.openCancelDialog}
                     onNotTakenRequest={model.openNotTakenDialog}

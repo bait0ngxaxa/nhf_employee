@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import type { Prisma } from "@prisma/client";
 
 import { requireActiveWorkforceSession } from "@/lib/auth/workforce";
 import { prisma } from "@/lib/db/prisma";
@@ -6,6 +7,11 @@ import { runSerializableTransaction } from "@/lib/db/transaction";
 import { getCurrentLeaveYear } from "@/lib/services/leave/quota-year";
 import { toLeaveQuotaDays, toLeaveRequestDays } from "@/lib/services/leave/half-days";
 import { ensureLeaveQuotasForYear } from "@/lib/services/leave/quota-entitlement";
+import {
+    buildEmployeeLeaveHistoryFilterWhere,
+    getAvailableLeaveHistoryYears,
+    parseEmployeeLeaveHistoryFilters,
+} from "@/lib/services/leave/history-filters";
 import {
     leaveAttachmentSummaryOrderBy,
     leaveAttachmentSummarySelect,
@@ -20,7 +26,7 @@ const LEAVE_PAGINATION_MESSAGES = {
     invalidLimit: "จำนวนรายการต่อหน้าต้องอยู่ระหว่าง 1 ถึง 50",
 } as const;
 
-export async function GET(req: Request) {
+export async function GET(req: Request): Promise<NextResponse> {
     try {
         if (!isFeatureEnabled(FEATURE_KEYS.leave)) {
             return notFound();
@@ -30,11 +36,6 @@ export async function GET(req: Request) {
         if (!auth.ok) return auth.response;
 
         const { employeeId } = auth;
-
-        const currentYear = getCurrentLeaveYear();
-        const quotas = await runSerializableTransaction((tx) =>
-            ensureLeaveQuotasForYear(tx, employeeId, currentYear),
-        );
 
         const url = new URL(req.url);
         const page = Number.parseInt(url.searchParams.get("page") || "1", 10);
@@ -47,11 +48,32 @@ export async function GET(req: Request) {
             return jsonError(LEAVE_PAGINATION_MESSAGES.invalidLimit, 400);
         }
 
+        const filtersResult = parseEmployeeLeaveHistoryFilters(url);
+        if (!filtersResult.success) {
+            return jsonError(filtersResult.error, 400);
+        }
+
+        const employeeHistoryScopeWhere: Prisma.LeaveRequestWhereInput = {
+            employeeId,
+        };
+        const historyFilterWhere = buildEmployeeLeaveHistoryFilterWhere(
+            filtersResult.filters,
+        );
+        const where: Prisma.LeaveRequestWhereInput = {
+            ...employeeHistoryScopeWhere,
+            ...(historyFilterWhere ?? {}),
+        };
+
+        const currentYear = getCurrentLeaveYear();
+        const quotas = await runSerializableTransaction((tx) =>
+            ensureLeaveQuotasForYear(tx, employeeId, currentYear),
+        );
+
         const skip = (page - 1) * limit;
 
-        const [history, totalCount] = await Promise.all([
+        const [history, totalCount, availableYearRecords] = await Promise.all([
             prisma.leaveRequest.findMany({
-                where: { employeeId },
+                where,
                 skip,
                 take: limit,
                 orderBy: { createdAt: "desc" },
@@ -69,7 +91,11 @@ export async function GET(req: Request) {
                     },
                 },
             }),
-            prisma.leaveRequest.count({ where: { employeeId } }),
+            prisma.leaveRequest.count({ where }),
+            prisma.leaveRequest.findMany({
+                where: employeeHistoryScopeWhere,
+                select: { startDate: true },
+            }),
         ]);
 
         return NextResponse.json({
@@ -82,6 +108,9 @@ export async function GET(req: Request) {
                 totalPages: Math.ceil(totalCount / limit),
                 totalItems: totalCount,
                 itemsPerPage: limit,
+                availableYears: getAvailableLeaveHistoryYears(
+                    availableYearRecords.map(({ startDate }) => startDate),
+                ),
             },
         });
     } catch (error) {

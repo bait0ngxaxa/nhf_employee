@@ -79,7 +79,13 @@ describe("useEmployeeLeaveDashboardModel", () => {
                 },
             ] as unknown as ReturnType<typeof useLeaveProfile>["quotas"],
             history: [],
-            metadata: { currentPage: 1, totalPages: 1, totalItems: 0, itemsPerPage: 10 },
+            metadata: {
+                currentPage: 1,
+                totalPages: 1,
+                totalItems: 0,
+                itemsPerPage: 10,
+                availableYears: [2030],
+            },
             isLoading: false,
             error: null,
             mutate,
@@ -109,6 +115,57 @@ describe("useEmployeeLeaveDashboardModel", () => {
 
         expect(mutate).toHaveBeenCalledTimes(1);
         expect(result.current.isRequestFormOpen).toBe(false);
+    });
+
+    it("resets employee history pagination when a filter changes", () => {
+        const { result } = renderHook(() => useEmployeeLeaveDashboardModel());
+
+        act(() => result.current.setPage(3));
+        act(() => result.current.setHistoryLeaveType("SICK"));
+
+        expect(result.current.page).toBe(1);
+        expect(result.current.historyLeaveType).toBe("SICK");
+        expect(vi.mocked(useLeaveProfile).mock.calls.at(-1)?.[0]).toEqual({
+            page: 1,
+            filters: { leaveType: "SICK" },
+        });
+    });
+
+    it("resets all employee history filters and keeps the first page", () => {
+        const { result } = renderHook(() => useEmployeeLeaveDashboardModel());
+
+        act(() => {
+            result.current.setPage(4);
+            result.current.setHistoryQuery("ไข้");
+            result.current.setHistoryStatus("APPROVED");
+            result.current.setHistoryYear("2026");
+        });
+        act(() => result.current.resetHistoryFilters());
+
+        expect(result.current.page).toBe(1);
+        expect(result.current.historyQuery).toBe("");
+        expect(result.current.historyLeaveType).toBe("");
+        expect(result.current.historyStatus).toBe("");
+        expect(result.current.historyYear).toBe("");
+        expect(result.current.historyFilters).toEqual({});
+    });
+
+    it("debounces employee history text search before requesting filtered data", () => {
+        vi.useFakeTimers();
+        const { result } = renderHook(() => useEmployeeLeaveDashboardModel());
+
+        act(() => result.current.setHistoryQuery(" ไข้ "));
+        expect(vi.mocked(useLeaveProfile).mock.calls.at(-1)?.[0]).toEqual({
+            page: 1,
+            filters: {},
+        });
+
+        act(() => vi.advanceTimersByTime(300));
+        expect(vi.mocked(useLeaveProfile).mock.calls.at(-1)?.[0]).toEqual({
+            page: 1,
+            filters: { query: "ไข้" },
+        });
+        vi.useRealTimers();
     });
 
     it("confirms cancel leave and resets dialog state", async () => {

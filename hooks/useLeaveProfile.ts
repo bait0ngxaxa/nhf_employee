@@ -1,4 +1,4 @@
-import useSWR from "swr";
+import useSWR, { type KeyedMutator } from "swr";
 import { apiPost } from "@/lib/client/api-client";
 import { apiGet } from "@/lib/client/api-client";
 import { API_ROUTES } from "@/lib/ssot/routes";
@@ -6,6 +6,10 @@ import {
     requestLeaveCancellation,
     submitLeaveNotTakenRequest,
 } from "@/lib/services/leave/client";
+import type {
+    LeaveHistoryFilters,
+    LeaveHistoryMetadata,
+} from "@/lib/services/leave/history-filters";
 import type { LeaveAttachmentSummary } from "@/lib/types/leave";
 
 const fetcher = async <T,>(url: string): Promise<T> => {
@@ -79,24 +83,69 @@ export interface LeaveRequest {
 export interface LeaveProfileResponse {
     quotas: LeaveQuota[];
     history: LeaveRequest[];
-    metadata: {
-        currentPage: number;
-        totalPages: number;
-        totalItems: number;
-        itemsPerPage: number;
-    };
+    metadata: LeaveHistoryMetadata;
 }
 
-export function useLeaveProfile(page: number = 1) {
-    const { data, error, isLoading, mutate } = useSWR<LeaveProfileResponse>(
-        `${API_ROUTES.leave.me}?page=${page}&limit=10`,
+export interface UseLeaveProfileOptions {
+    page?: number;
+    filters?: LeaveHistoryFilters;
+}
+
+export interface UseLeaveProfileResult {
+    quotas: LeaveQuota[];
+    history: LeaveRequest[];
+    metadata: LeaveProfileResponse["metadata"] | undefined;
+    isLoading: boolean;
+    error: unknown;
+    mutate: KeyedMutator<LeaveProfileResponse>;
+    cancelLeave: (leaveId: string) => Promise<boolean>;
+    requestApprovedCancellation: (leaveId: string, reason?: string) => Promise<boolean>;
+    requestNotTaken: (leaveId: string, note: string) => Promise<boolean>;
+}
+
+export function buildLeaveProfileUrl(
+    page: number,
+    filters: LeaveHistoryFilters = {},
+): string {
+    const searchParams = new URLSearchParams({
+        page: String(page),
+        limit: "10",
+    });
+    const query = filters.query?.trim();
+
+    if (query) {
+        searchParams.set("q", query);
+    }
+    if (filters.leaveType) {
+        searchParams.set("leaveType", filters.leaveType);
+    }
+    if (filters.status) {
+        searchParams.set("status", filters.status);
+    }
+    if (filters.year !== undefined) {
+        searchParams.set("year", String(filters.year));
+    }
+
+    return `${API_ROUTES.leave.me}?${searchParams.toString()}`;
+}
+
+export function useLeaveProfile(
+    options: UseLeaveProfileOptions | number = {},
+): UseLeaveProfileResult {
+    const normalizedOptions = typeof options === "number"
+        ? { page: options }
+        : options;
+    const normalizedPage = normalizedOptions.page ?? 1;
+    const normalizedFilters = normalizedOptions.filters ?? {};
+    const { data, error, isLoading, mutate } = useSWR<LeaveProfileResponse, unknown>(
+        buildLeaveProfileUrl(normalizedPage, normalizedFilters),
         fetcher,
         {
             revalidateOnFocus: false,
             revalidateIfStale: false,
             shouldRetryOnError: false,
             dedupingInterval: 60_000,
-        }
+        },
     );
 
     const cancelLeave = async (leaveId: string) => {

@@ -1,8 +1,12 @@
-import useSWR from "swr";
+import useSWR, { type KeyedMutator } from "swr";
 import { apiGet } from "@/lib/client/api-client";
 import { API_ROUTES } from "@/lib/ssot/routes";
 import type { LeaveAttachmentSummary } from "@/lib/types/leave";
 import type { LeaveApprovalPaginationMetadata } from "@/lib/services/leave/approval-queries";
+import type {
+    LeaveHistoryFilters,
+    LeaveHistoryMetadata,
+} from "@/lib/services/leave/history-filters";
 
 export type { LeaveApprovalPaginationMetadata } from "@/lib/services/leave/approval-queries";
 
@@ -61,26 +65,67 @@ export interface LeaveApprovalsResponse {
     metadata: {
         pending: LeaveApprovalPaginationMetadata;
         notTakenPending: LeaveApprovalPaginationMetadata;
-        history: LeaveApprovalPaginationMetadata;
+        history: LeaveHistoryMetadata;
         cancellationPending: LeaveApprovalPaginationMetadata;
     };
 }
 
-interface UseLeaveApprovalsPages {
+export interface UseLeaveApprovalsOptions {
     pendingPage: number;
     notTakenPage: number;
     historyPage: number;
     cancellationPage: number;
+    historyFilters?: LeaveHistoryFilters;
 }
 
-export function useLeaveApprovals({
+export interface UseLeaveApprovalsResult {
+    pending: PendingLeave[];
+    notTakenPending: PendingLeave[];
+    history: PendingLeave[];
+    cancellationPending: PendingLeave[];
+    metadata: LeaveApprovalsResponse["metadata"] | undefined;
+    isLoading: boolean;
+    isError: unknown;
+    mutate: KeyedMutator<LeaveApprovalsResponse>;
+}
+
+export function buildLeaveApprovalsUrl({
     pendingPage,
     notTakenPage,
     historyPage,
     cancellationPage,
-}: UseLeaveApprovalsPages) {
-    const { data, error, isLoading, mutate } = useSWR<LeaveApprovalsResponse>(
-        `${API_ROUTES.leave.approvals}?pendingPage=${pendingPage}&notTakenPage=${notTakenPage}&historyPage=${historyPage}&cancellationPage=${cancellationPage}`,
+    historyFilters = {},
+}: UseLeaveApprovalsOptions): string {
+    const searchParams = new URLSearchParams({
+        pendingPage: String(pendingPage),
+        notTakenPage: String(notTakenPage),
+        historyPage: String(historyPage),
+        cancellationPage: String(cancellationPage),
+    });
+    const query = historyFilters.query?.trim();
+
+    if (query) {
+        searchParams.set("historyQuery", query);
+    }
+    if (historyFilters.leaveType) {
+        searchParams.set("historyLeaveType", historyFilters.leaveType);
+    }
+    if (historyFilters.status) {
+        searchParams.set("historyStatus", historyFilters.status);
+    }
+    if (historyFilters.year !== undefined) {
+        searchParams.set("historyYear", String(historyFilters.year));
+    }
+
+    return `${API_ROUTES.leave.approvals}?${searchParams.toString()}`;
+}
+
+export function useLeaveApprovals({
+    historyFilters,
+    ...pages
+}: UseLeaveApprovalsOptions): UseLeaveApprovalsResult {
+    const { data, error, isLoading, mutate } = useSWR<LeaveApprovalsResponse, unknown>(
+        buildLeaveApprovalsUrl({ ...pages, historyFilters }),
         fetcher,
         {
             revalidateOnFocus: false,

@@ -56,4 +56,25 @@ describe("EmployeeLeaveHistoryList", () => {
             "คำขอยกเลิกครั้งก่อนไม่ได้รับการอนุมัติ และไม่สามารถส่งคำขอยกเลิกซ้ำได้",
         )).toBeInTheDocument();
     });
+
+    it("shows a filtered empty state instead of the initial empty state", () => {
+        render(
+            <EmployeeLeaveHistoryList
+                history={[]}
+                isFiltered
+                isSubmitting={false}
+                onCancelRequest={vi.fn()}
+                onNotTakenRequest={vi.fn()}
+                onPageChange={vi.fn()}
+            />,
+        );
+
+        expect(
+            screen.getByText("ไม่พบประวัติการลาตามตัวกรองที่เลือก"),
+        ).toBeInTheDocument();
+        expect(
+            screen.getByText("ลองปรับหรือล้างตัวกรองเพื่อดูรายการอื่น"),
+        ).toBeInTheDocument();
+        expect(screen.queryByText("ยังไม่มีประวัติการยื่นคำขอลา")).not.toBeInTheDocument();
+    });
 });

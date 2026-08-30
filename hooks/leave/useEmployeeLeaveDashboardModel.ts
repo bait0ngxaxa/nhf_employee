@@ -1,10 +1,15 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import type { LeaveStatus, LeaveType } from "@prisma/client";
 import { toast } from "sonner";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import {
     useLeaveProfile,
+    type LeaveQuota,
     type LeaveQuotaBalance,
+    type LeaveProfileResponse,
     type LeaveRequest,
 } from "@/hooks/useLeaveProfile";
+import type { LeaveHistoryFilters } from "@/lib/services/leave/history-filters";
 
 const EMPTY_LEAVE_QUOTA: LeaveQuotaBalance = {
     totalDays: 0,
@@ -14,7 +19,47 @@ const EMPTY_LEAVE_QUOTA: LeaveQuotaBalance = {
     remainingDays: 0,
 };
 
-export function useEmployeeLeaveDashboardModel() {
+export interface EmployeeLeaveDashboardModel {
+    isLoading: boolean;
+    isRequestFormOpen: boolean;
+    quotas: LeaveQuota[];
+    history: LeaveRequest[];
+    metadata: LeaveProfileResponse["metadata"] | undefined;
+    page: number;
+    isSubmitting: boolean;
+    cancelConfirmRequest: LeaveRequest | null;
+    cancelReason: string;
+    notTakenRequestId: string | null;
+    notTakenNote: string;
+    historyQuery: string;
+    historyLeaveType: LeaveType | "";
+    historyStatus: LeaveStatus | "";
+    historyYear: string;
+    historyFilters: LeaveHistoryFilters;
+    hasHistoryFilters: boolean;
+    sickQuota: LeaveQuotaBalance;
+    personalQuota: LeaveQuotaBalance;
+    vacationQuota: LeaveQuotaBalance;
+    setPage: (page: number) => void;
+    setHistoryQuery: (value: string) => void;
+    setHistoryLeaveType: (value: LeaveType | "") => void;
+    setHistoryStatus: (value: LeaveStatus | "") => void;
+    setHistoryYear: (value: string) => void;
+    resetHistoryFilters: () => void;
+    openRequestForm: () => void;
+    closeRequestForm: () => void;
+    onRequestSuccess: () => Promise<void>;
+    openCancelDialog: (request: LeaveRequest) => void;
+    closeCancelDialog: () => void;
+    setCancelReason: (value: string) => void;
+    confirmCancelLeave: () => Promise<void>;
+    openNotTakenDialog: (leaveId: string) => void;
+    closeNotTakenDialog: () => void;
+    setNotTakenNote: (value: string) => void;
+    confirmNotTakenRequest: () => Promise<void>;
+}
+
+export function useEmployeeLeaveDashboardModel(): EmployeeLeaveDashboardModel {
     const [isRequestFormOpen, setIsRequestFormOpen] = useState(false);
     const [page, setPage] = useState(1);
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -22,6 +67,35 @@ export function useEmployeeLeaveDashboardModel() {
     const [cancelReason, setCancelReason] = useState("");
     const [notTakenRequestId, setNotTakenRequestId] = useState<string | null>(null);
     const [notTakenNote, setNotTakenNote] = useState("");
+    const [historyQuery, setHistoryQuery] = useState("");
+    const [historyLeaveType, setHistoryLeaveType] = useState<LeaveType | "">("");
+    const [historyStatus, setHistoryStatus] = useState<LeaveStatus | "">("");
+    const [historyYear, setHistoryYear] = useState("");
+    const debouncedHistoryQuery = useDebouncedValue(historyQuery.trim());
+    const historyFilters = useMemo<LeaveHistoryFilters>(() => {
+        const filters: LeaveHistoryFilters = {};
+
+        if (debouncedHistoryQuery) {
+            filters.query = debouncedHistoryQuery;
+        }
+        if (historyLeaveType) {
+            filters.leaveType = historyLeaveType;
+        }
+        if (historyStatus) {
+            filters.status = historyStatus;
+        }
+        if (historyYear) {
+            filters.year = Number(historyYear);
+        }
+
+        return filters;
+    }, [debouncedHistoryQuery, historyLeaveType, historyStatus, historyYear]);
+    const hasHistoryFilters = Boolean(
+        historyQuery.trim()
+        || historyLeaveType
+        || historyStatus
+        || historyYear,
+    );
     const {
         quotas,
         history,
@@ -31,13 +105,41 @@ export function useEmployeeLeaveDashboardModel() {
         cancelLeave,
         requestApprovedCancellation,
         requestNotTaken,
-    } = useLeaveProfile(page);
+    } = useLeaveProfile({ page, filters: historyFilters });
 
-    const getQuota = (type: "SICK" | "PERSONAL" | "VACATION") =>
+    const getQuota = (type: LeaveType): LeaveQuotaBalance =>
         quotas.find((quota) => quota.leaveType === type) ?? EMPTY_LEAVE_QUOTA;
 
     const closeRequestForm = (): void => {
         setIsRequestFormOpen(false);
+    };
+
+    const handleHistoryQueryChange = (value: string): void => {
+        setHistoryQuery(value);
+        setPage(1);
+    };
+
+    const handleHistoryLeaveTypeChange = (value: LeaveType | ""): void => {
+        setHistoryLeaveType(value);
+        setPage(1);
+    };
+
+    const handleHistoryStatusChange = (value: LeaveStatus | ""): void => {
+        setHistoryStatus(value);
+        setPage(1);
+    };
+
+    const handleHistoryYearChange = (value: string): void => {
+        setHistoryYear(value);
+        setPage(1);
+    };
+
+    const resetHistoryFilters = (): void => {
+        setHistoryQuery("");
+        setHistoryLeaveType("");
+        setHistoryStatus("");
+        setHistoryYear("");
+        setPage(1);
     };
 
     const openRequestForm = (): void => {
@@ -128,10 +230,21 @@ export function useEmployeeLeaveDashboardModel() {
         cancelReason,
         notTakenRequestId,
         notTakenNote,
+        historyQuery,
+        historyLeaveType,
+        historyStatus,
+        historyYear,
+        historyFilters,
+        hasHistoryFilters,
         sickQuota: getQuota("SICK"),
         personalQuota: getQuota("PERSONAL"),
         vacationQuota: getQuota("VACATION"),
         setPage,
+        setHistoryQuery: handleHistoryQueryChange,
+        setHistoryLeaveType: handleHistoryLeaveTypeChange,
+        setHistoryStatus: handleHistoryStatusChange,
+        setHistoryYear: handleHistoryYearChange,
+        resetHistoryFilters,
         openRequestForm,
         closeRequestForm,
         onRequestSuccess,

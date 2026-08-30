@@ -1,4 +1,4 @@
-import type { LeaveType } from "@prisma/client";
+import type { LeaveStatus, LeaveType } from "@prisma/client";
 import { daysToHalfDays } from "@/lib/services/leave/half-days";
 
 /** Default annual leave quotas per type (SSOT) */
@@ -15,4 +15,21 @@ export const DEFAULT_LEAVE_QUOTA_HALF_DAYS: Record<LeaveType, number> = {
     VACATION: daysToHalfDays(DEFAULT_LEAVE_QUOTAS.VACATION),
 } as const;
 
-export const ALL_LEAVE_TYPES: LeaveType[] = ["SICK", "PERSONAL", "VACATION"];
+export const ALL_LEAVE_TYPES = ["SICK", "PERSONAL", "VACATION"] as const satisfies readonly LeaveType[];
+
+export const ALL_LEAVE_STATUSES = [
+    "PENDING",
+    "APPROVED",
+    "REJECTED",
+    "CANCELLED",
+    "NOT_TAKEN",
+    "CANCELLATION_REQUESTED",
+    "CANCELLED_AFTER_APPROVAL",
+] as const satisfies readonly LeaveStatus[];
+
+export const APPROVER_LEAVE_HISTORY_STATUSES = [
+    "APPROVED",
+    "REJECTED",
+    "NOT_TAKEN",
+    "CANCELLED_AFTER_APPROVAL",
+] as const satisfies readonly LeaveStatus[];

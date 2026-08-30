@@ -18,6 +18,7 @@ interface LeaveHistoryMetadata {
 interface EmployeeLeaveHistoryListProps {
     history: LeaveRequest[];
     metadata?: LeaveHistoryMetadata;
+    isFiltered?: boolean;
     isSubmitting: boolean;
     onCancelRequest: (request: LeaveRequest) => void;
     onNotTakenRequest: (leaveId: string) => void;
@@ -39,13 +40,14 @@ const periodLabel = (period: LeaveRequest["period"]): string => {
 export function EmployeeLeaveHistoryList({
     history,
     metadata,
+    isFiltered = false,
     isSubmitting,
     onCancelRequest,
     onNotTakenRequest,
     onPageChange,
 }: EmployeeLeaveHistoryListProps) {
     if (history.length === 0) {
-        return <EmptyLeaveHistory />;
+        return <EmptyLeaveHistory isFiltered={isFiltered} />;
     }
 
     return (
@@ -219,7 +221,20 @@ function LeaveNote({
     );
 }
 
-function EmptyLeaveHistory() {
+function EmptyLeaveHistory({ isFiltered }: { isFiltered: boolean }) {
+    if (isFiltered) {
+        return (
+            <Card className="border-dashed border-border-strong p-8 text-center shadow-none">
+                <p className="text-base/6 font-semibold text-content-primary">
+                    ไม่พบประวัติการลาตามตัวกรองที่เลือก
+                </p>
+                <p className="mt-1 text-sm/6 text-content-muted">
+                    ลองปรับหรือล้างตัวกรองเพื่อดูรายการอื่น
+                </p>
+            </Card>
+        );
+    }
+
     return (
         <Card className="border-dashed border-border-strong p-8 text-center shadow-none">
             <p className="text-base/6 font-semibold text-content-primary">ยังไม่มีประวัติการยื่นคำขอลา</p>

@@ -79,7 +79,10 @@ describe("GET /api/leave/approvals", () => {
             .mockResolvedValueOnce([createLeaveRequest("pending-1", "PENDING")] as never)
             .mockResolvedValueOnce([createLeaveRequest("not-taken-1", "APPROVED")] as never)
             .mockResolvedValueOnce([createLeaveRequest("history-1", "APPROVED")] as never)
-            .mockResolvedValueOnce([] as never);
+            .mockResolvedValueOnce([] as never)
+            .mockResolvedValueOnce([
+                { startDate: new Date("2027-01-04T00:00:00.000Z") },
+            ] as never);
         vi.mocked(prisma.leaveRequest.count)
             .mockResolvedValueOnce(11)
             .mockResolvedValueOnce(1)
@@ -128,6 +131,7 @@ describe("GET /api/leave/approvals", () => {
                 totalPages: 3,
                 totalItems: 21,
                 itemsPerPage: 10,
+                availableYears: [2027],
             },
             cancellationPending: {
                 currentPage: 1,
@@ -137,7 +141,7 @@ describe("GET /api/leave/approvals", () => {
             },
         });
         expect(JSON.stringify(body)).not.toContain("storageKey");
-        expect(prisma.leaveRequest.findMany).toHaveBeenCalledTimes(4);
+        expect(prisma.leaveRequest.findMany).toHaveBeenCalledTimes(5);
         expect(vi.mocked(prisma.leaveRequest.findMany).mock.calls[0][0]).toEqual(
             expect.objectContaining({
                 skip: 10,
@@ -178,7 +182,7 @@ describe("GET /api/leave/approvals", () => {
                 orderBy: { cancellationRequestedAt: "asc" },
             }),
         );
-        for (const call of vi.mocked(prisma.leaveRequest.findMany).mock.calls) {
+        for (const call of vi.mocked(prisma.leaveRequest.findMany).mock.calls.slice(0, 4)) {
             expect(call[0]).toEqual(
                 expect.objectContaining({
                     include: expect.objectContaining({
@@ -203,7 +207,7 @@ describe("GET /api/leave/approvals", () => {
         );
 
         expect(response.status).toBe(200);
-        expect(prisma.leaveRequest.findMany).toHaveBeenCalledTimes(4);
+        expect(prisma.leaveRequest.findMany).toHaveBeenCalledTimes(5);
         expect(prisma.leaveRequest.count).toHaveBeenCalledTimes(4);
         expect(vi.mocked(prisma.leaveRequest.findMany).mock.calls[0][0]).toEqual(
             expect.objectContaining({
@@ -247,6 +251,98 @@ describe("GET /api/leave/approvals", () => {
         expect(JSON.stringify(await response.json())).not.toContain("__admin_recovery_");
     });
 
+    it("applies history filters only to the authorized history queries", async () => {
+        const response = await getLeaveApprovals(
+            new Request(
+                "http://localhost/api/leave/approvals?pendingPage=2&notTakenPage=3&historyPage=4&cancellationPage=5&historyQuery=%20%E0%B8%AA%E0%B8%A1%E0%B8%8A%E0%B8%B2%E0%B8%A2%20&historyLeaveType=SICK&historyStatus=APPROVED&historyYear=2026",
+            ),
+        );
+
+        expect(response.status).toBe(200);
+        expect(vi.mocked(prisma.leaveRequest.findMany).mock.calls[0]?.[0]?.where).toEqual({
+            employeeId: { not: 200 },
+            OR: [
+                { exceptionApproverId: 200 },
+                { exceptionApproverId: null, approverId: 200 },
+            ],
+            status: "PENDING",
+        });
+        expect(vi.mocked(prisma.leaveRequest.findMany).mock.calls[1]?.[0]?.where).toEqual({
+            employeeId: { not: 200 },
+            OR: [
+                { exceptionApproverId: 200 },
+                { exceptionApproverId: null, approverId: 200 },
+            ],
+            status: "APPROVED",
+            notTakenRequestedAt: { not: null },
+            notTakenConfirmedAt: null,
+        });
+        const historyWhere = vi.mocked(prisma.leaveRequest.findMany).mock.calls[2]?.[0]?.where;
+        expect(historyWhere).toEqual({
+            AND: [
+                getAssignedLeaveApproverWhere(200),
+                {
+                    OR: [
+                        { status: { in: ["REJECTED", "NOT_TAKEN", "CANCELLED_AFTER_APPROVAL"] } },
+                        {
+                            status: "APPROVED",
+                            OR: [
+                                { notTakenRequestedAt: null },
+                                { notTakenConfirmedAt: { not: null } },
+                            ],
+                        },
+                    ],
+                },
+                {
+                    AND: [
+                        {
+                            employee: {
+                                OR: [
+                                    { firstName: { contains: "สมชาย" } },
+                                    { lastName: { contains: "สมชาย" } },
+                                    { nickname: { contains: "สมชาย" } },
+                                ],
+                            },
+                        },
+                        { leaveType: "SICK" },
+                        { status: "APPROVED" },
+                        {
+                            startDate: {
+                                gte: new Date("2026-01-01T00:00:00.000Z"),
+                                lt: new Date("2027-01-01T00:00:00.000Z"),
+                            },
+                        },
+                    ],
+                },
+            ],
+        });
+        expect(vi.mocked(prisma.leaveRequest.count).mock.calls[2]?.[0]?.where).toBe(historyWhere);
+        expect(vi.mocked(prisma.leaveRequest.findMany).mock.calls[3]?.[0]?.where).toEqual({
+            employeeId: { not: 200 },
+            OR: [
+                { exceptionApproverId: 200 },
+                { exceptionApproverId: null, approverId: 200 },
+            ],
+            status: "CANCELLATION_REQUESTED",
+        });
+    });
+
+    it.each([
+        "historyLeaveType=INVALID",
+        "historyStatus=NOT_A_STATUS",
+        "historyStatus=PENDING",
+        "historyYear=hello",
+        "historyYear=0",
+    ])("returns 400 for invalid history filter %s", async (query) => {
+        const response = await getLeaveApprovals(
+            new Request(`http://localhost/api/leave/approvals?${query}`),
+        );
+
+        expect(response.status).toBe(400);
+        expect(prisma.leaveRequest.findMany).not.toHaveBeenCalled();
+        expect(prisma.leaveRequest.count).not.toHaveBeenCalled();
+    });
+
     it("keeps approval history scoped to the effective approver", async () => {
         vi.mocked(requireActiveWorkforceSession).mockResolvedValue({
             ok: true,
@@ -264,7 +360,10 @@ describe("GET /api/leave/approvals", () => {
             .mockResolvedValueOnce([] as never)
             .mockResolvedValueOnce([] as never)
             .mockResolvedValueOnce([historicalExceptionAssignment] as never)
-            .mockResolvedValueOnce([] as never);
+            .mockResolvedValueOnce([] as never)
+            .mockResolvedValueOnce([
+                { startDate: new Date("2027-01-04T00:00:00.000Z") },
+            ] as never);
         vi.mocked(prisma.leaveRequest.count).mockReset();
         vi.mocked(prisma.leaveRequest.count)
             .mockResolvedValueOnce(0)

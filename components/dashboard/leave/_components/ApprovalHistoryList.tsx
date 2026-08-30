@@ -7,6 +7,7 @@ import { LeaveStatusBadge } from "./LeaveStatusBadge";
 
 interface ApprovalHistoryListProps {
     history: PendingLeave[];
+    isFiltered?: boolean;
 }
 
 const leaveShortLabel = (leaveType: PendingLeave["leaveType"]): string => {
@@ -36,14 +37,29 @@ function formatLeaveDateRange(startDate: string, endDate: string): string {
     return `${start} - ${formatter.format(new Date(endDate))}`;
 }
 
-export function ApprovalHistoryList({ history }: ApprovalHistoryListProps) {
+export function ApprovalHistoryList({ history, isFiltered = false }: ApprovalHistoryListProps) {
     if (history.length === 0) {
         return (
             <Card className="border-dashed border-border-strong p-8 text-center shadow-none">
-                <p className="text-sm font-medium text-content-strong">ยังไม่มีข้อมูลการพิจารณาในระบบ</p>
-                <p className="mt-1 text-sm text-content-muted">
-                    รายการที่อนุมัติหรือไม่อนุมัติแล้วจะแสดงที่นี่
-                </p>
+                {isFiltered ? (
+                    <>
+                        <p className="text-sm font-medium text-content-strong">
+                            ไม่พบประวัติการพิจารณาตามตัวกรองที่เลือก
+                        </p>
+                        <p className="mt-1 text-sm text-content-muted">
+                            ลองปรับหรือล้างตัวกรองเพื่อดูรายการอื่น
+                        </p>
+                    </>
+                ) : (
+                    <>
+                        <p className="text-sm font-medium text-content-strong">
+                            ยังไม่มีข้อมูลการพิจารณาในระบบ
+                        </p>
+                        <p className="mt-1 text-sm text-content-muted">
+                            รายการที่อนุมัติหรือไม่อนุมัติแล้วจะแสดงที่นี่
+                        </p>
+                    </>
+                )}
             </Card>
         );
     }

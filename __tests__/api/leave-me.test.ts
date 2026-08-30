@@ -281,4 +281,79 @@ describe("GET /api/leave/me", () => {
             }),
         );
     });
+
+    it("applies employee history filters before pagination and reuses the where for count", async () => {
+        const response = await getLeaveProfile(
+            new Request(
+                "http://localhost/api/leave/me?page=2&limit=10&q=%20%E0%B9%84%E0%B8%82%E0%B9%89%20&leaveType=SICK&status=APPROVED&year=2026",
+            ),
+        );
+
+        expect(response.status).toBe(200);
+        const findWhere = vi.mocked(prisma.leaveRequest.findMany).mock.calls[0]?.[0]?.where;
+        expect(findWhere).toEqual({
+            employeeId: 100,
+            AND: [
+                {
+                    OR: [
+                        { reason: { contains: "ไข้" } },
+                        { emergencyReason: { contains: "ไข้" } },
+                        { specialReason: { contains: "ไข้" } },
+                        { rejectReason: { contains: "ไข้" } },
+                        { notTakenReason: { contains: "ไข้" } },
+                        { cancellationReason: { contains: "ไข้" } },
+                    ],
+                },
+                { leaveType: "SICK" },
+                { status: "APPROVED" },
+                {
+                    startDate: {
+                        gte: new Date("2026-01-01T00:00:00.000Z"),
+                        lt: new Date("2027-01-01T00:00:00.000Z"),
+                    },
+                },
+            ],
+        });
+        expect(vi.mocked(prisma.leaveRequest.count).mock.calls[0]?.[0]?.where).toBe(findWhere);
+        expect(vi.mocked(prisma.leaveRequest.findMany).mock.calls[0]?.[0]).toEqual(
+            expect.objectContaining({ skip: 10, take: 10 }),
+        );
+    });
+
+    it("returns only years present in the authenticated employee history", async () => {
+        vi.mocked(prisma.leaveRequest.findMany).mockReset();
+        vi.mocked(prisma.leaveRequest.findMany)
+            .mockResolvedValueOnce([] as never)
+            .mockResolvedValueOnce([
+                { startDate: new Date("2026-02-01T00:00:00.000Z") },
+                { startDate: new Date("2024-08-01T00:00:00.000Z") },
+                { startDate: new Date("2026-09-01T00:00:00.000Z") },
+            ] as never);
+
+        const response = await getLeaveProfile(
+            new Request("http://localhost/api/leave/me?page=1&limit=10"),
+        );
+        const body = await response.json();
+
+        expect(body.metadata.availableYears).toEqual([2026, 2024]);
+        expect(prisma.leaveRequest.findMany).toHaveBeenNthCalledWith(2, {
+            where: { employeeId: 100 },
+            select: { startDate: true },
+        });
+    });
+
+    it.each([
+        "leaveType=INVALID",
+        "status=NOT_A_STATUS",
+        "year=hello",
+        "year=0",
+    ])("returns 400 for invalid history filter %s", async (query) => {
+        const response = await getLeaveProfile(
+            new Request(`http://localhost/api/leave/me?${query}`),
+        );
+
+        expect(response.status).toBe(400);
+        expect(prisma.leaveRequest.findMany).not.toHaveBeenCalled();
+        expect(prisma.leaveRequest.count).not.toHaveBeenCalled();
+    });
 });

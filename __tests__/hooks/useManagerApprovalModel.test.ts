@@ -89,6 +89,7 @@ describe("useManagerApprovalModel", () => {
                     totalPages: 1,
                     totalItems: 0,
                     itemsPerPage: 10,
+                    availableYears: [2030],
                 },
                 cancellationPending: {
                     currentPage: 1,
@@ -132,6 +133,28 @@ describe("useManagerApprovalModel", () => {
             notTakenPage: 1,
             historyPage: 1,
             cancellationPage: 1,
+            historyFilters: {},
+        });
+    });
+
+    it("resets only history pagination when a history filter changes", () => {
+        const { result } = renderHook(() => useManagerApprovalModel());
+
+        act(() => {
+            result.current.setPendingPage(2);
+            result.current.setNotTakenPage(3);
+            result.current.setHistoryPage(4);
+            result.current.setCancellationPage(5);
+            result.current.setHistoryStatus("APPROVED");
+        });
+
+        expect(result.current.historyStatus).toBe("APPROVED");
+        expect(vi.mocked(useLeaveApprovals).mock.calls.at(-1)?.[0]).toEqual({
+            pendingPage: 2,
+            notTakenPage: 3,
+            historyPage: 1,
+            cancellationPage: 5,
+            historyFilters: { status: "APPROVED" },
         });
     });
 
