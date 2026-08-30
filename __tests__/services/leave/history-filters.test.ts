@@ -125,13 +125,16 @@ describe("leave history filters", () => {
         });
     });
 
-    it("returns only years present in the authorized history data", () => {
+    it("creates descending year options from an authorized history date range", () => {
         expect(
-            getAvailableLeaveHistoryYears([
-                new Date("2024-06-01T00:00:00.000Z"),
-                new Date("2026-01-05T00:00:00.000Z"),
-                new Date("2024-11-12T00:00:00.000Z"),
-            ]),
-        ).toEqual([2026, 2024]);
+            getAvailableLeaveHistoryYears(
+                new Date("2024-06-20T00:00:00.000Z"),
+                new Date("2026-09-14T00:00:00.000Z"),
+            ),
+        ).toEqual([2026, 2025, 2024]);
+    });
+
+    it("returns no year options when the authorized history is empty", () => {
+        expect(getAvailableLeaveHistoryYears(null, null)).toEqual([]);
     });
 });

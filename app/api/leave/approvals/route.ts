@@ -105,7 +105,7 @@ export async function GET(req: Request): Promise<NextResponse> {
             historyCount,
             cancellationPending,
             cancellationCount,
-            availableYearRecords,
+            availableYearRange,
         ] = await Promise.all([
             prisma.leaveRequest.findMany({
                 where: pendingWhere,
@@ -145,9 +145,10 @@ export async function GET(req: Request): Promise<NextResponse> {
                 include: LEAVE_APPROVAL_REQUEST_INCLUDE,
             }),
             prisma.leaveRequest.count({ where: cancellationWhere }),
-            prisma.leaveRequest.findMany({
+            prisma.leaveRequest.aggregate({
                 where: historyScopeWhere,
-                select: { startDate: true },
+                _min: { startDate: true },
+                _max: { startDate: true },
             }),
         ]);
 
@@ -170,7 +171,8 @@ export async function GET(req: Request): Promise<NextResponse> {
                 history: {
                     ...createLeaveApprovalMetadata(historyPage, historyCount),
                     availableYears: getAvailableLeaveHistoryYears(
-                        availableYearRecords.map(({ startDate }) => startDate),
+                        availableYearRange._min.startDate,
+                        availableYearRange._max.startDate,
                     ),
                 },
                 cancellationPending: createLeaveApprovalMetadata(cancellationPage, cancellationCount),

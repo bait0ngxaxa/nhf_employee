@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactElement } from "react";
 import { useId } from "react";
 import type { LeaveStatus, LeaveType } from "@prisma/client";
 import { RotateCcw, Search } from "lucide-react";
@@ -18,6 +19,8 @@ import { ALL_LEAVE_TYPES } from "@/constants/leave";
 import { LEAVE_HISTORY_QUERY_MAX_LENGTH } from "@/lib/services/leave/history-filters";
 import { getLeaveTypeLabel } from "@/lib/services/leave/notification-format";
 import { getRequestStatusMeta } from "@/components/dashboard/shared/RequestStatusBadge";
+
+const ALL_FILTER_VALUE = "__ALL__";
 
 export interface LeaveHistoryFiltersProps {
     query: string;
@@ -51,7 +54,7 @@ export function LeaveHistoryFilters({
     onStatusChange,
     onYearChange,
     onReset,
-}: LeaveHistoryFiltersProps) {
+}: LeaveHistoryFiltersProps): ReactElement {
     const idPrefix = useId();
     const queryId = `${idPrefix}-query`;
     const leaveTypeId = `${idPrefix}-leave-type`;
@@ -91,8 +94,12 @@ export function LeaveHistoryFilters({
                         ประเภทการลา
                     </Label>
                     <Select
-                        value={leaveType || undefined}
+                        value={leaveType || ALL_FILTER_VALUE}
                         onValueChange={(value) => {
+                            if (value === ALL_FILTER_VALUE) {
+                                onLeaveTypeChange("");
+                                return;
+                            }
                             if (isLeaveType(value)) {
                                 onLeaveTypeChange(value);
                             }
@@ -106,6 +113,7 @@ export function LeaveHistoryFilters({
                             <SelectValue placeholder="ทุกประเภท" />
                         </SelectTrigger>
                         <SelectContent>
+                            <SelectItem value={ALL_FILTER_VALUE}>ทุกประเภท</SelectItem>
                             {ALL_LEAVE_TYPES.map((type) => (
                                 <SelectItem key={type} value={type}>
                                     {getLeaveTypeLabel(type)}
@@ -120,8 +128,12 @@ export function LeaveHistoryFilters({
                         สถานะการลา
                     </Label>
                     <Select
-                        value={status || undefined}
+                        value={status || ALL_FILTER_VALUE}
                         onValueChange={(value) => {
+                            if (value === ALL_FILTER_VALUE) {
+                                onStatusChange("");
+                                return;
+                            }
                             if (isOptionValue(value, statusOptions)) {
                                 onStatusChange(value);
                             }
@@ -135,6 +147,7 @@ export function LeaveHistoryFilters({
                             <SelectValue placeholder="ทุกสถานะ" />
                         </SelectTrigger>
                         <SelectContent>
+                            <SelectItem value={ALL_FILTER_VALUE}>ทุกสถานะ</SelectItem>
                             {statusOptions.map((statusOption) => (
                                 <SelectItem key={statusOption} value={statusOption}>
                                     {getRequestStatusMeta(statusOption).label}
@@ -148,7 +161,18 @@ export function LeaveHistoryFilters({
                     <Label htmlFor={yearId} className="sr-only">
                         ปีที่ลา
                     </Label>
-                    <Select value={year || undefined} onValueChange={onYearChange}>
+                    <Select
+                        value={year || ALL_FILTER_VALUE}
+                        onValueChange={(value) => {
+                            if (value === ALL_FILTER_VALUE) {
+                                onYearChange("");
+                                return;
+                            }
+                            if (isYearOption(value, yearOptions)) {
+                                onYearChange(value);
+                            }
+                        }}
+                    >
                         <SelectTrigger
                             id={yearId}
                             className="h-11 w-full rounded-lg border-border-subtle bg-surface-raised text-content-primary"
@@ -157,6 +181,7 @@ export function LeaveHistoryFilters({
                             <SelectValue placeholder="ทุกปี" />
                         </SelectTrigger>
                         <SelectContent>
+                            <SelectItem value={ALL_FILTER_VALUE}>ทุกปี</SelectItem>
                             {yearOptions.map((yearOption) => (
                                 <SelectItem key={yearOption} value={String(yearOption)}>
                                     {formatBuddhistYear(yearOption)}
@@ -191,6 +216,10 @@ function isOptionValue<T extends string>(
     options: readonly T[],
 ): value is T {
     return options.some((option) => option === value);
+}
+
+function isYearOption(value: string, options: readonly number[]): boolean {
+    return options.some((option) => String(option) === value);
 }
 
 function formatBuddhistYear(year: number): string {

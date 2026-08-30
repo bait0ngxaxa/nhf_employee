@@ -14,6 +14,7 @@ vi.mock("@/lib/db/prisma", () => ({
         leaveRequest: {
             findMany: vi.fn(),
             count: vi.fn(),
+            aggregate: vi.fn(),
         },
     },
 }));
@@ -79,15 +80,16 @@ describe("GET /api/leave/approvals", () => {
             .mockResolvedValueOnce([createLeaveRequest("pending-1", "PENDING")] as never)
             .mockResolvedValueOnce([createLeaveRequest("not-taken-1", "APPROVED")] as never)
             .mockResolvedValueOnce([createLeaveRequest("history-1", "APPROVED")] as never)
-            .mockResolvedValueOnce([] as never)
-            .mockResolvedValueOnce([
-                { startDate: new Date("2027-01-04T00:00:00.000Z") },
-            ] as never);
+            .mockResolvedValueOnce([] as never);
         vi.mocked(prisma.leaveRequest.count)
             .mockResolvedValueOnce(11)
             .mockResolvedValueOnce(1)
             .mockResolvedValueOnce(21)
             .mockResolvedValueOnce(0);
+        vi.mocked(prisma.leaveRequest.aggregate).mockResolvedValue({
+            _min: { startDate: new Date("2024-01-01T00:00:00.000Z") },
+            _max: { startDate: new Date("2026-01-01T00:00:00.000Z") },
+        } as never);
     });
 
     it("returns attachment summaries in every approval list without changing pagination", async () => {
@@ -131,7 +133,7 @@ describe("GET /api/leave/approvals", () => {
                 totalPages: 3,
                 totalItems: 21,
                 itemsPerPage: 10,
-                availableYears: [2027],
+                availableYears: [2026, 2025, 2024],
             },
             cancellationPending: {
                 currentPage: 1,
@@ -141,7 +143,7 @@ describe("GET /api/leave/approvals", () => {
             },
         });
         expect(JSON.stringify(body)).not.toContain("storageKey");
-        expect(prisma.leaveRequest.findMany).toHaveBeenCalledTimes(5);
+        expect(prisma.leaveRequest.findMany).toHaveBeenCalledTimes(4);
         expect(vi.mocked(prisma.leaveRequest.findMany).mock.calls[0][0]).toEqual(
             expect.objectContaining({
                 skip: 10,
@@ -207,7 +209,7 @@ describe("GET /api/leave/approvals", () => {
         );
 
         expect(response.status).toBe(200);
-        expect(prisma.leaveRequest.findMany).toHaveBeenCalledTimes(5);
+        expect(prisma.leaveRequest.findMany).toHaveBeenCalledTimes(4);
         expect(prisma.leaveRequest.count).toHaveBeenCalledTimes(4);
         expect(vi.mocked(prisma.leaveRequest.findMany).mock.calls[0][0]).toEqual(
             expect.objectContaining({
@@ -325,6 +327,27 @@ describe("GET /api/leave/approvals", () => {
             ],
             status: "CANCELLATION_REQUESTED",
         });
+        expect(prisma.leaveRequest.aggregate).toHaveBeenCalledWith({
+            where: {
+                AND: [
+                    getAssignedLeaveApproverWhere(200),
+                    {
+                        OR: [
+                            { status: { in: ["REJECTED", "NOT_TAKEN", "CANCELLED_AFTER_APPROVAL"] } },
+                            {
+                                status: "APPROVED",
+                                OR: [
+                                    { notTakenRequestedAt: null },
+                                    { notTakenConfirmedAt: { not: null } },
+                                ],
+                            },
+                        ],
+                    },
+                ],
+            },
+            _min: { startDate: true },
+            _max: { startDate: true },
+        });
     });
 
     it.each([
@@ -360,10 +383,7 @@ describe("GET /api/leave/approvals", () => {
             .mockResolvedValueOnce([] as never)
             .mockResolvedValueOnce([] as never)
             .mockResolvedValueOnce([historicalExceptionAssignment] as never)
-            .mockResolvedValueOnce([] as never)
-            .mockResolvedValueOnce([
-                { startDate: new Date("2027-01-04T00:00:00.000Z") },
-            ] as never);
+            .mockResolvedValueOnce([] as never);
         vi.mocked(prisma.leaveRequest.count).mockReset();
         vi.mocked(prisma.leaveRequest.count)
             .mockResolvedValueOnce(0)

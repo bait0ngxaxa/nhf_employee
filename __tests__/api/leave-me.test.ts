@@ -25,6 +25,7 @@ vi.mock("@/lib/db/prisma", () => ({
         leaveRequest: {
             findMany: vi.fn(),
             count: vi.fn(),
+            aggregate: vi.fn(),
         },
     },
 }));
@@ -89,6 +90,10 @@ describe("GET /api/leave/me", () => {
             });
         vi.mocked(prisma.leaveRequest.findMany).mockResolvedValue([]);
         vi.mocked(prisma.leaveRequest.count).mockResolvedValue(0);
+        vi.mocked(prisma.leaveRequest.aggregate).mockResolvedValue({
+            _min: { startDate: null },
+            _max: { startDate: null },
+        } as never);
     });
 
     afterEach(() => {
@@ -320,25 +325,38 @@ describe("GET /api/leave/me", () => {
         );
     });
 
-    it("returns only years present in the authenticated employee history", async () => {
+    it("returns year options from the authenticated employee history date range", async () => {
         vi.mocked(prisma.leaveRequest.findMany).mockReset();
-        vi.mocked(prisma.leaveRequest.findMany)
-            .mockResolvedValueOnce([] as never)
-            .mockResolvedValueOnce([
-                { startDate: new Date("2026-02-01T00:00:00.000Z") },
-                { startDate: new Date("2024-08-01T00:00:00.000Z") },
-                { startDate: new Date("2026-09-01T00:00:00.000Z") },
-            ] as never);
+        vi.mocked(prisma.leaveRequest.findMany).mockResolvedValueOnce([] as never);
+        vi.mocked(prisma.leaveRequest.aggregate).mockResolvedValueOnce({
+            _min: { startDate: new Date("2024-01-01T00:00:00.000Z") },
+            _max: { startDate: new Date("2026-01-01T00:00:00.000Z") },
+        } as never);
 
         const response = await getLeaveProfile(
             new Request("http://localhost/api/leave/me?page=1&limit=10"),
         );
         const body = await response.json();
 
-        expect(body.metadata.availableYears).toEqual([2026, 2024]);
-        expect(prisma.leaveRequest.findMany).toHaveBeenNthCalledWith(2, {
+        expect(body.metadata.availableYears).toEqual([2026, 2025, 2024]);
+        expect(prisma.leaveRequest.aggregate).toHaveBeenCalledWith({
             where: { employeeId: 100 },
-            select: { startDate: true },
+            _min: { startDate: true },
+            _max: { startDate: true },
+        });
+    });
+
+    it("returns no available years when the authenticated employee has no history", async () => {
+        const response = await getLeaveProfile(
+            new Request("http://localhost/api/leave/me?page=1&limit=10"),
+        );
+        const body = await response.json();
+
+        expect(body.metadata.availableYears).toEqual([]);
+        expect(prisma.leaveRequest.aggregate).toHaveBeenCalledWith({
+            where: { employeeId: 100 },
+            _min: { startDate: true },
+            _max: { startDate: true },
         });
     });
 

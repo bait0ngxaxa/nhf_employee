@@ -71,7 +71,7 @@ export async function GET(req: Request): Promise<NextResponse> {
 
         const skip = (page - 1) * limit;
 
-        const [history, totalCount, availableYearRecords] = await Promise.all([
+        const [history, totalCount, availableYearRange] = await Promise.all([
             prisma.leaveRequest.findMany({
                 where,
                 skip,
@@ -92,9 +92,10 @@ export async function GET(req: Request): Promise<NextResponse> {
                 },
             }),
             prisma.leaveRequest.count({ where }),
-            prisma.leaveRequest.findMany({
+            prisma.leaveRequest.aggregate({
                 where: employeeHistoryScopeWhere,
-                select: { startDate: true },
+                _min: { startDate: true },
+                _max: { startDate: true },
             }),
         ]);
 
@@ -109,7 +110,8 @@ export async function GET(req: Request): Promise<NextResponse> {
                 totalItems: totalCount,
                 itemsPerPage: limit,
                 availableYears: getAvailableLeaveHistoryYears(
-                    availableYearRecords.map(({ startDate }) => startDate),
+                    availableYearRange._min.startDate,
+                    availableYearRange._max.startDate,
                 ),
             },
         });

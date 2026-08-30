@@ -45,9 +45,9 @@ describe("LeaveHistoryFilters", () => {
             }),
         ).toBeInTheDocument();
         expect(screen.getAllByRole("combobox")).toHaveLength(3);
-        expect(screen.getByRole("combobox", { name: "ประเภทการลา" })).toBeInTheDocument();
-        expect(screen.getByRole("combobox", { name: "สถานะการลา" })).toBeInTheDocument();
-        expect(screen.getByRole("combobox", { name: "ปีที่ลา" })).toBeInTheDocument();
+        expect(screen.getByRole("combobox", { name: "ประเภทการลา" })).toHaveTextContent("ทุกประเภท");
+        expect(screen.getByRole("combobox", { name: "สถานะการลา" })).toHaveTextContent("ทุกสถานะ");
+        expect(screen.getByRole("combobox", { name: "ปีที่ลา" })).toHaveTextContent("ทุกปี");
         expect(screen.getByRole("button", { name: "ล้างตัวกรอง" })).toBeDisabled();
     });
 
@@ -59,6 +59,57 @@ describe("LeaveHistoryFilters", () => {
         expect(screen.getByRole("option", { name: "2569" })).toBeInTheDocument();
         expect(screen.getByRole("option", { name: "2567" })).toBeInTheDocument();
         expect(screen.queryByRole("option", { name: "2543" })).not.toBeInTheDocument();
+    });
+
+    it("clears only the leave type when selecting all types", () => {
+        const props = createProps({
+            leaveType: "SICK",
+            status: "APPROVED",
+            year: "2026",
+            hasActiveFilters: true,
+        });
+        render(<LeaveHistoryFilters {...props} />);
+
+        fireEvent.click(screen.getByRole("combobox", { name: "ประเภทการลา" }));
+        fireEvent.click(screen.getByRole("option", { name: "ทุกประเภท" }));
+
+        expect(props.onLeaveTypeChange).toHaveBeenCalledWith("");
+        expect(props.onStatusChange).not.toHaveBeenCalled();
+        expect(props.onYearChange).not.toHaveBeenCalled();
+    });
+
+    it("clears only the status when selecting all statuses", () => {
+        const props = createProps({
+            leaveType: "SICK",
+            status: "APPROVED",
+            year: "2026",
+            hasActiveFilters: true,
+        });
+        render(<LeaveHistoryFilters {...props} />);
+
+        fireEvent.click(screen.getByRole("combobox", { name: "สถานะการลา" }));
+        fireEvent.click(screen.getByRole("option", { name: "ทุกสถานะ" }));
+
+        expect(props.onStatusChange).toHaveBeenCalledWith("");
+        expect(props.onLeaveTypeChange).not.toHaveBeenCalled();
+        expect(props.onYearChange).not.toHaveBeenCalled();
+    });
+
+    it("clears only the year when selecting all years", () => {
+        const props = createProps({
+            leaveType: "SICK",
+            status: "APPROVED",
+            year: "2026",
+            hasActiveFilters: true,
+        });
+        render(<LeaveHistoryFilters {...props} />);
+
+        fireEvent.click(screen.getByRole("combobox", { name: "ปีที่ลา" }));
+        fireEvent.click(screen.getByRole("option", { name: "ทุกปี" }));
+
+        expect(props.onYearChange).toHaveBeenCalledWith("");
+        expect(props.onLeaveTypeChange).not.toHaveBeenCalled();
+        expect(props.onStatusChange).not.toHaveBeenCalled();
     });
 
     it("forwards search and select changes, and resets active filters", () => {

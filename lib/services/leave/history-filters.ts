@@ -192,15 +192,22 @@ export function hasLeaveHistoryFilters(filters: LeaveHistoryFilters): boolean {
 }
 
 export function getAvailableLeaveHistoryYears(
-    startDates: readonly (Date | string)[],
+    minDate: Date | string | null,
+    maxDate: Date | string | null,
 ): number[] {
-    const years = new Set<number>();
-
-    for (const startDate of startDates) {
-        years.add(getLeaveYearFromDateValue(startDate));
+    if (minDate === null || maxDate === null) {
+        return [];
     }
 
-    return [...years].sort((left, right) => right - left);
+    const minYear = getLeaveYearFromDateValue(minDate);
+    const maxYear = getLeaveYearFromDateValue(maxDate);
+    const firstYear = Math.min(minYear, maxYear);
+    const lastYear = Math.max(minYear, maxYear);
+
+    return Array.from(
+        { length: lastYear - firstYear + 1 },
+        (_, index) => lastYear - index,
+    );
 }
 
 function appendLeaveRequestAttributeFilters(
