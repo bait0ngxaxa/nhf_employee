@@ -110,6 +110,16 @@ export const API_ROUTES = {
         accountLink: "/api/line/account-link",
         liffSession: "/api/line/liff/session",
         home: "/api/line/home",
+        leaveMe: "/api/line/leave/me",
+        leaveRequest: "/api/line/leave/request",
+        leaveApprovals: "/api/line/leave/approvals",
+        leaveCancel: "/api/line/leave/cancel",
+        leaveNotTaken: "/api/line/leave/not-taken",
+        leaveDecision: "/api/line/leave/decision",
+        leaveRequestById: (id: string): string =>
+            `/api/line/leave/requests/${id}`,
+        leaveAttachmentById: (id: string): string =>
+            `/api/line/leave/attachments/${id}`,
         routineTasks: "/api/line/routine/tasks",
         routineSummary: "/api/line/routine/summary",
     },

@@ -10,7 +10,10 @@ import type {
     LeaveHistoryFilters,
     LeaveHistoryMetadata,
 } from "@/lib/services/leave/history-filters";
-import type { LeaveAttachmentSummary } from "@/lib/types/leave";
+import type {
+    LeaveQuotaSummary,
+    LeaveRequestSummary,
+} from "@/lib/types/leave";
 
 const fetcher = async <T,>(url: string): Promise<T> => {
     const res = await apiGet<T>(url);
@@ -18,17 +21,7 @@ const fetcher = async <T,>(url: string): Promise<T> => {
     return res.data;
 };
 
-export interface LeaveQuota {
-    id: string;
-    year: number;
-    employeeId: number;
-    leaveType: "SICK" | "PERSONAL" | "VACATION";
-    totalDays: number;
-    carryBalanceDays: number;
-    effectiveTotalDays: number;
-    usedDays: number;
-    remainingDays: number;
-}
+export type LeaveQuota = LeaveQuotaSummary;
 
 export type LeaveQuotaBalance = Pick<
     LeaveQuota,
@@ -39,46 +32,7 @@ export type LeaveQuotaBalance = Pick<
     | "remainingDays"
 >;
 
-export interface LeaveRequest {
-    id: string;
-    employeeId: number;
-    leaveType: "SICK" | "PERSONAL" | "VACATION";
-    startDate: string;
-    endDate: string;
-    period: "FULL_DAY" | "MORNING" | "AFTERNOON";
-    durationDays: number;
-    reason: string;
-    emergencyReason: string | null;
-    specialReason: string | null;
-    overQuotaDays: number;
-    status:
-        | "PENDING"
-        | "APPROVED"
-        | "REJECTED"
-        | "CANCELLED"
-        | "NOT_TAKEN"
-        | "CANCELLATION_REQUESTED"
-        | "CANCELLED_AFTER_APPROVAL";
-    approverId: number | null;
-    approvedAt: string | null;
-    rejectReason: string | null;
-    notTakenReason: string | null;
-    notTakenRequestedAt: string | null;
-    notTakenConfirmedAt: string | null;
-    notTakenConfirmedById: number | null;
-    cancellationReason: string | null;
-    cancellationRequestedAt: string | null;
-    cancellationConfirmedAt: string | null;
-    cancellationConfirmedById: number | null;
-    attachments: LeaveAttachmentSummary[];
-    createdAt: string;
-    updatedAt: string;
-    approver?: {
-        firstName: string;
-        lastName: string;
-        nickname: string | null;
-    } | null;
-}
+export type LeaveRequest = LeaveRequestSummary;
 
 export interface LeaveProfileResponse {
     quotas: LeaveQuota[];

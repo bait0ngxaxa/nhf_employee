@@ -24,8 +24,11 @@ type StoredLeaveAttachmentSummary = {
     height: number | null;
 };
 
+export type LeaveAttachmentUrlBuilder = (attachmentId: string) => string;
+
 export function toLeaveAttachmentSummary(
     attachment: StoredLeaveAttachmentSummary,
+    buildViewUrl: LeaveAttachmentUrlBuilder = API_ROUTES.leave.attachmentById,
 ): LeaveAttachmentSummary {
     return {
         id: attachment.id,
@@ -33,7 +36,7 @@ export function toLeaveAttachmentSummary(
         sizeBytes: attachment.sizeBytes,
         width: attachment.width,
         height: attachment.height,
-        viewUrl: API_ROUTES.leave.attachmentById(attachment.id),
+        viewUrl: buildViewUrl(attachment.id),
     };
 }
 
@@ -41,11 +44,14 @@ export function withLeaveAttachmentSummaries<
     T extends { attachments: StoredLeaveAttachmentSummary[] },
 >(
     request: T,
+    buildViewUrl: LeaveAttachmentUrlBuilder = API_ROUTES.leave.attachmentById,
 ): Omit<T, "attachments"> & { attachments: LeaveAttachmentSummary[] } {
     const { attachments, ...leaveRequest } = request;
 
     return {
         ...leaveRequest,
-        attachments: attachments.map(toLeaveAttachmentSummary),
+        attachments: attachments.map((attachment) =>
+            toLeaveAttachmentSummary(attachment, buildViewUrl),
+        ),
     };
 }

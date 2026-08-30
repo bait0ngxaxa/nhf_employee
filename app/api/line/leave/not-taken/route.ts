@@ -1,6 +1,6 @@
 import type { NextRequest, NextResponse } from "next/server";
 
-import { requireActiveWorkforceSession } from "@/lib/auth/workforce";
+import { requireLiffWorkforceSession } from "@/lib/auth/liff";
 import { enforceLeaveJsonBodySize } from "@/lib/server/leave-api";
 import {
     handleLeaveNotTakenConfirmation,
@@ -16,7 +16,7 @@ import { notFound } from "@/lib/ssot/http";
 async function authorizeMutation(
     req: NextRequest,
 ): Promise<
-    | { ok: true; auth: Awaited<ReturnType<typeof requireActiveWorkforceSession>> & { ok: true } }
+    | { ok: true; auth: Awaited<ReturnType<typeof requireLiffWorkforceSession>> & { ok: true } }
     | { ok: false; response: NextResponse }
 > {
     if (!isFeatureEnabled(FEATURE_KEYS.leave)) {
@@ -30,11 +30,9 @@ async function authorizeMutation(
         return { ok: false, response: preAuthRateLimitResponse };
     }
     const bodySizeResponse = enforceLeaveJsonBodySize(req);
-    if (bodySizeResponse) {
-        return { ok: false, response: bodySizeResponse };
-    }
+    if (bodySizeResponse) return { ok: false, response: bodySizeResponse };
 
-    const auth = await requireActiveWorkforceSession();
+    const auth = await requireLiffWorkforceSession();
     if (!auth.ok) return { ok: false, response: auth.response };
     const principalRateLimitResponse = enforceAuthenticatedMutationRateLimit(
         "leave-not-taken",
@@ -56,6 +54,6 @@ export async function PUT(req: NextRequest): Promise<NextResponse> {
     const authorization = await authorizeMutation(req);
     if (!authorization.ok) return authorization.response;
     return handleLeaveNotTakenConfirmation(req, authorization.auth, {
-        allowAdminOverride: true,
+        allowAdminOverride: false,
     });
 }

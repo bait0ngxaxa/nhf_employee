@@ -280,12 +280,13 @@ export async function cancelLeaveRequest(
     });
 }
 
-type CancellationDecisionActor = {
+export type CancellationDecisionActor = {
     userId: number;
     employeeId: number;
     role: string;
     name?: string | null;
     userEmail?: string;
+    allowAdminOverride?: boolean;
 };
 
 export async function confirmLeaveCancellation(
@@ -503,15 +504,17 @@ async function getCancellationDecisionRequest(
     ) {
         throw new LeaveCancellationError(LEAVE_CANCELLATION_MESSAGES.invalidStatus, 409);
     }
+    const allowAdminOverride = isAdminRole(actor.role)
+        && actor.allowAdminOverride !== false;
     const decisionAuthorization = getLeaveDecisionAuthorization(
         actor.employeeId,
-        isAdminRole(actor.role),
+        allowAdminOverride,
         leaveRequest,
     );
     if (decisionAuthorization === "OWNER") {
         throw new LeaveCancellationError(LEAVE_CANCELLATION_MESSAGES.forbidden, 403);
     }
-    if (isAdminRole(actor.role)) {
+    if (allowAdminOverride) {
         if (decisionAuthorization === "ASSIGNED_APPROVER") {
             return { leaveRequest, adminOverride: false };
         }

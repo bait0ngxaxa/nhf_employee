@@ -27,5 +27,9 @@ describe("LIFF home module availability", () => {
             enabled: true,
             status: "coming-soon",
         });
+        expect(getLiffHomeModules().leave).toEqual({
+            enabled: true,
+            status: "available",
+        });
     });
 });

@@ -1,7 +1,7 @@
 import useSWR, { type KeyedMutator } from "swr";
 import { apiGet } from "@/lib/client/api-client";
 import { API_ROUTES } from "@/lib/ssot/routes";
-import type { LeaveAttachmentSummary } from "@/lib/types/leave";
+import type { LeaveApprovalItem } from "@/lib/types/leave";
 import type { LeaveApprovalPaginationMetadata } from "@/lib/services/leave/approval-queries";
 import type {
     LeaveHistoryFilters,
@@ -16,46 +16,7 @@ const fetcher = async <T,>(url: string): Promise<T> => {
     return res.data;
 };
 
-export interface PendingLeave {
-    id: string;
-    employeeId: number;
-    leaveType: "SICK" | "PERSONAL" | "VACATION";
-    startDate: string;
-    endDate: string;
-    period: "FULL_DAY" | "MORNING" | "AFTERNOON";
-    durationDays: number;
-    reason: string;
-    emergencyReason: string | null;
-    specialReason: string | null;
-    overQuotaDays: number;
-    status:
-        | "PENDING"
-        | "APPROVED"
-        | "REJECTED"
-        | "CANCELLED"
-        | "NOT_TAKEN"
-        | "CANCELLATION_REQUESTED"
-        | "CANCELLED_AFTER_APPROVAL";
-    cancellationReason: string | null;
-    cancellationRequestedAt: string | null;
-    cancellationConfirmedAt: string | null;
-    cancellationConfirmedById: number | null;
-    notTakenReason: string | null;
-    notTakenRequestedAt: string | null;
-    notTakenConfirmedAt: string | null;
-    createdAt: string;
-    attachments: LeaveAttachmentSummary[];
-    employee: {
-        firstName: string;
-        lastName: string;
-        nickname: string | null;
-        position: string;
-        departmentId: number;
-        dept?: {
-            name: string;
-        };
-    };
-}
+export type PendingLeave = LeaveApprovalItem;
 
 export interface LeaveApprovalsResponse {
     pending: PendingLeave[];

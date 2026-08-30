@@ -83,6 +83,8 @@ export const leaveAttachmentIdParamSchema = z
   .max(64)
   .regex(/^[A-Za-z0-9_-]+$/);
 
+export const leaveRequestIdParamSchema = leaveAttachmentIdParamSchema;
+
 const emptyToNull = (value: unknown): unknown => {
   if (typeof value !== "string") {
     return value;

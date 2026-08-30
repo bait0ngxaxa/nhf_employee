@@ -9,7 +9,7 @@ export function getLiffHomeModules(): LiffHomeResponse["modules"] {
         stock: { enabled: true, status: "coming-soon" },
         leave: {
             enabled: leaveEnabled,
-            status: leaveEnabled ? "coming-soon" : "unavailable",
+            status: leaveEnabled ? "available" : "unavailable",
         },
         routine: {
             enabled: routineEnabled,

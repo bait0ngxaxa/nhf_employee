@@ -33,6 +33,11 @@ interface LeaveQuotaSnapshot {
 interface UseLeaveRequestFormModelArgs {
     onSuccess: () => void | Promise<void>;
     quotas?: LeaveQuotaSnapshot[];
+    submitRequest?: (
+        payload: LeaveRequestValues,
+        attachments: readonly File[],
+        idempotencyKey: string,
+    ) => Promise<void>;
 }
 
 interface UseLeaveRequestFormModelResult {
@@ -121,6 +126,7 @@ const normalizeLeaveRequestErrorMessage = (rawMessage: string): string => {
 export function useLeaveRequestFormModel({
     onSuccess,
     quotas = [],
+    submitRequest = submitLeaveRequest,
 }: UseLeaveRequestFormModelArgs): UseLeaveRequestFormModelResult {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -257,7 +263,7 @@ export function useLeaveRequestFormModel({
         idempotencyRef.current = idempotencyRequest;
         try {
             try {
-                await submitLeaveRequest(data, attachments, idempotencyRequest.key);
+                await submitRequest(data, attachments, idempotencyRequest.key);
             } catch (error) {
                 const rawMessage =
                     error instanceof Error && error.message

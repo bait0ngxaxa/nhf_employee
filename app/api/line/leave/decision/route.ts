@@ -1,6 +1,6 @@
 import { after, NextResponse, type NextRequest } from "next/server";
 
-import { requireActiveWorkforceSession } from "@/lib/auth/workforce";
+import { requireLiffWorkforceSession } from "@/lib/auth/liff";
 import { enforceLeaveJsonBodySize } from "@/lib/server/leave-api";
 import {
     decideLeaveRequest,
@@ -19,9 +19,7 @@ import { leaveActionSchema } from "@/lib/validations/leave";
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
     try {
-        if (!isFeatureEnabled(FEATURE_KEYS.leave)) {
-            return notFound();
-        }
+        if (!isFeatureEnabled(FEATURE_KEYS.leave)) return notFound();
         const preAuthRateLimitResponse = enforcePreAuthIpRateLimit(
             req,
             "leave-decision",
@@ -30,7 +28,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         const bodySizeResponse = enforceLeaveJsonBodySize(req);
         if (bodySizeResponse) return bodySizeResponse;
 
-        const auth = await requireActiveWorkforceSession();
+        const auth = await requireLiffWorkforceSession();
         if (!auth.ok) return auth.response;
         const principalRateLimitResponse = enforceAuthenticatedMutationRateLimit(
             "leave-decision",
@@ -44,7 +42,6 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
                 details: parsed.error.flatten().fieldErrors,
             });
         }
-
         const result = await decideLeaveRequest(
             {
                 userId: auth.user.id,
@@ -56,7 +53,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         );
         after(() => {
             processOutbox().catch((error: unknown) =>
-                console.error("Failed to process leave outbox in background:", {
+                console.error("Process LIFF leave decision outbox failed", {
                     errorType: error instanceof Error ? error.name : "UnknownError",
                 }),
             );
@@ -66,12 +63,12 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
             data: toLeaveRequestDays(result),
         });
     } catch (error) {
-        console.error("Intranet Leave Approval Error:", {
-            errorType: error instanceof Error ? error.name : "UnknownError",
-        });
         if (error instanceof LeaveApprovalError) {
             return jsonError(error.message, error.statusCode);
         }
+        console.error("LIFF leave decision failed", {
+            errorType: error instanceof Error ? error.name : "UnknownError",
+        });
         return jsonError(COMMON_API_MESSAGES.failedToProcessLeaveApproval, 500);
     }
 }

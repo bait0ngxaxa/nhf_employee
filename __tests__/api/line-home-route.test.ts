@@ -36,7 +36,7 @@ const AUTH = {
 
 const MODULES = {
     stock: { enabled: true, status: "coming-soon" as const },
-    leave: { enabled: true, status: "coming-soon" as const },
+    leave: { enabled: true, status: "available" as const },
     routine: { enabled: true, status: "available" as const },
 };
 

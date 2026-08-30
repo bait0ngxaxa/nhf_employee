@@ -4,7 +4,7 @@ import { Card } from "@/components/ui/card";
 import { Pagination } from "@/components/Pagination";
 import type { LeaveRequest } from "@/hooks/useLeaveProfile";
 import { formatThaiDateTimeWithTimeWord } from "@/lib/helpers/date-helpers";
-import { isAfterLeaveEnd, isBeforeLeaveStart } from "@/lib/services/leave/utils";
+import { getEmployeeLeaveActions } from "@/lib/services/leave/action-availability";
 import { LeaveAttachmentViewerButton } from "./LeaveAttachmentViewerButton";
 import { LeaveStatusBadge } from "./LeaveStatusBadge";
 
@@ -89,9 +89,10 @@ function LeaveHistoryItem({
     onCancelRequest: (request: LeaveRequest) => void;
     onNotTakenRequest: (leaveId: string) => void;
 }) {
-    const canCancel =
-        request.status === "PENDING" || canRequestApprovedCancellation(request);
-    const canRequestNotTakenAction = canRequestNotTaken(request);
+    const availableActions = getEmployeeLeaveActions(request);
+    const canCancel = availableActions.includes("CANCEL")
+        || availableActions.includes("REQUEST_CANCELLATION");
+    const canRequestNotTakenAction = availableActions.includes("REQUEST_NOT_TAKEN");
     const hasActions =
         request.attachments.length > 0 || canCancel || canRequestNotTakenAction;
 
@@ -258,20 +259,4 @@ function formatLeaveDateRange(startDate: string, endDate: string): string {
     }
 
     return `${start} - ${formatter.format(new Date(endDate))}`;
-}
-
-function canRequestNotTaken(request: LeaveRequest): boolean {
-    return (
-        request.status === "APPROVED"
-        && !request.notTakenRequestedAt
-        && isAfterLeaveEnd(request.endDate)
-    );
-}
-
-function canRequestApprovedCancellation(request: LeaveRequest): boolean {
-    return (
-        request.status === "APPROVED"
-        && !request.cancellationRequestedAt
-        && isBeforeLeaveStart(request.startDate)
-    );
 }
