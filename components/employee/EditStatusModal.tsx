@@ -113,7 +113,7 @@ export function EditStatusModal({
                   <SelectItem key={status.value} value={status.value}>
                     <div className="flex items-center space-x-2">
                       {status.icon === '✓' ? (
-                        <CheckCircle2 className="h-4 w-4 text-status-success-foreground" />
+                        <CheckCircle2 className="h-4 w-4 text-status-positive-accent" />
                       ) : (
                         <AlertCircle className="h-4 w-4 text-content-neutral-secondary" />
                       )}
@@ -127,8 +127,8 @@ export function EditStatusModal({
 
           {/* Status Description */}
           {selectedStatus && (
-            <div className="p-3 bg-brand-surface rounded-md">
-              <p className="text-sm text-brand-strong">
+            <div className="p-3 bg-action-primary-surface rounded-md">
+              <p className="text-sm text-action-primary-strong">
                 <strong>คำอธิบาย:</strong> {selectedStatusInfo.description}
               </p>
             </div>

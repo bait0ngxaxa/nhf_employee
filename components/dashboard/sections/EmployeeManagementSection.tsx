@@ -75,7 +75,7 @@ function EmployeeManagementContent() {
                             </Button>
                             <Button
                                 onClick={() => handleMenuClick("add-employee")}
-                                className="w-full justify-center rounded-xl bg-gradient-to-r from-brand-start to-brand-end text-content-on-brand hover:from-brand-start hover:to-brand-end sm:w-auto"
+                                className="w-full justify-center rounded-xl bg-gradient-to-r from-employee-action-start to-employee-action-end text-content-on-brand hover:from-employee-action-hover-start hover:to-employee-action-hover-end sm:w-auto"
                             >
                                 <Plus className="h-4 w-4" />
                                 <span>เพิ่มพนักงาน</span>

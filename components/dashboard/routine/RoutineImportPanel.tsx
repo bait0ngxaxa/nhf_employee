@@ -63,11 +63,11 @@ const STATUS_LABELS: Record<RoutineImportRowStatus, string> = {
 const STATUS_CLASSES: Record<RoutineImportRowStatus, string> = {
     VALID: "border-status-success-border bg-status-success-surface text-status-success-foreground",
     REQUIRES_REVIEW: "border-status-warning-border bg-status-warning-surface text-status-warning-strong",
-    EXCLUDED: "border-border-subtle bg-surface-subtle text-content-secondary",
-    ALREADY_IMPORTED: "border-brand-border bg-brand-surface text-brand-foreground",
-    CONFLICT: "border-status-danger-border bg-status-danger-surface text-status-danger-foreground",
+    EXCLUDED: "border-border-subtle bg-surface-subtle text-content-body",
+    ALREADY_IMPORTED: "border-brand-border-default bg-brand-surface text-brand-emphasis",
+    CONFLICT: "border-status-danger-border bg-status-danger-surface text-status-danger-strong",
     APPLIED: "border-status-success-border bg-status-success-surface text-status-success-foreground",
-    FAILED: "border-status-danger-border bg-status-danger-surface text-status-danger-foreground",
+    FAILED: "border-status-danger-border bg-status-danger-surface text-status-danger-strong",
 };
 
 const BATCH_STATUS_LABELS: Record<RoutineImportBatchView["status"], string> = {

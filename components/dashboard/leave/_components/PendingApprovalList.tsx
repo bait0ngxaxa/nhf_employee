@@ -161,7 +161,7 @@ function PendingApprovalCard({
                         onClick={() => onOpenReject(leave)}
                         disabled={isProcessing}
                         variant="outline"
-                        className="border-status-danger-border text-status-danger-foreground hover:bg-status-danger-surface hover:text-status-danger-strong"
+                        className="border-status-danger-border text-status-danger-strong hover:bg-status-danger-surface hover:text-status-danger-heading"
                     >
                         <XCircle className="h-4 w-4" aria-hidden="true" />
                         ไม่อนุมัติ
@@ -185,7 +185,7 @@ function InfoRow({
         <div className="min-w-0">
             <p className="text-xs/5 font-medium text-module-leave-badge-foreground">{label}</p>
             <p className="mt-1 flex items-start gap-2 break-words text-base/6 font-semibold text-content-heading">
-                <Icon className="mt-0.5 h-4 w-4 shrink-0 text-module-leave-badge-foreground" aria-hidden="true" />
+                <Icon className="mt-0.5 h-4 w-4 shrink-0 text-module-leave-icon" aria-hidden="true" />
                 <span>{value}</span>
             </p>
         </div>
@@ -204,7 +204,7 @@ function SpecialFlag({ label }: { label: string }) {
 function EmptyPendingApproval() {
     return (
         <Card className="border-dashed border-border-strong p-8 text-center shadow-none">
-            <CheckCircle className="mx-auto h-8 w-8 text-status-success-foreground" aria-hidden="true" />
+            <CheckCircle className="mx-auto h-8 w-8 text-status-success-accent" aria-hidden="true" />
             <p className="mt-3 text-base/6 font-semibold text-content-primary">ไม่มีคำขอที่ต้องพิจารณา</p>
             <p className="mt-1 text-sm/6 text-content-muted">คำขอใหม่จากทีมจะแสดงที่นี่</p>
         </Card>

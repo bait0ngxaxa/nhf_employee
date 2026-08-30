@@ -142,10 +142,10 @@ function BrowseCardBase(props: BrowseCardProps) {
     return (
         <Card className={`group relative h-full overflow-hidden rounded-2xl border bg-surface-raised transition-colors duration-200 ${
             isRecentlyAdded
-                ? "border-status-success-border ring-2 ring-status-success-solid/70"
+                ? "border-status-success-border-strong ring-2 ring-status-success-focus/70"
                 : availableQuantity === 0
                     ? "border-border-subtle/80"
-                    : "border-brand-border/80 hover:border-brand-border"
+                    : "border-action-primary-border-subtle/80 hover:border-action-primary-border-strong"
         }`}>
             <CardContent className="flex h-full flex-col gap-2.5 p-3">
                 <div className="overflow-hidden rounded-2xl bg-surface-subtle ring-1 ring-border-subtle">
@@ -162,7 +162,7 @@ function BrowseCardBase(props: BrowseCardProps) {
                         <button
                             type="button"
                             onClick={() => props.onPreviewImage(imageUrl, item.name)}
-                            className="group/preview relative block h-32 w-full overflow-hidden text-left outline-none focus-visible:ring-2 focus-visible:ring-brand-solid focus-visible:ring-offset-2"
+                            className="group/preview relative block h-32 w-full overflow-hidden text-left outline-none focus-visible:ring-2 focus-visible:ring-action-primary-ring focus-visible:ring-offset-2"
                             aria-label={`ดูรูป ${item.name} แบบพรีวิว`}
                         >
                             <Image
@@ -177,7 +177,7 @@ function BrowseCardBase(props: BrowseCardProps) {
                                 className="h-full w-full object-cover transition-transform duration-200 group-hover/preview:scale-[1.03]"
                             />
                             <span className="absolute inset-0 bg-surface-inverted/0 transition-colors duration-300 group-hover/preview:bg-surface-inverted/20" />
-                            <span className="absolute bottom-2 right-2 flex h-8 w-8 items-center justify-center rounded-full bg-surface-raised/90 text-content-body opacity-0 shadow-sm transition-opacity duration-200 group-hover/preview:opacity-100 group-hover/preview:text-brand-foreground group-focus-visible/preview:opacity-100 group-focus-visible/preview:text-brand-foreground">
+                            <span className="absolute bottom-2 right-2 flex h-8 w-8 items-center justify-center rounded-full bg-surface-raised/90 text-content-body opacity-0 shadow-sm transition-opacity duration-200 group-hover/preview:opacity-100 group-hover/preview:text-action-primary-foreground group-focus-visible/preview:opacity-100 group-focus-visible/preview:text-action-primary-foreground">
                                 <ZoomIn className="h-4 w-4" aria-hidden="true" />
                             </span>
                         </button>
@@ -234,7 +234,7 @@ function BrowseCardBase(props: BrowseCardProps) {
                         <div
                             className={`min-h-5 text-xs font-medium leading-5 ${
                                 item.reservedQuantity > 0
-                                    ? "text-status-warning-foreground"
+                                    ? "text-status-warning-accent"
                                     : "text-transparent"
                             }`}
                         >
@@ -254,12 +254,12 @@ function BrowseCardBase(props: BrowseCardProps) {
                     )}
                     <Button
                         variant="default"
-                        className={`group/button relative isolate w-full overflow-hidden rounded-xl shadow-sm ring-offset-2 transition-colors duration-200 focus-visible:ring-2 focus-visible:ring-brand-solid active:translate-y-0.5 active:scale-[0.98] ${
+                        className={`group/button relative isolate w-full overflow-hidden rounded-xl shadow-sm ring-offset-2 transition-colors duration-200 focus-visible:ring-2 focus-visible:ring-action-primary-ring active:translate-y-0.5 active:scale-[0.98] ${
                             availableQuantity === 0
                                 ? "border-border-subtle bg-surface-subtle/50 text-content-subtle"
                                 : isRecentlyAdded
-                                  ? "border border-status-success-border bg-status-success-solid text-content-on-brand hover:bg-status-success-solid-hover"
-                                : "border border-brand-border bg-brand-solid text-content-on-brand hover:border-brand-border hover:bg-brand-solid-hover"
+                                  ? "border border-status-success-solid bg-status-success-solid text-content-on-brand hover:bg-status-success-solid-hover"
+                                : "border border-action-primary-solid bg-action-primary-solid text-content-on-brand hover:border-action-primary-solid-hover hover:bg-action-primary-solid-hover"
                         }`}
                         onClick={() =>
                             hasSelectableVariants(item)

@@ -67,7 +67,7 @@ export function EditEmployeeForm({
                     <div className="grid gap-3">
                         <Label
                             htmlFor="status"
-                            className={fieldErrors.status ? "text-status-danger-foreground" : ""}
+                            className={fieldErrors.status ? "text-status-error-icon" : ""}
                         >
                             สถานะ *
                         </Label>
@@ -79,7 +79,7 @@ export function EditEmployeeForm({
                                 id="status"
                                 className={
                                     fieldErrors.status
-                                        ? "border-status-danger-border focus:ring-status-danger-solid"
+                                        ? "border-status-error-focus focus:ring-status-error-focus"
                                         : ""
                                 }
                             >
@@ -98,16 +98,16 @@ export function EditEmployeeForm({
                             </SelectContent>
                         </Select>
                         {fieldErrors.status && (
-                            <p className="text-xs text-status-danger-foreground">
+                            <p className="text-xs text-status-error-icon">
                                 {fieldErrors.status}
                             </p>
                         )}
                     </div>
 
                     {error && (
-                        <Alert className="border-status-danger-border bg-status-danger-surface">
-                            <AlertTriangle className="h-4 w-4 text-status-danger-foreground" />
-                            <div className="text-status-danger-foreground">{error}</div>
+                        <Alert className="border-status-error-border bg-status-error-surface">
+                            <AlertTriangle className="h-4 w-4 text-status-error-muted" />
+                            <div className="text-status-error-foreground">{error}</div>
                         </Alert>
                     )}
 
@@ -124,7 +124,7 @@ export function EditEmployeeForm({
                         <Button
                             type="submit"
                             disabled={isLoading}
-                            className="h-11 px-7 font-bold bg-brand-solid hover:bg-brand-solid-hover text-content-on-brand shadow-sm transition-all flex items-center space-x-2"
+                            className="h-11 px-7 font-bold bg-action-primary-solid hover:bg-action-primary-solid-hover text-content-on-brand shadow-sm transition-all flex items-center space-x-2"
                         >
                             {isLoading ? (
                                 <>

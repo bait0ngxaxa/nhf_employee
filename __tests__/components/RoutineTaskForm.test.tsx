@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { RoutineTaskForm } from "@/components/dashboard/routine/RoutineTaskForm";
 import {
+    daysInMonth,
     getCurrentBangkokDate,
     getDefaultRoutineScheduleConfig,
 } from "@/lib/routine/schedule";
@@ -188,7 +189,10 @@ describe("RoutineTaskForm reminder rules", () => {
 
         fireEvent.change(month, { target: { value: "2" } });
         expect(screen.getByLabelText("วันที่")).toHaveValue(
-            Number(getCurrentBangkokDate().slice(-2)),
+            Math.min(
+                Number(getCurrentBangkokDate().slice(-2)),
+                daysInMonth(2024, 2),
+            ),
         );
     });
 

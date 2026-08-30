@@ -96,12 +96,12 @@ function CancellationPendingItem({
                         </div>
                     </div>
                     {leave.cancellationReason ? (
-                        <p className="mt-2 max-w-[75ch] break-words rounded-md border border-status-warning-border bg-surface-raised p-2 text-sm/6 text-status-warning-strong">
+                        <p className="mt-2 max-w-[75ch] break-words rounded-md border border-status-warning-border bg-surface-raised p-2 text-sm/6 text-status-warning-emphasis">
                             เหตุผล: {leave.cancellationReason}
                         </p>
                     ) : null}
                     {!canConfirm ? (
-                        <p className="mt-2 text-sm/6 font-medium text-status-warning-strong">
+                        <p className="mt-2 text-sm/6 font-medium text-status-warning-emphasis">
                             วันลาเริ่มแล้ว ไม่สามารถยืนยันการยกเลิกและคืนโควต้าได้
                         </p>
                     ) : null}

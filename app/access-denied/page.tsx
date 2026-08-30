@@ -12,13 +12,13 @@ export default function AccessDenied() {
     <div className="flex min-h-screen items-center justify-center bg-surface-subtle p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <div className="mx-auto bg-status-danger-surface p-3 rounded-full w-16 h-16 flex items-center justify-center mb-4">
-            <Shield className="h-8 w-8 text-status-danger-foreground" />
+          <div className="mx-auto bg-status-error-surface-strong p-3 rounded-full w-16 h-16 flex items-center justify-center mb-4">
+            <Shield className="h-8 w-8 text-status-error-muted" />
           </div>
-          <CardTitle className="text-2xl font-bold text-status-danger-strong">
+          <CardTitle className="text-2xl font-bold text-status-error-emphasis">
             ไม่มีสิทธิ์เข้าถึง
           </CardTitle>
-          <CardDescription className="text-status-danger-foreground">
+          <CardDescription className="text-status-error-foreground">
             คุณไม่มีสิทธิ์ในการเข้าถึงส่วนนี้ของระบบ
           </CardDescription>
         </CardHeader>

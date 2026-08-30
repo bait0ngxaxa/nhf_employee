@@ -184,13 +184,13 @@ export function formatRoutineScheduleSummary(schedule: {
 export function getRoutineTimingStatusClass(status: RoutineTimingStatus): string {
     switch (status) {
         case "OVERDUE":
-            return "border-status-danger-border bg-status-danger-surface text-status-danger-foreground";
+            return "border-status-danger-border bg-status-danger-surface text-status-danger-strong";
         case "DUE_TODAY":
-            return "border-brand-border bg-brand-surface text-brand-foreground";
+            return "border-brand-border-default bg-brand-surface text-brand-emphasis";
         case "DUE_SOON":
             return "border-status-warning-border bg-status-warning-surface text-status-warning-foreground";
         case "UPCOMING":
-            return "border-border-subtle bg-surface-subtle text-content-secondary";
+            return "border-border-subtle bg-surface-subtle text-content-body";
     }
 }
 

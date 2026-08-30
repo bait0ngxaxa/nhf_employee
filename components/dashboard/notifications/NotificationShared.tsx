@@ -94,24 +94,24 @@ export function NotificationIcon({
 }): React.ReactElement {
     switch (type) {
         case "STOCK_REQUEST_NEW":
-            return <Bell className={cn("text-status-warning-foreground", className)} />;
+            return <Bell className={cn("text-notification-stock-request-icon", className)} />;
         case "ROUTINE_REMINDER":
-            return <ClipboardCheck className={cn("text-brand-foreground", className)} />;
+            return <ClipboardCheck className={cn("text-notification-routine-icon", className)} />;
         case "ROUTINE_CONTRACT_EXPIRY":
-            return <CalendarClock className={cn("text-status-warning-foreground", className)} />;
+            return <CalendarClock className={cn("text-notification-contract-expiry-icon", className)} />;
         case "STOCK_ISSUED":
         case "LEAVE_APPROVED":
         case "LEAVE_NOT_TAKEN_CONFIRMED":
         case "LEAVE_CANCELLED_AFTER_APPROVAL":
-            return <Check className={cn("text-status-success-foreground", className)} />;
+            return <Check className={cn("text-notification-success-icon", className)} />;
         case "STOCK_CANCELLED":
         case "LEAVE_REJECTED":
         case "LEAVE_CANCELLED":
-            return <XCircle className={cn("text-status-danger-foreground", className)} />;
+            return <XCircle className={cn("text-notification-cancelled-icon", className)} />;
         case "LEAVE_REQUESTED":
         case "LEAVE_NOT_TAKEN_REQUESTED":
         case "LEAVE_CANCELLATION_REQUESTED":
-            return <Bell className={cn("text-brand-foreground", className)} />;
+            return <Bell className={cn("text-notification-leave-request-icon", className)} />;
         case "SYSTEM_ALERT":
         default:
             return <Info className={cn("text-content-muted", className)} />;

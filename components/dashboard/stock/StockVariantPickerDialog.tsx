@@ -204,7 +204,7 @@ export function StockVariantPickerDialog({
                                             event.stopPropagation();
                                             setPreviewImageUrl(activeImageUrl);
                                         }}
-                                        className="group/preview relative h-full w-full overflow-hidden text-left outline-none transition-transform duration-200 focus-visible:ring-2 focus-visible:ring-brand-solid focus-visible:ring-offset-2 active:scale-95"
+                                        className="group/preview relative h-full w-full overflow-hidden text-left outline-none transition-transform duration-200 focus-visible:ring-2 focus-visible:ring-action-primary-ring focus-visible:ring-offset-2 active:scale-95"
                                         aria-label={`ดูรูป ${item.name} แบบพรีวิว`}
                                     >
                                         <Image
@@ -218,7 +218,7 @@ export function StockVariantPickerDialog({
                                             className="h-full w-full object-contain transition-transform duration-200 group-hover/preview:scale-[1.03]"
                                         />
                                         <span className="absolute inset-0 bg-surface-inverted/0 transition-colors duration-300 group-hover/preview:bg-surface-inverted/20" />
-                                        <span className="absolute bottom-1.5 right-1.5 flex h-7 w-7 items-center justify-center rounded-full bg-surface-raised/90 text-content-body opacity-0 shadow-sm transition-opacity duration-200 group-hover/preview:opacity-100 group-hover/preview:text-brand-foreground group-focus-visible/preview:opacity-100 group-focus-visible/preview:text-brand-foreground">
+                                        <span className="absolute bottom-1.5 right-1.5 flex h-7 w-7 items-center justify-center rounded-full bg-surface-raised/90 text-content-body opacity-0 shadow-sm transition-opacity duration-200 group-hover/preview:opacity-100 group-hover/preview:text-action-primary-foreground group-focus-visible/preview:opacity-100 group-focus-visible/preview:text-action-primary-foreground">
                                             <ZoomIn className="h-3.5 w-3.5" aria-hidden="true" />
                                         </span>
                                     </button>
@@ -288,10 +288,10 @@ export function StockVariantPickerDialog({
                                         onClick={() => focusVariant(variant)}
                                         className={`rounded-2xl border p-4 text-left transition-[border-color,background-color,box-shadow,opacity] duration-200 ${
                                             isSelected
-                                                ? "border-status-success-border bg-status-success-surface shadow-sm shadow-status-success-solid/15"
+                                                ? "border-status-success-border-strong bg-status-success-surface shadow-sm shadow-status-success-shadow-soft/70"
                                                 : isActive
-                                                    ? "border-brand-border bg-brand-surface/70 shadow-sm shadow-brand-solid/15"
-                                                    : "border-border-subtle bg-surface-raised hover:border-brand-border hover:bg-brand-surface/35"
+                                                    ? "border-action-primary-border-strong bg-action-primary-surface/70 shadow-sm shadow-action-primary-shadow-soft/60"
+                                                    : "border-border-subtle bg-surface-raised hover:border-action-primary-border hover:bg-action-primary-surface/35"
                                         } ${availableQuantity === 0 ? "bg-surface-subtle opacity-70" : "cursor-pointer"}`}
                                     >
                                         <div className="flex flex-col gap-3">
@@ -299,10 +299,10 @@ export function StockVariantPickerDialog({
                                                 <button
                                                     type="button"
                                                     onClick={() => focusVariant(variant)}
-                                                    className="min-w-0 flex-1 space-y-1 rounded-xl text-left outline-none transition-colors duration-200 hover:text-content-heading focus-visible:ring-2 focus-visible:ring-brand-solid focus-visible:ring-offset-2"
+                                                    className="min-w-0 flex-1 space-y-1 rounded-xl text-left outline-none transition-colors duration-200 hover:text-content-heading focus-visible:ring-2 focus-visible:ring-action-primary-ring focus-visible:ring-offset-2"
                                                     aria-label={`ดูรูปและรายละเอียด ${summary || variant.sku}`}
                                                 >
-                                                    <div className={`font-semibold ${isSelected ? "text-status-success-strong" : "text-content-strong"}`}>
+                                                    <div className={`font-semibold ${isSelected ? "text-status-success-emphasis" : "text-content-strong"}`}>
                                                         {summary || variant.sku}
                                                     </div>
                                                     <div className={isSelected ? "text-xs text-status-success-foreground/80" : "text-xs text-content-muted"}>
@@ -325,7 +325,7 @@ export function StockVariantPickerDialog({
                                                         <Button
                                                             type="button"
                                                             variant="outline"
-                                                            className="h-11 rounded-lg border-border-subtle bg-surface-raised px-3 text-sm font-semibold text-content-body hover:border-brand-border hover:bg-brand-surface hover:text-brand-strong"
+                                                            className="h-11 rounded-lg border-border-subtle bg-surface-raised px-3 text-sm font-semibold text-content-body hover:border-action-primary-border-strong hover:bg-action-primary-surface hover:text-action-primary-strong"
                                                             onClick={() =>
                                                                 handleVariantCardClick(variant)
                                                             }
@@ -358,7 +358,7 @@ export function StockVariantPickerDialog({
                                                         type="button"
                                                         variant="ghost"
                                                         size="icon"
-                                                        className="h-11 w-11 rounded-lg border border-border-subtle bg-surface-raised text-content-body shadow-sm transition-colors duration-200 hover:border-brand-border hover:bg-brand-surface hover:text-brand-foreground"
+                                                        className="h-11 w-11 rounded-lg border border-border-subtle bg-surface-raised text-content-body shadow-sm transition-colors duration-200 hover:border-action-primary-border hover:bg-action-primary-surface hover:text-action-primary-foreground"
                                                         onClick={() =>
                                                             updateVariantQuantity(variant, -1)
                                                         }
@@ -367,14 +367,14 @@ export function StockVariantPickerDialog({
                                                     >
                                                         <Minus className="h-3.5 w-3.5" aria-hidden="true" />
                                                     </Button>
-                                                    <div className={`w-12 rounded-lg py-1 text-center text-sm font-bold ${quantity > 0 ? "bg-status-success-surface text-status-success-strong" : "text-content-body"}`}>
+                                                    <div className={`w-12 rounded-lg py-1 text-center text-sm font-bold ${quantity > 0 ? "bg-status-success-surface-strong text-status-success-strong" : "text-content-body"}`}>
                                                         {quantity}
                                                     </div>
                                                     <Button
                                                         type="button"
                                                         variant="ghost"
                                                         size="icon"
-                                                        className="h-11 w-11 rounded-lg border border-border-subtle bg-surface-raised text-content-body shadow-sm transition-colors duration-200 hover:border-brand-border hover:bg-brand-surface hover:text-brand-foreground"
+                                                        className="h-11 w-11 rounded-lg border border-border-subtle bg-surface-raised text-content-body shadow-sm transition-colors duration-200 hover:border-action-primary-border hover:bg-action-primary-surface hover:text-action-primary-foreground"
                                                         onClick={() =>
                                                             updateVariantQuantity(variant, 1)
                                                         }
@@ -406,7 +406,7 @@ export function StockVariantPickerDialog({
                             ยกเลิก
                         </Button>
                         <Button
-                            className="h-11 bg-brand-solid font-bold text-content-on-brand shadow-sm transition-colors duration-200 hover:bg-brand-solid-hover"
+                            className="h-11 bg-action-primary-solid font-bold text-content-on-brand shadow-sm transition-colors duration-200 hover:bg-action-primary-solid-hover"
                             onClick={() => onConfirm(selections)}
                             disabled={selections.length === 0}
                         >

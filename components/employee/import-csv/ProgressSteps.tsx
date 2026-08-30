@@ -7,8 +7,8 @@ export function ProgressSteps({ step }: ProgressStepsProps) {
         const currentIndex = stepOrder.indexOf(step);
         const targetIndex = stepOrder.indexOf(targetStep);
 
-        if (targetIndex < currentIndex) return "text-status-success-foreground";
-        if (targetIndex === currentIndex) return "text-brand-foreground";
+        if (targetIndex < currentIndex) return "text-status-positive-foreground";
+        if (targetIndex === currentIndex) return "text-action-primary-foreground";
         return "text-content-neutral-muted";
     };
 
@@ -17,8 +17,8 @@ export function ProgressSteps({ step }: ProgressStepsProps) {
         const currentIndex = stepOrder.indexOf(step);
         const targetIndex = stepOrder.indexOf(targetStep);
 
-        if (targetIndex < currentIndex) return "bg-status-success-surface text-status-success-strong";
-        if (targetIndex === currentIndex) return "bg-brand-surface text-brand-strong ring-2 ring-brand-solid";
+        if (targetIndex < currentIndex) return "bg-status-positive-surface-strong text-status-positive-strong";
+        if (targetIndex === currentIndex) return "bg-action-primary-surface-strong text-action-primary-strong ring-2 ring-action-primary-border";
         return "bg-surface-neutral-muted text-content-neutral-secondary";
     };
 

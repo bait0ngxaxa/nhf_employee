@@ -25,7 +25,7 @@ export function StockImagePreviewSurface({
             onClick={onClose}
         >
             <div
-                className="flex max-h-[88vh] w-full max-w-[920px] flex-col overflow-hidden rounded-3xl border border-border-subtle bg-surface-raised shadow-2xl "
+                className="flex max-h-[88vh] w-full max-w-[920px] flex-col overflow-hidden rounded-3xl border border-border-subtle bg-surface-raised shadow-2xl shadow-image-preview-shadow/30"
                 onClick={(event) => event.stopPropagation()}
             >
                 <div className="flex items-center justify-between gap-3 border-b border-border-subtle bg-surface-subtle px-4 py-3 sm:px-5">
@@ -40,7 +40,7 @@ export function StockImagePreviewSurface({
                     <button
                         type="button"
                         onClick={onClose}
-                        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-brand-border bg-surface-raised text-brand-foreground shadow-sm transition-colors duration-200 hover:border-brand-border hover:bg-brand-surface focus-visible:ring-2 focus-visible:ring-brand-solid focus-visible:ring-offset-2"
+                        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-action-primary-border-subtle bg-surface-raised text-action-primary-foreground shadow-sm transition-colors duration-200 hover:border-action-primary-border hover:bg-action-primary-surface focus-visible:ring-2 focus-visible:ring-action-primary-ring focus-visible:ring-offset-2"
                         aria-label="ปิดพรีวิวรูป"
                     >
                         <X className="h-5 w-5" aria-hidden="true" />

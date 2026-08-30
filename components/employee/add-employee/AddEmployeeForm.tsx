@@ -46,12 +46,12 @@ export function AddEmployeeForm({ onSuccess }: AddEmployeeFormProps) {
                         />
 
                         {error && (
-                            <Alert className="border-status-danger-border bg-status-danger-surface" aria-live="assertive">
-                                <AlertTriangle className="h-4 w-4 text-status-danger-foreground" />
-                                <AlertTitle className="text-status-danger-strong">
+                            <Alert className="border-status-error-border bg-status-error-surface" aria-live="assertive">
+                                <AlertTriangle className="h-4 w-4 text-status-error-muted" />
+                                <AlertTitle className="text-status-error-strong">
                                     เพิ่มพนักงานไม่สำเร็จ
                                 </AlertTitle>
-                                <AlertDescription className="text-status-danger-foreground [overflow-wrap:anywhere]">
+                                <AlertDescription className="text-status-error-foreground [overflow-wrap:anywhere]">
                                     {error}
                                 </AlertDescription>
                             </Alert>
@@ -59,7 +59,7 @@ export function AddEmployeeForm({ onSuccess }: AddEmployeeFormProps) {
 
                         <Button
                             type="submit"
-                            className="h-11 w-full bg-brand-solid text-base font-bold text-content-on-brand transition-colors hover:bg-brand-solid-hover"
+                            className="h-11 w-full bg-action-primary-solid text-base font-bold text-content-on-brand transition-colors hover:bg-action-primary-solid-hover"
                             disabled={isLoading}
                         >
                             {isLoading ? (

@@ -167,7 +167,7 @@ function LeaveHistoryItem({
                                 <Button
                                     variant="outline"
                                     size="sm"
-                                    className="border-status-danger-border text-status-danger-foreground hover:bg-status-danger-surface hover:text-status-danger-strong"
+                                    className="border-status-danger-border text-status-danger-strong hover:bg-status-danger-surface hover:text-status-danger-heading"
                                     disabled={isSubmitting}
                                     onClick={() => onCancelRequest(request)}
                                 >
@@ -179,7 +179,7 @@ function LeaveHistoryItem({
                                 <Button
                                     variant="outline"
                                     size="sm"
-                                    className="border-brand-border text-brand-foreground hover:bg-brand-surface hover:text-brand-strong"
+                                    className="border-status-info-border text-status-info-foreground hover:bg-status-info-surface hover:text-status-info-strong"
                                     disabled={isSubmitting}
                                     onClick={() => onNotTakenRequest(request.id)}
                                 >
@@ -206,8 +206,8 @@ function LeaveNote({
 }) {
     const toneClassName = {
         neutral: "border-border-subtle bg-surface-subtle text-content-body",
-        danger: "border-status-danger-border bg-status-danger-surface text-status-danger-strong",
-        info: "border-brand-border bg-brand-surface text-brand-strong",
+        danger: "border-status-danger-border bg-status-danger-surface text-status-danger-heading",
+        info: "border-brand-border-default bg-brand-surface text-brand-heading",
         warning: "border-status-warning-border bg-status-warning-surface text-status-warning-strong",
     }[tone];
 

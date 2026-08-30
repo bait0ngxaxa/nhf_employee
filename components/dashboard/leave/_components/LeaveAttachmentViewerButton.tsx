@@ -30,7 +30,7 @@ export function LeaveAttachmentViewerButton({
                 variant="outline"
                 size="sm"
                 className={cn(
-                    "border-module-leave-badge-border text-module-leave-badge-foreground hover:bg-module-leave-badge-surface hover:text-module-leave-badge-foreground",
+                    "border-module-leave-border text-module-leave-badge-foreground hover:bg-module-leave-badge-surface hover:text-module-leave-strong",
                     className,
                 )}
                 onClick={() => setOpen(true)}

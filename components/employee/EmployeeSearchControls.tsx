@@ -52,7 +52,7 @@ export function EmployeeSearchControls({
                         placeholder="ค้นหาชื่อ ชื่อเล่น อีเมล ตำแหน่ง แผนก หรือสังกัด"
                         value={searchTerm}
                         onChange={(event) => handleSearch(event.target.value)}
-                        className="h-11 rounded-lg border-border-subtle bg-surface-raised pl-10 pr-10 text-content-primary placeholder:text-content-muted focus:border-brand-border focus:ring-brand-solid/20"
+                        className="h-11 rounded-lg border-border-subtle bg-surface-raised pl-10 pr-10 text-content-primary placeholder:text-content-muted focus:border-brand-focus focus:ring-brand-focus/20"
                     />
                     {searchTerm.trim().length > 0 && (
                         <Button

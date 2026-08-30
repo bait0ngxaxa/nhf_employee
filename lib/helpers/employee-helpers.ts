@@ -108,8 +108,8 @@ export function getEmployeeDepartmentLabel(department?: string): string {
 
 export function getEmployeeDepartmentBadgeClass(department?: string): string {
   if (department === 'ADMIN' || department === 'บริหาร') {
-    return 'bg-amber-50 text-amber-700 border-amber-200/80 hover:bg-amber-100';
+    return 'bg-status-warning-surface text-status-warning-foreground border-status-warning-border/80 hover:bg-status-warning-surface-strong';
   }
 
-  return 'bg-sky-50 text-sky-700 border-sky-200/80 hover:bg-sky-100';
+  return 'bg-brand-surface text-brand-emphasis border-brand-border-default/80 hover:bg-brand-surface-strong';
 }

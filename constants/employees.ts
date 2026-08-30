@@ -39,7 +39,7 @@ export const EMPLOYEE_STATUS_LABELS: Record<EmployeeStatusValue, string> = {
 };
 
 export const EMPLOYEE_STATUS_BADGE_CLASSES: Record<EmployeeStatusValue, string> = {
-  ACTIVE: 'bg-green-100 text-green-800',
-  INACTIVE: 'bg-gray-100 text-gray-800',
-  SUSPENDED: 'bg-red-100 text-red-800'
+  ACTIVE: 'bg-status-positive-surface-strong text-status-positive-strong',
+  INACTIVE: 'bg-surface-neutral-muted text-content-neutral-strong',
+  SUSPENDED: 'bg-status-error-surface-strong text-status-error-strong'
 };

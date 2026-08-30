@@ -59,9 +59,9 @@ function EmailRequestField({
         <div className="min-w-0 space-y-2">
             <Label
                 htmlFor={id}
-                className={error ? "text-status-danger-foreground [overflow-wrap:anywhere]" : "[overflow-wrap:anywhere]"}
+                className={error ? "text-status-error-foreground [overflow-wrap:anywhere]" : "[overflow-wrap:anywhere]"}
             >
-                {label} <span className="text-status-danger-foreground">*</span>
+                {label} <span className="text-status-error-muted">*</span>
             </Label>
             <Input
                 id={id}
@@ -77,10 +77,10 @@ function EmailRequestField({
                 disabled={disabled}
                 aria-invalid={Boolean(error)}
                 aria-describedby={error ? errorId : undefined}
-                className={error ? "border-status-danger-border focus-visible:ring-status-danger-solid" : ""}
+                className={error ? "border-status-error-focus focus-visible:ring-status-error-focus" : ""}
             />
             {error ? (
-                <p id={errorId} className="text-xs leading-5 text-status-danger-foreground [overflow-wrap:anywhere]">
+                <p id={errorId} className="text-xs leading-5 text-status-error-foreground [overflow-wrap:anywhere]">
                     {error}
                 </p>
             ) : null}
@@ -116,11 +116,11 @@ export function EmailRequestForm({ onCancel, onSuccess }: EmailRequestFormProps)
                 <CardContent className="p-6 md:p-8">
                     {error && (
                         <div
-                            className="mb-6 flex items-start gap-3 rounded-xl border border-status-danger-border bg-status-danger-surface p-4 text-status-danger-strong"
+                            className="mb-6 flex items-start gap-3 rounded-xl border border-status-error-border bg-status-error-surface p-4 text-status-error-strong"
                             role="alert"
                             aria-live="assertive"
                         >
-                            <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-status-danger-foreground" />
+                            <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-status-error-muted" />
                             <p className="text-sm leading-6 [overflow-wrap:anywhere]">
                                 {error}
                             </p>

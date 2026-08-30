@@ -44,7 +44,7 @@ function buildStatItems(stats: EmployeeStats): StatItem[] {
             label: "ฝ่ายวิชาการ",
             value: stats.academic,
             detail: "บุคลากรสายวิชาการ",
-            valueClassName: "text-brand-foreground",
+            valueClassName: "text-brand-emphasis",
         },
     ];
 }

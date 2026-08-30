@@ -33,10 +33,10 @@ export function ApproverManagement() {
     if (model.fetchError) {
         return (
             <Card className="border-status-danger-border bg-status-danger-surface p-8 text-center shadow-none">
-                <p className="text-sm font-medium text-status-danger-strong">
+                <p className="text-sm font-medium text-status-danger-heading">
                     ไม่สามารถโหลดข้อมูลผู้อนุมัติได้
                 </p>
-                <p className="mt-1 text-sm text-status-danger-foreground">
+                <p className="mt-1 text-sm text-status-danger-strong">
                     กรุณาลองรีเฟรชหน้าอีกครั้ง หากยังพบปัญหาให้ติดต่อผู้ดูแลระบบ
                 </p>
             </Card>
@@ -82,7 +82,7 @@ export function ApproverManagement() {
                             className={`px-4 py-2 rounded-lg text-sm mt-2 border ${
                                 model.saveMsg.type === "ok"
                                     ? "bg-status-success-surface border-status-success-border text-status-success-foreground"
-                                    : "bg-status-danger-surface border-status-danger-border text-status-danger-foreground"
+                                    : "bg-status-error-surface border-status-error-border text-status-error-foreground"
                             }`}
                         >
                             {model.saveMsg.text}
@@ -127,7 +127,7 @@ export function ApproverManagement() {
                 <div className="fixed bottom-4 left-1/2 z-50 w-[calc(100vw-1.5rem)] max-w-3xl -translate-x-1/2">
                     <div
                         role="status"
-                        className="flex items-center justify-between gap-3 rounded-lg border border-module-leave-badge-border bg-surface-raised px-4 py-3 shadow-md"
+                        className="flex items-center justify-between gap-3 rounded-lg border border-module-leave-border bg-surface-raised px-4 py-3 shadow-md"
                     >
                         <div className="min-w-0">
                             <p className="text-sm font-semibold text-module-leave-badge-foreground">

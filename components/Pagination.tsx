@@ -114,7 +114,7 @@ function PageNumberList({
                         aria-label={`ไปยังหน้า ${item}`}
                         className={
                             isCurrentPage
-                                ? "bg-gradient-to-br from-brand-start to-brand-end font-semibold text-content-on-brand hover:from-brand-start hover:to-brand-end hover:text-content-on-brand"
+                                ? "bg-gradient-to-br from-pagination-active-start to-pagination-active-end font-semibold text-content-on-brand hover:from-pagination-active-hover-start hover:to-pagination-active-hover-end hover:text-content-on-brand"
                                 : "font-semibold"
                         }
                     >

@@ -90,7 +90,7 @@ export function StockMyRequests() {
                                 <Button
                                     size="sm"
                                     variant="outline"
-                                    className="h-11 border-status-danger-border text-status-danger-foreground hover:bg-status-danger-surface hover:text-status-danger-foreground"
+                                    className="h-11 border-status-danger-border text-status-danger-foreground hover:bg-status-danger-surface hover:text-status-danger-strong"
                                     disabled={processingRequestId === request.id}
                                     onClick={() => setCancelTarget(request)}
                                 >
@@ -192,7 +192,7 @@ function RequestFilters(props: {
                         value={props.requestSearchQuery}
                         onChange={(event) => props.onSearchChange(event.target.value)}
                         placeholder="ค้นหาเลขที่คำขอ รหัสโครงการ หรือรายการ"
-                        className="h-12 rounded-2xl border-border-subtle bg-surface-raised pl-11 pr-11 text-content-primary placeholder:text-content-muted focus-visible:border-brand-border focus-visible:ring-brand-solid"
+                        className="h-12 rounded-2xl border-border-subtle bg-surface-raised pl-11 pr-11 text-content-primary placeholder:text-content-muted focus-visible:border-action-primary-border-strong focus-visible:ring-action-primary-border"
                     />
                     {props.requestSearchQuery.trim().length > 0 && (
                         <Button
@@ -219,7 +219,7 @@ function RequestFilters(props: {
                         }
                     >
                         <SelectTrigger
-                            className="h-12 rounded-2xl border-border-subtle bg-surface-raised text-content-primary focus:ring-brand-solid"
+                            className="h-12 rounded-2xl border-border-subtle bg-surface-raised text-content-primary focus:ring-action-primary-border"
                             aria-label="กรองสถานะประวัติคำขอเบิกวัสดุ"
                         >
                             <SelectValue placeholder="กรองสถานะ" />
@@ -248,7 +248,7 @@ function RequestRow(props: {
     const isPendingIssue = request.status === "PENDING_ISSUE";
 
     return (
-        <TableRow className="border-b border-border-subtle transition-colors hover:bg-brand-surface/60">
+        <TableRow className="border-b border-border-subtle transition-colors hover:bg-action-primary-surface/60">
             <TableCell className="border-r border-border-subtle py-4 font-medium text-content-strong">
                 #{request.id}
             </TableCell>
@@ -285,7 +285,7 @@ function RequestRow(props: {
                         <Button
                             size="sm"
                             variant="outline"
-                            className="border-status-danger-border text-status-danger-foreground hover:bg-status-danger-surface hover:text-status-danger-foreground"
+                            className="border-status-danger-border text-status-danger-foreground hover:bg-status-danger-surface hover:text-status-danger-strong"
                             disabled={processingId === request.id}
                             onClick={onOpenCancel}
                         >

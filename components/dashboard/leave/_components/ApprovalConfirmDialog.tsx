@@ -37,7 +37,7 @@ export function ApprovalConfirmDialog({
                     </DialogDescription>
                 </DialogHeader>
                 {leave ? (
-                    <div className="space-y-2 rounded-lg border border-status-warning-border bg-status-warning-surface p-3 text-sm leading-6 text-status-warning-strong">
+                    <div className="space-y-2 rounded-lg border border-status-warning-border bg-status-warning-surface p-3 text-sm leading-6 text-status-warning-heading">
                         {leave.emergencyReason ? (
                             <p className="break-words">
                                 <span className="font-semibold">เหตุผลในการลาย้อนหลัง:</span>{" "}

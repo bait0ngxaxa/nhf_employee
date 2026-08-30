@@ -58,7 +58,7 @@ function SessionRow({
     return (
         <li className={cn(
             "grid gap-4 p-5 sm:grid-cols-[minmax(0,1fr)_10rem] sm:items-start",
-            session.isCurrent && "bg-brand-surface/60",
+            session.isCurrent && "bg-status-info-surface/60",
         )}>
             <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2.5">
@@ -70,7 +70,7 @@ function SessionRow({
                     </span>
                     <span className="text-sm text-content-secondary">{parsed.os}</span>
                     {session.isCurrent ? (
-                        <Badge className="bg-brand-surface text-brand-strong hover:bg-brand-surface">
+                        <Badge className="bg-status-info-surface-strong text-status-info-strong hover:bg-status-info-surface-strong">
                             อุปกรณ์นี้
                         </Badge>
                     ) : null}
@@ -170,7 +170,7 @@ export function SessionManagementView({
                         </Button>
                         <Button
                             onClick={() => onSetConfirmAction({ type: "signout-current" })}
-                            className="h-11 bg-brand-solid-hover text-content-on-brand hover:bg-brand-solid-hover"
+                            className="h-11 bg-status-info-solid text-content-on-brand hover:bg-status-info-solid-hover"
                         >
                             ออกจากอุปกรณ์นี้
                         </Button>
@@ -181,7 +181,7 @@ export function SessionManagementView({
                     <div className="flex flex-col gap-3 border-b border-border-subtle px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
                         <div>
                             <h3 className="font-semibold text-content-heading">
-                                อุปกรณ์ที่กำลังใช้งาน <span className="text-brand-foreground">{sessions.length}</span>
+                                อุปกรณ์ที่กำลังใช้งาน <span className="text-status-info-foreground">{sessions.length}</span>
                             </h3>
                             <p className="mt-0.5 text-sm text-content-secondary">
                                 เลือกยกเลิกอุปกรณ์ที่คุณไม่รู้จักได้ทันที

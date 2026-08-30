@@ -12,20 +12,20 @@ type RequestStatusMeta = {
 const REQUEST_STATUS_META: Record<string, RequestStatusMeta> = {
     PENDING: {
         label: "รออนุมัติ",
-        colorClass: "bg-status-warning-surface text-status-warning-foreground border-status-warning-border hover:bg-status-warning-surface",
-        iconClass: "text-status-warning-foreground",
+        colorClass: "bg-status-warning-surface text-status-warning-foreground border-status-warning-border hover:bg-status-warning-surface-strong",
+        iconClass: "text-status-warning-icon",
         icon: Clock3,
     },
     APPROVED: {
         label: "อนุมัติแล้ว",
-        colorClass: "bg-status-success-surface text-status-success-foreground border-status-success-border hover:bg-status-success-surface",
-        iconClass: "text-status-success-foreground",
+        colorClass: "bg-status-success-surface text-status-success-foreground border-status-success-border hover:bg-status-success-surface-strong",
+        iconClass: "text-status-success-icon",
         icon: CheckCircle2,
     },
     REJECTED: {
         label: "ปฏิเสธ",
-        colorClass: "bg-status-danger-surface text-status-danger-foreground border-status-danger-border hover:bg-status-danger-surface",
-        iconClass: "text-status-danger-foreground",
+        colorClass: "bg-status-danger-surface text-status-danger-strong border-status-danger-border hover:bg-status-danger-surface-strong",
+        iconClass: "text-status-danger-icon",
         icon: XCircle,
     },
     CANCELLED: {
@@ -36,14 +36,14 @@ const REQUEST_STATUS_META: Record<string, RequestStatusMeta> = {
     },
     NOT_TAKEN: {
         label: "ไม่ได้ใช้วันลา",
-        colorClass: "bg-brand-surface text-brand-foreground border-brand-border hover:bg-brand-surface",
-        iconClass: "text-brand-foreground",
+        colorClass: "bg-status-info-surface text-status-info-foreground border-status-info-border hover:bg-status-info-surface-strong",
+        iconClass: "text-status-info-icon",
         icon: Ban,
     },
     CANCELLATION_REQUESTED: {
         label: "รอยืนยันยกเลิก",
-        colorClass: "bg-status-warning-surface text-status-warning-foreground border-status-warning-border hover:bg-status-warning-surface",
-        iconClass: "text-status-warning-foreground",
+        colorClass: "bg-status-warning-surface text-status-warning-foreground border-status-warning-border hover:bg-status-warning-surface-strong",
+        iconClass: "text-status-warning-icon",
         icon: Clock3,
     },
     CANCELLED_AFTER_APPROVAL: {
@@ -54,20 +54,20 @@ const REQUEST_STATUS_META: Record<string, RequestStatusMeta> = {
     },
     PENDING_ISSUE: {
         label: "รอจ่าย",
-        colorClass: "bg-status-warning-surface text-status-warning-foreground border-status-warning-border hover:bg-status-warning-surface",
-        iconClass: "text-status-warning-foreground",
+        colorClass: "bg-status-warning-surface text-status-warning-foreground border-status-warning-border hover:bg-status-warning-surface-strong",
+        iconClass: "text-status-warning-icon",
         icon: Clock3,
     },
     ISSUED: {
         label: "จ่ายแล้ว",
-        colorClass: "bg-status-success-surface text-status-success-foreground border-status-success-border hover:bg-status-success-surface",
-        iconClass: "text-status-success-foreground",
+        colorClass: "bg-status-success-surface text-status-success-foreground border-status-success-border hover:bg-status-success-surface-strong",
+        iconClass: "text-status-success-icon",
         icon: CheckCircle2,
     },
     REJECTED_LEGACY: {
         label: "ปฏิเสธ (เดิม)",
-        colorClass: "bg-status-danger-surface text-status-danger-foreground border-status-danger-border hover:bg-status-danger-surface",
-        iconClass: "text-status-danger-foreground",
+        colorClass: "bg-status-danger-surface text-status-danger-strong border-status-danger-border hover:bg-status-danger-surface-strong",
+        iconClass: "text-status-danger-icon",
         icon: XCircle,
     },
 };

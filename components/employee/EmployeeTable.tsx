@@ -176,7 +176,7 @@ function NicknameBadge({ nickname }: { nickname?: string }) {
     return (
         <Badge
             variant="secondary"
-            className="max-w-full border border-brand-border/70 bg-brand-surface px-2.5 font-medium text-brand-foreground hover:bg-brand-surface"
+            className="max-w-full border border-employee-nickname-border/70 bg-employee-nickname-surface px-2.5 font-medium text-employee-nickname-foreground hover:bg-employee-nickname-surface"
             title={normalizedNickname}
         >
             <span className="truncate">{normalizedNickname}</span>

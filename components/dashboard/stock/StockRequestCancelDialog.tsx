@@ -47,8 +47,8 @@ export function StockRequestCancelDialog({
             }}
         >
             <DialogContent className="overflow-hidden p-0 sm:max-w-[420px]">
-                <div className="border-b border-status-danger-border bg-status-danger-surface/50 px-5 py-4 sm:px-6">
-                    <DialogTitle className="text-lg font-semibold text-status-danger-strong">
+                <div className="border-b border-status-danger-border-subtle bg-status-danger-surface/50 px-5 py-4 sm:px-6">
+                    <DialogTitle className="text-lg font-semibold text-status-danger-heading">
                         ยืนยันการยกเลิกคำขอ #{request.id}
                     </DialogTitle>
                 </div>
@@ -70,7 +70,7 @@ export function StockRequestCancelDialog({
                             value={reason}
                             onChange={(event) => setReason(event.target.value)}
                             placeholder="ระบุเหตุผลเพิ่มเติมเพื่อให้เจ้าหน้าที่ทราบ"
-                            className="h-11 focus-visible:ring-status-danger-solid"
+                            className="h-11 focus-visible:ring-status-danger-focus"
                         />
                     </div>
                     <div className="flex flex-col-reverse gap-2 pt-3 sm:flex-row sm:justify-end">

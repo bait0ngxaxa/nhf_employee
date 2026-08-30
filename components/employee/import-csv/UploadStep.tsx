@@ -54,14 +54,14 @@ export function UploadStep({
                     {previewError && (
                         <Alert
                             id="csv-file-error"
-                            className="border-status-danger-border bg-status-danger-surface"
+                            className="border-status-error-border bg-status-error-surface"
                             aria-live="assertive"
                         >
-                            <XCircle className="h-4 w-4 text-status-danger-foreground" />
-                            <AlertTitle className="text-status-danger-strong">
+                            <XCircle className="h-4 w-4 text-status-error-muted" />
+                            <AlertTitle className="text-status-error-strong">
                                 ตรวจสอบไฟล์ไม่สำเร็จ
                             </AlertTitle>
-                            <AlertDescription className="whitespace-pre-line text-status-danger-foreground [overflow-wrap:anywhere]">
+                            <AlertDescription className="whitespace-pre-line text-status-error-foreground [overflow-wrap:anywhere]">
                                 {previewError}
                             </AlertDescription>
                         </Alert>

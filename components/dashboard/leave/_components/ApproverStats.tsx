@@ -15,8 +15,8 @@ interface StatCardProps {
 function StatCard({ label, value, color }: StatCardProps) {
     const colorMap: Record<StatCardProps["color"], { card: string; text: string }> = {
         sky: {
-            card: "border-brand-border bg-brand-surface",
-            text: "text-brand-strong",
+            card: "border-brand-border-default bg-brand-surface",
+            text: "text-brand-heading",
         },
         emerald: {
             card: "border-status-success-border bg-status-success-surface",

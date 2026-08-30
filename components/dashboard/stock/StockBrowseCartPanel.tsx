@@ -103,7 +103,7 @@ export function StockBrowseCartPanel({
                                 }
                                 placeholder="กรุณาระบุชื่อย่อโครงการ"
                                 disabled={submitting}
-                                className="h-11 border-border-subtle bg-surface-raised font-medium uppercase tracking-normal text-content-primary placeholder:text-content-muted focus-visible:border-brand-border focus-visible:ring-brand-solid"
+                                className="h-11 border-border-subtle bg-surface-raised font-medium uppercase tracking-normal text-content-primary placeholder:text-content-muted focus-visible:border-action-primary-border-strong focus-visible:ring-action-primary-border"
                             />
                             <div className="text-xs font-medium leading-5 text-content-secondary">
                                 ใช้สำหรับอ้างอิงคำขอเบิก สูงสุด {STOCK_PROJECT_CODE_MAX_LENGTH} ตัวอักษร
@@ -127,7 +127,7 @@ export function StockBrowseCartPanel({
                 </div>
 
                 <div className="border-t border-border-subtle bg-surface-subtle pb-[calc(1rem+env(safe-area-inset-bottom))] pl-[calc(1.25rem+env(safe-area-inset-left))] pr-[calc(1.25rem+env(safe-area-inset-right))] pt-4">
-                    <div className="mb-3 rounded-2xl border border-brand-border bg-surface-raised/95 px-4 py-3">
+                    <div className="mb-3 rounded-2xl border border-action-primary-border-subtle bg-surface-raised/95 px-4 py-3">
                         <div className="flex items-center justify-between gap-3 text-sm leading-5">
                             <span className="text-content-muted">สรุปรายการ</span>
                             <span className="font-semibold tabular-nums text-content-strong">
@@ -154,7 +154,7 @@ export function StockBrowseCartPanel({
                             type="button"
                             onClick={onSubmit}
                             disabled={!canSubmit}
-                            className="h-11 w-full bg-brand-solid font-bold text-content-on-brand shadow-sm transition-colors duration-200 hover:bg-brand-solid-hover"
+                            className="h-11 w-full bg-action-primary-solid font-bold text-content-on-brand shadow-sm transition-colors duration-200 hover:bg-action-primary-solid-hover"
                         >
                             {submitting ? (
                                 <Loader2
@@ -174,7 +174,7 @@ export function StockBrowseCartPanel({
                             variant="ghost"
                             onClick={() => setIsClearConfirmOpen(true)}
                             disabled={submitting || cartSize === 0}
-                            className="h-11 w-full border border-status-danger-border text-status-danger-foreground transition-colors duration-200 hover:border-status-danger-border hover:bg-status-danger-surface hover:text-status-danger-foreground"
+                            className="h-11 w-full border border-status-danger-border-subtle text-status-danger-foreground transition-colors duration-200 hover:border-status-danger-border hover:bg-status-danger-surface hover:text-status-danger-strong"
                         >
                             <XCircle
                                 className="mr-1.5 h-4 w-4"
@@ -196,7 +196,7 @@ export function StockBrowseCartPanel({
             >
                 <DialogContent className="sm:max-w-md">
                     <DialogHeader>
-                        <DialogTitle className="text-status-danger-foreground">
+                        <DialogTitle className="text-status-danger-strong">
                             ยืนยันการยกเลิกรายการทั้งหมด
                         </DialogTitle>
                         <DialogDescription>
@@ -285,7 +285,7 @@ function CartRow(props: {
                             size="icon"
                             onClick={props.onDecrease}
                             disabled={props.disabled || item.qty <= 1}
-                            className="h-11 w-11 rounded-lg border border-border-subtle bg-surface-raised text-content-body shadow-sm transition-colors duration-200 hover:border-brand-border hover:bg-brand-surface hover:text-brand-foreground"
+                            className="h-11 w-11 rounded-lg border border-border-subtle bg-surface-raised text-content-body shadow-sm transition-colors duration-200 hover:border-action-primary-border hover:bg-action-primary-surface hover:text-action-primary-foreground"
                             aria-label={`ลดจำนวน ${displayName}`}
                         >
                             <Minus
@@ -305,7 +305,7 @@ function CartRow(props: {
                                 props.disabled ||
                                 item.qty >= availableQuantity
                             }
-                            className="h-11 w-11 rounded-lg border border-border-subtle bg-surface-raised text-content-body shadow-sm transition-colors duration-200 hover:border-brand-border hover:bg-brand-surface hover:text-brand-foreground"
+                            className="h-11 w-11 rounded-lg border border-border-subtle bg-surface-raised text-content-body shadow-sm transition-colors duration-200 hover:border-action-primary-border hover:bg-action-primary-surface hover:text-action-primary-foreground"
                             aria-label={`เพิ่มจำนวน ${displayName}`}
                         >
                             <Plus
@@ -320,7 +320,7 @@ function CartRow(props: {
                         size="icon"
                         onClick={props.onRemove}
                         disabled={props.disabled}
-                        className="h-11 w-11 shrink-0 rounded-lg border border-transparent text-status-danger-foreground transition-colors duration-200 hover:border-status-danger-border hover:bg-status-danger-surface hover:text-status-danger-foreground"
+                        className="h-11 w-11 shrink-0 rounded-lg border border-transparent text-status-danger-foreground transition-colors duration-200 hover:border-status-danger-border-subtle hover:bg-status-danger-surface hover:text-status-danger-strong"
                         aria-label={`ลบ ${displayName} ออกจากตะกร้า`}
                     >
                         <Trash2

@@ -42,7 +42,7 @@ export function ApprovalSectionHeader({
 }): ReactElement {
     const toneClassName = {
         attention: "border-module-leave-badge-border bg-module-leave-badge-surface text-module-leave-badge-foreground",
-        info: "border-brand-border bg-brand-surface text-brand-strong",
+        info: "border-status-info-border-subtle bg-status-info-surface text-status-info-strong",
         neutral: "border-border-subtle bg-surface-subtle text-content-body",
     }[tone];
 

@@ -108,15 +108,15 @@ export function EmailRequestHistory(): ReactElement | null {
                         </div>
                     </div>
                 ) : error ? (
-                    <div className="flex flex-col items-center gap-4 rounded-xl border border-status-danger-border bg-status-danger-surface px-4 py-8 text-center text-status-danger-foreground">
-                        <AlertCircle className="h-6 w-6 text-status-danger-foreground" />
+                    <div className="flex flex-col items-center gap-4 rounded-xl border border-status-error-border bg-status-error-surface px-4 py-8 text-center text-status-error-foreground">
+                        <AlertCircle className="h-6 w-6 text-status-error-muted" />
                         <p className="max-w-xl text-sm leading-6 [overflow-wrap:anywhere]">
                             {error}
                         </p>
                         <Button
                             type="button"
                             variant="outline"
-                            className="border-status-danger-border bg-surface-raised text-status-danger-foreground hover:bg-status-danger-surface"
+                            className="border-status-error-border bg-surface-raised text-status-error-foreground hover:bg-status-error-surface"
                             onClick={refresh}
                         >
                             <RefreshCw className="mr-2 h-4 w-4" />
@@ -217,7 +217,7 @@ export function EmailRequestHistory(): ReactElement | null {
                                                 {formatThaiDateTime(request.createdAt)}
                                             </TableCell>
                                             <TableCell className="align-top">
-                                                <Badge className="flex w-fit items-center gap-1 bg-status-success-surface text-status-success-strong hover:bg-status-success-surface">
+                                                <Badge className="flex w-fit items-center gap-1 bg-status-positive-surface-strong text-status-positive-strong hover:bg-status-positive-surface-strong">
                                                     <CheckCircle className="h-3 w-3" />
                                                     เสร็จสิ้น
                                                 </Badge>

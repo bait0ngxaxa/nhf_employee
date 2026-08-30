@@ -102,8 +102,8 @@ export function ResetPasswordForm({
                 <Card className="rounded-2xl border-border-neutral-default/70 bg-surface-raised/90 shadow-sm">
                     <CardContent className="pt-8 pb-8">
                         <div className="flex flex-col items-center text-center space-y-4">
-                            <div className="w-16 h-16 rounded-full bg-status-danger-surface flex items-center justify-center">
-                                <XCircle className="h-8 w-8 text-status-danger-foreground" />
+                            <div className="w-16 h-16 rounded-full bg-status-error-surface-strong flex items-center justify-center">
+                                <XCircle className="h-8 w-8 text-status-error-muted" />
                             </div>
                             <h3 className="text-lg font-semibold text-content-neutral-primary">
                                 ลิงก์ไม่ถูกต้อง
@@ -113,7 +113,7 @@ export function ResetPasswordForm({
                             </p>
                             <Link
                                 href={APP_ROUTES.forgotPassword}
-                                className="text-sm text-brand-foreground hover:text-brand-foreground font-medium"
+                                className="text-sm text-action-primary-foreground-muted hover:text-action-primary-foreground font-medium"
                             >
                                 ขอลิงก์รีเซ็ตรหัสผ่านใหม่
                             </Link>
@@ -128,10 +128,10 @@ export function ResetPasswordForm({
         <div className={cn("flex flex-col gap-6", className)} {...props}>
             <Card className="rounded-2xl border-border-neutral-default/70 bg-surface-raised/90 shadow-sm">
                 <CardHeader className="text-center pb-2">
-                    <div className="w-12 h-12 rounded-full bg-brand-surface flex items-center justify-center mx-auto mb-3">
-                        <KeyRound className="h-6 w-6 text-brand-foreground" />
+                    <div className="w-12 h-12 rounded-full bg-action-primary-surface-strong flex items-center justify-center mx-auto mb-3">
+                        <KeyRound className="h-6 w-6 text-action-primary-foreground-muted" />
                     </div>
-                    <CardTitle className="text-2xl font-bold text-brand-foreground">
+                    <CardTitle className="text-2xl font-bold text-action-primary-foreground">
                         ตั้งรหัสผ่านใหม่
                     </CardTitle>
                     <CardDescription className="text-content-neutral-secondary">
@@ -143,7 +143,7 @@ export function ResetPasswordForm({
                         <div className="flex flex-col gap-5">
                             {error && (
                                 <div
-                                    className="rounded-md bg-status-danger-surface p-3 text-sm font-medium text-status-danger-foreground"
+                                    className="rounded-md bg-status-error-surface p-3 text-sm font-medium text-status-error-foreground"
                                     role="alert"
                                     aria-live="polite"
                                 >
@@ -166,7 +166,7 @@ export function ResetPasswordForm({
                                         }
                                         required
                                         aria-invalid={error ? true : undefined}
-                                        className="rounded-xl border-border-neutral-default bg-surface-raised/70 pr-10 focus:border-brand-border focus:ring-brand-solid/20"
+                                        className="rounded-xl border-border-neutral-default bg-surface-raised/70 pr-10 focus:border-action-primary-focus focus:ring-action-primary-focus/20"
                                     />
                                     <button
                                         type="button"
@@ -179,7 +179,7 @@ export function ResetPasswordForm({
                                                 : "แสดงรหัสผ่าน"
                                         }
                                         aria-pressed={showPassword}
-                                        className="absolute right-2 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-md text-content-neutral-muted hover:bg-brand-surface hover:text-brand-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-solid/40 sm:h-8 sm:w-8"
+                                        className="absolute right-2 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-md text-content-neutral-muted hover:bg-action-primary-surface hover:text-action-primary-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action-primary-focus/40 sm:h-8 sm:w-8"
                                     >
                                         {showPassword ? (
                                             <EyeOff className="h-4 w-4" />
@@ -201,14 +201,14 @@ export function ResetPasswordForm({
                                                 className="flex items-center gap-2 text-xs"
                                             >
                                                 {passed ? (
-                                                    <CheckCircle2 className="h-3.5 w-3.5 text-status-success-foreground" />
+                                                    <CheckCircle2 className="h-3.5 w-3.5 text-status-positive-icon" />
                                                 ) : (
                                                     <XCircle className="h-3.5 w-3.5 text-content-neutral-subtle" />
                                                 )}
                                                 <span
                                                     className={
                                                         passed
-                                                            ? "text-status-success-foreground"
+                                                            ? "text-status-positive-accent"
                                                             : "text-content-neutral-secondary"
                                                     }
                                                 >
@@ -240,7 +240,7 @@ export function ResetPasswordForm({
                                                 ? true
                                                 : undefined
                                         }
-                                        className="rounded-xl border-border-neutral-default bg-surface-raised/70 pr-10 focus:border-brand-border focus:ring-brand-solid/20"
+                                        className="rounded-xl border-border-neutral-default bg-surface-raised/70 pr-10 focus:border-action-primary-focus focus:ring-action-primary-focus/20"
                                     />
                                     <button
                                         type="button"
@@ -255,7 +255,7 @@ export function ResetPasswordForm({
                                                 : "แสดงรหัสผ่านยืนยัน"
                                         }
                                         aria-pressed={showConfirmPassword}
-                                        className="absolute right-2 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-md text-content-neutral-muted hover:bg-brand-surface hover:text-brand-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-solid/40 sm:h-8 sm:w-8"
+                                        className="absolute right-2 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-md text-content-neutral-muted hover:bg-action-primary-surface hover:text-action-primary-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action-primary-focus/40 sm:h-8 sm:w-8"
                                     >
                                         {showConfirmPassword ? (
                                             <EyeOff className="h-4 w-4" />
@@ -266,7 +266,7 @@ export function ResetPasswordForm({
                                 </div>
                                 {confirmPassword.length > 0 &&
                                     password !== confirmPassword && (
-                                        <p className="text-xs text-status-danger-foreground">
+                                        <p className="text-xs text-status-error-icon">
                                             รหัสผ่านไม่ตรงกัน
                                         </p>
                                     )}
@@ -292,7 +292,7 @@ export function ResetPasswordForm({
                             จำรหัสผ่านได้แล้ว?{" "}
                             <Link
                                 href={APP_ROUTES.login}
-                                className="text-brand-foreground hover:text-brand-foreground font-medium"
+                                className="text-action-primary-foreground-muted hover:text-action-primary-foreground font-medium"
                             >
                                 เข้าสู่ระบบ
                             </Link>

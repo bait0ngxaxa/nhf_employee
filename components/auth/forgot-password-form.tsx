@@ -53,8 +53,8 @@ export function ForgotPasswordForm({
                 <Card className="rounded-2xl border-border-neutral-default/70 bg-surface-raised/90 shadow-sm">
                     <CardContent className="pt-8 pb-8">
                         <div className="flex flex-col items-center text-center space-y-4">
-                            <div className="w-16 h-16 rounded-full bg-status-success-surface flex items-center justify-center">
-                                <CheckCircle2 className="h-8 w-8 text-status-success-foreground" />
+                            <div className="w-16 h-16 rounded-full bg-status-positive-surface-strong flex items-center justify-center">
+                                <CheckCircle2 className="h-8 w-8 text-status-positive-accent" />
                             </div>
                             <h3 className="text-lg font-semibold text-content-neutral-primary">
                                 ตรวจสอบอีเมลของคุณ
@@ -68,7 +68,7 @@ export function ForgotPasswordForm({
                             </p>
                             <Link
                                 href={APP_ROUTES.login}
-                                className="inline-flex items-center gap-2 text-sm text-brand-foreground hover:text-brand-foreground font-medium mt-2"
+                                className="inline-flex items-center gap-2 text-sm text-action-primary-foreground-muted hover:text-action-primary-foreground font-medium mt-2"
                             >
                                 <ArrowLeft className="h-4 w-4" />
                                 กลับไปหน้าเข้าสู่ระบบ
@@ -84,10 +84,10 @@ export function ForgotPasswordForm({
         <div className={cn("flex flex-col gap-6", className)} {...props}>
             <Card className="rounded-2xl border-border-neutral-default/70 bg-surface-raised/90 shadow-sm">
                 <CardHeader className="text-center pb-2">
-                    <div className="w-12 h-12 rounded-full bg-brand-surface flex items-center justify-center mx-auto mb-3">
-                        <Mail className="h-6 w-6 text-brand-foreground" />
+                    <div className="w-12 h-12 rounded-full bg-action-primary-surface-strong flex items-center justify-center mx-auto mb-3">
+                        <Mail className="h-6 w-6 text-action-primary-foreground-muted" />
                     </div>
-                    <CardTitle className="text-2xl font-bold text-brand-foreground">
+                    <CardTitle className="text-2xl font-bold text-action-primary-foreground">
                         ลืมรหัสผ่าน
                     </CardTitle>
                     <CardDescription className="text-content-neutral-secondary">
@@ -99,7 +99,7 @@ export function ForgotPasswordForm({
                         <div className="flex flex-col gap-5">
                             {error && (
                                 <div
-                                    className="rounded-md bg-status-danger-surface p-3 text-sm font-medium text-status-danger-foreground"
+                                    className="rounded-md bg-status-error-surface p-3 text-sm font-medium text-status-error-foreground"
                                     role="alert"
                                     aria-live="polite"
                                 >
@@ -124,7 +124,7 @@ export function ForgotPasswordForm({
                                     onChange={(e) => setEmail(e.target.value)}
                                     required
                                     aria-invalid={error ? true : undefined}
-                                    className="rounded-xl border-border-neutral-default bg-surface-raised/70 focus:border-brand-border focus:ring-brand-solid/20"
+                                    className="rounded-xl border-border-neutral-default bg-surface-raised/70 focus:border-action-primary-focus focus:ring-action-primary-focus/20"
                                 />
                             </div>
 
@@ -147,7 +147,7 @@ export function ForgotPasswordForm({
                         <div className="mt-4 text-center">
                             <Link
                                 href={APP_ROUTES.login}
-                                className="inline-flex items-center gap-1 text-sm text-content-neutral-muted hover:text-brand-foreground transition-colors"
+                                className="inline-flex items-center gap-1 text-sm text-content-neutral-muted hover:text-action-primary-foreground-muted transition-colors"
                             >
                                 <ArrowLeft className="h-3 w-3" />
                                 กลับไปหน้าเข้าสู่ระบบ

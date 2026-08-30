@@ -143,7 +143,7 @@ export function StockInventoryTable({
             >
                 <DialogContent className="sm:max-w-md">
                     <DialogHeader>
-                        <DialogTitle className="text-status-danger-foreground">
+                        <DialogTitle className="text-status-danger-strong">
                             ยืนยันการลบรายการวัสดุ
                         </DialogTitle>
                         <DialogDescription>
@@ -190,7 +190,7 @@ function InventoryRow({ item, onAdjust, onDelete, deleteDisabled }: InventoryRow
     const inventory = getItemInventoryMetrics(item);
 
     return (
-        <TableRow className="border-b border-border-subtle transition-colors hover:bg-brand-surface/60">
+        <TableRow className="border-b border-border-subtle transition-colors hover:bg-action-primary-surface/60">
             <TableCell className="border-r border-border-subtle py-4">
                 {item.imageUrl ? <InventoryImage item={item} /> : <ImagePlaceholder />}
             </TableCell>
@@ -211,7 +211,7 @@ function InventoryRow({ item, onAdjust, onDelete, deleteDisabled }: InventoryRow
             <TableCell className="border-r border-border-subtle py-4 align-top">
                 <Badge
                     variant="secondary"
-                    className="max-w-full justify-start whitespace-normal border-none bg-brand-surface/80 text-left font-medium leading-snug text-brand-foreground [overflow-wrap:anywhere] hover:bg-brand-surface"
+                    className="max-w-full justify-start whitespace-normal border-none bg-module-leave-badge-surface/80 text-left font-medium leading-snug text-module-leave-badge-foreground [overflow-wrap:anywhere] hover:bg-module-leave-badge-surface-strong"
                 >
                     {item.category.name}
                 </Badge>
@@ -220,7 +220,7 @@ function InventoryRow({ item, onAdjust, onDelete, deleteDisabled }: InventoryRow
                 <span
                     className={`rounded-lg px-2 py-1 text-sm font-bold ${
                         inventory.isLowStock
-                            ? "bg-status-danger-surface text-status-danger-foreground"
+                            ? "bg-status-danger-surface text-status-danger-strong"
                             : "text-content-body"
                     }`}
                 >
@@ -229,7 +229,7 @@ function InventoryRow({ item, onAdjust, onDelete, deleteDisabled }: InventoryRow
                         {inventory.unit}
                     </span>
                     {inventory.isLowStock && (
-                        <AlertTriangle className="ml-1.5 inline h-3.5 w-3.5 animate-pulse text-status-danger-foreground" />
+                        <AlertTriangle className="ml-1.5 inline h-3.5 w-3.5 animate-pulse text-status-danger-icon" />
                     )}
                 </span>
             </TableCell>
@@ -242,7 +242,7 @@ function InventoryRow({ item, onAdjust, onDelete, deleteDisabled }: InventoryRow
                     <Button
                         variant="ghost"
                         size="icon"
-                        className="h-11 w-11 text-brand-foreground transition-colors hover:bg-brand-surface hover:text-brand-foreground"
+                        className="h-11 w-11 text-action-primary-foreground-muted transition-colors hover:bg-action-primary-surface hover:text-action-primary-foreground"
                         onClick={() => onAdjust(item)}
                         aria-label={`แก้ไข ${item.name}`}
                     >
@@ -251,7 +251,7 @@ function InventoryRow({ item, onAdjust, onDelete, deleteDisabled }: InventoryRow
                     <Button
                         variant="ghost"
                         size="icon"
-                        className="h-11 w-11 text-status-danger-foreground transition-colors hover:bg-status-danger-surface hover:text-status-danger-foreground"
+                        className="h-11 w-11 text-status-danger-icon transition-colors hover:bg-status-danger-surface hover:text-status-danger-strong"
                         onClick={() => onDelete(item)}
                         disabled={deleteDisabled}
                         aria-label={`ลบ ${item.name}`}
@@ -288,7 +288,7 @@ function VariantBreakdown({ item }: { item: StockItem }) {
                         <div className="shrink-0 text-right">
                             <div
                                 className={`font-semibold ${
-                                    isLow ? "text-status-danger-foreground" : "text-content-body"
+                                    isLow ? "text-status-danger-strong" : "text-content-body"
                                 }`}
                             >
                                 {variant.quantity} {variant.unit}

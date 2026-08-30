@@ -110,7 +110,7 @@ export function StockImageUploadField({
                                 variant="outline"
                                 disabled={uploading}
                                 onClick={() => inputRef.current?.click()}
-                                className="border-brand-border text-brand-foreground hover:bg-brand-surface"
+                                className="border-action-primary-border text-action-primary-foreground hover:bg-action-primary-surface"
                             >
                                 {uploading ? (
                                     <Loader2 className="mr-1.5 h-4 w-4 animate-spin" aria-hidden="true" />
@@ -124,7 +124,7 @@ export function StockImageUploadField({
                                 variant="ghost"
                                 disabled={uploading}
                                 onClick={() => onChange("")}
-                                className="text-status-danger-foreground hover:bg-status-danger-surface hover:text-status-danger-foreground"
+                                className="text-status-danger-foreground hover:bg-status-danger-surface hover:text-status-danger-strong"
                             >
                                 <Trash2 className="mr-1.5 h-4 w-4" aria-hidden="true" />
                                 ลบรูป
@@ -136,7 +136,7 @@ export function StockImageUploadField({
                         type="button"
                         disabled={uploading}
                         onClick={() => inputRef.current?.click()}
-                        className="flex w-full flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-border-strong bg-surface-raised px-4 py-8 text-sm text-content-muted transition hover:border-brand-border hover:text-brand-foreground disabled:cursor-not-allowed"
+                        className="flex w-full flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-border-strong bg-surface-raised px-4 py-8 text-sm text-content-muted transition hover:border-action-primary-border-strong hover:text-action-primary-foreground disabled:cursor-not-allowed"
                     >
                         {uploading ? (
                             <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" />

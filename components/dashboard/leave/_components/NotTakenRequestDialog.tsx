@@ -54,7 +54,7 @@ export function NotTakenRequestDialog({
                     </Button>
                     <Button
                         disabled={isSubmitting || note.trim().length < 5}
-                        className="bg-brand-solid-hover text-content-on-brand hover:bg-brand-solid-hover"
+                        className="bg-status-info-solid text-content-on-brand hover:bg-status-info-solid-hover"
                         onClick={onConfirm}
                     >
                         {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : null}

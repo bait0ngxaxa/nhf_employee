@@ -278,7 +278,7 @@ export function EditItemDialog({
                         </div>
 
                         {variants.length > 1 && (
-                            <div className="rounded-xl border border-status-warning-border bg-status-warning-surface/70 px-4 py-3 text-sm text-status-warning-strong">
+                            <div className="rounded-xl border border-status-warning-border-subtle bg-status-warning-surface/70 px-4 py-3 text-sm text-status-warning-strong">
                                 ถ้ามีหลายรายการย่อย ต้องระบุคุณสมบัติของแต่ละตัวให้ชัด เช่น สี ขนาด หรือชนิด
                             </div>
                         )}
@@ -290,7 +290,7 @@ export function EditItemDialog({
                                     className="text-sm font-semibold text-content-body"
                                 >
                                     {STOCK_ADMIN_TEXT.itemName}{" "}
-                                    <span className="text-status-danger-foreground">*</span>
+                                    <span className="text-status-danger-icon">*</span>
                                 </Label>
                                 <Input
                                     id="edit-item-name"
@@ -299,7 +299,7 @@ export function EditItemDialog({
                                     required
                                     maxLength={200}
                                     placeholder="เช่น กระดาษ A4"
-                                    className="h-11 focus-visible:ring-brand-solid"
+                                    className="h-11 focus-visible:ring-action-primary-focus"
                                 />
                             </div>
                             <div className="space-y-1.5">
@@ -317,7 +317,7 @@ export function EditItemDialog({
                                     }
                                     maxLength={2000}
                                     placeholder={STOCK_ADMIN_TEXT.itemDescriptionPlaceholder}
-                                    className="min-h-11 resize-y focus-visible:ring-brand-solid"
+                                    className="min-h-11 resize-y focus-visible:ring-action-primary-focus"
                                 />
                             </div>
                         </div>
@@ -438,7 +438,7 @@ export function EditItemDialog({
                         <Button
                             type="submit"
                             disabled={loading || !hasChanges}
-                            className="h-11 bg-brand-solid px-7 font-bold text-content-on-brand shadow-sm transition-colors hover:bg-brand-solid-hover"
+                            className="h-11 bg-action-primary-solid px-7 font-bold text-content-on-brand shadow-sm transition-colors hover:bg-action-primary-solid-hover"
                         >
                             {loading ? STOCK_ADMIN_TEXT.saving : "บันทึกการแก้ไข"}
                         </Button>

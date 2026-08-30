@@ -47,7 +47,7 @@ function QuotaCard({
                         <p
                             className={cn(
                                 "tabular-nums text-4xl font-bold tracking-tight",
-                                isOverQuota ? "text-status-danger-foreground" : theme.valueColor,
+                                isOverQuota ? "text-status-danger-strong" : theme.valueColor,
                             )}
                         >
                             {displayedRemain}
@@ -66,7 +66,7 @@ function QuotaCard({
                         <p
                             className={cn(
                                 "break-words tabular-nums font-medium",
-                                carryBalance < 0 && "text-status-danger-foreground",
+                                carryBalance < 0 && "text-status-danger-strong",
                             )}
                         >
                             {carryBalance < 0 ? "ยอดเกินสิทธิ์ยกมา" : "ยอดยกมา"}{" "}
@@ -95,7 +95,7 @@ function QuotaCard({
                         }
                     >
                         <div
-                            className={cn("h-full rounded-full", isOverQuota ? "bg-status-danger-solid" : theme.barColor)}
+                            className={cn("h-full rounded-full", isOverQuota ? "bg-status-danger-fill" : theme.barColor)}
                             style={{ width: `${progress}%` }}
                         />
                     </div>
@@ -117,7 +117,7 @@ export function LeaveQuotaCards({ sickQuota, personalQuota, vacationQuota }: Lea
                 note="สิทธิประจำปี"
                 theme={{
                     valueColor: "text-status-success-foreground",
-                    barColor: "bg-status-success-solid",
+                    barColor: "bg-status-success-fill",
                 }}
             />
             <QuotaCard
@@ -129,8 +129,8 @@ export function LeaveQuotaCards({ sickQuota, personalQuota, vacationQuota }: Lea
                 carryBalance={personalQuota.carryBalanceDays}
                 note="สิทธิรวมหลังยอดยกมา"
                 theme={{
-                    valueColor: "text-brand-foreground",
-                    barColor: "bg-brand-solid",
+                    valueColor: "text-brand-emphasis",
+                    barColor: "bg-brand-icon",
                 }}
             />
             <QuotaCard
@@ -143,7 +143,7 @@ export function LeaveQuotaCards({ sickQuota, personalQuota, vacationQuota }: Lea
                 note="สิทธิรวมหลังยอดยกมา"
                 theme={{
                     valueColor: "text-status-warning-foreground",
-                    barColor: "bg-status-warning-solid",
+                    barColor: "bg-status-warning-fill",
                 }}
             />
         </div>

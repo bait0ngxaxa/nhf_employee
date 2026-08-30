@@ -88,7 +88,7 @@ function AccessPanel() {
     return (
         <aside className="rounded-2xl border border-border-neutral-default/70 bg-surface-raised/90 p-6 text-content-heading shadow-sm md:p-8">
             <div>
-                <p className="text-sm font-semibold text-brand-foreground">
+                <p className="text-sm font-semibold text-action-primary-foreground">
                     แอปสำหรับพนักงาน
                 </p>
                 <h2 className="mt-3 text-2xl font-bold leading-tight text-content-heading text-balance">
@@ -100,7 +100,7 @@ function AccessPanel() {
                 {TRUST_POINTS.map((point) => (
                     <div key={point} className="flex gap-3">
                         <CheckCircle2
-                            className="mt-0.5 h-5 w-5 shrink-0 text-brand-foreground"
+                            className="mt-0.5 h-5 w-5 shrink-0 text-action-primary-foreground-muted"
                             aria-hidden="true"
                         />
                         <p className="text-sm font-medium leading-6 text-content-body [overflow-wrap:anywhere]">
@@ -125,7 +125,7 @@ function AccessPanel() {
                     asChild
                     size="lg"
                     variant="outline"
-                    className="rounded-xl border-brand-border bg-surface-raised/80 text-brand-foreground hover:bg-brand-surface hover:text-brand-strong"
+                    className="rounded-xl border-action-primary-border bg-surface-raised/80 text-action-primary-foreground hover:bg-action-primary-surface hover:text-action-primary-strong"
                 >
                     <Link href={APP_ROUTES.signup}>ลงทะเบียนบัญชี</Link>
                 </Button>
@@ -156,10 +156,10 @@ export default async function Home() {
                 <section className="grid items-start gap-8 lg:grid-cols-[minmax(0,1fr)_24rem] lg:gap-12">
                     <div className="min-w-0">
                         <div className="mb-5 flex flex-wrap items-center gap-3">
-                            <p className="inline-flex rounded-full bg-brand-surface px-3 py-1 text-sm font-bold text-brand-strong">
+                            <p className="inline-flex rounded-full bg-action-primary-surface-strong px-3 py-1 text-sm font-bold text-action-primary-strong">
                                 National Health Foundation
                             </p>
-                            <p className="inline-flex rounded-full bg-surface-raised/80 px-3 py-1 text-sm font-semibold text-content-body ring-1 ring-brand-solid">
+                            <p className="inline-flex rounded-full bg-surface-raised/80 px-3 py-1 text-sm font-semibold text-content-body ring-1 ring-action-primary-border-subtle">
                                 สำหรับผู้ใช้งานของ NHF
                             </p>
                         </div>
@@ -175,7 +175,7 @@ export default async function Home() {
                     <AccessPanel />
                 </section>
 
-                <section className="mt-12 border-t border-brand-border pt-8">
+                <section className="mt-12 border-t border-action-primary-border-subtle pt-8">
                     <div className="mb-5 flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
                         <div>
                             <h2 className="text-xl font-bold leading-8 text-content-heading">

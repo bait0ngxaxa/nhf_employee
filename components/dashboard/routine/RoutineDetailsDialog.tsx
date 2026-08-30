@@ -181,7 +181,7 @@ export function RoutineDetailsDialog({
                         </span>
                         <span className={task.isActive
                             ? "rounded-full bg-status-success-surface px-2.5 py-1 text-xs font-semibold text-status-success-foreground"
-                            : "rounded-full bg-surface-muted px-2.5 py-1 text-xs font-semibold text-content-secondary"}
+                            : "rounded-full bg-surface-muted px-2.5 py-1 text-xs font-semibold text-content-body"}
                         >
                             {task.isActive ? "ใช้งาน" : "ปิดใช้งาน"}
                         </span>
