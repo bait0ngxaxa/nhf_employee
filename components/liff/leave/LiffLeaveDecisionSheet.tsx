@@ -30,13 +30,17 @@ interface LiffLeaveDecisionSheetProps {
     onConfirm: (reason: string | undefined) => void | Promise<void>;
 }
 
+type ReasonRule = "NONE" | "OPTIONAL_LONG" | "REQUIRED" | "REQUIRED_LONG";
+
+const MINIMUM_LONG_REASON_LENGTH = 5;
+
 const ACTION_CONTENT: Record<LiffLeaveAvailableAction, {
     heading: string;
     consequence: string;
     confirmLabel: string;
     reasonLabel?: string;
     reasonPlaceholder?: string;
-    reasonRequired?: boolean;
+    reasonRule?: ReasonRule;
     destructive?: boolean;
 }> = {
     CANCEL: {
@@ -51,6 +55,7 @@ const ACTION_CONTENT: Record<LiffLeaveAvailableAction, {
         confirmLabel: "ส่งคำขอยกเลิก",
         reasonLabel: "เหตุผล (ไม่บังคับ)",
         reasonPlaceholder: "ระบุเหตุผลที่ต้องการยกเลิก",
+        reasonRule: "OPTIONAL_LONG",
     },
     REQUEST_NOT_TAKEN: {
         heading: "แจ้งไม่ได้ใช้วันลา?",
@@ -58,7 +63,7 @@ const ACTION_CONTENT: Record<LiffLeaveAvailableAction, {
         confirmLabel: "ส่งคำขอ",
         reasonLabel: "เหตุผลหรือรายละเอียด",
         reasonPlaceholder: "ระบุว่าเหตุใดจึงไม่ได้ใช้วันลา",
-        reasonRequired: true,
+        reasonRule: "REQUIRED_LONG",
     },
     APPROVE: {
         heading: "อนุมัติคำขอลา?",
@@ -71,7 +76,7 @@ const ACTION_CONTENT: Record<LiffLeaveAvailableAction, {
         confirmLabel: "ยืนยันไม่อนุมัติ",
         reasonLabel: "เหตุผลที่ไม่อนุมัติ",
         reasonPlaceholder: "ระบุเหตุผลให้พนักงานทราบ",
-        reasonRequired: true,
+        reasonRule: "REQUIRED",
         destructive: true,
     },
     CONFIRM_NOT_TAKEN: {
@@ -94,6 +99,28 @@ const ACTION_CONTENT: Record<LiffLeaveAvailableAction, {
     },
 };
 
+function getReasonValidationMessage(
+    rule: ReasonRule,
+    reason: string,
+): string | null {
+    const length = reason.trim().length;
+
+    if (rule === "REQUIRED" && length === 0) {
+        return "กรุณาระบุเหตุผลในการไม่อนุมัติ";
+    }
+    if (rule === "REQUIRED_LONG" && length < MINIMUM_LONG_REASON_LENGTH) {
+        return "กรุณาระบุอย่างน้อย 5 ตัวอักษร";
+    }
+    if (
+        rule === "OPTIONAL_LONG"
+        && length > 0
+        && length < MINIMUM_LONG_REASON_LENGTH
+    ) {
+        return "หากระบุเหตุผล กรุณาระบุอย่างน้อย 5 ตัวอักษร";
+    }
+    return null;
+}
+
 export function LiffLeaveDecisionSheet({
     intent,
     busy,
@@ -108,8 +135,11 @@ export function LiffLeaveDecisionSheet({
         if (intent) setReason("");
     }, [intent]);
 
-    const minimumReasonLength = content?.reasonRequired ? 5 : 0;
-    const reasonInvalid = reason.trim().length < minimumReasonLength;
+    const reasonValidationMessage = getReasonValidationMessage(
+        content?.reasonRule ?? "NONE",
+        reason,
+    );
+    const reasonInvalid = reasonValidationMessage !== null;
 
     return (
         <Sheet
@@ -151,11 +181,18 @@ export function LiffLeaveDecisionSheet({
                                         className="min-h-24 resize-none"
                                         placeholder={content.reasonPlaceholder}
                                         disabled={busy}
+                                        aria-invalid={reasonInvalid}
+                                        aria-describedby={reasonInvalid
+                                            ? "liff-leave-decision-reason-error"
+                                            : undefined}
                                         onChange={(event) => setReason(event.target.value)}
                                     />
-                                    {content.reasonRequired && reasonInvalid ? (
-                                        <span className="text-xs font-normal text-content-muted">
-                                            กรุณาระบุอย่างน้อย 5 ตัวอักษร
+                                    {reasonValidationMessage ? (
+                                        <span
+                                            id="liff-leave-decision-reason-error"
+                                            className="text-xs font-normal text-status-danger-strong"
+                                        >
+                                            {reasonValidationMessage}
                                         </span>
                                     ) : null}
                                 </label>

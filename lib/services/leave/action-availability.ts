@@ -15,6 +15,7 @@ interface EmployeeActionRequest {
 
 interface ApproverActionRequest {
     status: LeaveStatusValue;
+    startDate: Date | string;
     notTakenRequestedAt: Date | string | null;
     notTakenConfirmedAt: Date | string | null;
 }
@@ -60,7 +61,9 @@ export function getApproverLeaveActions(
         return ["CONFIRM_NOT_TAKEN"];
     }
     if (request.status === "CANCELLATION_REQUESTED") {
-        return ["CONFIRM_CANCELLATION", "REJECT_CANCELLATION"];
+        return isBeforeLeaveStart(request.startDate)
+            ? ["CONFIRM_CANCELLATION", "REJECT_CANCELLATION"]
+            : ["REJECT_CANCELLATION"];
     }
     return [];
 }

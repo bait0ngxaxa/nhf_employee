@@ -1,8 +1,9 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
     search: "",
+    fetchHome: vi.fn(),
     fetchProfile: vi.fn(),
     fetchApprovals: vi.fn(),
     fetchRequest: vi.fn(),
@@ -26,6 +27,10 @@ vi.mock("@/lib/client/liff-leave", () => ({
     decideLiffLeaveCancellation: mocks.decideCancellation,
     requestLiffLeaveNotTaken: mocks.requestNotTaken,
     submitLiffLeaveDecision: mocks.submitDecision,
+}));
+
+vi.mock("@/lib/client/liff-home", () => ({
+    fetchLiffHome: mocks.fetchHome,
 }));
 
 vi.mock("@/components/liff/leave/LiffLeaveOverview", () => ({
@@ -96,6 +101,11 @@ describe("LIFF Leave app orchestration", () => {
     beforeEach(() => {
         vi.clearAllMocks();
         mocks.search = "";
+        mocks.fetchHome.mockResolvedValue({
+            workforce: { userId: 1, employeeId: 1, name: "พนักงาน ทดสอบ" },
+            modules: {},
+            capabilities: { canApproveLeave: false },
+        });
         mocks.fetchProfile.mockResolvedValue(PROFILE);
         mocks.fetchApprovals.mockResolvedValue(approvals(false));
     });
@@ -108,14 +118,48 @@ describe("LIFF Leave app orchestration", () => {
         expect(screen.getByText("คำขอลาของฉัน")).toBeInTheDocument();
         expect(screen.getByRole("button", { name: "ยื่นลา" })).toBeInTheDocument();
         expect(screen.queryByRole("tab", { name: /รอพิจารณา/ })).not.toBeInTheDocument();
+        expect(mocks.fetchApprovals).not.toHaveBeenCalled();
     });
 
-    it("shows the approver tab only for server-derived actionable workload", async () => {
+    it("loads approvals and shows the approver tab for a capable approver", async () => {
+        mocks.fetchHome.mockResolvedValueOnce({
+            workforce: { userId: 1, employeeId: 1, name: "หัวหน้า ทดสอบ" },
+            modules: {},
+            capabilities: { canApproveLeave: true },
+        });
         mocks.fetchApprovals.mockResolvedValueOnce(approvals(true));
 
         render(<LiffLeaveApp />);
 
         expect(await screen.findByRole("tab", { name: /รอพิจารณา/ })).toBeInTheDocument();
+        expect(mocks.fetchApprovals).toHaveBeenCalledWith({
+            pendingPage: 1,
+            notTakenPage: 1,
+            cancellationPage: 1,
+        });
+    });
+
+    it("keeps employee Leave usable and localizes an approval loading failure", async () => {
+        mocks.fetchHome.mockResolvedValueOnce({
+            workforce: { userId: 1, employeeId: 1, name: "หัวหน้า ทดสอบ" },
+            modules: {},
+            capabilities: { canApproveLeave: true },
+        });
+        mocks.fetchApprovals.mockRejectedValueOnce(new Error("approval unavailable"));
+
+        render(<LiffLeaveApp />);
+
+        expect(await screen.findByRole("heading", { name: "Leave" })).toBeInTheDocument();
+        expect(screen.getByText("สิทธิ์วันลาของฉัน")).toBeInTheDocument();
+        expect(screen.queryByRole("heading", { name: "เปิด Leave ไม่สำเร็จ" }))
+            .not.toBeInTheDocument();
+        const approvalsTab = screen.getByRole("tab", { name: /รอพิจารณา/ });
+        expect(approvalsTab).toBeInTheDocument();
+        fireEvent.mouseDown(approvalsTab, { button: 0, ctrlKey: false });
+        expect(await screen.findByText("โหลดรายการรอพิจารณาไม่สำเร็จ"))
+            .toBeInTheDocument();
+        expect(await screen.findByRole("button", { name: "ลองโหลดรายการอีกครั้ง" }))
+            .toBeInTheDocument();
     });
 
     it("opens a deep-linked request as presentation intent without mutating", async () => {
@@ -131,6 +175,8 @@ describe("LIFF Leave app orchestration", () => {
         expect(await screen.findByText("รายละเอียด leave_1 intent approve"))
             .toBeInTheDocument();
         expect(mocks.fetchRequest).toHaveBeenCalledWith("leave_1");
+        expect(mocks.fetchApprovals).not.toHaveBeenCalled();
+        expect(screen.getByRole("tab", { name: /รอพิจารณา/ })).toBeInTheDocument();
         expect(mocks.submitDecision).not.toHaveBeenCalled();
         expect(mocks.cancelLeave).not.toHaveBeenCalled();
         expect(mocks.confirmNotTaken).not.toHaveBeenCalled();

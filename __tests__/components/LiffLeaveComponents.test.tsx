@@ -11,6 +11,7 @@ import type {
     LiffLeaveApprovalsResponse,
     LiffLeaveProfileResponse,
     LiffLeaveQuotaSummary,
+    LiffLeaveRequestDetail as LiffLeaveRequestDetailData,
 } from "@/lib/types/leave";
 
 const QUOTAS: LiffLeaveQuotaSummary[] = [
@@ -164,10 +165,10 @@ describe("LIFF Leave mobile components", () => {
         const confirm = screen.getByRole("button", { name: "ยืนยันไม่อนุมัติ" });
         expect(confirm).toBeDisabled();
         fireEvent.change(screen.getByPlaceholderText("ระบุเหตุผลให้พนักงานทราบ"), {
-            target: { value: "ข้อมูลหลักฐานไม่ครบ" },
+            target: { value: "ไม่" },
         });
         fireEvent.click(confirm);
-        expect(onConfirm).toHaveBeenCalledWith("ข้อมูลหลักฐานไม่ครบ");
+        expect(onConfirm).toHaveBeenCalledWith("ไม่");
 
         rerender(
             <LiffLeaveDecisionSheet
@@ -184,6 +185,95 @@ describe("LIFF Leave mobile components", () => {
             />,
         );
         expect(screen.getByRole("button", { name: "กำลังดำเนินการ..." })).toBeDisabled();
+    });
+
+    it("validates an optional cancellation request reason only when provided", () => {
+        const onConfirm = vi.fn();
+        render(
+            <LiffLeaveDecisionSheet
+                intent={{
+                    requestId: "leave_1",
+                    action: "REQUEST_CANCELLATION",
+                    title: "ลาป่วย",
+                    summary: "1 ก.ย. 2569",
+                }}
+                busy={false}
+                error={null}
+                onOpenChange={vi.fn()}
+                onConfirm={onConfirm}
+            />,
+        );
+
+        const confirm = screen.getByRole("button", { name: "ส่งคำขอยกเลิก" });
+        const reason = screen.getByPlaceholderText("ระบุเหตุผลที่ต้องการยกเลิก");
+        expect(confirm).toBeEnabled();
+
+        fireEvent.change(reason, { target: { value: "abc" } });
+        expect(confirm).toBeDisabled();
+        expect(screen.getByText("หากระบุเหตุผล กรุณาระบุอย่างน้อย 5 ตัวอักษร"))
+            .toBeInTheDocument();
+
+        fireEvent.change(reason, { target: { value: "abcde" } });
+        expect(confirm).toBeEnabled();
+        fireEvent.click(confirm);
+        expect(onConfirm).toHaveBeenCalledWith("abcde");
+    });
+
+    it("keeps the not-taken request reason minimum at five characters", () => {
+        render(
+            <LiffLeaveDecisionSheet
+                intent={{
+                    requestId: "leave_1",
+                    action: "REQUEST_NOT_TAKEN",
+                    title: "ลาป่วย",
+                    summary: "1 ก.ย. 2569",
+                }}
+                busy={false}
+                error={null}
+                onOpenChange={vi.fn()}
+                onConfirm={vi.fn()}
+            />,
+        );
+
+        const confirm = screen.getByRole("button", { name: "ส่งคำขอ" });
+        const reason = screen.getByPlaceholderText("ระบุว่าเหตุใดจึงไม่ได้ใช้วันลา");
+        fireEvent.change(reason, { target: { value: "abcd" } });
+        expect(confirm).toBeDisabled();
+        fireEvent.change(reason, { target: { value: "abcde" } });
+        expect(confirm).toBeEnabled();
+    });
+
+    it("shows authorized approval actions for an approver deep link", () => {
+        const onAction = vi.fn();
+        const detail: LiffLeaveRequestDetailData = {
+            ...HISTORY_ITEM,
+            viewerRole: "APPROVER",
+            employee: {
+                firstName: "พนักงาน",
+                lastName: "ทดสอบ",
+                nickname: null,
+                position: "หัวหน้างาน",
+            },
+            availableActions: ["APPROVE", "REJECT"],
+        };
+
+        render(
+            <LiffLeaveRequestDetail
+                detail={detail}
+                actionIntent="approve"
+                onOpenChange={vi.fn()}
+                onAction={onAction}
+            />,
+        );
+
+        expect(screen.getByText(
+            "เปิดจากลิงก์เพื่อพิจารณา กรุณาตรวจรายละเอียดและกดยืนยันด้วยตนเอง",
+        )).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "อนุมัติ" })).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "ไม่อนุมัติ" })).toBeInTheDocument();
+
+        fireEvent.click(screen.getByRole("button", { name: "อนุมัติ" }));
+        expect(onAction).toHaveBeenCalledWith("APPROVE", detail);
     });
 
     it("does not turn approve deep-link intent into requester approval UI", () => {

@@ -22,6 +22,7 @@ import {
     requestLiffLeaveNotTaken,
     submitLiffLeaveDecision,
 } from "@/lib/client/liff-leave";
+import { fetchLiffHome } from "@/lib/client/liff-home";
 import { LiffApiError } from "@/lib/client/liff";
 import type { LeaveHistoryFilters } from "@/lib/services/leave/history-filters";
 import type {
@@ -89,6 +90,8 @@ export function LiffLeaveApp(): ReactElement {
     const [viewError, setViewError] = useState<string | null>(null);
     const [profile, setProfile] = useState<LiffLeaveProfileResponse | null>(null);
     const [approvals, setApprovals] = useState<LiffLeaveApprovalsResponse>(EMPTY_APPROVALS);
+    const [canApproveLeave, setCanApproveLeave] = useState(false);
+    const [approvalError, setApprovalError] = useState<string | null>(null);
     const [activeTab, setActiveTab] = useState<LeaveTab>("mine");
     const [hadApprovalWork, setHadApprovalWork] = useState(false);
     const [profilePage, setProfilePage] = useState(1);
@@ -103,23 +106,50 @@ export function LiffLeaveApp(): ReactElement {
     const [mutationError, setMutationError] = useState<string | null>(null);
     const [isMutating, setIsMutating] = useState(false);
 
+    const refreshApprovals = useCallback(async (
+        pages: typeof INITIAL_APPROVAL_PAGES,
+    ): Promise<void> => {
+        setIsApprovalsLoading(true);
+        setApprovalError(null);
+        try {
+            const nextApprovals = await fetchLiffLeaveApprovals(pages);
+            setApprovals(nextApprovals);
+            if (nextApprovals.hasActionableWork) setHadApprovalWork(true);
+        } catch (error) {
+            const message = getViewError(error);
+            setApprovalError(message);
+            toast.error(message);
+        } finally {
+            setIsApprovalsLoading(false);
+        }
+    }, []);
+
+    const loadApproverExperience = useCallback(async (): Promise<void> => {
+        try {
+            const home = await fetchLiffHome();
+            if (!home.capabilities.canApproveLeave) return;
+
+            setCanApproveLeave(true);
+            await refreshApprovals(INITIAL_APPROVAL_PAGES);
+        } catch {
+            // Capability is an optimization hint; employee Leave and deep links remain usable.
+        }
+    }, [refreshApprovals]);
+
     const loadInitialData = useCallback(async (): Promise<void> => {
         setState("LOADING");
         setViewError(null);
+        setApprovalError(null);
+        setCanApproveLeave(false);
         try {
-            const [nextProfile, nextApprovals] = await Promise.all([
-                fetchLiffLeaveProfile({ page: 1 }),
-                fetchLiffLeaveApprovals(INITIAL_APPROVAL_PAGES),
-            ]);
-            setProfile(nextProfile);
-            setApprovals(nextApprovals);
-            setHadApprovalWork(nextApprovals.hasActionableWork);
+            setProfile(await fetchLiffLeaveProfile({ page: 1 }));
             setState("READY");
+            void loadApproverExperience();
         } catch (error) {
             setViewError(getViewError(error));
             setState("ERROR");
         }
-    }, []);
+    }, [loadApproverExperience]);
 
     useEffect(() => {
         void loadInitialData();
@@ -177,21 +207,6 @@ export function LiffLeaveApp(): ReactElement {
             setIsProfileLoading(false);
         }
     }, [historyFilters, profilePage]);
-
-    const refreshApprovals = useCallback(async (
-        pages: typeof approvalPages = approvalPages,
-    ): Promise<void> => {
-        setIsApprovalsLoading(true);
-        try {
-            const nextApprovals = await fetchLiffLeaveApprovals(pages);
-            setApprovals(nextApprovals);
-            if (nextApprovals.hasActionableWork) setHadApprovalWork(true);
-        } catch (error) {
-            toast.error(getViewError(error));
-        } finally {
-            setIsApprovalsLoading(false);
-        }
-    }, [approvalPages]);
 
     const startAction = useCallback((
         action: EmployeeLeaveAction | ApproverLeaveAction,
@@ -276,7 +291,9 @@ export function LiffLeaveApp(): ReactElement {
         );
     }
 
-    const showApprovalTab = hadApprovalWork || approvals.hasActionableWork;
+    const showApprovalTab = canApproveLeave
+        || hadApprovalWork
+        || approvals.hasActionableWork;
 
     return (
         <main
@@ -325,22 +342,34 @@ export function LiffLeaveApp(): ReactElement {
                     </TabsContent>
                     {showApprovalTab ? (
                         <TabsContent value="approvals" className="mt-5">
-                            <LiffLeaveApprovals
-                                approvals={approvals}
-                                isLoading={isApprovalsLoading}
-                                onOpenDetail={(requestId) => void openDetail(requestId)}
-                                onAction={startAction}
-                                onPageChange={(category, page) => {
-                                    const pageKey: Record<ApprovalCategory, keyof typeof approvalPages> = {
-                                        pending: "pendingPage",
-                                        notTakenPending: "notTakenPage",
-                                        cancellationPending: "cancellationPage",
-                                    };
-                                    const nextPages = { ...approvalPages, [pageKey[category]]: page };
-                                    setApprovalPages(nextPages);
-                                    void refreshApprovals(nextPages);
-                                }}
-                            />
+                            {approvalError ? (
+                                <ErrorState
+                                    title="โหลดรายการรอพิจารณาไม่สำเร็จ"
+                                    description={approvalError}
+                                    action={{
+                                        label: "ลองโหลดรายการอีกครั้ง",
+                                        onClick: () => void refreshApprovals(approvalPages),
+                                    }}
+                                    className="min-h-64 border-border-subtle bg-surface-raised px-4 py-8"
+                                />
+                            ) : (
+                                <LiffLeaveApprovals
+                                    approvals={approvals}
+                                    isLoading={isApprovalsLoading}
+                                    onOpenDetail={(requestId) => void openDetail(requestId)}
+                                    onAction={startAction}
+                                    onPageChange={(category, page) => {
+                                        const pageKey: Record<ApprovalCategory, keyof typeof approvalPages> = {
+                                            pending: "pendingPage",
+                                            notTakenPending: "notTakenPage",
+                                            cancellationPending: "cancellationPage",
+                                        };
+                                        const nextPages = { ...approvalPages, [pageKey[category]]: page };
+                                        setApprovalPages(nextPages);
+                                        void refreshApprovals(nextPages);
+                                    }}
+                                />
+                            )}
                         </TabsContent>
                     ) : null}
                 </Tabs>

@@ -48,10 +48,33 @@ describe("Leave action availability", () => {
         })).toEqual([]);
     });
 
+    it("allows cancellation confirmation before the Leave start date", () => {
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date("2026-09-09T05:00:00.000Z"));
+
+        expect(getApproverLeaveActions({
+            status: "CANCELLATION_REQUESTED",
+            startDate: "2026-09-10T00:00:00.000Z",
+            notTakenRequestedAt: null,
+            notTakenConfirmedAt: null,
+        })).toEqual(["CONFIRM_CANCELLATION", "REJECT_CANCELLATION"]);
+    });
+
+    it("only allows rejecting cancellation on or after the Leave start date", () => {
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date("2026-09-10T05:00:00.000Z"));
+
+        expect(getApproverLeaveActions({
+            status: "CANCELLATION_REQUESTED",
+            startDate: "2026-09-10T00:00:00.000Z",
+            notTakenRequestedAt: null,
+            notTakenConfirmedAt: null,
+        })).toEqual(["REJECT_CANCELLATION"]);
+    });
+
     it.each([
         ["PENDING", null, null, ["APPROVE", "REJECT"]],
         ["APPROVED", "2026-09-12T00:00:00.000Z", null, ["CONFIRM_NOT_TAKEN"]],
-        ["CANCELLATION_REQUESTED", null, null, ["CONFIRM_CANCELLATION", "REJECT_CANCELLATION"]],
         ["REJECTED", null, null, []],
         ["APPROVED", "2026-09-12T00:00:00.000Z", "2026-09-13T00:00:00.000Z", []],
     ] as const)(
@@ -59,6 +82,7 @@ describe("Leave action availability", () => {
         (status, notTakenRequestedAt, notTakenConfirmedAt, expected) => {
             expect(getApproverLeaveActions({
                 status,
+                startDate: BASE_EMPLOYEE_REQUEST.startDate,
                 notTakenRequestedAt,
                 notTakenConfirmedAt,
             })).toEqual(expected);
