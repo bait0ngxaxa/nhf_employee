@@ -120,6 +120,16 @@ export const API_ROUTES = {
             `/api/line/leave/requests/${id}`,
         leaveAttachmentById: (id: string): string =>
             `/api/line/leave/attachments/${id}`,
+        stockItems: "/api/line/stock/items",
+        stockCategories: "/api/line/stock/categories",
+        stockRequests: "/api/line/stock/requests",
+        stockProcessing: "/api/line/stock/processing",
+        stockRequestById: (id: number | string): string =>
+            `/api/line/stock/requests/${id}`,
+        stockCancelById: (id: number | string): string =>
+            `/api/line/stock/requests/${id}/cancel`,
+        stockIssueById: (id: number | string): string =>
+            `/api/line/stock/requests/${id}/issue`,
         routineTasks: "/api/line/routine/tasks",
         routineSummary: "/api/line/routine/summary",
     },

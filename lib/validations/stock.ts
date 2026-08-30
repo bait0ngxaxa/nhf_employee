@@ -405,6 +405,21 @@ export const cancelRequestSchema = z.object({
     cancelReason: z.string().max(500).trim().nullish(),
 });
 
+export const stockRequestIdParamSchema = z
+    .string()
+    .regex(/^[1-9]\d*$/, "ID ไม่ถูกต้อง")
+    .transform((value, ctx) => {
+        const id = Number(value);
+        if (!Number.isSafeInteger(id)) {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: "ID ไม่ถูกต้อง",
+            });
+            return z.NEVER;
+        }
+        return id;
+    });
+
 export const stockReviewActionSchema = z.object({
     action: z.enum(["approve", "issue", "reject", "cancel"], {
         message: "action ไม่ถูกต้อง",
@@ -467,6 +482,7 @@ export type AdjustStockInput = z.infer<typeof adjustStockSchema>;
 export type CreateRequestInput = z.infer<typeof createRequestSchema>;
 export type IssueRequestInput = z.infer<typeof issueRequestSchema>;
 export type CancelRequestInput = z.infer<typeof cancelRequestSchema>;
+export type StockRequestIdParam = z.infer<typeof stockRequestIdParamSchema>;
 export type StockReviewActionInput = z.infer<typeof stockReviewActionSchema>;
 export type StockItemsFilter = z.infer<typeof stockItemsFilterSchema>;
 export type StockRequestsFilter = z.infer<typeof stockRequestsFilterSchema>;

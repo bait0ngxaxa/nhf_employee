@@ -4,14 +4,12 @@ import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { apiPost } from "@/lib/client/api-client";
 import { API_ROUTES } from "@/lib/ssot/routes";
-import type {
-    StockItem,
-    StockItemVariant,
-    StockItemVariantAttributeValue,
-} from "../context/stock/types";
 import { ensureStockApiSuccess } from "./stockAdminInventory.shared";
 import {
     type BrowseCartItem,
+    type StockBrowseItem,
+    type StockBrowseVariant,
+    type StockVariantAttributeValueLike,
     getPreferredVariant,
     getVariantAvailableQuantity,
 } from "./stockVariant.shared";
@@ -41,14 +39,21 @@ interface PersistedStockBrowseCartItem {
     variantUnit: string;
     variantImageUrl: string | null;
     variantAvailableQuantity: number;
-    variantAttributeValues?: StockItemVariantAttributeValue[];
+    variantAttributeValues?: StockVariantAttributeValueLike[];
     qty: number;
 }
 
 type UseStockBrowseCartParams = {
     userId: number | string | null | undefined;
     onSubmitted: () => void;
+    onSubmitError?: (error: unknown) => void;
+    submitRequest?: StockRequestSubmitter;
 };
+
+export type StockRequestSubmitter = (
+    payload: ReturnType<typeof buildStockRequestPayload>,
+    idempotencyKey: string,
+) => Promise<void>;
 
 type UseStockBrowseCartResult = {
     cartCount: number;
@@ -58,16 +63,16 @@ type UseStockBrowseCartResult = {
     projectCode: string;
     recentlyAddedItemId: number | null;
     submitting: boolean;
-    addDirectItem: (item: StockItem) => void;
+    addDirectItem: (item: StockBrowseItem) => void;
     addVariantToCart: (
-        item: StockItem,
-        variant: StockItemVariant,
+        item: StockBrowseItem,
+        variant: StockBrowseVariant,
         quantity: number,
     ) => void;
     addVariantsToCart: (
-        item: StockItem,
+        item: StockBrowseItem,
         variants: ReadonlyArray<{
-            variant: StockItemVariant;
+            variant: StockBrowseVariant;
             quantity: number;
         }>,
     ) => void;
@@ -251,6 +256,8 @@ function buildCartQuantityByItemId(
 export function useStockBrowseCart({
     userId,
     onSubmitted,
+    onSubmitError,
+    submitRequest: submitRequestTransport = submitDashboardStockRequest,
 }: UseStockBrowseCartParams): UseStockBrowseCartResult {
     const [cart, setCart] = useState<Map<number, BrowseCartItem>>(new Map());
     const [projectCode, setProjectCode] = useState("");
@@ -328,9 +335,9 @@ export function useStockBrowseCart({
     }, [recentlyAddedItemId]);
 
     function addVariantsToCart(
-        item: StockItem,
+        item: StockBrowseItem,
         variants: ReadonlyArray<{
-            variant: StockItemVariant;
+            variant: StockBrowseVariant;
             quantity: number;
         }>,
     ): void {
@@ -371,14 +378,14 @@ export function useStockBrowseCart({
     }
 
     function addVariantToCart(
-        item: StockItem,
-        variant: StockItemVariant,
+        item: StockBrowseItem,
+        variant: StockBrowseVariant,
         quantity: number,
     ): void {
         addVariantsToCart(item, [{ variant, quantity }]);
     }
 
-    function addDirectItem(item: StockItem): void {
+    function addDirectItem(item: StockBrowseItem): void {
         const defaultVariant = getPreferredVariant(item);
         if (!defaultVariant || getVariantAvailableQuantity(defaultVariant) === 0) {
             toast.error("รายการนี้ไม่มีสต็อกพร้อมเบิก");
@@ -461,12 +468,7 @@ export function useStockBrowseCart({
 
         setSubmitting(true);
         try {
-            ensureStockApiSuccess(
-                await apiPost(API_ROUTES.stock.requests, payload, {
-                    headers: { "Idempotency-Key": idempotency.key },
-                }),
-                "เกิดข้อผิดพลาด",
-            );
+            await submitRequestTransport(payload, idempotency.key);
 
             clearIdempotency();
             if (storageKey) {
@@ -481,6 +483,7 @@ export function useStockBrowseCart({
             setProjectCode("");
             onSubmitted();
         } catch (error: unknown) {
+            onSubmitError?.(error);
             toast.error(error instanceof Error ? error.message : "เกิดข้อผิดพลาด");
         } finally {
             setSubmitting(false);
@@ -514,4 +517,16 @@ export function useStockBrowseCart({
         submitRequest,
         updateCartQuantity,
     };
+}
+
+async function submitDashboardStockRequest(
+    payload: ReturnType<typeof buildStockRequestPayload>,
+    idempotencyKey: string,
+): Promise<void> {
+    ensureStockApiSuccess(
+        await apiPost(API_ROUTES.stock.requests, payload, {
+            headers: { "Idempotency-Key": idempotencyKey },
+        }),
+        "เกิดข้อผิดพลาด",
+    );
 }

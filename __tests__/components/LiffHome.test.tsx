@@ -36,7 +36,7 @@ const HOME = {
         name: "พนักงาน ทดสอบ",
     },
     modules: {
-        stock: { enabled: true, status: "coming-soon" as const },
+        stock: { enabled: true, status: "available" as const },
         leave: { enabled: false, status: "unavailable" as const },
         routine: { enabled: true, status: "available" as const },
     },

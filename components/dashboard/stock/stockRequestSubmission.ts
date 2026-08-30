@@ -1,4 +1,5 @@
 import { useCallback, useRef } from "react";
+import type { CreateRequestInput } from "@/lib/validations/stock";
 import type { BrowseCartItem } from "./stockVariant.shared";
 import { normalizeStockProjectCode } from "./stockBrowseCart.shared";
 
@@ -7,14 +8,7 @@ export type PendingRequestIdempotency = {
     key: string;
 };
 
-export type StockRequestPayload = {
-    projectCode: string;
-    items: Array<{
-        itemId: number;
-        variantId: number;
-        quantity: number;
-    }>;
-};
+export type StockRequestPayload = CreateRequestInput;
 
 function createIdempotencyKey(): string {
     if (typeof globalThis.crypto.randomUUID === "function") {

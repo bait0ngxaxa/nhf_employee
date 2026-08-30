@@ -6,6 +6,7 @@ import type {
 } from "@/lib/validations/stock";
 import { buildResolvedDefaultVariantIds } from "./default-variant-shadow";
 import { summarizeVariantInventory } from "./inventory-quantity-read";
+import type { StockRequestWithDetails } from "./request-creation";
 import {
     buildItemInclude,
     buildRequestInclude,
@@ -171,4 +172,13 @@ export async function getRequests(
     ]);
 
     return { requests, total, page, limit };
+}
+
+export async function getRequestById(
+    id: number,
+): Promise<StockRequestWithDetails | null> {
+    return prisma.stockRequest.findUnique({
+        where: { id },
+        include: buildRequestInclude(),
+    });
 }

@@ -6,7 +6,7 @@ export function getLiffHomeModules(): LiffHomeResponse["modules"] {
     const routineEnabled = isFeatureEnabled(FEATURE_KEYS.routine);
 
     return {
-        stock: { enabled: true, status: "coming-soon" },
+        stock: { enabled: true, status: "available" },
         leave: {
             enabled: leaveEnabled,
             status: leaveEnabled ? "available" : "unavailable",

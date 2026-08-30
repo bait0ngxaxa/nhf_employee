@@ -9,6 +9,10 @@ import {
     buildRoutineLiffTaskUrl,
     buildRoutineLiffUrl,
 } from "@/lib/line/routine-links";
+import {
+    buildStockLiffRequestUrl,
+    buildStockLiffUrl,
+} from "@/lib/line/stock-links";
 import { APP_ROUTES } from "@/lib/ssot/routes";
 
 describe("LIFF URL builder", () => {
@@ -53,6 +57,12 @@ describe("LIFF URL builder", () => {
         expect(buildLeaveLiffRequestUrl("leave_abc-123", { action: "approve" })).toBe(
             "https://liff.line.me/nhfapp-liff-id/leave?requestId=leave_abc-123&action=approve",
         );
+        expect(buildStockLiffUrl()).toBe(
+            "https://liff.line.me/nhfapp-liff-id/stock",
+        );
+        expect(buildStockLiffRequestUrl(123, { action: "issue" })).toBe(
+            "https://liff.line.me/nhfapp-liff-id/stock?requestId=123&action=issue",
+        );
     });
 
     it("rejects malformed Leave request IDs before building a deep link", () => {
@@ -60,6 +70,13 @@ describe("LIFF URL builder", () => {
 
         expect(() => buildLeaveLiffRequestUrl("../private", { action: "approve" }))
             .toThrow("Invalid Leave request ID");
+    });
+
+    it("rejects malformed Stock request IDs before building a deep link", () => {
+        vi.stubEnv("NEXT_PUBLIC_LINE_LIFF_ID", "nhfapp-liff-id");
+
+        expect(() => buildStockLiffRequestUrl("../private", { action: "issue" }))
+            .toThrow("Invalid Stock request ID");
     });
 
     it.each([

@@ -10,6 +10,7 @@ import {
     getCategories,
     getItems,
     getItemById,
+    getRequestById,
     getRequests,
 } from "./queries";
 import {
@@ -33,6 +34,7 @@ export const stockService = {
     updateItem,
     adjustStock,
     getRequests,
+    getRequestById,
     createRequest,
     issueRequest,
     cancelRequest,
@@ -48,6 +50,7 @@ export {
     updateItem,
     adjustStock,
     getRequests,
+    getRequestById,
     createRequest,
     issueRequest,
     cancelRequest,

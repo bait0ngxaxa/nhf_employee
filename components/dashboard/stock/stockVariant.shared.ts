@@ -1,23 +1,42 @@
 import type {
     StockItem,
     StockItemVariant,
-    StockItemVariantAttributeValue,
     StockRequestItemDetail,
 } from "../context/stock/types";
 
+export interface StockVariantAttributeValueLike {
+    attributeValue: {
+        value: string;
+        attribute: { name: string };
+    };
+}
+
+export interface StockBrowseVariant {
+    id: number;
+    sku: string;
+    unit: string;
+    imageUrl?: string | null;
+    availableQuantity: number;
+    attributeValues?: StockVariantAttributeValueLike[];
+}
+
+export interface StockBrowseItem {
+    id: number;
+    name: string;
+    imageUrl?: string | null;
+    variants?: StockBrowseVariant[];
+}
+
 export type BrowseCartItem = {
-    item: Pick<StockItem, "id" | "name" | "imageUrl">;
-    variant: Pick<
-        StockItemVariant,
-        "id" | "sku" | "unit" | "imageUrl" | "availableQuantity" | "attributeValues"
-    >;
+    item: Pick<StockBrowseItem, "id" | "name" | "imageUrl">;
+    variant: StockBrowseVariant;
     qty: number;
 };
 
 type VariantWithAvailableQuantity = Pick<StockItemVariant, "availableQuantity">;
 
 export function getVariantAttributeSummary(
-    attributeValues?: StockItemVariantAttributeValue[],
+    attributeValues?: StockVariantAttributeValueLike[],
 ): string {
     if (!attributeValues || attributeValues.length === 0) {
         return "";
@@ -35,7 +54,7 @@ export function getVariantDisplayName(
     itemName: string,
     variant?: {
         sku: string;
-        attributeValues?: StockItemVariantAttributeValue[];
+        attributeValues?: StockVariantAttributeValueLike[];
     } | null,
 ): string {
     if (!variant) {
@@ -50,7 +69,7 @@ export function getVariantDisplayName(
     return `${itemName} • ${attributeSummary}`;
 }
 
-export function getPreferredVariant(item: StockItem): StockItemVariant | null {
+export function getPreferredVariant(item: StockBrowseItem): StockBrowseVariant | null {
     return item.variants?.[0] ?? null;
 }
 
@@ -62,19 +81,22 @@ export function getVariantAvailableQuantity(variant: VariantWithAvailableQuantit
     return variant.availableQuantity;
 }
 
-export function getBrowseImageUrl(item: StockItem, variant?: StockItemVariant | null): string | null {
+export function getBrowseImageUrl(
+    item: StockBrowseItem,
+    variant?: StockBrowseVariant | null,
+): string | null {
     return variant?.imageUrl ?? item.imageUrl ?? null;
 }
 
-export function getBrowseCardImageUrl(item: StockItem): string | null {
+export function getBrowseCardImageUrl(item: StockBrowseItem): string | null {
     return item.imageUrl ?? getPreferredVariant(item)?.imageUrl ?? null;
 }
 
-export function hasSelectableVariants(item: StockItem): boolean {
+export function hasSelectableVariants(item: StockBrowseItem): boolean {
     return (item.variants?.length ?? 0) > 1;
 }
 
-export function getSelectableVariantCount(item: StockItem): number {
+export function getSelectableVariantCount(item: StockBrowseItem): number {
     return item.variants?.length ?? 0;
 }
 

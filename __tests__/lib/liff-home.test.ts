@@ -12,7 +12,7 @@ describe("LIFF home module availability", () => {
         vi.stubEnv("NEXT_PUBLIC_FEATURE_ROUTINE", "true");
 
         expect(getLiffHomeModules()).toEqual({
-            stock: { enabled: true, status: "coming-soon" },
+            stock: { enabled: true, status: "available" },
             leave: { enabled: false, status: "unavailable" },
             routine: { enabled: true, status: "available" },
         });
@@ -25,7 +25,7 @@ describe("LIFF home module availability", () => {
 
         expect(getLiffHomeModules().stock).toEqual({
             enabled: true,
-            status: "coming-soon",
+            status: "available",
         });
         expect(getLiffHomeModules().leave).toEqual({
             enabled: true,

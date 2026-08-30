@@ -394,13 +394,21 @@ export function buildRequestInclude() {
         items: {
             include: {
                 item: {
-                    select: { id: true, name: true, sku: true, unit: true },
+                    select: {
+                        id: true,
+                        name: true,
+                        sku: true,
+                        unit: true,
+                        isActive: true,
+                    },
                 },
                 variant: {
                     select: {
                         id: true,
                         sku: true,
                         unit: true,
+                        quantity: true,
+                        isActive: true,
                         imageUrl: true,
                         attributeValues: {
                             include: {
