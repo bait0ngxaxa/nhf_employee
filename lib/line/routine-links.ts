@@ -1,20 +1,20 @@
 import { APP_DASHBOARD_TABS, APP_ROUTES } from "@/lib/ssot/routes";
 import { getPublicOrigin } from "@/lib/network/public-url";
 
-import { getLineLiffId } from "./config";
+import { buildLiffUrl } from "./liff-links";
 
 export function buildRoutineLiffUrl(): string {
-    return `https://liff.line.me/${encodeURIComponent(getLineLiffId())}/routine`;
+    return buildLiffUrl(APP_ROUTES.line.routine);
 }
 
 export function buildRoutineLiffTaskUrl(
     taskId: number,
     occurrenceId: number,
 ): string {
-    const url = new URL(buildRoutineLiffUrl());
-    url.searchParams.set("taskId", String(taskId));
-    url.searchParams.set("occurrenceId", String(occurrenceId));
-    return url.toString();
+    return buildLiffUrl(APP_ROUTES.line.routine, {
+        taskId,
+        occurrenceId,
+    });
 }
 
 export function buildRoutineDashboardTaskUrl(

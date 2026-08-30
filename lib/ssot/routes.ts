@@ -9,6 +9,8 @@ export const APP_ROUTES = {
     resetPassword: "/reset-password",
     line: {
         root: "/liff",
+        stock: "/liff/stock",
+        leave: "/liff/leave",
         routine: "/liff/routine",
     },
 } as const;
@@ -107,6 +109,7 @@ export const API_ROUTES = {
     line: {
         accountLink: "/api/line/account-link",
         liffSession: "/api/line/liff/session",
+        home: "/api/line/home",
         routineTasks: "/api/line/routine/tasks",
         routineSummary: "/api/line/routine/summary",
     },

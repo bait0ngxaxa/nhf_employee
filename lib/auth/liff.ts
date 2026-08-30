@@ -8,7 +8,11 @@ import {
 import { LineIdentityVerificationError } from "@/lib/line/errors";
 import { prisma } from "@/lib/db/prisma";
 import { getEmployeeBackedUserDisplayName } from "@/lib/helpers/employee-helpers";
+import type { LiffCapabilities } from "@/lib/line/liff-types";
+import { getActionableLeaveApprovalWhere } from "@/lib/services/leave/approval-queries";
+import { isFeatureEnabled, FEATURE_KEYS } from "@/lib/ssot/features";
 import { forbidden, serverError, unauthorized } from "@/lib/ssot/http";
+import { isAdminRole } from "@/lib/ssot/permissions";
 
 export interface LiffWorkforceUser {
     id: number;
@@ -20,6 +24,51 @@ export interface LiffWorkforceUser {
 export interface LiffWorkforceSession {
     user: LiffWorkforceUser;
     employeeId: number;
+}
+
+export async function getLiffCapabilities(
+    session: LiffWorkforceSession,
+): Promise<LiffCapabilities> {
+    const leaveEnabled = isFeatureEnabled(FEATURE_KEYS.leave);
+    const routineEnabled = isFeatureEnabled(FEATURE_KEYS.routine);
+
+    const employee = leaveEnabled
+        ? await prisma.employee.findUnique({
+              where: { id: session.employeeId },
+              select: {
+                  subordinates: { select: { id: true }, take: 1 },
+                  approvals: {
+                      where: {
+                          exceptionApproverId: null,
+                          ...getActionableLeaveApprovalWhere(),
+                      },
+                      select: { id: true },
+                      take: 1,
+                  },
+                  exceptionApprovals: {
+                      where: getActionableLeaveApprovalWhere(),
+                      select: { id: true },
+                      take: 1,
+                  },
+              },
+          })
+        : null;
+
+    const canApproveLeave = leaveEnabled
+        && (
+            isAdminRole(session.user.role)
+            || (employee?.subordinates.length ?? 0) > 0
+            || (employee?.approvals.length ?? 0) > 0
+            || (employee?.exceptionApprovals.length ?? 0) > 0
+        );
+
+    return {
+        canRequestStock: true,
+        canProcessStockRequests: isAdminRole(session.user.role),
+        canRequestLeave: leaveEnabled,
+        canApproveLeave,
+        canCreateOwnRoutine: routineEnabled,
+    };
 }
 
 type LiffWorkforceSessionFailure = {

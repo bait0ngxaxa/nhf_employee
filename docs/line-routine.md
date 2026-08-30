@@ -1,23 +1,23 @@
-# NHFapp LINE / LIFF และ Routine Launch Runbook
+# NHFapp LINE / Unified LIFF Launch Runbook
 
-เอกสารนี้ใช้สำหรับเปิดใช้งาน LINE / LIFF กลางของ NHFapp และ Routine ใน environment จริง หลังจาก deploy แอปพลิเคชันและตรวจสอบ LIFF แล้ว
+เอกสารนี้ใช้สำหรับเปิดใช้งาน LINE / LIFF กลางของ NHFapp ใน environment จริง หลังจาก deploy แอปพลิเคชันและตรวจสอบ LIFF แล้ว
 
 ## Architecture
 
 ```text
 NHF Official Account
         ↓
-Rich Menu: งานของฉัน
+Unified Rich Menu: Stock | Leave | Routine
         ↓
-https://liff.line.me/{LIFF_ID}/routine
+https://liff.line.me/{LIFF_ID}/...
         ↓
-NHFapp LIFF authentication / account link
+LiffBootstrap: LINE authentication / account link
         ↓
-HttpOnly LIFF session
+NHFapp HttpOnly LIFF session
         ↓
-My Routine APIs
+Shared LIFF application shell
         ↓
-existing Routine services
+Home | Stock | Leave | Routine
 ```
 
 Reminder ใช้ scheduler และ outbox เดิมของ Routine แล้ว fan-out เป็น in-app, email และ LINE push แยก delivery กัน
@@ -45,6 +45,7 @@ LINE_APP_CHANNEL_SECRET="<nhfapp-messaging-api-secret>"
 LINE_LIFF_SESSION_SECRET="<long-random-server-secret>"
 LINE_LIFF_SESSION_TTL_SECONDS="3600"
 NEXT_PUBLIC_FEATURE_ROUTINE="true"
+NEXT_PUBLIC_FEATURE_LEAVE="true"
 ```
 
 ตรวจให้แน่ใจว่า:
@@ -53,7 +54,8 @@ NEXT_PUBLIC_FEATURE_ROUTINE="true"
 - Login Channel ID เป็น channel เดียวกับที่ใช้สร้าง LIFF app
 - Messaging API access token เป็นของ NHFapp Official Account สำหรับ targeted employee delivery และไม่ใช้ token ของ IT/Stock
 - `LINE_LIFF_SESSION_SECRET` ยาวและสุ่มเพียงพอ
-- Routine feature เปิดอยู่ก่อนจะเปิด Rich Menu ให้ผู้ใช้
+- Routine feature เปิดอยู่ก่อนจะเปิด Rich Menu ให้ผู้ใช้ เพราะเป็น module เดียวที่เปิดใช้งาน workflow เต็มรูปแบบใน Phase 1
+- Stock ใช้งานผ่าน LIFF ได้ในฐานะ landing surface และไม่มี feature flag แยกในระบบปัจจุบัน
 
 LIFF Endpoint URL ที่ตั้งใน LINE Developers Console ต้องตรงกับ URL ที่ deploy จริง เช่น:
 
@@ -64,19 +66,22 @@ https://<production-domain>/liff
 ค่าที่ถูกต้องคือ `/liff` เพียงค่าเดียว บริการ Routine ใช้ LIFF deep link
 `https://liff.line.me/{LIFF_ID}/routine` ซึ่งเปิด `/liff/routine` ภายใต้ Endpoint เดียวกัน
 
+เส้นทางภายใน LIFF ที่ใช้ใน Phase 1 คือ `/liff`, `/liff/stock`, `/liff/leave` และ `/liff/routine` ทุกเส้นทางใช้ `LiffBootstrap` และ session boundary เดียวกัน
+
 ## Rich Menu asset and definition
 
 Asset อยู่ที่:
 
 ```text
-assets/line/routine-rich-menu.png
+assets/line/nhf-rich-menu.png
 ```
 
 คุณสมบัติของ MVP:
 
 - PNG ขนาด 2500×843 pixels
-- พื้นที่กดหนึ่งพื้นที่ ครอบคลุมทั้งภาพ
-- URI action เปิด `https://liff.line.me/{LIFF_ID}/routine`
+- พื้นที่กดสามพื้นที่ แบ่งเป็น Stock, Leave และ Routine
+- URI action เปิด `https://liff.line.me/{LIFF_ID}/stock`, `.../leave` และ `.../routine` ตามลำดับ
+- สร้างด้วย `scripts/generate-nhf-rich-menu.ts` แบบ deterministic
 - ไม่มีข้อมูลพนักงาน, LINE user ID, NHF user ID หรือ secret ในภาพ/definition
 
 หากแก้ไข artwork ให้สร้าง asset ใหม่ด้วยคำสั่ง:
@@ -86,6 +91,8 @@ npm run line:richmenu:asset
 ```
 
 LINE ไม่อนุญาตให้แทนที่ภาพของ Rich Menu เดิม ให้สร้าง Rich Menu object ใหม่แล้ว set เป็น default แทน
+
+การเตรียม definition จะอ่านสถานะ feature จาก source of truth เดิม ถ้า Leave ถูกปิด ระบบจะยังตรวจสอบและสร้าง destination ที่ปลอดภัย แต่ UI จะแสดง unavailable ตาม feature flag หาก Routine ถูกปิด การ provision แบบ `--apply` จะหยุดด้วย configuration error เพื่อไม่เปิดเมนูที่ workflow หลักไม่พร้อม
 
 ## Provisioning
 
@@ -172,18 +179,22 @@ curl --request DELETE \
 
 ใช้ test LINE account บน smartphone และเพิ่ม NHF Official Account เป็นเพื่อนก่อนเริ่ม:
 
-1. ตรวจว่า Routine feature เปิดอยู่
+1. ตรวจว่า Routine และ Leave feature flags มีค่าตาม deployment ที่ต้องการ
 2. เปิด LIFF โดยตรงและตรวจว่า first-use linking ทำงาน
 3. เชื่อม Employee A กับ LINE Account A
-4. เปิด OA chat และตรวจว่า Rich Menu แสดง `งานของฉัน`
-5. แตะ `งานของฉัน` และตรวจว่า My Routine เปิดโดยไม่ต้อง login NHF ซ้ำ
-6. ตรวจว่า Employee A เห็นเฉพาะงานของ A
-7. ทดสอบ `taskId` ของ Employee อื่น และตรวจว่าไม่แสดงข้อมูล
-8. สร้าง/รัน reminder ที่ทดสอบได้
-9. ตรวจ in-app, email และ LINE push ของ Employee A
-10. แตะ `เปิดดูงาน` และตรวจว่า LIFF แสดงงานที่ถูกต้องแบบ authorized focus
+4. ตรวจหน้า `/liff` แสดงชื่อพนักงานและ module cards ที่เปิดใช้งาน
+5. ตรวจ bottom navigation และ active state ของ Home, Stock, Leave และ Routine
+6. แตะ Stock/Leave และตรวจว่า landing surface แสดงสถานะ Phase 1 โดยไม่เปิด workflow ที่ยังไม่พร้อม
+7. แตะ Routine และตรวจว่า My Routine เปิดโดยไม่ต้อง login NHF ซ้ำ
+8. ตรวจว่า Employee A เห็นเฉพาะงานของ A
+9. ทดสอบ `taskId` ของ Employee อื่น และตรวจว่าไม่แสดงข้อมูล
+10. สร้าง/รัน reminder ที่ทดสอบได้ และตรวจ deep link ไปยังงานที่ถูกต้อง
 11. ทดสอบ Employee C ที่ยังไม่ link: in-app/email ต้องทำงาน และ LINE ต้องถูก skip อย่างปลอดภัย
 12. ทดสอบ Admin ที่ link แล้ว: LIFF ต้องยังแสดงเฉพาะงานที่ assign ให้ Admin
+
+## Phase 1 boundaries
+
+Phase 1 เปิดใช้งาน Routine LIFF เดิมเป็น module ที่ทำงานเต็มรูปแบบ พร้อม unified home, shell, navigation, session bootstrap และ Rich Menu กลางเท่านั้น Stock และ Leave มี landing surface และ route foundation สำหรับ phase ถัดไป แต่ยังไม่มีการสร้างคำขอ, การอนุมัติ, quota, catalog, cart, attachment หรือ transactional workflow ใด ๆ ผ่าน LIFF
 
 ## Troubleshooting
 

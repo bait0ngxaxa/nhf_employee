@@ -1,15 +1,8 @@
 import { apiPost, type ApiResponse } from "@/lib/client/api-client";
+import type { LiffSessionResponse } from "@/lib/line/liff-types";
 import { API_ROUTES } from "@/lib/ssot/routes";
 
-export interface LiffWorkforceIdentity {
-    userId: number;
-    employeeId: number;
-    name: string | null;
-}
-
-export type LiffSessionResponse =
-    | { linked: false }
-    | { linked: true; workforce: LiffWorkforceIdentity };
+export type { LiffSessionResponse, LiffWorkforceIdentity } from "@/lib/line/liff-types";
 
 export class LiffApiError extends Error {
     readonly status: number | undefined;

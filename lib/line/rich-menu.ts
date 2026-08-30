@@ -4,13 +4,22 @@ import path from "node:path";
 import sharp from "sharp";
 
 import { isFeatureEnabled, FEATURE_KEYS } from "@/lib/ssot/features";
+import { getLiffHomeModules } from "@/lib/line/liff-home";
+import type { LiffHomeModules } from "@/lib/line/liff-types";
+import { APP_ROUTES } from "@/lib/ssot/routes";
 
 import {
     getLineConfigurationStatus,
     getLineLiffSessionConfig,
     getLineMessagingConfig,
 } from "./config";
+import { buildLiffUrl } from "./liff-links";
 import { buildRoutineLiffUrl } from "./routine-links";
+
+export const NHF_RICH_MENU_WIDTH = 2500;
+export const NHF_RICH_MENU_HEIGHT = 843;
+export const NHF_RICH_MENU_MAX_BYTES = 1_000_000;
+export const NHF_RICH_MENU_IMAGE_PATH = "assets/line/nhf-rich-menu.png";
 
 export const ROUTINE_RICH_MENU_WIDTH = 2500;
 export const ROUTINE_RICH_MENU_HEIGHT = 843;
@@ -35,6 +44,20 @@ export interface RichMenuUriAction {
 }
 
 export interface RoutineRichMenuDefinition {
+    size: {
+        width: number;
+        height: number;
+    };
+    selected: boolean;
+    name: string;
+    chatBarText: string;
+    areas: Array<{
+        bounds: RichMenuBounds;
+        action: RichMenuUriAction;
+    }>;
+}
+
+export interface NhfRichMenuDefinition {
     size: {
         width: number;
         height: number;
@@ -126,6 +149,45 @@ export interface RoutineRichMenuStatus {
     defaultRichMenuError: string | null;
 }
 
+export interface NhfRichMenuPreparation {
+    liffUrls: {
+        stock: string;
+        leave: string;
+        routine: string;
+    };
+    definition: NhfRichMenuDefinition;
+    imagePath: string;
+    image: RichMenuImageInfo;
+    modules: LiffHomeModules;
+    channelAccessToken: string;
+}
+
+export interface NhfRichMenuProvisionResult {
+    mode: "dry-run" | "applied";
+    liffUrls: NhfRichMenuPreparation["liffUrls"];
+    definition: NhfRichMenuDefinition;
+    imagePath: string;
+    image: RichMenuImageInfo;
+    modules: LiffHomeModules;
+    richMenuId?: string;
+    verifiedDefaultRichMenuId?: string;
+}
+
+export interface NhfRichMenuStatus {
+    liffIdConfigured: boolean;
+    loginChannelConfigured: boolean;
+    channelAccessTokenConfigured: boolean;
+    channelSecretConfigured: boolean;
+    sessionSecretConfigured: boolean;
+    sessionTtlConfigured: boolean;
+    sessionConfigValid: boolean;
+    modules: LiffHomeModules;
+    liffUrls: NhfRichMenuPreparation["liffUrls"] | null;
+    defaultRichMenuId: string | null;
+    defaultRichMenuStatus: RoutineRichMenuStatus["defaultRichMenuStatus"];
+    defaultRichMenuError: string | null;
+}
+
 type FetchImplementation = typeof fetch;
 
 function countCharacters(value: string): number {
@@ -210,14 +272,14 @@ async function requestLineApi(
     return readResponseJson(response);
 }
 
-function validateLiffUrl(liffUrl: string): void {
+function validateLiffUrl(liffUrl: string, menuLabel = "Routine"): void {
     let parsed: URL;
     try {
         parsed = new URL(liffUrl);
     } catch {
         throw new RichMenuProvisioningError(
             "configuration",
-            "Routine LIFF URL is invalid",
+            `${menuLabel} LIFF URL is invalid`,
         );
     }
 
@@ -230,7 +292,7 @@ function validateLiffUrl(liffUrl: string): void {
     ) {
         throw new RichMenuProvisioningError(
             "configuration",
-            "Routine LIFF URL must be a base https://liff.line.me URL",
+            `${menuLabel} LIFF URL must be a base https://liff.line.me URL`,
         );
     }
 }
@@ -268,6 +330,13 @@ export function buildRoutineRichMenuDefinition(
 
 export function validateRoutineRichMenuDefinition(
     definition: RoutineRichMenuDefinition,
+): void {
+    validateRichMenuDefinition(definition, "Routine Rich Menu");
+}
+
+function validateRichMenuDefinition(
+    definition: RoutineRichMenuDefinition | NhfRichMenuDefinition,
+    menuLabel: string,
 ): void {
     const { width, height } = definition.size;
     if (
@@ -315,11 +384,92 @@ export function validateRoutineRichMenuDefinition(
         if (area.action.type !== "uri") {
             throw new RichMenuProvisioningError(
                 "configuration",
-                "Routine Rich Menu must use a URI action",
+                `${menuLabel} must use a URI action`,
             );
         }
-        validateLiffUrl(area.action.uri);
+        validateLiffUrl(area.action.uri, menuLabel.replace(" Rich Menu", ""));
     }
+}
+
+export interface NhfRichMenuDestinations {
+    stock?: string;
+    leave?: string;
+    routine?: string;
+}
+
+export function buildNhfRichMenuDefinition(
+    destinations: NhfRichMenuDestinations = {},
+): NhfRichMenuDefinition {
+    const liffUrls = {
+        stock: destinations.stock ?? buildLiffUrl(APP_ROUTES.line.stock),
+        leave: destinations.leave ?? buildLiffUrl(APP_ROUTES.line.leave),
+        routine: destinations.routine ?? buildLiffUrl(APP_ROUTES.line.routine),
+    };
+    const menuWidth = NHF_RICH_MENU_WIDTH;
+    const firstAreaWidth = Math.floor(menuWidth / 3);
+    const secondAreaWidth = firstAreaWidth;
+    const thirdAreaWidth = menuWidth - firstAreaWidth - secondAreaWidth;
+
+    const areas = [
+        {
+            bounds: {
+                x: 0,
+                y: 0,
+                width: firstAreaWidth,
+                height: NHF_RICH_MENU_HEIGHT,
+            },
+            action: {
+                type: "uri" as const,
+                label: "เบิกวัสดุ",
+                uri: liffUrls.stock,
+            },
+        },
+        {
+            bounds: {
+                x: firstAreaWidth,
+                y: 0,
+                width: secondAreaWidth,
+                height: NHF_RICH_MENU_HEIGHT,
+            },
+            action: {
+                type: "uri" as const,
+                label: "ลางาน",
+                uri: liffUrls.leave,
+            },
+        },
+        {
+            bounds: {
+                x: firstAreaWidth + secondAreaWidth,
+                y: 0,
+                width: thirdAreaWidth,
+                height: NHF_RICH_MENU_HEIGHT,
+            },
+            action: {
+                type: "uri" as const,
+                label: "งานของฉัน",
+                uri: liffUrls.routine,
+            },
+        },
+    ];
+
+    const definition: NhfRichMenuDefinition = {
+        size: {
+            width: NHF_RICH_MENU_WIDTH,
+            height: NHF_RICH_MENU_HEIGHT,
+        },
+        selected: true,
+        name: "NHFapp",
+        chatBarText: "เลือกบริการ",
+        areas,
+    };
+    validateNhfRichMenuDefinition(definition);
+    return definition;
+}
+
+export function validateNhfRichMenuDefinition(
+    definition: NhfRichMenuDefinition,
+): void {
+    validateRichMenuDefinition(definition, "NHFapp Rich Menu");
 }
 
 export async function validateRoutineRichMenuImage(
@@ -394,10 +544,26 @@ export async function validateRoutineRichMenuImage(
     };
 }
 
+export async function validateNhfRichMenuImage(
+    imagePath: string,
+): Promise<RichMenuImageInfo> {
+    return validateRoutineRichMenuImage(imagePath, {
+        maxBytes: NHF_RICH_MENU_MAX_BYTES,
+        expectedWidth: NHF_RICH_MENU_WIDTH,
+        expectedHeight: NHF_RICH_MENU_HEIGHT,
+    });
+}
+
 export function getRoutineRichMenuImagePath(
     workingDirectory = process.cwd(),
 ): string {
     return path.resolve(workingDirectory, ROUTINE_RICH_MENU_IMAGE_PATH);
+}
+
+export function getNhfRichMenuImagePath(
+    workingDirectory = process.cwd(),
+): string {
+    return path.resolve(workingDirectory, NHF_RICH_MENU_IMAGE_PATH);
 }
 
 export async function prepareRoutineRichMenu(
@@ -426,25 +592,6 @@ export async function prepareRoutineRichMenu(
         imageBytes: await readFile(imagePath),
         routineFeatureEnabled: isFeatureEnabled(FEATURE_KEYS.routine),
         channelAccessToken,
-    };
-}
-
-function toProvisionResult(
-    prepared: RoutineRichMenuPreparation,
-    mode: "dry-run" | "applied",
-    result: {
-        richMenuId?: string;
-        verifiedDefaultRichMenuId?: string;
-    } = {},
-): RoutineRichMenuProvisionResult {
-    return {
-        mode,
-        liffUrl: prepared.liffUrl,
-        definition: prepared.definition,
-        imagePath: prepared.imagePath,
-        image: prepared.image,
-        routineFeatureEnabled: prepared.routineFeatureEnabled,
-        ...result,
     };
 }
 
@@ -507,78 +654,17 @@ export async function provisionRoutineRichMenu(
         fetchImpl?: FetchImplementation;
     },
 ): Promise<RoutineRichMenuProvisionResult> {
-    const prepared = await prepareRoutineRichMenu(options.imagePath);
-    if (!options.apply) {
-        return toProvisionResult(prepared, "dry-run");
-    }
-    if (!prepared.routineFeatureEnabled) {
-        throw new RichMenuProvisioningError(
-            "configuration",
-            "Routine feature is disabled; Rich Menu provisioning cannot be applied",
-        );
-    }
-
-    const fetchImpl = options.fetchImpl ?? fetch;
-    await requestLineApi({
-        phase: "validate",
-        endpoint: `${LINE_MESSAGING_API_URL}/v2/bot/richmenu/validate`,
-        channelAccessToken: prepared.channelAccessToken,
-        method: "POST",
-        contentType: "application/json",
-        body: JSON.stringify(prepared.definition),
-        fetchImpl,
-    });
-
-    const createResponse = await requestLineApi({
-        phase: "create",
-        endpoint: `${LINE_MESSAGING_API_URL}/v2/bot/richmenu`,
-        channelAccessToken: prepared.channelAccessToken,
-        method: "POST",
-        contentType: "application/json",
-        body: JSON.stringify(prepared.definition),
-        fetchImpl,
-    });
-    if (!isRecord(createResponse) || typeof createResponse.richMenuId !== "string") {
-        throw new RichMenuProvisioningError(
-            "create",
-            "LINE returned an invalid Rich Menu ID",
-        );
-    }
-    const richMenuId = createResponse.richMenuId;
-
-    await requestLineApi({
-        phase: "upload",
-        endpoint: `${LINE_MESSAGING_DATA_API_URL}/v2/bot/richmenu/${encodeURIComponent(richMenuId)}/content`,
-        channelAccessToken: prepared.channelAccessToken,
-        method: "POST",
-        contentType: prepared.image.contentType,
-        body: new Uint8Array(prepared.imageBytes),
-        richMenuId,
-        fetchImpl,
-    });
-
-    await requestLineApi({
-        phase: "set-default",
-        endpoint: `${LINE_MESSAGING_API_URL}/v2/bot/user/all/richmenu/${encodeURIComponent(richMenuId)}`,
-        channelAccessToken: prepared.channelAccessToken,
-        method: "POST",
-        fetchImpl,
-        richMenuId,
-    });
-
-    const verifiedDefaultRichMenuId = await getRoutineRichMenuDefaultId(fetchImpl);
-    if (verifiedDefaultRichMenuId !== richMenuId) {
-        throw new RichMenuProvisioningError(
-            "verify",
-            "LINE default Rich Menu does not match the newly provisioned menu",
-            { richMenuId },
-        );
-    }
-
-    return toProvisionResult(prepared, "applied", {
-        richMenuId,
-        verifiedDefaultRichMenuId,
-    });
+    const result = await provisionNhfRichMenu(options);
+    return {
+        mode: result.mode,
+        liffUrl: result.liffUrls.routine,
+        definition: result.definition,
+        imagePath: result.imagePath,
+        image: result.image,
+        routineFeatureEnabled: result.modules.routine.enabled,
+        richMenuId: result.richMenuId,
+        verifiedDefaultRichMenuId: result.verifiedDefaultRichMenuId,
+    };
 }
 
 function hasValue(value: string | undefined): boolean {
@@ -638,4 +724,171 @@ export async function getRoutineRichMenuStatus(
     }
 
     return status;
+}
+
+export async function prepareNhfRichMenu(
+    imagePath = getNhfRichMenuImagePath(),
+): Promise<NhfRichMenuPreparation & { imageBytes: Buffer }> {
+    let channelAccessToken: string;
+    try {
+        ({ channelAccessToken } = getLineMessagingConfig());
+    } catch {
+        throw new RichMenuProvisioningError(
+            "configuration",
+            "NHFapp LINE channel access token is not configured",
+        );
+    }
+
+    const liffUrls = {
+        stock: buildLiffUrl(APP_ROUTES.line.stock),
+        leave: buildLiffUrl(APP_ROUTES.line.leave),
+        routine: buildLiffUrl(APP_ROUTES.line.routine),
+    };
+    const definition = buildNhfRichMenuDefinition(liffUrls);
+    validateNhfRichMenuDefinition(definition);
+    const image = await validateNhfRichMenuImage(imagePath);
+
+    return {
+        liffUrls,
+        definition,
+        imagePath,
+        image,
+        imageBytes: await readFile(imagePath),
+        modules: getLiffHomeModules(),
+        channelAccessToken,
+    };
+}
+
+function toNhfProvisionResult(
+    prepared: NhfRichMenuPreparation,
+    mode: "dry-run" | "applied",
+    result: {
+        richMenuId?: string;
+        verifiedDefaultRichMenuId?: string;
+    } = {},
+): NhfRichMenuProvisionResult {
+    return {
+        mode,
+        liffUrls: prepared.liffUrls,
+        definition: prepared.definition,
+        imagePath: prepared.imagePath,
+        image: prepared.image,
+        modules: prepared.modules,
+        ...result,
+    };
+}
+
+export async function getNhfRichMenuDefaultId(
+    fetchImpl: FetchImplementation = fetch,
+): Promise<string | null> {
+    return getRoutineRichMenuDefaultId(fetchImpl);
+}
+
+export async function provisionNhfRichMenu(
+    options: {
+        apply: boolean;
+        imagePath?: string;
+        fetchImpl?: FetchImplementation;
+    },
+): Promise<NhfRichMenuProvisionResult> {
+    const prepared = await prepareNhfRichMenu(options.imagePath);
+    if (!options.apply) {
+        return toNhfProvisionResult(prepared, "dry-run");
+    }
+    if (!prepared.modules.routine.enabled) {
+        throw new RichMenuProvisioningError(
+            "configuration",
+            "Routine feature is disabled; unified Rich Menu provisioning cannot be applied",
+        );
+    }
+
+    const fetchImpl = options.fetchImpl ?? fetch;
+    await requestLineApi({
+        phase: "validate",
+        endpoint: `${LINE_MESSAGING_API_URL}/v2/bot/richmenu/validate`,
+        channelAccessToken: prepared.channelAccessToken,
+        method: "POST",
+        contentType: "application/json",
+        body: JSON.stringify(prepared.definition),
+        fetchImpl,
+    });
+
+    const createResponse = await requestLineApi({
+        phase: "create",
+        endpoint: `${LINE_MESSAGING_API_URL}/v2/bot/richmenu`,
+        channelAccessToken: prepared.channelAccessToken,
+        method: "POST",
+        contentType: "application/json",
+        body: JSON.stringify(prepared.definition),
+        fetchImpl,
+    });
+    if (!isRecord(createResponse) || typeof createResponse.richMenuId !== "string") {
+        throw new RichMenuProvisioningError(
+            "create",
+            "LINE returned an invalid Rich Menu ID",
+        );
+    }
+    const richMenuId = createResponse.richMenuId;
+
+    await requestLineApi({
+        phase: "upload",
+        endpoint: `${LINE_MESSAGING_DATA_API_URL}/v2/bot/richmenu/${encodeURIComponent(richMenuId)}/content`,
+        channelAccessToken: prepared.channelAccessToken,
+        method: "POST",
+        contentType: prepared.image.contentType,
+        body: new Uint8Array(prepared.imageBytes),
+        richMenuId,
+        fetchImpl,
+    });
+
+    await requestLineApi({
+        phase: "set-default",
+        endpoint: `${LINE_MESSAGING_API_URL}/v2/bot/user/all/richmenu/${encodeURIComponent(richMenuId)}`,
+        channelAccessToken: prepared.channelAccessToken,
+        method: "POST",
+        fetchImpl,
+        richMenuId,
+    });
+
+    const verifiedDefaultRichMenuId = await getNhfRichMenuDefaultId(fetchImpl);
+    if (verifiedDefaultRichMenuId !== richMenuId) {
+        throw new RichMenuProvisioningError(
+            "verify",
+            "LINE default Rich Menu does not match the newly provisioned menu",
+            { richMenuId },
+        );
+    }
+
+    return toNhfProvisionResult(prepared, "applied", {
+        richMenuId,
+        verifiedDefaultRichMenuId,
+    });
+}
+
+export async function getNhfRichMenuStatus(
+    fetchImpl: FetchImplementation = fetch,
+): Promise<NhfRichMenuStatus> {
+    const legacyStatus = await getRoutineRichMenuStatus(fetchImpl);
+    const liffUrls = legacyStatus.liffIdConfigured
+        ? {
+              stock: buildLiffUrl(APP_ROUTES.line.stock),
+              leave: buildLiffUrl(APP_ROUTES.line.leave),
+              routine: buildLiffUrl(APP_ROUTES.line.routine),
+          }
+        : null;
+
+    return {
+        liffIdConfigured: legacyStatus.liffIdConfigured,
+        loginChannelConfigured: legacyStatus.loginChannelConfigured,
+        channelAccessTokenConfigured: legacyStatus.channelAccessTokenConfigured,
+        channelSecretConfigured: legacyStatus.channelSecretConfigured,
+        sessionSecretConfigured: legacyStatus.sessionSecretConfigured,
+        sessionTtlConfigured: legacyStatus.sessionTtlConfigured,
+        sessionConfigValid: legacyStatus.sessionConfigValid,
+        modules: getLiffHomeModules(),
+        liffUrls,
+        defaultRichMenuId: legacyStatus.defaultRichMenuId,
+        defaultRichMenuStatus: legacyStatus.defaultRichMenuStatus,
+        defaultRichMenuError: legacyStatus.defaultRichMenuError,
+    };
 }

@@ -204,7 +204,7 @@ export function LiffRoutineApp(): ReactElement {
                 title="เปิด My Routine ไม่สำเร็จ"
                 description={viewError ?? "กรุณาลองใหม่อีกครั้ง"}
                 action={{ label: "ลองใหม่", onClick: () => void loadRoutine() }}
-                className="min-h-svh rounded-none border-0 bg-surface-subtle pb-[calc(1rem+env(safe-area-inset-bottom))] pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] pt-[calc(1rem+env(safe-area-inset-top))] sm:pb-[calc(2.5rem+env(safe-area-inset-bottom))] sm:pl-[max(1.5rem,env(safe-area-inset-left))] sm:pr-[max(1.5rem,env(safe-area-inset-right))] sm:pt-[calc(2.5rem+env(safe-area-inset-top))]"
+                className="min-h-[60svh] rounded-none border-0 bg-surface-subtle px-4 py-10"
             />
         );
     }
@@ -213,7 +213,7 @@ export function LiffRoutineApp(): ReactElement {
         return (
             <LoadingState
                 label="กำลังโหลดงาน Routine..."
-                className="min-h-svh rounded-none border-0 bg-surface-subtle pb-[calc(1rem+env(safe-area-inset-bottom))] pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] pt-[calc(1rem+env(safe-area-inset-top))] sm:pb-[calc(2.5rem+env(safe-area-inset-bottom))] sm:pl-[max(1.5rem,env(safe-area-inset-left))] sm:pr-[max(1.5rem,env(safe-area-inset-right))] sm:pt-[calc(2.5rem+env(safe-area-inset-top))]"
+                className="min-h-[60svh] rounded-none border-0 bg-surface-subtle px-4 py-10"
             />
         );
     }
@@ -221,7 +221,7 @@ export function LiffRoutineApp(): ReactElement {
     return (
         <main
             id="main"
-            className="min-h-svh bg-surface-subtle pb-[calc(1.25rem+env(safe-area-inset-bottom))] pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] pt-[calc(1rem+env(safe-area-inset-top))] sm:pb-[calc(2rem+env(safe-area-inset-bottom))] sm:pl-[max(1.5rem,env(safe-area-inset-left))] sm:pr-[max(1.5rem,env(safe-area-inset-right))] sm:pt-[calc(2rem+env(safe-area-inset-top))]"
+            className="bg-surface-subtle px-[max(1rem,env(safe-area-inset-left))] pb-8 pt-6 pr-[max(1rem,env(safe-area-inset-right))] sm:pt-8"
         >
             <div className="mx-auto w-full max-w-lg space-y-4 sm:space-y-5">
                 <header className="space-y-1">
