@@ -1,6 +1,7 @@
 "use client";
 
 import { useSearchParams } from "next/navigation";
+import { Plus } from "lucide-react";
 import {
     useCallback,
     useEffect,
@@ -10,11 +11,17 @@ import {
 } from "react";
 
 import { ErrorState, LoadingState } from "@/components/ui/state";
+import { Button } from "@/components/ui/button";
 import { LiffApiError } from "@/lib/client/liff";
 import {
+    deleteLiffRoutineTask,
+    fetchLiffRoutineReference,
     fetchLiffRoutineSummary,
+    fetchLiffRoutineTask,
     fetchLiffRoutineTasks,
+    type LiffRoutineReferenceData,
     type LiffRoutineSummary,
+    type LiffRoutineTaskDetail,
     type LiffRoutineTaskWorkItem,
     type LiffRoutineTasksResponse,
     type LiffRoutineTimingFilter,
@@ -23,9 +30,15 @@ import { formatDate } from "@/lib/helpers/date-helpers";
 
 import { LiffRoutineStatusFilter } from "./LiffRoutineStatusFilter";
 import { LiffRoutineSummary as LiffRoutineSummaryView } from "./LiffRoutineSummary";
+import { LiffRoutineTaskDetail as LiffRoutineTaskDetailView } from "./LiffRoutineTaskDetail";
+import {
+    LiffRoutineTaskFormSurface,
+} from "./LiffRoutineTaskFormSurface";
+import type { LiffRoutineTaskFormMode } from "./LiffRoutineTaskForm";
 import { LiffRoutineTaskList } from "./LiffRoutineTaskList";
 
 type LiffRoutineState = "LOADING" | "READY" | "ERROR";
+type LiffRoutineReferenceState = "IDLE" | "LOADING" | "READY" | "ERROR";
 
 const LIFF_TASK_PAGE_SIZE = 12;
 
@@ -56,6 +69,11 @@ function toRoutineViewError(error: unknown): string {
     return "ไม่สามารถโหลดงาน Routine ได้ กรุณาลองใหม่อีกครั้ง";
 }
 
+function toRoutineMutationError(error: unknown): string {
+    if (error instanceof LiffApiError) return error.message;
+    return "ไม่สามารถดำเนินการกับงาน Routine ได้ กรุณาลองใหม่อีกครั้ง";
+}
+
 export function LiffRoutineApp(): ReactElement {
     const searchParams = useSearchParams();
     const initialRoutineFocus = getRoutineFocus(searchParams);
@@ -70,7 +88,24 @@ export function LiffRoutineApp(): ReactElement {
     const [focusNotice, setFocusNotice] = useState<string | null>(null);
     const [selectedFilter, setSelectedFilter] = useState<LiffRoutineTimingFilter>("");
     const [isTaskLoading, setIsTaskLoading] = useState(false);
+    const [operationNotice, setOperationNotice] = useState<string | null>(null);
+    const [operationError, setOperationError] = useState<string | null>(null);
+
+    const [reference, setReference] = useState<LiffRoutineReferenceData | null>(null);
+    const [referenceState, setReferenceState] = useState<LiffRoutineReferenceState>("IDLE");
+    const [referenceError, setReferenceError] = useState<string | null>(null);
+
+    const [selectedTaskId, setSelectedTaskId] = useState<number | null>(null);
+    const [detail, setDetail] = useState<LiffRoutineTaskDetail | null>(null);
+    const [detailLoading, setDetailLoading] = useState(false);
+    const [detailError, setDetailError] = useState<string | null>(null);
+    const [formMode, setFormMode] = useState<LiffRoutineTaskFormMode | null>(null);
+    const [isDeleting, setIsDeleting] = useState(false);
+    const [deleteError, setDeleteError] = useState<string | null>(null);
+
     const taskRequestIdRef = useRef(0);
+    const detailRequestIdRef = useRef(0);
+    const referenceRequestIdRef = useRef(0);
 
     const loadRoutine = useCallback(async (): Promise<void> => {
         setState("LOADING");
@@ -136,6 +171,82 @@ export function LiffRoutineApp(): ReactElement {
         void loadRoutine();
     }, [loadRoutine]);
 
+    const loadReference = useCallback(async (): Promise<void> => {
+        if (reference || referenceState === "LOADING") return;
+        const requestId = referenceRequestIdRef.current + 1;
+        referenceRequestIdRef.current = requestId;
+        setReferenceState("LOADING");
+        setReferenceError(null);
+        try {
+            const nextReference = await fetchLiffRoutineReference();
+            if (requestId !== referenceRequestIdRef.current) return;
+            setReference(nextReference);
+            setReferenceState("READY");
+        } catch (error) {
+            if (requestId !== referenceRequestIdRef.current) return;
+            setReferenceError(toRoutineViewError(error));
+            setReferenceState("ERROR");
+        }
+    }, [reference, referenceState]);
+
+    const loadTaskDetail = useCallback((taskId: number): void => {
+        const requestId = detailRequestIdRef.current + 1;
+        detailRequestIdRef.current = requestId;
+        setSelectedTaskId(taskId);
+        setDetail(null);
+        setDetailError(null);
+        setDeleteError(null);
+        setDetailLoading(true);
+
+        void fetchLiffRoutineTask(taskId)
+            .then((response) => {
+                if (requestId !== detailRequestIdRef.current) return;
+                setDetail(response.task);
+            })
+            .catch((error: unknown) => {
+                if (requestId !== detailRequestIdRef.current) return;
+                setDetailError(toRoutineViewError(error));
+            })
+            .finally(() => {
+                if (requestId === detailRequestIdRef.current) {
+                    setDetailLoading(false);
+                }
+            });
+    }, []);
+
+    const retryTaskDetail = useCallback((): void => {
+        if (selectedTaskId === null) return;
+        loadTaskDetail(selectedTaskId);
+    }, [loadTaskDetail, selectedTaskId]);
+
+    const reloadLatestTask = useCallback(
+        async (taskId: number): Promise<LiffRoutineTaskDetail> => {
+            const requestId = detailRequestIdRef.current + 1;
+            detailRequestIdRef.current = requestId;
+            setSelectedTaskId(taskId);
+            setDetailError(null);
+            setDetailLoading(true);
+            try {
+                const response = await fetchLiffRoutineTask(taskId);
+                if (requestId !== detailRequestIdRef.current) {
+                    throw new Error("Routine detail request is no longer current");
+                }
+                setDetail(response.task);
+                return response.task;
+            } catch (error) {
+                if (requestId === detailRequestIdRef.current) {
+                    setDetailError(toRoutineViewError(error));
+                }
+                throw error;
+            } finally {
+                if (requestId === detailRequestIdRef.current) {
+                    setDetailLoading(false);
+                }
+            }
+        },
+        [],
+    );
+
     const handleFilterChange = useCallback(
         async (filter: LiffRoutineTimingFilter): Promise<void> => {
             if (state !== "READY") return;
@@ -198,6 +309,114 @@ export function LiffRoutineApp(): ReactElement {
         }
     }, [isTaskLoading, pagination, selectedFilter, state]);
 
+    const refreshRoutineData = useCallback(async (): Promise<boolean> => {
+        const requestId = taskRequestIdRef.current + 1;
+        taskRequestIdRef.current = requestId;
+        setIsTaskLoading(true);
+        setOperationError(null);
+        try {
+            const [summaryResponse, tasksResponse] = await Promise.all([
+                fetchLiffRoutineSummary(),
+                fetchLiffRoutineTasks({
+                    page: 1,
+                    limit: LIFF_TASK_PAGE_SIZE,
+                    timingStatus: selectedFilter || undefined,
+                }),
+            ]);
+            if (requestId !== taskRequestIdRef.current) return false;
+            setSummary(summaryResponse.summary);
+            setTasks(tasksResponse.tasks);
+            setPagination(tasksResponse.pagination);
+            return true;
+        } catch {
+            if (requestId !== taskRequestIdRef.current) return false;
+            setOperationError("บันทึกสำเร็จ แต่โหลดรายการ Routine ล่าสุดไม่ได้ กรุณาลองใหม่อีกครั้ง");
+            return false;
+        } finally {
+            if (requestId === taskRequestIdRef.current) {
+                setIsTaskLoading(false);
+            }
+        }
+    }, [selectedFilter]);
+
+    const openCreate = useCallback((): void => {
+        setOperationError(null);
+        setFormMode("CREATE");
+        void loadReference();
+    }, [loadReference]);
+
+    const openEdit = useCallback((task: LiffRoutineTaskDetail): void => {
+        if (!task.canManage) return;
+        setDeleteError(null);
+        setFormMode("EDIT");
+        void loadReference();
+    }, [loadReference]);
+
+    const handleTaskSaved = useCallback(
+        async (savedTask: LiffRoutineTaskDetail, mode: LiffRoutineTaskFormMode): Promise<void> => {
+            setFormMode(null);
+            setOperationError(null);
+            setOperationNotice(
+                mode === "CREATE"
+                    ? "สร้าง Routine ของฉันสำเร็จ กำลังอัปเดตรายการ"
+                    : "บันทึกการแก้ไข Routine สำเร็จ กำลังอัปเดตรายการ",
+            );
+            setSelectedTaskId(savedTask.id);
+            setDetail(savedTask);
+            setDetailError(null);
+            setDetailLoading(false);
+            await refreshRoutineData();
+        },
+        [refreshRoutineData],
+    );
+
+    const handleDelete = useCallback(
+        (task: LiffRoutineTaskDetail): void => {
+            if (isDeleting || !task.canManage) return;
+            setIsDeleting(true);
+            setDeleteError(null);
+            void (async () => {
+                try {
+                    await deleteLiffRoutineTask(task.id);
+                    setTasks((current) => current.filter((item) => item.id !== task.id));
+                    setOperationNotice(`ลบงาน “${task.title}” สำเร็จ กำลังอัปเดตรายการ`);
+                    setFocusedTaskId((current) => current === task.id ? null : current);
+                    detailRequestIdRef.current += 1;
+                    setSelectedTaskId(null);
+                    setDetail(null);
+                    setDetailError(null);
+                    setFormMode(null);
+                    await refreshRoutineData();
+                } catch (error) {
+                    if (error instanceof LiffApiError && error.status === 404) {
+                        setOperationNotice("งานนี้ถูกลบไปแล้ว กำลังโหลดรายการล่าสุด");
+                        setFocusedTaskId((current) => current === task.id ? null : current);
+                        detailRequestIdRef.current += 1;
+                        setSelectedTaskId(null);
+                        setDetail(null);
+                        setDetailError(null);
+                        await refreshRoutineData();
+                    } else {
+                        setDeleteError(toRoutineMutationError(error));
+                    }
+                } finally {
+                    setIsDeleting(false);
+                }
+            })();
+        },
+        [isDeleting, refreshRoutineData],
+    );
+
+    const handleDetailOpenChange = useCallback((open: boolean): void => {
+        if (open) return;
+        detailRequestIdRef.current += 1;
+        setSelectedTaskId(null);
+        setDetail(null);
+        setDetailError(null);
+        setDeleteError(null);
+        setDetailLoading(false);
+    }, []);
+
     if (state === "ERROR") {
         return (
             <ErrorState
@@ -219,46 +438,107 @@ export function LiffRoutineApp(): ReactElement {
     }
 
     return (
-        <main
-            id="main"
-            className="bg-surface-subtle px-[max(1rem,env(safe-area-inset-left))] pb-8 pt-6 pr-[max(1rem,env(safe-area-inset-right))] sm:pt-8"
-        >
-            <div className="mx-auto w-full max-w-lg space-y-4 sm:space-y-5">
-                <header className="space-y-1">
-                    <h1 className="text-2xl font-bold tracking-tight text-content-heading sm:text-3xl">
-                        งาน Routine ของฉัน
-                    </h1>
-                    <p className="text-sm leading-6 text-content-secondary">
-                        ดูงานที่ได้รับมอบหมายและกำหนดส่งของคุณ
-                    </p>
-                </header>
+        <>
+            <main
+                id="main"
+                className="bg-surface-subtle px-[max(1rem,env(safe-area-inset-left))] pb-8 pt-6 pr-[max(1rem,env(safe-area-inset-right))] sm:pt-8"
+            >
+                <div className="mx-auto w-full max-w-lg space-y-4 sm:space-y-5">
+                    <header className="space-y-3">
+                        <div className="space-y-1">
+                            <h1 className="text-2xl font-bold tracking-tight text-content-heading sm:text-3xl">
+                                งาน Routine ของฉัน
+                            </h1>
+                            <p className="text-sm leading-6 text-content-secondary">
+                                ดูงานที่ได้รับมอบหมายและกำหนดส่งของคุณ
+                            </p>
+                        </div>
+                        <Button
+                            type="button"
+                            onClick={openCreate}
+                            className="min-h-12 w-full rounded-xl bg-brand-solid font-bold text-content-on-brand hover:bg-brand-solid-hover min-[400px]:w-auto"
+                        >
+                            <Plus className="size-4" aria-hidden="true" />
+                            เพิ่ม Routine ของฉัน
+                        </Button>
+                    </header>
 
-                <LiffRoutineSummaryView summary={summary} />
-                {focusNotice ? (
-                    <div
-                        role="status"
-                        className="rounded-2xl border border-status-warning-border bg-status-warning-surface px-4 py-3 text-sm leading-6 text-status-warning-strong"
-                    >
-                        {focusNotice}
-                    </div>
-                ) : null}
-                <LiffRoutineStatusFilter
-                    value={selectedFilter}
-                    onChange={(filter) => void handleFilterChange(filter)}
+                    {operationNotice ? (
+                        <div
+                            role="status"
+                            aria-live="polite"
+                            className="rounded-2xl border border-status-success-border bg-status-success-surface px-4 py-3 text-sm leading-6 text-status-success-strong"
+                        >
+                            {operationNotice}
+                        </div>
+                    ) : null}
+                    {operationError ? (
+                        <div
+                            role="alert"
+                            className="rounded-2xl border border-status-warning-border bg-status-warning-surface px-4 py-3 text-sm leading-6 text-status-warning-strong"
+                        >
+                            {operationError}
+                        </div>
+                    ) : null}
+
+                    <LiffRoutineSummaryView summary={summary} />
+                    {focusNotice ? (
+                        <div
+                            role="status"
+                            className="rounded-2xl border border-status-warning-border bg-status-warning-surface px-4 py-3 text-sm leading-6 text-status-warning-strong"
+                        >
+                            {focusNotice}
+                        </div>
+                    ) : null}
+                    <LiffRoutineStatusFilter
+                        value={selectedFilter}
+                        onChange={(filter) => void handleFilterChange(filter)}
+                    />
+                    <LiffRoutineTaskList
+                        tasks={tasks}
+                        page={pagination.page}
+                        pages={pagination.pages}
+                        isLoading={isTaskLoading}
+                        isFiltered={selectedFilter !== ""}
+                        focusedTaskId={focusedTaskId}
+                        onLoadMore={() => void handleLoadMore()}
+                        onOpenTask={loadTaskDetail}
+                    />
+                </div>
+                <p className="mx-auto mt-5 max-w-lg text-center text-xs text-content-muted sm:mt-6">
+                    ข้อมูลสรุป ณ วันที่ {formatDate(summary.asOfDate)}
+                </p>
+            </main>
+
+            <LiffRoutineTaskDetailView
+                open={selectedTaskId !== null}
+                detail={detail}
+                loading={detailLoading}
+                error={detailError}
+                deleting={isDeleting}
+                deleteError={deleteError}
+                onOpenChange={handleDetailOpenChange}
+                onRetry={retryTaskDetail}
+                onEdit={openEdit}
+                onDelete={handleDelete}
+            />
+
+            {formMode ? (
+                <LiffRoutineTaskFormSurface
+                    open
+                    mode={formMode}
+                    reference={reference}
+                    referenceLoading={referenceState === "LOADING"}
+                    referenceError={referenceError}
+                    task={formMode === "EDIT" ? detail : null}
+                    onOpenChange={(open) => {
+                        if (!open) setFormMode(null);
+                    }}
+                    onRetryReference={() => void loadReference()}
+                    onSaved={handleTaskSaved}
+                    onReloadLatest={reloadLatestTask}
                 />
-                <LiffRoutineTaskList
-                    tasks={tasks}
-                    page={pagination.page}
-                    pages={pagination.pages}
-                    isLoading={isTaskLoading}
-                    isFiltered={selectedFilter !== ""}
-                    focusedTaskId={focusedTaskId}
-                    onLoadMore={() => void handleLoadMore()}
-                />
-            </div>
-            <p className="mx-auto mt-5 max-w-lg text-center text-xs text-content-muted sm:mt-6">
-                ข้อมูลสรุป ณ วันที่ {formatDate(summary.asOfDate)}
-            </p>
-        </main>
+            ) : null}
+        </>
     );
 }

@@ -16,6 +16,11 @@ const mocks = vi.hoisted(() => {
         useSearchParams: vi.fn(),
         fetchLiffRoutineSummary: vi.fn(),
         fetchLiffRoutineTasks: vi.fn(),
+        fetchLiffRoutineReference: vi.fn(),
+        fetchLiffRoutineTask: vi.fn(),
+        createLiffRoutineTask: vi.fn(),
+        updateLiffRoutineTask: vi.fn(),
+        deleteLiffRoutineTask: vi.fn(),
         MockLiffApiError,
     };
 });
@@ -31,10 +36,18 @@ vi.mock("@/lib/client/liff", () => ({
 vi.mock("@/lib/client/liff-routine", () => ({
     fetchLiffRoutineSummary: mocks.fetchLiffRoutineSummary,
     fetchLiffRoutineTasks: mocks.fetchLiffRoutineTasks,
+    fetchLiffRoutineReference: mocks.fetchLiffRoutineReference,
+    fetchLiffRoutineTask: mocks.fetchLiffRoutineTask,
+    createLiffRoutineTask: mocks.createLiffRoutineTask,
+    updateLiffRoutineTask: mocks.updateLiffRoutineTask,
+    deleteLiffRoutineTask: mocks.deleteLiffRoutineTask,
 }));
 
 import { LiffRoutineApp } from "@/components/liff/routine/LiffRoutineApp";
-import type { LiffRoutineTaskWorkItem } from "@/lib/line/routine-types";
+import type {
+    LiffRoutineTaskDetail,
+    LiffRoutineTaskWorkItem,
+} from "@/lib/line/routine-types";
 
 const SUMMARY = {
     summary: {
@@ -56,6 +69,74 @@ const TASK: LiffRoutineTaskWorkItem = {
     relevantOccurrence: null,
 };
 
+const REFERENCE = {
+    units: [{ id: 1, code: "IT", name: "ฝ่าย IT" }],
+    categories: [{ id: 2, name: "ระบบคอมพิวเตอร์", sortOrder: 1 }],
+    scheduleTypes: [
+        "MONTHLY_DAY",
+        "MONTH_END",
+        "INTERVAL_MONTHS",
+        "YEARLY_DATE",
+        "ONE_TIME",
+        "MANUAL",
+    ] as const,
+    businessDayPolicies: [
+        "NONE",
+        "PREVIOUS_BUSINESS_DAY",
+        "NEXT_BUSINESS_DAY",
+    ] as const,
+};
+
+const DETAIL: LiffRoutineTaskDetail = {
+    id: 71,
+    title: "ตรวจสอบระบบ",
+    description: "รายละเอียดฉบับเต็ม",
+    scheduleType: "MONTHLY_DAY",
+    scheduleConfig: { day: 10, monthOffset: 0 },
+    scheduleText: "ทุกวันที่ 10 ของเดือน",
+    contractStartDate: "2026-01-01",
+    contractEndDate: "2026-12-31",
+    contractText: "สัญญารายปี",
+    extraDetails: "รายละเอียดเพิ่มเติม",
+    businessDayPolicy: "NONE",
+    isActive: true,
+    version: 3,
+    unit: { id: 1, code: "IT", name: "ฝ่าย IT" },
+    category: { id: 2, name: "ระบบคอมพิวเตอร์" },
+    reminderRules: [{
+        daysBefore: 1,
+        sendHour: 9,
+        channel: "IN_APP",
+        recipientScope: "ASSIGNEES",
+        isActive: true,
+    }],
+    occurrences: [{
+        id: 91,
+        taskId: 71,
+        periodKey: "2026-08",
+        dueDate: "2026-08-10",
+        originalDueDate: "2026-08-10",
+        timingStatus: "DUE_TODAY",
+        isOverdue: false,
+        daysUntilDue: 0,
+    }],
+    canManage: true,
+};
+
+function deferred<T>(): {
+    promise: Promise<T>;
+    resolve: (value: T) => void;
+    reject: (reason?: unknown) => void;
+} {
+    let resolvePromise: (value: T) => void = () => undefined;
+    let rejectPromise: (reason?: unknown) => void = () => undefined;
+    const promise = new Promise<T>((resolve, reject) => {
+        resolvePromise = resolve;
+        rejectPromise = reject;
+    });
+    return { promise, resolve: resolvePromise, reject: rejectPromise };
+}
+
 function tasksResponse(
     tasks = [TASK],
     pages = 1,
@@ -74,10 +155,18 @@ function tasksResponse(
 
 describe("LiffRoutineApp", () => {
     beforeEach(() => {
-        vi.clearAllMocks();
+        vi.resetAllMocks();
         mocks.useSearchParams.mockReturnValue(new URLSearchParams());
         mocks.fetchLiffRoutineSummary.mockResolvedValue(SUMMARY);
         mocks.fetchLiffRoutineTasks.mockResolvedValue(tasksResponse());
+        mocks.fetchLiffRoutineReference.mockResolvedValue(REFERENCE);
+        mocks.fetchLiffRoutineTask.mockResolvedValue({ task: DETAIL });
+        mocks.createLiffRoutineTask.mockResolvedValue({
+            task: DETAIL,
+            replayed: false,
+        });
+        mocks.updateLiffRoutineTask.mockResolvedValue({ task: DETAIL });
+        mocks.deleteLiffRoutineTask.mockResolvedValue(undefined);
     });
 
     it("loads the Routine summary and task list", async () => {
@@ -303,5 +392,312 @@ describe("LiffRoutineApp", () => {
         });
         expect(screen.getAllByText("ตรวจสอบระบบ")).toHaveLength(1);
         expect(screen.getByText("งานหน้าแรก")).toBeInTheDocument();
+    });
+
+    it("opens the current task detail and shows self-service controls for canManage tasks", async () => {
+        render(<LiffRoutineApp />);
+        await screen.findByText("ตรวจสอบระบบ");
+
+        fireEvent.click(
+            screen.getByRole("button", { name: "เปิดรายละเอียดงาน ตรวจสอบระบบ" }),
+        );
+
+        expect(await screen.findByText("รายละเอียดฉบับเต็ม")).toBeInTheDocument();
+        expect(screen.getByText("ทุกวันที่ 10 ของเดือน")).toBeInTheDocument();
+        expect(screen.getByText("สัญญารายปี")).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "แก้ไขงานของฉัน" })).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "ลบงานนี้" })).toBeInTheDocument();
+        expect(mocks.fetchLiffRoutineTask).toHaveBeenCalledWith(71);
+    });
+
+    it("shows assigned occurrence detail without management controls", async () => {
+        mocks.useSearchParams.mockReturnValue(
+            new URLSearchParams("taskId=71&occurrenceId=91"),
+        );
+        mocks.fetchLiffRoutineTask.mockResolvedValueOnce({
+            task: {
+                ...DETAIL,
+                canManage: false,
+                reminderRules: [],
+            },
+        });
+
+        render(<LiffRoutineApp />);
+        await screen.findByText("ตรวจสอบระบบ");
+        fireEvent.click(
+            screen.getByRole("button", { name: "เปิดรายละเอียดงาน ตรวจสอบระบบ" }),
+        );
+
+        expect(await screen.findByText("รอบที่เกี่ยวข้อง")).toBeInTheDocument();
+        expect(screen.queryByRole("button", { name: "แก้ไขงานของฉัน" })).not.toBeInTheDocument();
+        expect(screen.queryByRole("button", { name: "ลบงานนี้" })).not.toBeInTheDocument();
+    });
+
+    it("ignores a stale detail response after quickly switching tasks", async () => {
+        const firstDetail = deferred<{ task: LiffRoutineTaskDetail }>();
+        const secondDetail = deferred<{ task: LiffRoutineTaskDetail }>();
+        const secondTask = { ...TASK, id: 72, title: "งานที่สอง" };
+        mocks.fetchLiffRoutineTasks.mockResolvedValueOnce(
+            tasksResponse([TASK, secondTask]),
+        );
+        mocks.fetchLiffRoutineTask
+            .mockImplementationOnce(() => firstDetail.promise)
+            .mockImplementationOnce(() => secondDetail.promise);
+
+        render(<LiffRoutineApp />);
+        await screen.findByText("งานที่สอง");
+        fireEvent.click(
+            screen.getByRole("button", { name: "เปิดรายละเอียดงาน ตรวจสอบระบบ" }),
+        );
+        fireEvent.click(screen.getByRole("button", { name: "ปิดรายละเอียดงาน Routine" }));
+        fireEvent.click(
+            screen.getByRole("button", { name: "เปิดรายละเอียดงาน งานที่สอง" }),
+        );
+
+        secondDetail.resolve({
+            task: { ...DETAIL, id: 72, title: "รายละเอียดงานที่สอง" },
+        });
+        const detailDialog = await screen.findByRole("dialog");
+        expect(within(detailDialog).getByRole("heading", { name: "รายละเอียดงานที่สอง" })).toBeInTheDocument();
+
+        firstDetail.resolve({ task: DETAIL });
+        await waitFor(() => {
+            expect(within(detailDialog).getByRole("heading", { name: "รายละเอียดงานที่สอง" })).toBeInTheDocument();
+        });
+    });
+
+    it("opens a create form without assignee controls and sends only the LIFF payload", async () => {
+        render(<LiffRoutineApp />);
+        await screen.findByText("ตรวจสอบระบบ");
+        fireEvent.click(screen.getByRole("button", { name: "เพิ่ม Routine ของฉัน" }));
+
+        const formDialog = await screen.findByRole("dialog");
+        expect(within(formDialog).getByRole("heading", { name: "เพิ่ม Routine ของฉัน" })).toBeInTheDocument();
+        expect(within(formDialog).queryByText("เลือกผู้รับผิดชอบ")).not.toBeInTheDocument();
+
+        fireEvent.change(within(formDialog).getByRole("combobox", { name: "หน่วยงาน" }), {
+            target: { value: "1" },
+        });
+        fireEvent.change(within(formDialog).getByRole("combobox", { name: "หมวดหมู่" }), {
+            target: { value: "2" },
+        });
+        fireEvent.change(within(formDialog).getByRole("textbox", { name: "ชื่องาน" }), {
+            target: { value: "งานใหม่ของฉัน" },
+        });
+        fireEvent.click(within(formDialog).getByRole("button", { name: "เพิ่ม Routine ของฉัน" }));
+
+        await waitFor(() => expect(mocks.createLiffRoutineTask).toHaveBeenCalledTimes(1));
+        const [payload] = mocks.createLiffRoutineTask.mock.calls[0] as [Record<string, unknown>, string];
+        expect(payload).toMatchObject({
+            unitId: 1,
+            categoryId: 2,
+            title: "งานใหม่ของฉัน",
+            scheduleType: "MONTHLY_DAY",
+        });
+        expect(payload).not.toHaveProperty("assignees");
+        expect(payload).not.toHaveProperty("sourceFileName");
+        expect(payload).not.toHaveProperty("sourceSheet");
+        expect(payload).not.toHaveProperty("sourceRow");
+        expect(mocks.fetchLiffRoutineReference).toHaveBeenCalledTimes(1);
+    });
+
+    it("keeps one create idempotency key when the same logical submission is retried", async () => {
+        mocks.createLiffRoutineTask
+            .mockRejectedValueOnce(new mocks.MockLiffApiError("เครือข่ายขัดข้อง"))
+            .mockResolvedValueOnce({ task: DETAIL, replayed: false });
+
+        render(<LiffRoutineApp />);
+        await screen.findByText("ตรวจสอบระบบ");
+        fireEvent.click(screen.getByRole("button", { name: "เพิ่ม Routine ของฉัน" }));
+        const formDialog = await screen.findByRole("dialog");
+        fireEvent.change(within(formDialog).getByRole("combobox", { name: "หน่วยงาน" }), {
+            target: { value: "1" },
+        });
+        fireEvent.change(within(formDialog).getByRole("combobox", { name: "หมวดหมู่" }), {
+            target: { value: "2" },
+        });
+        fireEvent.change(within(formDialog).getByRole("textbox", { name: "ชื่องาน" }), {
+            target: { value: "ลองสร้างอีกครั้ง" },
+        });
+
+        const submit = () =>
+            fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "เพิ่ม Routine ของฉัน" }));
+        submit();
+        expect(await screen.findByText("เครือข่ายขัดข้อง")).toBeInTheDocument();
+        submit();
+
+        await waitFor(() => expect(mocks.createLiffRoutineTask).toHaveBeenCalledTimes(2));
+        const firstKey = (mocks.createLiffRoutineTask.mock.calls[0] as [unknown, string])[1];
+        const secondKey = (mocks.createLiffRoutineTask.mock.calls[1] as [unknown, string])[1];
+        expect(firstKey).toBeTruthy();
+        expect(secondKey).toBe(firstKey);
+    });
+
+    it("prevents duplicate create submissions while the request is in flight", async () => {
+        const pendingCreate = deferred<{ task: LiffRoutineTaskDetail; replayed: boolean }>();
+        mocks.createLiffRoutineTask.mockImplementationOnce(() => pendingCreate.promise);
+
+        render(<LiffRoutineApp />);
+        await screen.findByText("ตรวจสอบระบบ");
+        fireEvent.click(screen.getByRole("button", { name: "เพิ่ม Routine ของฉัน" }));
+        const formDialog = await screen.findByRole("dialog");
+        fireEvent.change(within(formDialog).getByRole("combobox", { name: "หน่วยงาน" }), {
+            target: { value: "1" },
+        });
+        fireEvent.change(within(formDialog).getByRole("combobox", { name: "หมวดหมู่" }), {
+            target: { value: "2" },
+        });
+        fireEvent.change(within(formDialog).getByRole("textbox", { name: "ชื่องาน" }), {
+            target: { value: "ส่งครั้งเดียว" },
+        });
+
+        const submitButton = within(formDialog).getByRole("button", { name: "เพิ่ม Routine ของฉัน" });
+        fireEvent.click(submitButton);
+        fireEvent.click(submitButton);
+        await waitFor(() => expect(mocks.createLiffRoutineTask).toHaveBeenCalledTimes(1));
+
+        pendingCreate.resolve({ task: DETAIL, replayed: false });
+        await waitFor(() => expect(screen.queryByRole("heading", { name: "เพิ่ม Routine ของฉัน" })).not.toBeInTheDocument());
+    });
+
+    it("protects dirty create forms from accidental closing", async () => {
+        render(<LiffRoutineApp />);
+        await screen.findByText("ตรวจสอบระบบ");
+        fireEvent.click(screen.getByRole("button", { name: "เพิ่ม Routine ของฉัน" }));
+        const formDialog = await screen.findByRole("dialog");
+        fireEvent.change(within(formDialog).getByRole("textbox", { name: "ชื่องาน" }), {
+            target: { value: "งานที่ยังไม่ได้บันทึก" },
+        });
+
+        fireEvent.click(screen.getByRole("button", { name: "ปิดเพิ่ม Routine ของฉัน" }));
+        const discardDialog = await screen.findByRole("alertdialog");
+        expect(within(discardDialog).getByText("หากออกตอนนี้ การแก้ไขล่าสุดจะหายไป")).toBeInTheDocument();
+        fireEvent.click(within(discardDialog).getByRole("button", { name: "ออกโดยไม่บันทึก" }));
+
+        await waitFor(() => expect(screen.queryByRole("heading", { name: "เพิ่ม Routine ของฉัน" })).not.toBeInTheDocument());
+        expect(mocks.createLiffRoutineTask).not.toHaveBeenCalled();
+    });
+
+    it("refreshes the list and summary after a successful create", async () => {
+        const createdTask = { ...DETAIL, id: 88, title: "สร้างสำเร็จแล้ว" };
+        mocks.createLiffRoutineTask.mockResolvedValueOnce({ task: createdTask, replayed: false });
+
+        render(<LiffRoutineApp />);
+        await screen.findByText("ตรวจสอบระบบ");
+        fireEvent.click(screen.getByRole("button", { name: "เพิ่ม Routine ของฉัน" }));
+        const formDialog = await screen.findByRole("dialog");
+        fireEvent.change(within(formDialog).getByRole("combobox", { name: "หน่วยงาน" }), {
+            target: { value: "1" },
+        });
+        fireEvent.change(within(formDialog).getByRole("combobox", { name: "หมวดหมู่" }), {
+            target: { value: "2" },
+        });
+        fireEvent.change(within(formDialog).getByRole("textbox", { name: "ชื่องาน" }), {
+            target: { value: createdTask.title },
+        });
+        fireEvent.click(within(formDialog).getByRole("button", { name: "เพิ่ม Routine ของฉัน" }));
+
+        await waitFor(() => {
+            expect(mocks.fetchLiffRoutineSummary).toHaveBeenCalledTimes(2);
+            expect(mocks.fetchLiffRoutineTasks).toHaveBeenCalledTimes(2);
+        });
+        expect(screen.queryByRole("heading", { name: "เพิ่ม Routine ของฉัน" })).not.toBeInTheDocument();
+        expect(screen.getByText("สร้างสำเร็จแล้ว")).toBeInTheDocument();
+    });
+
+    it("edits only a manageable task with its current version", async () => {
+        const updatedTask = { ...DETAIL, title: "แก้ไขแล้ว", version: 4 };
+        mocks.updateLiffRoutineTask.mockResolvedValueOnce({ task: updatedTask });
+
+        render(<LiffRoutineApp />);
+        await screen.findByText("ตรวจสอบระบบ");
+        fireEvent.click(
+            screen.getByRole("button", { name: "เปิดรายละเอียดงาน ตรวจสอบระบบ" }),
+        );
+        await screen.findByText("รายละเอียดฉบับเต็ม");
+        fireEvent.click(screen.getByRole("button", { name: "แก้ไขงานของฉัน" }));
+
+        const dialogs = await screen.findAllByRole("dialog");
+        const formDialog = dialogs[dialogs.length - 1];
+        fireEvent.change(within(formDialog).getByRole("textbox", { name: "ชื่องาน" }), {
+            target: { value: "แก้ไขแล้ว" },
+        });
+        fireEvent.click(within(formDialog).getByRole("button", { name: "บันทึกการแก้ไข" }));
+
+        await waitFor(() => expect(mocks.updateLiffRoutineTask).toHaveBeenCalledTimes(1));
+        expect(mocks.updateLiffRoutineTask).toHaveBeenCalledWith(
+            71,
+            expect.objectContaining({ version: 3, title: "แก้ไขแล้ว" }),
+        );
+        const updatePayload = (mocks.updateLiffRoutineTask.mock.calls[0] as [number, Record<string, unknown>])[1];
+        expect(updatePayload).not.toHaveProperty("assignees");
+        expect(updatePayload).not.toHaveProperty("sourceFileName");
+        expect(updatePayload).not.toHaveProperty("sourceSheet");
+        expect(updatePayload).not.toHaveProperty("sourceRow");
+        await waitFor(() => {
+            expect(screen.queryByRole("heading", { name: "แก้ไข Routine ของฉัน" })).not.toBeInTheDocument();
+            expect(mocks.fetchLiffRoutineSummary).toHaveBeenCalledTimes(2);
+            expect(mocks.fetchLiffRoutineTasks).toHaveBeenCalledTimes(2);
+        });
+    });
+
+    it("reloads the latest detail after a stale update without silently retrying", async () => {
+        const latestTask = { ...DETAIL, title: "ฉบับล่าสุดบนระบบ", version: 4 };
+        mocks.updateLiffRoutineTask.mockRejectedValueOnce(
+            new mocks.MockLiffApiError("ข้อมูล Routine เปลี่ยนแปลงแล้ว", 409),
+        );
+        mocks.fetchLiffRoutineTask
+            .mockResolvedValueOnce({ task: DETAIL })
+            .mockResolvedValueOnce({ task: latestTask });
+
+        render(<LiffRoutineApp />);
+        await screen.findByText("ตรวจสอบระบบ");
+        fireEvent.click(
+            screen.getByRole("button", { name: "เปิดรายละเอียดงาน ตรวจสอบระบบ" }),
+        );
+        await screen.findByText("รายละเอียดฉบับเต็ม");
+        fireEvent.click(screen.getByRole("button", { name: "แก้ไขงานของฉัน" }));
+        const dialogs = await screen.findAllByRole("dialog");
+        const formDialog = dialogs[dialogs.length - 1];
+        fireEvent.change(within(formDialog).getByRole("textbox", { name: "ชื่องาน" }), {
+            target: { value: "ฉบับที่ฉันกำลังแก้" },
+        });
+        fireEvent.click(within(formDialog).getByRole("button", { name: "บันทึกการแก้ไข" }));
+
+        expect(await screen.findByText("งาน Routine นี้ถูกเปลี่ยนแปลงแล้ว ระบบโหลดข้อมูลล่าสุดให้แล้ว กรุณาตรวจสอบก่อนบันทึกอีกครั้ง")).toBeInTheDocument();
+        expect(screen.getByText("ฉบับล่าสุดบนระบบ")).toBeInTheDocument();
+        expect(mocks.updateLiffRoutineTask).toHaveBeenCalledTimes(1);
+        expect(mocks.fetchLiffRoutineTask).toHaveBeenCalledTimes(2);
+        expect(screen.getByRole("button", { name: "ใช้ข้อมูลล่าสุดและแก้ไขต่อ" })).toBeInTheDocument();
+
+        fireEvent.click(screen.getByRole("button", { name: "ใช้ข้อมูลล่าสุดและแก้ไขต่อ" }));
+        expect(within(formDialog).getByRole("textbox", { name: "ชื่องาน" })).toHaveValue("ฉบับล่าสุดบนระบบ");
+    });
+
+    it("requires delete confirmation and refreshes after one successful delete", async () => {
+        const pendingDelete = deferred<void>();
+        mocks.deleteLiffRoutineTask.mockImplementationOnce(() => pendingDelete.promise);
+
+        render(<LiffRoutineApp />);
+        await screen.findByText("ตรวจสอบระบบ");
+        fireEvent.click(
+            screen.getByRole("button", { name: "เปิดรายละเอียดงาน ตรวจสอบระบบ" }),
+        );
+        await screen.findByText("รายละเอียดฉบับเต็ม");
+        fireEvent.click(screen.getByRole("button", { name: "ลบงานนี้" }));
+
+        const confirmation = await screen.findByRole("alertdialog");
+        expect(within(confirmation).getByText("งาน “ตรวจสอบระบบ” จะถูกลบและไม่แสดงในรายการของคุณอีก การดำเนินการนี้ย้อนกลับไม่ได้")).toBeInTheDocument();
+        expect(mocks.deleteLiffRoutineTask).not.toHaveBeenCalled();
+        const confirmButton = within(confirmation).getByRole("button", { name: "ลบงานนี้" });
+        fireEvent.click(confirmButton);
+        fireEvent.click(confirmButton);
+        await waitFor(() => expect(mocks.deleteLiffRoutineTask).toHaveBeenCalledTimes(1));
+        expect(within(confirmation).getByRole("button", { name: "กำลังลบ..." })).toBeDisabled();
+
+        pendingDelete.resolve();
+        await waitFor(() => expect(screen.queryByText("รายละเอียดฉบับเต็ม")).not.toBeInTheDocument());
+        expect(mocks.fetchLiffRoutineSummary).toHaveBeenCalledTimes(2);
+        expect(mocks.fetchLiffRoutineTasks).toHaveBeenCalledTimes(2);
     });
 });

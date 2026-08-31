@@ -17,6 +17,7 @@ interface LiffRoutineTaskListProps {
     isFiltered: boolean;
     focusedTaskId: number | null;
     onLoadMore: () => void;
+    onOpenTask: (taskId: number) => void;
 }
 
 export function LiffRoutineTaskList({
@@ -27,6 +28,7 @@ export function LiffRoutineTaskList({
     isFiltered,
     focusedTaskId,
     onLoadMore,
+    onOpenTask,
 }: LiffRoutineTaskListProps): React.ReactElement {
     if (tasks.length === 0 && !isLoading) {
         return (
@@ -58,6 +60,7 @@ export function LiffRoutineTaskList({
                         key={task.id}
                         task={task}
                         isFocused={task.id === focusedTaskId}
+                        onOpen={onOpenTask}
                     />
                 ))}
             </div>

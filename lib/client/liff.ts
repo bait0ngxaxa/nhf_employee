@@ -6,11 +6,17 @@ export type { LiffSessionResponse, LiffWorkforceIdentity } from "@/lib/line/liff
 
 export class LiffApiError extends Error {
     readonly status: number | undefined;
+    readonly details: unknown;
 
-    constructor(message: string, status: number | undefined) {
+    constructor(
+        message: string,
+        status: number | undefined,
+        details: unknown = undefined,
+    ) {
         super(message);
         this.name = "LiffApiError";
         this.status = status;
+        this.details = details;
     }
 }
 
@@ -39,7 +45,11 @@ export async function unwrapLiffResponse<T>(
     ) => string = getSafeLiffApiErrorMessage,
 ): Promise<T> {
     if (response.success) return response.data;
-    throw new LiffApiError(getErrorMessage(response), response.status);
+    throw new LiffApiError(
+        getErrorMessage(response),
+        response.status,
+        response.details,
+    );
 }
 
 export const LIFF_API_REQUEST_OPTIONS = {
