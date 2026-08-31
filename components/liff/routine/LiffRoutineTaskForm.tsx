@@ -93,7 +93,6 @@ interface TaskFormState {
     contractText: string;
     extraDetails: string;
     businessDayPolicy: RoutineBusinessDayPolicy;
-    isActive: boolean;
     reminderRules: RoutineReminderRuleForm[];
 }
 
@@ -147,7 +146,6 @@ function taskToForm(task: LiffRoutineTaskDetail | null): TaskFormState {
         contractText: task?.contractText ?? "",
         extraDetails: task?.extraDetails ?? "",
         businessDayPolicy,
-        isActive: task?.isActive ?? true,
         reminderRules: task?.reminderRules.map((rule) => ({
             daysBefore: String(rule.daysBefore),
             sendHour: safeReminderSendTime(rule.sendHour),
@@ -180,8 +178,11 @@ function getMutationErrorMessage(error: unknown): string {
     return "บันทึกงาน Routine ไม่สำเร็จ กรุณาลองใหม่อีกครั้ง";
 }
 
-function buildFormPayload(form: TaskFormState): Record<string, unknown> {
-    return {
+function buildFormPayload(
+    form: TaskFormState,
+    mode: LiffRoutineTaskFormMode,
+): Record<string, unknown> {
+    const payload: Record<string, unknown> = {
         unitId: Number(form.unitId),
         categoryId: Number(form.categoryId),
         title: form.title,
@@ -194,7 +195,6 @@ function buildFormPayload(form: TaskFormState): Record<string, unknown> {
         contractText: form.contractText || null,
         extraDetails: form.extraDetails || null,
         businessDayPolicy: form.businessDayPolicy,
-        isActive: form.isActive,
         reminderRules: form.reminderRules.map((rule) => ({
             daysBefore: Number(rule.daysBefore),
             sendHour: parseRoutineSendTime(rule.sendHour) ?? -1,
@@ -203,6 +203,10 @@ function buildFormPayload(form: TaskFormState): Record<string, unknown> {
             isActive: rule.isActive,
         })),
     };
+
+    return mode === "CREATE"
+        ? { ...payload, isActive: true }
+        : payload;
 }
 
 function FieldError({ message }: { message?: string }): ReactElement | null {
@@ -371,7 +375,7 @@ export const LiffRoutineTaskForm = forwardRef<
             return;
         }
 
-        const basePayload = buildFormPayload(form);
+        const basePayload = buildFormPayload(form, mode);
         const candidate = mode === "EDIT"
             ? { ...basePayload, version: versionRef.current }
             : basePayload;
@@ -660,18 +664,6 @@ export const LiffRoutineTaskForm = forwardRef<
                             />
                             <FieldError message={fieldErrors.extraDetails} />
                         </label>
-                        <label className="flex min-h-11 items-center gap-3 text-sm font-semibold text-content-body">
-                            <input
-                                data-routine-field="isActive"
-                                type="checkbox"
-                                checked={form.isActive}
-                                disabled={controlsDisabled}
-                                onChange={(event) => updateField("isActive", event.target.checked)}
-                                className="size-5 rounded border-input"
-                            />
-                            เปิดใช้งานงานนี้
-                        </label>
-                        <FieldError message={fieldErrors.isActive} />
                     </section>
                 </div>
             </div>

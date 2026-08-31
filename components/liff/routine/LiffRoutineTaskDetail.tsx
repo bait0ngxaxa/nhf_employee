@@ -35,6 +35,7 @@ interface LiffRoutineTaskDetailProps {
     error: string | null;
     deleting: boolean;
     deleteError: string | null;
+    focusedOccurrenceId?: number | null;
     onOpenChange: (open: boolean) => void;
     onRetry: () => void;
     onEdit: (task: LiffRoutineTaskDetailData) => void;
@@ -69,13 +70,18 @@ function TimingBadge({ occurrence }: { occurrence: LiffRoutineTaskDetailOccurren
 }
 
 function currentOccurrence(
-    occurrences: readonly LiffRoutineTaskDetailOccurrence[],
+    task: Pick<LiffRoutineTaskDetailData, "id" | "occurrences">,
+    focusedOccurrenceId: number | null,
 ): LiffRoutineTaskDetailOccurrence | null {
-    return occurrences.find((occurrence) =>
-        occurrence.timingStatus === "OVERDUE"
-        || occurrence.timingStatus === "DUE_TODAY"
-        || occurrence.timingStatus === "DUE_SOON",
-    ) ?? occurrences[0] ?? null;
+    if (focusedOccurrenceId !== null) {
+        const focusedOccurrence = task.occurrences.find((occurrence) =>
+            occurrence.id === focusedOccurrenceId
+            && occurrence.taskId === task.id,
+        );
+        if (focusedOccurrence) return focusedOccurrence;
+    }
+
+    return task.occurrences.find((occurrence) => occurrence.daysUntilDue >= 0) ?? null;
 }
 
 function OptionalSection({
@@ -104,13 +110,14 @@ export function LiffRoutineTaskDetail({
     error,
     deleting,
     deleteError,
+    focusedOccurrenceId = null,
     onOpenChange,
     onRetry,
     onEdit,
     onDelete,
 }: LiffRoutineTaskDetailProps): ReactElement {
     const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
-    const timing = detail ? currentOccurrence(detail.occurrences) : null;
+    const timing = detail ? currentOccurrence(detail, focusedOccurrenceId) : null;
 
     useEffect(() => {
         setDeleteConfirmOpen(false);

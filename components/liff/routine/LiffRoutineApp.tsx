@@ -103,6 +103,10 @@ export function LiffRoutineApp(): ReactElement {
     const [isDeleting, setIsDeleting] = useState(false);
     const [deleteError, setDeleteError] = useState<string | null>(null);
 
+    const focusedOccurrenceId = detail?.id === initialFocusTaskId
+        ? initialFocusOccurrenceId
+        : null;
+
     const taskRequestIdRef = useRef(0);
     const detailRequestIdRef = useRef(0);
     const referenceRequestIdRef = useRef(0);
@@ -517,6 +521,7 @@ export function LiffRoutineApp(): ReactElement {
                 error={detailError}
                 deleting={isDeleting}
                 deleteError={deleteError}
+                focusedOccurrenceId={focusedOccurrenceId}
                 onOpenChange={handleDetailOpenChange}
                 onRetry={retryTaskDetail}
                 onEdit={openEdit}

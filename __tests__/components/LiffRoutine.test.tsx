@@ -123,6 +123,36 @@ const DETAIL: LiffRoutineTaskDetail = {
     canManage: true,
 };
 
+type DetailOccurrence = LiffRoutineTaskDetail["occurrences"][number];
+
+function makeOccurrence(
+    id: number,
+    taskId: number,
+    dueDate: string,
+    timingStatus: DetailOccurrence["timingStatus"],
+    daysUntilDue: number,
+): DetailOccurrence {
+    return {
+        id,
+        taskId,
+        periodKey: dueDate.slice(0, 7),
+        dueDate,
+        originalDueDate: dueDate,
+        timingStatus,
+        isOverdue: daysUntilDue < 0,
+        daysUntilDue,
+    };
+}
+
+function getRelevantOccurrenceSection(dialog: HTMLElement): HTMLElement {
+    const heading = within(dialog).getByText("รอบที่เกี่ยวข้อง");
+    const section = heading.closest("section");
+    if (!(section instanceof HTMLElement)) {
+        throw new Error("Expected the relevant occurrence heading to be inside a section");
+    }
+    return section;
+}
+
 function deferred<T>(): {
     promise: Promise<T>;
     resolve: (value: T) => void;
@@ -474,6 +504,9 @@ describe("LiffRoutineApp", () => {
         const formDialog = await screen.findByRole("dialog");
         expect(within(formDialog).getByRole("heading", { name: "เพิ่ม Routine ของฉัน" })).toBeInTheDocument();
         expect(within(formDialog).queryByText("เลือกผู้รับผิดชอบ")).not.toBeInTheDocument();
+        expect(
+            within(formDialog).queryByRole("checkbox", { name: "เปิดใช้งานงานนี้" }),
+        ).not.toBeInTheDocument();
 
         fireEvent.change(within(formDialog).getByRole("combobox", { name: "หน่วยงาน" }), {
             target: { value: "1" },
@@ -493,6 +526,7 @@ describe("LiffRoutineApp", () => {
             categoryId: 2,
             title: "งานใหม่ของฉัน",
             scheduleType: "MONTHLY_DAY",
+            isActive: true,
         });
         expect(payload).not.toHaveProperty("assignees");
         expect(payload).not.toHaveProperty("sourceFileName");
@@ -619,6 +653,9 @@ describe("LiffRoutineApp", () => {
 
         const dialogs = await screen.findAllByRole("dialog");
         const formDialog = dialogs[dialogs.length - 1];
+        expect(
+            within(formDialog).queryByRole("checkbox", { name: "เปิดใช้งานงานนี้" }),
+        ).not.toBeInTheDocument();
         fireEvent.change(within(formDialog).getByRole("textbox", { name: "ชื่องาน" }), {
             target: { value: "แก้ไขแล้ว" },
         });
@@ -634,11 +671,193 @@ describe("LiffRoutineApp", () => {
         expect(updatePayload).not.toHaveProperty("sourceFileName");
         expect(updatePayload).not.toHaveProperty("sourceSheet");
         expect(updatePayload).not.toHaveProperty("sourceRow");
+        expect(updatePayload).not.toHaveProperty("isActive");
         await waitFor(() => {
             expect(screen.queryByRole("heading", { name: "แก้ไข Routine ของฉัน" })).not.toBeInTheDocument();
             expect(mocks.fetchLiffRoutineSummary).toHaveBeenCalledTimes(2);
             expect(mocks.fetchLiffRoutineTasks).toHaveBeenCalledTimes(2);
         });
+    });
+
+    it("preserves an inactive self-created task when editing without a lifecycle control", async () => {
+        const inactiveDetail = { ...DETAIL, isActive: false };
+        mocks.fetchLiffRoutineTask.mockResolvedValueOnce({ task: inactiveDetail });
+
+        render(<LiffRoutineApp />);
+        await screen.findByText("ตรวจสอบระบบ");
+        fireEvent.click(
+            screen.getByRole("button", { name: "เปิดรายละเอียดงาน ตรวจสอบระบบ" }),
+        );
+        const detailDialog = await screen.findByRole("dialog");
+        expect(await within(detailDialog).findAllByText("ปิดใช้งาน")).not.toHaveLength(0);
+        fireEvent.click(screen.getByRole("button", { name: "แก้ไขงานของฉัน" }));
+
+        const dialogs = await screen.findAllByRole("dialog");
+        const formDialog = dialogs[dialogs.length - 1];
+        expect(
+            within(formDialog).queryByRole("checkbox", { name: "เปิดใช้งานงานนี้" }),
+        ).not.toBeInTheDocument();
+        fireEvent.change(within(formDialog).getByRole("textbox", { name: "ชื่องาน" }), {
+            target: { value: "แก้ไขงานที่ปิดใช้งาน" },
+        });
+        fireEvent.click(within(formDialog).getByRole("button", { name: "บันทึกการแก้ไข" }));
+
+        await waitFor(() => expect(mocks.updateLiffRoutineTask).toHaveBeenCalledTimes(1));
+        const updatePayload = (mocks.updateLiffRoutineTask.mock.calls[0] as [number, Record<string, unknown>])[1];
+        expect(updatePayload).not.toHaveProperty("isActive");
+    });
+
+    it("selects the nearest current occurrence instead of an older overdue occurrence", async () => {
+        mocks.fetchLiffRoutineTask.mockResolvedValueOnce({
+            task: {
+                ...DETAIL,
+                occurrences: [
+                    makeOccurrence(91, 71, "2026-08-01", "OVERDUE", -30),
+                    makeOccurrence(92, 71, "2026-08-31", "DUE_TODAY", 0),
+                    makeOccurrence(93, 71, "2026-09-10", "DUE_SOON", 10),
+                ],
+            },
+        });
+
+        render(<LiffRoutineApp />);
+        await screen.findByText("ตรวจสอบระบบ");
+        fireEvent.click(
+            screen.getByRole("button", { name: "เปิดรายละเอียดงาน ตรวจสอบระบบ" }),
+        );
+
+        const dialog = await screen.findByRole("dialog");
+        const relevantSection = getRelevantOccurrenceSection(dialog);
+        expect(within(relevantSection).getByText("31 สิงหาคม 2569")).toBeInTheDocument();
+        expect(within(relevantSection).getByText("วันนี้")).toBeInTheDocument();
+        expect(within(relevantSection).queryByText("1 สิงหาคม 2569")).not.toBeInTheDocument();
+    });
+
+    it("selects the earliest future occurrence when no occurrence is due today", async () => {
+        mocks.fetchLiffRoutineTask.mockResolvedValueOnce({
+            task: {
+                ...DETAIL,
+                occurrences: [
+                    makeOccurrence(101, 71, "2026-09-03", "DUE_SOON", 3),
+                    makeOccurrence(102, 71, "2026-09-10", "UPCOMING", 10),
+                ],
+            },
+        });
+
+        render(<LiffRoutineApp />);
+        await screen.findByText("ตรวจสอบระบบ");
+        fireEvent.click(
+            screen.getByRole("button", { name: "เปิดรายละเอียดงาน ตรวจสอบระบบ" }),
+        );
+
+        const dialog = await screen.findByRole("dialog");
+        const relevantSection = getRelevantOccurrenceSection(dialog);
+        expect(within(relevantSection).getByText("3 กันยายน 2569")).toBeInTheDocument();
+        expect(within(relevantSection).getByText("อีก 3 วัน")).toBeInTheDocument();
+        expect(within(relevantSection).queryByText("10 กันยายน 2569")).not.toBeInTheDocument();
+    });
+
+    it("does not show a historical occurrence as the relevant occurrence", async () => {
+        mocks.fetchLiffRoutineTask.mockResolvedValueOnce({
+            task: {
+                ...DETAIL,
+                occurrences: [
+                    makeOccurrence(111, 71, "2026-07-01", "OVERDUE", -61),
+                    makeOccurrence(112, 71, "2026-08-01", "OVERDUE", -30),
+                ],
+            },
+        });
+
+        render(<LiffRoutineApp />);
+        await screen.findByText("ตรวจสอบระบบ");
+        fireEvent.click(
+            screen.getByRole("button", { name: "เปิดรายละเอียดงาน ตรวจสอบระบบ" }),
+        );
+
+        const dialog = await screen.findByRole("dialog");
+        expect(within(dialog).queryByText("รอบที่เกี่ยวข้อง")).not.toBeInTheDocument();
+        expect(within(dialog).getByText("รอบงานและกำหนดส่ง")).toBeInTheDocument();
+        expect(within(dialog).getByText("1 กรกฎาคม 2569")).toBeInTheDocument();
+        expect(within(dialog).getByText("1 สิงหาคม 2569")).toBeInTheDocument();
+    });
+
+    it("prefers the deep-link occurrence for the focused task", async () => {
+        mocks.useSearchParams.mockReturnValue(
+            new URLSearchParams("taskId=71&occurrenceId=92"),
+        );
+        mocks.fetchLiffRoutineTask.mockResolvedValueOnce({
+            task: {
+                ...DETAIL,
+                occurrences: [
+                    makeOccurrence(91, 71, "2026-08-01", "OVERDUE", -30),
+                    makeOccurrence(92, 71, "2026-09-10", "DUE_SOON", 10),
+                    makeOccurrence(93, 71, "2026-08-31", "DUE_TODAY", 0),
+                ],
+            },
+        });
+
+        render(<LiffRoutineApp />);
+        await screen.findByText("ตรวจสอบระบบ");
+        fireEvent.click(
+            screen.getByRole("button", { name: "เปิดรายละเอียดงาน ตรวจสอบระบบ" }),
+        );
+
+        const dialog = await screen.findByRole("dialog");
+        const relevantSection = getRelevantOccurrenceSection(dialog);
+        expect(within(relevantSection).getByText("10 กันยายน 2569")).toBeInTheDocument();
+        expect(within(relevantSection).getByText("อีก 10 วัน")).toBeInTheDocument();
+        expect(within(relevantSection).queryByText("31 สิงหาคม 2569")).not.toBeInTheDocument();
+    });
+
+    it("does not leak deep-link occurrence focus to another task", async () => {
+        const secondTask = { ...TASK, id: 72, title: "งานที่สอง" };
+        mocks.useSearchParams.mockReturnValue(
+            new URLSearchParams("taskId=71&occurrenceId=92"),
+        );
+        mocks.fetchLiffRoutineTasks.mockResolvedValue(
+            tasksResponse([TASK, secondTask]),
+        );
+        mocks.fetchLiffRoutineTask
+            .mockResolvedValueOnce({
+                task: {
+                    ...DETAIL,
+                    occurrences: [
+                        makeOccurrence(91, 71, "2026-08-01", "OVERDUE", -30),
+                        makeOccurrence(92, 71, "2026-09-10", "DUE_SOON", 10),
+                        makeOccurrence(93, 71, "2026-08-31", "DUE_TODAY", 0),
+                    ],
+                },
+            })
+            .mockResolvedValueOnce({
+                task: {
+                    ...DETAIL,
+                    id: 72,
+                    title: "รายละเอียดงานที่สอง",
+                    occurrences: [
+                        makeOccurrence(201, 72, "2026-08-20", "OVERDUE", -11),
+                        makeOccurrence(202, 72, "2026-09-04", "DUE_SOON", 4),
+                    ],
+                },
+            });
+
+        render(<LiffRoutineApp />);
+        await screen.findByText("งานที่สอง");
+        fireEvent.click(
+            screen.getByRole("button", { name: "เปิดรายละเอียดงาน ตรวจสอบระบบ" }),
+        );
+        const firstDialog = await screen.findByRole("dialog");
+        const firstRelevantSection = getRelevantOccurrenceSection(firstDialog);
+        expect(within(firstRelevantSection).getByText("10 กันยายน 2569")).toBeInTheDocument();
+        fireEvent.click(screen.getByRole("button", { name: "ปิดรายละเอียดงาน Routine" }));
+        fireEvent.click(
+            screen.getByRole("button", { name: "เปิดรายละเอียดงาน งานที่สอง" }),
+        );
+
+        const dialog = await screen.findByRole("dialog");
+        expect(within(dialog).getByRole("heading", { name: "รายละเอียดงานที่สอง" })).toBeInTheDocument();
+        const relevantSection = getRelevantOccurrenceSection(dialog);
+        expect(within(relevantSection).getByText("4 กันยายน 2569")).toBeInTheDocument();
+        expect(within(relevantSection).getByText("อีก 4 วัน")).toBeInTheDocument();
+        expect(within(relevantSection).queryByText("10 กันยายน 2569")).not.toBeInTheDocument();
     });
 
     it("reloads the latest detail after a stale update without silently retrying", async () => {
