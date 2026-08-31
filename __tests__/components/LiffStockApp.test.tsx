@@ -9,6 +9,7 @@ import type {
     LiffStockRequestDetail,
     LiffStockRequestSummary,
     LiffStockRequestsResponse,
+    LiffStockVariantAvailability,
 } from "@/lib/types/stock-liff";
 
 const mocks = vi.hoisted(() => ({
@@ -19,6 +20,7 @@ const mocks = vi.hoisted(() => ({
     fetchMyRequests: vi.fn(),
     fetchProcessing: vi.fn(),
     fetchRequest: vi.fn(),
+    fetchAvailability: vi.fn(),
     submitRequest: vi.fn(),
     cancelRequest: vi.fn(),
     issueRequest: vi.fn(),
@@ -43,6 +45,7 @@ vi.mock("@/lib/client/liff-stock", () => ({
     fetchLiffStockMyRequests: mocks.fetchMyRequests,
     fetchLiffStockProcessingQueue: mocks.fetchProcessing,
     fetchLiffStockRequest: mocks.fetchRequest,
+    fetchLiffStockVariantAvailability: mocks.fetchAvailability,
     submitLiffStockRequest: mocks.submitRequest,
     cancelLiffStockRequest: mocks.cancelRequest,
     issueLiffStockRequest: mocks.issueRequest,
@@ -242,6 +245,7 @@ describe("LIFF Stock app orchestration", () => {
         mocks.fetchMyRequests.mockResolvedValue(EMPTY_REQUESTS);
         mocks.fetchProcessing.mockResolvedValue(EMPTY_REQUESTS);
         mocks.fetchRequest.mockResolvedValue(PROCESSOR_DETAIL);
+        mocks.fetchAvailability.mockResolvedValue([]);
         mocks.issueRequest.mockResolvedValue(undefined);
         mocks.cancelRequest.mockResolvedValue(undefined);
     });
@@ -356,6 +360,9 @@ describe("LIFF Stock app orchestration", () => {
         mocks.submitRequest.mockRejectedValueOnce(
             new LiffApiError("สต็อกเปลี่ยนแปลง", 409),
         );
+        mocks.fetchAvailability.mockResolvedValueOnce([
+            { id: 101, availableQuantity: 2 },
+        ]);
 
         render(<LiffStockApp />);
         expect(await screen.findByText("กระดาษ A4")).toBeInTheDocument();
@@ -380,6 +387,161 @@ describe("LIFF Stock app orchestration", () => {
         expect(toast.info).toHaveBeenCalledWith(
             "จำนวนวัสดุบางรายการถูกปรับตามสต็อกล่าสุด",
         );
+    });
+
+    it("preserves the exact retry payload and key after an ambiguous failure", async () => {
+        const latestCatalog = {
+            ...CATALOG,
+            items: [{
+                ...CATALOG.items[0],
+                availableQuantity: 3,
+                variants: [{
+                    ...CATALOG.items[0].variants[0],
+                    availableQuantity: 3,
+                }],
+            }],
+        };
+        mocks.fetchItems.mockImplementation(({ search }: { search?: string }) =>
+            search === "ล่าสุด" ? Promise.resolve(latestCatalog) : Promise.resolve(CATALOG));
+        mocks.submitRequest
+            .mockRejectedValueOnce(new Error("network unavailable"))
+            .mockResolvedValueOnce(undefined);
+
+        render(<LiffStockApp />);
+        expect(await screen.findByText("กระดาษ A4")).toBeInTheDocument();
+        fireEvent.click(screen.getByRole("button", { name: "เพิ่มลงตะกร้า" }));
+        fireEvent.click(screen.getByRole("button", { name: /เปิดตะกร้า/ }));
+        const increaseButton = screen.getByRole("button", {
+            name: "เพิ่มจำนวน กระดาษ A4",
+        });
+        for (let index = 0; index < 4; index += 1) {
+            fireEvent.click(increaseButton);
+        }
+        fireEvent.change(screen.getByLabelText("ชื่อย่อโครงการ"), {
+            target: { value: "NHF-2569" },
+        });
+        fireEvent.click(screen.getByRole("button", { name: "ส่งคำขอเบิก 5 ชิ้น" }));
+
+        await waitFor(() => expect(mocks.submitRequest).toHaveBeenCalledTimes(1));
+        const firstPayload = mocks.submitRequest.mock.calls[0]?.[0];
+        const firstKey = mocks.submitRequest.mock.calls[0]?.[1];
+        expect(firstKey).toBeTruthy();
+        expect(mocks.fetchAvailability).not.toHaveBeenCalled();
+
+        fireEvent.click(screen.getByRole("button", { name: "ปิดตะกร้า" }));
+        fireEvent.change(screen.getByLabelText("ค้นหาวัสดุ"), {
+            target: { value: "ล่าสุด" },
+        });
+        await waitFor(() => expect(mocks.fetchItems).toHaveBeenCalledWith(
+            expect.objectContaining({ search: "ล่าสุด" }),
+        ));
+        fireEvent.click(screen.getByRole("button", { name: /เปิดตะกร้า/ }));
+
+        expect(await screen.findByRole("button", { name: "ส่งคำขอเบิก 5 ชิ้น" }))
+            .toBeInTheDocument();
+        fireEvent.click(screen.getByRole("button", { name: "ส่งคำขอเบิก 5 ชิ้น" }));
+
+        await waitFor(() => expect(mocks.submitRequest).toHaveBeenCalledTimes(2));
+        expect(mocks.submitRequest.mock.calls[1]?.[0]).toEqual(firstPayload);
+        expect(mocks.submitRequest.mock.calls[1]?.[1]).toBe(firstKey);
+        expect(mocks.fetchAvailability).not.toHaveBeenCalled();
+    });
+
+    it("refreshes all cart variants with targeted availability after a deterministic conflict", async () => {
+        window.localStorage.setItem("stock:browse-cart:v1:user:7", JSON.stringify({
+            projectCode: "NHF-2569",
+            cartItems: [
+                {
+                    itemId: 10,
+                    itemName: "กระดาษ A4",
+                    itemImageUrl: null,
+                    variantId: 101,
+                    variantSku: "PAPER-A4-80",
+                    variantUnit: "รีม",
+                    variantImageUrl: null,
+                    variantAvailableQuantity: 8,
+                    qty: 5,
+                },
+                {
+                    itemId: 20,
+                    itemName: "ปากกา",
+                    itemImageUrl: null,
+                    variantId: 202,
+                    variantSku: "PEN-BLUE",
+                    variantUnit: "ด้าม",
+                    variantImageUrl: null,
+                    variantAvailableQuantity: 2,
+                    qty: 2,
+                },
+            ],
+            pendingIdempotency: null,
+        }));
+        mocks.submitRequest.mockRejectedValueOnce(
+            new LiffApiError("สต็อกเปลี่ยนแปลง", 409),
+        ).mockResolvedValueOnce(undefined);
+        mocks.fetchAvailability.mockResolvedValueOnce([
+            { id: 101, availableQuantity: 3 },
+            { id: 202, availableQuantity: 0 },
+        ]);
+
+        render(<LiffStockApp />);
+        expect(await screen.findByText("กระดาษ A4")).toBeInTheDocument();
+        fireEvent.click(screen.getByRole("button", { name: /เปิดตะกร้า/ }));
+        fireEvent.click(screen.getByRole("button", { name: "ส่งคำขอเบิก 7 ชิ้น" }));
+
+        await waitFor(() => expect(mocks.fetchAvailability).toHaveBeenCalledWith([
+            101,
+            202,
+        ]));
+        expect(await screen.findByRole("button", { name: "ส่งคำขอเบิก 3 ชิ้น" }))
+            .toBeInTheDocument();
+        expect(screen.queryByText("ปากกา")).not.toBeInTheDocument();
+        expect(mocks.submitRequest).toHaveBeenCalledTimes(1);
+        expect(toast.info).toHaveBeenCalledWith(
+            "จำนวนวัสดุบางรายการถูกปรับตามสต็อกล่าสุด และวัสดุที่ไม่มีสต็อกพร้อมเบิกถูกนำออกจากตะกร้า",
+        );
+
+        const firstKey = mocks.submitRequest.mock.calls[0]?.[1];
+        fireEvent.click(screen.getByRole("button", { name: "ส่งคำขอเบิก 3 ชิ้น" }));
+        await waitFor(() => expect(mocks.submitRequest).toHaveBeenCalledTimes(2));
+        expect(mocks.submitRequest.mock.calls[1]?.[0]).toMatchObject({
+            projectCode: "NHF-2569",
+            items: [{ itemId: 10, variantId: 101, quantity: 3 }],
+        });
+        expect(mocks.submitRequest.mock.calls[1]?.[1]).not.toBe(firstKey);
+    });
+
+    it("keeps the newest targeted availability response when conflict refreshes overlap", async () => {
+        const availabilityA = createDeferred<LiffStockVariantAvailability[]>();
+        const availabilityB = createDeferred<LiffStockVariantAvailability[]>();
+        mocks.submitRequest
+            .mockRejectedValueOnce(new LiffApiError("สต็อกเปลี่ยนแปลง", 409))
+            .mockRejectedValueOnce(new LiffApiError("สต็อกเปลี่ยนแปลง", 409));
+        mocks.fetchAvailability
+            .mockImplementationOnce(() => availabilityA.promise)
+            .mockImplementationOnce(() => availabilityB.promise);
+
+        render(<LiffStockApp />);
+        expect(await screen.findByText("กระดาษ A4")).toBeInTheDocument();
+        fireEvent.click(screen.getByRole("button", { name: "เพิ่มลงตะกร้า" }));
+        fireEvent.click(screen.getByRole("button", { name: /เปิดตะกร้า/ }));
+        fireEvent.change(screen.getByLabelText("ชื่อย่อโครงการ"), {
+            target: { value: "NHF-2569" },
+        });
+        fireEvent.click(screen.getByRole("button", { name: "ส่งคำขอเบิก 1 ชิ้น" }));
+
+        await waitFor(() => expect(mocks.fetchAvailability).toHaveBeenCalledTimes(1));
+        fireEvent.click(screen.getByRole("button", { name: "ส่งคำขอเบิก 1 ชิ้น" }));
+        await waitFor(() => expect(mocks.fetchAvailability).toHaveBeenCalledTimes(2));
+
+        availabilityB.resolve([{ id: 101, availableQuantity: 4, isAvailable: true }]);
+        expect(await screen.findByText("พร้อมเบิก 4 รีม")).toBeInTheDocument();
+        availabilityA.resolve([{ id: 101, availableQuantity: 0, isAvailable: false }]);
+        await waitFor(() => {
+            expect(screen.getByText("พร้อมเบิก 4 รีม")).toBeInTheDocument();
+        });
+        expect(screen.getByRole("button", { name: "ส่งคำขอเบิก 1 ชิ้น" }))
+            .toBeInTheDocument();
     });
 
     it("keeps the newest catalog result and error state when older responses finish later", async () => {

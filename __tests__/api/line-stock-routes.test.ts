@@ -7,6 +7,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
     requireLiffWorkforceSession: vi.fn(),
     getItems: vi.fn(),
+    getVariantAvailability: vi.fn(),
     getCategories: vi.fn(),
     getRequests: vi.fn(),
     getRequestById: vi.fn(),
@@ -35,6 +36,7 @@ vi.mock("@/lib/auth/liff", () => ({
 vi.mock("@/lib/services/stock", () => ({
     stockService: {
         getItems: mocks.getItems,
+        getVariantAvailability: mocks.getVariantAvailability,
         getCategories: mocks.getCategories,
         getRequests: mocks.getRequests,
         getRequestById: mocks.getRequestById,
@@ -56,6 +58,7 @@ vi.mock("@/lib/security/mutation-rate-limit", () => ({
 
 import { GET as getCategories } from "@/app/api/line/stock/categories/route";
 import { GET as getItems } from "@/app/api/line/stock/items/route";
+import { GET as getAvailability } from "@/app/api/line/stock/availability/route";
 import { GET as getProcessing } from "@/app/api/line/stock/processing/route";
 import { GET as getDetail } from "@/app/api/line/stock/requests/[id]/route";
 import { POST as cancelRequest } from "@/app/api/line/stock/requests/[id]/cancel/route";
@@ -193,6 +196,9 @@ describe("LIFF Stock route adapters", () => {
             page: 1,
             limit: 12,
         });
+        mocks.getVariantAvailability.mockResolvedValue([
+            { id: 101, availableQuantity: 17, isAvailable: true },
+        ]);
         mocks.getCategories.mockResolvedValue([{
             id: 2,
             name: "เครื่องเขียน",
@@ -228,6 +234,35 @@ describe("LIFF Stock route adapters", () => {
 
         expect((await getItems(request("/api/line/stock/items"))).status).toBe(401);
         expect(mocks.getItems).not.toHaveBeenCalled();
+    });
+
+    it("validates and authorizes targeted availability without exposing internal fields", async () => {
+        mocks.requireLiffWorkforceSession.mockResolvedValueOnce({
+            ok: false,
+            response: NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
+        });
+        expect((await getAvailability(request(
+            "/api/line/stock/availability?variantIds=101",
+        ))).status).toBe(401);
+        expect(mocks.getVariantAvailability).not.toHaveBeenCalled();
+
+        const response = await getAvailability(request(
+            "/api/line/stock/availability?variantIds=101,101,205",
+        ));
+        expect(response.status).toBe(200);
+        expect(mocks.getVariantAvailability).toHaveBeenCalledWith([101, 205]);
+        expect(await response.json()).toEqual({
+            variants: [{ id: 101, availableQuantity: 17, isAvailable: true }],
+        });
+
+        expect((await getAvailability(request(
+            "/api/line/stock/availability?variantIds=0,101",
+        ))).status).toBe(400);
+        const tooManyIds = Array.from({ length: 21 }, (_, index) => index + 1)
+            .join(",");
+        expect((await getAvailability(request(
+            `/api/line/stock/availability?variantIds=${tooManyIds}`,
+        ))).status).toBe(400);
     });
 
     it("forces active-only catalog filters and serializes only mobile fields", async () => {

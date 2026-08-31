@@ -31,6 +31,16 @@ export interface LiffStockCatalogItem {
     variants: LiffStockCatalogVariant[];
 }
 
+export interface LiffStockVariantAvailability {
+    id: number;
+    availableQuantity: number;
+    isAvailable: boolean;
+}
+
+export interface LiffStockVariantAvailabilityResponse {
+    variants: LiffStockVariantAvailability[];
+}
+
 export interface LiffStockCategory {
     id: number;
     name: string;

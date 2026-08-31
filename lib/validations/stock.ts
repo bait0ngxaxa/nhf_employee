@@ -420,6 +420,49 @@ export const stockRequestIdParamSchema = z
         return id;
     });
 
+const STOCK_VARIANT_AVAILABILITY_MAX_IDS = 20;
+
+export const stockVariantAvailabilityQuerySchema = z.object({
+    variantIds: z
+        .string({ message: "กรุณาระบุรายการวัสดุ" })
+        .trim()
+        .min(1, "กรุณาระบุรายการวัสดุ")
+        .transform((value, ctx) => {
+            const uniqueVariantIds = new Set<number>();
+            let hasInvalidId = false;
+
+            for (const rawId of value.split(",")) {
+                const parsedId = stockRequestIdParamSchema.safeParse(rawId.trim());
+                if (!parsedId.success) {
+                    hasInvalidId = true;
+                    continue;
+                }
+                uniqueVariantIds.add(parsedId.data);
+            }
+
+            if (hasInvalidId) {
+                ctx.addIssue({
+                    code: z.ZodIssueCode.custom,
+                    message: "รายการวัสดุไม่ถูกต้อง",
+                });
+            }
+            if (uniqueVariantIds.size === 0) {
+                ctx.addIssue({
+                    code: z.ZodIssueCode.custom,
+                    message: "กรุณาระบุรายการวัสดุ",
+                });
+            }
+            if (uniqueVariantIds.size > STOCK_VARIANT_AVAILABILITY_MAX_IDS) {
+                ctx.addIssue({
+                    code: z.ZodIssueCode.custom,
+                    message: `ตรวจสอบสต็อกได้สูงสุด ${STOCK_VARIANT_AVAILABILITY_MAX_IDS} รายการต่อครั้ง`,
+                });
+            }
+
+            return Array.from(uniqueVariantIds);
+        }),
+});
+
 export const stockReviewActionSchema = z.object({
     action: z.enum(["approve", "issue", "reject", "cancel"], {
         message: "action ไม่ถูกต้อง",
@@ -486,4 +529,7 @@ export type StockRequestIdParam = z.infer<typeof stockRequestIdParamSchema>;
 export type StockReviewActionInput = z.infer<typeof stockReviewActionSchema>;
 export type StockItemsFilter = z.infer<typeof stockItemsFilterSchema>;
 export type StockRequestsFilter = z.infer<typeof stockRequestsFilterSchema>;
+export type StockVariantAvailabilityQuery = z.infer<
+    typeof stockVariantAvailabilityQuerySchema
+>;
 export type StockReportExportQuery = z.infer<typeof stockReportExportQuerySchema>;

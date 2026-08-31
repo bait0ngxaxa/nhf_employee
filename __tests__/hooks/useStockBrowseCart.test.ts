@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
     useStockBrowseCart,
+    type StockCartVariantAvailability,
     type StockCartAvailabilityReconciliation,
 } from "@/components/dashboard/stock/useStockBrowseCart";
 import { apiPost } from "@/lib/client/api-client";
@@ -180,6 +181,46 @@ describe("useStockBrowseCart idempotency", () => {
                 cartItems: [],
                 pendingIdempotency: null,
             });
+    });
+
+    it("uses a new key after an intentional cart change following a network failure", async () => {
+        window.localStorage.setItem(storageKey, JSON.stringify({
+            projectCode: payload.projectCode,
+            cartItems: [{
+                itemId: 10,
+                itemName: "กระดาษ",
+                itemImageUrl: null,
+                variantId: 101,
+                variantSku: "PAPER-A4",
+                variantUnit: "รีม",
+                variantImageUrl: null,
+                variantAvailableQuantity: 20,
+                qty: 2,
+            }],
+            pendingIdempotency: null,
+        }));
+        const submitTransport = vi.fn()
+            .mockRejectedValueOnce(new Error("network unavailable"))
+            .mockResolvedValueOnce(undefined);
+        const { result } = renderHook(() => useStockBrowseCart({
+            userId: 7,
+            onSubmitted: vi.fn(),
+            submitRequest: submitTransport,
+        }));
+
+        await waitFor(() => expect(result.current.cartSize).toBe(1));
+        await act(async () => result.current.submitRequest());
+        const firstKey = submitTransport.mock.calls[0]?.[1] as string;
+
+        act(() => result.current.updateCartQuantity(101, -1));
+        await waitFor(() => expect(result.current.cartItems[0]?.qty).toBe(1));
+
+        await act(async () => result.current.submitRequest());
+        expect(submitTransport.mock.calls[1]?.[0]).toEqual({
+            projectCode: payload.projectCode,
+            items: [{ itemId: 10, variantId: 101, quantity: 1 }],
+        });
+        expect(submitTransport.mock.calls[1]?.[1]).not.toBe(firstKey);
     });
 
     it("uses a new idempotency key after availability reconciliation changes the payload", async () => {
@@ -362,6 +403,36 @@ describe("useStockBrowseCart availability reconciliation", () => {
         expect(reconciliation).toEqual({
             changed: false,
             adjustedCount: 0,
+            removedCount: 0,
+        });
+    });
+
+    it("reconciles targeted availability for the current cart variants", async () => {
+        const { result } = renderHook(() => useStockBrowseCart({
+            userId: 7,
+            onSubmitted: vi.fn(),
+        }));
+        await waitFor(() => expect(result.current.cartSize).toBe(0));
+
+        act(() => result.current.addVariantToCart(item, item.variants[0], 8));
+        const targetedAvailability: StockCartVariantAvailability[] = [{
+            id: 101,
+            availableQuantity: 4,
+        }];
+        let reconciliation: StockCartAvailabilityReconciliation | null = null;
+        act(() => {
+            reconciliation = result.current.reconcileVariantAvailability(
+                targetedAvailability,
+            );
+        });
+
+        expect(result.current.cartItems).toMatchObject([{
+            qty: 4,
+            variant: { id: 101, availableQuantity: 4 },
+        }]);
+        expect(reconciliation).toEqual({
+            changed: true,
+            adjustedCount: 1,
             removedCount: 0,
         });
     });

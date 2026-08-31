@@ -16,6 +16,7 @@ import {
     fetchLiffStockProcessingQueue,
     issueLiffStockRequest,
     submitLiffStockRequest,
+    fetchLiffStockVariantAvailability,
 } from "@/lib/client/liff-stock";
 import { API_ROUTES } from "@/lib/ssot/routes";
 
@@ -101,6 +102,22 @@ describe("LIFF Stock client", () => {
         expect(apiPostMock).toHaveBeenCalledWith(
             API_ROUTES.line.stockIssueById(71),
             {},
+            LIFF_OPTIONS,
+        );
+    });
+
+    it("fetches targeted variant availability through the LIFF API", async () => {
+        apiGetMock.mockResolvedValueOnce({
+            ...SUCCESS,
+            data: {
+                variants: [{ id: 101, availableQuantity: 4 }],
+            },
+        });
+
+        await fetchLiffStockVariantAvailability([101, 101, 205]);
+
+        expect(apiGetMock).toHaveBeenCalledWith(
+            `${API_ROUTES.line.stockAvailability}?variantIds=101%2C205`,
             LIFF_OPTIONS,
         );
     });

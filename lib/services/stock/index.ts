@@ -12,6 +12,7 @@ import {
     getItemById,
     getRequestById,
     getRequests,
+    getVariantAvailability,
 } from "./queries";
 import {
     createCategory,
@@ -38,6 +39,7 @@ export const stockService = {
     createRequest,
     issueRequest,
     cancelRequest,
+    getVariantAvailability,
 };
 
 export {
@@ -51,6 +53,7 @@ export {
     adjustStock,
     getRequests,
     getRequestById,
+    getVariantAvailability,
     createRequest,
     issueRequest,
     cancelRequest,

@@ -100,6 +100,71 @@ export async function getItems(filters: StockItemsFilter) {
     };
 }
 
+export type StockVariantAvailability = {
+    id: number;
+    availableQuantity: number;
+    isAvailable: boolean;
+};
+
+export async function getVariantAvailability(
+    variantIds: readonly number[],
+): Promise<StockVariantAvailability[]> {
+    const uniqueVariantIds = Array.from(new Set(variantIds));
+    if (uniqueVariantIds.length === 0) {
+        return [];
+    }
+
+    const variants = await prisma.stockItemVariant.findMany({
+        where: {
+            id: { in: uniqueVariantIds },
+            isActive: true,
+            stockItem: { isActive: true },
+        },
+        select: {
+            id: true,
+            stockItemId: true,
+            quantity: true,
+        },
+    });
+    const itemIds = Array.from(new Set(variants.map((variant) => variant.stockItemId)));
+    const pendingRequestItems = itemIds.length > 0
+        ? await prisma.stockRequestItem.findMany({
+              where: {
+                  itemId: { in: itemIds },
+                  request: { status: StockRequestStatus.PENDING_ISSUE },
+              },
+              select: {
+                  itemId: true,
+                  variantId: true,
+                  quantity: true,
+              },
+          })
+        : [];
+    const { reservedByVariantId } = buildReservedQuantityMaps(
+        pendingRequestItems,
+    );
+    const variantById = new Map(
+        variants.map((variant) => [variant.id, variant]),
+    );
+
+    return uniqueVariantIds.map((variantId) => {
+        const variant = variantById.get(variantId);
+        if (!variant) {
+            return { id: variantId, availableQuantity: 0, isAvailable: false };
+        }
+
+        const availableQuantity = getAvailableQuantity(
+            variant.quantity,
+            reservedByVariantId.get(variant.id) ?? 0,
+        );
+        return {
+            id: variant.id,
+            availableQuantity,
+            isAvailable: availableQuantity > 0,
+        };
+    });
+}
+
 export async function getItemById(id: number) {
     const item = await prisma.stockItem.findUnique({
         where: { id },

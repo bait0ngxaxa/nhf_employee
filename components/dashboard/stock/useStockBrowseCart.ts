@@ -49,6 +49,11 @@ export type StockCartAvailabilityReconciliation = {
     removedCount: number;
 };
 
+export type StockCartVariantAvailability = {
+    id: number;
+    availableQuantity: number;
+};
+
 type CartAvailabilityReconciliationOutcome = {
     nextCart: Map<number, BrowseCartItem>;
     result: StockCartAvailabilityReconciliation;
@@ -88,9 +93,13 @@ type UseStockBrowseCartResult = {
         }>,
     ) => void;
     clearCart: () => void;
+    hasPendingSubmission: () => boolean;
     removeFromCart: (variantId: number) => void;
     reconcileAvailability: (
         catalogItems: ReadonlyArray<StockBrowseItem>,
+    ) => StockCartAvailabilityReconciliation;
+    reconcileVariantAvailability: (
+        variants: ReadonlyArray<StockCartVariantAvailability>,
     ) => StockCartAvailabilityReconciliation;
     setProjectCode: (value: string) => void;
     submitRequest: () => Promise<void>;
@@ -267,19 +276,17 @@ function buildCartQuantityByItemId(
     return quantityByItemId;
 }
 
-function reconcileCartAvailability(
+function reconcileCartVariantAvailability(
     cart: Map<number, BrowseCartItem>,
-    catalogItems: ReadonlyArray<StockBrowseItem>,
+    variants: ReadonlyArray<StockCartVariantAvailability>,
 ): CartAvailabilityReconciliationOutcome {
     const availabilityByVariantId = new Map<number, number>();
-    for (const catalogItem of catalogItems) {
-        for (const variant of catalogItem.variants ?? []) {
-            if (Number.isFinite(variant.availableQuantity)) {
-                availabilityByVariantId.set(
-                    variant.id,
-                    Math.max(0, variant.availableQuantity),
-                );
-            }
+    for (const variant of variants) {
+        if (Number.isFinite(variant.availableQuantity)) {
+            availabilityByVariantId.set(
+                variant.id,
+                Math.max(0, variant.availableQuantity),
+            );
         }
     }
 
@@ -333,6 +340,23 @@ function reconcileCartAvailability(
     };
 }
 
+function reconcileCartAvailability(
+    cart: Map<number, BrowseCartItem>,
+    catalogItems: ReadonlyArray<StockBrowseItem>,
+): CartAvailabilityReconciliationOutcome {
+    const variants: StockCartVariantAvailability[] = [];
+    for (const catalogItem of catalogItems) {
+        for (const variant of catalogItem.variants ?? []) {
+            variants.push({
+                id: variant.id,
+                availableQuantity: variant.availableQuantity,
+            });
+        }
+    }
+
+    return reconcileCartVariantAvailability(cart, variants);
+}
+
 export function useStockBrowseCart({
     userId,
     onSubmitted,
@@ -347,6 +371,7 @@ export function useStockBrowseCart({
     const {
         clear: clearIdempotency,
         getOrCreate: getOrCreateIdempotency,
+        hasPending: hasPendingIdempotency,
         reconcile: reconcileIdempotency,
         restore: restoreIdempotency,
     } = useStockRequestIdempotency();
@@ -530,6 +555,18 @@ export function useStockBrowseCart({
         },
         [cart],
     );
+    const reconcileVariantAvailability = useCallback(
+        (
+            variants: ReadonlyArray<StockCartVariantAvailability>,
+        ): StockCartAvailabilityReconciliation => {
+            const outcome = reconcileCartVariantAvailability(cart, variants);
+            if (outcome.result.changed) {
+                setCart(outcome.nextCart);
+            }
+            return outcome.result;
+        },
+        [cart],
+    );
 
     async function submitRequest(): Promise<void> {
         if (submitting) {
@@ -603,8 +640,10 @@ export function useStockBrowseCart({
         addVariantToCart,
         addVariantsToCart,
         clearCart,
+        hasPendingSubmission: hasPendingIdempotency,
         removeFromCart,
         reconcileAvailability,
+        reconcileVariantAvailability,
         setProjectCode: updateProjectCode,
         submitRequest,
         updateCartQuantity,

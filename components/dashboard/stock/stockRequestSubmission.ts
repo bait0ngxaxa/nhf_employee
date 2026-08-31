@@ -63,6 +63,7 @@ export function parsePendingIdempotency(
 type StockRequestIdempotencyLifecycle = {
     clear: () => void;
     getOrCreate: (payloadSignature: string) => PendingRequestIdempotency;
+    hasPending: () => boolean;
     reconcile: (payloadSignature: string) => PendingRequestIdempotency | null;
     restore: (pending: PendingRequestIdempotency | null) => void;
 };
@@ -100,6 +101,9 @@ export function useStockRequestIdempotency(): StockRequestIdempotencyLifecycle {
         },
         [],
     );
+    const hasPending = useCallback((): boolean => {
+        return pendingRef.current !== null;
+    }, []);
 
-    return { clear, getOrCreate, reconcile, restore };
+    return { clear, getOrCreate, hasPending, reconcile, restore };
 }

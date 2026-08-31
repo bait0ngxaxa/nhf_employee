@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import {
     useStockBrowseCart,
     type StockCartAvailabilityReconciliation,
+    type StockCartVariantAvailability,
 } from "@/components/dashboard/stock/useStockBrowseCart";
 import { useLiffWorkforce } from "@/components/liff/LiffBootstrap";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -26,6 +27,7 @@ import {
     fetchLiffStockMyRequests,
     fetchLiffStockProcessingQueue,
     fetchLiffStockRequest,
+    fetchLiffStockVariantAvailability,
     issueLiffStockRequest,
     submitLiffStockRequest,
 } from "@/lib/client/liff-stock";
@@ -52,6 +54,12 @@ import { LiffStockVariantPicker } from "./LiffStockVariantPicker";
 
 type StockTab = "browse" | "mine" | "processing";
 
+type CatalogLoadInput = {
+    page: number;
+    search: string;
+    categoryId: number | undefined;
+};
+
 const CATALOG_PAGE_SIZE = 12;
 const REQUEST_PAGE_SIZE = 10;
 const SEARCH_DEBOUNCE_MS = 300;
@@ -76,6 +84,10 @@ const EMPTY_REQUESTS: LiffStockRequestsResponse = {
 function getStockError(error: unknown): string {
     if (error instanceof LiffApiError) return error.message;
     return "ไม่สามารถโหลดข้อมูล Stock ได้ กรุณาลองใหม่อีกครั้ง";
+}
+
+function isDeterministicStockConflict(error: unknown): boolean {
+    return error instanceof LiffApiError && error.status === 409;
 }
 
 function notifyCartAvailabilityReconciliation(
@@ -108,6 +120,12 @@ export function LiffStockApp(): ReactElement {
     const requestHistorySequenceRef = useRef(0);
     const processingQueueSequenceRef = useRef(0);
     const detailRequestSequenceRef = useRef(0);
+    const availabilityRequestSequenceRef = useRef(0);
+    const catalogQueryRef = useRef<CatalogLoadInput>({
+        page: 1,
+        search: "",
+        categoryId: undefined,
+    });
     const reconcileCartAvailabilityRef = useRef<
         (catalogItems: ReadonlyArray<LiffStockCatalogItem>) => StockCartAvailabilityReconciliation
     >(() => ({
@@ -115,6 +133,17 @@ export function LiffStockApp(): ReactElement {
         adjustedCount: 0,
         removedCount: 0,
     }));
+    const reconcileCartVariantAvailabilityRef = useRef<
+        (variants: ReadonlyArray<StockCartVariantAvailability>) => StockCartAvailabilityReconciliation
+    >(() => ({
+        changed: false,
+        adjustedCount: 0,
+        removedCount: 0,
+    }));
+    const hasPendingSubmissionRef = useRef<() => boolean>(() => false);
+    const refreshCartAvailabilityRef = useRef<() => Promise<void>>(
+        () => Promise.resolve(),
+    );
     const deepLinkRequestId = searchParams.get("requestId");
     const rawActionIntent = searchParams.get("action");
     const deepLinkActionIntent = rawActionIntent
@@ -158,11 +187,7 @@ export function LiffStockApp(): ReactElement {
     const [mutationError, setMutationError] = useState<string | null>(null);
     const [busyRequestId, setBusyRequestId] = useState<number | null>(null);
 
-    const loadCatalog = useCallback(async (input: {
-        page: number;
-        search: string;
-        categoryId: number | undefined;
-    }): Promise<void> => {
+    const loadCatalog = useCallback(async (input: CatalogLoadInput): Promise<void> => {
         const sequence = ++catalogRequestSequenceRef.current;
         setCatalogLoading(true);
         setCatalogError(null);
@@ -174,9 +199,11 @@ export function LiffStockApp(): ReactElement {
             if (sequence !== catalogRequestSequenceRef.current) return;
 
             setCatalog(nextCatalog);
-            notifyCartAvailabilityReconciliation(
-                reconcileCartAvailabilityRef.current(nextCatalog.items),
-            );
+            if (!hasPendingSubmissionRef.current()) {
+                notifyCartAvailabilityReconciliation(
+                    reconcileCartAvailabilityRef.current(nextCatalog.items),
+                );
+            }
         } catch (error) {
             if (sequence !== catalogRequestSequenceRef.current) return;
             setCatalogError(getStockError(error));
@@ -306,6 +333,14 @@ export function LiffStockApp(): ReactElement {
     }, []);
 
     useEffect(() => {
+        catalogQueryRef.current = {
+            page: catalogPage,
+            search: catalogSearch,
+            categoryId,
+        };
+    }, [catalogPage, catalogSearch, categoryId]);
+
+    useEffect(() => {
         const timeoutId = window.setTimeout(() => {
             void loadCatalog({
                 page: catalogPage,
@@ -385,7 +420,9 @@ export function LiffStockApp(): ReactElement {
         addVariantsToCart,
         clearCart,
         removeFromCart,
+        reconcileVariantAvailability,
         reconcileAvailability,
+        hasPendingSubmission,
         setProjectCode,
         submitRequest,
         updateCartQuantity,
@@ -400,14 +437,50 @@ export function LiffStockApp(): ReactElement {
                 loadCatalog({ page: catalogPage, search: catalogSearch, categoryId }),
             ]);
         },
-        onSubmitError: () => {
-            void loadCatalog({ page: catalogPage, search: catalogSearch, categoryId });
+        onSubmitError: (error) => {
+            if (isDeterministicStockConflict(error)) {
+                void refreshCartAvailabilityRef.current();
+            }
         },
     });
 
+    const refreshCartAvailability = useCallback(async (): Promise<void> => {
+        const variantIds = cartItems.map((cartItem) => cartItem.variant.id);
+        if (variantIds.length === 0) {
+            return;
+        }
+
+        const sequence = ++availabilityRequestSequenceRef.current;
+        try {
+            const latestAvailability = await fetchLiffStockVariantAvailability(
+                variantIds,
+            );
+            if (sequence !== availabilityRequestSequenceRef.current) return;
+
+            notifyCartAvailabilityReconciliation(
+                reconcileCartVariantAvailabilityRef.current(latestAvailability),
+            );
+        } catch (error: unknown) {
+            if (sequence !== availabilityRequestSequenceRef.current) return;
+            toast.error(getStockError(error));
+        }
+
+        if (sequence === availabilityRequestSequenceRef.current) {
+            await loadCatalog(catalogQueryRef.current);
+        }
+    }, [cartItems, loadCatalog]);
+
     useEffect(() => {
         reconcileCartAvailabilityRef.current = reconcileAvailability;
-    }, [reconcileAvailability]);
+        reconcileCartVariantAvailabilityRef.current = reconcileVariantAvailability;
+        hasPendingSubmissionRef.current = hasPendingSubmission;
+        refreshCartAvailabilityRef.current = refreshCartAvailability;
+    }, [
+        hasPendingSubmission,
+        reconcileAvailability,
+        reconcileVariantAvailability,
+        refreshCartAvailability,
+    ]);
 
     function startAction(
         action: LiffStockRequestAction,

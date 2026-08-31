@@ -9,6 +9,8 @@ import type {
     LiffStockCategory,
     LiffStockRequestDetail,
     LiffStockRequestsResponse,
+    LiffStockVariantAvailability,
+    LiffStockVariantAvailabilityResponse,
 } from "@/lib/types/stock-liff";
 import type { CreateRequestInput } from "@/lib/validations/stock";
 
@@ -82,6 +84,22 @@ export async function fetchLiffStockCategories(): Promise<LiffStockCategory[]> {
         ),
     );
     return response.categories;
+}
+
+export async function fetchLiffStockVariantAvailability(
+    variantIds: ReadonlyArray<number>,
+): Promise<LiffStockVariantAvailability[]> {
+    const uniqueVariantIds = Array.from(new Set(variantIds));
+    const params = new URLSearchParams({
+        variantIds: uniqueVariantIds.join(","),
+    });
+    const response = await unwrapStockResponse<LiffStockVariantAvailabilityResponse>(
+        await apiGet<LiffStockVariantAvailabilityResponse>(
+            `${API_ROUTES.line.stockAvailability}?${params.toString()}`,
+            LIFF_STOCK_API_REQUEST_OPTIONS,
+        ),
+    );
+    return response.variants;
 }
 
 export async function submitLiffStockRequest(
@@ -168,4 +186,6 @@ export type {
     LiffStockRequestDetail,
     LiffStockRequestsResponse,
     LiffStockRequestSummary,
+    LiffStockVariantAvailability,
+    LiffStockVariantAvailabilityResponse,
 } from "@/lib/types/stock-liff";

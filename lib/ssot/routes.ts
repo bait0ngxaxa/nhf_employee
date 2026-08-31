@@ -122,6 +122,7 @@ export const API_ROUTES = {
             `/api/line/leave/attachments/${id}`,
         stockItems: "/api/line/stock/items",
         stockCategories: "/api/line/stock/categories",
+        stockAvailability: "/api/line/stock/availability",
         stockRequests: "/api/line/stock/requests",
         stockProcessing: "/api/line/stock/processing",
         stockRequestById: (id: number | string): string =>

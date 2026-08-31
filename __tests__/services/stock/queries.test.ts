@@ -1,8 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { PrismaClient } from "@prisma/client";
+import { StockRequestStatus, type PrismaClient } from "@prisma/client";
 import { mockDeep, mockReset } from "vitest-mock-extended";
 import { prisma } from "@/lib/db/prisma";
-import { getCategories, getItemById, getItems, getRequests } from "@/lib/services/stock/queries";
+import {
+    getCategories,
+    getItemById,
+    getItems,
+    getRequests,
+    getVariantAvailability,
+} from "@/lib/services/stock/queries";
 import { StockInvariantViolationError } from "@/lib/services/stock/shared";
 
 vi.mock("@/lib/db/prisma", () => ({
@@ -18,6 +24,47 @@ function asNever<T>(value: T): never {
 describe("Stock Queries", () => {
     beforeEach(() => {
         mockReset(prismaMock);
+    });
+
+    it("calculates targeted variant availability from pending reservations", async () => {
+        prismaMock.stockItemVariant.findMany.mockResolvedValue(asNever([{
+            id: 11,
+            stockItemId: 1,
+            quantity: 10,
+        }]));
+        prismaMock.stockRequestItem.findMany.mockResolvedValue(asNever([
+            { itemId: 1, variantId: 11, quantity: 4 },
+        ]));
+
+        const result = await getVariantAvailability([11, 11, 12]);
+
+        expect(result).toEqual([
+            { id: 11, availableQuantity: 6, isAvailable: true },
+            { id: 12, availableQuantity: 0, isAvailable: false },
+        ]);
+        expect(prismaMock.stockItemVariant.findMany).toHaveBeenCalledWith({
+            where: {
+                id: { in: [11, 12] },
+                isActive: true,
+                stockItem: { isActive: true },
+            },
+            select: {
+                id: true,
+                stockItemId: true,
+                quantity: true,
+            },
+        });
+        expect(prismaMock.stockRequestItem.findMany).toHaveBeenCalledWith({
+            where: {
+                itemId: { in: [1] },
+                request: { status: StockRequestStatus.PENDING_ISSUE },
+            },
+            select: {
+                itemId: true,
+                variantId: true,
+                quantity: true,
+            },
+        });
     });
 
     describe("getItems", () => {
