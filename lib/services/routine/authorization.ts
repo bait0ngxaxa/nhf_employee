@@ -61,7 +61,7 @@ export async function assertActiveRoutineActorInTransaction(
         throw new RoutineForbiddenError("บัญชีผู้ใช้ไม่พร้อมดำเนินการ");
     }
 
-    if (user.role === "ADMIN") {
+    if (user.role === "ADMIN" && actor.mode !== "LIFF_SELF_SERVICE") {
         if (user.employee && !isActiveEmployee(user.employee)) {
             throw new RoutineForbiddenError("บัญชีผู้ดูแลระบบไม่พร้อมดำเนินการ");
         }

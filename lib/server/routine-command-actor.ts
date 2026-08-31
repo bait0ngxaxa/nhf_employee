@@ -13,6 +13,7 @@ function getTraceId(headers: Headers, name: string): string | undefined {
 export function createRoutineCommandActor(
     user: { id: number; role: string; email: string },
     headers: Headers,
+    options: { mode?: RoutineCommandActor["mode"] } = {},
 ): RoutineCommandActor {
     const requestId = getTraceId(headers, "x-request-id") ?? randomUUID();
     return {
@@ -24,5 +25,6 @@ export function createRoutineCommandActor(
         requestId,
         correlationId:
             getTraceId(headers, "x-correlation-id") ?? requestId,
+        ...options,
     };
 }

@@ -32,6 +32,8 @@ export const COMMON_API_MESSAGES = {
 
 export const ROUTINE_API_MESSAGES = {
     notFound: "ไม่พบงานประจำ",
+    liffFeatureDisabled: "ขณะนี้ยังไม่เปิดใช้งาน Routine ผ่าน LIFF",
+    liffResourceNotFound: "ไม่พบข้อมูล Routine ที่ต้องการ",
     invalidInput: "ข้อมูล NHF Routine ไม่ถูกต้อง",
     staleVersion: "ข้อมูลแม่แบบงานเปลี่ยนแปลงแล้ว กรุณาโหลดข้อมูลใหม่",
     forbidden: "คุณไม่มีสิทธิ์ดำเนินการกับงานนี้",

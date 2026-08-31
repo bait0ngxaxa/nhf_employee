@@ -19,6 +19,7 @@ import type {
 } from "@/lib/line/routine-types";
 import type { RoutineTimingStatus } from "@/lib/routine/timing";
 import { API_ROUTES } from "@/lib/ssot/routes";
+import { ROUTINE_API_MESSAGES } from "@/lib/ssot/messages";
 import type {
     LiffRoutineTaskCreateInput,
     LiffRoutineTaskUpdateInput,
@@ -49,7 +50,7 @@ function getRoutineApiErrorMessage(
         case 403:
             return "บัญชี NHF นี้ยังไม่สามารถเข้าถึง Routine ได้";
         case 404:
-            return "ขณะนี้ยังไม่เปิดใช้งาน Routine ผ่าน LIFF";
+            return response.errorThai || ROUTINE_API_MESSAGES.liffResourceNotFound;
         case 409:
             return response.errorThai || "ข้อมูล Routine เปลี่ยนแปลงแล้ว กรุณาโหลดข้อมูลใหม่";
         case 413:

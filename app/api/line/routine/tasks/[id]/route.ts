@@ -45,6 +45,7 @@ function createLiffRoutineActor(
             email: auth.user.email,
         },
         headers,
+        { mode: "LIFF_SELF_SERVICE" },
     );
 }
 
@@ -57,7 +58,7 @@ export async function GET(
     request: NextRequest,
     { params }: RouteContext,
 ): Promise<NextResponse> {
-    const featureResponse = routineFeatureGuard();
+    const featureResponse = routineFeatureGuard("liff");
     if (featureResponse) return featureResponse;
 
     try {
@@ -84,7 +85,7 @@ export async function PATCH(
     request: NextRequest,
     { params }: RouteContext,
 ): Promise<NextResponse> {
-    const featureResponse = routineFeatureGuard();
+    const featureResponse = routineFeatureGuard("liff");
     if (featureResponse) return featureResponse;
     const sizeResponse = routineRequestSizeGuard(request);
     if (sizeResponse) return sizeResponse;
@@ -135,7 +136,7 @@ export async function DELETE(
     request: NextRequest,
     { params }: RouteContext,
 ): Promise<NextResponse> {
-    const featureResponse = routineFeatureGuard();
+    const featureResponse = routineFeatureGuard("liff");
     if (featureResponse) return featureResponse;
 
     try {

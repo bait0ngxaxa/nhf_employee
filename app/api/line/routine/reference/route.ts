@@ -10,7 +10,7 @@ import {
 import { getRoutineReferenceData } from "@/lib/services/routine";
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
-    const featureResponse = routineFeatureGuard();
+    const featureResponse = routineFeatureGuard("liff");
     if (featureResponse) return featureResponse;
 
     try {

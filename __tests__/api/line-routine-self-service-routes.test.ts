@@ -321,7 +321,11 @@ describe("LIFF Routine self-service route contracts", () => {
         expect(mocks.updateRoutineTask).toHaveBeenCalledWith(
             71,
             { version: 3, title: "แก้ไขแล้ว" },
-            expect.objectContaining({ id: 7, role: "USER" }),
+            expect.objectContaining({
+                id: 7,
+                role: "USER",
+                mode: "LIFF_SELF_SERVICE",
+            }),
         );
     });
 
@@ -357,7 +361,11 @@ describe("LIFF Routine self-service route contracts", () => {
         expect(response.status).toBe(200);
         expect(mocks.deleteRoutineTask).toHaveBeenCalledWith(
             71,
-            expect.objectContaining({ id: 7, role: "USER" }),
+            expect.objectContaining({
+                id: 7,
+                role: "USER",
+                mode: "LIFF_SELF_SERVICE",
+            }),
         );
 
         mocks.deleteRoutineTask.mockRejectedValueOnce(

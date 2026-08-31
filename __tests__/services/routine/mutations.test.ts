@@ -6,6 +6,7 @@ import { prisma } from "@/lib/db/prisma";
 import { formatAuditLogDisplay } from "@/lib/audit-log/display";
 import {
     createRoutineTaskInTransaction,
+    deleteRoutineTask,
     reassignRoutineOccurrence,
     updateRoutineOccurrenceOverride,
     updateRoutineOccurrenceDueDate,
@@ -34,8 +35,12 @@ function asNever<T>(value: T): never {
     return value as unknown as never;
 }
 
-function actor(id: number, role: "USER" | "ADMIN" = "USER") {
-    return {
+function actor(
+    id: number,
+    role: "USER" | "ADMIN" = "USER",
+    mode?: "LIFF_SELF_SERVICE",
+) {
+    const baseActor = {
         id,
         email: `${role.toLowerCase()}-${id}@example.com`,
         name: role === "ADMIN" ? "ผู้ดูแลระบบ" : "ผู้ใช้งาน",
@@ -45,6 +50,7 @@ function actor(id: number, role: "USER" | "ADMIN" = "USER") {
         requestId: "routine-request",
         correlationId: "routine-correlation",
     } as const;
+    return mode ? { ...baseActor, mode } : baseActor;
 }
 
 function occurrence(overrides: Record<string, unknown> = {}): Record<string, unknown> {
@@ -92,6 +98,37 @@ function activeUser(role: "USER" | "ADMIN", employeeId: number, status = "ACTIVE
         isActive: true,
         deletedAt: null,
         employee: { id: employeeId, status, deletedAt: null },
+    };
+}
+
+function routineTaskForMutation(createdById: number): Record<string, unknown> {
+    return {
+        id: 71,
+        unitId: 1,
+        categoryId: 1,
+        title: "งานเดิม",
+        description: null,
+        scheduleType: "ONE_TIME",
+        scheduleConfig: { date: "2027-08-04" },
+        scheduleText: null,
+        contractStartDate: null,
+        contractEndDate: null,
+        contractText: null,
+        extraDetails: null,
+        businessDayPolicy: "NONE",
+        isActive: true,
+        version: 1,
+        sourceFileName: null,
+        sourceSheet: null,
+        sourceRow: null,
+        createdById,
+        updatedById: createdById,
+        createdAt: new Date("2026-01-01T00:00:00.000Z"),
+        updatedAt: new Date("2026-01-01T00:00:00.000Z"),
+        unit: { id: 1, code: "มสช.", name: "มสช.", isActive: true },
+        category: { id: 1, name: "อื่น ๆ", sortOrder: 1, isActive: true },
+        assignees: [{ employeeId: 99, role: "OWNER" }],
+        reminderRules: [],
     };
 }
 
@@ -832,5 +869,91 @@ describe("NHF Routine mutations", () => {
             ),
         ).rejects.toMatchObject({ code: "NOT_FOUND", statusCode: 404 });
         expect(prismaMock.routineTask.updateMany).not.toHaveBeenCalled();
+    });
+
+    it("treats an ADMIN LIFF actor as self-service for task updates", async () => {
+        const current = routineTaskForMutation(99);
+        const updated = { ...current, version: 2, title: "แก้ไขแล้ว" };
+        prismaMock.user.findUnique.mockResolvedValue(
+            asNever(activeUser("ADMIN", 99)),
+        );
+        prismaMock.routineUnit.findFirst.mockResolvedValue(asNever({ id: 1 }));
+        prismaMock.routineCategory.findFirst.mockResolvedValue(asNever({ id: 1 }));
+        prismaMock.routineTask.findFirst.mockResolvedValue(asNever(current));
+        prismaMock.routineTask.updateMany.mockResolvedValue(asNever({ count: 1 }));
+        prismaMock.routineTask.findUniqueOrThrow.mockResolvedValue(asNever(updated));
+
+        await updateRoutineTask(
+            71,
+            { version: 1, title: "แก้ไขแล้ว" },
+            actor(99, "ADMIN", "LIFF_SELF_SERVICE"),
+        );
+
+        expect(prismaMock.routineTask.findFirst).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: { id: 71, createdById: 99 },
+            }),
+        );
+        expect(prismaMock.routineTask.updateMany).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: { id: 71, version: 1, createdById: 99 },
+            }),
+        );
+    });
+
+    it("returns not found when an ADMIN LIFF actor updates another user's task", async () => {
+        prismaMock.user.findUnique.mockResolvedValue(
+            asNever(activeUser("ADMIN", 99)),
+        );
+        prismaMock.routineTask.findFirst.mockResolvedValue(null);
+
+        await expect(
+            updateRoutineTask(
+                71,
+                { version: 1, title: "ไม่ควรแก้ได้" },
+                actor(99, "ADMIN", "LIFF_SELF_SERVICE"),
+            ),
+        ).rejects.toMatchObject({ code: "NOT_FOUND", statusCode: 404 });
+        expect(prismaMock.routineTask.updateMany).not.toHaveBeenCalled();
+    });
+
+    it("allows an ADMIN LIFF actor to delete only their own task", async () => {
+        prismaMock.user.findUnique.mockResolvedValue(
+            asNever(activeUser("ADMIN", 99)),
+        );
+        prismaMock.routineTask.findFirst.mockResolvedValue(asNever({
+            id: 71,
+            title: "งานของแอดมิน",
+            version: 1,
+            createdById: 99,
+        }));
+        prismaMock.routineOccurrence.findMany.mockResolvedValue(asNever([]));
+
+        await deleteRoutineTask(71, actor(99, "ADMIN", "LIFF_SELF_SERVICE"));
+
+        expect(prismaMock.routineTask.findFirst).toHaveBeenCalledWith({
+            where: { id: 71, createdById: 99 },
+            select: {
+                id: true,
+                title: true,
+                version: true,
+                createdById: true,
+            },
+        });
+        expect(prismaMock.routineTask.delete).toHaveBeenCalledWith({
+            where: { id: 71 },
+        });
+    });
+
+    it("returns not found when an ADMIN LIFF actor deletes another user's task", async () => {
+        prismaMock.user.findUnique.mockResolvedValue(
+            asNever(activeUser("ADMIN", 99)),
+        );
+        prismaMock.routineTask.findFirst.mockResolvedValue(null);
+
+        await expect(
+            deleteRoutineTask(71, actor(99, "ADMIN", "LIFF_SELF_SERVICE")),
+        ).rejects.toMatchObject({ code: "NOT_FOUND", statusCode: 404 });
+        expect(prismaMock.routineTask.delete).not.toHaveBeenCalled();
     });
 });

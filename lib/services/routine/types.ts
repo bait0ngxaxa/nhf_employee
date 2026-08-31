@@ -2,6 +2,7 @@ export interface RoutineCommandActor {
     id: number;
     role: string;
     email: string;
+    mode?: "LIFF_SELF_SERVICE";
     ipAddress?: string;
     userAgent?: string;
     requestId?: string;

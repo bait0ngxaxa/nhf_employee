@@ -124,4 +124,52 @@ describe("LIFF Routine client contract", () => {
             message: "ข้อมูล Routine เปลี่ยนแปลงแล้ว กรุณาโหลดข้อมูลใหม่",
         });
     });
+
+    it("preserves a server-provided resource-not-found message", async () => {
+        mocks.apiGet.mockResolvedValueOnce({
+            success: false as const,
+            error: "ไม่พบงานประจำ",
+            errorThai: "ไม่พบงานประจำ",
+            code: "UNKNOWN_ERROR" as const,
+            status: 404,
+        });
+
+        await expect(fetchLiffRoutineTask(71)).rejects.toMatchObject({
+            name: "LiffApiError",
+            status: 404,
+            message: "ไม่พบงานประจำ",
+        });
+    });
+
+    it("uses a resource-not-found fallback instead of the feature-disabled message", async () => {
+        mocks.apiGet.mockResolvedValueOnce({
+            success: false as const,
+            error: "Not found",
+            errorThai: "",
+            code: "UNKNOWN_ERROR" as const,
+            status: 404,
+        });
+
+        await expect(fetchLiffRoutineTask(71)).rejects.toMatchObject({
+            name: "LiffApiError",
+            status: 404,
+            message: "ไม่พบข้อมูล Routine ที่ต้องการ",
+        });
+    });
+
+    it("keeps the feature-disabled message for a feature guard response", async () => {
+        mocks.apiGet.mockResolvedValueOnce({
+            success: false as const,
+            error: "ขณะนี้ยังไม่เปิดใช้งาน Routine ผ่าน LIFF",
+            errorThai: "ขณะนี้ยังไม่เปิดใช้งาน Routine ผ่าน LIFF",
+            code: "UNKNOWN_ERROR" as const,
+            status: 404,
+        });
+
+        await expect(fetchLiffRoutineTask(71)).rejects.toMatchObject({
+            name: "LiffApiError",
+            status: 404,
+            message: "ขณะนี้ยังไม่เปิดใช้งาน Routine ผ่าน LIFF",
+        });
+    });
 });

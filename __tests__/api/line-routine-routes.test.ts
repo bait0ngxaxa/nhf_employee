@@ -223,6 +223,9 @@ describe("LIFF Routine API authorization", () => {
         );
 
         expect(response.status).toBe(404);
+        await expect(response.json()).resolves.toEqual({
+            error: "ขณะนี้ยังไม่เปิดใช้งาน Routine ผ่าน LIFF",
+        });
         expect(requireLiffWorkforceSessionMock).not.toHaveBeenCalled();
     });
 });

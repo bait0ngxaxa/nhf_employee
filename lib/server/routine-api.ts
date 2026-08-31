@@ -9,8 +9,13 @@ import { RoutineServiceError } from "@/lib/services/routine";
 
 export const ROUTINE_MAX_REQUEST_BYTES = 64 * 1024;
 
-export function routineFeatureGuard(): NextResponse | null {
-    return isFeatureEnabled(FEATURE_KEYS.routine) ? null : notFound();
+export function routineFeatureGuard(
+    surface: "web" | "liff" = "web",
+): NextResponse | null {
+    if (isFeatureEnabled(FEATURE_KEYS.routine)) return null;
+    return surface === "liff"
+        ? jsonError(ROUTINE_API_MESSAGES.liffFeatureDisabled, 404)
+        : notFound();
 }
 
 export function routineRequestSizeGuard(

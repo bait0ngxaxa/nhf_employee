@@ -913,6 +913,19 @@ describe("NHF Routine query authorization", () => {
                                 },
                             },
                         },
+                        {
+                            isActive: true,
+                            occurrences: {
+                                some: {
+                                    assignees: {
+                                        some: {
+                                            employeeId: 21,
+                                            employee: expect.any(Object),
+                                        },
+                                    },
+                                },
+                            },
+                        },
                     ],
                 },
             }),
@@ -948,6 +961,162 @@ describe("NHF Routine query authorization", () => {
                 }),
             }),
         );
+    });
+
+    it("allows an active occurrence-level assignee to view task detail without management", async () => {
+        const task = {
+            ...taskRow(71, 21),
+            unitId: 1,
+            categoryId: 1,
+            version: 2,
+            createdById: 99,
+            updatedById: 99,
+            createdAt: new Date("2026-08-01T00:00:00.000Z"),
+            updatedAt: new Date("2026-08-01T00:00:00.000Z"),
+            occurrences: [],
+        };
+        prismaMock.routineTask.findFirst.mockResolvedValue(asNever(task));
+
+        const result = await getLiffRoutineTaskById(71, {
+            actor: { id: 5, email: "user@example.com", role: "USER" },
+            employeeId: 42,
+        });
+
+        expect(result).toMatchObject({ id: 71, createdById: 99, canManage: false });
+        expect(prismaMock.routineTask.findFirst).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: {
+                    id: 71,
+                    OR: [
+                        { createdById: 5 },
+                        {
+                            isActive: true,
+                            assignees: {
+                                some: {
+                                    employeeId: 42,
+                                    employee: expect.any(Object),
+                                },
+                            },
+                        },
+                        {
+                            isActive: true,
+                            occurrences: {
+                                some: {
+                                    assignees: {
+                                        some: {
+                                            employeeId: 42,
+                                            employee: {
+                                                status: "ACTIVE",
+                                                deletedAt: null,
+                                                user: {
+                                                    is: {
+                                                        isActive: true,
+                                                        deletedAt: null,
+                                                    },
+                                                },
+                                            },
+                                        },
+                                    },
+                                },
+                            },
+                        },
+                    ],
+                },
+            }),
+        );
+    });
+
+    it("fails closed for inactive or deleted employees in task detail access", async () => {
+        prismaMock.routineTask.findFirst.mockResolvedValue(null);
+
+        await expect(
+            getLiffRoutineTaskById(71, {
+                actor: { id: 5, email: "user@example.com", role: "USER" },
+                employeeId: 42,
+            }),
+        ).rejects.toMatchObject({ statusCode: 404, code: "NOT_FOUND" });
+
+        expect(prismaMock.routineTask.findFirst).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: expect.objectContaining({
+                    OR: expect.arrayContaining([
+                        expect.objectContaining({
+                            isActive: true,
+                            assignees: {
+                                some: {
+                                    employeeId: 42,
+                                    employee: {
+                                        status: "ACTIVE",
+                                        deletedAt: null,
+                                        user: {
+                                            is: {
+                                                isActive: true,
+                                                deletedAt: null,
+                                            },
+                                        },
+                                    },
+                                },
+                            },
+                        }),
+                        expect.objectContaining({
+                            isActive: true,
+                            occurrences: expect.objectContaining({
+                                some: expect.objectContaining({
+                                    assignees: {
+                                        some: {
+                                            employeeId: 42,
+                                            employee: {
+                                                status: "ACTIVE",
+                                                deletedAt: null,
+                                                user: {
+                                                    is: {
+                                                        isActive: true,
+                                                        deletedAt: null,
+                                                    },
+                                                },
+                                            },
+                                        },
+                                    },
+                                }),
+                            }),
+                        }),
+                    ]),
+                }),
+            }),
+        );
+    });
+
+    it("does not let the ADMIN role override LIFF canManage", async () => {
+        const task = {
+            ...taskRow(71, 21),
+            unitId: 1,
+            categoryId: 1,
+            version: 2,
+            createdById: 88,
+            updatedById: 88,
+            createdAt: new Date("2026-08-01T00:00:00.000Z"),
+            updatedAt: new Date("2026-08-01T00:00:00.000Z"),
+            occurrences: [],
+        };
+        prismaMock.routineTask.findFirst.mockResolvedValue(asNever(task));
+
+        const result = await getLiffRoutineTaskById(71, {
+            actor: { id: 99, email: "admin@example.com", role: "ADMIN" },
+            employeeId: 21,
+        });
+
+        expect(result.canManage).toBe(false);
+    });
+
+    it("returns a not-found error when no active task or occurrence assignment grants access", async () => {
+        prismaMock.routineTask.findFirst.mockResolvedValue(null);
+
+        await expect(
+            getLiffRoutineTaskById(71, {
+                actor: { id: 5, email: "user@example.com", role: "USER" },
+                employeeId: 42,
+            }),
+        ).rejects.toMatchObject({ statusCode: 404, code: "NOT_FOUND" });
     });
 
     it("returns only the current employee in regular-user reference data", async () => {

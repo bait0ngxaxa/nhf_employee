@@ -1005,10 +1005,6 @@ function buildLiffRoutineTaskAccessWhere(
     queryActor: RoutineQueryActor,
     employeeId: number | null,
 ): Prisma.RoutineTaskWhereInput {
-    if (queryActor.actor.role === "ADMIN") {
-        return { id: taskId };
-    }
-
     return {
         id: taskId,
         OR: [
@@ -1021,6 +1017,19 @@ function buildLiffRoutineTaskAccessWhere(
                           some: {
                               employeeId,
                               employee: activeEmployeeWhere(),
+                          },
+                      },
+                  },
+                  {
+                      isActive: true,
+                      occurrences: {
+                          some: {
+                              assignees: {
+                                  some: {
+                                      employeeId,
+                                      employee: activeEmployeeWhere(),
+                                  },
+                              },
                           },
                       },
                   }]),
@@ -1039,9 +1048,7 @@ export async function getLiffRoutineTaskById(
     );
     return {
         ...task,
-        canManage:
-            queryActor.actor.role === "ADMIN"
-            || task.createdById === queryActor.actor.id,
+        canManage: task.createdById === queryActor.actor.id,
     };
 }
 
