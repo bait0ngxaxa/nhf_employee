@@ -3,6 +3,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import { requireLiffWorkforceSession } from "@/lib/auth/liff";
 import { WorkforceAuthorizationError } from "@/lib/auth/workforce-transaction";
 import { createStockCommandActor } from "@/lib/server/stock-command-actor";
+import { enforceStockJsonBodySize } from "@/lib/server/stock-api";
 import { executeCancelStockRequest } from "@/lib/server/stock-request-commands";
 import {
     enforceAuthenticatedMutationRateLimit,
@@ -29,6 +30,9 @@ export async function POST(
             "stock-request-cancel",
         );
         if (preAuthRateLimitResponse) return preAuthRateLimitResponse;
+
+        const bodySizeResponse = enforceStockJsonBodySize(request);
+        if (bodySizeResponse) return bodySizeResponse;
 
         const auth = await requireLiffWorkforceSession();
         if (!auth.ok) return auth.response;

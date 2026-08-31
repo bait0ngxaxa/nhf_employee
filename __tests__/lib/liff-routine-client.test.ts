@@ -21,12 +21,10 @@ import {
     fetchLiffRoutineTask,
     updateLiffRoutineTask,
 } from "@/lib/client/liff-routine";
+import { LIFF_API_REQUEST_OPTIONS } from "@/lib/client/liff";
 import { API_ROUTES } from "@/lib/ssot/routes";
 
-const OPTIONS = {
-    retryCount: 0,
-    skipAuthRefresh: true,
-};
+const OPTIONS = LIFF_API_REQUEST_OPTIONS;
 
 function success<T>(data: T) {
     return {

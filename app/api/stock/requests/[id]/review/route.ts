@@ -7,6 +7,7 @@ import {
 } from "@/lib/server/stock-request-commands";
 import { stockReviewActionSchema } from "@/lib/validations/stock";
 import { createStockCommandActor } from "@/lib/server/stock-command-actor";
+import { enforceStockJsonBodySize } from "@/lib/server/stock-api";
 import {
     enforceAuthenticatedMutationRateLimit,
     enforcePreAuthIpRateLimit,
@@ -21,6 +22,9 @@ export async function POST(
     { params }: RouteParams,
 ): Promise<NextResponse> {
     try {
+        const bodySizeResponse = enforceStockJsonBodySize(request);
+        if (bodySizeResponse) return bodySizeResponse;
+
         const auth = await requireAdminSession();
         if (!auth.ok) return auth.response;
 

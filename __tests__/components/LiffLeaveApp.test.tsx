@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { LeaveHistoryFilters } from "@/lib/services/leave/history-filters";
 
 const mocks = vi.hoisted(() => ({
     search: "",
@@ -43,10 +44,94 @@ vi.mock("@/components/liff/leave/LiffLeaveOverview", () => ({
     ),
 }));
 vi.mock("@/components/liff/leave/LiffLeaveHistory", () => ({
-    LiffLeaveHistory: () => <section>คำขอลาของฉัน</section>,
+    LiffLeaveHistory: ({
+        profile,
+        onApplyFilters,
+        onPageChange,
+        onOpenDetail,
+    }: {
+        profile: { history: Array<{ id: string }> };
+        onApplyFilters: (filters: LeaveHistoryFilters) => void;
+        onPageChange: (page: number) => void;
+        onOpenDetail: (requestId: string) => void;
+    }) => (
+        <section>
+            คำขอลาของฉัน
+            <span data-testid="history-current">
+                {profile.history[0]?.id ?? "none"}
+            </span>
+            <button
+                type="button"
+                data-testid="history-filter-old"
+                onClick={() => onApplyFilters({ query: "old" })}
+            >
+                filter-old
+            </button>
+            <button
+                type="button"
+                data-testid="history-filter-new"
+                onClick={() => onApplyFilters({ query: "new" })}
+            >
+                filter-new
+            </button>
+            <button
+                type="button"
+                data-testid="history-page-two"
+                onClick={() => onPageChange(2)}
+            >
+                page-two
+            </button>
+            <button
+                type="button"
+                data-testid="history-detail-a"
+                onClick={() => onOpenDetail("leave-a")}
+            >
+                detail-a
+            </button>
+            <button
+                type="button"
+                data-testid="history-detail-b"
+                onClick={() => onOpenDetail("leave-b")}
+            >
+                detail-b
+            </button>
+        </section>
+    ),
 }));
 vi.mock("@/components/liff/leave/LiffLeaveApprovals", () => ({
-    LiffLeaveApprovals: () => <section>ไม่มีรายการรอพิจารณา</section>,
+    LiffLeaveApprovals: ({
+        approvals,
+        onPageChange,
+    }: {
+        approvals: {
+            metadata: { pending: { currentPage: number } };
+        };
+        onPageChange: (
+            category: "pending" | "notTakenPending" | "cancellationPending",
+            page: number,
+        ) => void;
+    }) => (
+        <section>
+            ไม่มีรายการรอพิจารณา
+            <span data-testid="approval-current-page">
+                {approvals.metadata.pending.currentPage}
+            </span>
+            <button
+                type="button"
+                data-testid="approval-page-two"
+                onClick={() => onPageChange("pending", 2)}
+            >
+                approval-page-two
+            </button>
+            <button
+                type="button"
+                data-testid="approval-page-three"
+                onClick={() => onPageChange("pending", 3)}
+            >
+                approval-page-three
+            </button>
+        </section>
+    ),
 }));
 vi.mock("@/components/liff/leave/LiffLeaveRequestForm", () => ({
     LiffLeaveRequestForm: ({ open }: { open: boolean }) => open
@@ -57,11 +142,24 @@ vi.mock("@/components/liff/leave/LiffLeaveRequestDetail", () => ({
     LiffLeaveRequestDetail: ({
         detail,
         actionIntent,
+        onOpenChange,
     }: {
         detail: { id: string } | null;
         actionIntent: string | null;
+        onOpenChange: (open: boolean) => void;
     }) => detail
-        ? <div>รายละเอียด {detail.id} intent {actionIntent ?? "none"}</div>
+        ? (
+            <div>
+                รายละเอียด {detail.id} intent {actionIntent ?? "none"}
+                <button
+                    type="button"
+                    data-testid="close-detail"
+                    onClick={() => onOpenChange(false)}
+                >
+                    close-detail
+                </button>
+            </div>
+        )
         : null,
 }));
 vi.mock("@/components/liff/leave/LiffLeaveDecisionSheet", () => ({
@@ -95,6 +193,20 @@ function approvals(hasActionableWork: boolean) {
         },
         hasActionableWork,
     };
+}
+
+function deferred<T>(): {
+    promise: Promise<T>;
+    resolve: (value: T) => void;
+    reject: (reason?: unknown) => void;
+} {
+    let resolvePromise: (value: T) => void = () => undefined;
+    let rejectPromise: (reason?: unknown) => void = () => undefined;
+    const promise = new Promise<T>((resolve, reject) => {
+        resolvePromise = resolve;
+        rejectPromise = reject;
+    });
+    return { promise, resolve: resolvePromise, reject: rejectPromise };
 }
 
 describe("LIFF Leave app orchestration", () => {
@@ -205,5 +317,123 @@ describe("LIFF Leave app orchestration", () => {
         expect(await screen.findByText("ลิงก์คำขอลาไม่ถูกต้อง กำลังแสดงรายการของคุณตามปกติ"))
             .toBeInTheDocument();
         expect(mocks.fetchRequest).not.toHaveBeenCalled();
+    });
+
+    it("keeps the newest history response when filters change quickly", async () => {
+        type ProfileWithHistory = Omit<typeof PROFILE, "history"> & {
+            history: Array<{ id: string }>;
+        };
+        const oldProfile = deferred<ProfileWithHistory>();
+        const newProfile = deferred<ProfileWithHistory>();
+        mocks.fetchProfile.mockImplementation((input: { filters?: LeaveHistoryFilters }) => {
+            if (input.filters?.query === "old") return oldProfile.promise;
+            if (input.filters?.query === "new") return newProfile.promise;
+            return Promise.resolve(PROFILE);
+        });
+
+        render(<LiffLeaveApp />);
+        await screen.findByRole("heading", { name: "Leave" });
+        fireEvent.click(screen.getByTestId("history-filter-old"));
+        fireEvent.click(screen.getByTestId("history-filter-new"));
+
+        newProfile.resolve({ ...PROFILE, history: [{ id: "new" }] });
+        expect(await screen.findByTestId("history-current")).toHaveTextContent("new");
+        oldProfile.resolve({ ...PROFILE, history: [{ id: "old" }] });
+        await waitFor(() => {
+            expect(screen.getByTestId("history-current")).toHaveTextContent("new");
+        });
+    });
+
+    it("does not let an older Leave detail replace the selected request", async () => {
+        type TestDetail = {
+            id: string;
+            viewerRole: "REQUESTER";
+            availableActions: [];
+        };
+        const detailA = deferred<TestDetail>();
+        const detailB = deferred<TestDetail>();
+        mocks.fetchRequest.mockImplementation((requestId: string) =>
+            requestId === "leave-a" ? detailA.promise : detailB.promise,
+        );
+
+        render(<LiffLeaveApp />);
+        await screen.findByRole("heading", { name: "Leave" });
+        fireEvent.click(screen.getByTestId("history-detail-a"));
+        fireEvent.click(screen.getByTestId("history-detail-b"));
+
+        detailB.resolve({ id: "leave-b", viewerRole: "REQUESTER", availableActions: [] });
+        expect(await screen.findByText("รายละเอียด leave-b intent none")).toBeInTheDocument();
+        detailA.resolve({ id: "leave-a", viewerRole: "REQUESTER", availableActions: [] });
+        await waitFor(() => {
+            expect(screen.getByText("รายละเอียด leave-b intent none")).toBeInTheDocument();
+        });
+        expect(screen.queryByText("รายละเอียด leave-a intent none")).not.toBeInTheDocument();
+    });
+
+    it("keeps the current approver page when an older page response arrives late", async () => {
+        const pageTwo = deferred<ReturnType<typeof approvals>>();
+        const pageThree = deferred<ReturnType<typeof approvals>>();
+        mocks.fetchHome.mockResolvedValueOnce({
+            workforce: { userId: 1, employeeId: 1, name: "หัวหน้า ทดสอบ" },
+            modules: {},
+            capabilities: { canApproveLeave: true },
+        });
+        mocks.fetchApprovals.mockResolvedValue(approvals(true));
+
+        render(<LiffLeaveApp />);
+        const approvalsTab = await screen.findByRole("tab", { name: /รอพิจารณา/ });
+        fireEvent.mouseDown(approvalsTab, { button: 0, ctrlKey: false });
+        expect(await screen.findByTestId("approval-current-page")).toHaveTextContent("1");
+
+        mocks.fetchApprovals.mockImplementation((pages: { pendingPage: number }) =>
+            pages.pendingPage === 2 ? pageTwo.promise : pageThree.promise,
+        );
+        fireEvent.click(screen.getByTestId("approval-page-two"));
+        fireEvent.click(screen.getByTestId("approval-page-three"));
+
+        pageThree.resolve({
+            ...approvals(true),
+            metadata: {
+                ...approvals(true).metadata,
+                pending: { ...approvals(true).metadata.pending, currentPage: 3 },
+            },
+        });
+        expect(await screen.findByTestId("approval-current-page")).toHaveTextContent("3");
+        pageTwo.resolve({
+            ...approvals(true),
+            metadata: {
+                ...approvals(true).metadata,
+                pending: { ...approvals(true).metadata.pending, currentPage: 2 },
+            },
+        });
+        await waitFor(() => {
+            expect(screen.getByTestId("approval-current-page")).toHaveTextContent("3");
+        });
+    });
+
+    it("clears a deep-link action intent before opening another Leave request", async () => {
+        mocks.search = "requestId=leave-a&action=approve";
+        mocks.fetchRequest
+            .mockResolvedValueOnce({
+                id: "leave-a",
+                viewerRole: "APPROVER",
+                availableActions: ["APPROVE"],
+            })
+            .mockResolvedValueOnce({
+                id: "leave-b",
+                viewerRole: "REQUESTER",
+                availableActions: [],
+            });
+
+        render(<LiffLeaveApp />);
+        expect(await screen.findByText("รายละเอียด leave-a intent approve")).toBeInTheDocument();
+        fireEvent.click(screen.getByTestId("close-detail"));
+        fireEvent.mouseDown(screen.getByRole("tab", { name: "วันลาของฉัน" }), {
+            button: 0,
+            ctrlKey: false,
+        });
+        fireEvent.click(screen.getByTestId("history-detail-b"));
+
+        expect(await screen.findByText("รายละเอียด leave-b intent none")).toBeInTheDocument();
     });
 });

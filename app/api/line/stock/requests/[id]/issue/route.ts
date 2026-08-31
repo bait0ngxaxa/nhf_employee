@@ -2,6 +2,7 @@ import { type NextRequest, NextResponse } from "next/server";
 
 import { requireLiffStockProcessorSession } from "@/lib/server/liff-stock-auth";
 import { createStockCommandActor } from "@/lib/server/stock-command-actor";
+import { enforceStockJsonBodySize } from "@/lib/server/stock-api";
 import { executeIssueStockRequest } from "@/lib/server/stock-request-commands";
 import {
     enforceAuthenticatedMutationRateLimit,
@@ -27,6 +28,9 @@ export async function POST(
             "stock-request-issue",
         );
         if (preAuthRateLimitResponse) return preAuthRateLimitResponse;
+
+        const bodySizeResponse = enforceStockJsonBodySize(request);
+        if (bodySizeResponse) return bodySizeResponse;
 
         const auth = await requireLiffStockProcessorSession();
         if (!auth.ok) return auth.response;

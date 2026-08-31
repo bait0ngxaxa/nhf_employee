@@ -36,6 +36,10 @@ export interface LeaveRequestActor {
     userEmail: string;
 }
 
+export type LeaveRequestResponseSerializer = (
+    request: CreatedLeaveRequest,
+) => object;
+
 async function cleanupAttachments(
     attachments: readonly StoredLeaveAttachment[],
 ): Promise<void> {
@@ -91,6 +95,7 @@ export async function handleLeaveRequestSubmission(
     request: NextRequest,
     actor: LeaveRequestActor,
     buildAttachmentUrl?: LeaveAttachmentUrlBuilder,
+    serializeResponse?: LeaveRequestResponseSerializer,
 ): Promise<NextResponse> {
     let storedAttachments: StoredLeaveAttachment[] = [];
     let transactionCommitted = false;
@@ -134,7 +139,9 @@ export async function handleLeaveRequestSubmission(
         return NextResponse.json(
             {
                 success: true,
-                data: createResponseData(result.request, buildAttachmentUrl),
+                data: serializeResponse
+                    ? serializeResponse(result.request)
+                    : createResponseData(result.request, buildAttachmentUrl),
             },
             { status: result.replayed ? 200 : 201 },
         );

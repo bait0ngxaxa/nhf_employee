@@ -5,6 +5,7 @@ import {
     type ApiResponse,
 } from "@/lib/client/api-client";
 import {
+    fetchLiffWithSessionRecovery,
     LIFF_API_REQUEST_OPTIONS,
     LiffApiError,
     unwrapLiffResponse,
@@ -170,11 +171,14 @@ export async function fetchLiffLeaveAttachment(
     attachmentId: string,
     signal?: AbortSignal,
 ): Promise<Blob> {
-    const response = await fetch(API_ROUTES.line.leaveAttachmentById(attachmentId), {
-        cache: "no-store",
-        credentials: "include",
-        ...(signal ? { signal } : {}),
-    });
+    const response = await fetchLiffWithSessionRecovery(
+        API_ROUTES.line.leaveAttachmentById(attachmentId),
+        {
+            cache: "no-store",
+            credentials: "include",
+            ...(signal ? { signal } : {}),
+        },
+    );
     if (!response.ok) {
         throw new LiffApiError(
             response.status === 401

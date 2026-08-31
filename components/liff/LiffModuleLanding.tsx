@@ -2,6 +2,7 @@ import {
     ArrowRight,
     Boxes,
     CalendarRange,
+    ClipboardCheck,
     CircleCheck,
     CircleOff,
 } from "lucide-react";
@@ -12,7 +13,7 @@ import type { ReactElement } from "react";
 import { cn } from "@/lib/ui/utils";
 import { APP_ROUTES } from "@/lib/ssot/routes";
 
-export type LiffLandingModule = "stock" | "leave";
+export type LiffLandingModule = "stock" | "leave" | "routine";
 
 interface LiffModuleLandingProps {
     module: LiffLandingModule;
@@ -48,6 +49,15 @@ const MODULE_CONFIG: Record<
         icon: CalendarRange,
         accentClassName: "bg-module-leave-badge-surface text-module-leave-badge-foreground",
         iconClassName: "border-module-leave-badge-border bg-module-leave-badge-surface text-module-leave-solid",
+    },
+    routine: {
+        label: "Routine",
+        title: "งาน Routine ของฉัน",
+        description: "บริการ Routine บน LINE กำลังเตรียมให้ใช้งานในขั้นถัดไป",
+        nextDescription: "ระยะนี้คุณยังใช้ Routine ผ่าน NHFapp บนเว็บได้ตามสิทธิ์เดิม",
+        icon: ClipboardCheck,
+        accentClassName: "bg-brand-surface text-brand-strong",
+        iconClassName: "border-brand-border bg-brand-surface text-brand-strong",
     },
 };
 

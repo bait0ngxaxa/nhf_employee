@@ -23,6 +23,7 @@ const mocks = vi.hoisted(() => {
         usePathname: vi.fn(),
         establishLiffSession: vi.fn(),
         linkLiffAccount: vi.fn(),
+        registerLiffSessionRecovery: vi.fn(),
         MockLiffApiError,
     };
 });
@@ -36,6 +37,7 @@ vi.mock("next/navigation", () => ({
 vi.mock("@/lib/client/liff", () => ({
     establishLiffSession: mocks.establishLiffSession,
     linkLiffAccount: mocks.linkLiffAccount,
+    registerLiffSessionRecovery: mocks.registerLiffSessionRecovery,
     LiffApiError: mocks.MockLiffApiError,
 }));
 
@@ -74,6 +76,7 @@ describe("LiffBootstrap", () => {
             linked: true,
             workforce: WORKFORCE,
         });
+        mocks.registerLiffSessionRecovery.mockReturnValue(vi.fn());
     });
 
     afterEach(() => {
@@ -173,7 +176,7 @@ describe("LiffBootstrap", () => {
         window.history.replaceState(
             null,
             "",
-            "/liff/routine?taskId=71&occurrenceId=91",
+            "/liff/routine?taskId=71&occurrenceId=91&liff.state=provider-secret",
         );
         mocks.liff.isLoggedIn.mockReturnValue(false);
 
@@ -187,6 +190,33 @@ describe("LiffBootstrap", () => {
                 "http://localhost:3000/liff/routine?taskId=71&occurrenceId=91&lineLogin=1",
         });
         expect(mocks.liff.getIDToken).not.toHaveBeenCalled();
+    });
+
+    it("re-establishes the shared session through the registered recovery handler", async () => {
+        let recover: (() => Promise<boolean>) | undefined;
+        mocks.registerLiffSessionRecovery.mockImplementationOnce(
+            (handler: () => Promise<boolean>) => {
+                recover = handler;
+                return vi.fn();
+            },
+        );
+
+        render(<LiffBootstrap><WorkforceProbe /></LiffBootstrap>);
+        expect(
+            await screen.findByText("พร้อมใช้งานสำหรับ พนักงาน ทดสอบ"),
+        ).toBeInTheDocument();
+
+        if (!recover) throw new Error("Expected a LIFF recovery handler");
+        mocks.establishLiffSession.mockResolvedValueOnce({
+            linked: true,
+            workforce: { ...WORKFORCE, name: "พนักงานหลังต่ออายุ" },
+        });
+
+        await expect(recover()).resolves.toBe(true);
+        expect(
+            await screen.findByText("พร้อมใช้งานสำหรับ พนักงานหลังต่ออายุ"),
+        ).toBeInTheDocument();
+        expect(mocks.establishLiffSession).toHaveBeenCalledTimes(2);
     });
 
     it("stops an incomplete LINE Login without creating a redirect loop", async () => {

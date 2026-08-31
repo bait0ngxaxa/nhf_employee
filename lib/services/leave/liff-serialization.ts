@@ -15,6 +15,20 @@ import type {
     LiffLeaveRequestDetail,
 } from "@/lib/types/leave";
 
+export interface LiffLeaveMutationResponse {
+    id: string;
+    status: LeaveStatusValue;
+}
+
+export function toLiffLeaveMutationResponse(
+    request: Pick<LeaveRequestSummary, "id" | "status">,
+): LiffLeaveMutationResponse {
+    return {
+        id: request.id,
+        status: request.status,
+    };
+}
+
 type LiffLeaveRequestSummary = Omit<
     LeaveRequestSummary,
     | "employeeId"

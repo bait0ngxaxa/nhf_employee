@@ -68,6 +68,7 @@ import {
     POST as createRequest,
 } from "@/app/api/line/stock/requests/route";
 import { StockRequestIdempotencyConflictError } from "@/lib/services/stock/request-idempotency";
+import { STOCK_JSON_MUTATION_MAX_BYTES } from "@/lib/server/stock-api";
 
 const USER_AUTH = {
     ok: true as const,
@@ -469,6 +470,24 @@ describe("LIFF Stock route adapters", () => {
             },
         ));
         expect(missingKeyResponse.status).toBe(400);
+        expect(mocks.createRequest).not.toHaveBeenCalled();
+    });
+
+    it("rejects oversized Stock mutations before parsing or authorization", async () => {
+        const response = await createRequest(request(
+            "/api/line/stock/requests",
+            {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Content-Length": String(STOCK_JSON_MUTATION_MAX_BYTES + 1),
+                },
+                body: "{}",
+            },
+        ));
+
+        expect(response.status).toBe(413);
+        expect(mocks.requireLiffWorkforceSession).not.toHaveBeenCalled();
         expect(mocks.createRequest).not.toHaveBeenCalled();
     });
 

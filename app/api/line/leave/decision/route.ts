@@ -6,7 +6,7 @@ import {
     decideLeaveRequest,
     LeaveApprovalError,
 } from "@/lib/services/leave/decision";
-import { toLeaveRequestDays } from "@/lib/services/leave/half-days";
+import { toLiffLeaveMutationResponse } from "@/lib/services/leave/liff-serialization";
 import { processOutbox } from "@/lib/services/outbox/processor";
 import {
     enforceAuthenticatedMutationRateLimit,
@@ -60,7 +60,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         });
         return NextResponse.json({
             success: true,
-            data: toLeaveRequestDays(result),
+            data: toLiffLeaveMutationResponse(result),
         });
     } catch (error) {
         if (error instanceof LeaveApprovalError) {

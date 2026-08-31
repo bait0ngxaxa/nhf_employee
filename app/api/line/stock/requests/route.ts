@@ -3,6 +3,7 @@ import { after, type NextRequest, NextResponse } from "next/server";
 import { requireLiffWorkforceSession } from "@/lib/auth/liff";
 import { WorkforceAuthorizationError } from "@/lib/auth/workforce-transaction";
 import { createStockCommandActor } from "@/lib/server/stock-command-actor";
+import { enforceStockJsonBodySize } from "@/lib/server/stock-api";
 import {
     enforceAuthenticatedMutationRateLimit,
     enforcePreAuthIpRateLimit,
@@ -61,6 +62,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
             "stock-request-create",
         );
         if (preAuthRateLimitResponse) return preAuthRateLimitResponse;
+
+        const bodySizeResponse = enforceStockJsonBodySize(request);
+        if (bodySizeResponse) return bodySizeResponse;
 
         const parsedBody = createRequestSchema.safeParse(await request.json());
         if (!parsedBody.success) {

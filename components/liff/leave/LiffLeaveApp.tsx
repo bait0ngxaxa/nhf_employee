@@ -85,7 +85,7 @@ export function LiffLeaveApp(): ReactElement {
     const actionIntent = rawActionIntent && DEEP_LINK_ACTIONS.has(rawActionIntent)
         ? rawActionIntent
         : null;
-    const deepLinkHandledRef = useRef(false);
+    const deepLinkHandledRef = useRef<string | null>(null);
     const [state, setState] = useState<LeaveViewState>("LOADING");
     const [viewError, setViewError] = useState<string | null>(null);
     const [profile, setProfile] = useState<LiffLeaveProfileResponse | null>(null);
@@ -101,32 +101,54 @@ export function LiffLeaveApp(): ReactElement {
     const [isApprovalsLoading, setIsApprovalsLoading] = useState(false);
     const [requestFormOpen, setRequestFormOpen] = useState(false);
     const [selectedDetail, setSelectedDetail] = useState<LiffLeaveRequestDetailData | null>(null);
+    const [selectedDetailActionIntent, setSelectedDetailActionIntent] = useState<string | null>(null);
     const [focusNotice, setFocusNotice] = useState<string | null>(null);
     const [mutationIntent, setMutationIntent] = useState<LiffLeaveMutationIntent | null>(null);
     const [mutationError, setMutationError] = useState<string | null>(null);
     const [isMutating, setIsMutating] = useState(false);
 
+    const initialRequestSequenceRef = useRef(0);
+    const profileRequestSequenceRef = useRef(0);
+    const approvalsRequestSequenceRef = useRef(0);
+    const capabilityRequestSequenceRef = useRef(0);
+    const detailRequestSequenceRef = useRef(0);
+
+    useEffect(() => () => {
+        initialRequestSequenceRef.current += 1;
+        profileRequestSequenceRef.current += 1;
+        approvalsRequestSequenceRef.current += 1;
+        capabilityRequestSequenceRef.current += 1;
+        detailRequestSequenceRef.current += 1;
+    }, []);
+
     const refreshApprovals = useCallback(async (
         pages: typeof INITIAL_APPROVAL_PAGES,
     ): Promise<void> => {
+        const requestSequence = ++approvalsRequestSequenceRef.current;
         setIsApprovalsLoading(true);
         setApprovalError(null);
         try {
             const nextApprovals = await fetchLiffLeaveApprovals(pages);
+            if (requestSequence !== approvalsRequestSequenceRef.current) return;
             setApprovals(nextApprovals);
             if (nextApprovals.hasActionableWork) setHadApprovalWork(true);
         } catch (error) {
+            if (requestSequence !== approvalsRequestSequenceRef.current) return;
             const message = getViewError(error);
             setApprovalError(message);
             toast.error(message);
         } finally {
-            setIsApprovalsLoading(false);
+            if (requestSequence === approvalsRequestSequenceRef.current) {
+                setIsApprovalsLoading(false);
+            }
         }
     }, []);
 
     const loadApproverExperience = useCallback(async (): Promise<void> => {
+        const requestSequence = ++capabilityRequestSequenceRef.current;
         try {
             const home = await fetchLiffHome();
+            if (requestSequence !== capabilityRequestSequenceRef.current) return;
             if (!home.capabilities.canApproveLeave) return;
 
             setCanApproveLeave(true);
@@ -137,15 +159,29 @@ export function LiffLeaveApp(): ReactElement {
     }, [refreshApprovals]);
 
     const loadInitialData = useCallback(async (): Promise<void> => {
+        const requestSequence = ++initialRequestSequenceRef.current;
+        profileRequestSequenceRef.current += 1;
+        approvalsRequestSequenceRef.current += 1;
+        capabilityRequestSequenceRef.current += 1;
+        detailRequestSequenceRef.current += 1;
         setState("LOADING");
         setViewError(null);
         setApprovalError(null);
         setCanApproveLeave(false);
+        setApprovals(EMPTY_APPROVALS);
+        setHadApprovalWork(false);
+        setIsProfileLoading(false);
+        setIsApprovalsLoading(false);
+        setSelectedDetail(null);
+        setSelectedDetailActionIntent(null);
         try {
-            setProfile(await fetchLiffLeaveProfile({ page: 1 }));
+            const nextProfile = await fetchLiffLeaveProfile({ page: 1 });
+            if (requestSequence !== initialRequestSequenceRef.current) return;
+            setProfile(nextProfile);
             setState("READY");
             void loadApproverExperience();
         } catch (error) {
+            if (requestSequence !== initialRequestSequenceRef.current) return;
             setViewError(getViewError(error));
             setState("ERROR");
         }
@@ -159,9 +195,13 @@ export function LiffLeaveApp(): ReactElement {
         requestId: string,
         intent: string | null = null,
     ): Promise<void> => {
+        const requestSequence = ++detailRequestSequenceRef.current;
         setFocusNotice(null);
+        setSelectedDetail(null);
+        setSelectedDetailActionIntent(intent);
         try {
             const detail = await fetchLiffLeaveRequest(requestId);
+            if (requestSequence !== detailRequestSequenceRef.current) return;
             setSelectedDetail(detail);
             if (detail.viewerRole === "APPROVER" && detail.availableActions.length > 0) {
                 setHadApprovalWork(true);
@@ -170,6 +210,9 @@ export function LiffLeaveApp(): ReactElement {
                 }
             }
         } catch (error) {
+            if (requestSequence !== detailRequestSequenceRef.current) return;
+            setSelectedDetail(null);
+            setSelectedDetailActionIntent(null);
             setFocusNotice(
                 error instanceof LiffApiError && error.status === 404
                     ? "ไม่พบคำขอลานี้ หรือคุณไม่มีสิทธิ์ดูรายการดังกล่าว"
@@ -181,12 +224,14 @@ export function LiffLeaveApp(): ReactElement {
     useEffect(() => {
         if (
             state !== "READY"
-            || deepLinkHandledRef.current
             || !deepLinkRequestId
         ) {
+            if (!deepLinkRequestId) deepLinkHandledRef.current = null;
             return;
         }
-        deepLinkHandledRef.current = true;
+        const deepLinkKey = `${deepLinkRequestId}:${actionIntent ?? ""}`;
+        if (deepLinkHandledRef.current === deepLinkKey) return;
+        deepLinkHandledRef.current = deepLinkKey;
         if (!/^[A-Za-z0-9_-]{1,64}$/.test(deepLinkRequestId)) {
             setFocusNotice("ลิงก์คำขอลาไม่ถูกต้อง กำลังแสดงรายการของคุณตามปกติ");
             return;
@@ -198,13 +243,19 @@ export function LiffLeaveApp(): ReactElement {
         page: number = profilePage,
         filters: LeaveHistoryFilters = historyFilters,
     ): Promise<void> => {
+        const requestSequence = ++profileRequestSequenceRef.current;
         setIsProfileLoading(true);
         try {
-            setProfile(await fetchLiffLeaveProfile({ page, filters }));
+            const nextProfile = await fetchLiffLeaveProfile({ page, filters });
+            if (requestSequence !== profileRequestSequenceRef.current) return;
+            setProfile(nextProfile);
         } catch (error) {
+            if (requestSequence !== profileRequestSequenceRef.current) return;
             toast.error(getViewError(error));
         } finally {
-            setIsProfileLoading(false);
+            if (requestSequence === profileRequestSequenceRef.current) {
+                setIsProfileLoading(false);
+            }
         }
     }, [historyFilters, profilePage]);
 
@@ -212,7 +263,9 @@ export function LiffLeaveApp(): ReactElement {
         action: EmployeeLeaveAction | ApproverLeaveAction,
         request: LiffEmployeeLeaveRequest | LiffLeaveApprovalItem | LiffLeaveRequestDetailData,
     ): void => {
+        detailRequestSequenceRef.current += 1;
         setSelectedDetail(null);
+        setSelectedDetailActionIntent(null);
         setMutationError(null);
         setMutationIntent({
             requestId: request.id,
@@ -386,9 +439,13 @@ export function LiffLeaveApp(): ReactElement {
             />
             <LiffLeaveRequestDetail
                 detail={selectedDetail}
-                actionIntent={actionIntent}
+                actionIntent={selectedDetailActionIntent}
                 onOpenChange={(open) => {
-                    if (!open) setSelectedDetail(null);
+                    if (!open) {
+                        detailRequestSequenceRef.current += 1;
+                        setSelectedDetail(null);
+                        setSelectedDetailActionIntent(null);
+                    }
                 }}
                 onAction={startAction}
             />

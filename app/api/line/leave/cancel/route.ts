@@ -8,7 +8,7 @@ import {
     LeaveCancellationError,
     rejectLeaveCancellation,
 } from "@/lib/services/leave/cancellation";
-import { toLeaveRequestDays } from "@/lib/services/leave/half-days";
+import { toLiffLeaveMutationResponse } from "@/lib/services/leave/liff-serialization";
 import { processOutbox } from "@/lib/services/outbox/processor";
 import {
     enforceAuthenticatedMutationRateLimit,
@@ -82,7 +82,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         scheduleOutbox();
         return NextResponse.json({
             success: true,
-            data: toLeaveRequestDays(result.request),
+            data: toLiffLeaveMutationResponse(result.request),
         });
     } catch (error) {
         if (error instanceof LeaveCancellationError) {
@@ -119,7 +119,7 @@ export async function PUT(req: NextRequest): Promise<NextResponse> {
         scheduleOutbox();
         return NextResponse.json({
             success: true,
-            data: toLeaveRequestDays(result.request),
+            data: toLiffLeaveMutationResponse(result.request),
         });
     } catch (error) {
         if (error instanceof LeaveCancellationError) {

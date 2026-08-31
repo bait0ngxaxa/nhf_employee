@@ -18,6 +18,7 @@ import {
     establishLiffSession,
     LiffApiError,
     linkLiffAccount,
+    registerLiffSessionRecovery,
     type LiffWorkforceIdentity,
 } from "@/lib/client/liff";
 import { isSafeInternalPath } from "@/lib/auth/return-path";
@@ -82,12 +83,14 @@ function buildLineLoginRedirectUri(currentUrl: URL): string {
         throw new Error("Invalid LIFF return path");
     }
     const redirectUrl = new URL(currentUrl.toString());
+    removeProviderSearchParams(redirectUrl);
     redirectUrl.searchParams.set("lineLogin", "1");
     return redirectUrl.toString();
 }
 
 function clearBootstrapMarkersFromUrl(...markers: string[]): void {
     const url = new URL(window.location.href);
+    removeProviderSearchParams(url);
     for (const marker of markers) {
         url.searchParams.delete(marker);
     }
@@ -167,6 +170,32 @@ export function LiffBootstrap({ children }: LiffBootstrapProps): ReactElement {
     const [retryNonce, setRetryNonce] = useState(0);
 
     useEffect(() => {
+        let active = true;
+        const unregister = registerLiffSessionRecovery(
+            async (): Promise<boolean> => {
+                if (!active || !liff.isLoggedIn()) return false;
+
+                const idToken = liff.getIDToken();
+                if (!idToken) return false;
+
+                const session = await establishLiffSession(idToken);
+                if (!active || !session.linked) return false;
+
+                setWorkforce(session.workforce);
+                return true;
+            },
+            (): void => {
+                if (typeof window !== "undefined") window.location.reload();
+            },
+        );
+
+        return () => {
+            active = false;
+            unregister();
+        };
+    }, []);
+
+    useEffect(() => {
         let cancelled = false;
 
         const bootstrap = async (): Promise<void> => {
@@ -186,6 +215,8 @@ export function LiffBootstrap({ children }: LiffBootstrapProps): ReactElement {
                     currentUrl.searchParams.get("loginReturn") === "1";
                 const lineLoginAttempted =
                     currentUrl.searchParams.get("lineLogin") === "1";
+
+                clearBootstrapMarkersFromUrl();
 
                 if (!liff.isLoggedIn()) {
                     if (lineLoginAttempted) {

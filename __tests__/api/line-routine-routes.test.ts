@@ -215,6 +215,17 @@ describe("LIFF Routine API authorization", () => {
         expect(getRoutineTaskWorkItemsMock).not.toHaveBeenCalled();
     });
 
+    it("rejects non-safe deep-link IDs before querying the Routine service", async () => {
+        const response = await tasksRoute(
+            getRequest(
+                "/api/line/routine/tasks?taskId=9007199254740992&occurrenceId=91",
+            ),
+        );
+
+        expect(response.status).toBe(400);
+        expect(getRoutineTaskWorkItemsMock).not.toHaveBeenCalled();
+    });
+
     it("follows the existing Routine feature guard", async () => {
         vi.stubEnv("NEXT_PUBLIC_FEATURE_ROUTINE", "false");
 

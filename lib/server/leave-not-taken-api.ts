@@ -39,6 +39,7 @@ import {
     leaveNotTakenRequestSchema,
 } from "@/lib/validations/leave";
 import { halfDaysToDays, toLeaveRequestDays } from "@/lib/services/leave/half-days";
+import type { LiffLeaveMutationResponse } from "@/lib/services/leave/liff-serialization";
 import {
     createLeaveAuditInTransaction,
     lockLeaveRequestRow,
@@ -78,9 +79,14 @@ export interface LeaveNotTakenApiActor {
     employeeId: number;
 }
 
+type LeaveNotTakenResponseSerializer = (
+    request: { id: string; status: LiffLeaveMutationResponse["status"] },
+) => LiffLeaveMutationResponse;
+
 export async function handleLeaveNotTakenRequest(
     req: NextRequest,
     auth: LeaveNotTakenApiActor,
+    serializeResponse?: LeaveNotTakenResponseSerializer,
 ): Promise<NextResponse> {
     try {
         const userId = auth.user.id;
@@ -242,7 +248,9 @@ export async function handleLeaveNotTakenRequest(
 
         return NextResponse.json({
             success: true,
-            data: toLeaveRequestDays(result.request),
+            data: serializeResponse
+                ? serializeResponse(result.request)
+                : toLeaveRequestDays(result.request),
         });
     } catch (error) {
         console.error("Leave not-taken request error:", error);
@@ -256,7 +264,10 @@ export async function handleLeaveNotTakenRequest(
 export async function handleLeaveNotTakenConfirmation(
     req: NextRequest,
     auth: LeaveNotTakenApiActor,
-    options: { allowAdminOverride: boolean },
+    options: {
+        allowAdminOverride: boolean;
+        serializeResponse?: LeaveNotTakenResponseSerializer;
+    },
 ): Promise<NextResponse> {
     try {
         const userId = auth.user.id;
@@ -487,7 +498,12 @@ export async function handleLeaveNotTakenConfirmation(
             );
         });
 
-        return NextResponse.json({ success: true, data: toLeaveRequestDays(result.request) });
+        return NextResponse.json({
+            success: true,
+            data: options.serializeResponse
+                ? options.serializeResponse(result.request)
+                : toLeaveRequestDays(result.request),
+        });
     } catch (error) {
         console.error("Leave not-taken confirm error:", error);
         if (error instanceof LeaveNotTakenError) {

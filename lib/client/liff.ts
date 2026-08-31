@@ -1,4 +1,8 @@
-import { apiPost, type ApiResponse } from "@/lib/client/api-client";
+import {
+    apiPost,
+    type ApiResponse,
+    type UnauthorizedRecoveryHandler,
+} from "@/lib/client/api-client";
 import type { LiffSessionResponse } from "@/lib/line/liff-types";
 import { API_ROUTES } from "@/lib/ssot/routes";
 
@@ -18,6 +22,89 @@ export class LiffApiError extends Error {
         this.status = status;
         this.details = details;
     }
+}
+
+type LiffSessionRecoveryHandler = () => Promise<boolean>;
+type LiffRebootstrapHandler = () => void;
+
+let activeRecoveryHandler: LiffSessionRecoveryHandler | null = null;
+let activeRebootstrapHandler: LiffRebootstrapHandler | null = null;
+let recoveryInFlight: {
+    handler: LiffSessionRecoveryHandler;
+    promise: Promise<boolean>;
+} | null = null;
+let rebootstrapRequested = false;
+
+export function registerLiffSessionRecovery(
+    handler: LiffSessionRecoveryHandler,
+    rebootstrap: LiffRebootstrapHandler,
+): () => void {
+    activeRecoveryHandler = handler;
+    activeRebootstrapHandler = rebootstrap;
+    rebootstrapRequested = false;
+
+    return () => {
+        if (activeRecoveryHandler !== handler) return;
+        activeRecoveryHandler = null;
+        activeRebootstrapHandler = null;
+    };
+}
+
+export async function recoverLiffSession(): Promise<boolean> {
+    const handler = activeRecoveryHandler;
+    if (!handler) return false;
+
+    if (recoveryInFlight?.handler === handler) {
+        return recoveryInFlight.promise;
+    }
+
+    const promise = Promise.resolve()
+        .then(() => handler())
+        .catch(() => false)
+        .finally(() => {
+            if (recoveryInFlight?.promise === promise) {
+                recoveryInFlight = null;
+            }
+        });
+    recoveryInFlight = { handler, promise };
+    return promise;
+}
+
+function requestLiffRebootstrap(): void {
+    if (!activeRebootstrapHandler || rebootstrapRequested) return;
+    rebootstrapRequested = true;
+    try {
+        activeRebootstrapHandler();
+    } catch {
+        // Keep the expired-session response visible if the host cannot reload.
+    }
+}
+
+export const handleLiffUnauthorized: UnauthorizedRecoveryHandler = async ({
+    method,
+}) => {
+    const recovered = await recoverLiffSession();
+    if (!recovered) requestLiffRebootstrap();
+    return recovered && method.toUpperCase() === "GET";
+};
+
+export async function fetchLiffWithSessionRecovery(
+    input: RequestInfo | URL,
+    init?: RequestInit,
+): Promise<Response> {
+    const method = init?.method?.toUpperCase() ?? "GET";
+    let response = await fetch(input, init);
+    if (response.status !== 401) return response;
+
+    const shouldReplay = await handleLiffUnauthorized({
+        endpoint: typeof input === "string" ? input : input.toString(),
+        method,
+        response,
+    });
+    if (shouldReplay && method === "GET" && !init?.signal?.aborted) {
+        response = await fetch(input, init);
+    }
+    return response;
 }
 
 function getSafeLiffApiErrorMessage(
@@ -52,9 +139,14 @@ export async function unwrapLiffResponse<T>(
     );
 }
 
-export const LIFF_API_REQUEST_OPTIONS = {
+const LIFF_SESSION_REQUEST_OPTIONS = {
     retryCount: 0,
     skipAuthRefresh: true,
+} as const;
+
+export const LIFF_API_REQUEST_OPTIONS = {
+    ...LIFF_SESSION_REQUEST_OPTIONS,
+    onUnauthorized: handleLiffUnauthorized,
 } as const;
 
 export async function establishLiffSession(
@@ -64,7 +156,7 @@ export async function establishLiffSession(
         await apiPost<LiffSessionResponse>(
             API_ROUTES.line.liffSession,
             { idToken },
-            LIFF_API_REQUEST_OPTIONS,
+            LIFF_SESSION_REQUEST_OPTIONS,
         ),
     );
 }
@@ -76,7 +168,7 @@ export async function linkLiffAccount(
         await apiPost<Extract<LiffSessionResponse, { linked: true }>>(
             API_ROUTES.line.accountLink,
             { idToken },
-            LIFF_API_REQUEST_OPTIONS,
+            LIFF_SESSION_REQUEST_OPTIONS,
         ),
     );
 }

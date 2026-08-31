@@ -6,6 +6,7 @@ import {
     handleLeaveRequestSubmission,
 } from "@/lib/server/leave-request-api";
 import { assertLeaveRequestBodySize } from "@/lib/services/leave/request-input";
+import { toLiffLeaveMutationResponse } from "@/lib/services/leave/liff-serialization";
 import {
     enforceAuthenticatedMutationRateLimit,
     enforcePreAuthIpRateLimit,
@@ -44,5 +45,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
             userEmail: auth.user.email,
         },
         API_ROUTES.line.leaveAttachmentById,
+        toLiffLeaveMutationResponse,
     );
 }

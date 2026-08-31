@@ -391,7 +391,13 @@ export const routineTaskFiltersSchema = z.object({
     limit: z.coerce.number().int().min(1).max(100).default(20),
 });
 
-export const routineIdParamSchema = z.string().regex(/^\d+$/, "รหัสไม่ถูกต้อง");
+export const routineIdParamSchema = z
+    .string()
+    .regex(/^\d+$/, "รหัสไม่ถูกต้อง")
+    .refine((value) => {
+        const id = Number(value);
+        return id > 0 && Number.isSafeInteger(id);
+    }, "รหัสไม่ถูกต้อง");
 
 export const routineDueDateSchema = z.object({
     expectedReminderVersion: z.coerce.number().int().positive(),

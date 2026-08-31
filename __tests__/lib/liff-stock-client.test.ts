@@ -18,6 +18,7 @@ import {
     submitLiffStockRequest,
     fetchLiffStockVariantAvailability,
 } from "@/lib/client/liff-stock";
+import { LIFF_API_REQUEST_OPTIONS } from "@/lib/client/liff";
 import { API_ROUTES } from "@/lib/ssot/routes";
 
 const SUCCESS = {
@@ -28,9 +29,8 @@ const SUCCESS = {
 };
 
 const LIFF_OPTIONS = {
+    ...LIFF_API_REQUEST_OPTIONS,
     credentials: "include" as const,
-    retryCount: 0,
-    skipAuthRefresh: true,
 };
 
 describe("LIFF Stock client", () => {

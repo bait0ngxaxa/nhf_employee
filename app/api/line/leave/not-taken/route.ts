@@ -6,6 +6,7 @@ import {
     handleLeaveNotTakenConfirmation,
     handleLeaveNotTakenRequest,
 } from "@/lib/server/leave-not-taken-api";
+import { toLiffLeaveMutationResponse } from "@/lib/services/leave/liff-serialization";
 import {
     enforceAuthenticatedMutationRateLimit,
     enforcePreAuthIpRateLimit,
@@ -47,7 +48,11 @@ async function authorizeMutation(
 export async function POST(req: NextRequest): Promise<NextResponse> {
     const authorization = await authorizeMutation(req);
     if (!authorization.ok) return authorization.response;
-    return handleLeaveNotTakenRequest(req, authorization.auth);
+    return handleLeaveNotTakenRequest(
+        req,
+        authorization.auth,
+        toLiffLeaveMutationResponse,
+    );
 }
 
 export async function PUT(req: NextRequest): Promise<NextResponse> {
@@ -55,5 +60,6 @@ export async function PUT(req: NextRequest): Promise<NextResponse> {
     if (!authorization.ok) return authorization.response;
     return handleLeaveNotTakenConfirmation(req, authorization.auth, {
         allowAdminOverride: false,
+        serializeResponse: toLiffLeaveMutationResponse,
     });
 }

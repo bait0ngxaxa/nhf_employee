@@ -29,12 +29,19 @@ export type ApiResponse<T> =
           requestId?: string;
       };
 
+export type UnauthorizedRecoveryHandler = (context: {
+    endpoint: string;
+    method: string;
+    response: Response;
+}) => Promise<boolean>;
+
 interface RequestConfig extends RequestInit {
     data?: unknown;
     timeoutMs?: number;
     retryCount?: number;
     requestId?: string;
     skipAuthRefresh?: boolean;
+    onUnauthorized?: UnauthorizedRecoveryHandler;
 }
 
 const DEFAULT_TIMEOUT_MS = 15000;
@@ -223,6 +230,7 @@ export async function apiRequest<T>(
         retryCount,
         requestId: customRequestId,
         skipAuthRefresh,
+        onUnauthorized,
         ...customConfig
     } = config;
     const method = customConfig.method?.toUpperCase() ?? "GET";
@@ -247,10 +255,30 @@ export async function apiRequest<T>(
     for (let attempt = 0; attempt <= finalRetryCount; attempt += 1) {
         const { signal, cleanup } = createTimedSignal(customConfig.signal, finalTimeoutMs);
         try {
-            const response = await fetchWithRefresh(endpoint, {
+            let response = await fetchWithRefresh(endpoint, {
                 ...requestInit,
                 signal,
             }, { refreshOnUnauthorized: !skipAuthRefresh });
+
+            if (response.status === 401 && onUnauthorized) {
+                let replayRequest = false;
+                try {
+                    replayRequest = await onUnauthorized({
+                        endpoint,
+                        method,
+                        response,
+                    });
+                } catch {
+                    replayRequest = false;
+                }
+
+                if (replayRequest && method === "GET" && !signal.aborted) {
+                    response = await fetchWithRefresh(endpoint, {
+                        ...requestInit,
+                        signal,
+                    }, { refreshOnUnauthorized: false });
+                }
+            }
 
             if (shouldRetry(method, attempt, finalRetryCount) && shouldRetryResponse(response)) {
                 await delay(getRetryDelayMs(attempt));

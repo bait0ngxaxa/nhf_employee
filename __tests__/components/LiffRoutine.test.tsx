@@ -496,6 +496,59 @@ describe("LiffRoutineApp", () => {
         });
     });
 
+    it("ignores an older bootstrap response after the deep-link target changes", async () => {
+        const firstSummary = deferred<typeof SUMMARY>();
+        const secondSummary = deferred<typeof SUMMARY>();
+        const firstFocused = deferred<ReturnType<typeof tasksResponse>>();
+        const secondFocused = deferred<ReturnType<typeof tasksResponse>>();
+        const firstList = deferred<ReturnType<typeof tasksResponse>>();
+        const secondList = deferred<ReturnType<typeof tasksResponse>>();
+        const firstTask = { ...TASK, title: "งานเป้าหมายแรก" };
+        const secondTask = { ...TASK, id: 72, title: "งานเป้าหมายที่สอง" };
+        let normalListCall = 0;
+
+        mocks.useSearchParams.mockReturnValue(
+            new URLSearchParams("taskId=71&occurrenceId=91"),
+        );
+        mocks.fetchLiffRoutineSummary
+            .mockImplementationOnce(() => firstSummary.promise)
+            .mockImplementationOnce(() => secondSummary.promise);
+        mocks.fetchLiffRoutineTasks.mockImplementation((input: { taskId?: number }) => {
+            if (input.taskId === 71) return firstFocused.promise;
+            if (input.taskId === 72) return secondFocused.promise;
+            normalListCall += 1;
+            return normalListCall === 1 ? firstList.promise : secondList.promise;
+        });
+
+        const { rerender } = render(<LiffRoutineApp />);
+        await waitFor(() => {
+            expect(mocks.fetchLiffRoutineSummary).toHaveBeenCalledTimes(1);
+        });
+
+        mocks.useSearchParams.mockReturnValue(
+            new URLSearchParams("taskId=72&occurrenceId=92"),
+        );
+        rerender(<LiffRoutineApp />);
+        await waitFor(() => {
+            expect(mocks.fetchLiffRoutineSummary).toHaveBeenCalledTimes(2);
+        });
+
+        secondFocused.resolve(tasksResponse([secondTask]));
+        secondList.resolve(tasksResponse([secondTask]));
+        secondSummary.resolve({
+            summary: { ...SUMMARY.summary, today: 9 },
+        });
+        expect(await screen.findByText("งานเป้าหมายที่สอง")).toBeInTheDocument();
+
+        firstFocused.resolve(tasksResponse([firstTask]));
+        firstList.resolve(tasksResponse([firstTask]));
+        firstSummary.resolve(SUMMARY);
+        await waitFor(() => {
+            expect(screen.getByText("งานเป้าหมายที่สอง")).toBeInTheDocument();
+        });
+        expect(screen.queryByText("งานเป้าหมายแรก")).not.toBeInTheDocument();
+    });
+
     it("opens a create form without assignee controls and sends only the LIFF payload", async () => {
         render(<LiffRoutineApp />);
         await screen.findByText("ตรวจสอบระบบ");

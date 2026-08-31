@@ -13,6 +13,7 @@ import {
 import { processOutbox } from "@/lib/services/outbox/processor";
 import { WorkforceAuthorizationError } from "@/lib/auth/workforce-transaction";
 import { createStockCommandActor } from "@/lib/server/stock-command-actor";
+import { enforceStockJsonBodySize } from "@/lib/server/stock-api";
 import {
     createRequestSchema,
     idempotencyKeySchema,
@@ -67,6 +68,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
             "stock-request-create",
         );
         if (preAuthRateLimitResponse) return preAuthRateLimitResponse;
+
+        const bodySizeResponse = enforceStockJsonBodySize(request);
+        if (bodySizeResponse) return bodySizeResponse;
 
         const body = await request.json();
         const result = createRequestSchema.safeParse(body);

@@ -4,6 +4,7 @@ import { jsonError, serverError } from "@/lib/ssot/http";
 import { executeIssueStockRequest } from "@/lib/server/stock-request-commands";
 import { issueRequestSchema } from "@/lib/validations/stock";
 import { createStockCommandActor } from "@/lib/server/stock-command-actor";
+import { enforceStockJsonBodySize } from "@/lib/server/stock-api";
 import {
     enforceAuthenticatedMutationRateLimit,
     enforcePreAuthIpRateLimit,
@@ -23,6 +24,9 @@ export async function POST(
             "stock-request-issue",
         );
         if (preAuthRateLimitResponse) return preAuthRateLimitResponse;
+
+        const bodySizeResponse = enforceStockJsonBodySize(request);
+        if (bodySizeResponse) return bodySizeResponse;
 
         const auth = await requireAdminSession();
         if (!auth.ok) return auth.response;

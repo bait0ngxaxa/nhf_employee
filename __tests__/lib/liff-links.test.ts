@@ -79,6 +79,15 @@ describe("LIFF URL builder", () => {
             .toThrow("Invalid Stock request ID");
     });
 
+    it("rejects unsafe Routine IDs before building notification links", () => {
+        vi.stubEnv("NEXT_PUBLIC_LINE_LIFF_ID", "nhfapp-liff-id");
+
+        expect(() => buildRoutineLiffTaskUrl(Number.MAX_SAFE_INTEGER + 1, 91))
+            .toThrow("Invalid Routine task ID");
+        expect(() => buildRoutineLiffTaskUrl(71, Number.MAX_SAFE_INTEGER + 1))
+            .toThrow("Invalid Routine occurrence ID");
+    });
+
     it.each([
         "https://attacker.example/redirect",
         "//attacker.example/redirect",

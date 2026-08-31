@@ -78,6 +78,7 @@ vi.mock("@/lib/security/mutation-rate-limit", () => ({
 
 import { GET as getApprovals } from "@/app/api/line/leave/approvals/route";
 import { GET as getAttachment } from "@/app/api/line/leave/attachments/[id]/route";
+import { POST as cancelLeave } from "@/app/api/line/leave/cancel/route";
 import { PUT as decideCancellation } from "@/app/api/line/leave/cancel/route";
 import { POST as decideLeave } from "@/app/api/line/leave/decision/route";
 import { GET as getProfile } from "@/app/api/line/leave/me/route";
@@ -283,7 +284,33 @@ describe("LIFF Leave route adapters", () => {
             nextRequest,
             { userId: 7, employeeId: 31, userEmail: "admin@example.com" },
             API_ROUTES.line.leaveAttachmentById,
+            expect.any(Function),
         );
+    });
+
+    it("keeps internal Leave fields out of LIFF mutation responses", async () => {
+        mocks.cancelLeaveRequest.mockResolvedValueOnce({
+            request: {
+                id: "leave_1",
+                status: "CANCELLED",
+                employeeId: 999,
+                approverId: 888,
+                attachmentUrl: "private/storage/path.webp",
+                employee: { user: { email: "employee@example.com" } },
+                approver: { user: { email: "approver@example.com" } },
+            },
+        });
+
+        const response = await cancelLeave(request("/api/line/leave/cancel", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ leaveId: "leave_1" }),
+        }));
+
+        await expect(response.json()).resolves.toEqual({
+            success: true,
+            data: { id: "leave_1", status: "CANCELLED" },
+        });
     });
 
     it("never enables ADMIN recovery for LIFF approver mutations", async () => {
@@ -324,7 +351,10 @@ describe("LIFF Leave route adapters", () => {
         expect(mocks.handleLeaveNotTakenConfirmation).toHaveBeenCalledWith(
             notTakenRequest,
             AUTH,
-            { allowAdminOverride: false },
+            {
+                allowAdminOverride: false,
+                serializeResponse: expect.any(Function),
+            },
         );
         expect(mocks.decideLeaveRequest).toHaveBeenCalledWith(
             expect.objectContaining({ employeeId: 31 }),

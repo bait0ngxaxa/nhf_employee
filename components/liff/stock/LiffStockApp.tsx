@@ -115,7 +115,7 @@ function notifyCartAvailabilityReconciliation(
 export function LiffStockApp(): ReactElement {
     const workforce = useLiffWorkforce();
     const searchParams = useSearchParams();
-    const deepLinkHandledRef = useRef(false);
+    const deepLinkHandledRef = useRef<string | null>(null);
     const catalogRequestSequenceRef = useRef(0);
     const requestHistorySequenceRef = useRef(0);
     const processingQueueSequenceRef = useRef(0);
@@ -144,6 +144,15 @@ export function LiffStockApp(): ReactElement {
     const refreshCartAvailabilityRef = useRef<() => Promise<void>>(
         () => Promise.resolve(),
     );
+
+    useEffect(() => () => {
+        catalogRequestSequenceRef.current += 1;
+        requestHistorySequenceRef.current += 1;
+        processingQueueSequenceRef.current += 1;
+        detailRequestSequenceRef.current += 1;
+        availabilityRequestSequenceRef.current += 1;
+    }, []);
+
     const deepLinkRequestId = searchParams.get("requestId");
     const rawActionIntent = searchParams.get("action");
     const deepLinkActionIntent = rawActionIntent
@@ -395,8 +404,13 @@ export function LiffStockApp(): ReactElement {
     ]);
 
     useEffect(() => {
-        if (deepLinkHandledRef.current || !deepLinkRequestId) return;
-        deepLinkHandledRef.current = true;
+        if (!deepLinkRequestId) {
+            deepLinkHandledRef.current = null;
+            return;
+        }
+        const deepLinkKey = `${deepLinkRequestId}:${deepLinkActionIntent ?? ""}`;
+        if (deepLinkHandledRef.current === deepLinkKey) return;
+        deepLinkHandledRef.current = deepLinkKey;
         if (!/^[1-9]\d*$/.test(deepLinkRequestId)) {
             setFocusNotice("ลิงก์คำขอเบิกไม่ถูกต้อง กำลังแสดง Stock ตามปกติ");
             return;
@@ -495,6 +509,19 @@ export function LiffStockApp(): ReactElement {
             actorMode: request.requester ? "processor" : "employee",
         });
     }
+
+    const handleDetailOpenChange = useCallback((open: boolean): void => {
+        if (open) {
+            setDetailOpen(true);
+            return;
+        }
+        detailRequestSequenceRef.current += 1;
+        setDetailOpen(false);
+        setDetail(null);
+        setDetailActionIntent(null);
+        setDetailError(null);
+        setDetailLoading(false);
+    }, []);
 
     async function executeMutation(reason?: string): Promise<void> {
         if (!decisionIntent || busyRequestId !== null) return;
@@ -722,7 +749,7 @@ export function LiffStockApp(): ReactElement {
                 loading={detailLoading}
                 error={detailError}
                 actionIntent={detailActionIntent}
-                onOpenChange={setDetailOpen}
+                onOpenChange={handleDetailOpenChange}
                 onAction={startAction}
             />
             <LiffStockDecisionSheet

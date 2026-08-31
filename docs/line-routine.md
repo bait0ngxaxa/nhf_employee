@@ -68,6 +68,10 @@ https://<production-domain>/liff
 
 เส้นทางภายใน LIFF ที่ใช้ใน Phase 1 คือ `/liff`, `/liff/stock`, `/liff/leave` และ `/liff/routine` ทุกเส้นทางใช้ `LiffBootstrap` และ session boundary เดียวกัน
 
+### LIFF session หมดอายุ
+
+LIFF API จะพยายามสร้าง NHFapp LIFF session ใหม่จาก LINE identity ปัจจุบันโดยอัตโนมัติเมื่อ session หมดอายุ สำหรับคำขออ่านข้อมูลจะ retry คำขอเดิมได้หนึ่งครั้ง ส่วน mutation จะไม่ retry อัตโนมัติเพื่อป้องกันการทำรายการซ้ำ หากสร้าง session ใหม่ไม่ได้ ระบบจะ rebootstrap โดยรักษาเส้นทางและ deep link ภายในเดิมไว้
+
 ## Rich Menu asset and definition
 
 Asset อยู่ที่:

@@ -110,8 +110,20 @@ export function LiffRoutineApp(): ReactElement {
     const taskRequestIdRef = useRef(0);
     const detailRequestIdRef = useRef(0);
     const referenceRequestIdRef = useRef(0);
+    const routineRequestIdRef = useRef(0);
+
+    useEffect(() => () => {
+        routineRequestIdRef.current += 1;
+        taskRequestIdRef.current += 1;
+        detailRequestIdRef.current += 1;
+        referenceRequestIdRef.current += 1;
+    }, []);
 
     const loadRoutine = useCallback(async (): Promise<void> => {
+        const requestId = routineRequestIdRef.current + 1;
+        routineRequestIdRef.current = requestId;
+        taskRequestIdRef.current += 1;
+        detailRequestIdRef.current += 1;
         setState("LOADING");
         setViewError(null);
         setSummary(null);
@@ -119,6 +131,11 @@ export function LiffRoutineApp(): ReactElement {
         setPagination(initialPagination());
         setFocusedTaskId(null);
         setFocusNotice(null);
+        setSelectedTaskId(null);
+        setDetail(null);
+        setDetailError(null);
+        setDeleteError(null);
+        setDetailLoading(false);
 
         try {
             const focusedTasksPromise = initialFocusTaskId !== null
@@ -139,6 +156,7 @@ export function LiffRoutineApp(): ReactElement {
                     }),
                     focusedTasksPromise,
                 ]);
+            if (requestId !== routineRequestIdRef.current) return;
 
             let initialTasks = tasksResponse.tasks;
             if (
@@ -166,6 +184,7 @@ export function LiffRoutineApp(): ReactElement {
             setPagination(tasksResponse.pagination);
             setState("READY");
         } catch (error) {
+            if (requestId !== routineRequestIdRef.current) return;
             setViewError(toRoutineViewError(error));
             setState("ERROR");
         }
@@ -416,6 +435,7 @@ export function LiffRoutineApp(): ReactElement {
         detailRequestIdRef.current += 1;
         setSelectedTaskId(null);
         setDetail(null);
+        setFocusedTaskId(null);
         setDetailError(null);
         setDeleteError(null);
         setDetailLoading(false);
