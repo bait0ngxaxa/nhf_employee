@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { toast } from "sonner";
 import { useLeaveRequestFormModel } from "@/hooks/leave/useLeaveRequestFormModel";
 import { submitLeaveRequest } from "@/lib/services/leave/client";
+import { LiffApiError } from "@/lib/client/liff";
 import {
     LEAVE_ATTACHMENT_MAX_BYTES,
     LEAVE_ATTACHMENT_MAX_FILES,
@@ -292,6 +293,47 @@ describe("useLeaveRequestFormModel", () => {
             firstIdempotencyKey,
         );
         expect(result.current.attachments).toEqual([attachment]);
+    });
+
+    it("refreshes before an explicit retry and keeps the Leave idempotency key after recovered ambiguity", async () => {
+        const submitRequest = vi.fn()
+            .mockRejectedValueOnce(
+                new LiffApiError(
+                    "เชื่อมต่อกับ LINE ใหม่เรียบร้อยแล้ว",
+                    401,
+                    undefined,
+                    { recovered: true, replayed: false },
+                ),
+            )
+            .mockResolvedValueOnce(undefined);
+        const onSubmitError = vi.fn().mockResolvedValue(undefined);
+        const { result } = renderHook(() => useLeaveRequestFormModel({
+            onSuccess,
+            onSubmitError,
+            submitRequest,
+        }));
+        const payload = {
+            leaveType: "SICK" as const,
+            startDate: "2031-01-01",
+            endDate: "2031-01-01",
+            period: "FULL_DAY" as const,
+            reason: "พักรักษาตัว",
+        };
+
+        await act(async () => {
+            await result.current.submit(payload);
+        });
+        expect(onSubmitError).toHaveBeenCalledOnce();
+        expect(result.current.errorMsg).toBe("เชื่อมต่อกับ LINE ใหม่เรียบร้อยแล้ว");
+        const firstKey = submitRequest.mock.calls[0]?.[2];
+
+        await act(async () => {
+            await result.current.submit(payload);
+        });
+
+        expect(submitRequest).toHaveBeenCalledTimes(2);
+        expect(submitRequest.mock.calls[1]?.[2]).toBe(firstKey);
+        expect(onSuccess).toHaveBeenCalledOnce();
     });
 
     it("clears attachments only after a successful submission", async () => {

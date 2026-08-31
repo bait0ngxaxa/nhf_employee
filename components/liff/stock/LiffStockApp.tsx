@@ -18,7 +18,11 @@ import {
 } from "@/components/dashboard/stock/useStockBrowseCart";
 import { useLiffWorkforce } from "@/components/liff/LiffBootstrap";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { LiffApiError } from "@/lib/client/liff";
+import {
+    isRecoveredLiffMutation,
+    LIFF_SESSION_RECOVERED_MUTATION_MESSAGE,
+    LiffApiError,
+} from "@/lib/client/liff";
 import { fetchLiffHome } from "@/lib/client/liff-home";
 import {
     cancelLiffStockRequest,
@@ -451,7 +455,19 @@ export function LiffStockApp(): ReactElement {
                 loadCatalog({ page: catalogPage, search: catalogSearch, categoryId }),
             ]);
         },
-        onSubmitError: (error) => {
+        onSubmitError: async (error) => {
+            if (isRecoveredLiffMutation(error)) {
+                setFocusNotice(LIFF_SESSION_RECOVERED_MUTATION_MESSAGE);
+                await Promise.allSettled([
+                    loadMyRequests({
+                        page: requestPage,
+                        search: requestSearch,
+                        status: requestStatus,
+                    }),
+                    refreshCartAvailabilityRef.current(),
+                ]);
+                return;
+            }
             if (isDeterministicStockConflict(error)) {
                 void refreshCartAvailabilityRef.current();
             }
@@ -567,6 +583,37 @@ export function LiffStockApp(): ReactElement {
             );
             setDecisionIntent(null);
         } catch (error) {
+            if (isRecoveredLiffMutation(error)) {
+                setMutationError(LIFF_SESSION_RECOVERED_MUTATION_MESSAGE);
+                setFocusNotice(LIFF_SESSION_RECOVERED_MUTATION_MESSAGE);
+                const refreshes: Promise<void>[] = [
+                    loadMyRequests({
+                        page: requestPage,
+                        search: requestSearch,
+                        status: requestStatus,
+                    }),
+                ];
+                if (action === "ISSUE") {
+                    refreshes.push(loadCatalog({
+                        page: catalogPage,
+                        search: catalogSearch,
+                        categoryId,
+                    }));
+                }
+                if (canProcessStockRequests || actorMode === "processor") {
+                    refreshes.push(loadProcessingQueue({
+                        page: processingPage,
+                        search: processingSearch,
+                    }));
+                }
+                await Promise.allSettled(refreshes);
+                if (decisionFromDetail) {
+                    await openDetail(request.id, null);
+                }
+                setDecisionIntent(null);
+                setDecisionFromDetail(false);
+                return;
+            }
             setMutationError(getStockError(error));
             if (action === "ISSUE") {
                 const refreshes: Promise<void>[] = [

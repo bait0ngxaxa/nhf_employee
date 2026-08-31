@@ -15,6 +15,7 @@ import { stockService } from "@/lib/services/stock";
 import { StockRequestIdempotencyConflictError } from "@/lib/services/stock/request-idempotency";
 import { processOutbox } from "@/lib/services/outbox/processor";
 import { WorkforceAuthorizationError } from "@/lib/auth/workforce-transaction";
+import { STOCK_JSON_MUTATION_MAX_BYTES } from "@/lib/server/stock-api";
 import {
     AUTHENTICATED_MUTATION_RATE_LIMIT_POLICIES,
     enforcePreAuthIpRateLimit,
@@ -79,6 +80,68 @@ describe("Stock Request Routes", () => {
             employee: { id: 10, status: "ACTIVE", deletedAt: null },
         } as never);
     });
+
+    it.each([
+        ["missing", undefined],
+        ["lying", "10"],
+    ] as const)(
+        "rejects an actually oversized web mutation with a %s Content-Length",
+        async (_label, contentLength) => {
+            vi.mocked(getApiAuthSession).mockResolvedValue({
+                user: { id: "1", email: "admin@test.com", role: "ADMIN" },
+            } as never);
+            vi.mocked(buildUserContext).mockReturnValue({
+                id: 1,
+                email: "admin@test.com",
+                role: "ADMIN",
+                name: "Admin",
+            });
+            vi.mocked(isAdminRole).mockReturnValue(true);
+
+            const createHeaders = (): Headers => {
+                const headers = new Headers({ "Content-Type": "application/json" });
+                if (contentLength) headers.set("Content-Length", contentLength);
+                return headers;
+            };
+            const createBody = (): ArrayBuffer =>
+                new ArrayBuffer(STOCK_JSON_MUTATION_MAX_BYTES + 1);
+
+            const responses = [
+                postRequestsRoute(new NextRequest(
+                    "http://localhost/api/stock/requests",
+                    { method: "POST", headers: createHeaders(), body: createBody() },
+                )),
+                cancelRequestRoute(
+                    new NextRequest(
+                        "http://localhost/api/stock/requests/71/cancel",
+                        { method: "POST", headers: createHeaders(), body: createBody() },
+                    ),
+                    { params: Promise.resolve({ id: "71" }) },
+                ),
+                issueRequestRoute(
+                    new NextRequest(
+                        "http://localhost/api/stock/requests/71/issue",
+                        { method: "POST", headers: createHeaders(), body: createBody() },
+                    ),
+                    { params: Promise.resolve({ id: "71" }) },
+                ),
+                reviewRequestRoute(
+                    new NextRequest(
+                        "http://localhost/api/stock/requests/71/review",
+                        { method: "POST", headers: createHeaders(), body: createBody() },
+                    ),
+                    { params: Promise.resolve({ id: "71" }) },
+                ),
+            ];
+
+            for (const response of await Promise.all(responses)) {
+                expect(response.status).toBe(413);
+            }
+            expect(stockService.createRequest).not.toHaveBeenCalled();
+            expect(stockService.cancelRequest).not.toHaveBeenCalled();
+            expect(stockService.issueRequest).not.toHaveBeenCalled();
+        },
+    );
 
     describe("GET /api/stock/requests", () => {
         it("should return 401 when unauthorized", async () => {

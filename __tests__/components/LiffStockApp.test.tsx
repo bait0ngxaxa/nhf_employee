@@ -345,6 +345,44 @@ describe("LIFF Stock app orchestration", () => {
         expect(mocks.issueRequest).toHaveBeenCalledTimes(1);
     });
 
+    it("refreshes Stock state after recovered issue ambiguity without issuing twice", async () => {
+        mocks.search = "requestId=71&action=issue";
+        const refreshedDetail = {
+            ...createProcessorDetail(71, 1, []),
+            status: "ISSUED" as const,
+            issuedAt: "2026-08-31T03:00:00.000Z",
+        };
+        mocks.issueRequest.mockRejectedValueOnce(
+            new LiffApiError(
+                "เชื่อมต่อกับ LINE ใหม่เรียบร้อยแล้ว",
+                401,
+                undefined,
+                { recovered: true, replayed: false },
+            ),
+        );
+
+        render(<LiffStockApp />);
+
+        expect(await screen.findByText(
+            "เปิดจากลิงก์เพื่อดำเนินการ กรุณาตรวจรายละเอียดและกดยืนยันด้วยตนเอง",
+        )).toBeInTheDocument();
+        mocks.fetchRequest.mockResolvedValueOnce(refreshedDetail);
+
+        fireEvent.click(screen.getByRole("button", { name: "จ่ายวัสดุ" }));
+        fireEvent.click(screen.getByRole("button", { name: "ยืนยันจ่ายวัสดุ" }));
+
+        await waitFor(() => {
+            expect(mocks.issueRequest).toHaveBeenCalledTimes(1);
+            expect(mocks.fetchRequest).toHaveBeenCalledTimes(2);
+        });
+        expect(screen.getByText(
+            "เชื่อมต่อกับ LINE ใหม่เรียบร้อยแล้ว กรุณาตรวจสอบสถานะล่าสุดก่อนลองดำเนินการอีกครั้ง",
+        )).toBeInTheDocument();
+        expect(await screen.findByText(/คงเหลือจริง 1 รีม/)).toBeInTheDocument();
+        expect(screen.queryByRole("button", { name: "จ่ายวัสดุ" }))
+            .not.toBeInTheDocument();
+    });
+
     it("reconciles stale cart quantities after a Stock conflict", async () => {
         const latestCatalog = {
             ...CATALOG,
@@ -387,6 +425,46 @@ describe("LIFF Stock app orchestration", () => {
         expect(toast.info).toHaveBeenCalledWith(
             "จำนวนวัสดุบางรายการถูกปรับตามสต็อกล่าสุด",
         );
+    });
+
+    it("refreshes Stock requests and availability after recovered create ambiguity", async () => {
+        mocks.submitRequest
+            .mockRejectedValueOnce(
+                new LiffApiError(
+                    "เชื่อมต่อกับ LINE ใหม่เรียบร้อยแล้ว",
+                    401,
+                    undefined,
+                    { recovered: true, replayed: false },
+                ),
+            )
+            .mockResolvedValueOnce(undefined);
+
+        render(<LiffStockApp />);
+        expect(await screen.findByText("กระดาษ A4")).toBeInTheDocument();
+        fireEvent.click(screen.getByRole("button", { name: "เพิ่มลงตะกร้า" }));
+        fireEvent.click(screen.getByRole("button", { name: /เปิดตะกร้า/ }));
+        fireEvent.change(screen.getByLabelText("ชื่อย่อโครงการ"), {
+            target: { value: "NHF-2569" },
+        });
+        const submitButton = screen.getByRole("button", { name: "ส่งคำขอเบิก 1 ชิ้น" });
+        fireEvent.click(submitButton);
+
+        await waitFor(() => expect(mocks.submitRequest).toHaveBeenCalledTimes(1));
+        expect(mocks.fetchAvailability).toHaveBeenCalledWith([101]);
+        await waitFor(() => {
+            expect(screen.getByRole("button", { name: "ส่งคำขอเบิก 1 ชิ้น" }))
+                .not.toBeDisabled();
+        });
+        expect(screen.getByText(
+            "เชื่อมต่อกับ LINE ใหม่เรียบร้อยแล้ว กรุณาตรวจสอบสถานะล่าสุดก่อนลองดำเนินการอีกครั้ง",
+        )).toBeInTheDocument();
+        const firstKey = mocks.submitRequest.mock.calls[0]?.[1];
+        expect(firstKey).toBeTruthy();
+        expect(screen.getByRole("button", { name: "ส่งคำขอเบิก 1 ชิ้น" })).toBeInTheDocument();
+
+        fireEvent.click(screen.getByRole("button", { name: "ส่งคำขอเบิก 1 ชิ้น" }));
+        await waitFor(() => expect(mocks.submitRequest).toHaveBeenCalledTimes(2));
+        expect(mocks.submitRequest.mock.calls[1]?.[1]).toBe(firstKey);
     });
 
     it("preserves the exact retry payload and key after an ambiguous failure", async () => {

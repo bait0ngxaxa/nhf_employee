@@ -62,7 +62,7 @@ type CartAvailabilityReconciliationOutcome = {
 type UseStockBrowseCartParams = {
     userId: number | string | null | undefined;
     onSubmitted: () => void;
-    onSubmitError?: (error: unknown) => void;
+    onSubmitError?: (error: unknown) => void | Promise<void>;
     submitRequest?: StockRequestSubmitter;
 };
 
@@ -611,7 +611,11 @@ export function useStockBrowseCart({
             setProjectCode("");
             onSubmitted();
         } catch (error: unknown) {
-            onSubmitError?.(error);
+            try {
+                await onSubmitError?.(error);
+            } catch {
+                // A reconciliation failure must not hide the original mutation error.
+            }
             toast.error(error instanceof Error ? error.message : "เกิดข้อผิดพลาด");
         } finally {
             setSubmitting(false);

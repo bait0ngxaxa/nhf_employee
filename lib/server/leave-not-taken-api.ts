@@ -46,6 +46,7 @@ import {
 } from "@/lib/services/leave/transaction";
 import { buildLeaveAuditContext } from "@/lib/services/leave/audit-details";
 import { reconcileLeaveQuotaForward } from "@/lib/services/leave/quota-entitlement";
+import { readLeaveJsonBody } from "@/lib/server/leave-api";
 
 const NOT_TAKEN_MESSAGES = {
     requestNotFound: "ไม่พบคำขอลาที่แจ้งไม่ได้ใช้วันลาได้",
@@ -92,8 +93,9 @@ export async function handleLeaveNotTakenRequest(
         const userId = auth.user.id;
         const employeeId = auth.employeeId;
 
-        const body = await req.json();
-        const parsed = leaveNotTakenRequestSchema.safeParse(body);
+        const body = await readLeaveJsonBody(req);
+        if (!body.ok) return body.response;
+        const parsed = leaveNotTakenRequestSchema.safeParse(body.body);
         if (!parsed.success) {
             return jsonError(COMMON_API_MESSAGES.invalidInput, 400, {
                 details: parsed.error.flatten().fieldErrors,
@@ -274,8 +276,9 @@ export async function handleLeaveNotTakenConfirmation(
         const managerId = auth.employeeId;
         const isAdmin = options.allowAdminOverride && isAdminRole(auth.user.role);
 
-        const body = await req.json();
-        const parsed = leaveNotTakenConfirmSchema.safeParse(body);
+        const body = await readLeaveJsonBody(req);
+        if (!body.ok) return body.response;
+        const parsed = leaveNotTakenConfirmSchema.safeParse(body.body);
         if (!parsed.success) {
             return jsonError(COMMON_API_MESSAGES.invalidInput, 400, {
                 details: parsed.error.flatten().fieldErrors,

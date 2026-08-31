@@ -4,11 +4,19 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => {
     class MockLiffApiError extends Error {
         readonly status: number | undefined;
+        readonly sessionRecovered: boolean;
+        readonly unauthorizedRecovery: { recovered: boolean; replayed: boolean } | undefined;
 
-        constructor(message: string, status?: number) {
+        constructor(
+            message: string,
+            status?: number,
+            unauthorizedRecovery?: { recovered: boolean; replayed: boolean },
+        ) {
             super(message);
             this.name = "LiffApiError";
             this.status = status;
+            this.sessionRecovered = unauthorizedRecovery?.recovered === true;
+            this.unauthorizedRecovery = unauthorizedRecovery;
         }
     }
 
@@ -22,6 +30,13 @@ const mocks = vi.hoisted(() => {
         updateLiffRoutineTask: vi.fn(),
         deleteLiffRoutineTask: vi.fn(),
         MockLiffApiError,
+        isRecoveredLiffMutation: (error: unknown): boolean =>
+            error instanceof MockLiffApiError
+            && error.status === 401
+            && error.sessionRecovered
+            && error.unauthorizedRecovery?.replayed === false,
+        LIFF_SESSION_RECOVERED_MUTATION_MESSAGE:
+            "เชื่อมต่อกับ LINE ใหม่เรียบร้อยแล้ว กรุณาตรวจสอบสถานะล่าสุดก่อนลองดำเนินการอีกครั้ง",
     };
 });
 
@@ -31,6 +46,9 @@ vi.mock("next/navigation", () => ({
 
 vi.mock("@/lib/client/liff", () => ({
     LiffApiError: mocks.MockLiffApiError,
+    isRecoveredLiffMutation: mocks.isRecoveredLiffMutation,
+    LIFF_SESSION_RECOVERED_MUTATION_MESSAGE:
+        mocks.LIFF_SESSION_RECOVERED_MUTATION_MESSAGE,
 }));
 
 vi.mock("@/lib/client/liff-routine", () => ({
@@ -620,6 +638,45 @@ describe("LiffRoutineApp", () => {
         expect(secondKey).toBe(firstKey);
     });
 
+    it("refreshes Routine state after recovered create ambiguity without auto retrying", async () => {
+        mocks.createLiffRoutineTask
+            .mockRejectedValueOnce(new mocks.MockLiffApiError(
+                "session recovered",
+                401,
+                { recovered: true, replayed: false },
+            ))
+            .mockResolvedValueOnce({ task: DETAIL, replayed: false });
+
+        render(<LiffRoutineApp />);
+        await screen.findByText("ตรวจสอบระบบ");
+        fireEvent.click(screen.getByRole("button", { name: "เพิ่ม Routine ของฉัน" }));
+        const formDialog = await screen.findByRole("dialog");
+        fireEvent.change(within(formDialog).getByRole("combobox", { name: "หน่วยงาน" }), {
+            target: { value: "1" },
+        });
+        fireEvent.change(within(formDialog).getByRole("combobox", { name: "หมวดหมู่" }), {
+            target: { value: "2" },
+        });
+        fireEvent.change(within(formDialog).getByRole("textbox", { name: "ชื่องาน" }), {
+            target: { value: "งานที่อาจสร้างแล้ว" },
+        });
+        fireEvent.click(within(formDialog).getByRole("button", { name: "เพิ่ม Routine ของฉัน" }));
+
+        await waitFor(() => expect(mocks.createLiffRoutineTask).toHaveBeenCalledTimes(1));
+        expect(mocks.fetchLiffRoutineSummary).toHaveBeenCalledTimes(2);
+        expect(mocks.fetchLiffRoutineTasks).toHaveBeenCalledTimes(2);
+        expect(screen.getByRole("heading", { name: "เพิ่ม Routine ของฉัน" })).toBeInTheDocument();
+        expect(screen.getAllByText(
+            "เชื่อมต่อกับ LINE ใหม่เรียบร้อยแล้ว กรุณาตรวจสอบสถานะล่าสุดก่อนลองดำเนินการอีกครั้ง",
+        ).length).toBeGreaterThan(0);
+
+        const firstKey = (mocks.createLiffRoutineTask.mock.calls[0] as [unknown, string])[1];
+        fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "เพิ่ม Routine ของฉัน" }));
+        await waitFor(() => expect(mocks.createLiffRoutineTask).toHaveBeenCalledTimes(2));
+        const secondKey = (mocks.createLiffRoutineTask.mock.calls[1] as [unknown, string])[1];
+        expect(secondKey).toBe(firstKey);
+    });
+
     it("prevents duplicate create submissions while the request is in flight", async () => {
         const pendingCreate = deferred<{ task: LiffRoutineTaskDetail; replayed: boolean }>();
         mocks.createLiffRoutineTask.mockImplementationOnce(() => pendingCreate.promise);
@@ -946,6 +1003,41 @@ describe("LiffRoutineApp", () => {
         expect(within(formDialog).getByRole("textbox", { name: "ชื่องาน" })).toHaveValue("ฉบับล่าสุดบนระบบ");
     });
 
+    it("reloads the latest version after recovered update ambiguity while keeping the draft", async () => {
+        const latestTask = { ...DETAIL, title: "ฉบับล่าสุดบนระบบ", version: 4 };
+        mocks.updateLiffRoutineTask.mockRejectedValueOnce(
+            new mocks.MockLiffApiError(
+                "session recovered",
+                401,
+                { recovered: true, replayed: false },
+            ),
+        );
+        mocks.fetchLiffRoutineTask
+            .mockResolvedValueOnce({ task: DETAIL })
+            .mockResolvedValueOnce({ task: latestTask });
+
+        render(<LiffRoutineApp />);
+        await screen.findByText("ตรวจสอบระบบ");
+        fireEvent.click(screen.getByRole("button", { name: "เปิดรายละเอียดงาน ตรวจสอบระบบ" }));
+        await screen.findByText("รายละเอียดฉบับเต็ม");
+        fireEvent.click(screen.getByRole("button", { name: "แก้ไขงานของฉัน" }));
+        const dialogs = await screen.findAllByRole("dialog");
+        const formDialog = dialogs[dialogs.length - 1];
+        fireEvent.change(within(formDialog).getByRole("textbox", { name: "ชื่องาน" }), {
+            target: { value: "ร่างที่ยังไม่ต้องการทับ" },
+        });
+        fireEvent.click(within(formDialog).getByRole("button", { name: "บันทึกการแก้ไข" }));
+
+        expect(await screen.findByText(
+            "เชื่อมต่อกับ LINE ใหม่เรียบร้อยแล้ว กรุณาตรวจสอบสถานะล่าสุดก่อนลองดำเนินการอีกครั้ง",
+        )).toBeInTheDocument();
+        expect(screen.getByText("ฉบับล่าสุดบนระบบ")).toBeInTheDocument();
+        expect(within(formDialog).getByRole("textbox", { name: "ชื่องาน" }))
+            .toHaveValue("ร่างที่ยังไม่ต้องการทับ");
+        expect(mocks.updateLiffRoutineTask).toHaveBeenCalledTimes(1);
+        expect(mocks.fetchLiffRoutineTask).toHaveBeenCalledTimes(2);
+    });
+
     it("requires delete confirmation and refreshes after one successful delete", async () => {
         const pendingDelete = deferred<void>();
         mocks.deleteLiffRoutineTask.mockImplementationOnce(() => pendingDelete.promise);
@@ -971,5 +1063,32 @@ describe("LiffRoutineApp", () => {
         await waitFor(() => expect(screen.queryByText("รายละเอียดฉบับเต็ม")).not.toBeInTheDocument());
         expect(mocks.fetchLiffRoutineSummary).toHaveBeenCalledTimes(2);
         expect(mocks.fetchLiffRoutineTasks).toHaveBeenCalledTimes(2);
+    });
+
+    it("refreshes task existence after recovered delete ambiguity without deleting twice", async () => {
+        mocks.deleteLiffRoutineTask.mockRejectedValueOnce(
+            new mocks.MockLiffApiError(
+                "session recovered",
+                401,
+                { recovered: true, replayed: false },
+            ),
+        );
+        mocks.fetchLiffRoutineTask
+            .mockResolvedValueOnce({ task: DETAIL })
+            .mockResolvedValueOnce({ task: DETAIL });
+
+        render(<LiffRoutineApp />);
+        await screen.findByText("ตรวจสอบระบบ");
+        fireEvent.click(screen.getByRole("button", { name: "เปิดรายละเอียดงาน ตรวจสอบระบบ" }));
+        await screen.findByText("รายละเอียดฉบับเต็ม");
+        fireEvent.click(screen.getByRole("button", { name: "ลบงานนี้" }));
+        const confirmation = await screen.findByRole("alertdialog");
+        fireEvent.click(within(confirmation).getByRole("button", { name: "ลบงานนี้" }));
+
+        await waitFor(() => expect(mocks.deleteLiffRoutineTask).toHaveBeenCalledTimes(1));
+        expect(mocks.fetchLiffRoutineSummary).toHaveBeenCalledTimes(2);
+        expect(mocks.fetchLiffRoutineTasks).toHaveBeenCalledTimes(2);
+        expect(mocks.fetchLiffRoutineTask).toHaveBeenCalledTimes(2);
+        expect(within(confirmation).getByRole("button", { name: "ลบงานนี้" })).toBeInTheDocument();
     });
 });

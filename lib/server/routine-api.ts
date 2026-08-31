@@ -2,12 +2,17 @@ import type { NextRequest, NextResponse } from "next/server";
 
 import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
 
+import {
+    contentLengthExceedsLimit,
+    readBoundedJsonBody,
+} from "@/lib/server/request-body";
 import { isFeatureEnabled, FEATURE_KEYS } from "@/lib/ssot/features";
 import { jsonError, notFound } from "@/lib/ssot/http";
 import { ROUTINE_API_MESSAGES } from "@/lib/ssot/messages";
+import { ROUTINE_MAX_REQUEST_BYTES } from "@/lib/ssot/request-limits";
 import { RoutineServiceError } from "@/lib/services/routine";
 
-export const ROUTINE_MAX_REQUEST_BYTES = 64 * 1024;
+export { ROUTINE_MAX_REQUEST_BYTES };
 
 export function routineFeatureGuard(
     surface: "web" | "liff" = "web",
@@ -21,11 +26,7 @@ export function routineFeatureGuard(
 export function routineRequestSizeGuard(
     request: NextRequest,
 ): NextResponse | null {
-    const contentLength = Number(request.headers.get("content-length"));
-    if (
-        Number.isFinite(contentLength)
-        && contentLength > ROUTINE_MAX_REQUEST_BYTES
-    ) {
+    if (contentLengthExceedsLimit(request, ROUTINE_MAX_REQUEST_BYTES)) {
         return jsonError("คำขอมีขนาดใหญ่เกินไป", 413);
     }
     return null;
@@ -34,15 +35,19 @@ export function routineRequestSizeGuard(
 export async function readRoutineJsonBody(
     request: NextRequest,
 ): Promise<{ ok: true; body: unknown } | { ok: false; response: NextResponse }> {
-    try {
-        const body: unknown = await request.json();
-        return { ok: true, body };
-    } catch {
+    const result = await readBoundedJsonBody(request, ROUTINE_MAX_REQUEST_BYTES);
+    if (!result.ok) {
         return {
             ok: false,
-            response: jsonError(ROUTINE_API_MESSAGES.invalidInput, 400),
+            response: jsonError(
+                result.reason === "TOO_LARGE"
+                    ? "คำขอมีขนาดใหญ่เกินไป"
+                    : ROUTINE_API_MESSAGES.invalidInput,
+                result.reason === "TOO_LARGE" ? 413 : 400,
+            ),
         };
     }
+    return { ok: true, body: result.value };
 }
 
 export function routineErrorResponse(

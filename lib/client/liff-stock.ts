@@ -1,5 +1,7 @@
 import { apiGet, apiPost, type ApiResponse } from "@/lib/client/api-client";
 import {
+    isRecoveredLiffUnauthorizedResponse,
+    LIFF_SESSION_RECOVERED_MUTATION_MESSAGE,
     LIFF_API_REQUEST_OPTIONS,
     unwrapLiffResponse,
 } from "@/lib/client/liff";
@@ -24,7 +26,9 @@ function getStockApiErrorMessage(
 ): string {
     switch (response.status) {
         case 401:
-            return "การยืนยันตัวตนหมดอายุ กรุณาเปิด NHFapp จาก LINE อีกครั้ง";
+            return isRecoveredLiffUnauthorizedResponse(response)
+                ? LIFF_SESSION_RECOVERED_MUTATION_MESSAGE
+                : "การยืนยันตัวตนหมดอายุ กรุณาเปิด NHFapp จาก LINE อีกครั้ง";
         case 403:
             return response.errorThai || "คุณไม่มีสิทธิ์ดำเนินการกับคำขอเบิกนี้";
         case 404:

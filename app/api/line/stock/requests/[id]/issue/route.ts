@@ -2,7 +2,10 @@ import { type NextRequest, NextResponse } from "next/server";
 
 import { requireLiffStockProcessorSession } from "@/lib/server/liff-stock-auth";
 import { createStockCommandActor } from "@/lib/server/stock-command-actor";
-import { enforceStockJsonBodySize } from "@/lib/server/stock-api";
+import {
+    enforceStockJsonBodySize,
+    readStockJsonBody,
+} from "@/lib/server/stock-api";
 import { executeIssueStockRequest } from "@/lib/server/stock-request-commands";
 import {
     enforceAuthenticatedMutationRateLimit,
@@ -42,7 +45,9 @@ export async function POST(
 
         const parsedId = stockRequestIdParamSchema.safeParse((await params).id);
         if (!parsedId.success) return jsonError("ID ไม่ถูกต้อง", 400);
-        const parsedBody = issueRequestSchema.safeParse(await request.json());
+        const body = await readStockJsonBody(request);
+        if (!body.ok) return body.response;
+        const parsedBody = issueRequestSchema.safeParse(body.body);
         if (!parsedBody.success) {
             return jsonError("ข้อมูลไม่ถูกต้อง", 400, {
                 details: parsedBody.error.flatten().fieldErrors,

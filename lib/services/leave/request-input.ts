@@ -1,5 +1,11 @@
 import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
 import { LEAVE_ATTACHMENT_MAX_REQUEST_BYTES } from "@/lib/ssot/leave-attachments";
+import { LEAVE_JSON_MUTATION_MAX_BYTES } from "@/lib/ssot/request-limits";
+import {
+    contentLengthExceedsLimit,
+    readBoundedBytes,
+    readBoundedJsonBody,
+} from "@/lib/server/request-body";
 import {
     validateLeaveAttachments,
     type LeaveAttachmentSource,
@@ -53,21 +59,58 @@ function parseJsonString(value: string): unknown {
 }
 
 async function parseJsonRequest(request: Request): Promise<ParsedLeaveRequestInput> {
-    let value: unknown;
-    try {
-        value = await request.json();
-    } catch {
-        throw new LeaveRequestInputError(COMMON_API_MESSAGES.invalidInput, 400);
+    const result = await readBoundedJsonBody(
+        request,
+        LEAVE_JSON_MUTATION_MAX_BYTES,
+    );
+    if (!result.ok) {
+        throw new LeaveRequestInputError(
+            result.reason === "TOO_LARGE"
+                ? "คำขอมีขนาดใหญ่เกินไป"
+                : COMMON_API_MESSAGES.invalidInput,
+            result.reason === "TOO_LARGE" ? 413 : 400,
+        );
     }
-    return { payload: parsePayload(value), attachments: [] };
+    return { payload: parsePayload(result.value), attachments: [] };
 }
 
 async function parseMultipartRequest(
     request: Request,
 ): Promise<ParsedLeaveRequestInput> {
+    const boundedBody = await readBoundedBytes(
+        request,
+        LEAVE_ATTACHMENT_MAX_REQUEST_BYTES,
+    );
+    if (!boundedBody.ok) {
+        throw new LeaveRequestInputError(
+            boundedBody.reason === "TOO_LARGE"
+                ? "คำขอมีขนาดใหญ่เกินไป"
+                : COMMON_API_MESSAGES.invalidInput,
+            boundedBody.reason === "TOO_LARGE" ? 413 : 400,
+        );
+    }
+
     let formData: FormData;
     try {
-        formData = await request.formData();
+        const bodyBuffer = new ArrayBuffer(boundedBody.bytes.byteLength);
+        new Uint8Array(bodyBuffer).set(boundedBody.bytes);
+        const boundedHeaders = new Headers(request.headers);
+        boundedHeaders.delete("content-length");
+        const boundedRequest = new Request(
+            typeof request.url === "string"
+                ? request.url
+                : "http://localhost/api/leave/request",
+            {
+                method: request.method
+                    && request.method !== "GET"
+                    && request.method !== "HEAD"
+                    ? request.method
+                    : "POST",
+                headers: boundedHeaders,
+                body: bodyBuffer,
+            },
+        );
+        formData = await boundedRequest.formData();
     } catch {
         throw new LeaveRequestInputError(COMMON_API_MESSAGES.invalidInput, 400);
     }
@@ -89,16 +132,7 @@ async function parseMultipartRequest(
 }
 
 export function assertLeaveRequestBodySize(request: Request): void {
-    const rawContentLength = request.headers.get("content-length");
-    if (!rawContentLength) {
-        return;
-    }
-
-    const contentLength = Number(rawContentLength);
-    if (
-        Number.isSafeInteger(contentLength)
-        && contentLength > LEAVE_ATTACHMENT_MAX_REQUEST_BYTES
-    ) {
+    if (contentLengthExceedsLimit(request, LEAVE_ATTACHMENT_MAX_REQUEST_BYTES)) {
         throw new LeaveRequestInputError("คำขอมีขนาดใหญ่เกินไป", 413);
     }
 }

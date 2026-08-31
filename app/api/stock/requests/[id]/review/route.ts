@@ -7,7 +7,10 @@ import {
 } from "@/lib/server/stock-request-commands";
 import { stockReviewActionSchema } from "@/lib/validations/stock";
 import { createStockCommandActor } from "@/lib/server/stock-command-actor";
-import { enforceStockJsonBodySize } from "@/lib/server/stock-api";
+import {
+    enforceStockJsonBodySize,
+    readStockJsonBody,
+} from "@/lib/server/stock-api";
 import {
     enforceAuthenticatedMutationRateLimit,
     enforcePreAuthIpRateLimit,
@@ -28,8 +31,9 @@ export async function POST(
         const auth = await requireAdminSession();
         if (!auth.ok) return auth.response;
 
-        const body = await request.json();
-        const parsed = stockReviewActionSchema.safeParse(body);
+        const body = await readStockJsonBody(request);
+        if (!body.ok) return body.response;
+        const parsed = stockReviewActionSchema.safeParse(body.body);
         if (!parsed.success) {
             return jsonError("ข้อมูลไม่ถูกต้อง", 400, {
                 details: parsed.error.flatten().fieldErrors,

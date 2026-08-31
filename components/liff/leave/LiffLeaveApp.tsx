@@ -23,7 +23,11 @@ import {
     submitLiffLeaveDecision,
 } from "@/lib/client/liff-leave";
 import { fetchLiffHome } from "@/lib/client/liff-home";
-import { LiffApiError } from "@/lib/client/liff";
+import {
+    isRecoveredLiffMutation,
+    LIFF_SESSION_RECOVERED_MUTATION_MESSAGE,
+    LiffApiError,
+} from "@/lib/client/liff";
 import type { LeaveHistoryFilters } from "@/lib/services/leave/history-filters";
 import type {
     ApproverLeaveAction,
@@ -104,6 +108,7 @@ export function LiffLeaveApp(): ReactElement {
     const [selectedDetailActionIntent, setSelectedDetailActionIntent] = useState<string | null>(null);
     const [focusNotice, setFocusNotice] = useState<string | null>(null);
     const [mutationIntent, setMutationIntent] = useState<LiffLeaveMutationIntent | null>(null);
+    const [mutationFromDetail, setMutationFromDetail] = useState(false);
     const [mutationError, setMutationError] = useState<string | null>(null);
     const [isMutating, setIsMutating] = useState(false);
 
@@ -263,9 +268,11 @@ export function LiffLeaveApp(): ReactElement {
         action: EmployeeLeaveAction | ApproverLeaveAction,
         request: LiffEmployeeLeaveRequest | LiffLeaveApprovalItem | LiffLeaveRequestDetailData,
     ): void => {
+        const fromDetail = selectedDetail !== null;
         detailRequestSequenceRef.current += 1;
         setSelectedDetail(null);
         setSelectedDetailActionIntent(null);
+        setMutationFromDetail(fromDetail);
         setMutationError(null);
         setMutationIntent({
             requestId: request.id,
@@ -277,14 +284,14 @@ export function LiffLeaveApp(): ReactElement {
                 && (request.overQuotaDays > 0 || request.emergencyReason || request.specialReason),
             ),
         });
-    }, []);
+    }, [selectedDetail]);
 
     const executeMutation = async (reason: string | undefined): Promise<void> => {
         if (!mutationIntent || isMutating) return;
+        const { requestId, action } = mutationIntent;
         setIsMutating(true);
         setMutationError(null);
         try {
-            const { requestId, action } = mutationIntent;
             if (action === "CANCEL" || action === "REQUEST_CANCELLATION") {
                 await cancelLiffLeave(requestId, reason);
             } else if (action === "REQUEST_NOT_TAKEN") {
@@ -318,6 +325,27 @@ export function LiffLeaveApp(): ReactElement {
             toast.success(getMutationSuccessMessage(action));
             setMutationIntent(null);
         } catch (error) {
+            if (isRecoveredLiffMutation(error)) {
+                const fromDetail = mutationFromDetail;
+                const isEmployeeAction = action === "CANCEL"
+                    || action === "REQUEST_CANCELLATION"
+                    || action === "REQUEST_NOT_TAKEN";
+                if (isEmployeeAction) {
+                    await refreshProfile();
+                } else {
+                    const firstPages = { ...INITIAL_APPROVAL_PAGES };
+                    setApprovalPages(firstPages);
+                    await refreshApprovals(firstPages);
+                }
+                if (fromDetail) {
+                    await openDetail(requestId, null);
+                }
+                setFocusNotice(LIFF_SESSION_RECOVERED_MUTATION_MESSAGE);
+                setMutationIntent(null);
+                setMutationError(null);
+                setMutationFromDetail(false);
+                return;
+            }
             setMutationError(getViewError(error));
         } finally {
             setIsMutating(false);
@@ -436,6 +464,11 @@ export function LiffLeaveApp(): ReactElement {
                     setProfilePage(1);
                     await refreshProfile(1);
                 }}
+                onAmbiguousSubmit={async () => {
+                    setProfilePage(1);
+                    await refreshProfile(1);
+                    setFocusNotice(LIFF_SESSION_RECOVERED_MUTATION_MESSAGE);
+                }}
             />
             <LiffLeaveRequestDetail
                 detail={selectedDetail}
@@ -457,6 +490,7 @@ export function LiffLeaveApp(): ReactElement {
                     if (!open) {
                         setMutationIntent(null);
                         setMutationError(null);
+                        setMutationFromDetail(false);
                     }
                 }}
                 onConfirm={executeMutation}

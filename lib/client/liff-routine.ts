@@ -6,7 +6,9 @@ import {
     type ApiResponse,
 } from "@/lib/client/api-client";
 import {
+    isRecoveredLiffUnauthorizedResponse,
     LIFF_API_REQUEST_OPTIONS,
+    LIFF_SESSION_RECOVERED_MUTATION_MESSAGE,
     unwrapLiffResponse,
 } from "@/lib/client/liff";
 import type {
@@ -46,7 +48,9 @@ function getRoutineApiErrorMessage(
 ): string {
     switch (response.status) {
         case 401:
-            return "การยืนยันตัวตนหมดอายุ กรุณาลองใหม่อีกครั้ง";
+            return isRecoveredLiffUnauthorizedResponse(response)
+                ? LIFF_SESSION_RECOVERED_MUTATION_MESSAGE
+                : "การยืนยันตัวตนหมดอายุ กรุณาลองใหม่อีกครั้ง";
         case 403:
             return "บัญชี NHF นี้ยังไม่สามารถเข้าถึง Routine ได้";
         case 404:

@@ -56,11 +56,12 @@ PM2/systemd ต้อง:
 
 ## Request size และ memory limitation
 
-server ตรวจ `Content-Length` ของ multipart ก่อนเรียก `request.formData()` และปฏิเสธ body ที่เกิน 25 MB ด้วย 413;
-แต่ Next.js/undici ยัง buffer multipart ใน memory ระหว่าง `formData()` และรองรับเฉพาะ JPG, PNG, WEBP
-จึงยังไม่ใช่ streaming upload สำหรับ body แบบ chunked ที่ไม่มี `Content-Length` ต้องพึ่ง Nginx limit, rate limit,
-จำนวนไฟล์สูงสุด 3, ขนาดไฟล์ 8 MB และขนาดรวม 20 MB ร่วมกัน หากต้องรองรับ concurrent upload สูงมากให้ย้ายไป
-streaming/object storage ใน phase ถัดไป
+server ใช้ `Content-Length` เป็นเพียง fast path แล้วอ่าน stream ของ multipart แบบจำกัดไม่เกิน 25 MB ก่อนสร้าง
+`FormData`; body ที่ไม่มีหรือมี `Content-Length` ไม่ถูกต้องจึงยังถูกปฏิเสธด้วย 413 โดยไม่พึ่ง header อย่างเดียว
+Next.js/undici ยัง buffer body ที่ถูกจำกัดแล้วใน memory ระหว่าง `formData()` และรองรับเฉพาะ JPG, PNG, WEBP
+จึงยังไม่ใช่ streaming multipart parser เต็มรูปแบบ: Nginx limit, rate limit, จำนวนไฟล์สูงสุด 3, ขนาดไฟล์ 8 MB
+และขนาดรวม 20 MB ยังคงเป็น defense-in-depth และ deployment boundary ที่ต้องตรวจใน Phase 5B หากต้องรองรับ
+concurrent upload สูงมากให้ย้ายไป streaming/object storage ใน phase ถัดไป
 
 ## Orphan cleanup
 

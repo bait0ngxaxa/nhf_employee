@@ -70,7 +70,7 @@ https://<production-domain>/liff
 
 ### LIFF session หมดอายุ
 
-LIFF API จะพยายามสร้าง NHFapp LIFF session ใหม่จาก LINE identity ปัจจุบันโดยอัตโนมัติเมื่อ session หมดอายุ สำหรับคำขออ่านข้อมูลจะ retry คำขอเดิมได้หนึ่งครั้ง ส่วน mutation จะไม่ retry อัตโนมัติเพื่อป้องกันการทำรายการซ้ำ หากสร้าง session ใหม่ไม่ได้ ระบบจะ rebootstrap โดยรักษาเส้นทางและ deep link ภายในเดิมไว้
+LIFF API จะพยายามสร้าง NHFapp LIFF session ใหม่จาก LINE identity ปัจจุบันโดยอัตโนมัติเมื่อ session หมดอายุ หากเป็นคำขออ่านข้อมูลและสร้าง session สำเร็จ จะ retry คำขอเดิมได้หนึ่งครั้ง ส่วน mutation จะไม่ retry อัตโนมัติ แม้สร้าง session สำเร็จ เพื่อป้องกันการทำรายการซ้ำ โดยจะ refresh สถานะ domain ล่าสุดก่อนให้ผู้ใช้ตัดสินใจลองทำรายการอีกครั้ง หากสร้าง session ใหม่ไม่ได้ ระบบจะ rebootstrap โดยรักษาเส้นทางและ deep link ภายในเดิมไว้
 
 ## Rich Menu asset and definition
 

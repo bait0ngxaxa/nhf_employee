@@ -1,6 +1,10 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { LeaveHistoryFilters } from "@/lib/services/leave/history-filters";
+import type {
+    ApproverLeaveAction,
+    LiffLeaveRequestDetail as LiffLeaveRequestDetailData,
+} from "@/lib/types/leave";
 
 const mocks = vi.hoisted(() => ({
     search: "",
@@ -143,14 +147,28 @@ vi.mock("@/components/liff/leave/LiffLeaveRequestDetail", () => ({
         detail,
         actionIntent,
         onOpenChange,
+        onAction,
     }: {
-        detail: { id: string } | null;
+        detail: LiffLeaveRequestDetailData | null;
         actionIntent: string | null;
         onOpenChange: (open: boolean) => void;
+        onAction: (
+            action: ApproverLeaveAction,
+            detail: LiffLeaveRequestDetailData,
+        ) => void;
     }) => detail
         ? (
             <div>
                 รายละเอียด {detail.id} intent {actionIntent ?? "none"}
+                {detail.availableActions?.includes("APPROVE") ? (
+                    <button
+                        type="button"
+                        data-testid="detail-approve"
+                        onClick={() => onAction("APPROVE", detail)}
+                    >
+                        detail-approve
+                    </button>
+                ) : null}
                 <button
                     type="button"
                     data-testid="close-detail"
@@ -163,7 +181,29 @@ vi.mock("@/components/liff/leave/LiffLeaveRequestDetail", () => ({
         : null,
 }));
 vi.mock("@/components/liff/leave/LiffLeaveDecisionSheet", () => ({
-    LiffLeaveDecisionSheet: () => null,
+    LiffLeaveDecisionSheet: ({
+        intent,
+        onConfirm,
+        onOpenChange,
+        error,
+    }: {
+        intent: { action: string } | null;
+        onConfirm: (reason: string | undefined) => void | Promise<void>;
+        onOpenChange: (open: boolean) => void;
+        error: string | null;
+    }) => intent
+        ? (
+            <div>
+                {error ? <div role="alert">{error}</div> : null}
+                <button type="button" onClick={() => void onConfirm(undefined)}>
+                    ยืนยันการทดสอบ
+                </button>
+                <button type="button" onClick={() => onOpenChange(false)}>
+                    ปิดการทดสอบ
+                </button>
+            </div>
+        )
+        : null,
 }));
 
 import { LiffLeaveApp } from "@/components/liff/leave/LiffLeaveApp";
@@ -293,6 +333,52 @@ describe("LIFF Leave app orchestration", () => {
         expect(mocks.cancelLeave).not.toHaveBeenCalled();
         expect(mocks.confirmNotTaken).not.toHaveBeenCalled();
         expect(mocks.decideCancellation).not.toHaveBeenCalled();
+    });
+
+    it("refreshes approval state after recovered decision ambiguity without deciding twice", async () => {
+        mocks.search = "requestId=leave-1&action=approve";
+        mocks.fetchHome.mockResolvedValueOnce({
+            workforce: { userId: 1, employeeId: 1, name: "หัวหน้า ทดสอบ" },
+            modules: {},
+            capabilities: { canApproveLeave: true },
+        });
+        const detail = {
+            id: "leave-1",
+            viewerRole: "APPROVER" as const,
+            availableActions: ["APPROVE"] as const,
+            leaveType: "SICK" as const,
+            startDate: "2031-01-01",
+            endDate: "2031-01-01",
+            overQuotaDays: 0,
+            emergencyReason: null,
+            specialReason: null,
+        } as unknown as LiffLeaveRequestDetailData;
+        mocks.fetchRequest
+            .mockResolvedValueOnce(detail)
+            .mockResolvedValueOnce({ ...detail, availableActions: [] });
+        mocks.submitDecision.mockRejectedValueOnce(
+            new LiffApiError(
+                "เชื่อมต่อกับ LINE ใหม่เรียบร้อยแล้ว",
+                401,
+                undefined,
+                { recovered: true, replayed: false },
+            ),
+        );
+
+        render(<LiffLeaveApp />);
+        expect(await screen.findByTestId("detail-approve")).toBeInTheDocument();
+        fireEvent.click(screen.getByTestId("detail-approve"));
+        fireEvent.click(screen.getByRole("button", { name: "ยืนยันการทดสอบ" }));
+
+        await waitFor(() => {
+            expect(mocks.submitDecision).toHaveBeenCalledTimes(1);
+            expect(mocks.fetchApprovals).toHaveBeenCalledTimes(2);
+            expect(mocks.fetchRequest).toHaveBeenCalledTimes(2);
+        });
+        expect(screen.getByText(
+            "เชื่อมต่อกับ LINE ใหม่เรียบร้อยแล้ว กรุณาตรวจสอบสถานะล่าสุดก่อนลองดำเนินการอีกครั้ง",
+        )).toBeInTheDocument();
+        expect(screen.queryByTestId("detail-approve")).not.toBeInTheDocument();
     });
 
     it("fails an inaccessible deep link safely without revealing its request", async () => {

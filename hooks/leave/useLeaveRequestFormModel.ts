@@ -32,6 +32,7 @@ interface LeaveQuotaSnapshot {
 
 interface UseLeaveRequestFormModelArgs {
     onSuccess: () => void | Promise<void>;
+    onSubmitError?: (error: unknown) => void | Promise<void>;
     quotas?: LeaveQuotaSnapshot[];
     submitRequest?: (
         payload: LeaveRequestValues,
@@ -125,6 +126,7 @@ const normalizeLeaveRequestErrorMessage = (rawMessage: string): string => {
 
 export function useLeaveRequestFormModel({
     onSuccess,
+    onSubmitError,
     quotas = [],
     submitRequest = submitLeaveRequest,
 }: UseLeaveRequestFormModelArgs): UseLeaveRequestFormModelResult {
@@ -271,6 +273,11 @@ export function useLeaveRequestFormModel({
                         : "";
                 const message = normalizeLeaveRequestErrorMessage(rawMessage);
                 setErrorMsg(message);
+                try {
+                    await onSubmitError?.(error);
+                } catch {
+                    // A reconciliation failure must not hide the original form error.
+                }
                 toast.error(message);
                 return;
             }

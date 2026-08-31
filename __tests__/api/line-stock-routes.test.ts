@@ -491,6 +491,56 @@ describe("LIFF Stock route adapters", () => {
         expect(mocks.createRequest).not.toHaveBeenCalled();
     });
 
+    it.each([
+        ["missing", undefined],
+        ["lying", "10"],
+    ] as const)(
+        "rejects an actually oversized Stock request with a %s Content-Length",
+        async (_label, contentLength) => {
+            const body = new ArrayBuffer(STOCK_JSON_MUTATION_MAX_BYTES + 1);
+            const headers: Record<string, string> = {
+                "Content-Type": "application/json",
+            };
+            if (contentLength) headers["Content-Length"] = contentLength;
+
+            const response = await createRequest(request(
+                "/api/line/stock/requests",
+                {
+                    method: "POST",
+                    headers,
+                    body,
+                },
+            ));
+
+            expect(response.status).toBe(413);
+            expect(mocks.createRequest).not.toHaveBeenCalled();
+            expect(mocks.requireLiffWorkforceSession).not.toHaveBeenCalled();
+        },
+    );
+
+    it.each(["cancel", "issue"] as const)(
+        "rejects an actually oversized LIFF Stock %s body before its domain service",
+        async (kind) => {
+            if (kind === "issue") {
+                mocks.requireLiffWorkforceSession.mockResolvedValueOnce(ADMIN_AUTH);
+            }
+
+            const invoke = kind === "cancel" ? cancelRequest : issueRequest;
+            const response = await invoke(request(
+                `/api/line/stock/requests/71/${kind}`,
+                {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: new ArrayBuffer(STOCK_JSON_MUTATION_MAX_BYTES + 1),
+                },
+            ), { params: Promise.resolve({ id: "71" }) });
+
+            expect(response.status).toBe(413);
+            expect(mocks.cancelRequest).not.toHaveBeenCalled();
+            expect(mocks.issueRequest).not.toHaveBeenCalled();
+        },
+    );
+
     it("returns an idempotency conflict without waking the outbox", async () => {
         mocks.createRequest.mockRejectedValueOnce(
             new StockRequestIdempotencyConflictError(),

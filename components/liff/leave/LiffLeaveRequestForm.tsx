@@ -15,6 +15,9 @@ import {
     SheetTitle,
 } from "@/components/ui/sheet";
 import { useLeaveRequestFormModel } from "@/hooks/leave/useLeaveRequestFormModel";
+import {
+    isRecoveredLiffMutation,
+} from "@/lib/client/liff";
 import { submitLiffLeaveRequest } from "@/lib/client/liff-leave";
 import type { LiffLeaveQuotaSummary } from "@/lib/types/leave";
 
@@ -23,6 +26,7 @@ interface LiffLeaveRequestFormProps {
     quotas: LiffLeaveQuotaSummary[];
     onOpenChange: (open: boolean) => void;
     onSuccess: () => void | Promise<void>;
+    onAmbiguousSubmit?: () => void | Promise<void>;
 }
 
 export function LiffLeaveRequestForm({
@@ -30,6 +34,7 @@ export function LiffLeaveRequestForm({
     quotas,
     onOpenChange,
     onSuccess,
+    onAmbiguousSubmit,
 }: LiffLeaveRequestFormProps): ReactElement {
     const model = useLeaveRequestFormModel({
         quotas,
@@ -37,6 +42,11 @@ export function LiffLeaveRequestForm({
         onSuccess: async () => {
             await onSuccess();
             onOpenChange(false);
+        },
+        onSubmitError: async (error) => {
+            if (isRecoveredLiffMutation(error)) {
+                await onAmbiguousSubmit?.();
+            }
         },
     });
 

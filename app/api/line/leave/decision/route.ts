@@ -1,7 +1,10 @@
 import { after, NextResponse, type NextRequest } from "next/server";
 
 import { requireLiffWorkforceSession } from "@/lib/auth/liff";
-import { enforceLeaveJsonBodySize } from "@/lib/server/leave-api";
+import {
+    enforceLeaveJsonBodySize,
+    readLeaveJsonBody,
+} from "@/lib/server/leave-api";
 import {
     decideLeaveRequest,
     LeaveApprovalError,
@@ -36,7 +39,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         );
         if (principalRateLimitResponse) return principalRateLimitResponse;
 
-        const parsed = leaveActionSchema.safeParse(await req.json());
+        const body = await readLeaveJsonBody(req);
+        if (!body.ok) return body.response;
+        const parsed = leaveActionSchema.safeParse(body.body);
         if (!parsed.success) {
             return jsonError(COMMON_API_MESSAGES.invalidActionParameters, 400, {
                 details: parsed.error.flatten().fieldErrors,

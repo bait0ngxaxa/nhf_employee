@@ -86,6 +86,7 @@ import { PUT as confirmNotTaken } from "@/app/api/line/leave/not-taken/route";
 import { POST as createRequest } from "@/app/api/line/leave/request/route";
 import { GET as getDetail } from "@/app/api/line/leave/requests/[id]/route";
 import { API_ROUTES } from "@/lib/ssot/routes";
+import { LEAVE_JSON_MUTATION_MAX_BYTES } from "@/lib/server/leave-api";
 
 const AUTH = {
     ok: true as const,
@@ -312,6 +313,28 @@ describe("LIFF Leave route adapters", () => {
             data: { id: "leave_1", status: "CANCELLED" },
         });
     });
+
+    it.each([
+        ["cancel", () => cancelLeave(request("/api/line/leave/cancel", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: new ArrayBuffer(LEAVE_JSON_MUTATION_MAX_BYTES + 1),
+        }))],
+        ["decision", () => decideLeave(request("/api/line/leave/decision", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: new ArrayBuffer(LEAVE_JSON_MUTATION_MAX_BYTES + 1),
+        }))],
+    ] as const)(
+        "rejects an actually oversized LIFF Leave %s body before its domain service",
+        async (_label, invoke) => {
+            const response = await invoke();
+
+            expect(response.status).toBe(413);
+            expect(mocks.cancelLeaveRequest).not.toHaveBeenCalled();
+            expect(mocks.decideLeaveRequest).not.toHaveBeenCalled();
+        },
+    );
 
     it("never enables ADMIN recovery for LIFF approver mutations", async () => {
         mocks.confirmLeaveCancellation.mockResolvedValueOnce({ request: { id: "leave_1" } });

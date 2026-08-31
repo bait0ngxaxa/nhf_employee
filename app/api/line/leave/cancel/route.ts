@@ -1,7 +1,10 @@
 import { after, NextResponse, type NextRequest } from "next/server";
 
 import { requireLiffWorkforceSession } from "@/lib/auth/liff";
-import { enforceLeaveJsonBodySize } from "@/lib/server/leave-api";
+import {
+    enforceLeaveJsonBodySize,
+    readLeaveJsonBody,
+} from "@/lib/server/leave-api";
 import {
     cancelLeaveRequest,
     confirmLeaveCancellation,
@@ -64,7 +67,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     try {
         const authorization = await requireLeaveMutation(req);
         if (!authorization.ok) return authorization.response;
-        const parsed = leaveCancelSchema.safeParse(await req.json());
+        const body = await readLeaveJsonBody(req);
+        if (!body.ok) return body.response;
+        const parsed = leaveCancelSchema.safeParse(body.body);
         if (!parsed.success) {
             return jsonError(COMMON_API_MESSAGES.invalidInput, 400, {
                 details: parsed.error.flatten().fieldErrors,
@@ -99,7 +104,9 @@ export async function PUT(req: NextRequest): Promise<NextResponse> {
     try {
         const authorization = await requireLeaveMutation(req);
         if (!authorization.ok) return authorization.response;
-        const parsed = leaveCancellationDecisionSchema.safeParse(await req.json());
+        const body = await readLeaveJsonBody(req);
+        if (!body.ok) return body.response;
+        const parsed = leaveCancellationDecisionSchema.safeParse(body.body);
         if (!parsed.success) {
             return jsonError(COMMON_API_MESSAGES.invalidInput, 400, {
                 details: parsed.error.flatten().fieldErrors,

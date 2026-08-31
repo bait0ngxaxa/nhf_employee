@@ -27,13 +27,24 @@ export type ApiResponse<T> =
           status?: number;
           details?: unknown;
           requestId?: string;
+          unauthorizedRecovery?: UnauthorizedRecoveryMetadata;
       };
+
+export type UnauthorizedRecoveryResult = {
+    recovered: boolean;
+    replay: boolean;
+};
+
+export type UnauthorizedRecoveryMetadata = {
+    recovered: boolean;
+    replayed: boolean;
+};
 
 export type UnauthorizedRecoveryHandler = (context: {
     endpoint: string;
     method: string;
     response: Response;
-}) => Promise<boolean>;
+}) => Promise<UnauthorizedRecoveryResult>;
 
 interface RequestConfig extends RequestInit {
     data?: unknown;
@@ -45,7 +56,7 @@ interface RequestConfig extends RequestInit {
 }
 
 const DEFAULT_TIMEOUT_MS = 15000;
-const DEFAULT_GET_RETRY_COUNT = 1;
+const DEFAULT_SAFE_READ_RETRY_COUNT = 1;
 const BASE_RETRY_DELAY_MS = 300;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -153,8 +164,12 @@ function extractErrorMessage(responseData: unknown, fallback: string): string {
     return fallback;
 }
 
+function isSafeReadMethod(method: string): boolean {
+    return method === "GET" || method === "HEAD";
+}
+
 function shouldRetry(method: string, attempt: number, retryCount: number): boolean {
-    return method === "GET" && attempt < retryCount;
+    return isSafeReadMethod(method) && attempt < retryCount;
 }
 
 function shouldRetryResponse(response: Response): boolean {
@@ -235,7 +250,9 @@ export async function apiRequest<T>(
     } = config;
     const method = customConfig.method?.toUpperCase() ?? "GET";
     const requestId = customRequestId ?? createRequestId();
-    const finalRetryCount = method === "GET" ? (retryCount ?? DEFAULT_GET_RETRY_COUNT) : 0;
+    const finalRetryCount = isSafeReadMethod(method)
+        ? (retryCount ?? DEFAULT_SAFE_READ_RETRY_COUNT)
+        : 0;
     const finalTimeoutMs = timeoutMs ?? DEFAULT_TIMEOUT_MS;
     const hasRawRequestData = isRawRequestData(data);
     const hasJsonData = data !== undefined && !hasRawRequestData;
@@ -255,28 +272,48 @@ export async function apiRequest<T>(
     for (let attempt = 0; attempt <= finalRetryCount; attempt += 1) {
         const { signal, cleanup } = createTimedSignal(customConfig.signal, finalTimeoutMs);
         try {
+            let unauthorizedRecovery: UnauthorizedRecoveryMetadata | undefined;
             let response = await fetchWithRefresh(endpoint, {
                 ...requestInit,
                 signal,
             }, { refreshOnUnauthorized: !skipAuthRefresh });
 
             if (response.status === 401 && onUnauthorized) {
-                let replayRequest = false;
+                let recoveryResult: UnauthorizedRecoveryResult = {
+                    recovered: false,
+                    replay: false,
+                };
                 try {
-                    replayRequest = await onUnauthorized({
+                    recoveryResult = await onUnauthorized({
                         endpoint,
                         method,
                         response,
                     });
                 } catch {
-                    replayRequest = false;
+                    recoveryResult = {
+                        recovered: false,
+                        replay: false,
+                    };
                 }
 
-                if (replayRequest && method === "GET" && !signal.aborted) {
+                unauthorizedRecovery = {
+                    recovered: recoveryResult.recovered,
+                    replayed: false,
+                };
+                if (
+                    recoveryResult.recovered
+                    && recoveryResult.replay
+                    && isSafeReadMethod(method)
+                    && !signal.aborted
+                ) {
                     response = await fetchWithRefresh(endpoint, {
                         ...requestInit,
                         signal,
                     }, { refreshOnUnauthorized: false });
+                    unauthorizedRecovery = {
+                        recovered: recoveryResult.recovered,
+                        replayed: true,
+                    };
                 }
             }
 
@@ -300,6 +337,7 @@ export async function apiRequest<T>(
                     status: response.status,
                     details: responseData,
                     requestId,
+                    unauthorizedRecovery,
                 };
             }
 

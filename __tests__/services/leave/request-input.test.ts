@@ -134,6 +134,30 @@ describe("parseLeaveRequestInput", () => {
         });
     });
 
+    it.each([
+        ["missing", undefined],
+        ["lying", "10"],
+    ] as const)(
+        "rejects an actually oversized multipart body with a %s Content-Length",
+        async (_label, contentLength) => {
+            const headers: Record<string, string> = {
+                "Content-Type": "multipart/form-data; boundary=test",
+            };
+            if (contentLength) headers["Content-Length"] = contentLength;
+
+            const request = new Request("http://localhost/api/leave/request", {
+                method: "POST",
+                headers,
+                body: new ArrayBuffer(LEAVE_ATTACHMENT_MAX_REQUEST_BYTES + 1),
+            });
+
+            await expect(parseLeaveRequestInput(request)).rejects.toMatchObject({
+                statusCode: 413,
+                message: "คำขอมีขนาดใหญ่เกินไป",
+            });
+        },
+    );
+
     it("returns a safe validation error when multipart parsing fails", async () => {
         const request = {
             headers: new Headers({ "Content-Type": "multipart/form-data" }),

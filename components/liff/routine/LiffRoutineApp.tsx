@@ -12,7 +12,11 @@ import {
 
 import { ErrorState, LoadingState } from "@/components/ui/state";
 import { Button } from "@/components/ui/button";
-import { LiffApiError } from "@/lib/client/liff";
+import {
+    isRecoveredLiffMutation,
+    LIFF_SESSION_RECOVERED_MUTATION_MESSAGE,
+    LiffApiError,
+} from "@/lib/client/liff";
 import {
     deleteLiffRoutineTask,
     fetchLiffRoutineReference,
@@ -332,7 +336,9 @@ export function LiffRoutineApp(): ReactElement {
         }
     }, [isTaskLoading, pagination, selectedFilter, state]);
 
-    const refreshRoutineData = useCallback(async (): Promise<boolean> => {
+    const refreshRoutineData = useCallback(async (
+        refreshFailureMessage = "บันทึกสำเร็จ แต่โหลดรายการ Routine ล่าสุดไม่ได้ กรุณาลองใหม่อีกครั้ง",
+    ): Promise<boolean> => {
         const requestId = taskRequestIdRef.current + 1;
         taskRequestIdRef.current = requestId;
         setIsTaskLoading(true);
@@ -353,7 +359,7 @@ export function LiffRoutineApp(): ReactElement {
             return true;
         } catch {
             if (requestId !== taskRequestIdRef.current) return false;
-            setOperationError("บันทึกสำเร็จ แต่โหลดรายการ Routine ล่าสุดไม่ได้ กรุณาลองใหม่อีกครั้ง");
+            setOperationError(refreshFailureMessage);
             return false;
         } finally {
             if (requestId === taskRequestIdRef.current) {
@@ -411,7 +417,26 @@ export function LiffRoutineApp(): ReactElement {
                     setFormMode(null);
                     await refreshRoutineData();
                 } catch (error) {
-                    if (error instanceof LiffApiError && error.status === 404) {
+                    if (isRecoveredLiffMutation(error)) {
+                        setDeleteError(LIFF_SESSION_RECOVERED_MUTATION_MESSAGE);
+                        setOperationNotice(LIFF_SESSION_RECOVERED_MUTATION_MESSAGE);
+                        await refreshRoutineData(
+                            `${LIFF_SESSION_RECOVERED_MUTATION_MESSAGE} แต่ยังโหลดรายการล่าสุดไม่ได้ กรุณาลองใหม่อีกครั้ง`,
+                        );
+                        try {
+                            await reloadLatestTask(task.id);
+                        } catch (reloadError) {
+                            if (reloadError instanceof LiffApiError && reloadError.status === 404) {
+                                setOperationNotice("งานนี้ไม่พบในสถานะล่าสุด กำลังปิดรายละเอียด");
+                                setFocusedTaskId((current) => current === task.id ? null : current);
+                                detailRequestIdRef.current += 1;
+                                setSelectedTaskId(null);
+                                setDetail(null);
+                                setDetailError(null);
+                                setDeleteError(null);
+                            }
+                        }
+                    } else if (error instanceof LiffApiError && error.status === 404) {
                         setOperationNotice("งานนี้ถูกลบไปแล้ว กำลังโหลดรายการล่าสุด");
                         setFocusedTaskId((current) => current === task.id ? null : current);
                         detailRequestIdRef.current += 1;
@@ -427,7 +452,7 @@ export function LiffRoutineApp(): ReactElement {
                 }
             })();
         },
-        [isDeleting, refreshRoutineData],
+        [isDeleting, refreshRoutineData, reloadLatestTask],
     );
 
     const handleDetailOpenChange = useCallback((open: boolean): void => {
@@ -562,6 +587,11 @@ export function LiffRoutineApp(): ReactElement {
                     onRetryReference={() => void loadReference()}
                     onSaved={handleTaskSaved}
                     onReloadLatest={reloadLatestTask}
+                    onAmbiguousSubmit={async () => {
+                        await refreshRoutineData(
+                            `${LIFF_SESSION_RECOVERED_MUTATION_MESSAGE} แต่ยังโหลดรายการล่าสุดไม่ได้ กรุณาลองใหม่อีกครั้ง`,
+                        );
+                    }}
                 />
             ) : null}
         </>

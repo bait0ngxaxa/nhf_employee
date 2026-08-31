@@ -6,7 +6,10 @@ import { executeCancelStockRequest } from "@/lib/server/stock-request-commands";
 import { cancelRequestSchema } from "@/lib/validations/stock";
 import { WorkforceAuthorizationError } from "@/lib/auth/workforce-transaction";
 import { createStockCommandActor } from "@/lib/server/stock-command-actor";
-import { enforceStockJsonBodySize } from "@/lib/server/stock-api";
+import {
+    enforceStockJsonBodySize,
+    readStockJsonBody,
+} from "@/lib/server/stock-api";
 import {
     enforceAuthenticatedMutationRateLimit,
     enforcePreAuthIpRateLimit,
@@ -49,8 +52,9 @@ export async function POST(
             return jsonError("ID ไม่ถูกต้อง", 400);
         }
 
-        const body = await request.json();
-        const parsed = cancelRequestSchema.safeParse(body);
+        const body = await readStockJsonBody(request);
+        if (!body.ok) return body.response;
+        const parsed = cancelRequestSchema.safeParse(body.body);
         if (!parsed.success) {
             return jsonError("ข้อมูลไม่ถูกต้อง", 400, {
                 details: parsed.error.flatten().fieldErrors,

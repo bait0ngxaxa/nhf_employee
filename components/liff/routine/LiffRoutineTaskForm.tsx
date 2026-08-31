@@ -25,7 +25,11 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { LiffApiError } from "@/lib/client/liff";
+import {
+    isRecoveredLiffMutation,
+    LIFF_SESSION_RECOVERED_MUTATION_MESSAGE,
+    LiffApiError,
+} from "@/lib/client/liff";
 import {
     createLiffRoutineTask,
     updateLiffRoutineTask,
@@ -74,6 +78,9 @@ interface LiffRoutineTaskFormProps {
         mode: LiffRoutineTaskFormMode,
     ) => void | Promise<void>;
     onReloadLatest?: (taskId: number) => Promise<LiffRoutineTaskDetail>;
+    onAmbiguousSubmit?: (
+        mode: LiffRoutineTaskFormMode,
+    ) => void | Promise<void>;
 }
 
 export interface LiffRoutineTaskFormHandle {
@@ -227,6 +234,7 @@ export const LiffRoutineTaskForm = forwardRef<
     onCancel,
     onSaved,
     onReloadLatest,
+    onAmbiguousSubmit,
 }, ref): ReactElement {
     const formTask = mode === "EDIT" ? task : null;
     const units = useMemo(
@@ -324,16 +332,18 @@ export const LiffRoutineTaskForm = forwardRef<
         }));
     }, []);
 
-    const reloadLatest = useCallback(async (): Promise<void> => {
+    const reloadLatest = useCallback(async (
+        message: string = STALE_CONFLICT_MESSAGE,
+    ): Promise<void> => {
         if (mode !== "EDIT" || !task || !onReloadLatest || isReloadingLatest) return;
         setIsReloadingLatest(true);
         try {
             const latest = await onReloadLatest(task.id);
             setLatestConflictTask(latest);
-            setError(STALE_CONFLICT_MESSAGE);
+            setError(message);
         } catch (reloadError) {
             setError(
-                `${STALE_CONFLICT_MESSAGE} แต่ยังโหลดข้อมูลล่าสุดไม่ได้ กรุณาลองโหลดอีกครั้ง`,
+                `${message} แต่ยังโหลดข้อมูลล่าสุดไม่ได้ กรุณาลองโหลดอีกครั้ง`,
             );
             toast.error(getMutationErrorMessage(reloadError));
         } finally {
@@ -426,6 +436,27 @@ export const LiffRoutineTaskForm = forwardRef<
             if (Object.keys(serverErrors).length > 0) {
                 setFieldErrors(serverErrors);
                 focusFirstRoutineInvalidField(serverErrors);
+            }
+
+            if (isRecoveredLiffMutation(submitError)) {
+                if (mode === "EDIT" && task && onReloadLatest) {
+                    setHasConflict(true);
+                    setLatestConflictTask(null);
+                    try {
+                        await reloadLatest(LIFF_SESSION_RECOVERED_MUTATION_MESSAGE);
+                    } catch {
+                        // reloadLatest has already surfaced the recoverable reload error.
+                    }
+                } else {
+                    try {
+                        await onAmbiguousSubmit?.(mode);
+                    } catch {
+                        // The form keeps its payload and idempotency key for explicit retry.
+                    }
+                    setError(LIFF_SESSION_RECOVERED_MUTATION_MESSAGE);
+                }
+                toast.error(LIFF_SESSION_RECOVERED_MUTATION_MESSAGE);
+                return;
             }
 
             if (mode === "EDIT"

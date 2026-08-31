@@ -36,6 +36,9 @@ interface LiffRoutineTaskFormSurfaceProps {
         mode: LiffRoutineTaskFormMode,
     ) => void | Promise<void>;
     onReloadLatest?: (taskId: number) => Promise<LiffRoutineTaskDetail>;
+    onAmbiguousSubmit?: (
+        mode: LiffRoutineTaskFormMode,
+    ) => void | Promise<void>;
 }
 
 export function LiffRoutineTaskFormSurface({
@@ -49,6 +52,7 @@ export function LiffRoutineTaskFormSurface({
     onRetryReference,
     onSaved,
     onReloadLatest,
+    onAmbiguousSubmit,
 }: LiffRoutineTaskFormSurfaceProps): ReactElement {
     const formRef = useRef<LiffRoutineTaskFormHandle>(null);
     const title = mode === "CREATE" ? "เพิ่ม Routine ของฉัน" : "แก้ไข Routine ของฉัน";
@@ -129,6 +133,7 @@ export function LiffRoutineTaskFormSurface({
                         onCancel={() => onOpenChange(false)}
                         onSaved={onSaved}
                         onReloadLatest={onReloadLatest}
+                        onAmbiguousSubmit={onAmbiguousSubmit}
                     />
                 ) : (
                     <div role="alert" className="flex flex-1 items-center justify-center bg-surface-subtle px-4 py-8 text-center text-sm leading-6 text-status-danger-foreground">

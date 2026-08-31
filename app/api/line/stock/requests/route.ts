@@ -3,7 +3,10 @@ import { after, type NextRequest, NextResponse } from "next/server";
 import { requireLiffWorkforceSession } from "@/lib/auth/liff";
 import { WorkforceAuthorizationError } from "@/lib/auth/workforce-transaction";
 import { createStockCommandActor } from "@/lib/server/stock-command-actor";
-import { enforceStockJsonBodySize } from "@/lib/server/stock-api";
+import {
+    enforceStockJsonBodySize,
+    readStockJsonBody,
+} from "@/lib/server/stock-api";
 import {
     enforceAuthenticatedMutationRateLimit,
     enforcePreAuthIpRateLimit,
@@ -66,7 +69,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         const bodySizeResponse = enforceStockJsonBodySize(request);
         if (bodySizeResponse) return bodySizeResponse;
 
-        const parsedBody = createRequestSchema.safeParse(await request.json());
+        const body = await readStockJsonBody(request);
+        if (!body.ok) return body.response;
+        const parsedBody = createRequestSchema.safeParse(body.body);
         if (!parsedBody.success) {
             return jsonError("ข้อมูลไม่ถูกต้อง", 400, {
                 details: parsedBody.error.flatten().fieldErrors,

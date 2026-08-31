@@ -1,6 +1,7 @@
 import {
     apiPost,
     type ApiResponse,
+    type UnauthorizedRecoveryMetadata,
     type UnauthorizedRecoveryHandler,
 } from "@/lib/client/api-client";
 import type { LiffSessionResponse } from "@/lib/line/liff-types";
@@ -8,19 +9,27 @@ import { API_ROUTES } from "@/lib/ssot/routes";
 
 export type { LiffSessionResponse, LiffWorkforceIdentity } from "@/lib/line/liff-types";
 
+export const LIFF_SESSION_RECOVERED_MUTATION_MESSAGE =
+    "เชื่อมต่อกับ LINE ใหม่เรียบร้อยแล้ว กรุณาตรวจสอบสถานะล่าสุดก่อนลองดำเนินการอีกครั้ง";
+
 export class LiffApiError extends Error {
     readonly status: number | undefined;
     readonly details: unknown;
+    readonly sessionRecovered: boolean;
+    readonly unauthorizedRecovery: UnauthorizedRecoveryMetadata | undefined;
 
     constructor(
         message: string,
         status: number | undefined,
         details: unknown = undefined,
+        unauthorizedRecovery: UnauthorizedRecoveryMetadata | undefined = undefined,
     ) {
         super(message);
         this.name = "LiffApiError";
         this.status = status;
         this.details = details;
+        this.sessionRecovered = unauthorizedRecovery?.recovered === true;
+        this.unauthorizedRecovery = unauthorizedRecovery;
     }
 }
 
@@ -85,8 +94,26 @@ export const handleLiffUnauthorized: UnauthorizedRecoveryHandler = async ({
 }) => {
     const recovered = await recoverLiffSession();
     if (!recovered) requestLiffRebootstrap();
-    return recovered && method.toUpperCase() === "GET";
+    return {
+        recovered,
+        replay: recovered && isSafeLiffReadMethod(method),
+    };
 };
+
+function isSafeLiffReadMethod(method: string): boolean {
+    const normalizedMethod = method.toUpperCase();
+    return normalizedMethod === "GET" || normalizedMethod === "HEAD";
+}
+
+export function isRecoveredLiffUnauthorizedResponse(
+    response: Extract<ApiResponse<unknown>, { success: false }>,
+): boolean {
+    return (
+        response.status === 401
+        && response.unauthorizedRecovery?.recovered === true
+        && response.unauthorizedRecovery.replayed === false
+    );
+}
 
 export async function fetchLiffWithSessionRecovery(
     input: RequestInfo | URL,
@@ -96,12 +123,12 @@ export async function fetchLiffWithSessionRecovery(
     let response = await fetch(input, init);
     if (response.status !== 401) return response;
 
-    const shouldReplay = await handleLiffUnauthorized({
+    const recovery = await handleLiffUnauthorized({
         endpoint: typeof input === "string" ? input : input.toString(),
         method,
         response,
     });
-    if (shouldReplay && method === "GET" && !init?.signal?.aborted) {
+    if (recovery.replay && isSafeLiffReadMethod(method) && !init?.signal?.aborted) {
         response = await fetch(input, init);
     }
     return response;
@@ -110,6 +137,10 @@ export async function fetchLiffWithSessionRecovery(
 function getSafeLiffApiErrorMessage(
     response: Extract<ApiResponse<unknown>, { success: false }>,
 ): string {
+    if (isRecoveredLiffUnauthorizedResponse(response)) {
+        return LIFF_SESSION_RECOVERED_MUTATION_MESSAGE;
+    }
+
     switch (response.status) {
         case 401:
             return "การยืนยันตัวตนหมดอายุ กรุณาลองใหม่อีกครั้ง";
@@ -136,6 +167,16 @@ export async function unwrapLiffResponse<T>(
         getErrorMessage(response),
         response.status,
         response.details,
+        response.unauthorizedRecovery,
+    );
+}
+
+export function isRecoveredLiffMutation(error: unknown): error is LiffApiError {
+    return (
+        error instanceof LiffApiError
+        && error.status === 401
+        && error.sessionRecovered
+        && error.unauthorizedRecovery?.replayed === false
     );
 }
 

@@ -5,6 +5,7 @@ import { getApiAuthSession } from "@/lib/auth/server";
 import { prisma } from "@/lib/db/prisma";
 import { getEmployeeIdFromUserId } from "@/lib/services/leave/get-employee-id";
 import { processOutbox } from "@/lib/services/outbox/processor";
+import { LEAVE_JSON_MUTATION_MAX_BYTES } from "@/lib/server/leave-api";
 import type * as NextServerModule from "next/server";
 
 vi.mock("next/server", async (importOriginal) => {
@@ -105,6 +106,32 @@ describe("/api/leave/not-taken", () => {
             return callback;
         });
     });
+
+    it.each([
+        ["missing", undefined],
+        ["lying", "10"],
+    ] as const)(
+        "rejects an actually oversized not-taken body with a %s Content-Length",
+        async (_label, contentLength) => {
+            const headers: Record<string, string> = {
+                "Content-Type": "application/json",
+            };
+            if (contentLength) headers["Content-Length"] = contentLength;
+
+            const response = await POST(new NextRequest(
+                "http://localhost/api/leave/not-taken",
+                {
+                    method: "POST",
+                    headers,
+                    body: new ArrayBuffer(LEAVE_JSON_MUTATION_MAX_BYTES + 1),
+                },
+            ));
+
+            expect(response.status).toBe(413);
+            expect(prisma.leaveRequest.findUnique).not.toHaveBeenCalled();
+            expect(prisma.leaveRequest.updateMany).not.toHaveBeenCalled();
+        },
+    );
 
     it("records employee not-taken request for an approved past leave", async () => {
         vi.mocked(prisma.leaveRequest.findUnique).mockResolvedValue({

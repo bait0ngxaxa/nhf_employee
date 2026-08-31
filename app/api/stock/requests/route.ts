@@ -13,7 +13,10 @@ import {
 import { processOutbox } from "@/lib/services/outbox/processor";
 import { WorkforceAuthorizationError } from "@/lib/auth/workforce-transaction";
 import { createStockCommandActor } from "@/lib/server/stock-command-actor";
-import { enforceStockJsonBodySize } from "@/lib/server/stock-api";
+import {
+    enforceStockJsonBodySize,
+    readStockJsonBody,
+} from "@/lib/server/stock-api";
 import {
     createRequestSchema,
     idempotencyKeySchema,
@@ -72,8 +75,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         const bodySizeResponse = enforceStockJsonBodySize(request);
         if (bodySizeResponse) return bodySizeResponse;
 
-        const body = await request.json();
-        const result = createRequestSchema.safeParse(body);
+        const body = await readStockJsonBody(request);
+        if (!body.ok) return body.response;
+        const result = createRequestSchema.safeParse(body.body);
         if (!result.success) {
             return jsonError("ข้อมูลไม่ถูกต้อง", 400, {
                 details: result.error.flatten().fieldErrors,
