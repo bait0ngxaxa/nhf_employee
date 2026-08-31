@@ -11,7 +11,10 @@ import {
 } from "react";
 import { toast } from "sonner";
 
-import { useStockBrowseCart } from "@/components/dashboard/stock/useStockBrowseCart";
+import {
+    useStockBrowseCart,
+    type StockCartAvailabilityReconciliation,
+} from "@/components/dashboard/stock/useStockBrowseCart";
 import { useLiffWorkforce } from "@/components/liff/LiffBootstrap";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { LiffApiError } from "@/lib/client/liff";
@@ -75,10 +78,43 @@ function getStockError(error: unknown): string {
     return "ไม่สามารถโหลดข้อมูล Stock ได้ กรุณาลองใหม่อีกครั้ง";
 }
 
+function notifyCartAvailabilityReconciliation(
+    reconciliation: StockCartAvailabilityReconciliation,
+): void {
+    if (reconciliation.adjustedCount === 0 && reconciliation.removedCount === 0) {
+        return;
+    }
+
+    if (reconciliation.adjustedCount > 0 && reconciliation.removedCount > 0) {
+        toast.info(
+            "จำนวนวัสดุบางรายการถูกปรับตามสต็อกล่าสุด และวัสดุที่ไม่มีสต็อกพร้อมเบิกถูกนำออกจากตะกร้า",
+        );
+        return;
+    }
+
+    if (reconciliation.adjustedCount > 0) {
+        toast.info("จำนวนวัสดุบางรายการถูกปรับตามสต็อกล่าสุด");
+        return;
+    }
+
+    toast.info("วัสดุบางรายการไม่มีสต็อกพร้อมเบิกแล้วและถูกนำออกจากตะกร้า");
+}
+
 export function LiffStockApp(): ReactElement {
     const workforce = useLiffWorkforce();
     const searchParams = useSearchParams();
     const deepLinkHandledRef = useRef(false);
+    const catalogRequestSequenceRef = useRef(0);
+    const requestHistorySequenceRef = useRef(0);
+    const processingQueueSequenceRef = useRef(0);
+    const detailRequestSequenceRef = useRef(0);
+    const reconcileCartAvailabilityRef = useRef<
+        (catalogItems: ReadonlyArray<LiffStockCatalogItem>) => StockCartAvailabilityReconciliation
+    >(() => ({
+        changed: false,
+        adjustedCount: 0,
+        removedCount: 0,
+    }));
     const deepLinkRequestId = searchParams.get("requestId");
     const rawActionIntent = searchParams.get("action");
     const deepLinkActionIntent = rawActionIntent
@@ -127,17 +163,27 @@ export function LiffStockApp(): ReactElement {
         search: string;
         categoryId: number | undefined;
     }): Promise<void> => {
+        const sequence = ++catalogRequestSequenceRef.current;
         setCatalogLoading(true);
         setCatalogError(null);
         try {
-            setCatalog(await fetchLiffStockItems({
+            const nextCatalog = await fetchLiffStockItems({
                 ...input,
                 limit: CATALOG_PAGE_SIZE,
-            }));
+            });
+            if (sequence !== catalogRequestSequenceRef.current) return;
+
+            setCatalog(nextCatalog);
+            notifyCartAvailabilityReconciliation(
+                reconcileCartAvailabilityRef.current(nextCatalog.items),
+            );
         } catch (error) {
+            if (sequence !== catalogRequestSequenceRef.current) return;
             setCatalogError(getStockError(error));
         } finally {
-            setCatalogLoading(false);
+            if (sequence === catalogRequestSequenceRef.current) {
+                setCatalogLoading(false);
+            }
         }
     }, []);
 
@@ -146,17 +192,24 @@ export function LiffStockApp(): ReactElement {
         search: string;
         status: StockRequestStatus | undefined;
     }): Promise<void> => {
+        const sequence = ++requestHistorySequenceRef.current;
         setRequestsLoading(true);
         setRequestsError(null);
         try {
-            setMyRequests(await fetchLiffStockMyRequests({
+            const nextRequests = await fetchLiffStockMyRequests({
                 ...input,
                 limit: REQUEST_PAGE_SIZE,
-            }));
+            });
+            if (sequence !== requestHistorySequenceRef.current) return;
+
+            setMyRequests(nextRequests);
         } catch (error) {
+            if (sequence !== requestHistorySequenceRef.current) return;
             setRequestsError(getStockError(error));
         } finally {
-            setRequestsLoading(false);
+            if (sequence === requestHistorySequenceRef.current) {
+                setRequestsLoading(false);
+            }
         }
     }, []);
 
@@ -164,17 +217,64 @@ export function LiffStockApp(): ReactElement {
         page: number;
         search: string;
     }): Promise<void> => {
+        const sequence = ++processingQueueSequenceRef.current;
         setProcessingLoading(true);
         setProcessingError(null);
         try {
-            setProcessingQueue(await fetchLiffStockProcessingQueue({
+            const nextQueue = await fetchLiffStockProcessingQueue({
                 ...input,
                 limit: REQUEST_PAGE_SIZE,
-            }));
+            });
+            if (sequence !== processingQueueSequenceRef.current) return;
+
+            setProcessingQueue(nextQueue);
         } catch (error) {
+            if (sequence !== processingQueueSequenceRef.current) return;
             setProcessingError(getStockError(error));
         } finally {
-            setProcessingLoading(false);
+            if (sequence === processingQueueSequenceRef.current) {
+                setProcessingLoading(false);
+            }
+        }
+    }, []);
+
+    const loadDetail = useCallback(async (
+        requestId: number,
+        actionIntent: string | null,
+        open: boolean,
+    ): Promise<void> => {
+        const sequence = ++detailRequestSequenceRef.current;
+        if (open) {
+            setDetailOpen(true);
+            setDetail(null);
+            setDetailActionIntent(actionIntent);
+        }
+        setDetailError(null);
+        setDetailLoading(true);
+        try {
+            const nextDetail = await fetchLiffStockRequest(requestId);
+            if (sequence !== detailRequestSequenceRef.current) return;
+
+            setDetail(nextDetail);
+            setDecisionIntent((currentIntent) => {
+                if (currentIntent?.request.id !== nextDetail.id) {
+                    return currentIntent;
+                }
+                return { ...currentIntent, request: nextDetail };
+            });
+            if (nextDetail.viewerRole === "PROCESSOR") {
+                setCanProcessStockRequests(true);
+                if (open && (actionIntent === "issue" || actionIntent === "review")) {
+                    setActiveTab("processing");
+                }
+            }
+        } catch (error) {
+            if (sequence !== detailRequestSequenceRef.current) return;
+            setDetailError(getStockError(error));
+        } finally {
+            if (sequence === detailRequestSequenceRef.current) {
+                setDetailLoading(false);
+            }
         }
     }, []);
 
@@ -182,26 +282,12 @@ export function LiffStockApp(): ReactElement {
         requestId: number,
         actionIntent: string | null = null,
     ): Promise<void> => {
-        setDetailOpen(true);
-        setDetail(null);
-        setDetailError(null);
-        setDetailLoading(true);
-        setDetailActionIntent(actionIntent);
-        try {
-            const nextDetail = await fetchLiffStockRequest(requestId);
-            setDetail(nextDetail);
-            if (nextDetail.viewerRole === "PROCESSOR") {
-                setCanProcessStockRequests(true);
-                if (actionIntent === "issue" || actionIntent === "review") {
-                    setActiveTab("processing");
-                }
-            }
-        } catch (error) {
-            setDetailError(getStockError(error));
-        } finally {
-            setDetailLoading(false);
-        }
-    }, []);
+        await loadDetail(requestId, actionIntent, true);
+    }, [loadDetail]);
+
+    const refreshDetail = useCallback(async (requestId: number): Promise<void> => {
+        await loadDetail(requestId, null, false);
+    }, [loadDetail]);
 
     useEffect(() => {
         let cancelled = false;
@@ -299,6 +385,7 @@ export function LiffStockApp(): ReactElement {
         addVariantsToCart,
         clearCart,
         removeFromCart,
+        reconcileAvailability,
         setProjectCode,
         submitRequest,
         updateCartQuantity,
@@ -317,6 +404,10 @@ export function LiffStockApp(): ReactElement {
             void loadCatalog({ page: catalogPage, search: catalogSearch, categoryId });
         },
     });
+
+    useEffect(() => {
+        reconcileCartAvailabilityRef.current = reconcileAvailability;
+    }, [reconcileAvailability]);
 
     function startAction(
         action: LiffStockRequestAction,
@@ -378,7 +469,21 @@ export function LiffStockApp(): ReactElement {
         } catch (error) {
             setMutationError(getStockError(error));
             if (action === "ISSUE") {
-                void loadCatalog({ page: catalogPage, search: catalogSearch, categoryId });
+                const refreshes: Promise<void>[] = [
+                    loadCatalog({
+                        page: catalogPage,
+                        search: catalogSearch,
+                        categoryId,
+                    }),
+                ];
+                if (
+                    decisionFromDetail
+                    && error instanceof LiffApiError
+                    && error.status === 409
+                ) {
+                    refreshes.push(refreshDetail(request.id));
+                }
+                await Promise.allSettled(refreshes);
             }
         } finally {
             setBusyRequestId(null);

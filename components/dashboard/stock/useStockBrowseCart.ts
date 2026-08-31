@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { apiPost } from "@/lib/client/api-client";
 import { API_ROUTES } from "@/lib/ssot/routes";
@@ -43,6 +43,17 @@ interface PersistedStockBrowseCartItem {
     qty: number;
 }
 
+export type StockCartAvailabilityReconciliation = {
+    changed: boolean;
+    adjustedCount: number;
+    removedCount: number;
+};
+
+type CartAvailabilityReconciliationOutcome = {
+    nextCart: Map<number, BrowseCartItem>;
+    result: StockCartAvailabilityReconciliation;
+};
+
 type UseStockBrowseCartParams = {
     userId: number | string | null | undefined;
     onSubmitted: () => void;
@@ -78,6 +89,9 @@ type UseStockBrowseCartResult = {
     ) => void;
     clearCart: () => void;
     removeFromCart: (variantId: number) => void;
+    reconcileAvailability: (
+        catalogItems: ReadonlyArray<StockBrowseItem>,
+    ) => StockCartAvailabilityReconciliation;
     setProjectCode: (value: string) => void;
     submitRequest: () => Promise<void>;
     updateCartQuantity: (variantId: number, delta: number) => void;
@@ -251,6 +265,72 @@ function buildCartQuantityByItemId(
     }
 
     return quantityByItemId;
+}
+
+function reconcileCartAvailability(
+    cart: Map<number, BrowseCartItem>,
+    catalogItems: ReadonlyArray<StockBrowseItem>,
+): CartAvailabilityReconciliationOutcome {
+    const availabilityByVariantId = new Map<number, number>();
+    for (const catalogItem of catalogItems) {
+        for (const variant of catalogItem.variants ?? []) {
+            if (Number.isFinite(variant.availableQuantity)) {
+                availabilityByVariantId.set(
+                    variant.id,
+                    Math.max(0, variant.availableQuantity),
+                );
+            }
+        }
+    }
+
+    let nextCart = cart;
+    let changed = false;
+    let adjustedCount = 0;
+    let removedCount = 0;
+
+    for (const cartItem of cart.values()) {
+        const latestAvailableQuantity = availabilityByVariantId.get(
+            cartItem.variant.id,
+        );
+        if (latestAvailableQuantity === undefined) {
+            continue;
+        }
+
+        if (latestAvailableQuantity === 0) {
+            if (!changed) nextCart = new Map(cart);
+            nextCart.delete(cartItem.variant.id);
+            changed = true;
+            removedCount += 1;
+            continue;
+        }
+
+        const nextQuantity = Math.min(cartItem.qty, latestAvailableQuantity);
+        if (
+            cartItem.variant.availableQuantity === latestAvailableQuantity
+            && cartItem.qty === nextQuantity
+        ) {
+            continue;
+        }
+
+        if (!changed) nextCart = new Map(cart);
+        nextCart.set(cartItem.variant.id, {
+            ...cartItem,
+            variant: {
+                ...cartItem.variant,
+                availableQuantity: latestAvailableQuantity,
+            },
+            qty: nextQuantity,
+        });
+        changed = true;
+        if (cartItem.qty !== nextQuantity) {
+            adjustedCount += 1;
+        }
+    }
+
+    return {
+        nextCart,
+        result: { changed, adjustedCount, removedCount },
+    };
 }
 
 export function useStockBrowseCart({
@@ -440,6 +520,17 @@ export function useStockBrowseCart({
         setProjectCode(normalizeStockProjectCode(value));
     }
 
+    const reconcileAvailability = useCallback(
+        (catalogItems: ReadonlyArray<StockBrowseItem>): StockCartAvailabilityReconciliation => {
+            const outcome = reconcileCartAvailability(cart, catalogItems);
+            if (outcome.result.changed) {
+                setCart(outcome.nextCart);
+            }
+            return outcome.result;
+        },
+        [cart],
+    );
+
     async function submitRequest(): Promise<void> {
         if (submitting) {
             return;
@@ -513,6 +604,7 @@ export function useStockBrowseCart({
         addVariantsToCart,
         clearCart,
         removeFromCart,
+        reconcileAvailability,
         setProjectCode: updateProjectCode,
         submitRequest,
         updateCartQuantity,

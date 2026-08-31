@@ -48,6 +48,7 @@ export function LiffStockDecisionSheet({
 
     const issuing = intent.action === "ISSUE";
     const processorCancellation = intent.actorMode === "processor" && !issuing;
+    const actionAvailable = intent.request.availableActions.includes(intent.action);
     const title = issuing
         ? "ยืนยันจ่ายวัสดุ"
         : processorCancellation
@@ -93,7 +94,9 @@ export function LiffStockDecisionSheet({
 
                 <div className="min-h-0 space-y-4 overflow-y-auto px-4 py-4">
                     <p className="rounded-2xl bg-surface-subtle px-4 py-3 text-sm font-semibold leading-6 text-content-strong">
-                        {issuing
+                        {!actionAvailable
+                            ? "สถานะคำขอเปลี่ยนแปลงแล้ว ไม่สามารถดำเนินการนี้ได้ กรุณาปิดหน้าต่างเพื่อตรวจสอบรายละเอียดล่าสุด"
+                            : issuing
                             ? "เมื่อยืนยัน สต็อกจะถูกตัดตามรายการนี้ทันที"
                             : "เมื่อยืนยัน คำขอนี้จะถูกยกเลิกและไม่สามารถจ่ายวัสดุจากคำขอเดิมได้"}
                     </p>
@@ -151,21 +154,23 @@ export function LiffStockDecisionSheet({
                 </div>
 
                 <div className="border-t border-border-subtle bg-surface-raised px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-3">
-                    <Button
-                        type="button"
-                        onClick={() => onConfirm(reason.trim() || undefined)}
-                        disabled={busy}
-                        className={`min-h-12 w-full rounded-xl font-bold text-content-on-brand ${
-                            issuing
-                                ? "bg-status-success-solid hover:bg-status-success-solid-hover"
-                                : "bg-status-danger-solid hover:bg-status-danger-solid-hover"
-                        }`}
-                    >
-                        {busy ? (
-                            <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-                        ) : null}
-                        {confirmationLabel}
-                    </Button>
+                    {actionAvailable ? (
+                        <Button
+                            type="button"
+                            onClick={() => onConfirm(reason.trim() || undefined)}
+                            disabled={busy}
+                            className={`min-h-12 w-full rounded-xl font-bold text-content-on-brand ${
+                                issuing
+                                    ? "bg-status-success-solid hover:bg-status-success-solid-hover"
+                                    : "bg-status-danger-solid hover:bg-status-danger-solid-hover"
+                            }`}
+                        >
+                            {busy ? (
+                                <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+                            ) : null}
+                            {confirmationLabel}
+                        </Button>
+                    ) : null}
                 </div>
             </DialogContent>
         </Dialog>

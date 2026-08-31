@@ -1,5 +1,15 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { toast } from "sonner";
+
+import { LiffApiError } from "@/lib/client/liff";
+import type {
+    LiffStockCatalogResponse,
+    LiffStockRequestAction,
+    LiffStockRequestDetail,
+    LiffStockRequestSummary,
+    LiffStockRequestsResponse,
+} from "@/lib/types/stock-liff";
 
 const mocks = vi.hoisted(() => ({
     search: "",
@@ -36,6 +46,14 @@ vi.mock("@/lib/client/liff-stock", () => ({
     submitLiffStockRequest: mocks.submitRequest,
     cancelLiffStockRequest: mocks.cancelRequest,
     issueLiffStockRequest: mocks.issueRequest,
+}));
+
+vi.mock("sonner", () => ({
+    toast: {
+        success: vi.fn(),
+        error: vi.fn(),
+        info: vi.fn(),
+    },
 }));
 
 import { LiffStockApp } from "@/components/liff/stock/LiffStockApp";
@@ -102,6 +120,107 @@ const PROCESSOR_DETAIL = {
     availableActions: ["ISSUE", "CANCEL"] as const,
     viewerRole: "PROCESSOR" as const,
 };
+
+type Deferred<T> = {
+    promise: Promise<T>;
+    resolve: (value: T) => void;
+    reject: (reason?: unknown) => void;
+};
+
+function createDeferred<T>(): Deferred<T> {
+    let resolvePromise: ((value: T) => void) | undefined;
+    let rejectPromise: ((reason?: unknown) => void) | undefined;
+    const promise = new Promise<T>((resolve, reject) => {
+        resolvePromise = resolve;
+        rejectPromise = reject;
+    });
+
+    return {
+        promise,
+        resolve: (value) => resolvePromise?.(value),
+        reject: (reason) => rejectPromise?.(reason),
+    };
+}
+
+function createCatalogResponse(
+    name: string,
+    itemId: number,
+): LiffStockCatalogResponse {
+    const sourceItem = CATALOG.items[0];
+    return {
+        ...CATALOG,
+        items: [{
+            ...sourceItem,
+            id: itemId,
+            name,
+            sku: `SKU-${itemId}`,
+            variants: sourceItem.variants.map((variant) => ({
+                ...variant,
+                id: itemId * 10 + 1,
+                sku: `SKU-${itemId}-VARIANT`,
+            })),
+        }],
+    };
+}
+
+function createRequestSummary(
+    id: number,
+    projectCode: string,
+    requester = false,
+): LiffStockRequestSummary {
+    return {
+        id,
+        projectCode,
+        status: "PENDING_ISSUE",
+        note: null,
+        cancelReason: null,
+        issuedAt: null,
+        cancelledAt: null,
+        createdAt: "2026-08-30T03:00:00.000Z",
+        ...(requester ? { requester: { name: "ผู้เบิก ทดสอบ" } } : {}),
+        items: [{
+            itemName: "กระดาษ A4",
+            itemSku: "PAPER-A4",
+            variantSku: "PAPER-A4-80",
+            variantLabel: "ความหนา: 80 แกรม",
+            unit: "รีม",
+            quantity: 2,
+            imageUrl: null,
+            currentQuantity: 5,
+            isAvailableForIssue: true,
+        }],
+        availableActions: requester ? ["ISSUE", "CANCEL"] : ["CANCEL"],
+    };
+}
+
+function createRequestsResponse(
+    requests: LiffStockRequestSummary[],
+): LiffStockRequestsResponse {
+    return {
+        requests,
+        total: requests.length,
+        page: 1,
+        limit: 10,
+        totalPages: requests.length > 0 ? 1 : 0,
+    };
+}
+
+function createProcessorDetail(
+    id: number,
+    currentQuantity: number,
+    availableActions: LiffStockRequestAction[] = ["ISSUE", "CANCEL"],
+): LiffStockRequestDetail {
+    return {
+        ...PROCESSOR_DETAIL,
+        id,
+        items: [{
+            ...PROCESSOR_DETAIL.items[0],
+            currentQuantity,
+            isAvailableForIssue: currentQuantity >= PROCESSOR_DETAIL.items[0].quantity,
+        }],
+        availableActions,
+    };
+}
 
 describe("LIFF Stock app orchestration", () => {
     beforeEach(() => {
@@ -185,6 +304,251 @@ describe("LIFF Stock app orchestration", () => {
         fireEvent.click(screen.getByRole("button", { name: "ยืนยันจ่ายวัสดุ" }));
 
         await waitFor(() => expect(mocks.issueRequest).toHaveBeenCalledWith(71));
+    });
+
+    it("refreshes processor detail after an issue conflict without retrying", async () => {
+        mocks.search = "requestId=71&action=issue";
+        const refreshedDetail = {
+            ...createProcessorDetail(71, 1, []),
+            status: "ISSUED" as const,
+            issuedAt: "2026-08-31T03:00:00.000Z",
+        };
+        mocks.issueRequest.mockRejectedValueOnce(
+            new LiffApiError("สต็อกเปลี่ยนแปลง", 409),
+        );
+
+        render(<LiffStockApp />);
+
+        expect(await screen.findByText(
+            "เปิดจากลิงก์เพื่อดำเนินการ กรุณาตรวจรายละเอียดและกดยืนยันด้วยตนเอง",
+        )).toBeInTheDocument();
+        mocks.fetchRequest.mockResolvedValueOnce(refreshedDetail);
+
+        fireEvent.click(screen.getByRole("button", { name: "จ่ายวัสดุ" }));
+        fireEvent.click(screen.getByRole("button", { name: "ยืนยันจ่ายวัสดุ" }));
+
+        await waitFor(() => {
+            expect(mocks.issueRequest).toHaveBeenCalledTimes(1);
+            expect(mocks.fetchRequest).toHaveBeenCalledTimes(2);
+        });
+        expect(screen.queryByRole("button", { name: "ยืนยันจ่ายวัสดุ" }))
+            .not.toBeInTheDocument();
+
+        fireEvent.click(screen.getByRole("button", { name: "ปิดหน้าต่างยืนยัน" }));
+        expect(await screen.findByText(/คงเหลือจริง 1 รีม/)).toBeInTheDocument();
+        expect(screen.queryByRole("button", { name: "จ่ายวัสดุ" }))
+            .not.toBeInTheDocument();
+        expect(mocks.issueRequest).toHaveBeenCalledTimes(1);
+    });
+
+    it("reconciles stale cart quantities after a Stock conflict", async () => {
+        const latestCatalog = {
+            ...CATALOG,
+            items: [{
+                ...CATALOG.items[0],
+                availableQuantity: 2,
+                variants: [{
+                    ...CATALOG.items[0].variants[0],
+                    availableQuantity: 2,
+                }],
+            }],
+        };
+        mocks.submitRequest.mockRejectedValueOnce(
+            new LiffApiError("สต็อกเปลี่ยนแปลง", 409),
+        );
+
+        render(<LiffStockApp />);
+        expect(await screen.findByText("กระดาษ A4")).toBeInTheDocument();
+        mocks.fetchItems.mockResolvedValueOnce(latestCatalog);
+
+        fireEvent.click(screen.getByRole("button", { name: "เพิ่มลงตะกร้า" }));
+        fireEvent.click(screen.getByRole("button", { name: /เปิดตะกร้า/ }));
+        const increaseButton = screen.getByRole("button", {
+            name: "เพิ่มจำนวน กระดาษ A4",
+        });
+        for (let index = 0; index < 4; index += 1) {
+            fireEvent.click(increaseButton);
+        }
+        fireEvent.change(screen.getByLabelText("ชื่อย่อโครงการ"), {
+            target: { value: "NHF-2569" },
+        });
+        fireEvent.click(screen.getByRole("button", { name: "ส่งคำขอเบิก 5 ชิ้น" }));
+
+        await waitFor(() => expect(mocks.submitRequest).toHaveBeenCalledTimes(1));
+        expect(await screen.findByRole("button", { name: "ส่งคำขอเบิก 2 ชิ้น" }))
+            .toBeInTheDocument();
+        expect(toast.info).toHaveBeenCalledWith(
+            "จำนวนวัสดุบางรายการถูกปรับตามสต็อกล่าสุด",
+        );
+    });
+
+    it("keeps the newest catalog result and error state when older responses finish later", async () => {
+        const catalogA = createDeferred<LiffStockCatalogResponse>();
+        const catalogB = createDeferred<LiffStockCatalogResponse>();
+        const resultB = createCatalogResponse("ผลลัพธ์ B", 202);
+        mocks.fetchItems.mockImplementation(({ search }: { search?: string }) => {
+            if (search === "กา") return catalogA.promise;
+            if (search === "กระดาษ") return catalogB.promise;
+            return Promise.resolve(CATALOG);
+        });
+
+        render(<LiffStockApp />);
+        expect(await screen.findByText("กระดาษ A4")).toBeInTheDocument();
+
+        fireEvent.change(screen.getByLabelText("ค้นหาวัสดุ"), {
+            target: { value: "กา" },
+        });
+        await waitFor(() => {
+            expect(mocks.fetchItems).toHaveBeenCalledWith(
+                expect.objectContaining({ search: "กา" }),
+            );
+        });
+
+        fireEvent.change(screen.getByLabelText("ค้นหาวัสดุ"), {
+            target: { value: "กระดาษ" },
+        });
+        await waitFor(() => {
+            expect(mocks.fetchItems).toHaveBeenCalledWith(
+                expect.objectContaining({ search: "กระดาษ" }),
+            );
+        });
+
+        catalogB.resolve(resultB);
+        expect(await screen.findByText("ผลลัพธ์ B")).toBeInTheDocument();
+        catalogA.reject(new Error("old catalog failure"));
+        await waitFor(() => expect(screen.getByText("ผลลัพธ์ B")).toBeInTheDocument());
+        expect(screen.queryByRole("heading", { name: "โหลดรายการวัสดุไม่สำเร็จ" }))
+            .not.toBeInTheDocument();
+        expect(screen.queryByText("ผลลัพธ์ A")).not.toBeInTheDocument();
+    });
+
+    it("keeps the newest employee request history result", async () => {
+        const requestA = createDeferred<LiffStockRequestsResponse>();
+        const requestB = createDeferred<LiffStockRequestsResponse>();
+        mocks.fetchMyRequests.mockImplementation(({ search }: { search?: string }) => {
+            if (search === "เก่า") return requestA.promise;
+            if (search === "ใหม่") return requestB.promise;
+            return Promise.resolve(EMPTY_REQUESTS);
+        });
+
+        render(<LiffStockApp />);
+        expect(await screen.findByText("กระดาษ A4")).toBeInTheDocument();
+        fireEvent.mouseDown(screen.getByRole("tab", { name: "คำขอของฉัน" }), {
+            button: 0,
+            ctrlKey: false,
+        });
+        expect(await screen.findByRole("heading", { name: "ยังไม่มีประวัติการเบิก" }))
+            .toBeInTheDocument();
+
+        fireEvent.change(screen.getByLabelText("ค้นหาคำขอเบิก"), {
+            target: { value: "เก่า" },
+        });
+        await waitFor(() => {
+            expect(mocks.fetchMyRequests).toHaveBeenCalledWith(
+                expect.objectContaining({ search: "เก่า" }),
+            );
+        });
+        fireEvent.change(screen.getByLabelText("ค้นหาคำขอเบิก"), {
+            target: { value: "ใหม่" },
+        });
+        await waitFor(() => {
+            expect(mocks.fetchMyRequests).toHaveBeenCalledWith(
+                expect.objectContaining({ search: "ใหม่" }),
+            );
+        });
+
+        requestB.resolve(createRequestsResponse([
+            createRequestSummary(202, "PROJECT-B"),
+        ]));
+        expect(await screen.findByText("PROJECT-B")).toBeInTheDocument();
+        requestA.resolve(createRequestsResponse([
+            createRequestSummary(201, "PROJECT-A"),
+        ]));
+        await waitFor(() => expect(screen.getByText("PROJECT-B")).toBeInTheDocument());
+        expect(screen.queryByText("PROJECT-A")).not.toBeInTheDocument();
+    });
+
+    it("keeps the newest processor queue result", async () => {
+        const queueA = createDeferred<LiffStockRequestsResponse>();
+        const queueB = createDeferred<LiffStockRequestsResponse>();
+        mocks.fetchHome.mockResolvedValue({
+            workforce: { userId: 7, employeeId: 70, name: "พนักงาน ทดสอบ" },
+            modules: {},
+            capabilities: { canProcessStockRequests: true },
+        });
+        mocks.fetchProcessing.mockImplementation(({ search }: { search?: string }) => {
+            if (search === "เก่า") return queueA.promise;
+            if (search === "ใหม่") return queueB.promise;
+            return Promise.resolve(EMPTY_REQUESTS);
+        });
+
+        render(<LiffStockApp />);
+        expect(await screen.findByText("กระดาษ A4")).toBeInTheDocument();
+        const processingTab = await screen.findByRole("tab", { name: /รอดำเนินการ/ });
+        fireEvent.mouseDown(processingTab, { button: 0, ctrlKey: false });
+        expect(await screen.findByRole("heading", { name: "ไม่มีคำขอรอดำเนินการ" }))
+            .toBeInTheDocument();
+
+        fireEvent.change(screen.getByLabelText("ค้นหาคำขอรอดำเนินการ"), {
+            target: { value: "เก่า" },
+        });
+        await waitFor(() => {
+            expect(mocks.fetchProcessing).toHaveBeenCalledWith(
+                expect.objectContaining({ search: "เก่า" }),
+            );
+        });
+        fireEvent.change(screen.getByLabelText("ค้นหาคำขอรอดำเนินการ"), {
+            target: { value: "ใหม่" },
+        });
+        await waitFor(() => {
+            expect(mocks.fetchProcessing).toHaveBeenCalledWith(
+                expect.objectContaining({ search: "ใหม่" }),
+            );
+        });
+
+        queueB.resolve(createRequestsResponse([
+            createRequestSummary(302, "QUEUE-B", true),
+        ]));
+        expect(await screen.findByText("QUEUE-B")).toBeInTheDocument();
+        queueA.resolve(createRequestsResponse([
+            createRequestSummary(301, "QUEUE-A", true),
+        ]));
+        await waitFor(() => expect(screen.getByText("QUEUE-B")).toBeInTheDocument());
+        expect(screen.queryByText("QUEUE-A")).not.toBeInTheDocument();
+    });
+
+    it("keeps the newest request detail when two detail loads overlap", async () => {
+        const detailA = createDeferred<LiffStockRequestDetail>();
+        const detailB = createDeferred<LiffStockRequestDetail>();
+        mocks.fetchMyRequests.mockResolvedValue(createRequestsResponse([
+            createRequestSummary(10, "PROJECT-A"),
+            createRequestSummary(20, "PROJECT-B"),
+        ]));
+        mocks.fetchRequest.mockImplementation((requestId: number) =>
+            requestId === 10 ? detailA.promise : detailB.promise,
+        );
+
+        render(<LiffStockApp />);
+        expect(await screen.findByText("กระดาษ A4")).toBeInTheDocument();
+        fireEvent.mouseDown(screen.getByRole("tab", { name: "คำขอของฉัน" }), {
+            button: 0,
+            ctrlKey: false,
+        });
+        expect(await screen.findByText("PROJECT-A")).toBeInTheDocument();
+        const detailButtons = screen.getAllByRole("button", { name: "รายละเอียด" });
+        fireEvent.click(detailButtons[0]);
+        fireEvent.click(detailButtons[1]);
+
+        detailB.resolve(createProcessorDetail(20, 2));
+        expect(await screen.findByRole("heading", { name: "รายละเอียดคำขอ #20" }))
+            .toBeInTheDocument();
+        detailA.resolve(createProcessorDetail(10, 5));
+        await waitFor(() => {
+            expect(screen.getByRole("heading", { name: "รายละเอียดคำขอ #20" }))
+                .toBeInTheDocument();
+        });
+        expect(screen.queryByRole("heading", { name: "รายละเอียดคำขอ #10" }))
+            .not.toBeInTheDocument();
     });
 
     it("rejects malformed deep links without calling the detail API", async () => {
