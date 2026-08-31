@@ -10,6 +10,8 @@ export type { CreateEmployeeInput, UpdateEmployeeInput } from "./employee";
 // NHF Routine validations
 export {
     routineTaskCreateSchema,
+    routineTaskSelfServiceCreateSchema,
+    routineTaskSelfServiceUpdateSchema,
     routineTaskUpdateSchema,
     routineOccurrenceFiltersSchema,
     routineTaskFiltersSchema,
@@ -18,6 +20,8 @@ export {
 } from "./routine";
 export type {
     RoutineTaskCreateInput,
+    RoutineTaskSelfServiceCreateInput,
+    RoutineTaskSelfServiceUpdateInput,
     RoutineTaskUpdateInput,
     RoutineOccurrenceFilters,
     RoutineTaskFilters,

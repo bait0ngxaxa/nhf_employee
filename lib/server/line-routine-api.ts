@@ -1,8 +1,22 @@
-import type { getRoutineTaskWorkItems } from "@/lib/services/routine";
-import type { LiffRoutineTasksResponse } from "@/lib/line/routine-types";
+import {
+    ROUTINE_BUSINESS_DAY_POLICIES,
+    ROUTINE_SCHEDULE_TYPES,
+} from "@/lib/routine/schedule";
+import type { getLiffRoutineTaskById, getRoutineReferenceData, getRoutineTaskWorkItems } from "@/lib/services/routine";
+import type {
+    LiffRoutineReferenceData,
+    LiffRoutineTaskDetail,
+    LiffRoutineTasksResponse,
+} from "@/lib/line/routine-types";
 
 type RoutineTaskWorkItemsResult = Awaited<
     ReturnType<typeof getRoutineTaskWorkItems>
+>;
+type RoutineReferenceDataResult = Awaited<
+    ReturnType<typeof getRoutineReferenceData>
+>;
+type LiffRoutineTaskDetailResult = Awaited<
+    ReturnType<typeof getLiffRoutineTaskById>
 >;
 
 export function serializeLiffRoutineTasks(
@@ -32,5 +46,73 @@ export function serializeLiffRoutineTasks(
                 : null,
         })),
         pagination: result.pagination,
+    };
+}
+
+export function serializeLiffRoutineReference(
+    result: RoutineReferenceDataResult,
+): LiffRoutineReferenceData {
+    return {
+        units: result.units.map((unit) => ({
+            id: unit.id,
+            code: unit.code,
+            name: unit.name,
+        })),
+        categories: result.categories.map((category) => ({
+            id: category.id,
+            name: category.name,
+            sortOrder: category.sortOrder,
+        })),
+        scheduleTypes: [...ROUTINE_SCHEDULE_TYPES],
+        businessDayPolicies: [...ROUTINE_BUSINESS_DAY_POLICIES],
+    };
+}
+
+export function serializeLiffRoutineTaskDetail(
+    task: LiffRoutineTaskDetailResult,
+): LiffRoutineTaskDetail {
+    return {
+        id: task.id,
+        title: task.title,
+        description: task.description,
+        scheduleType: task.scheduleType,
+        scheduleConfig: task.scheduleConfig,
+        scheduleText: task.scheduleText,
+        contractStartDate: task.contractStartDate,
+        contractEndDate: task.contractEndDate,
+        contractText: task.contractText,
+        extraDetails: task.extraDetails,
+        businessDayPolicy: task.businessDayPolicy,
+        isActive: task.isActive,
+        version: task.version,
+        unit: {
+            id: task.unit.id,
+            code: task.unit.code,
+            name: task.unit.name,
+        },
+        category: {
+            id: task.category.id,
+            name: task.category.name,
+        },
+        reminderRules: task.canManage
+            ? task.reminderRules.map((rule) => ({
+                  daysBefore: rule.daysBefore,
+                  sendHour: rule.sendHour,
+                  channel: "IN_APP" as const,
+                  recipientScope: "ASSIGNEES" as const,
+                  isActive: rule.isActive,
+              }))
+            : [],
+        occurrences: task.occurrences.map((occurrence) => ({
+            id: occurrence.id,
+            taskId: occurrence.taskId,
+            periodKey: occurrence.periodKey,
+            dueDate: occurrence.dueDate,
+            originalDueDate: occurrence.originalDueDate,
+            timingStatus: occurrence.timingStatus,
+            isOverdue: occurrence.isOverdue,
+            daysUntilDue: occurrence.daysUntilDue,
+        })),
+        canManage: task.canManage,
     };
 }

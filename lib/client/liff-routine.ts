@@ -1,21 +1,44 @@
-import { apiGet, type ApiResponse } from "@/lib/client/api-client";
+import {
+    apiDelete,
+    apiGet,
+    apiPatch,
+    apiPost,
+    type ApiResponse,
+} from "@/lib/client/api-client";
 import {
     LIFF_API_REQUEST_OPTIONS,
     unwrapLiffResponse,
 } from "@/lib/client/liff";
 import type {
+    LiffRoutineReferenceData,
     LiffRoutineSummary,
+    LiffRoutineTaskCreateResponse,
+    LiffRoutineTaskDetailResponse,
+    LiffRoutineTaskMutationResponse,
     LiffRoutineTasksResponse,
 } from "@/lib/line/routine-types";
 import type { RoutineTimingStatus } from "@/lib/routine/timing";
 import { API_ROUTES } from "@/lib/ssot/routes";
+import type {
+    LiffRoutineTaskCreateInput,
+    LiffRoutineTaskUpdateInput,
+} from "@/lib/validations/line-routine";
 
 export type {
     LiffRoutineSummary,
+    LiffRoutineReferenceData,
+    LiffRoutineTaskCreateResponse,
+    LiffRoutineTaskDetail,
+    LiffRoutineTaskDetailResponse,
+    LiffRoutineTaskMutationResponse,
     LiffRoutineTaskWorkItem,
     LiffRoutineTasksResponse,
     LiffRoutineTimingFilter,
 } from "@/lib/line/routine-types";
+export type {
+    LiffRoutineTaskCreateInput,
+    LiffRoutineTaskUpdateInput,
+} from "@/lib/validations/line-routine";
 
 function getRoutineApiErrorMessage(
     response: Extract<ApiResponse<unknown>, { success: false }>,
@@ -28,7 +51,11 @@ function getRoutineApiErrorMessage(
         case 404:
             return "ขณะนี้ยังไม่เปิดใช้งาน Routine ผ่าน LIFF";
         case 409:
-            return "บัญชี LINE หรือบัญชี NHF นี้ถูกเชื่อมกับบัญชีอื่นอยู่แล้ว กรุณาติดต่อผู้ดูแลระบบ";
+            return response.errorThai || "ข้อมูล Routine เปลี่ยนแปลงแล้ว กรุณาโหลดข้อมูลใหม่";
+        case 413:
+            return "คำขอ Routine มีขนาดใหญ่เกินไป";
+        case 429:
+            return "คุณทำรายการ Routine ถี่เกินไป กรุณารอสักครู่แล้วลองใหม่";
         default:
             return response.errorThai || "ไม่สามารถเชื่อมต่อข้อมูล Routine ได้";
     }
@@ -70,6 +97,71 @@ export async function fetchLiffRoutineTasks(input: {
     return unwrapLiffResponse(
         await apiGet<LiffRoutineTasksResponse>(
             `${API_ROUTES.line.routineTasks}?${params.toString()}`,
+            LIFF_API_REQUEST_OPTIONS,
+        ),
+        getRoutineApiErrorMessage,
+    );
+}
+
+export async function fetchLiffRoutineReference(): Promise<LiffRoutineReferenceData> {
+    return unwrapLiffResponse(
+        await apiGet<LiffRoutineReferenceData>(
+            API_ROUTES.line.routineReference,
+            LIFF_API_REQUEST_OPTIONS,
+        ),
+        getRoutineApiErrorMessage,
+    );
+}
+
+export async function fetchLiffRoutineTask(
+    taskId: number | string,
+): Promise<LiffRoutineTaskDetailResponse> {
+    return unwrapLiffResponse(
+        await apiGet<LiffRoutineTaskDetailResponse>(
+            API_ROUTES.line.routineTaskById(taskId),
+            LIFF_API_REQUEST_OPTIONS,
+        ),
+        getRoutineApiErrorMessage,
+    );
+}
+
+export async function createLiffRoutineTask(
+    payload: LiffRoutineTaskCreateInput,
+    idempotencyKey: string,
+): Promise<LiffRoutineTaskCreateResponse> {
+    return unwrapLiffResponse(
+        await apiPost<LiffRoutineTaskCreateResponse>(
+            API_ROUTES.line.routineTasks,
+            payload,
+            {
+                ...LIFF_API_REQUEST_OPTIONS,
+                headers: { "Idempotency-Key": idempotencyKey },
+            },
+        ),
+        getRoutineApiErrorMessage,
+    );
+}
+
+export async function updateLiffRoutineTask(
+    taskId: number | string,
+    payload: LiffRoutineTaskUpdateInput,
+): Promise<LiffRoutineTaskMutationResponse> {
+    return unwrapLiffResponse(
+        await apiPatch<LiffRoutineTaskMutationResponse>(
+            API_ROUTES.line.routineTaskById(taskId),
+            payload,
+            LIFF_API_REQUEST_OPTIONS,
+        ),
+        getRoutineApiErrorMessage,
+    );
+}
+
+export async function deleteLiffRoutineTask(
+    taskId: number | string,
+): Promise<void> {
+    await unwrapLiffResponse(
+        await apiDelete<{ success: true }>(
+            API_ROUTES.line.routineTaskById(taskId),
             LIFF_API_REQUEST_OPTIONS,
         ),
         getRoutineApiErrorMessage,

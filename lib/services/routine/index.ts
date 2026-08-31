@@ -1,4 +1,5 @@
 export type { RoutineCommandActor, RoutineQueryActor } from "./types";
+export type { RoutineTaskDetailResult } from "./queries";
 export type { RoutineGenerationResult } from "./types";
 export type { RoutineSchedulerResult } from "./scheduler";
 export {
@@ -43,6 +44,7 @@ export {
     getRoutineOccurrences,
     getRoutineReferenceData,
     getRoutineSummary,
+    getLiffRoutineTaskById,
     getRoutineTaskWorkItems,
     getRoutineTaskById,
     getRoutineTasks,

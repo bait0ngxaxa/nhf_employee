@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest";
 import {
     parseRoutineScheduleConfig,
     routineTaskCreateSchema,
+    routineTaskSelfServiceCreateSchema,
+    routineTaskSelfServiceUpdateSchema,
     routineReminderOutboxPayloadSchema,
 } from "@/lib/validations/routine";
 import { routineImportRowUpdateSchema } from "@/lib/validations/routine-import";
@@ -55,6 +57,38 @@ describe("NHF Routine validation", () => {
             expect(messages).toContain("ต้องมีผู้รับผิดชอบหลัก 1 คน");
             expect(messages).toContain("วันสิ้นสุดสัญญาต้องไม่ก่อนวันเริ่มสัญญา");
         }
+    });
+
+    it("keeps LIFF self-service schemas free of assignee and import fields", () => {
+        const valid = routineTaskSelfServiceCreateSchema.safeParse({
+            unitId: 1,
+            categoryId: 1,
+            title: "งานของฉัน",
+            scheduleType: "MANUAL",
+            scheduleConfig: {},
+        });
+        expect(valid.success).toBe(true);
+        if (valid.success) {
+            expect(valid.data).not.toHaveProperty("assignees");
+            expect(valid.data).not.toHaveProperty("sourceFileName");
+        }
+
+        expect(
+            routineTaskSelfServiceCreateSchema.safeParse({
+                unitId: 1,
+                categoryId: 1,
+                title: "งานของฉัน",
+                scheduleType: "MANUAL",
+                scheduleConfig: {},
+                assignees: [{ employeeId: 999, role: "OWNER" }],
+            }).success,
+        ).toBe(false);
+        expect(
+            routineTaskSelfServiceUpdateSchema.safeParse({
+                version: 1,
+                sourceSheet: "Spoof",
+            }).success,
+        ).toBe(false);
     });
 
     it("validates reminder rules and outbox identity payloads", () => {

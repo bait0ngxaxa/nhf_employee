@@ -13,6 +13,7 @@ import {
     getRoutineOccurrences,
     getRoutineReferenceData,
     getRoutineSummary,
+    getLiffRoutineTaskById,
     getRoutineTaskById,
     getRoutineTaskWorkItems,
     getRoutineTasks,
@@ -873,6 +874,78 @@ describe("NHF Routine query authorization", () => {
         expect(prismaMock.routineTask.findFirst).toHaveBeenCalledWith(
             expect.objectContaining({
                 where: { id: 71, createdById: 5 },
+            }),
+        );
+    });
+
+    it("allows an active assignee to view a task without granting management", async () => {
+        const task = {
+            ...taskRow(71, 21),
+            unitId: 1,
+            categoryId: 1,
+            version: 2,
+            createdById: 99,
+            updatedById: 99,
+            createdAt: new Date("2026-08-01T00:00:00.000Z"),
+            updatedAt: new Date("2026-08-01T00:00:00.000Z"),
+            occurrences: [],
+        };
+        prismaMock.routineTask.findFirst.mockResolvedValue(asNever(task));
+
+        const result = await getLiffRoutineTaskById(71, {
+            actor: { id: 5, email: "user@example.com", role: "USER" },
+            employeeId: 21,
+        });
+
+        expect(result).toMatchObject({ id: 71, createdById: 99, canManage: false });
+        expect(prismaMock.routineTask.findFirst).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: {
+                    id: 71,
+                    OR: [
+                        { createdById: 5 },
+                        {
+                            isActive: true,
+                            assignees: {
+                                some: {
+                                    employeeId: 21,
+                                    employee: expect.any(Object),
+                                },
+                            },
+                        },
+                    ],
+                },
+            }),
+        );
+    });
+
+    it("marks a self-created task as manageable and keeps inactive ownership access", async () => {
+        const task = {
+            ...taskRow(71, 21),
+            unitId: 1,
+            categoryId: 1,
+            version: 2,
+            isActive: false,
+            createdById: 5,
+            updatedById: 5,
+            createdAt: new Date("2026-08-01T00:00:00.000Z"),
+            updatedAt: new Date("2026-08-01T00:00:00.000Z"),
+            occurrences: [],
+        };
+        prismaMock.routineTask.findFirst.mockResolvedValue(asNever(task));
+
+        const result = await getLiffRoutineTaskById(71, {
+            actor: { id: 5, email: "user@example.com", role: "USER" },
+            employeeId: 21,
+        });
+
+        expect(result).toMatchObject({ id: 71, isActive: false, canManage: true });
+        expect(prismaMock.routineTask.findFirst).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: expect.objectContaining({
+                    id: 71,
+                    OR: expect.arrayContaining([{ createdById: 5 }]),
+                }),
             }),
         );
     });

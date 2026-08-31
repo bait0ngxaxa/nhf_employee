@@ -1,6 +1,12 @@
 import { z } from "zod";
 
 import { ROUTINE_TIMING_STATUSES } from "@/lib/routine/timing";
+import {
+    routineTaskSelfServiceCreateSchema,
+    routineTaskSelfServiceUpdateSchema,
+    type RoutineTaskSelfServiceCreateInput,
+    type RoutineTaskSelfServiceUpdateInput,
+} from "@/lib/validations/routine";
 
 export const liffRoutineTaskQuerySchema = z.object({
     taskId: z.coerce.number().int().positive().optional(),
@@ -13,3 +19,9 @@ export const liffRoutineTaskQuerySchema = z.object({
 export type LiffRoutineTaskQuery = z.infer<
     typeof liffRoutineTaskQuerySchema
 >;
+
+export const liffRoutineTaskCreateSchema = routineTaskSelfServiceCreateSchema;
+export const liffRoutineTaskUpdateSchema = routineTaskSelfServiceUpdateSchema;
+
+export type LiffRoutineTaskCreateInput = RoutineTaskSelfServiceCreateInput;
+export type LiffRoutineTaskUpdateInput = RoutineTaskSelfServiceUpdateInput;

@@ -139,6 +139,17 @@ type RoutineTaskDetailRow = RoutineTaskRow & {
     occurrences: RoutineOccurrenceRow[];
 };
 
+export type RoutineTaskDetailResult = Omit<
+    RoutineTaskDetailRow,
+    "contractStartDate" | "contractEndDate" | "createdAt" | "updatedAt" | "occurrences"
+> & {
+    contractStartDate: string | null;
+    contractEndDate: string | null;
+    createdAt: string;
+    updatedAt: string;
+    occurrences: SerializedRoutineOccurrence[];
+};
+
 type SerializedRoutineAssignee = ReturnType<typeof serializeAssignee>;
 
 interface SerializedRoutineTaskOccurrence {
@@ -947,24 +958,12 @@ export async function getRoutineTasks(
     };
 }
 
-export async function getRoutineTaskById(
+async function findRoutineTaskDetail(
     taskId: number,
-    queryActor: RoutineQueryActor,
-): Promise<Omit<
-    RoutineTaskDetailRow,
-    "contractStartDate" | "contractEndDate" | "createdAt" | "updatedAt" | "occurrences"
-> & {
-    contractStartDate: string | null;
-    contractEndDate: string | null;
-    createdAt: string;
-    updatedAt: string;
-    occurrences: SerializedRoutineOccurrence[];
-}> {
+    where: Prisma.RoutineTaskWhereInput,
+): Promise<RoutineTaskDetailResult> {
     const task = await prisma.routineTask.findFirst({
-        where: {
-            id: taskId,
-            ...buildRoutineTaskOwnershipWhere(queryActor),
-        },
+        where,
         select: {
             ...ROUTINE_TASK_SELECT,
             occurrences: {
@@ -988,6 +987,61 @@ export async function getRoutineTaskById(
         createdAt: task.createdAt.toISOString(),
         updatedAt: task.updatedAt.toISOString(),
         occurrences: task.occurrences.map((row) => serializeOccurrence(row)),
+    };
+}
+
+export async function getRoutineTaskById(
+    taskId: number,
+    queryActor: RoutineQueryActor,
+): Promise<RoutineTaskDetailResult> {
+    return findRoutineTaskDetail(taskId, {
+        id: taskId,
+        ...buildRoutineTaskOwnershipWhere(queryActor),
+    });
+}
+
+function buildLiffRoutineTaskAccessWhere(
+    taskId: number,
+    queryActor: RoutineQueryActor,
+    employeeId: number | null,
+): Prisma.RoutineTaskWhereInput {
+    if (queryActor.actor.role === "ADMIN") {
+        return { id: taskId };
+    }
+
+    return {
+        id: taskId,
+        OR: [
+            { createdById: queryActor.actor.id },
+            ...(employeeId === null
+                ? []
+                : [{
+                      isActive: true,
+                      assignees: {
+                          some: {
+                              employeeId,
+                              employee: activeEmployeeWhere(),
+                          },
+                      },
+                  }]),
+        ],
+    };
+}
+
+export async function getLiffRoutineTaskById(
+    taskId: number,
+    queryActor: RoutineQueryActor,
+): Promise<RoutineTaskDetailResult & { canManage: boolean }> {
+    const employeeId = await resolveActorEmployeeId(queryActor);
+    const task = await findRoutineTaskDetail(
+        taskId,
+        buildLiffRoutineTaskAccessWhere(taskId, queryActor, employeeId),
+    );
+    return {
+        ...task,
+        canManage:
+            queryActor.actor.role === "ADMIN"
+            || task.createdById === queryActor.actor.id,
     };
 }
 

@@ -133,6 +133,9 @@ export const API_ROUTES = {
             `/api/line/stock/requests/${id}/issue`,
         routineTasks: "/api/line/routine/tasks",
         routineSummary: "/api/line/routine/summary",
+        routineReference: "/api/line/routine/reference",
+        routineTaskById: (id: number | string): string =>
+            `/api/line/routine/tasks/${id}`,
     },
     stock: {
         categories: "/api/stock/categories",

@@ -214,93 +214,133 @@ export function validateRoutineScheduleConfig(
     }
 }
 
+function validateRoutineTaskScheduleAndContract(
+    data: {
+        scheduleType?: RoutineScheduleType;
+        scheduleConfig?: unknown;
+        contractStartDate?: string | null;
+        contractEndDate?: string | null;
+    },
+    ctx: z.RefinementCtx,
+): void {
+    if (data.scheduleType !== undefined) {
+        validateRoutineScheduleConfig(data.scheduleType, data.scheduleConfig, ctx);
+    }
+    if (
+        data.contractStartDate
+        && data.contractEndDate
+        && data.contractStartDate > data.contractEndDate
+    ) {
+        ctx.addIssue({
+            code: "custom",
+            path: ["contractEndDate"],
+            message: "วันสิ้นสุดสัญญาต้องไม่ก่อนวันเริ่มสัญญา",
+        });
+    }
+}
+
+const routineTaskCreateFields = {
+    unitId: z.coerce.number().int().positive("กรุณาเลือกหน่วยงาน"),
+    categoryId: z.coerce.number().int().positive("กรุณาเลือกหมวดหมู่"),
+    title: z
+        .string({ message: "กรุณาระบุชื่องาน" })
+        .trim()
+        .min(1, "กรุณาระบุชื่องาน")
+        .max(255, "ชื่องานต้องไม่เกิน 255 ตัวอักษร"),
+    description: optionalText(5000),
+    scheduleType: routineScheduleTypeSchema,
+    scheduleConfig: z.record(z.string(), z.json()).nullable().optional(),
+    scheduleText: optionalText(500),
+    contractStartDate: dateSchema.nullish(),
+    contractEndDate: dateSchema.nullish(),
+    contractText: optionalText(500),
+    extraDetails: optionalText(5000),
+    businessDayPolicy: routineBusinessDayPolicySchema.default("NONE"),
+    isActive: z.boolean().default(true),
+    assignees: z
+        .array(routineAssigneeSchema)
+        .min(1, "กรุณาระบุผู้รับผิดชอบ")
+        .max(100, "ผู้รับผิดชอบมีได้ไม่เกิน 100 คน"),
+    sourceFileName: optionalText(255),
+    sourceSheet: optionalText(255),
+    sourceRow: z.coerce.number().int().positive().nullable().optional(),
+    reminderRules: routineReminderRulesSchema.optional(),
+} as const;
+
+const routineTaskUpdateFields = {
+    version: z.coerce.number().int().positive("เวอร์ชันไม่ถูกต้อง"),
+    unitId: routineTaskCreateFields.unitId.optional(),
+    categoryId: routineTaskCreateFields.categoryId.optional(),
+    title: routineTaskCreateFields.title.optional(),
+    description: routineTaskCreateFields.description,
+    scheduleType: routineTaskCreateFields.scheduleType.optional(),
+    scheduleConfig: routineTaskCreateFields.scheduleConfig,
+    scheduleText: routineTaskCreateFields.scheduleText,
+    contractStartDate: routineTaskCreateFields.contractStartDate,
+    contractEndDate: routineTaskCreateFields.contractEndDate,
+    contractText: routineTaskCreateFields.contractText,
+    extraDetails: routineTaskCreateFields.extraDetails,
+    businessDayPolicy: routineBusinessDayPolicySchema.optional(),
+    isActive: z.boolean().optional(),
+    assignees: routineTaskCreateFields.assignees.optional(),
+    sourceFileName: routineTaskCreateFields.sourceFileName,
+    sourceSheet: routineTaskCreateFields.sourceSheet,
+    sourceRow: routineTaskCreateFields.sourceRow,
+    reminderRules: routineTaskCreateFields.reminderRules,
+} as const;
+
 export const routineTaskCreateSchema = z
-    .object({
-        unitId: z.coerce.number().int().positive("กรุณาเลือกหน่วยงาน"),
-        categoryId: z.coerce.number().int().positive("กรุณาเลือกหมวดหมู่"),
-        title: z
-            .string({ message: "กรุณาระบุชื่องาน" })
-            .trim()
-            .min(1, "กรุณาระบุชื่องาน")
-            .max(255, "ชื่องานต้องไม่เกิน 255 ตัวอักษร"),
-        description: optionalText(5000),
-        scheduleType: routineScheduleTypeSchema,
-        scheduleConfig: z.record(z.string(), z.json()).nullable().optional(),
-        scheduleText: optionalText(500),
-        contractStartDate: dateSchema.nullish(),
-        contractEndDate: dateSchema.nullish(),
-        contractText: optionalText(500),
-        extraDetails: optionalText(5000),
-        businessDayPolicy: routineBusinessDayPolicySchema.default("NONE"),
-        isActive: z.boolean().default(true),
-        assignees: z
-            .array(routineAssigneeSchema)
-            .min(1, "กรุณาระบุผู้รับผิดชอบ")
-            .max(100, "ผู้รับผิดชอบมีได้ไม่เกิน 100 คน"),
-        sourceFileName: optionalText(255),
-        sourceSheet: optionalText(255),
-        sourceRow: z.coerce.number().int().positive().nullable().optional(),
-        reminderRules: routineReminderRulesSchema.optional(),
-    })
+    .object(routineTaskCreateFields)
     .superRefine((data, ctx) => {
         validateAssigneeList(data.assignees, ctx);
-        validateRoutineScheduleConfig(data.scheduleType, data.scheduleConfig, ctx);
-        if (
-            data.contractStartDate
-            && data.contractEndDate
-            && data.contractStartDate > data.contractEndDate
-        ) {
-            ctx.addIssue({
-                code: "custom",
-                path: ["contractEndDate"],
-                message: "วันสิ้นสุดสัญญาต้องไม่ก่อนวันเริ่มสัญญา",
-            });
-        }
+        validateRoutineTaskScheduleAndContract(data, ctx);
     });
 
 export const routineTaskUpdateSchema = z
-    .object({
-        version: z.coerce.number().int().positive("เวอร์ชันไม่ถูกต้อง"),
-        unitId: z.coerce.number().int().positive().optional(),
-        categoryId: z.coerce.number().int().positive().optional(),
-        title: z.string().trim().min(1).max(255).optional(),
-        description: optionalText(5000),
-        scheduleType: routineScheduleTypeSchema.optional(),
-        scheduleConfig: z.record(z.string(), z.json()).nullable().optional(),
-        scheduleText: optionalText(500),
-        contractStartDate: dateSchema.nullish(),
-        contractEndDate: dateSchema.nullish(),
-        contractText: optionalText(500),
-        extraDetails: optionalText(5000),
-        businessDayPolicy: routineBusinessDayPolicySchema.optional(),
-        isActive: z.boolean().optional(),
-        assignees: z
-            .array(routineAssigneeSchema)
-            .min(1, "กรุณาระบุผู้รับผิดชอบ")
-            .max(100, "ผู้รับผิดชอบมีได้ไม่เกิน 100 คน")
-            .optional(),
-        sourceFileName: optionalText(255),
-        sourceSheet: optionalText(255),
-        sourceRow: z.coerce.number().int().positive().nullable().optional(),
-        reminderRules: routineReminderRulesSchema.optional(),
-    })
+    .object(routineTaskUpdateFields)
     .superRefine((data, ctx) => {
         if (data.assignees) validateAssigneeList(data.assignees, ctx);
-        if (data.scheduleType !== undefined) {
-            validateRoutineScheduleConfig(data.scheduleType, data.scheduleConfig, ctx);
-        }
-        if (
-            data.contractStartDate
-            && data.contractEndDate
-            && data.contractStartDate > data.contractEndDate
-        ) {
-            ctx.addIssue({
-                code: "custom",
-                path: ["contractEndDate"],
-                message: "วันสิ้นสุดสัญญาต้องไม่ก่อนวันเริ่มสัญญา",
-            });
-        }
+        validateRoutineTaskScheduleAndContract(data, ctx);
     });
+
+export const routineTaskSelfServiceCreateSchema = z
+    .strictObject({
+        unitId: routineTaskCreateFields.unitId,
+        categoryId: routineTaskCreateFields.categoryId,
+        title: routineTaskCreateFields.title,
+        description: routineTaskCreateFields.description,
+        scheduleType: routineTaskCreateFields.scheduleType,
+        scheduleConfig: routineTaskCreateFields.scheduleConfig,
+        scheduleText: routineTaskCreateFields.scheduleText,
+        contractStartDate: routineTaskCreateFields.contractStartDate,
+        contractEndDate: routineTaskCreateFields.contractEndDate,
+        contractText: routineTaskCreateFields.contractText,
+        extraDetails: routineTaskCreateFields.extraDetails,
+        businessDayPolicy: routineTaskCreateFields.businessDayPolicy,
+        isActive: routineTaskCreateFields.isActive,
+        reminderRules: routineTaskCreateFields.reminderRules,
+    })
+    .superRefine(validateRoutineTaskScheduleAndContract);
+
+export const routineTaskSelfServiceUpdateSchema = z
+    .strictObject({
+        version: routineTaskUpdateFields.version,
+        unitId: routineTaskUpdateFields.unitId,
+        categoryId: routineTaskUpdateFields.categoryId,
+        title: routineTaskUpdateFields.title,
+        description: routineTaskUpdateFields.description,
+        scheduleType: routineTaskUpdateFields.scheduleType,
+        scheduleConfig: routineTaskUpdateFields.scheduleConfig,
+        scheduleText: routineTaskUpdateFields.scheduleText,
+        contractStartDate: routineTaskUpdateFields.contractStartDate,
+        contractEndDate: routineTaskUpdateFields.contractEndDate,
+        contractText: routineTaskUpdateFields.contractText,
+        extraDetails: routineTaskUpdateFields.extraDetails,
+        businessDayPolicy: routineTaskUpdateFields.businessDayPolicy,
+        isActive: routineTaskUpdateFields.isActive,
+        reminderRules: routineTaskUpdateFields.reminderRules,
+    })
+    .superRefine(validateRoutineTaskScheduleAndContract);
 
 export const routineOccurrenceFiltersSchema = z.object({
     occurrenceId: z.coerce.number().int().positive().optional(),
@@ -448,6 +488,12 @@ export const routineContractExpiryLineOutboxPayloadSchema =
 
 export type RoutineTaskCreateInput = z.infer<typeof routineTaskCreateSchema>;
 export type RoutineTaskUpdateInput = z.infer<typeof routineTaskUpdateSchema>;
+export type RoutineTaskSelfServiceCreateInput = z.infer<
+    typeof routineTaskSelfServiceCreateSchema
+>;
+export type RoutineTaskSelfServiceUpdateInput = z.infer<
+    typeof routineTaskSelfServiceUpdateSchema
+>;
 export type RoutineOccurrenceFilters = z.infer<
     typeof routineOccurrenceFiltersSchema
 >;
