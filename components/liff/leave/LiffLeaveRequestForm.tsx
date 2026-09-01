@@ -71,10 +71,11 @@ export function LiffLeaveRequestForm({
         >
             <SheetContent
                 side="bottom"
+                scrollMode="content"
                 closeButtonLabel="ปิดแบบฟอร์มยื่นคำขอลา"
-                className="h-[100dvh] max-h-[100dvh] gap-0 overflow-hidden rounded-none border-0 p-0 sm:left-1/2 sm:max-w-lg sm:-translate-x-1/2"
+                className="h-screen max-h-screen supports-[height:100dvh]:h-[100dvh] supports-[height:100dvh]:max-h-[100dvh] gap-0 scroll-pb-28 rounded-none border-0 p-0 sm:left-1/2 sm:max-w-lg sm:-translate-x-1/2"
             >
-                <SheetHeader className="shrink-0 border-b border-border-subtle bg-surface px-5 pb-4 pt-[calc(1rem+env(safe-area-inset-top))] pr-16 text-left">
+                <SheetHeader className="sticky top-0 z-20 shrink-0 border-b border-border-subtle bg-surface px-5 pb-4 pt-[calc(1rem+env(safe-area-inset-top))] pr-16 text-left">
                     <SheetTitle className="text-xl font-bold tracking-tight text-content-heading">
                         ยื่นคำขอลา
                     </SheetTitle>
@@ -86,9 +87,9 @@ export function LiffLeaveRequestForm({
                 <Form {...model.form}>
                     <form
                         onSubmit={model.form.handleSubmit(model.submit)}
-                        className="flex min-h-0 flex-1 flex-col bg-surface-subtle"
+                        className="bg-surface-subtle"
                     >
-                        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-5">
+                        <div className="px-4 py-5">
                             <div className="space-y-4 rounded-2xl bg-surface p-4 shadow-sm">
                                 {model.errorMsg ? (
                                     <Alert variant="destructive" role="alert">
@@ -126,7 +127,7 @@ export function LiffLeaveRequestForm({
                             </div>
                         </div>
 
-                        <div className="grid shrink-0 grid-cols-[0.8fr_1.2fr] gap-2 border-t border-border-subtle bg-surface px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3">
+                        <div className="sticky bottom-0 z-20 grid grid-cols-[0.8fr_1.2fr] gap-2 border-t border-border-subtle bg-surface px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3">
                             <Button
                                 type="button"
                                 variant="outline"

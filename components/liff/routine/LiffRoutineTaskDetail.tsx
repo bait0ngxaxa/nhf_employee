@@ -94,7 +94,10 @@ function OptionalSection({
     children: ReactNode;
 }): ReactElement {
     return (
-        <section className="space-y-3 rounded-2xl bg-surface p-4 shadow-sm" aria-labelledby={id}>
+        <section
+            className="space-y-3 border-t border-border-subtle pt-5 first:border-t-0 first:pt-0"
+            aria-labelledby={id}
+        >
             <h3 id={id} className="text-base font-bold text-content-heading">
                 {title}
             </h3>
@@ -127,10 +130,11 @@ export function LiffRoutineTaskDetail({
         <Sheet open={open} onOpenChange={onOpenChange}>
             <SheetContent
                 side="bottom"
+                scrollMode="content"
                 closeButtonLabel="ปิดรายละเอียดงาน Routine"
-                className="h-[94dvh] max-h-[94dvh] gap-0 overflow-hidden rounded-t-3xl border-x-0 border-b-0 p-0 sm:left-1/2 sm:max-w-2xl sm:-translate-x-1/2"
+                className="h-[94vh] max-h-[94vh] supports-[height:100dvh]:h-[94dvh] supports-[height:100dvh]:max-h-[94dvh] gap-0 rounded-t-xl border-x-0 border-b-0 p-0 scroll-pb-28 sm:left-1/2 sm:max-w-2xl sm:-translate-x-1/2"
             >
-                <SheetHeader className="shrink-0 border-b border-border-subtle bg-surface px-5 pb-4 pt-5 pr-16 text-left sm:px-6">
+                <SheetHeader className="sticky top-0 z-20 shrink-0 border-b border-border-subtle bg-surface px-5 pb-4 pt-5 pr-16 text-left sm:px-6">
                     <div className="flex min-w-0 items-start gap-3">
                         <div className="min-w-0 flex-1">
                             <SheetTitle className="break-words text-xl font-bold leading-7 tracking-tight text-content-heading">
@@ -150,13 +154,13 @@ export function LiffRoutineTaskDetail({
                     </div>
                 </SheetHeader>
 
-                <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain bg-surface-subtle px-4 py-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] sm:px-6">
+                <div className="bg-surface-subtle px-4 py-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] sm:px-6">
                     <div className="mx-auto max-w-2xl space-y-4">
                         {loading ? (
                             <div
                                 role="status"
                                 aria-live="polite"
-                                className="flex min-h-64 items-center justify-center gap-2 rounded-2xl bg-surface p-4 text-sm font-medium text-content-secondary shadow-sm"
+                                className="flex min-h-64 items-center justify-center gap-2 border-y border-border-subtle bg-surface p-4 text-sm font-medium text-content-secondary"
                             >
                                 <Loader2 className="size-5 animate-spin" aria-hidden="true" />
                                 กำลังโหลดรายละเอียดงาน...
@@ -164,7 +168,7 @@ export function LiffRoutineTaskDetail({
                         ) : error ? (
                             <div
                                 role="alert"
-                                className="space-y-4 rounded-2xl border border-status-danger-border bg-status-danger-surface p-5 text-sm leading-6 text-status-danger-foreground"
+                                className="space-y-4 rounded-md border border-status-danger-border bg-status-danger-surface p-5 text-sm leading-6 text-status-danger-foreground"
                             >
                                 <p>{error}</p>
                                 <Button
@@ -179,7 +183,7 @@ export function LiffRoutineTaskDetail({
                         ) : detail ? (
                             <>
                                 {timing ? (
-                                    <section className="space-y-3 rounded-2xl border border-brand-border bg-brand-surface p-4 shadow-sm">
+                                    <section className="space-y-3 rounded-md border border-brand-border bg-brand-surface p-4">
                                         <div className="flex items-center gap-2 text-sm font-semibold text-brand-strong">
                                             <CalendarClock className="size-4" aria-hidden="true" />
                                             รอบที่เกี่ยวข้อง
@@ -271,7 +275,7 @@ export function LiffRoutineTaskDetail({
                                                 {detail.reminderRules.map((rule, index) => (
                                                     <li
                                                         key={`${rule.daysBefore}-${rule.sendHour}-${index}`}
-                                                        className="rounded-xl border border-border-subtle bg-surface-subtle px-3 py-3 text-sm leading-6"
+                                                        className="border-t border-border-subtle py-3 text-sm leading-6 first:border-t-0"
                                                     >
                                                         <span className="font-semibold text-content-heading">
                                                             {rule.daysBefore === 0
@@ -295,11 +299,11 @@ export function LiffRoutineTaskDetail({
                                             ยังไม่มีรอบงานที่สร้างไว้
                                         </p>
                                     ) : (
-                                        <ol className="space-y-2">
+                                        <ol className="divide-y divide-border-subtle border-y border-border-subtle">
                                             {detail.occurrences.map((occurrence, index) => (
                                                 <li
                                                     key={occurrence.id}
-                                                    className="rounded-xl border border-border-subtle bg-surface-subtle px-3 py-3"
+                                                    className="py-3 first:pt-3 last:pb-3"
                                                 >
                                                     <div className="flex items-start justify-between gap-3">
                                                         <div className="min-w-0">
@@ -327,11 +331,11 @@ export function LiffRoutineTaskDetail({
                 </div>
 
                 {detail?.canManage && !loading && !error ? (
-                    <div className="shrink-0 border-t border-border-subtle bg-surface px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 sm:px-6">
+                    <div className="sticky bottom-0 z-20 shrink-0 border-t border-border-subtle bg-surface px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 sm:px-6">
                         <div className="mx-auto grid max-w-2xl gap-2">
                             <Button
                                 type="button"
-                                className="min-h-12 rounded-xl bg-brand-solid font-bold text-content-on-brand hover:bg-brand-solid-hover"
+                                className="min-h-12 bg-brand-solid font-bold text-content-on-brand hover:bg-brand-solid-hover"
                                 onClick={() => onEdit(detail)}
                                 disabled={deleting}
                             >
@@ -341,7 +345,7 @@ export function LiffRoutineTaskDetail({
                             <Button
                                 type="button"
                                 variant="outline"
-                                className="min-h-11 rounded-xl border-status-danger-border text-status-danger-foreground hover:bg-status-danger-surface"
+                                className="min-h-11 border-status-danger-border text-status-danger-foreground hover:bg-status-danger-surface"
                                 onClick={() => setDeleteConfirmOpen(true)}
                                 disabled={deleting}
                             >

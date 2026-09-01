@@ -140,7 +140,7 @@ function LiffLinkRequiredView({ loginUrl }: { loginUrl: string }): ReactElement 
             className="flex min-h-svh items-center bg-surface-subtle pb-[calc(1rem+env(safe-area-inset-bottom))] pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] pt-[calc(1rem+env(safe-area-inset-top))] sm:pb-[calc(1.5rem+env(safe-area-inset-bottom))] sm:pl-[max(1.5rem,env(safe-area-inset-left))] sm:pr-[max(1.5rem,env(safe-area-inset-right))] sm:pt-[calc(1.5rem+env(safe-area-inset-top))]"
         >
             <div className="mx-auto w-full max-w-lg">
-                <Card className="w-full gap-4 rounded-2xl border-brand-border bg-surface-raised p-5 shadow-sm sm:gap-5 sm:p-8">
+                <Card className="w-full gap-4 rounded-md border-brand-border bg-surface-raised p-5 shadow-none sm:gap-5 sm:p-8">
                     <div className="space-y-2">
                         <h1 className="text-2xl font-bold tracking-tight text-content-heading">
                             เชื่อมบัญชี LINE กับ NHFapp
@@ -152,7 +152,7 @@ function LiffLinkRequiredView({ loginUrl }: { loginUrl: string }): ReactElement 
                     </div>
                     <Button
                         asChild
-                        className="min-h-12 w-full rounded-xl bg-gradient-to-r from-action-gradient-start to-action-gradient-end text-base font-semibold text-content-on-brand hover:from-action-gradient-hover-start hover:to-action-gradient-hover-end"
+                        className="min-h-12 w-full rounded-md bg-brand-solid text-base font-semibold text-content-on-brand hover:bg-brand-solid-hover"
                     >
                         <a href={loginUrl}>เชื่อมบัญชี NHFapp</a>
                     </Button>

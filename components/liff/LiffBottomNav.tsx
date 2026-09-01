@@ -59,7 +59,7 @@ export function LiffBottomNav({ pathname }: LiffBottomNavProps): ReactElement {
     return (
         <nav
             aria-label="เมนูบริการ NHFapp ผ่าน LINE"
-            className="sticky bottom-0 z-30 border-t border-border-subtle/80 bg-surface px-[max(0.5rem,env(safe-area-inset-left))] pb-[calc(0.625rem+env(safe-area-inset-bottom))] pt-2 pr-[max(0.5rem,env(safe-area-inset-right))]"
+            className="sticky bottom-0 z-30 border-t border-border-subtle/80 bg-surface/98 px-[max(0.5rem,env(safe-area-inset-left))] pb-[calc(0.625rem+env(safe-area-inset-bottom))] pt-1.5 pr-[max(0.5rem,env(safe-area-inset-right))]"
         >
             <div className="grid grid-cols-4 gap-1">
                 {NAV_ITEMS.map((item) => {
@@ -71,12 +71,18 @@ export function LiffBottomNav({ pathname }: LiffBottomNavProps): ReactElement {
                             href={item.href}
                             aria-current={active ? "page" : undefined}
                             className={cn(
-                                "flex min-h-12 min-w-0 flex-col items-center justify-center gap-1 rounded-xl px-1 text-[11px] font-semibold leading-4 transition-[background-color,color,box-shadow] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-focus/40",
+                                "relative flex min-h-12 min-w-0 flex-col items-center justify-center gap-1 rounded-md px-1 text-[11px] font-semibold leading-4 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-focus/40",
                                 active
-                                    ? "bg-brand-surface text-brand-strong shadow-sm"
+                                    ? "text-brand-solid"
                                     : "text-content-muted hover:bg-surface-subtle hover:text-content-body",
                             )}
                         >
+                            {active ? (
+                                <span
+                                    className="absolute inset-x-4 top-0 h-0.5 bg-brand-solid"
+                                    aria-hidden="true"
+                                />
+                            ) : null}
                             <Icon className="size-5" aria-hidden="true" />
                             <span className="truncate">{item.label}</span>
                         </Link>

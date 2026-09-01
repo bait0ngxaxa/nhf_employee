@@ -43,8 +43,8 @@ export function LiffRoutineStatusFilter({
                             onClick={() => onChange(item.value)}
                             className={
                                 selected
-                                    ? "min-h-11 shrink-0 rounded-full bg-brand-solid px-4 text-sm font-semibold text-content-on-brand shadow-sm transition-colors hover:bg-brand-solid-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-solid/40"
-                                    : "min-h-11 shrink-0 rounded-full border border-border-subtle bg-surface-raised px-4 text-sm font-semibold text-content-secondary transition-colors hover:border-brand-border hover:bg-brand-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-solid/40"
+                                    ? "min-h-11 shrink-0 rounded-md border border-brand-border bg-brand-surface px-3.5 text-sm font-semibold text-brand-strong transition-colors hover:bg-brand-surface-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-solid/40"
+                                    : "min-h-11 shrink-0 rounded-md border border-border-subtle bg-surface-raised px-3.5 text-sm font-semibold text-content-secondary transition-colors hover:border-brand-border hover:bg-brand-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-solid/40"
                             }
                         >
                             {item.label}

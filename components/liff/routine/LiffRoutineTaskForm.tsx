@@ -488,16 +488,16 @@ export const LiffRoutineTaskForm = forwardRef<
 
     return (
         <form
-            className="flex min-h-0 flex-1 flex-col overflow-hidden bg-surface-subtle"
+            className="bg-surface-subtle"
             onSubmit={(event) => {
                 event.preventDefault();
                 void submit();
             }}
             noValidate
         >
-            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-5 sm:px-6">
-                <div className="mx-auto max-w-2xl space-y-5">
-                    <section className="space-y-4 rounded-2xl bg-surface p-4 shadow-sm sm:p-5">
+            <div className="mx-auto max-w-2xl space-y-5 px-4 py-5 sm:px-6">
+                    <section className="space-y-4">
+                        <h2 className="text-base font-bold text-content-heading">ข้อมูลหลัก</h2>
                         <div className="rounded-xl border border-brand-border bg-brand-surface px-4 py-3 text-sm leading-6 text-brand-strong">
                             <p className="font-semibold">
                                 {mode === "CREATE"
@@ -567,7 +567,7 @@ export const LiffRoutineTaskForm = forwardRef<
                                 <select
                                     data-routine-field="unitId"
                                     aria-invalid={Boolean(fieldErrors.unitId)}
-                                    className="h-12 min-w-0 rounded-xl border border-input bg-background px-3 text-base focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+                                    className="h-12 min-w-0 rounded-md border border-input bg-background px-3 text-base focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
                                     value={form.unitId}
                                     disabled={controlsDisabled}
                                     onChange={(event) => updateField("unitId", event.target.value)}
@@ -587,7 +587,7 @@ export const LiffRoutineTaskForm = forwardRef<
                                 <select
                                     data-routine-field="categoryId"
                                     aria-invalid={Boolean(fieldErrors.categoryId)}
-                                    className="h-12 min-w-0 rounded-xl border border-input bg-background px-3 text-base focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+                                    className="h-12 min-w-0 rounded-md border border-input bg-background px-3 text-base focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
                                     value={form.categoryId}
                                     disabled={controlsDisabled}
                                     onChange={(event) => updateField("categoryId", event.target.value)}
@@ -612,7 +612,7 @@ export const LiffRoutineTaskForm = forwardRef<
                                     placeholder="เช่น ตรวจสอบค่าใช้จ่ายประจำเดือน"
                                     maxLength={255}
                                     disabled={controlsDisabled}
-                                    className="h-12 rounded-xl text-base"
+                                    className="h-12 text-base"
                                 />
                                 <FieldError message={fieldErrors.title} />
                             </label>
@@ -627,7 +627,7 @@ export const LiffRoutineTaskForm = forwardRef<
                                     placeholder="รายละเอียดหรือขั้นตอนที่จำเป็น"
                                     maxLength={5000}
                                     disabled={controlsDisabled}
-                                    className="min-h-24 rounded-xl text-base leading-6"
+                                    className="min-h-24 text-base leading-6"
                                 />
                                 <FieldError message={fieldErrors.description} />
                             </label>
@@ -650,9 +650,11 @@ export const LiffRoutineTaskForm = forwardRef<
                         errors={fieldErrors}
                         disabled={controlsDisabled}
                         allowManual
+                        variant="embedded"
                     />
 
-                    <section className="space-y-4 rounded-2xl bg-surface p-4 shadow-sm sm:p-5">
+                    <section className="space-y-3 border-t border-border-subtle pt-5">
+                        <h2 className="text-base font-bold text-content-heading">คำอธิบายกำหนดการ</h2>
                         <label className="grid gap-1.5 text-sm font-semibold text-content-body">
                             <span>คำอธิบายกำหนดการ</span>
                             <Input
@@ -663,7 +665,7 @@ export const LiffRoutineTaskForm = forwardRef<
                                 placeholder="เช่น ทุกวันที่ 10 ของเดือน"
                                 maxLength={500}
                                 disabled={controlsDisabled}
-                                className="h-12 rounded-xl text-base"
+                                className="h-12 text-base"
                             />
                             <FieldError message={fieldErrors.scheduleText} />
                         </label>
@@ -679,9 +681,11 @@ export const LiffRoutineTaskForm = forwardRef<
                         onAddRule={() => addReminderRule()}
                         onUpdateRule={updateReminderRule}
                         onRemoveRule={removeReminderRule}
+                        variant="embedded"
                     />
 
-                    <section className="space-y-4 rounded-2xl bg-surface p-4 shadow-sm sm:p-5">
+                    <section className="space-y-3 border-t border-border-subtle pt-5">
+                        <h2 className="text-base font-bold text-content-heading">รายละเอียดเพิ่มเติม</h2>
                         <label className="grid gap-1.5 text-sm font-semibold text-content-body">
                             <span>รายละเอียดเพิ่มเติม</span>
                             <Textarea
@@ -691,19 +695,18 @@ export const LiffRoutineTaskForm = forwardRef<
                                 onChange={(event) => updateField("extraDetails", event.target.value)}
                                 maxLength={5000}
                                 disabled={controlsDisabled}
-                                className="min-h-24 rounded-xl text-base leading-6"
+                                className="min-h-24 text-base leading-6"
                             />
                             <FieldError message={fieldErrors.extraDetails} />
                         </label>
                     </section>
-                </div>
             </div>
 
-            <div className="grid shrink-0 grid-cols-[0.8fr_1.2fr] gap-2 border-t border-border-subtle bg-surface px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 sm:px-6">
+            <div className="sticky bottom-0 z-20 grid grid-cols-[0.8fr_1.2fr] gap-2 border-t border-border-subtle bg-surface px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 sm:px-6">
                 <Button
                     type="button"
                     variant="outline"
-                    className="min-h-12 rounded-xl"
+                    className="min-h-12"
                     disabled={controlsDisabled}
                     onClick={requestClose}
                 >
@@ -711,7 +714,7 @@ export const LiffRoutineTaskForm = forwardRef<
                 </Button>
                 <Button
                     type="submit"
-                    className="min-h-12 rounded-xl bg-brand-solid font-bold text-content-on-brand hover:bg-brand-solid-hover"
+                    className="min-h-12 bg-brand-solid font-bold text-content-on-brand hover:bg-brand-solid-hover"
                     disabled={controlsDisabled || hasConflict}
                     aria-busy={isSubmitting}
                     aria-live="polite"

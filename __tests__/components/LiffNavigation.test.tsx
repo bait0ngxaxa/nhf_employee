@@ -26,6 +26,11 @@ describe("LIFF application shell navigation", () => {
         expect(screen.getByRole("navigation")).toHaveAccessibleName(
             "เมนูบริการ NHFapp ผ่าน LINE",
         );
+        expect(screen.getByRole("link", { name: "ไปหน้าหลัก NHFapp" })).toHaveAttribute(
+            "href",
+            APP_ROUTES.line.root,
+        );
+        expect(screen.getByAltText("โลโก้ NHFapp")).toBeInTheDocument();
         expect(screen.getByRole("link", { name: "หน้าหลัก" })).toHaveAttribute(
             "href",
             APP_ROUTES.line.root,

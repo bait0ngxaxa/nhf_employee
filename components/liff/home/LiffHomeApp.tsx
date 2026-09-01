@@ -107,7 +107,7 @@ function ModuleCard({ config, module }: ModuleCardProps): ReactElement {
             <div className="flex min-w-0 items-start gap-3">
                 <div
                     className={cn(
-                        "flex size-12 shrink-0 items-center justify-center rounded-2xl border",
+                        "flex size-10 shrink-0 items-center justify-center rounded-lg border",
                         config.iconClassName,
                     )}
                 >
@@ -120,7 +120,7 @@ function ModuleCard({ config, module }: ModuleCardProps): ReactElement {
                         </h3>
                         <span
                             className={cn(
-                                "rounded-full border px-2 py-0.5 text-[11px] font-bold leading-5",
+                                "rounded-md border px-2 py-0.5 text-[11px] font-bold leading-5",
                                 module.enabled
                                     ? `border-transparent bg-surface-subtle ${config.accentClassName}`
                                     : "border-border-subtle bg-surface-muted text-content-muted",
@@ -151,7 +151,7 @@ function ModuleCard({ config, module }: ModuleCardProps): ReactElement {
             <div
                 aria-disabled="true"
                 data-module-enabled="false"
-                className="flex min-h-28 w-full items-start justify-between gap-3 rounded-2xl border border-border-subtle bg-surface-muted/70 p-4 opacity-75"
+                className="flex min-h-28 w-full items-start justify-between gap-3 rounded-md border border-border-subtle bg-surface-muted/70 p-4 opacity-75"
             >
                 <LockKeyhole
                     className="mt-1 size-5 shrink-0 text-content-muted"
@@ -167,7 +167,7 @@ function ModuleCard({ config, module }: ModuleCardProps): ReactElement {
             href={config.href}
             data-module-enabled="true"
             className={cn(
-                "group flex min-h-28 w-full items-start justify-between gap-3 rounded-2xl border border-border-subtle bg-surface-raised p-4 shadow-sm transition-[border-color,background-color,box-shadow,transform] hover:-translate-y-0.5 hover:border-brand-border-strong hover:bg-brand-surface hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-focus/40",
+                "group flex min-h-28 w-full items-start justify-between gap-3 rounded-md border border-border-subtle bg-surface-raised p-4 transition-[border-color,background-color] hover:border-brand-border-strong hover:bg-brand-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-focus/40",
                 config.key === "routine" && "min-h-32 border-brand-border bg-brand-surface/60",
             )}
         >
@@ -229,17 +229,14 @@ export function LiffHomeApp(): ReactElement {
             id="main"
             className="px-[max(1rem,env(safe-area-inset-left))] pb-8 pt-6 pr-[max(1rem,env(safe-area-inset-right))] sm:pt-8"
         >
-            <div className="space-y-7">
-                <section className="relative overflow-hidden rounded-3xl border border-dashboard-hero-border bg-dashboard-hero-surface p-5 text-content-on-brand shadow-lg shadow-dashboard-hero-shadow/15 sm:p-7">
-                    <div className="pointer-events-none absolute -bottom-14 -right-10 size-44 rounded-full bg-dashboard-hero-dot/20" />
-                    <div className="relative space-y-3">
-                        <h1 className="break-words text-3xl font-bold leading-tight tracking-tight sm:text-4xl">
-                            สวัสดี {displayName}
-                        </h1>
-                        <p className="max-w-[34ch] text-sm font-medium leading-6 text-dashboard-hero-muted">
-                            เลือกบริการที่ต้องการ แล้วทำงานต่อได้ทันทีใน NHFapp
-                        </p>
-                    </div>
+            <div className="space-y-6">
+                <section className="border-b border-brand-border pb-5">
+                    <h1 className="break-words text-2xl font-bold leading-tight tracking-tight text-content-heading sm:text-3xl">
+                        สวัสดี {displayName}
+                    </h1>
+                    <p className="mt-2 max-w-[42ch] text-sm font-medium leading-6 text-content-secondary">
+                        เลือกบริการที่ต้องการ แล้วทำงานต่อได้ทันทีใน NHFapp
+                    </p>
                 </section>
 
                 <section aria-labelledby="liff-home-services-heading">

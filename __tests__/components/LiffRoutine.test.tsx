@@ -506,6 +506,7 @@ describe("LiffRoutineApp", () => {
             task: { ...DETAIL, id: 72, title: "รายละเอียดงานที่สอง" },
         });
         const detailDialog = await screen.findByRole("dialog");
+        expect(detailDialog).toHaveAttribute("data-scroll-owner", "content");
         expect(within(detailDialog).getByRole("heading", { name: "รายละเอียดงานที่สอง" })).toBeInTheDocument();
 
         firstDetail.resolve({ task: DETAIL });
@@ -573,6 +574,7 @@ describe("LiffRoutineApp", () => {
         fireEvent.click(screen.getByRole("button", { name: "เพิ่ม Routine ของฉัน" }));
 
         const formDialog = await screen.findByRole("dialog");
+        expect(formDialog).toHaveAttribute("data-scroll-owner", "content");
         expect(within(formDialog).getByRole("heading", { name: "เพิ่ม Routine ของฉัน" })).toBeInTheDocument();
         expect(within(formDialog).queryByText("เลือกผู้รับผิดชอบ")).not.toBeInTheDocument();
         expect(
@@ -715,6 +717,7 @@ describe("LiffRoutineApp", () => {
 
         fireEvent.click(screen.getByRole("button", { name: "ปิดเพิ่ม Routine ของฉัน" }));
         const discardDialog = await screen.findByRole("alertdialog");
+        expect(discardDialog).toHaveAttribute("data-scroll-owner", "content");
         expect(within(discardDialog).getByText("หากออกตอนนี้ การแก้ไขล่าสุดจะหายไป")).toBeInTheDocument();
         fireEvent.click(within(discardDialog).getByRole("button", { name: "ออกโดยไม่บันทึก" }));
 

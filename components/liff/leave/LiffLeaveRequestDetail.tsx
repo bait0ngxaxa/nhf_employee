@@ -52,12 +52,13 @@ export function LiffLeaveRequestDetail({
         <Sheet open={detail !== null} onOpenChange={onOpenChange}>
             <SheetContent
                 side="bottom"
+                scrollMode="content"
                 closeButtonLabel="ปิดรายละเอียดคำขอลา"
-                className="max-h-[92dvh] gap-0 overflow-hidden rounded-t-3xl border-0 p-0 sm:left-1/2 sm:max-w-lg sm:-translate-x-1/2"
+                className="max-h-[92vh] supports-[height:100dvh]:max-h-[92dvh] gap-0 scroll-pb-28 rounded-t-xl border-0 p-0 sm:left-1/2 sm:max-w-lg sm:-translate-x-1/2"
             >
                 {detail ? (
                     <>
-                        <SheetHeader className="shrink-0 border-b border-border-subtle px-5 pb-4 pt-5 pr-16 text-left">
+                        <SheetHeader className="sticky top-0 z-20 shrink-0 border-b border-border-subtle bg-surface px-5 pb-4 pt-5 pr-16 text-left">
                             <div className="flex flex-wrap items-center gap-2">
                                 <SheetTitle className="text-xl font-bold tracking-tight text-content-heading">
                                     {getLeaveTypeLabel(detail.leaveType)}
@@ -68,7 +69,7 @@ export function LiffLeaveRequestDetail({
                                 {formatLeaveDateRange(detail.startDate, detail.endDate)} · {getLeavePeriodLabel(detail.period)} · {formatLeaveDays(detail.durationDays)} วัน
                             </SheetDescription>
                         </SheetHeader>
-                        <div className="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain bg-surface-subtle px-4 py-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))]">
+                        <div className="space-y-5 bg-surface-subtle px-4 py-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))]">
                             {hasAuthorizedApproveIntent ? (
                                 <div
                                     role="status"

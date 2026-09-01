@@ -78,11 +78,12 @@ export function LiffRoutineTaskFormSurface({
         >
             <SheetContent
                 side="bottom"
+                scrollMode="content"
                 closeButtonLabel={`ปิด${title}`}
-                className="h-[100dvh] max-h-[100dvh] gap-0 overflow-hidden rounded-none border-0 p-0 sm:left-1/2 sm:max-w-2xl sm:-translate-x-1/2"
+                className="h-screen max-h-screen supports-[height:100dvh]:h-[100dvh] supports-[height:100dvh]:max-h-[100dvh] gap-0 rounded-none border-0 p-0 scroll-pb-28 sm:left-1/2 sm:max-w-2xl sm:-translate-x-1/2"
                 aria-busy={referenceLoading}
             >
-                <SheetHeader className="shrink-0 border-b border-border-subtle bg-surface px-5 pb-4 pt-[calc(1rem+env(safe-area-inset-top))] pr-16 text-left sm:px-6">
+                <SheetHeader className="sticky top-0 z-20 shrink-0 border-b border-border-subtle bg-surface px-5 pb-4 pt-[calc(1rem+env(safe-area-inset-top))] pr-16 text-left sm:px-6">
                     <SheetTitle className="text-xl font-bold tracking-tight text-content-heading">
                         {title}
                     </SheetTitle>
@@ -106,7 +107,7 @@ export function LiffRoutineTaskFormSurface({
                     <div className="flex flex-1 items-center justify-center bg-surface-subtle px-4 py-8">
                         <div
                             role="alert"
-                            className="w-full max-w-md space-y-4 rounded-2xl border border-status-danger-border bg-status-danger-surface p-5 text-sm leading-6 text-status-danger-foreground"
+                            className="w-full max-w-md space-y-4 rounded-md border border-status-danger-border bg-status-danger-surface p-5 text-sm leading-6 text-status-danger-foreground"
                         >
                             <div className="flex items-start gap-2">
                                 <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />

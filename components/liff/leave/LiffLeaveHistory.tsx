@@ -247,10 +247,11 @@ function LeaveFilterSheet({
         <Sheet open={open} onOpenChange={onOpenChange}>
             <SheetContent
                 side="bottom"
+                scrollMode="content"
                 closeButtonLabel="ปิดตัวกรองประวัติการลา"
-                className="max-h-[88dvh] overflow-y-auto rounded-t-3xl border-0 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:left-1/2 sm:max-w-lg sm:-translate-x-1/2"
+                className="max-h-[88vh] supports-[height:100dvh]:max-h-[88dvh] scroll-pb-28 rounded-t-xl border-0 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:left-1/2 sm:max-w-lg sm:-translate-x-1/2"
             >
-                <SheetHeader className="pr-12 text-left">
+                <SheetHeader className="sticky top-0 z-20 border-b border-border-subtle bg-surface px-4 py-4 pr-12 text-left">
                     <SheetTitle>กรองคำขอลา</SheetTitle>
                     <SheetDescription>ค้นหาและเลือกเฉพาะรายการที่ต้องการดู</SheetDescription>
                 </SheetHeader>

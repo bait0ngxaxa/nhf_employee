@@ -51,18 +51,24 @@ function DialogContent({
     children,
     closeLabel = "Close",
     showCloseButton = true,
+    scrollMode = "content",
     ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
     closeLabel?: string;
     showCloseButton?: boolean;
+    scrollMode?: "content" | "area";
 }) {
     return (
         <DialogPortal data-slot="dialog-portal">
             <DialogOverlay />
             <DialogPrimitive.Content
                 data-slot="dialog-content"
+                data-scroll-owner={scrollMode}
                 className={cn(
-                    "bg-surface-raised fixed top-[50%] left-[50%] z-50 grid max-h-[calc(100dvh-2rem)] w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 overflow-y-auto rounded-3xl border border-border-neutral p-6 shadow-xl sm:max-w-lg overscroll-contain",
+                    "bg-surface-raised fixed top-[50%] left-[50%] z-50 grid max-h-[calc(100vh-2rem)] supports-[height:100dvh]:max-h-[calc(100dvh-2rem)] w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-3xl border border-border-neutral p-6 shadow-xl sm:max-w-lg overscroll-contain",
+                    scrollMode === "content"
+                        ? "overflow-y-auto touch-pan-y [-webkit-overflow-scrolling:touch]"
+                        : "overflow-hidden",
                     className
                 )}
                 {...props}
@@ -71,7 +77,7 @@ function DialogContent({
                 {showCloseButton && (
                     <DialogPrimitive.Close
                         data-slot="dialog-close"
-                        className="ring-offset-background focus:ring-ring data-[state=open]:bg-accent data-[state=open]:text-muted-foreground absolute top-4 right-4 rounded-xs opacity-70 transition-opacity hover:opacity-100 focus:ring-2 focus:ring-offset-2 focus:outline-hidden disabled:pointer-events-none [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4"
+                        className="ring-offset-background focus:ring-ring data-[state=open]:bg-accent data-[state=open]:text-muted-foreground absolute top-[calc(0.75rem+env(safe-area-inset-top))] right-[calc(0.75rem+env(safe-area-inset-right))] flex size-11 items-center justify-center rounded-md opacity-70 transition-opacity hover:bg-accent hover:opacity-100 focus:ring-2 focus:ring-offset-2 focus:outline-hidden disabled:pointer-events-none [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4"
                     >
                         <XIcon />
                         <span className="sr-only">{closeLabel}</span>
@@ -146,3 +152,19 @@ export {
     DialogTitle,
     DialogTrigger,
 };
+
+export function DialogScrollArea({
+    className,
+    ...props
+}: React.ComponentProps<"div">): React.ReactElement {
+    return (
+        <div
+            data-slot="dialog-scroll-area"
+            className={cn(
+                "min-h-0 flex-1 overflow-y-auto overscroll-contain touch-pan-y [-webkit-overflow-scrolling:touch]",
+                className,
+            )}
+            {...props}
+        />
+    );
+}

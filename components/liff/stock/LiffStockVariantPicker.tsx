@@ -71,9 +71,10 @@ export function LiffStockVariantPicker({
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent
                 closeLabel="ปิดตัวเลือกวัสดุ"
-                className="bottom-0 left-0 top-auto max-h-[88svh] max-w-none translate-x-0 translate-y-0 gap-0 overflow-hidden rounded-b-none rounded-t-3xl border-x-0 border-b-0 p-0 sm:left-1/2 sm:max-w-lg sm:-translate-x-1/2"
+                scrollMode="content"
+                className="bottom-0 left-0 top-auto max-h-[88vh] supports-[height:100dvh]:max-h-[88dvh] max-w-none translate-x-0 translate-y-0 gap-0 scroll-pb-28 rounded-b-none rounded-t-xl border-x-0 border-b-0 p-0 sm:left-1/2 sm:max-w-lg sm:-translate-x-1/2"
             >
-                <div className="border-b border-border-subtle bg-surface-subtle px-4 py-4 pr-12">
+                <div className="sticky top-0 z-20 border-b border-border-subtle bg-surface-subtle px-4 py-4 pr-12">
                     <DialogTitle className="text-lg leading-7 text-content-heading">
                         เลือกตัวเลือกของ {item.name}
                     </DialogTitle>
@@ -81,7 +82,7 @@ export function LiffStockVariantPicker({
                         เลือกได้หลายตัวเลือก โดยจำนวนต้องไม่เกินยอดพร้อมเบิก
                     </DialogDescription>
                 </div>
-                <div className="min-h-0 space-y-3 overflow-y-auto px-4 py-4">
+                <div className="space-y-3 px-4 py-4">
                     {item.variants.map((variant) => {
                         const quantity = quantities[variant.id] ?? 0;
                         const label = getVariantAttributeSummary(
@@ -153,7 +154,7 @@ export function LiffStockVariantPicker({
                         );
                     })}
                 </div>
-                <div className="border-t border-border-subtle bg-surface-raised px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-3">
+                <div className="sticky bottom-0 z-20 border-t border-border-subtle bg-surface-raised px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-3">
                     <Button
                         type="button"
                         onClick={() => onConfirm(selections)}

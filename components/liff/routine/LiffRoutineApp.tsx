@@ -490,10 +490,10 @@ export function LiffRoutineApp(): ReactElement {
         <>
             <main
                 id="main"
-                className="bg-surface-subtle px-[max(1rem,env(safe-area-inset-left))] pb-8 pt-6 pr-[max(1rem,env(safe-area-inset-right))] sm:pt-8"
+                className="bg-surface-subtle px-[max(1rem,env(safe-area-inset-left))] pb-10 pt-5 pr-[max(1rem,env(safe-area-inset-right))] sm:pt-7"
             >
-                <div className="mx-auto w-full max-w-lg space-y-4 sm:space-y-5">
-                    <header className="space-y-3">
+                <div className="mx-auto w-full max-w-lg space-y-5">
+                    <header className="flex flex-col gap-4 border-b border-border-subtle pb-5 min-[420px]:flex-row min-[420px]:items-end min-[420px]:justify-between">
                         <div className="space-y-1">
                             <h1 className="text-2xl font-bold tracking-tight text-content-heading sm:text-3xl">
                                 งาน Routine ของฉัน
@@ -505,7 +505,7 @@ export function LiffRoutineApp(): ReactElement {
                         <Button
                             type="button"
                             onClick={openCreate}
-                            className="min-h-12 w-full rounded-xl bg-brand-solid font-bold text-content-on-brand hover:bg-brand-solid-hover min-[400px]:w-auto"
+                            className="min-h-11 w-full bg-brand-solid font-bold text-content-on-brand hover:bg-brand-solid-hover min-[420px]:w-auto"
                         >
                             <Plus className="size-4" aria-hidden="true" />
                             เพิ่ม Routine ของฉัน
@@ -516,7 +516,7 @@ export function LiffRoutineApp(): ReactElement {
                         <div
                             role="status"
                             aria-live="polite"
-                            className="rounded-2xl border border-status-success-border bg-status-success-surface px-4 py-3 text-sm leading-6 text-status-success-strong"
+                            className="rounded-md border border-status-success-border bg-status-success-surface px-4 py-3 text-sm leading-6 text-status-success-strong"
                         >
                             {operationNotice}
                         </div>
@@ -524,7 +524,7 @@ export function LiffRoutineApp(): ReactElement {
                     {operationError ? (
                         <div
                             role="alert"
-                            className="rounded-2xl border border-status-warning-border bg-status-warning-surface px-4 py-3 text-sm leading-6 text-status-warning-strong"
+                            className="rounded-md border border-status-warning-border bg-status-warning-surface px-4 py-3 text-sm leading-6 text-status-warning-strong"
                         >
                             {operationError}
                         </div>
@@ -534,7 +534,7 @@ export function LiffRoutineApp(): ReactElement {
                     {focusNotice ? (
                         <div
                             role="status"
-                            className="rounded-2xl border border-status-warning-border bg-status-warning-surface px-4 py-3 text-sm leading-6 text-status-warning-strong"
+                            className="rounded-md border border-status-warning-border bg-status-warning-surface px-4 py-3 text-sm leading-6 text-status-warning-strong"
                         >
                             {focusNotice}
                         </div>

@@ -75,6 +75,7 @@ interface RoutineReminderFieldsProps {
     errors?: Readonly<Record<string, string>>;
     disabled?: boolean;
     selfService?: boolean;
+    variant?: "default" | "embedded";
     onPresetChange: (preset: RoutineReminderPreset) => void;
     onAddRule: () => void;
     onUpdateRule: (index: number, patch: Partial<RoutineReminderRuleForm>) => void;
@@ -87,6 +88,7 @@ export function RoutineReminderFields({
     errors = {},
     disabled = false,
     selfService = false,
+    variant = "default",
     onPresetChange,
     onAddRule,
     onUpdateRule,
@@ -99,8 +101,12 @@ export function RoutineReminderFields({
     }
 
     return (
-        <fieldset className="space-y-4 rounded-xl border border-border-subtle bg-surface-subtle p-4 sm:p-5">
-            <legend className="px-1 text-base font-semibold text-content-heading">
+        <fieldset className={variant === "embedded"
+            ? "space-y-4 border-t border-border-subtle pt-5"
+            : "space-y-4 rounded-xl border border-border-subtle bg-surface-subtle p-4 sm:p-5"}>
+            <legend className={variant === "embedded"
+                ? "text-base font-semibold text-content-heading"
+                : "px-1 text-base font-semibold text-content-heading"}>
                 การแจ้งเตือนล่วงหน้า
             </legend>
             <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
@@ -150,7 +156,9 @@ export function RoutineReminderFields({
                         return (
                             <div
                                 key={index}
-                                className="grid min-w-0 gap-4 rounded-lg border border-border-subtle bg-background p-4 sm:grid-cols-2 xl:grid-cols-[minmax(7rem,0.7fr)_minmax(10rem,0.8fr)_minmax(14rem,1.4fr)_auto_auto] xl:items-end"
+                                className={variant === "embedded"
+                                    ? "grid min-w-0 gap-4 border-t border-border-subtle pt-4 first:border-t-0 first:pt-0 sm:grid-cols-2 xl:grid-cols-[minmax(7rem,0.7fr)_minmax(10rem,0.8fr)_minmax(14rem,1.4fr)_auto_auto] xl:items-end"
+                                    : "grid min-w-0 gap-4 rounded-lg border border-border-subtle bg-background p-4 sm:grid-cols-2 xl:grid-cols-[minmax(7rem,0.7fr)_minmax(10rem,0.8fr)_minmax(14rem,1.4fr)_auto_auto] xl:items-end"}
                             >
                                 <label className="grid min-w-0 gap-1 text-sm font-medium text-content-body">
                                     ล่วงหน้า (วัน)

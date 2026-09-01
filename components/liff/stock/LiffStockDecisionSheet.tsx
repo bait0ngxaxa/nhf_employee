@@ -71,10 +71,11 @@ export function LiffStockDecisionSheet({
         >
             <DialogContent
                 closeLabel="ปิดหน้าต่างยืนยัน"
-                className="bottom-0 left-0 top-auto max-h-[88svh] max-w-none translate-x-0 translate-y-0 gap-0 overflow-hidden rounded-b-none rounded-t-3xl border-x-0 border-b-0 p-0 sm:left-1/2 sm:max-w-lg sm:-translate-x-1/2"
+                scrollMode="content"
+                className="bottom-0 left-0 top-auto max-h-[88vh] supports-[height:100dvh]:max-h-[88dvh] max-w-none translate-x-0 translate-y-0 gap-0 scroll-pb-28 rounded-b-none rounded-t-xl border-x-0 border-b-0 p-0 sm:left-1/2 sm:max-w-lg sm:-translate-x-1/2"
                 aria-busy={busy}
             >
-                <div className={`border-b px-4 py-4 pr-12 ${
+                <div className={`sticky top-0 z-20 border-b px-4 py-4 pr-12 ${
                     issuing
                         ? "border-status-success-border bg-status-success-surface"
                         : "border-status-danger-border bg-status-danger-surface"
@@ -92,7 +93,7 @@ export function LiffStockDecisionSheet({
                     </DialogDescription>
                 </div>
 
-                <div className="min-h-0 space-y-4 overflow-y-auto px-4 py-4">
+                <div className="space-y-4 px-4 py-4">
                     <p className="rounded-2xl bg-surface-subtle px-4 py-3 text-sm font-semibold leading-6 text-content-strong">
                         {!actionAvailable
                             ? "สถานะคำขอเปลี่ยนแปลงแล้ว ไม่สามารถดำเนินการนี้ได้ กรุณาปิดหน้าต่างเพื่อตรวจสอบรายละเอียดล่าสุด"
@@ -153,7 +154,7 @@ export function LiffStockDecisionSheet({
                     ) : null}
                 </div>
 
-                <div className="border-t border-border-subtle bg-surface-raised px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-3">
+                <div className="sticky bottom-0 z-20 border-t border-border-subtle bg-surface-raised px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-3">
                     {actionAvailable ? (
                         <Button
                             type="button"

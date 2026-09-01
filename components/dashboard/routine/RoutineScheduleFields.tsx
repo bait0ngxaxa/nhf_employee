@@ -32,6 +32,7 @@ interface RoutineScheduleFieldsProps {
     errors?: Record<string, string>;
     disabled?: boolean;
     allowManual?: boolean;
+    variant?: "default" | "embedded";
 }
 
 function numberValue(value: unknown, fallback = 0): number {
@@ -74,6 +75,7 @@ export function RoutineScheduleFields({
     errors = {},
     disabled = false,
     allowManual = true,
+    variant = "default",
 }: RoutineScheduleFieldsProps) {
     function updateNumber(
         key: string,
@@ -123,10 +125,15 @@ export function RoutineScheduleFields({
         && yearlyMonth <= ROUTINE_SCHEDULE_LIMITS.month.max
         ? daysInMonth(2024, yearlyMonth)
         : ROUTINE_SCHEDULE_LIMITS.day.max;
+    const isEmbedded = variant === "embedded";
 
     return (
-        <fieldset className="space-y-5 rounded-xl border border-border-subtle bg-surface-subtle p-4 sm:p-5">
-            <legend className="px-1 text-base font-semibold text-content-heading">
+        <fieldset className={isEmbedded
+            ? "space-y-5 border-t border-border-subtle pt-5"
+            : "space-y-5 rounded-xl border border-border-subtle bg-surface-subtle p-4 sm:p-5"}>
+            <legend className={isEmbedded
+                ? "text-base font-semibold text-content-heading"
+                : "px-1 text-base font-semibold text-content-heading"}>
                 กำหนดตารางงาน
             </legend>
             <div className="grid gap-4 md:grid-cols-2">

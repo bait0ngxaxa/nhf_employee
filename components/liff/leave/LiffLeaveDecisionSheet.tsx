@@ -150,12 +150,13 @@ export function LiffLeaveDecisionSheet({
         >
             <SheetContent
                 side="bottom"
+                scrollMode="content"
                 closeButtonLabel="ปิดการยืนยันดำเนินการคำขอลา"
-                className="rounded-t-3xl border-0 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:left-1/2 sm:max-w-lg sm:-translate-x-1/2"
+                className="scroll-pb-28 rounded-t-xl border-0 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:left-1/2 sm:max-w-lg sm:-translate-x-1/2"
             >
                 {intent && content ? (
                     <>
-                        <SheetHeader className="pr-12 text-left">
+                        <SheetHeader className="sticky top-0 z-20 border-b border-border-subtle bg-surface px-4 py-4 pr-12 text-left">
                             <SheetTitle className="text-xl">{content.heading}</SheetTitle>
                             <SheetDescription className="leading-6">
                                 {intent.title} · {intent.summary}

@@ -31,8 +31,8 @@ export function LiffAppShell({ children }: LiffAppShellProps): ReactElement {
     const pathname = usePathname();
 
     return (
-        <div className="min-h-svh overflow-x-hidden bg-surface-subtle text-content-body">
-            <div className="mx-auto flex min-h-svh w-full max-w-lg flex-col bg-surface">
+        <div className="min-h-screen supports-[height:100dvh]:min-h-[100dvh] overflow-x-hidden supports-[overflow:clip]:overflow-x-clip bg-surface-subtle text-content-body">
+            <div className="mx-auto flex min-h-screen supports-[height:100dvh]:min-h-[100dvh] w-full max-w-lg flex-col bg-surface">
                 <LiffHeader sectionLabel={getSectionLabel(pathname)} />
                 <div className="min-w-0 flex-1">{children}</div>
                 <LiffBottomNav pathname={pathname} />
