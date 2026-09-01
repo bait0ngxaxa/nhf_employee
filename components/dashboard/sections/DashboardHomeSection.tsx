@@ -7,6 +7,7 @@ import {
     useDashboardUIContext,
     useDashboardDataContext,
 } from "@/components/dashboard/context/dashboard/DashboardContext";
+import { LineAddFriendCard } from "@/components/dashboard/line/LineAddFriendCard";
 
 const MENU_ITEM_CONFIG: Record<
     string,
@@ -336,6 +337,8 @@ export function DashboardHomeSection() {
                         </div>
                     </div>
                 </div>
+
+                <LineAddFriendCard />
 
                 <div className="pt-4">
                     {allMenuItems.length === 0 && (

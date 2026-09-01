@@ -77,6 +77,19 @@ export function DashboardHomeSkeleton(): ReactElement {
                     </div>
                 </div>
 
+                <div className="min-h-[204px] rounded-2xl border border-status-success-border bg-surface-raised p-4 sm:rounded-3xl sm:p-5 md:min-h-[164px] md:p-6">
+                    <div className="flex flex-col gap-5 md:flex-row md:items-center md:gap-6">
+                        <div className="flex min-w-0 flex-1 items-start gap-3 sm:gap-4">
+                            <Skeleton className="size-11 shrink-0 rounded-2xl sm:size-12" />
+                            <div className="min-w-0 flex-1 space-y-3">
+                                <Skeleton className="h-7 w-72 max-w-full" />
+                                <Skeleton className="h-12 w-full max-w-2xl" />
+                            </div>
+                        </div>
+                        <Skeleton className="hidden size-40 shrink-0 rounded-xl md:block" />
+                    </div>
+                </div>
+
                 <div>
                     <Skeleton className="mb-6 h-7 w-40" />
                     <div className="grid grid-cols-1 gap-4 md:gap-6 lg:grid-cols-2">
