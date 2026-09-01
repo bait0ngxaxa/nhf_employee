@@ -9,13 +9,11 @@ describe("LineAddFriendCard", () => {
 
         expect(
             screen.getByRole("heading", {
-                name: "เพิ่ม NHF เป็นเพื่อนใน LINE",
+                name: "เพิ่ม NHF ใน LINE",
             }),
         ).toBeInTheDocument();
         expect(
-            screen.getByText(
-                "รับการแจ้งเตือนและเข้าใช้งานบริการ NHF ผ่าน LINE ได้สะดวกยิ่งขึ้น",
-            ),
+            screen.getByText("รับการแจ้งเตือนจาก NHF ได้สะดวกขึ้น"),
         ).toBeInTheDocument();
 
         const qrImages = screen.getAllByAltText(
@@ -24,7 +22,7 @@ describe("LineAddFriendCard", () => {
         expect(qrImages.length).toBeGreaterThan(0);
         expect(qrImages[0]).toHaveAttribute("src", expect.stringContaining("950gaxzt"));
         expect(
-            screen.getAllByText("สแกน QR Code เพื่อเพิ่มเพื่อน").length,
+            screen.getAllByText("สแกนเพื่อเพิ่มเพื่อน").length,
         ).toBeGreaterThan(0);
     });
 

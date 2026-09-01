@@ -62,43 +62,50 @@ export function DashboardHomeSkeleton(): ReactElement {
             aria-busy="true"
             aria-label="กำลังโหลดหน้าหลักแดชบอร์ด"
         >
-            <div className="mx-auto max-w-7xl space-y-10">
-                <div className="min-h-[220px] rounded-2xl border border-border-subtle bg-surface-raised p-5 sm:rounded-3xl md:p-8">
-                    <div className="flex h-full min-h-[156px] flex-col justify-between gap-6 md:flex-row md:items-center">
+            <div className="mx-auto max-w-7xl space-y-6">
+                <div className="relative min-h-[220px] rounded-2xl border border-dashboard-hero-border bg-dashboard-hero-surface p-5 sm:rounded-3xl md:p-8 @container">
+                    <div className="grid min-h-[156px] gap-6 @3xl:grid-cols-[minmax(0,1fr)_minmax(18rem,22rem)] @3xl:items-center">
                         <div className="max-w-2xl space-y-4">
                             <Skeleton className="h-7 w-20 rounded-full" />
                             <Skeleton className="h-11 w-[32rem] max-w-full" />
                             <Skeleton className="h-5 w-64 max-w-full" />
                         </div>
-                        <div className="flex flex-wrap gap-3">
-                            <Skeleton className="h-9 w-28 rounded-xl" />
-                            <Skeleton className="h-9 w-36 rounded-xl" />
-                        </div>
-                    </div>
-                </div>
-
-                <div className="min-h-[204px] rounded-2xl border border-status-success-border bg-surface-raised p-4 sm:rounded-3xl sm:p-5 md:min-h-[164px] md:p-6">
-                    <div className="flex flex-col gap-5 md:flex-row md:items-center md:gap-6">
-                        <div className="flex min-w-0 flex-1 items-start gap-3 sm:gap-4">
-                            <Skeleton className="size-11 shrink-0 rounded-2xl sm:size-12" />
-                            <div className="min-w-0 flex-1 space-y-3">
-                                <Skeleton className="h-7 w-72 max-w-full" />
-                                <Skeleton className="h-12 w-full max-w-2xl" />
+                        <div className="flex min-w-0 flex-col gap-3">
+                            <div className="grid min-w-0 items-center gap-3 rounded-2xl border border-content-on-brand/20 bg-content-on-brand/10 p-3 sm:gap-4 sm:p-4 md:grid-cols-[minmax(0,1fr)_auto] @container">
+                                <div className="flex min-w-0 items-start gap-3 sm:gap-4">
+                                    <Skeleton className="size-9 shrink-0 rounded-xl sm:size-10" />
+                                    <div className="min-w-0 flex-1 space-y-2">
+                                        <Skeleton className="h-6 w-48 max-w-full" />
+                                        <Skeleton className="h-10 w-full max-w-[16rem]" />
+                                    </div>
+                                </div>
+                                <div className="hidden min-w-0 flex-col items-center gap-2 md:flex @sm:flex-row @sm:items-center">
+                                    <Skeleton className="size-28 shrink-0 rounded-xl" />
+                                    <Skeleton className="h-4 w-24 max-w-full" />
+                                </div>
+                                <Skeleton className="h-10 w-full rounded-xl md:hidden" />
+                            </div>
+                            <div className="flex flex-wrap gap-3 @3xl:justify-end">
+                                <Skeleton className="h-9 w-28 rounded-xl" />
+                                <Skeleton className="h-9 w-36 rounded-xl" />
                             </div>
                         </div>
-                        <Skeleton className="hidden size-40 shrink-0 rounded-xl md:block" />
                     </div>
                 </div>
 
-                <div>
-                    <Skeleton className="mb-6 h-7 w-40" />
-                    <div className="grid grid-cols-1 gap-4 md:gap-6 lg:grid-cols-2">
-                        {Array.from({ length: 2 }).map((_, index) => (
-                            <Skeleton
-                                key={index}
-                                className="min-h-[196px] rounded-2xl sm:rounded-3xl"
-                            />
-                        ))}
+                <div className="pt-4">
+                    <div className="mb-10">
+                        <Skeleton className="mb-6 h-7 w-40" />
+                        <div className="@container">
+                            <div className="grid grid-cols-1 gap-4 @xl:grid-cols-2 @min-[54rem]:grid-cols-3 md:gap-6">
+                                {Array.from({ length: 3 }).map((_, index) => (
+                                    <Skeleton
+                                        key={index}
+                                        className="min-h-[293px] rounded-2xl sm:rounded-3xl @min-[72rem]:min-h-[210px]"
+                                    />
+                                ))}
+                            </div>
+                        </div>
                     </div>
                 </div>
 

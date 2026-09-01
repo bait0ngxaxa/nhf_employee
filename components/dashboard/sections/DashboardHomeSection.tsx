@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { ArrowUpRight } from "lucide-react";
+import { Fragment, useEffect, useState } from "react";
+import { ArrowUpRight, HeartPulse } from "lucide-react";
 import { cn } from "@/lib/ui/utils";
 import {
     useDashboardUIContext,
@@ -129,8 +129,8 @@ function FeaturedCard({ item, onClick, animationDelay }: FeaturedCardProps) {
             onClick={onClick}
             style={{ animationDelay }}
             className={cn(
-                "dashboard-card-enter group relative flex w-full min-w-0 flex-col items-start gap-5 overflow-hidden rounded-2xl text-left text-content-on-brand sm:flex-row sm:items-center sm:rounded-3xl",
-                "min-h-[196px] border p-5 shadow-lg transition-[border-color,box-shadow,transform] duration-200 hover:-translate-y-0.5 hover:shadow-xl active:translate-y-0 md:p-7",
+                "dashboard-card-enter group relative flex w-full min-w-0 flex-col items-start gap-5 overflow-hidden rounded-2xl text-left text-content-on-brand @min-[72rem]:gap-3 @min-[72rem]:flex-row @min-[72rem]:items-center @min-[72rem]:rounded-3xl",
+                "min-h-[196px] border p-5 shadow-lg transition-[border-color,box-shadow,transform] duration-200 hover:-translate-y-0.5 hover:shadow-xl active:translate-y-0",
                 "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2",
                 config.featuredSurface,
                 config.featuredBorder,
@@ -149,11 +149,11 @@ function FeaturedCard({ item, onClick, animationDelay }: FeaturedCardProps) {
 
             <div
                 className={cn(
-                    "relative z-10 flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl border border-content-on-brand/25 bg-content-on-brand/15 text-content-on-brand ring-1 ring-content-on-brand/10 transition-colors duration-200 sm:h-20 sm:w-20",
+                    "relative z-10 flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl border border-content-on-brand/25 bg-content-on-brand/15 text-content-on-brand ring-1 ring-content-on-brand/10 transition-colors duration-200 @min-[72rem]:h-14 @min-[72rem]:w-14",
                     config.featuredIconHover,
                 )}
             >
-                <IconComponent className="h-8 w-8 sm:h-10 sm:w-10" aria-hidden="true" />
+                <IconComponent className="h-8 w-8 @min-[72rem]:h-7 @min-[72rem]:w-7" aria-hidden="true" />
             </div>
 
             <div className="relative z-10 min-w-0 flex-1">
@@ -168,12 +168,12 @@ function FeaturedCard({ item, onClick, animationDelay }: FeaturedCardProps) {
                         Quick action
                     </span>
                 </div>
-                <h3 className="line-clamp-2 text-2xl font-bold leading-tight text-content-on-brand [overflow-wrap:anywhere] sm:text-3xl md:text-4xl">
+                <h3 className="line-clamp-2 text-2xl font-bold leading-tight text-content-on-brand [overflow-wrap:anywhere] @min-[72rem]:min-h-[4.6875rem] @min-[72rem]:text-3xl">
                     {item.label}
                 </h3>
                 <p
                     className={cn(
-                        "mt-2 line-clamp-2 max-w-[58ch] text-sm font-medium leading-6 [overflow-wrap:anywhere]",
+                        "mt-2 min-h-6 line-clamp-2 max-w-[58ch] text-sm font-medium leading-6 [overflow-wrap:anywhere] @min-[72rem]:min-h-12",
                         config.featuredDescription,
                     )}
                 >
@@ -184,7 +184,7 @@ function FeaturedCard({ item, onClick, animationDelay }: FeaturedCardProps) {
 
             <div
                 className={cn(
-                    "relative z-10 flex h-12 w-12 shrink-0 items-center justify-center self-end rounded-2xl border border-content-on-brand/25 shadow-sm transition-[background-color,transform] duration-200 group-hover:-translate-y-0.5 group-hover:translate-x-0.5 sm:self-auto",
+                    "relative z-10 flex h-12 w-12 shrink-0 items-center justify-center self-end rounded-2xl border border-content-on-brand/25 shadow-sm transition-[background-color,transform] duration-200 group-hover:-translate-y-0.5 group-hover:translate-x-0.5 @min-[72rem]:self-auto @min-[72rem]:h-10 @min-[72rem]:w-10",
                     config.featuredControlSurface,
                     config.icon,
                     config.featuredArrowHover,
@@ -291,6 +291,14 @@ export function DashboardHomeSection() {
         (item) => MENU_ITEM_CONFIG[item.id]?.featured !== true,
     );
     const userName = getDisplayText(user?.name, "ผู้ใช้งาน");
+    const userNameParts = userName.split(/\s+/).filter(Boolean);
+    const lastNamePart = userNameParts[userNameParts.length - 1];
+    const hasNickname =
+        userNameParts.length > 1 && /^\(.+\)$/.test(lastNamePart ?? "");
+    const primaryName = hasNickname
+        ? userNameParts.slice(0, -1).join(" ")
+        : userName;
+    const nickname = hasNickname ? lastNamePart : undefined;
     const userRole = getDisplayText(user?.role, "พนักงาน");
     const userDepartment = getDisplayText(user?.department, "ฝ่ายทั่วไป");
 
@@ -298,8 +306,16 @@ export function DashboardHomeSection() {
         <div className="relative min-h-[calc(100dvh-6rem)] rounded-2xl border border-border-subtle/70 bg-surface-subtle p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:rounded-3xl md:p-8 md:pb-[calc(2rem+env(safe-area-inset-bottom))]">
             <div className="relative z-10 mx-auto max-w-7xl space-y-6">
                 <div>
-                    <div className="relative min-w-0 overflow-hidden rounded-2xl border border-dashboard-hero-border bg-dashboard-hero-surface p-5 text-content-on-brand shadow-lg shadow-dashboard-hero-shadow/15 sm:rounded-3xl md:p-8">
-                        <div className="flex flex-col justify-between gap-6 md:flex-row md:items-center">
+                    <div className="relative isolate min-w-0 overflow-hidden rounded-2xl border border-dashboard-hero-border bg-dashboard-hero-surface p-5 text-content-on-brand shadow-lg shadow-dashboard-hero-shadow/15 sm:rounded-3xl md:p-8 @container">
+                        <div
+                            className="pointer-events-none absolute inset-0 z-0"
+                            aria-hidden="true"
+                        >
+                            <div className="brand-sheen-subtle absolute inset-0 opacity-60" />
+                            <div className="absolute -left-20 -top-24 size-64 rounded-full border border-content-on-brand/10" />
+                            <HeartPulse className="absolute bottom-[-5rem] left-[34%] hidden size-80 rotate-[-10deg] text-content-on-brand/5 stroke-[1.25] sm:block" />
+                        </div>
+                        <div className="grid gap-6 @3xl:grid-cols-[minmax(0,1fr)_minmax(18rem,22rem)] @3xl:items-center">
                             <div className="relative z-10 min-w-0 max-w-2xl space-y-4">
                                 <div className="flex flex-wrap items-center gap-2">
                                     <div className="rounded-full border border-content-on-brand/20 bg-dashboard-featured-control-surface px-3 py-1 text-xs font-bold text-dashboard-hero-badge-foreground shadow-sm">
@@ -311,12 +327,22 @@ export function DashboardHomeSection() {
                                     <h1
                                         data-page-heading
                                         tabIndex={-1}
-                                        className="text-3xl font-bold leading-tight text-content-on-brand sm:text-4xl md:text-5xl [overflow-wrap:anywhere]"
+                                        className="text-3xl font-bold leading-tight text-content-on-brand sm:text-4xl md:text-5xl"
                                     >
-                                        {greeting},{" "}
-                                        <span className="text-dashboard-hero-muted [overflow-wrap:anywhere]">
-                                            {userName}
+                                        <span className="inline-block whitespace-nowrap">
+                                            {greeting},
+                                        </span>{" "}
+                                        <span className="inline-block max-w-full whitespace-nowrap text-dashboard-hero-muted">
+                                            {primaryName}
                                         </span>
+                                        {nickname ? (
+                                            <Fragment>
+                                                {" "}
+                                                <span className="inline-block whitespace-nowrap text-dashboard-hero-muted">
+                                                    {nickname}
+                                                </span>
+                                            </Fragment>
+                                        ) : null}
                                     </h1>
                                     <p className="max-w-[64ch] text-sm font-medium leading-6 text-dashboard-hero-muted/90">
                                         National Health Foundation 
@@ -324,21 +350,22 @@ export function DashboardHomeSection() {
                                 </div>
                             </div>
 
-                            <div className="relative z-10 flex min-w-0 flex-wrap gap-3 md:justify-end">
-                                <div className="flex min-w-0 max-w-full items-center gap-2.5 rounded-xl border border-content-on-brand/20 bg-content-on-brand/15 px-3 py-2 text-xs font-bold text-content-on-brand shadow-sm sm:px-4">
-                                    <div className="h-2 w-2 shrink-0 rounded-full bg-content-on-brand" />
-                                    <span className="min-w-0 truncate">{userRole}</span>
-                                </div>
-                                <div className="flex min-w-0 max-w-full items-center gap-2.5 rounded-xl border border-content-on-brand/20 bg-content-on-brand/15 px-3 py-2 text-xs font-bold text-content-on-brand shadow-sm sm:px-4">
-                                    <div className="h-2 w-2 shrink-0 rounded-full bg-dashboard-hero-dot" />
-                                    <span className="min-w-0 truncate">{userDepartment}</span>
+                            <div className="relative z-10 flex min-w-0 flex-col gap-3 @3xl:items-end">
+                                <LineAddFriendCard />
+                                <div className="flex min-w-0 flex-wrap gap-3 @3xl:justify-end">
+                                    <div className="flex min-w-0 max-w-full items-center gap-2.5 rounded-xl border border-content-on-brand/20 bg-content-on-brand/15 px-3 py-2 text-xs font-bold text-content-on-brand shadow-sm sm:px-4">
+                                        <div className="h-2 w-2 shrink-0 rounded-full bg-content-on-brand" />
+                                        <span className="min-w-0 truncate">{userRole}</span>
+                                    </div>
+                                    <div className="flex min-w-0 max-w-full items-center gap-2.5 rounded-xl border border-content-on-brand/20 bg-content-on-brand/15 px-3 py-2 text-xs font-bold text-content-on-brand shadow-sm sm:px-4">
+                                        <div className="h-2 w-2 shrink-0 rounded-full bg-dashboard-hero-dot" />
+                                        <span className="min-w-0 truncate">{userDepartment}</span>
+                                    </div>
                                 </div>
                             </div>
                         </div>
                     </div>
                 </div>
-
-                <LineAddFriendCard />
 
                 <div className="pt-4">
                     {allMenuItems.length === 0 && (
@@ -353,15 +380,17 @@ export function DashboardHomeSection() {
                                 <span className="inline-block h-6 w-1.5 rounded-full bg-module-stock-dashboard-accent" />
                                 Recommended
                             </h2>
-                            <div className="grid grid-cols-1 gap-4 md:gap-6 lg:grid-cols-2">
-                                {featuredItems.map((item, i) => (
-                                    <FeaturedCard
-                                        key={item.id}
-                                        item={item}
-                                        onClick={() => handleMenuClick(item.id)}
-                                        animationDelay={`${200 + i * 50}ms`}
-                                    />
-                                ))}
+                            <div className="@container">
+                                <div className="grid grid-cols-1 gap-4 @xl:grid-cols-2 @min-[54rem]:grid-cols-3 md:gap-6">
+                                    {featuredItems.map((item, i) => (
+                                        <FeaturedCard
+                                            key={item.id}
+                                            item={item}
+                                            onClick={() => handleMenuClick(item.id)}
+                                            animationDelay={`${200 + i * 50}ms`}
+                                        />
+                                    ))}
+                                </div>
                             </div>
                         </div>
                     )}
