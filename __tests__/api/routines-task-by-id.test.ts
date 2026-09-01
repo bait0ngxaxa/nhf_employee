@@ -103,6 +103,34 @@ describe("DELETE /api/routines/tasks/:id", () => {
         );
     });
 
+    it("passes a direct PATCH carrying lifecycle input to the backend service", async () => {
+        mocks.requireActiveWorkforceOrAdminSession.mockResolvedValue({
+            ok: true,
+            user: { id: 5, email: "user@example.com", role: "USER" },
+            employeeId: 21,
+        });
+
+        const response = await PATCH(
+            new NextRequest("http://localhost/api/routines/tasks/71", {
+                method: "PATCH",
+                headers: { "content-type": "application/json" },
+                body: JSON.stringify({
+                    version: 3,
+                    title: "แก้ไขได้",
+                    isActive: false,
+                }),
+            }),
+            { params: Promise.resolve({ id: "71" }) },
+        );
+
+        expect(response.status).toBe(200);
+        expect(mocks.updateTask).toHaveBeenCalledWith(
+            71,
+            { version: 3, title: "แก้ไขได้", isActive: false },
+            expect.objectContaining({ id: 5, role: "USER" }),
+        );
+    });
+
     it("returns the service denial for an unrelated employee instead of trusting UI capabilities", async () => {
         mocks.requireActiveWorkforceOrAdminSession.mockResolvedValue({
             ok: true,

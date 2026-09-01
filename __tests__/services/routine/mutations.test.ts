@@ -132,6 +132,25 @@ function routineTaskForMutation(createdById: number): Record<string, unknown> {
     };
 }
 
+function prepareTaskUpdateMocks(
+    current: Record<string, unknown>,
+    updated: Record<string, unknown>,
+    role: "USER" | "ADMIN",
+): void {
+    prismaMock.user.findUnique.mockResolvedValue(
+        asNever(activeUser(role, role === "ADMIN" ? 99 : 11)),
+    );
+    prismaMock.routineUnit.findFirst.mockResolvedValue(asNever({ id: 1 }));
+    prismaMock.routineCategory.findFirst.mockResolvedValue(asNever({ id: 1 }));
+    if (role === "ADMIN") {
+        prismaMock.routineTask.findUnique.mockResolvedValue(asNever(current));
+    } else {
+        prismaMock.routineTask.findFirst.mockResolvedValue(asNever(current));
+    }
+    prismaMock.routineTask.updateMany.mockResolvedValue(asNever({ count: 1 }));
+    prismaMock.routineTask.findUniqueOrThrow.mockResolvedValue(asNever(updated));
+}
+
 describe("NHF Routine mutations", () => {
     beforeEach(() => {
         mockReset(prismaMock);
@@ -933,26 +952,129 @@ describe("NHF Routine mutations", () => {
         expect(prismaMock.routineTask.updateMany).not.toHaveBeenCalled();
     });
 
-    it("rejects an assigned employee's lifecycle change while allowing content edits", async () => {
+    it("ignores an assigned employee's deactivation while allowing content edits", async () => {
         const current = {
             ...routineTaskForMutation(99),
             assignees: [{ employeeId: 11, role: "OWNER" }],
         };
-        prismaMock.user.findUnique.mockResolvedValue(
-            asNever(activeUser("USER", 11)),
-        );
-        prismaMock.routineUnit.findFirst.mockResolvedValue(asNever({ id: 1 }));
-        prismaMock.routineCategory.findFirst.mockResolvedValue(asNever({ id: 1 }));
-        prismaMock.routineTask.findFirst.mockResolvedValue(asNever(current));
+        const updated = { ...current, version: 2, title: "แก้ไขได้" };
+        prepareTaskUpdateMocks(current, updated, "USER");
 
-        await expect(
-            updateRoutineTask(
-                71,
-                { version: 1, isActive: false },
-                actor(3, "USER"),
-            ),
-        ).rejects.toMatchObject({ code: "FORBIDDEN", statusCode: 403 });
-        expect(prismaMock.routineTask.updateMany).not.toHaveBeenCalled();
+        await updateRoutineTask(
+            71,
+            { version: 1, title: "แก้ไขได้", isActive: false },
+            actor(3, "USER"),
+        );
+
+        expect(prismaMock.routineTask.updateMany).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: {
+                    id: 71,
+                    version: 1,
+                    OR: [
+                        { createdById: 3 },
+                        { assignees: { some: { employeeId: 11 } } },
+                    ],
+                },
+                data: expect.objectContaining({ title: "แก้ไขได้" }),
+            }),
+        );
+        expect(
+            prismaMock.routineTask.updateMany.mock.calls[0]?.[0]?.data,
+        ).toMatchObject({ isActive: undefined });
+        expect(prismaMock.routineOccurrence.updateMany).not.toHaveBeenCalled();
+        const auditData = prismaMock.auditLog.create.mock.calls[0]?.[0]?.data;
+        expect(JSON.parse(String(auditData?.details))).toMatchObject({
+            isActiveChanged: false,
+        });
+    });
+
+    it("ignores an assigned employee's activation when the task is inactive", async () => {
+        const current = {
+            ...routineTaskForMutation(99),
+            isActive: false,
+            assignees: [{ employeeId: 11, role: "OWNER" }],
+        };
+        const updated = { ...current, version: 2, title: "แก้ไขได้" };
+        prepareTaskUpdateMocks(current, updated, "USER");
+
+        await updateRoutineTask(
+            71,
+            { version: 1, title: "แก้ไขได้", isActive: true },
+            actor(3, "USER"),
+        );
+
+        expect(
+            prismaMock.routineTask.updateMany.mock.calls[0]?.[0]?.data,
+        ).toMatchObject({ isActive: undefined });
+        expect(prismaMock.routineOccurrence.updateMany).not.toHaveBeenCalled();
+        const auditData = prismaMock.auditLog.create.mock.calls[0]?.[0]?.data;
+        expect(JSON.parse(String(auditData?.details))).toMatchObject({
+            isActiveChanged: false,
+        });
+    });
+
+    it("allows a non-admin creator to deactivate their task", async () => {
+        const current = {
+            ...routineTaskForMutation(3),
+            assignees: [{ employeeId: 11, role: "OWNER" }],
+        };
+        const updated = { ...current, version: 2, isActive: false };
+        prepareTaskUpdateMocks(current, updated, "USER");
+
+        await updateRoutineTask(
+            71,
+            { version: 1, isActive: false },
+            actor(3, "USER"),
+        );
+
+        expect(
+            prismaMock.routineTask.updateMany.mock.calls[0]?.[0]?.data,
+        ).toMatchObject({ isActive: false });
+        expect(prismaMock.routineOccurrence.updateMany).toHaveBeenCalledWith({
+            where: { taskId: 71 },
+            data: { reminderVersion: { increment: 1 } },
+        });
+    });
+
+    it("allows a non-admin creator to reactivate their task", async () => {
+        const current = {
+            ...routineTaskForMutation(3),
+            isActive: false,
+            assignees: [{ employeeId: 11, role: "OWNER" }],
+        };
+        const updated = { ...current, version: 2, isActive: true };
+        prepareTaskUpdateMocks(current, updated, "USER");
+
+        await updateRoutineTask(
+            71,
+            { version: 1, isActive: true },
+            actor(3, "USER"),
+        );
+
+        expect(
+            prismaMock.routineTask.updateMany.mock.calls[0]?.[0]?.data,
+        ).toMatchObject({ isActive: true });
+        expect(prismaMock.routineOccurrence.updateMany).toHaveBeenCalledWith({
+            where: { taskId: 71 },
+            data: { reminderVersion: { increment: 1 } },
+        });
+    });
+
+    it("allows an admin to change task lifecycle", async () => {
+        const current = routineTaskForMutation(99);
+        const updated = { ...current, version: 2, isActive: false };
+        prepareTaskUpdateMocks(current, updated, "ADMIN");
+
+        await updateRoutineTask(
+            71,
+            { version: 1, isActive: false },
+            actor(99, "ADMIN"),
+        );
+
+        expect(
+            prismaMock.routineTask.updateMany.mock.calls[0]?.[0]?.data,
+        ).toMatchObject({ isActive: false });
     });
 
     it("returns a conflict when an assigned employee submits a stale task version", async () => {

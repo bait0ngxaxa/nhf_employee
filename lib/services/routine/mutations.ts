@@ -42,7 +42,6 @@ import {
 } from "./idempotency";
 import {
     RoutineConflictError,
-    RoutineForbiddenError,
     RoutineNotFoundError,
     RoutineValidationError,
 } from "./errors";
@@ -172,6 +171,7 @@ function normalizeRoutineTaskCreateInput(
 function normalizeRoutineTaskUpdateInput(
     input: RoutineTaskUpdateInput,
     authorization: RoutineActorAuthorization,
+    options: { canChangeLifecycle: boolean },
 ): RoutineTaskUpdateInput {
     if (authorization.isAdmin) return input;
 
@@ -181,6 +181,7 @@ function normalizeRoutineTaskUpdateInput(
         sourceFileName: undefined,
         sourceSheet: undefined,
         sourceRow: undefined,
+        isActive: options.canChangeLifecycle ? input.isActive : undefined,
         reminderRules: canonicalizeReminderRules(input.reminderRules, authorization),
     };
 }
@@ -628,7 +629,6 @@ export async function updateRoutineTask(
 ): Promise<Prisma.RoutineTaskGetPayload<{ include: typeof ROUTINE_TASK_INCLUDE }>> {
     return runSerializableTransaction(async (tx) => {
         const authorization = await assertActiveRoutineActorInTransaction(tx, actor);
-        const normalizedInput = normalizeRoutineTaskUpdateInput(input, authorization);
         const taskScope = buildRoutineTaskEditScope(actor.id, authorization);
         const current = authorization.isAdmin
             ? await tx.routineTask.findUnique({
@@ -641,12 +641,16 @@ export async function updateRoutineTask(
               });
         if (!current) throw new RoutineNotFoundError();
 
+        const canChangeLifecycle =
+            authorization.isAdmin || current.createdById === actor.id;
+        const normalizedInput = normalizeRoutineTaskUpdateInput(
+            input,
+            authorization,
+            { canChangeLifecycle },
+        );
         const isActiveChanged =
             normalizedInput.isActive !== undefined
             && normalizedInput.isActive !== current.isActive;
-        if (isActiveChanged && !authorization.isAdmin && current.createdById !== actor.id) {
-            throw new RoutineForbiddenError("คุณไม่มีสิทธิ์เปลี่ยนสถานะแม่แบบงานนี้");
-        }
 
         const nextScheduleType = (normalizedInput.scheduleType
             ?? current.scheduleType) as RoutineScheduleType;
