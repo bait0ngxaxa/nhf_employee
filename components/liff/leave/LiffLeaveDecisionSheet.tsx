@@ -9,6 +9,7 @@ import {
     SheetContent,
     SheetDescription,
     SheetHeader,
+    SheetScrollArea,
     SheetTitle,
 } from "@/components/ui/sheet";
 import { Textarea } from "@/components/ui/textarea";
@@ -150,19 +151,19 @@ export function LiffLeaveDecisionSheet({
         >
             <SheetContent
                 side="bottom"
-                scrollMode="content"
+                scrollMode="area"
                 closeButtonLabel="ปิดการยืนยันดำเนินการคำขอลา"
-                className="scroll-pb-28 rounded-t-xl border-0 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:left-1/2 sm:max-w-lg sm:-translate-x-1/2"
+                className="gap-0 rounded-t-xl border-0 p-0 sm:left-1/2 sm:max-w-lg sm:-translate-x-1/2"
             >
                 {intent && content ? (
                     <>
-                        <SheetHeader className="sticky top-0 z-20 border-b border-border-subtle bg-surface px-4 py-4 pr-12 text-left">
+                        <SheetHeader className="shrink-0 border-b border-border-subtle bg-surface px-4 py-4 pr-12 text-left">
                             <SheetTitle className="text-xl">{content.heading}</SheetTitle>
                             <SheetDescription className="leading-6">
                                 {intent.title} · {intent.summary}
                             </SheetDescription>
                         </SheetHeader>
-                        <div className="space-y-4 px-4">
+                        <SheetScrollArea className="space-y-4 px-4 py-4 scroll-pb-4">
                             <div className="rounded-xl border border-border-subtle bg-surface-subtle px-3 py-3 text-sm leading-6 text-content-body">
                                 {content.consequence}
                             </div>
@@ -203,7 +204,9 @@ export function LiffLeaveDecisionSheet({
                                     {error}
                                 </p>
                             ) : null}
-                            <div className="grid grid-cols-2 gap-2 pt-1">
+                        </SheetScrollArea>
+                        <div className="shrink-0 border-t border-border-subtle bg-surface px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-3">
+                            <div className="grid grid-cols-2 gap-2">
                                 <Button
                                     type="button"
                                     variant="outline"

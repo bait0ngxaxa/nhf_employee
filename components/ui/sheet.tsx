@@ -55,7 +55,7 @@ function SheetContent({
   children,
   side = "right",
   closeButtonLabel = "Close",
-  scrollMode = "content",
+  scrollMode = "area",
   ...props
 }: SheetContentProps): React.ReactElement {
   return (
@@ -82,7 +82,7 @@ function SheetContent({
         {...props}
       >
         {children}
-        <SheetPrimitive.Close className="ring-offset-background focus:ring-ring absolute right-[calc(0.75rem+env(safe-area-inset-right))] top-[calc(0.75rem+env(safe-area-inset-top))] flex size-11 items-center justify-center rounded-md opacity-70 transition-opacity hover:bg-secondary hover:opacity-100 focus:ring-2 focus:ring-offset-2 focus:outline-hidden disabled:pointer-events-none">
+        <SheetPrimitive.Close data-slot="sheet-close" className="ring-offset-background focus:ring-ring absolute top-[calc(0.75rem+env(safe-area-inset-top))] right-[calc(0.75rem+env(safe-area-inset-right))] z-30 flex size-11 items-center justify-center rounded-md opacity-70 transition-opacity hover:bg-secondary hover:opacity-100 focus:ring-2 focus:ring-offset-2 focus:outline-hidden disabled:pointer-events-none">
           <XIcon className="size-4" />
           <span className="sr-only">{closeButtonLabel}</span>
         </SheetPrimitive.Close>

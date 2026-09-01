@@ -62,7 +62,7 @@ export function AdminRecoveryReasonDialog({
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent>
+            <DialogContent scrollMode="content">
                 <DialogHeader>
                     <DialogTitle>{copy.title}</DialogTitle>
                     <DialogDescription>{copy.description}</DialogDescription>

@@ -99,7 +99,7 @@ export function AdjustDialog({ item, onClose, onSuccess }: AdjustDialogProps) {
 
     return (
         <Dialog open onOpenChange={() => closeWhenIdle(loading, onClose)}>
-            <DialogContent className="overflow-hidden p-0 sm:max-w-[400px]">
+            <DialogContent scrollMode="area" className="overflow-hidden p-0 sm:max-w-[400px]">
                 <div className="border-b border-border-neutral-muted bg-surface-subtle/50 px-5 py-4 sm:px-6">
                     <DialogTitle className="text-lg font-semibold text-content-strong">
                         {STOCK_ADMIN_TEXT.adjustStockTitle}
@@ -225,7 +225,7 @@ export function AddCategoryDialog({
 
     return (
         <Dialog open={open} onOpenChange={() => closeWhenIdle(loading, onClose)}>
-            <DialogContent className="overflow-hidden p-0 sm:max-w-[400px]">
+            <DialogContent scrollMode="area" className="overflow-hidden p-0 sm:max-w-[400px]">
                 <div className="border-b border-border-neutral-muted bg-surface-subtle/50 px-5 py-4 sm:px-6">
                     <DialogTitle className="text-lg font-semibold text-content-strong">
                         {STOCK_ADMIN_TEXT.addCategoryTitle}

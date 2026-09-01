@@ -194,7 +194,7 @@ export function StockBrowseCartPanel({
                     }
                 }}
             >
-                <DialogContent className="sm:max-w-md">
+                <DialogContent scrollMode="content" className="sm:max-w-md">
                     <DialogHeader>
                         <DialogTitle className="text-status-danger-strong">
                             ยืนยันการยกเลิกรายการทั้งหมด

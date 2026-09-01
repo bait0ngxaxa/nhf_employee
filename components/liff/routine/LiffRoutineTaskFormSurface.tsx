@@ -9,6 +9,7 @@ import {
     SheetContent,
     SheetDescription,
     SheetHeader,
+    SheetScrollArea,
     SheetTitle,
 } from "@/components/ui/sheet";
 import type {
@@ -78,12 +79,12 @@ export function LiffRoutineTaskFormSurface({
         >
             <SheetContent
                 side="bottom"
-                scrollMode="content"
+                scrollMode="area"
                 closeButtonLabel={`ปิด${title}`}
-                className="h-screen max-h-screen supports-[height:100dvh]:h-[100dvh] supports-[height:100dvh]:max-h-[100dvh] gap-0 rounded-none border-0 p-0 scroll-pb-28 sm:left-1/2 sm:max-w-2xl sm:-translate-x-1/2"
+                className="h-screen max-h-screen supports-[height:100dvh]:h-[100dvh] supports-[height:100dvh]:max-h-[100dvh] gap-0 rounded-none border-0 p-0 sm:left-1/2 sm:max-w-2xl sm:-translate-x-1/2"
                 aria-busy={referenceLoading}
             >
-                <SheetHeader className="sticky top-0 z-20 shrink-0 border-b border-border-subtle bg-surface px-5 pb-4 pt-[calc(1rem+env(safe-area-inset-top))] pr-16 text-left sm:px-6">
+                <SheetHeader className="shrink-0 border-b border-border-subtle bg-surface px-5 pb-4 pt-[calc(1rem+env(safe-area-inset-top))] pr-16 text-left sm:px-6">
                     <SheetTitle className="text-xl font-bold tracking-tight text-content-heading">
                         {title}
                     </SheetTitle>
@@ -95,16 +96,16 @@ export function LiffRoutineTaskFormSurface({
                 </SheetHeader>
 
                 {referenceLoading ? (
-                    <div
+                    <SheetScrollArea
                         role="status"
                         aria-live="polite"
                         className="flex min-h-56 flex-1 items-center justify-center gap-2 bg-surface-subtle px-4 text-sm font-medium text-content-secondary"
                     >
                         <Loader2 className="size-5 animate-spin" aria-hidden="true" />
                         กำลังเตรียมข้อมูลสำหรับแบบฟอร์ม...
-                    </div>
+                    </SheetScrollArea>
                 ) : referenceError ? (
-                    <div className="flex flex-1 items-center justify-center bg-surface-subtle px-4 py-8">
+                    <SheetScrollArea className="flex flex-1 items-center justify-center bg-surface-subtle px-4 py-8">
                         <div
                             role="alert"
                             className="w-full max-w-md space-y-4 rounded-md border border-status-danger-border bg-status-danger-surface p-5 text-sm leading-6 text-status-danger-foreground"
@@ -123,7 +124,7 @@ export function LiffRoutineTaskFormSurface({
                                 ลองโหลดข้อมูลอีกครั้ง
                             </Button>
                         </div>
-                    </div>
+                    </SheetScrollArea>
                 ) : reference && (mode === "CREATE" || task?.canManage === true) ? (
                     <LiffRoutineTaskForm
                         key={`${mode}-${task?.id ?? "new"}`}
@@ -137,9 +138,9 @@ export function LiffRoutineTaskFormSurface({
                         onAmbiguousSubmit={onAmbiguousSubmit}
                     />
                 ) : (
-                    <div role="alert" className="flex flex-1 items-center justify-center bg-surface-subtle px-4 py-8 text-center text-sm leading-6 text-status-danger-foreground">
+                    <SheetScrollArea role="alert" className="flex flex-1 items-center justify-center bg-surface-subtle px-4 py-8 text-center text-sm leading-6 text-status-danger-foreground">
                         ไม่พบข้อมูลงาน Routine สำหรับเปิดแบบฟอร์ม
-                    </div>
+                    </SheetScrollArea>
                 )}
             </SheetContent>
         </Sheet>

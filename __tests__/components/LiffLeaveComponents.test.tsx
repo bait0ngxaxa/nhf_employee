@@ -269,10 +269,15 @@ describe("LIFF Leave mobile components", () => {
         expect(screen.getByText(
             "เปิดจากลิงก์เพื่อพิจารณา กรุณาตรวจรายละเอียดและกดยืนยันด้วยตนเอง",
         )).toBeInTheDocument();
-        expect(screen.getByRole("button", { name: "อนุมัติ" })).toBeInTheDocument();
-        expect(screen.getByRole("button", { name: "ไม่อนุมัติ" })).toBeInTheDocument();
+        const detailDialog = screen.getByRole("dialog");
+        const detailScrollArea = detailDialog.querySelector('[data-slot="sheet-scroll-area"]');
+        const approveButton = screen.getByRole("button", { name: "อนุมัติ" });
+        const rejectButton = screen.getByRole("button", { name: "ไม่อนุมัติ" });
+        expect(detailDialog.querySelectorAll('[data-slot="sheet-scroll-area"]')).toHaveLength(1);
+        expect(detailScrollArea).not.toContainElement(approveButton);
+        expect(detailScrollArea).not.toContainElement(rejectButton);
 
-        fireEvent.click(screen.getByRole("button", { name: "อนุมัติ" }));
+        fireEvent.click(approveButton);
         expect(onAction).toHaveBeenCalledWith("APPROVE", detail);
     });
 

@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { SheetScrollArea } from "@/components/ui/sheet";
 import {
     isRecoveredLiffMutation,
     LIFF_SESSION_RECOVERED_MUTATION_MESSAGE,
@@ -488,14 +489,15 @@ export const LiffRoutineTaskForm = forwardRef<
 
     return (
         <form
-            className="bg-surface-subtle"
+            className="flex min-h-0 flex-1 flex-col bg-surface-subtle"
             onSubmit={(event) => {
                 event.preventDefault();
                 void submit();
             }}
             noValidate
         >
-            <div className="mx-auto max-w-2xl space-y-5 px-4 py-5 sm:px-6">
+            <SheetScrollArea className="scroll-pb-6">
+                <div className="mx-auto max-w-2xl space-y-5 px-4 py-5 sm:px-6">
                     <section className="space-y-4">
                         <h2 className="text-base font-bold text-content-heading">ข้อมูลหลัก</h2>
                         <div className="rounded-xl border border-brand-border bg-brand-surface px-4 py-3 text-sm leading-6 text-brand-strong">
@@ -700,9 +702,10 @@ export const LiffRoutineTaskForm = forwardRef<
                             <FieldError message={fieldErrors.extraDetails} />
                         </label>
                     </section>
-            </div>
+                </div>
+            </SheetScrollArea>
 
-            <div className="sticky bottom-0 z-20 grid grid-cols-[0.8fr_1.2fr] gap-2 border-t border-border-subtle bg-surface px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 sm:px-6">
+            <div className="shrink-0 grid grid-cols-[0.8fr_1.2fr] gap-2 border-t border-border-subtle bg-surface px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 sm:px-6">
                 <Button
                     type="button"
                     variant="outline"

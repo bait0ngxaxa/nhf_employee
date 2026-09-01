@@ -42,6 +42,7 @@ export function LeaveRequestForm({ open, onSuccess, onCancel, quotas }: Props) {
             onDiscard={model.resetForm}
         >
             <AsyncFormDialogContent
+                scrollMode="area"
                 className="flex flex-col overflow-hidden rounded-xl p-0 sm:max-w-[720px]"
             >
                 <AsyncFormDialogClose

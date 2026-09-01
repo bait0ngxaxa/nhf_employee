@@ -30,7 +30,7 @@ export function CancelLeaveDialog({
 }: CancelLeaveDialogProps) {
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent>
+            <DialogContent scrollMode="content">
                 <DialogHeader>
                     <DialogTitle>
                         {requiresApproval ? "ขอยกเลิกวันลาที่อนุมัติแล้ว" : "ยืนยันการยกเลิกคำขอลา"}

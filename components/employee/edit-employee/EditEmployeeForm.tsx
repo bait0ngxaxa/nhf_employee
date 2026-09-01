@@ -45,7 +45,7 @@ export function EditEmployeeForm({
 
     return (
         <Dialog open={isOpen} onOpenChange={handleClose}>
-            <DialogContent className="max-w-md mx-auto h-[90vh] overflow-y-auto">
+            <DialogContent scrollMode="content" className="max-w-md mx-auto h-[90vh] overflow-y-auto">
                 <DialogHeader>
                     <DialogTitle className="flex items-center space-x-2">
                         <span>แก้ไขข้อมูลพนักงาน</span>

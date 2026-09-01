@@ -79,7 +79,7 @@ export function EditStatusModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent scrollMode="content" className="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle className="flex items-center space-x-2">
             <span>แก้ไขสถานะพนักงาน</span>

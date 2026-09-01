@@ -33,7 +33,7 @@ export function RejectLeaveDialog({
 }: RejectLeaveDialogProps) {
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent>
+            <DialogContent scrollMode="content">
                 <DialogHeader>
                     <DialogTitle>เหตุผลที่ไม่อนุมัติ</DialogTitle>
                     <DialogDescription>

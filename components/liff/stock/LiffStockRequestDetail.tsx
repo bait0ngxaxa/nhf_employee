@@ -10,6 +10,7 @@ import {
     Dialog,
     DialogContent,
     DialogDescription,
+    DialogScrollArea,
     DialogTitle,
 } from "@/components/ui/dialog";
 import type {
@@ -46,10 +47,10 @@ export function LiffStockRequestDetail({
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent
                 closeLabel="ปิดรายละเอียดคำขอ"
-                scrollMode="content"
-                className="bottom-0 left-0 top-auto max-h-[90vh] supports-[height:100dvh]:max-h-[90dvh] max-w-none translate-x-0 translate-y-0 gap-0 scroll-pb-28 rounded-b-none rounded-t-xl border-x-0 border-b-0 p-0 sm:left-1/2 sm:max-w-lg sm:-translate-x-1/2"
+                scrollMode="area"
+                className="bottom-0 left-0 top-auto max-h-[90vh] supports-[height:100dvh]:max-h-[90dvh] max-w-none translate-x-0 translate-y-0 gap-0 rounded-b-none rounded-t-xl border-x-0 border-b-0 p-0 sm:left-1/2 sm:max-w-lg sm:-translate-x-1/2"
             >
-                <div className="sticky top-0 z-20 border-b border-border-subtle bg-surface-subtle px-4 py-4 pr-12">
+                <div className="shrink-0 border-b border-border-subtle bg-surface-subtle px-4 py-4 pr-12">
                     <DialogTitle className="text-lg leading-7 text-content-heading">
                         {detail ? `รายละเอียดคำขอ #${detail.id}` : "รายละเอียดคำขอเบิก"}
                     </DialogTitle>
@@ -58,7 +59,7 @@ export function LiffStockRequestDetail({
                     </DialogDescription>
                 </div>
 
-                <div className="px-4 py-4">
+                <DialogScrollArea className="px-4 py-4 scroll-pb-4">
                     {loading ? (
                         <div className="flex min-h-56 items-center justify-center gap-2 text-sm font-medium text-content-secondary" role="status">
                             <Loader2 className="size-5 animate-spin" aria-hidden="true" />
@@ -149,10 +150,10 @@ export function LiffStockRequestDetail({
                             ) : null}
                         </div>
                     ) : null}
-                </div>
+                </DialogScrollArea>
 
                 {detail && detail.availableActions.length > 0 ? (
-                    <div className="sticky bottom-0 z-20 flex gap-2 border-t border-border-subtle bg-surface-raised px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-3">
+                    <div className="shrink-0 flex gap-2 border-t border-border-subtle bg-surface-raised px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-3">
                         {detail.availableActions.map((action) => (
                             <Button
                                 key={action}

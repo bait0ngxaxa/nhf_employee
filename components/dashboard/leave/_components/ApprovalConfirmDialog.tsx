@@ -26,7 +26,7 @@ export function ApprovalConfirmDialog({
 }: ApprovalConfirmDialogProps) {
     return (
         <Dialog open={Boolean(leave)} onOpenChange={onOpenChange}>
-            <DialogContent>
+            <DialogContent scrollMode="content">
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2 text-status-warning-foreground">
                         <AlertTriangle className="h-5 w-5" />

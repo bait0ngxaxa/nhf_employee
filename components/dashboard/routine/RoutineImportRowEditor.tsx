@@ -456,7 +456,7 @@ export function RoutineImportRowEditor({
 
     return (
         <Dialog open={open} onOpenChange={(nextOpen) => { if (nextOpen) onOpenChange(true); else requestClose(); }}>
-            <DialogContent className="max-h-[90dvh] max-w-4xl overflow-y-auto">
+            <DialogContent scrollMode="content" className="max-h-[90dvh] max-w-4xl overflow-y-auto">
                 <DialogHeader>
                     <DialogTitle>แก้ไขแถวที่ {row.sourceRow}</DialogTitle>
                     <DialogDescription>

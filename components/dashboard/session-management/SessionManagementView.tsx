@@ -230,7 +230,7 @@ export function SessionManagementView({
             </div>
 
             <Dialog open={Boolean(confirmAction)} onOpenChange={(open) => !open && onSetConfirmAction(null)}>
-                <DialogContent className="sm:max-w-md">
+                <DialogContent scrollMode="content" className="sm:max-w-md">
                     <DialogHeader>
                         <DialogTitle className="[overflow-wrap:anywhere]">{title}</DialogTitle>
                         <DialogDescription className="[overflow-wrap:anywhere]">{description}</DialogDescription>

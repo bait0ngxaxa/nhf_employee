@@ -10,6 +10,7 @@ import {
     SheetContent,
     SheetDescription,
     SheetHeader,
+    SheetScrollArea,
     SheetTitle,
 } from "@/components/ui/sheet";
 import { formatThaiDateTimeWithTimeWord } from "@/lib/helpers/date-helpers";
@@ -52,13 +53,13 @@ export function LiffLeaveRequestDetail({
         <Sheet open={detail !== null} onOpenChange={onOpenChange}>
             <SheetContent
                 side="bottom"
-                scrollMode="content"
+                scrollMode="area"
                 closeButtonLabel="ปิดรายละเอียดคำขอลา"
-                className="max-h-[92vh] supports-[height:100dvh]:max-h-[92dvh] gap-0 scroll-pb-28 rounded-t-xl border-0 p-0 sm:left-1/2 sm:max-w-lg sm:-translate-x-1/2"
+                className="max-h-[92vh] supports-[height:100dvh]:max-h-[92dvh] gap-0 rounded-t-xl border-0 p-0 sm:left-1/2 sm:max-w-lg sm:-translate-x-1/2"
             >
                 {detail ? (
                     <>
-                        <SheetHeader className="sticky top-0 z-20 shrink-0 border-b border-border-subtle bg-surface px-5 pb-4 pt-5 pr-16 text-left">
+                        <SheetHeader className="shrink-0 border-b border-border-subtle bg-surface px-5 pb-4 pt-5 pr-16 text-left">
                             <div className="flex flex-wrap items-center gap-2">
                                 <SheetTitle className="text-xl font-bold tracking-tight text-content-heading">
                                     {getLeaveTypeLabel(detail.leaveType)}
@@ -69,7 +70,7 @@ export function LiffLeaveRequestDetail({
                                 {formatLeaveDateRange(detail.startDate, detail.endDate)} · {getLeavePeriodLabel(detail.period)} · {formatLeaveDays(detail.durationDays)} วัน
                             </SheetDescription>
                         </SheetHeader>
-                        <div className="space-y-5 bg-surface-subtle px-4 py-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))]">
+                        <SheetScrollArea className="space-y-5 bg-surface-subtle px-4 py-5 pb-5">
                             {hasAuthorizedApproveIntent ? (
                                 <div
                                     role="status"
@@ -111,7 +112,9 @@ export function LiffLeaveRequestDetail({
                                 />
                                 <LiffLeaveAttachments attachments={detail.attachments} />
                             </section>
-                            {detail.availableActions.length > 0 ? (
+                        </SheetScrollArea>
+                        {detail.availableActions.length > 0 ? (
+                            <div className="shrink-0 border-t border-border-subtle bg-surface px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3">
                                 <section className="space-y-2" aria-label="การดำเนินการคำขอลา">
                                     {detail.availableActions.map((action) => (
                                         <ActionButton
@@ -122,8 +125,8 @@ export function LiffLeaveRequestDetail({
                                         />
                                     ))}
                                 </section>
-                            ) : null}
-                        </div>
+                            </div>
+                        ) : null}
                     </>
                 ) : null}
             </SheetContent>

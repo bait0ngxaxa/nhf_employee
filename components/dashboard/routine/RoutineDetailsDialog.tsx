@@ -169,6 +169,7 @@ export function RoutineDetailsDialog({
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent
                 closeLabel="ปิดรายละเอียด Routine"
+                scrollMode="area"
                 className="flex max-h-[calc(100dvh-1rem)] w-[calc(100%-1rem)] flex-col gap-0 overflow-hidden rounded-2xl p-0 sm:max-w-3xl"
             >
                 <DialogHeader className="shrink-0 gap-3 border-b border-border-subtle bg-surface-subtle px-5 py-5 pr-12 text-left sm:px-6">

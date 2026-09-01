@@ -51,7 +51,7 @@ function DialogContent({
     children,
     closeLabel = "Close",
     showCloseButton = true,
-    scrollMode = "content",
+    scrollMode = "area",
     ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
     closeLabel?: string;
@@ -65,10 +65,10 @@ function DialogContent({
                 data-slot="dialog-content"
                 data-scroll-owner={scrollMode}
                 className={cn(
-                    "bg-surface-raised fixed top-[50%] left-[50%] z-50 grid max-h-[calc(100vh-2rem)] supports-[height:100dvh]:max-h-[calc(100dvh-2rem)] w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-3xl border border-border-neutral p-6 shadow-xl sm:max-w-lg overscroll-contain",
+                    "bg-surface-raised fixed top-[50%] left-[50%] z-50 max-h-[calc(100vh-2rem)] supports-[height:100dvh]:max-h-[calc(100dvh-2rem)] w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-3xl border border-border-neutral p-6 shadow-xl sm:max-w-lg overscroll-contain",
                     scrollMode === "content"
-                        ? "overflow-y-auto touch-pan-y [-webkit-overflow-scrolling:touch]"
-                        : "overflow-hidden",
+                        ? "grid overflow-y-auto touch-pan-y [-webkit-overflow-scrolling:touch]"
+                        : "min-h-0 flex flex-col overflow-hidden",
                     className
                 )}
                 {...props}
@@ -77,7 +77,7 @@ function DialogContent({
                 {showCloseButton && (
                     <DialogPrimitive.Close
                         data-slot="dialog-close"
-                        className="ring-offset-background focus:ring-ring data-[state=open]:bg-accent data-[state=open]:text-muted-foreground absolute top-[calc(0.75rem+env(safe-area-inset-top))] right-[calc(0.75rem+env(safe-area-inset-right))] flex size-11 items-center justify-center rounded-md opacity-70 transition-opacity hover:bg-accent hover:opacity-100 focus:ring-2 focus:ring-offset-2 focus:outline-hidden disabled:pointer-events-none [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4"
+                        className="ring-offset-background focus:ring-ring data-[state=open]:bg-accent data-[state=open]:text-muted-foreground absolute top-[calc(0.75rem+env(safe-area-inset-top))] right-[calc(0.75rem+env(safe-area-inset-right))] z-30 flex size-11 items-center justify-center rounded-md opacity-70 transition-opacity hover:bg-accent hover:opacity-100 focus:ring-2 focus:ring-offset-2 focus:outline-hidden disabled:pointer-events-none [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4"
                     >
                         <XIcon />
                         <span className="sr-only">{closeLabel}</span>

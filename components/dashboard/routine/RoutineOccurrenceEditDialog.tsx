@@ -180,6 +180,7 @@ export function RoutineOccurrenceEditDialog({
             <DialogContent
                 closeLabel="ปิดการปรับรอบ Routine"
                 showCloseButton={!isSaving}
+                scrollMode="area"
                 className="flex max-h-[calc(100dvh-1rem)] w-[calc(100%-1rem)] flex-col gap-0 overflow-hidden rounded-2xl p-0 sm:max-w-3xl"
             >
                 <DialogHeader className="shrink-0 gap-2 border-b border-border-subtle bg-surface-subtle px-5 py-4 pr-12 text-left sm:px-6">

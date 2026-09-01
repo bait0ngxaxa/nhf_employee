@@ -105,6 +105,7 @@ export function RoutineTaskDialog({
         >
             <DialogContent
                 closeLabel="ปิดแบบฟอร์ม Routine"
+                scrollMode="area"
                 className="flex max-h-[calc(100dvh-1rem)] w-[calc(100%-1rem)] flex-col gap-0 overflow-hidden rounded-2xl p-0 sm:max-w-3xl lg:max-w-4xl"
                 onCloseAutoFocus={(event) => {
                     const focusTarget = restoreFocusElementRef.current;

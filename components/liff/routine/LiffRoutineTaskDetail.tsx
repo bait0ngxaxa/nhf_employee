@@ -9,6 +9,7 @@ import {
     SheetContent,
     SheetDescription,
     SheetHeader,
+    SheetScrollArea,
     SheetTitle,
 } from "@/components/ui/sheet";
 import { formatDate } from "@/lib/helpers/date-helpers";
@@ -130,11 +131,11 @@ export function LiffRoutineTaskDetail({
         <Sheet open={open} onOpenChange={onOpenChange}>
             <SheetContent
                 side="bottom"
-                scrollMode="content"
+                scrollMode="area"
                 closeButtonLabel="ปิดรายละเอียดงาน Routine"
-                className="h-[94vh] max-h-[94vh] supports-[height:100dvh]:h-[94dvh] supports-[height:100dvh]:max-h-[94dvh] gap-0 rounded-t-xl border-x-0 border-b-0 p-0 scroll-pb-28 sm:left-1/2 sm:max-w-2xl sm:-translate-x-1/2"
+                className="h-[94vh] max-h-[94vh] supports-[height:100dvh]:h-[94dvh] supports-[height:100dvh]:max-h-[94dvh] gap-0 rounded-t-xl border-x-0 border-b-0 p-0 sm:left-1/2 sm:max-w-2xl sm:-translate-x-1/2"
             >
-                <SheetHeader className="sticky top-0 z-20 shrink-0 border-b border-border-subtle bg-surface px-5 pb-4 pt-5 pr-16 text-left sm:px-6">
+                <SheetHeader className="shrink-0 border-b border-border-subtle bg-surface px-5 pb-4 pt-5 pr-16 text-left sm:px-6">
                     <div className="flex min-w-0 items-start gap-3">
                         <div className="min-w-0 flex-1">
                             <SheetTitle className="break-words text-xl font-bold leading-7 tracking-tight text-content-heading">
@@ -154,7 +155,7 @@ export function LiffRoutineTaskDetail({
                     </div>
                 </SheetHeader>
 
-                <div className="bg-surface-subtle px-4 py-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] sm:px-6">
+                <SheetScrollArea className="bg-surface-subtle px-4 py-5 pb-5 sm:px-6">
                     <div className="mx-auto max-w-2xl space-y-4">
                         {loading ? (
                             <div
@@ -328,10 +329,10 @@ export function LiffRoutineTaskDetail({
                             </>
                         ) : null}
                     </div>
-                </div>
+                </SheetScrollArea>
 
                 {detail?.canManage && !loading && !error ? (
-                    <div className="sticky bottom-0 z-20 shrink-0 border-t border-border-subtle bg-surface px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 sm:px-6">
+                    <div className="shrink-0 border-t border-border-subtle bg-surface px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 sm:px-6">
                         <div className="mx-auto grid max-w-2xl gap-2">
                             <Button
                                 type="button"

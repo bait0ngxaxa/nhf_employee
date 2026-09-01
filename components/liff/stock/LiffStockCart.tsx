@@ -11,6 +11,7 @@ import {
     Dialog,
     DialogContent,
     DialogDescription,
+    DialogScrollArea,
     DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -54,11 +55,11 @@ export function LiffStockCart({
         >
             <DialogContent
                 closeLabel="ปิดตะกร้า"
-                scrollMode="content"
-                className="bottom-0 left-0 top-auto max-h-[90vh] supports-[height:100dvh]:max-h-[90dvh] max-w-none translate-x-0 translate-y-0 gap-0 scroll-pb-28 rounded-b-none rounded-t-xl border-x-0 border-b-0 p-0 sm:left-1/2 sm:max-w-lg sm:-translate-x-1/2"
+                scrollMode="area"
+                className="bottom-0 left-0 top-auto max-h-[90vh] supports-[height:100dvh]:max-h-[90dvh] max-w-none translate-x-0 translate-y-0 gap-0 rounded-b-none rounded-t-xl border-x-0 border-b-0 p-0 sm:left-1/2 sm:max-w-lg sm:-translate-x-1/2"
                 aria-busy={submitting}
             >
-                <div className="sticky top-0 z-20 border-b border-border-subtle bg-module-stock-badge-surface px-4 py-4 pr-12">
+                <div className="shrink-0 border-b border-border-subtle bg-module-stock-badge-surface px-4 py-4 pr-12">
                     <DialogTitle className="flex items-center gap-2 text-lg leading-7 text-content-heading">
                         <ShoppingCart className="size-5 text-module-stock-solid" aria-hidden="true" />
                         ตะกร้าเบิกวัสดุ
@@ -68,7 +69,7 @@ export function LiffStockCart({
                     </DialogDescription>
                 </div>
 
-                <div className="space-y-4 px-4 py-4">
+                <DialogScrollArea className="space-y-4 px-4 py-4 scroll-pb-4">
                     {items.length === 0 ? (
                         <div className="py-10 text-center text-sm text-content-secondary">
                             ยังไม่มีวัสดุในตะกร้า
@@ -175,9 +176,9 @@ export function LiffStockCart({
                             ล้างตะกร้าทั้งหมด
                         </Button>
                     ) : null}
-                </div>
+                </DialogScrollArea>
 
-                <div className="sticky bottom-0 z-20 border-t border-border-subtle bg-surface-raised px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-3">
+                <div className="shrink-0 border-t border-border-subtle bg-surface-raised px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-3">
                     <Button
                         type="button"
                         onClick={onSubmit}

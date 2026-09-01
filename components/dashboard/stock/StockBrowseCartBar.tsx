@@ -70,6 +70,7 @@ export function StockBrowseCartBar(props: StockBrowseCartBarProps) {
             <Sheet open={open} onOpenChange={handleOpenChange}>
                 <SheetContent
                     side="right"
+                    scrollMode="area"
                     className="w-full border-l-0 bg-surface-raised p-0 sm:max-w-xl"
                 >
                     <SheetHeader className="sr-only">

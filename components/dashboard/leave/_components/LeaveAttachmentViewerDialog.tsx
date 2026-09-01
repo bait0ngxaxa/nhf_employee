@@ -208,6 +208,7 @@ export function LeaveAttachmentViewerDialog({
         <Dialog open={open} onOpenChange={handleOpenChange}>
             <DialogContent
                 showCloseButton={false}
+                scrollMode="area"
                 className="flex flex-col gap-4 overflow-hidden rounded-xl p-0 sm:max-w-4xl"
             >
                 <DialogHeader className="border-b border-border-subtle px-5 py-4 pr-14 text-left">

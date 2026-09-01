@@ -134,6 +134,7 @@ export function DashboardNavbar(): ReactElement {
                         </SheetTrigger>
                         <SheetContent
                             side="left"
+                            scrollMode="area"
                             closeButtonLabel="ปิดเมนู"
                             className="w-64 max-w-[calc(100vw-2rem)] gap-0 border-sidebar-border bg-sidebar p-0 data-[state=closed]:duration-200 data-[state=open]:duration-200 sm:max-w-72 lg:hidden"
                         >
@@ -277,6 +278,7 @@ export function DashboardNavbar(): ReactElement {
                 setShowLogoutDialog(true);
             }}>
                 <DialogContent
+                    scrollMode="content"
                     showCloseButton={!isLoggingOut}
                     onEscapeKeyDown={(event) => {
                         if (isLoggingOut) {

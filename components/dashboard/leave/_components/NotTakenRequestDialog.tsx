@@ -28,7 +28,7 @@ export function NotTakenRequestDialog({
 }: NotTakenRequestDialogProps) {
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent>
+            <DialogContent scrollMode="content">
                 <DialogHeader>
                     <DialogTitle>แจ้งว่าไม่ได้ใช้วันลา</DialogTitle>
                     <DialogDescription>

@@ -12,6 +12,7 @@ import {
     SheetContent,
     SheetDescription,
     SheetHeader,
+    SheetScrollArea,
     SheetTitle,
 } from "@/components/ui/sheet";
 import { useLeaveRequestFormModel } from "@/hooks/leave/useLeaveRequestFormModel";
@@ -71,11 +72,11 @@ export function LiffLeaveRequestForm({
         >
             <SheetContent
                 side="bottom"
-                scrollMode="content"
+                scrollMode="area"
                 closeButtonLabel="ปิดแบบฟอร์มยื่นคำขอลา"
-                className="h-screen max-h-screen supports-[height:100dvh]:h-[100dvh] supports-[height:100dvh]:max-h-[100dvh] gap-0 scroll-pb-28 rounded-none border-0 p-0 sm:left-1/2 sm:max-w-lg sm:-translate-x-1/2"
+                className="h-screen max-h-screen supports-[height:100dvh]:h-[100dvh] supports-[height:100dvh]:max-h-[100dvh] gap-0 rounded-none border-0 p-0 sm:left-1/2 sm:max-w-lg sm:-translate-x-1/2"
             >
-                <SheetHeader className="sticky top-0 z-20 shrink-0 border-b border-border-subtle bg-surface px-5 pb-4 pt-[calc(1rem+env(safe-area-inset-top))] pr-16 text-left">
+                <SheetHeader className="shrink-0 border-b border-border-subtle bg-surface px-5 pb-4 pt-[calc(1rem+env(safe-area-inset-top))] pr-16 text-left">
                     <SheetTitle className="text-xl font-bold tracking-tight text-content-heading">
                         ยื่นคำขอลา
                     </SheetTitle>
@@ -87,9 +88,9 @@ export function LiffLeaveRequestForm({
                 <Form {...model.form}>
                     <form
                         onSubmit={model.form.handleSubmit(model.submit)}
-                        className="bg-surface-subtle"
+                        className="flex min-h-0 flex-1 flex-col bg-surface-subtle"
                     >
-                        <div className="px-4 py-5">
+                        <SheetScrollArea className="scroll-pb-6 px-4 py-5">
                             <div className="space-y-4 rounded-2xl bg-surface p-4 shadow-sm">
                                 {model.errorMsg ? (
                                     <Alert variant="destructive" role="alert">
@@ -125,9 +126,9 @@ export function LiffLeaveRequestForm({
                                 </div>
                                 <LeaveDialogFields model={model} />
                             </div>
-                        </div>
+                        </SheetScrollArea>
 
-                        <div className="sticky bottom-0 z-20 grid grid-cols-[0.8fr_1.2fr] gap-2 border-t border-border-subtle bg-surface px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3">
+                        <div className="shrink-0 grid grid-cols-[0.8fr_1.2fr] gap-2 border-t border-border-subtle bg-surface px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3">
                             <Button
                                 type="button"
                                 variant="outline"

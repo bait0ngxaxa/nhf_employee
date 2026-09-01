@@ -453,8 +453,15 @@ describe("LiffRoutineApp", () => {
         expect(await screen.findByText("รายละเอียดฉบับเต็ม")).toBeInTheDocument();
         expect(screen.getByText("ทุกวันที่ 10 ของเดือน")).toBeInTheDocument();
         expect(screen.getByText("สัญญารายปี")).toBeInTheDocument();
-        expect(screen.getByRole("button", { name: "แก้ไขงานของฉัน" })).toBeInTheDocument();
-        expect(screen.getByRole("button", { name: "ลบงานนี้" })).toBeInTheDocument();
+        const detailDialog = screen.getByRole("dialog");
+        const detailScrollArea = detailDialog.querySelector('[data-slot="sheet-scroll-area"]');
+        const editButton = screen.getByRole("button", { name: "แก้ไขงานของฉัน" });
+        const deleteButton = screen.getByRole("button", { name: "ลบงานนี้" });
+        expect(detailDialog).toHaveAttribute("data-scroll-owner", "area");
+        expect(detailDialog.querySelectorAll('[data-slot="sheet-scroll-area"]')).toHaveLength(1);
+        expect(detailScrollArea).not.toContainElement(editButton);
+        expect(detailScrollArea).not.toContainElement(deleteButton);
+        expect(screen.getByRole("button", { name: "ปิดรายละเอียดงาน Routine" })).toHaveClass("z-30");
         expect(mocks.fetchLiffRoutineTask).toHaveBeenCalledWith(71);
     });
 
@@ -506,7 +513,8 @@ describe("LiffRoutineApp", () => {
             task: { ...DETAIL, id: 72, title: "รายละเอียดงานที่สอง" },
         });
         const detailDialog = await screen.findByRole("dialog");
-        expect(detailDialog).toHaveAttribute("data-scroll-owner", "content");
+        expect(detailDialog).toHaveAttribute("data-scroll-owner", "area");
+        expect(detailDialog.querySelectorAll('[data-slot="sheet-scroll-area"]')).toHaveLength(1);
         expect(within(detailDialog).getByRole("heading", { name: "รายละเอียดงานที่สอง" })).toBeInTheDocument();
 
         firstDetail.resolve({ task: DETAIL });
@@ -574,7 +582,12 @@ describe("LiffRoutineApp", () => {
         fireEvent.click(screen.getByRole("button", { name: "เพิ่ม Routine ของฉัน" }));
 
         const formDialog = await screen.findByRole("dialog");
-        expect(formDialog).toHaveAttribute("data-scroll-owner", "content");
+        const formScrollArea = formDialog.querySelector('[data-slot="sheet-scroll-area"]');
+        const formSubmit = within(formDialog).getByRole("button", { name: "เพิ่ม Routine ของฉัน" });
+        expect(formDialog).toHaveAttribute("data-scroll-owner", "area");
+        expect(formDialog.querySelectorAll('[data-slot="sheet-scroll-area"]')).toHaveLength(1);
+        expect(formScrollArea).not.toContainElement(formSubmit);
+        expect(formSubmit.closest("form")).not.toBeNull();
         expect(within(formDialog).getByRole("heading", { name: "เพิ่ม Routine ของฉัน" })).toBeInTheDocument();
         expect(within(formDialog).queryByText("เลือกผู้รับผิดชอบ")).not.toBeInTheDocument();
         expect(

@@ -341,7 +341,7 @@ function CancelDialog({
                 }
             }}
         >
-            <DialogContent className="overflow-hidden p-0 sm:max-w-[400px]">
+            <DialogContent scrollMode="area" className="overflow-hidden p-0 sm:max-w-[400px]">
                 <div className="border-b border-status-danger-border-subtle bg-status-danger-surface/50 px-5 py-4 sm:px-6">
                     <DialogTitle className="text-lg font-semibold text-status-danger-heading">
                         ยกเลิกคำขอ #{request.id}

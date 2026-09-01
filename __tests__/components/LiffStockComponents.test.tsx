@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { LiffStockCart } from "@/components/liff/stock/LiffStockCart";
@@ -106,13 +106,20 @@ describe("LIFF Stock mobile components", () => {
             />,
         );
 
+        const dialogs = screen.getAllByRole("dialog");
+        const cartDialog = dialogs[dialogs.length - 1];
+        const cartScrollArea = cartDialog.querySelector('[data-slot="dialog-scroll-area"]');
+        const submitButton = within(cartDialog).getByRole("button", { name: "ส่งคำขอเบิก 1 ชิ้น" });
+        expect(cartDialog.querySelectorAll('[data-slot="dialog-scroll-area"]')).toHaveLength(1);
+        expect(cartScrollArea).not.toContainElement(submitButton);
+
         fireEvent.change(screen.getByLabelText("ชื่อย่อโครงการ"), {
             target: { value: "NHF-2570" },
         });
         expect(onProjectCodeChange).toHaveBeenCalledWith("NHF-2570");
         fireEvent.click(screen.getByRole("button", { name: "เพิ่มจำนวน เสื้อกิจกรรม" }));
         expect(onChangeQuantity).toHaveBeenCalledWith(101, 1);
-        fireEvent.click(screen.getByRole("button", { name: "ส่งคำขอเบิก 1 ชิ้น" }));
+        fireEvent.click(submitButton);
         expect(onSubmit).toHaveBeenCalledTimes(1);
 
         const onAction = vi.fn();
