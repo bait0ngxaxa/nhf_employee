@@ -29,7 +29,11 @@ Evidence ควรเป็น commit/log/response status/screenshot/หน้�
 | Operator |  |
 | Environment / production domain |  |
 | LIFF ID suffix (non-secret identifier) |  |
-| Messaging API channel identifier (non-secret) |  |
+| LINE Provider display name/identifier (non-secret) |  |
+| LINE Login Channel ID (non-secret) |  |
+| NHFapp Messaging API Channel ID (non-secret) |  |
+| Stock Messaging API Channel ID (non-secret, if enabled) |  |
+| IT Messaging API Channel ID (non-secret, if enabled) |  |
 | Previous default `richMenuId` |  |
 | New `richMenuId` |  |
 | Monitoring window |  |
@@ -56,13 +60,16 @@ Evidence ควรเป็น commit/log/response status/screenshot/หน้�
 | REL-02 | Database | Backup database และ `.uploads/private/leave` ก่อน migration | Backup สำเร็จและ timestamp สอดคล้องกัน | `NOT RUN` |  |
 | REL-03 | Database | รัน `npx prisma migrate deploy` | migration สำเร็จ; ไม่มี Phase 5B migration ใหม่ | `NOT RUN` |  |
 | REL-04 | Application | ตรวจ process/service health และ origin health check | Next.js healthy, public HTTPS ตอบตาม policy | `NOT RUN` |  |
-| REL-05 | Environment | ตรวจ LIFF, Login channel, Messaging token/secret, session config และ cron secrets แบบ redacted | แสดงเพียง configured/valid; ไม่มีค่า secret ออกมา | `NOT RUN` |  |
+| REL-05 | Environment | ตรวจ LIFF, Login channel, `LINE_APP` และ enabled legacy LINE token/secret, session config และ cron secrets แบบ redacted | แสดงเพียง configured/valid; ไม่มีค่า secret ออกมา | `NOT RUN` |  |
 | REL-06 | Feature flags | ตรวจ Leave/Routine ที่ตั้งก่อน build | Home และ direct API/route ใช้ state เดียวกัน | `NOT RUN` |  |
 | REL-07 | LINE Console | ตรวจ Provider, channel, LIFF ID, `openid`, endpoint และ HTTPS | ตรงกับ production application | `NOT RUN` |  |
-| REL-08 | Rich Menu | รัน `npm run line:richmenu:status` | อ่าน current default/config โดยไม่ mutate | `NOT RUN` |  |
-| REL-09 | Rich Menu | รัน `npm run line:richmenu:provision` | dry-run validate สำเร็จหรือบันทึก missing local config; ไม่เรียก mutation | `NOT RUN` |  |
-| REL-10 | Rich Menu | ก่อน activation capture previous/new ID, timestamp, operator และ SHA | rollback evidence ครบ | `NOT RUN` |  |
-| REL-11 | Rich Menu | ยืนยันว่า `provision -- --apply` ยังไม่ถูกใช้ก่อน smartphone acceptance | เมนูใหม่ยังไม่เปิดเป็น default | `NOT RUN` |  |
+| REL-08 | LINE Provider | Verify LINE Login Channel และ NHFapp Messaging API Channel Provider | ทั้งสอง channel อยู่ใต้ LINE Provider เดียวกัน; ต่าง Provider = `NO-GO` | `NOT RUN` |  |
+| REL-09 | Rich Menu | รัน `npm run line:richmenu:status` | อ่าน current default/config โดยไม่ mutate | `NOT RUN` |  |
+| REL-10 | Rich Menu | รัน `npm run line:richmenu:provision` | dry-run validate สำเร็จหรือบันทึก missing local config; ไม่เรียก mutation | `NOT RUN` |  |
+| REL-11 | Rich Menu | ก่อน activation capture previous/new ID, timestamp, operator และ SHA | rollback evidence ครบ | `NOT RUN` |  |
+| REL-12 | Rich Menu | ยืนยันว่า `provision -- --apply` ยังไม่ถูกใช้ก่อน smartphone acceptance | เมนูใหม่ยังไม่เปิดเป็น default | `NOT RUN` |  |
+
+Provider evidence ต้องเป็น safe identifiers เท่านั้น เช่น Provider display name/identifier, LINE Login Channel ID และ NHFapp Messaging API Channel ID ห้ามใส่ channel secret, access token หรือ ID token
 
 ## 5. Scheduler และ notification outbox acceptance
 
@@ -81,11 +88,14 @@ Evidence ควรเป็น commit/log/response status/screenshot/หน้�
 | OPS-11 | Ownership | ตรวจ scheduler owner และ outbox owner | มี external owner เดียวต่อ job ไม่เกิด duplicate invocation | `NOT RUN` |  |
 | OPS-12 | Monitoring | ตรวจ HTTP success/failure และ timeout ของทั้งสอง job | alert/record แยกกัน และ timeout สอดคล้องกับ deployment | `NOT RUN` |  |
 | OPS-13 | Reminder | occurrence generated → scheduler → parent outbox → outbox worker | parent work ถูก enqueue และ worker process ได้ | `NOT RUN` |  |
-| OPS-14 | Reminder | ตรวจ in-app delivery | notification ปรากฏในบัญชีผู้รับที่ถูกต้อง | `NOT RUN` |  |
-| OPS-15 | Reminder | ตรวจ email เมื่อ SMTP/recipient configured | email ถึงผู้รับและลิงก์ถูกต้อง | `NOT RUN` |  |
-| OPS-16 | Reminder | ตรวจ LINE เมื่อ recipient linked และเป็นเพื่อน OA | LINE push ถึง test user และเปิด deep link ถูกต้อง | `NOT RUN` |  |
-| OPS-17 | Reminder | recipient ไม่มี `LineAccountLink` | ช่องทางอื่นที่เปิดยังทำงาน และไม่มี LINE child event สำหรับผู้รับนั้น | `NOT RUN` |  |
-| OPS-18 | Outbox health | ตรวจ pending/failed/retry/DEAD เมื่อ observable | backlog ไม่โตผิดปกติ; error มี owner follow-up | `NOT RUN` |  |
+| OPS-14 | Routine reminder | ตรวจ in-app delivery | notification ปรากฏในบัญชีผู้รับที่ถูกต้อง | `NOT RUN` |  |
+| OPS-15 | Routine reminder | ตรวจ email เมื่อ SMTP/recipient configured | email ถึงผู้รับและลิงก์ถูกต้อง | `NOT RUN` |  |
+| OPS-16 | Routine reminder | ตรวจ targeted LINE เมื่อ recipient linked และเป็นเพื่อน OA | `LINE_APP_CHANNEL_ACCESS_TOKEN` ส่ง Routine LINE push ถึง test user และเปิด deep link ถูกต้อง | `NOT RUN` |  |
+| OPS-17 | Stock integration | ตรวจ existing Stock request/low-stock LINE broadcast เมื่อ workflow เปิดใช้ | ใช้ `LINE_STOCK_CHANNEL_ACCESS_TOKEN` แยกจาก `LINE_APP`; broadcast ทำงานถูกต้อง | `NOT RUN` |  |
+| OPS-18 | IT integration | ตรวจ existing IT/email-request LINE notification เมื่อ workflow เปิดใช้ | ใช้ `LINE_IT_CHANNEL_ACCESS_TOKEN` แยกจาก `LINE_APP`; delivery ทำงานถูกต้อง | `NOT RUN` |  |
+| OPS-19 | Leave notification | ตรวจ Leave notification ปัจจุบัน | in-app และ email ทำงาน; ไม่คาดหวัง Leave targeted LINE push | `NOT RUN` |  |
+| OPS-20 | Routine reminder | recipient ไม่มี `LineAccountLink` | ช่องทางอื่นที่เปิดยังทำงาน และไม่มี Routine LINE child event สำหรับผู้รับนั้น | `NOT RUN` |  |
+| OPS-21 | Outbox health | ตรวจ pending/failed/retry/DEAD เมื่อ observable | backlog ไม่โตผิดปกติ; error มี owner follow-up | `NOT RUN` |  |
 
 ## 6. Identity และ account-link acceptance
 
@@ -250,7 +260,7 @@ Evidence ควรเป็น commit/log/response status/screenshot/หน้�
 | Routine | mutation errors, `409` conflicts, unauthorized deep links | `NOT RUN` |  |
 | Scheduler | HTTP failures, `errors` counter, unexpected no-op | `NOT RUN` |  |
 | Outbox | HTTP failures, `failed`, pending/retry backlog และ `DEAD` rows เมื่อ observable | `NOT RUN` |  |
-| Delivery | LINE provider/delivery failures และ SMTP/email delivery failures | `NOT RUN` |  |
+| Delivery | `LINE_APP` Routine delivery, `LINE_STOCK` Stock broadcast, `LINE_IT` IT notification และ SMTP/email delivery failures | `NOT RUN` |  |
 
 หยุด rolloutและพิจารณา rollback/containment ทันทีเมื่อพบ login/session ล้มเหลวสม่ำเสมอ, account link ผิดคนหรือ overwrite, authorization bypass, duplicate/data-integrity failure, scheduler สร้าง reminder ผิด, outbox backlog โตควบคุมไม่ได้ หรือ Rich Menu ใหม่พาไป broken route/critical mobile action ใช้ไม่ได้ ความผิดพลาดด้าน security/data integrity เป็น immediate stop; cosmetic defect เล็กน้อยต้องประเมินผลกระทบก่อน
 
@@ -276,7 +286,11 @@ Deployment timestamp (timezone):
 Operator:
 Environment / production domain:
 LIFF ID suffix (non-secret):
-Messaging API channel identifier (non-secret):
+NHFapp Messaging API channel identifier (non-secret):
+Stock Messaging API channel identifier (non-secret, if enabled):
+IT Messaging API channel identifier (non-secret, if enabled):
+LINE Provider display name/identifier (non-secret):
+LINE Login Channel ID (non-secret):
 Previous default richMenuId:
 New richMenuId:
 Monitoring window / owner:

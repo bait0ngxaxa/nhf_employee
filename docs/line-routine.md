@@ -12,15 +12,15 @@
 ## 1. Architecture
 
 ```text
-NHF Official Account
-        │
-        ├── Messaging API Channel
-        │       ├── Routine LINE push
-        │       ├── existing Stock/Leave notification delivery
-        │       └── Unified Rich Menu
-        │
-        └── LINE Login Channel
-                └── LIFF App
+LINE Provider
+│
+├── LINE Login Channel
+│   └── LIFF App
+│       └── NEXT_PUBLIC_LINE_LIFF_ID
+│
+└── NHFapp Messaging API Channel
+    └── NHF Official Account
+        └── LINE_APP_CHANNEL_ACCESS_TOKEN
 
 Unified Rich Menu
         ↓
@@ -39,20 +39,47 @@ Shared LIFF Shell
 Stock | Leave | Routine
 ```
 
+Application identity flow:
+
+```text
+LIFF
+    → LINE Login identity / ID token `sub`
+    → LineAccountLink.lineUserId
+    → NHFapp HttpOnly LIFF session
+```
+
+Routine targeted notification flow:
+
+```text
+Routine notification
+    → LineAccountLink.lineUserId
+    → LINE_APP_CHANNEL_ACCESS_TOKEN
+    → targeted LINE push
+```
+
+LINE user IDs are provider-scoped. The LINE Login Channel containing the LIFF
+app and the NHFapp Messaging API Channel represented by
+`LINE_APP_CHANNEL_ACCESS_TOKEN` **MUST belong to the same LINE Provider**.
+This is a human LINE Developers Console requirement; the application does not
+try to derive Provider identity from a token.
+
 ### บทบาทของแต่ละส่วน
 
 | ส่วน | บทบาทใน production |
 | --- | --- |
-| NHF Official Account | OA ที่ผู้ใช้เพิ่มเป็นเพื่อน และเป็นเจ้าของ channel access token สำหรับส่งข้อความของ NHFapp |
-| LINE Login Channel | ตรวจสอบ LIFF identity และใช้สร้าง LIFF application; `LINE_LOGIN_CHANNEL_ID` ต้องเป็น channel เดียวกับ LIFF app |
-| Messaging API Channel | ส่ง Rich Menu และข้อความแจ้งเตือนตาม notification architecture เดิม |
+| LINE Provider | ต้องเป็นเจ้าของทั้ง LINE Login Channel ที่มี LIFF และ NHFapp Messaging API Channel ที่ใช้ `LINE_APP_CHANNEL_ACCESS_TOKEN` |
+| NHF Official Account | OA ที่ผู้ใช้เพิ่มเป็นเพื่อน และ associated กับ NHFapp Messaging API Channel; Rich Menu และ Routine targeted push ส่งผ่าน channel นี้ |
+| LINE Login Channel | ตรวจสอบ LIFF identity และใช้สร้าง LIFF application; `LINE_LOGIN_CHANNEL_ID` ต้องเป็น channel เดียวกับ LIFF app และอยู่ใต้ Provider เดียวกับ NHFapp Messaging API Channel |
+| NHFapp Messaging API Channel | ใช้ `LINE_APP_CHANNEL_ACCESS_TOKEN` สำหรับ Unified Rich Menu, Routine targeted reminder push และ Routine contract-expiry targeted push; ไม่ใช่ token ของ legacy Stock/IT integrations |
+| Existing Stock Messaging integration | ใช้ `LINE_STOCK_CHANNEL_ACCESS_TOKEN` สำหรับ Stock request และ low-stock LINE broadcast ตาม integration เดิม |
+| Existing IT Messaging integration | ใช้ `LINE_IT_CHANNEL_ACCESS_TOKEN` สำหรับ IT/email-request LINE notification path ตาม integration เดิม |
 | LIFF | จุดเข้าใช้งานจาก LINE และส่ง ID token ระยะสั้นให้ server ตรวจสอบ identity |
 | `LiffBootstrap` | เรียก `liff.init`, ตรวจ LINE login, สร้าง/กู้ NHFapp session และนำผู้ใช้ไป account-link เมื่อยังไม่ link |
 | NHFapp HttpOnly LIFF session | cookie `nhf_liff_session` ที่ server เซ็นและตรวจอายุ ใช้ยืนยัน workforce session ของ NHFapp |
 | account linking | ผูก LINE user ID กับ NHFapp user ที่ login ไว้; conflict ต้อง fail และห้ามเขียนทับ link เดิม |
 | feature flags | ควบคุม Leave และ Routine จาก `NEXT_PUBLIC_*`; ค่าถูกฝังตอน build |
 | Routine scheduler | สร้าง occurrence และ enqueue reminder work ลง notification outbox; ไม่ได้ส่งข้อความเอง |
-| Notification outbox | claim/process งานค้างและส่ง in-app, email และ LINE ตาม event ที่มีอยู่ |
+| Notification outbox | claim/process งานค้างและ dispatch event ตาม channel ที่กำหนด: Routine in-app/email/LINE, Stock legacy LINE, IT legacy LINE และ Leave in-app/email |
 
 ID token เป็น identity assertion ที่อายุสั้น ใช้ตรวจสอบกับ LINE แล้วไม่ใช่ NHF session ระยะยาว ห้ามบันทึก ID token, cookie หรือ Authorization header ลง log
 
@@ -84,8 +111,8 @@ ID token เป็น identity assertion ที่อายุสั้น ใ�
 | --- | --- | --- |
 | `NEXT_PUBLIC_LINE_LIFF_ID` | LIFF ID ที่ client ใช้ `liff.init` และใช้สร้าง Rich Menu URL | LINE Login Console; เป็น identifier ที่เปิดเผยได้และต้องตั้งก่อน build |
 | `LINE_LOGIN_CHANNEL_ID` | channel ID ที่ server ส่งให้ LINE ID-token verification ตรวจ `aud` | LINE Login Channel ใน LINE Developers Console |
-| `LINE_APP_CHANNEL_ACCESS_TOKEN` | token ของ Messaging API channel สำหรับ Rich Menu และ NHFapp LINE push | secret manager / Messaging API channel ของ NHF Official Account |
-| `LINE_APP_CHANNEL_SECRET` | channel secret ของ Messaging API channel | LINE Developers Console; เก็บใน secret manager |
+| `LINE_APP_CHANNEL_ACCESS_TOKEN` | token ของ NHFapp Messaging API Channel สำหรับ Unified Rich Menu, Routine targeted reminder push และ Routine contract-expiry targeted push; ไม่ได้กำหนด Stock/IT legacy channel | secret manager / NHFapp Messaging API Channel ของ NHF Official Account |
+| `LINE_APP_CHANNEL_SECRET` | channel secret ของ NHFapp Messaging API Channel | LINE Developers Console; เก็บใน secret manager |
 | `LINE_LIFF_SESSION_SECRET` | secret สำหรับเซ็น NHFapp HttpOnly LIFF session | secret manager; production ต้องยาวอย่างน้อย 32 ตัวอักษรและต้องสุ่ม |
 | `LINE_LIFF_SESSION_TTL_SECONDS` | อายุ LIFF session | deployment configuration; integer `1` ถึง `86400` |
 | `NEXT_PUBLIC_FEATURE_LEAVE` | เปิด/ปิด Leave | release configuration ก่อน build; `true` เพื่อเปิด |
@@ -128,25 +155,36 @@ NEXT_PUBLIC_FEATURE_ROUTINE=false
 
 | Variable/asset | ใช้เมื่อ |
 | --- | --- |
-| `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS` | Routine reminder/contract expiry และ notification email เดิม; Routine email acceptance ต้องตั้งครบ |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS` | Routine reminder/contract expiry, Leave notification email และ notification email เดิม; Routine/Leave email acceptance ต้องตั้งครบ |
 | `.uploads/` | รูป Stock และ private leave attachments; ต้องอยู่บน persistent disk |
 | `LEAVE_ATTACHMENT_CLEANUP_SECRET` | เปิด scheduled orphan cleanup ของ private leave attachments |
 | `AUTH_CLEANUP_SECRET`, `AUDIT_LOG_CLEANUP_SECRET` | เปิด maintenance endpoint ของ auth/audit ตาม deployment policy |
 
 รายละเอียด permission, backup, restore, reverse proxy และ cleanup ของ leave attachment อยู่ใน [Leave attachment deployment runbook](./leave-attachments-deployment.md)
 
-Integration LINE เดิมนอก Unified LIFF ใช้ตัวแปรต่อไปนี้เมื่อ workflow เหล่านั้นยังเปิดจริง:
+### Existing notification integrations
+
+ห้ามนำ `LINE_APP_CHANNEL_ACCESS_TOKEN` ไปแทน token ของ integration เดิมโดยอัตโนมัติ แต่ละ channel เป็น configuration แยกกัน:
+
+| Integration | Variables | Current responsibility |
+| --- | --- | --- |
+| Existing Stock Messaging integration | `LINE_STOCK_CHANNEL_ACCESS_TOKEN`, `LINE_STOCK_CHANNEL_SECRET` | Stock request LINE broadcast และ low-stock LINE broadcast |
+| Existing IT Messaging integration | `LINE_IT_CHANNEL_ACCESS_TOKEN`, `LINE_IT_CHANNEL_SECRET`, `LINE_IT_TEAM_USER_ID` | IT/email-request LINE notification; ส่งหา IT team user หรือ broadcast ตาม configuration |
+| Webhook / Email Request support | `LINE_WEBHOOK_URL` | existing webhook integration ตาม code; ไม่ใช่ LIFF endpoint และไม่ใช่ `LINE_APP` token |
+
+Flow แยกจาก Unified NHFapp Messaging API:
 
 ```text
 LINE_IT_CHANNEL_ACCESS_TOKEN
 LINE_IT_CHANNEL_SECRET
+    → Existing IT / email-request LINE notifications
+
 LINE_STOCK_CHANNEL_ACCESS_TOKEN
 LINE_STOCK_CHANNEL_SECRET
-LINE_IT_TEAM_USER_ID
-LINE_WEBHOOK_URL
+    → Existing Stock LINE broadcasts
 ```
 
-ตัวแปรกลุ่มนี้ไม่ใช่ตัวแทนของ `LINE_APP_CHANNEL_ACCESS_TOKEN` และห้ามนำ token คนละ OA มาใช้แทนกัน `LINE_WEBHOOK_URL` เป็น integration เสริมของ Email Request ไม่ใช่ LIFF endpoint
+Leave notification ปัจจุบันใช้ **in-app และ email** ผ่าน Leave notification/outbox workflow ไม่มี Leave targeted LINE push ที่ต้องตั้งค่าใน Phase 5B
 
 `BOOTSTRAP_ADMIN_EMAILS` ใช้ตอน seed/bootstrap เท่านั้น ส่วน `MYSQL_ROOT_PASSWORD`, `MYSQL_DATABASE`, `MYSQL_USER`, `MYSQL_PASSWORD` ใช้เมื่อ deployment เลือก Docker Compose MySQL
 
@@ -156,9 +194,11 @@ LINE_WEBHOOK_URL
 
 ### Provider และ channel architecture
 
-- [ ] Messaging API Channel ของ NHF Official Account และ LINE Login Channel อยู่ใต้ Provider/account architecture ที่องค์กรตั้งใจใช้
+- [ ] LINE Login Channel ที่มี LIFF และ NHFapp Messaging API Channel ที่ใช้ `LINE_APP_CHANNEL_ACCESS_TOKEN` อยู่ใต้ **LINE Provider เดียวกัน** — หากต่าง Provider ให้ `NO-GO`
+- [ ] บันทึก Provider display name/identifier (ถ้า console แสดง), `LINE_LOGIN_CHANNEL_ID` และ NHFapp Messaging API Channel ID เป็น safe evidence เท่านั้น
 - [ ] LIFF application อยู่บน LINE Login Channel เดียวกับ `LINE_LOGIN_CHANNEL_ID`
-- [ ] Messaging API channel เป็นของ OA ที่ผู้ใช้จะเพิ่มเป็นเพื่อนและเป็น OA ที่ส่ง NHFapp notification
+- [ ] NHFapp Messaging API Channel เป็น channel ของ OA ที่ผู้ใช้จะเพิ่มเป็นเพื่อนและเป็น OA ที่ส่ง Unified Rich Menu/Routine targeted push
+- [ ] ห้ามพยายาม derive หรือยืนยัน Provider identity จาก channel access token ใน application/operator script; ตรวจใน LINE Developers Console โดย human operator
 
 ### LINE Login / LIFF application
 
@@ -186,13 +226,19 @@ https://liff.line.me/<LIFF_ID>/routine
 
 ## 4. Messaging API และ Official Account checklist
 
-- [ ] `LINE_APP_CHANNEL_ACCESS_TOKEN` เป็น token ของ Messaging API Channel ที่ผูกกับ NHF Official Account ถูกตัว
-- [ ] `LINE_APP_CHANNEL_SECRET` เป็น channel secret ของ channel เดียวกัน
-- [ ] token มีสิทธิ์สำหรับ Rich Menu operations และ push message ที่ระบบใช้อยู่
+- [ ] `LINE_APP_CHANNEL_ACCESS_TOKEN` เป็น token ของ NHFapp Messaging API Channel ที่ผูกกับ NHF Official Account ถูกตัว
+- [ ] `LINE_APP_CHANNEL_SECRET` เป็น channel secret ของ NHFapp Messaging API Channel เดียวกัน
+- [ ] token มีสิทธิ์สำหรับ Unified Rich Menu และ Routine targeted/contract-expiry push
 - [ ] OA ตรงกับ token คือ OA ที่ test identities เพิ่มเป็นเพื่อน
+- [ ] ยืนยันด้วย human console check ว่า LINE Login Channel และ NHFapp Messaging API Channel อยู่ใต้ LINE Provider เดียวกัน
 - [ ] ไม่มี token/channel secret ใน `NEXT_PUBLIC_*`, source control, shell transcript, application log หรือ monitoring payload
 - [ ] หลัง scheduler/outbox พร้อม ทดสอบ Routine LINE push ด้วย linked test user และตรวจ deep link
-- [ ] ตรวจ existing Stock/Leave/other LINE notification events ตาม outbox architecture เดิม ไม่เพิ่ม channel ใหม่
+
+### Existing notification integrations checklist
+
+- [ ] หาก Stock LINE notifications ยังเปิดใช้ ให้ตรวจ `LINE_STOCK_CHANNEL_ACCESS_TOKEN`/`LINE_STOCK_CHANNEL_SECRET` และทดสอบ Stock request/low-stock broadcast แยกจาก `LINE_APP`
+- [ ] หาก IT/email-request LINE notifications ยังเปิดใช้ ให้ตรวจ `LINE_IT_CHANNEL_ACCESS_TOKEN`/`LINE_IT_CHANNEL_SECRET` และ `LINE_IT_TEAM_USER_ID` ตาม flow เดิม
+- [ ] Leave acceptance ตรวจ **in-app และ email** ตาม workflow ปัจจุบัน; ไม่ตั้งหรือทดสอบ Leave LINE push ที่ไม่มีใน code
 - [ ] หากใช้ `/api/line/webhook` ให้ตั้ง secrets ของ webhook integration ตาม code ปัจจุบัน (`LINE_IT_CHANNEL_SECRET`/`LINE_STOCK_CHANNEL_SECRET`)
 
 ## 5. Unified Rich Menu source of truth
@@ -372,11 +418,12 @@ occurrence generated
 → notification outbox runs
 → in-app notification visible
 → email delivery เมื่อ SMTP/recipient พร้อม
-→ LINE push delivery เมื่อ LINE account linked และ OA เป็นเพื่อน
+→ Routine targeted LINE push delivery เมื่อ LINE account linked และ OA เป็นเพื่อน
 → LIFF deep link เปิด task/occurrence ที่ถูกต้อง
 ```
 
-ผู้รับที่ไม่มี `LineAccountLink` ต้องยังได้ช่องทางที่เปิดใช้งานอยู่โดยไม่สร้าง LINE child event ให้ผู้รับคนนั้น
+ผู้รับที่ไม่มี `LineAccountLink` ต้องยังได้ช่องทางที่เปิดใช้งานอยู่โดยไม่สร้าง Routine LINE child event ให้ผู้รับคนนั้น
+Leave notification acceptance ให้ตรวจ **in-app และ email** ตาม workflow ปัจจุบันเท่านั้น ไม่มี Leave targeted LINE push ใน implementation ปัจจุบัน
 
 ## 8. Leave attachment production readiness
 

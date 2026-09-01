@@ -181,6 +181,67 @@ describe("NHFapp Rich Menu provisioning", () => {
         ]);
     });
 
+    it("classifies unified provisioning create failures", async () => {
+        fetchMock
+            .mockResolvedValueOnce(emptyResponse())
+            .mockResolvedValueOnce(jsonResponse({ message: "create failed" }, 400));
+
+        await expect(
+            provisionNhfRichMenu({ apply: true, fetchImpl: fetchMock }),
+        ).rejects.toMatchObject({ phase: "create", statusCode: 400 });
+        expect(fetchMock).toHaveBeenCalledTimes(2);
+    });
+
+    it("preserves the created target when unified provisioning upload fails", async () => {
+        fetchMock
+            .mockResolvedValueOnce(emptyResponse())
+            .mockResolvedValueOnce(jsonResponse({ richMenuId: "richmenu-created" }))
+            .mockResolvedValueOnce(jsonResponse({ message: "upload failed" }, 500));
+
+        await expect(
+            provisionNhfRichMenu({ apply: true, fetchImpl: fetchMock }),
+        ).rejects.toMatchObject({
+            phase: "upload",
+            statusCode: 500,
+            richMenuId: "richmenu-created",
+        });
+        expect(fetchMock).toHaveBeenCalledTimes(3);
+    });
+
+    it("classifies unified provisioning set-default failures", async () => {
+        fetchMock
+            .mockResolvedValueOnce(emptyResponse())
+            .mockResolvedValueOnce(jsonResponse({ richMenuId: "richmenu-created" }))
+            .mockResolvedValueOnce(emptyResponse())
+            .mockResolvedValueOnce(jsonResponse({ message: "set failed" }, 500));
+
+        await expect(
+            provisionNhfRichMenu({ apply: true, fetchImpl: fetchMock }),
+        ).rejects.toMatchObject({
+            phase: "set-default",
+            statusCode: 500,
+            richMenuId: "richmenu-created",
+        });
+        expect(fetchMock).toHaveBeenCalledTimes(4);
+    });
+
+    it("classifies unified provisioning verification failures", async () => {
+        fetchMock
+            .mockResolvedValueOnce(emptyResponse())
+            .mockResolvedValueOnce(jsonResponse({ richMenuId: "richmenu-created" }))
+            .mockResolvedValueOnce(emptyResponse())
+            .mockResolvedValueOnce(emptyResponse())
+            .mockResolvedValueOnce(jsonResponse({ richMenuId: "richmenu-other" }));
+
+        await expect(
+            provisionNhfRichMenu({ apply: true, fetchImpl: fetchMock }),
+        ).rejects.toMatchObject({
+            phase: "verify",
+            richMenuId: "richmenu-created",
+        });
+        expect(fetchMock).toHaveBeenCalledTimes(5);
+    });
+
     it("keeps set-default dry-run free of LINE mutation requests", async () => {
         const result = await setNhfRichMenuDefault({
             richMenuId: "richmenu-previous",
@@ -294,5 +355,85 @@ describe("NHFapp Rich Menu provisioning", () => {
         const output = logSpy.mock.calls.flat().join(" ");
         expect(output).not.toContain("nhfapp-token");
         logSpy.mockRestore();
+    });
+
+    it("uses target/default wording for set-default provider failures", async () => {
+        fetchMock.mockResolvedValueOnce(
+            jsonResponse({ message: "default update failed" }, 500),
+        );
+        const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(fetchMock);
+        const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+        try {
+            await expect(
+                runNhfRichMenuCli([
+                    "set-default",
+                    "--rich-menu-id=richmenu-previous",
+                    "--apply",
+                ]),
+            ).resolves.toBe(1);
+
+            const output = errorSpy.mock.calls.flat().join(" ");
+            expect(output).toContain("Target richMenuId: richmenu-previous");
+            expect(output).not.toContain("Created richMenuId");
+            expect(output.toLowerCase()).not.toContain("new menu");
+            expect(output).toContain("may or may not have changed");
+            expect(output).toContain("npm run line:richmenu:status");
+            expect(output).not.toContain("nhfapp-token");
+        } finally {
+            errorSpy.mockRestore();
+            fetchSpy.mockRestore();
+        }
+    });
+
+    it("uses verification wording for set-default mismatches", async () => {
+        fetchMock
+            .mockResolvedValueOnce(emptyResponse())
+            .mockResolvedValueOnce(jsonResponse({ richMenuId: "richmenu-other" }));
+        const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(fetchMock);
+        const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+        try {
+            await expect(
+                runNhfRichMenuCli([
+                    "set-default",
+                    "--rich-menu-id=richmenu-previous",
+                    "--apply",
+                ]),
+            ).resolves.toBe(1);
+
+            const output = errorSpy.mock.calls.flat().join(" ");
+            expect(output).toContain("Target richMenuId: richmenu-previous");
+            expect(output).not.toContain("Created richMenuId");
+            expect(output.toLowerCase()).not.toContain("new menu");
+            expect(output).toContain("was not verified as the current default");
+            expect(output).toContain("npm run line:richmenu:status");
+        } finally {
+            errorSpy.mockRestore();
+            fetchSpy.mockRestore();
+        }
+    });
+
+    it("keeps provisioning upload diagnostics operation-specific", async () => {
+        fetchMock
+            .mockResolvedValueOnce(emptyResponse())
+            .mockResolvedValueOnce(jsonResponse({ richMenuId: "richmenu-created" }))
+            .mockResolvedValueOnce(jsonResponse({ message: "upload failed" }, 500));
+        const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(fetchMock);
+        const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+        try {
+            await expect(
+                runNhfRichMenuCli(["provision", "--apply"]),
+            ).resolves.toBe(1);
+
+            const output = errorSpy.mock.calls.flat().join(" ");
+            expect(output).toContain("Target richMenuId: richmenu-created");
+            expect(output).toContain("A new Rich Menu was created");
+            expect(output).toContain("Existing default was not changed");
+        } finally {
+            errorSpy.mockRestore();
+            fetchSpy.mockRestore();
+        }
     });
 });

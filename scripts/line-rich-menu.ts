@@ -71,23 +71,54 @@ function printStatus(status: NhfRichMenuStatus): void {
     }
 }
 
-function printProvisioningError(error: unknown): void {
+type RichMenuCliOperation = "provision" | "set-default";
+
+function printRichMenuError(
+    error: unknown,
+    operation: RichMenuCliOperation,
+): void {
     if (!(error instanceof RichMenuProvisioningError)) {
-        console.error("Rich Menu provisioning failed.");
+        console.error(
+            operation === "set-default"
+                ? "Rich Menu set-default failed."
+                : "Rich Menu provisioning failed.",
+        );
         return;
     }
 
-    console.error(`Rich Menu provisioning failed during ${error.phase}.`);
+    const operationLabel = operation === "set-default"
+        ? "Rich Menu set-default"
+        : "Rich Menu provisioning";
+    console.error(`${operationLabel} failed during ${error.phase}.`);
     console.error(`Reason: ${error.message}`);
-    if (error.richMenuId) {
-        console.error(`Created richMenuId: ${error.richMenuId}`);
-        if (error.phase === "upload") {
-            console.error("The new menu was NOT set as default. Existing default was not changed.");
+    if (!error.richMenuId) return;
+
+    console.error(`Target richMenuId: ${error.richMenuId}`);
+    if (operation === "set-default") {
+        if (error.phase === "verify") {
+            console.error(
+                "The requested Rich Menu was not verified as the current default. Run `npm run line:richmenu:status` before taking another action.",
+            );
         } else if (error.phase === "set-default") {
-            console.error("The new menu may not be the default. Check the status command before retrying.");
-        } else if (error.phase === "verify") {
-            console.error("The default may have changed. Check the status command before retrying.");
+            console.error(
+                "The requested default Rich Menu may or may not have changed. Run `npm run line:richmenu:status` before retrying.",
+            );
         }
+        return;
+    }
+
+    if (error.phase === "upload") {
+        console.error(
+            "A new Rich Menu was created, but its image upload failed. Existing default was not changed.",
+        );
+    } else if (error.phase === "set-default") {
+        console.error(
+            "The newly provisioned Rich Menu may not be the default. Check `npm run line:richmenu:status` before retrying.",
+        );
+    } else if (error.phase === "verify") {
+        console.error(
+            "The provisioned Rich Menu default may have changed. Check `npm run line:richmenu:status` before retrying.",
+        );
     }
 }
 
@@ -177,7 +208,10 @@ export async function runNhfRichMenuCli(args: string[]): Promise<number> {
         printUsage();
         return command === "help" ? 0 : 1;
     } catch (error) {
-        printProvisioningError(error);
+        printRichMenuError(
+            error,
+            command === "set-default" ? "set-default" : "provision",
+        );
         return 1;
     }
 }
