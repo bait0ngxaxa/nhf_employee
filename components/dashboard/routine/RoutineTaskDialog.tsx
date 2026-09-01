@@ -22,6 +22,7 @@ interface RoutineTaskDialogProps {
     error?: Error;
     intent: "create" | "edit";
     isLoading: boolean;
+    canChangeStatus?: boolean;
     mode: "SELF_SERVICE" | "ADMIN";
     onClose: () => void;
     onRetry: () => void;
@@ -39,9 +40,7 @@ function dialogTitle(
     mode: RoutineTaskDialogProps["mode"],
 ): string {
     if (intent === "edit") {
-        return mode === "SELF_SERVICE"
-            ? "แก้ไขแม่แบบงานของฉัน"
-            : "แก้ไข Routine";
+        return "แก้ไข Routine";
     }
     return mode === "SELF_SERVICE"
         ? "สร้างแม่แบบงานของฉัน"
@@ -57,6 +56,7 @@ export function RoutineTaskDialog({
     error,
     intent,
     isLoading,
+    canChangeStatus = true,
     mode,
     onClose,
     onRetry,
@@ -159,6 +159,7 @@ export function RoutineTaskDialog({
                         reference={reference}
                         initialTask={intent === "edit" ? task : null}
                         mode={mode}
+                        canChangeStatus={canChangeStatus}
                         presentation="dialog"
                         onSaved={onSaved}
                         onCancel={onClose}

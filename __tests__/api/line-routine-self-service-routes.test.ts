@@ -92,7 +92,12 @@ function request(
     return new NextRequest(`http://localhost${path}`, init);
 }
 
-function taskDetail(canManage = true): Record<string, unknown> {
+function taskDetail(
+    capabilities: { canEdit: boolean; canDelete: boolean } = {
+        canEdit: true,
+        canDelete: true,
+    },
+): Record<string, unknown> {
     return {
         id: 71,
         title: "ตรวจสอบระบบ",
@@ -130,8 +135,9 @@ function taskDetail(canManage = true): Record<string, unknown> {
             reminderVersion: 1,
             assignees: [{ employeeId: 31, role: "OWNER" }],
         }],
-        canManage,
-        createdById: canManage ? 7 : 99,
+        canEdit: capabilities.canEdit,
+        canDelete: capabilities.canDelete,
+        createdById: capabilities.canDelete ? 7 : 99,
         sourceFileName: "internal.xlsx",
         sourceSheet: "Sheet1",
         sourceRow: 12,
@@ -285,12 +291,15 @@ describe("LIFF Routine self-service route contracts", () => {
         expect(response.status).toBe(200);
         await expect(response.json()).resolves.toMatchObject({
             replayed: true,
-            task: { id: 71, canManage: true },
+            task: { id: 71, canEdit: true, canDelete: true },
         });
     });
 
-    it("exposes assigned detail with canManage=false and no internal metadata", async () => {
-        mocks.getLiffRoutineTaskById.mockResolvedValueOnce(taskDetail(false));
+    it("exposes assigned detail with edit but no delete and no internal metadata", async () => {
+        mocks.getLiffRoutineTaskById.mockResolvedValueOnce(taskDetail({
+            canEdit: true,
+            canDelete: false,
+        }));
 
         const response = await getTask(
             request("/api/line/routine/tasks/71"),
@@ -299,12 +308,20 @@ describe("LIFF Routine self-service route contracts", () => {
         const body = await response.json() as { task: Record<string, unknown> };
 
         expect(response.status).toBe(200);
-        expect(body.task).toMatchObject({ id: 71, canManage: false });
+        expect(body.task).toMatchObject({ id: 71, canEdit: true, canDelete: false });
         expect(body.task).not.toHaveProperty("createdById");
         expect(body.task).not.toHaveProperty("sourceFileName");
         expect(body.task).not.toHaveProperty("sourceSheet");
         expect(body.task).not.toHaveProperty("sourceRow");
-        expect(body.task).toEqual(expect.objectContaining({ reminderRules: [] }));
+        expect(body.task).toEqual(expect.objectContaining({
+            reminderRules: [{
+                daysBefore: 1,
+                sendHour: 9,
+                channel: "IN_APP",
+                recipientScope: "ASSIGNEES",
+                isActive: true,
+            }],
+        }));
     });
 
     it("passes the expected version to the existing update service", async () => {

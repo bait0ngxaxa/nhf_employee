@@ -83,7 +83,8 @@ export interface LiffRoutineTaskDetail {
     category: { id: number; name: string };
     reminderRules: LiffRoutineTaskReminderRule[];
     occurrences: LiffRoutineTaskDetailOccurrence[];
-    canManage: boolean;
+    canEdit: boolean;
+    canDelete: boolean;
 }
 
 export interface LiffRoutineTaskDetailResponse {

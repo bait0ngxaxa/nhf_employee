@@ -123,4 +123,41 @@ describe("NHF Routine task deletion", () => {
             .rejects.toMatchObject({ statusCode: 404, code: "NOT_FOUND" });
         expect(prismaMock.routineTask.findUnique).not.toHaveBeenCalled();
     });
+
+    it("does not let an assigned non-creator delete an Admin-created task", async () => {
+        prismaMock.user.findUnique.mockResolvedValue(asNever({
+            id: 5,
+            role: "USER",
+            isActive: true,
+            deletedAt: null,
+            employee: { id: 21, status: "ACTIVE", deletedAt: null },
+        }));
+        prismaMock.routineTask.findFirst.mockResolvedValue(null);
+
+        await expect(
+            deleteRoutineTask(71, { ...adminActor, id: 5, role: "USER" }),
+        ).rejects.toMatchObject({ statusCode: 404, code: "NOT_FOUND" });
+        expect(prismaMock.routineTask.delete).not.toHaveBeenCalled();
+    });
+
+    it("keeps creator deletion available for a self-service task", async () => {
+        prismaMock.user.findUnique.mockResolvedValue(asNever({
+            id: 5,
+            role: "USER",
+            isActive: true,
+            deletedAt: null,
+            employee: { id: 21, status: "ACTIVE", deletedAt: null },
+        }));
+        prismaMock.routineTask.findFirst.mockResolvedValue(asNever({
+            id: 71,
+            title: "งานของฉัน",
+            version: 1,
+            createdById: 5,
+        }));
+        prismaMock.routineOccurrence.findMany.mockResolvedValue(asNever([]));
+
+        await deleteRoutineTask(71, { ...adminActor, id: 5, role: "USER" });
+
+        expect(prismaMock.routineTask.delete).toHaveBeenCalledWith({ where: { id: 71 } });
+    });
 });

@@ -1,9 +1,11 @@
 import type { RoutineTimingStatus } from "@/lib/routine/timing";
 import type { RoutineScheduleType } from "@/lib/routine/schedule";
 import type { RoutineAssigneeRole } from "@/lib/routine/assignees";
+import type { RoutineTaskCapabilities } from "@/lib/routine/capabilities";
 
 export type { RoutineTimingStatus } from "@/lib/routine/timing";
 export type { RoutineAssigneeRole } from "@/lib/routine/assignees";
+export type { RoutineTaskCapabilities } from "@/lib/routine/capabilities";
 
 export type RoutineReminderRecipientScope =
     | "ASSIGNEES"
@@ -76,7 +78,7 @@ export interface RoutineTaskWorkItemOccurrence {
     assignees: RoutineAssignee[];
 }
 
-export interface RoutineTaskWorkItem {
+export interface RoutineTaskWorkItem extends RoutineTaskCapabilities {
     id: number;
     title: string;
     description: string | null;
@@ -96,7 +98,7 @@ export interface RoutineTaskWorkItem {
     relevantOccurrence: RoutineTaskWorkItemOccurrence | null;
 }
 
-export interface RoutineTask {
+export interface RoutineTask extends RoutineTaskCapabilities {
     id: number;
     unitId: number;
     categoryId: number;

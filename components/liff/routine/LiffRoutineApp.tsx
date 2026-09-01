@@ -375,7 +375,7 @@ export function LiffRoutineApp(): ReactElement {
     }, [loadReference]);
 
     const openEdit = useCallback((task: LiffRoutineTaskDetail): void => {
-        if (!task.canManage) return;
+        if (!task.canEdit) return;
         setDeleteError(null);
         setFormMode("EDIT");
         void loadReference();
@@ -401,7 +401,7 @@ export function LiffRoutineApp(): ReactElement {
 
     const handleDelete = useCallback(
         (task: LiffRoutineTaskDetail): void => {
-            if (isDeleting || !task.canManage) return;
+            if (isDeleting || !task.canDelete) return;
             setIsDeleting(true);
             setDeleteError(null);
             void (async () => {

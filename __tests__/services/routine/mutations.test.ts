@@ -766,7 +766,7 @@ describe("NHF Routine mutations", () => {
         expect(prismaMock.routineTask.create).not.toHaveBeenCalled();
     });
 
-    it("does not let self-service updates change assignees or import metadata", async () => {
+    it("lets an assigned employee edit content without changing assignees or import metadata", async () => {
         const current = {
             id: 71,
             unitId: 1,
@@ -786,8 +786,8 @@ describe("NHF Routine mutations", () => {
             sourceFileName: null,
             sourceSheet: null,
             sourceRow: null,
-            createdById: 3,
-            updatedById: 3,
+            createdById: 99,
+            updatedById: 99,
             createdAt: new Date("2026-01-01T00:00:00.000Z"),
             updatedAt: new Date("2026-01-01T00:00:00.000Z"),
             unit: { id: 1, code: "มสช.", name: "มสช.", isActive: true },
@@ -834,7 +834,14 @@ describe("NHF Routine mutations", () => {
         );
 
         expect(prismaMock.routineTask.updateMany).toHaveBeenCalledWith({
-            where: { id: 71, version: 1, createdById: 3 },
+            where: {
+                id: 71,
+                version: 1,
+                OR: [
+                    { createdById: 3 },
+                    { assignees: { some: { employeeId: 11 } } },
+                ],
+            },
             data: expect.objectContaining({
                 title: "แก้ไขแล้ว",
                 updatedById: 3,
@@ -853,6 +860,122 @@ describe("NHF Routine mutations", () => {
                 isActive: true,
             }],
         });
+    });
+
+    it("allows the current master assignee to update an Admin-created task", async () => {
+        const current = {
+            ...routineTaskForMutation(99),
+            assignees: [{ employeeId: 11, role: "OWNER" }],
+        };
+        const updated = { ...current, version: 2, title: "แก้ไขแล้ว" };
+        prismaMock.user.findUnique.mockResolvedValue(
+            asNever(activeUser("USER", 11)),
+        );
+        prismaMock.routineUnit.findFirst.mockResolvedValue(asNever({ id: 1 }));
+        prismaMock.routineCategory.findFirst.mockResolvedValue(asNever({ id: 1 }));
+        prismaMock.routineTask.findFirst.mockResolvedValue(asNever(current));
+        prismaMock.routineTask.updateMany.mockResolvedValue(asNever({ count: 1 }));
+        prismaMock.routineTask.findUniqueOrThrow.mockResolvedValue(asNever(updated));
+
+        await updateRoutineTask(
+            71,
+            { version: 1, title: "แก้ไขแล้ว" },
+            actor(3, "USER"),
+        );
+
+        const expectedScope = {
+            OR: [
+                { createdById: 3 },
+                { assignees: { some: { employeeId: 11 } } },
+            ],
+        };
+        expect(prismaMock.routineTask.findFirst).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: { id: 71, ...expectedScope },
+            }),
+        );
+        expect(prismaMock.routineTask.updateMany).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: { id: 71, version: 1, ...expectedScope },
+            }),
+        );
+        const auditData = prismaMock.auditLog.create.mock.calls[0]?.[0]?.data;
+        expect(auditData).toMatchObject({ userId: 3, entityId: 71 });
+        expect(JSON.parse(String(auditData?.details))).toMatchObject({
+            createdById: 99,
+        });
+    });
+
+    it("rejects an unrelated, former, or occurrence-only assignee from updating the master", async () => {
+        const cases = [
+            { employeeId: 42, label: "unrelated" },
+            { employeeId: 11, label: "former" },
+            { employeeId: 42, label: "occurrence-only" },
+        ];
+
+        for (const { employeeId } of cases) {
+            mockReset(prismaMock);
+            prismaMock.$queryRaw.mockResolvedValue(asNever([]));
+            prismaMock.user.findUnique.mockResolvedValue(
+                asNever(activeUser("USER", employeeId)),
+            );
+            prismaMock.routineTask.findFirst.mockResolvedValue(null);
+
+            await expect(
+                updateRoutineTask(
+                    71,
+                    { version: 1, title: "ไม่ควรแก้ได้" },
+                    actor(3, "USER"),
+                ),
+            ).rejects.toMatchObject({ code: "NOT_FOUND", statusCode: 404 });
+        }
+
+        expect(prismaMock.routineTask.updateMany).not.toHaveBeenCalled();
+    });
+
+    it("rejects an assigned employee's lifecycle change while allowing content edits", async () => {
+        const current = {
+            ...routineTaskForMutation(99),
+            assignees: [{ employeeId: 11, role: "OWNER" }],
+        };
+        prismaMock.user.findUnique.mockResolvedValue(
+            asNever(activeUser("USER", 11)),
+        );
+        prismaMock.routineUnit.findFirst.mockResolvedValue(asNever({ id: 1 }));
+        prismaMock.routineCategory.findFirst.mockResolvedValue(asNever({ id: 1 }));
+        prismaMock.routineTask.findFirst.mockResolvedValue(asNever(current));
+
+        await expect(
+            updateRoutineTask(
+                71,
+                { version: 1, isActive: false },
+                actor(3, "USER"),
+            ),
+        ).rejects.toMatchObject({ code: "FORBIDDEN", statusCode: 403 });
+        expect(prismaMock.routineTask.updateMany).not.toHaveBeenCalled();
+    });
+
+    it("returns a conflict when an assigned employee submits a stale task version", async () => {
+        const current = {
+            ...routineTaskForMutation(99),
+            assignees: [{ employeeId: 11, role: "OWNER" }],
+        };
+        prismaMock.user.findUnique.mockResolvedValue(
+            asNever(activeUser("USER", 11)),
+        );
+        prismaMock.routineUnit.findFirst.mockResolvedValue(asNever({ id: 1 }));
+        prismaMock.routineCategory.findFirst.mockResolvedValue(asNever({ id: 1 }));
+        prismaMock.routineTask.findFirst.mockResolvedValue(asNever(current));
+        prismaMock.routineTask.updateMany.mockResolvedValue(asNever({ count: 0 }));
+
+        await expect(
+            updateRoutineTask(
+                71,
+                { version: 1, description: "ข้อมูลใหม่" },
+                actor(3, "USER"),
+            ),
+        ).rejects.toThrow("ข้อมูลแม่แบบงานเปลี่ยนแปลงแล้ว กรุณาโหลดข้อมูลใหม่");
+        expect(prismaMock.auditLog.create).not.toHaveBeenCalled();
     });
 
     it("returns not found when a self-service user updates another user's task", async () => {
@@ -891,12 +1014,25 @@ describe("NHF Routine mutations", () => {
 
         expect(prismaMock.routineTask.findFirst).toHaveBeenCalledWith(
             expect.objectContaining({
-                where: { id: 71, createdById: 99 },
+                where: {
+                    id: 71,
+                    OR: [
+                        { createdById: 99 },
+                        { assignees: { some: { employeeId: 99 } } },
+                    ],
+                },
             }),
         );
         expect(prismaMock.routineTask.updateMany).toHaveBeenCalledWith(
             expect.objectContaining({
-                where: { id: 71, version: 1, createdById: 99 },
+                where: {
+                    id: 71,
+                    version: 1,
+                    OR: [
+                        { createdById: 99 },
+                        { assignees: { some: { employeeId: 99 } } },
+                    ],
+                },
             }),
         );
     });

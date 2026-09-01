@@ -104,7 +104,7 @@ function RoutineOccurrencePanel({
         isLoading: editingTaskLoading,
         mutate: mutateEditingTask,
     } = useSWR<RoutineTaskByIdResponse, Error>(
-        isAdmin && editingTaskId !== null
+        editingTaskId !== null
             ? API_ROUTES.routines.taskById(editingTaskId)
             : null,
         fetchRoutine,
@@ -242,7 +242,8 @@ function RoutineOccurrencePanel({
             <RoutineTaskDialog
                 open={editingTaskId !== null}
                 intent="edit"
-                mode="ADMIN"
+                mode={isAdmin ? "ADMIN" : "SELF_SERVICE"}
+                canChangeStatus={isAdmin || editingTask?.canDelete === true}
                 reference={reference}
                 task={editingTask}
                 error={referenceError ?? editingTaskError}
@@ -356,7 +357,7 @@ function RoutineTaskSettings({
         <div className="space-y-5">
             <div className="space-y-1">
                 <h2 className="text-xl font-semibold tracking-tight text-brand-strong">{isSelfService ? "จัดการงานของฉัน" : "ตั้งค่าแม่แบบงานประจำ"}</h2>
-                <p className="max-w-prose text-sm leading-6 text-content-secondary">{isSelfService ? "สร้างและจัดการเฉพาะแม่แบบงาน Routine ที่คุณสร้างไว้" : "กำหนดตารางงาน ผู้รับผิดชอบ และการแจ้งเตือนของแต่ละแม่แบบ"}</p>
+                <p className="max-w-prose text-sm leading-6 text-content-secondary">{isSelfService ? "สร้างและจัดการแม่แบบงาน Routine ที่คุณสร้างหรือได้รับมอบหมาย" : "กำหนดตารางงาน ผู้รับผิดชอบ และการแจ้งเตือนของแต่ละแม่แบบ"}</p>
             </div>
             <RoutineTaskList
                 data={tasks}
@@ -397,6 +398,7 @@ function RoutineTaskSettings({
                 open={isCreating || editingTask !== null}
                 intent={editingTask ? "edit" : "create"}
                 mode={mode}
+                canChangeStatus={editingTask === null || editingTask.canDelete}
                 reference={reference}
                 task={editingTask}
                 error={referenceError}

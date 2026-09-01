@@ -32,6 +32,8 @@ import {
     assertActiveAdminInTransaction,
     assertActiveEmployeesInTransaction,
     assertActiveRoutineActorInTransaction,
+    buildRoutineTaskDeleteScope,
+    buildRoutineTaskEditScope,
     type RoutineActorAuthorization,
 } from "./authorization";
 import {
@@ -40,6 +42,7 @@ import {
 } from "./idempotency";
 import {
     RoutineConflictError,
+    RoutineForbiddenError,
     RoutineNotFoundError,
     RoutineValidationError,
 } from "./errors";
@@ -529,7 +532,10 @@ export async function deleteRoutineTask(
                   },
               })
             : await tx.routineTask.findFirst({
-                  where: { id: taskId, createdById: actor.id },
+                  where: {
+                      id: taskId,
+                      ...buildRoutineTaskDeleteScope(actor.id, authorization),
+                  },
                   select: {
                       id: true,
                       title: true,
@@ -623,16 +629,24 @@ export async function updateRoutineTask(
     return runSerializableTransaction(async (tx) => {
         const authorization = await assertActiveRoutineActorInTransaction(tx, actor);
         const normalizedInput = normalizeRoutineTaskUpdateInput(input, authorization);
+        const taskScope = buildRoutineTaskEditScope(actor.id, authorization);
         const current = authorization.isAdmin
             ? await tx.routineTask.findUnique({
                   where: { id: taskId },
                   include: ROUTINE_TASK_INCLUDE,
               })
             : await tx.routineTask.findFirst({
-                  where: { id: taskId, createdById: actor.id },
+                  where: { id: taskId, ...taskScope },
                   include: ROUTINE_TASK_INCLUDE,
               });
         if (!current) throw new RoutineNotFoundError();
+
+        const isActiveChanged =
+            normalizedInput.isActive !== undefined
+            && normalizedInput.isActive !== current.isActive;
+        if (isActiveChanged && !authorization.isAdmin && current.createdById !== actor.id) {
+            throw new RoutineForbiddenError("คุณไม่มีสิทธิ์เปลี่ยนสถานะแม่แบบงานนี้");
+        }
 
         const nextScheduleType = (normalizedInput.scheduleType
             ?? current.scheduleType) as RoutineScheduleType;
@@ -669,9 +683,6 @@ export async function updateRoutineTask(
         const reminderRulesChanged =
             nextReminderRules !== null
             && !areReminderRulesEqual(current.reminderRules, nextReminderRules);
-        const isActiveChanged =
-            normalizedInput.isActive !== undefined
-            && normalizedInput.isActive !== current.isActive;
         if (nextAssignees) {
             await assertActiveEmployeesInTransaction(
                 tx,
@@ -712,7 +723,7 @@ export async function updateRoutineTask(
             where: {
                 id: taskId,
                 version: normalizedInput.version,
-                ...(authorization.isAdmin ? {} : { createdById: actor.id }),
+                ...taskScope,
             },
             data,
         });

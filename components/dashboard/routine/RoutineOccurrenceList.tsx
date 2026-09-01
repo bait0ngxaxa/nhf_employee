@@ -183,19 +183,17 @@ export function RoutineOccurrenceList({
                                 <Eye aria-hidden="true" />
                                 ดูรายละเอียด
                             </Button>
-                            {isAdmin ? (
-                                <>
-                                    <Button type="button" size="sm" variant="outline" onClick={() => onEditTask(task.id)}>
-                                        <Pencil aria-hidden="true" />
-                                        แก้ไข Routine
-                                    </Button>
-                                    {occurrence ? (
-                                        <Button type="button" size="sm" variant="outline" onClick={() => openOccurrenceEdit(task)}>
-                                            <Pencil aria-hidden="true" />
-                                            ปรับเฉพาะรอบนี้
-                                        </Button>
-                                    ) : null}
-                                </>
+                            {task.canEdit ? (
+                                <Button type="button" size="sm" variant="outline" onClick={() => onEditTask(task.id)}>
+                                    <Pencil aria-hidden="true" />
+                                    แก้ไข Routine
+                                </Button>
+                            ) : null}
+                            {isAdmin && occurrence ? (
+                                <Button type="button" size="sm" variant="outline" onClick={() => openOccurrenceEdit(task)}>
+                                    <Pencil aria-hidden="true" />
+                                    ปรับเฉพาะรอบนี้
+                                </Button>
                             ) : null}
                         </div>
                     </article>

@@ -265,7 +265,7 @@ export function LiffRoutineTaskDetail({
                                     </OptionalSection>
                                 ) : null}
 
-                                {detail.canManage ? (
+                                {detail.canEdit ? (
                                     <OptionalSection id="liff-routine-reminders" title="การแจ้งเตือน">
                                         {detail.reminderRules.length === 0 ? (
                                             <p className="text-sm leading-6 text-content-secondary">
@@ -331,28 +331,32 @@ export function LiffRoutineTaskDetail({
                     </div>
                 </SheetScrollArea>
 
-                {detail?.canManage && !loading && !error ? (
+                {(detail?.canEdit || detail?.canDelete) && !loading && !error ? (
                     <div className="shrink-0 border-t border-border-subtle bg-surface px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 sm:px-6">
                         <div className="mx-auto grid max-w-2xl gap-2">
-                            <Button
-                                type="button"
-                                className="min-h-12 bg-brand-solid font-bold text-content-on-brand hover:bg-brand-solid-hover"
-                                onClick={() => onEdit(detail)}
-                                disabled={deleting}
-                            >
-                                <Pencil className="size-4" aria-hidden="true" />
-                                แก้ไขงานของฉัน
-                            </Button>
-                            <Button
-                                type="button"
-                                variant="outline"
-                                className="min-h-11 border-status-danger-border text-status-danger-foreground hover:bg-status-danger-surface"
-                                onClick={() => setDeleteConfirmOpen(true)}
-                                disabled={deleting}
-                            >
-                                <Trash2 className="size-4" aria-hidden="true" />
-                                ลบงานนี้
-                            </Button>
+                            {detail?.canEdit ? (
+                                <Button
+                                    type="button"
+                                    className="min-h-12 bg-brand-solid font-bold text-content-on-brand hover:bg-brand-solid-hover"
+                                    onClick={() => onEdit(detail)}
+                                    disabled={deleting}
+                                >
+                                    <Pencil className="size-4" aria-hidden="true" />
+                                    แก้ไขงาน
+                                </Button>
+                            ) : null}
+                            {detail?.canDelete ? (
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    className="min-h-11 border-status-danger-border text-status-danger-foreground hover:bg-status-danger-surface"
+                                    onClick={() => setDeleteConfirmOpen(true)}
+                                    disabled={deleting}
+                                >
+                                    <Trash2 className="size-4" aria-hidden="true" />
+                                    ลบงานนี้
+                                </Button>
+                            ) : null}
                         </div>
                     </div>
                 ) : null}

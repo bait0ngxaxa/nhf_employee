@@ -65,6 +65,8 @@ describe("RoutineTaskForm reminder rules", () => {
 
     it("keeps an existing manual Routine editable", () => {
         const manualTask = {
+            canEdit: true,
+            canDelete: true,
             id: 81,
             unitId: 1,
             categoryId: 1,
@@ -399,6 +401,8 @@ describe("RoutineTaskForm reminder rules", () => {
 
     it("shows an admin-reassigned employee and preserves that assignee on self-service edit", async () => {
         const initialTask = {
+            canEdit: true,
+            canDelete: true,
             id: 71,
             unitId: 1,
             categoryId: 1,
@@ -463,7 +467,7 @@ describe("RoutineTaskForm reminder rules", () => {
         expect(screen.queryByText("ผู้รับผิดชอบคือคุณ และการแจ้งเตือนจะส่งทั้งในระบบและอีเมล")).not.toBeInTheDocument();
         expect(screen.getByText("ผู้รับผิดชอบของงานนี้ถูกปรับโดยผู้ดูแลระบบ")).toBeInTheDocument();
 
-        fireEvent.click(screen.getByRole("button", { name: "บันทึกงานของฉัน" }));
+        fireEvent.click(screen.getByRole("button", { name: "บันทึกการแก้ไข" }));
 
         await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
         const request = fetchMock.mock.calls[0]?.[1] as RequestInit;

@@ -623,6 +623,7 @@ describe("NHF Routine query authorization", () => {
         expect(result.tasks).toHaveLength(1);
         expect(result.tasks[0]?.id).toBe(71);
         expect(result.tasks[0]?.relevantOccurrence?.id).toBe(99);
+        expect(result.tasks[0]).toMatchObject({ canEdit: false, canDelete: false });
         expect(prismaMock.routineTask.findMany).toHaveBeenCalledWith(
             expect.objectContaining({
                 where: expect.objectContaining({ id: 71 }),
@@ -745,6 +746,7 @@ describe("NHF Routine query authorization", () => {
 
         expect(result.tasks).toHaveLength(1);
         expect(result.tasks[0]?.relevantOccurrence?.id).toBe(100);
+        expect(result.tasks[0]).toMatchObject({ canEdit: true, canDelete: false });
     });
 
     it("does not fall back for an occurrence-only assignee after deletion", async () => {
@@ -836,7 +838,7 @@ describe("NHF Routine query authorization", () => {
         });
     });
 
-    it("combines unit and category filters with management ownership scope", async () => {
+    it("combines unit and category filters with creator-or-assignee scope", async () => {
         await getRoutineTasks(
             {
                 activeOnly: undefined,
@@ -851,17 +853,102 @@ describe("NHF Routine query authorization", () => {
             },
         );
 
+        const expectedScope = {
+            OR: [
+                { createdById: 5 },
+                {
+                    assignees: {
+                        some: {
+                            employeeId: 21,
+                            employee: expect.any(Object),
+                        },
+                    },
+                },
+            ],
+        };
         expect(prismaMock.routineTask.findMany).toHaveBeenCalledWith(
             expect.objectContaining({
-                where: { createdById: 5, unitId: 3, categoryId: 5 },
+                where: expect.objectContaining({
+                    ...expectedScope,
+                    unitId: 3,
+                    categoryId: 5,
+                }),
             }),
         );
         expect(prismaMock.routineTask.count).toHaveBeenCalledWith({
-            where: { createdById: 5, unitId: 3, categoryId: 5 },
+            where: expect.objectContaining({
+                ...expectedScope,
+                unitId: 3,
+                categoryId: 5,
+            }),
         });
     });
 
-    it("returns 404-compatible detail queries for another user's task", async () => {
+    it("returns an Admin-created task in management results for its active assignee", async () => {
+        prismaMock.routineTask.findMany.mockResolvedValue(asNever([{
+            ...taskRow(71, 21),
+            createdById: 99,
+        }]));
+        prismaMock.routineTask.count.mockResolvedValue(1);
+
+        const result = await getRoutineTasks(
+            { activeOnly: undefined, page: 1, limit: 20 },
+            {
+                actor: { id: 5, email: "user@example.com", role: "USER" },
+                employeeId: 21,
+            },
+        );
+
+        expect(result.tasks).toMatchObject([{
+            id: 71,
+            createdById: 99,
+            canEdit: true,
+            canDelete: false,
+        }]);
+    });
+
+    it("keeps creator-or-assignee scope when searching management results", async () => {
+        await getRoutineTasks(
+            {
+                activeOnly: undefined,
+                search: "Admin report",
+                page: 1,
+                limit: 20,
+            },
+            {
+                actor: { id: 5, email: "user@example.com", role: "USER" },
+                employeeId: 21,
+            },
+        );
+
+        expect(prismaMock.routineTask.findMany).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: expect.objectContaining({
+                    OR: [
+                        { createdById: 5 },
+                        {
+                            assignees: {
+                                some: {
+                                    employeeId: 21,
+                                    employee: expect.any(Object),
+                                },
+                            },
+                        },
+                    ],
+                    AND: [{
+                        OR: [
+                            { title: { contains: "Admin report" } },
+                            { description: { contains: "Admin report" } },
+                            { unit: { name: { contains: "Admin report" } } },
+                            { category: { name: { contains: "Admin report" } } },
+                        ],
+                    }],
+                }),
+            }),
+        );
+    });
+
+    it("returns 404-compatible detail queries for an unrelated user's task", async () => {
         prismaMock.routineTask.findFirst.mockResolvedValue(null);
 
         await expect(
@@ -873,12 +960,52 @@ describe("NHF Routine query authorization", () => {
 
         expect(prismaMock.routineTask.findFirst).toHaveBeenCalledWith(
             expect.objectContaining({
-                where: { id: 71, createdById: 5 },
+                where: {
+                    id: 71,
+                    OR: [
+                        { createdById: 5 },
+                        {
+                            assignees: {
+                                some: {
+                                    employeeId: 21,
+                                    employee: expect.any(Object),
+                                },
+                            },
+                        },
+                    ],
+                },
             }),
         );
     });
 
-    it("allows an active assignee to view a task without granting management", async () => {
+    it("returns an Admin-created task to its current master assignee", async () => {
+        const task = {
+            ...taskRow(71, 21),
+            unitId: 1,
+            categoryId: 1,
+            version: 2,
+            createdById: 99,
+            updatedById: 99,
+            createdAt: new Date("2026-08-01T00:00:00.000Z"),
+            updatedAt: new Date("2026-08-01T00:00:00.000Z"),
+            occurrences: [],
+        };
+        prismaMock.routineTask.findFirst.mockResolvedValue(asNever(task));
+
+        const result = await getRoutineTaskById(71, {
+            actor: { id: 5, email: "user@example.com", role: "USER" },
+            employeeId: 21,
+        });
+
+        expect(result).toMatchObject({
+            id: 71,
+            createdById: 99,
+            canEdit: true,
+            canDelete: false,
+        });
+    });
+
+    it("allows an active master assignee to view and edit without granting delete", async () => {
         const task = {
             ...taskRow(71, 21),
             unitId: 1,
@@ -897,7 +1024,12 @@ describe("NHF Routine query authorization", () => {
             employeeId: 21,
         });
 
-        expect(result).toMatchObject({ id: 71, createdById: 99, canManage: false });
+        expect(result).toMatchObject({
+            id: 71,
+            createdById: 99,
+            canEdit: true,
+            canDelete: false,
+        });
         expect(prismaMock.routineTask.findFirst).toHaveBeenCalledWith(
             expect.objectContaining({
                 where: {
@@ -952,7 +1084,12 @@ describe("NHF Routine query authorization", () => {
             employeeId: 21,
         });
 
-        expect(result).toMatchObject({ id: 71, isActive: false, canManage: true });
+        expect(result).toMatchObject({
+            id: 71,
+            isActive: false,
+            canEdit: true,
+            canDelete: true,
+        });
         expect(prismaMock.routineTask.findFirst).toHaveBeenCalledWith(
             expect.objectContaining({
                 where: expect.objectContaining({
@@ -982,7 +1119,12 @@ describe("NHF Routine query authorization", () => {
             employeeId: 42,
         });
 
-        expect(result).toMatchObject({ id: 71, createdById: 99, canManage: false });
+        expect(result).toMatchObject({
+            id: 71,
+            createdById: 99,
+            canEdit: false,
+            canDelete: false,
+        });
         expect(prismaMock.routineTask.findFirst).toHaveBeenCalledWith(
             expect.objectContaining({
                 where: {
@@ -1086,7 +1228,7 @@ describe("NHF Routine query authorization", () => {
         );
     });
 
-    it("does not let the ADMIN role override LIFF canManage", async () => {
+    it("does not let the ADMIN role override LIFF self-service capabilities", async () => {
         const task = {
             ...taskRow(71, 21),
             unitId: 1,
@@ -1101,11 +1243,17 @@ describe("NHF Routine query authorization", () => {
         prismaMock.routineTask.findFirst.mockResolvedValue(asNever(task));
 
         const result = await getLiffRoutineTaskById(71, {
-            actor: { id: 99, email: "admin@example.com", role: "ADMIN" },
-            employeeId: 21,
+            actor: {
+                id: 99,
+                email: "admin@example.com",
+                role: "ADMIN",
+                mode: "LIFF_SELF_SERVICE",
+            },
+            employeeId: 42,
         });
 
-        expect(result.canManage).toBe(false);
+        expect(result.canEdit).toBe(false);
+        expect(result.canDelete).toBe(false);
     });
 
     it("returns a not-found error when no active task or occurrence assignment grants access", async () => {

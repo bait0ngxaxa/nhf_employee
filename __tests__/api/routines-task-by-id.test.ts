@@ -1,10 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const mocks = vi.hoisted(() => ({
-    requireActiveWorkforceOrAdminSession: vi.fn(),
-    deleteTask: vi.fn(),
-}));
+const mocks = vi.hoisted(() => {
+    class MockRoutineServiceError extends Error {
+        readonly statusCode: number;
+
+        constructor(message: string, statusCode: number) {
+            super(message);
+            this.statusCode = statusCode;
+        }
+    }
+
+    return {
+        requireActiveWorkforceOrAdminSession: vi.fn(),
+        deleteTask: vi.fn(),
+        getTask: vi.fn(),
+        updateTask: vi.fn(),
+        RoutineServiceError: MockRoutineServiceError,
+    };
+});
 
 vi.mock("@/lib/auth/api", () => ({
     requireAdminSession: vi.fn(),
@@ -15,13 +29,17 @@ vi.mock("@/lib/auth/workforce", () => ({
 }));
 
 vi.mock("@/lib/services/routine", () => ({
-    RoutineServiceError: class RoutineServiceError extends Error {},
+    RoutineServiceError: mocks.RoutineServiceError,
     deleteRoutineTask: mocks.deleteTask,
-    getRoutineTaskById: vi.fn(),
-    updateRoutineTask: vi.fn(),
+    getRoutineTaskById: mocks.getTask,
+    updateRoutineTask: mocks.updateTask,
 }));
 
-import { DELETE } from "@/app/api/routines/tasks/[id]/route";
+import {
+    DELETE,
+    GET,
+    PATCH,
+} from "@/app/api/routines/tasks/[id]/route";
 
 describe("DELETE /api/routines/tasks/:id", () => {
     beforeEach(() => {
@@ -31,6 +49,80 @@ describe("DELETE /api/routines/tasks/:id", () => {
             user: { id: 99, email: "admin@example.com", role: "ADMIN" },
         });
         mocks.deleteTask.mockResolvedValue(undefined);
+        mocks.getTask.mockResolvedValue({
+            id: 71,
+            canEdit: true,
+            canDelete: false,
+        });
+        mocks.updateTask.mockResolvedValue({ id: 71 });
+    });
+
+    it("allows a current master assignee to fetch the task detail", async () => {
+        mocks.requireActiveWorkforceOrAdminSession.mockResolvedValue({
+            ok: true,
+            user: { id: 5, email: "user@example.com", role: "USER" },
+            employeeId: 21,
+        });
+
+        const response = await GET(
+            new NextRequest("http://localhost/api/routines/tasks/71"),
+            { params: Promise.resolve({ id: "71" }) },
+        );
+
+        expect(response.status).toBe(200);
+        expect(mocks.getTask).toHaveBeenCalledWith(
+            71,
+            expect.objectContaining({
+                actor: expect.objectContaining({ id: 5, role: "USER" }),
+                employeeId: 21,
+            }),
+        );
+    });
+
+    it("passes an authorized assignee PATCH to the service with the authenticated actor", async () => {
+        mocks.requireActiveWorkforceOrAdminSession.mockResolvedValue({
+            ok: true,
+            user: { id: 5, email: "user@example.com", role: "USER" },
+            employeeId: 21,
+        });
+
+        const response = await PATCH(
+            new NextRequest("http://localhost/api/routines/tasks/71", {
+                method: "PATCH",
+                headers: { "content-type": "application/json" },
+                body: JSON.stringify({ version: 3, title: "แก้ไขแล้ว" }),
+            }),
+            { params: Promise.resolve({ id: "71" }) },
+        );
+
+        expect(response.status).toBe(200);
+        expect(mocks.updateTask).toHaveBeenCalledWith(
+            71,
+            { version: 3, title: "แก้ไขแล้ว" },
+            expect.objectContaining({ id: 5, role: "USER" }),
+        );
+    });
+
+    it("returns the service denial for an unrelated employee instead of trusting UI capabilities", async () => {
+        mocks.requireActiveWorkforceOrAdminSession.mockResolvedValue({
+            ok: true,
+            user: { id: 6, email: "other@example.com", role: "USER" },
+            employeeId: 42,
+        });
+        mocks.updateTask.mockRejectedValueOnce(
+            new mocks.RoutineServiceError("ไม่พบงานประจำ", 404),
+        );
+
+        const response = await PATCH(
+            new NextRequest("http://localhost/api/routines/tasks/71", {
+                method: "PATCH",
+                headers: { "content-type": "application/json" },
+                body: JSON.stringify({ version: 3, title: "ไม่ควรแก้ได้" }),
+            }),
+            { params: Promise.resolve({ id: "71" }) },
+        );
+
+        expect(response.status).toBe(404);
     });
 
     it("authorizes an admin and deletes exactly the requested task", async () => {

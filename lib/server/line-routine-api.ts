@@ -94,7 +94,7 @@ export function serializeLiffRoutineTaskDetail(
             id: task.category.id,
             name: task.category.name,
         },
-        reminderRules: task.canManage
+        reminderRules: task.canEdit
             ? task.reminderRules.map((rule) => ({
                   daysBefore: rule.daysBefore,
                   sendHour: rule.sendHour,
@@ -113,6 +113,7 @@ export function serializeLiffRoutineTaskDetail(
             isOverdue: occurrence.isOverdue,
             daysUntilDue: occurrence.daysUntilDue,
         })),
-        canManage: task.canManage,
+        canEdit: task.canEdit,
+        canDelete: task.canDelete,
     };
 }

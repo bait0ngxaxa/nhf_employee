@@ -267,18 +267,24 @@ export function RoutineTaskList({
                                                     <Eye aria-hidden="true" />
                                                     ดูรายละเอียด
                                                 </Button>
-                                                <Button type="button" variant="outline" size="sm" onClick={() => onEdit(task)} disabled={pendingTaskId === task.id}>
-                                                    <Edit3 aria-hidden="true" />
-                                                    แก้ไข
-                                                </Button>
-                                                <Button type="button" variant="outline" size="sm" disabled={pendingTaskId === task.id} onClick={() => void onToggleActive(task)}>
-                                                    <Power aria-hidden="true" />
-                                                    {pendingTaskId === task.id ? "กำลังบันทึก..." : task.isActive ? "ปิดใช้งาน" : "เปิดใช้งาน"}
-                                                </Button>
-                                                <Button type="button" variant="ghost" size="sm" className="text-status-danger-foreground" disabled={pendingTaskId === task.id} onClick={() => setDeleteTask(task)}>
-                                                    <Trash2 aria-hidden="true" />
-                                                    ลบ
-                                                </Button>
+                                                {task.canEdit ? (
+                                                    <Button type="button" variant="outline" size="sm" onClick={() => onEdit(task)} disabled={pendingTaskId === task.id}>
+                                                        <Edit3 aria-hidden="true" />
+                                                        แก้ไข
+                                                    </Button>
+                                                ) : null}
+                                                {task.canDelete ? (
+                                                    <>
+                                                        <Button type="button" variant="outline" size="sm" disabled={pendingTaskId === task.id} onClick={() => void onToggleActive(task)}>
+                                                            <Power aria-hidden="true" />
+                                                            {pendingTaskId === task.id ? "กำลังบันทึก..." : task.isActive ? "ปิดใช้งาน" : "เปิดใช้งาน"}
+                                                        </Button>
+                                                        <Button type="button" variant="ghost" size="sm" className="text-status-danger-foreground" disabled={pendingTaskId === task.id} onClick={() => setDeleteTask(task)}>
+                                                            <Trash2 aria-hidden="true" />
+                                                            ลบ
+                                                        </Button>
+                                                    </>
+                                                ) : null}
                                             </div>
                                         </td>
                                     </tr>

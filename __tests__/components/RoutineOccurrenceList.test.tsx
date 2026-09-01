@@ -10,6 +10,8 @@ import type {
 
 const taskData: PaginatedRoutineTaskWorkItemsResponse = {
     tasks: [{
+        canEdit: false,
+        canDelete: false,
         id: 71,
         title: "ตรวจสอบระบบประจำเดือน",
         description: "ตรวจรายการระบบทั้งหมดและสรุปผลให้ทีมบริหาร",
@@ -193,12 +195,32 @@ describe("RoutineOccurrenceList", () => {
 
     it("separates admin task edit from the occurrence-only override", () => {
         const onEditTask = vi.fn();
-        renderList({ isAdmin: true, onEditTask });
+        const adminData: PaginatedRoutineTaskWorkItemsResponse = {
+            ...taskData,
+            tasks: [{ ...taskData.tasks[0], canEdit: true, canDelete: true }],
+        };
+        renderList({ data: adminData, isAdmin: true, onEditTask });
 
         expect(screen.getByRole("button", { name: "ดูรายละเอียด" })).toBeInTheDocument();
         expect(screen.getByRole("button", { name: "แก้ไข Routine" })).toBeInTheDocument();
         expect(screen.getByRole("button", { name: "ปรับเฉพาะรอบนี้" })).toBeInTheDocument();
 
+        fireEvent.click(screen.getByRole("button", { name: "แก้ไข Routine" }));
+        expect(onEditTask).toHaveBeenCalledWith(71);
+    });
+
+    it("shows master edit to an assigned employee without occurrence administration", () => {
+        const onEditTask = vi.fn();
+        const assignedData: PaginatedRoutineTaskWorkItemsResponse = {
+            ...taskData,
+            tasks: [{ ...taskData.tasks[0], canEdit: true, canDelete: false }],
+        };
+
+        renderList({ data: assignedData, onEditTask });
+
+        expect(screen.getByRole("button", { name: "ดูรายละเอียด" })).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "แก้ไข Routine" })).toBeInTheDocument();
+        expect(screen.queryByRole("button", { name: "ปรับเฉพาะรอบนี้" })).not.toBeInTheDocument();
         fireEvent.click(screen.getByRole("button", { name: "แก้ไข Routine" }));
         expect(onEditTask).toHaveBeenCalledWith(71);
     });

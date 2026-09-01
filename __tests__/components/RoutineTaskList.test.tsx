@@ -5,6 +5,8 @@ import { RoutineTaskList } from "@/components/dashboard/routine/RoutineTaskList"
 import type { RoutineTask } from "@/components/dashboard/routine/types";
 
 const task = {
+    canEdit: true,
+    canDelete: true,
     id: 71,
     unitId: 1,
     categoryId: 1,
@@ -193,5 +195,26 @@ describe("RoutineTaskList", () => {
         fireEvent.click(screen.getByRole("button", { name: "ลบรายการ" }));
 
         await waitFor(() => expect(props.onDelete).toHaveBeenCalledWith(task));
+    });
+
+    it("keeps delete and lifecycle actions hidden for an assigned non-creator", () => {
+        const assignedTask: RoutineTask = {
+            ...task,
+            canEdit: true,
+            canDelete: false,
+            createdById: 99,
+        };
+        const props = makeProps();
+        render(
+            <RoutineTaskList
+                {...props}
+                data={{ ...props.data, tasks: [assignedTask] }}
+            />,
+        );
+
+        expect(screen.getByRole("button", { name: "ดูรายละเอียด" })).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "แก้ไข" })).toBeInTheDocument();
+        expect(screen.queryByRole("button", { name: "ปิดใช้งาน" })).not.toBeInTheDocument();
+        expect(screen.queryByRole("button", { name: "ลบ" })).not.toBeInTheDocument();
     });
 });

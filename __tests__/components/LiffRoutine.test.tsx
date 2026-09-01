@@ -138,7 +138,8 @@ const DETAIL: LiffRoutineTaskDetail = {
         isOverdue: false,
         daysUntilDue: 0,
     }],
-    canManage: true,
+    canEdit: true,
+    canDelete: true,
 };
 
 type DetailOccurrence = LiffRoutineTaskDetail["occurrences"][number];
@@ -442,7 +443,7 @@ describe("LiffRoutineApp", () => {
         expect(screen.getByText("งานหน้าแรก")).toBeInTheDocument();
     });
 
-    it("opens the current task detail and shows self-service controls for canManage tasks", async () => {
+    it("opens the current task detail and shows edit and delete controls for authorized tasks", async () => {
         render(<LiffRoutineApp />);
         await screen.findByText("ตรวจสอบระบบ");
 
@@ -455,7 +456,7 @@ describe("LiffRoutineApp", () => {
         expect(screen.getByText("สัญญารายปี")).toBeInTheDocument();
         const detailDialog = screen.getByRole("dialog");
         const detailScrollArea = detailDialog.querySelector('[data-slot="sheet-scroll-area"]');
-        const editButton = screen.getByRole("button", { name: "แก้ไขงานของฉัน" });
+        const editButton = screen.getByRole("button", { name: "แก้ไขงาน" });
         const deleteButton = screen.getByRole("button", { name: "ลบงานนี้" });
         expect(detailDialog).toHaveAttribute("data-scroll-owner", "area");
         expect(detailDialog.querySelectorAll('[data-slot="sheet-scroll-area"]')).toHaveLength(1);
@@ -465,14 +466,35 @@ describe("LiffRoutineApp", () => {
         expect(mocks.fetchLiffRoutineTask).toHaveBeenCalledWith(71);
     });
 
-    it("shows assigned occurrence detail without management controls", async () => {
+    it("shows an assigned master task edit control without delete access", async () => {
+        mocks.fetchLiffRoutineTask.mockResolvedValueOnce({
+            task: {
+                ...DETAIL,
+                canEdit: true,
+                canDelete: false,
+            },
+        });
+
+        render(<LiffRoutineApp />);
+        await screen.findByText("ตรวจสอบระบบ");
+        fireEvent.click(
+            screen.getByRole("button", { name: "เปิดรายละเอียดงาน ตรวจสอบระบบ" }),
+        );
+
+        expect(await screen.findByText("รอบที่เกี่ยวข้อง")).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "แก้ไขงาน" })).toBeInTheDocument();
+        expect(screen.queryByRole("button", { name: "ลบงานนี้" })).not.toBeInTheDocument();
+    });
+
+    it("shows assigned occurrence detail without master management controls", async () => {
         mocks.useSearchParams.mockReturnValue(
             new URLSearchParams("taskId=71&occurrenceId=91"),
         );
         mocks.fetchLiffRoutineTask.mockResolvedValueOnce({
             task: {
                 ...DETAIL,
-                canManage: false,
+                canEdit: false,
+                canDelete: false,
                 reminderRules: [],
             },
         });
@@ -484,7 +506,7 @@ describe("LiffRoutineApp", () => {
         );
 
         expect(await screen.findByText("รอบที่เกี่ยวข้อง")).toBeInTheDocument();
-        expect(screen.queryByRole("button", { name: "แก้ไขงานของฉัน" })).not.toBeInTheDocument();
+        expect(screen.queryByRole("button", { name: "แก้ไขงาน" })).not.toBeInTheDocument();
         expect(screen.queryByRole("button", { name: "ลบงานนี้" })).not.toBeInTheDocument();
     });
 
@@ -775,7 +797,7 @@ describe("LiffRoutineApp", () => {
             screen.getByRole("button", { name: "เปิดรายละเอียดงาน ตรวจสอบระบบ" }),
         );
         await screen.findByText("รายละเอียดฉบับเต็ม");
-        fireEvent.click(screen.getByRole("button", { name: "แก้ไขงานของฉัน" }));
+        fireEvent.click(screen.getByRole("button", { name: "แก้ไขงาน" }));
 
         const dialogs = await screen.findAllByRole("dialog");
         const formDialog = dialogs[dialogs.length - 1];
@@ -816,7 +838,7 @@ describe("LiffRoutineApp", () => {
         );
         const detailDialog = await screen.findByRole("dialog");
         expect(await within(detailDialog).findAllByText("ปิดใช้งาน")).not.toHaveLength(0);
-        fireEvent.click(screen.getByRole("button", { name: "แก้ไขงานของฉัน" }));
+        fireEvent.click(screen.getByRole("button", { name: "แก้ไขงาน" }));
 
         const dialogs = await screen.findAllByRole("dialog");
         const formDialog = dialogs[dialogs.length - 1];
@@ -1001,7 +1023,7 @@ describe("LiffRoutineApp", () => {
             screen.getByRole("button", { name: "เปิดรายละเอียดงาน ตรวจสอบระบบ" }),
         );
         await screen.findByText("รายละเอียดฉบับเต็ม");
-        fireEvent.click(screen.getByRole("button", { name: "แก้ไขงานของฉัน" }));
+        fireEvent.click(screen.getByRole("button", { name: "แก้ไขงาน" }));
         const dialogs = await screen.findAllByRole("dialog");
         const formDialog = dialogs[dialogs.length - 1];
         fireEvent.change(within(formDialog).getByRole("textbox", { name: "ชื่องาน" }), {
@@ -1036,7 +1058,7 @@ describe("LiffRoutineApp", () => {
         await screen.findByText("ตรวจสอบระบบ");
         fireEvent.click(screen.getByRole("button", { name: "เปิดรายละเอียดงาน ตรวจสอบระบบ" }));
         await screen.findByText("รายละเอียดฉบับเต็ม");
-        fireEvent.click(screen.getByRole("button", { name: "แก้ไขงานของฉัน" }));
+        fireEvent.click(screen.getByRole("button", { name: "แก้ไขงาน" }));
         const dialogs = await screen.findAllByRole("dialog");
         const formDialog = dialogs[dialogs.length - 1];
         fireEvent.change(within(formDialog).getByRole("textbox", { name: "ชื่องาน" }), {

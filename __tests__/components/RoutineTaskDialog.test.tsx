@@ -20,6 +20,8 @@ const reference: RoutineReferenceData = {
 };
 
 const task = {
+    canEdit: true,
+    canDelete: true,
     id: 71,
     unitId: 1,
     categoryId: 1,

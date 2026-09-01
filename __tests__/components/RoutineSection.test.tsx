@@ -86,12 +86,12 @@ vi.mock("@/components/dashboard/routine/RoutineKpiGrid", () => ({
 }));
 
 vi.mock("@/components/dashboard/routine/RoutineOccurrenceList", () => ({
-    RoutineOccurrenceList: ({
-        isAdmin,
+            RoutineOccurrenceList: ({
+        _isAdmin,
         onEditTask,
         onPageChange,
     }: {
-        isAdmin: boolean;
+        _isAdmin: boolean;
         onEditTask: (taskId: number) => void;
         onPageChange: (page: number) => void;
     }) => (
@@ -99,11 +99,9 @@ vi.mock("@/components/dashboard/routine/RoutineOccurrenceList", () => ({
             <button type="button" onClick={() => onPageChange(2)}>
                 ไปหน้ารายการ Routine ถัดไป
             </button>
-            {isAdmin ? (
-                <button type="button" onClick={() => onEditTask(71)}>
-                    แก้ไข Routine ทดสอบ
-                </button>
-            ) : null}
+            <button type="button" onClick={() => onEditTask(71)}>
+                แก้ไข Routine ทดสอบ
+            </button>
         </div>
     ),
 }));
@@ -288,6 +286,21 @@ describe("RoutineSection tabs", () => {
         fireEvent.click(screen.getByRole("button", { name: "แก้ไข Routine ทดสอบ" }));
 
         expect(screen.getByTestId("routine-occurrence-list")).toBeInTheDocument();
+        expect(screen.getByRole("dialog", { name: "แก้ไข Routine" })).toBeInTheDocument();
+    });
+
+    it("loads the master task detail for a regular employee's edit action", async () => {
+        mocks.useDashboardDataContext.mockReturnValue({
+            user: { role: "USER" },
+        });
+
+        render(<RoutineSection />);
+        fireEvent.click(screen.getByRole("button", { name: "แก้ไข Routine ทดสอบ" }));
+
+        await waitFor(() => expect(mocks.useSWR).toHaveBeenCalledWith(
+            "/api/routines/tasks/71",
+            expect.any(Function),
+        ));
         expect(screen.getByRole("dialog", { name: "แก้ไข Routine" })).toBeInTheDocument();
     });
 

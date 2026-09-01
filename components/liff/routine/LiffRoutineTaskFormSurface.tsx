@@ -56,7 +56,7 @@ export function LiffRoutineTaskFormSurface({
     onAmbiguousSubmit,
 }: LiffRoutineTaskFormSurfaceProps): ReactElement {
     const formRef = useRef<LiffRoutineTaskFormHandle>(null);
-    const title = mode === "CREATE" ? "เพิ่ม Routine ของฉัน" : "แก้ไข Routine ของฉัน";
+    const title = mode === "CREATE" ? "เพิ่ม Routine ของฉัน" : "แก้ไขงาน Routine";
 
     function requestClose(): void {
         if (formRef.current) {
@@ -125,7 +125,7 @@ export function LiffRoutineTaskFormSurface({
                             </Button>
                         </div>
                     </SheetScrollArea>
-                ) : reference && (mode === "CREATE" || task?.canManage === true) ? (
+                ) : reference && (mode === "CREATE" || task?.canEdit === true) ? (
                     <LiffRoutineTaskForm
                         key={`${mode}-${task?.id ?? "new"}`}
                         ref={formRef}

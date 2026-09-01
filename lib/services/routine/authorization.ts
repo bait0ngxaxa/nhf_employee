@@ -15,6 +15,37 @@ export interface RoutineActorAuthorization {
     employeeId: number | null;
 }
 
+export function isRoutineAdminActor(
+    role: string,
+    mode: RoutineCommandActor["mode"] = undefined,
+): boolean {
+    return role === "ADMIN" && mode !== "LIFF_SELF_SERVICE";
+}
+
+export function buildRoutineTaskEditScope(
+    actorId: number,
+    authorization: RoutineActorAuthorization,
+): Prisma.RoutineTaskWhereInput {
+    if (authorization.isAdmin) return {};
+
+    const scopes: Prisma.RoutineTaskWhereInput[] = [
+        { createdById: actorId },
+    ];
+    if (authorization.employeeId !== null) {
+        scopes.push({
+            assignees: { some: { employeeId: authorization.employeeId } },
+        });
+    }
+    return { OR: scopes };
+}
+
+export function buildRoutineTaskDeleteScope(
+    actorId: number,
+    authorization: RoutineActorAuthorization,
+): Prisma.RoutineTaskWhereInput {
+    return authorization.isAdmin ? {} : { createdById: actorId };
+}
+
 interface ActiveUserRecord {
     id: number;
     role: string;
@@ -61,7 +92,7 @@ export async function assertActiveRoutineActorInTransaction(
         throw new RoutineForbiddenError("บัญชีผู้ใช้ไม่พร้อมดำเนินการ");
     }
 
-    if (user.role === "ADMIN" && actor.mode !== "LIFF_SELF_SERVICE") {
+    if (isRoutineAdminActor(user.role, actor.mode)) {
         if (user.employee && !isActiveEmployee(user.employee)) {
             throw new RoutineForbiddenError("บัญชีผู้ดูแลระบบไม่พร้อมดำเนินการ");
         }

@@ -76,6 +76,7 @@ interface RoutineTaskFormProps {
     initialTask: RoutineTask | null;
     onSaved: () => void;
     onCancel: () => void;
+    canChangeStatus?: boolean;
     mode?: "SELF_SERVICE" | "ADMIN";
     presentation?: "dialog" | "standalone";
 }
@@ -179,6 +180,7 @@ function RoutineTaskForm({
     initialTask,
     onSaved,
     onCancel,
+    canChangeStatus = true,
     mode = "ADMIN",
     presentation = "standalone",
 }: RoutineTaskFormProps, ref): ReactElement {
@@ -461,7 +463,7 @@ function RoutineTaskForm({
             >
                 {presentation === "standalone" ? (
                     <div className="space-y-1">
-                        <h3 className="text-xl font-semibold tracking-tight text-content-heading">{initialTask ? (isSelfService ? "แก้ไขแม่แบบงานของฉัน" : "แก้ไขแม่แบบงานประจำ") : (isSelfService ? "สร้างแม่แบบงานของฉัน" : "สร้างแม่แบบงานประจำ")}</h3>
+                        <h3 className="text-xl font-semibold tracking-tight text-content-heading">{initialTask ? "แก้ไข Routine" : (isSelfService ? "สร้างแม่แบบงานของฉัน" : "สร้างแม่แบบงานประจำ")}</h3>
                         <p className="max-w-prose text-sm leading-6 text-content-secondary">กำหนดข้อมูลหลัก ตารางงาน ผู้รับผิดชอบ และการแจ้งเตือนในแบบฟอร์มเดียว</p>
                     </div>
                 ) : null}
@@ -566,7 +568,9 @@ function RoutineTaskForm({
                     <Textarea value={form.extraDetails} onChange={(event) => updateField("extraDetails", event.target.value)} maxLength={5000} disabled={isSubmitting} />
                 </label>
             </div>
-            <label className="flex min-h-11 items-center gap-3 text-sm font-medium text-content-body"><input type="checkbox" checked={form.isActive} onChange={(event) => updateField("isActive", event.target.checked)} disabled={isSubmitting} /> เปิดใช้งานแม่แบบงานนี้</label>
+            {canChangeStatus ? (
+                <label className="flex min-h-11 items-center gap-3 text-sm font-medium text-content-body"><input type="checkbox" checked={form.isActive} onChange={(event) => updateField("isActive", event.target.checked)} disabled={isSubmitting} /> เปิดใช้งานแม่แบบงานนี้</label>
+            ) : null}
             </div>
             <DialogFooter className={presentation === "dialog"
                 ? "shrink-0 border-t border-border-subtle bg-surface-subtle px-4 py-4 sm:px-6"
@@ -579,7 +583,7 @@ function RoutineTaskForm({
                             <Loader2 className="animate-spin motion-reduce:animate-none" aria-hidden="true" />
                             กำลังบันทึก…
                         </>
-                    ) : isSelfService ? "บันทึกงานของฉัน" : "บันทึกแม่แบบงาน"}
+                    ) : initialTask ? "บันทึกการแก้ไข" : isSelfService ? "บันทึกงานของฉัน" : "บันทึกแม่แบบงาน"}
                 </Button>
             </DialogFooter>
             <AlertDialog open={discardConfirmOpen} onOpenChange={setDiscardConfirmOpen}>
