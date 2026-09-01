@@ -29,6 +29,7 @@ export const ROUTINE_RICH_MENU_IMAGE_PATH =
 
 const LINE_MESSAGING_API_URL = "https://api.line.me";
 const LINE_MESSAGING_DATA_API_URL = "https://api-data.line.me";
+const RICH_MENU_ID_PATTERN = /^richmenu-[A-Za-z0-9_-]{1,128}$/;
 
 export interface RichMenuBounds {
     x: number;
@@ -188,6 +189,12 @@ export interface NhfRichMenuStatus {
     defaultRichMenuError: string | null;
 }
 
+export interface NhfRichMenuDefaultResult {
+    mode: "dry-run" | "applied";
+    richMenuId: string;
+    verifiedDefaultRichMenuId?: string;
+}
+
 type FetchImplementation = typeof fetch;
 
 function countCharacters(value: string): number {
@@ -198,11 +205,30 @@ function isRecord(value: unknown): value is Record<string, unknown> {
     return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function getProviderErrorSummary(status: number, body: string): string {
+function redactSensitiveValues(
+    value: string,
+    sensitiveValues: readonly string[],
+): string {
+    return sensitiveValues.reduce(
+        (redacted, sensitiveValue) => sensitiveValue
+            ? redacted.split(sensitiveValue).join("[REDACTED]")
+            : redacted,
+        value,
+    );
+}
+
+function getProviderErrorSummary(
+    status: number,
+    body: string,
+    sensitiveValues: readonly string[] = [],
+): string {
     try {
         const parsed: unknown = JSON.parse(body);
         if (isRecord(parsed) && typeof parsed.message === "string") {
-            const message = parsed.message.trim().slice(0, 200);
+            const message = redactSensitiveValues(
+                parsed.message.trim(),
+                sensitiveValues,
+            ).slice(0, 200);
             if (message) return message;
         }
     } catch {
@@ -261,7 +287,9 @@ async function requestLineApi(
         const responseBody = await response.text().catch(() => "");
         throw new RichMenuProvisioningError(
             input.phase,
-            getProviderErrorSummary(response.status, responseBody),
+            getProviderErrorSummary(response.status, responseBody, [
+                input.channelAccessToken,
+            ]),
             {
                 statusCode: response.status,
                 richMenuId: input.richMenuId,
@@ -631,7 +659,9 @@ export async function getRoutineRichMenuDefaultId(
         const responseBody = await response.text().catch(() => "");
         throw new RichMenuProvisioningError(
             "verify",
-            getProviderErrorSummary(response.status, responseBody),
+            getProviderErrorSummary(response.status, responseBody, [
+                channelAccessToken,
+            ]),
             { statusCode: response.status },
         );
     }
@@ -782,6 +812,66 @@ export async function getNhfRichMenuDefaultId(
     fetchImpl: FetchImplementation = fetch,
 ): Promise<string | null> {
     return getRoutineRichMenuDefaultId(fetchImpl);
+}
+
+export function validateNhfRichMenuId(richMenuId: string): string {
+    const normalizedRichMenuId = richMenuId.trim();
+    if (!RICH_MENU_ID_PATTERN.test(normalizedRichMenuId)) {
+        throw new RichMenuProvisioningError(
+            "configuration",
+            "Rich Menu ID is invalid",
+        );
+    }
+
+    return normalizedRichMenuId;
+}
+
+export async function setNhfRichMenuDefault(
+    options: {
+        richMenuId: string;
+        apply: boolean;
+        fetchImpl?: FetchImplementation;
+    },
+): Promise<NhfRichMenuDefaultResult> {
+    const richMenuId = validateNhfRichMenuId(options.richMenuId);
+    if (!options.apply) {
+        return { mode: "dry-run", richMenuId };
+    }
+
+    let channelAccessToken: string;
+    try {
+        ({ channelAccessToken } = getLineMessagingConfig());
+    } catch {
+        throw new RichMenuProvisioningError(
+            "configuration",
+            "NHFapp LINE channel access token is not configured",
+        );
+    }
+
+    const fetchImpl = options.fetchImpl ?? fetch;
+    await requestLineApi({
+        phase: "set-default",
+        endpoint: `${LINE_MESSAGING_API_URL}/v2/bot/user/all/richmenu/${encodeURIComponent(richMenuId)}`,
+        channelAccessToken,
+        method: "POST",
+        fetchImpl,
+        richMenuId,
+    });
+
+    const verifiedDefaultRichMenuId = await getNhfRichMenuDefaultId(fetchImpl);
+    if (verifiedDefaultRichMenuId !== richMenuId) {
+        throw new RichMenuProvisioningError(
+            "verify",
+            "LINE default Rich Menu does not match the requested menu",
+            { richMenuId },
+        );
+    }
+
+    return {
+        mode: "applied",
+        richMenuId,
+        verifiedDefaultRichMenuId,
+    };
 }
 
 export async function provisionNhfRichMenu(

@@ -404,6 +404,7 @@ counters เมื่อบางรายการทำงานไม่ส�
 - [ ] ทดสอบ dry-run ของ leave attachment cleanup และตรวจ disk usage/permission
 - [ ] backup ฐานข้อมูลและ `.uploads/private/leave/` สำเร็จก่อน migration และเก็บไว้นอกเครื่องเดียวกับ app
 - [ ] ทดสอบ login, refresh session, upload รูป, Email/LINE และหน้า feature ที่เปิด
+- [ ] ตรวจ [NHFapp Unified LINE / LIFF Production Runbook](./docs/line-routine.md) และบันทึกผลใน [LIFF Production Acceptance](./docs/liff-production-acceptance.md) ก่อนเปิด Unified Rich Menu
 
 ## การอัปเดตเวอร์ชัน
 

@@ -8,8 +8,10 @@ import {
     getNhfRichMenuStatus,
     provisionNhfRichMenu,
     RichMenuProvisioningError,
+    setNhfRichMenuDefault,
     type NhfRichMenuProvisionResult,
     type NhfRichMenuStatus,
+    validateNhfRichMenuId,
 } from "../lib/line/rich-menu";
 
 function yesNo(value: boolean): string {
@@ -106,11 +108,47 @@ async function runStatus(): Promise<void> {
     printStatus(await getNhfRichMenuStatus());
 }
 
+function getRequiredOption(args: readonly string[], option: string): string {
+    const inlinePrefix = `${option}=`;
+    const inlineValue = args.find((arg) => arg.startsWith(inlinePrefix));
+    if (inlineValue) return inlineValue.slice(inlinePrefix.length);
+
+    const optionIndex = args.indexOf(option);
+    const followingValue = optionIndex >= 0 ? args[optionIndex + 1] : undefined;
+    if (followingValue) return followingValue;
+
+    throw new RichMenuProvisioningError(
+        "configuration",
+        `${option} is required`,
+    );
+}
+
+async function runSetDefault(richMenuIdInput: string, apply: boolean): Promise<void> {
+    const richMenuId = validateNhfRichMenuId(richMenuIdInput);
+    console.log("NHFapp LINE Rich Menu set-default");
+    console.log(`  Target richMenuId: ${richMenuId}`);
+
+    const result = await setNhfRichMenuDefault({
+        richMenuId,
+        apply,
+    });
+
+    if (!apply) {
+        console.log("Dry-run only. No LINE API request was made.");
+        return;
+    }
+
+    console.log(`Set default richMenuId: ${result.richMenuId}`);
+    console.log(`Verified default richMenuId: ${result.verifiedDefaultRichMenuId}`);
+}
+
 function printUsage(): void {
     console.log("Usage:");
     console.log("  npm run line:richmenu:status");
     console.log("  npm run line:richmenu:provision");
     console.log("  npm run line:richmenu:provision -- --apply");
+    console.log("  npm run line:richmenu:set-default -- --rich-menu-id=<id>");
+    console.log("  npm run line:richmenu:set-default -- --rich-menu-id=<id> --apply");
 }
 
 export function loadNhfRichMenuEnvironment(): void {
@@ -126,6 +164,13 @@ export async function runNhfRichMenuCli(args: string[]): Promise<number> {
         }
         if (command === "provision") {
             await runProvision(args.includes("--apply"));
+            return 0;
+        }
+        if (command === "set-default") {
+            await runSetDefault(
+                getRequiredOption(args.slice(1), "--rich-menu-id"),
+                args.includes("--apply"),
+            );
             return 0;
         }
 
