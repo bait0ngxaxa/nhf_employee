@@ -1,5 +1,6 @@
 import * as z from "zod";
 import { getEmployeeDisplayName } from "@/lib/helpers/employee-helpers";
+import { lineRetryKeySchema } from "@/lib/validations/line";
 
 const dateStringSchema = z
     .string()
@@ -83,6 +84,33 @@ export const leaveNotTakenConfirmedPayloadSchema = leaveDetailsSchema.extend({
     ...decisionActorFields,
 });
 
+export const leaveActionLinePayloadSchema = leaveActionPayloadSchema.extend({
+    retryKey: lineRetryKeySchema,
+});
+
+export const leaveResultLinePayloadSchema = leaveResultPayloadSchema.extend({
+    retryKey: lineRetryKeySchema,
+});
+
+export const leaveCancelledLinePayloadSchema =
+    leaveCancelledPayloadSchema.extend({ retryKey: lineRetryKeySchema });
+
+export const leaveCancellationRequestedLinePayloadSchema =
+    leaveCancellationRequestedPayloadSchema.extend({
+        retryKey: lineRetryKeySchema,
+    });
+
+export const leaveCancelledAfterApprovalLinePayloadSchema =
+    leaveCancelledAfterApprovalPayloadSchema.extend({
+        retryKey: lineRetryKeySchema,
+    });
+
+export const leaveNotTakenRequestedLinePayloadSchema =
+    leaveNotTakenRequestedPayloadSchema.extend({ retryKey: lineRetryKeySchema });
+
+export const leaveNotTakenConfirmedLinePayloadSchema =
+    leaveNotTakenConfirmedPayloadSchema.extend({ retryKey: lineRetryKeySchema });
+
 export type LeaveNotificationRecipient = z.infer<typeof recipientSchema>;
 export type LeaveConfiguredApprover = LeaveNotificationRecipient & {
     userId: number;
@@ -101,6 +129,25 @@ export type LeaveNotTakenRequestedPayload = z.infer<
 >;
 export type LeaveNotTakenConfirmedPayload = z.infer<
     typeof leaveNotTakenConfirmedPayloadSchema
+>;
+export type LeaveActionLinePayload = z.infer<
+    typeof leaveActionLinePayloadSchema
+>;
+export type LeaveResultLinePayload = z.infer<typeof leaveResultLinePayloadSchema>;
+export type LeaveCancelledLinePayload = z.infer<
+    typeof leaveCancelledLinePayloadSchema
+>;
+export type LeaveCancellationRequestedLinePayload = z.infer<
+    typeof leaveCancellationRequestedLinePayloadSchema
+>;
+export type LeaveCancelledAfterApprovalLinePayload = z.infer<
+    typeof leaveCancelledAfterApprovalLinePayloadSchema
+>;
+export type LeaveNotTakenRequestedLinePayload = z.infer<
+    typeof leaveNotTakenRequestedLinePayloadSchema
+>;
+export type LeaveNotTakenConfirmedLinePayload = z.infer<
+    typeof leaveNotTakenConfirmedLinePayloadSchema
 >;
 
 export type LeaveNotificationPayload =
@@ -270,5 +317,75 @@ export function parseLeaveNotTakenConfirmedPayload(
         leaveNotTakenConfirmedPayloadSchema,
         normalizeLegacyDecisionActorPayload(payload),
         "LEAVE_NOT_TAKEN_CONFIRMED",
+    );
+}
+
+export function parseLeaveActionLinePayload(
+    payload: unknown,
+): LeaveActionLinePayload {
+    return parseLeavePayload(
+        leaveActionLinePayloadSchema,
+        payload,
+        "LEAVE_ACTION_LINE",
+    );
+}
+
+export function parseLeaveResultLinePayload(
+    payload: unknown,
+): LeaveResultLinePayload {
+    return parseLeavePayload(
+        leaveResultLinePayloadSchema,
+        payload,
+        "LEAVE_RESULT_LINE",
+    );
+}
+
+export function parseLeaveCancelledLinePayload(
+    payload: unknown,
+): LeaveCancelledLinePayload {
+    return parseLeavePayload(
+        leaveCancelledLinePayloadSchema,
+        payload,
+        "LEAVE_CANCELLED_LINE",
+    );
+}
+
+export function parseLeaveCancellationRequestedLinePayload(
+    payload: unknown,
+): LeaveCancellationRequestedLinePayload {
+    return parseLeavePayload(
+        leaveCancellationRequestedLinePayloadSchema,
+        payload,
+        "LEAVE_CANCELLATION_REQUESTED_LINE",
+    );
+}
+
+export function parseLeaveCancelledAfterApprovalLinePayload(
+    payload: unknown,
+): LeaveCancelledAfterApprovalLinePayload {
+    return parseLeavePayload(
+        leaveCancelledAfterApprovalLinePayloadSchema,
+        normalizeLegacyDecisionActorPayload(payload),
+        "LEAVE_CANCELLED_AFTER_APPROVAL_LINE",
+    );
+}
+
+export function parseLeaveNotTakenRequestedLinePayload(
+    payload: unknown,
+): LeaveNotTakenRequestedLinePayload {
+    return parseLeavePayload(
+        leaveNotTakenRequestedLinePayloadSchema,
+        payload,
+        "LEAVE_NOT_TAKEN_REQUESTED_LINE",
+    );
+}
+
+export function parseLeaveNotTakenConfirmedLinePayload(
+    payload: unknown,
+): LeaveNotTakenConfirmedLinePayload {
+    return parseLeavePayload(
+        leaveNotTakenConfirmedLinePayloadSchema,
+        normalizeLegacyDecisionActorPayload(payload),
+        "LEAVE_NOT_TAKEN_CONFIRMED_LINE",
     );
 }

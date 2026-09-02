@@ -150,4 +150,9 @@ export const lineNotificationService = {
 };
 
 export { sendLineAppMessage, sendLinePushMessage };
+export {
+    sendAppLineNotification,
+    type AppLineNotificationResult,
+    type SendAppLineNotificationInput,
+} from "./app-notification";
 export type { LineWebhookData };

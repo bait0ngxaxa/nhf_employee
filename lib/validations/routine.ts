@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { lineRetryKeySchema } from "@/lib/validations/line";
 import {
     ROUTINE_BUSINESS_DAY_POLICIES,
     ROUTINE_MAX_REMINDER_DAYS_BEFORE,
@@ -451,11 +452,6 @@ export const routineReminderEmailOutboxPayloadSchema = z.object({
     userId: z.number().int().positive(),
     reminderVersion: z.number().int().positive(),
 });
-
-const lineRetryKeySchema = z.string().regex(
-    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
-    "LINE retry key must be a UUID",
-);
 
 export const routineReminderLineOutboxPayloadSchema = z.object({
     occurrenceId: z.number().int().positive(),

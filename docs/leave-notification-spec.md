@@ -1,6 +1,6 @@
 # สเปกการแจ้งเตือนการลา
 
-เอกสารนี้สรุปขอบเขตการส่งอีเมลและ in-app notification สำหรับเหตุการณ์แจ้งเตือนการลาทุก flow ที่ตกลงไว้ก่อน implement
+เอกสารนี้สรุปขอบเขตการส่งอีเมลและ in-app notification สำหรับเหตุการณ์แจ้งเตือนการลาทุก flow ที่ตกลงไว้ก่อน implement รวมถึง personal LINE delivery ที่เพิ่มแบบ additive ในภายหลัง รายละเอียด channel matrix ฉบับรวมอยู่ที่ [Notification Channel Architecture](./notification-channels.md)
 
 ## หลักการ
 
@@ -17,16 +17,16 @@
 
 ## Event Matrix
 
-| เหตุการณ์ | ผู้กระทำ | ผู้รับหลัก | ช่องทางผู้รับหลัก | Self confirmation | ปลายทาง |
-| --- | --- | --- | --- | --- | --- |
-| ส่งคำขอลาใหม่ | พนักงาน | ผู้อนุมัติ | Email + in-app | ไม่มี | `managerApproval` |
-| อนุมัติคำขอลา | ผู้อนุมัติ | พนักงาน | Email + in-app | ไม่มี | `leaveHistory` |
-| ไม่อนุมัติคำขอลา | ผู้อนุมัติ | พนักงาน | Email + in-app | ไม่มี | `leaveHistory` |
-| ยกเลิกคำขอที่ยังรออนุมัติ | พนักงาน | ผู้อนุมัติ | Email + in-app | In-app ถึงพนักงาน | ผู้อนุมัติไป `managerApproval`, พนักงานไป `leaveHistory` |
-| แจ้งไม่ได้ใช้วันลา | พนักงาน | ผู้อนุมัติ | Email + in-app | In-app ถึงพนักงาน | ผู้อนุมัติไป `managerApproval`, พนักงานไป `leaveHistory` |
-| ยืนยันไม่ได้ใช้วันลา | ผู้อนุมัติ | พนักงาน | Email + in-app | ไม่มี | `leaveHistory` |
-| ขอยกเลิกวันลาที่อนุมัติแล้ว | พนักงาน | ผู้อนุมัติ | Email + in-app | In-app ถึงพนักงาน | ผู้อนุมัติไป `managerApproval`, พนักงานไป `leaveHistory` |
-| ยืนยันยกเลิกวันลาที่อนุมัติแล้ว | ผู้อนุมัติ | พนักงาน | Email + in-app | ไม่มี | `leaveHistory` |
+| เหตุการณ์ | ผู้กระทำ | ผู้รับหลัก | ช่องทางผู้รับหลัก | NHFapp LINE | Self confirmation | ปลายทาง |
+| --- | --- | --- | --- | --- | --- | --- |
+| ส่งคำขอลาใหม่ | พนักงาน | ผู้อนุมัติ | Email + in-app | ผู้อนุมัติที่ active และมี link (`LEAVE_ACTION_LINE`, `action=approve`) | ไม่มี | `managerApproval` |
+| อนุมัติคำขอลา | ผู้อนุมัติ | พนักงาน | Email + in-app | พนักงานที่ active และมี link (`LEAVE_RESULT_LINE`) | ไม่มี | `leaveHistory` |
+| ไม่อนุมัติคำขอลา | ผู้อนุมัติ | พนักงาน | Email + in-app | พนักงานที่ active และมี link (`LEAVE_RESULT_LINE`) | ไม่มี | `leaveHistory` |
+| ยกเลิกคำขอที่ยังรออนุมัติ | พนักงาน | ผู้อนุมัติ | Email + in-app | ผู้อนุมัติที่ active และมี link (`LEAVE_CANCELLED_LINE`, `action=review`) | In-app ถึงพนักงาน | ผู้อนุมัติไป `managerApproval`, พนักงานไป `leaveHistory` |
+| แจ้งไม่ได้ใช้วันลา | พนักงาน | ผู้อนุมัติ | Email + in-app | ผู้อนุมัติที่ active และมี link (`LEAVE_NOT_TAKEN_REQUESTED_LINE`, `action=not-taken`) | In-app ถึงพนักงาน | ผู้อนุมัติไป `managerApproval`, พนักงานไป `leaveHistory` |
+| ยืนยันไม่ได้ใช้วันลา | ผู้อนุมัติ | พนักงาน | Email + in-app | พนักงานที่ active และมี link (`LEAVE_NOT_TAKEN_CONFIRMED_LINE`) | ไม่มี | `leaveHistory` |
+| ขอยกเลิกวันลาที่อนุมัติแล้ว | พนักงาน | ผู้อนุมัติ | Email + in-app | ผู้อนุมัติที่ active และมี link (`LEAVE_CANCELLATION_REQUESTED_LINE`, `action=review`) | In-app ถึงพนักงาน | ผู้อนุมัติไป `managerApproval`, พนักงานไป `leaveHistory` |
+| ยืนยันยกเลิกวันลาที่อนุมัติแล้ว | ผู้อนุมัติ | พนักงาน | Email + in-app | พนักงานที่ active และมี link (`LEAVE_CANCELLED_AFTER_APPROVAL_LINE`) | ไม่มี | `leaveHistory` |
 
 ## Type Mapping
 
@@ -96,6 +96,8 @@ Payload ควรเก็บข้อมูลดิบที่ parse ได�
 ถ้า in-app notification ถูกสร้างสำเร็จแล้วแต่ email ล้มเหลว รอบ retry ถัดไปต้องไม่สร้าง in-app ซ้ำด้วย dedupe/no-op duplicate
 
 การส่งอีเมลยังเป็น at-least-once: `Message-ID` ของ `LEAVE_ACTION` ผูกกับ `leaveId + approverUserId` เพื่อช่วยกันการส่งซ้ำของ identity เดิม แต่ไม่รับประกัน exactly-once จาก provider ภายนอก
+
+Personal LINE ใช้ child outbox แยกจาก parent Email/In-app โดย resolve ผู้รับจาก `User` และ `LineAccountLink.lineUserId` แล้วส่งผ่าน NHFapp `LINE_APP_CHANNEL_ACCESS_TOKEN` เท่านั้น หากผู้ใช้ไม่ link หรือไม่ active จะ supersede LINE delivery โดยไม่ทำให้ Email หรือ In-app ล้มเหลว ส่วน LINE provider failure จะ retry ตาม outbox policy ของ child row
 
 ## Email Template
 

@@ -12,10 +12,12 @@ import type {
     StockRequestLineData,
 } from "@/types/api";
 import { toDashboardStockTabPath, STOCK_DASHBOARD_TABS } from "@/lib/ssot/routes";
+import { createLineRetryKey } from "@/lib/services/outbox/provider-key";
 import {
     buildVariantLabel,
     type StockRequestResultEmailPayload,
 } from "./notification-payloads";
+import { buildStockRequestResultLineEventKey } from "./line-notifications";
 import type { LowStockAlertCandidate } from "./types";
 
 type StockNotificationClient = Pick<
@@ -92,6 +94,29 @@ export async function enqueueStockRequestResultEmail(
             type: "STOCK_REQUEST_RESULT_EMAIL",
             eventKey: `stock-request:${payload.requestId}:${payload.status}:email`,
             payload: JSON.stringify(payload),
+        }],
+        skipDuplicates: true,
+    });
+}
+
+export async function enqueueStockRequestResultLine(
+    payload: StockRequestResultEmailPayload,
+    client: StockNotificationClient = prisma,
+): Promise<void> {
+    const eventKey = buildStockRequestResultLineEventKey(
+        payload.requestId,
+        payload.status,
+    );
+    const linePayload = {
+        ...payload,
+        retryKey: createLineRetryKey(eventKey),
+    };
+
+    await client.notificationOutbox.createMany({
+        data: [{
+            type: "STOCK_REQUEST_RESULT_LINE",
+            eventKey,
+            payload: JSON.stringify(linePayload),
         }],
         skipDuplicates: true,
     });

@@ -1754,6 +1754,7 @@ describe("Stock Service Mutations", () => {
         it("should cancel only pending issue requests", async () => {
             prismaMock.stockRequest.findUnique.mockResolvedValue(
                 asNever({
+                    id: 55,
                     status: "PENDING_ISSUE",
                     requestedBy: 3,
                     projectCode: "PRJ-CANCEL",
@@ -1766,6 +1767,15 @@ describe("Stock Service Mutations", () => {
                             nickname: "ชาย",
                         },
                     },
+                    items: [{
+                        id: 1001,
+                        itemId: 10,
+                        variantId: 101,
+                        quantity: 2,
+                        ...requestItemSnapshot("ปากกา", "ด้าม", [
+                            { name: "สี", value: "น้ำเงิน" },
+                        ]),
+                    }],
                 }),
             );
             prismaMock.stockRequest.findUniqueOrThrow.mockResolvedValue(
@@ -1831,7 +1841,21 @@ describe("Stock Service Mutations", () => {
                     }),
                 }),
             );
-            expect(prismaMock.notificationOutbox.createMany).not.toHaveBeenCalled();
+            expect(prismaMock.notificationOutbox.createMany).toHaveBeenCalledWith({
+                data: [{
+                    type: "STOCK_REQUEST_RESULT_LINE",
+                    eventKey: "stock-request:55:CANCELLED:line",
+                    payload: expect.stringContaining('"status":"CANCELLED"'),
+                }],
+                skipDuplicates: true,
+            });
+            expect(prismaMock.notificationOutbox.createMany).not.toHaveBeenCalledWith(
+                expect.objectContaining({
+                    data: expect.arrayContaining([
+                        expect.objectContaining({ type: "STOCK_REQUEST_RESULT_EMAIL" }),
+                    ]),
+                }),
+            );
         });
 
         it("should enqueue a result email when an admin cancels a request", async () => {

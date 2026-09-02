@@ -33,3 +33,5 @@ Outbox payload ของเหตุการณ์การลาต้อง�
 ผลการส่งอีเมลที่ไม่สำเร็จต้องทำให้ outbox failed และ retry แม้ email service จะคืนค่า `false` แทนการ throw error เพราะ outbox มีหน้าที่รับประกัน delivery ของช่องทางอีเมล ส่วน in-app notification ที่ถูกสร้างสำเร็จไปแล้วต้องไม่ซ้ำในรอบ retry
 
 Delivery semantics ของ outbox คือ **at-least-once** ไม่ใช่ exactly-once เพราะ process อาจล้มหลัง provider รับอีเมลสำเร็จแต่ก่อนฐานข้อมูลถูก mark เป็น `SENT` แล้ว worker จะ retry delivery เดิม การสร้าง in-app notification ป้องกันซ้ำด้วย `dedupeKey` และ unique constraint ส่วนอีเมล `LEAVE_ACTION` ใช้ `Message-ID` คงที่จาก event, `leaveId` และ `approverUserId`: retry ผู้รับเดิมจึงใช้ค่าเดิม แต่เมื่อเปลี่ยนผู้อนุมัติจะได้ค่าใหม่ `Message-ID` เป็นเพียง best-effort idempotency hint ที่ Nodemailer/SMTP รองรับและ provider ไม่รับประกันว่าจะ deduplicate จึงห้ามอ้างว่าอีเมลส่งแบบ exactly-once
+
+การเพิ่ม personal LINE ในระยะถัดมาใช้ child outbox แยกจาก parent Email/In-app และมีรายละเอียด channel matrix, recipient policy, retry และ Stock legacy coexistence อยู่ใน [Notification Channel Architecture](../notification-channels.md) โดยไม่เปลี่ยน decision เรื่อง Leave business workflow ใน ADR นี้

@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
     sendLineMessage,
     sendLineBroadcast,
+    sendStockLineBroadcast,
 } from "@/lib/line";
 import { sendLineAppMessage } from "@/lib/line/messaging";
 import type { LineFlexMessage } from "@/types/api";
@@ -108,6 +109,24 @@ describe("LINE Notification Service", () => {
             expect(fetchMock).toHaveBeenCalledWith(
                 "https://api.line.me/v2/bot/message/broadcast",
                 expect.anything(),
+            );
+        });
+    });
+
+    describe("sendStockLineBroadcast", () => {
+        it("continues to use the legacy Stock channel token", async () => {
+            vi.stubEnv("LINE_STOCK_CHANNEL_ACCESS_TOKEN", "legacy-stock-token");
+
+            const result = await sendStockLineBroadcast(flexMessage);
+
+            expect(result).toBe(true);
+            expect(fetchMock).toHaveBeenCalledWith(
+                "https://api.line.me/v2/bot/message/broadcast",
+                expect.objectContaining({
+                    headers: expect.objectContaining({
+                        Authorization: "Bearer legacy-stock-token",
+                    }),
+                }),
             );
         });
     });

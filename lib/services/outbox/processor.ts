@@ -26,11 +26,16 @@ import {
 } from "@/lib/services/leave/notification-payloads";
 import { dispatchCurrentLeaveAction } from "@/lib/services/leave/current-action-recipient";
 import {
+    dispatchLeaveLineOutbox,
+    enqueueLeaveLineNotification,
+} from "@/lib/services/leave/line-notifications";
+import {
     isSharedDriveOption,
     type SharedDriveOption,
 } from "@/constants/email-request";
 import { dispatchRoutineReminderOutbox } from "@/lib/services/routine/reminders";
 import { dispatchRoutineContractExpiryOutbox } from "@/lib/services/routine/contract-reminders";
+import { dispatchStockRequestResultLineOutbox } from "@/lib/services/stock/line-notifications";
 import {
     MAX_OUTBOX_ATTEMPTS,
     OUTBOX_RETRY_BASE_DELAY_MS,
@@ -333,6 +338,16 @@ async function dispatchNotification(
             null,
         );
         if (routineContractOutcome) return routineContractOutcome;
+        const leaveLineOutcome = await dispatchLeaveLineOutbox(
+            notification,
+            null,
+        );
+        if (leaveLineOutcome) return leaveLineOutcome;
+        const stockResultLineOutcome = await dispatchStockRequestResultLineOutbox(
+            notification,
+            null,
+        );
+        if (stockResultLineOutcome) return stockResultLineOutcome;
         throw error;
     }
     const routineOutcome = await dispatchRoutineReminderOutbox(
@@ -346,6 +361,18 @@ async function dispatchNotification(
         payload,
     );
     if (routineContractOutcome) return routineContractOutcome;
+
+    const leaveLineOutcome = await dispatchLeaveLineOutbox(
+        notification,
+        payload,
+    );
+    if (leaveLineOutcome) return leaveLineOutcome;
+
+    const stockResultLineOutcome = await dispatchStockRequestResultLineOutbox(
+        notification,
+        payload,
+    );
+    if (stockResultLineOutcome) return stockResultLineOutcome;
 
     switch (notification.type) {
         case "EMAIL_REQUEST": {
@@ -365,6 +392,10 @@ async function dispatchNotification(
         }
         case "LEAVE_RESULT": {
             const parsedLeaveResult = parseLeaveResultPayload(payload);
+            await enqueueLeaveLineNotification({
+                type: "LEAVE_RESULT_LINE",
+                payload: parsedLeaveResult,
+            });
             const { sendLeaveResultNotifications } = await import(
                 "../leave/notifications"
             );
@@ -373,6 +404,10 @@ async function dispatchNotification(
         }
         case "LEAVE_CANCELLED": {
             const parsedLeaveCancelled = parseLeaveCancelledPayload(payload);
+            await enqueueLeaveLineNotification({
+                type: "LEAVE_CANCELLED_LINE",
+                payload: parsedLeaveCancelled,
+            });
             const { sendLeaveCancelledNotifications } = await import(
                 "../leave/notifications"
             );
@@ -381,6 +416,10 @@ async function dispatchNotification(
         }
         case "LEAVE_CANCELLATION_REQUESTED": {
             const parsedCancellationRequested = parseLeaveCancellationRequestedPayload(payload);
+            await enqueueLeaveLineNotification({
+                type: "LEAVE_CANCELLATION_REQUESTED_LINE",
+                payload: parsedCancellationRequested,
+            });
             const { sendLeaveCancellationRequestedNotifications } = await import(
                 "../leave/notifications"
             );
@@ -389,6 +428,10 @@ async function dispatchNotification(
         }
         case "LEAVE_CANCELLED_AFTER_APPROVAL": {
             const parsedCancelledAfterApproval = parseLeaveCancelledAfterApprovalPayload(payload);
+            await enqueueLeaveLineNotification({
+                type: "LEAVE_CANCELLED_AFTER_APPROVAL_LINE",
+                payload: parsedCancelledAfterApproval,
+            });
             const { sendLeaveCancelledAfterApprovalNotifications } = await import(
                 "../leave/notifications"
             );
@@ -397,6 +440,10 @@ async function dispatchNotification(
         }
         case "LEAVE_NOT_TAKEN_REQUESTED": {
             const parsedNotTaken = parseLeaveNotTakenRequestedPayload(payload);
+            await enqueueLeaveLineNotification({
+                type: "LEAVE_NOT_TAKEN_REQUESTED_LINE",
+                payload: parsedNotTaken,
+            });
             const { sendLeaveNotTakenRequestedNotifications } = await import(
                 "../leave/notifications"
             );
@@ -405,6 +452,10 @@ async function dispatchNotification(
         }
         case "LEAVE_NOT_TAKEN_CONFIRMED": {
             const parsedConfirmed = parseLeaveNotTakenConfirmedPayload(payload);
+            await enqueueLeaveLineNotification({
+                type: "LEAVE_NOT_TAKEN_CONFIRMED_LINE",
+                payload: parsedConfirmed,
+            });
             const { sendLeaveNotTakenConfirmedNotifications } = await import(
                 "../leave/notifications"
             );

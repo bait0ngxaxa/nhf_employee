@@ -10,6 +10,7 @@
 - Routine Management: กำหนดและติดตามงานประจำขององค์กร
 - New Employee Request: ส่งคำร้องอีเมล สารบรรณ และ Shared Drive ให้ทีมไอที
 - Notification: แจ้งเตือนในระบบ, Email และ LINE ผ่าน transactional outbox
+- Notification architecture และ channel matrix: [Notification Channel Architecture](./docs/notification-channels.md)
 - Security: JWT access token, refresh-token rotation, RBAC และ audit log
 
 ## Technology Stack
@@ -142,6 +143,11 @@ openssl rand -base64 48
 
 | Variable | หน้าที่ |
 | --- | --- |
+| `NEXT_PUBLIC_LINE_LIFF_ID` | LIFF ID สำหรับ NHFapp personal notification deep links และ LIFF bootstrap |
+| `LINE_LOGIN_CHANNEL_ID` | LINE Login channel ID ที่ใช้ตรวจ identity ของ LIFF session |
+| `LINE_APP_CHANNEL_ACCESS_TOKEN` | canonical NHFapp Messaging API token สำหรับ personal LINE ของ Leave, Routine และ Stock result |
+| `LINE_APP_CHANNEL_SECRET` | channel secret ของ NHFapp Messaging API / LIFF integration |
+| `LINE_LIFF_SESSION_SECRET` / `LINE_LIFF_SESSION_TTL_SECONDS` | secret และอายุของ NHFapp HttpOnly LIFF session |
 | `LINE_IT_CHANNEL_ACCESS_TOKEN` | channel access token สำหรับคำร้องพนักงานใหม่ |
 | `LINE_IT_CHANNEL_SECRET` | ใช้ตรวจ signature ของ channel คำร้องพนักงานใหม่ |
 | `LINE_STOCK_CHANNEL_ACCESS_TOKEN` | channel access token สำหรับ Stock |

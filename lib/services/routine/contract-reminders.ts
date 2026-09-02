@@ -1,5 +1,3 @@
-import { randomUUID } from "node:crypto";
-
 import type { NotificationOutbox, Prisma } from "@prisma/client";
 
 import {
@@ -8,8 +6,9 @@ import {
 } from "@/lib/email";
 import { prisma } from "@/lib/db/prisma";
 import { hasPrismaErrorCode, runSerializableTransaction } from "@/lib/db/transaction";
-import { sendLineAppMessage } from "@/lib/line/messaging";
+import { sendAppLineNotification } from "@/lib/line/app-notification";
 import { generateRoutineContractExpiryFlexMessage } from "@/lib/line/flex-messages/routine-contract-expiry";
+import { createLineRetryKey } from "@/lib/services/outbox/provider-key";
 import { getPublicOrigin } from "@/lib/network/public-url";
 import {
     addCalendarMonths,
@@ -33,8 +32,6 @@ import {
     type RoutineContractExpiryOutboxPayload,
 } from "@/lib/validations/routine";
 import {
-    isActiveRoutineEmployee,
-    isActiveRoutineUser,
     resolveActiveRoutineAssigneeUserIds,
     resolveLinkedRoutineLineRecipients,
     resolveRoutineNotificationRecipients,
@@ -458,35 +455,6 @@ async function dispatchRoutineContractExpiryLineOutbox(
 
     const prepared = await prepareContractDelivery(notification, payload);
     if (!prepared) return "SUPERSEDED";
-    const recipient = await prisma.user.findUnique({
-        where: { id: payload.userId },
-        select: {
-            employeeId: true,
-            isActive: true,
-            deletedAt: true,
-            employee: { select: { status: true, deletedAt: true } },
-            lineAccountLink: { select: { lineUserId: true } },
-        },
-    });
-    const lineUserId = recipient?.lineAccountLink?.lineUserId.trim();
-    if (
-        !recipient
-        || !isActiveRoutineUser(recipient)
-        || !recipient.employee
-        || !isActiveRoutineEmployee(recipient.employee)
-        || recipient.employeeId === null
-        || !lineUserId
-    ) {
-        await runSerializableTransaction((tx) =>
-            markRoutineContractExpirySuperseded(
-                tx,
-                notification.id,
-                "Superseded Routine contract expiry LINE delivery for unavailable recipient",
-            ),
-        );
-        return "SUPERSEDED";
-    }
-
     const message = generateRoutineContractExpiryFlexMessage({
         taskTitle: prepared.task.title,
         unitName: prepared.task.unit.name,
@@ -496,12 +464,25 @@ async function dispatchRoutineContractExpiryLineOutbox(
         ),
         actionUrl: getRoutineContractExpiryAbsoluteActionUrl(payload.taskId),
     });
-    const sent = await sendLineAppMessage(
-        lineUserId,
-        message,
-        payload.retryKey,
-    );
-    if (!sent) throw new Error("Routine contract expiry LINE delivery failed");
+    try {
+        const result = await sendAppLineNotification({
+            userId: payload.userId,
+            message,
+            retryKey: payload.retryKey,
+        });
+        if (result.status === "SKIPPED") {
+            await runSerializableTransaction((tx) =>
+                markRoutineContractExpirySuperseded(
+                    tx,
+                    notification.id,
+                    "Superseded Routine contract expiry LINE delivery for unavailable recipient",
+                ),
+            );
+            return "SUPERSEDED";
+        }
+    } catch {
+        throw new Error("Routine contract expiry LINE delivery failed");
+    }
     return "SENT";
 }
 
@@ -665,19 +646,20 @@ export async function dispatchRoutineContractExpiryOutbox(
         if (lineRecipients.length > 0) {
             await tx.notificationOutbox.createMany({
                 data: lineRecipients.map((recipient) => {
+                    const eventKey = buildRoutineContractExpiryLineEventKey(
+                        payload.taskId,
+                        payload.contractEndDate,
+                        recipient.userId,
+                    );
                     const linePayload: RoutineContractExpiryLineOutboxPayload = {
                         taskId: payload.taskId,
                         userId: recipient.userId,
                         contractEndDate: payload.contractEndDate,
-                        retryKey: randomUUID(),
+                        retryKey: createLineRetryKey(eventKey),
                     };
                     return {
                         type: ROUTINE_CONTRACT_EXPIRY_LINE_OUTBOX_TYPE,
-                        eventKey: buildRoutineContractExpiryLineEventKey(
-                            linePayload.taskId,
-                            linePayload.contractEndDate,
-                            linePayload.userId,
-                        ),
+                        eventKey,
                         payload: JSON.stringify(linePayload),
                     };
                 }),

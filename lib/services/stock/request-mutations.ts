@@ -21,6 +21,7 @@ import {
 } from "./request-idempotency";
 import {
     buildVariantLabel,
+    enqueueStockRequestResultLine,
     enqueueStockRequestResultEmail,
     notifyAdminsStockRequestCancelledByRequester,
     notifyStockRequestResult,
@@ -391,13 +392,18 @@ export async function issueRequest(
             tx,
         );
         await persistLowStockNotifications(lowStockAlerts, tx);
+        const resultPayload = buildStockRequestResultEmailPayload(
+            request,
+            "ISSUED",
+            null,
+            issuedAt,
+        );
         await enqueueStockRequestResultEmail(
-            buildStockRequestResultEmailPayload(
-                request,
-                "ISSUED",
-                null,
-                issuedAt,
-            ),
+            resultPayload,
+            tx,
+        );
+        await enqueueStockRequestResultLine(
+            resultPayload,
             tx,
         );
 
@@ -487,6 +493,12 @@ export async function cancelRequest(
             reason,
             tx,
         );
+        const resultPayload = buildStockRequestResultEmailPayload(
+            request,
+            "CANCELLED",
+            reason ?? null,
+            cancelledAt,
+        );
         if (!options.isAdmin) {
             await notifyAdminsStockRequestCancelledByRequester(
                 requestId,
@@ -495,15 +507,11 @@ export async function cancelRequest(
             );
         } else {
             await enqueueStockRequestResultEmail(
-                buildStockRequestResultEmailPayload(
-                    request,
-                    "CANCELLED",
-                    reason ?? null,
-                    cancelledAt,
-                ),
+                resultPayload,
                 tx,
             );
         }
+        await enqueueStockRequestResultLine(resultPayload, tx);
 
         return updated;
     });

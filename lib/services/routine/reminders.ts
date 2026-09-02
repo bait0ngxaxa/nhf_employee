@@ -1,5 +1,3 @@
-import { randomUUID } from "node:crypto";
-
 import type { NotificationOutbox, Prisma } from "@prisma/client";
 import { Role } from "@prisma/client";
 
@@ -7,13 +5,14 @@ import {
     sendRoutineReminderNotification,
     type RoutineReminderEmailData,
 } from "@/lib/email";
-import { sendLineAppMessage } from "@/lib/line/messaging";
+import { sendAppLineNotification } from "@/lib/line/app-notification";
 import { generateRoutineReminderFlexMessage } from "@/lib/line/flex-messages/routine-reminder";
 import {
     buildRoutineDashboardTaskUrl,
     buildRoutineLiffTaskUrl,
 } from "@/lib/line/routine-links";
 import { runSerializableTransaction } from "@/lib/db/transaction";
+import { createLineRetryKey } from "@/lib/services/outbox/provider-key";
 import {
     createInAppNotificationOnce,
 } from "@/lib/services/notifications/in-app";
@@ -33,8 +32,6 @@ import {
     type RoutineReminderOutboxPayload,
 } from "@/lib/validations/routine";
 import {
-    isActiveRoutineEmployee,
-    isActiveRoutineUser,
     resolveLinkedRoutineLineRecipients,
     resolveRoutineNotificationRecipients,
 } from "./recipients";
@@ -350,7 +347,6 @@ async function dispatchRoutineReminderEmailOutbox(
 }
 
 type RoutineLineDeliveryContext = {
-    lineUserId: string;
     taskTitle: string;
     unitName: string;
     categoryName: string;
@@ -449,9 +445,6 @@ async function dispatchRoutineReminderLineOutbox(
         const lineUserId = recipient?.lineAccountLink?.lineUserId.trim();
         if (
             !recipient
-            || !isActiveRoutineUser(recipient)
-            || (recipient.employee !== null && !isActiveRoutineEmployee(recipient.employee))
-            || (recipient.employeeId !== null && recipient.employee === null)
             || !lineUserId
         ) {
             await markRoutineReminderSuperseded(
@@ -483,7 +476,6 @@ async function dispatchRoutineReminderLineOutbox(
         return {
             kind: "READY" as const,
             context: {
-                lineUserId,
                 taskTitle: state.occurrence.task.title,
                 unitName: state.occurrence.task.unit.name,
                 categoryName: state.occurrence.task.category.name,
@@ -507,12 +499,23 @@ async function dispatchRoutineReminderLineOutbox(
         timingLabel: formatRoutineReminderTiming(prepared.context.daysBefore),
         actionUrl,
     });
-    const sent = await sendLineAppMessage(
-        prepared.context.lineUserId,
-        message,
-        payload.retryKey,
-    );
-    if (!sent) {
+    try {
+        const result = await sendAppLineNotification({
+            userId: payload.userId,
+            message,
+            retryKey: payload.retryKey,
+        });
+        if (result.status === "SKIPPED") {
+            await runSerializableTransaction((tx) =>
+                markRoutineReminderSuperseded(
+                    tx,
+                    notification.id,
+                    "Superseded Routine reminder LINE delivery for unavailable recipient",
+                ),
+            );
+            return "SUPERSEDED";
+        }
+    } catch {
         throw new Error("Routine LINE reminder delivery failed");
     }
 
@@ -720,6 +723,12 @@ export async function dispatchRoutineReminderOutbox(
         if (lineRecipients.length > 0) {
             await tx.notificationOutbox.createMany({
                 data: lineRecipients.map((recipient) => {
+                    const eventKey = buildRoutineReminderLineEventKey(
+                        payload.occurrenceId,
+                        payload.ruleId,
+                        recipient.userId,
+                        payload.reminderVersion,
+                    );
                     const linePayload: RoutineReminderLineOutboxPayload = {
                         occurrenceId: payload.occurrenceId,
                         taskId: payload.taskId,
@@ -733,16 +742,11 @@ export async function dispatchRoutineReminderOutbox(
                         daysBefore: rule.daysBefore,
                         scheduledFor: expectedScheduledFor.toISOString(),
                         isAssignee: recipient.isAssignee,
-                        retryKey: randomUUID(),
+                        retryKey: createLineRetryKey(eventKey),
                     };
                     return {
                         type: ROUTINE_REMINDER_LINE_OUTBOX_TYPE,
-                        eventKey: buildRoutineReminderLineEventKey(
-                            linePayload.occurrenceId,
-                            linePayload.ruleId,
-                            linePayload.userId,
-                            linePayload.reminderVersion,
-                        ),
+                        eventKey,
                         payload: JSON.stringify(linePayload),
                     };
                 }),

@@ -1,6 +1,7 @@
 import type { Prisma } from "@prisma/client";
 import * as z from "zod";
 import { getEmployeeBackedUserDisplayName } from "@/lib/helpers/employee-helpers";
+import { lineRetryKeySchema } from "@/lib/validations/line";
 
 export function buildVariantLabel(
     attributeValues: Array<{
@@ -32,25 +33,44 @@ const dateStringSchema = z
 
 const stockRequestResultStatusSchema = z.enum(["ISSUED", "CANCELLED"]);
 
-const stockRequestResultEmailPayloadSchema = z.object({
+const stockRequestResultRecipientSchema = z.object({
+    userId: z.number().int().positive(),
+    name: z.string().trim().min(1),
+    email: z.string().trim().min(1),
+});
+
+const stockRequestResultEmailRecipientSchema =
+    stockRequestResultRecipientSchema.extend({
+        email: z.string().trim().email(),
+    });
+
+const stockRequestResultItemsSchema = z.array(z.object({
+    name: z.string().trim().min(1),
+    quantity: z.number().int().positive(),
+    unit: z.string().trim().min(1),
+    variantLabel: z.string().trim().min(1).optional(),
+})).min(1);
+
+const stockRequestResultPayloadSchema = z.object({
     schemaVersion: z.literal(1),
     requestId: z.number().int().positive(),
     status: stockRequestResultStatusSchema,
     projectCode: z.string().trim().min(1),
-    recipient: z.object({
-        userId: z.number().int().positive(),
-        name: z.string().trim().min(1),
-        email: z.string().trim().email(),
-    }),
-    items: z.array(z.object({
-        name: z.string().trim().min(1),
-        quantity: z.number().int().positive(),
-        unit: z.string().trim().min(1),
-        variantLabel: z.string().trim().min(1).optional(),
-    })).min(1),
+    recipient: stockRequestResultRecipientSchema,
+    items: stockRequestResultItemsSchema,
     cancelReason: z.string().nullable(),
     actedAt: dateStringSchema,
 });
+
+const stockRequestResultEmailPayloadSchema =
+    stockRequestResultPayloadSchema.extend({
+        recipient: stockRequestResultEmailRecipientSchema,
+    });
+
+export const stockRequestResultLinePayloadSchema =
+    stockRequestResultPayloadSchema.extend({
+        retryKey: lineRetryKeySchema,
+    });
 
 export type StockRequestResultEmailPayload = z.infer<
     typeof stockRequestResultEmailPayloadSchema
@@ -58,6 +78,10 @@ export type StockRequestResultEmailPayload = z.infer<
 
 export type StockRequestResultStatus =
     StockRequestResultEmailPayload["status"];
+
+export type StockRequestResultLinePayload = z.infer<
+    typeof stockRequestResultLinePayloadSchema
+>;
 
 export const stockRequestResultEmailSelect = {
     id: true,
@@ -158,6 +182,17 @@ export function parseStockRequestResultEmailPayload(
     const result = stockRequestResultEmailPayloadSchema.safeParse(payload);
     if (!result.success) {
         throw new Error("Invalid STOCK_REQUEST_RESULT_EMAIL payload");
+    }
+
+    return result.data;
+}
+
+export function parseStockRequestResultLinePayload(
+    payload: unknown,
+): StockRequestResultLinePayload {
+    const result = stockRequestResultLinePayloadSchema.safeParse(payload);
+    if (!result.success) {
+        throw new Error("Invalid STOCK_REQUEST_RESULT_LINE payload");
     }
 
     return result.data;

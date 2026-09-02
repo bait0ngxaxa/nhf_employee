@@ -31,6 +31,7 @@ type TestTransaction = {
     $queryRaw: (strings: TemplateStringsArray, ...values: unknown[]) => Promise<unknown[]>;
     notificationOutbox: {
         findFirst: (args: unknown) => Promise<{ id: number } | null>;
+        createMany: (args: unknown) => Promise<{ count: number }>;
         updateMany: (args: unknown) => Promise<{ count: number }>;
     };
     leaveRequest: {
@@ -116,6 +117,7 @@ function createHarness(options: {
         },
         notificationOutbox: {
             findFirst: async () => state.outboxStatus === "PROCESSING" ? { id: 100 } : null,
+            createMany: async () => ({ count: 1 }),
             updateMany: async (args: unknown) => {
                 if (owner !== "worker") return { count: 0 };
                 state.outboxStatus = "SUPERSEDED";
