@@ -13,7 +13,13 @@ import {
     type LeaveLineEnqueueInput,
 } from "@/lib/services/leave/line-notifications";
 import { createLineRetryKey } from "@/lib/services/outbox/provider-key";
+import { buildLeaveActionDeliveryIdentity } from "@/lib/services/leave/notification-payloads";
 import type {
+    LeaveActionLinePayload,
+    LeaveCancelledAfterApprovalLinePayload,
+    LeaveCancellationRequestedLinePayload,
+    LeaveNotTakenRequestedLinePayload,
+    LeaveNotTakenConfirmedLinePayload,
     LeaveResultLinePayload,
 } from "@/lib/services/leave/notification-payloads";
 
@@ -128,10 +134,15 @@ describe("Leave LINE outbox", () => {
                 data: Array<{ eventKey: string; payload: string; type: string }>;
                 skipDuplicates: boolean;
             };
+        const expectedEventKey = buildLeaveLineEventKey(
+            type as LeaveLineEnqueueInput["type"],
+            payload.leaveId,
+            userId,
+        );
         expect(call).toEqual(expect.objectContaining({
             skipDuplicates: true,
             data: [expect.objectContaining({
-                eventKey: expect.stringContaining(`:user:${userId}`),
+                eventKey: expectedEventKey,
                 type,
             })],
         }));
@@ -199,5 +210,411 @@ describe("Leave LINE outbox", () => {
                 lastError: "Superseded Leave LINE delivery for unavailable recipient",
             },
         });
+    });
+
+    it("keeps final-state Leave LINE result notifications deliverable", async () => {
+        const cancelledEventKey = buildLeaveLineEventKey(
+            "LEAVE_CANCELLED_AFTER_APPROVAL_LINE",
+            leaveDetails.leaveId,
+            1,
+        );
+        const cancelledPayload: LeaveCancelledAfterApprovalLinePayload = {
+            ...leaveDetails,
+            employee,
+            decisionActorName: approver.name,
+            decisionActorRole: "USER",
+            recoveryOverride: false,
+            retryKey: createLineRetryKey(cancelledEventKey),
+        };
+        const cancelledNotification: NotificationOutbox = {
+            ...buildLineNotification({
+                ...leaveDetails,
+                employee,
+                approverName: approver.name,
+                status: "APPROVED",
+                reason: null,
+                retryKey: createLineRetryKey(
+                    buildLeaveLineEventKey("LEAVE_RESULT_LINE", leaveDetails.leaveId, 1),
+                ),
+            }),
+            type: "LEAVE_CANCELLED_AFTER_APPROVAL_LINE",
+            eventKey: cancelledEventKey,
+            payload: JSON.stringify(cancelledPayload),
+        };
+
+        await expect(dispatchLeaveLineOutbox(
+            cancelledNotification,
+            cancelledPayload,
+        )).resolves.toBe("SENT");
+
+        vi.clearAllMocks();
+        const notTakenEventKey = buildLeaveLineEventKey(
+            "LEAVE_NOT_TAKEN_CONFIRMED_LINE",
+            leaveDetails.leaveId,
+            1,
+        );
+        const notTakenPayload: LeaveNotTakenConfirmedLinePayload = {
+            ...leaveDetails,
+            employee,
+            decisionActorName: approver.name,
+            decisionActorRole: "USER",
+            recoveryOverride: false,
+            retryKey: createLineRetryKey(notTakenEventKey),
+        };
+        const notTakenNotification: NotificationOutbox = {
+            ...cancelledNotification,
+            type: "LEAVE_NOT_TAKEN_CONFIRMED_LINE",
+            eventKey: notTakenEventKey,
+            payload: JSON.stringify(notTakenPayload),
+        };
+
+        await expect(dispatchLeaveLineOutbox(
+            notTakenNotification,
+            notTakenPayload,
+        )).resolves.toBe("SENT");
+        expect(sendAppLineNotificationMock).toHaveBeenCalledTimes(1);
+    });
+
+    function buildLeaveActionPayload(
+        userId: number,
+        deliveryIdentity: string,
+    ): LeaveActionLinePayload {
+        const eventKey = buildLeaveLineEventKey(
+            "LEAVE_ACTION_LINE",
+            leaveDetails.leaveId,
+            userId,
+            deliveryIdentity,
+        );
+        return {
+            ...leaveDetails,
+            employee,
+            approver: { ...approver, userId },
+            deliveryIdentity,
+            reason: "พักผ่อน",
+            emergencyReason: null,
+            specialReason: null,
+            overQuotaDays: 0,
+            retryKey: createLineRetryKey(eventKey),
+        };
+    }
+
+    function buildAssignmentDeliveryIdentity(
+        userId: number,
+        generation: number,
+    ): string {
+        return `${buildLeaveActionDeliveryIdentity(
+            leaveDetails.leaveId,
+            userId,
+        )}:generation:${generation}`;
+    }
+
+    function buildCancellationPayload(
+        overrides: Partial<LeaveCancellationRequestedLinePayload> = {},
+    ): LeaveCancellationRequestedLinePayload {
+        const payload = {
+            ...leaveDetails,
+            employee,
+            approver,
+            note: "มีเหตุจำเป็น",
+            ...overrides,
+        };
+        const eventKey = buildLeaveLineEventKey(
+            "LEAVE_CANCELLATION_REQUESTED_LINE",
+            payload.leaveId,
+            payload.approver.userId,
+        );
+        return { ...payload, retryKey: createLineRetryKey(eventKey) };
+    }
+
+    function buildNotTakenPayload(
+        overrides: Partial<LeaveNotTakenRequestedLinePayload> = {},
+    ): LeaveNotTakenRequestedLinePayload {
+        const payload = {
+            ...leaveDetails,
+            employee,
+            approver,
+            note: "ไม่ได้ใช้วันลา",
+            ...overrides,
+        };
+        const eventKey = buildLeaveLineEventKey(
+            "LEAVE_NOT_TAKEN_REQUESTED_LINE",
+            payload.leaveId,
+            payload.approver.userId,
+        );
+        return { ...payload, retryKey: createLineRetryKey(eventKey) };
+    }
+
+    it("uses delivery identity to deduplicate same-generation action retries and allow A-B-A", async () => {
+        const firstAIdentity = buildAssignmentDeliveryIdentity(2, 1);
+        const bIdentity = buildAssignmentDeliveryIdentity(3, 2);
+        const secondAIdentity = buildAssignmentDeliveryIdentity(2, 3);
+        const deliveries = [
+            buildLeaveActionPayload(2, firstAIdentity),
+            buildLeaveActionPayload(3, bIdentity),
+            buildLeaveActionPayload(2, secondAIdentity),
+        ];
+
+        for (const payload of deliveries) {
+            await enqueueLeaveLineNotification({
+                type: "LEAVE_ACTION_LINE",
+                payload,
+            }, prismaMock);
+        }
+
+        const rows = prismaMock.notificationOutbox.createMany.mock.calls
+            .map(([args]) => (args as {
+                data: Array<{ eventKey: string; payload: string }>;
+            }).data[0]);
+        const firstA = rows[0];
+        const b = rows[1];
+        const secondA = rows[2];
+        if (!firstA || !b || !secondA) {
+            throw new Error("Leave action LINE rows were not recorded");
+        }
+
+        expect(firstA.eventKey).not.toBe(secondA.eventKey);
+        expect(firstA.eventKey).not.toBe(b.eventKey);
+        expect(b.eventKey).not.toBe(secondA.eventKey);
+        expect(JSON.parse(firstA.payload)).toEqual(expect.objectContaining({
+            deliveryIdentity: firstAIdentity,
+            retryKey: createLineRetryKey(firstA.eventKey),
+        }));
+        expect(JSON.parse(secondA.payload)).toEqual(expect.objectContaining({
+            deliveryIdentity: secondAIdentity,
+            retryKey: createLineRetryKey(secondA.eventKey),
+        }));
+
+        await enqueueLeaveLineNotification({
+            type: "LEAVE_ACTION_LINE",
+            payload: deliveries[0],
+        }, prismaMock);
+
+        const retryArgs = prismaMock.notificationOutbox.createMany.mock.calls[3]?.[0] as {
+            data: Array<{ eventKey: string }>;
+            skipDuplicates: boolean;
+        };
+        expect(retryArgs.data[0]?.eventKey).toBe(firstA.eventKey);
+        expect(retryArgs.skipDuplicates).toBe(true);
+    });
+
+    it("supersedes a Leave LINE row with a mismatched deterministic retry key", async () => {
+        const payload = buildLeaveActionPayload(
+            2,
+            buildLeaveActionDeliveryIdentity("leave-1", 2),
+        );
+        const mismatchedPayload = {
+            ...payload,
+            retryKey: createLineRetryKey("different-event"),
+        };
+        const notification = buildProcessingNotification(
+            "LEAVE_ACTION_LINE",
+            mismatchedPayload,
+        );
+
+        await expect(dispatchLeaveLineOutbox(
+            notification,
+            mismatchedPayload,
+        )).resolves.toBe("SUPERSEDED");
+        expect(sendAppLineNotificationMock).not.toHaveBeenCalled();
+        expect(prismaMock.notificationOutbox.updateMany).toHaveBeenCalledWith({
+            where: { id: 700, status: "PROCESSING" },
+            data: {
+                status: "SUPERSEDED",
+                lastError: "Superseded mismatched Leave LINE retry key",
+            },
+        });
+    });
+
+    function buildCurrentApproverRecord(
+        employeeId = 20,
+        userId = 2,
+    ) {
+        return {
+            id: employeeId,
+            firstName: "ผู้จัดการ",
+            lastName: "ใจดี",
+            nickname: null,
+            email: "manager@example.com",
+            status: "ACTIVE",
+            deletedAt: null,
+            user: {
+                id: userId,
+                email: "manager@example.com",
+                isActive: true,
+                deletedAt: null,
+            },
+        };
+    }
+
+    function configureCurrentLeaveRequest(
+        overrides: Record<string, unknown> = {},
+    ): void {
+        prismaMock.leaveRequest.findUnique.mockResolvedValue(asNever({
+            status: "PENDING",
+            startDate: new Date("2026-12-01T00:00:00.000Z"),
+            notTakenRequestedAt: null,
+            notTakenConfirmedAt: null,
+            cancellationRequestedAt: null,
+            cancellationConfirmedAt: null,
+            approverId: 20,
+            exceptionApproverId: null,
+            approver: buildCurrentApproverRecord(),
+            exceptionApprover: null,
+            ...overrides,
+        }));
+    }
+
+    function buildProcessingNotification(
+        type: "LEAVE_ACTION_LINE"
+            | "LEAVE_CANCELLATION_REQUESTED_LINE"
+            | "LEAVE_NOT_TAKEN_REQUESTED_LINE",
+        payload: LeaveActionLinePayload
+            | LeaveCancellationRequestedLinePayload
+            | LeaveNotTakenRequestedLinePayload,
+    ): NotificationOutbox {
+        const deliveryIdentity = type === "LEAVE_ACTION_LINE"
+            ? (payload as LeaveActionLinePayload).deliveryIdentity
+            : undefined;
+        return {
+            id: 700,
+            type,
+            eventKey: buildLeaveLineEventKey(
+                type,
+                payload.leaveId,
+                payload.approver.userId,
+                deliveryIdentity,
+            ),
+            payload: JSON.stringify(payload),
+            status: "PROCESSING",
+            attempts: 0,
+            nextAttemptAt: new Date(),
+            lastError: null,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+        };
+    }
+
+    it("supersedes stale normal approval LINE without calling the provider", async () => {
+        const payload = buildLeaveActionPayload(
+            2,
+            buildLeaveActionDeliveryIdentity("leave-1", 2),
+        );
+        configureCurrentLeaveRequest({ status: "APPROVED" });
+
+        await expect(dispatchLeaveLineOutbox(
+            buildProcessingNotification("LEAVE_ACTION_LINE", payload),
+            payload,
+        )).resolves.toBe("SUPERSEDED");
+        expect(sendAppLineNotificationMock).not.toHaveBeenCalled();
+    });
+
+    it("supersedes a resolved cancellation request LINE without calling the provider", async () => {
+        const payload = buildCancellationPayload();
+        configureCurrentLeaveRequest({
+            status: "APPROVED",
+            cancellationRequestedAt: new Date("2026-08-01T00:00:00.000Z"),
+        });
+
+        await expect(dispatchLeaveLineOutbox(
+            buildProcessingNotification("LEAVE_CANCELLATION_REQUESTED_LINE", payload),
+            payload,
+        )).resolves.toBe("SUPERSEDED");
+        expect(sendAppLineNotificationMock).not.toHaveBeenCalled();
+    });
+
+    it("supersedes a resolved not-taken request LINE without calling the provider", async () => {
+        const payload = buildNotTakenPayload();
+        configureCurrentLeaveRequest({
+            status: "APPROVED",
+            notTakenRequestedAt: new Date("2026-08-01T00:00:00.000Z"),
+            notTakenConfirmedAt: new Date("2026-08-02T00:00:00.000Z"),
+        });
+
+        await expect(dispatchLeaveLineOutbox(
+            buildProcessingNotification("LEAVE_NOT_TAKEN_REQUESTED_LINE", payload),
+            payload,
+        )).resolves.toBe("SUPERSEDED");
+        expect(sendAppLineNotificationMock).not.toHaveBeenCalled();
+    });
+
+    it.each([
+        ["LEAVE_CANCELLATION_REQUESTED_LINE", buildCancellationPayload],
+        ["LEAVE_NOT_TAKEN_REQUESTED_LINE", buildNotTakenPayload],
+    ])("supersedes %s when the current approver changed", async (type, buildPayload) => {
+        const payload = buildPayload();
+        const actionableType = type as
+            | "LEAVE_CANCELLATION_REQUESTED_LINE"
+            | "LEAVE_NOT_TAKEN_REQUESTED_LINE";
+        configureCurrentLeaveRequest({
+            status: actionableType === "LEAVE_CANCELLATION_REQUESTED_LINE"
+                ? "CANCELLATION_REQUESTED"
+                : "APPROVED",
+            cancellationRequestedAt: actionableType === "LEAVE_CANCELLATION_REQUESTED_LINE"
+                ? new Date("2026-08-01T00:00:00.000Z")
+                : null,
+            notTakenRequestedAt: actionableType === "LEAVE_NOT_TAKEN_REQUESTED_LINE"
+                ? new Date("2026-08-01T00:00:00.000Z")
+                : null,
+            approverId: 30,
+            approver: buildCurrentApproverRecord(30, 3),
+        });
+
+        await expect(dispatchLeaveLineOutbox(
+            buildProcessingNotification(actionableType, payload),
+            payload,
+        )).resolves.toBe("SUPERSEDED");
+        expect(sendAppLineNotificationMock).not.toHaveBeenCalled();
+    });
+
+    it("sends a current approval action LINE", async () => {
+        const payload = buildLeaveActionPayload(
+            2,
+            buildLeaveActionDeliveryIdentity("leave-1", 2),
+        );
+        configureCurrentLeaveRequest({ status: "PENDING" });
+
+        await expect(dispatchLeaveLineOutbox(
+            buildProcessingNotification("LEAVE_ACTION_LINE", payload),
+            payload,
+        )).resolves.toBe("SENT");
+        expect(sendAppLineNotificationMock).toHaveBeenCalledWith(expect.objectContaining({
+            userId: 2,
+            retryKey: payload.retryKey,
+        }));
+        expect(JSON.stringify(sendAppLineNotificationMock.mock.calls[0]?.[0])).toContain(
+            "action=approve",
+        );
+    });
+
+    it("sends current cancellation and not-taken action LINE notifications", async () => {
+        const cancellationPayload = buildCancellationPayload();
+        configureCurrentLeaveRequest({
+            status: "CANCELLATION_REQUESTED",
+            cancellationRequestedAt: new Date("2026-08-01T00:00:00.000Z"),
+        });
+        await expect(dispatchLeaveLineOutbox(
+            buildProcessingNotification(
+                "LEAVE_CANCELLATION_REQUESTED_LINE",
+                cancellationPayload,
+            ),
+            cancellationPayload,
+        )).resolves.toBe("SENT");
+        expect(JSON.stringify(sendAppLineNotificationMock.mock.calls[0]?.[0])).toContain(
+            "action=review",
+        );
+
+        vi.clearAllMocks();
+        const notTakenPayload = buildNotTakenPayload();
+        configureCurrentLeaveRequest({
+            status: "APPROVED",
+            notTakenRequestedAt: new Date("2026-08-01T00:00:00.000Z"),
+        });
+        await expect(dispatchLeaveLineOutbox(
+            buildProcessingNotification("LEAVE_NOT_TAKEN_REQUESTED_LINE", notTakenPayload),
+            notTakenPayload,
+        )).resolves.toBe("SENT");
+        expect(JSON.stringify(sendAppLineNotificationMock.mock.calls[0]?.[0])).toContain(
+            "action=not-taken",
+        );
     });
 });

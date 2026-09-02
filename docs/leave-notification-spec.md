@@ -99,6 +99,10 @@ Payload ควรเก็บข้อมูลดิบที่ parse ได�
 
 Personal LINE ใช้ child outbox แยกจาก parent Email/In-app โดย resolve ผู้รับจาก `User` และ `LineAccountLink.lineUserId` แล้วส่งผ่าน NHFapp `LINE_APP_CHANNEL_ACCESS_TOKEN` เท่านั้น หากผู้ใช้ไม่ link หรือไม่ active จะ supersede LINE delivery โดยไม่ทำให้ Email หรือ In-app ล้มเหลว ส่วน LINE provider failure จะ retry ตาม outbox policy ของ child row
 
+Actionable Leave LINE (`LEAVE_ACTION_LINE`, `LEAVE_CANCELLATION_REQUESTED_LINE` และ `LEAVE_NOT_TAKEN_REQUESTED_LINE`) ต้อง lock และ revalidate current workflow state, effective approver และ recipient ก่อนเรียก provider หาก action ถูกดำเนินการหรือผู้อนุมัติเปลี่ยนไปแล้ว child จะเป็น `SUPERSEDED` โดยไม่ส่งข้อความ stale ส่วน result/informational LINE จะยังส่งตาม event snapshot เพื่อไม่ suppress ผลลัพธ์ที่เกิดขึ้นแล้ว
+
+`LEAVE_ACTION_LINE` ใช้ `deliveryIdentity` เดียวกับ Leave action producer เป็นส่วนหนึ่งของ event key ร่วมกับ `leaveId` และ channel ดังนั้น retry ของ action generation เดิมใช้ key เดิม ขณะที่ assignment generation ใหม่ แม้กลับมาที่ผู้อนุมัติคนเดิม ต้องมี delivery identity ใหม่เพื่อให้ outbox dedupe ไม่กลืน notification ที่ถูกต้อง
+
 ## Email Template
 
 คง template เดิมสำหรับคำขอใหม่และผลอนุมัติ/ไม่อนุมัติ แต่ปรับข้อความและข้อมูลประกอบให้ตรงกับ glossary

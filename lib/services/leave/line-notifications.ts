@@ -15,6 +15,8 @@ import {
 import { buildLeaveLiffRequestUrl } from "@/lib/line/leave-links";
 import { createLineRetryKey } from "@/lib/services/outbox/provider-key";
 import {
+    buildLeaveActionDeliveryIdentity,
+    getLeaveActionDeliveryIdentity,
     parseLeaveActionLinePayload,
     parseLeaveCancelledAfterApprovalLinePayload,
     parseLeaveCancelledLinePayload,
@@ -37,7 +39,11 @@ import {
     type LeaveNotTakenRequestedPayload,
     type LeaveResultPayload,
 } from "@/lib/services/leave/notification-payloads";
-import { resolveCurrentLeaveAction } from "@/lib/services/leave/current-action-validation";
+import {
+    resolveCurrentLeaveAction,
+    resolveCurrentLeaveCancellationAction,
+    resolveCurrentLeaveNotTakenAction,
+} from "@/lib/services/leave/current-action-validation";
 import { lockLeaveRequestRow } from "@/lib/services/leave/transaction";
 
 export const LEAVE_LINE_OUTBOX_TYPES = [
@@ -118,7 +124,16 @@ export function buildLeaveLineEventKey(
     type: LeaveLineOutboxType,
     leaveId: string,
     userId: number,
+    deliveryIdentity?: string,
 ): string {
+    // The Leave action producer owns the generation encoded in deliveryIdentity.
+    // Never rebuild this key from the recipient alone: the same approver can be
+    // assigned again in a later generation.
+    if (type === "LEAVE_ACTION_LINE") {
+        return `leave:${leaveId}:action:${deliveryIdentity
+            ?? buildLeaveActionDeliveryIdentity(leaveId, userId)}:line`;
+    }
+
     return `leave:${leaveId}:${type}:user:${userId}`;
 }
 
@@ -143,11 +158,25 @@ export async function enqueueLeaveLineNotification(
     const userId = getRecipientUserId(input);
     if (userId === null) return;
 
-    const eventKey = buildLeaveLineEventKey(input.type, input.payload.leaveId, userId);
-    const payload = {
-        ...input.payload,
-        retryKey: createLineRetryKey(eventKey),
-    };
+    const deliveryIdentity = input.type === "LEAVE_ACTION_LINE"
+        ? getLeaveActionDeliveryIdentity(input.payload)
+        : undefined;
+    const eventKey = buildLeaveLineEventKey(
+        input.type,
+        input.payload.leaveId,
+        userId,
+        deliveryIdentity,
+    );
+    const payload = input.type === "LEAVE_ACTION_LINE"
+        ? {
+            ...input.payload,
+            deliveryIdentity,
+            retryKey: createLineRetryKey(eventKey),
+        }
+        : {
+            ...input.payload,
+            retryKey: createLineRetryKey(eventKey),
+        };
 
     await client.notificationOutbox.createMany({
         data: [{
@@ -169,6 +198,17 @@ async function markLeaveLineSuperseded(
             data: { status: "SUPERSEDED", lastError },
         }),
     );
+}
+
+async function markLeaveLineSupersededInTransaction(
+    tx: Prisma.TransactionClient,
+    notificationId: number,
+    lastError: string,
+): Promise<void> {
+    await tx.notificationOutbox.updateMany({
+        where: { id: notificationId, status: "PROCESSING" },
+        data: { status: "SUPERSEDED", lastError },
+    });
 }
 
 function parseLeaveLinePayload(
@@ -263,10 +303,21 @@ async function ensureLeaveLineOutboxClaimed(
     return claimed !== null;
 }
 
-async function resolveCurrentActionLinePayload(
+type ActionableLeaveLineDeliveryInput =
+    | { type: "LEAVE_ACTION_LINE"; payload: LeaveActionLinePayload }
+    | {
+        type: "LEAVE_CANCELLATION_REQUESTED_LINE";
+        payload: LeaveCancellationRequestedLinePayload;
+    }
+    | {
+        type: "LEAVE_NOT_TAKEN_REQUESTED_LINE";
+        payload: LeaveNotTakenRequestedLinePayload;
+    };
+
+async function resolveCurrentActionableLeaveLinePayload(
     notificationId: number,
-    payload: LeaveActionLinePayload,
-): Promise<LeaveActionLinePayload | null> {
+    input: ActionableLeaveLineDeliveryInput,
+): Promise<ActionableLeaveLineDeliveryInput | null> {
     return runSerializableTransaction(async (tx) => {
         const claimed = await tx.notificationOutbox.findFirst({
             where: { id: notificationId, status: "PROCESSING" },
@@ -274,20 +325,60 @@ async function resolveCurrentActionLinePayload(
         });
         if (!claimed) return null;
 
-        await lockLeaveRequestRow(tx, payload.leaveId);
-        const resolved = await resolveCurrentLeaveAction(tx, payload);
-        if (!resolved) {
-            await tx.notificationOutbox.updateMany({
-                where: { id: notificationId, status: "PROCESSING" },
-                data: {
-                    status: "SUPERSEDED",
-                    lastError: "Superseded by stale leave-action LINE delivery",
-                },
-            });
-            return null;
+        await lockLeaveRequestRow(tx, input.payload.leaveId);
+        switch (input.type) {
+            case "LEAVE_ACTION_LINE": {
+                const currentPayload = await resolveCurrentLeaveAction(
+                    tx,
+                    input.payload,
+                );
+                if (!currentPayload) break;
+                return {
+                    type: input.type,
+                    payload: {
+                        ...currentPayload,
+                        retryKey: input.payload.retryKey,
+                    },
+                };
+            }
+            case "LEAVE_CANCELLATION_REQUESTED_LINE": {
+                const currentPayload = await resolveCurrentLeaveCancellationAction(
+                    tx,
+                    input.payload,
+                );
+                if (!currentPayload) break;
+                return {
+                    type: input.type,
+                    payload: {
+                        ...currentPayload,
+                        retryKey: input.payload.retryKey,
+                    },
+                };
+            }
+            case "LEAVE_NOT_TAKEN_REQUESTED_LINE": {
+                const currentPayload = await resolveCurrentLeaveNotTakenAction(
+                    tx,
+                    input.payload,
+                );
+                if (!currentPayload) break;
+                return {
+                    type: input.type,
+                    payload: {
+                        ...currentPayload,
+                        retryKey: input.payload.retryKey,
+                    },
+                };
+            }
         }
-
-        return { ...resolved, retryKey: payload.retryKey };
+        const staleError = input.type === "LEAVE_ACTION_LINE"
+            ? "Superseded by stale leave-action LINE delivery"
+            : `Superseded by stale ${input.type} delivery`;
+        await markLeaveLineSupersededInTransaction(
+            tx,
+            notificationId,
+            staleError,
+        );
+        return null;
     });
 }
 
@@ -308,6 +399,9 @@ async function dispatchTypedLeaveLine(
         input.type,
         input.payload.leaveId,
         recipientUserId,
+        input.type === "LEAVE_ACTION_LINE"
+            ? getLeaveActionDeliveryIdentity(input.payload)
+            : undefined,
     );
     if (notification.eventKey !== expectedEventKey) {
         await markLeaveLineSuperseded(
@@ -316,15 +410,26 @@ async function dispatchTypedLeaveLine(
         );
         return "SUPERSEDED";
     }
+    if (input.payload.retryKey !== createLineRetryKey(expectedEventKey)) {
+        await markLeaveLineSuperseded(
+            notification.id,
+            "Superseded mismatched Leave LINE retry key",
+        );
+        return "SUPERSEDED";
+    }
 
     let delivery = input;
-    if (input.type === "LEAVE_ACTION_LINE") {
-        const currentPayload = await resolveCurrentActionLinePayload(
+    if (
+        input.type === "LEAVE_ACTION_LINE"
+        || input.type === "LEAVE_CANCELLATION_REQUESTED_LINE"
+        || input.type === "LEAVE_NOT_TAKEN_REQUESTED_LINE"
+    ) {
+        const currentDelivery = await resolveCurrentActionableLeaveLinePayload(
             notification.id,
-            input.payload,
+            input,
         );
-        if (!currentPayload) return "SUPERSEDED";
-        delivery = { type: input.type, payload: currentPayload };
+        if (!currentDelivery) return "SUPERSEDED";
+        delivery = currentDelivery;
     } else if (!(await ensureLeaveLineOutboxClaimed(notification.id))) {
         return "SUPERSEDED";
     }

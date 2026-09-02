@@ -90,8 +90,25 @@ LINE:
 ข้อความ Leave เป็น Flex message ที่มีประเภทการลา, ช่วงวันที่/ระยะเวลา, สถานะหรือผู้กระทำ
 และ CTA ที่ชี้ไปยัง `/liff/leave` ผ่าน `buildLeaveLiffRequestUrl()` เสมอ
 
-`LEAVE_ACTION_LINE` ตรวจซ้ำว่า request ยัง `PENDING`, approver ยังเป็น current approver
-และยัง active ก่อนส่ง เพื่อ suppress งานที่ stale เช่นเดียวกับ action parent เดิม
+ก่อนส่ง actionable Leave LINE ทุกครั้ง ระบบ lock และตรวจซ้ำกับ workflow state ปัจจุบัน:
+
+- `LEAVE_ACTION_LINE` ต้องยัง `PENDING`, approver ต้องเป็น current approver ที่ active และ
+  `deliveryIdentity` ต้องตรงกับ action generation ที่ enqueue ไว้
+- `LEAVE_CANCELLATION_REQUESTED_LINE` ต้องยังอยู่ระหว่างรอยืนยัน/พิจารณายกเลิก และผู้รับ
+  ต้องเป็น effective approver ที่ active
+- `LEAVE_NOT_TAKEN_REQUESTED_LINE` ต้องยังมี not-taken action ค้างอยู่ และผู้รับต้องเป็น
+  effective approver ที่ active
+
+ถ้า action ใดไม่ตรงกับ state, recipient หรือ delivery identity ปัจจุบัน child row จะถูก
+mark เป็น `SUPERSEDED` และจะไม่เรียก LINE provider ส่วน result/informational LINE เช่น
+`LEAVE_RESULT_LINE`, `LEAVE_CANCELLED_AFTER_APPROVAL_LINE` และ
+`LEAVE_NOT_TAKEN_CONFIRMED_LINE` จะไม่ถูก suppress ด้วยกฎ pending-action นี้ เพราะเป็นผลลัพธ์
+ของเหตุการณ์ที่เกิดขึ้นแล้ว
+
+สำหรับ `LEAVE_ACTION_LINE` event key ใช้ `leaveId + deliveryIdentity + LINE channel`
+โดย `deliveryIdentity` เป็น identity แบบ deterministic ของ Leave action producer ไม่ได้
+สร้างจาก recipient เพียงอย่างเดียว จึงรองรับ assignment generation เดิมซ้ำผู้รับเดิมได้
+โดยไม่ทำให้ retry ของ generation เดียวกันสร้าง child ซ้ำ
 
 ## Routine behavior
 
