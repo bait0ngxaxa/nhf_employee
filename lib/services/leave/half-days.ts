@@ -36,6 +36,7 @@ type StoredLeaveQuota = {
 type StoredLeaveRequest = {
     durationHalfDays: number;
     overQuotaHalfDays: number;
+    approvalActionVersion?: number;
 };
 
 export function toLeaveQuotaDays<T extends StoredLeaveQuota>(
@@ -78,7 +79,12 @@ export function toLeaveRequestDays<T extends StoredLeaveRequest>(
     durationDays: number;
     overQuotaDays: number;
 } {
-    const { durationHalfDays, overQuotaHalfDays, ...rest } = request;
+    const {
+        durationHalfDays,
+        overQuotaHalfDays,
+        approvalActionVersion: _approvalActionVersion,
+        ...rest
+    } = request;
     return {
         ...rest,
         durationDays: halfDaysToDays(durationHalfDays),

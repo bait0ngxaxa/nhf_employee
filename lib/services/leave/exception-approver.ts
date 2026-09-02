@@ -172,6 +172,10 @@ export async function resolveLeaveExceptionApprover(
     };
 }
 
+/**
+ * Persist the effective exception assignment and its generation together.
+ * Callers must hold the LeaveRequest row lock before resolving this assignment.
+ */
 export async function persistLeaveExceptionApprover(
     tx: Prisma.TransactionClient,
     leaveId: string,
@@ -179,11 +183,28 @@ export async function persistLeaveExceptionApprover(
 ): Promise<void> {
     if (!resolution.shouldPersist) return;
 
+    const currentLeaveRequest = await tx.leaveRequest.findUnique({
+        where: { id: leaveId },
+        select: {
+            approverId: true,
+            exceptionApproverId: true,
+        },
+    });
+    if (!currentLeaveRequest) {
+        throw new Error("Leave request not found");
+    }
+
+    const assignmentChanged = getEffectiveLeaveApproverId(currentLeaveRequest)
+        !== resolution.approver.id;
+
     await tx.leaveRequest.update({
         where: { id: leaveId },
         data: {
             exceptionApproverId: resolution.exceptionApproverId,
             exceptionApproverAssignedAt: resolution.assignedAt,
+            ...(assignmentChanged
+                ? { approvalActionVersion: { increment: 1 } }
+                : {}),
         },
     });
 }

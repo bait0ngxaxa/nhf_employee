@@ -103,6 +103,21 @@ Actionable Leave LINE (`LEAVE_ACTION_LINE`, `LEAVE_CANCELLATION_REQUESTED_LINE` 
 
 `LEAVE_ACTION_LINE` ใช้ `deliveryIdentity` เดียวกับ Leave action producer เป็นส่วนหนึ่งของ event key ร่วมกับ `leaveId` และ channel ดังนั้น retry ของ action generation เดิมใช้ key เดิม ขณะที่ assignment generation ใหม่ แม้กลับมาที่ผู้อนุมัติคนเดิม ต้องมี delivery identity ใหม่เพื่อให้ outbox dedupe ไม่กลืน notification ที่ถูกต้อง
 
+Leave action generation เป็น state ที่ persist อยู่ใน `LeaveRequest.approvalActionVersion`
+ไม่ใช่ retry count หรือ version ของ notification row คำขอใหม่กำหนดค่าเริ่มต้นเป็น `1`
+และ producer สร้าง `deliveryIdentity` จาก `leaveId`, `approverUserId` และ version ที่อ่านได้
+จากแถว Leave เดียวกัน เมื่อ effective approver เปลี่ยน การเขียน approver state และการเพิ่ม
+version ต้องอยู่ใน transaction ที่ lock แถว Leave เดียวกัน หากเปลี่ยนจาก A ไป B แล้วกลับมา A
+จะได้ A(v1), B(v2), A(v3) ทำให้ A รอบที่สองไม่ชนกับ delivery ของ A รอบแรก
+ฟิลด์นี้ใช้กับ approval-action delivery identity เท่านั้น ไม่เปลี่ยน `LEAVE_ACTION` email
+`Message-ID` เดิมหรือการ dedupe ของ in-app notification
+
+Payload หรือ child outbox แบบ legacy ที่ใช้ identity `leaveId:approverUserId` จะรองรับได้
+เฉพาะ initial generation ที่ authoritative state ยืนยันว่าเป็น version `1`, คำขอยัง `PENDING`
+และไม่มี exception approver; legacy row ที่พิสูจน์ความเป็น action ปัจจุบันไม่ได้จะถูก
+`SUPERSEDED` โดยไม่ลบ row ที่ค้างอยู่ การตรวจปัจจุบันจะใช้ effective approver เดียวกับ
+authorization โดยให้ exception approver มี precedence เหนือ original approver
+
 ## Email Template
 
 คง template เดิมสำหรับคำขอใหม่และผลอนุมัติ/ไม่อนุมัติ แต่ปรับข้อความและข้อมูลประกอบให้ตรงกับ glossary

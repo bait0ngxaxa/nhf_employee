@@ -54,6 +54,7 @@ function buildCancellationRequest(
         approverId: 20,
         exceptionApproverId: null,
         exceptionApproverAssignedAt: null,
+        approvalActionVersion: 1,
         approvedAt: new Date("2098-12-20T00:00:00.000Z"),
         rejectReason: null,
         notTakenReason: null,
@@ -122,7 +123,7 @@ describe("POST /api/leave/cancel", () => {
         vi.mocked(prisma.leaveRequest.findUnique).mockResolvedValue({
             id: "leave-1", employeeId: 10, leaveType: "SICK", startDate: new Date(), endDate: new Date(),
             period: "FULL_DAY", durationHalfDays: 2, reason: "ลาป่วย", emergencyReason: null, specialReason: null,
-            overQuotaHalfDays: 0, status: "PENDING", approverId: 20, exceptionApproverId: null, exceptionApproverAssignedAt: null, approvedAt: null, rejectReason: null,
+            overQuotaHalfDays: 0, status: "PENDING", approverId: 20, exceptionApproverId: null, exceptionApproverAssignedAt: null, approvalActionVersion: 1, approvedAt: null, rejectReason: null,
             notTakenReason: null, notTakenRequestedAt: null, notTakenConfirmedAt: null, notTakenConfirmedById: null,
             cancellationReason: null, cancellationRequestedAt: null, cancellationConfirmedAt: null, cancellationConfirmedById: null,
             attachmentUrl: null, createdAt: new Date(), updatedAt: new Date(),
@@ -172,7 +173,7 @@ describe("POST /api/leave/cancel", () => {
         vi.mocked(prisma.leaveRequest.findUnique).mockResolvedValue({
             id: "leave-2", employeeId: 10, leaveType: "SICK", startDate: new Date(), endDate: new Date(),
             period: "FULL_DAY", durationHalfDays: 2, reason: "ลาป่วย", emergencyReason: null, specialReason: null,
-            overQuotaHalfDays: 0, status: "PENDING", approverId: 20, exceptionApproverId: null, exceptionApproverAssignedAt: null, approvedAt: null, rejectReason: null,
+            overQuotaHalfDays: 0, status: "PENDING", approverId: 20, exceptionApproverId: null, exceptionApproverAssignedAt: null, approvalActionVersion: 1, approvedAt: null, rejectReason: null,
             notTakenReason: null, notTakenRequestedAt: null, notTakenConfirmedAt: null, notTakenConfirmedById: null,
             cancellationReason: null, cancellationRequestedAt: null, cancellationConfirmedAt: null, cancellationConfirmedById: null,
             attachmentUrl: null, createdAt: new Date(), updatedAt: new Date(),
@@ -223,6 +224,7 @@ describe("POST /api/leave/cancel", () => {
             approverId: 20,
             exceptionApproverId: null,
             exceptionApproverAssignedAt: null,
+            approvalActionVersion: 1,
             approvedAt: new Date("2098-12-20T00:00:00.000Z"),
             rejectReason: null,
             notTakenReason: null,
@@ -379,6 +381,7 @@ describe("POST /api/leave/cancel", () => {
             data: {
                 exceptionApproverId: 30,
                 exceptionApproverAssignedAt: expect.any(Date),
+                approvalActionVersion: { increment: 1 },
             },
         });
         expect(prisma.notificationOutbox.create).toHaveBeenCalledWith({
@@ -418,6 +421,7 @@ describe("POST /api/leave/cancel", () => {
             approverId: 20,
             exceptionApproverId: null,
             exceptionApproverAssignedAt: null,
+            approvalActionVersion: 1,
             approvedAt: new Date("2098-12-20T00:00:00.000Z"),
             rejectReason: null,
             notTakenReason: null,
@@ -567,6 +571,7 @@ describe("POST /api/leave/cancel", () => {
             },
         });
         vi.mocked(prisma.leaveRequest.findUnique)
+            .mockResolvedValueOnce(initialRequest)
             .mockResolvedValueOnce(initialRequest)
             .mockResolvedValueOnce(assignedRequest);
         vi.mocked(prisma.leaveRequest.update).mockResolvedValue({ id: "leave-cancellation" } as never);

@@ -3,6 +3,7 @@ import type {
     NotificationOutbox,
     PrismaClient,
 } from "@prisma/client";
+import type { Prisma } from "@prisma/client";
 import { mockDeep, mockReset } from "vitest-mock-extended";
 
 import { prisma } from "@/lib/db/prisma";
@@ -13,7 +14,14 @@ import {
     type LeaveLineEnqueueInput,
 } from "@/lib/services/leave/line-notifications";
 import { createLineRetryKey } from "@/lib/services/outbox/provider-key";
-import { buildLeaveActionDeliveryIdentity } from "@/lib/services/leave/notification-payloads";
+import {
+    persistLeaveExceptionApprover,
+    resolveLeaveExceptionApprover,
+} from "@/lib/services/leave/exception-approver";
+import {
+    buildLegacyLeaveActionDeliveryIdentity,
+    buildLeaveActionDeliveryIdentity,
+} from "@/lib/services/leave/notification-payloads";
 import type {
     LeaveActionLinePayload,
     LeaveCancelledAfterApprovalLinePayload,
@@ -278,6 +286,7 @@ describe("Leave LINE outbox", () => {
     function buildLeaveActionPayload(
         userId: number,
         deliveryIdentity: string,
+        employeeId = approver.employeeId,
     ): LeaveActionLinePayload {
         const eventKey = buildLeaveLineEventKey(
             "LEAVE_ACTION_LINE",
@@ -288,7 +297,7 @@ describe("Leave LINE outbox", () => {
         return {
             ...leaveDetails,
             employee,
-            approver: { ...approver, userId },
+            approver: { ...approver, employeeId, userId },
             deliveryIdentity,
             reason: "พักผ่อน",
             emergencyReason: null,
@@ -302,10 +311,11 @@ describe("Leave LINE outbox", () => {
         userId: number,
         generation: number,
     ): string {
-        return `${buildLeaveActionDeliveryIdentity(
+        return buildLeaveActionDeliveryIdentity(
             leaveDetails.leaveId,
             userId,
-        )}:generation:${generation}`;
+            generation,
+        );
     }
 
     function buildCancellationPayload(
@@ -344,13 +354,100 @@ describe("Leave LINE outbox", () => {
         return { ...payload, retryKey: createLineRetryKey(eventKey) };
     }
 
-    it("uses delivery identity to deduplicate same-generation action retries and allow A-B-A", async () => {
-        const firstAIdentity = buildAssignmentDeliveryIdentity(2, 1);
-        const bIdentity = buildAssignmentDeliveryIdentity(3, 2);
-        const secondAIdentity = buildAssignmentDeliveryIdentity(2, 3);
+    it("uses persisted assignment generations to deduplicate retries and allow A-B-A", async () => {
+        const originalApprover = buildCurrentApproverRecord(20, 2);
+        const unavailableOriginalApprover = {
+            ...originalApprover,
+            status: "INACTIVE" as const,
+            user: null,
+        };
+        const recoveryApprover = buildCurrentApproverRecord(30, 3);
+        const state = {
+            approverId: originalApprover.id,
+            exceptionApproverId: null as number | null,
+            approvalActionVersion: 1,
+        };
+        const firstAIdentity = buildLeaveActionDeliveryIdentity(
+            leaveDetails.leaveId,
+            originalApprover.user.id,
+            state.approvalActionVersion,
+        );
+
+        vi.mocked(prismaMock.employee.findUnique).mockResolvedValue({
+            manager: recoveryApprover,
+        } as never);
+        vi.mocked(prismaMock.leaveRequest.findUnique).mockImplementation((async () => ({
+            approverId: state.approverId,
+            exceptionApproverId: state.exceptionApproverId,
+        }) as never) as never);
+        vi.mocked(prismaMock.leaveRequest.update).mockImplementation((async (args: { data: unknown }) => {
+            const data = args.data as {
+                exceptionApproverId?: number | null;
+                approvalActionVersion?: { increment: number };
+            };
+            state.exceptionApproverId = data.exceptionApproverId ?? null;
+            if (data.approvalActionVersion?.increment) {
+                state.approvalActionVersion += data.approvalActionVersion.increment;
+            }
+            return state as never;
+        }) as never);
+
+        const firstResolution = await resolveLeaveExceptionApprover(
+            prismaMock as unknown as Prisma.TransactionClient,
+            {
+                employeeId: employee.employeeId,
+                originalApprover: unavailableOriginalApprover,
+                existingApprover: null,
+                reuseExisting: false,
+            },
+        );
+        if (!firstResolution) throw new Error("Expected recovery approver");
+        await persistLeaveExceptionApprover(
+            prismaMock as unknown as Prisma.TransactionClient,
+            leaveDetails.leaveId,
+            firstResolution,
+        );
+        const bIdentity = buildLeaveActionDeliveryIdentity(
+            leaveDetails.leaveId,
+            recoveryApprover.user.id,
+            state.approvalActionVersion,
+        );
+
+        const secondResolution = await resolveLeaveExceptionApprover(
+            prismaMock as unknown as Prisma.TransactionClient,
+            {
+                employeeId: employee.employeeId,
+                originalApprover,
+                existingApprover: recoveryApprover,
+                reuseExisting: false,
+            },
+        );
+        if (!secondResolution) throw new Error("Expected original approver");
+        await persistLeaveExceptionApprover(
+            prismaMock as unknown as Prisma.TransactionClient,
+            leaveDetails.leaveId,
+            secondResolution,
+        );
+        const secondAIdentity = buildLeaveActionDeliveryIdentity(
+            leaveDetails.leaveId,
+            originalApprover.user.id,
+            state.approvalActionVersion,
+        );
+        expect(state.approvalActionVersion).toBe(3);
+
+        const rows: Array<{ eventKey: string; payload: string }> = [];
+        vi.mocked(prismaMock.notificationOutbox.createMany).mockImplementation((async (args: { data: unknown }) => {
+            const data = args.data as Array<{ eventKey: string; payload: string }>;
+            for (const row of data) {
+                if (!rows.some((existing) => existing.eventKey === row.eventKey)) {
+                    rows.push(row);
+                }
+            }
+            return { count: data.length } as never;
+        }) as never);
         const deliveries = [
             buildLeaveActionPayload(2, firstAIdentity),
-            buildLeaveActionPayload(3, bIdentity),
+            buildLeaveActionPayload(3, bIdentity, recoveryApprover.id),
             buildLeaveActionPayload(2, secondAIdentity),
         ];
 
@@ -361,10 +458,6 @@ describe("Leave LINE outbox", () => {
             }, prismaMock);
         }
 
-        const rows = prismaMock.notificationOutbox.createMany.mock.calls
-            .map(([args]) => (args as {
-                data: Array<{ eventKey: string; payload: string }>;
-            }).data[0]);
         const firstA = rows[0];
         const b = rows[1];
         const secondA = rows[2];
@@ -389,6 +482,7 @@ describe("Leave LINE outbox", () => {
             payload: deliveries[0],
         }, prismaMock);
 
+        expect(rows).toHaveLength(3);
         const retryArgs = prismaMock.notificationOutbox.createMany.mock.calls[3]?.[0] as {
             data: Array<{ eventKey: string }>;
             skipDuplicates: boolean;
@@ -400,7 +494,7 @@ describe("Leave LINE outbox", () => {
     it("supersedes a Leave LINE row with a mismatched deterministic retry key", async () => {
         const payload = buildLeaveActionPayload(
             2,
-            buildLeaveActionDeliveryIdentity("leave-1", 2),
+            buildLeaveActionDeliveryIdentity("leave-1", 2, 1),
         );
         const mismatchedPayload = {
             ...payload,
@@ -435,7 +529,7 @@ describe("Leave LINE outbox", () => {
             lastName: "ใจดี",
             nickname: null,
             email: "manager@example.com",
-            status: "ACTIVE",
+            status: "ACTIVE" as const,
             deletedAt: null,
             user: {
                 id: userId,
@@ -450,6 +544,7 @@ describe("Leave LINE outbox", () => {
         overrides: Record<string, unknown> = {},
     ): void {
         prismaMock.leaveRequest.findUnique.mockResolvedValue(asNever({
+            id: "leave-1",
             status: "PENDING",
             startDate: new Date("2026-12-01T00:00:00.000Z"),
             notTakenRequestedAt: null,
@@ -458,6 +553,7 @@ describe("Leave LINE outbox", () => {
             cancellationConfirmedAt: null,
             approverId: 20,
             exceptionApproverId: null,
+            approvalActionVersion: 1,
             approver: buildCurrentApproverRecord(),
             exceptionApprover: null,
             ...overrides,
@@ -497,7 +593,7 @@ describe("Leave LINE outbox", () => {
     it("supersedes stale normal approval LINE without calling the provider", async () => {
         const payload = buildLeaveActionPayload(
             2,
-            buildLeaveActionDeliveryIdentity("leave-1", 2),
+            buildLeaveActionDeliveryIdentity("leave-1", 2, 1),
         );
         configureCurrentLeaveRequest({ status: "APPROVED" });
 
@@ -569,7 +665,7 @@ describe("Leave LINE outbox", () => {
     it("sends a current approval action LINE", async () => {
         const payload = buildLeaveActionPayload(
             2,
-            buildLeaveActionDeliveryIdentity("leave-1", 2),
+            buildLeaveActionDeliveryIdentity("leave-1", 2, 1),
         );
         configureCurrentLeaveRequest({ status: "PENDING" });
 
@@ -584,6 +680,110 @@ describe("Leave LINE outbox", () => {
         expect(JSON.stringify(sendAppLineNotificationMock.mock.calls[0]?.[0])).toContain(
             "action=approve",
         );
+    });
+
+    it("supersedes the first A generation after production state returns to A", async () => {
+        const firstAIdentity = buildAssignmentDeliveryIdentity(2, 1);
+        const currentAIdentity = buildAssignmentDeliveryIdentity(2, 3);
+        const payload = buildLeaveActionPayload(2, firstAIdentity);
+        configureCurrentLeaveRequest({
+            approvalActionVersion: 3,
+            status: "PENDING",
+            approverId: 20,
+            exceptionApproverId: null,
+        });
+
+        await expect(dispatchLeaveLineOutbox(
+            buildProcessingNotification("LEAVE_ACTION_LINE", payload),
+            payload,
+        )).resolves.toBe("SUPERSEDED");
+        expect(firstAIdentity).not.toBe(currentAIdentity);
+        expect(sendAppLineNotificationMock).not.toHaveBeenCalled();
+    });
+
+    it("sends the current A generation with its canonical event and retry keys", async () => {
+        const currentAIdentity = buildAssignmentDeliveryIdentity(2, 3);
+        const payload = buildLeaveActionPayload(2, currentAIdentity);
+        configureCurrentLeaveRequest({
+            approvalActionVersion: 3,
+            status: "PENDING",
+            approverId: 20,
+            exceptionApproverId: null,
+        });
+
+        const notification = buildProcessingNotification("LEAVE_ACTION_LINE", payload);
+        await expect(dispatchLeaveLineOutbox(
+            notification,
+            payload,
+        )).resolves.toBe("SENT");
+        const eventKey = notification.eventKey;
+        if (!eventKey) throw new Error("Expected canonical Leave LINE event key");
+        expect(eventKey).toBe(
+            buildLeaveLineEventKey("LEAVE_ACTION_LINE", "leave-1", 2, currentAIdentity),
+        );
+        expect(payload.retryKey).toBe(createLineRetryKey(eventKey));
+        expect(sendAppLineNotificationMock).toHaveBeenCalledWith(expect.objectContaining({
+            userId: 2,
+            retryKey: payload.retryKey,
+        }));
+    });
+
+    it("accepts a legacy action identity only for the initial current assignment", async () => {
+        const legacyIdentity = buildLegacyLeaveActionDeliveryIdentity("leave-1", 2);
+        const payload = buildLeaveActionPayload(2, legacyIdentity);
+        configureCurrentLeaveRequest({
+            approvalActionVersion: 1,
+            status: "PENDING",
+            approverId: 20,
+            exceptionApproverId: null,
+        });
+
+        await expect(dispatchLeaveLineOutbox(
+            buildProcessingNotification("LEAVE_ACTION_LINE", payload),
+            payload,
+        )).resolves.toBe("SENT");
+        expect(sendAppLineNotificationMock).toHaveBeenCalledWith(expect.objectContaining({
+            userId: 2,
+            retryKey: payload.retryKey,
+        }));
+    });
+
+    it("supersedes a legacy action identity after the persisted generation advances", async () => {
+        const legacyIdentity = buildLegacyLeaveActionDeliveryIdentity("leave-1", 2);
+        const payload = buildLeaveActionPayload(2, legacyIdentity);
+        configureCurrentLeaveRequest({
+            approvalActionVersion: 3,
+            status: "PENDING",
+            approverId: 20,
+            exceptionApproverId: null,
+        });
+
+        await expect(dispatchLeaveLineOutbox(
+            buildProcessingNotification("LEAVE_ACTION_LINE", payload),
+            payload,
+        )).resolves.toBe("SUPERSEDED");
+        expect(sendAppLineNotificationMock).not.toHaveBeenCalled();
+    });
+
+    it("uses the exception approver as the current Leave action recipient", async () => {
+        const bIdentity = buildAssignmentDeliveryIdentity(3, 2);
+        const payload = buildLeaveActionPayload(3, bIdentity, 30);
+        configureCurrentLeaveRequest({
+            approvalActionVersion: 2,
+            status: "PENDING",
+            approverId: 20,
+            exceptionApproverId: 30,
+            exceptionApprover: buildCurrentApproverRecord(30, 3),
+        });
+
+        await expect(dispatchLeaveLineOutbox(
+            buildProcessingNotification("LEAVE_ACTION_LINE", payload),
+            payload,
+        )).resolves.toBe("SENT");
+        expect(sendAppLineNotificationMock).toHaveBeenCalledWith(expect.objectContaining({
+            userId: 3,
+            retryKey: payload.retryKey,
+        }));
     });
 
     it("sends current cancellation and not-taken action LINE notifications", async () => {

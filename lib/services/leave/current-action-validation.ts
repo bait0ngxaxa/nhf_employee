@@ -3,6 +3,7 @@ import type { Prisma } from "@prisma/client";
 import { getApproverLeaveActions } from "@/lib/services/leave/action-availability";
 import {
     buildConfiguredApproverSnapshot,
+    buildLegacyLeaveActionDeliveryIdentity,
     buildLeaveActionDeliveryIdentity,
     getLeaveActionDeliveryIdentity,
     type LeaveActionPayload,
@@ -14,11 +15,15 @@ import {
     isActiveLeaveApprover,
 } from "@/lib/services/leave/approver-eligibility";
 import {
+    INITIAL_LEAVE_APPROVAL_ACTION_VERSION,
+} from "@/lib/services/leave/approval-action-version";
+import {
     getEffectiveLeaveApprover,
     getEffectiveLeaveApproverId,
 } from "@/lib/services/leave/exception-approver";
 
 const CURRENT_LEAVE_ACTION_SELECT = {
+    id: true,
     status: true,
     startDate: true,
     notTakenRequestedAt: true,
@@ -27,6 +32,7 @@ const CURRENT_LEAVE_ACTION_SELECT = {
     cancellationConfirmedAt: true,
     approverId: true,
     exceptionApproverId: true,
+    approvalActionVersion: true,
     approver: {
         select: {
             id: true,
@@ -85,24 +91,34 @@ export async function resolveCurrentLeaveAction(
     payload: LeaveActionPayload,
 ): Promise<LeaveActionPayload | null> {
     const leaveRequest = await findCurrentLeaveActionRequest(tx, payload.leaveId);
-    const approver = leaveRequest?.approver;
+    const approver = leaveRequest
+        ? getEffectiveLeaveApprover(leaveRequest)
+        : null;
     if (
         leaveRequest?.status !== "PENDING"
         || !isActiveLeaveApprover(approver)
         || !getApproverLeaveActions(leaveRequest).some((action) =>
             action === "APPROVE" || action === "REJECT"
         )
-        || approver.id !== payload.approver.employeeId
-        || approver.user.id !== payload.approver.userId
+        || !hasCurrentApprover(leaveRequest, payload.approver)
     ) {
         return null;
     }
 
     const currentIdentity = buildLeaveActionDeliveryIdentity(
-        payload.leaveId,
+        leaveRequest.id,
         approver.user.id,
+        leaveRequest.approvalActionVersion,
     );
-    if (getLeaveActionDeliveryIdentity(payload) !== currentIdentity) {
+    const payloadIdentity = getLeaveActionDeliveryIdentity(payload);
+    const isLegacyVersionOneIdentity =
+        leaveRequest.approvalActionVersion === INITIAL_LEAVE_APPROVAL_ACTION_VERSION
+        && leaveRequest.exceptionApproverId === null
+        && payloadIdentity === buildLegacyLeaveActionDeliveryIdentity(
+            leaveRequest.id,
+            approver.user.id,
+        );
+    if (payloadIdentity !== currentIdentity && !isLegacyVersionOneIdentity) {
         return null;
     }
 

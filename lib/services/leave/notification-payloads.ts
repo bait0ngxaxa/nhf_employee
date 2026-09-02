@@ -201,6 +201,18 @@ export function buildConfiguredApproverSnapshot(
 export function buildLeaveActionDeliveryIdentity(
     leaveId: string,
     approverUserId: number,
+    approvalActionVersion: number,
+): string {
+    if (!Number.isSafeInteger(approvalActionVersion) || approvalActionVersion < 1) {
+        throw new Error("Invalid Leave approval action version");
+    }
+
+    return `${leaveId}:${approverUserId}:generation:${approvalActionVersion}`;
+}
+
+export function buildLegacyLeaveActionDeliveryIdentity(
+    leaveId: string,
+    approverUserId: number,
 ): string {
     return `${leaveId}:${approverUserId}`;
 }
@@ -208,7 +220,7 @@ export function buildLeaveActionDeliveryIdentity(
 export function getLeaveActionDeliveryIdentity(
     payload: LeaveActionPayload,
 ): string {
-    return payload.deliveryIdentity ?? buildLeaveActionDeliveryIdentity(
+    return payload.deliveryIdentity ?? buildLegacyLeaveActionDeliveryIdentity(
         payload.leaveId,
         payload.approver.userId,
     );

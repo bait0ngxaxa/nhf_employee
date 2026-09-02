@@ -126,7 +126,11 @@ function createHarness(options: {
         },
         leaveRequest: {
             findUnique: async () => ({
+                id: "leave-1",
                 status: state.requestStatus,
+                approverId: 20,
+                exceptionApproverId: null,
+                approvalActionVersion: 1,
                 approver: {
                     id: 20,
                     firstName: "Manager",

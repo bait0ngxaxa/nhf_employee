@@ -414,6 +414,7 @@ model LeaveRequest {
   approverId            Int? // หัวหน้าที่ต้องอนุมัติตอนนั้น (ดึงจาก managerId ของพนักงาน)
   exceptionApproverId   Int? // ผู้ดำเนินการปัจจุบันของ exception flow เมื่อ approver เดิมใช้การไม่ได้
   exceptionApproverAssignedAt DateTime?
+  approvalActionVersion Int      @default(1) // รุ่นของ effective approval assignment ปัจจุบัน
   approvedAt            DateTime? // เวลาที่กดอนุมัติ/ปฏิเสธ
   rejectReason          String?   @db.Text // เหตุผลที่ปฏิเสธ (ถ้ามี)
   notTakenReason        String?   @db.Text // โน๊ตเมื่ออนุมัติแล้วแต่ไม่ได้ใช้วันลา

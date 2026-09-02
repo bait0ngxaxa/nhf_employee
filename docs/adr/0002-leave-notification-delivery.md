@@ -8,6 +8,14 @@
 
 การสร้างคำขอลาใหม่กับการเปลี่ยนผู้อนุมัติใช้ `Employee` row lock เดียวกัน จึงถูก serialize ตามลำดับที่ได้ lock: คำขอที่สร้างและ commit เป็น `PENDING` ก่อนจะทำให้การเปลี่ยนผู้อนุมัติได้ `409` ส่วนการเปลี่ยนผู้อนุมัติที่ commit ก่อนจะทำให้คำขอใหม่อ่าน manager และ User ล่าสุด คำขอเดิมไม่ถูกแก้ `approverId` จากการจัดการผู้อนุมัติทั่วไป
 
+ตัวตนของ approval action ต้องผูกกับ approval-assignment generation ที่ persist ใน
+`LeaveRequest.approvalActionVersion` คำขอใหม่เริ่มที่ version `1` และ producer ใช้ค่าเดียวกัน
+ในการสร้าง `deliveryIdentity` รูปแบบ `leaveId + approverUserId + generation` เมื่อ effective
+approver เปลี่ยนผ่าน exception/recovery flow ให้เพิ่ม version แบบ atomic ใน transaction ที่
+lock แถว Leave เดียวกับการเขียน `exceptionApproverId` หากผู้อนุมัติเปลี่ยนแบบ
+`A → B → A` จึงได้ generation `1 → 2 → 3` และการกลับมาเป็น A จะสร้าง event identity ใหม่
+ไม่ชนกับ action เดิมของ A การ retry ของ assignment เดิมไม่เพิ่ม version
+
 Worker ของ `LEAVE_ACTION` และการยกเลิกคำขอใช้ `LeaveRequest` row lock เดียวกัน การตรวจสถานะปัจจุบันและการสร้าง `LEAVE_REQUESTED` in-app อยู่ใน transaction เดียวกันกับ lock เมื่อ cancel commit ก่อน worker ต้อง mark outbox เป็น `SUPERSEDED` และไม่สร้าง notification หรือส่งอีเมลใหม่ เมื่อ worker commit ก่อน cancel จะ mark notification เดิม เป็นอ่านแล้วหลังเปลี่ยนคำขอเป็น `CANCELLED`
 
 การตรวจสิทธิ์ซ้ำใน transaction เป็น fail closed: ต้อง lock แถว Employee แล้วตรวจ User ที่ active ไม่ถูก soft-delete และ Employee ที่มีสถานะ `ACTIVE` ไม่ถูก soft-delete ด้วย Prisma transaction client โดยตรง หากตรวจไม่ได้หรือ transaction client ไม่ครบ ห้าม fallback ไปตรวจเฉพาะ Employee และห้ามทำ business write ต่อ
@@ -27,6 +35,13 @@ Worker ของ `LEAVE_ACTION` และการยกเลิกคำขอ
 เมื่อเหตุการณ์ทำให้งานค้างของผู้อนุมัติสิ้นสุด เช่น อนุมัติ, ไม่อนุมัติ, ยกเลิกคำขอ, หรือยืนยันไม่ได้ใช้วันลา ให้ mark in-app notification เดิมเป็นอ่านแล้วแทนการลบ เพื่อรักษาประวัติแต่ไม่ทำให้ตัวนับแจ้งเตือนค้างอยู่ การส่งคำขอลาใหม่ไม่ต้องสร้าง self notification ให้พนักงาน เพราะผู้ส่งเห็นผลลัพธ์ในหน้าจอและประวัติของตนเองทันที
 
 Outbox payload ของเหตุการณ์การลาต้องเก็บ snapshot ของผู้รับหลักและข้อมูลที่ใช้แสดงผล ณ ตอนเกิดเหตุการณ์ สำหรับ `LEAVE_ACTION` ให้เก็บ `deliveryIdentity` จาก action producer และให้ child `LEAVE_ACTION_LINE` ใช้ `leaveId + deliveryIdentity + channel` เป็น event identity เพื่อแยก assignment generation ที่ถูกต้อง แม้ผู้รับจะกลับมาเป็นคนเดิม การ retry ของ generation เดิมยังคงใช้ identity เดิม ส่วน stale หรือ legacy outbox ที่ identity ไม่ตรงต้องถูกปิดเป็น `SUPERSEDED`
+
+การเพิ่ม field generation ใช้ migration แบบ forward-only พร้อม default `1` เพื่อ backfill
+Leave เดิมโดยไม่ลบ pending outbox เดิม Legacy `LEAVE_ACTION`/`LEAVE_ACTION_LINE` ที่ยังเป็น
+initial pending assignment และมี recipient ตรงกับ effective approver ปัจจุบันสามารถถูก
+normalize ใน validation ได้ ส่วน payload ที่ state ปัจจุบันยืนยันไม่ได้ว่าเป็น generation แรก
+จะถูก supersede อย่างปลอดภัยแทนการประดิษฐ์ version ใหม่ การเพิ่ม generation นี้เป็นเฉพาะ
+approval-action identity และไม่เปลี่ยน event identity ของ result หรือ informational Leave event
 
 ก่อน dispatch `LEAVE_ACTION` ทุกครั้ง processor ต้องยืนยันว่า outbox ยังเป็น `PROCESSING`, คำขอยังรออนุมัติ, ผู้อนุมัติปัจจุบันยัง eligible และ delivery identity ตรงกับ action generation/recipient ปัจจุบัน หากไม่ตรงให้ mark row เป็น `SUPERSEDED` และไม่ส่ง snapshot เก่า การตรวจและการสร้าง `LEAVE_REQUESTED` in-app ทำใน transaction เดียวกัน แล้ว commit ก่อนเรียก SMTP หาก processor พบว่า in-app notification เดิมมีอยู่แล้วจากการ dedupe หรือ unique constraint ให้ถือว่าส่วน in-app สำเร็จแบบ no-op ไม่ทำให้ outbox failed
 

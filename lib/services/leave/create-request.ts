@@ -38,6 +38,7 @@ import { getLeaveYearFromDateValue } from "@/lib/services/leave/quota-year";
 import { calculateLeaveDurationHalfDays, isWorkingDay } from "@/lib/services/leave/utils";
 import { toUtcDate } from "@/lib/services/leave/business-date";
 import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
+import { INITIAL_LEAVE_APPROVAL_ACTION_VERSION } from "@/lib/services/leave/approval-action-version";
 import type { StoredLeaveAttachment } from "@/lib/uploads/leave";
 import type { LeaveRequestValues } from "@/lib/validations/leave";
 import {
@@ -221,16 +222,17 @@ function getOverQuotaHalfDays(
 
 async function enqueueLeaveNotification(
     tx: Prisma.TransactionClient,
-    input: CreateLeaveRequestInput,
     prepared: PreparedLeaveRequest,
     employee: EligibleEmployee,
     overQuotaHalfDays: number,
+    leaveRequest: Pick<CreatedLeaveRequest, "id" | "approvalActionVersion">,
 ): Promise<void> {
     const payload: LeaveActionPayload = {
-        leaveId: input.id,
+        leaveId: leaveRequest.id,
         deliveryIdentity: buildLeaveActionDeliveryIdentity(
-            input.id,
+            leaveRequest.id,
             employee.manager.user.id,
+            leaveRequest.approvalActionVersion,
         ),
         employee: buildLeaveRecipientSnapshot(employee),
         approver: buildConfiguredApproverSnapshot(employee.manager),
@@ -299,13 +301,20 @@ async function createInTransaction(
             overQuotaHalfDays,
             status: "PENDING",
             approverId: employee.managerId,
+            approvalActionVersion: INITIAL_LEAVE_APPROVAL_ACTION_VERSION,
             ...(attachmentData.length > 0
                 ? { attachments: { create: attachmentData } }
                 : {}),
         },
         include: LEAVE_REQUEST_INCLUDE,
     });
-    await enqueueLeaveNotification(tx, input, prepared, employee, overQuotaHalfDays);
+    await enqueueLeaveNotification(
+        tx,
+        prepared,
+        employee,
+        overQuotaHalfDays,
+        leaveRequest,
+    );
     await tx.leaveRequestIdempotency.create({
         data: {
             userId: input.userId,

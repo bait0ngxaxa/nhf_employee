@@ -149,6 +149,7 @@ describe("POST /api/leave/decision", () => {
             approverId: 30,
             exceptionApproverId: null,
             exceptionApproverAssignedAt: null,
+            approvalActionVersion: 1,
             employee: {
                 id: 10,
                 firstName: "Employee",
@@ -215,6 +216,7 @@ describe("POST /api/leave/decision", () => {
             approverId: 20,
             exceptionApproverId: null,
             exceptionApproverAssignedAt: null,
+            approvalActionVersion: 1,
             employee: {
                 id: 10,
                 firstName: "Employee",
@@ -300,6 +302,7 @@ describe("POST /api/leave/decision", () => {
             approverId: 30,
             exceptionApproverId: null,
             exceptionApproverAssignedAt: null,
+            approvalActionVersion: 1,
             employee: {
                 id: 10,
                 firstName: "Employee",
@@ -345,6 +348,7 @@ describe("POST /api/leave/decision", () => {
             approverId: 30,
             exceptionApproverId: null,
             exceptionApproverAssignedAt: null,
+            approvalActionVersion: 1,
             employee: { id: 10 },
             approver: { id: 30 },
         } as never);
@@ -399,6 +403,7 @@ describe("POST /api/leave/decision", () => {
             approverId: 20,
             exceptionApproverId: null,
             exceptionApproverAssignedAt: null,
+            approvalActionVersion: 1,
             approvedAt: null,
             rejectReason: null,
             notTakenReason: null,
@@ -573,6 +578,7 @@ describe("POST /api/leave/decision", () => {
             approverId: 20,
             exceptionApproverId: null,
             exceptionApproverAssignedAt: null,
+            approvalActionVersion: 1,
             approvedAt: null,
             rejectReason: null,
             notTakenReason: null,
@@ -656,6 +662,7 @@ describe("POST /api/leave/decision", () => {
             approverId: 20,
             exceptionApproverId: null,
             exceptionApproverAssignedAt: null,
+            approvalActionVersion: 1,
             approvedAt: null,
             rejectReason: null,
             notTakenReason: null,

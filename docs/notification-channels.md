@@ -110,6 +110,24 @@ mark เป็น `SUPERSEDED` และจะไม่เรียก LINE prov
 สร้างจาก recipient เพียงอย่างเดียว จึงรองรับ assignment generation เดิมซ้ำผู้รับเดิมได้
 โดยไม่ทำให้ retry ของ generation เดียวกันสร้าง child ซ้ำ
 
+Leave approval assignment มี generation แบบ persisted ที่ `LeaveRequest.approvalActionVersion`
+โดยคำขอใหม่เริ่มที่ `1` และ identity ที่ production producer สร้างมีรูปแบบ
+`leaveId:approverUserId:generation:approvalActionVersion` เช่น
+`leave-123:42:generation:3` ค่า version นี้เปลี่ยนเฉพาะเมื่อ effective approver
+เปลี่ยนเป็น assignment ใหม่ และเปลี่ยนพร้อมกับการเขียน approver state ภายใต้
+`LeaveRequest` row lock เดียวกัน การ retry หรือการเขียน assignment ซ้ำที่ยังมี effective
+approver เดิมจึงไม่เพิ่ม version
+
+กรณี `A → B → A` จะเป็น version `1 → 2 → 3` ทำให้ notification ของ A รอบแรกและรอบที่สอง
+มี `deliveryIdentity`, `eventKey` และ LINE retry key คนละค่า แม้ recipient จะเป็น User เดิม
+อีกครั้ง ส่วนการเปลี่ยนผู้อนุมัติของคำขอ `PENDING` ตาม policy เดิมยังใช้
+cancel-before-reassign และคำขอใหม่จะเริ่ม generation ของตัวเอง
+
+ระหว่าง migration จะไม่ลบ outbox ที่ค้างอยู่ payload เก่าที่ไม่มี generation identity จะยอมรับ
+เป็น generation `1` เฉพาะเมื่อ Leave ปัจจุบันยัง `PENDING`, ไม่มี exception approver และ
+recipient ตรงกับ effective approver ปัจจุบันเท่านั้น หาก state หรือ recipient ไม่ตรง
+จะ mark เป็น `SUPERSEDED` เพื่อไม่ส่ง notification ที่คลุมเครือ
+
 ## Routine behavior
 
 Routine ยังคงมี reminder version validation, schedule/due-time validation, recipient scope,

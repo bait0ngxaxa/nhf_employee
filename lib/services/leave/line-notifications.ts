@@ -15,7 +15,7 @@ import {
 import { buildLeaveLiffRequestUrl } from "@/lib/line/leave-links";
 import { createLineRetryKey } from "@/lib/services/outbox/provider-key";
 import {
-    buildLeaveActionDeliveryIdentity,
+    buildLegacyLeaveActionDeliveryIdentity,
     getLeaveActionDeliveryIdentity,
     parseLeaveActionLinePayload,
     parseLeaveCancelledAfterApprovalLinePayload,
@@ -131,7 +131,7 @@ export function buildLeaveLineEventKey(
     // assigned again in a later generation.
     if (type === "LEAVE_ACTION_LINE") {
         return `leave:${leaveId}:action:${deliveryIdentity
-            ?? buildLeaveActionDeliveryIdentity(leaveId, userId)}:line`;
+            ?? buildLegacyLeaveActionDeliveryIdentity(leaveId, userId)}:line`;
     }
 
     return `leave:${leaveId}:${type}:user:${userId}`;

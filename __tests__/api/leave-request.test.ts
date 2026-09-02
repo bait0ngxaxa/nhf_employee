@@ -13,6 +13,7 @@ import { createLeaveRequestHash } from "@/lib/services/leave/idempotency";
 import { NextRequest } from "next/server";
 import type * as NextServerModule from "next/server";
 import { formatAuditLogDisplay } from "@/lib/audit-log/display";
+import { buildLeaveActionDeliveryIdentity } from "@/lib/services/leave/notification-payloads";
 
 const uploadMocks = vi.hoisted(() => ({
     save: vi.fn(),
@@ -338,10 +339,11 @@ describe("POST /api/leave/request", () => {
             carryBalanceHalfDays: 0,
             usedHalfDays: 0,
         });
-        (prisma.leaveRequest.create as unknown as { mockResolvedValue: (v: { id: number; durationHalfDays: number; overQuotaHalfDays: number }) => void }).mockResolvedValue({
+        (prisma.leaveRequest.create as unknown as { mockResolvedValue: (v: { id: number; durationHalfDays: number; overQuotaHalfDays: number; approvalActionVersion: number }) => void }).mockResolvedValue({
             id: 123,
             durationHalfDays: 4,
             overQuotaHalfDays: 0,
+            approvalActionVersion: 1,
         });
 
         const payload = {
@@ -498,10 +500,11 @@ describe("POST /api/leave/request", () => {
                 carryBalanceHalfDays: -4,
                 usedHalfDays: 16,
             });
-            (prisma.leaveRequest.create as unknown as { mockResolvedValue: (v: { id: number; durationHalfDays: number; overQuotaHalfDays: number }) => void }).mockResolvedValue({
+            (prisma.leaveRequest.create as unknown as { mockResolvedValue: (v: { id: number; durationHalfDays: number; overQuotaHalfDays: number; approvalActionVersion: number }) => void }).mockResolvedValue({
                 id: 123,
                 durationHalfDays: 2,
                 overQuotaHalfDays: 2,
+                approvalActionVersion: 1,
             });
 
             const req = createLeaveRequestRequest({
@@ -536,10 +539,11 @@ describe("POST /api/leave/request", () => {
                 carryBalanceHalfDays: 0,
                 usedHalfDays: 0,
             });
-            (prisma.leaveRequest.create as unknown as { mockResolvedValue: (v: { id: string; durationHalfDays: number; overQuotaHalfDays: number }) => void }).mockResolvedValue({
+            (prisma.leaveRequest.create as unknown as { mockResolvedValue: (v: { id: string; durationHalfDays: number; overQuotaHalfDays: number; approvalActionVersion: number }) => void }).mockResolvedValue({
                 id: "leave-backdated-1",
                 durationHalfDays: 2,
                 overQuotaHalfDays: 0,
+                approvalActionVersion: 1,
             });
 
             const req = createLeaveRequestRequest({
@@ -563,6 +567,7 @@ describe("POST /api/leave/request", () => {
                         emergencyReason: "ป่วยฉุกเฉินจนยื่นคำขอไม่ทัน",
                         status: "PENDING",
                         approverId: 200,
+                        approvalActionVersion: 1,
                     }),
                 }),
             );
@@ -575,6 +580,20 @@ describe("POST /api/leave/request", () => {
                 }),
             });
             expect(payload.emergencyReason).toBe("ป่วยฉุกเฉินจนยื่นคำขอไม่ทัน");
+            expect(payload.deliveryIdentity).toBe(
+                buildLeaveActionDeliveryIdentity(
+                    String(payload.leaveId),
+                    mockManager.user.id,
+                    1,
+                ),
+            );
+            expect(payload.deliveryIdentity).not.toBe(
+                buildLeaveActionDeliveryIdentity(
+                    String(payload.leaveId),
+                    mockManager.user.id,
+                    2,
+                ),
+            );
             expect(processOutbox).toHaveBeenCalled();
         });
 
@@ -707,6 +726,7 @@ describe("POST /api/leave/request", () => {
                 id: 999,
                 durationHalfDays: 2,
                 overQuotaHalfDays: 0,
+                approvalActionVersion: 1,
             };
             (prisma.leaveRequest.create as unknown as { mockResolvedValue: (v: typeof mockCreatedRequest) => void }).mockResolvedValue(
                 mockCreatedRequest,
@@ -850,6 +870,7 @@ describe("POST /api/leave/request", () => {
                 period: validPayload.period,
                 durationHalfDays: 2,
                 overQuotaHalfDays: 0,
+                approvalActionVersion: 1,
                 attachments,
             } as never);
         }

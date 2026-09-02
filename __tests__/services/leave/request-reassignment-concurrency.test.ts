@@ -22,6 +22,7 @@ type Deferred = {
 type LeaveState = {
     managerId: number;
     managerUserId: number;
+    approvalActionVersion: number;
     pending: boolean;
     outbox: { approverId: number; deliveryIdentity: string } | null;
 };
@@ -36,7 +37,7 @@ type TestTransaction = {
     };
     leaveRequest: {
         findMany: (args: unknown) => Promise<unknown[]>;
-        create: (args: unknown) => Promise<{ id: string }>;
+        create: (args: unknown) => Promise<{ id: string; approvalActionVersion: number }>;
     };
     notificationOutbox: { create: (args: unknown) => Promise<unknown> };
     auditLog: { create: (args: unknown) => Promise<unknown> };
@@ -61,6 +62,7 @@ function createHarness(options: {
     const state: LeaveState = {
         managerId: 20,
         managerUserId: 200,
+        approvalActionVersion: 1,
         pending: false,
         outbox: null,
     };
@@ -155,7 +157,7 @@ function createHarness(options: {
                     options.requestCreated.signal.resolve();
                     await options.requestCreated.release.promise;
                 }
-                return { id: "leave-1" };
+                return { id: "leave-1", approvalActionVersion: state.approvalActionVersion };
             },
         },
         notificationOutbox: {
@@ -209,6 +211,7 @@ async function createLeaveRequest(harness: ReturnType<typeof createHarness>): Pr
                     deliveryIdentity: buildLeaveActionDeliveryIdentity(
                         leaveRequest.id,
                         managerUser.id,
+                        leaveRequest.approvalActionVersion,
                     ),
                 }),
             },
@@ -261,7 +264,11 @@ describe("leave request and manager reassignment serialization", () => {
         expect(harness.state.pending).toBe(true);
         expect(harness.state.outbox).toEqual({
             approverId: 30,
-            deliveryIdentity: "leave-1:300",
+            deliveryIdentity: buildLeaveActionDeliveryIdentity(
+                "leave-1",
+                harness.state.managerUserId,
+                harness.state.approvalActionVersion,
+            ),
         });
     });
 });

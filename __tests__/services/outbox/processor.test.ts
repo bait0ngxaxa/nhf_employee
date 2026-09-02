@@ -419,7 +419,11 @@ describe("processOutbox", () => {
             buildNotification(124, "LEAVE_ACTION", JSON.stringify(buildLeavePayload())),
         ]));
         prismaMock.leaveRequest.findUnique.mockResolvedValue(asNever({
+            id: "leave-1",
             status: "PENDING",
+            approverId: 20,
+            exceptionApproverId: null,
+            approvalActionVersion: 1,
             approver: {
                 id: 20,
                 firstName: "Current",
@@ -441,7 +445,7 @@ describe("processOutbox", () => {
         expect(result).toEqual({ processed: 1, failed: 0 });
         expect(sendLeaveActionNotifications).toHaveBeenCalledWith(
             expect.objectContaining({
-                deliveryIdentity: "leave-1:2",
+                deliveryIdentity: "leave-1:2:generation:1",
                 approver: expect.objectContaining({
                     userId: 2,
                     email: "current-approver@example.com",
