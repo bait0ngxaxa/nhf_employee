@@ -137,4 +137,16 @@ describe("architecture checker module boundaries", () => {
             'imports "../../stock/domain/inventory"',
         );
     });
+
+    it("rejects Stock importing the global Outbox Processor", async () => {
+        const result = await checkFixture(
+            "modules/stock/application/requests/example.ts",
+            'import { processOutbox } from "@/lib/services/outbox/processor";\n',
+        );
+
+        expect(result.violations).toHaveLength(1);
+        expect(result.violations[0]).toContain(
+            "Stock must not depend on the global Outbox Processor",
+        );
+    });
 });

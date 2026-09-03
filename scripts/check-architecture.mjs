@@ -138,6 +138,18 @@ function getArchitectureTarget(specifier, importerPath, rootPath, modulesRoot, s
     return null;
 }
 
+function getModuleDependencyViolation(owner, moduleSpecifier) {
+    if (
+        owner.kind === "module"
+        && owner.name === "stock"
+        && moduleSpecifier === "@/lib/services/outbox/processor"
+    ) {
+        return "Stock must not depend on the global Outbox Processor; schedule it from the delivery/composition layer.";
+    }
+
+    return null;
+}
+
 function getScriptKind(filePath) {
     switch (extname(filePath)) {
         case ".js":
@@ -260,6 +272,20 @@ function checkArchitecture(options = {}) {
         const owner = getOwner(filePath, modulesRoot, sharedRoot);
 
         for (const importRecord of getImports(filePath)) {
+            const moduleDependencyViolation = getModuleDependencyViolation(
+                owner,
+                importRecord.moduleSpecifier,
+            );
+            if (moduleDependencyViolation !== null) {
+                violations.push(describeViolation(
+                    filePath,
+                    rootPath,
+                    importRecord,
+                    moduleDependencyViolation,
+                ));
+                continue;
+            }
+
             const target = getArchitectureTarget(
                 importRecord.moduleSpecifier,
                 filePath,

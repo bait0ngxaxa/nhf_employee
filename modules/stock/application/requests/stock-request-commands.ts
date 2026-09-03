@@ -1,5 +1,3 @@
-import { after } from "next/server";
-
 import {
     cancelRequest,
     issueRequest,
@@ -8,7 +6,6 @@ import type {
     CancelRequestOptions,
     StockCommandActor,
 } from "../../domain/types";
-import { processOutbox } from "@/lib/services/outbox/processor";
 
 type IssueStockRequestCommand = {
     requestId: number;
@@ -28,14 +25,6 @@ type CancelledStockRequest = Awaited<
     ReturnType<typeof cancelRequest>
 >;
 
-function wakeOutboxProcessor(): void {
-    after(() => {
-        processOutbox().catch((error) =>
-            console.error("Outbox processor failed:", error),
-        );
-    });
-}
-
 export async function executeIssueStockRequest(
     command: IssueStockRequestCommand,
 ): Promise<IssuedStockRequest> {
@@ -43,7 +32,6 @@ export async function executeIssueStockRequest(
         command.requestId,
         command.actor,
     );
-    wakeOutboxProcessor();
     return result.request;
 }
 

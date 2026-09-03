@@ -1,6 +1,7 @@
-import { type NextRequest, NextResponse } from "next/server";
+import { after, type NextRequest, NextResponse } from "next/server";
 import { requireAdminSession } from "@/lib/auth/api";
 import { jsonError, serverError } from "@/lib/ssot/http";
+import { processOutbox } from "@/lib/services/outbox/processor";
 import {
     createStockCommandActor,
     enforceStockJsonBodySize,
@@ -64,6 +65,11 @@ export async function POST(
             const issuedRequest = await executeIssueStockRequest({
                 requestId,
                 actor: createStockCommandActor(auth.user, request.headers),
+            });
+            after(() => {
+                processOutbox().catch((error) =>
+                    console.error("Outbox processor failed:", error),
+                );
             });
             return NextResponse.json({ request: issuedRequest });
         }

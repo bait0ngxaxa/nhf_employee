@@ -55,6 +55,10 @@ import { something } from "@/modules/stock/application/create-item";
 import { something } from "../../stock/infrastructure/repository";
 ```
 
+Stock application code may persist outbox records as part of its transaction,
+but it must not import the global Outbox Processor. Waking or scheduling that
+processor belongs to the delivery/composition layer.
+
 Feature internals are private by ownership even when TypeScript can resolve the
 path. Both external consumers and other modules must use the target module root
 public entry point instead.
@@ -124,7 +128,7 @@ the module boundary from a legacy directory, while imports unrelated to
 | Check | Scope | Behavior |
 | --- | --- | --- |
 | ESLint `no-restricted-imports` | `shared/**/*.{js,jsx,ts,tsx}` | Rejects imports from `modules/` so a shared capability cannot acquire a business dependency |
-| `npm run architecture:check` | Repository source files, excluding dependency, build, coverage, and generated directories | Uses the installed TypeScript parser to inspect imports, re-exports, type imports, dynamic imports, and `require()` calls; rejects `shared -> modules`, external consumers deep-importing module internals, and cross-module deep imports, including relative paths |
+| `npm run architecture:check` | Repository source files, excluding dependency, build, coverage, and generated directories | Uses the installed TypeScript parser to inspect imports, re-exports, type imports, dynamic imports, and `require()` calls; rejects `shared -> modules`, external consumers deep-importing module internals, cross-module deep imports, including relative paths, and Stock importing the global Outbox Processor |
 | Client/server policy | Legacy and new code | Documentation-led in Phase A; no broad rule is added that would require unrelated migration |
 | Route-level Prisma policy | Legacy and new code | Documentation-led in Phase A for the existing route exceptions; new module infrastructure remains the intended boundary |
 

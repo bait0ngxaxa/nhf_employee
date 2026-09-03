@@ -1,4 +1,4 @@
-import { type NextRequest, NextResponse } from "next/server";
+import { after, type NextRequest, NextResponse } from "next/server";
 
 import {
     createStockCommandActor,
@@ -13,6 +13,7 @@ import {
     enforceAuthenticatedMutationRateLimit,
     enforcePreAuthIpRateLimit,
 } from "@/lib/security/mutation-rate-limit";
+import { processOutbox } from "@/lib/services/outbox/processor";
 import { jsonError, serverError } from "@/lib/ssot/http";
 import {
     issueRequestSchema,
@@ -59,6 +60,11 @@ export async function POST(
         await executeIssueStockRequest({
             requestId: parsedId.data,
             actor: createStockCommandActor(auth.user, request.headers),
+        });
+        after(() => {
+            processOutbox().catch((error) =>
+                console.error("Outbox processor failed:", error),
+            );
         });
         return NextResponse.json({ success: true });
     } catch (error) {

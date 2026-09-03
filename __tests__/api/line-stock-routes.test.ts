@@ -58,7 +58,6 @@ vi.mock("@/modules/stock", async () => {
                 command.requestId,
                 command.actor,
             );
-            void mocks.processOutbox();
             return result.request;
         },
         executeCancelStockRequest: (command: Parameters<typeof actual.executeCancelStockRequest>[0]) =>
