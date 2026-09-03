@@ -69,6 +69,31 @@ const eslintConfig = [
             eqeqeq: ["error", "always"],
         },
     },
+    // Phase A architecture guardrail. This applies only to the new shared/
+    // boundary so legacy code can coexist during incremental migration.
+    {
+        files: ["shared/**/*.{js,jsx,ts,tsx}"],
+        rules: {
+            "no-restricted-imports": [
+                "error",
+                {
+                    patterns: [
+                        {
+                            group: [
+                                "@/modules",
+                                "@/modules/**",
+                                "modules",
+                                "modules/**",
+                                "**/modules",
+                                "**/modules/**",
+                            ],
+                            message: "shared/ must not depend on business modules. Keep the dependency in app/ or a module, or move only genuinely cross-domain capability into shared/.",
+                        },
+                    ],
+                },
+            ],
+        },
+    },
 ];
 
 export default eslintConfig;

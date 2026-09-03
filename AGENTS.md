@@ -135,3 +135,39 @@ UI → Hooks → Services → Data Layer
   * Security หรือ architecture decisions ที่สำคัญ
   * Commands และ tests ที่รันพร้อมผลลัพธ์
   * ข้อจำกัด assumption หรือความเสี่ยงที่ยังเหลือ
+
+## 11. Modular Monolith Architecture (Phase A)
+
+* สถานะปัจจุบันเป็นการวาง foundation เท่านั้น: โค้ด Stock, Routine, Leave,
+  Employee และ business module เดิมยังอยู่ที่เดิมและต้องทำงานเหมือนเดิม
+* งาน business feature ใหม่ที่มีสาระสำคัญให้เริ่มที่ `modules/<feature>/`
+  และเปิดเผย contract ที่ตั้งใจรองรับผ่าน `modules/<feature>/index.ts`
+* ใช้ dependency direction `app/** -> modules/** -> shared/**` โดย `app/**`
+  สามารถใช้ `shared/**` ได้โดยตรง และ module หนึ่งใช้ module อื่นผ่าน public API
+  เท่านั้น
+* ห้าม import internal path ของ module อื่น และห้ามให้ `shared/**` depend on
+  business module; ห้ามใช้ deep import เป็น public API โดยปริยาย
+* `shared/` มีไว้สำหรับ capability ที่ cross-domain/platform จริงเท่านั้น
+  เช่น auth, db, http, security, audit, notification delivery, uploads,
+  network และ generic UI primitives ห้ามย้าย feature-specific business rule
+  เข้า shared เพียงเพราะมีการ reuse
+* หลีกเลี่ยงการเพิ่ม feature-specific business code ใหม่ใน global
+  `lib/services`, `lib/server` หรือ `lib/validations` เว้นแต่เป็น compatibility
+  adapter หรือมีเหตุผลและ exception ที่บันทึกไว้อย่างชัดเจน
+* API route ของ business feature ใหม่ควรไหลผ่าน application/service และ
+  repository/infrastructure ก่อนถึง Prisma; direct Prisma ใน route เดิมยังเป็น
+  legacy compatibility และห้ามเปลี่ยนยกชุดใน Phase A
+* Client component ห้ามพึ่ง server-only implementation, database, secret หรือ
+  filesystem โดยตรง; รายละเอียด enforcement และข้อยกเว้นอยู่ใน
+  `docs/architecture/dependency-rules.md`
+* เมื่อแก้โค้ดใน `modules/` หรือ `shared/` ให้รัน `npm run architecture:check`
+  และอ่านเอกสาร `docs/architecture/` ที่เกี่ยวข้องก่อนออกแบบ boundary
+* การ migrate ต้องทำแบบ incremental ต่อ feature และ preserve behavior, API,
+  permission, schema, URL และ integration เดิม เว้นแต่ผู้ใช้สั่งเปลี่ยนโดยตรง
+
+รายละเอียด current state, target state, module ownership และ dependency
+enforcement อยู่ที่:
+
+* `docs/architecture/modular-monolith.md`
+* `docs/architecture/module-boundaries.md`
+* `docs/architecture/dependency-rules.md`
