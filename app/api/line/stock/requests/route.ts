@@ -2,28 +2,30 @@ import { after, type NextRequest, NextResponse } from "next/server";
 
 import { requireLiffWorkforceSession } from "@/lib/auth/liff";
 import { WorkforceAuthorizationError } from "@/lib/auth/workforce-transaction";
-import { createStockCommandActor } from "@/lib/server/stock-command-actor";
+import { createStockCommandActor } from "@/modules/stock";
 import {
     enforceStockJsonBodySize,
     readStockJsonBody,
-} from "@/lib/server/stock-api";
+} from "@/modules/stock";
 import {
     enforceAuthenticatedMutationRateLimit,
     enforcePreAuthIpRateLimit,
 } from "@/lib/security/mutation-rate-limit";
 import { processOutbox } from "@/lib/services/outbox/processor";
-import { stockService } from "@/lib/services/stock";
-import { StockRequestIdempotencyConflictError } from "@/lib/services/stock/request-idempotency";
+import {
+    stockService,
+    StockRequestIdempotencyConflictError,
+} from "@/modules/stock";
 import {
     toLiffStockRequestsResponse,
     toLiffStockRequestSummary,
-} from "@/lib/services/stock/liff-serialization";
+} from "@/modules/stock";
 import { jsonError, serverError } from "@/lib/ssot/http";
 import {
     createRequestSchema,
     idempotencyKeySchema,
     stockRequestsFilterSchema,
-} from "@/lib/validations/stock";
+} from "@/modules/stock";
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
     const auth = await requireLiffWorkforceSession();

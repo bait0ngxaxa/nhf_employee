@@ -1,11 +1,13 @@
 import { NextResponse } from "next/server";
 
 import { requireLiffWorkforceSession } from "@/lib/auth/liff";
-import { stockService } from "@/lib/services/stock";
-import { toLiffStockRequestDetail } from "@/lib/services/stock/liff-serialization";
+import {
+    stockService,
+    toLiffStockRequestDetail,
+    stockRequestIdParamSchema,
+} from "@/modules/stock";
 import { isAdminRole } from "@/lib/ssot/permissions";
 import { notFound, serverError } from "@/lib/ssot/http";
-import { stockRequestIdParamSchema } from "@/lib/validations/stock";
 
 interface RouteContext {
     params: Promise<{ id: string }>;

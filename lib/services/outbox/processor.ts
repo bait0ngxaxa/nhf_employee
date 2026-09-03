@@ -9,12 +9,11 @@ import type {
 } from "@/types/api";
 import { createEmailRequestInAppNotification } from "@/lib/services/email-request/notifications";
 import {
-    parseStockRequestResultEmailPayload,
-} from "@/lib/services/stock/notification-payloads";
-import {
+    dispatchStockRequestResultLineOutbox,
     notifyAdminsLowStockInApp,
     notifyAdminsStockRequestLineInApp,
-} from "@/lib/services/stock/notifications";
+    parseStockRequestResultEmailPayload,
+} from "@/modules/stock";
 import {
     parseLeaveActionPayload,
     parseLeaveCancellationRequestedPayload,
@@ -35,7 +34,6 @@ import {
 } from "@/constants/email-request";
 import { dispatchRoutineReminderOutbox } from "@/lib/services/routine/reminders";
 import { dispatchRoutineContractExpiryOutbox } from "@/lib/services/routine/contract-reminders";
-import { dispatchStockRequestResultLineOutbox } from "@/lib/services/stock/line-notifications";
 import {
     MAX_OUTBOX_ATTEMPTS,
     OUTBOX_RETRY_BASE_DELAY_MS,

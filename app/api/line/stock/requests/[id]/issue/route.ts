@@ -1,12 +1,14 @@
 import { type NextRequest, NextResponse } from "next/server";
 
-import { requireLiffStockProcessorSession } from "@/lib/server/liff-stock-auth";
-import { createStockCommandActor } from "@/lib/server/stock-command-actor";
+import {
+    createStockCommandActor,
+    executeIssueStockRequest,
+    requireLiffStockProcessorSession,
+} from "@/modules/stock";
 import {
     enforceStockJsonBodySize,
     readStockJsonBody,
-} from "@/lib/server/stock-api";
-import { executeIssueStockRequest } from "@/lib/server/stock-request-commands";
+} from "@/modules/stock";
 import {
     enforceAuthenticatedMutationRateLimit,
     enforcePreAuthIpRateLimit,
@@ -15,7 +17,7 @@ import { jsonError, serverError } from "@/lib/ssot/http";
 import {
     issueRequestSchema,
     stockRequestIdParamSchema,
-} from "@/lib/validations/stock";
+} from "@/modules/stock";
 
 interface RouteContext {
     params: Promise<{ id: string }>;

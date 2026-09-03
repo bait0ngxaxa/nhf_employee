@@ -2,15 +2,13 @@ import { type NextRequest, NextResponse } from "next/server";
 import { requireAdminSession } from "@/lib/auth/api";
 import { jsonError, serverError } from "@/lib/ssot/http";
 import {
+    createStockCommandActor,
+    enforceStockJsonBodySize,
     executeCancelStockRequest,
     executeIssueStockRequest,
-} from "@/lib/server/stock-request-commands";
-import { stockReviewActionSchema } from "@/lib/validations/stock";
-import { createStockCommandActor } from "@/lib/server/stock-command-actor";
-import {
-    enforceStockJsonBodySize,
     readStockJsonBody,
-} from "@/lib/server/stock-api";
+    stockReviewActionSchema,
+} from "@/modules/stock";
 import {
     enforceAuthenticatedMutationRateLimit,
     enforcePreAuthIpRateLimit,

@@ -1,0 +1,452 @@
+import { StockRequestStatus, type Prisma } from "@prisma/client";
+import { prisma } from "@/lib/db/prisma";
+import {
+    deleteLocalUploadByUrl,
+    isManagedUploadUrl,
+} from "@/lib/uploads/local";
+import type {
+    CreateItemInput,
+    CreateRequestInput,
+} from "../../schemas/stock";
+import type { PendingRequestItemRecord } from "../../domain/types";
+import {
+    LEGACY_DEFAULT_VARIANT_ORDER_BY,
+    selectLegacyDefaultVariantId,
+} from "../../domain/legacy-default-variant";
+import {
+    buildDefaultVariantShadowComparison,
+    isExplicitDefaultVariantReadEnabled,
+    reportDefaultVariantShadowComparison,
+    resolveDefaultVariantId,
+} from "../../domain/default-variant-shadow";
+
+export function generateSku(): string {
+    const time = Date.now().toString(36).toUpperCase();
+    const rand = Math.random().toString(36).slice(2, 6).toUpperCase();
+    return `SKU-${time}-${rand}`;
+}
+
+/** Resolve existing active defaults for commands without creating variants. */
+export async function loadActiveDefaultVariantsByItemIds(
+    tx: Prisma.TransactionClient,
+    itemIds: number[],
+    options: { explicitReadEnabled?: boolean } = {},
+): Promise<Map<number, { id: number }>> {
+    const uniqueItemIds = Array.from(new Set(itemIds));
+    if (uniqueItemIds.length === 0) {
+        return new Map();
+    }
+
+    const variants = await tx.stockItemVariant.findMany({
+        where: { stockItemId: { in: uniqueItemIds }, isActive: true },
+        select: {
+            id: true,
+            stockItemId: true,
+        },
+        orderBy: LEGACY_DEFAULT_VARIANT_ORDER_BY,
+    });
+    const explicitDefaultItems = await tx.stockItem.findMany({
+        where: { id: { in: uniqueItemIds } },
+        select: {
+            id: true,
+            defaultVariantId: true,
+            defaultVariant: {
+                select: { stockItemId: true },
+            },
+        },
+    });
+
+    const variantsByItemId = new Map<
+        number,
+        Array<{ id: number; isActive: boolean }>
+    >();
+    const explicitDefaultsByItemId = new Map<number, {
+        id: number | null;
+        stockItemId: number | null;
+    }>();
+    for (const variant of variants) {
+        const itemVariants = variantsByItemId.get(variant.stockItemId) ?? [];
+        itemVariants.push({ id: variant.id, isActive: true });
+        variantsByItemId.set(variant.stockItemId, itemVariants);
+    }
+    for (const item of explicitDefaultItems) {
+        if (!("defaultVariantId" in item)) continue;
+        explicitDefaultsByItemId.set(item.id, {
+            id: item.defaultVariantId,
+            stockItemId: item.defaultVariant?.stockItemId ?? null,
+        });
+    }
+
+    const defaultVariants = new Map<number, { id: number }>();
+    for (const itemId of uniqueItemIds) {
+        const activeVariants = variantsByItemId.get(itemId) ?? [];
+        const legacyDefaultVariantId = selectLegacyDefaultVariantId(
+            activeVariants,
+        );
+        const explicitDefault = explicitDefaultsByItemId.get(itemId);
+        if (explicitDefault) {
+            reportDefaultVariantShadowComparison(
+                buildDefaultVariantShadowComparison({
+                    itemId,
+                    legacyDefaultVariantId,
+                    explicitDefaultVariantId: explicitDefault.id,
+                    explicitDefaultVariantStockItemId:
+                        explicitDefault.stockItemId,
+                }),
+            );
+        }
+        const resolvedDefaultVariantId = resolveDefaultVariantId({
+            legacyDefaultVariantId,
+            explicitDefaultVariantId: explicitDefault?.id ?? null,
+            explicitDefaultIsUsable: explicitDefault?.id !== null
+                && explicitDefault?.id !== undefined
+                && explicitDefault.stockItemId === itemId
+                && activeVariants.some(
+                    (variant) => variant.id === explicitDefault.id,
+                ),
+            explicitReadEnabled:
+                options.explicitReadEnabled
+                ?? isExplicitDefaultVariantReadEnabled(),
+        });
+        if (resolvedDefaultVariantId !== null) {
+            defaultVariants.set(itemId, { id: resolvedDefaultVariantId });
+        }
+    }
+
+    return defaultVariants;
+}
+
+export class StockInvariantViolationError extends Error {
+    constructor(
+        message = "ข้อมูลวัสดุไม่สอดคล้อง: ไม่พบรายการย่อยของวัสดุ",
+    ) {
+        super(message);
+        this.name = "StockInvariantViolationError";
+    }
+}
+
+export async function assertPersistedVariantsForRead(
+    items: ReadonlyArray<{
+        id: number;
+        sku: string;
+        variants: ReadonlyArray<unknown>;
+    }>,
+): Promise<void> {
+    const itemsWithoutActiveVariants = items.filter(
+        (item) => item.variants.length === 0,
+    );
+    if (itemsWithoutActiveVariants.length === 0) {
+        return;
+    }
+
+    const persistedVariants = await prisma.stockItemVariant.findMany({
+        where: {
+            stockItemId: {
+                in: itemsWithoutActiveVariants.map((item) => item.id),
+            },
+        },
+        select: { stockItemId: true },
+    });
+    const itemIdsWithPersistedVariants = new Set(
+        persistedVariants.map((variant) => variant.stockItemId),
+    );
+    const itemsWithoutPersistedVariants = itemsWithoutActiveVariants.filter(
+        (item) => !itemIdsWithPersistedVariants.has(item.id),
+    );
+
+    if (itemsWithoutPersistedVariants.length === 0) {
+        return;
+    }
+
+    for (const item of itemsWithoutPersistedVariants) {
+        console.error("Stock invariant violation: item has no variant", {
+            itemId: item.id,
+            sku: item.sku,
+        });
+    }
+
+    throw new StockInvariantViolationError();
+}
+
+// This include is a presentation view. An empty active list does not mean that
+// the parent has no persisted variants; callers that need that distinction must
+// query variants without the isActive filter.
+export function buildItemInclude() {
+    return {
+        category: { select: { id: true, name: true } },
+        variants: {
+            where: { isActive: true },
+            include: {
+                attributeValues: {
+                    include: {
+                        attributeValue: {
+                            include: { attribute: { select: { id: true, name: true } } },
+                        },
+                    },
+                },
+            },
+            orderBy: { id: "asc" as const },
+        },
+    };
+}
+
+export function appendReservedQuantity(
+    reservedMap: Map<number, number>,
+    key: number,
+    quantity: number,
+): void {
+    reservedMap.set(key, (reservedMap.get(key) ?? 0) + quantity);
+}
+
+export function buildReservedQuantityMaps(
+    requestItems: PendingRequestItemRecord[],
+): {
+    reservedByItemId: Map<number, number>;
+    reservedByVariantId: Map<number, number>;
+} {
+    const reservedByItemId = new Map<number, number>();
+    const reservedByVariantId = new Map<number, number>();
+
+    for (const requestItem of requestItems) {
+        if (requestItem.variantId === null) {
+            throw new StockInvariantViolationError(
+                "พบคำขอรอจ่ายที่ไม่มี variant snapshot",
+            );
+        }
+
+        appendReservedQuantity(
+            reservedByItemId,
+            requestItem.itemId,
+            requestItem.quantity,
+        );
+
+        appendReservedQuantity(
+            reservedByVariantId,
+            requestItem.variantId,
+            requestItem.quantity,
+        );
+    }
+
+    return { reservedByItemId, reservedByVariantId };
+}
+
+export function getAvailableQuantity(
+    quantity: number,
+    reservedQuantity: number,
+): number {
+    return Math.max(0, quantity - reservedQuantity);
+}
+
+export async function createVariantAttributes(
+    tx: Prisma.TransactionClient,
+    variantId: number,
+    attributes: NonNullable<CreateItemInput["variants"]>[number]["attributes"],
+): Promise<void> {
+    for (const attribute of attributes) {
+        const attributeRecord = await tx.stockAttribute.upsert({
+            where: { name: attribute.name },
+            update: {},
+            create: { name: attribute.name },
+            select: { id: true },
+        });
+
+        const attributeValue = await tx.stockAttributeValue.upsert({
+            where: {
+                attributeId_value: {
+                    attributeId: attributeRecord.id,
+                    value: attribute.value,
+                },
+            },
+            update: {},
+            create: {
+                attributeId: attributeRecord.id,
+                value: attribute.value,
+            },
+            select: { id: true },
+        });
+
+        await tx.stockVariantAttributeValue.create({
+            data: {
+                variantId,
+                attributeValueId: attributeValue.id,
+            },
+        });
+    }
+}
+
+export async function variantHasReferences(
+    tx: Prisma.TransactionClient,
+    variantId: number,
+): Promise<boolean> {
+    const [transaction, requestItem] = await Promise.all([
+        tx.stockTransaction.findFirst({
+            where: { variantId },
+            select: { id: true },
+        }),
+        tx.stockRequestItem.findFirst({
+            where: { variantId },
+            select: { id: true },
+        }),
+    ]);
+
+    return Boolean(transaction || requestItem);
+}
+
+export async function assertNoPendingStockRequestsForItem(
+    tx: Prisma.TransactionClient,
+    itemId: number,
+): Promise<void> {
+    const pendingRequestItem = await tx.stockRequestItem.findFirst({
+        where: {
+            itemId,
+            request: { status: StockRequestStatus.PENDING_ISSUE },
+        },
+        select: { id: true },
+    });
+
+    if (pendingRequestItem) {
+        throw new Error("ไม่สามารถปิดใช้งานวัสดุที่มีคำขอรอจ่ายอยู่");
+    }
+}
+
+export async function assertNoPendingStockRequestsForVariants(
+    tx: Prisma.TransactionClient,
+    variantIds: readonly number[],
+): Promise<void> {
+    const uniqueVariantIds = Array.from(new Set(variantIds));
+    if (uniqueVariantIds.length === 0) return;
+
+    const pendingRequestItem = await tx.stockRequestItem.findFirst({
+        where: {
+            variantId: { in: uniqueVariantIds },
+            request: { status: StockRequestStatus.PENDING_ISSUE },
+        },
+        select: { id: true },
+    });
+
+    if (pendingRequestItem) {
+        throw new Error("ไม่สามารถปิดใช้งานรายการย่อยที่มีคำขอรอจ่ายอยู่");
+    }
+}
+
+export async function cleanupUnusedUploadUrls(
+    candidateUrls: Iterable<string | null | undefined>,
+    retainedUrls: Iterable<string | null | undefined>,
+): Promise<void> {
+    const retained = new Set(
+        Array.from(retainedUrls).filter((url): url is string => isManagedUploadUrl(url)),
+    );
+    const candidates = Array.from(
+        new Set(
+            Array.from(candidateUrls).filter(
+                (url): url is string => isManagedUploadUrl(url) && !retained.has(url),
+            ),
+        ),
+    );
+
+    await Promise.allSettled(candidates.map((url) => deleteLocalUploadByUrl(url)));
+}
+
+export function buildRequestInclude() {
+    return {
+        requester: {
+            select: {
+                id: true,
+                name: true,
+                email: true,
+                employee: {
+                    select: {
+                        firstName: true,
+                        lastName: true,
+                        nickname: true,
+                    },
+                },
+            },
+        },
+        issuer: {
+            select: {
+                id: true,
+                name: true,
+                email: true,
+                employee: {
+                    select: {
+                        firstName: true,
+                        lastName: true,
+                        nickname: true,
+                    },
+                },
+            },
+        },
+        canceller: {
+            select: {
+                id: true,
+                name: true,
+                email: true,
+                employee: {
+                    select: {
+                        firstName: true,
+                        lastName: true,
+                        nickname: true,
+                    },
+                },
+            },
+        },
+        items: {
+            include: {
+                item: {
+                    select: {
+                        id: true,
+                        name: true,
+                        sku: true,
+                        unit: true,
+                        isActive: true,
+                    },
+                },
+                variant: {
+                    select: {
+                        id: true,
+                        sku: true,
+                        unit: true,
+                        quantity: true,
+                        isActive: true,
+                        imageUrl: true,
+                        attributeValues: {
+                            include: {
+                                attributeValue: {
+                                    include: {
+                                        attribute: { select: { id: true, name: true } },
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        },
+    } as const;
+}
+
+export function normalizeRequestItems(
+    data: CreateRequestInput,
+    itemIdByVariantId: Map<number, number>,
+    defaultVariantsByItemId: Map<number, { id: number }>,
+): Array<{ itemId: number; variantId: number; quantity: number }> {
+    return data.items.map((item) => {
+        const itemId = item.variantId
+            ? itemIdByVariantId.get(item.variantId)
+            : item.itemId;
+        const variantId =
+            item.variantId ??
+            (itemId ? defaultVariantsByItemId.get(itemId)?.id : undefined);
+
+        if (!itemId || !variantId) {
+            throw new Error("กรุณาเลือกรายการวัสดุ");
+        }
+
+        return {
+            itemId,
+            variantId,
+            quantity: item.quantity,
+        };
+    });
+}

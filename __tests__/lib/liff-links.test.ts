@@ -12,7 +12,7 @@ import {
 import {
     buildStockLiffRequestUrl,
     buildStockLiffUrl,
-} from "@/lib/line/stock-links";
+} from "@/modules/stock";
 import { APP_ROUTES } from "@/lib/ssot/routes";
 
 describe("LIFF URL builder", () => {

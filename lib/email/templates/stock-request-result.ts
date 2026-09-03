@@ -1,4 +1,4 @@
-import type { StockRequestResultEmailPayload } from "@/lib/services/stock/notification-payloads";
+import type { StockRequestResultEmailPayload } from "@/modules/stock";
 import { formatThaiDateTime } from "@/lib/helpers/date-helpers";
 import { escapeHtml } from "./html";
 

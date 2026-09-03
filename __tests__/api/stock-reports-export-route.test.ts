@@ -1,17 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
+import type * as StockModule from "@/modules/stock";
 import { GET as stockReportsExportRoute } from "@/app/api/stock/reports/export/route";
 import { getApiAuthSession } from "@/lib/auth/server";
 import { isAdminRole } from "@/lib/ssot/permissions";
 import {
     createStockBalanceReportXlsxResponse,
     getStockBalanceReportMeta,
-} from "@/lib/services/stock/balance-export";
-import {
     createStockRequestReportXlsxResponse,
     getStockRequestReportMeta,
     getStockRequestReportYears,
-} from "@/lib/services/stock/report-export";
+} from "@/modules/stock";
 
 vi.mock("@/lib/auth/server", () => ({
     getApiAuthSession: vi.fn(),
@@ -21,16 +20,19 @@ vi.mock("@/lib/ssot/permissions", () => ({
     isAdminRole: vi.fn(),
 }));
 
-vi.mock("@/lib/services/stock/balance-export", () => ({
-    getStockBalanceReportMeta: vi.fn(),
-    createStockBalanceReportXlsxResponse: vi.fn(),
-}));
-
-vi.mock("@/lib/services/stock/report-export", () => ({
-    getStockRequestReportYears: vi.fn(),
-    getStockRequestReportMeta: vi.fn(),
-    createStockRequestReportXlsxResponse: vi.fn(),
-}));
+vi.mock("@/modules/stock", async () => {
+    const actual = await vi.importActual<typeof StockModule>(
+        "@/modules/stock",
+    );
+    return {
+        ...actual,
+        getStockBalanceReportMeta: vi.fn(),
+        createStockBalanceReportXlsxResponse: vi.fn(),
+        getStockRequestReportYears: vi.fn(),
+        getStockRequestReportMeta: vi.fn(),
+        createStockRequestReportXlsxResponse: vi.fn(),
+    };
+});
 
 describe("GET /api/stock/reports/export", () => {
     beforeEach(() => {

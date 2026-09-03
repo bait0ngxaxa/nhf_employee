@@ -7,7 +7,7 @@ import {
     determineAuditExitCode,
     type StockInventoryAuditResult,
     type StockInventoryAuditSnapshot,
-} from "../lib/services/stock/inventory-audit";
+} from "../modules/stock";
 
 type AuditOptions = {
     strict: boolean;

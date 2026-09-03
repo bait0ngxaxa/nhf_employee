@@ -5,23 +5,19 @@ import {
 } from "@/lib/auth/workforce";
 import { isAdminRole } from "@/lib/ssot/permissions";
 import { jsonError, serverError } from "@/lib/ssot/http";
-import { stockService } from "@/lib/services/stock";
-import {
-    omitStockRequestIdempotency,
-    StockRequestIdempotencyConflictError,
-} from "@/lib/services/stock/request-idempotency";
-import { processOutbox } from "@/lib/services/outbox/processor";
-import { WorkforceAuthorizationError } from "@/lib/auth/workforce-transaction";
-import { createStockCommandActor } from "@/lib/server/stock-command-actor";
-import {
-    enforceStockJsonBodySize,
-    readStockJsonBody,
-} from "@/lib/server/stock-api";
 import {
     createRequestSchema,
+    createStockCommandActor,
     idempotencyKeySchema,
+    omitStockRequestIdempotency,
+    readStockJsonBody,
+    stockService,
+    StockRequestIdempotencyConflictError,
     stockRequestsFilterSchema,
-} from "@/lib/validations/stock";
+} from "@/modules/stock";
+import { processOutbox } from "@/lib/services/outbox/processor";
+import { WorkforceAuthorizationError } from "@/lib/auth/workforce-transaction";
+import { enforceStockJsonBodySize } from "@/modules/stock";
 import {
     enforceAuthenticatedMutationRateLimit,
     enforcePreAuthIpRateLimit,

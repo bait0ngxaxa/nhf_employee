@@ -2,12 +2,14 @@ import { type NextRequest, NextResponse } from "next/server";
 
 import { requireLiffWorkforceSession } from "@/lib/auth/liff";
 import { WorkforceAuthorizationError } from "@/lib/auth/workforce-transaction";
-import { createStockCommandActor } from "@/lib/server/stock-command-actor";
+import {
+    createStockCommandActor,
+    executeCancelStockRequest,
+} from "@/modules/stock";
 import {
     enforceStockJsonBodySize,
     readStockJsonBody,
-} from "@/lib/server/stock-api";
-import { executeCancelStockRequest } from "@/lib/server/stock-request-commands";
+} from "@/modules/stock";
 import {
     enforceAuthenticatedMutationRateLimit,
     enforcePreAuthIpRateLimit,
@@ -17,7 +19,7 @@ import { isAdminRole } from "@/lib/ssot/permissions";
 import {
     cancelRequestSchema,
     stockRequestIdParamSchema,
-} from "@/lib/validations/stock";
+} from "@/modules/stock";
 
 interface RouteContext {
     params: Promise<{ id: string }>;

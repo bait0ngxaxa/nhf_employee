@@ -7,7 +7,7 @@ import {
     sendRoutineReminderNotification,
     sendStockRequestResultNotification,
 } from "@/lib/email";
-import type { StockRequestResultEmailPayload } from "@/lib/services/stock/notification-payloads";
+import type { StockRequestResultEmailPayload } from "@/modules/stock";
 import type {
     LeaveCancelledAfterApprovalPayload,
     LeaveNotTakenConfirmedPayload,

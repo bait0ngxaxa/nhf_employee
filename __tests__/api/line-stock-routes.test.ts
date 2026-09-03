@@ -1,6 +1,7 @@
 // @vitest-environment node
 import { StockRequestStatus } from "@prisma/client";
 import type * as NextServerModule from "next/server";
+import type * as StockModule from "@/modules/stock";
 import { NextRequest, NextResponse } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -33,18 +34,42 @@ vi.mock("@/lib/auth/liff", () => ({
     requireLiffWorkforceSession: mocks.requireLiffWorkforceSession,
 }));
 
-vi.mock("@/lib/services/stock", () => ({
-    stockService: {
-        getItems: mocks.getItems,
-        getVariantAvailability: mocks.getVariantAvailability,
-        getCategories: mocks.getCategories,
-        getRequests: mocks.getRequests,
-        getRequestById: mocks.getRequestById,
-        createRequest: mocks.createRequest,
-        issueRequest: mocks.issueRequest,
-        cancelRequest: mocks.cancelRequest,
-    },
-}));
+vi.mock("@/modules/stock", async () => {
+    const actual = await vi.importActual<typeof StockModule>(
+        "@/modules/stock",
+    );
+    return {
+        ...actual,
+        stockService: {
+            ...actual.stockService,
+            getItems: mocks.getItems,
+            getVariantAvailability: mocks.getVariantAvailability,
+            getCategories: mocks.getCategories,
+            getRequests: mocks.getRequests,
+            getRequestById: mocks.getRequestById,
+            createRequest: mocks.createRequest,
+            issueRequest: mocks.issueRequest,
+            cancelRequest: mocks.cancelRequest,
+        },
+        executeIssueStockRequest: async (
+            command: Parameters<typeof actual.executeIssueStockRequest>[0],
+        ) => {
+            const result = await mocks.issueRequest(
+                command.requestId,
+                command.actor,
+            );
+            void mocks.processOutbox();
+            return result.request;
+        },
+        executeCancelStockRequest: (command: Parameters<typeof actual.executeCancelStockRequest>[0]) =>
+            mocks.cancelRequest(
+                command.requestId,
+                command.actor,
+                command.reason,
+                command.options,
+            ),
+    };
+});
 
 vi.mock("@/lib/services/outbox/processor", () => ({
     processOutbox: mocks.processOutbox,
@@ -67,8 +92,10 @@ import {
     GET as getMyRequests,
     POST as createRequest,
 } from "@/app/api/line/stock/requests/route";
-import { StockRequestIdempotencyConflictError } from "@/lib/services/stock/request-idempotency";
-import { STOCK_JSON_MUTATION_MAX_BYTES } from "@/lib/server/stock-api";
+import {
+    STOCK_JSON_MUTATION_MAX_BYTES,
+    StockRequestIdempotencyConflictError,
+} from "@/modules/stock";
 
 const USER_AUTH = {
     ok: true as const,

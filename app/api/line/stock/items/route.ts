@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server";
 
 import { requireLiffWorkforceSession } from "@/lib/auth/liff";
-import { stockService } from "@/lib/services/stock";
-import { toLiffStockCatalogResponse } from "@/lib/services/stock/liff-serialization";
+import {
+    stockService,
+    toLiffStockCatalogResponse,
+    stockItemsFilterSchema,
+} from "@/modules/stock";
 import { jsonError, serverError } from "@/lib/ssot/http";
-import { stockItemsFilterSchema } from "@/lib/validations/stock";
 
 export async function GET(request: Request): Promise<NextResponse> {
     const auth = await requireLiffWorkforceSession();

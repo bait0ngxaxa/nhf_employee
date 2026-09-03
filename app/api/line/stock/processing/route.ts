@@ -1,11 +1,13 @@
 import { StockRequestStatus } from "@prisma/client";
 import { NextResponse } from "next/server";
 
-import { requireLiffStockProcessorSession } from "@/lib/server/liff-stock-auth";
-import { stockService } from "@/lib/services/stock";
-import { toLiffStockRequestsResponse } from "@/lib/services/stock/liff-serialization";
+import {
+    requireLiffStockProcessorSession,
+    stockService,
+    toLiffStockRequestsResponse,
+    stockRequestsFilterSchema,
+} from "@/modules/stock";
 import { jsonError, serverError } from "@/lib/ssot/http";
-import { stockRequestsFilterSchema } from "@/lib/validations/stock";
 
 export async function GET(request: Request): Promise<NextResponse> {
     const auth = await requireLiffStockProcessorSession();

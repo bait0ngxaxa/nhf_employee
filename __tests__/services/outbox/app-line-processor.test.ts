@@ -5,8 +5,8 @@ import { mockDeep, mockReset } from "vitest-mock-extended";
 import { sendStockRequestResultNotification } from "@/lib/email";
 import { prisma } from "@/lib/db/prisma";
 import { processOutbox } from "@/lib/services/outbox/processor";
-import { buildStockRequestResultLineEventKey } from "@/lib/services/stock/line-notifications";
-import type { StockRequestResultLinePayload } from "@/lib/services/stock/notification-payloads";
+import { buildStockRequestResultLineEventKey } from "@/modules/stock";
+import type { StockRequestResultLinePayload } from "@/modules/stock";
 import { createLineRetryKey } from "@/lib/services/outbox/provider-key";
 
 const sendAppLineNotificationMock = vi.hoisted(() => vi.fn());

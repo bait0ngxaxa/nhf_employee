@@ -3,10 +3,6 @@ import type { AuditDetails } from "@/lib/audit-log/contracts";
 import { getTrustedClientIp } from "@/lib/network/trusted-client-ip";
 import { type AuditAction } from "@prisma/client";
 import { headers } from "next/headers";
-import {
-    getStockAuditEntityType,
-    type StockAuditAction,
-} from "@/lib/audit-log/stock-entity";
 
 /**
  * Audit log details interface
@@ -127,7 +123,6 @@ export async function logAuthEvent(
         details,
     });
 }
-
 /**
  * Create audit log for employee management events
  */
@@ -205,25 +200,5 @@ export async function logLeaveEvent(
                 leaveRequestId: entityId,
             },
         },
-    });
-}
-
-/**
- * Create audit log for stock management events
- */
-export async function logStockEvent(
-    action: StockAuditAction,
-    entityId: number,
-    userId: number,
-    userEmail: string,
-    details?: AuditLogDetails,
-): Promise<void> {
-    await createAuditLog({
-        action,
-        entityType: getStockAuditEntityType(action),
-        entityId,
-        userId,
-        userEmail,
-        details,
     });
 }

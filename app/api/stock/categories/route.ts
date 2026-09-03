@@ -2,9 +2,11 @@ import { type NextRequest, NextResponse } from "next/server";
 import { requireAdminSession } from "@/lib/auth/api";
 import { requireActiveWorkforceOrAdminSession } from "@/lib/auth/workforce";
 import { jsonError, serverError } from "@/lib/ssot/http";
-import { stockService } from "@/lib/services/stock";
-import { createCategorySchema } from "@/lib/validations/stock";
-import { createStockCommandActor } from "@/lib/server/stock-command-actor";
+import {
+    createCategorySchema,
+    createStockCommandActor,
+    stockService,
+} from "@/modules/stock";
 
 export async function GET(): Promise<NextResponse> {
     try {

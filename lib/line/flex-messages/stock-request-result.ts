@@ -1,6 +1,6 @@
 import type { LineFlexMessage } from "@/types/api";
 
-import type { StockRequestResultLinePayload } from "@/lib/services/stock/notification-payloads";
+import type { StockRequestResultLinePayload } from "@/modules/stock";
 import { formatDate } from "../helpers";
 
 function buildItemsPreview(

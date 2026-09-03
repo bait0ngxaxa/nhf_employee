@@ -47,4 +47,4 @@ export type {
 export type {
     StockRequestResultEmailPayload,
     StockRequestResultStatus,
-} from "@/lib/services/stock/notification-payloads";
+} from "@/modules/stock";

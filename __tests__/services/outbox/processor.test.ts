@@ -19,7 +19,7 @@ import {
     sendLeaveNotTakenConfirmedNotifications,
     sendLeaveNotTakenRequestedNotifications,
 } from "@/lib/services/leave/notifications";
-import type { StockRequestResultEmailPayload } from "@/lib/services/stock/notification-payloads";
+import type { StockRequestResultEmailPayload } from "@/modules/stock";
 
 vi.mock("@/lib/db/prisma", () => ({
     prisma: mockDeep<PrismaClient>(),

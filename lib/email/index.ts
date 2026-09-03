@@ -1,5 +1,5 @@
 import nodemailer from "nodemailer";
-import type { StockRequestResultEmailPayload } from "@/lib/services/stock/notification-payloads";
+import type { StockRequestResultEmailPayload } from "@/modules/stock";
 import {
     type EmailData,
     type LeaveActionPayload,

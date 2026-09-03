@@ -1,10 +1,12 @@
 import { after, type NextRequest, NextResponse } from "next/server";
 import { requireAdminSession } from "@/lib/auth/api";
 import { jsonError, serverError } from "@/lib/ssot/http";
-import { stockService } from "@/lib/services/stock";
+import {
+    adjustStockSchema,
+    createStockCommandActor,
+    stockService,
+} from "@/modules/stock";
 import { processOutbox } from "@/lib/services/outbox/processor";
-import { adjustStockSchema } from "@/lib/validations/stock";
-import { createStockCommandActor } from "@/lib/server/stock-command-actor";
 import {
     enforceAuthenticatedMutationRateLimit,
     enforcePreAuthIpRateLimit,

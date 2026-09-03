@@ -5,12 +5,10 @@ import {
     loadDefaultVariantBackfillReport,
     type DefaultVariantBackfillApplyResult,
     type DefaultVariantBackfillReport,
-} from "../lib/services/stock/default-variant-backfill";
-import {
     assertDefaultVariantApplyAuthorized,
     assertDefaultVariantReportSafeForApply,
     getDefaultVariantDatabaseTarget,
-} from "../lib/services/stock/default-variant-backfill-safety";
+} from "../modules/stock";
 
 type BackfillOptions = {
     apply: boolean;

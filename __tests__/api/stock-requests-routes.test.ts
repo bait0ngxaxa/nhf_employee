@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 import type * as NextServerModule from "next/server";
+import type * as StockModule from "@/modules/stock";
 import { GET as getRequestsRoute, POST as postRequestsRoute } from "@/app/api/stock/requests/route";
 import { POST as issueRequestRoute } from "@/app/api/stock/requests/[id]/issue/route";
 import { POST as cancelRequestRoute } from "@/app/api/stock/requests/[id]/cancel/route";
@@ -11,11 +12,13 @@ import { getApiAuthSession } from "@/lib/auth/server";
 import { buildUserContext } from "@/lib/auth/context";
 import { prisma } from "@/lib/db/prisma";
 import { isAdminRole } from "@/lib/ssot/permissions";
-import { stockService } from "@/lib/services/stock";
-import { StockRequestIdempotencyConflictError } from "@/lib/services/stock/request-idempotency";
+import {
+    stockService,
+    StockRequestIdempotencyConflictError,
+    STOCK_JSON_MUTATION_MAX_BYTES,
+} from "@/modules/stock";
 import { processOutbox } from "@/lib/services/outbox/processor";
 import { WorkforceAuthorizationError } from "@/lib/auth/workforce-transaction";
-import { STOCK_JSON_MUTATION_MAX_BYTES } from "@/lib/server/stock-api";
 import {
     AUTHENTICATED_MUTATION_RATE_LIMIT_POLICIES,
     enforcePreAuthIpRateLimit,
@@ -51,16 +54,46 @@ vi.mock("@/lib/ssot/permissions", () => ({
     isAdminRole: vi.fn(),
 }));
 
-vi.mock("@/lib/services/stock", () => ({
-    stockService: {
-        getRequests: vi.fn(),
-        createRequest: vi.fn(),
-        issueRequest: vi.fn(),
-        cancelRequest: vi.fn(),
-        getItems: vi.fn(),
-        getCategories: vi.fn(),
-    },
-}));
+vi.mock("@/modules/stock", async () => {
+    const actual = await vi.importActual<typeof StockModule>(
+        "@/modules/stock",
+    );
+    const getRequests = vi.fn();
+    const createRequest = vi.fn();
+    const issueRequest = vi.fn();
+    const cancelRequest = vi.fn();
+    const getItems = vi.fn();
+    const getCategories = vi.fn();
+    return {
+        ...actual,
+        stockService: {
+            ...actual.stockService,
+            getRequests,
+            createRequest,
+            issueRequest,
+            cancelRequest,
+            getItems,
+            getCategories,
+        },
+        executeIssueStockRequest: async (
+            command: Parameters<typeof actual.executeIssueStockRequest>[0],
+        ) => {
+            const result = await issueRequest(
+                command.requestId,
+                command.actor,
+            );
+            void processOutbox();
+            return result.request;
+        },
+        executeCancelStockRequest: (command: Parameters<typeof actual.executeCancelStockRequest>[0]) =>
+            cancelRequest(
+                command.requestId,
+                command.actor,
+                command.reason,
+                command.options,
+            ),
+    };
+});
 
 vi.mock("@/lib/services/outbox/processor", () => ({
     processOutbox: vi.fn(),

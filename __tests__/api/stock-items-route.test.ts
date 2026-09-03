@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
+import type * as StockModule from "@/modules/stock";
 import {
     DELETE as deleteItemRoute,
     PATCH as patchItemRoute,
@@ -7,7 +8,7 @@ import {
 import { getApiAuthSession } from "@/lib/auth/server";
 import { buildUserContext } from "@/lib/auth/context";
 import { isAdminRole } from "@/lib/ssot/permissions";
-import { stockService } from "@/lib/services/stock";
+import { stockService } from "@/modules/stock";
 
 vi.mock("@/lib/auth/server", () => ({
     getApiAuthSession: vi.fn(),
@@ -21,11 +22,18 @@ vi.mock("@/lib/ssot/permissions", () => ({
     isAdminRole: vi.fn(),
 }));
 
-vi.mock("@/lib/services/stock", () => ({
-    stockService: {
-        updateItem: vi.fn(),
-    },
-}));
+vi.mock("@/modules/stock", async () => {
+    const actual = await vi.importActual<typeof StockModule>(
+        "@/modules/stock",
+    );
+    return {
+        ...actual,
+        stockService: {
+            ...actual.stockService,
+            updateItem: vi.fn(),
+        },
+    };
+});
 
 const adminSession = {
     user: { id: "1", email: "admin@test.com", role: "ADMIN" },

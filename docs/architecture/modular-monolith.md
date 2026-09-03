@@ -1,9 +1,12 @@
 # NHF Employee modular monolith
 
-Status: Phase A — Architecture Baseline & Guardrails.
+Status: Phase B — Stock Pilot Module Migration.
 
 This document separates the repository's observed current state from the
-target architecture. No business feature has been migrated as part of Phase A.
+target architecture. Stock server/business ownership is now migrated into
+`modules/stock/`; its Dashboard and client presentation remain legacy until
+Phase C. See [stock-migration.md](./stock-migration.md) for the migration
+status and transitional dependencies.
 
 ## Why a modular monolith
 
@@ -34,9 +37,11 @@ distributed across locations such as:
 - `prisma/` for the single schema and its migrations; and
 - `__tests__/` for the existing unit, integration, API, and component tests.
 
-At the Phase A baseline, `modules/` and `shared/` are foundations for future
-work. Existing feature code remains in its current locations and existing
-routes continue to use their current services and database adapters.
+At the Phase B baseline, `modules/stock/` is the first feature module with
+server/business ownership. Existing feature code for Routine, Leave, and
+Employee remains in its current locations. Stock Dashboard/client
+presentation and generic legacy platform infrastructure continue to coexist
+incrementally with the migrated module.
 
 ## Target architecture
 
@@ -85,8 +90,8 @@ Future migrations should be vertical and behavior-preserving:
 5. Verify the feature before removing the now-obsolete legacy path.
 
 Legacy and migrated modules may coexist during this process. Migration is
-explicit and feature-by-feature; Phase A does not perform the first feature
-migration.
+explicit and feature-by-feature; Stock is the Phase B pilot, while later
+features remain out of scope.
 
 ## Invariants for this phase
 
@@ -95,8 +100,9 @@ The following remain outside the scope of the architecture scaffolding:
 - business behavior, API contracts, UI behavior, URLs, and navigation;
 - authentication, authorization, permissions, and LIFF behavior;
 - the Prisma schema, migrations, and database layout; and
-- cron, notifications, email, LINE, uploads, Stock, Routine, Leave, and
-  Employee runtime behavior.
+- cron, notifications, email, LINE, uploads, Routine, Leave, and Employee
+  runtime behavior. Stock runtime behavior remains unchanged by the Phase B
+  ownership migration.
 
 Detailed boundary and import rules are in
 [module-boundaries.md](./module-boundaries.md) and

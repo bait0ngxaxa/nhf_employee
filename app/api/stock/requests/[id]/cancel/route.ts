@@ -2,14 +2,14 @@ import { type NextRequest, NextResponse } from "next/server";
 import { requireActiveWorkforceOrAdminSession } from "@/lib/auth/workforce";
 import { isAdminRole } from "@/lib/ssot/permissions";
 import { jsonError, serverError } from "@/lib/ssot/http";
-import { executeCancelStockRequest } from "@/lib/server/stock-request-commands";
-import { cancelRequestSchema } from "@/lib/validations/stock";
-import { WorkforceAuthorizationError } from "@/lib/auth/workforce-transaction";
-import { createStockCommandActor } from "@/lib/server/stock-command-actor";
 import {
+    cancelRequestSchema,
+    createStockCommandActor,
     enforceStockJsonBodySize,
+    executeCancelStockRequest,
     readStockJsonBody,
-} from "@/lib/server/stock-api";
+} from "@/modules/stock";
+import { WorkforceAuthorizationError } from "@/lib/auth/workforce-transaction";
 import {
     enforceAuthenticatedMutationRateLimit,
     enforcePreAuthIpRateLimit,

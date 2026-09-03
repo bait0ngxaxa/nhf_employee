@@ -5,7 +5,7 @@ import {
     createRequestSchema,
     stockReportExportQuerySchema,
     updateItemSchema,
-} from "@/lib/validations/stock";
+} from "@/modules/stock";
 
 describe("Stock Validation", () => {
     describe("createRequestSchema", () => {

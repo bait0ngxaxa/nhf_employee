@@ -7,10 +7,12 @@ const BASE_EXCLUDES = [
     ".next",
     ".git",
     "__tests__/integration/**",
+    "modules/stock/__tests__/integration/**",
 ];
 
 const NODE_TESTS = [
     "__tests__/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts}",
+    "modules/stock/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts}",
 ];
 
 const DOM_TESTS = [
