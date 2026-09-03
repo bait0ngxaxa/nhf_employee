@@ -4,9 +4,6 @@ import { fileURLToPath } from "node:url";
 import ts from "typescript";
 
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const modulesRoot = resolve(repositoryRoot, "modules");
-const sharedRoot = resolve(repositoryRoot, "shared");
-const architectureRoots = [modulesRoot, sharedRoot];
 const sourceExtensions = new Set([
     ".cjs",
     ".cts",
@@ -17,12 +14,30 @@ const sourceExtensions = new Set([
     ".ts",
     ".tsx",
 ]);
+const ignoredDirectoryNames = new Set([
+    ".git",
+    ".next",
+    ".turbo",
+    ".vercel",
+    "build",
+    "coverage",
+    "dist",
+    "generated",
+    "graphify-out",
+    "node_modules",
+    "out",
+    "storybook-static",
+]);
 
 function pathIsWithin(candidatePath, parentPath) {
     const relativePath = relative(parentPath, candidatePath);
     return (
         relativePath === ""
-        || (!relativePath.startsWith(`..${sep}`) && !isAbsolute(relativePath))
+        || (
+            relativePath !== ".."
+            && !relativePath.startsWith(`..${sep}`)
+            && !isAbsolute(relativePath)
+        )
     );
 }
 
@@ -46,6 +61,10 @@ function getSourceFiles(directoryPath) {
     return entries.flatMap((entry) => {
         const entryPath = resolve(directoryPath, entry.name);
         if (entry.isDirectory()) {
+            if (ignoredDirectoryNames.has(entry.name.toLowerCase())) {
+                return [];
+            }
+
             return getSourceFiles(entryPath);
         }
 
@@ -53,21 +72,21 @@ function getSourceFiles(directoryPath) {
     });
 }
 
-function getImportSourcePath(specifier, importerPath) {
+function getImportSourcePath(specifier, importerPath, rootPath) {
     if (specifier === "@/modules" || specifier.startsWith("@/modules/")) {
-        return resolve(repositoryRoot, specifier.slice(2));
+        return resolve(rootPath, specifier.slice(2));
     }
 
     if (specifier === "@/shared" || specifier.startsWith("@/shared/")) {
-        return resolve(repositoryRoot, specifier.slice(2));
+        return resolve(rootPath, specifier.slice(2));
     }
 
     if (specifier === "modules" || specifier.startsWith("modules/")) {
-        return resolve(repositoryRoot, specifier);
+        return resolve(rootPath, specifier);
     }
 
     if (specifier === "shared" || specifier.startsWith("shared/")) {
-        return resolve(repositoryRoot, specifier);
+        return resolve(rootPath, specifier);
     }
 
     if (specifier.startsWith(".")) {
@@ -77,12 +96,12 @@ function getImportSourcePath(specifier, importerPath) {
     return null;
 }
 
-function getOwner(filePath) {
+function getOwner(filePath, modulesRoot, sharedRoot) {
     const moduleSegments = getPathSegments(filePath, modulesRoot);
-    if (moduleSegments !== null) {
+    if (moduleSegments !== null && moduleSegments.length > 0) {
         return {
             kind: "module",
-            name: moduleSegments[0] ?? null,
+            name: moduleSegments[0],
         };
     }
 
@@ -90,20 +109,20 @@ function getOwner(filePath) {
         return { kind: "shared", name: null };
     }
 
-    return null;
+    return { kind: "external", name: null };
 }
 
-function getArchitectureTarget(specifier, importerPath) {
-    const importPath = getImportSourcePath(specifier, importerPath);
+function getArchitectureTarget(specifier, importerPath, rootPath, modulesRoot, sharedRoot) {
+    const importPath = getImportSourcePath(specifier, importerPath, rootPath);
     if (importPath === null) {
         return null;
     }
 
     const moduleSegments = getPathSegments(importPath, modulesRoot);
-    if (moduleSegments !== null) {
+    if (moduleSegments !== null && moduleSegments.length > 0) {
         return {
             kind: "modules",
-            moduleName: moduleSegments[0] ?? null,
+            moduleName: moduleSegments[0],
             isPublicEntryPoint: moduleSegments.length === 1,
         };
     }
@@ -187,69 +206,106 @@ function getImports(filePath) {
     return imports;
 }
 
-function relativeFilePath(filePath) {
-    return relative(repositoryRoot, filePath).split(sep).join("/");
+function relativeFilePath(filePath, rootPath) {
+    return relative(rootPath, filePath).split(sep).join("/");
 }
 
-function describeViolation(filePath, importRecord, message) {
-    return `${relativeFilePath(filePath)}:${importRecord.line} imports "${importRecord.moduleSpecifier}": ${message}`;
+function describeViolation(filePath, rootPath, importRecord, message) {
+    return `${relativeFilePath(filePath, rootPath)}:${importRecord.line} imports "${importRecord.moduleSpecifier}": ${message}`;
 }
 
-const missingRoots = architectureRoots.filter((directoryPath) => !existsSync(directoryPath));
-const violations = missingRoots.map((directoryPath) => (
-    `Missing architecture directory: ${relativeFilePath(directoryPath)}/`
-));
+function getBoundaryViolation(owner, target) {
+    if (owner.kind === "shared" && target.kind === "modules") {
+        return "shared/ cannot depend on business modules.";
+    }
 
-if (missingRoots.length === 0) {
-    const sourceFiles = architectureRoots.flatMap(getSourceFiles).sort();
+    if (target.kind !== "modules" || target.moduleName === null) {
+        return null;
+    }
+
+    const publicApi = `@/modules/${target.moduleName}`;
+
+    if (target.isPublicEntryPoint) {
+        return null;
+    }
+
+    if (owner.kind === "module" && owner.name === target.moduleName) {
+        return null;
+    }
+
+    if (owner.kind === "module") {
+        return `cross-module dependencies must use the target module public entry point "${publicApi}".`;
+    }
+
+    return `external consumers must use the target module public API "${publicApi}".`;
+}
+
+function checkArchitecture(options = {}) {
+    const rootPath = resolve(options.repositoryRoot ?? repositoryRoot);
+    const modulesRoot = resolve(rootPath, "modules");
+    const sharedRoot = resolve(rootPath, "shared");
+    const architectureRoots = [modulesRoot, sharedRoot];
+    const missingRoots = architectureRoots.filter((directoryPath) => !existsSync(directoryPath));
+    const violations = missingRoots.map((directoryPath) => (
+        `Missing architecture directory: ${relativeFilePath(directoryPath, rootPath)}/`
+    ));
+
+    if (missingRoots.length > 0) {
+        return { sourceFiles: [], violations };
+    }
+
+    const sourceFiles = getSourceFiles(rootPath).sort();
 
     for (const filePath of sourceFiles) {
-        const owner = getOwner(filePath);
-        if (owner === null) {
-            continue;
-        }
+        const owner = getOwner(filePath, modulesRoot, sharedRoot);
 
         for (const importRecord of getImports(filePath)) {
-            const target = getArchitectureTarget(importRecord.moduleSpecifier, filePath);
+            const target = getArchitectureTarget(
+                importRecord.moduleSpecifier,
+                filePath,
+                rootPath,
+                modulesRoot,
+                sharedRoot,
+            );
             if (target === null) {
                 continue;
             }
 
-            if (owner.kind === "shared" && target.kind === "modules") {
+            const message = getBoundaryViolation(owner, target);
+            if (message !== null) {
                 violations.push(describeViolation(
                     filePath,
+                    rootPath,
                     importRecord,
-                    "shared/ cannot depend on business modules.",
-                ));
-                continue;
-            }
-
-            if (
-                owner.kind === "module"
-                && target.kind === "modules"
-                && owner.name !== target.moduleName
-                && !target.isPublicEntryPoint
-            ) {
-                violations.push(describeViolation(
-                    filePath,
-                    importRecord,
-                    "cross-module dependencies must use the target module public entry point, such as @/modules/<feature>.",
+                    message,
                 ));
             }
         }
     }
 
-    if (violations.length === 0) {
-        process.stdout.write(
-            `Architecture check passed: checked ${sourceFiles.length} source file(s) under modules/ and shared/.\n`,
-        );
-    }
+    return { sourceFiles, violations };
 }
 
-if (violations.length > 0) {
-    console.error(`Architecture check failed with ${violations.length} violation(s).`);
-    for (const violation of violations) {
+function reportResult(result) {
+    if (result.violations.length === 0) {
+        process.stdout.write(
+            `Architecture check passed: checked ${result.sourceFiles.length} repository source file(s) for module boundaries.\n`,
+        );
+        return;
+    }
+
+    console.error(`Architecture check failed with ${result.violations.length} violation(s).`);
+    for (const violation of result.violations) {
         console.error(`- ${violation}`);
     }
     process.exitCode = 1;
+}
+
+export { checkArchitecture };
+
+const isMainModule = process.argv[1] !== undefined
+    && resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+
+if (isMainModule) {
+    reportResult(checkArchitecture());
 }

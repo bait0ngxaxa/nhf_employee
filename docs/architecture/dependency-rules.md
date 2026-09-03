@@ -48,12 +48,16 @@ import { getStock } from "@/modules/stock";
 // module A -> module B internal implementation
 import { something } from "@/modules/stock/application/internal/foo";
 
+// external consumer -> module internal implementation
+import { something } from "@/modules/stock/application/create-item";
+
 // The same violation written with a relative path
 import { something } from "../../stock/infrastructure/repository";
 ```
 
 Feature internals are private by ownership even when TypeScript can resolve the
-path. Use the target module root public entry point instead.
+path. Both external consumers and other modules must use the target module root
+public entry point instead.
 
 ## Client/server boundary
 
@@ -112,20 +116,23 @@ usage. Add a narrower row when a new exceptional platform case is approved.
 
 ## Automated enforcement
 
-Phase A intentionally limits automation to the new roots:
+Phase A limits automation by import target rather than by importer location.
+The checker scans repository source files so external consumers cannot bypass
+the module boundary from a legacy directory, while imports unrelated to
+`modules/**` remain outside its scope:
 
 | Check | Scope | Behavior |
 | --- | --- | --- |
 | ESLint `no-restricted-imports` | `shared/**/*.{js,jsx,ts,tsx}` | Rejects imports from `modules/` so a shared capability cannot acquire a business dependency |
-| `npm run architecture:check` | Source files under `modules/` and `shared/` | Uses the installed TypeScript parser to inspect imports, re-exports, type imports, dynamic imports, and `require()` calls; rejects `shared -> modules` and cross-module deep imports, including relative paths |
+| `npm run architecture:check` | Repository source files, excluding dependency, build, coverage, and generated directories | Uses the installed TypeScript parser to inspect imports, re-exports, type imports, dynamic imports, and `require()` calls; rejects `shared -> modules`, external consumers deep-importing module internals, and cross-module deep imports, including relative paths |
 | Client/server policy | Legacy and new code | Documentation-led in Phase A; no broad rule is added that would require unrelated migration |
 | Route-level Prisma policy | Legacy and new code | Documentation-led in Phase A for the existing route exceptions; new module infrastructure remains the intended boundary |
 
-The check is fast and is included at the start of `npm run check`. It does not
-scan legacy feature directories for the target violations, because doing so
-would turn Phase A into an implicit Stock, Routine, Leave, Employee, or API
-migration. Once a feature is migrated, its new module code is covered by the
-new-root checks.
+The check is fast and is included at the start of `npm run check`. Scanning
+legacy feature directories does not migrate them: the checker only evaluates
+imports that resolve into `modules/**`. Existing legacy files without such
+imports remain compatible, and migrated module code is covered by the same
+owner-aware rules.
 
 ## Legacy compatibility
 
