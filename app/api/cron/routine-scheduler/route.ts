@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { isFeatureEnabled, FEATURE_KEYS } from "@/lib/ssot/features";
 import { forbidden, jsonError, serverError } from "@/lib/ssot/http";
 import { ROUTINE_API_MESSAGES } from "@/lib/ssot/messages";
-import { runRoutineScheduler, type RoutineSchedulerResult } from "@/lib/services/routine";
+import { runRoutineScheduler, type RoutineSchedulerResult } from "@/modules/routine";
 
 const ROUTINE_SCHEDULER_SECRET_HEADER = "x-routine-secret";
 

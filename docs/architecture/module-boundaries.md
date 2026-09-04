@@ -1,7 +1,7 @@
 # Module boundaries
 
-Status: Phase C policy. The examples describe the target shape; migrations
-remain incremental.
+Status: Phase D policy. Stock and Routine are migrated examples; remaining
+feature migrations remain incremental.
 
 ## What is a module
 
@@ -39,6 +39,10 @@ modules/<feature>/client.ts
 ```ts
 import { StockSection } from "@/modules/stock/client";
 ```
+
+Routine follows the same split: server/application consumers use
+`@/modules/routine`, while Dashboard and LIFF consumers use
+`@/modules/routine/client`.
 
 The root barrel remains server/application-oriented. The client entry point
 must export only client-safe presentation contracts.
@@ -147,7 +151,7 @@ Routine screens use it.
 ## Legacy coexistence
 
 The current `app/`, `components/`, `hooks/`, `lib/`, and `lib/validations/`
-structure remains operational while migration is pending. Existing imports are
-not rewritten merely to make the target diagram look complete. A migration
-must preserve behavior unless a separate change explicitly requests a behavior
-change.
+structure remains operational for features that have not migrated. Existing
+imports are not rewritten merely to make the target diagram look complete. A
+migration must preserve behavior unless a separate change explicitly requests
+a behavior change.

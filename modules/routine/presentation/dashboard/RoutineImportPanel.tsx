@@ -1,0 +1,1236 @@
+"use client";
+
+import { useCallback, useEffect, useRef, useState } from "react";
+import {
+    Check,
+    CheckCircle2,
+    FileSpreadsheet,
+    Pencil,
+    RefreshCw,
+    Trash2,
+    UploadCloud,
+    X,
+} from "lucide-react";
+import { toast } from "sonner";
+
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { EmptyState, ErrorState, LoadingState } from "@/components/ui/state";
+import { Input } from "@/components/ui/input";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
+import { API_ROUTES } from "@/lib/ssot/routes";
+import { routineImportReferenceDataSchema } from "../../schemas/import-reference";
+import {
+    ROUTINE_IMPORT_MAX_FILE_BYTES,
+    ROUTINE_IMPORT_TARGET_SHEET,
+} from "../../application/imports/sheet-config";
+
+import { RoutineImportRowEditor } from "./RoutineImportRowEditor";
+import { RoutineImportRowsSkeleton } from "./RoutineSkeletons";
+import { formatRoutineScheduleSummary } from "./labels";
+import type {
+    RoutineImportBatchView,
+    RoutineImportReference,
+    RoutineImportRowEdit,
+    RoutineImportRowView,
+    RoutineImportRowsPage,
+    RoutineImportRowStatus,
+} from "./import-types";
+
+type ImportFilter = RoutineImportRowStatus | "";
+type ImportIssue = "" | "UNRESOLVED_OWNER";
+
+const STATUS_LABELS: Record<RoutineImportRowStatus, string> = {
+    VALID: "พร้อมนำเข้า",
+    REQUIRES_REVIEW: "ต้องตรวจสอบ",
+    EXCLUDED: "ถูกข้าม",
+    ALREADY_IMPORTED: "เคยนำเข้าแล้ว",
+    CONFLICT: "conflict",
+    APPLIED: "นำเข้าแล้ว",
+    FAILED: "ล้มเหลว",
+};
+
+const STATUS_CLASSES: Record<RoutineImportRowStatus, string> = {
+    VALID: "border-status-success-border bg-status-success-surface text-status-success-foreground",
+    REQUIRES_REVIEW: "border-status-warning-border bg-status-warning-surface text-status-warning-strong",
+    EXCLUDED: "border-border-subtle bg-surface-subtle text-content-body",
+    ALREADY_IMPORTED: "border-brand-border-default bg-brand-surface text-brand-emphasis",
+    CONFLICT: "border-status-danger-border bg-status-danger-surface text-status-danger-strong",
+    APPLIED: "border-status-success-border bg-status-success-surface text-status-success-foreground",
+    FAILED: "border-status-danger-border bg-status-danger-surface text-status-danger-strong",
+};
+
+const BATCH_STATUS_LABELS: Record<RoutineImportBatchView["status"], string> = {
+    PREVIEW: "กำลังตรวจสอบตัวอย่าง",
+    READY: "พร้อมตรวจสอบและนำเข้า",
+    APPLYING: "กำลังนำเข้า",
+    COMPLETED: "นำเข้าเสร็จแล้ว",
+    FAILED: "นำเข้าไม่สำเร็จ",
+    CANCELLED: "ยกเลิกแล้ว",
+    EXPIRED: "หมดอายุแล้ว",
+};
+
+const REFERENCE_REVIEW_REASON_CODES = new Set([
+    "OWNER_MAPPING_EMPLOYEE_NOT_FOUND",
+    "OWNER_MAPPING_EMPLOYEE_INACTIVE",
+    "MISSING_CATEGORY",
+    "INACTIVE_CATEGORY",
+    "MISSING_UNIT",
+    "INACTIVE_UNIT",
+]);
+
+function isEditableBatchStatus(
+    status: RoutineImportBatchView["status"],
+): boolean {
+    return status === "READY" || status === "PREVIEW";
+}
+
+function batchReadOnlyReason(status: RoutineImportBatchView["status"]): string {
+    const label = BATCH_STATUS_LABELS[status];
+    if (status === "APPLYING")
+        return `ชุดข้อมูลอยู่ในสถานะ “${label}” จึงยังแก้ไขไม่ได้ กรุณารอให้ระบบดำเนินการเสร็จ`;
+    if (status === "EXPIRED")
+        return `ชุดข้อมูล “${label}” จึงแก้ไขหรือนำเข้าไม่ได้ กรุณาอัปโหลดไฟล์ใหม่`;
+    return `ชุดข้อมูลอยู่ในสถานะ “${label}” จึงแก้ไขข้อมูล staging ไม่ได้`;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function responseError(value: unknown, fallback: string): string {
+    if (isRecord(value) && typeof value.error === "string") return value.error;
+    return fallback;
+}
+
+async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
+    const response = await fetch(url, { cache: "no-store", ...init });
+    const body: unknown = await response.json().catch(() => null);
+    if (!response.ok)
+        throw new Error(responseError(body, "ดำเนินการไม่สำเร็จ"));
+    return body as T;
+}
+
+function formatDate(value: string | null): string {
+    if (!value) return "-";
+    return value.slice(0, 10);
+}
+
+function scheduleLabel(row: RoutineImportRowView): string {
+    const schedule = row.data.normalizedSchedule;
+    if (!schedule) return "ยังไม่กำหนด";
+    return formatRoutineScheduleSummary(schedule);
+}
+
+function reviewLabel(reason: string): string {
+    const [code, detail] = reason.split(":", 2);
+    const labels: Record<string, string> = {
+        MISSING_OWNER: "ไม่มีผู้รับผิดชอบ",
+        OWNER_MAPPING_EMPLOYEE_NOT_FOUND: "ยังจับคู่พนักงานไม่ได้",
+        OWNER_MAPPING_EMPLOYEE_INACTIVE: "พนักงานไม่พร้อมใช้งาน",
+        DUPLICATE_OWNER: "ผู้รับผิดชอบซ้ำกันไม่ได้",
+        INVALID_CONTRACT_DATE_RANGE: "ช่วงสัญญาไม่ถูกต้อง",
+        INVALID_OWNER_ROLE: "ต้องมีผู้รับผิดชอบหลัก 1 คน",
+        MISSING_CATEGORY: "ไม่มีหมวดงาน",
+        MISSING_TITLE: "ไม่มีชื่อรายการ",
+        MISSING_UNIT: "ไม่มีหน่วยงาน",
+        INACTIVE_UNIT: "หน่วยงานไม่พร้อมใช้งาน",
+        INACTIVE_CATEGORY: "หมวดงานไม่พร้อมใช้งาน",
+        PLACEHOLDER_ROW: "รายการอ้างอิงหรือ placeholder",
+    };
+    return `${labels[code] ?? code}${detail ? ` (${detail})` : ""}`;
+}
+
+function rowStatusLabel(row: RoutineImportRowView): string {
+    if (
+        row.status === "REQUIRES_REVIEW" &&
+        row.reviewReasons.some((reason) =>
+            [
+                "MISSING_OWNER",
+                "OWNER_MAPPING_EMPLOYEE_NOT_FOUND",
+                "OWNER_MAPPING_EMPLOYEE_INACTIVE",
+                "DUPLICATE_OWNER",
+                "INVALID_OWNER_ROLE",
+            ].includes(reason.split(":", 1)[0]),
+        )
+    ) {
+        return "ต้องเลือกผู้รับผิดชอบ";
+    }
+    return STATUS_LABELS[row.status];
+}
+
+function hasReferenceReviewReason(row: RoutineImportRowView): boolean {
+    return row.reviewReasons.some((reason) => (
+        REFERENCE_REVIEW_REASON_CODES.has(reason.split(":", 1)[0] ?? "")
+    ));
+}
+
+function rowToEditPayload(
+    row: RoutineImportRowView,
+    selected: boolean,
+): RoutineImportRowEdit {
+    const schedule = row.data.normalizedSchedule;
+    return {
+        version: row.version,
+        categoryName: row.data.categoryName,
+        title: row.data.title,
+        mappedAssignees:
+            row.data.mappedAssignees ??
+            row.data.mappedEmployeeIds.map((employeeId, index) => ({
+                employeeId,
+                role: index === 0 ? "OWNER" : "CO_OWNER",
+            })),
+        scheduleText: row.data.scheduleText,
+        scheduleType: schedule?.scheduleType ?? "MANUAL",
+        scheduleConfig: schedule?.scheduleConfig ?? {},
+        businessDayPolicy: schedule?.businessDayPolicy ?? "NONE",
+        contractStartDate: row.data.contractStartDate,
+        contractEndDate: row.data.contractEndDate,
+        contractText: row.data.contractText,
+        extraDetails: row.data.extraDetails,
+        selected,
+        reminderRules: row.data.reminderRules ?? [],
+    };
+}
+
+function SummaryItem({
+    label,
+    value,
+    tone = "default",
+    priority = "primary",
+}: {
+    label: string;
+    value: number;
+    tone?: "default" | "warning" | "success" | "danger";
+    priority?: "primary" | "secondary";
+}) {
+    const toneClasses = {
+        default: {
+            surface: "border-brand-border bg-brand-surface",
+            value: "text-brand-strong",
+        },
+        warning: {
+            surface: "border-status-warning-border bg-status-warning-surface",
+            value: "text-status-warning-foreground",
+        },
+        success: {
+            surface: "border-status-success-border bg-status-success-surface",
+            value: "text-status-success-foreground",
+        },
+        danger: {
+            surface: "border-status-danger-border bg-status-danger-surface",
+            value: "text-status-danger-foreground",
+        },
+    }[tone];
+    return (
+        <div className={`rounded-lg border ${toneClasses.surface} ${priority === "primary" ? "px-4 py-4" : "px-4 py-3"}`}>
+            <p className={`font-medium leading-5 text-content-secondary ${priority === "primary" ? "text-sm" : "text-xs sm:text-sm"}`}>
+                {label}
+            </p>
+            <p
+                className={`mt-2 font-bold tracking-tight tabular-nums ${priority === "primary" ? "text-3xl" : "text-2xl"} ${toneClasses.value}`}
+            >
+                {value}
+            </p>
+        </div>
+    );
+}
+
+export function RoutineImportPanel() {
+    const inputRef = useRef<HTMLInputElement>(null);
+    const [file, setFile] = useState<File | null>(null);
+    const [batchId, setBatchId] = useState<number | null>(null);
+    const [batch, setBatch] = useState<RoutineImportBatchView | null>(null);
+    const [rowsPage, setRowsPage] = useState<RoutineImportRowsPage | null>(
+        null,
+    );
+    const [reference, setReference] = useState<RoutineImportReference | null>(
+        null,
+    );
+    const [referenceBatchKey, setReferenceBatchKey] = useState<string | null>(null);
+    const [filter, setFilter] = useState<ImportFilter>("");
+    const [issue, setIssue] = useState<ImportIssue>("");
+    const [selectedOnly, setSelectedOnly] = useState(false);
+    const [searchInput, setSearchInput] = useState("");
+    const debouncedSearch = useDebouncedValue(searchInput);
+    const [page, setPage] = useState(1);
+    const [loading, setLoading] = useState(false);
+    const [uploading, setUploading] = useState(false);
+    const [applying, setApplying] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const [referenceLoading, setReferenceLoading] = useState(false);
+    const [referenceError, setReferenceError] = useState<string | null>(null);
+    const [editorRow, setEditorRow] = useState<RoutineImportRowView | null>(
+        null,
+    );
+    const [confirmOpen, setConfirmOpen] = useState(false);
+    const uploadLockRef = useRef(false);
+    const uploadToastBatchIdRef = useRef<number | null>(null);
+    const applyLockRef = useRef(false);
+    const cancelLockRef = useRef(false);
+    const selectionLocksRef = useRef<Set<number>>(new Set());
+    const referenceRequestIdRef = useRef(0);
+    const referenceLoadingKeyRef = useRef<string | null>(null);
+
+    const loadReference = useCallback(async (batchKey: string): Promise<void> => {
+        if (referenceLoadingKeyRef.current === batchKey) return;
+        const requestId = referenceRequestIdRef.current + 1;
+        referenceRequestIdRef.current = requestId;
+        referenceLoadingKeyRef.current = batchKey;
+        setReferenceLoading(true);
+        setReferenceError(null);
+        setReference(null);
+        setReferenceBatchKey(null);
+        try {
+            const body = await fetchJson<unknown>(
+                API_ROUTES.routines.imports.reference,
+            );
+            const parsed = routineImportReferenceDataSchema.safeParse(body);
+            if (!parsed.success) {
+                throw new Error("ข้อมูลอ้างอิงสำหรับนำเข้าไม่ถูกต้อง กรุณาลองใหม่");
+            }
+            if (referenceRequestIdRef.current !== requestId) return;
+            setReference(parsed.data);
+            setReferenceBatchKey(batchKey);
+        } catch (loadError) {
+            if (referenceRequestIdRef.current !== requestId) return;
+            setReferenceError(
+                loadError instanceof Error
+                    ? loadError.message
+                    : "โหลดข้อมูลอ้างอิงสำหรับนำเข้าไม่สำเร็จ",
+            );
+        } finally {
+            if (referenceRequestIdRef.current === requestId) {
+                setReferenceLoading(false);
+                referenceLoadingKeyRef.current = null;
+            }
+        }
+    }, []);
+
+    const loadBatch = useCallback(async (): Promise<void> => {
+        if (batchId === null) return;
+        setLoading(true);
+        setError(null);
+        try {
+            const params = new URLSearchParams({
+                page: String(page),
+                limit: "25",
+            });
+            if (filter) params.set("status", filter);
+            if (issue) params.set("issue", issue);
+            if (selectedOnly) params.set("selected", "1");
+            if (debouncedSearch.trim()) params.set("search", debouncedSearch.trim());
+            const [batchBody, rowsBody] = await Promise.all([
+                fetchJson<{ batch: RoutineImportBatchView }>(
+                    API_ROUTES.routines.imports.batchById(batchId),
+                ),
+                fetchJson<RoutineImportRowsPage>(
+                    `${API_ROUTES.routines.imports.rows(batchId)}?${params.toString()}`,
+                ),
+            ]);
+            setBatch(batchBody.batch);
+            setRowsPage(rowsBody);
+            if (uploadToastBatchIdRef.current === batchId) {
+                uploadToastBatchIdRef.current = null;
+                toast.success("อ่านไฟล์และสร้างตัวอย่างข้อมูลสำเร็จ");
+            }
+        } catch (loadError) {
+            setError(
+                loadError instanceof Error
+                    ? loadError.message
+                    : "โหลดข้อมูลนำเข้าไม่สำเร็จ",
+            );
+        } finally {
+            setLoading(false);
+        }
+    }, [batchId, debouncedSearch, filter, issue, page, selectedOnly]);
+
+    const currentReferenceBatchKey = batchId !== null && batch
+        ? `${batchId}:${batch.version}`
+        : null;
+    const referenceReady = currentReferenceBatchKey !== null
+        && referenceBatchKey === currentReferenceBatchKey
+        && reference !== null;
+
+    useEffect(() => {
+        if (currentReferenceBatchKey && !referenceReady) {
+            void loadReference(currentReferenceBatchKey);
+        }
+    }, [currentReferenceBatchKey, loadReference, referenceReady]);
+    useEffect(() => {
+        void loadBatch();
+    }, [loadBatch]);
+
+    function reset(): void {
+        setFile(null);
+        setBatchId(null);
+        setBatch(null);
+        setRowsPage(null);
+        referenceRequestIdRef.current += 1;
+        referenceLoadingKeyRef.current = null;
+        setReference(null);
+        setReferenceBatchKey(null);
+        setReferenceLoading(false);
+        setReferenceError(null);
+        setEditorRow(null);
+        setError(null);
+        uploadToastBatchIdRef.current = null;
+        setFilter("");
+        setIssue("");
+        setSelectedOnly(false);
+        setSearchInput("");
+        setPage(1);
+        if (inputRef.current) inputRef.current.value = "";
+    }
+
+    async function upload(): Promise<void> {
+        if (!file || uploadLockRef.current) return;
+        uploadLockRef.current = true;
+        if (file.size > ROUTINE_IMPORT_MAX_FILE_BYTES) {
+            setError("ไฟล์ต้องมีขนาดไม่เกิน 10 MB");
+            uploadLockRef.current = false;
+            return;
+        }
+        setUploading(true);
+        setError(null);
+        try {
+            const formData = new FormData();
+            formData.append("file", file);
+            const body = await fetchJson<{
+                batch: RoutineImportBatchView;
+                reusedExisting: boolean;
+            }>(API_ROUTES.routines.imports.preview, {
+                method: "POST",
+                body: formData,
+            });
+            uploadToastBatchIdRef.current = body.batch.id;
+            referenceRequestIdRef.current += 1;
+            referenceLoadingKeyRef.current = null;
+            setReference(null);
+            setReferenceBatchKey(null);
+            setReferenceError(null);
+            setBatchId(body.batch.id);
+            setPage(1);
+        } catch (uploadError) {
+            const message =
+                uploadError instanceof Error
+                    ? uploadError.message
+                    : "อัปโหลดไฟล์ไม่สำเร็จ";
+            setError(message);
+            toast.error(message);
+        } finally {
+            setUploading(false);
+            uploadLockRef.current = false;
+        }
+    }
+
+    async function updateSelection(
+        row: RoutineImportRowView,
+        selected: boolean,
+    ): Promise<void> {
+        if (
+            !batch ||
+            !isEditableBatchStatus(batch.status) ||
+            (row.status !== "VALID" && row.status !== "EXCLUDED") ||
+            selectionLocksRef.current.has(row.id)
+        )
+            return;
+        selectionLocksRef.current.add(row.id);
+        setError(null);
+        try {
+            await fetchJson<{ row: RoutineImportRowView }>(
+                API_ROUTES.routines.imports.rowById(batchId ?? 0, row.id),
+                {
+                    method: "PATCH",
+                    headers: { "content-type": "application/json" },
+                    body: JSON.stringify(rowToEditPayload(row, selected)),
+                },
+            );
+            await loadBatch();
+            toast.success("อัปเดตการเลือกแถวสำเร็จ");
+        } catch (updateError) {
+            const message =
+                updateError instanceof Error
+                    ? updateError.message
+                    : "อัปเดตการเลือกไม่สำเร็จ";
+            setError(message);
+            toast.error(message);
+        } finally {
+            selectionLocksRef.current.delete(row.id);
+        }
+    }
+
+    async function apply(): Promise<void> {
+        if (!batch || batchId === null || applyLockRef.current) return;
+        applyLockRef.current = true;
+        setConfirmOpen(false);
+        setApplying(true);
+        setError(null);
+        try {
+            const result = await fetchJson<{ batch: RoutineImportBatchView }>(
+                API_ROUTES.routines.imports.apply(batchId),
+                {
+                    method: "POST",
+                    headers: { "content-type": "application/json" },
+                    body: JSON.stringify({ confirm: true }),
+                },
+            );
+            setBatch(result.batch);
+            await loadBatch();
+            toast.success("นำเข้าข้อมูล Routine สำเร็จ");
+        } catch (applyError) {
+            const message =
+                applyError instanceof Error
+                    ? applyError.message
+                    : "นำเข้าข้อมูลไม่สำเร็จ";
+            setError(message);
+            toast.error(message);
+            await Promise.all([
+                loadBatch(),
+                currentReferenceBatchKey
+                    ? loadReference(currentReferenceBatchKey)
+                    : Promise.resolve(),
+            ]);
+        } finally {
+            setApplying(false);
+            applyLockRef.current = false;
+        }
+    }
+
+    async function cancelBatch(): Promise<void> {
+        if (
+            batchId === null ||
+            cancelLockRef.current ||
+            !window.confirm("ยกเลิกชุดข้อมูลนำเข้านี้หรือไม่")
+        )
+            return;
+        cancelLockRef.current = true;
+        try {
+            const result = await fetchJson<{ batch: RoutineImportBatchView }>(
+                API_ROUTES.routines.imports.cancel(batchId),
+                { method: "POST" },
+            );
+            setBatch(result.batch);
+            await loadBatch();
+            toast.success("ยกเลิกชุดข้อมูลนำเข้าสำเร็จ");
+        } catch (cancelError) {
+            const message =
+                cancelError instanceof Error
+                    ? cancelError.message
+                    : "ยกเลิกชุดข้อมูลไม่สำเร็จ";
+            setError(message);
+            toast.error(message);
+        } finally {
+            cancelLockRef.current = false;
+        }
+    }
+
+    const canApply = Boolean(
+        batch &&
+        isEditableBatchStatus(batch.status) &&
+        batch.selectedValidRows > 0 &&
+        batch.selectedRows === batch.selectedValidRows &&
+        !applying,
+    );
+    const currentPage = rowsPage?.pagination;
+
+    if (!batchId) {
+        return (
+            <div className="space-y-5">
+                <div className="rounded-xl border border-brand-border/70 bg-brand-surface p-5 sm:p-6">
+                    <div className="flex items-start gap-3">
+                        <div className="rounded-lg bg-brand-surface p-2 text-brand-foreground">
+                            <FileSpreadsheet className="h-5 w-5" />
+                        </div>
+                        <div>
+                            <h3 className="text-lg font-semibold tracking-tight text-brand-strong">
+                                นำเข้าข้อมูลจาก Excel
+                            </h3>
+                            <p className="mt-1 max-w-2xl text-sm leading-6 text-content-secondary">
+                                ระบบจะอ่านเฉพาะชีต มสช.
+                                แสดงตัวอย่างให้ตรวจสอบก่อนสร้างแม่แบบงาน
+                                ชีตอื่นในไฟล์จะไม่ถูกนำเข้า
+                            </p>
+                        </div>
+                    </div>
+                    <div className="mt-5 grid gap-3 md:grid-cols-[1fr_auto] md:items-end">
+                        <label className="grid gap-1 text-sm font-medium text-content-body">
+                            ไฟล์ Excel (.xls หรือ .xlsx)
+                            <Input
+                                ref={inputRef}
+                                type="file"
+                                accept=".xls,.xlsx,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                                onChange={(event) => {
+                                    setFile(event.target.files?.[0] ?? null);
+                                    setError(null);
+                                }}
+                            />
+                        </label>
+                        <Button
+                            type="button"
+                            onClick={() => void upload()}
+                            disabled={!file || uploading}
+                        >
+                            {uploading ? (
+                                "กำลังอ่านไฟล์..."
+                            ) : (
+                                <>
+                                    <UploadCloud /> อัปโหลดและดูตัวอย่าง
+                                </>
+                            )}
+                        </Button>
+                    </div>
+                    <p className="mt-3 text-sm leading-6 text-content-secondary">
+                        ขนาดไฟล์ไม่เกิน 10 MB · ไม่ประเมินสูตรหรือ macro ·
+                        ข้อมูลจริงจะยังไม่ถูกสร้างจนกว่าจะกดยืนยัน
+                    </p>
+                </div>
+                {error ? (
+                    <p
+                        className="rounded-lg border border-status-danger-border bg-status-danger-surface px-4 py-3 text-sm text-status-danger-foreground"
+                        role="alert"
+                    >
+                        {error}
+                    </p>
+                ) : null}
+            </div>
+        );
+    }
+
+    if (loading && !batch)
+        return <LoadingState label="กำลังโหลดตัวอย่างข้อมูลนำเข้า..." />;
+    if (error && !batch)
+        return (
+            <ErrorState
+                action={{
+                    label: "ลองใหม่",
+                    onClick: () => void loadBatch(),
+                    icon: <RefreshCw />,
+                }}
+                description={error}
+            />
+        );
+    if (!batch) return null;
+
+    const batchEditable = isEditableBatchStatus(batch.status);
+    const completedWithReviewRows =
+        batch.status === "COMPLETED" && batch.reviewRows > 0;
+    const readOnlyReason = batchEditable
+        ? applying
+            ? "กำลังนำเข้าข้อมูล จึงยังแก้ไขแถวไม่ได้"
+            : undefined
+        : batch.errorMessage
+            ? `${batchReadOnlyReason(batch.status)} เหตุผล: ${batch.errorMessage}`
+            : batchReadOnlyReason(batch.status);
+    const applyDisabledReason = !batchEditable
+        ? readOnlyReason
+        : applying
+            ? "กำลังนำเข้าข้อมูล..."
+            : batch.selectedRows !== batch.selectedValidRows
+                ? "กรุณาแก้ไขรายการที่ต้องตรวจสอบ หรือยกเลิกการเลือกแถวนั้นก่อนนำเข้า"
+                : batch.selectedValidRows === 0
+                    ? "กรุณาเลือกแถวที่พร้อมนำเข้าอย่างน้อย 1 รายการ"
+                    : undefined;
+
+    return (
+        <div className="space-y-5">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                    <h3 className="text-xl font-semibold tracking-tight text-brand-strong">
+                        ตัวอย่างการนำเข้า · ชีต {ROUTINE_IMPORT_TARGET_SHEET}
+                    </h3>
+                    <p className="mt-1 text-sm leading-6 text-content-secondary">
+                        {batch.originalFileName} · hash {batch.fileHashPrefix} ·
+                        อ้างอิงวันที่ {formatDate(batch.asOfDate)}
+                    </p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                    <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => void loadBatch()}
+                        disabled={loading || applying}
+                    >
+                        <RefreshCw /> รีเฟรช
+                    </Button>
+                    {batch.status === "READY" || batch.status === "PREVIEW" ? (
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => void cancelBatch()}
+                            disabled={applying}
+                        >
+                            <Trash2 /> ยกเลิกชุดนี้
+                        </Button>
+                    ) : null}
+                    <Button
+                        type="button"
+                        variant="outline"
+                        onClick={reset}
+                        disabled={applying}
+                    >
+                        อัปโหลดไฟล์ใหม่
+                    </Button>
+                </div>
+            </div>
+
+            <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
+                    <SummaryItem label="อ่านได้ทั้งหมด" value={batch.totalRows} />
+                    <SummaryItem
+                        label="พร้อมนำเข้า"
+                        value={batch.validRows}
+                        tone="success"
+                    />
+                    <SummaryItem
+                        label="ต้อง map ผู้รับผิดชอบ"
+                        value={batch.unresolvedOwnerRows}
+                        tone="warning"
+                    />
+                    <SummaryItem
+                        label="เลือกไว้สำหรับนำเข้า"
+                        value={batch.selectedRows}
+                        tone="success"
+                    />
+                </div>
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
+                    <SummaryItem
+                        label="เคยนำเข้าแล้ว"
+                        value={batch.alreadyImportedRows}
+                        priority="secondary"
+                    />
+                    <SummaryItem
+                        label="ข้อมูลขัดแย้ง"
+                        value={batch.conflictRows}
+                        tone="danger"
+                        priority="secondary"
+                    />
+                    <SummaryItem label="ข้าม" value={batch.excludedRows} priority="secondary" />
+                </div>
+            </div>
+
+            {batch.ignoredSheetNames.length > 0 ? (
+                <div className="rounded-lg border border-status-warning-border bg-status-warning-surface px-4 py-3 text-sm leading-6 text-status-warning-foreground">
+                    <p className="font-semibold">ชีตที่พบแต่ยังไม่เปิดใช้งาน</p>
+                    <p className="mt-1">
+                        {batch.ignoredSheetNames.join(" · ")}
+                    </p>
+                </div>
+            ) : null}
+            {error ? (
+                <p
+                    className="rounded-lg border border-status-danger-border bg-status-danger-surface px-4 py-3 text-sm leading-6 text-status-danger-foreground"
+                    role="alert"
+                >
+                    {error}
+                </p>
+            ) : null}
+            {completedWithReviewRows ? (
+                <div
+                    className="flex items-start gap-3 rounded-lg border border-status-warning-border bg-status-warning-surface px-4 py-3 text-sm leading-6 text-status-warning-foreground"
+                    role="status"
+                >
+                    <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0" />
+                    <div className="min-w-0 flex-1">
+                        <p className="font-semibold">
+                            นำเข้ารายการที่พร้อมแล้ว แต่ยังมีรายการต้อง map
+                        </p>
+                        <p className="mt-1">
+                            สร้างรายการ Routine แล้ว {batch.appliedRows} รายการ
+                            และยังเหลือ {batch.reviewRows} รายการที่ต้องตรวจสอบ
+                            ชุดเดิมปิดแล้วจึงแก้ไขต่อไม่ได้
+                        </p>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="mt-3"
+                            onClick={reset}
+                        >
+                            <UploadCloud /> อัปโหลดไฟล์เดิมเพื่อ map ต่อ
+                        </Button>
+                    </div>
+                </div>
+            ) : batch.status === "COMPLETED" ? (
+                <div className="flex items-start gap-3 rounded-lg border border-status-success-border bg-status-success-surface px-4 py-3 text-sm leading-6 text-status-success-foreground">
+                    <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0" />
+                    <div>
+                        <p className="font-semibold">
+                            นำเข้าชุดข้อมูลนี้เสร็จแล้ว
+                        </p>
+                        <p className="mt-1">
+                            สร้างรายการ Routine แล้ว {batch.appliedRows} รายการ
+                        </p>
+                    </div>
+                </div>
+            ) : null}
+            {!batchEditable && !completedWithReviewRows ? (
+                <div
+                    className="rounded-lg border border-status-warning-border bg-status-warning-surface px-4 py-3 text-sm leading-6 text-status-warning-foreground"
+                    role="status"
+                >
+                    {readOnlyReason}
+                </div>
+            ) : null}
+            {referenceError ? (
+                <div
+                    className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-status-danger-border bg-status-danger-surface px-4 py-3 text-sm leading-6 text-status-danger-foreground"
+                    role="alert"
+                >
+                    <span>
+                        โหลดข้อมูลอ้างอิงสำหรับนำเข้าไม่สำเร็จ: {referenceError}
+                    </span>
+                    <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                            if (currentReferenceBatchKey) {
+                                void loadReference(currentReferenceBatchKey);
+                            }
+                        }}
+                        disabled={referenceLoading || !currentReferenceBatchKey}
+                    >
+                        <RefreshCw /> ลองโหลดข้อมูลอ้างอิงใหม่
+                    </Button>
+                </div>
+            ) : null}
+
+            <div className="grid gap-4 rounded-xl border border-brand-border/70 bg-transparent p-4 sm:p-5 lg:grid-cols-[minmax(0,1fr)_180px_220px_auto_auto] lg:items-end">
+                <div className="grid gap-1 text-sm font-medium text-brand-strong">
+                    <label htmlFor="routine-import-search">ค้นหา</label>
+                    <div className="relative">
+                        <Input
+                            id="routine-import-search"
+                            type="search"
+                            value={searchInput}
+                            onChange={(event) => {
+                                setSearchInput(event.target.value);
+                                setPage(1);
+                            }}
+                            className="pr-12 sm:pr-10 [&::-webkit-search-cancel-button]:appearance-none"
+                            placeholder="รายการ หมวดงาน หรือผู้รับผิดชอบ"
+                        />
+                        {searchInput.trim().length > 0 ? (
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => {
+                                    setSearchInput("");
+                                    setPage(1);
+                                }}
+                                className="absolute right-1.5 top-1/2 size-11 -translate-y-1/2 rounded-md text-content-muted hover:bg-surface-muted hover:text-content-body sm:size-7"
+                                aria-label="ล้างคำค้นหารายการนำเข้า"
+                            >
+                                <X className="size-4" aria-hidden="true" />
+                            </Button>
+                        ) : null}
+                    </div>
+                </div>
+                <label className="grid gap-1 text-sm font-medium text-brand-strong">
+                    สถานะ
+                    <select
+                        className="h-11 rounded-md border border-brand-border bg-surface-raised px-3 text-sm focus-visible:border-brand-solid focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-solid/40"
+                        value={filter}
+                        onChange={(event) => {
+                            setFilter(event.target.value as ImportFilter);
+                            setPage(1);
+                        }}
+                    >
+                        <option value="">ทุกสถานะ</option>
+                        {Object.entries(STATUS_LABELS).map(([value, label]) => (
+                            <option key={value} value={value}>
+                                {label}
+                            </option>
+                        ))}
+                    </select>
+                </label>
+                <label className="grid gap-1 text-sm font-medium text-brand-strong">
+                    ประเด็น
+                    <select
+                        className="h-11 rounded-md border border-brand-border bg-surface-raised px-3 text-sm focus-visible:border-brand-solid focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-solid/40"
+                        value={issue}
+                        onChange={(event) => {
+                            setIssue(event.target.value as ImportIssue);
+                            setPage(1);
+                        }}
+                    >
+                        <option value="">ทุกประเด็น</option>
+                        <option value="UNRESOLVED_OWNER">
+                            ไม่มีผู้รับผิดชอบ / ยัง map ไม่ได้
+                        </option>
+                    </select>
+                </label>
+                <label className="flex h-11 items-center gap-2 text-sm font-medium text-brand-strong">
+                    <input
+                        type="checkbox"
+                        checked={selectedOnly}
+                        onChange={(event) => {
+                            setSelectedOnly(event.target.checked);
+                            setPage(1);
+                        }}
+                    />{" "}
+                    เฉพาะที่เลือก
+                </label>
+                <p className="text-sm leading-6 text-content-secondary">
+                    ผู้รับผิดชอบระบบ: {batch.uploadedBy.name}
+                </p>
+            </div>
+
+            {loading ? (
+                <RoutineImportRowsSkeleton />
+            ) : rowsPage && rowsPage.rows.length === 0 ? (
+                <EmptyState
+                    compact
+                    title="ไม่พบแถวตามตัวกรอง"
+                    description="ลองเปลี่ยนตัวกรองหรือค้นหาคำอื่น"
+                />
+            ) : rowsPage ? (
+                <div className="overflow-hidden rounded-xl border border-brand-border/70 bg-surface-raised">
+                    <div className="overflow-x-auto">
+                        <table className="w-full min-w-[1100px] text-sm" aria-label="รายการตัวอย่างนำเข้า">
+                            <thead className="bg-brand-surface text-left text-sm text-brand-strong">
+                                <tr>
+                                    <th className="w-12 px-4 py-3 font-semibold">
+                                        เลือก
+                                    </th>
+                                    <th className="px-4 py-3 font-semibold">
+                                        แถว
+                                    </th>
+                                    <th className="px-4 py-3 font-semibold">
+                                        หมวด / รายการ
+                                    </th>
+                                    <th className="px-4 py-3 font-semibold">
+                                        ผู้รับผิดชอบ
+                                    </th>
+                                    <th className="px-4 py-3 font-semibold">
+                                        กำหนดการ
+                                    </th>
+                                    <th className="px-4 py-3 font-semibold">
+                                        สัญญา
+                                    </th>
+                                    <th className="px-4 py-3 font-semibold">
+                                        สถานะ
+                                    </th>
+                                    <th className="sticky right-0 z-20 whitespace-nowrap border-l border-brand-border/70 bg-brand-surface px-4 py-3 font-semibold employee-table-sticky-shadow">
+                                        จัดการ
+                                    </th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {rowsPage.rows.map((row) => {
+                                    const terminal =
+                                        row.status === "ALREADY_IMPORTED" ||
+                                        row.status === "CONFLICT" ||
+                                        row.status === "APPLIED";
+                                    const editDisabled =
+                                        terminal || !batchEditable || applying;
+                                    const openingEditor =
+                                        editorRow?.id === row.id &&
+                                        !referenceReady &&
+                                        referenceLoading;
+                                    return (
+                                        <tr
+                                            key={row.id}
+                                            className="border-t border-border-subtle align-top"
+                                        >
+                                            <td className="px-4 py-4">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={row.selected}
+                                                    disabled={
+                                                        terminal ||
+                                                        !batchEditable ||
+                                                        row.status ===
+                                                            "REQUIRES_REVIEW" ||
+                                                        applying
+                                                    }
+                                                    onChange={(event) =>
+                                                        void updateSelection(
+                                                            row,
+                                                            event.target
+                                                                .checked,
+                                                        )
+                                                    }
+                                                    aria-label={`เลือกแถว ${row.sourceRow}`}
+                                                />
+                                            </td>
+                                            <td className="px-4 py-4 text-content-secondary">
+                                                {row.sourceRow}
+                                            </td>
+                                            <td className="max-w-xs px-4 py-4">
+                                                <p className="text-base font-semibold leading-6 text-content-heading">
+                                                    {row.data.title}
+                                                </p>
+                                                <p className="mt-1 text-sm text-content-secondary">
+                                                    {row.data.categoryName ||
+                                                        "ไม่มีหมวด"}
+                                                </p>
+                                            </td>
+                                            <td className="max-w-xs px-4 py-4">
+                                                <p className="text-sm leading-6 text-content-body">
+                                                    {row.data.ownerNames.join(
+                                                        ", ",
+                                                    ) || "ไม่พบชื่อ"}
+                                                </p>
+                                                <p className="mt-1 text-sm text-content-secondary">
+                                                    {row.data.mappedEmployeeNames.join(
+                                                        ", ",
+                                                    ) || "ยังไม่ map"}
+                                                </p>
+                                            </td>
+                                            <td className="max-w-xs px-4 py-4">
+                                                <p className="text-sm text-content-secondary">
+                                                    {row.data.scheduleText ||
+                                                        "-"}
+                                                </p>
+                                                <p className="mt-1 break-all text-sm text-content-body">
+                                                    {scheduleLabel(row)}
+                                                </p>
+                                            </td>
+                                            <td className="max-w-xs px-4 py-4">
+                                                <p className="text-sm text-content-body">
+                                                    {row.data.contractText ||
+                                                        "-"}
+                                                </p>
+                                                <p className="mt-1 text-sm text-content-secondary">
+                                                    {formatDate(
+                                                        row.data
+                                                            .contractStartDate,
+                                                    )}{" "}
+                                                    –{" "}
+                                                    {formatDate(
+                                                        row.data
+                                                            .contractEndDate,
+                                                    )}
+                                                </p>
+                                            </td>
+                                            <td className="px-4 py-4">
+                                                <Badge
+                                                    variant="outline"
+                                                    className={
+                                                        `whitespace-nowrap [overflow-wrap:normal] ${STATUS_CLASSES[
+                                                            row.status
+                                                        ]}`
+                                                    }
+                                                >
+                                                    {rowStatusLabel(row)}
+                                                </Badge>
+                                                {row.reviewReasons.length >
+                                                0 ? (
+                                                    <ul className="mt-2 max-w-52 space-y-1 text-sm text-status-warning-foreground">
+                                                        {row.reviewReasons
+                                                            .slice(0, 2)
+                                                            .map((reason) => (
+                                                                <li
+                                                                    key={reason}
+                                                                >
+                                                                    •{" "}
+                                                                    {reviewLabel(
+                                                                        reason,
+                                                                    )}
+                                                                </li>
+                                                            ))}
+                                                    </ul>
+                                                ) : null}
+                                            </td>
+                                            <td className="sticky right-0 z-10 whitespace-nowrap border-l border-border-subtle bg-surface-raised px-4 py-4 employee-table-sticky-shadow">
+                                                <Button
+                                                    type="button"
+                                                    variant={
+                                                        row.status === "REQUIRES_REVIEW"
+                                                            ? "default"
+                                                            : "outline"
+                                                    }
+                                                    size="sm"
+                                                    disabled={editDisabled}
+                                                    aria-busy={openingEditor}
+                                                    aria-label={openingEditor ? "กำลังเปิดตัวแก้ไข..." : "แก้ไขและ map ผู้รับผิดชอบ"}
+                                                    title={
+                                                        terminal
+                                                            ? `แถวนี้อยู่ในสถานะ “${rowStatusLabel(row)}” จึงแก้ไขไม่ได้`
+                                                            : !batchEditable || applying
+                                                            ? readOnlyReason
+                                                            : "ตรวจสอบและแก้ไขข้อมูลและ map ผู้รับผิดชอบ"
+                                                    }
+                                                    onClick={() => {
+                                                        setEditorRow(row);
+                                                        if (!referenceReady && currentReferenceBatchKey) {
+                                                            void loadReference(currentReferenceBatchKey);
+                                                        }
+                                                    }}
+                                                >
+                                                    {openingEditor ? (
+                                                        <>
+                                                            <RefreshCw className="animate-spin" />
+                                                            กำลังเปิดตัวแก้ไข...
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <Pencil /> ตรวจสอบและแก้ไข
+                                                        </>
+                                                    )}
+                                                </Button>
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    </div>
+                    {currentPage ? (
+                        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-brand-border/70 px-4 py-3 text-sm">
+                            <span className="text-content-secondary">
+                                หน้า {currentPage.page} / {currentPage.pages} ·
+                                ทั้งหมด {currentPage.total} แถว
+                            </span>
+                            <div className="flex gap-2">
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    disabled={currentPage.page <= 1 || loading}
+                                    onClick={() =>
+                                        setPage((value) => value - 1)
+                                    }
+                                >
+                                    ก่อนหน้า
+                                </Button>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    disabled={
+                                        currentPage.page >= currentPage.pages ||
+                                        loading
+                                    }
+                                    onClick={() =>
+                                        setPage((value) => value + 1)
+                                    }
+                                >
+                                    ถัดไป
+                                </Button>
+                            </div>
+                        </div>
+                    ) : null}
+                </div>
+            ) : null}
+
+            <div className="sticky bottom-3 z-10 flex flex-col gap-3 rounded-xl border border-brand-border/70 bg-brand-surface p-4 shadow-md sm:flex-row sm:items-center sm:justify-between">
+                <div className="text-sm">
+                    <p className="text-base font-semibold text-brand-strong">
+                        เลือกไว้สำหรับนำเข้า {batch.selectedRows} รายการ
+                    </p>
+                    <p className="mt-1 text-sm leading-6 text-content-secondary">
+                        พร้อมนำเข้า {batch.validRows} · ยังต้องตรวจสอบ{" "}
+                        {batch.reviewRows} · ข้าม {batch.excludedRows}
+                    </p>
+                    {batchEditable && !canApply && applyDisabledReason ? (
+                        <p
+                            className="mt-2 text-sm font-medium text-status-warning-foreground"
+                            role="status"
+                        >
+                            {applyDisabledReason}
+                        </p>
+                    ) : null}
+                </div>
+                <Button
+                    type="button"
+                    onClick={() => setConfirmOpen(true)}
+                    disabled={!canApply}
+                    title={applyDisabledReason}
+                >
+                    <Check /> ยืนยันและนำเข้า
+                </Button>
+            </div>
+
+            {referenceReady && reference ? (
+                <RoutineImportRowEditor
+                    batchId={batch.id}
+                    row={editorRow}
+                    reference={reference}
+                    open={editorRow !== null}
+                    disabled={!batchEditable || applying}
+                    readOnlyReason={readOnlyReason}
+                    onOpenChange={(open) => {
+                        if (!open) setEditorRow(null);
+                    }}
+                    onSaved={(savedRow) => {
+                        setEditorRow(savedRow);
+                        void loadBatch();
+                        if (
+                            hasReferenceReviewReason(savedRow)
+                            && currentReferenceBatchKey
+                        ) {
+                            void loadReference(currentReferenceBatchKey);
+                        }
+                    }}
+                    onConflict={async () => {
+                        setEditorRow(null);
+                        await Promise.all([
+                            loadBatch(),
+                            currentReferenceBatchKey
+                                ? loadReference(currentReferenceBatchKey)
+                                : Promise.resolve(),
+                        ]);
+                    }}
+                />
+            ) : null}
+
+            <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>
+                            ยืนยันการนำเข้าข้อมูล
+                        </AlertDialogTitle>
+                        <AlertDialogDescription>
+                            กำลังจะนำเข้าข้อมูลจากชีต{" "}
+                            {ROUTINE_IMPORT_TARGET_SHEET}
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <div className="rounded-lg border border-brand-border/70 bg-brand-surface p-4 text-sm text-content-body">
+                        <p>
+                            รายการที่เลือก:{" "}
+                            <strong>{batch.selectedRows}</strong>
+                        </p>
+                        <p>
+                            พร้อมนำเข้า: <strong>{batch.validRows}</strong>
+                        </p>
+                        <p>
+                            ยัง map ผู้รับผิดชอบไม่ครบ:{" "}
+                            <strong>{batch.unresolvedOwnerRows}</strong>
+                        </p>
+                        <p>
+                            ข้าม: <strong>{batch.excludedRows}</strong>
+                        </p>
+                    </div>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel disabled={applying}>
+                            กลับไปตรวจสอบ
+                        </AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={(event) => {
+                                event.preventDefault();
+                                void apply();
+                            }}
+                            disabled={applying}
+                        >
+                            ยืนยันการนำเข้า
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+        </div>
+    );
+}

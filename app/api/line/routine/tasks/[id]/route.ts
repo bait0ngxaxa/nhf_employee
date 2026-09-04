@@ -3,27 +3,27 @@ import { type NextRequest, NextResponse } from "next/server";
 import { requireLiffWorkforceSession } from "@/lib/auth/liff";
 import {
     serializeLiffRoutineTaskDetail,
-} from "@/lib/server/line-routine-api";
-import { createRoutineCommandActor } from "@/lib/server/routine-command-actor";
+} from "@/modules/routine";
+import { createRoutineCommandActor } from "@/modules/routine";
 import {
     readRoutineJsonBody,
     routineErrorResponse,
     routineFeatureGuard,
     routineRequestSizeGuard,
-} from "@/lib/server/routine-api";
+} from "@/modules/routine";
 import { enforceAuthenticatedMutationRateLimit } from "@/lib/security/mutation-rate-limit";
 import {
     deleteRoutineTask,
     getLiffRoutineTaskById,
     updateRoutineTask,
-} from "@/lib/services/routine";
+} from "@/modules/routine";
 import {
     liffRoutineTaskUpdateSchema,
-} from "@/lib/validations/line-routine";
+} from "@/modules/routine";
 import {
     routineIdParamSchema,
     type RoutineTaskUpdateInput,
-} from "@/lib/validations/routine";
+} from "@/modules/routine";
 
 interface RouteContext {
     params: Promise<{ id: string }>;

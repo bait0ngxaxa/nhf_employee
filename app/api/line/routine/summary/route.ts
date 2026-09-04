@@ -1,12 +1,12 @@
 import { type NextRequest, NextResponse } from "next/server";
 
 import { requireLiffWorkforceSession } from "@/lib/auth/liff";
-import { createRoutineCommandActor } from "@/lib/server/routine-command-actor";
+import { createRoutineCommandActor } from "@/modules/routine";
 import {
     routineErrorResponse,
     routineFeatureGuard,
-} from "@/lib/server/routine-api";
-import { getRoutineSummary } from "@/lib/services/routine";
+} from "@/modules/routine";
+import { getRoutineSummary } from "@/modules/routine";
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
     const featureResponse = routineFeatureGuard("liff");

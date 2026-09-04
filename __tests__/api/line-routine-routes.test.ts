@@ -16,7 +16,8 @@ vi.mock("@/lib/auth/liff", () => ({
     requireLiffWorkforceSession: requireLiffWorkforceSessionMock,
 }));
 
-vi.mock("@/lib/services/routine", () => ({
+vi.mock("@/modules/routine", async (importOriginal) => ({
+    ...(await importOriginal()),
     getRoutineTaskWorkItems: getRoutineTaskWorkItemsMock,
     getRoutineSummary: getRoutineSummaryMock,
 }));

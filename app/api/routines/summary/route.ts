@@ -1,13 +1,13 @@
 import { type NextRequest, NextResponse } from "next/server";
 
 import { requireActiveWorkforceOrAdminSession } from "@/lib/auth/workforce";
-import { createRoutineCommandActor } from "@/lib/server/routine-command-actor";
+import { createRoutineCommandActor } from "@/modules/routine";
 import {
     routineErrorResponse,
     routineFeatureGuard,
-} from "@/lib/server/routine-api";
-import { getRoutineSummary } from "@/lib/services/routine";
-import { routineSummaryQuerySchema } from "@/lib/validations/routine";
+} from "@/modules/routine";
+import { getRoutineSummary } from "@/modules/routine";
+import { routineSummaryQuerySchema } from "@/modules/routine";
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
     const featureResponse = routineFeatureGuard();

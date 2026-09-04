@@ -4,12 +4,12 @@ import { requireAdminSession } from "@/lib/auth/api";
 import {
     routineErrorResponse,
     routineFeatureGuard,
-} from "@/lib/server/routine-api";
-import { getRoutineImportRows } from "@/lib/services/routine-import";
+} from "@/modules/routine";
+import { getRoutineImportRows } from "@/modules/routine";
 import {
     routineImportBatchIdSchema,
     routineImportRowsQuerySchema,
-} from "@/lib/validations/routine-import";
+} from "@/modules/routine";
 
 export async function GET(
     request: NextRequest,

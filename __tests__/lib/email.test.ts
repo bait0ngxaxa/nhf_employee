@@ -4,7 +4,6 @@ import {
     sendLeaveCancelledAfterApprovalNotification,
     sendLeaveActionNotification,
     sendLeaveNotTakenConfirmedNotification,
-    sendRoutineReminderNotification,
     sendStockRequestResultNotification,
 } from "@/lib/email";
 import type { StockRequestResultEmailPayload } from "@/modules/stock";
@@ -247,42 +246,6 @@ describe("Email Service", () => {
             }));
             expect(sendMailMock.mock.calls.at(-1)?.[0].html).toContain(
                 "ไม่ได้ระบุเหตุผล",
-            );
-        });
-    });
-
-    describe("sendRoutineReminderNotification", () => {
-        it("sends an escaped HTML/text reminder with a deterministic Message-ID", async () => {
-            const data = {
-                to: "user@example.com",
-                recipientName: "ผู้รับการแจ้งเตือน",
-                taskTitle: "งาน <ทดสอบ>\n",
-                unitName: "หน่วยงาน",
-                categoryName: "หมวดหมู่",
-                dueDate: "2026-08-05",
-                daysBefore: 2,
-                actionUrl: "/dashboard/routine?taskId=71&occurrenceId=91",
-                occurrenceId: 91,
-                ruleId: 31,
-                userId: 17,
-                reminderVersion: 2,
-            };
-
-            await sendRoutineReminderNotification(data);
-            await sendRoutineReminderNotification(data);
-
-            expect(sendMailMock).toHaveBeenCalledWith(expect.objectContaining({
-                from: '"ระบบ NHF Routine" <user>',
-                to: "user@example.com",
-                subject: "[NHF Routine] งานใกล้ถึงกำหนด: งาน <ทดสอบ>",
-                messageId: "<nhf-routine-91-rule-31-user-17-v2@notifications.thainhf.org>",
-                html: expect.stringContaining("งาน &lt;ทดสอบ&gt;"),
-                text: expect.stringContaining(
-                    "ดูรายการ Routine: http://localhost:3000/dashboard/routine?taskId=71&occurrenceId=91",
-                ),
-            }));
-            expect(sendMailMock.mock.calls[0]?.[0].messageId).toBe(
-                sendMailMock.mock.calls[1]?.[0].messageId,
             );
         });
     });

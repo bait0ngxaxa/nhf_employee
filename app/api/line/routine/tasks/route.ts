@@ -1,29 +1,29 @@
 import { type NextRequest, NextResponse } from "next/server";
 
 import { requireLiffWorkforceSession } from "@/lib/auth/liff";
-import { createRoutineCommandActor } from "@/lib/server/routine-command-actor";
+import { createRoutineCommandActor } from "@/modules/routine";
 import {
     serializeLiffRoutineTaskDetail,
     serializeLiffRoutineTasks,
-} from "@/lib/server/line-routine-api";
+} from "@/modules/routine";
 import {
     routineErrorResponse,
     routineFeatureGuard,
     routineRequestSizeGuard,
     readRoutineJsonBody,
-} from "@/lib/server/routine-api";
+} from "@/modules/routine";
 import { enforceAuthenticatedMutationRateLimit } from "@/lib/security/mutation-rate-limit";
 import {
     createRoutineTask,
     getLiffRoutineTaskById,
     getRoutineTaskWorkItems,
-} from "@/lib/services/routine";
+} from "@/modules/routine";
 import { idempotencyKeySchema } from "@/lib/validations/idempotency";
 import {
     liffRoutineTaskCreateSchema,
     liffRoutineTaskQuerySchema,
-} from "@/lib/validations/line-routine";
-import type { RoutineTaskCreateInput } from "@/lib/validations/routine";
+} from "@/modules/routine";
+import type { RoutineTaskCreateInput } from "@/modules/routine";
 
 type LiffSession = Extract<
     Awaited<ReturnType<typeof requireLiffWorkforceSession>>,

@@ -143,7 +143,7 @@ Dashboard modules use canonical App Router paths; do not add new
 presentation must use an explicit `/client` public entry point instead of a
 server-oriented module barrel.
 
-* สถานะปัจจุบันเป็นการวาง foundation เท่านั้น: โค้ด Stock, Routine, Leave,
+* สถานะปัจจุบัน: โค้ด Stock และ Routine อยู่ใน feature modules แล้ว ส่วน Leave,
   Employee และ business module เดิมยังอยู่ที่เดิมและต้องทำงานเหมือนเดิม
 * งาน business feature ใหม่ที่มีสาระสำคัญให้เริ่มที่ `modules/<feature>/`
   และเปิดเผย contract ที่ตั้งใจรองรับผ่าน `modules/<feature>/index.ts`
@@ -152,6 +152,9 @@ server-oriented module barrel.
   เท่านั้น
 * ห้าม import internal path ของ module อื่น และห้ามให้ `shared/**` depend on
   business module; ห้ามใช้ deep import เป็น public API โดยปริยาย
+* Business modules may enqueue outbox work but must never import or execute the
+  global Outbox Processor; dispatch remains owned by the delivery/composition
+  layer.
 * `shared/` มีไว้สำหรับ capability ที่ cross-domain/platform จริงเท่านั้น
   เช่น auth, db, http, security, audit, notification delivery, uploads,
   network และ generic UI primitives ห้ามย้าย feature-specific business rule

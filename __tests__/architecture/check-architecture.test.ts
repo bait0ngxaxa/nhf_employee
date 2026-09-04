@@ -14,6 +14,7 @@ const fixtureFiles: FixtureFiles = {
     "modules/stock/domain/inventory.ts": "export const x = 1;\n",
     "modules/routine/index.ts": "export const x = 1;\n",
     "modules/routine/application/example.ts": "export const x = 1;\n",
+    "modules/future/index.ts": "export const x = 1;\n",
     "shared/index.ts": "export const x = 1;\n",
 };
 
@@ -178,15 +179,18 @@ describe("architecture checker module boundaries", () => {
         );
     });
 
-    it("rejects Stock importing the global Outbox Processor", async () => {
-        const result = await checkFixture(
-            "modules/stock/application/requests/example.ts",
-            'import { processOutbox } from "@/lib/services/outbox/processor";\n',
-        );
+    it.each(["stock", "routine", "future"])(
+        "rejects %s importing the global Outbox Processor",
+        async (moduleName) => {
+            const result = await checkFixture(
+                `modules/${moduleName}/application/requests/example.ts`,
+                'import { processOutbox } from "@/lib/services/outbox/processor";\n',
+            );
 
-        expect(result.violations).toHaveLength(1);
-        expect(result.violations[0]).toContain(
-            "Stock must not depend on the global Outbox Processor",
-        );
-    });
+            expect(result.violations).toHaveLength(1);
+            expect(result.violations[0]).toContain(
+                "Business modules must not depend on the global Outbox Processor",
+            );
+        },
+    );
 });

@@ -142,10 +142,9 @@ function getArchitectureTarget(specifier, importerPath, rootPath, modulesRoot, s
 function getModuleDependencyViolation(owner, moduleSpecifier) {
     if (
         owner.kind === "module"
-        && owner.name === "stock"
         && moduleSpecifier === "@/lib/services/outbox/processor"
     ) {
-        return "Stock must not depend on the global Outbox Processor; schedule it from the delivery/composition layer.";
+        return "Business modules must not depend on the global Outbox Processor; schedule it from the delivery/composition layer.";
     }
 
     return null;

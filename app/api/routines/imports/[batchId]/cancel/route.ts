@@ -1,15 +1,15 @@
 import { type NextRequest, NextResponse } from "next/server";
 
 import { requireAdminSession } from "@/lib/auth/api";
-import { createRoutineCommandActor } from "@/lib/server/routine-command-actor";
+import { createRoutineCommandActor } from "@/modules/routine";
 import { enforceAuthenticatedMutationRateLimit } from "@/lib/security/mutation-rate-limit";
 import {
     routineErrorResponse,
     routineFeatureGuard,
     routineRequestSizeGuard,
-} from "@/lib/server/routine-api";
-import { cancelRoutineImportBatch } from "@/lib/services/routine-import";
-import { routineImportBatchIdSchema } from "@/lib/validations/routine-import";
+} from "@/modules/routine";
+import { cancelRoutineImportBatch } from "@/modules/routine";
+import { routineImportBatchIdSchema } from "@/modules/routine";
 
 export async function POST(
     request: NextRequest,

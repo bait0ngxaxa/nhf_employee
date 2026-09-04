@@ -1,13 +1,13 @@
 import { type NextRequest, NextResponse } from "next/server";
 
 import { requireLiffWorkforceSession } from "@/lib/auth/liff";
-import { serializeLiffRoutineReference } from "@/lib/server/line-routine-api";
-import { createRoutineCommandActor } from "@/lib/server/routine-command-actor";
+import { serializeLiffRoutineReference } from "@/modules/routine";
+import { createRoutineCommandActor } from "@/modules/routine";
 import {
     routineErrorResponse,
     routineFeatureGuard,
-} from "@/lib/server/routine-api";
-import { getRoutineReferenceData } from "@/lib/services/routine";
+} from "@/modules/routine";
+import { getRoutineReferenceData } from "@/modules/routine";
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
     const featureResponse = routineFeatureGuard("liff");

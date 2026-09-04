@@ -32,8 +32,10 @@ import {
     isSharedDriveOption,
     type SharedDriveOption,
 } from "@/constants/email-request";
-import { dispatchRoutineReminderOutbox } from "@/lib/services/routine/reminders";
-import { dispatchRoutineContractExpiryOutbox } from "@/lib/services/routine/contract-reminders";
+import {
+    dispatchRoutineReminderOutbox,
+    dispatchRoutineContractExpiryOutbox,
+} from "@/modules/routine";
 import {
     MAX_OUTBOX_ATTEMPTS,
     OUTBOX_RETRY_BASE_DELAY_MS,

@@ -1,7 +1,8 @@
 # Dependency rules and enforcement
 
-Status: Phase A baseline. These rules govern new architecture code while
-legacy code remains compatible during incremental migration.
+Status: Phase D guardrails extend the Phase A baseline. These rules govern new
+architecture code while legacy code remains compatible during incremental
+migration.
 
 ## Direction
 
@@ -58,9 +59,10 @@ import { something } from "@/modules/stock/application/create-item";
 import { something } from "../../stock/infrastructure/repository";
 ```
 
-Stock application code may persist outbox records as part of its transaction,
-but it must not import the global Outbox Processor. Waking or scheduling that
-processor belongs to the delivery/composition layer.
+Business-module application code may persist or enqueue outbox records as part
+of its transaction, but any `modules/**` code must not import the global Outbox
+Processor. Waking or scheduling that processor belongs to the
+delivery/composition layer.
 
 Feature internals are private by ownership even when TypeScript can resolve the
 path. External consumers and other modules must use exactly one of the target
@@ -134,7 +136,7 @@ the module boundary from a legacy directory, while imports unrelated to
 | Check | Scope | Behavior |
 | --- | --- | --- |
 | ESLint `no-restricted-imports` | `shared/**/*.{js,jsx,ts,tsx}` | Rejects imports from `modules/` so a shared capability cannot acquire a business dependency |
-| `npm run architecture:check` | Repository source files, excluding dependency, build, coverage, and generated directories | Uses the installed TypeScript parser to inspect imports, re-exports, type imports, dynamic imports, and `require()` calls; allows only `@/modules/<feature>` and `@/modules/<feature>/client` as module public entries; rejects `shared -> modules`, external consumers deep-importing module internals, cross-module deep imports, including relative paths, and Stock importing the global Outbox Processor |
+| `npm run architecture:check` | Repository source files, excluding dependency, build, coverage, and generated directories | Uses the installed TypeScript parser to inspect imports, re-exports, type imports, dynamic imports, and `require()` calls; allows only `@/modules/<feature>` and `@/modules/<feature>/client` as module public entries; rejects `shared -> modules`, external consumers deep-importing module internals, cross-module deep imports, including relative paths, and any business module importing the global Outbox Processor |
 | Client/server policy | Legacy and new code | The migrated Stock client entry is explicit and client-safe; broader legacy client/server migration remains incremental |
 | Route-level Prisma policy | Legacy and new code | Documentation-led in Phase A for the existing route exceptions; new module infrastructure remains the intended boundary |
 

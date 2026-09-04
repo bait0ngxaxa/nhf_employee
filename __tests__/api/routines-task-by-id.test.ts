@@ -1,24 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const mocks = vi.hoisted(() => {
-    class MockRoutineServiceError extends Error {
-        readonly statusCode: number;
-
-        constructor(message: string, statusCode: number) {
-            super(message);
-            this.statusCode = statusCode;
-        }
-    }
-
-    return {
+const mocks = vi.hoisted(() => ({
         requireActiveWorkforceOrAdminSession: vi.fn(),
         deleteTask: vi.fn(),
         getTask: vi.fn(),
         updateTask: vi.fn(),
-        RoutineServiceError: MockRoutineServiceError,
-    };
-});
+}));
 
 vi.mock("@/lib/auth/api", () => ({
     requireAdminSession: vi.fn(),
@@ -28,8 +16,8 @@ vi.mock("@/lib/auth/workforce", () => ({
     requireActiveWorkforceOrAdminSession: mocks.requireActiveWorkforceOrAdminSession,
 }));
 
-vi.mock("@/lib/services/routine", () => ({
-    RoutineServiceError: mocks.RoutineServiceError,
+vi.mock("@/modules/routine", async (importOriginal) => ({
+    ...(await importOriginal()),
     deleteRoutineTask: mocks.deleteTask,
     getRoutineTaskById: mocks.getTask,
     updateRoutineTask: mocks.updateTask,
@@ -40,6 +28,7 @@ import {
     GET,
     PATCH,
 } from "@/app/api/routines/tasks/[id]/route";
+import { RoutineNotFoundError } from "@/modules/routine";
 
 describe("DELETE /api/routines/tasks/:id", () => {
     beforeEach(() => {
@@ -138,7 +127,7 @@ describe("DELETE /api/routines/tasks/:id", () => {
             employeeId: 42,
         });
         mocks.updateTask.mockRejectedValueOnce(
-            new mocks.RoutineServiceError("ไม่พบงานประจำ", 404),
+            new RoutineNotFoundError("ไม่พบงานประจำ"),
         );
 
         const response = await PATCH(

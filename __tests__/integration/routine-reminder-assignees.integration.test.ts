@@ -8,17 +8,17 @@ import {
     getCurrentBangkokDate,
     getRoutineReminderScheduledFor,
     toBangkokCalendarDate,
-} from "@/lib/routine/schedule";
+} from "@/modules/routine";
 import {
     createRoutineTaskInTransaction,
     updateRoutineTask,
-} from "@/lib/services/routine/mutations";
+} from "@/modules/routine";
 import {
     buildRoutineReminderEventKey,
     dispatchRoutineReminderOutbox,
-} from "@/lib/services/routine/reminders";
-import type { RoutineCommandActor } from "@/lib/services/routine/types";
-import { routineReminderEmailOutboxPayloadSchema } from "@/lib/validations/routine";
+} from "@/modules/routine";
+import type { RoutineCommandActor } from "@/modules/routine";
+import { routineReminderEmailOutboxPayloadSchema } from "@/modules/routine";
 
 function assertDedicatedDatabase(): void {
     const rawUrl = process.env.DATABASE_URL;

@@ -1,16 +1,16 @@
 import { type NextRequest, NextResponse } from "next/server";
 
 import { requireActiveWorkforceOrAdminSession } from "@/lib/auth/workforce";
-import { createRoutineCommandActor } from "@/lib/server/routine-command-actor";
+import { createRoutineCommandActor } from "@/modules/routine";
 import {
     routineErrorResponse,
     routineFeatureGuard,
-} from "@/lib/server/routine-api";
+} from "@/modules/routine";
 import {
     getRoutineOccurrences,
     getRoutineTaskWorkItems,
-} from "@/lib/services/routine";
-import { routineOccurrenceFiltersSchema } from "@/lib/validations/routine";
+} from "@/modules/routine";
+import { routineOccurrenceFiltersSchema } from "@/modules/routine";
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
     const featureResponse = routineFeatureGuard();

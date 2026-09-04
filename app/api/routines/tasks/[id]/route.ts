@@ -1,23 +1,23 @@
 import { type NextRequest, NextResponse } from "next/server";
 
 import { requireActiveWorkforceOrAdminSession } from "@/lib/auth/workforce";
-import { createRoutineCommandActor } from "@/lib/server/routine-command-actor";
+import { createRoutineCommandActor } from "@/modules/routine";
 import { enforceAuthenticatedMutationRateLimit } from "@/lib/security/mutation-rate-limit";
 import {
     readRoutineJsonBody,
     routineErrorResponse,
     routineFeatureGuard,
     routineRequestSizeGuard,
-} from "@/lib/server/routine-api";
+} from "@/modules/routine";
 import {
     deleteRoutineTask,
     getRoutineTaskById,
     updateRoutineTask,
-} from "@/lib/services/routine";
+} from "@/modules/routine";
 import {
     routineIdParamSchema,
     routineTaskUpdateSchema,
-} from "@/lib/validations/routine";
+} from "@/modules/routine";
 
 export async function GET(
     request: NextRequest,

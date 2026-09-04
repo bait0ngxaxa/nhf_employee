@@ -8,7 +8,7 @@ import {
 import {
     buildRoutineLiffTaskUrl,
     buildRoutineLiffUrl,
-} from "@/lib/line/routine-links";
+} from "@/modules/routine";
 import {
     buildStockLiffRequestUrl,
     buildStockLiffUrl,

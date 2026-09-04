@@ -11,7 +11,8 @@ vi.mock("@/lib/auth/workforce", () => ({
     requireActiveWorkforceOrAdminSession: mocks.requireSession,
 }));
 
-vi.mock("@/lib/services/routine", () => ({
+vi.mock("@/modules/routine", async (importOriginal) => ({
+    ...(await importOriginal()),
     getRoutineOccurrences: mocks.getOccurrences,
     getRoutineTaskWorkItems: mocks.getTaskWorkItems,
 }));

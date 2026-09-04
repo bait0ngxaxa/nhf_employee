@@ -4,9 +4,9 @@ import { requireAdminSession } from "@/lib/auth/api";
 import {
     routineErrorResponse,
     routineFeatureGuard,
-} from "@/lib/server/routine-api";
-import { getRoutineImportBatch } from "@/lib/services/routine-import";
-import { routineImportBatchIdSchema } from "@/lib/validations/routine-import";
+} from "@/modules/routine";
+import { getRoutineImportBatch } from "@/modules/routine";
+import { routineImportBatchIdSchema } from "@/modules/routine";
 
 export async function GET(
     _request: NextRequest,

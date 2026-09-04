@@ -12,7 +12,8 @@ vi.mock("@/lib/auth/api", () => ({
     requireAdminSession: mocks.requireAdminSession,
 }));
 
-vi.mock("@/lib/services/routine", () => ({
+vi.mock("@/modules/routine", async (importOriginal) => ({
+    ...(await importOriginal()),
     getRoutineOccurrenceById: mocks.getOccurrence,
     updateRoutineOccurrenceDueDate: mocks.updateDueDate,
     reassignRoutineOccurrence: mocks.reassign,

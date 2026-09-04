@@ -1,19 +1,19 @@
 import { type NextRequest, NextResponse } from "next/server";
 
 import { requireAdminSession } from "@/lib/auth/api";
-import { createRoutineCommandActor } from "@/lib/server/routine-command-actor";
+import { createRoutineCommandActor } from "@/modules/routine";
 import { enforceAuthenticatedMutationRateLimit } from "@/lib/security/mutation-rate-limit";
 import {
     readRoutineJsonBody,
     routineErrorResponse,
     routineFeatureGuard,
     routineRequestSizeGuard,
-} from "@/lib/server/routine-api";
+} from "@/modules/routine";
 import {
     getRoutineOccurrenceById,
     updateRoutineOccurrenceDueDate,
-} from "@/lib/services/routine";
-import { routineDueDateSchema, routineIdParamSchema } from "@/lib/validations/routine";
+} from "@/modules/routine";
+import { routineDueDateSchema, routineIdParamSchema } from "@/modules/routine";
 
 export async function PATCH(
     request: NextRequest,

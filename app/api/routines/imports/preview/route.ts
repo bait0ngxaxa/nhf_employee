@@ -1,15 +1,15 @@
 import { type NextRequest, NextResponse } from "next/server";
 
 import { requireAdminSession } from "@/lib/auth/api";
-import { createRoutineCommandActor } from "@/lib/server/routine-command-actor";
+import { createRoutineCommandActor } from "@/modules/routine";
 import {
     routineErrorResponse,
     routineFeatureGuard,
-} from "@/lib/server/routine-api";
+} from "@/modules/routine";
 import { enforceAuthenticatedMutationRateLimit } from "@/lib/security/mutation-rate-limit";
-import { createRoutineImportPreview } from "@/lib/services/routine-import";
-import { ROUTINE_IMPORT_MAX_FILE_BYTES } from "@/lib/services/routine-import/sheet-config";
-import { routineImportPreviewOptionsSchema } from "@/lib/validations/routine-import";
+import { createRoutineImportPreview } from "@/modules/routine";
+import { ROUTINE_IMPORT_MAX_FILE_BYTES } from "@/modules/routine";
+import { routineImportPreviewOptionsSchema } from "@/modules/routine";
 
 function isUploadFile(value: FormDataEntryValue | null): value is File {
     return typeof value === "object"

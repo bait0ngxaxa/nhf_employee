@@ -3,8 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
     RoutineConflictError,
-    RoutineServiceError,
-} from "@/lib/services/routine/errors";
+} from "@/modules/routine";
 
 const mocks = vi.hoisted(() => ({
     requireAdminSession: vi.fn(),
@@ -16,8 +15,8 @@ vi.mock("@/lib/auth/api", () => ({
     requireAdminSession: mocks.requireAdminSession,
 }));
 
-vi.mock("@/lib/services/routine", () => ({
-    RoutineServiceError,
+vi.mock("@/modules/routine", async (importOriginal) => ({
+    ...(await importOriginal()),
     getRoutineOccurrenceById: mocks.getOccurrence,
     updateRoutineOccurrenceOverride: mocks.updateOverride,
 }));

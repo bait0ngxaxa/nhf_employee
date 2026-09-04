@@ -3,10 +3,12 @@ import type { Prisma } from "@prisma/client";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { prisma } from "@/lib/db/prisma";
-import { buildRoutineImportSourceKey } from "@/lib/services/routine-import/sheet-config";
-import { applyRoutineImportBatch } from "@/lib/services/routine-import/staging";
-import type { RoutineImportRow } from "@/lib/services/routine-import/types";
-import type { RoutineCommandActor } from "@/lib/services/routine/types";
+import {
+    applyRoutineImportBatch,
+    buildRoutineImportSourceKey,
+} from "@/modules/routine";
+import type { RoutineImportRow } from "@/modules/routine";
+import type { RoutineCommandActor } from "@/modules/routine";
 
 import {
     createRoutineImportRollbackTrigger,

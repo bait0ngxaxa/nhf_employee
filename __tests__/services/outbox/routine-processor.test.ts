@@ -12,11 +12,8 @@ vi.mock("@/lib/db/prisma", () => ({
     prisma: mockDeep<PrismaClient>(),
 }));
 
-vi.mock("@/lib/services/routine/reminders", () => ({
+vi.mock("@/modules/routine", () => ({
     dispatchRoutineReminderOutbox: dispatchRoutineReminderOutboxMock,
-}));
-
-vi.mock("@/lib/services/routine/contract-reminders", () => ({
     dispatchRoutineContractExpiryOutbox:
         dispatchRoutineContractExpiryOutboxMock,
 }));

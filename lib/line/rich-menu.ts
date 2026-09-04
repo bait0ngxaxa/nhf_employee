@@ -14,7 +14,7 @@ import {
     getLineMessagingConfig,
 } from "./config";
 import { buildLiffUrl } from "./liff-links";
-import { buildRoutineLiffUrl } from "./routine-links";
+import { buildRoutineLiffUrl } from "@/modules/routine";
 
 export const NHF_RICH_MENU_WIDTH = 2500;
 export const NHF_RICH_MENU_HEIGHT = 843;

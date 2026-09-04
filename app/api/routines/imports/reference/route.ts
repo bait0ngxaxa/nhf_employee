@@ -4,8 +4,8 @@ import { requireAdminSession } from "@/lib/auth/api";
 import {
     routineErrorResponse,
     routineFeatureGuard,
-} from "@/lib/server/routine-api";
-import { getRoutineImportReferenceData } from "@/lib/services/routine-import";
+} from "@/modules/routine";
+import { getRoutineImportReferenceData } from "@/modules/routine";
 
 export async function GET(_request: NextRequest): Promise<NextResponse> {
     const featureResponse = routineFeatureGuard();

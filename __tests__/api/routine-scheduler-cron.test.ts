@@ -3,7 +3,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const runRoutineSchedulerMock = vi.hoisted(() => vi.fn());
 
-vi.mock("@/lib/services/routine", () => ({
+vi.mock("@/modules/routine", async (importOriginal) => ({
+    ...(await importOriginal()),
     runRoutineScheduler: runRoutineSchedulerMock,
 }));
 

@@ -2,17 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const mocks = vi.hoisted(() => {
-    class MockRoutineServiceError extends Error {
-        readonly statusCode: number;
-
-        constructor(message: string, statusCode: number) {
-            super(message);
-            this.statusCode = statusCode;
-        }
-    }
-
-    return {
+const mocks = vi.hoisted(() => ({
         requireLiffWorkforceSession: vi.fn(),
         getRoutineReferenceData: vi.fn(),
         getLiffRoutineTaskById: vi.fn(),
@@ -20,9 +10,7 @@ const mocks = vi.hoisted(() => {
         updateRoutineTask: vi.fn(),
         deleteRoutineTask: vi.fn(),
         enforceAuthenticatedMutationRateLimit: vi.fn(),
-        RoutineServiceError: MockRoutineServiceError,
-    };
-});
+}));
 
 vi.mock("@/lib/auth/liff", () => ({
     requireLiffWorkforceSession: mocks.requireLiffWorkforceSession,
@@ -33,8 +21,8 @@ vi.mock("@/lib/security/mutation-rate-limit", () => ({
         mocks.enforceAuthenticatedMutationRateLimit,
 }));
 
-vi.mock("@/lib/services/routine", () => ({
-    RoutineServiceError: mocks.RoutineServiceError,
+vi.mock("@/modules/routine", async (importOriginal) => ({
+    ...(await importOriginal()),
     getRoutineReferenceData: mocks.getRoutineReferenceData,
     getLiffRoutineTaskById: mocks.getLiffRoutineTaskById,
     getRoutineTaskWorkItems: vi.fn(),
@@ -54,6 +42,10 @@ import {
 import {
     POST as createTask,
 } from "@/app/api/line/routine/tasks/route";
+import {
+    RoutineConflictError,
+    RoutineNotFoundError,
+} from "@/modules/routine";
 
 const AUTH = {
     ok: true as const,
@@ -348,9 +340,8 @@ describe("LIFF Routine self-service route contracts", () => {
 
     it("returns a conflict when the service rejects a stale version", async () => {
         mocks.updateRoutineTask.mockRejectedValueOnce(
-            new mocks.RoutineServiceError(
+            new RoutineConflictError(
                 "ข้อมูลแม่แบบงานเปลี่ยนแปลงแล้ว กรุณาโหลดข้อมูลใหม่",
-                409,
             ),
         );
 
@@ -386,7 +377,7 @@ describe("LIFF Routine self-service route contracts", () => {
         );
 
         mocks.deleteRoutineTask.mockRejectedValueOnce(
-            new mocks.RoutineServiceError("ไม่พบงานประจำ", 404),
+            new RoutineNotFoundError("ไม่พบงานประจำ"),
         );
         const denied = await deleteTask(
             request("/api/line/routine/tasks/71", { method: "DELETE" }),

@@ -13,6 +13,7 @@ const BASE_EXCLUDES = [
 const NODE_TESTS = [
     "__tests__/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts}",
     "modules/stock/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts}",
+    "modules/routine/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts}",
 ];
 
 const DOM_TESTS = [
@@ -20,6 +21,8 @@ const DOM_TESTS = [
     "__tests__/{components,hooks,context}/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts}",
     "modules/stock/presentation/dashboard/**/*.{test,spec}.{jsx,mjsx,cjsx,tsx,mtsx,ctsx}",
     "modules/stock/presentation/dashboard/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts}",
+    "modules/routine/presentation/**/*.{test,spec}.{jsx,mjsx,cjsx,tsx,mtsx,ctsx}",
+    "modules/routine/presentation/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts}",
 ];
 
 export default defineConfig({

@@ -13,26 +13,21 @@ vi.mock("@/lib/auth/api", () => ({
     requireAdminSession: mocks.requireAdminSession,
 }));
 
-vi.mock("@/lib/services/routine-import", () => ({
+vi.mock("@/modules/routine", async (importOriginal) => ({
+    ...(await importOriginal()),
     createRoutineImportPreview: mocks.createRoutineImportPreview,
     getRoutineImportReferenceData: mocks.getRoutineImportReferenceData,
     ROUTINE_IMPORT_MAX_FILE_BYTES: 10 * 1024 * 1024,
-}));
-
-vi.mock("@/lib/server/routine-command-actor", () => ({
     createRoutineCommandActor: mocks.createRoutineCommandActor,
-}));
-
-vi.mock("@/lib/security/mutation-rate-limit", () => ({
-    enforceAuthenticatedMutationRateLimit: mocks.enforceAuthenticatedMutationRateLimit,
-}));
-
-vi.mock("@/lib/server/routine-api", () => ({
     routineFeatureGuard: () => null,
     routineErrorResponse: (error: unknown) => NextResponse.json(
         { error: error instanceof Error ? error.message : "เกิดข้อผิดพลาด" },
         { status: 500 },
     ),
+}));
+
+vi.mock("@/lib/security/mutation-rate-limit", () => ({
+    enforceAuthenticatedMutationRateLimit: mocks.enforceAuthenticatedMutationRateLimit,
 }));
 
 import { POST } from "@/app/api/routines/imports/preview/route";

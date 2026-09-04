@@ -10,8 +10,8 @@ vi.mock("@/lib/auth/workforce", () => ({
     requireActiveWorkforceOrAdminSession: mocks.requireActiveWorkforceOrAdminSession,
 }));
 
-vi.mock("@/lib/services/routine", () => ({
-    RoutineServiceError: class RoutineServiceError extends Error {},
+vi.mock("@/modules/routine", async (importOriginal) => ({
+    ...(await importOriginal()),
     getRoutineReferenceData: mocks.getReference,
 }));
 
