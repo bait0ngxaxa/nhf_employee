@@ -7,7 +7,7 @@ import { prisma } from "@/lib/db/prisma";
 import {
     ApproverAssignmentError,
     assignLeaveApprovers,
-} from "@/lib/services/leave/approver-assignment";
+} from "@/modules/leave";
 
 vi.mock("@/lib/auth/api", () => ({ requireAdminSession: vi.fn() }));
 vi.mock("@/lib/db/prisma", () => ({
@@ -15,7 +15,8 @@ vi.mock("@/lib/db/prisma", () => ({
         employee: { findMany: vi.fn() },
     },
 }));
-vi.mock("@/lib/services/leave/approver-assignment", () => {
+vi.mock("@/modules/leave", async (importOriginal) => {
+    const actual = await importOriginal();
     class MockApproverAssignmentError extends Error {
         readonly statusCode: number;
 
@@ -25,6 +26,7 @@ vi.mock("@/lib/services/leave/approver-assignment", () => {
         }
     }
     return {
+        ...(actual as Record<string, unknown>),
         ApproverAssignmentError: MockApproverAssignmentError,
         assignLeaveApprovers: vi.fn(),
     };

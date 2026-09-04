@@ -1,6 +1,6 @@
 # Dependency rules and enforcement
 
-Status: Phase D guardrails extend the Phase A baseline. These rules govern new
+Status: Phase E1 guardrails extend the Phase A baseline. These rules govern new
 architecture code while legacy code remains compatible during incremental
 migration.
 
@@ -126,6 +126,13 @@ Temporary exceptions must be explicit and narrow:
 This ledger is a migration record, not permission for new unrestricted Prisma
 usage. Add a narrower row when a new exceptional platform case is approved.
 
+For the completed Leave E1 server migration, both Leave route families must
+consume `@/modules/leave`. The architecture checker rejects legacy Leave
+ownership imports from `app/api/leave/**` and `app/api/line/leave/**`, including
+legacy services, server adapters, schemas, upload orchestration, Leave email
+templates, LINE composition, Leave links, constants, and Leave types. Leave
+presentation compatibility remains allowed until Phase E2.
+
 ## Automated enforcement
 
 Phase A limits automation by import target rather than by importer location.
@@ -137,6 +144,7 @@ the module boundary from a legacy directory, while imports unrelated to
 | --- | --- | --- |
 | ESLint `no-restricted-imports` | `shared/**/*.{js,jsx,ts,tsx}` | Rejects imports from `modules/` so a shared capability cannot acquire a business dependency |
 | `npm run architecture:check` | Repository source files, excluding dependency, build, coverage, and generated directories | Uses the installed TypeScript parser to inspect imports, re-exports, type imports, dynamic imports, and `require()` calls; allows only `@/modules/<feature>` and `@/modules/<feature>/client` as module public entries; rejects `shared -> modules`, external consumers deep-importing module internals, cross-module deep imports, including relative paths, and any business module importing the global Outbox Processor |
+| Leave route ownership | `app/api/leave/**`, `app/api/line/leave/**` | Rejects imports from legacy Leave ownership paths so the completed E1 route adapters cannot regress behind the module boundary |
 | Client/server policy | Legacy and new code | The migrated Stock client entry is explicit and client-safe; broader legacy client/server migration remains incremental |
 | Route-level Prisma policy | Legacy and new code | Documentation-led in Phase A for the existing route exceptions; new module infrastructure remains the intended boundary |
 
@@ -154,3 +162,8 @@ Legacy paths such as `lib/services/*`, `lib/server/*`, `lib/validations/*`,
 locations unless the change is a documented compatibility adapter or a
 justified exception. Migrations must be incremental, reviewable, and
 behavior-preserving.
+
+The Leave compatibility ledger is maintained in
+[leave-migration.md](./leave-migration.md). Its three narrow deep-import
+facades are explicit exceptions for transitional consumers only; they do not
+make Leave module internals public.

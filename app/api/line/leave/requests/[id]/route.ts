@@ -1,12 +1,14 @@
 import { NextResponse } from "next/server";
 
 import { requireLiffWorkforceSession } from "@/lib/auth/liff";
-import { getAuthorizedLeaveDetail } from "@/lib/services/leave/participant-access";
-import { toLiffLeaveRequestDetail } from "@/lib/services/leave/liff-serialization";
+import {
+    getAuthorizedLeaveDetail,
+    leaveRequestIdParamSchema,
+    toLiffLeaveRequestDetail,
+} from "@/modules/leave";
 import { FEATURE_KEYS, isFeatureEnabled } from "@/lib/ssot/features";
 import { notFound, serverError } from "@/lib/ssot/http";
 import { API_ROUTES } from "@/lib/ssot/routes";
-import { leaveRequestIdParamSchema } from "@/lib/validations/leave";
 
 interface LeaveDetailRouteContext {
     params: Promise<{ id: string }>;

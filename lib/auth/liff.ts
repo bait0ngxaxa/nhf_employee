@@ -12,7 +12,7 @@ import type { LiffCapabilities } from "@/lib/line/liff-types";
 import {
     getActionableLeaveApprovalWhere,
     getAssignedLeaveApproverWhere,
-} from "@/lib/services/leave/approval-queries";
+} from "@/modules/leave";
 import { isFeatureEnabled, FEATURE_KEYS } from "@/lib/ssot/features";
 import { forbidden, serverError, unauthorized } from "@/lib/ssot/http";
 import { isAdminRole } from "@/lib/ssot/permissions";

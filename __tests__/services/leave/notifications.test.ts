@@ -2,7 +2,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Prisma, type PrismaClient } from "@prisma/client";
 import { mockDeep, mockReset } from "vitest-mock-extended";
 
-import { emailService } from "@/lib/email";
 import { prisma } from "@/lib/db/prisma";
 import {
     sendLeaveActionNotifications,
@@ -16,6 +15,16 @@ import type {
     LeaveNotTakenConfirmedPayload,
     LeaveResultPayload,
 } from "@/lib/services/leave/notification-payloads";
+
+const leaveEmailMocks = vi.hoisted(() => ({
+    sendLeaveActionNotification: vi.fn(),
+    sendLeaveResultNotification: vi.fn(),
+    sendLeaveCancelledAfterApprovalNotification: vi.fn(),
+    sendLeaveNotTakenConfirmedNotification: vi.fn(),
+    sendLeaveCancelledNotification: vi.fn(),
+    sendLeaveCancellationRequestedNotification: vi.fn(),
+    sendLeaveNotTakenRequestedNotification: vi.fn(),
+}));
 import {
     buildConfiguredApproverSnapshot,
     buildLeaveRecipientSnapshot,
@@ -30,13 +39,8 @@ vi.mock("@/lib/network/public-url", () => ({
     getPublicOrigin: () => "https://example.com",
 }));
 
-vi.mock("@/lib/email", () => ({
-    emailService: {
-        sendLeaveActionNotification: vi.fn(),
-        sendLeaveResultNotification: vi.fn(),
-        sendLeaveCancelledAfterApprovalNotification: vi.fn(),
-        sendLeaveNotTakenConfirmedNotification: vi.fn(),
-    },
+vi.mock("@/modules/leave/infrastructure/notifications/email", () => ({
+    ...leaveEmailMocks,
 }));
 
 const prismaMock = prisma as unknown as ReturnType<typeof mockDeep<PrismaClient>>;
@@ -112,10 +116,10 @@ describe("leave notification delivery", () => {
     beforeEach(() => {
         mockReset(prismaMock);
         vi.clearAllMocks();
-        vi.mocked(emailService.sendLeaveActionNotification).mockResolvedValue(true);
-        vi.mocked(emailService.sendLeaveResultNotification).mockResolvedValue(true);
-        vi.mocked(emailService.sendLeaveCancelledAfterApprovalNotification).mockResolvedValue(true);
-        vi.mocked(emailService.sendLeaveNotTakenConfirmedNotification).mockResolvedValue(true);
+        leaveEmailMocks.sendLeaveActionNotification.mockResolvedValue(true);
+        leaveEmailMocks.sendLeaveResultNotification.mockResolvedValue(true);
+        leaveEmailMocks.sendLeaveCancelledAfterApprovalNotification.mockResolvedValue(true);
+        leaveEmailMocks.sendLeaveNotTakenConfirmedNotification.mockResolvedValue(true);
     });
 
     it("builds canonical employee and approver name snapshots", () => {
@@ -147,7 +151,7 @@ describe("leave notification delivery", () => {
     });
 
     it("still creates in-app emergency leave notification when action email delivery fails", async () => {
-        vi.mocked(emailService.sendLeaveActionNotification).mockResolvedValue(false);
+        leaveEmailMocks.sendLeaveActionNotification.mockResolvedValue(false);
         const payload = {
             ...buildActionPayload(),
             emergencyReason: "ป่วยฉุกเฉินจนยื่นคำขอไม่ทัน",

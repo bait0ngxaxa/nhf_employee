@@ -1,12 +1,14 @@
 import { NextResponse } from "next/server";
 
 import { requireActiveWorkforceOrAdminSession } from "@/lib/auth/workforce";
-import { prisma } from "@/lib/db/prisma";
+import {
+    getAuthorizedLeaveAttachmentForViewer,
+    leaveAttachmentIdParamSchema,
+    readLeaveAttachment,
+} from "@/modules/leave";
 import { FEATURE_KEYS, isFeatureEnabled } from "@/lib/ssot/features";
 import { notFound, serverError } from "@/lib/ssot/http";
 import { isAdminRole } from "@/lib/ssot/permissions";
-import { readLeaveAttachment } from "@/lib/uploads/leave";
-import { leaveAttachmentIdParamSchema } from "@/lib/validations/leave";
 
 interface AttachmentRouteContext {
     params: Promise<{ attachmentId: string }>;
@@ -53,33 +55,16 @@ export async function GET(
     }
 
     try {
-        const attachment = await prisma.leaveAttachment.findUnique({
-            where: { id: parsedAttachmentId.data },
-            select: {
-                storageKey: true,
-                contentType: true,
-                leaveRequest: {
-                    select: {
-                        employeeId: true,
-                        approverId: true,
-                        exceptionApproverId: true,
-                    },
-                },
+        const employeeId = "employeeId" in auth ? auth.employeeId : undefined;
+        const attachment = await getAuthorizedLeaveAttachmentForViewer(
+            parsedAttachmentId.data,
+            {
+                employeeId,
+                isAdmin: isAdminRole(auth.user.role),
             },
-        });
+        );
 
         if (!attachment) {
-            return notFound();
-        }
-
-        const employeeId =
-            "employeeId" in auth ? auth.employeeId : undefined;
-        const canReadAttachment =
-            isAdminRole(auth.user.role)
-            || employeeId === attachment.leaveRequest.employeeId
-            || employeeId === attachment.leaveRequest.approverId
-            || employeeId === attachment.leaveRequest.exceptionApproverId;
-        if (!canReadAttachment) {
             return notFound();
         }
 

@@ -18,18 +18,10 @@ import {
     sendLeaveCancelledNotifications,
     sendLeaveNotTakenConfirmedNotifications,
     sendLeaveNotTakenRequestedNotifications,
-} from "@/lib/services/leave/notifications";
+} from "@/modules/leave";
 import type { StockRequestResultEmailPayload } from "@/modules/stock";
 
-vi.mock("@/lib/db/prisma", () => ({
-    prisma: mockDeep<PrismaClient>(),
-}));
-
-vi.mock("@/lib/email", () => ({
-    sendStockRequestResultNotification: vi.fn(),
-}));
-
-vi.mock("@/lib/services/leave/notifications", () => ({
+const leaveNotificationMocks = vi.hoisted(() => ({
     createLeaveActionInAppNotification: vi.fn(),
     sendLeaveActionNotifications: vi.fn(),
     sendLeaveCancellationRequestedNotifications: vi.fn(),
@@ -39,6 +31,30 @@ vi.mock("@/lib/services/leave/notifications", () => ({
     sendLeaveNotTakenRequestedNotifications: vi.fn(),
     sendLeaveNotTakenConfirmedNotifications: vi.fn(),
 }));
+
+vi.mock("@/lib/db/prisma", () => ({
+    prisma: mockDeep<PrismaClient>(),
+}));
+
+vi.mock("@/lib/email", () => ({
+    sendStockRequestResultNotification: vi.fn(),
+}));
+
+vi.mock("@/modules/leave/application/notifications/notifications", async (importOriginal) => {
+    const actual = await importOriginal();
+    return {
+        ...(actual as Record<string, unknown>),
+        ...leaveNotificationMocks,
+    };
+});
+
+vi.mock("@/modules/leave", async (importOriginal) => {
+    const actual = await importOriginal();
+    return {
+        ...(actual as Record<string, unknown>),
+        ...leaveNotificationMocks,
+    };
+});
 
 vi.mock("@/lib/line", () => ({
     lineNotificationService: {

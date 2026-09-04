@@ -2,15 +2,15 @@ import { after, type NextRequest, NextResponse } from "next/server";
 
 import { requireActiveWorkforceSession } from "@/lib/auth/workforce";
 import { logDataExport } from "@/lib/server/audit";
-import { getCurrentLeaveYear } from "@/lib/services/leave/quota-year";
 import {
     createLeaveReportXlsxResponse,
+    getCurrentLeaveYear,
     getLeaveReportMeta,
     getLeaveReportYears,
-} from "@/lib/services/leave/report-export";
+    leaveReportScopeSchema,
+} from "@/modules/leave";
 import { jsonError, notFound, operationFailed } from "@/lib/ssot/http";
 import { FEATURE_KEYS, isFeatureEnabled } from "@/lib/ssot/features";
-import { leaveReportScopeSchema } from "@/lib/validations/leave-report";
 
 export async function GET(request: NextRequest): Promise<Response> {
     try {

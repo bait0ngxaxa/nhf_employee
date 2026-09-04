@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server";
 
 import { requireLiffWorkforceSession } from "@/lib/auth/liff";
-import { getEmployeeLeaveActions } from "@/lib/services/leave/action-availability";
-import { parseEmployeeLeaveHistoryFilters } from "@/lib/services/leave/history-filters";
 import {
+    getEmployeeLeaveActions,
+    getEmployeeLeaveProfile,
+    parseEmployeeLeaveHistoryFilters,
     toLiffEmployeeLeaveRequest,
     toLiffLeaveQuota,
-} from "@/lib/services/leave/liff-serialization";
-import { getEmployeeLeaveProfile } from "@/lib/services/leave/profile-queries";
+} from "@/modules/leave";
 import { FEATURE_KEYS, isFeatureEnabled } from "@/lib/ssot/features";
 import { jsonError, notFound, serverError } from "@/lib/ssot/http";
 import { API_ROUTES } from "@/lib/ssot/routes";

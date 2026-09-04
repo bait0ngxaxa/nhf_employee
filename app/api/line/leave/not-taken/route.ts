@@ -1,18 +1,35 @@
-import type { NextRequest, NextResponse } from "next/server";
+import { after, type NextRequest, type NextResponse } from "next/server";
 
 import { requireLiffWorkforceSession } from "@/lib/auth/liff";
-import { enforceLeaveJsonBodySize } from "@/lib/server/leave-api";
 import {
+    enforceLeaveJsonBodySize,
     handleLeaveNotTakenConfirmation,
     handleLeaveNotTakenRequest,
-} from "@/lib/server/leave-not-taken-api";
-import { toLiffLeaveMutationResponse } from "@/lib/services/leave/liff-serialization";
+    toLiffLeaveMutationResponse,
+} from "@/modules/leave";
+import { processOutbox } from "@/lib/services/outbox/processor";
 import {
     enforceAuthenticatedMutationRateLimit,
     enforcePreAuthIpRateLimit,
 } from "@/lib/security/mutation-rate-limit";
 import { FEATURE_KEYS, isFeatureEnabled } from "@/lib/ssot/features";
 import { notFound } from "@/lib/ssot/http";
+
+function scheduleLeaveOutbox(): void {
+    after(() => {
+        processOutbox().catch((error: unknown) =>
+            console.error("Failed to process leave not-taken outbox:", error),
+        );
+    });
+}
+
+function scheduleLeaveNotTakenConfirmationOutbox(): void {
+    after(() => {
+        processOutbox().catch((error: unknown) =>
+            console.error("Failed to process leave not-taken confirm outbox:", error),
+        );
+    });
+}
 
 async function authorizeMutation(
     req: NextRequest,
@@ -52,6 +69,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         req,
         authorization.auth,
         toLiffLeaveMutationResponse,
+        scheduleLeaveOutbox,
     );
 }
 
@@ -61,5 +79,6 @@ export async function PUT(req: NextRequest): Promise<NextResponse> {
     return handleLeaveNotTakenConfirmation(req, authorization.auth, {
         allowAdminOverride: false,
         serializeResponse: toLiffLeaveMutationResponse,
+        scheduleOutbox: scheduleLeaveNotTakenConfirmationOutbox,
     });
 }

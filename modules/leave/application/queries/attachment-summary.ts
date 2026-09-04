@@ -1,7 +1,7 @@
 import type { Prisma } from "@prisma/client";
 
 import { API_ROUTES } from "@/lib/ssot/routes";
-import type { LeaveAttachmentSummary } from "@/lib/types/leave";
+import type { LeaveAttachmentSummary } from "@/modules/leave/presentation/types";
 
 export const leaveAttachmentSummarySelect = {
     id: true,

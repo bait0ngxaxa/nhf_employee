@@ -1,6 +1,6 @@
 # NHF Employee modular monolith
 
-Status: Phase D — Routine Module Migration.
+Status: Phase E1 — Leave server/business Module Migration.
 
 This document separates the repository's observed current state from the
 target architecture. Stock server/business ownership is now migrated into
@@ -13,6 +13,11 @@ Routine server/business and Dashboard/LIFF presentation ownership is now also
 migrated into `modules/routine/`. See
 [routine-migration.md](./routine-migration.md) for its public contracts and
 transitional platform dependencies.
+
+Leave server/business ownership is now migrated into `modules/leave/`. Its
+Dashboard and LIFF presentation remain transitional for Phase E2. See
+[leave-migration.md](./leave-migration.md) for the ownership boundary, public
+server API, attachment boundary, and compatibility ledger.
 
 ## Why a modular monolith
 
@@ -43,10 +48,12 @@ distributed across locations such as:
 - `prisma/` for the single schema and its migrations; and
 - `__tests__/` for the existing unit, integration, API, and component tests.
 
-At the Phase D baseline, `modules/stock/` and `modules/routine/` own their
+At the Phase E1 baseline, `modules/stock/` and `modules/routine/` own their
 server/business and client-facing presentation code behind separate public
-entry points. Existing feature code for Leave and Employee remains in its
-current locations. The Dashboard uses route-per-module App Router pages;
+entry points, while `modules/leave/` owns Leave server/business behavior and
+exposes a client-safe transitional contract. Leave Dashboard and LIFF
+presentation, and Employee feature code, remain in their current locations.
+The Dashboard uses route-per-module App Router pages;
 historical
 `/dashboard?tab=...` links remain inbound-compatible through the dashboard home
 route boundary.
@@ -99,8 +106,10 @@ Future migrations should be vertical and behavior-preserving:
 5. Verify the feature before removing the now-obsolete legacy path.
 
 Legacy and migrated modules may coexist during this process. Migration is
-explicit and feature-by-feature; Stock was the Phase B pilot and Routine is the
-Phase D migration. Leave and Employee remain out of scope.
+explicit and feature-by-feature; Stock was the Phase B pilot, Routine is the
+Phase D migration, and Leave server/business is the Phase E1 migration.
+Employee and Leave presentation remain out of scope for the next migration
+steps.
 
 ## Invariants for this phase
 
@@ -111,9 +120,9 @@ The following remain outside the scope of the route migration:
   compatibility constraints; canonical Dashboard page paths are now explicit;
 - authentication, authorization, permissions, and LIFF behavior;
 - the Prisma schema, migrations, and database layout; and
-- cron, notifications, email, LINE, uploads, Leave, and Employee runtime
-  behavior. Stock and Routine runtime behavior remain unchanged by their
-  ownership migrations.
+- cron, notifications, email, LINE, uploads, and Employee runtime behavior;
+  Leave runtime behavior remains unchanged by its ownership migration. Stock
+  and Routine runtime behavior remain unchanged by their ownership migrations.
 
 Detailed boundary and import rules are in
 [module-boundaries.md](./module-boundaries.md) and

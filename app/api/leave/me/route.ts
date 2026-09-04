@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
 import { requireActiveWorkforceSession } from "@/lib/auth/workforce";
 import {
+    getEmployeeLeaveProfile,
     parseEmployeeLeaveHistoryFilters,
-} from "@/lib/services/leave/history-filters";
-import { getEmployeeLeaveProfile } from "@/lib/services/leave/profile-queries";
+} from "@/modules/leave";
 import { jsonError, notFound } from "@/lib/ssot/http";
 import { FEATURE_KEYS, isFeatureEnabled } from "@/lib/ssot/features";
 import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";

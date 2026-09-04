@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
 
 import { requireActiveWorkforceSession } from "@/lib/auth/workforce";
-import { getLeaveApprovalList } from "@/lib/services/leave/approval-list";
-import { parseLeaveApprovalPage } from "@/lib/services/leave/approval-queries";
-import { parseApproverLeaveHistoryFilters } from "@/lib/services/leave/history-filters";
+import {
+    getLeaveApprovalList,
+    parseApproverLeaveHistoryFilters,
+    parseLeaveApprovalPage,
+} from "@/modules/leave";
 import { FEATURE_KEYS, isFeatureEnabled } from "@/lib/ssot/features";
 import { jsonError, notFound } from "@/lib/ssot/http";
 import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";

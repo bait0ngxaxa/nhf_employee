@@ -11,7 +11,7 @@ import { getEmployeeBackedUserDisplayName } from "@/lib/helpers/employee-helpers
 import {
     getActionableLeaveApprovalWhere,
     getApproverHistoryReportWhere,
-} from "@/lib/services/leave/approval-queries";
+} from "@/modules/leave";
 
 export type ApiAuthSession = HybridAuthSession;
 

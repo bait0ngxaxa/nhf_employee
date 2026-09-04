@@ -1,0 +1,376 @@
+import type { Prisma } from "@prisma/client";
+
+import { getEmployeeDisplayName } from "@/lib/helpers/employee-helpers";
+import { prisma } from "@/lib/db/prisma";
+import {
+    runSerializableTransaction,
+} from "@/lib/db/transaction";
+import {
+    isActiveEmployeeInTransaction,
+    isEmployeeInTransaction,
+} from "@/modules/leave/application/queries/active-employee-session";
+import { isActiveLeaveApprover } from "@/modules/leave/domain/approver-eligibility";
+import { buildCreatedLeaveRequestAuditDetails } from "@/modules/leave/application/requests/create-request-audit";
+import {
+    LEAVE_REQUEST_MESSAGES,
+    LeaveRequestError,
+} from "@/modules/leave/application/requests/create-request-errors";
+import {
+    EMPLOYEE_INCLUDE,
+    LEAVE_REQUEST_INCLUDE,
+    type CreatedLeaveRequest,
+    type EligibleEmployee,
+} from "@/modules/leave/application/requests/create-request-prisma";
+import { halfDaysToDays } from "@/modules/leave/domain/half-days";
+import {
+    buildConfiguredApproverSnapshot,
+    buildLeaveActionDeliveryIdentity,
+    buildLeaveRecipientSnapshot,
+    type LeaveActionPayload,
+} from "@/modules/leave/application/notifications/notification-payloads";
+import { calculateAdditionalOverQuotaHalfDays } from "@/modules/leave/domain/over-quota";
+import { calculateEffectiveEntitlementHalfDays } from "@/modules/leave/domain/quota-accounting";
+import {
+    ensureLeaveQuotaForYear,
+    reconcileLeaveQuotaForward,
+} from "@/modules/leave/domain/quota-entitlement";
+import { getLeaveYearFromDateValue } from "@/modules/leave/domain/quota-year";
+import { calculateLeaveDurationHalfDays, isWorkingDay } from "@/modules/leave/domain/utils";
+import { toUtcDate } from "@/modules/leave/domain/business-date";
+import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
+import { INITIAL_LEAVE_APPROVAL_ACTION_VERSION } from "@/modules/leave/domain/approval-action-version";
+import type { StoredLeaveAttachment } from "@/modules/leave/infrastructure/attachments/storage";
+import type { LeaveRequestValues } from "@/modules/leave/schemas/leave";
+import {
+    assertMatchingLeaveRequestHash,
+    createLeaveRequestHash,
+    isLeaveRequestIdempotencyConflict,
+} from "@/modules/leave/application/requests/idempotency";
+import { createLeaveAuditInTransaction } from "@/modules/leave/infrastructure/persistence/transaction";
+
+interface PreparedLeaveRequest {
+    payload: LeaveRequestValues;
+    start: Date;
+    end: Date;
+    currentYear: number;
+    durationHalfDays: number;
+    durationDays: number;
+    emergencyReason: string | null;
+    specialReason: string | null;
+}
+
+export interface CreateLeaveRequestInput {
+    id: string;
+    userId: number;
+    userEmail: string;
+    employeeId: number;
+    idempotencyKey: string;
+    payload: LeaveRequestValues;
+    attachments: readonly StoredLeaveAttachment[];
+}
+
+export interface CreatedLeaveRequestResult {
+    request: CreatedLeaveRequest;
+    replayed: boolean;
+}
+
+function prepareLeaveRequest(payload: LeaveRequestValues): PreparedLeaveRequest {
+    const { startDate, endDate, period } = payload;
+    if (period !== "FULL_DAY" && startDate !== endDate) {
+        throw new LeaveRequestError(LEAVE_REQUEST_MESSAGES.halfDayMultiDate, 400);
+    }
+
+    const start = toUtcDate(startDate);
+    const end = toUtcDate(endDate);
+    const durationHalfDays = calculateLeaveDurationHalfDays(startDate, endDate, period);
+    if (durationHalfDays === 0) {
+        throw new LeaveRequestError(LEAVE_REQUEST_MESSAGES.holidayConflict, 400);
+    }
+    if (period === "FULL_DAY" && (!isWorkingDay(startDate) || !isWorkingDay(endDate))) {
+        throw new LeaveRequestError(LEAVE_REQUEST_MESSAGES.holidayConflict, 400);
+    }
+
+    return {
+        payload,
+        start,
+        end,
+        currentYear: getLeaveYearFromDateValue(startDate),
+        durationHalfDays,
+        durationDays: halfDaysToDays(durationHalfDays),
+        emergencyReason: payload.emergencyReason?.trim() || null,
+        specialReason: payload.specialReason?.trim() || null,
+    };
+}
+
+async function assertActiveRequester(
+    tx: Prisma.TransactionClient,
+    input: CreateLeaveRequestInput,
+): Promise<void> {
+    if (!await isActiveEmployeeInTransaction(tx, input.userId, input.employeeId)) {
+        const employeeExists = await isEmployeeInTransaction(tx, input.employeeId);
+        throw new LeaveRequestError(
+            employeeExists
+                ? COMMON_API_MESSAGES.forbidden
+                : LEAVE_REQUEST_MESSAGES.employeeNotFound,
+            employeeExists ? 403 : 404,
+        );
+    }
+}
+
+async function getEligibleEmployee(
+    tx: Prisma.TransactionClient,
+    input: CreateLeaveRequestInput,
+): Promise<EligibleEmployee> {
+    const employee = await tx.employee.findUnique({
+        where: { id: input.employeeId },
+        include: EMPLOYEE_INCLUDE,
+    });
+    if (!employee) {
+        throw new LeaveRequestError(LEAVE_REQUEST_MESSAGES.employeeNotFound, 404);
+    }
+    if (!employee.managerId) {
+        throw new LeaveRequestError(LEAVE_REQUEST_MESSAGES.approverNotConfigured, 400);
+    }
+    const { manager } = employee;
+    if (!isActiveLeaveApprover(manager)) {
+        throw new LeaveRequestError(
+            LEAVE_REQUEST_MESSAGES.approverAccountNotConfigured,
+            400,
+        );
+    }
+    if (manager.id === employee.id) {
+        throw new LeaveRequestError(
+            LEAVE_REQUEST_MESSAGES.approverAccountNotConfigured,
+            400,
+        );
+    }
+    return { ...employee, manager };
+}
+
+type LeaveRequestIdempotencyClient = Pick<
+    Prisma.TransactionClient,
+    "leaveRequestIdempotency"
+>;
+
+async function findReplayedLeaveRequest(
+    client: LeaveRequestIdempotencyClient,
+    input: CreateLeaveRequestInput,
+    requestHash: string,
+): Promise<CreatedLeaveRequest | null> {
+    const record = await client.leaveRequestIdempotency.findUnique({
+        where: {
+            userId_idempotencyKey: {
+                userId: input.userId,
+                idempotencyKey: input.idempotencyKey,
+            },
+        },
+        include: {
+            leaveRequest: { include: LEAVE_REQUEST_INCLUDE },
+        },
+    });
+    if (!record) {
+        return null;
+    }
+
+    assertMatchingLeaveRequestHash(record, requestHash);
+    return record.leaveRequest;
+}
+
+async function assertNoOverlap(
+    tx: Prisma.TransactionClient,
+    employeeId: number,
+    start: Date,
+    end: Date,
+): Promise<void> {
+    const overlap = await tx.leaveRequest.findFirst({
+        where: {
+            employeeId,
+            status: { in: ["PENDING", "APPROVED", "CANCELLATION_REQUESTED"] },
+            AND: [
+                { startDate: { lte: end } },
+                { endDate: { gte: start } },
+            ],
+        },
+    });
+    if (overlap) {
+        throw new LeaveRequestError(LEAVE_REQUEST_MESSAGES.overlapConflict, 409);
+    }
+}
+
+function getOverQuotaHalfDays(
+    quota: {
+        totalHalfDays: number;
+        carryBalanceHalfDays: number;
+        usedHalfDays: number;
+    },
+    prepared: PreparedLeaveRequest,
+): number {
+    const effectiveTotalHalfDays = calculateEffectiveEntitlementHalfDays(
+        quota.totalHalfDays,
+        quota.carryBalanceHalfDays,
+    );
+    const overQuotaHalfDays = calculateAdditionalOverQuotaHalfDays(
+        effectiveTotalHalfDays,
+        quota.usedHalfDays,
+        prepared.durationHalfDays,
+    );
+    if (overQuotaHalfDays > 0 && !prepared.specialReason) {
+        throw new LeaveRequestError(LEAVE_REQUEST_MESSAGES.specialReasonRequired, 400);
+    }
+    return overQuotaHalfDays;
+}
+
+async function enqueueLeaveNotification(
+    tx: Prisma.TransactionClient,
+    prepared: PreparedLeaveRequest,
+    employee: EligibleEmployee,
+    overQuotaHalfDays: number,
+    leaveRequest: Pick<CreatedLeaveRequest, "id" | "approvalActionVersion">,
+): Promise<void> {
+    const payload: LeaveActionPayload = {
+        leaveId: leaveRequest.id,
+        deliveryIdentity: buildLeaveActionDeliveryIdentity(
+            leaveRequest.id,
+            employee.manager.user.id,
+            leaveRequest.approvalActionVersion,
+        ),
+        employee: buildLeaveRecipientSnapshot(employee),
+        approver: buildConfiguredApproverSnapshot(employee.manager),
+        leaveType: prepared.payload.leaveType,
+        startDate: prepared.start.toISOString(),
+        endDate: prepared.end.toISOString(),
+        period: prepared.payload.period,
+        durationDays: prepared.durationDays,
+        reason: prepared.payload.reason,
+        emergencyReason: prepared.emergencyReason,
+        specialReason: prepared.specialReason,
+        overQuotaDays: halfDaysToDays(overQuotaHalfDays),
+    };
+    await tx.notificationOutbox.create({
+        data: { type: "LEAVE_ACTION", payload: JSON.stringify(payload) },
+    });
+}
+
+async function createInTransaction(
+    tx: Prisma.TransactionClient,
+    input: CreateLeaveRequestInput,
+    prepared: PreparedLeaveRequest,
+    requestHash: string,
+): Promise<CreatedLeaveRequestResult> {
+    await assertActiveRequester(tx, input);
+    const replayedRequest = await findReplayedLeaveRequest(tx, input, requestHash);
+    if (replayedRequest) {
+        return { request: replayedRequest, replayed: true };
+    }
+
+    const employee = await getEligibleEmployee(tx, input);
+    await assertNoOverlap(tx, input.employeeId, prepared.start, prepared.end);
+    const quota = await ensureLeaveQuotaForYear(tx, {
+        employeeId: input.employeeId,
+        year: prepared.currentYear,
+        leaveType: prepared.payload.leaveType,
+    });
+    await reconcileLeaveQuotaForward(tx, {
+        ...quota,
+        employeeId: input.employeeId,
+        year: prepared.currentYear,
+        leaveType: prepared.payload.leaveType,
+    });
+    const overQuotaHalfDays = getOverQuotaHalfDays(quota, prepared);
+    const attachmentData = input.attachments.map((attachment) => ({
+        storageKey: attachment.storageKey,
+        originalName: attachment.originalName,
+        contentType: attachment.contentType,
+        sizeBytes: attachment.sizeBytes,
+        width: attachment.width,
+        height: attachment.height,
+    }));
+
+    const leaveRequest = await tx.leaveRequest.create({
+        data: {
+            id: input.id,
+            employeeId: input.employeeId,
+            leaveType: prepared.payload.leaveType,
+            startDate: prepared.start,
+            endDate: prepared.end,
+            period: prepared.payload.period,
+            durationHalfDays: prepared.durationHalfDays,
+            reason: prepared.payload.reason,
+            emergencyReason: prepared.emergencyReason,
+            specialReason: prepared.specialReason,
+            overQuotaHalfDays,
+            status: "PENDING",
+            approverId: employee.managerId,
+            approvalActionVersion: INITIAL_LEAVE_APPROVAL_ACTION_VERSION,
+            ...(attachmentData.length > 0
+                ? { attachments: { create: attachmentData } }
+                : {}),
+        },
+        include: LEAVE_REQUEST_INCLUDE,
+    });
+    await enqueueLeaveNotification(
+        tx,
+        prepared,
+        employee,
+        overQuotaHalfDays,
+        leaveRequest,
+    );
+    await tx.leaveRequestIdempotency.create({
+        data: {
+            userId: input.userId,
+            idempotencyKey: input.idempotencyKey,
+            requestHash,
+            leaveRequestId: leaveRequest.id,
+        },
+    });
+    await createLeaveAuditInTransaction(
+        tx,
+        "LEAVE_REQUEST_CREATE",
+        leaveRequest.id,
+        input.userId,
+        input.userEmail,
+        buildCreatedLeaveRequestAuditDetails({
+            request: leaveRequest,
+            employeeName: getEmployeeDisplayName(employee),
+            attachmentCount: input.attachments.length,
+        }),
+    );
+    return { request: leaveRequest, replayed: false };
+}
+
+export async function createLeaveRequest(
+    input: CreateLeaveRequestInput,
+): Promise<CreatedLeaveRequestResult> {
+    const prepared = prepareLeaveRequest(input.payload);
+    const requestHash = createLeaveRequestHash(input.payload, input.attachments);
+    let result: CreatedLeaveRequestResult;
+    try {
+        result = await runSerializableTransaction((tx) =>
+            createInTransaction(tx, input, prepared, requestHash),
+        );
+    } catch (error) {
+        if (!isLeaveRequestIdempotencyConflict(error)) {
+            throw error;
+        }
+
+        const replayedRequest = await findReplayedLeaveRequest(
+            prisma,
+            input,
+            requestHash,
+        );
+        if (!replayedRequest) {
+            throw error;
+        }
+        result = { request: replayedRequest, replayed: true };
+    }
+
+    return result;
+}
+
+export { LeaveRequestError } from "@/modules/leave/application/requests/create-request-errors";
+export {
+    LeaveRequestIdempotencyConflictError,
+} from "@/modules/leave/application/requests/idempotency";
+export type {
+    CreatedLeaveRequest,
+} from "@/modules/leave/application/requests/create-request-prisma";

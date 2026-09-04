@@ -4,15 +4,15 @@ import { prisma } from "@/lib/db/prisma";
 import {
     getEmployeeLeaveActions,
     getApproverLeaveActions,
-} from "@/lib/services/leave/action-availability";
-import { getAssignedLeaveApproverWhere } from "@/lib/services/leave/approval-queries";
+} from "@/modules/leave/domain/action-availability";
+import { getAssignedLeaveApproverWhere } from "@/modules/leave/application/approvals/approval-queries";
 import {
     leaveAttachmentSummaryOrderBy,
     leaveAttachmentSummarySelect,
     type LeaveAttachmentUrlBuilder,
     withLeaveAttachmentSummaries,
-} from "@/lib/services/leave/attachment-summary";
-import { toLeaveRequestDays } from "@/lib/services/leave/half-days";
+} from "@/modules/leave/application/queries/attachment-summary";
+import { toLeaveRequestDays } from "@/modules/leave/domain/half-days";
 
 const LIFF_LEAVE_DETAIL_INCLUDE = {
     employee: {
@@ -109,4 +109,51 @@ export async function getAuthorizedLeaveAttachment(
             contentType: true,
         },
     });
+}
+
+export interface LeaveAttachmentViewer {
+    employeeId?: number;
+    isAdmin: boolean;
+}
+
+export async function getAuthorizedLeaveAttachmentForViewer(
+    attachmentId: string,
+    viewer: LeaveAttachmentViewer,
+): Promise<AuthorizedLeaveAttachment | null> {
+    const attachment = await prisma.leaveAttachment.findUnique({
+        where: { id: attachmentId },
+        select: {
+            storageKey: true,
+            contentType: true,
+            leaveRequest: {
+                select: {
+                    employeeId: true,
+                    approverId: true,
+                    exceptionApproverId: true,
+                },
+            },
+        },
+    });
+
+    if (!attachment) {
+        return null;
+    }
+
+    if (!viewer.isAdmin) {
+        const employeeId = viewer.employeeId;
+        const canReadAttachment = employeeId !== undefined
+            && (
+                employeeId === attachment.leaveRequest.employeeId
+                || employeeId === attachment.leaveRequest.approverId
+                || employeeId === attachment.leaveRequest.exceptionApproverId
+            );
+        if (!canReadAttachment) {
+            return null;
+        }
+    }
+
+    return {
+        storageKey: attachment.storageKey,
+        contentType: attachment.contentType,
+    };
 }

@@ -4,14 +4,14 @@ import { requireLiffWorkforceSession } from "@/lib/auth/liff";
 import {
     enforceLeaveJsonBodySize,
     readLeaveJsonBody,
-} from "@/lib/server/leave-api";
-import {
     cancelLeaveRequest,
     confirmLeaveCancellation,
     LeaveCancellationError,
+    leaveCancelSchema,
+    leaveCancellationDecisionSchema,
     rejectLeaveCancellation,
-} from "@/lib/services/leave/cancellation";
-import { toLiffLeaveMutationResponse } from "@/lib/services/leave/liff-serialization";
+    toLiffLeaveMutationResponse,
+} from "@/modules/leave";
 import { processOutbox } from "@/lib/services/outbox/processor";
 import {
     enforceAuthenticatedMutationRateLimit,
@@ -20,10 +20,6 @@ import {
 import { FEATURE_KEYS, isFeatureEnabled } from "@/lib/ssot/features";
 import { jsonError, notFound } from "@/lib/ssot/http";
 import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
-import {
-    leaveCancellationDecisionSchema,
-    leaveCancelSchema,
-} from "@/lib/validations/leave";
 
 async function requireLeaveMutation(
     req: NextRequest,

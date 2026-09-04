@@ -1,43 +1,15 @@
 import { NextResponse } from "next/server";
-import { z } from "zod";
 
 import { requireAdminSession } from "@/lib/auth/api";
-import { prisma } from "@/lib/db/prisma";
 import {
     ApproverAssignmentError,
     assignLeaveApprovers,
-} from "@/lib/services/leave/approver-assignment";
-import {
-    ACTIVE_LEAVE_EMPLOYEE_QUERY_WHERE,
-    isActiveLeaveApprover,
-} from "@/lib/services/leave/approver-eligibility";
+    getLeaveApproverEmployees,
+    leaveApproverAssignmentsSchema,
+} from "@/modules/leave";
 import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
 import { forbidden, notFound } from "@/lib/ssot/http";
 import { FEATURE_KEYS, isFeatureEnabled } from "@/lib/ssot/features";
-
-const bulkAssignSchema = z.object({
-    assignments: z
-        .array(
-            z.object({
-                employeeId: z.number().int().positive(),
-                managerId: z.number().int().positive().nullable(),
-            }),
-        )
-        .min(1, "At least one assignment required")
-        .superRefine((assignments, context) => {
-            const seenEmployeeIds = new Set<number>();
-            assignments.forEach((assignment, index) => {
-                if (seenEmployeeIds.has(assignment.employeeId)) {
-                    context.addIssue({
-                        code: "custom",
-                        message: "ห้ามกำหนดผู้อนุมัติซ้ำสำหรับพนักงานคนเดียวกัน",
-                        path: [index, "employeeId"],
-                    });
-                }
-                seenEmployeeIds.add(assignment.employeeId);
-            });
-        }),
-});
 
 export async function GET(): Promise<NextResponse> {
     try {
@@ -50,40 +22,9 @@ export async function GET(): Promise<NextResponse> {
         });
         if (!auth.ok) return auth.response;
 
-        const employees = await prisma.employee.findMany({
-            where: ACTIVE_LEAVE_EMPLOYEE_QUERY_WHERE,
-            select: {
-                id: true,
-                firstName: true,
-                lastName: true,
-                nickname: true,
-                email: true,
-                position: true,
-                status: true,
-                deletedAt: true,
-                managerId: true,
-                dept: { select: { name: true } },
-                user: {
-                    select: {
-                        id: true,
-                        email: true,
-                        isActive: true,
-                        deletedAt: true,
-                    },
-                },
-            },
-            orderBy: [{ firstName: "asc" }, { lastName: "asc" }],
-        });
+        const employees = await getLeaveApproverEmployees();
 
-        return NextResponse.json({
-            employees: employees.map(({ user, ...employee }) => ({
-                ...employee,
-                canApproveLeave: isActiveLeaveApprover({
-                    ...employee,
-                    user,
-                }),
-            })),
-        });
+        return NextResponse.json({ employees });
     } catch (error) {
         console.error("Error fetching approver data:", error);
         return NextResponse.json(
@@ -105,7 +46,7 @@ export async function PUT(req: Request): Promise<NextResponse> {
         if (!auth.ok) return auth.response;
 
         const body = await req.json();
-        const parsed = bulkAssignSchema.safeParse(body);
+        const parsed = leaveApproverAssignmentsSchema.safeParse(body);
 
         if (!parsed.success) {
             return NextResponse.json(

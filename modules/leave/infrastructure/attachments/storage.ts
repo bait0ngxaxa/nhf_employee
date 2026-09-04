@@ -1,0 +1,214 @@
+import { createHash, randomBytes } from "node:crypto";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import path from "node:path";
+import sharp from "sharp";
+
+import {
+    LEAVE_ATTACHMENT_ACCEPTED_FORMATS,
+    LEAVE_ATTACHMENT_MAX_HEIGHT,
+    LEAVE_ATTACHMENT_MAX_INPUT_PIXELS,
+    LEAVE_ATTACHMENT_MAX_WIDTH,
+    LEAVE_ATTACHMENT_WEBP_QUALITY,
+} from "@/modules/leave/infrastructure/attachments/constants";
+import {
+    LeaveAttachmentValidationError,
+    validateLeaveAttachments,
+} from "@/modules/leave/schemas/attachments";
+
+const DEFAULT_PRIVATE_UPLOAD_ROOT = path.join(process.cwd(), ".uploads", "private");
+const SAFE_LEAVE_REQUEST_ID = /^[A-Za-z0-9_-]{1,64}$/;
+const SAFE_STORAGE_KEY = /^leave\/[A-Za-z0-9_-]{1,64}\/[a-f0-9]{32}\.webp$/;
+const ALLOWED_INPUT_FORMATS: ReadonlySet<string> = new Set(
+    LEAVE_ATTACHMENT_ACCEPTED_FORMATS,
+);
+
+export {
+    LeaveAttachmentValidationError,
+    validateLeaveAttachments,
+} from "@/modules/leave/schemas/attachments";
+
+export interface LeaveAttachmentSource {
+    readonly name: string;
+    readonly type: string;
+    readonly size: number;
+    arrayBuffer(): Promise<ArrayBuffer>;
+}
+
+export interface StoredLeaveAttachment {
+    storageKey: string;
+    originalName: string;
+    contentType: "image/webp";
+    contentSha256: string;
+    sizeBytes: number;
+    width: number;
+    height: number;
+}
+
+export interface LeaveAttachmentStorageService {
+    save(input: {
+        leaveRequestId: string;
+        files: readonly LeaveAttachmentSource[];
+    }): Promise<StoredLeaveAttachment[]>;
+    read(storageKey: string): Promise<Buffer>;
+    delete(storageKey: string): Promise<void>;
+}
+
+function validateLeaveRequestId(leaveRequestId: string): void {
+    if (!SAFE_LEAVE_REQUEST_ID.test(leaveRequestId)) {
+        throw new LeaveAttachmentValidationError("รหัสคำขอลาไม่ถูกต้อง");
+    }
+}
+
+function resolveStoragePath(rootDirectory: string, storageKey: string): string {
+    if (!SAFE_STORAGE_KEY.test(storageKey)) {
+        throw new LeaveAttachmentValidationError("รหัสจัดเก็บไฟล์ไม่ถูกต้อง");
+    }
+
+    const rootPath = path.resolve(rootDirectory);
+    const resolvedPath = path.resolve(rootPath, ...storageKey.split("/"));
+    if (!resolvedPath.startsWith(`${rootPath}${path.sep}`)) {
+        throw new LeaveAttachmentValidationError("รหัสจัดเก็บไฟล์ไม่ถูกต้อง");
+    }
+
+    return resolvedPath;
+}
+
+async function transformFile(file: LeaveAttachmentSource): Promise<{
+    data: Buffer;
+    contentSha256: string;
+    width: number;
+    height: number;
+}> {
+    try {
+        const sourceBuffer = Buffer.from(await file.arrayBuffer());
+        const metadataImage = sharp(sourceBuffer, {
+            failOn: "warning",
+            sequentialRead: true,
+        });
+        const metadata = await metadataImage.metadata();
+
+        if (!metadata.format || !ALLOWED_INPUT_FORMATS.has(metadata.format)) {
+            throw new LeaveAttachmentValidationError(
+                `ไฟล์ "${file.name}" ต้องเป็น JPG, PNG หรือ WEBP`,
+            );
+        }
+
+        if (
+            !metadata.width ||
+            !metadata.height ||
+            metadata.width * metadata.height > LEAVE_ATTACHMENT_MAX_INPUT_PIXELS
+        ) {
+            throw new LeaveAttachmentValidationError(
+                `ไฟล์ "${file.name}" มีความละเอียดสูงเกินไป`,
+            );
+        }
+
+        const image = sharp(sourceBuffer, {
+            limitInputPixels: LEAVE_ATTACHMENT_MAX_INPUT_PIXELS,
+            failOn: "warning",
+            sequentialRead: true,
+        });
+        const transformed = await image
+            .rotate()
+            .resize(LEAVE_ATTACHMENT_MAX_WIDTH, LEAVE_ATTACHMENT_MAX_HEIGHT, {
+                fit: "inside",
+                withoutEnlargement: true,
+            })
+            .webp({ quality: LEAVE_ATTACHMENT_WEBP_QUALITY })
+            .toBuffer({ resolveWithObject: true });
+
+        if (!transformed.info.width || !transformed.info.height) {
+            throw new Error("Missing transformed image dimensions");
+        }
+
+        return {
+            data: transformed.data,
+            contentSha256: createHash("sha256")
+                .update(transformed.data)
+                .digest("hex"),
+            width: transformed.info.width,
+            height: transformed.info.height,
+        };
+    } catch (error) {
+        if (error instanceof LeaveAttachmentValidationError) {
+            throw error;
+        }
+
+        throw new LeaveAttachmentValidationError(
+            `ไฟล์ "${file.name}" ไม่ใช่รูปภาพที่ถูกต้อง`,
+        );
+    }
+}
+
+function createStorageKey(leaveRequestId: string): string {
+    return `leave/${leaveRequestId}/${randomBytes(16).toString("hex")}.webp`;
+}
+
+export function createLeaveAttachmentStorage(
+    rootDirectory: string = DEFAULT_PRIVATE_UPLOAD_ROOT,
+): LeaveAttachmentStorageService {
+    const save = async (input: {
+        leaveRequestId: string;
+        files: readonly LeaveAttachmentSource[];
+    }): Promise<StoredLeaveAttachment[]> => {
+        validateLeaveRequestId(input.leaveRequestId);
+        validateLeaveAttachments(input.files);
+
+        const stored: StoredLeaveAttachment[] = [];
+        try {
+            for (const file of input.files) {
+                const transformed = await transformFile(file);
+                const storageKey = createStorageKey(input.leaveRequestId);
+                const targetPath = resolveStoragePath(rootDirectory, storageKey);
+                await mkdir(path.dirname(targetPath), {
+                    recursive: true,
+                    mode: 0o750,
+                });
+                await writeFile(targetPath, transformed.data, {
+                    flag: "wx",
+                    mode: 0o640,
+                });
+                stored.push({
+                    storageKey,
+                    originalName: file.name,
+                    contentType: "image/webp",
+                    contentSha256: transformed.contentSha256,
+                    sizeBytes: transformed.data.byteLength,
+                    width: transformed.width,
+                    height: transformed.height,
+                });
+            }
+            return stored;
+        } catch (error) {
+            const cleanupResults = await Promise.allSettled(
+                stored.map(({ storageKey }) =>
+                    rm(resolveStoragePath(rootDirectory, storageKey), { force: true }),
+                ),
+            );
+            const failedCleanupCount = cleanupResults.filter(
+                (result) => result.status === "rejected",
+            ).length;
+            if (failedCleanupCount > 0) {
+                console.error("ลบไฟล์หลักฐานระหว่าง rollback ไม่สำเร็จ", {
+                    failedCleanupCount,
+                });
+            }
+            throw error;
+        }
+    };
+
+    return {
+        save,
+        read: async (storageKey: string): Promise<Buffer> =>
+            readFile(resolveStoragePath(rootDirectory, storageKey)),
+        delete: async (storageKey: string): Promise<void> => {
+            await rm(resolveStoragePath(rootDirectory, storageKey), { force: true });
+        },
+    };
+}
+
+const leaveAttachmentStorage = createLeaveAttachmentStorage();
+
+export const saveLeaveAttachments = leaveAttachmentStorage.save;
+export const readLeaveAttachment = leaveAttachmentStorage.read;
+export const deleteLeaveAttachment = leaveAttachmentStorage.delete;

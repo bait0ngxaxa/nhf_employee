@@ -1,35 +1,5 @@
-import type { LeaveStatus, LeaveType } from "@prisma/client";
-import { daysToHalfDays } from "@/lib/services/leave/half-days";
-
-/** Default annual leave quotas per type (SSOT) */
-export const DEFAULT_LEAVE_QUOTAS: Record<LeaveType, number> = {
-    SICK: 30,
-    PERSONAL: 10,
-    VACATION: 6,
-} as const;
-
-/** Default annual leave quotas in persisted half-day units. */
-export const DEFAULT_LEAVE_QUOTA_HALF_DAYS: Record<LeaveType, number> = {
-    SICK: daysToHalfDays(DEFAULT_LEAVE_QUOTAS.SICK),
-    PERSONAL: daysToHalfDays(DEFAULT_LEAVE_QUOTAS.PERSONAL),
-    VACATION: daysToHalfDays(DEFAULT_LEAVE_QUOTAS.VACATION),
-} as const;
-
-export const ALL_LEAVE_TYPES = ["SICK", "PERSONAL", "VACATION"] as const satisfies readonly LeaveType[];
-
-export const ALL_LEAVE_STATUSES = [
-    "PENDING",
-    "APPROVED",
-    "REJECTED",
-    "CANCELLED",
-    "NOT_TAKEN",
-    "CANCELLATION_REQUESTED",
-    "CANCELLED_AFTER_APPROVAL",
-] as const satisfies readonly LeaveStatus[];
-
-export const APPROVER_LEAVE_HISTORY_STATUSES = [
-    "APPROVED",
-    "REJECTED",
-    "NOT_TAKEN",
-    "CANCELLED_AFTER_APPROVAL",
-] as const satisfies readonly LeaveStatus[];
+/**
+ * Transitional client-facing facade retained until the Phase E2 presentation migration.
+ * Leave constants are owned by modules/leave/domain/constants.ts.
+ */
+export * from "@/modules/leave/client";

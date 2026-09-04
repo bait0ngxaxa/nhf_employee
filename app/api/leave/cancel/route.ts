@@ -4,22 +4,18 @@ import { requireActiveWorkforceSession } from "@/lib/auth/workforce";
 import {
     enforceLeaveJsonBodySize,
     readLeaveJsonBody,
-} from "@/lib/server/leave-api";
-import {
     cancelLeaveRequest,
     confirmLeaveCancellation,
     LeaveCancellationError,
+    leaveCancelSchema,
+    leaveCancellationDecisionSchema,
     rejectLeaveCancellation,
-} from "@/lib/services/leave/cancellation";
+    toLeaveRequestDays,
+} from "@/modules/leave";
 import { processOutbox } from "@/lib/services/outbox/processor";
 import { jsonError, notFound } from "@/lib/ssot/http";
 import { FEATURE_KEYS, isFeatureEnabled } from "@/lib/ssot/features";
 import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
-import {
-    leaveCancelSchema,
-    leaveCancellationDecisionSchema,
-} from "@/lib/validations/leave";
-import { toLeaveRequestDays } from "@/lib/services/leave/half-days";
 import {
     enforceAuthenticatedMutationRateLimit,
     enforcePreAuthIpRateLimit,

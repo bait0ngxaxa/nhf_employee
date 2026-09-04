@@ -1,17 +1,34 @@
-import type { NextRequest, NextResponse } from "next/server";
+import { after, type NextRequest, type NextResponse } from "next/server";
 
 import { requireActiveWorkforceSession } from "@/lib/auth/workforce";
-import { enforceLeaveJsonBodySize } from "@/lib/server/leave-api";
 import {
+    enforceLeaveJsonBodySize,
     handleLeaveNotTakenConfirmation,
     handleLeaveNotTakenRequest,
-} from "@/lib/server/leave-not-taken-api";
+} from "@/modules/leave";
+import { processOutbox } from "@/lib/services/outbox/processor";
 import {
     enforceAuthenticatedMutationRateLimit,
     enforcePreAuthIpRateLimit,
 } from "@/lib/security/mutation-rate-limit";
 import { FEATURE_KEYS, isFeatureEnabled } from "@/lib/ssot/features";
 import { notFound } from "@/lib/ssot/http";
+
+function scheduleLeaveOutbox(): void {
+    after(() => {
+        processOutbox().catch((error: unknown) =>
+            console.error("Failed to process leave not-taken outbox:", error),
+        );
+    });
+}
+
+function scheduleLeaveNotTakenConfirmationOutbox(): void {
+    after(() => {
+        processOutbox().catch((error: unknown) =>
+            console.error("Failed to process leave not-taken confirm outbox:", error),
+        );
+    });
+}
 
 async function authorizeMutation(
     req: NextRequest,
@@ -49,7 +66,12 @@ async function authorizeMutation(
 export async function POST(req: NextRequest): Promise<NextResponse> {
     const authorization = await authorizeMutation(req);
     if (!authorization.ok) return authorization.response;
-    return handleLeaveNotTakenRequest(req, authorization.auth);
+    return handleLeaveNotTakenRequest(
+        req,
+        authorization.auth,
+        undefined,
+        scheduleLeaveOutbox,
+    );
 }
 
 export async function PUT(req: NextRequest): Promise<NextResponse> {
@@ -57,5 +79,6 @@ export async function PUT(req: NextRequest): Promise<NextResponse> {
     if (!authorization.ok) return authorization.response;
     return handleLeaveNotTakenConfirmation(req, authorization.auth, {
         allowAdminOverride: true,
+        scheduleOutbox: scheduleLeaveNotTakenConfirmationOutbox,
     });
 }

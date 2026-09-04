@@ -10,7 +10,7 @@ import {
     createLeaveReportXlsxResponse,
     getLeaveReportMeta,
     getLeaveReportYears,
-} from "@/lib/services/leave/report-export";
+} from "@/modules/leave";
 import { logDataExport } from "@/lib/server/audit";
 
 vi.mock("next/server", async (importOriginal) => {
@@ -37,11 +37,15 @@ vi.mock("@/lib/db/prisma", () => ({
     },
 }));
 
-vi.mock("@/lib/services/leave/report-export", () => ({
-    getLeaveReportYears: vi.fn(),
-    getLeaveReportMeta: vi.fn(),
-    createLeaveReportXlsxResponse: vi.fn(),
-}));
+vi.mock("@/modules/leave", async (importOriginal) => {
+    const actual = await importOriginal();
+    return {
+        ...(actual as Record<string, unknown>),
+        getLeaveReportYears: vi.fn(),
+        getLeaveReportMeta: vi.fn(),
+        createLeaveReportXlsxResponse: vi.fn(),
+    };
+});
 
 vi.mock("@/lib/server/audit", () => ({
     logDataExport: vi.fn(),

@@ -1,11 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { emailService } from "@/lib/email";
 import { prisma } from "@/lib/db/prisma";
 import { dispatchCurrentLeaveAction } from "@/lib/services/leave/current-action-recipient";
 import { runSerializableTransaction } from "@/lib/db/transaction";
 import { lockLeaveRequestRow } from "@/lib/services/leave/transaction";
 import type { LeaveActionPayload } from "@/lib/services/leave/notification-payloads";
+
+const leaveEmailMocks = vi.hoisted(() => ({
+    sendLeaveActionNotification: vi.fn(),
+}));
 
 vi.mock("@/lib/db/prisma", () => ({
     prisma: {
@@ -13,10 +16,8 @@ vi.mock("@/lib/db/prisma", () => ({
     },
 }));
 
-vi.mock("@/lib/email", () => ({
-    emailService: {
-        sendLeaveActionNotification: vi.fn(),
-    },
+vi.mock("@/modules/leave/infrastructure/notifications/email", () => ({
+    sendLeaveActionNotification: leaveEmailMocks.sendLeaveActionNotification,
 }));
 
 type Deferred = { promise: Promise<void>; resolve: () => void };
@@ -211,7 +212,7 @@ async function cancelRequest(harness: ReturnType<typeof createHarness>): Promise
 describe("LEAVE_ACTION worker and cancellation serialization", () => {
     beforeEach(() => {
         vi.clearAllMocks();
-        vi.mocked(emailService.sendLeaveActionNotification).mockResolvedValue(true);
+        leaveEmailMocks.sendLeaveActionNotification.mockResolvedValue(true);
     });
 
     it("lets the worker create the notification, then cancellation reads it and marks it read", async () => {
@@ -233,7 +234,7 @@ describe("LEAVE_ACTION worker and cancellation serialization", () => {
         expect(harness.state.notifications).toEqual([{ type: "LEAVE_REQUESTED", isRead: true }]);
         expect(harness.state.notifications.some((notification) => !notification.isRead)).toBe(false);
         expect(harness.state.outboxStatus).toBe("SENT");
-        expect(emailService.sendLeaveActionNotification).toHaveBeenCalledTimes(1);
+        expect(leaveEmailMocks.sendLeaveActionNotification).toHaveBeenCalledTimes(1);
     });
 
     it("lets cancellation commit first, so the worker supersedes the stale outbox without email", async () => {
@@ -253,6 +254,6 @@ describe("LEAVE_ACTION worker and cancellation serialization", () => {
         expect(harness.state.requestStatus).toBe("CANCELLED");
         expect(harness.state.outboxStatus).toBe("SUPERSEDED");
         expect(harness.state.notifications).toEqual([]);
-        expect(emailService.sendLeaveActionNotification).not.toHaveBeenCalled();
+        expect(leaveEmailMocks.sendLeaveActionNotification).not.toHaveBeenCalled();
     });
 });

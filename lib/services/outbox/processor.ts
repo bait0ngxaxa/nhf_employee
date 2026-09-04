@@ -22,12 +22,16 @@ import {
     parseLeaveNotTakenConfirmedPayload,
     parseLeaveNotTakenRequestedPayload,
     parseLeaveResultPayload,
-} from "@/lib/services/leave/notification-payloads";
-import { dispatchCurrentLeaveAction } from "@/lib/services/leave/current-action-recipient";
-import {
+    dispatchCurrentLeaveAction,
     dispatchLeaveLineOutbox,
     enqueueLeaveLineNotification,
-} from "@/lib/services/leave/line-notifications";
+    sendLeaveResultNotifications,
+    sendLeaveCancelledNotifications,
+    sendLeaveCancellationRequestedNotifications,
+    sendLeaveCancelledAfterApprovalNotifications,
+    sendLeaveNotTakenRequestedNotifications,
+    sendLeaveNotTakenConfirmedNotifications,
+} from "@/modules/leave";
 import {
     isSharedDriveOption,
     type SharedDriveOption,
@@ -396,9 +400,6 @@ async function dispatchNotification(
                 type: "LEAVE_RESULT_LINE",
                 payload: parsedLeaveResult,
             });
-            const { sendLeaveResultNotifications } = await import(
-                "../leave/notifications"
-            );
             await sendLeaveResultNotifications(parsedLeaveResult);
             return "SENT";
         }
@@ -408,9 +409,6 @@ async function dispatchNotification(
                 type: "LEAVE_CANCELLED_LINE",
                 payload: parsedLeaveCancelled,
             });
-            const { sendLeaveCancelledNotifications } = await import(
-                "../leave/notifications"
-            );
             await sendLeaveCancelledNotifications(parsedLeaveCancelled);
             return "SENT";
         }
@@ -420,9 +418,6 @@ async function dispatchNotification(
                 type: "LEAVE_CANCELLATION_REQUESTED_LINE",
                 payload: parsedCancellationRequested,
             });
-            const { sendLeaveCancellationRequestedNotifications } = await import(
-                "../leave/notifications"
-            );
             await sendLeaveCancellationRequestedNotifications(parsedCancellationRequested);
             return "SENT";
         }
@@ -432,9 +427,6 @@ async function dispatchNotification(
                 type: "LEAVE_CANCELLED_AFTER_APPROVAL_LINE",
                 payload: parsedCancelledAfterApproval,
             });
-            const { sendLeaveCancelledAfterApprovalNotifications } = await import(
-                "../leave/notifications"
-            );
             await sendLeaveCancelledAfterApprovalNotifications(parsedCancelledAfterApproval);
             return "SENT";
         }
@@ -444,9 +436,6 @@ async function dispatchNotification(
                 type: "LEAVE_NOT_TAKEN_REQUESTED_LINE",
                 payload: parsedNotTaken,
             });
-            const { sendLeaveNotTakenRequestedNotifications } = await import(
-                "../leave/notifications"
-            );
             await sendLeaveNotTakenRequestedNotifications(parsedNotTaken);
             return "SENT";
         }
@@ -456,9 +445,6 @@ async function dispatchNotification(
                 type: "LEAVE_NOT_TAKEN_CONFIRMED_LINE",
                 payload: parsedConfirmed,
             });
-            const { sendLeaveNotTakenConfirmedNotifications } = await import(
-                "../leave/notifications"
-            );
             await sendLeaveNotTakenConfirmedNotifications(parsedConfirmed);
             return "SENT";
         }

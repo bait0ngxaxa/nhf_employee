@@ -42,7 +42,7 @@ vi.mock("@/lib/services/leave/get-employee-id", () => ({
     getEmployeeIdFromUserId: vi.fn(),
 }));
 
-vi.mock("@/lib/uploads/leave", async (importOriginal) => {
+vi.mock("@/modules/leave/infrastructure/attachments/storage", async (importOriginal) => {
     const actual = await importOriginal();
     return {
         ...(actual as Record<string, unknown>),

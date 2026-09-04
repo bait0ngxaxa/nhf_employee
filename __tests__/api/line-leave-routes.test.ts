@@ -1,6 +1,5 @@
 // @vitest-environment node
 import type * as NextServerModule from "next/server";
-import type * as LeaveHalfDaysModule from "@/lib/services/leave/half-days";
 import { NextRequest, NextResponse } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -30,42 +29,23 @@ vi.mock("next/server", async (importOriginal) => {
 vi.mock("@/lib/auth/liff", () => ({
     requireLiffWorkforceSession: mocks.requireLiffWorkforceSession,
 }));
-vi.mock("@/lib/services/leave/profile-queries", () => ({
-    getEmployeeLeaveProfile: mocks.getEmployeeLeaveProfile,
-}));
-vi.mock("@/lib/services/leave/approval-list", () => ({
-    getLeaveApprovalList: mocks.getLeaveApprovalList,
-}));
-vi.mock("@/lib/services/leave/participant-access", () => ({
-    getAuthorizedLeaveDetail: mocks.getAuthorizedLeaveDetail,
-    getAuthorizedLeaveAttachment: mocks.getAuthorizedLeaveAttachment,
-}));
-vi.mock("@/lib/uploads/leave", () => ({
-    readLeaveAttachment: mocks.readLeaveAttachment,
-}));
-vi.mock("@/lib/server/leave-request-api", () => ({
-    handleLeaveRequestSubmission: mocks.handleLeaveRequestSubmission,
-    createLeaveRequestErrorResponse: mocks.createLeaveRequestErrorResponse,
-}));
-vi.mock("@/lib/server/leave-not-taken-api", () => ({
-    handleLeaveNotTakenRequest: mocks.handleLeaveNotTakenRequest,
-    handleLeaveNotTakenConfirmation: mocks.handleLeaveNotTakenConfirmation,
-}));
-vi.mock("@/lib/services/leave/cancellation", () => ({
-    cancelLeaveRequest: mocks.cancelLeaveRequest,
-    confirmLeaveCancellation: mocks.confirmLeaveCancellation,
-    rejectLeaveCancellation: mocks.rejectLeaveCancellation,
-    LeaveCancellationError: class LeaveCancellationError extends Error {},
-}));
-vi.mock("@/lib/services/leave/decision", () => ({
-    decideLeaveRequest: mocks.decideLeaveRequest,
-    LeaveApprovalError: class LeaveApprovalError extends Error {},
-}));
-vi.mock("@/lib/services/leave/half-days", async (importOriginal) => {
-    const actual = await importOriginal<typeof LeaveHalfDaysModule>();
+vi.mock("@/modules/leave", async (importOriginal) => {
+    const actual = await importOriginal();
     return {
-        ...actual,
-        toLeaveRequestDays: vi.fn((value: unknown) => value),
+        ...(actual as Record<string, unknown>),
+        getEmployeeLeaveProfile: mocks.getEmployeeLeaveProfile,
+        getLeaveApprovalList: mocks.getLeaveApprovalList,
+        getAuthorizedLeaveDetail: mocks.getAuthorizedLeaveDetail,
+        getAuthorizedLeaveAttachment: mocks.getAuthorizedLeaveAttachment,
+        readLeaveAttachment: mocks.readLeaveAttachment,
+        handleLeaveRequestSubmission: mocks.handleLeaveRequestSubmission,
+        createLeaveRequestErrorResponse: mocks.createLeaveRequestErrorResponse,
+        handleLeaveNotTakenRequest: mocks.handleLeaveNotTakenRequest,
+        handleLeaveNotTakenConfirmation: mocks.handleLeaveNotTakenConfirmation,
+        cancelLeaveRequest: mocks.cancelLeaveRequest,
+        confirmLeaveCancellation: mocks.confirmLeaveCancellation,
+        rejectLeaveCancellation: mocks.rejectLeaveCancellation,
+        decideLeaveRequest: mocks.decideLeaveRequest,
     };
 });
 vi.mock("@/lib/services/outbox/processor", () => ({
@@ -286,6 +266,7 @@ describe("LIFF Leave route adapters", () => {
             { userId: 7, employeeId: 31, userEmail: "admin@example.com" },
             API_ROUTES.line.leaveAttachmentById,
             expect.any(Function),
+            expect.any(Function),
         );
     });
 
@@ -377,6 +358,7 @@ describe("LIFF Leave route adapters", () => {
             {
                 allowAdminOverride: false,
                 serializeResponse: expect.any(Function),
+                scheduleOutbox: expect.any(Function),
             },
         );
         expect(mocks.decideLeaveRequest).toHaveBeenCalledWith(

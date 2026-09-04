@@ -2,24 +2,24 @@ import { NotificationOutboxType, type Prisma } from "@prisma/client";
 
 import { runSerializableTransaction } from "@/lib/db/transaction";
 import { getEmployeeDisplayName } from "@/lib/helpers/employee-helpers";
-import { isActiveEmployeeInTransaction } from "@/lib/services/leave/active-employee-session";
-import { getAssignedLeaveApproverWhere } from "@/lib/services/leave/approval-queries";
-import { buildLeaveAuditContext } from "@/lib/services/leave/audit-details";
-import { getLeaveDecisionAuthorization } from "@/lib/services/leave/exception-approver";
-import { halfDaysToDays } from "@/lib/services/leave/half-days";
+import { isActiveEmployeeInTransaction } from "@/modules/leave/application/queries/active-employee-session";
+import { getAssignedLeaveApproverWhere } from "@/modules/leave/application/approvals/approval-queries";
+import { buildLeaveAuditContext } from "@/modules/leave/application/notifications/audit-details";
+import { getLeaveDecisionAuthorization } from "@/modules/leave/application/approvals/exception-approver";
+import { halfDaysToDays } from "@/modules/leave/domain/half-days";
 import {
     buildLeaveRecipientSnapshot,
     type LeaveResultPayload,
-} from "@/lib/services/leave/notification-payloads";
-import { calculateAdditionalOverQuotaHalfDays } from "@/lib/services/leave/over-quota";
-import { calculateEffectiveEntitlementHalfDays } from "@/lib/services/leave/quota-accounting";
+} from "@/modules/leave/application/notifications/notification-payloads";
+import { calculateAdditionalOverQuotaHalfDays } from "@/modules/leave/domain/over-quota";
+import { calculateEffectiveEntitlementHalfDays } from "@/modules/leave/domain/quota-accounting";
 import {
     ensureLeaveQuotaForYear,
     reconcileLeaveQuotaForward,
-} from "@/lib/services/leave/quota-entitlement";
-import { getLeaveYearFromDateValue } from "@/lib/services/leave/quota-year";
-import { createLeaveAuditInTransaction } from "@/lib/services/leave/transaction";
-import type { LeaveActionValues } from "@/lib/validations/leave";
+} from "@/modules/leave/domain/quota-entitlement";
+import { getLeaveYearFromDateValue } from "@/modules/leave/domain/quota-year";
+import { createLeaveAuditInTransaction } from "@/modules/leave/infrastructure/persistence/transaction";
+import type { LeaveActionValues } from "@/modules/leave/schemas/leave";
 
 const LEAVE_APPROVAL_MESSAGES = {
     requestNotFound: "ไม่พบคำขอลา",

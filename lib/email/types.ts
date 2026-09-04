@@ -15,7 +15,7 @@ export type {
     LeaveNotTakenConfirmedPayload,
     LeaveNotTakenRequestedPayload,
     LeaveResultPayload,
-} from "@/lib/services/leave/notification-payloads";
+} from "@/modules/leave";
 
 export type {
     StockRequestResultEmailPayload,

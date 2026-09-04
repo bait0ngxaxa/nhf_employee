@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server";
 
 import { requireLiffWorkforceSession } from "@/lib/auth/liff";
-import { getApproverLeaveActions } from "@/lib/services/leave/action-availability";
-import { getLeaveApprovalList } from "@/lib/services/leave/approval-list";
-import { parseLeaveApprovalPage } from "@/lib/services/leave/approval-queries";
-import { toLiffLeaveApprovalItem } from "@/lib/services/leave/liff-serialization";
+import {
+    getApproverLeaveActions,
+    getLeaveApprovalList,
+    parseLeaveApprovalPage,
+    toLiffLeaveApprovalItem,
+} from "@/modules/leave";
 import { FEATURE_KEYS, isFeatureEnabled } from "@/lib/ssot/features";
 import { jsonError, notFound, serverError } from "@/lib/ssot/http";
 import { API_ROUTES } from "@/lib/ssot/routes";

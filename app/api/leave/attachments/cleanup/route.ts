@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { cleanupOrphanedLeaveAttachments } from "@/lib/services/leave/cleanup-orphans";
+import { cleanupOrphanedLeaveAttachments } from "@/modules/leave";
 import { forbidden, jsonError, serverError } from "@/lib/ssot/http";
 import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
 

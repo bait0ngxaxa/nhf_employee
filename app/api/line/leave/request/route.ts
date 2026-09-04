@@ -1,12 +1,13 @@
-import type { NextRequest, NextResponse } from "next/server";
+import { after, type NextRequest, type NextResponse } from "next/server";
 
 import { requireLiffWorkforceSession } from "@/lib/auth/liff";
 import {
+    assertLeaveRequestBodySize,
     createLeaveRequestErrorResponse,
     handleLeaveRequestSubmission,
-} from "@/lib/server/leave-request-api";
-import { assertLeaveRequestBodySize } from "@/lib/services/leave/request-input";
-import { toLiffLeaveMutationResponse } from "@/lib/services/leave/liff-serialization";
+    toLiffLeaveMutationResponse,
+} from "@/modules/leave";
+import { processOutbox } from "@/lib/services/outbox/processor";
 import {
     enforceAuthenticatedMutationRateLimit,
     enforcePreAuthIpRateLimit,
@@ -14,6 +15,16 @@ import {
 import { API_ROUTES } from "@/lib/ssot/routes";
 import { FEATURE_KEYS, isFeatureEnabled } from "@/lib/ssot/features";
 import { notFound } from "@/lib/ssot/http";
+
+function scheduleLeaveOutbox(): void {
+    after(() => {
+        processOutbox().catch((error: unknown) =>
+            console.error("ประมวลผล outbox หลังสร้างคำขอลาไม่สำเร็จ", {
+                errorType: error instanceof Error ? error.name : "UnknownError",
+            }),
+        );
+    });
+}
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
     if (!isFeatureEnabled(FEATURE_KEYS.leave)) return notFound();
@@ -46,5 +57,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         },
         API_ROUTES.line.leaveAttachmentById,
         toLiffLeaveMutationResponse,
+        scheduleLeaveOutbox,
     );
 }

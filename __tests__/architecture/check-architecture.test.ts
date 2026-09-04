@@ -167,6 +167,21 @@ describe("architecture checker module boundaries", () => {
         );
     });
 
+    it.each([
+        "app/api/leave/example.ts",
+        "app/api/line/leave/example.ts",
+    ])("rejects %s importing legacy Leave ownership", async (importerPath) => {
+        const result = await checkFixture(
+            importerPath,
+            'import { x } from "@/lib/services/leave/notifications";\n',
+        );
+
+        expect(result.violations).toHaveLength(1);
+        expect(result.violations[0]).toContain(
+            "Leave API routes must use the Leave module public API",
+        );
+    });
+
     it("rejects a relative cross-module deep import", async () => {
         const result = await checkFixture(
             "modules/routine/application/example.ts",

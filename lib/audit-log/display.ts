@@ -10,8 +10,8 @@ import {
     getLeavePeriodLabel,
     getLeaveTypeLabel,
     type LeaveTypeValue,
-} from "@/lib/services/leave/notification-format";
-import type { LeavePeriodValue } from "@/lib/services/leave/utils";
+} from "@/modules/leave";
+import type { LeavePeriodValue } from "@/modules/leave";
 
 export interface AuditLogDisplayInput {
     action: string;

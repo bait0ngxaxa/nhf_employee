@@ -1,11 +1,13 @@
 import { NextResponse } from "next/server";
 
 import { requireLiffWorkforceSession } from "@/lib/auth/liff";
-import { getAuthorizedLeaveAttachment } from "@/lib/services/leave/participant-access";
-import { readLeaveAttachment } from "@/lib/uploads/leave";
+import {
+    getAuthorizedLeaveAttachment,
+    leaveAttachmentIdParamSchema,
+    readLeaveAttachment,
+} from "@/modules/leave";
 import { FEATURE_KEYS, isFeatureEnabled } from "@/lib/ssot/features";
 import { notFound, serverError } from "@/lib/ssot/http";
-import { leaveAttachmentIdParamSchema } from "@/lib/validations/leave";
 
 interface LeaveAttachmentRouteContext {
     params: Promise<{ id: string }>;

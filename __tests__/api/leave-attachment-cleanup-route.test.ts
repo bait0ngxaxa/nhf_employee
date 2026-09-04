@@ -2,11 +2,15 @@ import { NextRequest } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { POST } from "@/app/api/leave/attachments/cleanup/route";
-import { cleanupOrphanedLeaveAttachments } from "@/lib/services/leave/cleanup-orphans";
+import { cleanupOrphanedLeaveAttachments } from "@/modules/leave";
 
-vi.mock("@/lib/services/leave/cleanup-orphans", () => ({
-    cleanupOrphanedLeaveAttachments: vi.fn(),
-}));
+vi.mock("@/modules/leave", async (importOriginal) => {
+    const actual = await importOriginal();
+    return {
+        ...(actual as Record<string, unknown>),
+        cleanupOrphanedLeaveAttachments: vi.fn(),
+    };
+});
 
 function createRequest(secret?: string, dryRun?: boolean): NextRequest {
     return new NextRequest(

@@ -4,12 +4,11 @@ import { requireActiveWorkforceSession } from "@/lib/auth/workforce";
 import {
     enforceLeaveJsonBodySize,
     readLeaveJsonBody,
-} from "@/lib/server/leave-api";
-import {
     decideLeaveRequest,
     LeaveApprovalError,
-} from "@/lib/services/leave/decision";
-import { toLeaveRequestDays } from "@/lib/services/leave/half-days";
+    leaveActionSchema,
+    toLeaveRequestDays,
+} from "@/modules/leave";
 import { processOutbox } from "@/lib/services/outbox/processor";
 import {
     enforceAuthenticatedMutationRateLimit,
@@ -18,7 +17,6 @@ import {
 import { FEATURE_KEYS, isFeatureEnabled } from "@/lib/ssot/features";
 import { jsonError, notFound } from "@/lib/ssot/http";
 import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
-import { leaveActionSchema } from "@/lib/validations/leave";
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
     try {

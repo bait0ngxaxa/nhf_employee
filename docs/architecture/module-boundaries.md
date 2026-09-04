@@ -1,7 +1,8 @@
 # Module boundaries
 
-Status: Phase D policy. Stock and Routine are migrated examples; remaining
-feature migrations remain incremental.
+Status: Phase E1 policy. Stock and Routine are migrated examples, and Leave
+server/business ownership is now migrated; remaining presentation and feature
+migrations remain incremental.
 
 ## What is a module
 
@@ -43,6 +44,10 @@ import { StockSection } from "@/modules/stock/client";
 Routine follows the same split: server/application consumers use
 `@/modules/routine`, while Dashboard and LIFF consumers use
 `@/modules/routine/client`.
+
+Leave server/application consumers use `@/modules/leave`. Leave Dashboard and
+LIFF consumers may temporarily use `@/modules/leave/client` or the documented
+legacy facades until Phase E2 completes presentation migration.
 
 The root barrel remains server/application-oriented. The client entry point
 must export only client-safe presentation contracts.
@@ -155,3 +160,10 @@ structure remains operational for features that have not migrated. Existing
 imports are not rewritten merely to make the target diagram look complete. A
 migration must preserve behavior unless a separate change explicitly requests
 a behavior change.
+
+Leave is a deliberate partial migration: `modules/leave/` owns all migrated
+server/business behavior, while legacy presentation and client delivery paths
+remain only as thin compatibility adapters. The architecture checker rejects
+legacy Leave ownership imports from `app/api/leave/**` and
+`app/api/line/leave/**`; it does not reject the documented E2 presentation
+compatibility paths.

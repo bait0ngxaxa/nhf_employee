@@ -150,6 +150,63 @@ function getModuleDependencyViolation(owner, moduleSpecifier) {
     return null;
 }
 
+const leaveApiRouteDirectories = [
+    "app/api/leave",
+    "app/api/line/leave",
+];
+
+const legacyLeaveImportPrefixes = [
+    "@/constants/leave",
+    "@/lib/email/templates/leave-action",
+    "@/lib/email/templates/leave-event",
+    "@/lib/email/templates/leave-result",
+    "@/lib/line/flex-messages/leave",
+    "@/lib/line/leave-links",
+    "@/lib/server/leave-api",
+    "@/lib/server/leave-not-taken-api",
+    "@/lib/server/leave-request-api",
+    "@/lib/services/leave",
+    "@/lib/ssot/leave-attachments",
+    "@/lib/types/leave",
+    "@/lib/uploads/leave",
+    "@/lib/validations/leave-attachments",
+    "@/lib/validations/leave-report",
+    "@/lib/validations/leave",
+];
+
+const leaveCompatibilityFacadePaths = new Set([
+    "lib/services/leave/audit-details.ts",
+    "lib/services/leave/create-request-audit.ts",
+    "lib/services/leave/transaction.ts",
+]);
+
+function hasImportPrefix(moduleSpecifier, prefix) {
+    return moduleSpecifier === prefix || moduleSpecifier.startsWith(`${prefix}/`);
+}
+
+function getLeaveRouteDependencyViolation(filePath, rootPath, moduleSpecifier) {
+    const isLeaveApiRoute = leaveApiRouteDirectories.some((directory) =>
+        pathIsWithin(filePath, resolve(rootPath, directory)),
+    );
+    if (!isLeaveApiRoute) {
+        return null;
+    }
+
+    if (legacyLeaveImportPrefixes.some((prefix) =>
+        hasImportPrefix(moduleSpecifier, prefix),
+    )) {
+        return "Leave API routes must use the Leave module public API \"@/modules/leave\" instead of legacy Leave ownership paths.";
+    }
+
+    return null;
+}
+
+function isAllowedLeaveCompatibilityFacade(filePath, rootPath, target) {
+    return target.moduleName === "leave"
+        && !target.isPublicEntryPoint
+        && leaveCompatibilityFacadePaths.has(relativeFilePath(filePath, rootPath));
+}
+
 function getScriptKind(filePath) {
     switch (extname(filePath)) {
         case ".js":
@@ -226,12 +283,16 @@ function describeViolation(filePath, rootPath, importRecord, message) {
     return `${relativeFilePath(filePath, rootPath)}:${importRecord.line} imports "${importRecord.moduleSpecifier}": ${message}`;
 }
 
-function getBoundaryViolation(owner, target) {
+function getBoundaryViolation(owner, target, filePath, rootPath) {
     if (owner.kind === "shared" && target.kind === "modules") {
         return "shared/ cannot depend on business modules.";
     }
 
     if (target.kind !== "modules" || target.moduleName === null) {
+        return null;
+    }
+
+    if (isAllowedLeaveCompatibilityFacade(filePath, rootPath, target)) {
         return null;
     }
 
@@ -272,6 +333,21 @@ function checkArchitecture(options = {}) {
         const owner = getOwner(filePath, modulesRoot, sharedRoot);
 
         for (const importRecord of getImports(filePath)) {
+            const leaveRouteDependencyViolation = getLeaveRouteDependencyViolation(
+                filePath,
+                rootPath,
+                importRecord.moduleSpecifier,
+            );
+            if (leaveRouteDependencyViolation !== null) {
+                violations.push(describeViolation(
+                    filePath,
+                    rootPath,
+                    importRecord,
+                    leaveRouteDependencyViolation,
+                ));
+                continue;
+            }
+
             const moduleDependencyViolation = getModuleDependencyViolation(
                 owner,
                 importRecord.moduleSpecifier,
@@ -297,7 +373,7 @@ function checkArchitecture(options = {}) {
                 continue;
             }
 
-            const message = getBoundaryViolation(owner, target);
+            const message = getBoundaryViolation(owner, target, filePath, rootPath);
             if (message !== null) {
                 violations.push(describeViolation(
                     filePath,
