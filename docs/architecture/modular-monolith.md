@@ -1,12 +1,13 @@
 # NHF Employee modular monolith
 
-Status: Phase B — Stock Pilot Module Migration.
+Status: Phase C — Dashboard Route-per-Module Migration.
 
 This document separates the repository's observed current state from the
 target architecture. Stock server/business ownership is now migrated into
-`modules/stock/`; its Dashboard and client presentation remain legacy until
-Phase C. See [stock-migration.md](./stock-migration.md) for the migration
-status and transitional dependencies.
+`modules/stock/`; its Dashboard and client presentation now live in the same
+module behind separate server and client public entry points. See
+[stock-migration.md](./stock-migration.md) for the migration status and
+transitional dependencies.
 
 ## Why a modular monolith
 
@@ -37,11 +38,12 @@ distributed across locations such as:
 - `prisma/` for the single schema and its migrations; and
 - `__tests__/` for the existing unit, integration, API, and component tests.
 
-At the Phase B baseline, `modules/stock/` is the first feature module with
-server/business ownership. Existing feature code for Routine, Leave, and
-Employee remains in its current locations. Stock Dashboard/client
-presentation and generic legacy platform infrastructure continue to coexist
-incrementally with the migrated module.
+At the Phase C baseline, `modules/stock/` is the first feature module with
+server/business and Dashboard/client presentation ownership. Existing feature
+code for Routine, Leave, and Employee remains in its current locations. The
+Dashboard uses route-per-module App Router pages; historical
+`/dashboard?tab=...` links remain inbound-compatible through the dashboard home
+route boundary.
 
 ## Target architecture
 
@@ -62,7 +64,8 @@ flow LR
 `app/` owns routing and framework delivery. `modules/` owns business feature
 behavior. `shared/` owns only genuinely cross-domain/platform capabilities.
 Cross-module use is deliberate and goes through the target module's public
-entry point, normally `modules/<feature>/index.ts`.
+entry point: `modules/<feature>/index.ts` for server/application code or the
+explicit `modules/<feature>/client.ts` entry for client presentation.
 
 The dependency graph describes new architecture code. It does not claim that
 the legacy `lib/`, `components/`, or route structure has already been
@@ -95,9 +98,11 @@ features remain out of scope.
 
 ## Invariants for this phase
 
-The following remain outside the scope of the architecture scaffolding:
+The following remain outside the scope of the route migration:
 
-- business behavior, API contracts, UI behavior, URLs, and navigation;
+- business behavior, API contracts, visual UI behavior, and navigation wording;
+- API URLs and historical dashboard query-tab URLs remain behavior-preserving
+  compatibility constraints; canonical Dashboard page paths are now explicit;
 - authentication, authorization, permissions, and LIFF behavior;
 - the Prisma schema, migrations, and database layout; and
 - cron, notifications, email, LINE, uploads, Routine, Leave, and Employee

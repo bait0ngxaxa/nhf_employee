@@ -15,7 +15,7 @@ import {
 import { cn } from "@/lib/ui/utils";
 import { apiGet } from "@/lib/client/api-client";
 import { isDashboardTabEnabled } from "@/lib/ssot/features";
-import { toDashboardTabPath } from "@/lib/ssot/routes";
+import { toDashboardMenuPath } from "@/lib/ssot/routes";
 
 import {
     EmptyState,
@@ -59,7 +59,7 @@ export function normalizeNotificationActionUrl(
         const parsedUrl = new URL(normalizedUrl, "http://localhost");
         const tab = parsedUrl.searchParams.get("tab");
         if (tab && !isDashboardTabEnabled(tab)) {
-            return toDashboardTabPath("dashboard");
+            return toDashboardMenuPath("dashboard");
         }
     } catch {
         return normalizedUrl;

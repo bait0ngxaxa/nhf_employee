@@ -2,15 +2,16 @@
 
 import { Button } from "@/components/ui/button";
 import { Users } from "lucide-react";
+import { useSWRConfig } from "swr";
 import { AddEmployeeForm } from "@/components/employee";
 import {
     useDashboardUIContext,
-    useDashboardDataContext,
 } from "@/components/dashboard/context/dashboard/DashboardContext";
+import { API_ROUTES } from "@/lib/ssot/routes";
 
 export function AddEmployeeSection() {
     const { handleMenuClick } = useDashboardUIContext();
-    const { handleEmployeeAdded } = useDashboardDataContext();
+    const { mutate } = useSWRConfig();
 
     return (
         <div className="min-h-[calc(100dvh-6rem)] overflow-hidden rounded-2xl border border-border-subtle bg-surface-subtle">
@@ -39,7 +40,11 @@ export function AddEmployeeSection() {
                 </div>
 
                 <div className="space-y-8">
-                    <AddEmployeeForm onSuccess={handleEmployeeAdded} />
+                    <AddEmployeeForm
+                        onSuccess={() => {
+                            void mutate(API_ROUTES.employees.stats);
+                        }}
+                    />
                 </div>
             </div>
         </div>

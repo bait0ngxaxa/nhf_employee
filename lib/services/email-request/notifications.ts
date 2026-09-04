@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db/prisma";
 import { createInAppNotificationOnce } from "@/lib/services/notifications/in-app";
 import type { EmailRequestData } from "@/types/api";
+import { APP_DASHBOARD_TABS, toDashboardMenuPath } from "@/lib/ssot/routes";
 
 export const EMAIL_REQUEST_INAPP_RECIPIENTS_ENV =
     "EMAIL_REQUEST_INAPP_RECIPIENT_EMAILS";
@@ -54,7 +55,7 @@ export async function createEmailRequestInAppNotification(
                 type: "SYSTEM_ALERT",
                 title: "มีคำขออีเมลพนักงานใหม่",
                 message: `${payload.thaiName} (${payload.position}, ${payload.department}) ส่งคำขออีเมลพนักงานใหม่`,
-                actionUrl: "/dashboard?tab=email-request",
+                actionUrl: toDashboardMenuPath(APP_DASHBOARD_TABS.emailRequest),
                 referenceId: payload.replyEmail,
                 dedupeKey: `email-request:${payload.replyEmail}:${payload.requestedAt}:${userId}`,
             }),

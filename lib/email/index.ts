@@ -33,7 +33,7 @@ import {
 import {
     APP_DASHBOARD_TABS,
     STOCK_DASHBOARD_TABS,
-    toDashboardTabPath,
+    toDashboardMenuPath,
     toDashboardStockTabPath,
 } from "@/lib/ssot/routes";
 import {
@@ -315,7 +315,7 @@ export async function sendLeaveActionNotification(
 export async function sendLeaveResultNotification(
     data: LeaveResultPayload
 ): Promise<boolean> {
-    const dashboardUrl = `${getPublicOrigin()}${toDashboardTabPath(APP_DASHBOARD_TABS.leaveHistory)}`;
+    const dashboardUrl = `${getPublicOrigin()}${toDashboardMenuPath(APP_DASHBOARD_TABS.leaveHistory)}`;
     const emailData: EmailData = {
         to: data.employee.email,
         subject: `[NHF Leave] ผลการพิจารณาคำขอลา: ${data.status === "APPROVED" ? "อนุมัติ" : "ไม่อนุมัติ"}`,
@@ -330,7 +330,7 @@ export async function sendLeaveResultNotification(
 export async function sendLeaveCancelledNotification(
     data: LeaveCancelledPayload,
 ): Promise<boolean> {
-    const dashboardLink = `${getPublicOrigin()}${toDashboardTabPath(APP_DASHBOARD_TABS.managerApproval)}`;
+    const dashboardLink = `${getPublicOrigin()}${toDashboardMenuPath(APP_DASHBOARD_TABS.managerApproval)}`;
     const emailData: EmailData = {
         to: data.approver.email,
         subject: `[NHF Leave] ${data.employee.name} ยกเลิกคำขอลาแล้ว`,
@@ -352,7 +352,7 @@ export async function sendLeaveCancelledNotification(
 export async function sendLeaveCancellationRequestedNotification(
     data: LeaveCancellationRequestedPayload,
 ): Promise<boolean> {
-    const dashboardLink = `${getPublicOrigin()}${toDashboardTabPath(APP_DASHBOARD_TABS.managerApproval)}`;
+    const dashboardLink = `${getPublicOrigin()}${toDashboardMenuPath(APP_DASHBOARD_TABS.managerApproval)}`;
     const emailData: EmailData = {
         to: data.approver.email,
         subject: `[NHF Leave] มีคำขอยกเลิกวันลาจาก ${data.employee.name}`,
@@ -380,7 +380,7 @@ export async function sendLeaveCancellationRequestedNotification(
 export async function sendLeaveCancelledAfterApprovalNotification(
     data: LeaveCancelledAfterApprovalPayload,
 ): Promise<boolean> {
-    const dashboardLink = `${getPublicOrigin()}${toDashboardTabPath(APP_DASHBOARD_TABS.leaveHistory)}`;
+    const dashboardLink = `${getPublicOrigin()}${toDashboardMenuPath(APP_DASHBOARD_TABS.leaveHistory)}`;
     const decisionActor = formatLeaveDecisionActor(data);
     const emailData: EmailData = {
         to: data.employee.email,
@@ -408,7 +408,7 @@ export async function sendLeaveCancelledAfterApprovalNotification(
 export async function sendLeaveNotTakenRequestedNotification(
     data: LeaveNotTakenRequestedPayload,
 ): Promise<boolean> {
-    const dashboardLink = `${getPublicOrigin()}${toDashboardTabPath(APP_DASHBOARD_TABS.managerApproval)}`;
+    const dashboardLink = `${getPublicOrigin()}${toDashboardMenuPath(APP_DASHBOARD_TABS.managerApproval)}`;
     const emailData: EmailData = {
         to: data.approver.email,
         subject: `[NHF Leave] มีรายการแจ้งไม่ได้ใช้วันลารอยืนยัน`,
@@ -432,7 +432,7 @@ export async function sendLeaveNotTakenRequestedNotification(
 export async function sendLeaveNotTakenConfirmedNotification(
     data: LeaveNotTakenConfirmedPayload,
 ): Promise<boolean> {
-    const dashboardLink = `${getPublicOrigin()}${toDashboardTabPath(APP_DASHBOARD_TABS.leaveHistory)}`;
+    const dashboardLink = `${getPublicOrigin()}${toDashboardMenuPath(APP_DASHBOARD_TABS.leaveHistory)}`;
     const decisionActor = formatLeaveDecisionActor(data);
     const emailData: EmailData = {
         to: data.employee.email,

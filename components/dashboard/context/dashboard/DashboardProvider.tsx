@@ -3,85 +3,33 @@
 import {
     useState,
     useCallback,
-    useEffect,
     useMemo,
-    startTransition,
     type ReactElement,
     type ReactNode,
 } from "react";
-import { useRouter, useSearchParams, usePathname } from "next/navigation";
-import useSWR from "swr";
+import { useRouter, usePathname } from "next/navigation";
 import {
     DASHBOARD_MENU_ITEMS,
     getAvailableMenuGroups,
 } from "@/constants/dashboard";
 import { DashboardDataContext, DashboardUIContext } from "./DashboardContext";
 import {
-    type EmployeeStats,
     type DashboardDataContextValue,
     type DashboardUIContextValue,
 } from "./types";
 import {
-    API_ROUTES,
     APP_ROUTES,
-    toDashboardTabPath,
+    getDashboardMenuIdFromPathname,
+    toDashboardMenuPath,
 } from "@/lib/ssot/routes";
 import { isDashboardTabEnabled } from "@/lib/ssot/features";
 import { isAdminRole, USER_ROLES } from "@/lib/ssot/permissions";
 import { useAuth } from "@/components/auth/HybridAuthProvider";
+import { clearStockBrowseCart } from "@/modules/stock/client";
 
 interface DashboardProviderProps {
     children: ReactNode;
     initialUser?: DashboardDataContextValue["user"];
-}
-
-const STOCK_BROWSE_CART_STORAGE_KEY_PREFIX = "stock:browse-cart:v1:user:";
-const STOCK_BROWSE_CART_LEGACY_KEY = "stock:browse-cart:v1";
-const DASHBOARD_SYSTEM_TABS = new Set([
-    "dashboard",
-    "notifications",
-    "sessions",
-    "manager-approval",
-    "leave-history",
-]);
-
-const defaultStats: EmployeeStats = {
-    total: 0,
-    active: 0,
-    admin: 0,
-    academic: 0,
-};
-
-function normalizeDashboardTab(tab: string | null): string {
-    if (tab === "it-equipment") {
-        return "stock";
-    }
-
-    const normalizedTab = tab ?? "dashboard";
-    const isKnownTab =
-        DASHBOARD_SYSTEM_TABS.has(normalizedTab) ||
-        DASHBOARD_MENU_ITEMS.some((item) => item.id === normalizedTab);
-
-    return isKnownTab && isDashboardTabEnabled(normalizedTab)
-        ? normalizedTab
-        : "dashboard";
-}
-
-function clearStockCartStorage(userId: string): void {
-    if (typeof window === "undefined") {
-        return;
-    }
-
-    try {
-        if (userId) {
-            window.localStorage.removeItem(
-                `${STOCK_BROWSE_CART_STORAGE_KEY_PREFIX}${userId}`,
-            );
-        }
-        window.localStorage.removeItem(STOCK_BROWSE_CART_LEGACY_KEY);
-    } catch {
-        // Logout must continue even when storage is unavailable.
-    }
 }
 
 export function DashboardProvider({
@@ -90,7 +38,6 @@ export function DashboardProvider({
 }: DashboardProviderProps): ReactElement {
     const { user: authUser, status, signOut } = useAuth();
     const router = useRouter();
-    const searchParams = useSearchParams();
     const pathname = usePathname();
     const user = authUser ?? initialUser;
     const isAdmin = isAdminRole(user?.role);
@@ -99,48 +46,15 @@ export function DashboardProvider({
             ? "authenticated"
             : status;
 
-    // Initialize selectedMenu from URL ?tab= param, fallback to "dashboard"
-    const initialTab = normalizeDashboardTab(searchParams.get("tab"));
-    const [selectedMenu, setSelectedMenu] = useState<string>(initialTab);
+    const selectedMenu = getDashboardMenuIdFromPathname(pathname);
     const [mobileNavOpen, setMobileNavOpen] = useState(false);
     const [desktopSidebarCollapsed, setDesktopSidebarCollapsed] =
         useState(false);
-    const [refreshTrigger, setRefreshTrigger] = useState(0);
-
-    // Sync selectedMenu when URL ?tab= changes (e.g. notification click or browser back/forward)
-    useEffect(() => {
-        const requestedTab = searchParams.get("tab");
-        const tabFromUrl = normalizeDashboardTab(requestedTab);
-        startTransition(() => {
-            setSelectedMenu(tabFromUrl);
-        });
-
-        if (
-            pathname === APP_ROUTES.dashboard &&
-            requestedTab !== null &&
-            requestedTab !== tabFromUrl
-        ) {
-            router.replace(toDashboardTabPath(tabFromUrl), { scroll: false });
-        }
-    }, [pathname, router, searchParams]);
 
     const availableMenuGroups = useMemo(
         () => getAvailableMenuGroups(isAdmin),
         [isAdmin],
     );
-
-
-
-    const { data: statsData, mutate: mutateStats } = useSWR<{
-        stats: EmployeeStats;
-    }>(API_ROUTES.employees.stats);
-
-    const employeeStats = statsData?.stats || defaultStats;
-
-    const handleEmployeeAdded = useCallback(() => {
-        mutateStats();
-        setRefreshTrigger((prev) => prev + 1);
-    }, [mutateStats]);
 
     const handleMenuClick = useCallback(
         (menuId: string) => {
@@ -150,7 +64,7 @@ export function DashboardProvider({
                 (item) => item.id === menuId,
             );
             if (menuItem?.feature && !isDashboardTabEnabled(menuId)) {
-                router.push(toDashboardTabPath("dashboard"), { scroll: false });
+                router.push(APP_ROUTES.dashboard, { scroll: false });
                 return;
             }
             if (menuItem?.requiredRole === USER_ROLES.ADMIN && !isAdmin) {
@@ -158,12 +72,12 @@ export function DashboardProvider({
                 return;
             }
 
-            // Sync with URL to support browser history and bookmarks
-            if (pathname !== APP_ROUTES.dashboard || searchParams.get("tab") !== menuId) {
-                router.push(toDashboardTabPath(menuId), { scroll: false });
+            const targetPath = toDashboardMenuPath(menuId);
+            if (pathname !== targetPath) {
+                router.push(targetPath, { scroll: false });
             }
         },
-        [isAdmin, router, searchParams, pathname],
+        [isAdmin, pathname, router],
     );
 
     const handleSignOut = useCallback(async (): Promise<void> => {
@@ -174,7 +88,7 @@ export function DashboardProvider({
                   ? String(user.id)
                   : "";
 
-        clearStockCartStorage(userId);
+        clearStockBrowseCart(userId);
         await signOut();
     }, [signOut, user?.id]);
 
@@ -183,18 +97,12 @@ export function DashboardProvider({
             status: effectiveStatus,
             user,
             isAdmin,
-            employeeStats,
-            refreshTrigger,
-            handleEmployeeAdded,
             availableMenuGroups,
         }),
         [
             effectiveStatus,
             user,
             isAdmin,
-            employeeStats,
-            refreshTrigger,
-            handleEmployeeAdded,
             availableMenuGroups,
         ],
     );
@@ -202,7 +110,6 @@ export function DashboardProvider({
     const uiValue = useMemo<DashboardUIContextValue>(
         () => ({
             selectedMenu,
-            setSelectedMenu,
             mobileNavOpen,
             setMobileNavOpen,
             desktopSidebarCollapsed,
@@ -213,7 +120,6 @@ export function DashboardProvider({
         }),
         [
             selectedMenu,
-            setSelectedMenu,
             mobileNavOpen,
             setMobileNavOpen,
             desktopSidebarCollapsed,

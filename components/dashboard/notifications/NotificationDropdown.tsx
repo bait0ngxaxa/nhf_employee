@@ -13,7 +13,7 @@ import { getRelativeTime } from "@/lib/helpers/date-helpers";
 import {
     API_ROUTES,
     APP_DASHBOARD_TABS,
-    toDashboardTabPath,
+    toDashboardMenuPath,
 } from "@/lib/ssot/routes";
 
 import { Button } from "@/components/ui/button";
@@ -204,7 +204,7 @@ export function NotificationDropdown(): React.ReactElement {
                         onClick={() => {
                             setOpen(false);
                             router.push(
-                                toDashboardTabPath(
+                                toDashboardMenuPath(
                                     APP_DASHBOARD_TABS.notifications,
                                 ),
                             );

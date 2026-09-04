@@ -11,7 +11,7 @@ import {
     DialogScrollArea,
     DialogTitle,
 } from "@/components/ui/dialog";
-import { getVariantAttributeSummary } from "@/components/dashboard/stock/stockVariant.shared";
+import { getVariantAttributeSummary } from "@/modules/stock/client";
 import type {
     LiffStockCatalogItem,
     LiffStockCatalogVariant,

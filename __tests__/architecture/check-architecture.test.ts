@@ -9,6 +9,7 @@ type FixtureFiles = Readonly<Record<string, string>>;
 
 const fixtureFiles: FixtureFiles = {
     "modules/stock/index.ts": "export const x = 1;\n",
+    "modules/stock/client.ts": '"use client"; export const x = 1;\n',
     "modules/stock/application/create-item.ts": "export const x = 1;\n",
     "modules/stock/domain/inventory.ts": "export const x = 1;\n",
     "modules/routine/index.ts": "export const x = 1;\n",
@@ -60,6 +61,15 @@ describe("architecture checker module boundaries", () => {
         expect(result.violations).toEqual([]);
     });
 
+    it("allows an external consumer to use the explicit client public API", async () => {
+        const result = await checkFixture(
+            "app/example.ts",
+            'import { x } from "@/modules/stock/client";\n',
+        );
+
+        expect(result.violations).toEqual([]);
+    });
+
     it("rejects an external consumer deep-importing module internals", async () => {
         const result = await checkFixture(
             "app/example.ts",
@@ -76,6 +86,15 @@ describe("architecture checker module boundaries", () => {
         const result = await checkFixture(
             "modules/routine/example.ts",
             'import { x } from "@/modules/stock";\n',
+        );
+
+        expect(result.violations).toEqual([]);
+    });
+
+    it("allows a module to use another module client public API", async () => {
+        const result = await checkFixture(
+            "modules/routine/example.ts",
+            'import { x } from "@/modules/stock/client";\n',
         );
 
         expect(result.violations).toEqual([]);
@@ -102,10 +121,31 @@ describe("architecture checker module boundaries", () => {
         expect(result.violations).toEqual([]);
     });
 
+    it("allows a module to use its own client public API", async () => {
+        const result = await checkFixture(
+            "modules/stock/presentation/example.ts",
+            'import { x } from "@/modules/stock/client";\n',
+        );
+
+        expect(result.violations).toEqual([]);
+    });
+
     it("rejects shared code importing a module public API", async () => {
         const result = await checkFixture(
             "shared/example.ts",
             'import { x } from "@/modules/stock";\n',
+        );
+
+        expect(result.violations).toHaveLength(1);
+        expect(result.violations[0]).toContain(
+            "shared/ cannot depend on business modules",
+        );
+    });
+
+    it("rejects shared code importing a module client public API", async () => {
+        const result = await checkFixture(
+            "shared/example.ts",
+            'import { x } from "@/modules/stock/client";\n',
         );
 
         expect(result.violations).toHaveLength(1);

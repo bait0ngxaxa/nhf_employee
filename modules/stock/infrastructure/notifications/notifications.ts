@@ -135,7 +135,7 @@ export async function notifyAdminsNewStockRequest(
         type: "STOCK_REQUEST_NEW",
         title: "คำขอเบิกวัสดุใหม่",
         message: `${requesterName} ส่งคำขอเบิกวัสดุ #${requestId} (${projectCode})`,
-        actionUrl: "/dashboard?tab=stock&stockTab=admin-requests",
+        actionUrl: toDashboardStockTabPath(STOCK_DASHBOARD_TABS.adminRequests),
         referenceId: String(requestId),
         dedupeKeyPrefix: `stock:${requestId}:STOCK_REQUEST_NEW`,
     }, client);
@@ -248,7 +248,7 @@ export async function notifyAdminsStockRequestLineInApp(
         type: "STOCK_REQUEST_NEW",
         title: "คำขอเบิกวัสดุใหม่",
         message: `${payload.requesterName} ส่งคำขอเบิกวัสดุ #${payload.requestId} (${payload.projectCode})`,
-        actionUrl: "/dashboard?tab=stock&stockTab=admin-requests",
+        actionUrl: toDashboardStockTabPath(STOCK_DASHBOARD_TABS.adminRequests),
         referenceId: String(payload.requestId),
         dedupeKeyPrefix: `stock:${payload.requestId}:STOCK_REQUEST_NEW`,
     }, client);
@@ -276,7 +276,7 @@ export async function notifyAdminsLowStockInApp(
         type: "SYSTEM_ALERT",
         title: "วัสดุใกล้หมดสต็อก",
         message: buildLowStockMessage(payload),
-        actionUrl: "/dashboard?tab=stock&stockTab=inventory",
+        actionUrl: toDashboardStockTabPath(STOCK_DASHBOARD_TABS.inventory),
         referenceId: payload.items[0]
             ? ("variantId" in payload.items[0]
                 ? payload.items[0].variantSku
@@ -321,7 +321,7 @@ export async function notifyAdminsStockRequestCancelledByRequester(
             type: "STOCK_CANCELLED",
             title: "คำขอเบิกถูกผู้ใช้ยกเลิก",
             message: `${requesterName} ยกเลิกคำขอเบิก #${requestId} แล้ว`,
-            actionUrl: "/dashboard?tab=stock&stockTab=admin-requests",
+            actionUrl: toDashboardStockTabPath(STOCK_DASHBOARD_TABS.adminRequests),
             referenceId: String(requestId),
         })),
     });

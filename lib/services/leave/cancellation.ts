@@ -39,7 +39,7 @@ import {
 } from "@/lib/services/leave/notification-format";
 import {
     APP_DASHBOARD_TABS,
-    toDashboardTabPath,
+    toDashboardMenuPath,
 } from "@/lib/ssot/routes";
 
 export const LEAVE_CANCELLATION_MESSAGES = {
@@ -668,7 +668,7 @@ async function createSelfCancelledNotification(
                 period: leaveRequest.period,
                 durationDays: halfDaysToDays(leaveRequest.durationHalfDays),
             })} แล้ว`,
-            actionUrl: toDashboardTabPath(APP_DASHBOARD_TABS.leaveHistory),
+            actionUrl: toDashboardMenuPath(APP_DASHBOARD_TABS.leaveHistory),
             referenceId: leaveRequest.id,
             dedupeKey: `leave:${userId}:LEAVE_CANCELLED:${leaveRequest.id}`,
         },
@@ -686,7 +686,7 @@ async function createCancellationRequestedNotification(
             type: "LEAVE_CANCELLATION_REQUESTED",
             title: "ส่งคำขอยกเลิกวันลาแล้ว",
             message: `ส่งคำขอยกเลิก${getLeaveTypeLabel(leaveRequest.leaveType)}แล้ว รอผู้อนุมัติยืนยัน`,
-            actionUrl: toDashboardTabPath(APP_DASHBOARD_TABS.leaveHistory),
+            actionUrl: toDashboardMenuPath(APP_DASHBOARD_TABS.leaveHistory),
             referenceId: leaveRequest.id,
             dedupeKey: `leave:${userId}:LEAVE_CANCELLATION_REQUESTED:${leaveRequest.id}`,
         },
@@ -711,7 +711,7 @@ async function createCancellationRejectedNotification(
                 period: leaveRequest.period,
                 durationDays: halfDaysToDays(leaveRequest.durationHalfDays),
             })} ยังคงมีสถานะอนุมัติ`,
-            actionUrl: toDashboardTabPath(APP_DASHBOARD_TABS.leaveHistory),
+            actionUrl: toDashboardMenuPath(APP_DASHBOARD_TABS.leaveHistory),
             referenceId: leaveRequest.id,
             dedupeKey: `leave:${employeeUserId}:LEAVE_CANCELLATION_REJECTED:${leaveRequest.id}`,
         },

@@ -1,5 +1,9 @@
 import { type EmailRequestData, type LineFlexMessage } from "@/types/api";
 import { formatDate } from "../helpers";
+import {
+    APP_DASHBOARD_TABS,
+    toDashboardMenuPath,
+} from "@/lib/ssot/routes";
 
 export function generateEmailRequestFlexMessage(
     data: EmailRequestData,
@@ -252,7 +256,7 @@ export function generateEmailRequestFlexMessage(
                         action: {
                             type: "uri",
                             label: "ดูคำร้องในระบบ",
-                            uri: `${baseUrl}/dashboard?tab=email-request`,
+                            uri: `${baseUrl}${toDashboardMenuPath(APP_DASHBOARD_TABS.emailRequest)}`,
                         },
                         color: "#7C3AED",
                     },

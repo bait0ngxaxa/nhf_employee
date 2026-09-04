@@ -1,6 +1,6 @@
 # Stock pilot migration
 
-Status: Phase B — server/business ownership migrated.
+Status: Phase C — server/business and Dashboard/client ownership migrated.
 
 Stock is the first feature migrated onto the modular-monolith foundation. Its
 server-side business behavior, application orchestration, Stock validation,
@@ -23,17 +23,18 @@ notification dispatch contracts, and the maintenance/audit contracts required
 by existing server consumers. Prisma repositories, workbook implementations,
 and other internal helpers are not exported as public implementation details.
 
-The migration intentionally leaves the Dashboard, Stock React components,
-browser API helpers, and client-facing Stock types in their legacy locations
-until Phase C. `lib/validations/stock.ts` is now a type-only compatibility
-facade for that deferred client layer; runtime schemas live in the module.
+Stock Dashboard React components, browser API helpers, and client-facing Stock
+types now live under modules/stock/presentation/. The module exposes them
+through the explicit @/modules/stock/client entry point; its server barrel
+remains @/modules/stock. lib/validations/stock.ts remains a type-only
+compatibility facade where legacy client types still need it.
 
 Existing generic platform infrastructure also remains transitional where it is
 still the correct owner, including audit persistence, notification/email/LINE
 delivery adapters, Prisma access, and outbox processing. These adapters now
 consume the Stock public API and do not duplicate Stock business rules.
 
-No Prisma schema or migration changes are part of Phase B. API URLs, payloads,
+No Prisma schema or migration changes are part of Phase C. API URLs, payloads,
 status mappings, Thai wording, permissions, transaction boundaries, inventory
 invariants, default-variant safety behavior, and report output remain
 behavior-preserving migration constraints.

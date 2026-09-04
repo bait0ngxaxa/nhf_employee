@@ -214,7 +214,7 @@ describe("Email Service", () => {
                 subject: "[NHF Stock] คำขอเบิก #123 ถูกจ่ายเรียบร้อยแล้ว",
                 messageId: "<nhf-stock-request-123-issued@notifications.thainhf.org>",
                 text: expect.stringContaining(
-                    "ดูรายการเบิกของฉัน: http://localhost:3000/dashboard?tab=stock&stockTab=my-requests",
+                    "ดูรายการเบิกของฉัน: http://localhost:3000/dashboard/stock?stockTab=my-requests",
                 ),
                 html: expect.stringContaining(
                     "ขนาด: A4",
@@ -261,7 +261,7 @@ describe("Email Service", () => {
                 categoryName: "หมวดหมู่",
                 dueDate: "2026-08-05",
                 daysBefore: 2,
-                actionUrl: "/dashboard?tab=routine&taskId=71&occurrenceId=91",
+                actionUrl: "/dashboard/routine?taskId=71&occurrenceId=91",
                 occurrenceId: 91,
                 ruleId: 31,
                 userId: 17,
@@ -278,7 +278,7 @@ describe("Email Service", () => {
                 messageId: "<nhf-routine-91-rule-31-user-17-v2@notifications.thainhf.org>",
                 html: expect.stringContaining("งาน &lt;ทดสอบ&gt;"),
                 text: expect.stringContaining(
-                    "ดูรายการ Routine: http://localhost:3000/dashboard?tab=routine&taskId=71&occurrenceId=91",
+                    "ดูรายการ Routine: http://localhost:3000/dashboard/routine?taskId=71&occurrenceId=91",
                 ),
             }));
             expect(sendMailMock.mock.calls[0]?.[0].messageId).toBe(

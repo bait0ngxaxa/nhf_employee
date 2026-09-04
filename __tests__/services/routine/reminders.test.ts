@@ -107,7 +107,7 @@ function buildEmailPayload(overrides: Record<string, unknown> = {}) {
         categoryName: "หมวดหมู่ทดสอบ",
         dueDate: "2026-08-05",
         daysBefore: 2,
-        actionUrl: "/dashboard?tab=routine&taskId=71&occurrenceId=91",
+        actionUrl: "/dashboard/routine?taskId=71&occurrenceId=91",
         occurrenceId: 91,
         ruleId: 31,
         userId: 17,
@@ -270,7 +270,7 @@ describe("Routine reminder dispatch", () => {
                 type: "ROUTINE_REMINDER",
                 title: "งานใกล้ถึงกำหนด",
                 referenceId: "91",
-                actionUrl: "/dashboard?tab=routine&taskId=71&occurrenceId=91",
+        actionUrl: "/dashboard/routine?taskId=71&occurrenceId=91",
                 dedupeKey: "routine:91:rule:31:user:17:version:2",
             }),
             prismaMock,
@@ -1102,7 +1102,7 @@ describe("Routine reminder dispatch", () => {
         expect(result).toBe("SENT");
         const message = sendLineAppMessageMock.mock.calls[0]?.[1];
         expect(JSON.stringify(message)).toContain(
-            "https://employee.example.com/dashboard?tab=routine&taskId=71&occurrenceId=91",
+            "https://employee.example.com/dashboard/routine?taskId=71&occurrenceId=91",
         );
         expect(JSON.stringify(message)).not.toContain("liff.line.me");
     });

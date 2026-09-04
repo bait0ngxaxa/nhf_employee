@@ -1,28 +1,24 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { type ReactElement } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { DashboardProvider } from "@/components/dashboard/context/dashboard/DashboardProvider";
 import { useDashboardUIContext } from "@/components/dashboard/context/dashboard/DashboardContext";
 
 const navigationMocks = vi.hoisted(() => ({
+    pathname: "/dashboard",
     router: {
         push: vi.fn(),
         replace: vi.fn(),
     },
-    searchParams: new URLSearchParams(),
 }));
 
 vi.mock("next/navigation", () => ({
     useRouter: () => navigationMocks.router,
-    useSearchParams: () => navigationMocks.searchParams,
-    usePathname: () => "/dashboard",
+    usePathname: () => navigationMocks.pathname,
 }));
 
-vi.mock("swr", () => ({
-    default: () => ({
-        data: undefined,
-        mutate: vi.fn(),
-    }),
+vi.mock("@/modules/stock/client", () => ({
+    clearStockBrowseCart: vi.fn(),
 }));
 
 vi.mock("@/components/auth/HybridAuthProvider", () => ({
@@ -58,7 +54,7 @@ describe("DashboardProvider navigation state", () => {
     beforeEach(() => {
         navigationMocks.router.push.mockReset();
         navigationMocks.router.replace.mockReset();
-        navigationMocks.searchParams = new URLSearchParams();
+        navigationMocks.pathname = "/dashboard";
     });
 
     it("starts with mobile navigation closed and desktop sidebar expanded", () => {
@@ -76,8 +72,8 @@ describe("DashboardProvider navigation state", () => {
         ).toHaveTextContent("false");
     });
 
-    it("falls back to the dashboard for a removed IT Support URL", async () => {
-        navigationMocks.searchParams = new URLSearchParams("tab=it-support");
+    it("derives the selected menu from the canonical pathname", () => {
+        navigationMocks.pathname = "/dashboard/employees/import";
 
         render(
             <DashboardProvider>
@@ -85,14 +81,35 @@ describe("DashboardProvider navigation state", () => {
             </DashboardProvider>,
         );
 
-        await waitFor(() => {
-            expect(screen.getByTestId("selected-menu")).toHaveTextContent(
-                "dashboard",
+        expect(screen.getByTestId("selected-menu")).toHaveTextContent(
+            "import-employee",
+        );
+        expect(navigationMocks.router.replace).not.toHaveBeenCalled();
+    });
+
+    it("navigates menu clicks to canonical paths", () => {
+        function NavigationProbe(): ReactElement {
+            const { handleMenuClick } = useDashboardUIContext();
+            return (
+                <button
+                    type="button"
+                    onClick={() => handleMenuClick("stock")}
+                >
+                    Stock
+                </button>
             );
-            expect(navigationMocks.router.replace).toHaveBeenCalledWith(
-                "/dashboard?tab=dashboard",
-                { scroll: false },
-            );
-        });
+        }
+
+        render(
+            <DashboardProvider>
+                <NavigationProbe />
+            </DashboardProvider>,
+        );
+
+        fireEvent.click(screen.getByRole("button", { name: "Stock" }));
+        expect(navigationMocks.router.push).toHaveBeenCalledWith(
+            "/dashboard/stock",
+            { scroll: false },
+        );
     });
 });

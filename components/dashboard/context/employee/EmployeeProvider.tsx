@@ -21,6 +21,7 @@ import { EmployeeDataContext, EmployeeUIContext } from "./EmployeeContext";
 import { EXPORT_LIMITS } from "@/lib/ssot/exports";
 import { API_ROUTES } from "@/lib/ssot/routes";
 import {
+    type EmployeeStats,
     type EmployeeDataContextValue,
     type EmployeeUIContextValue,
 } from "./types";
@@ -42,6 +43,17 @@ const defaultPagination: Pagination = {
     total: 0,
     totalPages: 0,
 };
+
+const defaultEmployeeStats: EmployeeStats = {
+    total: 0,
+    active: 0,
+    admin: 0,
+    academic: 0,
+};
+
+interface EmployeeStatsResponse {
+    stats: EmployeeStats;
+}
 
 export function EmployeeProvider({ children }: EmployeeProviderProps) {
     const [searchTerm, setSearchTerm] = useState("");
@@ -92,12 +104,19 @@ export function EmployeeProvider({ children }: EmployeeProviderProps) {
         isLoading,
         error: swrError,
     } = useSWR(swrKey, { keepPreviousData: true });
+    const { data: statsData, mutate: mutateStats } = useSWR<EmployeeStatsResponse>(
+        API_ROUTES.employees.stats,
+    );
 
     // Keep mutate stable using ref to prevent unnecessary re-renders
     const mutateRef = useRef(mutate);
+    const mutateStatsRef = useRef(mutateStats);
     useEffect(() => {
         mutateRef.current = mutate;
     }, [mutate]);
+    useEffect(() => {
+        mutateStatsRef.current = mutateStats;
+    }, [mutateStats]);
 
     // Derived data - wrapped in useMemo to prevent exhaustive-deps warning in dataValue
     const { employees, pagination, error } = useMemo(() => {
@@ -109,6 +128,7 @@ export function EmployeeProvider({ children }: EmployeeProviderProps) {
                 : "",
         };
     }, [data, swrError]);
+    const employeeStats = statsData?.stats ?? defaultEmployeeStats;
 
     // Force refresh when refreshTrigger changes
     useEffect(() => {
@@ -203,11 +223,15 @@ export function EmployeeProvider({ children }: EmployeeProviderProps) {
         });
 
         mutateRef.current(); // Revalidate SWR
+        void mutateStatsRef.current();
     }, [employeeToEdit]);
 
     // Stable triggerRefresh that doesn't depend on mutate identity
     const triggerRefresh = useCallback(async () => {
-        await mutateRef.current();
+        await Promise.all([
+            mutateRef.current(),
+            mutateStatsRef.current(),
+        ]);
         setRefreshTrigger((prev) => prev + 1);
     }, []);
 
@@ -217,6 +241,7 @@ export function EmployeeProvider({ children }: EmployeeProviderProps) {
         () => ({
             employees,
             currentEmployees: employees,
+            employeeStats,
             totalEmployees: pagination.total,
             totalPages: pagination.totalPages,
             isLoading,
@@ -228,6 +253,7 @@ export function EmployeeProvider({ children }: EmployeeProviderProps) {
         // eslint-disable-next-line react-hooks/exhaustive-deps
         [
             employees,
+            employeeStats,
             pagination.total,
             pagination.totalPages,
             isLoading,

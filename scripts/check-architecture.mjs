@@ -123,7 +123,8 @@ function getArchitectureTarget(specifier, importerPath, rootPath, modulesRoot, s
         return {
             kind: "modules",
             moduleName: moduleSegments[0],
-            isPublicEntryPoint: moduleSegments.length === 1,
+            isPublicEntryPoint: moduleSegments.length === 1
+                || (moduleSegments.length === 2 && moduleSegments[1] === "client"),
         };
     }
 

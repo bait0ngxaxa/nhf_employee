@@ -1,13 +1,6 @@
 import { type useRouter } from "next/navigation";
 import { type MenuGroup } from "@/types/dashboard";
 
-export interface EmployeeStats {
-    total: number;
-    active: number;
-    admin: number;
-    academic: number;
-}
-
 export interface DashboardUser {
     id?: string;
     name?: string | null;
@@ -25,11 +18,6 @@ export interface DashboardDataContextValue {
     user?: DashboardUser;
     isAdmin: boolean;
 
-    // Employee Stats & Data
-    employeeStats: EmployeeStats;
-    refreshTrigger: number;
-    handleEmployeeAdded: () => void;
-
     // Navigation Data
     availableMenuGroups: MenuGroup[];
 }
@@ -37,7 +25,6 @@ export interface DashboardDataContextValue {
 export interface DashboardUIContextValue {
     // Navigation State
     selectedMenu: string;
-    setSelectedMenu: (menu: string) => void;
     mobileNavOpen: boolean;
     setMobileNavOpen: (open: boolean) => void;
     desktopSidebarCollapsed: boolean;

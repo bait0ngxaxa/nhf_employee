@@ -1,7 +1,7 @@
 # Module boundaries
 
-Status: Phase A policy. The examples describe the target shape; they do not
-mean that the existing features have already been moved.
+Status: Phase C policy. The examples describe the target shape; migrations
+remain incremental.
 
 ## What is a module
 
@@ -17,8 +17,8 @@ The test is ownership, not reuse:
 
 ## Public module API
 
-Each future module should expose a deliberate public contract from its root
-entry point:
+Each module should expose a deliberate server/application contract from its
+root entry point:
 
 ```text
 modules/<feature>/index.ts
@@ -30,6 +30,19 @@ Consumers use the public entry point:
 import { something } from "@/modules/stock";
 ```
 
+Client-facing presentation may use the separate client-safe entry point:
+
+```text
+modules/<feature>/client.ts
+```
+
+```ts
+import { StockSection } from "@/modules/stock/client";
+```
+
+The root barrel remains server/application-oriented. The client entry point
+must export only client-safe presentation contracts.
+
 Files below the module root are internal implementation. Consumers must not
 turn paths such as the following into an accidental public API:
 
@@ -37,10 +50,11 @@ turn paths such as the following into an accidental public API:
 import { something } from "@/modules/stock/application/internal/foo";
 ```
 
-The public API should export only contracts that another layer or module is
-intended to rely on. Avoid exporting an entire internal tree through a broad
-barrel file; a small explicit entry point is easier to evolve and keeps
-dependency direction visible.
+The public entries should export only contracts that another layer or module
+is intended to rely on. Avoid exporting an entire internal tree through broad
+barrel files; small explicit entry points are easier to evolve and keep
+dependency direction visible. Only the module root and its /client entry are
+public; arbitrary subpaths remain private.
 
 ## Larger feature shape
 
@@ -98,7 +112,7 @@ API. Prefer a narrow command, query, type, or result contract over reaching
 into B's repository, database model, UI component, or internal helper.
 
 ```text
-module A -> module B/index.ts -> module B internals
+module A -> module B/index.ts or module B/client.ts -> module B internals
 ```
 
 The target module owns the meaning and compatibility of its public contract.

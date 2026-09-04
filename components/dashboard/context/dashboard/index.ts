@@ -1,5 +1,4 @@
 export type {
-    EmployeeStats,
     DashboardUser,
     DashboardDataContextValue,
     DashboardUIContextValue,

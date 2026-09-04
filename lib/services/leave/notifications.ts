@@ -4,7 +4,7 @@ import { emailService } from "@/lib/email";
 import { prisma } from "@/lib/db/prisma";
 import {
     APP_DASHBOARD_TABS,
-    toDashboardTabPath,
+    toDashboardMenuPath,
 } from "@/lib/ssot/routes";
 import {
     formatLeaveDecisionActor,
@@ -81,7 +81,7 @@ async function createNotificationOnce(input: LeaveNotificationInput): Promise<vo
 }
 
 function getAbsoluteDashboardPath(tab: string): string {
-    return `${getPublicOrigin()}${toDashboardTabPath(tab)}`;
+    return `${getPublicOrigin()}${toDashboardMenuPath(tab)}`;
 }
 
 function buildLeaveMessage(data: LeaveNotificationPayload): string {
@@ -101,7 +101,7 @@ export async function createLeaveActionInAppNotification(
         type: "LEAVE_REQUESTED",
         title: "มีคำขอลาใหม่รออนุมัติ",
         message: buildLeaveActionMessage(payload),
-        actionUrl: toDashboardTabPath(APP_DASHBOARD_TABS.managerApproval),
+        actionUrl: toDashboardMenuPath(APP_DASHBOARD_TABS.managerApproval),
         referenceId: payload.leaveId,
     });
 }
@@ -136,7 +136,7 @@ export async function sendLeaveResultNotifications(
         message: isApproved
             ? `ผู้อนุมัติอนุมัติ${buildLeaveMessage(payload)}แล้ว`
             : `ผู้อนุมัติไม่อนุมัติ${buildLeaveMessage(payload)}`,
-        actionUrl: toDashboardTabPath(APP_DASHBOARD_TABS.leaveHistory),
+        actionUrl: toDashboardMenuPath(APP_DASHBOARD_TABS.leaveHistory),
         referenceId: payload.leaveId,
     });
 
@@ -154,7 +154,7 @@ export async function sendLeaveCancelledNotifications(
         type: "LEAVE_CANCELLED",
         title: "คำขอลาถูกยกเลิก",
         message: `${payload.employee.name} ยกเลิกคำขอ${buildLeaveMessage(payload)}`,
-        actionUrl: toDashboardTabPath(APP_DASHBOARD_TABS.managerApproval),
+        actionUrl: toDashboardMenuPath(APP_DASHBOARD_TABS.managerApproval),
         referenceId: payload.leaveId,
     });
 
@@ -172,7 +172,7 @@ export async function sendLeaveCancellationRequestedNotifications(
         type: "LEAVE_CANCELLATION_REQUESTED",
         title: "มีคำขอยกเลิกวันลารอยืนยัน",
         message: `${payload.employee.name} ขอ${buildLeaveMessage(payload)}ที่อนุมัติแล้ว`,
-        actionUrl: toDashboardTabPath(APP_DASHBOARD_TABS.managerApproval),
+        actionUrl: toDashboardMenuPath(APP_DASHBOARD_TABS.managerApproval),
         referenceId: payload.leaveId,
     });
 
@@ -191,7 +191,7 @@ export async function sendLeaveCancelledAfterApprovalNotifications(
         type: "LEAVE_CANCELLED_AFTER_APPROVAL",
         title: "ยกเลิกวันลาที่อนุมัติแล้วเรียบร้อย",
         message: `${decisionActor} ยืนยันการยกเลิก${buildLeaveMessage(payload)}แล้ว`,
-        actionUrl: toDashboardTabPath(APP_DASHBOARD_TABS.leaveHistory),
+        actionUrl: toDashboardMenuPath(APP_DASHBOARD_TABS.leaveHistory),
         referenceId: payload.leaveId,
     });
 
@@ -209,7 +209,7 @@ export async function sendLeaveNotTakenRequestedNotifications(
         type: "LEAVE_NOT_TAKEN_REQUESTED",
         title: "มีรายการแจ้งไม่ได้ใช้วันลารอยืนยัน",
         message: `${payload.employee.name} แจ้งไม่ได้ใช้วันลา: ${buildLeaveMessage(payload)}`,
-        actionUrl: toDashboardTabPath(APP_DASHBOARD_TABS.managerApproval),
+        actionUrl: toDashboardMenuPath(APP_DASHBOARD_TABS.managerApproval),
         referenceId: payload.leaveId,
     });
 
@@ -228,7 +228,7 @@ export async function sendLeaveNotTakenConfirmedNotifications(
         type: "LEAVE_NOT_TAKEN_CONFIRMED",
         title: "ยืนยันไม่ได้ใช้วันลาแล้ว",
         message: `${decisionActor} ยืนยันไม่ได้ใช้วันลา: ${buildLeaveMessage(payload)}`,
-        actionUrl: toDashboardTabPath(APP_DASHBOARD_TABS.leaveHistory),
+        actionUrl: toDashboardMenuPath(APP_DASHBOARD_TABS.leaveHistory),
         referenceId: payload.leaveId,
     });
 

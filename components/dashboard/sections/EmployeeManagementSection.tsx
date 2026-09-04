@@ -22,8 +22,8 @@ import { EmployeeProvider } from "@/components/dashboard/context/employee/Employ
 
 function EmployeeManagementContent() {
     const { handleMenuClick } = useDashboardUIContext();
-    const { employeeStats, user, isAdmin } = useDashboardDataContext();
-    const { employees, refreshTrigger } = useEmployeeDataContext();
+    const { user, isAdmin } = useDashboardDataContext();
+    const { employeeStats, employees, refreshTrigger } = useEmployeeDataContext();
     const { isExporting, handleExportCSV } = useEmployeeUIContext();
 
     return (

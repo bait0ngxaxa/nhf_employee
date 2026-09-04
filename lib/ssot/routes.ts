@@ -1,9 +1,21 @@
+import { isDashboardTabEnabled } from "./features";
+
 export const APP_ROUTES = {
     home: "/",
     login: "/login",
     signup: "/signup",
     refreshSession: "/auth/refresh",
     dashboard: "/dashboard",
+    dashboardLeave: "/dashboard/leave",
+    dashboardStock: "/dashboard/stock",
+    dashboardRoutine: "/dashboard/routine",
+    dashboardEmailRequest: "/dashboard/email-request",
+    dashboardEmployees: "/dashboard/employees",
+    dashboardEmployeeNew: "/dashboard/employees/new",
+    dashboardEmployeeImport: "/dashboard/employees/import",
+    dashboardAudit: "/dashboard/audit",
+    dashboardNotifications: "/dashboard/notifications",
+    dashboardSessions: "/dashboard/sessions",
     accessDenied: "/access-denied",
     forgotPassword: "/forgot-password",
     resetPassword: "/reset-password",
@@ -22,17 +34,74 @@ export function isLiffAppPath(pathname: string | null | undefined): boolean {
 
 export const APP_DASHBOARD_TABS = {
     dashboard: "dashboard",
-    notifications: "notifications",
-    sessions: "sessions",
     leaveManagement: "leave-management",
     leaveHistory: "leave-history",
     managerApproval: "manager-approval",
     stock: "stock",
     routine: "routine",
+    emailRequest: "email-request",
+    employeeManagement: "employee-management",
+    addEmployee: "add-employee",
+    importEmployee: "import-employee",
+    auditLogs: "audit-logs",
+    notifications: "notifications",
+    sessions: "sessions",
+    itEquipment: "it-equipment",
 } as const;
 
-export function toDashboardTabPath(tab: string): string {
-    return `${APP_ROUTES.dashboard}?tab=${tab}`;
+export type DashboardMenuId =
+    (typeof APP_DASHBOARD_TABS)[keyof typeof APP_DASHBOARD_TABS];
+
+export const DASHBOARD_MENU_PATHS: Readonly<Record<DashboardMenuId, string>> = {
+    dashboard: APP_ROUTES.dashboard,
+    "leave-management": APP_ROUTES.dashboardLeave,
+    "leave-history": `${APP_ROUTES.dashboardLeave}?leaveTab=my-leave`,
+    "manager-approval": `${APP_ROUTES.dashboardLeave}?leaveTab=approvals`,
+    stock: APP_ROUTES.dashboardStock,
+    "it-equipment": APP_ROUTES.dashboardStock,
+    routine: APP_ROUTES.dashboardRoutine,
+    "email-request": APP_ROUTES.dashboardEmailRequest,
+    "employee-management": APP_ROUTES.dashboardEmployees,
+    "add-employee": APP_ROUTES.dashboardEmployeeNew,
+    "import-employee": APP_ROUTES.dashboardEmployeeImport,
+    "audit-logs": APP_ROUTES.dashboardAudit,
+    notifications: APP_ROUTES.dashboardNotifications,
+    sessions: APP_ROUTES.dashboardSessions,
+};
+
+const DASHBOARD_PATH_MENU_ENTRIES: ReadonlyArray<
+    readonly [string, DashboardMenuId]
+> = [
+    [APP_ROUTES.dashboardEmployeeImport, APP_DASHBOARD_TABS.importEmployee],
+    [APP_ROUTES.dashboardEmployeeNew, APP_DASHBOARD_TABS.addEmployee],
+    [APP_ROUTES.dashboardEmployees, APP_DASHBOARD_TABS.employeeManagement],
+    [APP_ROUTES.dashboardLeave, APP_DASHBOARD_TABS.leaveManagement],
+    [APP_ROUTES.dashboardStock, APP_DASHBOARD_TABS.stock],
+    [APP_ROUTES.dashboardRoutine, APP_DASHBOARD_TABS.routine],
+    [APP_ROUTES.dashboardEmailRequest, APP_DASHBOARD_TABS.emailRequest],
+    [APP_ROUTES.dashboardAudit, APP_DASHBOARD_TABS.auditLogs],
+    [APP_ROUTES.dashboardNotifications, APP_DASHBOARD_TABS.notifications],
+    [APP_ROUTES.dashboardSessions, APP_DASHBOARD_TABS.sessions],
+    [APP_ROUTES.dashboard, APP_DASHBOARD_TABS.dashboard],
+];
+
+export function toDashboardMenuPath(menuId: string): string {
+    return DASHBOARD_MENU_PATHS[menuId as DashboardMenuId]
+        ?? APP_ROUTES.dashboard;
+}
+
+export function getDashboardMenuIdFromPathname(
+    pathname: string | null | undefined,
+): DashboardMenuId {
+    if (!pathname) {
+        return APP_DASHBOARD_TABS.dashboard;
+    }
+
+    const match = DASHBOARD_PATH_MENU_ENTRIES.find(([path]) =>
+        pathname === path || pathname.startsWith(`${path}/`),
+    );
+
+    return match?.[1] ?? APP_DASHBOARD_TABS.dashboard;
 }
 
 export const STOCK_DASHBOARD_TABS = {
@@ -49,7 +118,180 @@ export type StockDashboardTab =
 export function toDashboardStockTabPath(
     stockTab: StockDashboardTab,
 ): string {
-    return `${toDashboardTabPath(APP_DASHBOARD_TABS.stock)}&stockTab=${stockTab}`;
+    const params = new URLSearchParams({ stockTab });
+    return `${APP_ROUTES.dashboardStock}?${params.toString()}`;
+}
+
+export function toDashboardRoutineTaskPath(
+    taskId: number,
+    occurrenceId?: number,
+): string {
+    const params = new URLSearchParams({ taskId: String(taskId) });
+    if (occurrenceId !== undefined) {
+        params.set("occurrenceId", String(occurrenceId));
+    }
+
+    return `${APP_ROUTES.dashboardRoutine}?${params.toString()}`;
+}
+
+export type DashboardPageSearchParams = Readonly<
+    Record<string, string | string[] | undefined>
+>;
+
+const LEGACY_DASHBOARD_TAB_TARGETS: Readonly<
+    Record<
+        string,
+        {
+            menuId: DashboardMenuId;
+            leaveTab?: "my-leave" | "approvals";
+        }
+    >
+> = {
+    dashboard: { menuId: APP_DASHBOARD_TABS.dashboard },
+    "leave-management": { menuId: APP_DASHBOARD_TABS.leaveManagement },
+    "manager-approval": {
+        menuId: APP_DASHBOARD_TABS.leaveManagement,
+        leaveTab: "approvals",
+    },
+    "leave-history": {
+        menuId: APP_DASHBOARD_TABS.leaveManagement,
+        leaveTab: "my-leave",
+    },
+    stock: { menuId: APP_DASHBOARD_TABS.stock },
+    "it-equipment": { menuId: APP_DASHBOARD_TABS.stock },
+    routine: { menuId: APP_DASHBOARD_TABS.routine },
+    "email-request": { menuId: APP_DASHBOARD_TABS.emailRequest },
+    "employee-management": {
+        menuId: APP_DASHBOARD_TABS.employeeManagement,
+    },
+    "add-employee": { menuId: APP_DASHBOARD_TABS.addEmployee },
+    "import-employee": { menuId: APP_DASHBOARD_TABS.importEmployee },
+    "audit-logs": { menuId: APP_DASHBOARD_TABS.auditLogs },
+    notifications: { menuId: APP_DASHBOARD_TABS.notifications },
+    sessions: { menuId: APP_DASHBOARD_TABS.sessions },
+};
+
+const DASHBOARD_QUERY_KEYS_BY_MENU: Readonly<
+    Partial<Record<DashboardMenuId, readonly string[]>>
+> = {
+    "leave-management": ["leaveTab"],
+    stock: [
+        "stockTab",
+        "stockItemsPage",
+        "stockInventoryPage",
+        "stockSearch",
+        "stockCategoryId",
+        "stockRequestsPage",
+    ],
+    routine: ["routineTab", "taskId", "occurrenceId"],
+};
+
+const VALID_LEAVE_TABS = new Set<string>([
+    "my-leave",
+    "approvals",
+    "recovery",
+    "reports",
+    "approver-settings",
+]);
+const VALID_STOCK_TABS = new Set<string>(Object.values(STOCK_DASHBOARD_TABS));
+const VALID_ROUTINE_TABS = new Set<string>([
+    "mine",
+    "all",
+    "manage",
+    "settings",
+    "import",
+]);
+
+function getSingleSearchParam(
+    searchParams: DashboardPageSearchParams,
+    key: string,
+): string | null {
+    const value = searchParams[key];
+    return typeof value === "string" ? value : null;
+}
+
+function isPositiveIntegerParam(value: string): boolean {
+    const parsed = Number(value);
+    return /^\d+$/.test(value)
+        && Number.isSafeInteger(parsed)
+        && parsed > 0;
+}
+
+function isValidDashboardQueryParam(key: string, value: string): boolean {
+    if (key === "leaveTab") {
+        return VALID_LEAVE_TABS.has(value);
+    }
+    if (key === "stockTab") {
+        return VALID_STOCK_TABS.has(value);
+    }
+    if (key === "routineTab") {
+        return VALID_ROUTINE_TABS.has(value);
+    }
+    if (
+        key === "stockItemsPage"
+        || key === "stockInventoryPage"
+        || key === "stockRequestsPage"
+        || key === "stockCategoryId"
+        || key === "taskId"
+        || key === "occurrenceId"
+    ) {
+        return isPositiveIntegerParam(value);
+    }
+    return key === "stockSearch";
+}
+
+function appendSafeDashboardQueryParams(
+    target: URLSearchParams,
+    searchParams: DashboardPageSearchParams,
+    menuId: DashboardMenuId,
+): void {
+    const allowedKeys = DASHBOARD_QUERY_KEYS_BY_MENU[menuId] ?? [];
+    for (const key of allowedKeys) {
+        const value = getSingleSearchParam(searchParams, key);
+        if (value !== null && isValidDashboardQueryParam(key, value)) {
+            target.set(key, value);
+        }
+    }
+}
+
+export function resolveLegacyDashboardRedirect(
+    searchParams: DashboardPageSearchParams,
+): string | null {
+    const rawLegacyTab = searchParams.tab;
+    if (rawLegacyTab === undefined) {
+        return null;
+    }
+    if (typeof rawLegacyTab !== "string") {
+        return APP_ROUTES.dashboard;
+    }
+
+    const legacyTab = rawLegacyTab;
+
+    const target = LEGACY_DASHBOARD_TAB_TARGETS[legacyTab];
+    if (!target || !isDashboardTabEnabled(legacyTab)) {
+        return APP_ROUTES.dashboard;
+    }
+
+    const targetUrl = new URL(
+        toDashboardMenuPath(target.menuId),
+        "http://dashboard.local",
+    );
+    const targetSearchParams = targetUrl.searchParams;
+
+    if (target.leaveTab) {
+        targetSearchParams.set("leaveTab", target.leaveTab);
+    } else {
+        appendSafeDashboardQueryParams(
+            targetSearchParams,
+            searchParams,
+            target.menuId,
+        );
+    }
+
+    const query = targetSearchParams.toString();
+    return query
+        ? `${targetUrl.pathname}?${query}`
+        : targetUrl.pathname;
 }
 
 export const API_ROUTES = {

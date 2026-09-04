@@ -15,7 +15,7 @@ import {
     useStockBrowseCart,
     type StockCartAvailabilityReconciliation,
     type StockCartVariantAvailability,
-} from "@/components/dashboard/stock/useStockBrowseCart";
+} from "@/modules/stock/client";
 import { useLiffWorkforce } from "@/components/liff/LiffBootstrap";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {

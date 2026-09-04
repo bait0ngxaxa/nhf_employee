@@ -3,6 +3,10 @@ import {
     type StockLowLineData,
 } from "@/types/api";
 import { formatDate } from "../helpers";
+import {
+    STOCK_DASHBOARD_TABS,
+    toDashboardStockTabPath,
+} from "@/lib/ssot/routes";
 
 function buildItemsPreview(items: StockLowLineData["items"]): string {
     const previewItems = items.slice(0, 3).map((item) => {
@@ -107,7 +111,7 @@ export function generateStockLowFlexMessage(
                         action: {
                             type: "uri",
                             label: "เปิดหน้าคลังวัสดุ",
-                            uri: `${baseUrl}/dashboard?tab=stock&stockTab=inventory`,
+                            uri: `${baseUrl}${toDashboardStockTabPath(STOCK_DASHBOARD_TABS.inventory)}`,
                         },
                         color: "#ea580c",
                     },

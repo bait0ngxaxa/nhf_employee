@@ -53,9 +53,6 @@ function mockDashboardUser(user: {
         status: "authenticated",
         user,
         isAdmin: user.role === "ADMIN",
-        employeeStats: { total: 0, active: 0, admin: 0, academic: 0 },
-        refreshTrigger: 0,
-        handleEmployeeAdded: vi.fn(),
         availableMenuGroups: [],
     });
 }

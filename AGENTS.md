@@ -138,6 +138,11 @@ UI → Hooks → Services → Data Layer
 
 ## 11. Modular Monolith Architecture (Phase A)
 
+Dashboard modules use canonical App Router paths; do not add new
+`/dashboard?tab=<module>` navigation producers. Client-facing module
+presentation must use an explicit `/client` public entry point instead of a
+server-oriented module barrel.
+
 * สถานะปัจจุบันเป็นการวาง foundation เท่านั้น: โค้ด Stock, Routine, Leave,
   Employee และ business module เดิมยังอยู่ที่เดิมและต้องทำงานเหมือนเดิม
 * งาน business feature ใหม่ที่มีสาระสำคัญให้เริ่มที่ `modules/<feature>/`

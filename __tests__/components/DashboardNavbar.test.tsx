@@ -37,14 +37,10 @@ function mockNavbarContext(mobileNavOpen: boolean): void {
             department: "IT",
         },
         isAdmin: false,
-        employeeStats: { total: 0, active: 0, admin: 0, academic: 0 },
-        refreshTrigger: 0,
-        handleEmployeeAdded: vi.fn(),
         availableMenuGroups: [],
     });
     vi.mocked(useDashboardUIContext).mockReturnValue({
         selectedMenu: "dashboard",
-        setSelectedMenu: vi.fn(),
         mobileNavOpen,
         setMobileNavOpen,
         desktopSidebarCollapsed: false,

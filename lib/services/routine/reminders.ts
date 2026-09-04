@@ -16,7 +16,7 @@ import { createLineRetryKey } from "@/lib/services/outbox/provider-key";
 import {
     createInAppNotificationOnce,
 } from "@/lib/services/notifications/in-app";
-import { APP_DASHBOARD_TABS, APP_ROUTES } from "@/lib/ssot/routes";
+import { toDashboardRoutineTaskPath } from "@/lib/ssot/routes";
 import {
     getRoutineReminderScheduledFor,
     isRoutineReminderExpired,
@@ -149,7 +149,7 @@ export function getRoutineReminderActionUrl(
     occurrenceId: number,
     taskId: number,
 ): string {
-    return `${APP_ROUTES.dashboard}?tab=${APP_DASHBOARD_TABS.routine}&taskId=${taskId}&occurrenceId=${occurrenceId}`;
+    return toDashboardRoutineTaskPath(taskId, occurrenceId);
 }
 
 export function formatRoutineReminderMessage(

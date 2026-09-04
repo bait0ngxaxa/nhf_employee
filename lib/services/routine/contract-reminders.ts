@@ -22,7 +22,7 @@ import {
     type CalendarDate,
 } from "@/lib/routine/schedule";
 import { createInAppNotificationOnce } from "@/lib/services/notifications/in-app";
-import { APP_DASHBOARD_TABS, APP_ROUTES } from "@/lib/ssot/routes";
+import { toDashboardRoutineTaskPath } from "@/lib/ssot/routes";
 import {
     routineContractExpiryEmailOutboxPayloadSchema,
     routineContractExpiryLineOutboxPayloadSchema,
@@ -155,7 +155,7 @@ export function buildRoutineContractExpiryLineEventKey(
 }
 
 function getRoutineContractExpiryActionUrl(taskId: number): string {
-    return `${APP_ROUTES.dashboard}?tab=${APP_DASHBOARD_TABS.routine}&taskId=${taskId}`;
+    return toDashboardRoutineTaskPath(taskId);
 }
 
 function getRoutineContractExpiryAbsoluteActionUrl(taskId: number): string {

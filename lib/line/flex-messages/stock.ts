@@ -3,6 +3,10 @@ import {
     type StockRequestLineData,
 } from "@/types/api";
 import { formatDate } from "../helpers";
+import {
+    STOCK_DASHBOARD_TABS,
+    toDashboardStockTabPath,
+} from "@/lib/ssot/routes";
 
 function buildItemsPreview(items: StockRequestLineData["items"]): string {
     const previewItems = items.slice(0, 3).map((item) => {
@@ -209,7 +213,7 @@ export function generateStockRequestFlexMessage(
                         action: {
                             type: "uri",
                             label: "ดูคำขอเบิก",
-                            uri: `${baseUrl}/dashboard?tab=stock&stockTab=admin-requests`,
+                            uri: `${baseUrl}${toDashboardStockTabPath(STOCK_DASHBOARD_TABS.adminRequests)}`,
                         },
                         color: "#059669",
                     },

@@ -20,14 +20,10 @@ function mockSidebarContext(desktopSidebarCollapsed: boolean): void {
         status: "authenticated",
         user: { name: "สมชาย ใจดี", role: "ADMIN", department: "IT" },
         isAdmin: true,
-        employeeStats: { total: 0, active: 0, admin: 0, academic: 0 },
-        refreshTrigger: 0,
-        handleEmployeeAdded: vi.fn(),
         availableMenuGroups: getAvailableMenuGroups(true),
     });
     vi.mocked(useDashboardUIContext).mockReturnValue({
         selectedMenu: "employee-management",
-        setSelectedMenu: vi.fn(),
         mobileNavOpen: false,
         setMobileNavOpen: vi.fn(),
         desktopSidebarCollapsed,

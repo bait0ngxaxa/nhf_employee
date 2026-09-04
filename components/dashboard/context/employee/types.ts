@@ -1,9 +1,17 @@
 import { type Employee } from "@/types/employees";
 
+export interface EmployeeStats {
+    total: number;
+    active: number;
+    admin: number;
+    academic: number;
+}
+
 export interface EmployeeDataContextValue {
     // Data
     employees: Employee[];
     currentEmployees: Employee[];
+    employeeStats: EmployeeStats;
 
     // Data Stats
     totalEmployees: number;

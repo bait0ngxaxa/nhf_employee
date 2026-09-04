@@ -457,6 +457,6 @@ describe("Routine contract expiry dispatch", () => {
             payload.retryKey,
         );
         expect(JSON.stringify(sendLineAppMessageMock.mock.calls[0]?.[1]))
-            .toContain("https://employee.example.com/dashboard?tab=routine&taskId=71");
+            .toContain("https://employee.example.com/dashboard/routine?taskId=71");
     });
 });

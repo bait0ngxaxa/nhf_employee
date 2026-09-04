@@ -1,4 +1,7 @@
-import { APP_DASHBOARD_TABS, APP_ROUTES } from "@/lib/ssot/routes";
+import {
+    APP_ROUTES,
+    toDashboardRoutineTaskPath,
+} from "@/lib/ssot/routes";
 import { getPublicOrigin } from "@/lib/network/public-url";
 import { routineIdParamSchema } from "@/lib/validations/routine";
 
@@ -26,11 +29,10 @@ export function buildRoutineDashboardTaskUrl(
 ): string {
     assertRoutineLinkId(taskId, "task");
     assertRoutineLinkId(occurrenceId, "occurrence");
-    const url = new URL(APP_ROUTES.dashboard, getPublicOrigin());
-    url.searchParams.set("tab", APP_DASHBOARD_TABS.routine);
-    url.searchParams.set("taskId", String(taskId));
-    url.searchParams.set("occurrenceId", String(occurrenceId));
-    return url.toString();
+    return new URL(
+        toDashboardRoutineTaskPath(taskId, occurrenceId),
+        getPublicOrigin(),
+    ).toString();
 }
 
 function assertRoutineLinkId(id: number, kind: "task" | "occurrence"): void {

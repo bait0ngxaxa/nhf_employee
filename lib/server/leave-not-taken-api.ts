@@ -33,7 +33,7 @@ import { runSerializableTransaction } from "@/lib/db/transaction";
 import { jsonError } from "@/lib/ssot/http";
 import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
 import { isAdminRole } from "@/lib/ssot/permissions";
-import { APP_DASHBOARD_TABS, toDashboardTabPath } from "@/lib/ssot/routes";
+import { APP_DASHBOARD_TABS, toDashboardMenuPath } from "@/lib/ssot/routes";
 import {
     leaveNotTakenConfirmSchema,
     leaveNotTakenRequestSchema,
@@ -211,7 +211,7 @@ export async function handleLeaveNotTakenRequest(
                     type: "LEAVE_NOT_TAKEN_REQUESTED",
                     title: "แจ้งไม่ได้ใช้วันลาแล้ว",
                     message: `แจ้งไม่ได้ใช้วันลาแล้ว: ${getLeaveTypeLabel(leaveRequest.leaveType)} ${formatLeaveSummary(leaveSummary)}`,
-                    actionUrl: toDashboardTabPath(APP_DASHBOARD_TABS.leaveHistory),
+                    actionUrl: toDashboardMenuPath(APP_DASHBOARD_TABS.leaveHistory),
                     referenceId: leaveRequest.id,
                 },
             });

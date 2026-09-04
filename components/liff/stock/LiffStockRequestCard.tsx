@@ -4,7 +4,7 @@ import { Ban, Eye, PackageCheck } from "lucide-react";
 import type { ReactElement } from "react";
 
 import { RequestStatusBadge } from "@/components/dashboard/shared/RequestStatusBadge";
-import { formatStockRequestDate } from "@/components/dashboard/stock/stockRequest.shared";
+import { formatStockRequestDate } from "@/modules/stock/client";
 import { Button } from "@/components/ui/button";
 import type {
     LiffStockRequestAction,

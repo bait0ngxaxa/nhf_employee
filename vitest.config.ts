@@ -18,6 +18,8 @@ const NODE_TESTS = [
 const DOM_TESTS = [
     "__tests__/**/*.{test,spec}.{jsx,mjsx,cjsx,tsx,mtsx,ctsx}",
     "__tests__/{components,hooks,context}/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts}",
+    "modules/stock/presentation/dashboard/**/*.{test,spec}.{jsx,mjsx,cjsx,tsx,mtsx,ctsx}",
+    "modules/stock/presentation/dashboard/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts}",
 ];
 
 export default defineConfig({
