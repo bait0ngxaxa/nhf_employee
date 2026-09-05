@@ -5,7 +5,7 @@
  * eliminating the need for boilerplate try/catch blocks in UI components.
  */
 
-import { AUTH_MUTATION_HEADERS } from "@/lib/auth/csrf";
+import { AUTH_MUTATION_HEADERS } from "@/lib/auth/mutation-headers";
 import { fetchWithRefresh } from "@/lib/auth/client";
 
 export type ApiErrorCode =

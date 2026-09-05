@@ -2,8 +2,10 @@ import { Suspense } from "react";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
-import { LeaveManagementSection } from "@/components/dashboard/sections/LeaveManagementSection";
-import { LeaveManagementSectionSkeleton } from "@/components/dashboard/leave/LeaveSkeletons";
+import {
+    LeaveManagementSection,
+    LeaveManagementSectionSkeleton,
+} from "@/modules/leave/client";
 import { FEATURE_KEYS, isFeatureEnabled } from "@/lib/ssot/features";
 import type { DashboardPageSearchParams } from "@/lib/ssot/routes";
 import { APP_ROUTES } from "@/lib/ssot/routes";

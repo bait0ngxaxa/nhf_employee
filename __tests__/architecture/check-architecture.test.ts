@@ -53,6 +53,90 @@ afterEach(async () => {
 });
 
 describe("architecture checker module boundaries", () => {
+    const leavePresentationImporters = [
+        "app/dashboard/leave/page.tsx",
+        "app/dashboard/leave/loading.tsx",
+        "app/liff/leave/page.tsx",
+        "modules/leave/presentation/dashboard/Example.tsx",
+        "modules/leave/presentation/liff/api.ts",
+    ];
+
+    it.each(leavePresentationImporters)("rejects legacy Leave presentation imports in %s", async (importerPath) => {
+        const legacyPaths = [
+            "components/dashboard/leave/LeaveRequestForm",
+            "components/dashboard/sections/LeaveManagementSection",
+            "components/liff/leave/LiffLeaveApp",
+            "hooks/leave/useLeaveRequestFormModel",
+            "hooks/useLeaveApprovals",
+            "hooks/useLeaveProfile",
+            "lib/client/liff-leave",
+            "lib/services/leave/client",
+            "lib/types/leave",
+        ];
+        const result = await checkFixture(importerPath, legacyPaths.map((target, index) =>
+            `import { x as x${index} } from "@/${target}";`,
+        ).join("\n"));
+
+        expect(result.violations).toHaveLength(legacyPaths.length);
+        expect(result.violations.every((message) => message.includes("legacy Leave ownership"))).toBe(true);
+    });
+
+    it.each([
+        'export { x } from "../../../components/liff/leave/LiffLeaveApp.tsx";',
+        'const x = import("../../../lib/client/liff-leave");',
+        'const x = require("../../../hooks/useLeaveProfile");',
+        'type X = import("../../../hooks/useLeaveApprovals").X;',
+    ])("rejects relative legacy Leave dependencies: %s", async (source) => {
+        const result = await checkFixture("app/liff/leave/page.tsx", source);
+        expect(result.violations).toHaveLength(1);
+        expect(result.violations[0]).toContain("legacy Leave ownership");
+    });
+
+    it.each(["@/modules/leave", "@/modules/leave/presentation/liff/LiffLeaveApp"])(
+        "rejects the wrong Leave route entry %s", async (specifier) => {
+            const result = await checkFixture("app/liff/leave/page.tsx", `import { x } from "${specifier}";`);
+            expect(result.violations).toHaveLength(1);
+            expect(result.violations[0]).toContain("routes must use @/modules/leave/client");
+        },
+    );
+
+    it("allows Leave route composition and generic platform imports", async () => {
+        const result = await checkFixture("app/dashboard/leave/page.tsx", [
+            'import { x } from "@/modules/leave/client";',
+            'import { y } from "@/components/ui/button";',
+            'import { z } from "@/lib/client/liff";',
+        ].join("\n"));
+        expect(result.violations).toEqual([]);
+    });
+
+    it("rejects Leave presentation importing its own public barrel", async () => {
+        const result = await checkFixture("modules/leave/presentation/liff/api.ts", 'import { x } from "../../client";');
+        expect(result.violations).toHaveLength(1);
+        expect(result.violations[0]).toContain("own public barrel");
+    });
+
+    it("rejects server-only runtime dependencies from the Leave client graph", async () => {
+        const rootPath = await createFixture({
+            ...fixtureFiles,
+            "modules/leave/client.ts": 'import { x } from "@/lib/server/leave-api"; export { x };\n',
+            "lib/server/leave-api.ts": "export const x = 1;\n",
+        });
+        const result = checkArchitecture({ repositoryRoot: rootPath });
+
+        expect(result.violations).toHaveLength(1);
+        expect(result.violations[0]).toContain("Server-only runtime dependency");
+    });
+
+    it("does not treat type-only Prisma contracts as client runtime dependencies", async () => {
+        const rootPath = await createFixture({
+            ...fixtureFiles,
+            "modules/leave/client.ts": 'import type { Prisma } from "@prisma/client"; export type Select = Prisma.UserSelect;\n',
+        });
+        const result = checkArchitecture({ repositoryRoot: rootPath });
+
+        expect(result.violations).toEqual([]);
+    });
+
     it("allows an external consumer to use a module public API", async () => {
         const result = await checkFixture(
             "app/example.ts",

@@ -1,8 +1,8 @@
 # Module boundaries
 
-Status: Phase E1 policy. Stock and Routine are migrated examples, and Leave
-server/business ownership is now migrated; remaining presentation and feature
-migrations remain incremental.
+Status: Phase E2 policy. Stock and Routine are migrated examples, and Leave
+server/business plus Dashboard/LIFF presentation ownership is now migrated;
+remaining compatibility cleanup remains incremental.
 
 ## What is a module
 
@@ -46,8 +46,9 @@ Routine follows the same split: server/application consumers use
 `@/modules/routine/client`.
 
 Leave server/application consumers use `@/modules/leave`. Leave Dashboard and
-LIFF consumers may temporarily use `@/modules/leave/client` or the documented
-legacy facades until Phase E2 completes presentation migration.
+LIFF route composition use the explicit client-safe entry point
+`@/modules/leave/client`; migrated module presentation internals use local
+relative contracts.
 
 The root barrel remains server/application-oriented. The client entry point
 must export only client-safe presentation contracts.
@@ -161,9 +162,9 @@ imports are not rewritten merely to make the target diagram look complete. A
 migration must preserve behavior unless a separate change explicitly requests
 a behavior change.
 
-Leave is a deliberate partial migration: `modules/leave/` owns all migrated
-server/business behavior, while legacy presentation and client delivery paths
-remain only as thin compatibility adapters. The architecture checker rejects
-legacy Leave ownership imports from `app/api/leave/**` and
-`app/api/line/leave/**`; it does not reject the documented E2 presentation
-compatibility paths.
+Leave is a deliberate incremental migration: `modules/leave/` owns server,
+Dashboard presentation, and LIFF presentation behavior. Only the narrow,
+behavior-free compatibility facades documented in `leave-migration.md` remain.
+The architecture checker rejects legacy Leave ownership imports from both API
+routes and migrated Leave presentation, and requires Leave route composition to
+use `@/modules/leave/client`.

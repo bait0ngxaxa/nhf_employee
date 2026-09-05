@@ -24,6 +24,8 @@ const DOM_TESTS = [
     "modules/stock/presentation/dashboard/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts}",
     "modules/routine/presentation/**/*.{test,spec}.{jsx,mjsx,cjsx,tsx,mtsx,ctsx}",
     "modules/routine/presentation/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts}",
+    "modules/leave/presentation/**/*.{test,spec}.{jsx,mjsx,cjsx,tsx,mtsx,ctsx}",
+    "modules/leave/presentation/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts}",
 ];
 
 export default defineConfig({

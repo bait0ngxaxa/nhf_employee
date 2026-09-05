@@ -1,4 +1,4 @@
-﻿import { Prisma } from "@prisma/client";
+﻿import type { Prisma } from "@prisma/client";
 import type { JWTPayload } from "jose";
 
 interface SessionUserLike {
@@ -55,22 +55,22 @@ export function hasEligibleEmployeeLifecycle(
         || (employee.status === "ACTIVE" && employee.deletedAt === null);
 }
 
-export const authSessionUserSelect = Prisma.validator<Prisma.UserSelect>()({
+export const authSessionUserSelect = {
     id: true,
     role: true,
     isActive: true,
     tokenVersion: true,
-});
+} as const satisfies Prisma.UserSelect;
 
-export const authRefreshUserSelect = Prisma.validator<Prisma.UserSelect>()({
+export const authRefreshUserSelect = {
     id: true,
     email: true,
     role: true,
     isActive: true,
     tokenVersion: true,
-});
+} as const satisfies Prisma.UserSelect;
 
-export const authLoginUserSelect = Prisma.validator<Prisma.UserSelect>()({
+export const authLoginUserSelect = {
     ...authRefreshUserSelect,
     name: true,
     password: true,
@@ -81,7 +81,7 @@ export const authLoginUserSelect = Prisma.validator<Prisma.UserSelect>()({
             deletedAt: true,
         },
     },
-});
+} as const satisfies Prisma.UserSelect;
 
 export const AUTH_ERROR_MESSAGES = {
     forbidden: "Forbidden",

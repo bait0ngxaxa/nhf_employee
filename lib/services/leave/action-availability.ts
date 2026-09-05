@@ -1,2 +1,2 @@
-/** Transitional facade for Phase E2 presentation consumers. */
-export * from "@/modules/leave/client";
+/** Compatibility for existing external tests; final delivery cleanup belongs to E3. */
+export { getApproverLeaveActions, getEmployeeLeaveActions } from "@/modules/leave/client";

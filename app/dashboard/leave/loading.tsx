@@ -1,6 +1,6 @@
 import type { ReactElement } from "react";
 
-import { LeaveManagementSectionSkeleton } from "@/components/dashboard/leave/LeaveSkeletons";
+import { LeaveManagementSectionSkeleton } from "@/modules/leave/client";
 
 export default function LeaveLoading(): ReactElement {
     return <LeaveManagementSectionSkeleton />;

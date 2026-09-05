@@ -48,6 +48,4 @@ export function withTrustedMutation(handler: TrustedMutationHandler): TrustedMut
     };
 }
 
-export const AUTH_MUTATION_HEADERS: Readonly<Record<string, string>> = {
-    "X-Requested-With": AJAX_HEADER_VALUE,
-};
+export { AUTH_MUTATION_HEADERS } from "./mutation-headers";

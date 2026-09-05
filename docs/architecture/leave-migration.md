@@ -1,7 +1,8 @@
 # Leave module migration
 
-Status: Phase E1 — Leave server/business ownership migrated. Dashboard and
-LIFF presentation remain transitional and are planned for Phase E2.
+Status: Phase E2 — Leave server/business, Dashboard presentation, and LIFF
+presentation ownership migrated. Final compatibility and public API cleanup
+remain for Phase E3.
 
 Leave server-side business behavior is now owned by `modules/leave/`. The
 migration preserves the existing delivery boundaries while moving the rules,
@@ -33,10 +34,16 @@ templates, or internal notification composition helpers. The small
 `getEmployeeIdFromUserId` export remains only for the existing transitional
 server/test facade; it is not a general module-internal escape hatch.
 
-The module also has `modules/leave/client.ts`. It is a client-safe transitional
-contract for existing Dashboard/LIFF consumers while their presentation
-ownership is migrated in Phase E2. It does not export database, filesystem,
-email, LINE transport, or server application implementation.
+The module also has `modules/leave/client.ts`, the supported client-safe entry
+point for Leave presentation. It exposes only the route-facing Dashboard and
+LIFF roots plus the small client-safe contracts still required by retained
+compatibility consumers. It does not export database, filesystem, email, LINE
+transport, or server application implementation.
+
+The route-facing exports are `LeaveManagementSection`,
+`LeaveManagementSectionSkeleton`, and `LiffLeaveApp`. Presentation components,
+hooks, and the Dashboard/LIFF API adapters remain internal to
+`modules/leave/presentation/**`.
 
 ## Actual module shape
 
@@ -68,10 +75,34 @@ modules/leave/
 │   └── reports/
 ├── schemas/
 ├── server/
-├── presentation/types.ts
+├── presentation/
+│   ├── dashboard/
+│   │   ├── components/
+│   │   ├── hooks/
+│   │   ├── api.ts
+│   │   └── Leave* roots and tests
+│   ├── liff/
+│   │   ├── api.ts
+│   │   ├── leave-format.ts
+│   │   └── LiffLeave* components and tests
+│   └── types.ts
 ├── client.ts
 └── index.ts
 ```
+
+`app/dashboard/leave/page.tsx` and its loading boundary compose the module
+through `@/modules/leave/client`. The page retains metadata, feature gating,
+query parsing, the five existing `leaveTab` values (`my-leave`, `approvals`,
+`recovery`, `reports`, and `approver-settings`), and the existing Suspense
+fallback. `LeaveManagementSection` owns the Leave-specific tab composition
+under `presentation/dashboard/` while continuing to consume shared dashboard
+context and generic Section UI.
+
+`app/liff/leave/page.tsx` composes `LiffLeaveApp` through the same client entry.
+All Leave LIFF state, deep-link handling, mutations, pagination, session
+recovery usage, and attachment presentation now live under
+`presentation/liff/`. The Leave LIFF API adapter is `presentation/liff/api.ts`;
+generic LIFF session recovery and API infrastructure remain platform-owned.
 
 The domain layer owns Leave-year and business-date calculations, half-day
 arithmetic, quota/carry accounting, over-quota calculations, action
@@ -148,31 +179,31 @@ contain Leave business policy.
 
 ## Transitional compatibility
 
-The following facades intentionally remain until Phase E2/E3 removes their
-legacy consumers. They contain no independent Leave business logic:
+The former Leave presentation ownership paths and the generic
+`lib/client/liff-leave.ts` adapter were deleted after all application consumers
+were migrated. There is no duplicate Dashboard or LIFF implementation under
+`components/`, `hooks/`, or `lib/client/`.
 
-- `constants/leave.ts`, `lib/types/leave.ts`, the three Leave validation
-  files, and `lib/ssot/leave-attachments.ts` forward client/schema contracts to
-  `@/modules/leave/client`;
-- the remaining client-safe compatibility paths (`constants/leave.ts`,
-  `lib/types/leave.ts`, `lib/validations/leave*.ts`,
-  `lib/ssot/leave-attachments.ts`, and `lib/services/leave/client.ts`) forward
-  to `@/modules/leave/client`;
-- the remaining server/delivery facades under `lib/services/leave/`,
-  `lib/server/leave-api.ts`, `lib/server/leave-request-api.ts`,
-  `lib/server/leave-not-taken-api.ts`, and `lib/line/leave-links.ts` forward
-  to `@/modules/leave`; and
-- no Leave deep-import compatibility exception remains. The former
-  `lib/services/leave/audit-details.ts`,
-  `lib/services/leave/create-request-audit.ts`, and
-  `lib/services/leave/transaction.ts` facades had no remaining consumers
-  after the E1 extraction and were removed.
+The following narrow, behavior-free facades remain because external unit or
+integration tests still import these historical contracts:
 
-The remaining `lib/services/leave/client.ts` and legacy presentation locations
-are client/delivery compatibility work deferred to Phase E2. Retained
-server/delivery facades forward through `@/modules/leave` or
-`@/modules/leave/client`; they do not deep-import Leave internals. No new
-Leave business logic should be added to legacy locations.
+- `lib/validations/leave.ts`;
+- `lib/ssot/leave-attachments.ts`; and
+- the client-safe domain/query facades under `lib/services/leave/` for
+  business-date, half-day, quota, history-filter, action-availability, and
+  utility contracts.
+
+Each forwards directly to an explicit export from `@/modules/leave/client` and
+contains no Leave behavior. They are tracked for final removal or minimization
+in E3. The remaining server/delivery facades under `lib/services/leave/`,
+`lib/server/leave-api.ts`, `lib/server/leave-request-api.ts`,
+`lib/server/leave-not-taken-api.ts`, and `lib/line/leave-links.ts` continue to
+forward through `@/modules/leave` as established by E1.
+
+The architecture checker now rejects Leave route or migrated presentation
+imports from the deleted ownership paths, requires route composition through
+`@/modules/leave/client`, rejects module-internal imports through that public
+barrel, and checks the runtime client graph for server-only dependencies.
 
 ## Preserved invariants
 
@@ -186,4 +217,6 @@ redaction.
 
 No Prisma schema or database migration was introduced. No API contract, public
 route, permission policy, status value, Thai wording, UI/UX, or database
-semantic change was introduced in Phase E1.
+semantic change was introduced in Phase E2. Phase E3 has not started; it is
+reserved for final facade removal/public API minimization, cross-layer cleanup,
+and the full dependency re-audit.

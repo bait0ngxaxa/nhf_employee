@@ -1,4 +1,3 @@
-/**
- * Transitional client-facing facade retained for the Phase E2 presentation migration.
- */
-export * from "@/modules/leave/client";
+/** Compatibility for existing external tests; final delivery cleanup belongs to E3. */
+export { leaveRequestSchema } from "@/modules/leave/client";
+export type { LeaveRequestValues } from "@/modules/leave/client";

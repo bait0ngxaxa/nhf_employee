@@ -1,6 +1,7 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, extname, isAbsolute, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
+import { isBuiltin } from "node:module";
 import ts from "typescript";
 
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -155,6 +156,21 @@ const leaveApiRouteDirectories = [
     "app/api/line/leave",
 ];
 
+const leavePresentationRouteDirectories = [
+    "app/dashboard/leave",
+    "app/liff/leave",
+];
+
+const legacyLeavePresentationPrefixes = [
+    "@/components/dashboard/leave",
+    "@/components/dashboard/sections/LeaveManagementSection",
+    "@/components/liff/leave",
+    "@/hooks/leave",
+    "@/hooks/useLeaveApprovals",
+    "@/hooks/useLeaveProfile",
+    "@/lib/client/liff-leave",
+];
+
 const legacyLeaveImportPrefixes = [
     "@/constants/leave",
     "@/lib/email/templates/leave-action",
@@ -179,6 +195,32 @@ function hasImportPrefix(moduleSpecifier, prefix) {
 }
 
 function getLeaveRouteDependencyViolation(filePath, rootPath, moduleSpecifier) {
+    const resolvedImport = moduleSpecifier.startsWith("@/")
+        ? resolve(rootPath, moduleSpecifier.slice(2))
+        : getImportSourcePath(moduleSpecifier, filePath, rootPath);
+    const normalizedSpecifier = resolvedImport === null
+        ? moduleSpecifier
+        : `@/${relativeFilePath(resolvedImport, rootPath).replace(/\.[cm]?[jt]sx?$/, "")}`;
+    const isPresentationRoute = leavePresentationRouteDirectories.some((directory) =>
+        pathIsWithin(filePath, resolve(rootPath, directory)),
+    );
+    const isLeavePresentation = pathIsWithin(
+        filePath, resolve(rootPath, "modules/leave/presentation"),
+    );
+    if (isPresentationRoute || isLeavePresentation) {
+        if ([...legacyLeaveImportPrefixes, ...legacyLeavePresentationPrefixes].some((prefix) =>
+            hasImportPrefix(normalizedSpecifier, prefix),
+        )) {
+            return "Leave presentation must not depend on legacy Leave ownership paths; routes use @/modules/leave/client and module internals use local contracts.";
+        }
+        if (isPresentationRoute && hasImportPrefix(normalizedSpecifier, "@/modules/leave")
+            && normalizedSpecifier !== "@/modules/leave/client") {
+            return "Leave presentation routes must use @/modules/leave/client.";
+        }
+        if (isLeavePresentation && ["@/modules/leave", "@/modules/leave/client"].includes(normalizedSpecifier)) {
+            return "Leave presentation internals must use local contracts instead of their own public barrel.";
+        }
+    }
     const isLeaveApiRoute = leaveApiRouteDirectories.some((directory) =>
         pathIsWithin(filePath, resolve(rootPath, directory)),
     );
@@ -187,7 +229,7 @@ function getLeaveRouteDependencyViolation(filePath, rootPath, moduleSpecifier) {
     }
 
     if (legacyLeaveImportPrefixes.some((prefix) =>
-        hasImportPrefix(moduleSpecifier, prefix),
+        hasImportPrefix(normalizedSpecifier, prefix),
     )) {
         return "Leave API routes must use the Leave module public API \"@/modules/leave\" instead of legacy Leave ownership paths.";
     }
@@ -214,10 +256,18 @@ function getStringLiteralText(node) {
     return ts.isStringLiteralLike(node) ? node.text : null;
 }
 
-function getImports(filePath) {
+function getImports(filePath, runtimeOnly = false) {
+    const contents = readFileSync(filePath, "utf8");
     const sourceFile = ts.createSourceFile(
         filePath,
-        readFileSync(filePath, "utf8"),
+        runtimeOnly ? ts.transpileModule(contents, {
+            fileName: filePath,
+            compilerOptions: {
+                module: ts.ModuleKind.ESNext,
+                target: ts.ScriptTarget.ESNext,
+                jsx: ts.JsxEmit.Preserve,
+            },
+        }).outputText : contents,
         ts.ScriptTarget.Latest,
         true,
         getScriptKind(filePath),
@@ -267,6 +317,54 @@ function getImports(filePath) {
 
     visit(sourceFile);
     return imports;
+}
+
+function getLeaveClientGraphViolations(rootPath) {
+    const entryPath = resolve(rootPath, "modules/leave/client.ts");
+    if (!existsSync(entryPath)) return [];
+    const pending = [entryPath];
+    const visited = new Set();
+    const violations = [];
+    const serverPackages = [
+        "@prisma/client",
+        "nodemailer",
+        "@line/bot-sdk",
+        "server-only",
+        "next/server",
+        "next/headers",
+        "next/cache",
+    ];
+    const serverDirectories = [
+        "lib/db", "lib/server", "lib/email", "lib/line",
+        "modules/leave/server", "modules/leave/infrastructure/persistence",
+        "modules/leave/infrastructure/notifications", "modules/leave/infrastructure/reports",
+    ];
+    while (pending.length > 0) {
+        const filePath = pending.pop();
+        if (visited.has(filePath)) continue;
+        visited.add(filePath);
+        for (const record of getImports(filePath, true)) {
+            const specifier = record.moduleSpecifier;
+            const target = specifier.startsWith("@/")
+                ? resolve(rootPath, specifier.slice(2))
+                : getImportSourcePath(specifier, filePath, rootPath);
+            if (isBuiltin(specifier) || serverPackages.some((name) => hasImportPrefix(specifier, name))
+                || (target !== null && serverDirectories.some((directory) =>
+                    pathIsWithin(target, resolve(rootPath, directory))))) {
+                violations.push(describeViolation(filePath, rootPath, record,
+                    "Server-only runtime dependency is reachable from @/modules/leave/client."));
+                continue;
+            }
+            if (target === null) continue;
+            const sourcePath = [
+                ...[...sourceExtensions].map((extension) => `${target}${extension}`),
+                ...[...sourceExtensions].map((extension) => resolve(target, `index${extension}`)),
+                ...(sourceExtensions.has(extname(target)) ? [target] : []),
+            ].find((candidate) => existsSync(candidate));
+            if (sourcePath !== undefined) pending.push(sourcePath);
+        }
+    }
+    return violations;
 }
 
 function relativeFilePath(filePath, rootPath) {
@@ -375,6 +473,7 @@ function checkArchitecture(options = {}) {
         }
     }
 
+    violations.push(...getLeaveClientGraphViolations(rootPath));
     return { sourceFiles, violations };
 }
 

@@ -126,12 +126,14 @@ Temporary exceptions must be explicit and narrow:
 This ledger is a migration record, not permission for new unrestricted Prisma
 usage. Add a narrower row when a new exceptional platform case is approved.
 
-For the completed Leave E1 server migration, both Leave route families must
-consume `@/modules/leave`. The architecture checker rejects legacy Leave
-ownership imports from `app/api/leave/**` and `app/api/line/leave/**`, including
-legacy services, server adapters, schemas, upload orchestration, Leave email
-templates, LINE composition, Leave links, constants, and Leave types. Leave
-presentation compatibility remains allowed until Phase E2.
+For the completed Leave E2 migration, Leave API route families must consume
+`@/modules/leave`, while Dashboard and LIFF route composition must consume
+`@/modules/leave/client`. The architecture checker rejects legacy Leave
+ownership imports from `app/api/leave/**`, `app/api/line/leave/**`, and migrated
+Leave presentation, including legacy services, server adapters, schemas,
+upload orchestration, Leave email templates, LINE composition, Leave links,
+constants, types, components, and hooks. Module presentation internals must use
+local contracts instead of importing their own public barrel.
 
 ## Automated enforcement
 
@@ -144,8 +146,9 @@ the module boundary from a legacy directory, while imports unrelated to
 | --- | --- | --- |
 | ESLint `no-restricted-imports` | `shared/**/*.{js,jsx,ts,tsx}` | Rejects imports from `modules/` so a shared capability cannot acquire a business dependency |
 | `npm run architecture:check` | Repository source files, excluding dependency, build, coverage, and generated directories | Uses the installed TypeScript parser to inspect imports, re-exports, type imports, dynamic imports, and `require()` calls; allows only `@/modules/<feature>` and `@/modules/<feature>/client` as module public entries; rejects `shared -> modules`, external consumers deep-importing module internals, cross-module deep imports, including relative paths, and any business module importing the global Outbox Processor |
-| Leave route ownership | `app/api/leave/**`, `app/api/line/leave/**` | Rejects imports from legacy Leave ownership paths so the completed E1 route adapters cannot regress behind the module boundary |
-| Client/server policy | Legacy and new code | The migrated Stock client entry is explicit and client-safe; broader legacy client/server migration remains incremental |
+| Leave route ownership | `app/api/leave/**`, `app/api/line/leave/**` | Rejects imports from legacy Leave ownership paths so the completed Leave route adapters cannot regress behind the module boundary |
+| Leave presentation ownership | `app/dashboard/leave/**`, `app/liff/leave/**`, `modules/leave/presentation/**` | Requires Leave route composition through `@/modules/leave/client`, rejects deleted legacy presentation paths and module-internal public-barrel imports, and checks the client entry runtime graph for server-only dependencies |
+| Client/server policy | Migrated module client entries | The Leave and Routine client entries are explicit and client-safe; broader legacy client/server migration remains incremental |
 | Route-level Prisma policy | Legacy and new code | Documentation-led in Phase A for the existing route exceptions; new module infrastructure remains the intended boundary |
 
 The check is fast and is included at the start of `npm run check`. Scanning

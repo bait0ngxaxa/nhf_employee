@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import type { ReactElement } from "react";
 
 import { LiffModuleLanding } from "@/components/liff/LiffModuleLanding";
-import { LiffLeaveApp } from "@/components/liff/leave/LiffLeaveApp";
+import { LiffLeaveApp } from "@/modules/leave/client";
 import { FEATURE_KEYS, isFeatureEnabled } from "@/lib/ssot/features";
 
 export const metadata: Metadata = {

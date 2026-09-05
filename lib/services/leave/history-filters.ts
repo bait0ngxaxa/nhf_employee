@@ -1,2 +1,2 @@
-/** Transitional client-facing facade retained until Phase E2. */
-export * from "@/modules/leave/client";
+/** Compatibility for existing external tests; final delivery cleanup belongs to E3. */
+export { buildApproverLeaveHistoryFilterWhere, buildEmployeeLeaveHistoryFilterWhere, createLeaveHistoryYearRange, getAvailableLeaveHistoryYears, parseApproverLeaveHistoryFilters, parseEmployeeLeaveHistoryFilters } from "@/modules/leave/client";
