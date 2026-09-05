@@ -8,7 +8,7 @@ import {
     getCurrentTeamReportMeta,
     loadApproverHistoryReportEmployees,
     loadCurrentTeamReportEmployees,
-} from "@/lib/services/leave/report-export";
+} from "./report-export";
 
 vi.mock("@/lib/db/prisma", () => ({
     prisma: {

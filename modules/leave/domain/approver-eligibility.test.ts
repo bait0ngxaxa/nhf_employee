@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
     isActiveLeaveApprover,
     isUsableLeaveEmail,
-} from "@/lib/services/leave/approver-eligibility";
+} from "./approver-eligibility";
 
 const ACTIVE_APPROVER = {
     id: 20,

@@ -2,9 +2,11 @@
 
 import { describe, expect, it } from "vitest";
 
-import { parseLeaveRequestInput } from "@/lib/services/leave/request-input";
-import type { LeaveRequestInputError } from "@/lib/services/leave/request-input";
-import { LEAVE_ATTACHMENT_MAX_REQUEST_BYTES } from "@/lib/ssot/leave-attachments";
+import {
+    parseLeaveRequestInput,
+    type LeaveRequestInputError,
+} from "./request-input";
+import { LEAVE_ATTACHMENT_MAX_REQUEST_BYTES } from "../../infrastructure/attachments/constants";
 
 const VALID_PAYLOAD = {
     leaveType: "PERSONAL",

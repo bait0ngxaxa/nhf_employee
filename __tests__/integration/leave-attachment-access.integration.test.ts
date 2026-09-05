@@ -16,15 +16,15 @@ import {
 import { GET } from "@/app/api/leave/attachments/[attachmentId]/route";
 import { requireActiveWorkforceOrAdminSession } from "@/lib/auth/workforce";
 import { prisma } from "@/lib/db/prisma";
-import { readLeaveAttachment } from "@/lib/uploads/leave";
-import type * as LeaveUploadsModule from "@/lib/uploads/leave";
+import { readLeaveAttachment } from "@/modules/leave";
+import type * as LeaveModule from "@/modules/leave";
 
 vi.mock("@/lib/auth/workforce", () => ({
     requireActiveWorkforceOrAdminSession: vi.fn(),
 }));
 
-vi.mock("@/lib/uploads/leave", async (importOriginal) => {
-    const actual = await importOriginal<typeof LeaveUploadsModule>();
+vi.mock("@/modules/leave", async (importOriginal) => {
+    const actual = await importOriginal<typeof LeaveModule>();
     return {
         ...actual,
         readLeaveAttachment: vi.fn(),

@@ -5,9 +5,9 @@ import { prisma } from "@/lib/db/prisma";
 import {
     persistLeaveExceptionApprover,
     resolveLeaveExceptionApprover,
-} from "@/lib/services/leave/exception-approver";
-import { buildLeaveActionDeliveryIdentity } from "@/lib/services/leave/notification-payloads";
-import { lockLeaveRequestRow } from "@/lib/services/leave/transaction";
+} from "./exception-approver";
+import { buildLeaveActionDeliveryIdentity } from "../notifications/notification-payloads";
+import { lockLeaveRequestRow } from "../../infrastructure/persistence/transaction";
 
 vi.mock("@/lib/db/prisma", () => ({
     prisma: {

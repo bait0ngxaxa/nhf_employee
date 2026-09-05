@@ -6,12 +6,13 @@ import { getApiAuthSession } from "@/lib/auth/server";
 import { prisma } from "@/lib/db/prisma";
 import { getEmployeeIdFromUserId } from "@/lib/services/leave/get-employee-id";
 import { processOutbox } from "@/lib/services/outbox/processor";
-import { LeaveAttachmentValidationError } from "@/lib/uploads/leave";
+import { LeaveAttachmentValidationError } from "@/modules/leave";
 import { LEAVE_ATTACHMENT_MAX_BYTES } from "@/lib/ssot/leave-attachments";
 import { resetMutationRateLimit } from "@/lib/security/mutation-rate-limit";
 import { createLeaveRequestHash } from "@/lib/services/leave/idempotency";
 import { NextRequest } from "next/server";
 import type * as NextServerModule from "next/server";
+import type * as LeaveModule from "@/modules/leave";
 import { formatAuditLogDisplay } from "@/lib/audit-log/display";
 import { buildLeaveActionDeliveryIdentity } from "@/lib/services/leave/notification-payloads";
 
@@ -42,12 +43,27 @@ vi.mock("@/lib/services/leave/get-employee-id", () => ({
     getEmployeeIdFromUserId: vi.fn(),
 }));
 
-vi.mock("@/modules/leave/infrastructure/attachments/storage", async (importOriginal) => {
-    const actual = await importOriginal();
+vi.mock("@/modules/leave", async (importOriginal) => {
+    const actual = await importOriginal<typeof LeaveModule>();
     return {
-        ...(actual as Record<string, unknown>),
-        saveLeaveAttachments: uploadMocks.save,
-        deleteLeaveAttachment: uploadMocks.delete,
+        ...actual,
+        handleLeaveRequestSubmission: (
+            request: Parameters<typeof actual.handleLeaveRequestSubmission>[0],
+            actor: Parameters<typeof actual.handleLeaveRequestSubmission>[1],
+            buildAttachmentUrl: Parameters<typeof actual.handleLeaveRequestSubmission>[2],
+            serializeResponse: Parameters<typeof actual.handleLeaveRequestSubmission>[3],
+            scheduleOutbox: Parameters<typeof actual.handleLeaveRequestSubmission>[4],
+        ) => actual.handleLeaveRequestSubmission(
+            request,
+            actor,
+            buildAttachmentUrl,
+            serializeResponse,
+            scheduleOutbox,
+            {
+                saveLeaveAttachments: uploadMocks.save,
+                deleteLeaveAttachment: uploadMocks.delete,
+            },
+        ),
     };
 });
 

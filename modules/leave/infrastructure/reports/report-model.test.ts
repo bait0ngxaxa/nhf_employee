@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { buildLeaveReportRows } from "@/lib/services/leave/report-model";
-import type { LeaveReportEmployee } from "@/lib/services/leave/report-types";
+import { buildLeaveReportRows } from "./report-model";
+import type { LeaveReportEmployee } from "./report-types";
 
 describe("leave report model", () => {
     it("summarizes current team employees and keeps detail rows reconciled", () => {

@@ -8,12 +8,12 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
     createLeaveAttachmentStorage,
     type LeaveAttachmentSource,
-} from "@/lib/uploads/leave";
+} from "./storage";
 import {
     LEAVE_ATTACHMENT_MAX_BYTES,
     LEAVE_ATTACHMENT_MAX_FILES,
     LEAVE_ATTACHMENT_MAX_INPUT_PIXELS,
-} from "@/lib/ssot/leave-attachments";
+} from "./constants";
 
 function createFile(
     name: string,

@@ -2,8 +2,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Prisma } from "@prisma/client";
 
 import { prisma } from "@/lib/db/prisma";
-import { assignLeaveApprovers } from "@/lib/services/leave/approver-assignment";
-import { ACTIVE_LEAVE_EMPLOYEE_QUERY_WHERE } from "@/lib/services/leave/approver-eligibility";
+import { assignLeaveApprovers } from "./approver-assignment";
+import { ACTIVE_LEAVE_EMPLOYEE_QUERY_WHERE } from "../../domain/approver-eligibility";
 import { formatAuditLogDisplay } from "@/lib/audit-log/display";
 
 vi.mock("@/lib/db/prisma", () => ({

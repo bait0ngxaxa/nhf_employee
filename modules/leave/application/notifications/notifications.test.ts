@@ -8,13 +8,13 @@ import {
     sendLeaveCancelledAfterApprovalNotifications,
     sendLeaveNotTakenConfirmedNotifications,
     sendLeaveResultNotifications,
-} from "@/lib/services/leave/notifications";
+} from "./notifications";
 import type {
     LeaveActionPayload,
     LeaveCancelledAfterApprovalPayload,
     LeaveNotTakenConfirmedPayload,
     LeaveResultPayload,
-} from "@/lib/services/leave/notification-payloads";
+} from "./notification-payloads";
 
 const leaveEmailMocks = vi.hoisted(() => ({
     sendLeaveActionNotification: vi.fn(),
@@ -29,7 +29,7 @@ import {
     buildConfiguredApproverSnapshot,
     buildLeaveRecipientSnapshot,
     parseLeaveActionPayload,
-} from "@/lib/services/leave/notification-payloads";
+} from "./notification-payloads";
 
 vi.mock("@/lib/db/prisma", () => ({
     prisma: mockDeep<PrismaClient>(),
@@ -39,7 +39,7 @@ vi.mock("@/lib/network/public-url", () => ({
     getPublicOrigin: () => "https://example.com",
 }));
 
-vi.mock("@/modules/leave/infrastructure/notifications/email", () => ({
+vi.mock("../../infrastructure/notifications/email", () => ({
     ...leaveEmailMocks,
 }));
 

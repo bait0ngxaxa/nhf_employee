@@ -3,9 +3,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { prisma } from "@/lib/db/prisma";
 import {
     isActiveEmployeeInTransaction,
-} from "@/lib/services/leave/active-employee-session";
-import { assignLeaveApprovers } from "@/lib/services/leave/approver-assignment";
-import { buildLeaveActionDeliveryIdentity } from "@/lib/services/leave/notification-payloads";
+} from "../queries/active-employee-session";
+import { assignLeaveApprovers } from "../approvals/approver-assignment";
+import { buildLeaveActionDeliveryIdentity } from "../notifications/notification-payloads";
 import { runSerializableTransaction } from "@/lib/db/transaction";
 
 vi.mock("@/lib/db/prisma", () => ({

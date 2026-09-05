@@ -39,11 +39,22 @@ export type LeaveRequestResponseSerializer = (
     request: CreatedLeaveRequest,
 ) => object;
 
+interface LeaveRequestApiDependencies {
+    saveLeaveAttachments: typeof saveLeaveAttachments;
+    deleteLeaveAttachment: typeof deleteLeaveAttachment;
+}
+
+const defaultDependencies: LeaveRequestApiDependencies = {
+    saveLeaveAttachments,
+    deleteLeaveAttachment,
+};
+
 async function cleanupAttachments(
     attachments: readonly StoredLeaveAttachment[],
+    deleteAttachment: LeaveRequestApiDependencies["deleteLeaveAttachment"],
 ): Promise<void> {
     const results = await Promise.allSettled(
-        attachments.map(({ storageKey }) => deleteLeaveAttachment(storageKey)),
+        attachments.map(({ storageKey }) => deleteAttachment(storageKey)),
     );
     const failedCleanupCount = results.filter(
         (result) => result.status === "rejected",
@@ -96,6 +107,7 @@ export async function handleLeaveRequestSubmission(
     buildAttachmentUrl?: LeaveAttachmentUrlBuilder,
     serializeResponse?: LeaveRequestResponseSerializer,
     scheduleOutbox?: () => void,
+    dependencies: LeaveRequestApiDependencies = defaultDependencies,
 ): Promise<NextResponse> {
     let storedAttachments: StoredLeaveAttachment[] = [];
     let transactionCommitted = false;
@@ -109,7 +121,7 @@ export async function handleLeaveRequestSubmission(
         }
 
         const leaveRequestId = randomUUID();
-        storedAttachments = await saveLeaveAttachments({
+        storedAttachments = await dependencies.saveLeaveAttachments({
             leaveRequestId,
             files: input.attachments,
         });
@@ -125,7 +137,10 @@ export async function handleLeaveRequestSubmission(
         transactionCommitted = true;
 
         if (result.replayed) {
-            await cleanupAttachments(storedAttachments);
+            await cleanupAttachments(
+                storedAttachments,
+                dependencies.deleteLeaveAttachment,
+            );
         } else if (scheduleOutbox) {
             scheduleOutbox();
         }
@@ -141,7 +156,10 @@ export async function handleLeaveRequestSubmission(
         );
     } catch (error) {
         if (!transactionCommitted && storedAttachments.length > 0) {
-            await cleanupAttachments(storedAttachments);
+            await cleanupAttachments(
+                storedAttachments,
+                dependencies.deleteLeaveAttachment,
+            );
         }
         return createErrorResponse(error);
     }

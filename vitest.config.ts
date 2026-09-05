@@ -14,6 +14,7 @@ const NODE_TESTS = [
     "__tests__/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts}",
     "modules/stock/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts}",
     "modules/routine/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts}",
+    "modules/leave/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts}",
 ];
 
 const DOM_TESTS = [

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { isActiveEmployeeInTransaction } from "@/lib/services/leave/active-employee-session";
+import { isActiveEmployeeInTransaction } from "./active-employee-session";
 
 describe("active employee transaction guards", () => {
     it("locks and checks the employee inside the transaction", async () => {

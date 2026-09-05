@@ -7,11 +7,7 @@ import {
     LeaveStatus,
     LeaveType,
 } from "@prisma/client";
-import { mkdtemp, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import path from "node:path";
 import { NextRequest } from "next/server";
-import sharp from "sharp";
 import {
     afterAll,
     beforeAll,
@@ -22,17 +18,13 @@ import {
     vi,
 } from "vitest";
 import type * as NextServerModule from "next/server";
+import type * as LeaveModule from "@/modules/leave";
 
 import { GET as readAttachment } from "@/app/api/leave/attachments/[attachmentId]/route";
 import { POST as submitLeaveRequest } from "@/app/api/leave/request/route";
 import { prisma } from "@/lib/db/prisma";
 import { resetMutationRateLimit } from "@/lib/security/mutation-rate-limit";
-import {
-    createLeaveAttachmentStorage,
-    LeaveAttachmentValidationError,
-    type StoredLeaveAttachment,
-} from "@/lib/uploads/leave";
-import type * as LeaveUploadsModule from "@/lib/uploads/leave";
+import { LeaveAttachmentValidationError } from "@/modules/leave";
 
 const mocks = vi.hoisted(() => ({
     session: vi.fn(),
@@ -56,12 +48,27 @@ vi.mock("@/lib/auth/workforce", () => ({
     requireActiveWorkforceOrAdminSession: mocks.session,
 }));
 
-vi.mock("@/lib/uploads/leave", async (importOriginal) => {
-    const actual = await importOriginal<typeof LeaveUploadsModule>();
+vi.mock("@/modules/leave", async (importOriginal) => {
+    const actual = await importOriginal<typeof LeaveModule>();
     return {
         ...actual,
-        saveLeaveAttachments: mocks.save,
-        deleteLeaveAttachment: mocks.remove,
+        handleLeaveRequestSubmission: (
+            request: Parameters<typeof actual.handleLeaveRequestSubmission>[0],
+            actor: Parameters<typeof actual.handleLeaveRequestSubmission>[1],
+            buildAttachmentUrl: Parameters<typeof actual.handleLeaveRequestSubmission>[2],
+            serializeResponse: Parameters<typeof actual.handleLeaveRequestSubmission>[3],
+            scheduleOutbox: Parameters<typeof actual.handleLeaveRequestSubmission>[4],
+        ) => actual.handleLeaveRequestSubmission(
+            request,
+            actor,
+            buildAttachmentUrl,
+            serializeResponse,
+            scheduleOutbox,
+            {
+                saveLeaveAttachments: mocks.save,
+                deleteLeaveAttachment: mocks.remove,
+            },
+        ),
         readLeaveAttachment: mocks.read,
     };
 });
@@ -84,7 +91,15 @@ type Fixture = {
     adminUserId: number;
 };
 
-type StoredFile = StoredLeaveAttachment;
+type StoredFile = {
+    storageKey: string;
+    originalName: string;
+    contentType: "image/webp";
+    contentSha256: string;
+    sizeBytes: number;
+    width: number;
+    height: number;
+};
 
 function assertDedicatedDatabase(): void {
     const rawUrl = process.env.DATABASE_URL;
@@ -334,44 +349,6 @@ describe.sequential("leave attachment flow with real MySQL", () => {
     afterAll(async () => {
         await cleanFixture();
         await prisma.$disconnect();
-    });
-
-    it("runs the real Sharp/private-storage lifecycle on a temporary root", async () => {
-        const storageRoot = await mkdtemp(
-            path.join(tmpdir(), "leave-flow-storage-"),
-        );
-        try {
-            const source = await sharp({
-                create: {
-                    width: 16,
-                    height: 12,
-                    channels: 3,
-                    background: { r: 20, g: 80, b: 140 },
-                },
-            }).jpeg().toBuffer();
-            const storage = createLeaveAttachmentStorage(storageRoot);
-            const [stored] = await storage.save({
-                leaveRequestId: "real-storage-request",
-                files: [{
-                    name: "proof.jpg",
-                    type: "image/jpeg",
-                    size: source.byteLength,
-                    arrayBuffer: async () => Uint8Array.from(source).buffer,
-                }],
-            });
-
-            expect(stored?.contentType).toBe("image/webp");
-            expect(stored?.storageKey).toMatch(
-                /^leave\/real-storage-request\/[a-f0-9]{32}\.webp$/,
-            );
-            await expect(storage.read(stored?.storageKey ?? "")).resolves.toBeInstanceOf(Buffer);
-            await storage.delete(stored?.storageKey ?? "");
-            await expect(storage.read(stored?.storageKey ?? "")).rejects.toMatchObject({
-                code: "ENOENT",
-            });
-        } finally {
-            await rm(storageRoot, { recursive: true, force: true });
-        }
     });
 
     it("creates requests with zero, one, and three attachments", async () => {

@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { prisma } from "@/lib/db/prisma";
-import { dispatchCurrentLeaveAction } from "@/lib/services/leave/current-action-recipient";
+import { dispatchCurrentLeaveAction } from "./current-action-recipient";
 import { runSerializableTransaction } from "@/lib/db/transaction";
-import { lockLeaveRequestRow } from "@/lib/services/leave/transaction";
-import type { LeaveActionPayload } from "@/lib/services/leave/notification-payloads";
+import { lockLeaveRequestRow } from "../../infrastructure/persistence/transaction";
+import type { LeaveActionPayload } from "../notifications/notification-payloads";
 
 const leaveEmailMocks = vi.hoisted(() => ({
     sendLeaveActionNotification: vi.fn(),
@@ -16,7 +16,7 @@ vi.mock("@/lib/db/prisma", () => ({
     },
 }));
 
-vi.mock("@/modules/leave/infrastructure/notifications/email", () => ({
+vi.mock("../../infrastructure/notifications/email", () => ({
     sendLeaveActionNotification: leaveEmailMocks.sendLeaveActionNotification,
 }));
 

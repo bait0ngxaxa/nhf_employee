@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
     ensureLeaveQuotaForYear,
     reconcileLeaveQuotaForward,
-} from "@/lib/services/leave/quota-entitlement";
+} from "./quota-entitlement";
 
 function createQuota(overrides: Partial<LeaveQuota> = {}): LeaveQuota {
     return {

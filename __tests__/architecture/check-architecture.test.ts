@@ -167,6 +167,18 @@ describe("architecture checker module boundaries", () => {
         );
     });
 
+    it("rejects an external test deep-mocking module internals", async () => {
+        const result = await checkFixture(
+            "__tests__/example.test.ts",
+            'vi.mock("@/modules/leave/infrastructure/storage");\n',
+        );
+
+        expect(result.violations).toHaveLength(1);
+        expect(result.violations[0]).toContain(
+            'external consumers must use the target module public API "@/modules/leave"',
+        );
+    });
+
     it.each([
         "app/api/leave/example.ts",
         "app/api/line/leave/example.ts",

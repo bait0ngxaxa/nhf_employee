@@ -1,8 +1,8 @@
 import ExcelJS from "exceljs";
 import { describe, expect, it } from "vitest";
 
-import { createLeaveReportWorkbook } from "@/lib/services/leave/report-workbook";
-import type { LeaveReportEmployee } from "@/lib/services/leave/report-types";
+import { createLeaveReportWorkbook } from "./report-workbook";
+import type { LeaveReportEmployee } from "./report-types";
 
 describe("leave report workbook", () => {
     it("creates a valid two-sheet xlsx workbook by default", async () => {

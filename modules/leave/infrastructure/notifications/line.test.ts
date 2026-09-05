@@ -12,16 +12,16 @@ import {
     dispatchLeaveLineOutbox,
     enqueueLeaveLineNotification,
     type LeaveLineEnqueueInput,
-} from "@/lib/services/leave/line-notifications";
+} from "./line";
 import { createLineRetryKey } from "@/lib/services/outbox/provider-key";
 import {
     persistLeaveExceptionApprover,
     resolveLeaveExceptionApprover,
-} from "@/lib/services/leave/exception-approver";
+} from "../../application/approvals/exception-approver";
 import {
     buildLegacyLeaveActionDeliveryIdentity,
     buildLeaveActionDeliveryIdentity,
-} from "@/lib/services/leave/notification-payloads";
+} from "../../application/notifications/notification-payloads";
 import type {
     LeaveActionLinePayload,
     LeaveCancelledAfterApprovalLinePayload,
@@ -29,7 +29,7 @@ import type {
     LeaveNotTakenRequestedLinePayload,
     LeaveNotTakenConfirmedLinePayload,
     LeaveResultLinePayload,
-} from "@/lib/services/leave/notification-payloads";
+} from "../../application/notifications/notification-payloads";
 
 const sendAppLineNotificationMock = vi.hoisted(() => vi.fn());
 

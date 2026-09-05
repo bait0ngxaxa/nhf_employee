@@ -8,7 +8,7 @@ import {
     generateLeaveNotTakenConfirmedFlexMessage,
     generateLeaveNotTakenRequestedFlexMessage,
     generateLeaveResultFlexMessage,
-} from "@/lib/line/flex-messages/leave";
+} from "./line-flex";
 import type {
     LeaveActionPayload,
     LeaveCancelledAfterApprovalPayload,
@@ -17,7 +17,7 @@ import type {
     LeaveNotTakenConfirmedPayload,
     LeaveNotTakenRequestedPayload,
     LeaveResultPayload,
-} from "@/lib/services/leave/notification-payloads";
+} from "../../application/notifications/notification-payloads";
 
 const employee = {
     employeeId: 10,

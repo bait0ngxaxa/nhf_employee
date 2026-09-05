@@ -174,12 +174,6 @@ const legacyLeaveImportPrefixes = [
     "@/lib/validations/leave",
 ];
 
-const leaveCompatibilityFacadePaths = new Set([
-    "lib/services/leave/audit-details.ts",
-    "lib/services/leave/create-request-audit.ts",
-    "lib/services/leave/transaction.ts",
-]);
-
 function hasImportPrefix(moduleSpecifier, prefix) {
     return moduleSpecifier === prefix || moduleSpecifier.startsWith(`${prefix}/`);
 }
@@ -199,12 +193,6 @@ function getLeaveRouteDependencyViolation(filePath, rootPath, moduleSpecifier) {
     }
 
     return null;
-}
-
-function isAllowedLeaveCompatibilityFacade(filePath, rootPath, target) {
-    return target.moduleName === "leave"
-        && !target.isPublicEntryPoint
-        && leaveCompatibilityFacadePaths.has(relativeFilePath(filePath, rootPath));
 }
 
 function getScriptKind(filePath) {
@@ -263,7 +251,13 @@ function getImports(filePath) {
                 ts.isIdentifier(node.expression)
                 && node.expression.text === "require"
             );
-            if (isDynamicImport || isRequireCall) {
+            const isTestModuleMock = (
+                ts.isPropertyAccessExpression(node.expression)
+                && ts.isIdentifier(node.expression.expression)
+                && ["vi", "jest"].includes(node.expression.expression.text)
+                && ["mock", "doMock"].includes(node.expression.name.text)
+            );
+            if (isDynamicImport || isRequireCall || isTestModuleMock) {
                 addImport(node, getStringLiteralText(node.arguments[0]));
             }
         }
@@ -283,16 +277,12 @@ function describeViolation(filePath, rootPath, importRecord, message) {
     return `${relativeFilePath(filePath, rootPath)}:${importRecord.line} imports "${importRecord.moduleSpecifier}": ${message}`;
 }
 
-function getBoundaryViolation(owner, target, filePath, rootPath) {
+function getBoundaryViolation(owner, target) {
     if (owner.kind === "shared" && target.kind === "modules") {
         return "shared/ cannot depend on business modules.";
     }
 
     if (target.kind !== "modules" || target.moduleName === null) {
-        return null;
-    }
-
-    if (isAllowedLeaveCompatibilityFacade(filePath, rootPath, target)) {
         return null;
     }
 
@@ -373,7 +363,7 @@ function checkArchitecture(options = {}) {
                 continue;
             }
 
-            const message = getBoundaryViolation(owner, target, filePath, rootPath);
+            const message = getBoundaryViolation(owner, target);
             if (message !== null) {
                 violations.push(describeViolation(
                     filePath,

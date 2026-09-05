@@ -164,6 +164,6 @@ justified exception. Migrations must be incremental, reviewable, and
 behavior-preserving.
 
 The Leave compatibility ledger is maintained in
-[leave-migration.md](./leave-migration.md). Its three narrow deep-import
-facades are explicit exceptions for transitional consumers only; they do not
-make Leave module internals public.
+[leave-migration.md](./leave-migration.md). Retained Leave compatibility
+facades must forward through `@/modules/leave` or `@/modules/leave/client`;
+there is no deep-import exception for Leave internals.

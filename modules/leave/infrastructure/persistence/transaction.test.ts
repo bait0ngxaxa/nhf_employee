@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
     lockEmployeeRows,
     lockLeaveRequestRow,
-} from "@/lib/services/leave/transaction";
+} from "./transaction";
 
 type QueryRawMock = ReturnType<typeof vi.fn>;
 
