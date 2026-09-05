@@ -115,6 +115,15 @@ describe("architecture checker module boundaries", () => {
         expect(result.violations[0]).toContain("own public barrel");
     });
 
+    it("rejects any Leave implementation importing its own public barrel", async () => {
+        const result = await checkFixture(
+            "modules/leave/domain/example.ts",
+            'import { x } from "@/modules/leave";',
+        );
+        expect(result.violations).toHaveLength(1);
+        expect(result.violations[0]).toContain("own public barrel");
+    });
+
     it("rejects server-only runtime dependencies from the Leave client graph", async () => {
         const rootPath = await createFixture({
             ...fixtureFiles,
@@ -131,6 +140,49 @@ describe("architecture checker module boundaries", () => {
         const rootPath = await createFixture({
             ...fixtureFiles,
             "modules/leave/client.ts": 'import type { Prisma } from "@prisma/client"; export type Select = Prisma.UserSelect;\n',
+        });
+        const result = checkArchitecture({ repositoryRoot: rootPath });
+
+        expect(result.violations).toEqual([]);
+    });
+
+    it("rejects a transitive client-reachable import of the Leave server entry", async () => {
+        const rootPath = await createFixture({
+            ...fixtureFiles,
+            "modules/leave/index.ts": "export const leaveServerContract = 1;\n",
+            "modules/leave/client.ts": '"use client"; export const leaveClientContract = 1;\n',
+            "components/ClientComponent.tsx": [
+                '"use client";',
+                'import { leaveServerContract } from "@/lib/leave-display";',
+                "export const ClientComponent = () => leaveServerContract;",
+            ].join("\n"),
+            "lib/leave-display.ts": [
+                'import { leaveServerContract } from "@/modules/leave";',
+                "export { leaveServerContract };",
+            ].join("\n"),
+        });
+        const result = checkArchitecture({ repositoryRoot: rootPath });
+
+        expect(result.violations).toHaveLength(1);
+        expect(result.violations[0]).toContain(
+            "Client-reachable runtime code must not import the Leave server entry",
+        );
+    });
+
+    it("allows a transitive client-reachable import of the Leave client entry", async () => {
+        const rootPath = await createFixture({
+            ...fixtureFiles,
+            "modules/leave/index.ts": "export const leaveServerContract = 1;\n",
+            "modules/leave/client.ts": '"use client"; export const leaveClientContract = 1;\n',
+            "components/ClientComponent.tsx": [
+                '"use client";',
+                'import { leaveClientContract } from "@/lib/leave-display";',
+                "export const ClientComponent = () => leaveClientContract;",
+            ].join("\n"),
+            "lib/leave-display.ts": [
+                'import { leaveClientContract } from "@/modules/leave/client";',
+                "export { leaveClientContract };",
+            ].join("\n"),
         });
         const result = checkArchitecture({ repositoryRoot: rootPath });
 
@@ -275,6 +327,21 @@ describe("architecture checker module boundaries", () => {
         expect(result.violations).toHaveLength(1);
         expect(result.violations[0]).toContain(
             "Leave API routes must use the Leave module public API",
+        );
+    });
+
+    it.each([
+        "app/api/leave/example.ts",
+        "app/api/line/leave/example.ts",
+    ])("rejects %s importing the Leave client entry", async (importerPath) => {
+        const result = await checkFixture(
+            importerPath,
+            'import { x } from "@/modules/leave/client";\n',
+        );
+
+        expect(result.violations).toHaveLength(1);
+        expect(result.violations[0]).toContain(
+            "Leave API routes must use the server entry",
         );
     });
 

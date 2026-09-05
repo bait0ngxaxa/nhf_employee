@@ -4,7 +4,7 @@ import path from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
-import { cleanupOrphanedLeaveAttachments } from "@/lib/services/leave/cleanup-orphans";
+import { cleanupOrphanedLeaveAttachments } from "./cleanup-orphans";
 
 const STORED_KEY =
     "leave/request-1/0123456789abcdef0123456789abcdef.webp";

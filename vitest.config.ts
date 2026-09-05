@@ -7,6 +7,7 @@ const BASE_EXCLUDES = [
     ".next",
     ".git",
     "__tests__/integration/**",
+    "modules/leave/__tests__/integration/**",
     "modules/stock/__tests__/integration/**",
 ];
 

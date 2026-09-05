@@ -8,16 +8,6 @@ export interface EmailData {
 }
 
 export type {
-    LeaveActionPayload,
-    LeaveCancelledPayload,
-    LeaveCancellationRequestedPayload,
-    LeaveCancelledAfterApprovalPayload,
-    LeaveNotTakenConfirmedPayload,
-    LeaveNotTakenRequestedPayload,
-    LeaveResultPayload,
-} from "@/modules/leave";
-
-export type {
     StockRequestResultEmailPayload,
     StockRequestResultStatus,
 } from "@/modules/stock";

@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
     getApproverLeaveActions,
     getEmployeeLeaveActions,
-} from "@/lib/services/leave/action-availability";
+} from "./action-availability";
 
 const BASE_EMPLOYEE_REQUEST = {
     status: "APPROVED" as const,

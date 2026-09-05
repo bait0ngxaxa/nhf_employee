@@ -6,7 +6,7 @@ import {
     calculateEffectiveEntitlementHalfDays,
     calculateOpeningCarryBalanceHalfDays,
     calculateRemainingBalanceHalfDays,
-} from "@/lib/services/leave/quota-accounting";
+} from "./quota-accounting";
 
 describe("leave quota accounting", () => {
     it("calculates positive, zero, and negative effective entitlements", () => {

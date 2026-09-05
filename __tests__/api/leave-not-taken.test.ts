@@ -3,9 +3,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { POST, PUT } from "@/app/api/leave/not-taken/route";
 import { getApiAuthSession } from "@/lib/auth/server";
 import { prisma } from "@/lib/db/prisma";
-import { getEmployeeIdFromUserId } from "@/lib/services/leave/get-employee-id";
 import { processOutbox } from "@/lib/services/outbox/processor";
-import { LEAVE_JSON_MUTATION_MAX_BYTES } from "@/lib/server/leave-api";
+import { LEAVE_JSON_MUTATION_MAX_BYTES } from "@/lib/ssot/request-limits";
 import type * as NextServerModule from "next/server";
 
 vi.mock("next/server", async (importOriginal) => {
@@ -22,9 +21,6 @@ vi.mock("@/lib/auth/server", () => ({
     getApiAuthSession: vi.fn(),
 }));
 
-vi.mock("@/lib/services/leave/get-employee-id", () => ({
-    getEmployeeIdFromUserId: vi.fn(),
-}));
 
 vi.mock("@/lib/services/outbox/processor", () => ({
     processOutbox: vi.fn(),
@@ -74,7 +70,6 @@ describe("/api/leave/not-taken", () => {
                 role: "USER",
             },
         });
-        vi.mocked(getEmployeeIdFromUserId).mockResolvedValue(10);
         vi.mocked(prisma.user.findUnique).mockResolvedValue({
             isActive: true,
             deletedAt: null,

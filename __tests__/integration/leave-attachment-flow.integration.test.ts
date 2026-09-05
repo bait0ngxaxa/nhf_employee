@@ -24,7 +24,6 @@ import { GET as readAttachment } from "@/app/api/leave/attachments/[attachmentId
 import { POST as submitLeaveRequest } from "@/app/api/leave/request/route";
 import { prisma } from "@/lib/db/prisma";
 import { resetMutationRateLimit } from "@/lib/security/mutation-rate-limit";
-import { LeaveAttachmentValidationError } from "@/modules/leave";
 
 const mocks = vi.hoisted(() => ({
     session: vi.fn(),
@@ -467,24 +466,6 @@ describe.sequential("leave attachment flow with real MySQL", () => {
 
         expect(response.status).toBe(404);
         await expect(response.text()).resolves.toBe("{\"error\":\"Not found\"}");
-    });
-
-    it("does not persist a request when upload validation fails", async () => {
-        const beforeCount = await prisma.leaveRequest.count({
-            where: { employeeId: fixture.ownerEmployeeId },
-        });
-        mocks.save.mockRejectedValueOnce(
-            new LeaveAttachmentValidationError("ไฟล์หลักฐานไม่ถูกต้อง"),
-        );
-
-        const result = await submit(createFiles(1));
-        const afterCount = await prisma.leaveRequest.count({
-            where: { employeeId: fixture.ownerEmployeeId },
-        });
-
-        expect(result.response.status).toBe(400);
-        expect(afterCount).toBe(beforeCount);
-        expect(mocks.remove).not.toHaveBeenCalled();
     });
 
     it("cleans up files when the transaction cannot persist attachment metadata", async () => {

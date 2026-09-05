@@ -6,7 +6,7 @@ import {
     signedHalfDaysToDays,
     toLeaveQuotaDays,
     toLeaveRequestDays,
-} from "@/lib/services/leave/half-days";
+} from "./half-days";
 
 describe("leave half-day units", () => {
     it("converts whole and half days without floating-point arithmetic", () => {

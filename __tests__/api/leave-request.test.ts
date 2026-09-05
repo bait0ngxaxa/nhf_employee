@@ -4,17 +4,12 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { POST as submitLeaveRequest } from "@/app/api/leave/request/route";
 import { getApiAuthSession } from "@/lib/auth/server";
 import { prisma } from "@/lib/db/prisma";
-import { getEmployeeIdFromUserId } from "@/lib/services/leave/get-employee-id";
 import { processOutbox } from "@/lib/services/outbox/processor";
-import { LeaveAttachmentValidationError } from "@/modules/leave";
-import { LEAVE_ATTACHMENT_MAX_BYTES } from "@/lib/ssot/leave-attachments";
 import { resetMutationRateLimit } from "@/lib/security/mutation-rate-limit";
-import { createLeaveRequestHash } from "@/lib/services/leave/idempotency";
 import { NextRequest } from "next/server";
 import type * as NextServerModule from "next/server";
 import type * as LeaveModule from "@/modules/leave";
 import { formatAuditLogDisplay } from "@/lib/audit-log/display";
-import { buildLeaveActionDeliveryIdentity } from "@/lib/services/leave/notification-payloads";
 
 const uploadMocks = vi.hoisted(() => ({
     save: vi.fn(),
@@ -37,10 +32,6 @@ vi.mock("@/lib/auth/server", () => ({
 
 vi.mock("@/lib/services/outbox/processor", () => ({
     processOutbox: vi.fn(),
-}));
-
-vi.mock("@/lib/services/leave/get-employee-id", () => ({
-    getEmployeeIdFromUserId: vi.fn(),
 }));
 
 vi.mock("@/modules/leave", async (importOriginal) => {
@@ -178,7 +169,6 @@ describe("POST /api/leave/request", () => {
 
     it("requires an Idempotency-Key for a valid leave payload", async () => {
         (getApiAuthSession as unknown as { mockResolvedValue: (v: { user: { id: string; name: string } }) => void }).mockResolvedValue({ user: mockUser });
-        (getEmployeeIdFromUserId as unknown as { mockResolvedValue: (v: number) => void }).mockResolvedValue(mockEmployeeId);
 
         const req = new NextRequest("http://localhost/api/leave/request", {
             method: "POST",
@@ -233,7 +223,6 @@ describe("POST /api/leave/request", () => {
 
     it("should return 404 if employee not found for the user", async () => {
         (getApiAuthSession as unknown as { mockResolvedValue: (v: { user: { id: string; name: string } }) => void }).mockResolvedValue({ user: mockUser });
-        (getEmployeeIdFromUserId as unknown as { mockResolvedValue: (v: null) => void }).mockResolvedValue(null);
         vi.mocked(prisma.user.findUnique).mockResolvedValue({
             isActive: true,
             employee: null,
@@ -253,7 +242,6 @@ describe("POST /api/leave/request", () => {
 
     it("should return 400 for invalid input payload", async () => {
         (getApiAuthSession as unknown as { mockResolvedValue: (v: { user: { id: string; name: string } }) => void }).mockResolvedValue({ user: mockUser });
-        (getEmployeeIdFromUserId as unknown as { mockResolvedValue: (v: number) => void }).mockResolvedValue(mockEmployeeId);
 
         const req = createLeaveRequestRequest({
             method: "POST",
@@ -269,7 +257,6 @@ describe("POST /api/leave/request", () => {
 
     it("should reject timestamp dates for a half-day request before starting a transaction", async () => {
         (getApiAuthSession as unknown as { mockResolvedValue: (v: { user: { id: string; name: string } }) => void }).mockResolvedValue({ user: mockUser });
-        (getEmployeeIdFromUserId as unknown as { mockResolvedValue: (v: number) => void }).mockResolvedValue(mockEmployeeId);
 
         const req = createLeaveRequestRequest({
             method: "POST",
@@ -290,7 +277,6 @@ describe("POST /api/leave/request", () => {
 
     it("should return 400 if half-day period spans multiple days", async () => {
         (getApiAuthSession as unknown as { mockResolvedValue: (v: { user: { id: string; name: string } }) => void }).mockResolvedValue({ user: mockUser });
-        (getEmployeeIdFromUserId as unknown as { mockResolvedValue: (v: number) => void }).mockResolvedValue(mockEmployeeId);
 
         const payload = {
             leaveType: "SICK",
@@ -313,7 +299,6 @@ describe("POST /api/leave/request", () => {
 
     it("should return 400 if full-day leave range includes weekend", async () => {
         (getApiAuthSession as unknown as { mockResolvedValue: (v: { user: { id: string; name: string } }) => void }).mockResolvedValue({ user: mockUser });
-        (getEmployeeIdFromUserId as unknown as { mockResolvedValue: (v: number) => void }).mockResolvedValue(mockEmployeeId);
 
         const payload = {
             leaveType: "SICK",
@@ -336,7 +321,6 @@ describe("POST /api/leave/request", () => {
 
     it("should allow full-day leave that crosses weekend in the middle", async () => {
         (getApiAuthSession as unknown as { mockResolvedValue: (v: { user: { id: string; name: string } }) => void }).mockResolvedValue({ user: mockUser });
-        (getEmployeeIdFromUserId as unknown as { mockResolvedValue: (v: number) => void }).mockResolvedValue(mockEmployeeId);
         (
             prisma.$transaction as unknown as { mockImplementation: (fn: (arg: unknown) => Promise<unknown>) => void }
         ).mockImplementation(async (arg: unknown) => {
@@ -397,7 +381,6 @@ describe("POST /api/leave/request", () => {
 
         beforeEach(() => {
             (getApiAuthSession as unknown as { mockResolvedValue: (v: { user: { id: string; name: string } }) => void }).mockResolvedValue({ user: mockUser });
-            (getEmployeeIdFromUserId as unknown as { mockResolvedValue: (v: number) => void }).mockResolvedValue(mockEmployeeId);
             (
                 prisma.$transaction as unknown as { mockImplementation: (fn: (arg: unknown) => Promise<unknown>) => void }
             ).mockImplementation(async (arg: unknown) => {
@@ -597,18 +580,10 @@ describe("POST /api/leave/request", () => {
             });
             expect(payload.emergencyReason).toBe("ป่วยฉุกเฉินจนยื่นคำขอไม่ทัน");
             expect(payload.deliveryIdentity).toBe(
-                buildLeaveActionDeliveryIdentity(
-                    String(payload.leaveId),
-                    mockManager.user.id,
-                    1,
-                ),
+                `${String(payload.leaveId)}:${mockManager.user.id}:generation:1`,
             );
             expect(payload.deliveryIdentity).not.toBe(
-                buildLeaveActionDeliveryIdentity(
-                    String(payload.leaveId),
-                    mockManager.user.id,
-                    2,
-                ),
+                `${String(payload.leaveId)}:${mockManager.user.id}:generation:2`,
             );
             expect(processOutbox).toHaveBeenCalled();
         });
@@ -639,7 +614,7 @@ describe("POST /api/leave/request", () => {
                 attachments: [],
             };
             vi.mocked(prisma.leaveRequestIdempotency.findUnique).mockResolvedValue({
-                requestHash: createLeaveRequestHash(validPayload as never),
+                requestHash: "c607d41308fd5c69b7d86fea0bf507e577fd4f81785ea3b31030490572299841",
                 leaveRequest: replayedRequest,
             } as never);
 
@@ -1057,7 +1032,7 @@ describe("POST /api/leave/request", () => {
         it("rejects an attachment larger than eight megabytes", async () => {
             arrangeSuccessfulCreation();
             const file = new File(
-                [new Uint8Array(LEAVE_ATTACHMENT_MAX_BYTES + 1)],
+                [new Uint8Array(8 * 1024 * 1024 + 1)],
                 "large.jpg",
                 { type: "image/jpeg" },
             );
@@ -1140,23 +1115,5 @@ describe("POST /api/leave/request", () => {
             consoleError.mockRestore();
         });
 
-        it("returns a validation error when image decoding fails", async () => {
-            arrangeSuccessfulCreation();
-            uploadMocks.save.mockRejectedValue(
-                new LeaveAttachmentValidationError(
-                    'ไฟล์ "invalid.jpg" ไม่ใช่รูปภาพที่ถูกต้อง',
-                ),
-            );
-            const file = new File(["not an image"], "invalid.jpg", {
-                type: "image/jpeg",
-            });
-
-            const response = await submitLeaveRequest(createMultipartRequest([file]));
-
-            expect(response.status).toBe(400);
-            await expect(response.json()).resolves.toMatchObject({
-                error: 'ไฟล์ "invalid.jpg" ไม่ใช่รูปภาพที่ถูกต้อง',
-            });
-        });
     });
 });

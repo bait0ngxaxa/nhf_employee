@@ -2,15 +2,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { GET as getLeaveProfile } from "@/app/api/leave/me/route";
 import { getApiAuthSession, type ApiAuthSession } from "@/lib/auth/server";
 import { prisma } from "@/lib/db/prisma";
-import { getEmployeeIdFromUserId } from "@/lib/services/leave/get-employee-id";
 
 vi.mock("@/lib/auth/server", () => ({
     getApiAuthSession: vi.fn(),
 }));
 
-vi.mock("@/lib/services/leave/get-employee-id", () => ({
-    getEmployeeIdFromUserId: vi.fn(),
-}));
 
 vi.mock("@/lib/db/prisma", () => ({
     prisma: {
@@ -47,7 +43,6 @@ describe("GET /api/leave/me", () => {
         vi.useFakeTimers();
         vi.setSystemTime(new Date("2026-12-31T17:30:00.000Z"));
         vi.mocked(getApiAuthSession).mockResolvedValue(MOCK_SESSION);
-        vi.mocked(getEmployeeIdFromUserId).mockResolvedValue(100);
         vi.mocked(prisma.user.findUnique).mockResolvedValue({
             isActive: true,
             employee: { id: 100, status: "ACTIVE", deletedAt: null },

@@ -4,7 +4,6 @@ import { POST, PUT } from "@/app/api/leave/cancel/route";
 import { POST as requestNotTaken } from "@/app/api/leave/not-taken/route";
 import { requireApiSession } from "@/lib/auth/api";
 import { prisma } from "@/lib/db/prisma";
-import { getEmployeeIdFromUserId } from "@/lib/services/leave/get-employee-id";
 import { processOutbox } from "@/lib/services/outbox/processor";
 import type * as NextServerModule from "next/server";
 
@@ -14,7 +13,6 @@ vi.mock("next/server", async (importOriginal) => {
 });
 
 vi.mock("@/lib/auth/api", () => ({ requireApiSession: vi.fn() }));
-vi.mock("@/lib/services/leave/get-employee-id", () => ({ getEmployeeIdFromUserId: vi.fn() }));
 vi.mock("@/lib/services/outbox/processor", () => ({ processOutbox: vi.fn() }));
 vi.mock("@/lib/db/prisma", () => ({
     prisma: {
@@ -101,7 +99,6 @@ describe("POST /api/leave/cancel", () => {
             session: { user: { id: "10", email: "employee@example.com", name: "Employee", role: "USER" } },
             user: { id: 10, email: "employee@example.com", name: "Employee", role: "USER" },
         });
-        vi.mocked(getEmployeeIdFromUserId).mockResolvedValue(10);
         vi.mocked(prisma.user.findUnique).mockResolvedValue({
             isActive: true,
             employee: { id: 10, status: "ACTIVE", deletedAt: null },
@@ -507,7 +504,6 @@ describe("POST /api/leave/cancel", () => {
             session: { user: { id: "30", email: "current@example.com", name: "Current", role: "USER" } },
             user: { id: 30, email: "current@example.com", name: "Current", role: "USER" },
         });
-        vi.mocked(getEmployeeIdFromUserId).mockResolvedValue(30);
         vi.mocked(prisma.user.findUnique).mockResolvedValue({
             isActive: true,
             deletedAt: null,

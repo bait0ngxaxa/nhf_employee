@@ -7,12 +7,11 @@ import {
     cancelLeaveRequest,
     confirmLeaveCancellation,
     rejectLeaveCancellation,
-} from "@/lib/services/leave/cancellation";
+} from "../../application/cancellation/cancellation";
 import {
     createLeaveRequest,
-} from "@/lib/services/leave/create-request";
-import type { LeaveRequestError } from "@/lib/services/leave/create-request";
-import type { LeaveRequestValues } from "@/lib/validations/leave";
+    type LeaveRequestError,
+} from "../../application/requests/create-request";
 
 const DEPARTMENT_NAME = "Leave Cancellation Overlap Integration";
 const DEPARTMENT_CODE = "LEAVE-CANCEL-OVERLAP";
@@ -22,7 +21,7 @@ const LEAVE_PAYLOAD = {
     endDate: "2031-05-12",
     period: "FULL_DAY",
     reason: "ตรวจสอบคำขอลาซ้อนกับการยกเลิก",
-} satisfies LeaveRequestValues;
+} satisfies Parameters<typeof createLeaveRequest>[0]["payload"];
 
 type Fixture = {
     approverEmployeeId: number;

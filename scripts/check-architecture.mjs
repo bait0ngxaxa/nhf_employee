@@ -207,6 +207,12 @@ function getLeaveRouteDependencyViolation(filePath, rootPath, moduleSpecifier) {
     const isLeavePresentation = pathIsWithin(
         filePath, resolve(rootPath, "modules/leave/presentation"),
     );
+    const leaveModuleRoot = resolve(rootPath, "modules/leave");
+    const isLeaveModuleInternal = pathIsWithin(filePath, leaveModuleRoot)
+        && ![
+            resolve(leaveModuleRoot, "index.ts"),
+            resolve(leaveModuleRoot, "client.ts"),
+        ].includes(filePath);
     if (isPresentationRoute || isLeavePresentation) {
         if ([...legacyLeaveImportPrefixes, ...legacyLeavePresentationPrefixes].some((prefix) =>
             hasImportPrefix(normalizedSpecifier, prefix),
@@ -217,9 +223,9 @@ function getLeaveRouteDependencyViolation(filePath, rootPath, moduleSpecifier) {
             && normalizedSpecifier !== "@/modules/leave/client") {
             return "Leave presentation routes must use @/modules/leave/client.";
         }
-        if (isLeavePresentation && ["@/modules/leave", "@/modules/leave/client"].includes(normalizedSpecifier)) {
-            return "Leave presentation internals must use local contracts instead of their own public barrel.";
-        }
+    }
+    if (isLeaveModuleInternal && ["@/modules/leave", "@/modules/leave/client"].includes(normalizedSpecifier)) {
+        return "Leave module internals must use local contracts instead of their own public barrel.";
     }
     const isLeaveApiRoute = leaveApiRouteDirectories.some((directory) =>
         pathIsWithin(filePath, resolve(rootPath, directory)),
@@ -232,6 +238,10 @@ function getLeaveRouteDependencyViolation(filePath, rootPath, moduleSpecifier) {
         hasImportPrefix(normalizedSpecifier, prefix),
     )) {
         return "Leave API routes must use the Leave module public API \"@/modules/leave\" instead of legacy Leave ownership paths.";
+    }
+    if (hasImportPrefix(normalizedSpecifier, "@/modules/leave")
+        && normalizedSpecifier !== "@/modules/leave") {
+        return "Leave API routes must use the server entry @/modules/leave.";
     }
 
     return null;
@@ -319,6 +329,95 @@ function getImports(filePath, runtimeOnly = false) {
     return imports;
 }
 
+function resolveSourcePath(importTarget) {
+    if (importTarget === null) return null;
+
+    return [
+        ...[...sourceExtensions].map((extension) => `${importTarget}${extension}`),
+        ...[...sourceExtensions].map((extension) => resolve(importTarget, `index${extension}`)),
+        ...(sourceExtensions.has(extname(importTarget)) ? [importTarget] : []),
+    ].find((candidate) => existsSync(candidate)) ?? null;
+}
+
+function getRuntimeImportTarget(specifier, importerPath, rootPath) {
+    const importTarget = specifier.startsWith("@/")
+        ? resolve(rootPath, specifier.slice(2))
+        : getImportSourcePath(specifier, importerPath, rootPath);
+
+    return {
+        importTarget,
+        sourcePath: resolveSourcePath(importTarget),
+    };
+}
+
+function hasUseClientDirective(filePath) {
+    const contents = readFileSync(filePath, "utf8");
+    const sourceFile = ts.createSourceFile(
+        filePath,
+        contents,
+        ts.ScriptTarget.Latest,
+        true,
+        getScriptKind(filePath),
+    );
+
+    for (const statement of sourceFile.statements) {
+        if (!ts.isExpressionStatement(statement)
+            || !ts.isStringLiteralLike(statement.expression)) {
+            return false;
+        }
+        if (statement.expression.text === "use client") return true;
+    }
+
+    return false;
+}
+
+function isTestSource(filePath, rootPath) {
+    const repositoryPath = relativeFilePath(filePath, rootPath);
+    return repositoryPath.split("/").includes("__tests__")
+        || /\.(?:test|spec)\.[cm]?[jt]sx?$/.test(repositoryPath);
+}
+
+function getClientReachableLeaveServerEntryViolations(rootPath, sourceFiles) {
+    const leaveServerEntry = resolve(rootPath, "modules/leave");
+    const pending = sourceFiles.filter((filePath) => (
+        !isTestSource(filePath, rootPath) && hasUseClientDirective(filePath)
+    ));
+    const visited = new Set();
+    const violations = [];
+
+    while (pending.length > 0) {
+        const filePath = pending.pop();
+        if (visited.has(filePath)) continue;
+        visited.add(filePath);
+
+        for (const record of getImports(filePath, true)) {
+            const { importTarget, sourcePath } = getRuntimeImportTarget(
+                record.moduleSpecifier,
+                filePath,
+                rootPath,
+            );
+            const importsLeaveServerEntry = importTarget === leaveServerEntry
+                || (sourcePath !== null
+                    && pathIsWithin(sourcePath, leaveServerEntry)
+                    && /^index\.[cm]?[jt]sx?$/.test(relative(leaveServerEntry, sourcePath)));
+
+            if (importsLeaveServerEntry) {
+                violations.push(describeViolation(
+                    filePath,
+                    rootPath,
+                    record,
+                    "Client-reachable runtime code must not import the Leave server entry; use @/modules/leave/client.",
+                ));
+                continue;
+            }
+
+            if (sourcePath !== null) pending.push(sourcePath);
+        }
+    }
+
+    return violations;
+}
+
 function getLeaveClientGraphViolations(rootPath) {
     const entryPath = resolve(rootPath, "modules/leave/client.ts");
     if (!existsSync(entryPath)) return [];
@@ -345,23 +444,19 @@ function getLeaveClientGraphViolations(rootPath) {
         visited.add(filePath);
         for (const record of getImports(filePath, true)) {
             const specifier = record.moduleSpecifier;
-            const target = specifier.startsWith("@/")
-                ? resolve(rootPath, specifier.slice(2))
-                : getImportSourcePath(specifier, filePath, rootPath);
+            const { importTarget, sourcePath } = getRuntimeImportTarget(
+                specifier,
+                filePath,
+                rootPath,
+            );
             if (isBuiltin(specifier) || serverPackages.some((name) => hasImportPrefix(specifier, name))
-                || (target !== null && serverDirectories.some((directory) =>
-                    pathIsWithin(target, resolve(rootPath, directory))))) {
+                || (importTarget !== null && serverDirectories.some((directory) =>
+                    pathIsWithin(importTarget, resolve(rootPath, directory))))) {
                 violations.push(describeViolation(filePath, rootPath, record,
                     "Server-only runtime dependency is reachable from @/modules/leave/client."));
                 continue;
             }
-            if (target === null) continue;
-            const sourcePath = [
-                ...[...sourceExtensions].map((extension) => `${target}${extension}`),
-                ...[...sourceExtensions].map((extension) => resolve(target, `index${extension}`)),
-                ...(sourceExtensions.has(extname(target)) ? [target] : []),
-            ].find((candidate) => existsSync(candidate));
-            if (sourcePath !== undefined) pending.push(sourcePath);
+            if (sourcePath !== null) pending.push(sourcePath);
         }
     }
     return violations;
@@ -474,6 +569,7 @@ function checkArchitecture(options = {}) {
     }
 
     violations.push(...getLeaveClientGraphViolations(rootPath));
+    violations.push(...getClientReachableLeaveServerEntryViolations(rootPath, sourceFiles));
     return { sourceFiles, violations };
 }
 

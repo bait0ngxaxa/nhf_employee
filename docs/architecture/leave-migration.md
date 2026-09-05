@@ -1,13 +1,19 @@
 # Leave module migration
 
-Status: Phase E2 — Leave server/business, Dashboard presentation, and LIFF
-presentation ownership migrated. Final compatibility and public API cleanup
-remain for Phase E3.
+Status: Phase E3 complete — Leave server/business, Dashboard presentation,
+LIFF presentation, compatibility cleanup, and production client/server
+re-audit are closed from baseline `1b4e49b1`.
 
 Leave server-side business behavior is now owned by `modules/leave/`. The
 migration preserves the existing delivery boundaries while moving the rules,
 use cases, validation contracts, and Leave-specific technical composition
 behind a deliberate module API.
+
+The migration closed incrementally: E1 moved server/business ownership; E2
+moved Dashboard and LIFF presentation ownership; corrective commit `1b4e49b1`
+closed the audit-display client/server regression found by production build;
+and E3 removed compatibility facades, minimized both public interfaces, moved
+implementation tests, and added transitive client-graph enforcement.
 
 ## Ownership boundary
 
@@ -25,25 +31,57 @@ External server consumers must use that entry point; module internals such as
 Prisma selects, transaction-only helpers, workbook implementation details, and
 private validation helpers are not public contracts.
 
-The root API intentionally groups only route-facing schemas, use cases and
-errors, HTTP/response adapters, report and attachment delivery contracts,
-notification/outbox dispatch contracts, and the small domain values required
-by existing server/platform consumers. It does not re-export query fragments,
-Prisma select/include constants, workbook builders, storage factories, raw
-templates, or internal notification composition helpers. The small
-`getEmployeeIdFromUserId` export remains only for the existing transitional
-server/test facade; it is not a general module-internal escape hatch.
+The root interface intentionally groups only route-facing schemas, application
+queries/use cases/errors, HTTP/response adapters, report and attachment
+delivery contracts, notification/outbox dispatch contracts, and the small
+domain contracts used by route/auth/platform composition. It does not expose
+Prisma selectors/includes, transaction helpers, raw repositories, workbook
+builders, storage factories, raw templates, individual email senders, link
+builders, client formatters, or test-only helpers.
 
 The module also has `modules/leave/client.ts`, the supported client-safe entry
-point for Leave presentation. It exposes only the route-facing Dashboard and
-LIFF roots plus the small client-safe contracts still required by retained
-compatibility consumers. It does not export database, filesystem, email, LINE
-transport, or server application implementation.
+point for Leave presentation. It exposes the route-facing Dashboard and LIFF
+roots plus the minimum client-safe formatting contract used by generic audit
+presentation. It does not export database, filesystem, email, LINE transport,
+server application implementation, schemas, query helpers, or domain
+calculations merely because they are client-compatible.
 
-The route-facing exports are `LeaveManagementSection`,
-`LeaveManagementSectionSkeleton`, and `LiffLeaveApp`. Presentation components,
-hooks, and the Dashboard/LIFF API adapters remain internal to
-`modules/leave/presentation/**`.
+The presentation-root exports are `LeaveManagementSection`,
+`LeaveManagementSectionSkeleton`, and `LiffLeaveApp`. The legitimate formatter
+exports are `formatLeaveDateRange`, `formatLeaveDurationDays`,
+`getLeavePeriodLabel`, `getLeaveTypeLabel`, `LeavePeriodValue`, and
+`LeaveTypeValue`; `lib/audit-log/display.ts` is their production client-shared
+consumer. Presentation components, hooks, schemas, calculations, and the
+Dashboard/LIFF API adapters remain internal to `modules/leave/**`.
+
+### Final server interface
+
+`modules/leave/index.ts` exposes three deliberate categories:
+
+- Route contracts: Leave action/ID/cancellation/approver/report schemas;
+  request-size validation; decision, cancellation, approval-list,
+  approver-assignment, profile/detail/attachment/recovery queries; request and
+  not-taken HTTP adapters; LIFF serializers; report response/meta/year
+  orchestration; and attachment read/orphan-cleanup operations.
+- Platform delivery contracts: current-action dispatch; Leave semantic email,
+  LINE, and in-app notification orchestration; payload parsers; and Leave LINE
+  outbox enqueue/dispatch.
+- Cross-boundary domain contracts: assigned/actionable/history approver query
+  predicates used by server auth composition, the current Leave year, employee
+  and approver action availability, and half-day-to-response conversion.
+
+No export is retained only for a compatibility facade or unit test. In
+particular, raw hash helpers, individual Leave email senders, link builders,
+payload types, formatter functions, Prisma details, and storage factories are
+not part of the server interface.
+
+### Final client interface
+
+`modules/leave/client.ts` exports exactly the three presentation roots listed
+above plus the four audit formatter functions and two formatter value types.
+The route roots are `PRESENTATION ROOT` contracts; the formatter surface is a
+`LEGITIMATE CLIENT CONTRACT`. No compatibility-only, test-only, or
+module-internal export remains.
 
 ## Actual module shape
 
@@ -103,6 +141,22 @@ All Leave LIFF state, deep-link handling, mutations, pagination, session
 recovery usage, and attachment presentation now live under
 `presentation/liff/`. The Leave LIFF API adapter is `presentation/liff/api.ts`;
 generic LIFF session recovery and API infrastructure remain platform-owned.
+
+## Post-E2 production-build finding
+
+The E2 ownership migration at `584e8c72` left a transitive client/server
+violation: `components/audit/AuditLogViewer.tsx` reached
+`lib/audit-log/display.ts`, which imported the server-oriented
+`@/modules/leave` entry and pulled the Leave application/server graph into the
+client bundle. Corrective baseline `1b4e49b1` changed the audit formatter to
+`@/modules/leave/client` and exposed only its client-safe formatter/types.
+
+E3 keeps the existing runtime walk from `modules/leave/client.ts` and adds a
+repository client-reachability walk rooted at production files with a
+`"use client"` directive. Runtime imports are derived through the TypeScript
+parser/transpiler so type-only imports are erased. Any transitive client path
+that reaches `@/modules/leave` is rejected, while the equivalent path through
+`@/modules/leave/client` is allowed. Regression fixtures cover both cases.
 
 The domain layer owns Leave-year and business-date calculations, half-day
 arithmetic, quota/carry accounting, over-quota calculations, action
@@ -177,33 +231,37 @@ No file under `modules/leave/` imports or executes the global outbox processor.
 The processor consumes Leave contracts through `@/modules/leave`; it does not
 contain Leave business policy.
 
-## Transitional compatibility
+Generic `lib/email/index.ts` no longer imports or re-exports Leave-specific
+senders, and `emailService` contains no Leave methods. `lib/email/types.ts`
+keeps transport-level `EmailData` and Stock compatibility only; Leave payload
+types remain in the Leave module. Generic LINE transport remains outside Leave,
+while Leave link and Flex composition are module-internal. The global outbox
+processor consumes deliberate parse, semantic notification, and LINE dispatch
+contracts from the server entry without reconstructing authorization, quota,
+approver, or state-transition policy.
 
-The former Leave presentation ownership paths and the generic
-`lib/client/liff-leave.ts` adapter were deleted after all application consumers
-were migrated. There is no duplicate Dashboard or LIFF implementation under
-`components/`, `hooks/`, or `lib/client/`.
+## Final compatibility and test ownership
 
-The following narrow, behavior-free facades remain because external unit or
-integration tests still import these historical contracts:
+No Leave compatibility facade remains. E3 removed `lib/services/leave/**`,
+`lib/server/leave-*`, `lib/line/leave-links.ts`,
+`lib/validations/leave.ts`, and `lib/ssot/leave-attachments.ts` after inventory
+confirmed that their remaining consumers were tests. Deleted Dashboard/LIFF
+components, hooks, and `lib/client/liff-leave.ts` remain forbidden paths; there
+is no duplicate Leave implementation outside the module.
 
-- `lib/validations/leave.ts`;
-- `lib/ssot/leave-attachments.ts`; and
-- the client-safe domain/query facades under `lib/services/leave/` for
-  business-date, half-day, quota, history-filter, action-availability, and
-  utility contracts.
+Domain calculation, business-date, quota, history-filter, idempotency, schema,
+orphan-cleanup, link, and Leave email tests are colocated with their owning
+implementation. The Leave overlap/cancellation MySQL test is module-owned and
+the integration Vitest configuration includes its new path. API, auth, global
+outbox, delivery composition, and cross-boundary attachment tests remain
+external and consume `@/modules/leave` only.
 
-Each forwards directly to an explicit export from `@/modules/leave/client` and
-contains no Leave behavior. They are tracked for final removal or minimization
-in E3. The remaining server/delivery facades under `lib/services/leave/`,
-`lib/server/leave-api.ts`, `lib/server/leave-request-api.ts`,
-`lib/server/leave-not-taken-api.ts`, and `lib/line/leave-links.ts` continue to
-forward through `@/modules/leave` as established by E1.
-
-The architecture checker now rejects Leave route or migrated presentation
-imports from the deleted ownership paths, requires route composition through
-`@/modules/leave/client`, rejects module-internal imports through that public
-barrel, and checks the runtime client graph for server-only dependencies.
+The architecture checker rejects deleted ownership imports, Leave API routes
+using anything other than the server entry, Leave presentation routes using
+anything other than the client entry, every Leave implementation importing its
+own public barrels, any business module importing the global outbox processor,
+server-only dependencies reachable from the Leave client entry, and the
+transitive client-to-Leave-server-entry failure class.
 
 ## Preserved invariants
 
@@ -215,8 +273,27 @@ idempotency keys/hashes, transaction ordering, worker claim safety, attachment
 security, report output, notification channels, dedupe semantics, and audit
 redaction.
 
+The attachment boundary and report boundary remain unchanged: Leave owns their
+orchestration and feature-specific validation/composition, while routes expose
+the same private-file and workbook responses through deliberate server
+contracts. Shared auth still requires trusted origin and
+`X-Requested-With: XMLHttpRequest`; client mutation code obtains the identical
+header value from `lib/auth/mutation-headers.ts` without reaching server CSRF
+implementation.
+
 No Prisma schema or database migration was introduced. No API contract, public
-route, permission policy, status value, Thai wording, UI/UX, or database
-semantic change was introduced in Phase E2. Phase E3 has not started; it is
-reserved for final facade removal/public API minimization, cross-layer cleanup,
-and the full dependency re-audit.
+route, permission policy, status value, business rule, transaction/concurrency
+behavior, notification behavior, attachment behavior, LIFF behavior, Thai
+wording, UI/UX, or database semantic changed in E3. Closure requires both
+`npm run check` and the actual production `npm run build`; their final results
+are recorded in the E3 delivery report.
+
+## E3 verification
+
+The final E3 implementation passed `npm run architecture:check`,
+`npm run lint:strict`, `npm run typecheck`, `npm run test:run` (228 files,
+1,793 tests), `npm run check`, and `npm run build`. The production build
+compiled successfully and generated all 88 static pages, covering the client
+bundle regression missed during E2. The configured MySQL integration suite
+passed 10 files and 65 tests; its first run encountered a transient fixture
+setup deadlock, and an unchanged rerun passed with no pending migrations.

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { calculateAdditionalOverQuotaDays } from "@/lib/services/leave/over-quota";
+import { calculateAdditionalOverQuotaDays } from "./over-quota";
 
 describe("calculateAdditionalOverQuotaDays", () => {
     it("counts only the excess introduced by a request when quota is already exceeded", () => {

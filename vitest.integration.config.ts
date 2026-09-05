@@ -12,6 +12,7 @@ export default defineConfig({
         globals: true,
         include: [
             "__tests__/integration/**/*.integration.test.ts",
+            "modules/leave/__tests__/integration/**/*.integration.test.ts",
             "modules/stock/__tests__/integration/**/*.integration.test.ts",
         ],
         fileParallelism: false,

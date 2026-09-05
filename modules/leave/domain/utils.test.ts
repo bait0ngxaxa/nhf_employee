@@ -11,11 +11,11 @@ import {
     isPastDate,
     isWorkingDay,
     isWithinEmergencyBackdateWindow,
-} from "@/lib/services/leave/utils";
+} from "./utils";
 import {
     getBusinessDate,
     toDateOnlyString,
-} from "@/lib/services/leave/business-date";
+} from "./business-date";
 
 describe("leave business date utilities", () => {
     it("parses date-only values without using the process timezone", () => {

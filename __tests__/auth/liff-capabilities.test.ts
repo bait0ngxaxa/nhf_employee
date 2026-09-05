@@ -18,7 +18,7 @@ import type { LiffWorkforceSession } from "@/lib/auth/liff";
 import {
     getActionableLeaveApprovalWhere,
     getAssignedLeaveApproverWhere,
-} from "@/lib/services/leave/approval-queries";
+} from "@/modules/leave";
 
 const SESSION: LiffWorkforceSession = {
     user: {

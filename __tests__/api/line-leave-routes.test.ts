@@ -66,7 +66,7 @@ import { PUT as confirmNotTaken } from "@/app/api/line/leave/not-taken/route";
 import { POST as createRequest } from "@/app/api/line/leave/request/route";
 import { GET as getDetail } from "@/app/api/line/leave/requests/[id]/route";
 import { API_ROUTES } from "@/lib/ssot/routes";
-import { LEAVE_JSON_MUTATION_MAX_BYTES } from "@/lib/server/leave-api";
+import { LEAVE_JSON_MUTATION_MAX_BYTES } from "@/lib/ssot/request-limits";
 
 const AUTH = {
     ok: true as const,

@@ -7,7 +7,7 @@ import {
     getAvailableLeaveHistoryYears,
     parseApproverLeaveHistoryFilters,
     parseEmployeeLeaveHistoryFilters,
-} from "@/lib/services/leave/history-filters";
+} from "./history-filters";
 
 describe("leave history filters", () => {
     it("normalizes employee history filters", () => {

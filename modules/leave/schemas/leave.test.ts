@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 
-import { leaveRequestSchema } from "@/lib/validations/leave";
+import { leaveRequestSchema } from "./leave";
 
 const ORIGINAL_TIMEZONE = process.env.TZ;
 

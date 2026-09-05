@@ -1,13 +1,4 @@
 import type { StockRequestResultEmailPayload } from "@/modules/stock";
-import {
-    sendLeaveActionNotification,
-    sendLeaveCancelledAfterApprovalNotification,
-    sendLeaveCancelledNotification,
-    sendLeaveCancellationRequestedNotification,
-    sendLeaveNotTakenConfirmedNotification,
-    sendLeaveNotTakenRequestedNotification,
-    sendLeaveResultNotification,
-} from "@/modules/leave";
 import { getPublicOrigin } from "@/lib/network/public-url";
 import {
     STOCK_DASHBOARD_TABS,
@@ -49,26 +40,10 @@ export async function sendStockRequestResultNotification(
 }
 
 export { sendEmail } from "./transport";
-export {
-    sendLeaveActionNotification,
-    sendLeaveCancelledAfterApprovalNotification,
-    sendLeaveCancelledNotification,
-    sendLeaveCancellationRequestedNotification,
-    sendLeaveNotTakenConfirmedNotification,
-    sendLeaveNotTakenRequestedNotification,
-    sendLeaveResultNotification,
-} from "@/modules/leave";
 
 export const emailService = {
     sendEmail,
     sendStockRequestResultNotification,
-    sendLeaveActionNotification,
-    sendLeaveResultNotification,
-    sendLeaveCancelledNotification,
-    sendLeaveCancellationRequestedNotification,
-    sendLeaveCancelledAfterApprovalNotification,
-    sendLeaveNotTakenRequestedNotification,
-    sendLeaveNotTakenConfirmedNotification,
 };
 
 export type { EmailData } from "./types";

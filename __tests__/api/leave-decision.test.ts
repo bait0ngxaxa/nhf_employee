@@ -3,7 +3,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { POST } from "@/app/api/leave/decision/route";
 import { requireApiSession } from "@/lib/auth/api";
 import { prisma } from "@/lib/db/prisma";
-import { getEmployeeIdFromUserId } from "@/lib/services/leave/get-employee-id";
 import { processOutbox } from "@/lib/services/outbox/processor";
 import type * as NextServerModule from "next/server";
 import { formatAuditLogDisplay } from "@/lib/audit-log/display";
@@ -22,9 +21,6 @@ vi.mock("@/lib/auth/api", () => ({
     requireApiSession: vi.fn(),
 }));
 
-vi.mock("@/lib/services/leave/get-employee-id", () => ({
-    getEmployeeIdFromUserId: vi.fn(),
-}));
 
 vi.mock("@/lib/services/outbox/processor", () => ({
     processOutbox: vi.fn(),
@@ -82,7 +78,6 @@ describe("POST /api/leave/decision", () => {
                 role: "USER",
             },
         });
-        vi.mocked(getEmployeeIdFromUserId).mockResolvedValue(20);
         vi.mocked(prisma.user.findUnique).mockResolvedValue({
             isActive: true,
             deletedAt: null,

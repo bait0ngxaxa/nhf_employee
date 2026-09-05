@@ -1,8 +1,8 @@
 # Module boundaries
 
-Status: Phase E2 policy. Stock and Routine are migrated examples, and Leave
-server/business plus Dashboard/LIFF presentation ownership is now migrated;
-remaining compatibility cleanup remains incremental.
+Status: Phase E3 policy. Stock and Routine are migrated examples, and the Leave
+server/business, Dashboard/LIFF presentation, compatibility cleanup, and
+production boundary re-audit are complete.
 
 ## What is a module
 
@@ -162,9 +162,9 @@ imports are not rewritten merely to make the target diagram look complete. A
 migration must preserve behavior unless a separate change explicitly requests
 a behavior change.
 
-Leave is a deliberate incremental migration: `modules/leave/` owns server,
-Dashboard presentation, and LIFF presentation behavior. Only the narrow,
-behavior-free compatibility facades documented in `leave-migration.md` remain.
-The architecture checker rejects legacy Leave ownership imports from both API
-routes and migrated Leave presentation, and requires Leave route composition to
-use `@/modules/leave/client`.
+Leave is a completed incremental migration: `modules/leave/` owns server,
+Dashboard presentation, and LIFF presentation behavior. No Leave compatibility
+facades remain. The architecture checker rejects deleted Leave ownership paths,
+requires API routes to use `@/modules/leave`, requires Dashboard/LIFF routes to
+use `@/modules/leave/client`, and walks production Client Component graphs so a
+generic helper cannot transitively import the Leave server entry.

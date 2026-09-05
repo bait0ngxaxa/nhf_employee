@@ -1,8 +1,8 @@
 # Dependency rules and enforcement
 
-Status: Phase E1 guardrails extend the Phase A baseline. These rules govern new
-architecture code while legacy code remains compatible during incremental
-migration.
+Status: Phase E3 guardrails extend the Phase A baseline. These rules govern new
+architecture code while unrelated legacy features remain compatible during
+incremental migration.
 
 ## Direction
 
@@ -126,14 +126,14 @@ Temporary exceptions must be explicit and narrow:
 This ledger is a migration record, not permission for new unrestricted Prisma
 usage. Add a narrower row when a new exceptional platform case is approved.
 
-For the completed Leave E2 migration, Leave API route families must consume
+For the completed Leave E3 migration, Leave API route families must consume
 `@/modules/leave`, while Dashboard and LIFF route composition must consume
 `@/modules/leave/client`. The architecture checker rejects legacy Leave
 ownership imports from `app/api/leave/**`, `app/api/line/leave/**`, and migrated
 Leave presentation, including legacy services, server adapters, schemas,
 upload orchestration, Leave email templates, LINE composition, Leave links,
-constants, types, components, and hooks. Module presentation internals must use
-local contracts instead of importing their own public barrel.
+constants, types, components, and hooks. All Leave module internals must use
+local contracts instead of importing either public barrel.
 
 ## Automated enforcement
 
@@ -146,9 +146,9 @@ the module boundary from a legacy directory, while imports unrelated to
 | --- | --- | --- |
 | ESLint `no-restricted-imports` | `shared/**/*.{js,jsx,ts,tsx}` | Rejects imports from `modules/` so a shared capability cannot acquire a business dependency |
 | `npm run architecture:check` | Repository source files, excluding dependency, build, coverage, and generated directories | Uses the installed TypeScript parser to inspect imports, re-exports, type imports, dynamic imports, and `require()` calls; allows only `@/modules/<feature>` and `@/modules/<feature>/client` as module public entries; rejects `shared -> modules`, external consumers deep-importing module internals, cross-module deep imports, including relative paths, and any business module importing the global Outbox Processor |
-| Leave route ownership | `app/api/leave/**`, `app/api/line/leave/**` | Rejects imports from legacy Leave ownership paths so the completed Leave route adapters cannot regress behind the module boundary |
-| Leave presentation ownership | `app/dashboard/leave/**`, `app/liff/leave/**`, `modules/leave/presentation/**` | Requires Leave route composition through `@/modules/leave/client`, rejects deleted legacy presentation paths and module-internal public-barrel imports, and checks the client entry runtime graph for server-only dependencies |
-| Client/server policy | Migrated module client entries | The Leave and Routine client entries are explicit and client-safe; broader legacy client/server migration remains incremental |
+| Leave route ownership | `app/api/leave/**`, `app/api/line/leave/**` | Requires the server entry `@/modules/leave` and rejects legacy paths, the client entry, and deep implementation imports |
+| Leave presentation ownership | `app/dashboard/leave/**`, `app/liff/leave/**`, `modules/leave/**` | Requires route composition through `@/modules/leave/client`, rejects deleted legacy presentation paths, and rejects Leave internals importing either public barrel |
+| Client/server policy | Production `"use client"` dependency graphs and migrated module client entries | Walks runtime imports transitively, rejects client-reachable use of the Leave server entry, and separately rejects server-only runtime dependencies reachable from `@/modules/leave/client`; type-only imports are erased before graph traversal |
 | Route-level Prisma policy | Legacy and new code | Documentation-led in Phase A for the existing route exceptions; new module infrastructure remains the intended boundary |
 
 The check is fast and is included at the start of `npm run check`. Scanning
@@ -166,7 +166,6 @@ locations unless the change is a documented compatibility adapter or a
 justified exception. Migrations must be incremental, reviewable, and
 behavior-preserving.
 
-The Leave compatibility ledger is maintained in
-[leave-migration.md](./leave-migration.md). Retained Leave compatibility
-facades must forward through `@/modules/leave` or `@/modules/leave/client`;
-there is no deep-import exception for Leave internals.
+The closed Leave migration record is maintained in
+[leave-migration.md](./leave-migration.md). No Leave compatibility facade or
+deep-import exception remains.

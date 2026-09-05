@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { GET as getLeaveApprovals } from "@/app/api/leave/approvals/route";
 import { requireActiveWorkforceSession } from "@/lib/auth/workforce";
 import { prisma } from "@/lib/db/prisma";
-import { getAssignedLeaveApproverWhere } from "@/lib/services/leave/approval-queries";
+import { getAssignedLeaveApproverWhere } from "@/modules/leave";
 
 vi.mock("@/lib/auth/workforce", () => ({
     requireActiveWorkforceSession: vi.fn(),

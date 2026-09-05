@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
     createLeaveRequestHash,
     isLeaveRequestIdempotencyConflict,
-} from "@/lib/services/leave/idempotency";
+} from "./idempotency";
 
 const PAYLOAD = {
     leaveType: "SICK",

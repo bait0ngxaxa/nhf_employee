@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
     getCurrentLeaveYear,
     getLeaveYearFromDateValue,
-} from "@/lib/services/leave/quota-year";
+} from "./quota-year";
 
 describe("leave quota year helpers", () => {
     it("uses Thailand business year for current-time calculations", () => {
