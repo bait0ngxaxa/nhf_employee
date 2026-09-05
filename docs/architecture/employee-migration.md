@@ -16,22 +16,33 @@ There is intentionally no `modules/employee/` directory yet.
 | Concern | F0 owner decision | Reason and current evidence |
 | --- | --- | --- |
 | Employee profile and organizational data | Employee | `Employee` owns names, contact fields, position, affiliation, department relation, email, and employee status. The current CRUD, list, stats, import, and export behavior all operate on these concepts. |
-| Employee lifecycle policy | Employee | The lifecycle transition is expressed as `EmployeeStatus` plus `Employee.deletedAt`; deactivation also has Employee-specific guards for self-deactivation, the last admin, subordinates, and pending Leave dependencies. |
-| User credentials and authentication | Auth/platform | Password hashing, login, access/refresh tokens, cookies, session families, token versions, CSRF/trusted mutations, and auth rate limits live under `lib/auth/**` and related platform code. They are not Employee behavior. |
+| Employee lifecycle transition | Employee | Employee owns `Employee.status`, `Employee.deletedAt`, profile state, hierarchy, and whether the target has active organizational subordinates. The legacy lifecycle function also coordinates account safety/effects and Leave blockers, but those policies do not become Employee-owned merely because Employee orchestrates the administration action. |
+| User credentials, account administration, and authentication | Auth/platform | `User.isActive`, `User.deletedAt`, `User.role`, token versions, refresh-token revocation, last-active-ADMIN protection, self-account/offboarding protection, password hashing, login, cookies, session families, CSRF/trusted mutations, and auth rate limits are account/security concerns. They are not pure Employee domain invariants. |
 | Account-to-workforce eligibility | Existing Auth/Workforce boundary | `lib/auth/workforce.ts` and `workforce-transaction.ts` already combine User and Employee state. F0 does not create a new Workforce module. Employee should expose only Employee-side lifecycle/identity contracts; Auth/Workforce should compose them with User/session state. |
 | Employee hierarchy | Employee | `managerId`, the self-relation, subordinate lookup, and the meaning of who reports to whom are organizational structure. Leave may interpret that structure for approval, but does not own the underlying relationship. |
 | Leave approval and exception policy | Leave | `approverId`, `exceptionApproverId`, reassignment rules, pending-request guards, current-action resolution, and approval capabilities are Leave rules. They must not be moved into Employee. |
+| Leave offboarding dependency policy | Leave | Leave owns the semantic interpretation of which outstanding request/action states prevent an Employee from leaving Leave responsibilities. The legacy Employee lifecycle implementation directly reconstructs this policy from `LeaveRequest`; this is transitional coupling, not target Employee ownership. |
 | Department reference data | Transitional separate capability; future organization/reference-data capability | `Department` has its own model and `/api/departments` route, but no independent service or module exists. Employee owns its department association and import mapping, not all Department behavior. |
 | Display identity | Split by meaning | Employee owns Employee display projection and pure Employee formatting. The fallback projection from a User to Employee/name/email is an Auth/workforce/platform composition concern and must not make generic client code import the Employee server barrel. |
 | CSV import/export | Employee | The business meaning of Employee rows, fields, normalization, status, department mapping, and report columns is Employee-owned. CSV parsing/streaming is a technical adapter and may use shared file/HTTP primitives. |
 | Audit, LINE, outbox, email, and session mechanics | Shared/platform or delivery | These systems deliver or record events. Employee supplies Employee event meaning/snapshots and identity data; it must not own the global outbox processor, LINE token/session implementation, or generic audit infrastructure. |
 
-The practical rule for F1 is therefore:
+The source-of-truth rule for F1 is therefore:
 
-> Employee owns what an Employee is, how Employee organizational data changes,
-> and what an Employee lifecycle state means. Auth/Workforce owns whether an
-> authenticated account may act as workforce. Leave owns what organizational
-> relationships mean in Leave workflows.
+> Employee owns the Employee lifecycle transition.
+>
+> Auth/platform owns account/session security mechanics.
+>
+> Leave owns whether outstanding Leave responsibility blocks that transition.
+>
+> Employee may orchestrate the operation, but it must consume those external
+> policies through deliberate contracts rather than duplicating their business
+> rules.
+
+Employee lifecycle orchestration may request account deactivation/reactivation,
+but Auth/platform owns authentication/session mechanics and account-security
+effects. Auth/Workforce continues to own whether an authenticated account may
+act as workforce.
 
 ## 2. Discovery method and completeness
 
@@ -258,9 +269,11 @@ redesign is considered.
 | `GET /api/departments` | `requireApiSession`; current route uses a custom `403` unauthorized response | No parameters | Success `{ departments }`; unexpected failure `500` | Directly lists all departments by name ascending. It is consumed by Employee forms/import but is not currently an Employee-owned service |
 
 There is no observed Employee-specific request body-size guard or rate limit in
-these routes. The import row cap and browser-side five-megabyte file policy are
-the current controls. F1 must preserve this behavior and separately record any
-hardening proposal rather than silently changing the contract.
+these routes. The active client and HTTP route independently enforce the import
+row cap; the legacy import service does not. The browser-side five-megabyte file
+policy is the other current import control. F1 must preserve this effective
+external behavior and separately record any hardening proposal rather than
+silently changing the contract.
 
 ### 4.2 Profile, lifecycle, and uniqueness rules
 
@@ -293,14 +306,24 @@ hardening proposal rather than silently changing the contract.
 
 #### Status transition and offboarding
 
-The current lifecycle use case accepts `OFFBOARD`, `SUSPEND`, and `REACTIVATE`
-and uses row locks plus a serializable transaction:
+The current legacy lifecycle use case accepts `OFFBOARD`, `SUSPEND`, and
+`REACTIVATE` and uses row locks plus a serializable transaction. It currently
+mixes Employee lifecycle/hierarchy checks, Auth/account-administration safety
+and effects, and Leave-specific dependency policy in one function:
 
 | Operation | Employee write | User/session write | Guards and audit |
 | --- | --- | --- | --- |
 | Offboard / `DELETE` | `status = INACTIVE`, `deletedAt = now` | linked User `isActive = false`; token version increments; non-revoked refresh tokens are revoked | Blocks self-offboarding, removing the last active admin, targets with active subordinates, or targets with relevant pending/approved Leave action dependencies; records Employee delete audit |
 | Suspend | `status = SUSPENDED`, `deletedAt` remains `null` | linked User `isActive = false`; token version increments; refresh tokens are revoked | Uses the same deactivation safety checks; records status-change audit |
 | Reactivate | `status = ACTIVE`, `deletedAt = null` | linked User `isActive = true`, `deletedAt = null`; token version increments; refresh tokens are revoked | Re-enables the Employee/account pair and records status-change audit |
+
+The deactivation guard directly queries `LeaveRequest` and treats `PENDING`,
+`CANCELLATION_REQUESTED`, and `APPROVED` with non-null
+`notTakenRequestedAt`—for either `approverId` or `exceptionApproverId`—as
+blockers. Those meanings are current compatibility behavior, but their semantic
+owner is Leave. Self-account/offboarding and last-active-ADMIN protection are
+Auth/account-administration concerns; active subordinate protection is an
+Employee hierarchy concern.
 
 No physical Employee delete was found. The service also supports a no-op
 transition path that can still update profile data and avoids duplicate audit
@@ -339,6 +362,8 @@ Employee import is a distinct Employee sub-capability. Its current behavior is:
 
 ### Input and file policy
 
+Current compatibility behavior:
+
 - The browser accepts `.csv` only, with a maximum file size of five megabytes.
   Empty MIME type is allowed; known CSV MIME types are accepted. A basic
   signature/null-byte check rejects common binary signatures, including ZIP
@@ -346,8 +371,15 @@ Employee import is a distinct Employee sub-capability. Its current behavior is:
 - Employee import does not accept `.xls` or `.xlsx`. The repository's XLSX
   import behavior belongs to Routine and must not be copied into Employee by
   assumption.
-- The client previews up to the first 100 parsed rows and enforces a 1,000-row
-  cap before posting. The route and service also enforce the 1,000-row cap.
+- The active client at
+  `components/employee/import-csv/useImportCSV.ts` previews up to the first 100
+  parsed rows and rejects more than 1,000 parsed rows before posting.
+- `app/api/employees/import/route.ts` independently rejects more than 1,000
+  submitted rows.
+- `lib/services/employee/import.ts` has no row-count guard.
+- `lib/services/employee/index.ts` re-exports
+  `importEmployeesFromCSV()` directly and does not add another row-count
+  guard.
 - The server endpoint receives JSON rows, not the original file. It only checks
   that `employees` is an array; it does not re-run a row schema at the route
   boundary.
@@ -394,8 +426,12 @@ basic quoted commas. It does not implement multiline quoted CSV records.
 
 F1 target: `application/import` owns Employee row meaning and all-or-partial
 semantics; `infrastructure/import` owns CSV parser/technical adapters; the
-route remains a thin adapter. The existing behavior must be characterized by
-tests before any transaction or validation consolidation.
+route remains a thin adapter. F1 may centralize the 1,000-row invariant inside
+the Employee application seam if external HTTP/client behavior remains
+unchanged, but that is consolidation of the current duplicated client/route
+enforcement, not preservation of an existing service-level check. The existing
+behavior must be characterized by tests before any transaction or validation
+consolidation.
 
 ## 6. Export workflow audit
 
@@ -470,8 +506,12 @@ The stats response contains all six values, but the current
 `EmployeeStatsCards` UI model renders only total, active, admin, and academic.
 This is an existing contract/UI discrepancy and is not changed in F0.
 
-The likely Employee application contracts are `listEmployees`,
-`getEmployeeById`, `getEmployeeStats`, and a pure filter/value contract. The
+The initial public Employee query contracts are `listEmployees`,
+`getEmployeeStats`, and a pure filter/value contract because existing routes
+consume them. `getEmployeeById` may remain an internal application/query
+implementation, but it is not part of the initial public contract unless F1
+discovers a real production consumer. Its service unit tests do not justify a
+public export, and there is no current `GET /api/employees/[id]` route. The
 query implementation should remain able to support Leave/Routine transaction
 queries without turning every cross-feature read into a network-like service
 call or an N+1 sequence.
@@ -699,6 +739,42 @@ Leave owns what that relationship means for Leave approval.
 Leave owns exception approver assignment and policy; it is not an Employee
 manager relationship merely because it stores an Employee ID.
 ```
+
+The legacy Employee deactivation guard is a second transitional dependency in
+the opposite direction. It directly queries `LeaveRequest.approverId`,
+`exceptionApproverId`, `status`, and `notTakenRequestedAt` to decide whether
+outstanding Leave responsibility blocks an Employee lifecycle transition.
+Employee must not reproduce or hard-code that Leave workflow status policy
+inside `modules/employee` merely because the legacy Employee implementation
+currently does so.
+
+The F1 target dependency is:
+
+```text
+Employee offboarding orchestration
+    |
+    +--> Employee hierarchy / Employee lifecycle invariants
+    |
+    +--> Auth/account safety + account/session side-effect seam
+    |
+    +--> @/modules/leave semantic offboarding-dependency contract
+```
+
+F1 may add the minimum deliberate server interface to `@/modules/leave` that
+answers whether an Employee can exit outstanding Leave responsibilities. A
+conceptual shape could be `getEmployeeLeaveOffboardingBlockers(employeeId)` or
+`assertEmployeeCanExitLeaveResponsibilities(employeeId)`, but F0 does not fix
+the name or implementation. Leave owns the blocker semantics; Employee may own
+the high-level offboarding orchestration and consume that semantic result.
+
+This must not become an ordinary detached query with weaker guarantees. The
+Employee ↔ Leave offboarding seam must preserve the effective transaction and
+concurrency guarantees of the current lifecycle operation. F1 must inspect
+whether the Leave blocker check must execute within the caller's transaction,
+through a transaction-aware public contract, or through another design that
+does not introduce a TOCTOU window. Relevant races include Leave request
+creation, approver reassignment, Leave action changes, and Employee hierarchy
+changes.
 
 The current Leave approver-assignment use case writes `Employee.managerId`.
 F1 must preserve its transaction and Leave-specific policy while establishing a
@@ -943,7 +1019,7 @@ modules/employee/
 │   ├── identity/reference value contracts
 │   └── hierarchy invariants
 ├── application/
-│   ├── employees/list, detail, create, update, stats
+│   ├── employees/list, create, update, stats; detail query only if needed
 │   ├── lifecycle transitions and hierarchy command
 │   ├── account-link/signup seam
 │   ├── import/
@@ -979,9 +1055,13 @@ Layer decision:
 
 ## 19. Proposed server public API
 
-These are proposed contract categories, not implemented exports. Every listed
-contract has a real production consumer. Names may be refined in F1 while the
-ownership and input/output boundaries remain stable.
+These are proposed interface categories, not implemented exports. Guaranteed
+entries below identify a current production consumer. Conditional entries
+identify a current production capability that may need a seam, but F1 must
+prove that the particular export is necessary before adding it. Tests and
+hypothetical future screens are not consumers. Names may be refined in F1 while
+the ownership and input/output boundaries remain stable. No speculative public
+exports are allowed.
 
 ### Route contracts
 
@@ -989,26 +1069,30 @@ ownership and input/output boundaries remain stable.
 | --- | --- | --- |
 | `employeeFiltersSchema` or a route-safe `parseEmployeeFilters` | `app/api/employees/route.ts`, `app/api/employees/export/route.ts` | Preserve search/status/page/limit parsing and current errors without exporting Prisma types |
 | `createEmployeeSchema`, `updateEmployeeSchema` or route-safe parsers | `app/api/employees/route.ts`, `app/api/employees/[id]/route.ts` | Preserve current request validation; route schemas are not test-only exports |
-| `listEmployees` and `getEmployeeById` | Employee list route and future detail consumer | Paginated Employee DTOs with explicit reference/user fields, not raw Prisma payloads |
-| `createEmployee` and `updateEmployeeProfile` | Employee POST/PATCH route | Profile application commands and committed DTOs |
-| `changeEmployeeLifecycle` plus explicit offboard/delete compatibility command | Employee PATCH/DELETE routes; Auth/Workforce side-effect seam | Preserve OFFBOARD/SUSPEND/REACTIVATE guards, locks, audit snapshot, and paired User/session effects |
-| `getEmployeeStats` | `/api/employees/stats` | Preserve six current aggregate values, including current soft-delete inclusion semantics until separately changed |
-| `importEmployeesFromCsvRows` | `/api/employees/import` and F2 browser import adapter | Preserve row normalization, 1,000-row cap, duplicate handling, partial success, and result DTO |
-| `createEmployeeExport` or a report-row stream contract | `/api/employees/export` | Preserve filters, 2,000-row limit, 250 batching, Thai columns/labels, filename inputs, and audit metadata without leaking the stream implementation |
+| `listEmployees` | `app/api/employees/route.ts` | Paginated Employee DTOs with explicit reference/user fields, not raw Prisma payloads |
+| `createEmployee` and `updateEmployeeProfile` | `app/api/employees/route.ts`, `app/api/employees/[id]/route.ts` | Profile application commands and committed DTOs |
+| `changeEmployeeLifecycle` plus explicit offboard/delete compatibility command | `app/api/employees/[id]/route.ts`; Auth/Workforce is the account/session-effect seam | Preserve OFFBOARD/SUSPEND/REACTIVATE guards, locks, audit snapshot, and paired User/session effects |
+| `getEmployeeStats` | `app/api/employees/stats/route.ts` | Preserve six current aggregate values, including current soft-delete inclusion semantics until separately changed |
+| `importEmployeesFromCsvRows` | `app/api/employees/import/route.ts`; the active browser import reaches this route | Preserve row normalization, duplicate handling, partial success, result DTO, and the externally observable 1,000-row maximum. Any application-layer guard would be F1 consolidation of current client/route checks; the legacy service has no such guard |
+| `createEmployeeExport` or a report-row stream contract | `app/api/employees/export/route.ts` | Preserve filters, 2,000-row limit, 250 batching, Thai columns/labels, filename inputs, and audit metadata without leaking the stream implementation |
+
+`getEmployeeById` is not an initial public export. It has no current production
+consumer and no `GET /api/employees/[id]` route; F1 may keep it internal or add
+it to the public interface only if a real production consumer is discovered.
 
 ### Auth/workforce contracts
 
 | Proposed contract | Real consumer | Contract intent |
 | --- | --- | --- |
 | `getEmployeeLifecycleState` / `isEligibleEmployeeLifecycle` | `lib/auth/workforce.ts`, `workforce-transaction.ts`, hybrid/LIFF/LINE composition | Employee-only status/deleted semantics; must document that User/session state is not included |
-| `findSignupEligibleEmployee` and a transaction-safe `linkEmployeeAccount` seam | `app/api/auth/signup/route.ts` | Preserve exact email, unlinked check, row lock, serializable re-read, and concurrent signup/update behavior; do not move credentials into Employee |
-| `EmployeeWorkforceReference` structural type/lookup contract, if F1 proves it is needed | Existing Auth/Workforce and LIFF identity composition | Narrow Employee identity/lifecycle projection; no User session/token implementation and no raw Prisma payload |
+| Conditional: `findSignupEligibleEmployee` and/or a transaction-safe `linkEmployeeAccount` seam | `app/api/auth/signup/route.ts` is the real production capability consumer; F1 must choose the minimum transaction-safe interface | Preserve exact email, unlinked check, row lock, serializable re-read, and concurrent signup/update behavior; do not move credentials into Employee |
+| Conditional: `EmployeeWorkforceReference` structural type/lookup contract | Existing Auth/Workforce and LIFF identity composition; export only if F1 proves these consumers need it | Narrow Employee identity/lifecycle projection; no User session/token implementation and no raw Prisma payload |
 
 ### Cross-module contracts
 
 | Proposed contract | Real consumer | Contract intent |
 | --- | --- | --- |
-| `EmployeeReference` / `EmployeeDisplayNameSource` structural types | Leave, Routine, Stock, audit/report composition | Share a stable projection shape without exposing Employee repositories or Prisma models |
+| Conditional: `EmployeeReference` / `EmployeeDisplayNameSource` structural types | Existing Leave, Routine, Stock, and audit/report composition; export only where a consumer crosses the Employee seam | Share a stable projection shape without exposing Employee repositories or Prisma models; existing feature-owned query shapes do not by themselves require a public Employee export |
 | `getEmployeeDisplayName` pure formatter | Employee server/UI, Leave/Routine/Stock server projections, audit display where a module dependency is acceptable | Canonical Employee name + nickname formatting; a separate client-safe implementation/export is required |
 | `changeEmployeeManager` or equivalent hierarchy command | Leave approver-assignment use case | Employee owns the relation mutation; Leave retains approver-specific validation, pending-request blocking, audit meaning, and transaction coordination |
 
@@ -1016,6 +1100,12 @@ The initial Employee public API should not export a generic “Leave approver,�
 “Routine assignee,” or “Stock recipient” operation. Those meanings remain in
 their owning modules. It should also not expose `Prisma.Employee`, repository
 objects, workbook internals, or a User credential operation.
+
+The Employee offboarding use case may consume a new Leave-owned semantic
+offboarding-dependency contract through `@/modules/leave`. That is a deliberate
+addition to the completed Leave module's server public interface, not an
+Employee export; its exact shape remains conditional on the transaction design
+described in Section 12.
 
 ### Platform contracts
 
@@ -1036,7 +1126,7 @@ client-safe presentation contracts:
 | `AddEmployeeSection` | `app/dashboard/employees/new/page.tsx` | Feature add route composition |
 | `ImportEmployeeRouteContent` or a route-facing import composition contract | `app/dashboard/employees/import/page.tsx` | Feature import route composition and Dashboard shell integration |
 | `formatEmployeeDisplayName` / client-safe Employee identity formatter | Employee presentation and any audited client consumer that genuinely needs Employee-specific display | Pure, browser-safe identity formatting without server/database imports |
-| Client-safe Employee status/identity value types or formatters, only where used outside internal presentation | Employee forms/table and future client consumers | Prevent Prisma enum leakage; keep styling/components internal unless a real external consumer exists |
+| Conditional: client-safe Employee status/identity value types or formatters | Current Employee forms/table are internal consumers; export only if an app route or another module demonstrably crosses the client seam | Prevent Prisma enum leakage; keep styling/components internal unless a real external consumer exists |
 
 The client entry must not expose server use cases, Prisma types, repositories,
 database/session/secret code, import persistence internals, workbook/stream
@@ -1059,6 +1149,16 @@ unless an app route or another feature has a demonstrated production need.
   eventual F1/F2 diff, not by changing behavior in F0.
 - Preserve the Employee service's User synchronization, row locks,
   serializable transactions, lifecycle guards, and refresh-token revocation.
+- Preserve the effective import maximum: the active client rejects more than
+  1,000 parsed rows and the HTTP route independently rejects more than 1,000
+  submitted rows. The legacy service has no row-count guard. Moving the
+  invariant into the Employee application seam is optional consolidation, not
+  preservation of an existing service check, and must not change client/HTTP
+  behavior.
+- Split lifecycle ownership without changing outcomes: Employee owns the
+  Employee transition and hierarchy invariant; Auth/platform owns account and
+  session-security effects; Leave owns whether outstanding Leave responsibility
+  blocks the transition.
 
 ### F2 compatibility
 
@@ -1098,8 +1198,15 @@ and all tests. Removal is not authorized merely because a new module exists.
 Include:
 
 - Employee domain lifecycle/identity/hierarchy contracts;
-- Employee application list/detail/create/update/stats use cases;
-- status transitions, soft offboard, manager/hierarchy seam, and safety guards;
+- Employee application list/create/update/stats use cases; an Employee detail
+  query may remain internal and must not be publicly exported without a real
+  production consumer;
+- status transitions, soft offboard, manager/hierarchy seam, and Employee-owned
+  safety guards;
+- the minimum deliberate `@/modules/leave` server contract needed for the
+  Employee offboarding flow to consume Leave-owned blocker semantics;
+- Auth/account safety and account/session side-effect integration while keeping
+  authentication/session implementation outside Employee;
 - Employee repository/infrastructure and transaction/locking adapters;
 - Employee validation/schemas and server DTOs;
 - Employee import backend semantics and Employee export/report backend;
@@ -1118,6 +1225,14 @@ Exclude:
 
 F1 should introduce the real `modules/employee/index.ts` and only then add
 hard Employee architecture enforcement incrementally.
+
+F1 acceptance requires that the legacy Employee deactivation implementation is
+not migrated by copying its direct `LeaveRequest` status query into
+`modules/employee`. The Leave dependency check must become a deliberate
+Leave-owned semantic contract while preserving atomicity and concurrency
+behavior. Auth/account side effects must remain owned by Auth/platform
+mechanics. The resulting Employee lifecycle use case must preserve all current
+externally observable behavior.
 
 ### Phase F2 — Employee Presentation Ownership
 
@@ -1241,7 +1356,9 @@ These are concrete implementation questions, not unknown ownership:
    behavior. F1 needs characterization tests before consolidating.
 8. **Import guarantees:** Import is partial-success, independently committed,
    has no observed audit event, and accepts unvalidated JSON rows at the HTTP
-   boundary. These are compatibility facts and future hardening decisions.
+   boundary. The active client and HTTP route enforce the 1,000-row maximum;
+   the legacy service does not. Application-layer enforcement in F1 would be a
+   consolidation. These are compatibility facts and future hardening decisions.
 9. **Export permission:** Employee export currently allows any authenticated
    API session. Do not infer admin-only behavior from the UI button.
 10. **Prisma/runtime leakage:** Runtime Prisma imports and raw payloads must be
@@ -1254,6 +1371,12 @@ These are concrete implementation questions, not unknown ownership:
 13. **Account consistency:** `User.employeeId` and the inverse Employee.user
     relation must remain one-to-one; signup and lifecycle mutations require
     their current locks and unique constraints.
+14. **Employee ↔ Leave offboarding transaction seam:** The Leave-owned blocker
+    policy currently runs inside the serializable Employee lifecycle
+    transaction. F1 must determine whether its public contract accepts the
+    caller's transaction or uses another design that preserves effective
+    atomicity and does not introduce a TOCTOU window across Leave request
+    creation, approver reassignment, Leave action changes, or hierarchy changes.
 
 ## 25. F0 conclusion
 
@@ -1265,4 +1388,4 @@ Stock behavior, Prisma schema, migration, or database semantics were changed.
 The next authorized implementation step is F1, using this document as the
 behavior-preservation and public-boundary contract.
 
-Phase F0 CLOSED — Employee boundary defined; implementation has not started.
+Phase F0 CLOSED — Employee boundary defined and corrected; implementation has not started.

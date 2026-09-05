@@ -47,9 +47,9 @@ distributed across locations such as:
 
 - `app/` for routes, pages, and other Next.js delivery concerns;
 - `components/`, `hooks/`, and `types/` for UI and client-facing artifacts;
-- `lib/` for shared infrastructure and feature services, including legacy
-  Stock, Routine, Leave, Employee, authentication, notification, and upload
-  code;
+- `lib/` for shared/platform infrastructure and legacy feature implementation
+  for capabilities not yet migrated, including Employee, plus authentication,
+  notification, and upload code;
 - `prisma/` for the single schema and its migrations; and
 - `__tests__/` for the existing unit, integration, API, and component tests.
 
