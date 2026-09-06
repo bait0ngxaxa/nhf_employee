@@ -1,6 +1,6 @@
 # Phase G0 — Organization / Department Discovery & Boundary Definition (historical record)
 
-Status: **Phase G0 CLOSED — historical discovery record; Phase G1 CLOSED — Department server/persistence ownership complete; Phase G2 CLOSED — Department server-only client/presentation boundary confirmed**
+Status: **Phase G0 CLOSED — historical discovery record; Phase G1 CLOSED — Department server/persistence ownership complete; Phase G2 CLOSED — Department server-only client/presentation boundary confirmed; Phase G3 CLOSED — Department migration complete**
 
 Discovery date: 2026-09-06
 
@@ -630,11 +630,151 @@ No `modules/department/client.ts` exists or is required. No Department UI,
 schema, migration, seed, authorization, Organization, tenant, or runtime
 business behavior was added or changed.
 
-### Proposed Phase G3 scope
+### Historical proposed Phase G3 scope (superseded by Section O)
 
-Phase G3 should perform final ownership verification, remove only obsolete
-Department compatibility artifacts proven unnecessary, reconcile architecture
-documentation and migration ledgers, and close the migration with a final
-consumer/dependency audit. It should not introduce Department presentation,
+The pre-closure proposal was to perform final ownership verification, remove
+only obsolete Department compatibility artifacts proven unnecessary, reconcile
+architecture documentation and migration ledgers, and close the migration with
+a final consumer/dependency audit. It should not introduce Department presentation,
 Organization/tenant concepts, schema changes, or unrelated runtime cleanup.
+
+## O. Phase G3 final architecture and migration closure
+
+Status: **Phase G3 CLOSED — Department migration complete**
+
+G3 performed the final repository-wide ownership, compatibility, dependency,
+client-graph, and documentation audit. No obsolete production Department
+compatibility layer remained after G2, so no runtime deletion was necessary.
+The permanent product invariant is unchanged: NHF Employee is a single-NHF-
+organization system, Department is global reference data, and no Organization
+or tenant architecture is part of this product.
+
+### Final architecture
+
+```text
+Employee client
+    -> GET /api/departments
+        -> app/api/departments
+            -> @/modules/department
+                -> Department application
+                    -> Department infrastructure
+                        -> Prisma
+
+Employee application/import
+    -> @/modules/department
+        -> listDepartmentReferences()
+```
+
+`modules/department/` is the server-only owner of Department application
+behavior and production Department persistence. `app/api/departments` remains
+the authenticated HTTP delivery boundary. Employee application/import uses the
+Department public server contract; Employee browser presentation uses the HTTP
+endpoint and never reaches the Department server entry.
+
+### Final public API
+
+The supported server entry is `@/modules/department` and its minimal public
+function surface is:
+
+```text
+listDepartments()
+listDepartmentReferences()
+```
+
+`listDepartments()` is consumed by `app/api/departments/route.ts` and returns
+the complete current Department scalar record in ascending `name` order.
+`listDepartmentReferences()` is consumed by
+`modules/employee/application/import-employees.ts` and returns only `{ id,
+code }` reference data for Employee-owned import mapping. No Department CRUD or
+lifecycle contract is required by a production consumer.
+
+### Final compatibility state
+
+- `GET /api/departments` remains `GET`, uses `requireApiSession`, returns `403`
+  when unauthenticated, returns `200` with `{ departments: [...] }` on success,
+  preserves all Department scalar fields and Date-to-ISO serialization, orders
+  by `Department.name` ascending, and returns a sanitized `500` failure.
+- Employee import remains Employee-owned. `ADMIN`/`บริหาร` map to `ADMIN`, and
+  `ACADEMIC`/`วิชาการ` map to `ACADEMIC`; Thai validation/errors, partial
+  success, duplicate handling, temporary email generation, NHF-domain
+  normalization, status mapping, and Employee creation behavior remain intact.
+- Employee owns `departmentId` association semantics, create/update input,
+  selector state, import mapping, and Employee-specific Department display
+  compatibility. `Employee.affiliation` remains free text and
+  `Employee.managerId` remains Employee hierarchy.
+- Auth/Dashboard keep `user.department` as an Employee/Department display
+  projection only. Department identity is not an authorization capability.
+- Leave keeps Employee `departmentId`/`dept.name` projection behavior while
+  manager and approver relationships remain Leave/Employee hierarchy policy.
+  Routine carries Employee `departmentId` as reference data and keeps
+  `RoutineUnit` separate. Stock has no Department business dependency.
+- `EmailRequest.department` remains requester-provided historical free text
+  shown as `สังกัด`; it is not normalized to `departmentId` and does not call
+  `/api/departments`.
+- The schema remains unchanged: `Department.id`, `name`, `code`,
+  `description`, `createdAt`, and `updatedAt`; globally unique `name` and
+  `code`; required `Employee.departmentId` foreign key; and existing IDs/FK
+  behavior. No Department status, archive, hierarchy, head, CRUD, or
+  authorization capability was introduced.
+
+### Final legitimate direct Prisma exceptions
+
+Remaining direct Department Prisma access is limited to these categories:
+
+```text
+Department infrastructure       = production owner
+Prisma seed/support code         = seed/support exception
+test/integration fixtures        = test fixture exception
+architecture test fixtures      = architecture fixture exception
+```
+
+No unexplained production Department persistence access remains. Employee,
+Leave, Routine, Stock, Auth, Dashboard, and Email Request production code does
+not directly own Department lifecycle persistence; Employee relation joins
+remain legitimate projections or association persistence.
+
+### Removed artifacts
+
+```text
+No obsolete production Department compatibility artifact remained after G2.
+No runtime deletion was necessary in G3.
+```
+
+### Known preserved compatibility quirks
+
+- `getEmployeeDepartmentLabel()` and
+  `getEmployeeDepartmentBadgeClass()` remain Employee presentation behavior.
+  Their current fallback treats values outside the recognized
+  `ADMIN`/`บริหาร` case as the alternative `วิชาการ` presentation. These
+  formatters are still consumed by Employee table/import presentation, so the
+  fallback is active compatibility behavior and was not generalized or fixed.
+- `API_ROUTES.employees.departments` retains its historical Employee namespace
+  even though it resolves to `/api/departments`. It is harmless compatibility
+  naming and changing it would add no correctness or ownership benefit.
+
+### Final dependency audit
+
+| Source | Dependency | Classification | Final state |
+| --- | --- | --- | --- |
+| `/api/departments` | Department public API | intended delivery consumer | keep |
+| Employee import | Department public API | intended cross-module consumer | keep |
+| Employee client | `/api/departments` HTTP | intended browser boundary | keep |
+| Auth/Dashboard | Employee `dept.name` projection | legitimate cross-feature projection | keep |
+| Leave | Employee Department projection | legitimate cross-feature projection | keep |
+| Routine | Employee `departmentId` transport | legitimate cross-feature projection | keep |
+| Stock | none | no Department dependency | keep |
+| Email Request | free-text `department` / `สังกัด` | unrelated historical data | keep |
+| Department infrastructure | direct Department Prisma | production owner | keep |
+| Prisma seed/support | direct Department Prisma | seed/support exception | keep |
+| test/integration fixtures | direct Department Prisma | test fixture exception | keep |
+| architecture fixtures | direct Department Prisma | architecture fixture exception | keep |
+
+The final audit found no duplicate implementation, dead compatibility facade,
+obsolete transitional runtime artifact, Department deep import, Department to
+Employee runtime dependency, Department client entry, or Department-based
+authorization path. The existing narrow architecture guardrails remain in
+place and no G3 enforcement change was required.
+
+Department migration G0-G3 is complete. Future Department work must be treated
+as new product functionality rather than another architecture migration phase.
 

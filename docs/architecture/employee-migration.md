@@ -2,7 +2,7 @@
 
 Status: Phase F3 CLOSED — Employee migration complete; Phase G1 Department
 server/persistence ownership complete; Phase G2 Department server-only
-presentation boundary confirmed.
+presentation boundary confirmed; Phase G3 Department migration complete.
 
 Approved F0 baseline: `ee9a60be6c077055873214a9644384caa8b43f80`
 (`docs(employee): correct F0 migration boundary`).
@@ -1686,3 +1686,9 @@ Phase G2 CLOSED — Department presentation/client re-audit complete; Department
 is intentionally server-only, Employee presentation remains the browser owner,
 and direct/transitive client reachability of the Department server entry is
 enforced.
+Phase G3 CLOSED — Department migration complete. The final Department audit
+confirmed the public server API, Employee import and association seams, browser
+HTTP compatibility, and architecture enforcement. No obsolete production
+Department compatibility artifact remained, so no runtime deletion was
+necessary; this document now records the final Department closure without
+claiming that unrelated application features are fully migrated.

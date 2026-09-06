@@ -1,7 +1,6 @@
 # NHF Employee modular monolith
 
-Status: Phase G2 CLOSED — Department server/persistence ownership and
-presentation boundary complete.
+Status: Phase G3 CLOSED — Department migration complete.
 
 This document separates the repository's observed current state from the
 target architecture. Stock server/business ownership is now migrated into
@@ -31,10 +30,10 @@ Phase G0 Organization/Department discovery remains preserved as a historical
 record in [organization-department-migration.md](./organization-department-migration.md).
 The post-G0 product decision is authoritative: NHF Employee is permanently a
 single-NHF-organization system, with no Organization domain or tenant
-architecture. Phase G1 now gives the NHF-wide Department reference-data
-capability a server/application/persistence owner in `modules/department/`;
-Employee still owns its required Department association and Employee-specific
-mapping behavior.
+architecture. Phases G1-G3 give the NHF-wide Department reference-data
+capability a stable server/application/persistence owner in
+`modules/department/`; Employee still owns its required Department association
+and Employee-specific mapping and presentation behavior.
 
 ## Why a modular monolith
 
@@ -132,7 +131,7 @@ response composition, and sanitized failures. Employee consumes Department only
 through the public server entry; no Department code depends on Employee, and no
 other module is coupled to Department speculatively. There is no Department
 client presentation, CRUD, lifecycle, hierarchy, or Department-head behavior
-in G1 or G2.
+in the final G3 architecture.
 
 ### Department presentation boundary (G2)
 
@@ -154,6 +153,16 @@ and transitive runtime imports from production Client Component graphs while
 allowing the app route and Employee server/application consumers. No
 `modules/department/client.ts` exists because no evidence-backed client
 contract requires one.
+
+### Department migration closure (G3)
+
+Department migration G0-G3 is complete. The Department module is intentionally
+server-only, its supported functions are `listDepartments()` and
+`listDepartmentReferences()`, and its production Prisma ownership remains in
+Department infrastructure. The authenticated `/api/departments` route and
+Employee import seam preserve their existing contracts; Employee browser code
+continues to use HTTP. No obsolete Department runtime artifact remained, so no
+runtime cleanup was required.
 
 ## Ownership principle
 

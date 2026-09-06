@@ -1,7 +1,6 @@
 # Module boundaries
 
-Status: Phase G2 CLOSED — Department server/persistence ownership and
-presentation boundary complete.
+Status: Phase G3 CLOSED — Department migration complete.
 Stock, Routine, Leave, and Employee are migrated examples; Employee
 server/business and active presentation ownership are migrated as well.
 
@@ -197,7 +196,10 @@ The current `/api/departments` URL remains app delivery. It authenticates,
 delegates to `listDepartments()`, and preserves the existing response/order/error
 contract. Employee owns the selector, `departmentId` form state, import mapping,
 and Employee-specific Department display behavior. Department has no CRUD,
-lifecycle, hierarchy, head, or client-owned presentation behavior in G1/G2.
+lifecycle, hierarchy, head, or client-owned presentation behavior in the final
+G3 architecture.
+The G3 final audit confirmed that this remains the final boundary; no obsolete
+Department compatibility artifact or runtime deletion was identified.
 
 The browser contract is intentionally HTTP-based:
 
@@ -212,6 +214,11 @@ Dashboard keep Department as an Employee/session display projection, Leave
 keeps Employee projections, Routine carries an opaque Employee `departmentId`,
 Stock has no Department dependency, and Email Request keeps free-text
 `department`/`สังกัด`.
+
+Department migration G0-G3 is complete. Department remains a server-only
+reference-data owner with the minimal public server API
+`listDepartments()`/`listDepartmentReferences()`; Employee owns association,
+import, selector, and display compatibility behavior.
 
 ## Shared/platform ownership
 

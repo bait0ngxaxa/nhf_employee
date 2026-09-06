@@ -1,6 +1,6 @@
 # Dependency rules and enforcement
 
-Status: Phase G2 guardrails extend the Phase A baseline. These rules govern
+Status: Phase G3 CLOSED — Department migration complete. These rules govern
 new architecture code while unrelated legacy features remain compatible during
 incremental migration.
 
@@ -213,6 +213,26 @@ the module boundary from a legacy directory, while imports unrelated to
 | Employee/Leave offboarding seam | `modules/employee/**` plus Employee route composition | Employee exposes only a structural blocker-provider port; the outer composition binds Leave's implementation and must preserve the same Employee lifecycle transaction client |
 | Department G1 ownership | `app/api/departments/**`, `modules/department/**`, Employee import, production source | Department API delivery uses `@/modules/department`; Department Prisma access stays in Department infrastructure; Employee uses the Department public query; Department does not depend on Employee |
 | Department G2 presentation boundary | Production Client Component runtime graphs and Employee Department presentation | Rejects direct/transitive client imports of the server-only `@/modules/department` entry; preserves the `/api/departments` browser contract and does not require a Department client entry |
+
+## Department final closure (G3)
+
+The G3 final audit confirmed that the Department guardrails are sufficient for
+the completed migration:
+
+- `app/api/departments/**` uses only the Department public root.
+- Production `prisma.department` access is owned by
+  `modules/department/infrastructure/**`.
+- Department internals cannot import the Department public barrel or Employee;
+  external and cross-module consumers cannot deep-import Department internals.
+- Production Client Component graphs cannot reach the server-only Department
+  entry; browser consumers use `GET /api/departments`.
+- Prisma seed/support code, test/integration fixtures, and architecture
+  fixtures remain permitted infrastructure exceptions.
+
+No checker change was required in G3. The existing narrow rules cover the
+validated direct, transitive, deep-import, self-barrel, and persistence-leak
+regression classes without introducing false positives for legitimate support
+or test code.
 
 The check is fast and is included at the start of `npm run check`. Scanning
 legacy feature directories does not migrate them: the checker only evaluates
