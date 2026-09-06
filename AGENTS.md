@@ -2,62 +2,63 @@
 
 ## 1. Priorities and Scope
 
-* ลำดับความสำคัญ: **Correctness > Security > Maintainability > Performance > Speed**
-* ทำการแก้ไขให้น้อยที่สุดเท่าที่จำเป็น และสอดคล้องกับ architecture เดิม
-* อ่านโค้ดที่เกี่ยวข้องก่อนแก้ไข ห้ามคาดเดา behavior จากชื่อไฟล์หรือชื่อฟังก์ชัน
-* ห้ามแก้ไฟล์นอก scope, rewrite โค้ดโดยไม่จำเป็น หรือ revert การเปลี่ยนแปลงเดิมของผู้ใช้
-* งานปรับ UI/style ต้องไม่เปลี่ยน business logic เว้นแต่ได้รับคำสั่งโดยตรง
+* Priority order: **Correctness > Security > Maintainability > Performance > Speed**
+* Make the smallest necessary change and keep it consistent with the existing architecture.
+* Read the relevant code before making changes. Do not infer behavior from file names or function names.
+* Do not modify files outside the task scope, rewrite code unnecessarily, or revert existing user changes.
+* UI/style work must not change business logic unless explicitly instructed.
 
 ## 2. Thai Text and Encoding
 
-* **ห้ามทำข้อความภาษาไทยเพี้ยน สูญหาย ถูกแปล หรือเกิด mojibake เด็ดขาด**
-* รักษา encoding, BOM และ line endings เดิมของไฟล์
-* ไฟล์ข้อความใหม่ให้ใช้ **UTF-8 without BOM** เว้นแต่ repository กำหนดไว้ต่างออกไป
-* เมื่อใช้ PowerShell ต้องระบุ encoding ทุกครั้งที่อ่านหรือเขียน เช่น:
+* **Thai text must never become corrupted, lost, translated, or mojibake.**
+* Preserve the existing file encoding, BOM, and line endings.
+* New text files must use **UTF-8 without BOM** unless the repository specifies otherwise.
+* When using PowerShell, always specify encoding explicitly when reading or writing files, for example:
 
 ```powershell
 Get-Content -Raw -Encoding UTF8
+
 Set-Content -Encoding utf8NoBOM
 ```
 
-* ห้ามเขียนทับไฟล์ภาษาไทยผ่านคำสั่งที่ใช้ default encoding
-* ตรวจ `git diff` หลังแก้ไขเพื่อค้นหาอักขระเพี้ยน เช่น `�`, ข้อความไทยผิดรูป หรือการเปลี่ยน encoding ทั้งไฟล์
-* ห้ามเปลี่ยนข้อความภาษาไทยเป็นภาษาอังกฤษโดยไม่ได้รับอนุญาต
+* Never overwrite files containing Thai text using commands that rely on default encoding.
+* Inspect `git diff` after making changes to detect corrupted characters such as `�`, malformed Thai text, or unintended whole-file encoding changes.
+* Do not translate Thai text into English unless explicitly authorized.
 
 ## 3. Documentation and Repository Context
 
-* ตรวจ project instructions, types, tests, schemas และ implementation เดิมก่อนสร้างของใหม่
-* ใช้ implementation และ conventions ภายใน repository เป็นแหล่งอ้างอิงแรก
-* เมื่อต้องใช้ API หรือ behavior จาก library ภายนอก ให้ตรวจเอกสารล่าสุดผ่าน **Context7 MCP** หรือ official documentation
-* ห้ามเดา API, configuration option, framework behavior หรือ package version
-* หากเอกสารไม่ชัดเจน ให้ระบุ assumption และเลือกแนวทางที่มีผลกระทบน้อยที่สุด
-* งาน UI/UX ต้องใช้ **Impeccable skill** และปฏิบัติตาม design system เดิมของโปรเจกต์
+* Review project instructions, types, tests, schemas, and existing implementations before creating anything new.
+* Treat existing repository implementations and conventions as the primary source of truth.
+* When using APIs or behavior from external libraries, verify the latest documentation through **Context7 MCP** or official documentation.
+* Do not guess APIs, configuration options, framework behavior, or package versions.
+* If documentation is unclear, state the assumption and choose the approach with the smallest impact.
+* UI/UX work must use the **Impeccable skill** and follow the project's existing design system.
 
 ## 4. Code Quality and Type Safety
 
-* ส่งมอบ implementation ที่สมบูรณ์ ห้ามใช้ placeholder เช่น `// ...`, pseudo-code หรือฟังก์ชันว่าง
-* เน้น reuse ก่อนสร้าง abstraction หรือ implementation ใหม่
-* ใช้หลัก SRP, DRY, KISS, early return และ pure functions เมื่อเหมาะสม
-* หลีกเลี่ยง mutation โดยไม่จำเป็น
-* First-party code ที่แก้ไขใหม่ต้องไม่มี `any`
-* ใช้ `unknown` ร่วมกับ schema validation หรือ type guard
-* กำหนด return type ให้ฟังก์ชันที่ export, service, hook, action และ API handler
-* จัดการ `null` และ `undefined` อย่างชัดเจน ห้ามใช้ non-null assertion โดยไม่มีหลักฐานรองรับ
-* ห้ามเปลี่ยน generated code หรือ vendor code เพื่อหลบ type error
+* Deliver complete implementations. Do not use placeholders such as `// ...`, pseudo-code, or empty functions.
+* Prefer reuse before introducing new abstractions or implementations.
+* Apply SRP, DRY, KISS, early returns, and pure functions where appropriate.
+* Avoid unnecessary mutation.
+* Newly modified first-party code must not introduce `any`.
+* Use `unknown` together with schema validation or type guards.
+* Define explicit return types for exported functions, services, hooks, actions, and API handlers.
+* Handle `null` and `undefined` explicitly. Do not use non-null assertions without supporting evidence.
+* Do not modify generated code or vendor code merely to bypass type errors.
 
-## 5. Validation, Security and Errors
+## 5. Validation, Security, and Errors
 
-* Validate input ทุกจุดที่ข้อมูลเข้าสู่ระบบ เช่น API, server action, form, webhook และ environment variables
-* ใช้ schema เป็น Single Source of Truth และ derive types จาก schema เมื่อทำได้
-* ตรวจ authentication และ authorization ฝั่ง server ทุก mutation
-* ห้ามเชื่อ role, owner ID หรือ permission ที่ส่งมาจาก client
-* ห้าม hardcode secrets, credentials, tokens หรือ sensitive configuration
-* ห้ามส่ง stack trace, SQL error, internal path หรือ implementation detail กลับไปยัง client
-* Client-facing errors ต้องปลอดภัยและเข้าใจได้ ส่วนรายละเอียดทางเทคนิคให้บันทึกใน server logs
+* Validate input at every system boundary, including APIs, server actions, forms, webhooks, and environment variables.
+* Use schemas as the Single Source of Truth and derive types from schemas whenever possible.
+* Enforce authentication and authorization on the server for every mutation.
+* Never trust roles, owner IDs, or permissions supplied by the client.
+* Do not hardcode secrets, credentials, tokens, or sensitive configuration.
+* Do not expose stack traces, SQL errors, internal paths, or implementation details to clients.
+* Client-facing errors must be safe and understandable. Technical details should be recorded in server logs.
 
-ลำดับมาตรฐานสำหรับ server mutation:
+Standard order for server-side mutations:
 
-1. Request size / abuse protection / rate limit
+1. Request size / abuse protection / rate limiting
 2. Authentication
 3. Input parsing and schema validation
 4. Resource-level authorization
@@ -68,115 +69,70 @@ Set-Content -Encoding utf8NoBOM
 
 ## 6. Architecture and Single Source of Truth
 
-* Types, constants, validation schemas และ business rules ต้องมี authoritative source เพียงจุดเดียว
+* Types, constants, validation schemas, and business rules must each have a single authoritative source.
 * Dependency direction:
 
 ```text
 UI → Hooks → Services → Data Layer
 ```
 
-* Layer ด้านล่างห้าม import จาก layer ด้านบน
-* UI ห้ามเข้าถึง database หรือ persistence implementation โดยตรง
-* Business logic ที่ใช้หลาย entry points ต้องอยู่ใน service/domain layer ไม่ duplicate ใน route หรือ component
-* หลีกเลี่ยง circular dependencies และ hidden side effects
+* Lower layers must not import from higher layers.
+* UI code must not access the database or persistence implementation directly.
+* Business logic shared across multiple entry points must live in the service/domain layer rather than being duplicated in routes or components.
+* Avoid circular dependencies and hidden side effects.
 
 ## 7. API and Database
 
-* Public API ที่ต้องรองรับระยะยาวควรใช้ versioned endpoints
-* Dataset ที่สามารถเติบโตมากให้ใช้ cursor-based pagination
-* Mutation ที่อาจถูก retry, duplicate submission หรือมีผลกระทบสำคัญต้องออกแบบ idempotency semantics ให้ชัดเจน
-* ห้ามประกอบ SQL จาก user input ด้วย string concatenation
-* ใช้ parameterized queries หรือ ORM query APIs เท่านั้น
-* Raw SQL ห้ามใช้ `SELECT *`; เลือกเฉพาะ field ที่ต้องใช้
-* ใช้ transaction เมื่อหลาย operation ต้องสำเร็จหรือล้มเหลวพร้อมกัน
-* Production schema changes ต้องผ่าน migration เท่านั้น
-* ตรวจ uniqueness, foreign keys และ concurrency constraints ที่ database layer เมื่อเป็น business invariant
+* Public APIs intended for long-term support should use versioned endpoints.
+* Use cursor-based pagination for datasets that may grow significantly.
+* Mutations that may be retried, submitted more than once, or have significant side effects must define clear idempotency semantics.
+* Never construct SQL from user input using string concatenation.
+* Use parameterized queries or ORM query APIs only.
+* Raw SQL must not use `SELECT *`; select only the required fields.
+* Use transactions when multiple operations must either succeed or fail together.
+* Production schema changes must be applied through migrations only.
+* Enforce uniqueness, foreign keys, and concurrency constraints at the database layer when they represent business invariants.
 
 ## 8. Performance and Reliability
 
-* หลีกเลี่ยง accidental `O(n²)`, N+1 queries และ repeated database/network calls
-* ใช้ `Map` หรือ `Set` เมื่อมี repeated lookup และข้อมูลมีขนาดที่เหมาะสม
-* ใช้ `Promise.all` เฉพาะ operation ที่เป็นอิสระต่อกันและรองรับ concurrent execution
-* ห้าม parallelize operation ที่มี dependency, transaction order หรือ shared mutable state
-* ใช้ caching เมื่อกำหนด owner, TTL, invalidation และ consistency behavior ได้ชัดเจน
-* ใช้ dynamic import เฉพาะ dependency ที่มีขนาดใหญ่ ไม่จำเป็นต่อ initial path และให้ประโยชน์ที่ตรวจสอบได้
-* Retry เฉพาะ transient failures และ operation ที่ปลอดภัยต่อการ retry
-* Retry ต้องมีจำนวนครั้งสูงสุด, exponential backoff และ jitter
-* อย่า optimize จากการคาดเดาในเส้นทางที่ไม่ใช่ hot path
+* Avoid accidental `O(n²)` behavior, N+1 queries, and repeated database or network calls.
+* Use `Map` or `Set` for repeated lookups when appropriate for the dataset size.
+* Use `Promise.all` only for operations that are independent and safe to execute concurrently.
+* Do not parallelize operations that have dependencies, transaction ordering requirements, or shared mutable state.
+* Use caching only when ownership, TTL, invalidation, and consistency behavior are clearly defined.
+* Use dynamic imports only for dependencies that are large, unnecessary on the initial path, and provide measurable benefit.
+* Retry only transient failures and operations that are safe to retry.
+* Retries must have a maximum attempt count, exponential backoff, and jitter.
+* Do not optimize based on speculation for code paths that are not known hot paths.
 
 ## 9. Testing and Verification
 
-ให้รันเฉพาะ checks ที่เกี่ยวข้องกับการเปลี่ยนแปลง:
+Run only checks relevant to the change:
 
 1. Lint
 2. Typecheck
 3. Targeted tests
-4. Test suite ที่กว้างขึ้นเมื่อความเสี่ยงต่อ regression สูง
+4. Broader test suites when regression risk is high
 
-* ใช้ scripts ที่ repository กำหนดไว้เป็นหลัก
-* ไม่ต้อง build หรือรัน dev server เว้นแต่ผู้ใช้สั่ง, ต้อง reproduce ปัญหา หรือไม่มีวิธีตรวจสอบอื่น
-* Tests ต้องตรวจ behavior ไม่ผูกกับ implementation detail
-* Unit tests สำหรับ business rules และ pure logic
-* Integration tests สำหรับ database, authorization และ critical mutations
-* E2E tests สำหรับ critical user flows ทั้ง happy path และ error path
-* ห้ามแก้ test เพียงเพื่อให้ผ่านโดยไม่ตรวจว่า behavior ที่คาดหวังยังถูกต้อง
-* หากรันคำสั่งใดไม่ได้ ต้องระบุคำสั่ง สาเหตุ และสิ่งที่ยังไม่ได้ verify
+* Prefer scripts defined by the repository.
+* Do not build or run the development server unless explicitly requested, required to reproduce an issue, or there is no other reasonable verification method.
+* Tests must verify behavior rather than implementation details.
+* Use unit tests for business rules and pure logic.
+* Use integration tests for database interactions, authorization, and critical mutations.
+* Use E2E tests for critical user flows, including both happy paths and error paths.
+* Do not modify tests merely to make them pass without verifying that the expected behavior is still correct.
+* If a command cannot be run, state the command, the reason, and what remains unverified.
 
 ## 10. Git and Delivery
 
-* ตรวจ `git status` และ `git diff` ก่อนและหลังแก้ไข
-* ห้ามใช้ destructive Git commands, force push หรือ reset งานของผู้ใช้โดยไม่ได้รับอนุญาต
-* ห้ามเปลี่ยน lockfile, generated files หรือ format ทั้ง repository หากไม่จำเป็นต่อ task
-* รักษา diff ให้เล็ก อ่านง่าย และแยก concern ชัดเจน
-* ก่อนจบงานให้สรุป:
+* Inspect `git status` and `git diff` before and after making changes.
+* Do not use destructive Git commands, force pushes, or reset user work without explicit authorization.
+* Do not modify lockfiles, generated files, or format the entire repository unless required by the task.
+* Keep diffs small, readable, and clearly separated by concern.
+* Before completing the task, summarize:
 
-  * ไฟล์ที่แก้ไข
-  * Behavior ที่เปลี่ยน
-  * Security หรือ architecture decisions ที่สำคัญ
-  * Commands และ tests ที่รันพร้อมผลลัพธ์
-  * ข้อจำกัด assumption หรือความเสี่ยงที่ยังเหลือ
-
-## 11. Modular Monolith Architecture (Phase A)
-
-Dashboard modules use canonical App Router paths; do not add new
-`/dashboard?tab=<module>` navigation producers. Client-facing module
-presentation must use an explicit `/client` public entry point instead of a
-server-oriented module barrel.
-
-* สถานะปัจจุบัน: Stock, Routine และ Leave อยู่ใน feature modules แล้ว; Employee
-  server/business อยู่ใน `modules/employee/` ส่วน Employee presentation ยังอยู่
-  ที่เดิมจนถึง Phase F2 และต้องทำงานเหมือนเดิม
-* งาน business feature ใหม่ที่มีสาระสำคัญให้เริ่มที่ `modules/<feature>/`
-  และเปิดเผย contract ที่ตั้งใจรองรับผ่าน `modules/<feature>/index.ts`
-* ใช้ dependency direction `app/** -> modules/** -> shared/**` โดย `app/**`
-  สามารถใช้ `shared/**` ได้โดยตรง และ module หนึ่งใช้ module อื่นผ่าน public API
-  เท่านั้น
-* ห้าม import internal path ของ module อื่น และห้ามให้ `shared/**` depend on
-  business module; ห้ามใช้ deep import เป็น public API โดยปริยาย
-* Business modules may enqueue outbox work but must never import or execute the
-  global Outbox Processor; dispatch remains owned by the delivery/composition
-  layer.
-* `shared/` มีไว้สำหรับ capability ที่ cross-domain/platform จริงเท่านั้น
-  เช่น auth, db, http, security, audit, notification delivery, uploads,
-  network และ generic UI primitives ห้ามย้าย feature-specific business rule
-  เข้า shared เพียงเพราะมีการ reuse
-* หลีกเลี่ยงการเพิ่ม feature-specific business code ใหม่ใน global
-  `lib/services`, `lib/server` หรือ `lib/validations` เว้นแต่เป็น compatibility
-  adapter หรือมีเหตุผลและ exception ที่บันทึกไว้อย่างชัดเจน
-* API route ของ business feature ใหม่ควรไหลผ่าน application/service และ
-  repository/infrastructure ก่อนถึง Prisma; direct Prisma ใน route เดิมยังเป็น
-  legacy compatibility และห้ามเปลี่ยนยกชุดใน Phase A
-* Client component ห้ามพึ่ง server-only implementation, database, secret หรือ
-  filesystem โดยตรง; รายละเอียด enforcement และข้อยกเว้นอยู่ใน
-  `docs/architecture/dependency-rules.md`
-* เมื่อแก้โค้ดใน `modules/` หรือ `shared/` ให้รัน `npm run architecture:check`
-  และอ่านเอกสาร `docs/architecture/` ที่เกี่ยวข้องก่อนออกแบบ boundary
-* การ migrate ต้องทำแบบ incremental ต่อ feature และ preserve behavior, API,
-  permission, schema, URL และ integration เดิม เว้นแต่ผู้ใช้สั่งเปลี่ยนโดยตรง
-
-รายละเอียด current state, target state, module ownership และ dependency
-enforcement อยู่ที่:
-
-* `docs/architecture/modular-monolith.md`
-* `docs/architecture/module-boundaries.md`
-* `docs/architecture/dependency-rules.md`
+  * Files changed
+  * Behavior changed
+  * Important security or architecture decisions
+  * Commands and tests executed, including results
+  * Remaining limitations, assumptions, or risks
