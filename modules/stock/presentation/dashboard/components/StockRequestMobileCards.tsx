@@ -8,7 +8,7 @@ import {
 } from "./stockRequest.shared";
 import { getRequestItemDisplayName } from "./stockVariant.shared";
 import { StockRequestNote } from "./StockRequestNote";
-import { getEmployeeBackedUserDisplayName } from "@/lib/helpers/employee-helpers";
+import { getUserDisplayName } from "@/shared/identity/display";
 
 type StockRequestMobileCardsProps = {
     requests: StockRequest[];
@@ -45,7 +45,7 @@ export function StockRequestMobileCards({
                         {showRequester ? (
                             <InfoRow
                                 label="ผู้เบิก"
-                                value={`${getEmployeeBackedUserDisplayName(request.requester)} (${request.requester.email})`}
+                                value={`${getUserDisplayName(request.requester)} (${request.requester.email})`}
                             />
                         ) : null}
                     </div>

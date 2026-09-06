@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/dialog";
 import { Loader2 } from "lucide-react";
 import type { PendingLeave } from "../hooks/useLeaveApprovals";
-import { getEmployeeDisplayName } from "@/lib/helpers/employee-helpers";
+import { getEmployeeDisplayName } from "@/modules/employee/client";
 
 interface RejectLeaveDialogProps {
     open: boolean;

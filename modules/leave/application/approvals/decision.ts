@@ -1,7 +1,7 @@
 import { NotificationOutboxType, type Prisma } from "@prisma/client";
 
 import { runSerializableTransaction } from "@/lib/db/transaction";
-import { getEmployeeDisplayName } from "@/lib/helpers/employee-helpers";
+import { getEmployeeDisplayName } from "@/modules/employee";
 import { isActiveEmployeeInTransaction } from "@/modules/leave/application/queries/active-employee-session";
 import { getAssignedLeaveApproverWhere } from "@/modules/leave/application/approvals/approval-queries";
 import { buildLeaveAuditContext } from "@/modules/leave/application/notifications/audit-details";

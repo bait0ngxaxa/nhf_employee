@@ -30,3 +30,4 @@ export {
     getEmployeeDisplayName,
     getEmployeeFullName,
 } from "./domain/identity";
+export type { EmployeeDisplayNameSource } from "./domain/identity";

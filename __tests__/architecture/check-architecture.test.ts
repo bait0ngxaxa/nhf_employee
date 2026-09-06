@@ -173,6 +173,55 @@ describe("architecture checker module boundaries", () => {
         expect(result.violations[0]).toContain("Employee API routes must use");
     });
 
+    it.each([
+        "@/types/employees",
+        "@/constants/employees",
+        "@/lib/helpers/employee-helpers",
+        "@/lib/helpers/csv-helpers",
+        "@/hooks/useCSVImport",
+        "@/components/employee/EditStatusModal",
+    ])("rejects imports of deleted Employee compatibility path %s", async (specifier) => {
+        const result = await checkFixture(
+            "app/example.ts",
+            `import { x } from "${specifier}";`,
+        );
+
+        expect(result.violations).toHaveLength(1);
+        expect(result.violations[0]).toContain(
+            "Deleted Employee compatibility path",
+        );
+    });
+
+    it("rejects a relative import of a deleted Employee compatibility path", async () => {
+        const result = await checkFixture(
+            "modules/routine/application/example.ts",
+            'import { x } from "../../../lib/helpers/employee-helpers";',
+        );
+
+        expect(result.violations).toHaveLength(1);
+        expect(result.violations[0]).toContain(
+            "Deleted Employee compatibility path",
+        );
+    });
+
+    it.each([
+        'export { x } from "../../../types/employees";',
+        'const x = import("../../../constants/employees");',
+        'const x = require("../../../lib/helpers/csv-helpers");',
+        'type X = import("../../../hooks/useCSVImport").X;',
+        'vi.mock("../../../components/employee/EditStatusModal");',
+    ])("rejects non-static deleted Employee compatibility dependency %s", async (source) => {
+        const result = await checkFixture(
+            "modules/routine/application/example.ts",
+            source,
+        );
+
+        expect(result.violations).toHaveLength(1);
+        expect(result.violations[0]).toContain(
+            "Deleted Employee compatibility path",
+        );
+    });
+
     it("rejects Employee API routes importing the client entry", async () => {
         const result = await checkFixture(
             "app/api/employees/example.ts",

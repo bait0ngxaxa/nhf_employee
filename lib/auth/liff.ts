@@ -7,7 +7,7 @@ import {
 } from "@/lib/line/liff-session";
 import { LineIdentityVerificationError } from "@/lib/line/errors";
 import { prisma } from "@/lib/db/prisma";
-import { getEmployeeBackedUserDisplayName } from "@/lib/helpers/employee-helpers";
+import { getUserDisplayName } from "@/shared/identity/display";
 import type { LiffCapabilities } from "@/lib/line/liff-types";
 import {
     getActionableLeaveApprovalWhere,
@@ -113,7 +113,7 @@ export async function findActiveLiffWorkforceIdentity(
             id: user.id,
             role: user.role,
             email: user.email,
-            name: getEmployeeBackedUserDisplayName(user),
+            name: getUserDisplayName(user),
         },
         employeeId: user.employee.id,
     };

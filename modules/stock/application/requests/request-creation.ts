@@ -16,7 +16,7 @@ import {
     normalizeRequestItems,
 } from "../../infrastructure/persistence/shared";
 import type { StockCommandActor } from "../../domain/types";
-import { getEmployeeBackedUserDisplayName } from "@/lib/helpers/employee-helpers";
+import { getUserDisplayName } from "@/shared/identity/display";
 import { createIdempotencyKeyAuditHash } from "./request-idempotency";
 
 export type StockRequestWithDetails = Prisma.StockRequestGetPayload<{
@@ -272,7 +272,7 @@ async function persistRequest(
     );
     await notifyAdminsNewStockRequest(
         request.id,
-        getEmployeeBackedUserDisplayName(request.requester),
+        getUserDisplayName(request.requester),
         request.projectCode,
         tx,
     );

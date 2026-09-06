@@ -8,8 +8,10 @@ import {
 } from "@/modules/leave/domain/approver-eligibility";
 import { runSerializableTransaction } from "@/lib/db/transaction";
 import { lockEmployeeRows } from "@/modules/leave/infrastructure/persistence/transaction";
-import { getEmployeeDisplayName } from "@/lib/helpers/employee-helpers";
-import { applyEmployeeManagerChangesInTransaction } from "@/modules/employee";
+import {
+    applyEmployeeManagerChangesInTransaction,
+    getEmployeeDisplayName,
+} from "@/modules/employee";
 
 export type ApproverAssignment = {
     employeeId: number;

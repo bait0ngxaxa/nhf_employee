@@ -1,5 +1,5 @@
 import * as z from "zod";
-import { getEmployeeDisplayName } from "@/lib/helpers/employee-helpers";
+import { getEmployeeDisplayName } from "@/modules/employee";
 import { lineRetryKeySchema } from "@/lib/validations/line";
 
 const dateStringSchema = z

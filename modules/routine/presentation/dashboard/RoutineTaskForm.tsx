@@ -46,7 +46,7 @@ import {
     setRoutineAssigneeRole,
 } from "../../domain/assignees";
 import { createIdempotencyKey } from "@/lib/client/idempotency-key";
-import { getEmployeeDisplayName } from "@/lib/helpers/employee-helpers";
+import { getEmployeeDisplayName } from "@/modules/employee/client";
 import {
     routineTaskCreateSchema,
     routineTaskUpdateSchema,

@@ -3,7 +3,7 @@ import {
     getAuditActionLabel,
 } from "@/constants/audit";
 import { formatThaiDate } from "@/lib/helpers/date-helpers";
-import { getEmployeeDisplayName } from "@/lib/helpers/employee-helpers";
+import { getEmployeeDisplayName } from "@/modules/employee/client";
 import {
     formatLeaveDateRange,
     formatLeaveDurationDays,

@@ -2,9 +2,9 @@ import { Role, type Prisma } from "@prisma/client";
 import { z } from "zod";
 
 import {
-    getEmployeeBackedUserDisplayName,
     type EmployeeDisplayNameSource,
-} from "@/lib/helpers/employee-helpers";
+} from "@/modules/employee";
+import { getUserDisplayName } from "@/shared/identity/display";
 
 export type RoutineNotificationRecipient = {
     userId: number;
@@ -93,7 +93,7 @@ export async function resolveRoutineNotificationRecipients(
         recipients.set(user.id, {
             userId: user.id,
             email: user.email,
-            name: getEmployeeBackedUserDisplayName(
+            name: getUserDisplayName(
                 { ...user, employee },
                 "ผู้รับการแจ้งเตือน",
             ),

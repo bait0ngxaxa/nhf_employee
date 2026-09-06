@@ -179,6 +179,14 @@ const legacyEmployeePresentationPrefixes = [
     "@/components/dashboard/sections/EmployeeManagementSection",
     "@/components/dashboard/sections/AddEmployeeSection",
 ];
+const deletedEmployeeCompatibilityPrefixes = [
+    "@/types/employees",
+    "@/constants/employees",
+    "@/lib/helpers/employee-helpers",
+    "@/lib/helpers/csv-helpers",
+    "@/hooks/useCSVImport",
+    "@/components/employee/EditStatusModal",
+];
 
 const legacyLeavePresentationPrefixes = [
     "@/components/dashboard/leave",
@@ -305,6 +313,22 @@ function getEmployeeDependencyViolation(filePath, rootPath, moduleSpecifier) {
         return "Employee API routes must use the server entry @/modules/employee.";
     }
     return null;
+}
+
+function getDeletedEmployeeCompatibilityViolation(filePath, rootPath, moduleSpecifier) {
+    const resolvedImport = moduleSpecifier.startsWith("@/")
+        ? resolve(rootPath, moduleSpecifier.slice(2))
+        : getImportSourcePath(moduleSpecifier, filePath, rootPath);
+    const normalizedSpecifier = resolvedImport === null
+        ? moduleSpecifier
+        : `@/${relativeFilePath(resolvedImport, rootPath).replace(/\.[cm]?[jt]sx?$/, "")}`;
+    const deletedPath = deletedEmployeeCompatibilityPrefixes.find((prefix) =>
+        hasImportPrefix(normalizedSpecifier, prefix),
+    );
+
+    return deletedPath === undefined
+        ? null
+        : `Deleted Employee compatibility path "${deletedPath}" must not be imported.`;
 }
 
 function getEmployeeDashboardRouteDependencyViolation(filePath, rootPath, moduleSpecifier) {
@@ -689,6 +713,22 @@ function checkArchitecture(options = {}) {
         const owner = getOwner(filePath, modulesRoot, sharedRoot);
 
         for (const importRecord of getImports(filePath)) {
+            const deletedEmployeeCompatibilityViolation =
+                getDeletedEmployeeCompatibilityViolation(
+                    filePath,
+                    rootPath,
+                    importRecord.moduleSpecifier,
+                );
+            if (deletedEmployeeCompatibilityViolation !== null) {
+                violations.push(describeViolation(
+                    filePath,
+                    rootPath,
+                    importRecord,
+                    deletedEmployeeCompatibilityViolation,
+                ));
+                continue;
+            }
+
             const leaveRouteDependencyViolation = getLeaveRouteDependencyViolation(
                 filePath,
                 rootPath,

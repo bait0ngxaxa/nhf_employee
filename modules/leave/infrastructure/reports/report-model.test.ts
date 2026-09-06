@@ -33,6 +33,11 @@ describe("leave report model", () => {
         expect(teamSummary?.totalUsed).toBe(2.5);
         expect(rows.detailRows).toHaveLength(5);
         expect(rows.detailRows.map((row) => row.effectiveDays)).toEqual([1, 1.5, 0, 0, 0]);
+        expect(rows.detailRows[0]).toEqual(expect.objectContaining({
+            leaveType: "ลาป่วย",
+            period: "เต็มวัน",
+            status: "อนุมัติแล้ว",
+        }));
     });
 
     it("preserves negative effective entitlement in remaining totals", () => {

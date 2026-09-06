@@ -6,6 +6,13 @@ import type { EmployeeStatusValue } from "../../domain/lifecycle";
 
 export { getEmployeeDisplayName, getEmployeeStatusLabel };
 
+export const EMPLOYEE_STATUS_FILTER_OPTIONS = [
+    { value: "all", label: "สถานะทั้งหมด" },
+    { value: "ACTIVE", label: "ทำงานอยู่" },
+    { value: "INACTIVE", label: "ไม่ทำงาน" },
+    { value: "SUSPENDED", label: "ถูกระงับ" },
+] as const;
+
 const EMPLOYEE_STATUS_BADGE_CLASSES: Readonly<
     Record<EmployeeStatusValue, string>
 > = {

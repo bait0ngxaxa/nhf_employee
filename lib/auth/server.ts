@@ -7,7 +7,7 @@ import { hasActiveSessionFamily } from "@/lib/auth/hybrid/session-store";
 import { verifyAccessToken } from "@/lib/auth/hybrid/tokens";
 import { hasEligibleEmployeeLifecycle } from "@/modules/employee";
 import { prisma } from "@/lib/db/prisma";
-import { getEmployeeBackedUserDisplayName } from "@/lib/helpers/employee-helpers";
+import { getUserDisplayName } from "@/shared/identity/display";
 import {
     getActionableLeaveApprovalWhere,
     getApproverHistoryReportWhere,
@@ -62,7 +62,7 @@ function toApiAuthSession(
             id: String(user.id),
             role: user.role,
             email: user.email,
-            name: getEmployeeBackedUserDisplayName(user),
+            name: getUserDisplayName(user),
             department: user.employee?.dept?.name,
             isManager: (user.employee?.subordinates?.length ?? 0) > 0,
             canApproveLeave:

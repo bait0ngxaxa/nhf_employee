@@ -1,7 +1,7 @@
 import { Card } from "@/components/ui/card";
 import type { PendingLeave } from "../hooks/useLeaveApprovals";
 import { formatThaiDateTimeWithTimeWord } from "@/lib/helpers/date-helpers";
-import { getEmployeeDisplayName } from "@/lib/helpers/employee-helpers";
+import { getEmployeeDisplayName } from "@/modules/employee/client";
 import { LeaveAttachmentViewerButton } from "./LeaveAttachmentViewerButton";
 import { LeaveStatusBadge } from "./LeaveStatusBadge";
 

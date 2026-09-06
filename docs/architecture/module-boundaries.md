@@ -1,6 +1,6 @@
 # Module boundaries
 
-Status: Phase F2 CLOSED — Employee presentation ownership migrated. Stock,
+Status: Phase F3 CLOSED — Employee migration complete. Stock,
 Routine, and Leave are migrated examples; Employee server/business and active
 presentation ownership are now migrated as well.
 
@@ -54,13 +54,23 @@ Employee server/application consumers use `@/modules/employee`. Employee
 Dashboard route composition uses `@/modules/employee/client`, whose route-facing
 presentation exports are `EmployeeManagementSection`,
 `EmployeeManagementSectionSkeleton`, `AddEmployeeSection`, and
-`ImportEmployeeRouteContent`. The active feature presentation, provider/context,
-forms, local types/formatters, and CSV browser flow live under
+`ImportEmployeeRouteContent`. The same client entry exposes the proven pure
+`getEmployeeDisplayName` formatter required by Leave, Routine, and audit
+presentation. The active feature presentation, provider/context, forms, local
+types/formatters, and CSV browser flow live under
 `modules/employee/presentation/**`; internals use relative/local contracts.
 Server schema exports remain in `modules/employee/index.ts` for Employee API
 routes; `modules/employee/client.ts` does not expose server schemas. The
 former `lib/validations/employee.ts` compatibility facade was removed after
 its production consumers were audited.
+
+Generic User/Employee display fallback projection is owned by the browser-safe
+structural helper `shared/identity/display.ts` and is consumed through
+`getUserDisplayName`; it does not depend on the Employee module. Employee
+status values and presentation formatting are owned by Employee domain and
+presentation-local contracts. Employee CSV parsing is owned by
+`modules/employee/presentation/import/csv.ts`, while Leave report labels and
+row mapping are owned by Leave report infrastructure.
 
 Employee and Leave have one deliberate server dependency direction. Leave may
 consume the public Employee hierarchy contract to mutate the Employee-owned
@@ -196,13 +206,11 @@ requires API routes to use `@/modules/leave`, requires Dashboard/LIFF routes to
 use `@/modules/leave/client`, and walks production Client Component graphs so a
 generic helper cannot transitively import the Leave server entry.
 
-Employee F1 is a server/business ownership migration and F2 is the active
-presentation ownership migration. Employee API routes use the module root, Auth
+Employee F0-F3 is complete. Employee API routes use the module root, Auth
 signup uses its transaction-aware Employee lookup/recheck interface, and Leave
 uses its hierarchy mutation interface. Employee lifecycle composition binds the
 Leave offboarding blocker provider at the route boundary; there is no Employee
 → Leave runtime dependency. Generic Dashboard shell/context/navigation remain
-outside Employee. The former legacy Employee validation facade was removed
-after its production consumers were audited; Employee API routes use the
-module root. Mixed/orphan legacy presentation candidates remain deferred to
-F3.
+outside Employee. The former legacy Employee validation facade, mixed Employee
+helpers/types, duplicate CSV helper, and confirmed orphan presentation files
+were removed after production-consumer audits.

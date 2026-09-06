@@ -1,6 +1,6 @@
 # Dependency rules and enforcement
 
-Status: Phase F2 guardrails extend the Phase A baseline. These rules govern new
+Status: Phase F3 guardrails extend the Phase A baseline. These rules govern new
 architecture code while unrelated legacy features remain compatible during
 incremental migration.
 
@@ -145,15 +145,17 @@ upload orchestration, Leave email templates, LINE composition, Leave links,
 constants, types, components, and hooks. All Leave module internals must use
 local contracts instead of importing either public barrel.
 
-For Employee F1/F2, Employee API routes must consume `@/modules/employee` and
+For Employee F3, Employee API routes must consume `@/modules/employee` and
 Employee Dashboard routes must consume `@/modules/employee/client`; neither
-may use legacy ownership paths or deep imports. Employee internals may not
-self-import the root or client public interface. Production Client Component
-graphs may not reach the Employee server interface, and the Employee client
-graph may not reach Prisma, database/session/secret code, server-only Next.js
-modules, or Employee application/infrastructure code. Active Employee CSV
-browser parsing is owned by `modules/employee/presentation/import/csv.ts` and
-must not depend on the mixed `lib/helpers/csv-helpers.ts`.
+may use deleted legacy ownership paths or deep imports. Employee internals may
+not self-import the root or client public interface. Production Client
+Component graphs may not reach the Employee server interface, and the Employee
+client graph may not reach Prisma, database/session/secret code, server-only
+Next.js modules, or Employee application/infrastructure code. Active Employee
+CSV browser parsing is owned by `modules/employee/presentation/import/csv.ts`.
+The checker also rejects deleted Employee compatibility paths, including
+relative forms, static/dynamic imports, re-exports, `require()`, and test/mock
+imports.
 
 ## Automated enforcement
 
@@ -170,7 +172,7 @@ the module boundary from a legacy directory, while imports unrelated to
 | Leave presentation ownership | `app/dashboard/leave/**`, `app/liff/leave/**`, `modules/leave/**` | Requires route composition through `@/modules/leave/client`, rejects deleted legacy presentation paths, and rejects Leave internals importing either public barrel |
 | Client/server policy | Production `"use client"` dependency graphs and migrated module client entries | Walks runtime imports transitively, rejects client-reachable use of the Leave server entry, and separately rejects server-only runtime dependencies reachable from `@/modules/leave/client`; type-only imports are erased before graph traversal |
 | Route-level Prisma policy | Legacy and new code | Documentation-led in Phase A for the existing route exceptions; new module infrastructure remains the intended boundary |
-| Employee F1/F2 ownership | `app/api/employees/**`, `app/dashboard/employees/**`, `modules/employee/**`, production Client Component graphs | Requires `@/modules/employee` for API routes and `@/modules/employee/client` for the four Employee Dashboard routes; rejects legacy/deep presentation paths, deep/self-barrel imports, Employee → Leave imports, client-to-server reachability, and server-only dependencies from the Employee client graph |
+| Employee F3 ownership | `app/api/employees/**`, `app/dashboard/employees/**`, `modules/employee/**`, production Client Component graphs | Requires `@/modules/employee` for API routes and `@/modules/employee/client` for the four Employee Dashboard routes; rejects deleted legacy compatibility paths and deep presentation paths, including relative forms, deep/self-barrel imports, Employee → Leave imports, client-to-server reachability, and server-only dependencies from the Employee client graph |
 | Employee/Leave offboarding seam | `modules/employee/**` plus Employee route composition | Employee exposes only a structural blocker-provider port; the outer composition binds Leave's implementation and must preserve the same Employee lifecycle transaction client |
 
 The check is fast and is included at the start of `npm run check`. Scanning
@@ -192,14 +194,13 @@ The closed Leave migration record is maintained in
 [leave-migration.md](./leave-migration.md). No Leave compatibility facade or
 deep-import exception remains.
 
-The Employee validation facade `lib/validations/employee.ts` was removed after
-a repository-wide search confirmed that no runtime/production consumer
-remained. Employee API routes consume the schemas exported by
-`@/modules/employee`; the browser client entry does not expose server schemas.
-The architecture checker still rejects the deleted legacy import path on
-Employee API routes to prevent its reintroduction. Migrated presentation types
-and formatters are now local to Employee; mixed helpers/types, the mixed CSV
-helper, `hooks/useCSVImport.ts`, and `components/employee/EditStatusModal.tsx`
-remain legacy/orphan candidates intentionally deferred to F3. The active
-Employee browser graph does not import those mixed Employee/Leave presentation
-helpers.
+The Employee validation facade `lib/validations/employee.ts`, mixed legacy
+Employee helper/type files, duplicate CSV helper, and confirmed orphan
+presentation files were removed after repository-wide production-consumer
+audits. Employee API routes consume schemas exported by `@/modules/employee`;
+the browser client entry exposes only route composition and the proven pure
+Employee display formatter. The architecture checker rejects the deleted
+legacy Employee paths to prevent their reintroduction, including relative and
+non-static import forms supported by the checker parser. Generic User/Employee
+fallback display is owned by the structural browser-safe helper at
+`shared/identity/display.ts`; Leave report labels remain Leave-owned.

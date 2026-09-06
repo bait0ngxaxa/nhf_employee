@@ -1,12 +1,12 @@
 import type { LeaveStatus, LeaveType } from "@prisma/client";
 
+import { getEmployeeDisplayName } from "@/modules/employee";
 import { ALL_LEAVE_TYPES, DEFAULT_LEAVE_QUOTAS } from "@/modules/leave/domain/constants";
-import { getEmployeeDisplayName } from "@/lib/helpers/employee-helpers";
 import {
     LEAVE_PERIOD_TH,
     LEAVE_STATUS_TH,
     LEAVE_TYPE_TH,
-} from "@/lib/helpers/csv-helpers";
+} from "./csv-labels";
 import type {
     LeaveDetailRow,
     LeaveReportEmployee,

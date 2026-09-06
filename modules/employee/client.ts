@@ -11,3 +11,6 @@ export { AddEmployeeSection } from "./presentation/dashboard/AddEmployeeSection"
 export {
     ImportEmployeeRouteContent,
 } from "./presentation/import/ImportEmployeeRouteContent";
+
+// Pure identity formatter used by Employee-adjacent browser presentation.
+export { getEmployeeDisplayName } from "./domain/identity";

@@ -3,13 +3,14 @@
 `modules/` is the ownership boundary for business capabilities in the NHF
 Employee application.
 
-Stock, Routine, and Leave are migrated feature modules. Employee F1 owns
-Employee server/business behavior and F2 now owns the active Employee
-presentation in `modules/employee/presentation/`. Employee Dashboard routes
-consume the minimal browser-safe `@/modules/employee/client` entry. Generic
-Dashboard shell/context/navigation and route access remain outside Employee.
-Other legacy locations remain valid until their feature is deliberately
-migrated; Employee compatibility/orphan cleanup remains F3 work.
+Stock, Routine, Leave, and Employee are migrated feature modules. Employee
+F0-F3 owns its server/business behavior and active presentation in
+`modules/employee/`. Employee Dashboard routes consume the minimal
+browser-safe `@/modules/employee/client` entry, which also exposes the proven
+pure Employee display formatter required by Leave, Routine, and audit
+presentation. Generic Dashboard shell/context/navigation and route access
+remain outside Employee. Other legacy locations remain valid until their
+feature is deliberately migrated; Employee compatibility cleanup is complete.
 
 Rules for new work:
 
@@ -37,9 +38,13 @@ runtime-import `@/modules/leave` or Leave internals.
 
 The Employee presentation keeps using the existing `/api/employees/**` and
 `/api/departments` browser endpoints. Its CSV upload/preview/result flow uses
-the module-owned client-safe parser and does not depend on the mixed
-Prisma/Leave `lib/helpers/csv-helpers.ts` implementation. Employee presentation
-internals use local contracts and must not import either Employee public barrel.
+the module-owned client-safe parser and does not depend on the deleted mixed
+Prisma/Leave `lib/helpers/csv-helpers.ts` implementation. Employee
+presentation internals use local contracts and must not import either Employee
+public barrel. Generic User/Employee fallback display is owned by the neutral
+structural helper in `shared/identity/display.ts`, and Leave report labels are
+owned by Leave report infrastructure.
 
-Phase F2 CLOSED — Employee presentation ownership migrated.
-Phase F3 compatibility cleanup/final re-audit remains.
+Phase F3 CLOSED — Employee migration complete.
+F0-F3 Employee modular-monolith migration is complete. This does not claim
+that other application features are fully migrated.

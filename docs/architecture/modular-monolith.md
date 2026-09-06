@@ -1,6 +1,6 @@
 # NHF Employee modular monolith
 
-Status: Phase F2 CLOSED — Employee presentation ownership migrated.
+Status: Phase F3 CLOSED — Employee migration complete.
 
 This document separates the repository's observed current state from the
 target architecture. Stock server/business ownership is now migrated into
@@ -21,9 +21,10 @@ server and client APIs, attachment boundary, and compatibility ledger.
 
 Employee server/business and active Dashboard presentation ownership now live
 in `modules/employee/`; Employee API routes consume its server interface and
-Employee Dashboard routes consume `@/modules/employee/client`. See
+Employee Dashboard routes consume `@/modules/employee/client`. Employee
+compatibility cleanup and the final dependency re-audit are complete. See
 [employee-migration.md](./employee-migration.md) for the F0 discovery record
-and F1/F2 implementation ledger.
+and F1-F3 implementation ledger.
 
 ## Why a modular monolith
 
@@ -49,13 +50,13 @@ distributed across locations such as:
 - `app/` for routes, pages, and other Next.js delivery concerns;
 - `components/`, `hooks/`, and `types/` for UI and client-facing artifacts;
 - `lib/` for shared/platform infrastructure and legacy feature implementation
-  for capabilities not yet migrated, including Employee, plus authentication,
-  notification, and upload code;
+  for capabilities not yet migrated, plus authentication, notification, and
+  upload code;
 - `prisma/` for the single schema and its migrations; and
 - `__tests__/` for the existing unit, integration, API, and component tests.
 
-`modules/stock/`, `modules/routine/`, `modules/leave/`, and the active Employee
-presentation own their server/business and client-facing presentation code
+`modules/stock/`, `modules/routine/`, `modules/leave/`, and `modules/employee/`
+own their server/business and client-facing presentation code
 behind separate public entry points. `modules/employee/` owns Employee
 server/business behavior and `presentation/**`; its browser route surface is
 `modules/employee/client.ts`. Generic Dashboard shell, navigation, access
@@ -89,8 +90,8 @@ explicit `modules/<feature>/client.ts` entry for client presentation.
 
 The dependency graph describes new architecture code. It does not claim that
 the legacy `lib/`, `components/`, or unrelated route structure has already been
-reorganized. Employee F2 is the implemented presentation migration; remaining
-compatibility/orphan candidates remain intentionally deferred to F3.
+reorganized. Employee F0-F3 is complete; unrelated legacy feature locations
+remain outside the scope of this migration.
 
 ### Employee/Leave lifecycle direction
 
@@ -126,8 +127,8 @@ Future migrations should be vertical and behavior-preserving:
 
 Legacy and migrated modules may coexist during this process. Migration is
 explicit and feature-by-feature; Stock was the Phase B pilot, Routine is the
-Phase D migration, Leave E1/E2/E3 is complete, Employee F1 established the
-server/business interface, and Employee F2 now owns the active presentation.
+Phase D migration, Leave E1/E2/E3 is complete, and Employee F0-F3 now owns
+the Employee server/business and active presentation boundaries.
 
 ## Invariants for this phase
 

@@ -3,7 +3,7 @@ import type {
     RoutineReminderRecipientScope,
     RoutineTimingStatus,
 } from "./types";
-import { getEmployeeDisplayName } from "@/lib/helpers/employee-helpers";
+import { getEmployeeDisplayName } from "@/modules/employee/client";
 
 export const ROUTINE_TIMING_STATUS_LABELS: Record<RoutineTimingStatus, string> = {
     OVERDUE: "เกินกำหนด",

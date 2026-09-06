@@ -11,11 +11,11 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import { Search, Download, Filter, Loader2, X } from "lucide-react";
-import { STATUS_FILTER_OPTIONS } from "@/constants/ui";
 import {
     useEmployeeUIContext,
     useEmployeeDataContext,
 } from "./context/EmployeeContext";
+import { EMPLOYEE_STATUS_FILTER_OPTIONS } from "./formatters";
 
 interface EmployeeSearchControlsProps {
     onExportClick: () => void;
@@ -87,7 +87,7 @@ export function EmployeeSearchControls({
                             </div>
                         </SelectTrigger>
                         <SelectContent>
-                            {STATUS_FILTER_OPTIONS.map((option) => (
+                            {EMPLOYEE_STATUS_FILTER_OPTIONS.map((option) => (
                                 <SelectItem
                                     key={option.value}
                                     value={option.value}

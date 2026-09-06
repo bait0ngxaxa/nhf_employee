@@ -44,7 +44,7 @@ import type {
     LowStockAlertCandidate,
     StockCommandActor,
 } from "../../domain/types";
-import { getEmployeeBackedUserDisplayName } from "@/lib/helpers/employee-helpers";
+import { getUserDisplayName } from "@/shared/identity/display";
 
 export type CreateStockRequestResult = {
     request: StockRequestWithDetails;
@@ -502,7 +502,7 @@ export async function cancelRequest(
         if (!options.isAdmin) {
             await notifyAdminsStockRequestCancelledByRequester(
                 requestId,
-                getEmployeeBackedUserDisplayName(request.requester),
+                getUserDisplayName(request.requester),
                 tx,
             );
         } else {

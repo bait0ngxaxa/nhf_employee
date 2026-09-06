@@ -1,4 +1,4 @@
-import { getEmployeeBackedUserDisplayName } from "@/lib/helpers/employee-helpers";
+import { getUserDisplayName } from "@/shared/identity/display";
 import type {
     LiffStockCatalogItem,
     LiffStockCatalogResponse,
@@ -95,7 +95,7 @@ export function toLiffStockRequestSummary(
         ...(viewerRole === "PROCESSOR"
             ? {
                   requester: {
-                      name: getEmployeeBackedUserDisplayName(request.requester),
+                      name: getUserDisplayName(request.requester),
                   },
               }
             : {}),

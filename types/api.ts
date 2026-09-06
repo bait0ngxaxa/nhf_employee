@@ -1,4 +1,3 @@
-import { type Employee, } from '@/types/employees';
 import type { SharedDriveOption } from '@/constants/email-request';
 
 export interface EmailRequestBody {
@@ -128,16 +127,4 @@ export interface LineFlexMessage {
     body?: LineFlexBox;
     footer?: LineFlexBox;
   };
-}
-
-export interface GetEmployeesResponse {
-  employees: Employee[];
-  total: number;
-}
-
-export interface DepartmentResponse {
-  id: number;
-  name: string;
-  code: string;
-  description?: string;
 }

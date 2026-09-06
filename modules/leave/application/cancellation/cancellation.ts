@@ -13,7 +13,7 @@ import {
     type LeaveCancelledAfterApprovalPayload,
     type LeaveCancellationRequestedPayload,
 } from "@/modules/leave/application/notifications/notification-payloads";
-import { getEmployeeDisplayName } from "@/lib/helpers/employee-helpers";
+import { getEmployeeDisplayName } from "@/modules/employee";
 import {
     getEffectiveLeaveApprover,
     getEffectiveLeaveApproverId,

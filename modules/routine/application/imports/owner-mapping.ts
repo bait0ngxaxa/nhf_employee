@@ -2,7 +2,7 @@ import { ROUTINE_IMPORT_REVIEW_REASONS } from "./constants";
 import {
     getEmployeeDisplayName,
     getEmployeeFullName,
-} from "@/lib/helpers/employee-helpers";
+} from "@/modules/employee";
 import type {
     RoutineImportOwnerMapping,
     RoutineImportReferenceData,

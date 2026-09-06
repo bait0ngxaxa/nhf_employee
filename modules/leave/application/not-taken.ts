@@ -30,7 +30,7 @@ import {
     lockLeaveRequestRow,
 } from "../infrastructure/persistence/transaction";
 import { runSerializableTransaction } from "@/lib/db/transaction";
-import { getEmployeeDisplayName } from "@/lib/helpers/employee-helpers";
+import { getEmployeeDisplayName } from "@/modules/employee";
 import { isAdminRole } from "@/lib/ssot/permissions";
 import { APP_DASHBOARD_TABS, toDashboardMenuPath } from "@/lib/ssot/routes";
 

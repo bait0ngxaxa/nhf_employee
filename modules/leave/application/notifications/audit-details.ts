@@ -1,5 +1,5 @@
 import type { LeaveAuditContext } from "@/lib/audit-log/contracts";
-import { getEmployeeDisplayName } from "@/lib/helpers/employee-helpers";
+import { getEmployeeDisplayName } from "@/modules/employee";
 import { halfDaysToDays } from "@/modules/leave/domain/half-days";
 
 type LeaveAuditSource = {

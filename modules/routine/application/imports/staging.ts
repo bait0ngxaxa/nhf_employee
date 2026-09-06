@@ -10,10 +10,8 @@ import type {
 import * as XLSX from "xlsx";
 
 import { runSerializableTransaction } from "@/lib/db/transaction";
-import {
-    getEmployeeBackedUserDisplayName,
-    getEmployeeDisplayName,
-} from "@/lib/helpers/employee-helpers";
+import { getUserDisplayName } from "@/shared/identity/display";
+import { getEmployeeDisplayName } from "@/modules/employee";
 import { prisma } from "@/lib/db/prisma";
 import {
     calendarDateToDate,
@@ -299,7 +297,7 @@ function getBatchView(
         status: batch.status,
         uploadedBy: {
             id: batch.uploadedBy.id,
-            name: getEmployeeBackedUserDisplayName(batch.uploadedBy),
+            name: getUserDisplayName(batch.uploadedBy),
         },
         totalRows: batch.totalRows,
         validRows: batch.validRows,

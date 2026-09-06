@@ -1,7 +1,7 @@
 import ExcelJS from "exceljs";
 
 import { toBangkokExcelDate } from "@/lib/helpers/bangkok-time";
-import { getEmployeeBackedUserDisplayName } from "@/lib/helpers/employee-helpers";
+import { getUserDisplayName } from "@/shared/identity/display";
 import { finishStockWorksheet } from "./workbook-style";
 
 const SUMMARY_SHEET_NAME = "สรุปการใช้วัสดุ";
@@ -162,10 +162,10 @@ function toCalculationRow(
         issuedAt: toBangkokExcelDate(request.issuedAt),
         requestNumber: request.id,
         projectCode: request.projectCode,
-        requesterName: getEmployeeBackedUserDisplayName(request.requester),
+        requesterName: getUserDisplayName(request.requester),
         requesterEmail: request.requester.email,
         issuerName: request.issuer
-            ? getEmployeeBackedUserDisplayName(request.issuer, "-")
+            ? getUserDisplayName(request.issuer, "-")
             : "-",
         categoryName: item.item.category.name,
         itemName: item.item.name,
@@ -185,10 +185,10 @@ function toDetailRow(
         issuedAt: toBangkokExcelDate(request.issuedAt),
         requestNumber: request.id,
         projectCode: request.projectCode,
-        requesterName: getEmployeeBackedUserDisplayName(request.requester),
+        requesterName: getUserDisplayName(request.requester),
         requesterEmail: request.requester.email,
         issuerName: request.issuer
-            ? getEmployeeBackedUserDisplayName(request.issuer, "-")
+            ? getUserDisplayName(request.issuer, "-")
             : "-",
         itemSummary: formatItemsSummary(request.items),
         itemTypeCount: request.items.length,

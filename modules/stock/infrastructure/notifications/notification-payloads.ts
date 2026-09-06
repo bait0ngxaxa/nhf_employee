@@ -1,6 +1,6 @@
 import type { Prisma } from "@prisma/client";
 import * as z from "zod";
-import { getEmployeeBackedUserDisplayName } from "@/lib/helpers/employee-helpers";
+import { getUserDisplayName } from "@/shared/identity/display";
 import { lineRetryKeySchema } from "@/lib/validations/line";
 
 export function buildVariantLabel(
@@ -145,7 +145,7 @@ export function buildStockRequestResultEmailPayload(
     cancelReason: string | null,
     actedAt: Date,
 ): StockRequestResultEmailPayload {
-    const requesterName = getEmployeeBackedUserDisplayName(request.requester);
+    const requesterName = getUserDisplayName(request.requester);
 
     return {
         schemaVersion: 1,
