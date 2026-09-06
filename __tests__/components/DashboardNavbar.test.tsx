@@ -12,7 +12,7 @@ vi.mock("@/components/dashboard/context/dashboard/DashboardContext", () => ({
 }));
 
 vi.mock(
-    "@/components/dashboard/notifications/NotificationDropdown",
+    "@/modules/notification/client",
     () => ({
         NotificationDropdown: () => <button type="button">การแจ้งเตือน</button>,
     }),

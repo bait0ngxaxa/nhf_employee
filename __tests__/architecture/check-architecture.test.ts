@@ -21,6 +21,7 @@ const fixtureFiles: FixtureFiles = {
     "modules/department/application/example.ts": "export const x = 1;\n",
     "modules/department/infrastructure/persistence/repository.ts": "export const x = 1;\n",
     "modules/notification/index.ts": "export const x = 1;\n",
+    "modules/notification/client.ts": '"use client"; export const x = 1;\n',
     "modules/notification/application/example.ts": "export const x = 1;\n",
     "modules/notification/infrastructure/persistence/repository.ts": "export const x = 1;\n",
     "modules/future/index.ts": "export const x = 1;\n",
@@ -570,6 +571,86 @@ describe("architecture checker module boundaries", () => {
         );
     });
 
+    it.each([
+        "app/dashboard/notifications/page.tsx",
+        "app/dashboard/notifications/loading.tsx",
+    ])("allows %s to compose Notification presentation through the client entry", async (routePath) => {
+        const result = await checkFixture(
+            routePath,
+            'import { NotificationsSection } from "@/modules/notification/client";\n',
+        );
+
+        expect(result.violations).toEqual([]);
+    });
+
+    it.each([
+        "@/modules/notification",
+        "@/modules/notification/presentation/dashboard/NotificationsPageContent",
+        "@/components/dashboard/notifications/NotificationsPageContent",
+    ])("rejects Notification dashboard routes importing %s", async (specifier) => {
+        const result = await checkFixture(
+            "app/dashboard/notifications/page.tsx",
+            `import { x } from "${specifier}";`,
+        );
+
+        expect(result.violations).toHaveLength(1);
+        expect(result.violations[0]).toContain(
+            "Notification Dashboard routes must use @/modules/notification/client",
+        );
+    });
+
+    it("rejects a Notification dashboard route that does not import the client entry", async () => {
+        const result = await checkFixture(
+            "app/dashboard/notifications/page.tsx",
+            'import { x } from "@/components/ui/button";',
+        );
+
+        expect(result.violations).toHaveLength(1);
+        expect(result.violations[0]).toContain(
+            'must consume Notification presentation through "@/modules/notification/client"',
+        );
+    });
+
+    it("allows DashboardNavbar to mount Notification through the client entry", async () => {
+        const result = await checkFixture(
+            "components/dashboard/layout/DashboardNavbar.tsx",
+            'import { NotificationDropdown } from "@/modules/notification/client";\n',
+        );
+
+        expect(result.violations).toEqual([]);
+    });
+
+    it.each([
+        "@/modules/notification",
+        "@/modules/notification/presentation/dashboard/NotificationDropdown",
+        "@/components/dashboard/notifications/NotificationDropdown",
+    ])("rejects DashboardNavbar importing Notification through %s", async (specifier) => {
+        const result = await checkFixture(
+            "components/dashboard/layout/DashboardNavbar.tsx",
+            `import { x } from "${specifier}";`,
+        );
+
+        expect(result.violations).toHaveLength(1);
+        expect(result.violations[0]).toContain(
+            "DashboardNavbar",
+        );
+        expect(result.violations[0]).toContain(
+            "@/modules/notification/client",
+        );
+    });
+
+    it("rejects a DashboardNavbar that drops the Notification client dependency", async () => {
+        const result = await checkFixture(
+            "components/dashboard/layout/DashboardNavbar.tsx",
+            'import { Button } from "@/components/ui/button";',
+        );
+
+        expect(result.violations).toHaveLength(1);
+        expect(result.violations[0]).toContain(
+            'must consume Notification through "@/modules/notification/client"',
+        );
+    });
+
     it("rejects Notification internals importing their own public barrel", async () => {
         const result = await checkFixture(
             "modules/notification/application/example.ts",
@@ -579,6 +660,112 @@ describe("architecture checker module boundaries", () => {
         expect(result.violations).toHaveLength(1);
         expect(result.violations[0]).toContain(
             "Notification module internals must use local contracts",
+        );
+    });
+
+    it.each([
+        "modules/notification/application/example.ts",
+        "modules/notification/presentation/dashboard/Example.tsx",
+        "modules/notification/infrastructure/persistence/repository.ts",
+    ])("rejects %s importing the Notification public barrels", async (importerPath) => {
+        const result = await checkFixture(
+            importerPath,
+            'import { x } from "@/modules/notification/client";\n',
+        );
+
+        expect(result.violations).toHaveLength(1);
+        expect(result.violations[0]).toContain(
+            "Notification module internals must use local contracts",
+        );
+    });
+
+    it.each([
+        'import { x } from "@/components/dashboard/notifications/NotificationDropdown";',
+        'export { x } from "@/components/dashboard/notifications/NotificationShared";',
+        'const x = import("@/components/dashboard/notifications/NotificationsPageContent");',
+        'const x = require("@/components/dashboard/notifications/NotificationPageParts");',
+        'type X = import("@/components/dashboard/notifications/NotificationShared").NotificationItem;',
+        'vi.mock("@/components/dashboard/notifications/NotificationDropdown");',
+    ])("rejects deleted Notification presentation dependency %s", async (source) => {
+        const result = await checkFixture("app/example.ts", source);
+
+        expect(result.violations).toHaveLength(1);
+        expect(result.violations[0]).toContain(
+            "Deleted Notification presentation path",
+        );
+    });
+
+    it("rejects a relative import of the deleted Notification presentation path", async () => {
+        const result = await checkFixture(
+            "modules/routine/application/example.ts",
+            'import { x } from "../../../components/dashboard/notifications/NotificationDropdown";',
+        );
+
+        expect(result.violations).toHaveLength(1);
+        expect(result.violations[0]).toContain(
+            "Deleted Notification presentation path",
+        );
+    });
+
+    it("rejects server-only runtime dependencies from the Notification client graph", async () => {
+        const rootPath = await createFixture({
+            ...fixtureFiles,
+            "modules/notification/client.ts": [
+                '"use client";',
+                'import { prisma } from "@/lib/db/prisma";',
+                "export { prisma };",
+            ].join("\n"),
+            "lib/db/prisma.ts": "export const prisma = 1;\n",
+        });
+        const result = checkArchitecture({ repositoryRoot: rootPath });
+
+        expect(result.violations).toHaveLength(1);
+        expect(result.violations[0]).toContain(
+            "@/modules/notification/client",
+        );
+        expect(result.violations[0]).toContain("Server-only runtime dependency");
+    });
+
+    it("rejects a transitive Prisma runtime dependency from the Notification client graph", async () => {
+        const rootPath = await createFixture({
+            ...fixtureFiles,
+            "modules/notification/client.ts": 'export { x } from "./presentation/example";\n',
+            "modules/notification/presentation/example.ts": [
+                'import { PrismaClient } from "@prisma/client";',
+                "export const x = PrismaClient;",
+            ].join("\n"),
+        });
+        const result = checkArchitecture({ repositoryRoot: rootPath });
+
+        expect(result.violations).toHaveLength(1);
+        expect(result.violations[0]).toContain("@prisma/client");
+        expect(result.violations[0]).toContain("Server-only runtime dependency");
+    });
+
+    it("does not treat type-only Prisma contracts as Notification client runtime dependencies", async () => {
+        const rootPath = await createFixture({
+            ...fixtureFiles,
+            "modules/notification/client.ts": 'import type { Prisma } from "@prisma/client"; export type Select = Prisma.UserSelect;\n',
+        });
+        const result = checkArchitecture({ repositoryRoot: rootPath });
+
+        expect(result.violations).toEqual([]);
+    });
+
+    it("rejects a transitive client-reachable import of the Notification server entry", async () => {
+        const rootPath = await createFixture({
+            ...fixtureFiles,
+            "components/NotificationClient.tsx": [
+                '"use client";',
+                'import { x } from "@/modules/notification";',
+                "export const NotificationClient = () => x;",
+            ].join("\n"),
+        });
+        const result = checkArchitecture({ repositoryRoot: rootPath });
+
+        expect(result.violations).toHaveLength(1);
+        expect(result.violations[0]).toContain(
+            "Client-reachable runtime code must not import the Notification server entry",
         );
     });
 

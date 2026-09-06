@@ -34,11 +34,11 @@ import {
     NotificationLoadingState,
     normalizeNotificationActionUrl,
     notificationFetcher,
-} from "@/components/dashboard/notifications/NotificationShared";
+} from "./NotificationShared";
 import type {
     NotificationItem,
     NotificationsData,
-} from "@/components/dashboard/notifications/NotificationShared";
+} from "./NotificationShared";
 
 function getNotificationButtonLabel(unreadCount: number): string {
     if (unreadCount <= 0) {

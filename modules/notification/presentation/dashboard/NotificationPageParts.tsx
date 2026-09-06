@@ -10,11 +10,11 @@ import { Button } from "@/components/ui/button";
 import {
     NotificationIcon,
     NotificationInlineLoading,
-} from "@/components/dashboard/notifications/NotificationShared";
+} from "./NotificationShared";
 import type {
     NotificationFilter,
     NotificationItem,
-} from "@/components/dashboard/notifications/NotificationShared";
+} from "./NotificationShared";
 
 export function NotificationsHeader({
     filter,

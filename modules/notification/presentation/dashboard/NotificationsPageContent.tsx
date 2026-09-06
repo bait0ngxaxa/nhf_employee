@@ -14,7 +14,7 @@ import {
     NotificationFilterTabs,
     NotificationPageList,
     NotificationsHeader,
-} from "@/components/dashboard/notifications/NotificationPageParts";
+} from "./NotificationPageParts";
 import {
     NotificationEmptyState,
     NotificationErrorState,
@@ -22,12 +22,12 @@ import {
     NotificationLoadingState,
     normalizeNotificationActionUrl,
     notificationFetcher,
-} from "@/components/dashboard/notifications/NotificationShared";
+} from "./NotificationShared";
 import type {
     NotificationFilter,
     NotificationItem,
     NotificationsResponse,
-} from "@/components/dashboard/notifications/NotificationShared";
+} from "./NotificationShared";
 
 function getApiUrl(filter: NotificationFilter): string {
     return `${API_ROUTES.notifications.all}?filter=${filter}`;

@@ -1,7 +1,8 @@
 # NHF Employee modular monolith
 
-Status: Phase H1 CLOSED — Notification server/application ownership complete.
-Phase H0 Notification discovery and boundary definition remains closed. Phase G3
+Status: Phase H2 CLOSED — Notification presentation ownership complete.
+Phase H1 server/application ownership and Phase H0 Notification discovery remain
+closed. Phase G3
 Department migration remains complete.
 
 This document separates the repository's observed current state from the
@@ -37,13 +38,17 @@ capability a stable server/application/persistence owner in
 `modules/department/`; Employee still owns its required Department association
 and Employee-specific mapping and presentation behavior.
 
-Phase H1 has established the server/application Notification boundary in
-`modules/notification/`. It is the in-app Notification/Inbox owner; it does not
-absorb business notification semantics, the global
+Phase H1 established the server/application Notification boundary in
+`modules/notification/`, and H2 now owns its active Dashboard presentation in
+`modules/notification/presentation/dashboard/**` behind
+`@/modules/notification/client`. It is the in-app Notification/Inbox owner; it
+does not absorb business notification semantics, the global
 `NotificationOutbox`, or Email/LINE delivery infrastructure. Leave, Stock, and
 Routine retain event and recipient policy, while Email Request remains a
-transitional/deferred consumer pending the future IT capability boundary. See
-[notification-migration.md](./notification-migration.md) for the complete
+transitional/deferred consumer pending the future IT capability boundary. The
+Notification page/loading routes use the client entry, while
+`DashboardNavbar` remains Dashboard-owned and mounts the dropdown through it.
+See [notification-migration.md](./notification-migration.md) for the complete
 discovery record and migration ledger.
 
 ## Why a modular monolith
@@ -92,8 +97,10 @@ route boundary.
 Notification server/application ownership now lives in `modules/notification/`:
 the four Notification routes delegate through its public server entry, and the
 shared generic in-app helper is a compatibility adapter over that entry. The
-Dashboard Notification presentation remains a legacy `components/` surface for
-H2. The current global outbox already treats in-app delivery as one possible
+Dashboard Notification presentation is module-owned behind its browser-safe
+client entry; the deleted `components/dashboard/notifications/**` path is not a
+supported ownership path. The current global outbox already treats in-app
+delivery as one possible
 channel, including Routine reminders, while the outbox processor and provider
 composition remain shared/platform infrastructure.
 
@@ -183,13 +190,16 @@ Employee import seam preserve their existing contracts; Employee browser code
 continues to use HTTP. No obsolete Department runtime artifact remained, so no
 runtime cleanup was required.
 
-### Notification boundary and server ownership (H0/H1)
+### Notification boundary and presentation ownership (H0/H1/H2)
 
 The Notification capability is deliberately narrower than the word
 "notification" in the repository. It owns durable per-user in-app Inbox
 entries, latest/history/unread queries, mark-read commands, generic
-deduplicated persistence, and its server/application contract. H2 will own
-Notification-specific presentation. A business module supplies the explicit
+deduplicated persistence, and its server/application contract. H2 owns
+Notification-specific Dashboard presentation under
+`modules/notification/presentation/dashboard/**` and exposes only the active
+composition contract through `modules/notification/client.ts`. A business module
+supplies the explicit
 recipient and owns the event's meaning, semantic
 type, title/message, action URL, reference ID, channel choice, and
 event-specific dedupe/supersede behavior.
@@ -211,9 +221,10 @@ resolved command payload, not current business-owned events.
 
 Dashboard navbar/page/menu composition remains app/Dashboard-owned. Email
 Request is documented as a transitional/deferred consumer and legacy IT enum
-values remain storage-compatible history only. H1 changes server/application
-ownership only; H2 presentation and H3 producer integration/compatibility
-cleanup are not complete.
+values remain storage-compatible history only. H1 server/application ownership
+and H2 presentation ownership are complete; H3 producer integration and
+compatibility cleanup are not started. The timestamp-only history cursor risk
+remains unresolved.
 
 ## Ownership principle
 

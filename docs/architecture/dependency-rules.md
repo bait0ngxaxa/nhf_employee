@@ -1,8 +1,8 @@
 # Dependency rules and enforcement
 
-Status: Phase H1 CLOSED — Notification server/application ownership complete.
-Phase H0 Notification discovery and boundary definition remains closed. Phase G3
-Department migration remains complete. These rules govern new architecture code
+Status: Phase H2 CLOSED — Notification presentation ownership complete.
+Phase H1 server/application ownership and Phase H0 Notification discovery remain
+closed. Phase G3 Department migration remains complete. These rules govern new architecture code
 while unrelated legacy features remain compatible during incremental migration.
 
 ## Direction
@@ -83,11 +83,14 @@ for client/presentation usage. Arbitrary subpaths remain forbidden. A
 server-only module intentionally has no client entry, and a client entry must
 not expose server-only implementation, database adapters, or secrets.
 
-## Notification and outbox boundary (H0/H1)
+## Notification and outbox boundary (H0/H1/H2)
 
 The Notification capability is consumed through `@/modules/notification`;
-external consumers must not deep-import its repository, Prisma, or presentation
-internals. The H1 public server contract is for the user-facing in-app Inbox
+server consumers must not deep-import its repository, Prisma, or presentation
+internals. Browser consumers use only `@/modules/notification/client`; its
+Dashboard presentation implementation lives under
+`modules/notification/presentation/dashboard/**`. The H1 public server
+contract is for the user-facing in-app Inbox
 and generic persistence to an explicit user. A business producer supplies the
 recipient and owns event meaning, semantic type, title/message, action URL,
 reference ID, channel selection, and event-specific dedupe/supersede policy.
@@ -116,6 +119,15 @@ H3.
 Do not introduce a generic Notification audience query or migrate Email Request
 until the future IT capability boundary is approved. Legacy IT notification and
 outbox enum values remain storage-compatible history only.
+
+H2 keeps `app/dashboard/notifications/page.tsx` and `loading.tsx` as App Router
+composition and requires them to use `@/modules/notification/client`.
+`components/dashboard/layout/DashboardNavbar.tsx` remains generic Dashboard
+shell ownership and mounts `NotificationDropdown` through that client entry.
+The deleted `components/dashboard/notifications/**` path must not be
+reintroduced. Notification browser code remains HTTP-based through
+`API_ROUTES.notifications.*`; H1 server/application, Prisma, Outbox, Email,
+LINE, and business producer ownership remain unchanged for H3.
 
 ## Client/server boundary
 
@@ -242,13 +254,13 @@ the module boundary from a legacy directory, while imports unrelated to
 | `npm run architecture:check` | Repository source files, excluding dependency, build, coverage, and generated directories | Uses the installed TypeScript parser to inspect imports, re-exports, type imports, dynamic imports, and `require()` calls; allows `@/modules/<feature>` and, when present, `@/modules/<feature>/client` as module public entries; rejects `shared -> modules`, external consumers deep-importing module internals, cross-module deep imports, including relative paths, and any business module importing the global Outbox Processor |
 | Leave route ownership | `app/api/leave/**`, `app/api/line/leave/**` | Requires the server entry `@/modules/leave` and rejects legacy paths, the client entry, and deep implementation imports |
 | Leave presentation ownership | `app/dashboard/leave/**`, `app/liff/leave/**`, `modules/leave/**` | Requires route composition through `@/modules/leave/client`, rejects deleted legacy presentation paths, and rejects Leave internals importing either public barrel |
-| Client/server policy | Production `"use client"` dependency graphs and migrated module client entries | Walks runtime imports transitively, rejects client-reachable use of the Leave, Employee, and server-only Department entries, and separately rejects server-only runtime dependencies reachable from `@/modules/leave/client` and `@/modules/employee/client`; type-only imports are erased before graph traversal |
+| Client/server policy | Production `"use client"` dependency graphs and migrated module client entries | Walks runtime imports transitively, rejects client-reachable use of the Leave, Employee, Department, and Notification server entries, and separately rejects server-only runtime dependencies reachable from `@/modules/leave/client`, `@/modules/employee/client`, and `@/modules/notification/client`; type-only imports are erased before graph traversal |
 | Route-level Prisma policy | Legacy and new code | Documentation-led for unrelated legacy routes; G1 enforces Department ownership in `modules/department/infrastructure/**` |
 | Employee F3 ownership | `app/api/employees/**`, `app/dashboard/employees/**`, `modules/employee/**`, production Client Component graphs | Requires `@/modules/employee` for API routes and `@/modules/employee/client` for the four Employee Dashboard routes; rejects deleted legacy compatibility paths and deep presentation paths, including relative forms, deep/self-barrel imports, Employee → Leave imports, client-to-server reachability, and server-only dependencies from the Employee client graph |
 | Employee/Leave offboarding seam | `modules/employee/**` plus Employee route composition | Employee exposes only a structural blocker-provider port; the outer composition binds Leave's implementation and must preserve the same Employee lifecycle transaction client |
 | Department G1 ownership | `app/api/departments/**`, `modules/department/**`, Employee import, production source | Department API delivery uses `@/modules/department`; Department Prisma access stays in Department infrastructure; Employee uses the Department public query; Department does not depend on Employee |
 | Department G2 presentation boundary | Production Client Component runtime graphs and Employee Department presentation | Rejects direct/transitive client imports of the server-only `@/modules/department` entry; preserves the `/api/departments` browser contract and does not require a Department client entry |
-| Notification H1 server ownership | `app/api/notifications/**`, `modules/notification/**` | Requires the four Notification API routes to consume `@/modules/notification`, rejects route deep imports and direct `prisma.notification` access, and rejects Notification internals importing their own public barrel; full Notification persistence exclusivity remains deferred until H3 producer migration |
+| Notification H1/H2 ownership | `app/api/notifications/**`, `app/dashboard/notifications/**`, `components/dashboard/layout/DashboardNavbar.tsx`, `modules/notification/**`, production client graphs | Requires Notification API routes to consume `@/modules/notification`; requires Notification Dashboard routes and DashboardNavbar to consume `@/modules/notification/client`; rejects deleted legacy presentation paths, deep/self-barrel imports, server-only dependencies in the Notification client graph, and production client reachability of the Notification server entry. Direct `prisma.notification` exclusivity remains deferred until H3 producer migration |
 
 ## Department final closure (G3)
 

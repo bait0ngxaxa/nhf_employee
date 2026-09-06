@@ -38,7 +38,7 @@ import {
     useDashboardUIContext,
     useDashboardDataContext,
 } from "@/components/dashboard/context/dashboard/DashboardContext";
-import { NotificationDropdown } from "@/components/dashboard/notifications/NotificationDropdown";
+import { NotificationDropdown } from "@/modules/notification/client";
 import { DashboardSidebar } from "@/components/dashboard/layout/DashboardSidebar";
 import { ThemeSelector } from "@/components/theme/ThemeSelector";
 import { getRoleLabelThai } from "@/lib/ssot/permissions";

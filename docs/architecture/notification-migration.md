@@ -1,7 +1,8 @@
 # Notification migration record
 
-Status: **Phase H1 CLOSED — Notification server/application ownership complete.**
-Phase H0 discovery and boundary definition remains closed.
+Status: **Phase H2 CLOSED — Notification presentation ownership complete.**
+Phase H1 server/application ownership and Phase H0 discovery remain closed.
+H3 producer integration and compatibility cleanup remain open/not started.
 
 This record is the source of truth for the Notification boundary and its
 incremental implementation. It records the repository behavior observed at the
@@ -48,8 +49,9 @@ H0.
 The Notification capability is the user-facing **in-app Notification / Inbox**
 capability. It owns durable per-user inbox entries and the queries and commands
 that let the current user view, filter, paginate, and mark those entries read.
-H1 has established its server/application contracts and persistence boundary;
-Notification-specific presentation remains an H2 concern.
+H1 established its server/application contracts and persistence boundary. H2
+now owns the Notification-specific browser presentation and exposes it through
+the explicit `@/modules/notification/client` entry.
 
 Notification does not own the business event that caused an entry, the
 recipient policy, a domain-specific message, or the choice of delivery
@@ -59,7 +61,7 @@ channels.
 
 | Concern | Owner at target | Boundary decision |
 | --- | --- | --- |
-| In-app Notification / Inbox | `modules/notification/` | Owns the `Notification` persistence boundary, generic durable create-to-user mechanics, inbox queries, unread/read commands, and the H1 server/application contract; Notification presentation/client contracts remain H2 work. |
+| In-app Notification / Inbox | `modules/notification/` | Owns the `Notification` persistence boundary, generic durable create-to-user mechanics, inbox queries, unread/read commands, the H1 server/application contract, and the H2 browser presentation/client seam. |
 | Business-owned notification semantics | Leave, Stock, Routine, Email Request while deferred, and future IT/business modules | Owns why an event is noteworthy, who receives it, its semantic type, title, message, action URL, reference ID, channel selection, and event-specific dedupe/supersede rules. |
 | Reliable asynchronous delivery / NotificationOutbox | Shared/platform outbox infrastructure | Owns `NotificationOutbox` lifecycle, claim/retry/dead-letter/supersede behavior, scheduling/wakeup, and processor composition. Business modules may enqueue rows transactionally but must not import the processor. |
 | Provider/channel integrations | Shared/platform transports plus business-owned payload composers | Email and LINE transports remain generic platform infrastructure. Leave, Stock, Routine, and the deferred Email Request capability continue to own channel-specific event payload and message meaning. |
@@ -159,13 +161,14 @@ of Notification persistence or business meaning.
 13. **Transitional paths:** H1 now routes the legacy
     `app/api/notifications/**` HTTP adapters and generic
     `lib/services/notifications/in-app.ts` writes through the Notification
-    public server entry. `components/dashboard/notifications/**`, direct
-    producer writes, and the public business dispatch contracts consumed by the
-    global processor remain transitional until their named phases.
+    public server entry. Direct producer writes and the public business
+    dispatch contracts consumed by the global processor remain transitional
+    until H3; the obsolete `components/dashboard/notifications/**` ownership
+    path was removed in H2.
 14. **Next phases:** H1 established server/application ownership and route
-    delegation; H2 establishes Notification presentation/client ownership; H3
+    delegation; H2 established Notification presentation/client ownership; H3
     integrates producers, resolves mixed helpers, adds guardrails, and performs
-    the final compatibility audit. H1 is now closed; H2 and H3 remain open.
+    the final compatibility audit. H1 and H2 are closed; H3 remains open.
 
 ## Current `Notification` persistence model
 
@@ -244,16 +247,16 @@ compatibility risks, not H0 fixes.
 
 ### Notification-specific presentation
 
-The following files are actual Notification presentation and are candidates
-for H2 ownership under a future Notification client entry. They are not moved
-in H0:
+The following files are Notification-owned Dashboard presentation behind the
+browser-safe `@/modules/notification/client` entry after H2:
 
-| Current path | Observed responsibility |
+| H2 path | Observed responsibility |
 | --- | --- |
-| `components/dashboard/notifications/NotificationShared.tsx` | Browser-safe Notification item/list contracts, fetcher, loading/empty/error states, badge formatting, action-URL normalization, and type-to-icon mapping. `NotificationItem` exposes `id`, `type`, `title`, `message`, `isRead`, `actionUrl`, and `createdAt`; it intentionally does not expose every Prisma field. |
-| `components/dashboard/notifications/NotificationPageParts.tsx` | Notification history header, filter tabs, mark-all affordance, list rows, unread styling/dot, type icon, and relative-time display. |
-| `components/dashboard/notifications/NotificationDropdown.tsx` | Navbar inbox dropdown; SWR list fetch, 60-second polling, no focus revalidation, no automatic retry, 30-second dedupe, single-read and mark-all mutations, badge, and navigation to the history route. |
-| `components/dashboard/notifications/NotificationsPageContent.tsx` | Full history page; SWR filter fetch, timestamp cursor loading, append behavior, optimistic read/mark-all behavior, total count, and action navigation. |
+| `modules/notification/presentation/dashboard/NotificationShared.tsx` | Browser-safe Notification item/list contracts, fetcher, loading/empty/error states, badge formatting, action-URL normalization, and type-to-icon mapping. `NotificationItem` exposes `id`, `type`, `title`, `message`, `isRead`, `actionUrl`, and `createdAt`; it intentionally does not expose every Prisma field. |
+| `modules/notification/presentation/dashboard/NotificationPageParts.tsx` | Notification history header, filter tabs, mark-all affordance, list rows, unread styling/dot, type icon, and relative-time display. |
+| `modules/notification/presentation/dashboard/NotificationDropdown.tsx` | Navbar inbox dropdown; SWR list fetch, 60-second polling, no focus revalidation, no automatic retry, 30-second dedupe, single-read and mark-all mutations, badge, and navigation to the history route. |
+| `modules/notification/presentation/dashboard/NotificationsPageContent.tsx` | Full history page; SWR filter fetch, timestamp cursor loading, append behavior, optimistic read/mark-all behavior, total count, and action navigation. |
+| `modules/notification/presentation/dashboard/NotificationSkeletons.tsx` | Notification history loading presentation formerly embedded in generic Dashboard feedback; it is now owned by Notification without moving generic skeleton primitives. |
 
 The current type-to-icon mapping is semantic presentation, not business policy:
 
@@ -269,7 +272,11 @@ The current type-to-icon mapping is semantic presentation, not business policy:
 The default mapping intentionally remains forward-compatible for new stored
 values and historical values.
 
-Current browser contracts and behavior that H2 must preserve include:
+The H2 browser entry exposes only `NotificationDropdown`,
+`NotificationsSection`, and `NotificationSectionSkeleton`. Shared contracts,
+page parts, row components, state components, and fetcher implementation stay
+internal to Notification presentation. Current browser contracts and behavior
+preserved by H2 include:
 
 - `API_ROUTES.notifications.list` uses `/api/notifications` and the history
   endpoint uses `/api/notifications/all?filter=...`.
@@ -303,10 +310,11 @@ notifications:
 - `__tests__/components/DashboardNavbar.test.tsx` proves navbar composition;
   it should remain a shell test even after the dropdown implementation moves.
 
-The future H2 client entry may export Notification-specific presentation and a
-browser-safe client contract. It must not pull server Prisma/auth/outbox code
-into a client graph, and it must not make the generic Dashboard shell a
-Notification implementation detail.
+`app/dashboard/notifications/page.tsx` and `loading.tsx` consume the client
+entry. `DashboardNavbar` remains Dashboard-owned and mounts only the public
+`NotificationDropdown` contract through that entry. The Notification browser
+graph remains HTTP-based through `API_ROUTES.notifications.*`; it does not
+reach the H1 server/application or infrastructure implementation.
 
 ## Producer audit by business capability
 
@@ -616,7 +624,7 @@ The target ownership map is:
 | Generic create-one-to-explicit-user and deduplicated write mechanics | Notification application contract |
 | Inbox latest/history queries, unread count, filter, cursor, mark-one, mark-all | Notification application contract |
 | Notification-specific server DTOs and route delegation | Notification application; `app/api/notifications/**` remains HTTP delivery composition |
-| Notification-specific client data contract and components | Notification client entry/presentation in H2 |
+| Notification-specific client data contract and components | `modules/notification/client.ts` and `modules/notification/presentation/dashboard/**` |
 | Leave/Stock/Routine event and recipient policy | Respective business module |
 | `NotificationOutbox` row lifecycle, processor, retry, stale recovery, scheduling/wakeup | Shared/platform outbox infrastructure |
 | Email/LINE transport and provider retry mechanics | Shared/platform channel infrastructure |
@@ -655,7 +663,7 @@ input directly to Notification.
 
 ## Behavioral invariants for future phases
 
-Future H2-H3 work must preserve these observed invariants unless a separately
+Future H3 work must preserve these observed invariants unless a separately
 approved behavior change explicitly supersedes them:
 
 - a signed-in user can only list, count, read, or mark-read their own Inbox;
@@ -727,12 +735,13 @@ symbol in that responsibility; grouping does not imply ownership transfer.
 | `app/api/notifications/[id]/read/route.ts` `PATCH` | User-scoped single mark-read | App HTTP adapter | Notification application command via app adapter | H1 moved persistence behind the public command | H1 | Preserve current 500 behavior for missing/non-owned rows unless separately approved. |
 | `app/api/notifications/mark-all-read/route.ts` `POST` | User-scoped mark-all-read and count | App HTTP adapter | Notification application command via app adapter | H1 moved update behind the public command | H1 | Preserve idempotent zero count and response. |
 | `__tests__/api/notifications.test.ts`; `modules/notification/application/*.test.ts`; `modules/notification/infrastructure/persistence/repository.test.ts` | Auth, public app contract, query semantics, read commands, create-once dedupe/context tests | API/module compatibility suites | Notification API/application/persistence contract suites | H1 added focused boundary coverage while preserving existing route contracts | H1 | Full cursor tie correctness remains a later approved change. |
-| `components/dashboard/notifications/NotificationShared.tsx` | Browser-safe item/list types, fetcher, states, action URL normalization, badge, icon mapping | Legacy Dashboard Notification presentation | Notification client/presentation | Move behind `modules/notification/client.ts` or a narrow client adapter | H2 | Preserve legacy Stock tab alias, disabled-tab fallback, unknown icon fallback, and client-safe graph. |
-| `components/dashboard/notifications/NotificationPageParts.tsx` | History header, filters, rows, unread visual semantics | Legacy Dashboard Notification presentation | Notification client/presentation | Move with minimal behavior-preserving component contract | H2 | Preserve all/unread labels, mark-all affordance, relative time, and row navigation. |
-| `components/dashboard/notifications/NotificationDropdown.tsx` | Navbar SWR polling and mutations | Legacy Dashboard Notification presentation | Notification client/presentation; mounted by Dashboard | Move implementation/client contract; keep mount in navbar | H2 | Preserve 60s polling, no focus revalidation/retry, 30s dedupe, toast/navigation behavior. |
-| `components/dashboard/notifications/NotificationsPageContent.tsx` | History SWR, timestamp cursor append, optimistic read mutations | Legacy Dashboard Notification presentation | Notification client/presentation | Move component or equivalent client adapter | H2 | Preserve filter reset, append behavior, local unread quirk, and action navigation. |
-| `app/dashboard/notifications/page.tsx`, `loading.tsx` | App Router metadata, Suspense, route composition, skeleton | App/Dashboard delivery | App/Dashboard composition + Notification client entry | Change imports only after H2 client contract exists | H2 | Do not make generic routing/shell a Notification internal. |
-| `components/dashboard/layout/DashboardNavbar.tsx` | Generic navbar/user-menu composition and dropdown mount | Dashboard shell | Dashboard shell | Update mount import to Notification client entry | H2 | Keep shell ownership and navbar tests outside Notification. |
+| `modules/notification/presentation/dashboard/NotificationShared.tsx` | Browser-safe item/list types, fetcher, states, action URL normalization, badge, icon mapping | Notification client/presentation | Notification client/presentation | H2 moved implementation with local contracts | H2 (closed) | Preserve legacy Stock tab alias, disabled-tab fallback, unknown icon fallback, and client-safe graph. |
+| `modules/notification/presentation/dashboard/NotificationPageParts.tsx` | History header, filters, rows, unread visual semantics | Notification client/presentation | Notification client/presentation | H2 moved with minimal behavior-preserving component contract | H2 (closed) | Preserve all/unread labels, mark-all affordance, relative time, and row navigation. |
+| `modules/notification/presentation/dashboard/NotificationDropdown.tsx` | Navbar SWR polling and mutations | Notification client/presentation | Notification client/presentation; mounted by Dashboard | H2 moved implementation behind the client entry; navbar mount remains external | H2 (closed) | Preserve 60s polling, no focus revalidation/retry, 30s dedupe, toast/navigation behavior. |
+| `modules/notification/presentation/dashboard/NotificationsPageContent.tsx` | History SWR, timestamp cursor append, optimistic read mutations | Notification client/presentation | Notification client/presentation | H2 moved implementation with local contracts | H2 (closed) | Preserve filter reset, append behavior, local unread quirk, and action navigation. |
+| `modules/notification/presentation/dashboard/NotificationSkeletons.tsx` | Notification history loading presentation | Generic Dashboard feedback | Notification client/presentation | H2 moved the Notification-specific skeleton only | H2 (closed) | Generic skeleton primitives remain in Dashboard feedback. |
+| `app/dashboard/notifications/page.tsx`, `loading.tsx` | App Router metadata, Suspense, route composition, skeleton | App/Dashboard delivery | App/Dashboard composition + Notification client entry | H2 changed imports only | H2 (closed) | Routes consume `@/modules/notification/client`; route ownership remains in `app/`. |
+| `components/dashboard/layout/DashboardNavbar.tsx` | Generic navbar/user-menu composition and dropdown mount | Dashboard shell | Dashboard shell | H2 updated only the Notification mount import | H2 (closed) | Navbar remains Dashboard-owned and uses the Notification client entry. |
 | `lib/ssot/routes.ts` and `constants/dashboard.ts` | API URLs, dashboard path/tab/menu metadata, generic labels | App/shared route/menu SSOT | App/shared route/menu SSOT | Keep constants stable; only add a public module adapter if needed | H1/H2 | `API_ROUTES.notifications` and `APP_DASHBOARD_TABS.notifications` are compatibility contracts, not persistence ownership. |
 | `lib/services/notifications/in-app.ts :: createInAppNotificationOnce` | Generic create, optional Prisma transaction client, P2002 idempotent no-op | Transitional compatibility adapter | Notification application/infrastructure, with adapter retained for current callers | H1 converted it to a thin adapter over `@/modules/notification`; migrate callers incrementally in H3 | H1/H3 | Preserve explicit user ID, supplied semantic fields, dedupe, and transaction client support. |
 | `lib/services/notifications/in-app.ts :: createAdminInAppNotificationsOnce` | Admin lookup plus repeated generic create | Mixed shared helper: persistence + audience policy | Recipient resolution in business producer; generic write in Notification | Split after consumers have explicit recipient resolution | H3 | Do not create a generic “all admins” Notification API. |
@@ -762,12 +771,12 @@ symbol in that responsibility; grouping does not imply ownership transfer.
 | `app/api/cron/notification-outbox/route.ts`; `app/api/email-request/route.ts`; `app/api/leave/request/route.ts`, `decision/route.ts`, `cancel/route.ts`, `not-taken/route.ts`; `app/api/line/leave/request/route.ts`, `decision/route.ts`, `cancel/route.ts`, `not-taken/route.ts`; `app/api/stock/requests/route.ts`, `requests/[id]/issue/route.ts`, `requests/[id]/review/route.ts`, `items/[id]/adjust/route.ts`; `app/api/line/stock/requests/route.ts`, `requests/[id]/issue/route.ts` | Secret-gated processor execution and post-transaction `after(() => processOutbox())` wakeups | App/platform composition | App/platform composition | Keep unchanged while module contracts migrate | H3 audit | These routes wake the global processor; no route becomes Notification-owned merely by delivering an event. |
 | `lib/services/outbox/provider-key.ts` | Deterministic LINE retry keys and email message IDs | Global platform outbox/provider infrastructure | Global platform outbox/provider infrastructure | Preserve derivation and provider idempotency | H3 audit | Keys are not inbox dedupe keys. |
 | `lib/email/**`, `lib/line/**` | Generic SMTP/LINE transport, eligibility, provider retries, legacy adapters | Shared/platform channel infrastructure | Shared/platform channel infrastructure | No move to Notification; preserve channel-specific caller contracts | H3 audit | Business modules still choose channels and compose event meaning. |
-| `__tests__/components/NotificationShared.test.tsx`, `DashboardNavbar.test.tsx` | Icon mapping and Dashboard shell integration | Notification presentation + Dashboard shell tests | Split Notification client tests from shell tests | Move/rename only with H2 implementation | H2 | Preserve mappings and prove navbar composition separately. |
+| `modules/notification/presentation/dashboard/NotificationShared.test.tsx`, `__tests__/components/DashboardNavbar.test.tsx` | Notification icon/URL/badge semantics and Dashboard shell integration | Notification presentation + Dashboard shell tests | Split Notification client tests from shell tests | H2 moved Notification tests and updated only the Navbar mock boundary | H2 (closed) | Preserve mappings and prove navbar composition separately. |
 | `__tests__/api/notification-outbox-cron.test.ts`; `__tests__/services/outbox/processor.test.ts`, `routine-processor.test.ts`, `app-line-processor.test.ts`, `provider-key.test.ts` | Cron secret boundary, global claim/retry/dead, producer dispatch ordering, child delivery, provider keys | Global outbox/provider tests | Global outbox/provider tests | Keep outside Notification; add contract tests only when seam changes | H3 | Tests prove wakeup security, in-app-before-failed-channel, and at-least-once behavior. |
 | `modules/leave/application/notifications/notifications.test.ts`, `modules/leave/infrastructure/notifications/line.test.ts`, `modules/stock/__tests__/notifications.test.ts`, `modules/stock/__tests__/mutations.test.ts`, `modules/stock/__tests__/line-notifications.test.ts`, `modules/routine/application/reminders.test.ts`, `contract-reminders.test.ts`, `scheduler.test.ts`, `delete.test.ts` | Business recipient, payload, transaction, dedupe, supersede, and channel behavior | Respective feature test suites | Respective feature suites plus Notification contract tests | Preserve behavior; extend for public seam during H3 | H3 | Do not move business tests into a god Notification suite. |
 | `__tests__/api/leave-request.test.ts`, `leave-decision.test.ts`, `leave-cancel.test.ts`, `leave-not-taken.test.ts`, `stock-requests-routes.test.ts`, `line-stock-routes.test.ts`, `line-leave-routes.test.ts`, `email-request.test.ts`, and `__tests__/integration/email-request-idempotency.integration.test.ts` | API transaction/wakeup/idempotency evidence around notification-producing use cases | App/feature compatibility suites | Same feature/API suites | Preserve and extend only for an approved public seam | H3 | These tests prove producer behavior; they are not grounds for moving producer semantics into Notification. |
-| `__tests__/architecture/check-architecture.test.ts`, `scripts/check-architecture.mjs`, `modules/README.md`, `docs/architecture/*.md` | Import/dependency and ownership rules | Architecture documentation/checker | Architecture rules + Notification record | H1 added narrow route public-entry, route persistence, and Notification self-barrel rules | H1 | Full `prisma.notification` exclusivity remains deferred until H3 producer migration. |
-| `modules/notification/index.ts`, `application/**`, `infrastructure/persistence/**` | Server/application Notification contract and durable Inbox persistence | H1 Notification module | Notification capability | H1 established public queries/commands, repository ownership, timestamp pagination, and transaction-aware create-once persistence | H1 | No `client.ts`; presentation remains H2, business producer integration remains H3. |
+| `__tests__/architecture/check-architecture.test.ts`, `scripts/check-architecture.mjs`, `modules/README.md`, `docs/architecture/*.md` | Import/dependency and ownership rules | Architecture documentation/checker | Architecture rules + Notification record | H1 server rules remain; H2 adds client-entry composition, deleted-path, self-barrel, client-graph, and client-to-server reachability rules | H2 (closed) | Full `prisma.notification` exclusivity remains deferred until H3 producer migration. |
+| `modules/notification/index.ts`, `application/**`, `infrastructure/persistence/**` | Server/application Notification contract and durable Inbox persistence | H1 Notification module | Notification capability | H1 established public queries/commands, repository ownership, timestamp pagination, and transaction-aware create-once persistence | H1 (closed) | H2 left the server boundary unchanged; business producer integration remains H3. |
 
 ## Explicit H0 non-goals
 
@@ -813,9 +822,9 @@ timestamp-cursor behavior, user scoping, error compatibility, and zero-count
 mark-all behavior. It did not change the Prisma schema, business producer
 writes, NotificationOutbox, global processor, Email/LINE behavior, or
 Notification presentation. The timestamp-only cursor tie risk remains
-intentionally unresolved. Email Request/IT remains deferred; H2 owns future
-presentation migration and H3 owns producer integration and compatibility
-cleanup.
+intentionally unresolved. Email Request/IT remains deferred; H2 subsequently
+moved presentation ownership and H3 owns producer integration and
+compatibility cleanup.
 
 For outbox-originated writes, H1 preserves the canonical
 Outbox → business dispatch contract → business/application semantics →
@@ -824,11 +833,28 @@ direct Notification caller in current or H1 code.
 
 ### H2 — Notification Presentation Ownership
 
-Move Notification-specific Dashboard presentation behind a minimal browser-safe
-`modules/notification/client.ts`. Keep navbar, App Router route composition,
-menu constants, generic shell, and access/session composition outside the
-module. Preserve SWR, polling, filters, cursor behavior, action URL
-normalization, icon mapping, unread/read UX, and loading/error/empty states.
+H2 moved Notification-specific Dashboard presentation to
+`modules/notification/presentation/dashboard/**` behind the minimal
+browser-safe `modules/notification/client.ts` surface. The public surface is
+limited to `NotificationDropdown`, `NotificationsSection`, and
+`NotificationSectionSkeleton`; page parts, browser contracts, row/state
+components, and fetcher implementation remain internal. The old
+`components/dashboard/notifications/**` path was removed after the consumer
+audit. The Notification-specific history skeleton moved out of generic
+Dashboard feedback, while generic skeleton primitives stayed in Dashboard.
+
+The notification page and loading route consume `@/modules/notification/client`.
+`DashboardNavbar` remains Dashboard-owned and mounts the dropdown through the
+same client entry. H2 preserves HTTP API access, SWR/polling, filters, the
+timestamp cursor behavior, action URL normalization, icon mapping,
+unread/read UX, Thai wording, accessibility, and loading/error/empty states;
+it does not redesign UI or change the H1 server boundary.
+
+H2 guardrails require the route and navbar composition entries, reject deleted
+legacy presentation imports and Notification self-barrel imports, walk the
+Notification client graph for server-only dependencies, and reject production
+client reachability of `@/modules/notification`. Full Notification Prisma
+exclusivity and producer migration remain H3 work.
 
 ### H3 — Producer Integration, Compatibility Cleanup, and Final Audit
 
@@ -854,4 +880,8 @@ Processor.
 
 **Phase H1 CLOSED — Notification server/application ownership complete.**
 
-H2 and H3 remain not started.
+**Phase H2 CLOSED — Notification presentation ownership complete.**
+
+H3 remains open/not started. Timestamp-only history cursor ambiguity remains an
+unresolved compatibility risk. Email Request/IT remains deferred, and the
+global Outbox Processor plus Email/LINE delivery remain outside Notification.

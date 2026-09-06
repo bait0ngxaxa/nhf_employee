@@ -74,14 +74,26 @@ ledger in
 [organization-department-migration.md](../docs/architecture/organization-department-migration.md)
 for the historical G0 record and final G1-G3 implementation ledger.
 
-Phase H1 Notification server/application ownership is complete.
+Phase H2 Notification presentation ownership is complete; Phase H1
+server/application ownership remains complete.
 `modules/notification/` owns the user-facing in-app Notification/Inbox
 persistence, queries, read commands, generic create-to-explicit-user mechanics,
 and Notification dedupe behavior. Its `index.ts` is the only supported server
 entry. The four `app/api/notifications/**` routes remain HTTP/auth adapters and
 delegate through that entry; their full Prisma-serialized row responses and
-current timestamp-cursor behavior remain compatible. H1 is server-only: no
-`client.ts` or presentation migration exists yet.
+current timestamp-cursor behavior remain compatible. Its browser-facing
+`client.ts` exposes only `NotificationDropdown`, `NotificationsSection`, and
+`NotificationSectionSkeleton`; the active Dashboard presentation is owned under
+`modules/notification/presentation/dashboard/**`. The Notification page and
+loading routes use the client entry, and the generic DashboardNavbar remains
+Dashboard-owned while mounting the dropdown through it.
+
+Notification presentation continues to use the HTTP contracts in
+`API_ROUTES.notifications.*`; the client graph does not reach the server entry,
+Prisma, Notification application/infrastructure, Outbox, Email, or LINE
+implementation. The deleted `components/dashboard/notifications/**` path has
+no compatibility facade. The Notification-specific history skeleton moved to
+the module; generic Dashboard skeleton primitives remain shared.
 
 `createInAppNotificationOnce` is now a thin compatibility adapter over the
 Notification public create command. `createAdminInAppNotificationsOnce` remains
@@ -107,8 +119,10 @@ resolved command payload; no current production event uses that shape.
 Email Request remains explicitly deferred until the future IT capability
 boundary is ready. See
 [notification-migration.md](../docs/architecture/notification-migration.md)
-for the H0 evidence, exhaustive ledger, invariants, and H1-H3 slices.
+for the H0 evidence, exhaustive ledger, invariants, and H1-H3 slices. H3
+producer integration and compatibility cleanup remain open/not started.
 
 Phase H0 CLOSED — Notification discovery and boundary definition complete.
 Phase H1 CLOSED — Notification server/application ownership complete.
-H2-H3 are not started.
+Phase H2 CLOSED — Notification presentation ownership complete.
+H3 remains open/not started.

@@ -1,8 +1,10 @@
 import { Suspense } from "react";
 import type { Metadata } from "next";
 
-import { NotificationSectionSkeleton } from "@/components/dashboard/feedback/SectionSkeleton";
-import { NotificationsSection } from "@/components/dashboard/notifications/NotificationsPageContent";
+import {
+    NotificationSectionSkeleton,
+    NotificationsSection,
+} from "@/modules/notification/client";
 
 export const metadata: Metadata = {
     title: "Notifications | NHFapp",

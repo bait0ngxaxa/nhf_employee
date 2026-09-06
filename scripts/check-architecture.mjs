@@ -176,6 +176,11 @@ const notificationApiRouteFiles = [
     "app/api/notifications/[id]/read/route.ts",
     "app/api/notifications/mark-all-read/route.ts",
 ];
+const notificationDashboardRouteFiles = [
+    "app/dashboard/notifications/page.tsx",
+    "app/dashboard/notifications/loading.tsx",
+];
+const dashboardNavbarFile = "components/dashboard/layout/DashboardNavbar.tsx";
 const legacyEmployeeServerPrefixes = [
     "@/lib/services/employee",
     "@/lib/validations/employee",
@@ -222,6 +227,9 @@ const legacyLeaveImportPrefixes = [
     "@/lib/validations/leave-attachments",
     "@/lib/validations/leave-report",
     "@/lib/validations/leave",
+];
+const legacyNotificationPresentationPrefixes = [
+    "@/components/dashboard/notifications",
 ];
 
 function hasImportPrefix(moduleSpecifier, prefix) {
@@ -382,6 +390,22 @@ function getDeletedEmployeeCompatibilityViolation(filePath, rootPath, moduleSpec
     return deletedPath === undefined
         ? null
         : `Deleted Employee compatibility path "${deletedPath}" must not be imported.`;
+}
+
+function getDeletedNotificationPresentationViolation(filePath, rootPath, moduleSpecifier) {
+    const resolvedImport = moduleSpecifier.startsWith("@/")
+        ? resolve(rootPath, moduleSpecifier.slice(2))
+        : getImportSourcePath(moduleSpecifier, filePath, rootPath);
+    const normalizedSpecifier = resolvedImport === null
+        ? moduleSpecifier
+        : `@/${relativeFilePath(resolvedImport, rootPath).replace(/\.[cm]?[jt]sx?$/, "")}`;
+    const deletedPath = legacyNotificationPresentationPrefixes.find((prefix) =>
+        hasImportPrefix(normalizedSpecifier, prefix),
+    );
+
+    return deletedPath === undefined
+        ? null
+        : `Deleted Notification presentation path "${deletedPath}" must not be imported; use @/modules/notification/client.`;
 }
 
 function getEmployeeDashboardRouteDependencyViolation(filePath, rootPath, moduleSpecifier) {
@@ -625,6 +649,124 @@ function getNotificationRouteDependencyViolation(filePath, rootPath, moduleSpeci
     return null;
 }
 
+function getNotificationDashboardRouteDependencyViolation(filePath, rootPath, moduleSpecifier) {
+    if (!notificationDashboardRouteFiles.some((routePath) =>
+        filePath === resolve(rootPath, routePath),
+    )) {
+        return null;
+    }
+
+    const resolvedImport = moduleSpecifier.startsWith("@/")
+        ? resolve(rootPath, moduleSpecifier.slice(2))
+        : getImportSourcePath(moduleSpecifier, filePath, rootPath);
+    const normalizedSpecifier = resolvedImport === null
+        ? moduleSpecifier
+        : `@/${relativeFilePath(resolvedImport, rootPath).replace(/\.[cm]?[jt]sx?$/, "")}`;
+
+    if (legacyNotificationPresentationPrefixes.some((prefix) =>
+        hasImportPrefix(normalizedSpecifier, prefix),
+    )) {
+        return "Notification Dashboard routes must use @/modules/notification/client instead of the deleted Notification presentation path.";
+    }
+
+    if (hasImportPrefix(normalizedSpecifier, "@/modules/notification")
+        && normalizedSpecifier !== "@/modules/notification/client") {
+        return "Notification Dashboard routes must use @/modules/notification/client.";
+    }
+
+    return null;
+}
+
+function getNotificationNavbarDependencyViolation(filePath, rootPath, moduleSpecifier) {
+    if (filePath !== resolve(rootPath, dashboardNavbarFile)) {
+        return null;
+    }
+
+    const resolvedImport = moduleSpecifier.startsWith("@/")
+        ? resolve(rootPath, moduleSpecifier.slice(2))
+        : getImportSourcePath(moduleSpecifier, filePath, rootPath);
+    const normalizedSpecifier = resolvedImport === null
+        ? moduleSpecifier
+        : `@/${relativeFilePath(resolvedImport, rootPath).replace(/\.[cm]?[jt]sx?$/, "")}`;
+
+    if (legacyNotificationPresentationPrefixes.some((prefix) =>
+        hasImportPrefix(normalizedSpecifier, prefix),
+    )) {
+        return "DashboardNavbar must use @/modules/notification/client instead of the deleted Notification presentation path.";
+    }
+
+    if (hasImportPrefix(normalizedSpecifier, "@/modules/notification")
+        && normalizedSpecifier !== "@/modules/notification/client") {
+        return "DashboardNavbar must consume Notification through @/modules/notification/client.";
+    }
+
+    return null;
+}
+
+function getNotificationDashboardRouteCompositionViolations(rootPath, sourceFiles) {
+    const clientEntry = "@/modules/notification/client";
+    const violations = [];
+
+    for (const routePath of notificationDashboardRouteFiles) {
+        const filePath = resolve(rootPath, routePath);
+        if (!sourceFiles.includes(filePath)) continue;
+
+        const normalizedSpecifiers = getImports(filePath).map((record) => {
+            const resolvedImport = record.moduleSpecifier.startsWith("@/")
+                ? resolve(rootPath, record.moduleSpecifier.slice(2))
+                : getImportSourcePath(record.moduleSpecifier, filePath, rootPath);
+            return resolvedImport === null
+                ? record.moduleSpecifier
+                : `@/${relativeFilePath(resolvedImport, rootPath).replace(/\.[cm]?[jt]sx?$/, "")}`;
+        });
+
+        if (normalizedSpecifiers.includes(clientEntry)) continue;
+
+        const hasNotificationPresentationImport = normalizedSpecifiers.some((specifier) =>
+            hasImportPrefix(specifier, "@/modules/notification")
+            || legacyNotificationPresentationPrefixes.some((prefix) =>
+                hasImportPrefix(specifier, prefix),
+            ),
+        );
+        if (hasNotificationPresentationImport) continue;
+
+        violations.push(
+            `${relativeFilePath(filePath, rootPath)} must consume Notification presentation through "${clientEntry}".`,
+        );
+    }
+
+    return violations;
+}
+
+function getNotificationNavbarCompositionViolations(rootPath, sourceFiles) {
+    const filePath = resolve(rootPath, dashboardNavbarFile);
+    if (!sourceFiles.includes(filePath)) return [];
+
+    const clientEntry = "@/modules/notification/client";
+    const normalizedSpecifiers = getImports(filePath).map((record) => {
+        const resolvedImport = record.moduleSpecifier.startsWith("@/")
+            ? resolve(rootPath, record.moduleSpecifier.slice(2))
+            : getImportSourcePath(record.moduleSpecifier, filePath, rootPath);
+        return resolvedImport === null
+            ? record.moduleSpecifier
+            : `@/${relativeFilePath(resolvedImport, rootPath).replace(/\.[cm]?[jt]sx?$/, "")}`;
+    });
+
+    if (normalizedSpecifiers.includes(clientEntry)) return [];
+
+    const hasNotificationDependency = normalizedSpecifiers.some((specifier) =>
+        hasImportPrefix(specifier, "@/modules/notification")
+        || legacyNotificationPresentationPrefixes.some((prefix) =>
+            hasImportPrefix(specifier, prefix),
+        ),
+    );
+    if (hasNotificationDependency) return [];
+
+    return [
+        `${relativeFilePath(filePath, rootPath)} must consume Notification through "${clientEntry}".`,
+    ];
+}
+
 function getNotificationRouteCompositionViolations(rootPath, sourceFiles) {
     const publicEntry = "@/modules/notification";
     const violations = [];
@@ -830,6 +972,63 @@ function getLeaveClientGraphViolations(rootPath) {
     return violations;
 }
 
+function getNotificationClientGraphViolations(rootPath) {
+    const entryPath = resolve(rootPath, "modules/notification/client.ts");
+    if (!existsSync(entryPath)) return [];
+    const pending = [entryPath];
+    const visited = new Set();
+    const violations = [];
+    const serverPackages = [
+        "@prisma/client",
+        "nodemailer",
+        "@line/bot-sdk",
+        "server-only",
+        "next/server",
+        "next/headers",
+        "next/cache",
+    ];
+    const serverDirectories = [
+        "lib/db",
+        "lib/server",
+        "lib/email",
+        "lib/line",
+        "lib/services/outbox",
+        "modules/notification/application",
+        "modules/notification/infrastructure",
+    ];
+
+    while (pending.length > 0) {
+        const filePath = pending.pop();
+        if (filePath === undefined || visited.has(filePath)) continue;
+        visited.add(filePath);
+
+        for (const record of getImports(filePath, true)) {
+            const specifier = record.moduleSpecifier;
+            const { importTarget, sourcePath } = getRuntimeImportTarget(
+                specifier,
+                filePath,
+                rootPath,
+            );
+            if (isBuiltin(specifier)
+                || serverPackages.some((name) => hasImportPrefix(specifier, name))
+                || (importTarget !== null && serverDirectories.some((directory) =>
+                    pathIsWithin(importTarget, resolve(rootPath, directory)),
+                ))) {
+                violations.push(describeViolation(
+                    filePath,
+                    rootPath,
+                    record,
+                    "Server-only runtime dependency is reachable from @/modules/notification/client.",
+                ));
+                continue;
+            }
+            if (sourcePath !== null) pending.push(sourcePath);
+        }
+    }
+
+    return violations;
+}
+
 function relativeFilePath(filePath, rootPath) {
     return relative(rootPath, filePath).split(sep).join("/");
 }
@@ -900,6 +1099,38 @@ function checkArchitecture(options = {}) {
         const owner = getOwner(filePath, modulesRoot, sharedRoot);
 
         for (const importRecord of getImports(filePath)) {
+            const notificationDashboardRouteDependencyViolation =
+                getNotificationDashboardRouteDependencyViolation(
+                    filePath,
+                    rootPath,
+                    importRecord.moduleSpecifier,
+                );
+            if (notificationDashboardRouteDependencyViolation !== null) {
+                violations.push(describeViolation(
+                    filePath,
+                    rootPath,
+                    importRecord,
+                    notificationDashboardRouteDependencyViolation,
+                ));
+                continue;
+            }
+
+            const notificationNavbarDependencyViolation =
+                getNotificationNavbarDependencyViolation(
+                    filePath,
+                    rootPath,
+                    importRecord.moduleSpecifier,
+                );
+            if (notificationNavbarDependencyViolation !== null) {
+                violations.push(describeViolation(
+                    filePath,
+                    rootPath,
+                    importRecord,
+                    notificationNavbarDependencyViolation,
+                ));
+                continue;
+            }
+
             const departmentRouteDependencyViolation = getDepartmentRouteDependencyViolation(
                 filePath,
                 rootPath,
@@ -942,6 +1173,22 @@ function checkArchitecture(options = {}) {
                     rootPath,
                     importRecord,
                     deletedEmployeeCompatibilityViolation,
+                ));
+                continue;
+            }
+
+            const deletedNotificationPresentationViolation =
+                getDeletedNotificationPresentationViolation(
+                    filePath,
+                    rootPath,
+                    importRecord.moduleSpecifier,
+                );
+            if (deletedNotificationPresentationViolation !== null) {
+                violations.push(describeViolation(
+                    filePath,
+                    rootPath,
+                    importRecord,
+                    deletedNotificationPresentationViolation,
                 ));
                 continue;
             }
@@ -1061,12 +1308,16 @@ function checkArchitecture(options = {}) {
     }
 
     violations.push(...getEmployeeDashboardRouteCompositionViolations(rootPath, sourceFiles));
+    violations.push(...getNotificationDashboardRouteCompositionViolations(rootPath, sourceFiles));
+    violations.push(...getNotificationNavbarCompositionViolations(rootPath, sourceFiles));
     violations.push(...getNotificationRouteCompositionViolations(rootPath, sourceFiles));
     violations.push(...getLeaveClientGraphViolations(rootPath));
     violations.push(...getEmployeeClientGraphViolations(rootPath));
+    violations.push(...getNotificationClientGraphViolations(rootPath));
     violations.push(...getClientReachableServerEntryViolations(rootPath, sourceFiles, "leave"));
     violations.push(...getClientReachableServerEntryViolations(rootPath, sourceFiles, "employee"));
     violations.push(...getClientReachableServerEntryViolations(rootPath, sourceFiles, "department", null));
+    violations.push(...getClientReachableServerEntryViolations(rootPath, sourceFiles, "notification"));
     return { sourceFiles, violations };
 }
 

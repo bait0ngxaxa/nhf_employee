@@ -1,7 +1,8 @@
 # Module boundaries
 
-Status: Phase H1 CLOSED — Notification server/application ownership complete.
-Phase H0 Notification discovery and boundary definition remains closed. Phase G3
+Status: Phase H2 CLOSED — Notification presentation ownership complete.
+Phase H1 server/application ownership and Phase H0 Notification discovery remain
+closed. Phase G3
 Department migration remains complete.
 Stock, Routine, Leave, and Employee are migrated examples; Employee
 server/business and active presentation ownership are migrated as well.
@@ -82,14 +83,16 @@ server-side application and Prisma persistence; G2 confirms that it is
 intentionally server-only and has no `client.ts` or Department-owned
 presentation.
 
-## Notification boundary (H0/H1)
+## Notification boundary (H0/H1/H2)
 
 The `modules/notification/` module now owns the user-facing in-app
 Notification/Inbox capability. It owns the `Notification` repository and
 persistence boundary, generic create-to-explicit-user mechanics, dedupe
 handling, latest/history/unread queries, mark-one/mark-all-read commands, and
-the public server/application contract. Notification-specific client contracts
-and presentation remain H2 work; H1 intentionally creates no `client.ts`.
+the public server/application contract. Notification-specific Dashboard
+presentation is now owned under
+`modules/notification/presentation/dashboard/**` and is exposed only through
+the browser-safe `@/modules/notification/client` entry.
 
 The module must receive explicit recipients and semantic payloads. Leave,
 Stock, Routine, and the deferred Email Request/IT capability retain ownership
@@ -115,9 +118,11 @@ Leave, Stock, Routine, or deferred Email Request events.
 
 The four existing `app/api/notifications/**` routes remain app HTTP delivery
 composition and now delegate their query/read behavior through
-`@/modules/notification`. Notification-specific Dashboard components are H2
-candidates; the generic
-Dashboard navbar, route/page composition, menu constants, and session/auth
+`@/modules/notification`. The notification page and loading route consume
+`@/modules/notification/client`; `DashboardNavbar` remains generic Dashboard
+shell ownership and mounts `NotificationDropdown` through that entry. The
+obsolete `components/dashboard/notifications/**` path is deleted, while the
+generic Dashboard navbar, route/page composition, menu constants, and session/auth
 infrastructure remain outside the module. The complete H0 evidence and ledger
 are in [notification-migration.md](./notification-migration.md).
 
@@ -132,7 +137,10 @@ serializable lifecycle operation.
 
 The root barrel remains server/application-oriented. Where a client entry
 exists, it must export only client-safe presentation contracts; a server-only
-module intentionally has no client entry.
+module intentionally has no client entry. Notification's client graph remains
+HTTP-based through `API_ROUTES.notifications.*` and may not reach Prisma,
+server-only Next.js modules, Email/LINE infrastructure, the Outbox Processor,
+or Notification application/infrastructure code.
 
 The Employee client entry is browser-safe: its runtime graph contains no
 Prisma runtime, database/session/secret implementation, server-only Next.js
