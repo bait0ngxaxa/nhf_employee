@@ -1,6 +1,6 @@
 # Dependency rules and enforcement
 
-Status: Phase F3 guardrails extend the Phase A baseline. These rules govern new
+Status: Phase G1 guardrails extend the Phase A baseline. These rules govern new
 architecture code while unrelated legacy features remain compatible during
 incremental migration.
 
@@ -157,16 +157,26 @@ The checker also rejects deleted Employee compatibility paths, including
 relative forms, static/dynamic imports, re-exports, `require()`, and test/mock
 imports.
 
-## Department transitional compatibility (G0)
+## Department ownership (G1)
 
-Phase G0 confirms that `app/api/departments/route.ts` and
-`modules/employee/infrastructure/persistence/employee-import.ts` are existing
-Department reference-data access paths, not a new permission to add direct
-Prisma to architecture code. The route remains `app/**` delivery, and its
-current URL/response/auth behavior is a compatibility constraint. A later G1
-must place Department persistence behind the approved owner service and
-repository boundary, then remove only the proven transitional access. No
-Organization or tenant dependency exists in the current graph.
+`modules/department/index.ts` is the supported server entry for the independent
+NHF-wide Department capability. `app/api/departments/route.ts` must consume
+`@/modules/department` for `listDepartments()`, and Employee import must consume
+the same public entry for `listDepartmentReferences()`. Department application
+code must use local contracts and Department infrastructure owns all production
+`prisma.department` access.
+
+The architecture checker adds narrow guardrails for this boundary: Department
+API routes cannot use Department deep imports or the client entry, production
+code outside `modules/department/infrastructure/**` cannot directly access
+`prisma.department`, and Department cannot depend on Employee. Tests and Prisma
+support code remain legitimate exceptions. The generic public-entry rule also
+rejects Department deep imports from other external consumers or modules.
+
+NHF Employee is permanently single-NHF-organization. No Organization domain,
+tenant IDs, tenant middleware, organization membership/switching, tenant-scoped
+queries, RLS isolation, or organization-scoped uniqueness belongs in this
+architecture.
 
 ## Automated enforcement
 
@@ -182,9 +192,10 @@ the module boundary from a legacy directory, while imports unrelated to
 | Leave route ownership | `app/api/leave/**`, `app/api/line/leave/**` | Requires the server entry `@/modules/leave` and rejects legacy paths, the client entry, and deep implementation imports |
 | Leave presentation ownership | `app/dashboard/leave/**`, `app/liff/leave/**`, `modules/leave/**` | Requires route composition through `@/modules/leave/client`, rejects deleted legacy presentation paths, and rejects Leave internals importing either public barrel |
 | Client/server policy | Production `"use client"` dependency graphs and migrated module client entries | Walks runtime imports transitively, rejects client-reachable use of the Leave server entry, and separately rejects server-only runtime dependencies reachable from `@/modules/leave/client`; type-only imports are erased before graph traversal |
-| Route-level Prisma policy | Legacy and new code | Documentation-led in Phase A for the existing route exceptions; new module infrastructure remains the intended boundary |
+| Route-level Prisma policy | Legacy and new code | Documentation-led for unrelated legacy routes; G1 enforces Department ownership in `modules/department/infrastructure/**` |
 | Employee F3 ownership | `app/api/employees/**`, `app/dashboard/employees/**`, `modules/employee/**`, production Client Component graphs | Requires `@/modules/employee` for API routes and `@/modules/employee/client` for the four Employee Dashboard routes; rejects deleted legacy compatibility paths and deep presentation paths, including relative forms, deep/self-barrel imports, Employee → Leave imports, client-to-server reachability, and server-only dependencies from the Employee client graph |
 | Employee/Leave offboarding seam | `modules/employee/**` plus Employee route composition | Employee exposes only a structural blocker-provider port; the outer composition binds Leave's implementation and must preserve the same Employee lifecycle transaction client |
+| Department G1 ownership | `app/api/departments/**`, `modules/department/**`, Employee import, production source | Department API delivery uses `@/modules/department`; Department Prisma access stays in Department infrastructure; Employee uses the Department public query; Department does not depend on Employee |
 
 The check is fast and is included at the start of `npm run check`. Scanning
 legacy feature directories does not migrate them: the checker only evaluates

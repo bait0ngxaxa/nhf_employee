@@ -17,6 +17,9 @@ const fixtureFiles: FixtureFiles = {
     "modules/employee/index.ts": "export const x = 1;\n",
     "modules/employee/client.ts": '"use client"; export const x = 1;\n',
     "modules/employee/application/example.ts": "export const x = 1;\n",
+    "modules/department/index.ts": "export const x = 1;\n",
+    "modules/department/application/example.ts": "export const x = 1;\n",
+    "modules/department/infrastructure/persistence/repository.ts": "export const x = 1;\n",
     "modules/future/index.ts": "export const x = 1;\n",
     "shared/index.ts": "export const x = 1;\n",
 };
@@ -440,6 +443,90 @@ describe("architecture checker module boundaries", () => {
         expect(result.violations[0]).toContain(
             'external consumers must use the target module public API "@/modules/stock"',
         );
+    });
+
+    it("rejects Department API routes deep-importing Department internals", async () => {
+        const result = await checkFixture(
+            "app/api/departments/route.ts",
+            'import { x } from "@/modules/department/application/example";\n',
+        );
+
+        expect(result.violations).toHaveLength(1);
+        expect(result.violations[0]).toContain(
+            "Department API routes must use the server entry @/modules/department",
+        );
+    });
+
+    it("rejects Department API routes importing the client entry", async () => {
+        const result = await checkFixture(
+            "app/api/departments/route.ts",
+            'import { x } from "@/modules/department/client";\n',
+        );
+
+        expect(result.violations).toHaveLength(1);
+        expect(result.violations[0]).toContain(
+            "Department API routes must use the server entry @/modules/department",
+        );
+    });
+
+    it("rejects direct Department Prisma access outside Department infrastructure", async () => {
+        const result = await checkFixture(
+            "app/api/departments/route.ts",
+            [
+                'import { prisma } from "@/lib/db/prisma";',
+                "const departments = await prisma.department.findMany();",
+            ].join("\n"),
+        );
+
+        expect(result.violations).toHaveLength(1);
+        expect(result.violations[0]).toContain(
+            "direct Department Prisma access must be owned by modules/department/infrastructure/",
+        );
+    });
+
+    it("allows Department infrastructure to own direct Department Prisma access", async () => {
+        const result = await checkFixture(
+            "modules/department/infrastructure/persistence/repository.ts",
+            [
+                'import { prisma } from "@/lib/db/prisma";',
+                "const departments = await prisma.department.findMany();",
+            ].join("\n"),
+        );
+
+        expect(result.violations).toEqual([]);
+    });
+
+    it("rejects Department depending on Employee", async () => {
+        const result = await checkFixture(
+            "modules/department/application/example.ts",
+            'import { x } from "@/modules/employee";\n',
+        );
+
+        expect(result.violations).toHaveLength(1);
+        expect(result.violations[0]).toContain(
+            "Department module must not depend on Employee",
+        );
+    });
+
+    it("rejects Department internals importing their own public barrel", async () => {
+        const result = await checkFixture(
+            "modules/department/application/example.ts",
+            'import { x } from "@/modules/department";\n',
+        );
+
+        expect(result.violations).toHaveLength(1);
+        expect(result.violations[0]).toContain(
+            "Department module internals must use local contracts",
+        );
+    });
+
+    it("allows Employee to consume the Department public server API", async () => {
+        const result = await checkFixture(
+            "modules/employee/application/example.ts",
+            'import { x } from "@/modules/department";\n',
+        );
+
+        expect(result.violations).toEqual([]);
     });
 
     it("allows a module to use another module public API", async () => {

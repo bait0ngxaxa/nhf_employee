@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 
 import { requireApiSession } from "@/lib/auth/api";
-import { prisma } from "@/lib/db/prisma";
 import { operationFailed } from "@/lib/ssot/http";
+import { listDepartments } from "@/modules/department";
 
 export async function GET(): Promise<NextResponse> {
     try {
@@ -11,9 +11,7 @@ export async function GET(): Promise<NextResponse> {
         });
         if (!auth.ok) return auth.response;
 
-        const departments = await prisma.department.findMany({
-            orderBy: { name: "asc" },
-        });
+        const departments = await listDepartments();
 
         return NextResponse.json({ departments }, { status: 200 });
     } catch (error) {

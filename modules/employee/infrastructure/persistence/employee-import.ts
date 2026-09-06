@@ -1,16 +1,15 @@
 import { prisma } from "@/lib/db/prisma";
 import type { EmployeeStatusValue } from "../../domain/lifecycle";
 
-export async function loadEmployeeImportReferenceData(): Promise<{
-    departments: Array<{ id: number; code: string }>;
-    existingEmployees: Array<{ email: string; firstName: string; lastName: string }>;
-}> {
-    const departments = await prisma.department.findMany();
-    const existingEmployees = await prisma.employee.findMany({
+export async function loadExistingEmployeeImportIdentities(): Promise<Array<{
+    email: string;
+    firstName: string;
+    lastName: string;
+}>> {
+    return prisma.employee.findMany({
         where: { deletedAt: null },
         select: { email: true, firstName: true, lastName: true },
     });
-    return { departments, existingEmployees };
 }
 
 export async function createImportedEmployee(data: {

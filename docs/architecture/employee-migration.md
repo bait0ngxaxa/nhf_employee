@@ -1,6 +1,7 @@
 # Employee migration
 
-Status: Phase F3 CLOSED — Employee migration complete.
+Status: Phase F3 CLOSED — Employee migration complete; Phase G1 Department
+server/persistence ownership complete.
 
 Approved F0 baseline: `ee9a60be6c077055873214a9644384caa8b43f80`
 (`docs(employee): correct F0 migration boundary`).
@@ -10,6 +11,13 @@ F1-F3 ownership and cleanup. All phases are behavior-preserving: API
 contracts, permissions, transactions, concurrency rules, Thai wording, CSV
 behavior, audit behavior, Auth/Workforce behavior, Leave behavior, UI, and
 Prisma schema remain unchanged.
+
+Phase G1's Department ownership seam is recorded here because Employee import
+consumes it: `modules/employee/application/import-employees.ts` uses the public
+`@/modules/department` reference query, while Employee persistence owns only
+Employee identity lookup and Employee creation. The permanent single-NHF
+product decision and complete Department record are maintained in
+[organization-department-migration.md](./organization-department-migration.md).
 
 ## F1 implementation record
 
@@ -244,7 +252,7 @@ was intentionally changed.
 | Employee hierarchy | Employee | `managerId`, the self-relation, subordinate lookup, and the meaning of who reports to whom are organizational structure. Leave may interpret that structure for approval, but does not own the underlying relationship. |
 | Leave approval and exception policy | Leave | `approverId`, `exceptionApproverId`, reassignment rules, pending-request guards, current-action resolution, and approval capabilities are Leave rules. They must not be moved into Employee. |
 | Leave offboarding dependency policy | Leave | Leave owns the semantic interpretation of which outstanding request/action states prevent an Employee from leaving Leave responsibilities. Its implementation is injected into the Employee lifecycle through `EmployeeOffboardingDependencyProvider`; Employee does not reconstruct the policy from `LeaveRequest`. |
-| Department reference data | Transitional separate capability; future organization/reference-data capability | `Department` has its own model and `/api/departments` route, but no independent service or module exists. Employee owns its department association and import mapping, not all Department behavior. |
+| Department reference data | `modules/department/` server capability | Department owns reference identity, server queries, and Prisma persistence. Employee owns its `departmentId` association and import mapping, and consumes the narrow public Department reference query. |
 | Display identity | Split by meaning | Employee owns Employee display projection and pure Employee formatting. The fallback projection from a User to Employee/name/email is an Auth/workforce/platform composition concern and must not make generic client code import the Employee server barrel. |
 | CSV import/export | Employee | The business meaning of Employee rows, fields, normalization, status, department mapping, and report columns is Employee-owned. CSV parsing/streaming is a technical adapter and may use shared file/HTTP primitives. |
 | Audit, LINE, outbox, email, and session mechanics | Shared/platform or delivery | These systems deliver or record events. Employee supplies Employee event meaning/snapshots and identity data; it must not own the global outbox processor, LINE token/session implementation, or generic audit infrastructure. |
@@ -290,7 +298,7 @@ LEGACY` rather than being silently assigned to Employee.
 | `app/api/employees/stats/route.ts` | Authenticated aggregate Employee counts | `EMPLOYEE DELIVERY/HTTP` | Thin route adapter in F1 |
 | `app/api/employees/import/route.ts` | Admin JSON import submission and 1,000-row guard | `EMPLOYEE DELIVERY/HTTP` | Thin route adapter in F1; browser file parsing is now owned by Employee presentation in F2 |
 | `app/api/employees/export/route.ts` | Authenticated streamed Employee CSV export | `EMPLOYEE DELIVERY/HTTP` | Thin route adapter in F1 over Employee report/export contracts |
-| `app/api/departments/route.ts` | Authenticated Department reference-data read | `SHARED / PLATFORM` for delivery, `COMPATIBILITY / LEGACY` for the capability | Remains outside Employee in F0; revisit with a future organization/reference-data migration |
+| `app/api/departments/route.ts` | Authenticated Department reference-data read | App delivery composed over `@/modules/department` | G1 preserves the URL/auth/403/response/order/sanitized-error contract while Department owns persistence |
 | `lib/ssot/routes.ts` | Canonical Employee dashboard/API route constants, including detail, stats, import, export, and departments | `SHARED / PLATFORM` route SSOT with Employee-specific constants | Compatibility route contract; F1/F2 preserve values |
 | `lib/ssot/exports.ts` | Employee export limit of 2,000 rows and batch size of 250 | `SHARED / PLATFORM` policy registry with Employee-specific entry | F2 presentation continues to consume the existing registry; any ownership cleanup remains separately scoped |
 
@@ -484,7 +492,7 @@ redesign is considered.
 | `GET /api/employees/stats` | `requireApiSession`; no admin-only restriction | No request parameters | Success `200`: `{ success: true, stats: { total, active, inactive, suspended, admin, academic } }`; unexpected error `500` | Direct Prisma aggregate counts. `total`, status counts, and department counts do not filter `deletedAt`, unlike list/export. No audit observed |
 | `POST /api/employees/import` | `requireAdminSession`; route maps unauthorized/forbidden to `403` | JSON must contain an `employees` array; more than `1,000` rows returns `400`; route does not perform a per-row schema parse | Success `200`: English summary message plus `{ result: { success, errors } }`; invalid body/row limit `400`; unexpected failure `500` | Delegates to Employee import service. Rows are independent and partial success is returned. No route-level rate limit or Employee import audit was observed |
 | `GET /api/employees/export` | `requireApiSession`; any authenticated API session may export | Query only `search` and `status`; Employee filters schema; maximum `2,000` matched records | Invalid filters or maximum exceeded `400`; success is a streamed CSV response; unexpected failure is sanitized `500` | Uses Employee list where-clause, counts first, then selects batches of `250`; schedules `DATA_EXPORT` audit with filters/count; Thai headings and filename are part of the behavior contract |
-| `GET /api/departments` | `requireApiSession`; current route uses a custom `403` unauthorized response | No parameters | Success `{ departments }`; unexpected failure `500` | Directly lists all departments by name ascending. It is consumed by Employee forms/import but is not currently an Employee-owned service |
+| `GET /api/departments` | `requireApiSession`; current route uses a custom `403` unauthorized response | No parameters | Success `{ departments }`; unexpected failure `500` | Delegates to `listDepartments()` through `@/modules/department`, which owns the name-ascending Department query. Employee forms/import continue to consume the browser endpoint. |
 
 There is no observed Employee-specific request body-size guard or rate limit in
 these routes. The active client and HTTP route independently enforce the import
@@ -1095,11 +1103,12 @@ planned.
 No direct Employee business dependency was found in the Stock/Routine/Leave
 public barrel contracts themselves. The dependencies are implementation-level
 queries and legacy helper imports recorded above; F1/F2/F3 must convert only
-where a real ownership contract benefits from it.
+where a real ownership contract benefits from it. Department's G1 reference
+contract is now the proven cross-module seam for Employee import.
 
 ## 14. Department ownership decision
 
-### Evidence
+### F0 evidence (historical)
 
 - `Department` is a separate Prisma model with unique `name` and `code` and an
   Employee relation.
@@ -1113,19 +1122,29 @@ where a real ownership contract benefits from it.
 - Other features can carry/read `departmentId`, while email-request uses a
   separate free-text department field.
 
-### Decision
+### Post-G0 product decision and G1 implementation
 
-The recommendation is **C: a future organization/reference-data capability**.
-Until that capability is separately migrated, Department remains a
-transitional legacy reference-data concern. Employee owns:
+NHF Employee is permanently a single-NHF-organization system. There is no
+Organization domain or tenant architecture, and the existing global Department
+`name`/`code` uniqueness remains intentional.
 
-- the fact that an Employee has a department association;
-- Employee form/import validation that currently requires a Department;
-- Employee-specific display/report use of the relation.
+Department is now an independent NHF-wide server capability in
+`modules/department/`. Its public server entry exposes `listDepartments()` for
+the app route and `listDepartmentReferences()` for Employee import. Department
+infrastructure owns Department Prisma reads.
 
-Employee does not absorb all Department routes or invent a Department module in
-F0. F1 may use a narrow Department reference port only if the Employee server
-boundary needs one; the route/API contract remains unchanged.
+Employee continues to own:
+
+- the fact that an Employee has a `departmentId` association;
+- Employee form/import validation and the existing import aliases/mapping;
+- Employee-specific display/report use of the relation; and
+- Employee persistence, including duplicate identity lookup and creation.
+
+Employee import consumes Department only through `@/modules/department`; it no
+longer calls `prisma.department.findMany()` from Employee persistence. The route
+remains app delivery and its URL, auth, 403, response, ordering, and sanitized
+failure behavior remain unchanged. No Department client entry, CRUD, lifecycle,
+hierarchy, or Department-head behavior was introduced.
 
 ## 15. Manager, hierarchy, and approver ownership
 
@@ -1583,9 +1602,11 @@ F3 ownership decisions:
    `managerId` while enforcing Leave-specific approver rules. The seam must
    retain atomicity and prevent races with Leave request creation and
    reassignment.
-3. **Department future owner:** Department should become a separate
-   organization/reference-data capability, but no current module exists. Avoid
-   creating one as part of Employee migration without a separate scope.
+3. **Department server seam:** Resolved in G1. Department server/application and
+   Prisma persistence are owned by `modules/department/`; Employee import uses
+   only its public `listDepartmentReferences()` contract. There is no
+   Organization or tenant architecture, and no Department client/CRUD/lifecycle
+   behavior is implied by this seam.
 4. **Backed-user display ownership:** Resolved in F3. The neutral structural
    `shared/identity/display.ts` helper preserves Employee → User name → User
    email → caller fallback precedence without depending on Employee.
@@ -1641,3 +1662,5 @@ Phase F2 CLOSED — Employee presentation ownership migrated.
 Phase F3 CLOSED — Employee migration complete.
 F0-F3 Employee modular-monolith migration is complete. This closure does not
 claim that other application features are fully migrated.
+Phase G1 CLOSED — Department server/persistence ownership migrated; Employee
+continues to own Employee association and import policy.

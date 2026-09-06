@@ -163,6 +163,7 @@ const leavePresentationRouteDirectories = [
 
 const employeeApiRouteDirectory = "app/api/employees";
 const employeeDashboardRouteDirectory = "app/dashboard/employees";
+const departmentApiRouteDirectory = "app/api/departments";
 const employeeDashboardFeatureRouteFiles = [
     "app/dashboard/employees/page.tsx",
     "app/dashboard/employees/loading.tsx",
@@ -312,6 +313,52 @@ function getEmployeeDependencyViolation(filePath, rootPath, moduleSpecifier) {
         && normalizedSpecifier !== "@/modules/employee") {
         return "Employee API routes must use the server entry @/modules/employee.";
     }
+    return null;
+}
+
+function getDepartmentRouteDependencyViolation(filePath, rootPath, moduleSpecifier) {
+    if (!pathIsWithin(filePath, resolve(rootPath, departmentApiRouteDirectory))) {
+        return null;
+    }
+
+    const resolvedImport = moduleSpecifier.startsWith("@/")
+        ? resolve(rootPath, moduleSpecifier.slice(2))
+        : getImportSourcePath(moduleSpecifier, filePath, rootPath);
+    const normalizedSpecifier = resolvedImport === null
+        ? moduleSpecifier
+        : `@/${relativeFilePath(resolvedImport, rootPath).replace(/\.[cm]?[jt]sx?$/, "")}`;
+
+    if (hasImportPrefix(normalizedSpecifier, "@/modules/department")
+        && normalizedSpecifier !== "@/modules/department") {
+        return "Department API routes must use the server entry @/modules/department.";
+    }
+
+    return null;
+}
+
+function getDepartmentDependencyViolation(filePath, rootPath, moduleSpecifier) {
+    const departmentModuleRoot = resolve(rootPath, "modules/department");
+    if (!pathIsWithin(filePath, departmentModuleRoot)) return null;
+
+    const resolvedImport = moduleSpecifier.startsWith("@/")
+        ? resolve(rootPath, moduleSpecifier.slice(2))
+        : getImportSourcePath(moduleSpecifier, filePath, rootPath);
+    const normalizedSpecifier = resolvedImport === null
+        ? moduleSpecifier
+        : `@/${relativeFilePath(resolvedImport, rootPath).replace(/\.[cm]?[jt]sx?$/, "")}`;
+
+    const isDepartmentInternal = ![
+        resolve(departmentModuleRoot, "index.ts"),
+    ].includes(filePath);
+    if (isDepartmentInternal
+        && ["@/modules/department", "@/modules/department/client"].includes(normalizedSpecifier)) {
+        return "Department module internals must use local contracts instead of their own public barrel.";
+    }
+
+    if (hasImportPrefix(normalizedSpecifier, "@/modules/employee")) {
+        return "Department module must not depend on Employee; keep the Department capability independent.";
+    }
+
     return null;
 }
 
@@ -531,6 +578,23 @@ function isTestSource(filePath, rootPath) {
         || /\.(?:test|spec)\.[cm]?[jt]sx?$/.test(repositoryPath);
 }
 
+function getDepartmentPersistenceViolation(filePath, rootPath) {
+    const departmentInfrastructureRoot = resolve(rootPath, "modules/department/infrastructure");
+    const prismaRoot = resolve(rootPath, "prisma");
+    if (pathIsWithin(filePath, departmentInfrastructureRoot)
+        || pathIsWithin(filePath, prismaRoot)
+        || isTestSource(filePath, rootPath)) {
+        return null;
+    }
+
+    const contents = readFileSync(filePath, "utf8");
+    const accessMatch = /\bprisma\s*\.\s*department\b/.exec(contents);
+    if (accessMatch === null || accessMatch.index === undefined) return null;
+
+    const line = contents.slice(0, accessMatch.index).split(/\r?\n/).length;
+    return `${relativeFilePath(filePath, rootPath)}:${line} direct Department Prisma access must be owned by modules/department/infrastructure/.`;
+}
+
 function getClientReachableServerEntryViolations(rootPath, sourceFiles, moduleName) {
     const serverEntry = resolve(rootPath, `modules/${moduleName}`);
     const displayName = moduleName[0].toUpperCase() + moduleName.slice(1);
@@ -710,9 +774,47 @@ function checkArchitecture(options = {}) {
     const sourceFiles = getSourceFiles(rootPath).sort();
 
     for (const filePath of sourceFiles) {
+        const departmentPersistenceViolation = getDepartmentPersistenceViolation(
+            filePath,
+            rootPath,
+        );
+        if (departmentPersistenceViolation !== null) {
+            violations.push(departmentPersistenceViolation);
+        }
+
         const owner = getOwner(filePath, modulesRoot, sharedRoot);
 
         for (const importRecord of getImports(filePath)) {
+            const departmentRouteDependencyViolation = getDepartmentRouteDependencyViolation(
+                filePath,
+                rootPath,
+                importRecord.moduleSpecifier,
+            );
+            if (departmentRouteDependencyViolation !== null) {
+                violations.push(describeViolation(
+                    filePath,
+                    rootPath,
+                    importRecord,
+                    departmentRouteDependencyViolation,
+                ));
+                continue;
+            }
+
+            const departmentDependencyViolation = getDepartmentDependencyViolation(
+                filePath,
+                rootPath,
+                importRecord.moduleSpecifier,
+            );
+            if (departmentDependencyViolation !== null) {
+                violations.push(describeViolation(
+                    filePath,
+                    rootPath,
+                    importRecord,
+                    departmentDependencyViolation,
+                ));
+                continue;
+            }
+
             const deletedEmployeeCompatibilityViolation =
                 getDeletedEmployeeCompatibilityViolation(
                     filePath,

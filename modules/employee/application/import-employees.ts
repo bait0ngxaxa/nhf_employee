@@ -1,8 +1,10 @@
+import { listDepartmentReferences } from "@/modules/department";
+
 import { getEmployeeDisplayName } from "../domain/identity";
 import { parseEmployeeImportStatus } from "../domain/import-status";
 import {
     createImportedEmployee,
-    loadEmployeeImportReferenceData,
+    loadExistingEmployeeImportIdentities,
 } from "../infrastructure/persistence/employee-import";
 import { EMPLOYEE_DEPARTMENT_CODE_MAP } from "./constants";
 import type { CsvImportEmployee, EmployeeImportResult } from "./types";
@@ -38,7 +40,8 @@ export async function importEmployeesFromCsvRows(
     employees: Partial<CsvImportEmployee>[],
 ): Promise<EmployeeImportResult> {
     const result: EmployeeImportResult = { success: [], errors: [] };
-    const { departments, existingEmployees } = await loadEmployeeImportReferenceData();
+    const departments = await listDepartmentReferences();
+    const existingEmployees = await loadExistingEmployeeImportIdentities();
     const departmentMap = new Map(departments.map((department) => [department.code, department.id]));
     const existingEmails = new Set(existingEmployees
         .filter((employee) => employee.email && !employee.email.includes("@temp.local"))

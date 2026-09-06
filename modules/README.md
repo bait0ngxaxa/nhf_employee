@@ -3,8 +3,8 @@
 `modules/` is the ownership boundary for business capabilities in the NHF
 Employee application.
 
-Stock, Routine, Leave, and Employee are migrated feature modules. Employee
-F0-F3 owns its server/business behavior and active presentation in
+Stock, Routine, Leave, Employee, and Department are migrated feature modules.
+Employee F0-F3 owns its server/business behavior and active presentation in
 `modules/employee/`. Employee Dashboard routes consume the minimal
 browser-safe `@/modules/employee/client` entry, which also exposes the proven
 pure Employee display formatter required by Leave, Routine, and audit
@@ -49,10 +49,19 @@ Phase F3 CLOSED — Employee migration complete.
 F0-F3 Employee modular-monolith migration is complete. This does not claim
 that other application features are fully migrated.
 
-Phase G0 Organization/Department discovery is closed. Department remains
-transitional reference data with no `modules/organization/` or
-`modules/department/` implementation and no Organization/tenant persistence.
-Employee owns its `departmentId` association and Employee-specific mapping,
-while a future organization/reference-data capability would own Department
-lifecycle only after product requirements are resolved. See
-[organization-department-migration.md](../docs/architecture/organization-department-migration.md).
+Phase G0 Organization/Department discovery remains available as a historical
+record. The post-G0 product decision is permanent single-NHF organization:
+there is no Organization domain or tenant architecture. Department is an
+NHF-wide reference-data capability owned by `modules/department/`.
+
+`modules/department/index.ts` is the supported server entry. It exposes
+`listDepartments()` for `app/api/departments/route.ts` and
+`listDepartmentReferences()` for Employee import. Department infrastructure
+owns production Department Prisma reads. Employee still owns its
+`departmentId` association, CSV aliases/mapping, import policy, and Employee
+creation; it consumes Department only through `@/modules/department`.
+
+Department has no `client.ts`, CRUD, lifecycle, hierarchy, or Department-head
+behavior in G1. See
+[organization-department-migration.md](../docs/architecture/organization-department-migration.md)
+for the historical G0 record and current G1 implementation ledger.

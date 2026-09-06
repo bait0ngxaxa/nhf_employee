@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { mockDeep, mockReset } from "vitest-mock-extended";
 import type { PrismaClient } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
+import { listDepartmentReferences } from "@/modules/department";
 import {
     importEmployeesFromCsvRows,
 } from "./import-employees";
@@ -9,6 +10,9 @@ import type { CsvImportEmployee } from "./types";
 
 vi.mock("@/lib/db/prisma", () => ({
     prisma: mockDeep<PrismaClient>(),
+}));
+vi.mock("@/modules/department", () => ({
+    listDepartmentReferences: vi.fn(),
 }));
 
 const prismaMock = prisma as unknown as ReturnType<
@@ -18,12 +22,13 @@ const prismaMock = prisma as unknown as ReturnType<
 describe("Employee Import", () => {
     beforeEach(() => {
         mockReset(prismaMock);
+        vi.mocked(listDepartmentReferences).mockReset();
     });
 
     it("should import valid employees", async () => {
         // Arrange
         const mockDepts = [{ id: 1, code: "ADMIN", name: "Administration" }];
-        prismaMock.department.findMany.mockResolvedValue(mockDepts as never);
+        vi.mocked(listDepartmentReferences).mockResolvedValue(mockDepts);
         prismaMock.employee.findMany.mockResolvedValue([]); // No existing emails
         prismaMock.employee.create.mockImplementation((args) =>
             Promise.resolve({
@@ -50,10 +55,11 @@ describe("Employee Import", () => {
         expect(result.success).toHaveLength(1);
         expect(result.errors).toHaveLength(0);
         expect(prismaMock.employee.create).toHaveBeenCalled();
+        expect(listDepartmentReferences).toHaveBeenCalledTimes(1);
     });
 
     it("should report errors for missing fields", async () => {
-        prismaMock.department.findMany.mockResolvedValue([]);
+        vi.mocked(listDepartmentReferences).mockResolvedValue([]);
         prismaMock.employee.findMany.mockResolvedValue([]);
 
         const csvData: Partial<CsvImportEmployee>[] = [
@@ -67,7 +73,7 @@ describe("Employee Import", () => {
     });
 
     it("should handle duplicate emails inside CSV or DB", async () => {
-        prismaMock.department.findMany.mockResolvedValue([
+        vi.mocked(listDepartmentReferences).mockResolvedValue([
             { id: 1, code: "ADMIN" },
         ] as never);
         prismaMock.employee.findMany.mockResolvedValue([
@@ -107,7 +113,7 @@ describe("Employee Import", () => {
     });
 
     it("should handle duplicate names inside DB", async () => {
-        prismaMock.department.findMany.mockResolvedValue([
+        vi.mocked(listDepartmentReferences).mockResolvedValue([
             { id: 1, code: "ADMIN" },
         ] as never);
         prismaMock.employee.findMany.mockResolvedValue([
@@ -136,7 +142,7 @@ describe("Employee Import", () => {
     });
 
     it("accounts for every row in a mixed valid and invalid file", async () => {
-        prismaMock.department.findMany.mockResolvedValue([
+        vi.mocked(listDepartmentReferences).mockResolvedValue([
             { id: 1, code: "ADMIN", name: "Administration" },
         ] as never);
         prismaMock.employee.findMany.mockResolvedValue([]);
@@ -180,7 +186,7 @@ describe("Employee Import", () => {
     });
 
     it("rejects an external email", async () => {
-        prismaMock.department.findMany.mockResolvedValue([
+        vi.mocked(listDepartmentReferences).mockResolvedValue([
             { id: 1, code: "ADMIN" },
         ] as never);
         prismaMock.employee.findMany.mockResolvedValue([]);
@@ -199,7 +205,7 @@ describe("Employee Import", () => {
     });
 
     it("normalizes an uppercase organizational email", async () => {
-        prismaMock.department.findMany.mockResolvedValue([
+        vi.mocked(listDepartmentReferences).mockResolvedValue([
             { id: 1, code: "ADMIN", name: "Administration" },
         ] as never);
         prismaMock.employee.findMany.mockResolvedValue([]);
@@ -228,7 +234,7 @@ describe("Employee Import", () => {
     it.each(["", "-"])(
         "uses a temporary email when the source email is %j",
         async (email) => {
-            prismaMock.department.findMany.mockResolvedValue([
+            vi.mocked(listDepartmentReferences).mockResolvedValue([
                 { id: 1, code: "ADMIN", name: "Administration" },
             ] as never);
             prismaMock.employee.findMany.mockResolvedValue([]);
@@ -258,7 +264,7 @@ describe("Employee Import", () => {
     );
 
     it("rejects an unknown non-empty status", async () => {
-        prismaMock.department.findMany.mockResolvedValue([
+        vi.mocked(listDepartmentReferences).mockResolvedValue([
             { id: 1, code: "ADMIN" },
         ] as never);
         prismaMock.employee.findMany.mockResolvedValue([]);
@@ -283,7 +289,7 @@ describe("Employee Import", () => {
         ["ลาออก", "INACTIVE"],
         ["suspended", "SUSPENDED"],
     ])("maps import status %j to %s on the server", async (status, expected) => {
-        prismaMock.department.findMany.mockResolvedValue([
+        vi.mocked(listDepartmentReferences).mockResolvedValue([
             { id: 1, code: "ADMIN", name: "Administration" },
         ] as never);
         prismaMock.employee.findMany.mockResolvedValue([]);
@@ -310,7 +316,7 @@ describe("Employee Import", () => {
     });
 
     it("continues to reject duplicate emails within the same file", async () => {
-        prismaMock.department.findMany.mockResolvedValue([
+        vi.mocked(listDepartmentReferences).mockResolvedValue([
             { id: 1, code: "ADMIN", name: "Administration" },
         ] as never);
         prismaMock.employee.findMany.mockResolvedValue([]);
@@ -343,7 +349,7 @@ describe("Employee Import", () => {
     });
 
     it("retains the historical application behavior without a 1000-row guard", async () => {
-        prismaMock.department.findMany.mockResolvedValue([]);
+        vi.mocked(listDepartmentReferences).mockResolvedValue([]);
         prismaMock.employee.findMany.mockResolvedValue([]);
         const rows = Array.from({ length: 1001 }, () => ({
             firstName: "Missing",

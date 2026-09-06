@@ -1,8 +1,8 @@
 # Module boundaries
 
-Status: Phase F3 CLOSED — Employee migration complete. Stock,
-Routine, and Leave are migrated examples; Employee server/business and active
-presentation ownership are now migrated as well.
+Status: Phase G1 CLOSED — Department server/persistence ownership complete.
+Stock, Routine, Leave, and Employee are migrated examples; Employee
+server/business and active presentation ownership are migrated as well.
 
 ## What is a module
 
@@ -71,6 +71,12 @@ status values and presentation formatting are owned by Employee domain and
 presentation-local contracts. Employee CSV parsing is owned by
 `modules/employee/presentation/import/csv.ts`, while Leave report labels and
 row mapping are owned by Leave report infrastructure.
+
+Department server/application consumers use `@/modules/department`. Its root
+entry exposes `listDepartments()` for the app Department route and the narrow
+`listDepartmentReferences()` query for Employee import. Department owns its
+server-side application and Prisma persistence; it has no `client.ts` or
+Department-owned presentation in G1.
 
 Employee and Leave have one deliberate server dependency direction. Leave may
 consume the public Employee hierarchy contract to mutate the Employee-owned
@@ -167,22 +173,26 @@ If two modules appear to share a business rule, first determine which module
 owns that rule. Move it to `shared/` only when it is truly cross-domain and
 platform-level; reuse alone is not enough.
 
-## Organization / Department boundary (G0)
+## Organization / Department boundary (G1)
 
-Phase G0 records the current Department boundary in
+Phase G0 remains preserved as a historical discovery record in
 [organization-department-migration.md](./organization-department-migration.md).
-Department remains transitional reference data with no feature module or
-Organization entity. Employee owns `Employee.departmentId`, its association
-validation, current import mapping, and Employee-facing projections; it does
-not own Department lifecycle. `Employee.affiliation` is still free text, and
+The current product invariant is permanent single-NHF organization: there is
+no Organization domain or tenant architecture. Department is an independent
+NHF-wide reference-data capability in `modules/department/`.
+
+Employee owns `Employee.departmentId`, its association semantics, current import
+mapping, and Employee-facing projections. Department owns Department identity,
+reference queries, and Department Prisma persistence. Employee consumes the
+Department server contract only through `@/modules/department`; Department does
+not depend on Employee. `Employee.affiliation` remains free text, and
 `Employee.managerId` remains Employee-owned hierarchy rather than a Department
 head.
 
-If product requirements later establish Organization-scoped Departments, the
-recommended future owner is a single organization/reference-data capability
-behind a public server API, with an explicit client-safe entry only when client
-presentation needs it. The current `/api/departments` URL remains app delivery
-and is a G1 migration candidate, not a reason to add a speculative module now.
+The current `/api/departments` URL remains app delivery. It authenticates,
+delegates to `listDepartments()`, and preserves the existing response/order/error
+contract. Department has no CRUD, lifecycle, hierarchy, head, or client-owned
+presentation behavior in G1.
 
 ## Shared/platform ownership
 
@@ -231,3 +241,7 @@ Leave offboarding blocker provider at the route boundary; there is no Employee
 outside Employee. The former legacy Employee validation facade, mixed Employee
 helpers/types, duplicate CSV helper, and confirmed orphan presentation files
 were removed after production-consumer audits.
+
+G1 adds Department server ownership without changing the Employee presentation
+boundary or the other module projections. Department internals remain private;
+the Department root is the only supported server entry.

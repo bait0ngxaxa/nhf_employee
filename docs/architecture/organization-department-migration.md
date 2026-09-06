@@ -1,13 +1,28 @@
-# Phase G0 — Organization / Department Discovery & Boundary Definition
+# Phase G0 — Organization / Department Discovery & Boundary Definition (historical record)
 
-Status: **Phase G0 CLOSED — discovery and boundary decision complete**
+Status: **Phase G0 CLOSED — historical discovery record; Phase G1 CLOSED — Department server/persistence ownership complete**
 
 Discovery date: 2026-09-06
 
-This document closes the discovery phase only. It records the repository's
-observed behavior, the current boundary decision, and the evidence needed for
-later implementation phases. It does not create an Organization or Department
-module, change Prisma, add tenant fields, or change runtime behavior.
+This document preserves the G0 discovery record and its pre-G1 observations.
+The current authoritative product and implementation decisions are recorded in
+Sections L and M below. G0's conditional Organization branch is historical and
+has been superseded by the permanent single-NHF-organization decision.
+
+## Post-G0 product decision (current architectural invariant)
+
+NHF Employee is permanently a single-NHF-organization system. It is not and
+will not become a multi-tenant or multi-organization application.
+
+There is no `Organization` domain, `modules/organization/`, `organizationId`,
+`tenantId`, organization membership, organization switching, tenant middleware,
+tenant-scoped query behavior, organization-isolation RLS, or organization-scoped
+uniqueness in this product. The current global Department `name` and `code`
+uniqueness is intentional.
+
+This decision supersedes the conditional future Organization/reference-data
+recommendation recorded in the G0 sections below. Those sections remain as a
+historical discovery record; they are not a future target for NHF Employee.
 
 ## A. Phase status
 
@@ -47,7 +62,12 @@ G0 acceptance checklist:
 - [x] A concrete G1/G2/G3 sequence is recorded in Section J.
 - [x] No Organization/tenant implementation or runtime behavior change was made.
 
-## B. Observed current state
+## B. Observed current state (G0 historical snapshot, before G1)
+
+Sections B-K retain the evidence and decisions captured when G0 closed. Any
+description of direct Department access, a transitional owner, unresolved
+Organization requirements, or a conditional future module describes that
+historical point in time, not the current G1 implementation.
 
 ### B1. Department persistence
 
@@ -95,7 +115,7 @@ Organization concept:
 bootstrap Employee. This is seed data, not evidence of a general Department
 administration workflow.
 
-### B2. Current Department delivery and writes
+### B2. Department delivery and writes (G0 snapshot)
 
 `app/api/departments/route.ts` is the only production Department route found.
 It exposes an authenticated `GET`, reads Prisma directly, orders by `name asc`,
@@ -279,7 +299,7 @@ Department administration workflow.
 | Employee/Leave/Auth display projections | Employee, Leave, and Auth respectively | Each consuming feature keeps its presentation projection | A display consumer does not become owner of the reference entity. |
 | Email Request department text | Email Request | Email Request | It is requester-entered historical text, not canonical Department data. |
 
-## E. Boundary decision
+## E. Boundary decision (G0 historical record)
 
 ### Selected G0 boundary: D for the current repository
 
@@ -289,7 +309,7 @@ does not alter the schema. Employee owns its required association and
 Employee-specific mapping/projection behavior; it does not own Department
 reference-data lifecycle.
 
-### Conditional future target: A only after product requirements are approved
+### Conditional future target recorded by G0 (superseded)
 
 If product requirements establish that there is a real Organization aggregate
 and that Departments are scoped reference data beneath it, the recommended
@@ -373,10 +393,11 @@ Later phases must preserve or explicitly approve changes to the following:
 | Schema IDs and FK behavior | Preserve Department IDs, globally unique name/code behavior, required Employee FK, restrictive Department deletion, and existing historical Employee/Leave/Routine references until an approved migration changes them. |
 | Employee offboarding | Preserve soft-delete behavior; do not physically remove Department references as a side effect. |
 
-## H. Organization / multi-organization blast-radius map
+## H. Organization / multi-organization blast-radius map (G0 historical record)
 
-No item in this section is implemented by G0. It is the impact map for a
-future approved Organization requirement.
+No item in this section was implemented by G0. It is the historical impact map
+that was recorded for a possible Organization requirement; the post-G0 product
+decision makes that requirement permanently out of scope.
 
 | Area | Existing assumption | Future decision/impact |
 | --- | --- | --- |
@@ -397,7 +418,7 @@ future approved Organization requirement.
 The blast radius is intentionally a map, not permission to add
 `organizationId`, tenant middleware, RLS, switching, or new constraints.
 
-## I. Open requirements / unresolved semantics
+## I. Open requirements / unresolved semantics (G0 historical snapshot)
 
 The repository cannot answer these questions safely:
 
@@ -425,7 +446,13 @@ The repository cannot answer these questions safely:
 These questions must be answered before any Organization persistence,
 tenant-scoped uniqueness, membership model, or Department lifecycle migration.
 
-## J. Proposed G1/G2/G3 plan
+The list above records what was unresolved when G0 closed. Post-G0 resolves the
+organization questions permanently: NHF Employee remains single-NHF-
+organization, Department remains globally unique, and no Organization/tenant
+architecture will be added. The remaining Department lifecycle questions are
+outside G1 and do not create a future Organization branch.
+
+## J. Proposed G1/G2/G3 plan (G0 historical plan)
 
 G0 does not execute these phases.
 
@@ -472,7 +499,7 @@ G0 does not execute these phases.
    are changed, and close the migration only with a final diff and runtime
    consumer audit.
 
-## K. Non-goals completed by not doing them
+## K. Non-goals completed by not doing them (G0 historical record)
 
 G0 deliberately did not:
 
@@ -484,4 +511,76 @@ G0 deliberately did not:
 - alter seed data, uniqueness/FK constraints, Department hierarchy, or heads;
 - normalize free-text `department` values into foreign keys; or
 - perform unrelated cleanup.
+
+## L. Phase G1 implementation record
+
+Phase G1 establishes `modules/department/` as the server-side Department
+ownership boundary without changing the Department schema or redesigning the
+capability.
+
+```text
+app/api/departments/route.ts
+    -> @/modules/department
+        -> modules/department/application/queries.ts
+            -> modules/department/infrastructure/persistence/
+                -> lib/db/prisma -> Department
+
+modules/employee/application/import-employees.ts
+    -> @/modules/department
+        .listDepartmentReferences()
+```
+
+The supported server entry point is `modules/department/index.ts`. It exposes
+only these consumer-driven contracts:
+
+| Contract | Consumer | Responsibility |
+| --- | --- | --- |
+| `listDepartments()` | `app/api/departments/route.ts` | Returns all current scalar Department fields, ordered by `name` ascending. |
+| `listDepartmentReferences()` | `modules/employee/application/import-employees.ts` | Returns only `{ id, code }` reference data required by the existing import mapping. |
+
+Department infrastructure is the only production owner of
+`prisma.department` reads. Employee persistence retains Employee identity
+lookup and Employee creation, including the `dept.name` result needed for the
+existing import response, but no longer reads the Department model directly.
+Employee continues to own CSV parsing, aliases, the `ADMIN`/`บริหาร` and
+`ACADEMIC`/`วิชาการ` mapping, validation messages, partial-success behavior,
+duplicate handling, temporary email generation, status mapping, and
+`departmentId` association semantics.
+
+`GET /api/departments` remains an app delivery boundary. Its authentication,
+custom unauthenticated `403`, `{ departments }` response, full scalar field
+compatibility, ascending name order, Department IDs, and sanitized `500`
+failure behavior are unchanged. Authentication remains outside the Department
+module, and Department application code does not depend on Next.js delivery
+objects or Employee.
+
+No `modules/department/client.ts`, Department CRUD, lifecycle, archive,
+hierarchy, or Department-head behavior was introduced. `Employee.affiliation`
+remains free text, `Employee.managerId` remains Employee hierarchy used by
+Leave, and `EmailRequest.department` remains requester-provided historical
+free text. Leave, Routine, Stock, Auth, Dashboard, seed data, migrations,
+schema constraints, Department IDs, and foreign-key behavior remain outside
+this ownership migration.
+
+The architecture checker now protects the migrated boundary by requiring
+Department API routes to use `@/modules/department`, rejecting direct
+`prisma.department` access outside Department infrastructure (while allowing
+tests and Prisma support code), and rejecting Department-to-Employee runtime
+dependencies. The generic public-entry rule continues to reject all other
+external and cross-module Department deep imports.
+
+## M. Proposed Phase G2 — Department client/presentation boundary
+
+The smallest evidence-backed G2 scope is a presentation re-audit only:
+
+1. Trace the existing Employee selectors and import UI through the unchanged
+   `/api/departments` browser contract.
+2. Add a Department client-safe entry only if a Department-owned presentation
+   component or browser adapter is proven necessary.
+3. Keep Employee's selector, import aliases, Thai labels, and validation
+   behavior Employee-owned unless a separate product requirement changes them.
+
+Current evidence does not require Department-owned client presentation, so G2
+should not create `modules/department/client.ts` artificially or move Employee
+presentation. Organization and tenant work remain permanently out of scope.
 
