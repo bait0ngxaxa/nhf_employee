@@ -1,6 +1,7 @@
 # Dependency rules and enforcement
 
-Status: Phase G3 CLOSED — Department migration complete. These rules govern
+Status: Phase H0 CLOSED — Notification discovery and boundary definition
+complete. Phase G3 Department migration remains complete. These rules govern
 new architecture code while unrelated legacy features remain compatible during
 incremental migration.
 
@@ -81,6 +82,33 @@ usage or, when the target owns client presentation, `@/modules/<feature>/client`
 for client/presentation usage. Arbitrary subpaths remain forbidden. A
 server-only module intentionally has no client entry, and a client entry must
 not expose server-only implementation, database adapters, or secrets.
+
+## Notification and outbox boundary (H0)
+
+The future Notification capability is consumed through
+`@/modules/notification`; external consumers must not deep-import its
+repository, Prisma, or presentation internals. The public contract is for the
+user-facing in-app Inbox and generic persistence to an explicit user. A
+business producer supplies the recipient and owns event meaning, semantic
+type, title/message, action URL, reference ID, channel selection, and
+event-specific dedupe/supersede policy.
+
+`NotificationOutbox` and `lib/services/outbox/processor.ts` are global
+platform infrastructure, not part of the Notification feature module. Leave,
+Stock, Routine, and other business modules may persist/enqueue outbox rows in
+their own transactions, but no `modules/**` code may import the global Outbox
+Processor. Processor scheduling/wakeup, claim/retry/backoff/dead-letter/stale
+recovery, supersede lifecycle, and Email/LINE dispatch composition remain
+outside Notification. A future processor adapter may call the Notification
+public command for an in-app write and pass a transaction-bound client; that is
+an allowed public call, not processor ownership transfer.
+
+The current `lib/services/notifications/in-app.ts` helper is transitional.
+Its generic create-once operation is evidence for the Notification persistence
+seam, while its admin lookup is recipient policy that must be split during H3.
+Do not introduce a generic Notification audience query or migrate Email Request
+until the future IT capability boundary is approved. Legacy IT notification and
+outbox enum values remain storage-compatible history only.
 
 ## Client/server boundary
 

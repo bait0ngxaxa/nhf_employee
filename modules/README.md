@@ -73,3 +73,26 @@ remained, so no runtime deletion was necessary in G3. See the final migration
 ledger in
 [organization-department-migration.md](../docs/architecture/organization-department-migration.md)
 for the historical G0 record and final G1-G3 implementation ledger.
+
+Phase H0 Notification discovery is complete. The future
+`modules/notification/` capability is intentionally not created yet. It will
+own the user-facing in-app Notification/Inbox persistence, queries, read
+commands, generic create-to-explicit-user mechanics, and Notification-specific
+presentation. Leave, Stock, Routine, and the deferred Email Request/IT
+capability continue to own event meaning, recipients, titles/messages,
+action/reference values, channel choices, and event-specific dedupe or
+supersede rules.
+
+`NotificationOutbox` is not part of the future Notification module. The shared
+platform outbox owns reliable asynchronous delivery, claim/retry/dead-letter/
+supersede lifecycle, scheduling/wakeup, and provider dispatch composition.
+Business modules may enqueue outbox rows transactionally but must not import
+the global processor. An outbox-dispatched in-app event may call a narrow
+Notification public command later without transferring processor ownership.
+Email Request remains explicitly deferred until the future IT capability
+boundary is ready. See
+[notification-migration.md](../docs/architecture/notification-migration.md)
+for the H0 evidence, exhaustive ledger, invariants, and H1-H3 slices.
+
+Phase H0 CLOSED — Notification discovery and boundary definition complete.
+H1-H3 are not started.

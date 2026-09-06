@@ -1,6 +1,7 @@
 # Module boundaries
 
-Status: Phase G3 CLOSED — Department migration complete.
+Status: Phase H0 CLOSED — Notification discovery and boundary definition
+complete. Phase G3 Department migration remains complete.
 Stock, Routine, Leave, and Employee are migrated examples; Employee
 server/business and active presentation ownership are migrated as well.
 
@@ -79,6 +80,36 @@ entry exposes `listDepartments()` for the app Department route and the narrow
 server-side application and Prisma persistence; G2 confirms that it is
 intentionally server-only and has no `client.ts` or Department-owned
 presentation.
+
+## Notification boundary (H0)
+
+The future `modules/notification/` module is the owner of the user-facing
+in-app Notification/Inbox capability. It owns the `Notification` repository
+and persistence boundary, generic create-to-explicit-user mechanics, dedupe
+handling, latest/history/unread queries, mark-one/mark-all-read commands, and
+Notification-specific server/client contracts and presentation.
+
+The module must receive explicit recipients and semantic payloads. Leave,
+Stock, Routine, and the deferred Email Request/IT capability retain ownership
+of the triggering event, recipient policy, notification type, title/message,
+action URL, reference ID, channel choice, and event-specific dedupe or
+supersede semantics. Notification must not grow audience APIs such as “notify
+all Stock admins” or become a workflow owner for another module.
+
+`NotificationOutbox` is a separate shared/platform boundary. The global
+outbox owns reliable asynchronous delivery, event claim and status lifecycle,
+retry/backoff/dead-letter/stale recovery, scheduling/wakeup, and provider
+dispatch composition. Business modules may enqueue outbox rows transactionally
+but must not import the global Outbox Processor. An outbox-dispatched in-app
+event may invoke a narrow Notification public command with explicit input and
+a transaction-bound client; this does not transfer processor ownership.
+
+The four existing `app/api/notifications/**` routes remain app HTTP delivery
+composition while their query/read behavior is delegated to Notification in
+H1. Notification-specific Dashboard components are H2 candidates; the generic
+Dashboard navbar, route/page composition, menu constants, and session/auth
+infrastructure remain outside the module. The complete H0 evidence and ledger
+are in [notification-migration.md](./notification-migration.md).
 
 Employee and Leave have one deliberate server dependency direction. Leave may
 consume the public Employee hierarchy contract to mutate the Employee-owned

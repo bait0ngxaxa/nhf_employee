@@ -1,6 +1,7 @@
 # NHF Employee modular monolith
 
-Status: Phase G3 CLOSED — Department migration complete.
+Status: Phase H0 CLOSED — Notification discovery and boundary definition
+complete. Phase G3 Department migration remains complete.
 
 This document separates the repository's observed current state from the
 target architecture. Stock server/business ownership is now migrated into
@@ -34,6 +35,15 @@ architecture. Phases G1-G3 give the NHF-wide Department reference-data
 capability a stable server/application/persistence owner in
 `modules/department/`; Employee still owns its required Department association
 and Employee-specific mapping and presentation behavior.
+
+Phase H0 has now defined the Notification boundary. The future
+`modules/notification/` capability is the in-app Notification/Inbox owner; it
+does not absorb business notification semantics, the global
+`NotificationOutbox`, or Email/LINE delivery infrastructure. Leave, Stock, and
+Routine retain event and recipient policy, while Email Request remains a
+transitional/deferred consumer pending the future IT capability boundary. See
+[notification-migration.md](./notification-migration.md) for the complete
+discovery record and migration ledger.
 
 ## Why a modular monolith
 
@@ -77,6 +87,13 @@ The Dashboard uses route-per-module App Router pages;
 historical
 `/dashboard?tab=...` links remain inbound-compatible through the dashboard home
 route boundary.
+
+Notification is currently still a legacy `app/`/`components/`/`lib/` surface:
+the four Notification routes, Dashboard Notification presentation, and shared
+in-app helper have not moved. The current global outbox already treats in-app
+delivery as one possible channel, including Routine reminders, but the outbox
+processor and provider composition remain shared/platform infrastructure. H1
+will establish the Notification server seam before H2 moves its presentation.
 
 ## Target architecture
 
@@ -163,6 +180,29 @@ Department infrastructure. The authenticated `/api/departments` route and
 Employee import seam preserve their existing contracts; Employee browser code
 continues to use HTTP. No obsolete Department runtime artifact remained, so no
 runtime cleanup was required.
+
+### Notification boundary definition (H0)
+
+The Notification capability is deliberately narrower than the word
+"notification" in the repository. It owns durable per-user in-app Inbox
+entries, latest/history/unread queries, mark-read commands, generic
+deduplicated persistence, and Notification-specific presentation. A business
+module supplies the explicit recipient and owns the event's meaning, semantic
+type, title/message, action URL, reference ID, channel choice, and
+event-specific dedupe/supersede behavior.
+
+`NotificationOutbox` remains global reliable asynchronous delivery
+infrastructure. Its processor owns claiming, retry/backoff, stale
+`PROCESSING` recovery, dead-lettering, superseding, scheduling/wakeup, and
+dispatch composition for Email, LINE, and in-app delivery. Business modules
+may enqueue rows in their own transactions but must not import the processor.
+The processor may later call a narrow Notification public command for an
+in-app write without becoming part of the Notification module.
+
+Dashboard navbar/page/menu composition remains app/Dashboard-owned. Email
+Request is documented as a transitional/deferred consumer and legacy IT enum
+values remain storage-compatible history only. H0 changes documentation only;
+H1-H3 are not complete.
 
 ## Ownership principle
 
