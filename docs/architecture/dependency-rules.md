@@ -1,7 +1,7 @@
 # Dependency rules and enforcement
 
-Status: Phase G1 guardrails extend the Phase A baseline. These rules govern new
-architecture code while unrelated legacy features remain compatible during
+Status: Phase G2 guardrails extend the Phase A baseline. These rules govern
+new architecture code while unrelated legacy features remain compatible during
 incremental migration.
 
 ## Direction
@@ -75,11 +75,12 @@ Processor. Waking or scheduling that processor belongs to the
 delivery/composition layer.
 
 Feature internals are private by ownership even when TypeScript can resolve the
-path. External consumers and other modules must use exactly one of the target
-module's deliberate public entry points: `@/modules/<feature>` for
-server/application usage or `@/modules/<feature>/client` for client/presentation
-usage. Arbitrary subpaths remain forbidden. The client entry must not expose
-server-only implementation, database adapters, or secrets.
+path. External consumers and other modules must use the target module's
+deliberate public entry points: `@/modules/<feature>` for server/application
+usage or, when the target owns client presentation, `@/modules/<feature>/client`
+for client/presentation usage. Arbitrary subpaths remain forbidden. A
+server-only module intentionally has no client entry, and a client entry must
+not expose server-only implementation, database adapters, or secrets.
 
 ## Client/server boundary
 
@@ -178,6 +179,21 @@ tenant IDs, tenant middleware, organization membership/switching, tenant-scoped
 queries, RLS isolation, or organization-scoped uniqueness belongs in this
 architecture.
 
+## Department server-only client boundary (G2)
+
+`modules/department/index.ts` is a server-only public API because its runtime
+graph reaches Department infrastructure and Prisma. Department has no
+`modules/department/client.ts` and no Department-owned browser presentation.
+Employee selectors, import UI, and Employee-specific Department formatting stay
+Employee-owned and use the existing `GET /api/departments` HTTP contract.
+
+The architecture checker walks production Client Component runtime graphs and
+rejects both direct and transitive imports of `@/modules/department`. The
+diagnostic points browser code to the existing HTTP/API boundary and does not
+suggest a Department client entry. The app Department route and Employee
+application import remain valid server consumers; HTTP use of `/api/departments`
+or `API_ROUTES.employees.departments` is not a module dependency.
+
 ## Automated enforcement
 
 Phase A limits automation by import target rather than by importer location.
@@ -188,14 +204,15 @@ the module boundary from a legacy directory, while imports unrelated to
 | Check | Scope | Behavior |
 | --- | --- | --- |
 | ESLint `no-restricted-imports` | `shared/**/*.{js,jsx,ts,tsx}` | Rejects imports from `modules/` so a shared capability cannot acquire a business dependency |
-| `npm run architecture:check` | Repository source files, excluding dependency, build, coverage, and generated directories | Uses the installed TypeScript parser to inspect imports, re-exports, type imports, dynamic imports, and `require()` calls; allows only `@/modules/<feature>` and `@/modules/<feature>/client` as module public entries; rejects `shared -> modules`, external consumers deep-importing module internals, cross-module deep imports, including relative paths, and any business module importing the global Outbox Processor |
+| `npm run architecture:check` | Repository source files, excluding dependency, build, coverage, and generated directories | Uses the installed TypeScript parser to inspect imports, re-exports, type imports, dynamic imports, and `require()` calls; allows `@/modules/<feature>` and, when present, `@/modules/<feature>/client` as module public entries; rejects `shared -> modules`, external consumers deep-importing module internals, cross-module deep imports, including relative paths, and any business module importing the global Outbox Processor |
 | Leave route ownership | `app/api/leave/**`, `app/api/line/leave/**` | Requires the server entry `@/modules/leave` and rejects legacy paths, the client entry, and deep implementation imports |
 | Leave presentation ownership | `app/dashboard/leave/**`, `app/liff/leave/**`, `modules/leave/**` | Requires route composition through `@/modules/leave/client`, rejects deleted legacy presentation paths, and rejects Leave internals importing either public barrel |
-| Client/server policy | Production `"use client"` dependency graphs and migrated module client entries | Walks runtime imports transitively, rejects client-reachable use of the Leave server entry, and separately rejects server-only runtime dependencies reachable from `@/modules/leave/client`; type-only imports are erased before graph traversal |
+| Client/server policy | Production `"use client"` dependency graphs and migrated module client entries | Walks runtime imports transitively, rejects client-reachable use of the Leave, Employee, and server-only Department entries, and separately rejects server-only runtime dependencies reachable from `@/modules/leave/client` and `@/modules/employee/client`; type-only imports are erased before graph traversal |
 | Route-level Prisma policy | Legacy and new code | Documentation-led for unrelated legacy routes; G1 enforces Department ownership in `modules/department/infrastructure/**` |
 | Employee F3 ownership | `app/api/employees/**`, `app/dashboard/employees/**`, `modules/employee/**`, production Client Component graphs | Requires `@/modules/employee` for API routes and `@/modules/employee/client` for the four Employee Dashboard routes; rejects deleted legacy compatibility paths and deep presentation paths, including relative forms, deep/self-barrel imports, Employee → Leave imports, client-to-server reachability, and server-only dependencies from the Employee client graph |
 | Employee/Leave offboarding seam | `modules/employee/**` plus Employee route composition | Employee exposes only a structural blocker-provider port; the outer composition binds Leave's implementation and must preserve the same Employee lifecycle transaction client |
 | Department G1 ownership | `app/api/departments/**`, `modules/department/**`, Employee import, production source | Department API delivery uses `@/modules/department`; Department Prisma access stays in Department infrastructure; Employee uses the Department public query; Department does not depend on Employee |
+| Department G2 presentation boundary | Production Client Component runtime graphs and Employee Department presentation | Rejects direct/transitive client imports of the server-only `@/modules/department` entry; preserves the `/api/departments` browser contract and does not require a Department client entry |
 
 The check is fast and is included at the start of `npm run check`. Scanning
 legacy feature directories does not migrate them: the checker only evaluates

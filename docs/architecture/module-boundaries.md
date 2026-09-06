@@ -1,6 +1,7 @@
 # Module boundaries
 
-Status: Phase G1 CLOSED — Department server/persistence ownership complete.
+Status: Phase G2 CLOSED — Department server/persistence ownership and
+presentation boundary complete.
 Stock, Routine, Leave, and Employee are migrated examples; Employee
 server/business and active presentation ownership are migrated as well.
 
@@ -31,7 +32,8 @@ Consumers use the public entry point:
 import { something } from "@/modules/stock";
 ```
 
-Client-facing presentation may use the separate client-safe entry point:
+When a module owns client-facing presentation, that presentation may use the
+separate client-safe entry point:
 
 ```text
 modules/<feature>/client.ts
@@ -75,8 +77,9 @@ row mapping are owned by Leave report infrastructure.
 Department server/application consumers use `@/modules/department`. Its root
 entry exposes `listDepartments()` for the app Department route and the narrow
 `listDepartmentReferences()` query for Employee import. Department owns its
-server-side application and Prisma persistence; it has no `client.ts` or
-Department-owned presentation in G1.
+server-side application and Prisma persistence; G2 confirms that it is
+intentionally server-only and has no `client.ts` or Department-owned
+presentation.
 
 Employee and Leave have one deliberate server dependency direction. Leave may
 consume the public Employee hierarchy contract to mutate the Employee-owned
@@ -87,8 +90,9 @@ composition binds Leave's blocker implementation to that port. The provider
 must receive and use the same `Prisma.TransactionClient` as the Employee
 serializable lifecycle operation.
 
-The root barrel remains server/application-oriented. The client entry point
-must export only client-safe presentation contracts.
+The root barrel remains server/application-oriented. Where a client entry
+exists, it must export only client-safe presentation contracts; a server-only
+module intentionally has no client entry.
 
 The Employee client entry is browser-safe: its runtime graph contains no
 Prisma runtime, database/session/secret implementation, server-only Next.js
@@ -106,8 +110,8 @@ import { something } from "@/modules/stock/application/internal/foo";
 The public entries should export only contracts that another layer or module
 is intended to rely on. Avoid exporting an entire internal tree through broad
 barrel files; small explicit entry points are easier to evolve and keep
-dependency direction visible. Only the module root and its /client entry are
-public; arbitrary subpaths remain private.
+dependency direction visible. Only the module root and, when present, its
+`client.ts` entry are public; arbitrary subpaths remain private.
 
 ## Larger feature shape
 
@@ -191,8 +195,23 @@ head.
 
 The current `/api/departments` URL remains app delivery. It authenticates,
 delegates to `listDepartments()`, and preserves the existing response/order/error
-contract. Department has no CRUD, lifecycle, hierarchy, head, or client-owned
-presentation behavior in G1.
+contract. Employee owns the selector, `departmentId` form state, import mapping,
+and Employee-specific Department display behavior. Department has no CRUD,
+lifecycle, hierarchy, head, or client-owned presentation behavior in G1/G2.
+
+The browser contract is intentionally HTTP-based:
+
+```text
+Employee client -> GET /api/departments -> app route -> @/modules/department
+```
+
+Client-reachable runtime code must not import `@/modules/department` directly
+or transitively. The architecture checker enforces this server-only boundary;
+it permits the app route and Employee application server consumers. Auth and
+Dashboard keep Department as an Employee/session display projection, Leave
+keeps Employee projections, Routine carries an opaque Employee `departmentId`,
+Stock has no Department dependency, and Email Request keeps free-text
+`department`/`สังกัด`.
 
 ## Shared/platform ownership
 
@@ -242,6 +261,8 @@ outside Employee. The former legacy Employee validation facade, mixed Employee
 helpers/types, duplicate CSV helper, and confirmed orphan presentation files
 were removed after production-consumer audits.
 
-G1 adds Department server ownership without changing the Employee presentation
-boundary or the other module projections. Department internals remain private;
-the Department root is the only supported server entry.
+G1 added Department server ownership without changing the Employee
+presentation boundary or the other module projections. G2 re-audited the
+presentation boundary and confirmed that no Department client entry is needed.
+Department internals remain private; the Department root is the only supported
+server entry.

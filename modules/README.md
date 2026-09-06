@@ -61,7 +61,12 @@ owns production Department Prisma reads. Employee still owns its
 `departmentId` association, CSV aliases/mapping, import policy, and Employee
 creation; it consumes Department only through `@/modules/department`.
 
-Department has no `client.ts`, CRUD, lifecycle, hierarchy, or Department-head
-behavior in G1. See
+Department is intentionally server-only: it has no `client.ts`, standalone
+presentation, CRUD, lifecycle, hierarchy, or Department-head behavior in G1/G2.
+Employee owns its Department selectors, `departmentId` form state, import
+mapping, and Employee-specific display formatting. Browser lookup remains
+`GET /api/departments`, and the architecture checker rejects direct or
+transitive client-reachable imports of `@/modules/department`; server consumers
+use the root entry. See
 [organization-department-migration.md](../docs/architecture/organization-department-migration.md)
-for the historical G0 record and current G1 implementation ledger.
+for the historical G0 record and current G1/G2 implementation ledger.

@@ -372,6 +372,74 @@ describe("architecture checker module boundaries", () => {
         expect(result.violations[0]).toContain("Employee server entry");
     });
 
+    it("rejects a direct client import of the Department server entry", async () => {
+        const result = await checkFixture(
+            "components/DepartmentClient.tsx",
+            [
+                '"use client";',
+                'import { listDepartments } from "@/modules/department";',
+                "export const DepartmentClient = () => listDepartments;",
+            ].join("\n"),
+        );
+
+        expect(result.violations).toHaveLength(1);
+        expect(result.violations[0]).toContain(
+            "Client-reachable runtime code must not import the Department server entry",
+        );
+        expect(result.violations[0]).toContain(
+            "existing HTTP/API boundary",
+        );
+        expect(result.violations[0]).not.toContain(
+            "@/modules/department/client",
+        );
+    });
+
+    it("rejects a transitive client-reachable import of the Department server entry", async () => {
+        const rootPath = await createFixture({
+            ...fixtureFiles,
+            "components/DepartmentClient.tsx": [
+                '"use client";',
+                'import { departmentData } from "@/lib/department-display";',
+                "export const DepartmentClient = () => departmentData;",
+            ].join("\n"),
+            "lib/department-display.ts": [
+                'import { listDepartments } from "@/modules/department";',
+                "export const departmentData = listDepartments;",
+            ].join("\n"),
+        });
+        const result = checkArchitecture({ repositoryRoot: rootPath });
+
+        expect(result.violations).toHaveLength(1);
+        expect(result.violations[0]).toContain(
+            "Client-reachable runtime code must not import the Department server entry",
+        );
+        expect(result.violations[0]).toContain(
+            "existing HTTP/API boundary",
+        );
+    });
+
+    it("allows Department server consumers and browser HTTP consumption", async () => {
+        const rootPath = await createFixture({
+            ...fixtureFiles,
+            "app/api/departments/route.ts": [
+                'import { listDepartments } from "@/modules/department";',
+                "export { listDepartments };",
+            ].join("\n"),
+            "modules/employee/application/import.ts": [
+                'import { listDepartmentReferences } from "@/modules/department";',
+                "export { listDepartmentReferences };",
+            ].join("\n"),
+            "components/DepartmentClient.tsx": [
+                '"use client";',
+                'import { API_ROUTES } from "@/lib/ssot/routes";',
+                "export const departmentEndpoint = API_ROUTES.employees.departments;",
+            ].join("\n"),
+        });
+        const result = checkArchitecture({ repositoryRoot: rootPath });
+
+        expect(result.violations).toEqual([]);
+    });
+
     it("rejects server-only runtime dependencies from the Employee client graph", async () => {
         const rootPath = await createFixture({
             ...fixtureFiles,

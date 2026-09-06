@@ -1,7 +1,8 @@
 # Employee migration
 
 Status: Phase F3 CLOSED — Employee migration complete; Phase G1 Department
-server/persistence ownership complete.
+server/persistence ownership complete; Phase G2 Department server-only
+presentation boundary confirmed.
 
 Approved F0 baseline: `ee9a60be6c077055873214a9644384caa8b43f80`
 (`docs(employee): correct F0 migration boundary`).
@@ -18,6 +19,10 @@ consumes it: `modules/employee/application/import-employees.ts` uses the public
 Employee identity lookup and Employee creation. The permanent single-NHF
 product decision and complete Department record are maintained in
 [organization-department-migration.md](./organization-department-migration.md).
+G2 re-audited the Employee Department presentation boundary and confirmed that
+Employee remains the owner of its selectors, import presentation, and
+Department-specific display compatibility; no Department client entry is
+required.
 
 ## F1 implementation record
 
@@ -780,6 +785,12 @@ route SSOT constants, SWR, toast, download, debounce, and file-validation
 primitives from its module-owned presentation code. No Employee server
 application API is exposed to the browser.
 
+The Department lookup is intentionally still an HTTP concern of Employee
+presentation: the add/edit hooks use `API_ROUTES.employees.departments`, which
+resolves to `GET /api/departments`. The Employee presentation does not import
+`@/modules/department`; the Department server entry is protected from direct
+and transitive Client Component reachability by the architecture checker.
+
 ### Implemented presentation ownership
 
 ```text
@@ -1145,6 +1156,12 @@ longer calls `prisma.department.findMany()` from Employee persistence. The route
 remains app delivery and its URL, auth, 403, response, ordering, and sanitized
 failure behavior remain unchanged. No Department client entry, CRUD, lifecycle,
 hierarchy, or Department-head behavior was introduced.
+
+G2 confirms that this server seam does not imply a Department presentation
+seam. Employee continues to own the Department selector, `departmentId`
+association input, import aliases/mapping, and Employee-facing labels/styles.
+Auth/Dashboard, Leave, Routine, Stock, and Email Request retain their audited
+projection, opaque transport, no-dependency, or free-text ownership decisions.
 
 ## 15. Manager, hierarchy, and approver ownership
 
@@ -1602,11 +1619,12 @@ F3 ownership decisions:
    `managerId` while enforcing Leave-specific approver rules. The seam must
    retain atomicity and prevent races with Leave request creation and
    reassignment.
-3. **Department server seam:** Resolved in G1. Department server/application and
-   Prisma persistence are owned by `modules/department/`; Employee import uses
-   only its public `listDepartmentReferences()` contract. There is no
-   Organization or tenant architecture, and no Department client/CRUD/lifecycle
-   behavior is implied by this seam.
+3. **Department server/presentation seam:** Resolved in G1/G2. Department
+   server/application and Prisma persistence are owned by
+   `modules/department/`; Employee import uses only its public
+   `listDepartmentReferences()` contract, while Employee browser lookup uses
+   `GET /api/departments`. There is no Organization or tenant architecture,
+   and no Department client/CRUD/lifecycle behavior is implied by this seam.
 4. **Backed-user display ownership:** Resolved in F3. The neutral structural
    `shared/identity/display.ts` helper preserves Employee → User name → User
    email → caller fallback precedence without depending on Employee.
@@ -1664,3 +1682,7 @@ F0-F3 Employee modular-monolith migration is complete. This closure does not
 claim that other application features are fully migrated.
 Phase G1 CLOSED — Department server/persistence ownership migrated; Employee
 continues to own Employee association and import policy.
+Phase G2 CLOSED — Department presentation/client re-audit complete; Department
+is intentionally server-only, Employee presentation remains the browser owner,
+and direct/transitive client reachability of the Department server entry is
+enforced.

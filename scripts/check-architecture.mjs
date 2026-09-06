@@ -595,7 +595,12 @@ function getDepartmentPersistenceViolation(filePath, rootPath) {
     return `${relativeFilePath(filePath, rootPath)}:${line} direct Department Prisma access must be owned by modules/department/infrastructure/.`;
 }
 
-function getClientReachableServerEntryViolations(rootPath, sourceFiles, moduleName) {
+function getClientReachableServerEntryViolations(
+    rootPath,
+    sourceFiles,
+    moduleName,
+    clientEntry = `@/modules/${moduleName}/client`,
+) {
     const serverEntry = resolve(rootPath, `modules/${moduleName}`);
     const displayName = moduleName[0].toUpperCase() + moduleName.slice(1);
     const pending = sourceFiles.filter((filePath) => (
@@ -621,11 +626,14 @@ function getClientReachableServerEntryViolations(rootPath, sourceFiles, moduleNa
                     && /^index\.[cm]?[jt]sx?$/.test(relative(serverEntry, sourcePath)));
 
             if (importsServerEntry) {
+                const boundaryMessage = clientEntry === null
+                    ? `Browser ${displayName} data must be consumed through the existing HTTP/API boundary.`
+                    : `use ${clientEntry}.`;
                 violations.push(describeViolation(
                     filePath,
                     rootPath,
                     record,
-                    `Client-reachable runtime code must not import the ${displayName} server entry; use @/modules/${moduleName}/client.`,
+                    `Client-reachable runtime code must not import the ${displayName} server entry; ${boundaryMessage}`,
                 ));
                 continue;
             }
@@ -919,6 +927,7 @@ function checkArchitecture(options = {}) {
     violations.push(...getEmployeeClientGraphViolations(rootPath));
     violations.push(...getClientReachableServerEntryViolations(rootPath, sourceFiles, "leave"));
     violations.push(...getClientReachableServerEntryViolations(rootPath, sourceFiles, "employee"));
+    violations.push(...getClientReachableServerEntryViolations(rootPath, sourceFiles, "department", null));
     return { sourceFiles, violations };
 }
 

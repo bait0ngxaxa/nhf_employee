@@ -1,6 +1,7 @@
 # NHF Employee modular monolith
 
-Status: Phase G1 CLOSED — Department server/persistence ownership complete.
+Status: Phase G2 CLOSED — Department server/persistence ownership and
+presentation boundary complete.
 
 This document separates the repository's observed current state from the
 target architecture. Stock server/business ownership is now migrated into
@@ -66,8 +67,9 @@ distributed across locations such as:
 
 `modules/stock/`, `modules/routine/`, `modules/leave/`, and `modules/employee/`
 own their server/business and client-facing presentation code behind separate
-public entry points. The `modules/department/` server module owns Department
-application and persistence behavior without a client entry yet.
+public entry points. The `modules/department/` server module intentionally owns
+only Department application and persistence behavior; G2 confirmed that no
+Department client entry or standalone presentation is required.
 `modules/employee/` owns Employee server/business behavior and `presentation/**`;
 its browser route surface is
 `modules/employee/client.ts`. Generic Dashboard shell, navigation, access
@@ -96,8 +98,10 @@ flow LR
 `app/` owns routing and framework delivery. `modules/` owns business feature
 behavior. `shared/` owns only genuinely cross-domain/platform capabilities.
 Cross-module use is deliberate and goes through the target module's public
-entry point: `modules/<feature>/index.ts` for server/application code or the
-explicit `modules/<feature>/client.ts` entry for client presentation.
+entry point: `modules/<feature>/index.ts` for server/application code or, when
+the target feature owns browser presentation, the explicit
+`modules/<feature>/client.ts` entry for client presentation. A server-only
+module may intentionally have no client entry.
 
 The dependency graph describes new architecture code. It does not claim that
 the legacy `lib/`, `components/`, or unrelated route structure has already been
@@ -128,7 +132,28 @@ response composition, and sanitized failures. Employee consumes Department only
 through the public server entry; no Department code depends on Employee, and no
 other module is coupled to Department speculatively. There is no Department
 client presentation, CRUD, lifecycle, hierarchy, or Department-head behavior
-in G1.
+in G1 or G2.
+
+### Department presentation boundary (G2)
+
+The G2 audit found no Department-owned page, editor, selector, browser state,
+client validation, or client business logic. Employee owns its Department
+selectors, `departmentId` form state, import mapping, and Employee-specific
+display formatting. Auth/Dashboard, Leave, and Routine retain their existing
+projection or transport behavior; Stock has no speculative Department
+dependency; Email Request remains free text.
+
+Browser Department lookup therefore remains an app-delivered HTTP contract:
+
+```text
+Employee client -> GET /api/departments -> app route -> @/modules/department
+```
+
+`@/modules/department` is server-only. The architecture checker rejects direct
+and transitive runtime imports from production Client Component graphs while
+allowing the app route and Employee server/application consumers. No
+`modules/department/client.ts` exists because no evidence-backed client
+contract requires one.
 
 ## Ownership principle
 

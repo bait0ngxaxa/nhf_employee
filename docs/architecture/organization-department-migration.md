@@ -1,6 +1,6 @@
 # Phase G0 — Organization / Department Discovery & Boundary Definition (historical record)
 
-Status: **Phase G0 CLOSED — historical discovery record; Phase G1 CLOSED — Department server/persistence ownership complete**
+Status: **Phase G0 CLOSED — historical discovery record; Phase G1 CLOSED — Department server/persistence ownership complete; Phase G2 CLOSED — Department server-only client/presentation boundary confirmed**
 
 Discovery date: 2026-09-06
 
@@ -569,7 +569,7 @@ tests and Prisma support code), and rejecting Department-to-Employee runtime
 dependencies. The generic public-entry rule continues to reject all other
 external and cross-module Department deep imports.
 
-## M. Proposed Phase G2 — Department client/presentation boundary
+## M. Historical Phase G2 proposal — Department client/presentation boundary
 
 The smallest evidence-backed G2 scope is a presentation re-audit only:
 
@@ -583,4 +583,58 @@ The smallest evidence-backed G2 scope is a presentation re-audit only:
 Current evidence does not require Department-owned client presentation, so G2
 should not create `modules/department/client.ts` artificially or move Employee
 presentation. Organization and tenant work remain permanently out of scope.
+
+## N. Phase G2 implementation and presentation re-audit record
+
+Phase G2 is closed. The repository-wide presentation audit confirms that
+Department is intentionally server-only:
+
+```text
+modules/department/index.ts
+    = server-only Department public API
+
+Employee client
+    -> GET /api/departments
+        -> app/api/departments/route.ts
+            -> @/modules/department
+```
+
+No production Department-owned client or standalone presentation contract was
+found. The audited ownership classifications are:
+
+| Consumer | Classification and owner |
+| --- | --- |
+| Employee add/edit selectors, `departmentId` state, and form validation | Employee-owned presentation consuming the HTTP response |
+| Employee import CSV aliases, mapping, preview, and result display | Employee-owned presentation/application behavior |
+| Employee table/card labels and `getEmployeeDepartmentLabel` / `getEmployeeDepartmentBadgeClass` | Employee-owned compatibility presentation; historical fallback behavior is preserved |
+| Auth/Dashboard `user.department` | Auth/session projection and Dashboard display; not Department authorization |
+| Leave Department IDs/names | Leave-owned Employee projections for reports, approvals, and LIFF; no Department internals |
+| Routine `departmentId` | Opaque Employee projection; `RoutineUnit` remains a separate Routine concept |
+| Stock | No Department presentation or dependency found |
+| Email Request `department` / `สังกัด` | Email Request free-text/snapshot behavior, unrelated to canonical Department |
+
+The existing `GET /api/departments` endpoint remains the browser contract. The
+Employee selectors continue to use `API_ROUTES.employees.departments`; that
+namespace is retained as compatibility naming because changing it would add
+no behavior or ownership benefit. No server action, direct client module
+import, new route, or response change was introduced.
+
+The architecture checker now rejects both direct and transitive runtime imports
+of `@/modules/department` from production Client Component graphs. It permits
+the existing app route and Employee application server consumers, and does not
+classify HTTP access through `/api/departments` or the route constant as a
+module dependency. The Department diagnostic directs browser code to the
+existing HTTP/API boundary and does not suggest a nonexistent client entry.
+
+No `modules/department/client.ts` exists or is required. No Department UI,
+schema, migration, seed, authorization, Organization, tenant, or runtime
+business behavior was added or changed.
+
+### Proposed Phase G3 scope
+
+Phase G3 should perform final ownership verification, remove only obsolete
+Department compatibility artifacts proven unnecessary, reconcile architecture
+documentation and migration ledgers, and close the migration with a final
+consumer/dependency audit. It should not introduce Department presentation,
+Organization/tenant concepts, schema changes, or unrelated runtime cleanup.
 
