@@ -157,6 +157,17 @@ The checker also rejects deleted Employee compatibility paths, including
 relative forms, static/dynamic imports, re-exports, `require()`, and test/mock
 imports.
 
+## Department transitional compatibility (G0)
+
+Phase G0 confirms that `app/api/departments/route.ts` and
+`modules/employee/infrastructure/persistence/employee-import.ts` are existing
+Department reference-data access paths, not a new permission to add direct
+Prisma to architecture code. The route remains `app/**` delivery, and its
+current URL/response/auth behavior is a compatibility constraint. A later G1
+must place Department persistence behind the approved owner service and
+repository boundary, then remove only the proven transitional access. No
+Organization or tenant dependency exists in the current graph.
+
 ## Automated enforcement
 
 Phase A limits automation by import target rather than by importer location.

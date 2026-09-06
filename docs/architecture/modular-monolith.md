@@ -26,6 +26,14 @@ compatibility cleanup and the final dependency re-audit are complete. See
 [employee-migration.md](./employee-migration.md) for the F0 discovery record
 and F1-F3 implementation ledger.
 
+Phase G0 Organization/Department discovery is now closed in
+[organization-department-migration.md](./organization-department-migration.md).
+The current decision keeps Department as transitional reference data: Employee
+owns its required Department association, while no Organization/Department
+module or tenant model exists yet. Any future organization/reference-data owner
+must be introduced only after the product requirements recorded in that
+document are resolved; G0 made no schema or runtime changes.
+
 ## Why a modular monolith
 
 NHF Employee is gaining business capabilities while remaining one product. A

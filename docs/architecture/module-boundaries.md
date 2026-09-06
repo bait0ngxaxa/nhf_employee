@@ -167,6 +167,23 @@ If two modules appear to share a business rule, first determine which module
 owns that rule. Move it to `shared/` only when it is truly cross-domain and
 platform-level; reuse alone is not enough.
 
+## Organization / Department boundary (G0)
+
+Phase G0 records the current Department boundary in
+[organization-department-migration.md](./organization-department-migration.md).
+Department remains transitional reference data with no feature module or
+Organization entity. Employee owns `Employee.departmentId`, its association
+validation, current import mapping, and Employee-facing projections; it does
+not own Department lifecycle. `Employee.affiliation` is still free text, and
+`Employee.managerId` remains Employee-owned hierarchy rather than a Department
+head.
+
+If product requirements later establish Organization-scoped Departments, the
+recommended future owner is a single organization/reference-data capability
+behind a public server API, with an explicit client-safe entry only when client
+presentation needs it. The current `/api/departments` URL remains app delivery
+and is a G1 migration candidate, not a reason to add a speculative module now.
+
 ## Shared/platform ownership
 
 Appropriate future `shared/` responsibilities may include authentication and

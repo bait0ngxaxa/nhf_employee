@@ -48,3 +48,11 @@ owned by Leave report infrastructure.
 Phase F3 CLOSED — Employee migration complete.
 F0-F3 Employee modular-monolith migration is complete. This does not claim
 that other application features are fully migrated.
+
+Phase G0 Organization/Department discovery is closed. Department remains
+transitional reference data with no `modules/organization/` or
+`modules/department/` implementation and no Organization/tenant persistence.
+Employee owns its `departmentId` association and Employee-specific mapping,
+while a future organization/reference-data capability would own Department
+lifecycle only after product requirements are resolved. See
+[organization-department-migration.md](../docs/architecture/organization-department-migration.md).
