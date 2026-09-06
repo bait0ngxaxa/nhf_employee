@@ -100,9 +100,16 @@ all Stock admins” or become a workflow owner for another module.
 outbox owns reliable asynchronous delivery, event claim and status lifecycle,
 retry/backoff/dead-letter/stale recovery, scheduling/wakeup, and provider
 dispatch composition. Business modules may enqueue outbox rows transactionally
-but must not import the global Outbox Processor. An outbox-dispatched in-app
-event may invoke a narrow Notification public command with explicit input and
-a transaction-bound client; this does not transfer processor ownership.
+but must not import the global Outbox Processor. For business-owned outbox
+events, the global processor calls the producing business module's supported
+public dispatch contract. That module revalidates domain state, resolves
+recipients and semantics, makes stale/defer/supersede decisions, and invokes
+Notification's public command when an in-app entry is needed. The business
+dispatch contract owns any transaction context; the global processor does not
+pass a transaction client directly to Notification. A direct
+processor-to-Notification dispatch is reserved for a future generic
+Notification-owned event with a fully resolved command payload, not current
+Leave, Stock, Routine, or deferred Email Request events.
 
 The four existing `app/api/notifications/**` routes remain app HTTP delivery
 composition while their query/read behavior is delegated to Notification in

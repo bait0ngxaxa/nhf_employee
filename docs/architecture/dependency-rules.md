@@ -99,9 +99,16 @@ Stock, Routine, and other business modules may persist/enqueue outbox rows in
 their own transactions, but no `modules/**` code may import the global Outbox
 Processor. Processor scheduling/wakeup, claim/retry/backoff/dead-letter/stale
 recovery, supersede lifecycle, and Email/LINE dispatch composition remain
-outside Notification. A future processor adapter may call the Notification
-public command for an in-app write and pass a transaction-bound client; that is
-an allowed public call, not processor ownership transfer.
+outside Notification. For business-owned outbox events, the global processor
+routes through the producing business module's public dispatch contract. That
+module performs domain validation, recipient/semantic resolution, and
+stale/defer/supersede decisions before invoking Notification's public command
+for an in-app write. If atomic persistence is required, the business dispatch
+contract owns the transaction and supplies its transaction-bound persistence
+context; the global processor does not pass a transaction client directly to
+Notification. A direct processor-to-Notification dispatch is reserved for a
+future truly Notification-owned generic event whose payload is already a fully
+resolved Notification command; no current production event uses that shape.
 
 The current `lib/services/notifications/in-app.ts` helper is transitional.
 Its generic create-once operation is evidence for the Notification persistence

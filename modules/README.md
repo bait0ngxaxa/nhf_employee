@@ -87,8 +87,15 @@ supersede rules.
 platform outbox owns reliable asynchronous delivery, claim/retry/dead-letter/
 supersede lifecycle, scheduling/wakeup, and provider dispatch composition.
 Business modules may enqueue outbox rows transactionally but must not import
-the global processor. An outbox-dispatched in-app event may call a narrow
-Notification public command later without transferring processor ownership.
+the global processor. For business-owned outbox events, the global processor
+routes through the producing business module's public dispatch contract. That
+module owns domain validation, recipient/semantic resolution, and
+stale/defer/supersede decisions before invoking Notification's public command
+for an in-app write. The business dispatch contract owns any transaction-bound
+persistence context; the global processor does not pass a transaction client
+directly to Notification. A direct processor-to-Notification dispatch is
+reserved for a future truly Notification-owned generic event with a fully
+resolved command payload; no current production event uses that shape.
 Email Request remains explicitly deferred until the future IT capability
 boundary is ready. See
 [notification-migration.md](../docs/architecture/notification-migration.md)

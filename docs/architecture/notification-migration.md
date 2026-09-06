@@ -63,6 +63,40 @@ channels.
 | Reliable asynchronous delivery / NotificationOutbox | Shared/platform outbox infrastructure | Owns `NotificationOutbox` lifecycle, claim/retry/dead-letter/supersede behavior, scheduling/wakeup, and processor composition. Business modules may enqueue rows transactionally but must not import the processor. |
 | Provider/channel integrations | Shared/platform transports plus business-owned payload composers | Email and LINE transports remain generic platform infrastructure. Leave, Stock, Routine, and the deferred Email Request capability continue to own channel-specific event payload and message meaning. |
 
+### Canonical business/outbox/Notification flow
+
+```text
+Business transaction/event
+        ↓
+Business module
+        ├─ owns recipients + semantics
+        ├─ may enqueue NotificationOutbox event
+        └─ may create Inbox notification atomically
+                    ↓
+            Notification public command
+                    ↓
+              Notification persistence
+
+Async path:
+
+NotificationOutbox
+        ↓
+Global Outbox Processor
+        ↓
+Business module public dispatch contract
+        ↓
+domain validation / recipient resolution / semantic composition
+        ↓
+Notification public command (when in-app delivery is required)
+        ↓
+Notification persistence
+```
+
+Email/LINE branches remain business/provider delivery concerns. The global
+processor owns reliable delivery lifecycle and routes business-owned events to
+the producing business contract; it does not interpret domain notification
+semantics or bypass that contract to call Notification directly.
+
 The Dashboard navbar, route composition, and generic shell remain app/Dashboard
 composition. They mount Notification presentation but do not become the owner
 of Notification persistence or business meaning.
@@ -72,8 +106,11 @@ of Notification persistence or business meaning.
 1. **Notification business capability:** a per-user in-app Inbox with durable
    entries, history/unread queries, pagination/filtering, and read commands.
 2. **In-app inbox or delivery infrastructure:** Notification means the in-app
-   Inbox. It does not absorb reliable delivery infrastructure. Outbox can
-   deliver an in-app entry, but that is a cross-boundary call into Notification.
+   Inbox. It does not absorb reliable delivery infrastructure. For a
+   business-owned outbox event, the global processor routes through the
+   producing business module, which may then invoke Notification to persist an
+   entry. A direct Outbox-to-Notification path is reserved for a future truly
+   Notification-owned generic event with a fully resolved command payload.
 3. **`Notification` Prisma model:** the future Notification capability owns
    its repository and application persistence boundary. The physical Prisma
    schema remains the repository's shared schema until H1 migrates ownership.
@@ -93,15 +130,23 @@ of Notification persistence or business meaning.
    Notification application command with an explicit user and semantic
    payload. It does not import Notification Prisma internals or the shared
    helper's implementation file.
-9. **Transaction-aware creation:** the business use case owns its transaction
-   and passes a transaction-bound Notification persistence port (implemented by
-   the existing Prisma transaction client pattern) to the command. The command
-   writes through that client and does not start a second transaction.
-10. **Outbox-delivered in-app entry:** the global processor may call the
-    narrow Notification public command, passing the claimed event's explicit
-    recipient/payload and transaction client where the dispatch also persists
-    related outbox state. The processor remains outside Notification and keeps
-    ownership of claim, retry, status, wakeup, and provider composition.
+9. **Transaction-aware creation:** the business use case or business dispatch
+   contract owns its transaction and supplies a transaction-bound Notification
+   persistence port (implemented by the existing Prisma transaction client
+   pattern) to the command. The command writes through that context and does
+   not start a second transaction. The global processor does not pass its own
+   transaction client directly to Notification.
+10. **Outbox-delivered in-app entry:** for current business-owned outbox
+    events, the global processor calls the producing business module's public
+    dispatch contract. That business application performs domain
+    revalidation, recipient resolution, stale/defer/supersede decisions, and
+    semantic composition, then invokes Notification's public command when an
+    in-app entry is required. The business dispatch contract owns the
+    transaction-bound context for atomic persistence. The processor remains
+    outside Notification and keeps ownership of claim, retry, status, wakeup,
+    and provider composition. Only a future truly Notification-owned generic
+    event with a fully resolved Notification command payload could use a direct
+    processor-to-Notification dispatch; no current production event does.
 11. **Legacy IT values:** `TICKET_CREATED`, `NEW_COMMENT`, and
     `TICKET_UPDATED` in `NotificationType`, and the legacy `TICKET_*` outbox
     values described below, are historical storage compatibility only. H0 does
@@ -111,8 +156,9 @@ of Notification persistence or business meaning.
     to be decided with the future IT capability boundary.
 13. **Transitional paths:** the legacy `app/api/notifications/**` routes,
     `components/dashboard/notifications/**`,
-    `lib/services/notifications/in-app.ts`, direct producer writes, and global
-    processor adapters continue to run unchanged until their named phases.
+    `lib/services/notifications/in-app.ts`, direct producer writes, and the
+    public business dispatch contracts consumed by the global processor continue
+    to run unchanged until their named phases.
 14. **Next phases:** H1 establishes server/application ownership and route
     delegation; H2 establishes Notification presentation/client ownership; H3
     integrates producers, resolves mixed helpers, adds guardrails, and performs
@@ -307,9 +353,10 @@ Leave's transaction-coupled outbox sites are:
 important cross-boundary example. The global processor claims a Leave outbox
 row, the Leave application revalidates the current action inside a transaction,
 creates the Leave in-app entry there, and enqueues the Leave LINE child. The
-processor later sends email after the transaction. The eventual in-app write
-can use a public Notification command; this does not transfer the processor or
-Leave semantics to Notification.
+processor later sends email after the transaction. After Leave's revalidation
+and semantic composition, the Leave dispatch contract is the future caller of
+the public Notification command; this does not transfer the processor or Leave
+semantics to Notification.
 
 ### Stock
 
@@ -370,8 +417,9 @@ independent email/LINE child outbox rows.
 This is an explicit required case: **an in-app Notification can be delivered
 through the global outbox reliability mechanism**. That fact does not make
 `NotificationOutbox` part of the Notification feature. Routine owns the
-reminder event; the platform processor owns delivery lifecycle; Notification
-will own only the durable inbox write when H1/H3 establish that seam.
+reminder event and its dispatch contract; the platform processor owns delivery
+lifecycle; Notification will own only the durable inbox write when H1/H3
+establish that seam.
 
 `modules/routine/application/mutations.ts` also supersedes pending/processing/
 failed reminder child rows when a Routine task is deleted. That is Routine
@@ -390,6 +438,9 @@ row transactionally with the Email Request record and idempotency state.
 `app/api/email-request/route.ts` authenticates/admin-checks the request and
 wakes the global processor after a new request. The global processor creates
 the Email Request in-app entry before attempting the LINE/email channel path.
+This current direct path is transitional legacy behavior, not the target
+business-dispatch boundary and not a pattern for H1; future Email Request/IT
+ownership remains deferred.
 
 Email Request remains a transitional consumer. Its future ownership is
 intentionally deferred until the IT capability boundary is re-established so
@@ -546,8 +597,10 @@ The cron/wakeup composition remains outside Notification:
 
 Business-module code may persist/enqueue outbox rows as part of its own
 transaction. No `modules/**` production code may import the global Outbox
-Processor. A future processor-to-Notification call is a narrow application
-command call, not a transfer of processor ownership.
+Processor. For business-owned events, the global processor routes through the
+producing business module's public dispatch contract; that contract may make a
+narrow Notification application command call after domain composition. This is
+not a transfer of processor ownership.
 
 ## Target ownership and public seam
 
@@ -585,11 +638,14 @@ action/reference values, and the producer's dedupe key. It must not carry an
 implicit audience query such as “all Stock admins”. Query/read commands must
 enforce user scope in the server/application layer regardless of caller UI.
 
-For an outbox-dispatched in-app event, the processor will eventually pass the
-same semantic input to `createForUserOnce` through `@/modules/notification`.
-When the dispatch requires atomic changes to outbox state or child rows, the
-command receives the transaction-bound client. The global processor continues
-to own claiming, retry, status, scheduling, and channel dispatch.
+For a business-owned outbox-dispatched in-app event, the global processor
+continues to dispatch through the producing business module's public contract.
+After domain revalidation and recipient/semantic resolution, that business
+application may call `createForUserOnce` through `@/modules/notification`,
+using the existing transaction context when atomic persistence is required.
+The global processor continues to own claiming, retry, status, scheduling, and
+channel dispatch; it does not pass a transaction client or business semantic
+input directly to Notification.
 
 ## Behavioral invariants for future phases
 
@@ -679,13 +735,13 @@ symbol in that responsibility; grouping does not imply ownership transfer.
 | `modules/leave/application/cancellation/cancellation.ts` | Mark obsolete rows; create cancellation/rejection rows; enqueue cancellation outbox events | Leave cancellation workflow | Leave workflow + Notification command | Adapt persistence/read commands after H1 seam exists | H3 | Preserve state-specific type, recipient, action, dedupe, and atomic rollback behavior. |
 | `modules/leave/application/not-taken.ts` | Create employee confirmation; mark approver row read; enqueue not-taken events | Leave not-taken workflow | Leave workflow + Notification command | Adapt persistence/read commands | H3 | Preserve request/confirm semantics and event keys. |
 | `modules/leave/application/requests/create-request.ts` (`LEAVE_ACTION`), `modules/leave/application/approvals/decision.ts` (`LEAVE_RESULT`), `modules/leave/application/cancellation/cancellation.ts` (`LEAVE_CANCELLED`, `LEAVE_CANCELLATION_REQUESTED`, `LEAVE_CANCELLED_AFTER_APPROVAL`), `modules/leave/application/not-taken.ts` (`LEAVE_NOT_TAKEN_REQUESTED`, `LEAVE_NOT_TAKEN_CONFIRMED`), and `modules/leave/infrastructure/notifications/line.ts` (seven Leave `*_LINE` child types) | Transactional Leave event and channel-row enqueueing | Leave use cases + global outbox infrastructure | Leave + global outbox infrastructure | Keep transactional enqueue; only change the in-app dispatch seam | H3 | Preserve each event key, payload, child retry key, and Leave-owned meaning; the processor remains global. |
-| `modules/leave/application/approvals/current-action-recipient.ts` | Claims/revalidates a Leave action during global dispatch, writes the in-app entry in the transaction, enqueues the LINE child, and lets the processor send email after commit | Leave application + global processor composition | Leave application + Notification command + global outbox | Keep the public Leave dispatch contract and later call Notification through its public command | H3 | This is the canonical outbox-to-inbox crossing; stale/current-action supersede remains Leave-owned. |
-| `modules/leave/infrastructure/notifications/line.ts` | Leave LINE child rows, payload validation, retry key, stale/current-action supersede | Leave channel composition | Leave channel composition + global outbox lifecycle | No wholesale move; only keep processor adapter public | H3 audit | LINE is not Notification inbox ownership. |
-| `modules/leave/index.ts`, `modules/stock/index.ts`, `modules/routine/index.ts` | Public business dispatch contracts consumed by the global processor | Respective business modules | Respective business modules + global processor composition | Keep public adapters; do not expose Notification internals through them | H3 audit | Cross-boundary calls use module public entries; no business module imports the processor. |
+| `modules/leave/application/approvals/current-action-recipient.ts` | Claims/revalidates a Leave action during global dispatch, writes the in-app entry in the transaction, enqueues the LINE child, and lets the processor send email after commit | Leave application + global processor composition | Leave application + Notification command + global outbox | Keep the public Leave dispatch contract; after Leave revalidation and semantic composition, call Notification through its public command | H3 | This is the canonical Outbox → Leave → Notification flow; stale/current-action supersede remains Leave-owned. |
+| `modules/leave/infrastructure/notifications/line.ts` | Leave LINE child rows, payload validation, retry key, stale/current-action supersede | Leave channel composition | Leave channel composition + global outbox lifecycle | No wholesale move; keep the public Leave channel dispatch contract | H3 audit | LINE is not Notification inbox ownership. |
+| `modules/leave/index.ts`, `modules/stock/index.ts`, `modules/routine/index.ts` | Public business dispatch contracts consumed by the global processor | Respective business modules | Respective business modules + global processor composition | Keep explicit public business dispatch contracts; do not expose Notification internals through them | H3 audit | Cross-boundary calls use module public entries; no business module imports the processor. |
 | `modules/stock/infrastructure/notifications/notifications.ts` | Stock requester/admin/low-stock in-app semantics; result email/LINE and low-stock/new-request outbox enqueue | Stock | Stock for semantics/recipients; Notification for generic write; global outbox for delivery | Resolve explicit recipients, then adapt generic writes | H3 | Preserve no-dedupe paths, admin filtering differences, request refs, URLs, and transaction boundaries. |
 | `modules/stock/application/requests/request-creation.ts`, `request-mutations.ts`, `item-mutations.ts` | Atomic Stock state changes plus in-app/outbox notification composition | Stock application | Stock application + public Notification command + global outbox | Keep business transaction; replace only persistence internals after seam | H3 | No producer refactor in H0; low-stock in-app/outbox pairing remains atomic. |
-| Stock outbox sites in `infrastructure/notifications/notifications.ts` | `STOCK_REQUEST_LINE`, `STOCK_LOW_LINE`, `STOCK_REQUEST_RESULT_EMAIL`, `STOCK_REQUEST_RESULT_LINE` rows | Stock + global outbox | Same | Keep enqueue payload/event/retry semantics; retain public processor adapters | H3 audit | Provider/channel meaning stays Stock-owned. |
-| `modules/stock/infrastructure/notifications/line-notifications.ts` | Claims Stock LINE rows, validates current request/stock state, supersedes unavailable work, and delegates provider delivery | Stock channel composition + global outbox lifecycle | Stock channel composition + global outbox lifecycle | Keep as a public Stock dispatch adapter; do not move to Notification | H3 audit | LINE delivery and Stock state validation are not Inbox ownership. |
+| Stock outbox sites in `infrastructure/notifications/notifications.ts` | `STOCK_REQUEST_LINE`, `STOCK_LOW_LINE`, `STOCK_REQUEST_RESULT_EMAIL`, `STOCK_REQUEST_RESULT_LINE` rows | Stock + global outbox | Same | Keep enqueue payload/event/retry semantics; retain public Stock dispatch contracts | H3 audit | Provider/channel meaning stays Stock-owned. |
+| `modules/stock/infrastructure/notifications/line-notifications.ts` | Claims Stock LINE rows, validates current request/stock state, supersedes unavailable work, and delegates provider delivery | Stock channel composition + global outbox lifecycle | Stock channel composition + global outbox lifecycle | Keep as a public Stock channel dispatch contract; do not move to Notification | H3 audit | LINE delivery and Stock state validation are not Inbox ownership. |
 | `modules/routine/application/recipients.ts` | Active assignee/admin/user and linked LINE recipient policy | Routine | Routine | No move; Notification accepts explicit IDs only | H3 audit | Never reproduce Routine audience selection in Notification. |
 | `modules/routine/application/scheduler.ts` | Due reminder scheduling and `ROUTINE_REMINDER_IN_APP` enqueue | Routine scheduler | Routine + global outbox | Keep scheduler/event key; adapt eventual in-app dispatch | H3 | Scheduler does not import processor and remains Routine-owned. |
 | `modules/routine/application/reminders.ts` | Revalidation, defer/supersede, in-app persistence, email/LINE child enqueue/dispatch | Routine | Routine semantics + Notification write + global outbox | Keep public Routine processor contract; replace generic write after H1 | H3 | In-app delivery through outbox is a required compatibility case. |
@@ -696,7 +752,7 @@ symbol in that responsibility; grouping does not imply ownership transfer.
 | `lib/services/email-request/mutations.ts`, `app/api/email-request/route.ts` | Transactional Email Request outbox, idempotency, admin delivery/wakeup | Email Request transitional path + app | Deferred IT capability + global outbox/app | Preserve current path until approved IT migration | Deferred | Department remains requester-provided free text/snapshot. |
 | Legacy `TICKET_*` Notification and NotificationOutbox values | Readability of historical IT Support rows | Shared schema/storage compatibility | Shared schema/storage compatibility | Retain; add no producers and do not restore module | H3 final audit | Delete only in a separately approved data-compatibility decision. |
 | `lib/services/outbox/types.ts` | Runtime whitelist, status list, max attempts and stale threshold | Global platform outbox | Global platform outbox | Keep outside Notification; document enum/storage difference | H3 audit | Current whitelist intentionally excludes legacy TICKET values. |
-| `lib/services/outbox/processor.ts` | Claim, stale recovery, retry/backoff/dead, supersede, dispatch composition | Global platform outbox | Global platform outbox | Do not move; add only a narrow Notification public call in a later phase | H3 | Business modules and Notification must not own/import this processor. |
+| `lib/services/outbox/processor.ts` | Claim, stale recovery, retry/backoff/dead, supersede, dispatch composition | Global platform outbox | Global platform outbox | Do not move; later business dispatch contracts may add a narrow Notification public call after domain composition | H3 | The processor routes business-owned events through public business contracts; business modules and Notification must not own/import this processor. |
 | `app/api/cron/notification-outbox/route.ts`; `app/api/email-request/route.ts`; `app/api/leave/request/route.ts`, `decision/route.ts`, `cancel/route.ts`, `not-taken/route.ts`; `app/api/line/leave/request/route.ts`, `decision/route.ts`, `cancel/route.ts`, `not-taken/route.ts`; `app/api/stock/requests/route.ts`, `requests/[id]/issue/route.ts`, `requests/[id]/review/route.ts`, `items/[id]/adjust/route.ts`; `app/api/line/stock/requests/route.ts`, `requests/[id]/issue/route.ts` | Secret-gated processor execution and post-transaction `after(() => processOutbox())` wakeups | App/platform composition | App/platform composition | Keep unchanged while module contracts migrate | H3 audit | These routes wake the global processor; no route becomes Notification-owned merely by delivering an event. |
 | `lib/services/outbox/provider-key.ts` | Deterministic LINE retry keys and email message IDs | Global platform outbox/provider infrastructure | Global platform outbox/provider infrastructure | Preserve derivation and provider idempotency | H3 audit | Keys are not inbox dedupe keys. |
 | `lib/email/**`, `lib/line/**` | Generic SMTP/LINE transport, eligibility, provider retries, legacy adapters | Shared/platform channel infrastructure | Shared/platform channel infrastructure | No move to Notification; preserve channel-specific caller contracts | H3 audit | Business modules still choose channels and compose event meaning. |
@@ -736,6 +792,11 @@ inbox query/read commands, a transaction-aware generic create-to-user command,
 and route delegation for the four existing HTTP routes. Preserve the exact
 auth, user scope, response, pagination, and error behavior. Do not perform
 broad producer cleanup or migrate Email Request.
+
+For outbox-originated writes, H1 must preserve the canonical
+Outbox → business dispatch contract → business/application semantics →
+Notification command flow. H1 must not make the global processor a direct
+Notification caller.
 
 ### H2 — Notification Presentation Ownership
 

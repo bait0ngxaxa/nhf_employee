@@ -196,8 +196,15 @@ infrastructure. Its processor owns claiming, retry/backoff, stale
 `PROCESSING` recovery, dead-lettering, superseding, scheduling/wakeup, and
 dispatch composition for Email, LINE, and in-app delivery. Business modules
 may enqueue rows in their own transactions but must not import the processor.
-The processor may later call a narrow Notification public command for an
-in-app write without becoming part of the Notification module.
+For business-owned outbox events, the processor routes through the producing
+business module's public dispatch contract. That module revalidates domain
+state, resolves recipients and notification semantics, makes stale/defer/
+supersede decisions, and may then invoke Notification's public command for the
+in-app write. The business dispatch contract owns any transaction-bound
+persistence context; the global processor does not pass a transaction client
+directly to Notification. A direct processor-to-Notification dispatch is
+reserved for a future truly Notification-owned generic event with a fully
+resolved command payload, not current business-owned events.
 
 Dashboard navbar/page/menu composition remains app/Dashboard-owned. Email
 Request is documented as a transitional/deferred consumer and legacy IT enum
