@@ -162,9 +162,22 @@ const leavePresentationRouteDirectories = [
 ];
 
 const employeeApiRouteDirectory = "app/api/employees";
+const employeeDashboardRouteDirectory = "app/dashboard/employees";
+const employeeDashboardFeatureRouteFiles = [
+    "app/dashboard/employees/page.tsx",
+    "app/dashboard/employees/loading.tsx",
+    "app/dashboard/employees/new/page.tsx",
+    "app/dashboard/employees/import/page.tsx",
+];
 const legacyEmployeeServerPrefixes = [
     "@/lib/services/employee",
     "@/lib/validations/employee",
+];
+const legacyEmployeePresentationPrefixes = [
+    "@/components/employee",
+    "@/components/dashboard/context/employee",
+    "@/components/dashboard/sections/EmployeeManagementSection",
+    "@/components/dashboard/sections/AddEmployeeSection",
 ];
 
 const legacyLeavePresentationPrefixes = [
@@ -267,8 +280,16 @@ function getEmployeeDependencyViolation(filePath, rootPath, moduleSpecifier) {
             resolve(employeeModuleRoot, "index.ts"),
             resolve(employeeModuleRoot, "client.ts"),
         ].includes(filePath);
+    const isEmployeePresentation = pathIsWithin(
+        filePath,
+        resolve(employeeModuleRoot, "presentation"),
+    );
     if (isEmployeeModule && hasImportPrefix(normalizedSpecifier, "@/modules/leave")) {
         return "Employee module must not depend on Leave; inject the Employee offboarding-responsibility port at the composition boundary.";
+    }
+    if (isEmployeePresentation
+        && ["@/modules/employee", "@/modules/employee/client"].includes(normalizedSpecifier)) {
+        return "Employee presentation internals must use local contracts instead of their own public barrel.";
     }
     if (isEmployeeInternal
         && ["@/modules/employee", "@/modules/employee/client"].includes(normalizedSpecifier)) {
@@ -284,6 +305,76 @@ function getEmployeeDependencyViolation(filePath, rootPath, moduleSpecifier) {
         return "Employee API routes must use the server entry @/modules/employee.";
     }
     return null;
+}
+
+function getEmployeeDashboardRouteDependencyViolation(filePath, rootPath, moduleSpecifier) {
+    if (!pathIsWithin(filePath, resolve(rootPath, employeeDashboardRouteDirectory))) {
+        return null;
+    }
+
+    const resolvedImport = moduleSpecifier.startsWith("@/")
+        ? resolve(rootPath, moduleSpecifier.slice(2))
+        : getImportSourcePath(moduleSpecifier, filePath, rootPath);
+    const normalizedSpecifier = resolvedImport === null
+        ? moduleSpecifier
+        : `@/${relativeFilePath(resolvedImport, rootPath).replace(/\.[cm]?[jt]sx?$/, "")}`;
+
+    if (legacyEmployeePresentationPrefixes.some((prefix) =>
+        hasImportPrefix(normalizedSpecifier, prefix),
+    )) {
+        return "Employee Dashboard routes must use @/modules/employee/client instead of legacy Employee presentation paths.";
+    }
+
+    if (hasImportPrefix(normalizedSpecifier, "@/modules/employee/presentation")) {
+        return "Employee Dashboard routes must use @/modules/employee/client instead of deep Employee presentation imports.";
+    }
+
+    const isFeatureRoute = employeeDashboardFeatureRouteFiles.some((routePath) =>
+        pathIsWithin(filePath, resolve(rootPath, routePath)),
+    );
+    if (isFeatureRoute
+        && hasImportPrefix(normalizedSpecifier, "@/modules/employee")
+        && normalizedSpecifier !== "@/modules/employee/client") {
+        return "Employee Dashboard routes must use @/modules/employee/client.";
+    }
+
+    return null;
+}
+
+function getEmployeeDashboardRouteCompositionViolations(rootPath, sourceFiles) {
+    const clientEntry = "@/modules/employee/client";
+    const violations = [];
+
+    for (const routePath of employeeDashboardFeatureRouteFiles) {
+        const filePath = resolve(rootPath, routePath);
+        if (!sourceFiles.includes(filePath)) continue;
+
+        const imports = getImports(filePath);
+        const normalizedSpecifiers = imports.map((record) => {
+            const resolvedImport = record.moduleSpecifier.startsWith("@/")
+                ? resolve(rootPath, record.moduleSpecifier.slice(2))
+                : getImportSourcePath(record.moduleSpecifier, filePath, rootPath);
+            return resolvedImport === null
+                ? record.moduleSpecifier
+                : `@/${relativeFilePath(resolvedImport, rootPath).replace(/\.[cm]?[jt]sx?$/, "")}`;
+        });
+
+        if (normalizedSpecifiers.includes(clientEntry)) continue;
+
+        const hasEmployeePresentationImport = normalizedSpecifiers.some((specifier) =>
+            hasImportPrefix(specifier, "@/modules/employee")
+            || legacyEmployeePresentationPrefixes.some((prefix) =>
+                hasImportPrefix(specifier, prefix),
+            ),
+        );
+        if (hasEmployeePresentationImport) continue;
+
+        violations.push(
+            `${relativeFilePath(filePath, rootPath)} must consume Employee presentation through "${clientEntry}".`,
+        );
+    }
+
+    return violations;
 }
 
 function getScriptKind(filePath) {
@@ -470,7 +561,7 @@ function getEmployeeClientGraphViolations(rootPath) {
     ];
     const serverDirectories = [
         "lib/db", "lib/server", "lib/email", "lib/line",
-        "modules/employee/server", "modules/employee/infrastructure",
+        "modules/employee/server", "modules/employee/application", "modules/employee/infrastructure",
     ];
     while (pending.length > 0) {
         const filePath = pending.pop();
@@ -628,6 +719,22 @@ function checkArchitecture(options = {}) {
                 continue;
             }
 
+            const employeeDashboardRouteDependencyViolation =
+                getEmployeeDashboardRouteDependencyViolation(
+                    filePath,
+                    rootPath,
+                    importRecord.moduleSpecifier,
+                );
+            if (employeeDashboardRouteDependencyViolation !== null) {
+                violations.push(describeViolation(
+                    filePath,
+                    rootPath,
+                    importRecord,
+                    employeeDashboardRouteDependencyViolation,
+                ));
+                continue;
+            }
+
             const moduleDependencyViolation = getModuleDependencyViolation(
                 owner,
                 importRecord.moduleSpecifier,
@@ -665,6 +772,7 @@ function checkArchitecture(options = {}) {
         }
     }
 
+    violations.push(...getEmployeeDashboardRouteCompositionViolations(rootPath, sourceFiles));
     violations.push(...getLeaveClientGraphViolations(rootPath));
     violations.push(...getEmployeeClientGraphViolations(rootPath));
     violations.push(...getClientReachableServerEntryViolations(rootPath, sourceFiles, "leave"));

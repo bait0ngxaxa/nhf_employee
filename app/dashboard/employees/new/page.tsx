@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import type { Metadata } from "next";
 
-import { AddEmployeeSection } from "@/components/dashboard/sections/AddEmployeeSection";
+import { AddEmployeeSection } from "@/modules/employee/client";
 import { FormSectionSkeleton } from "@/components/dashboard/feedback/SectionSkeleton";
 import { requireDashboardAdmin } from "@/app/dashboard/_lib/route-access";
 

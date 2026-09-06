@@ -1,15 +1,15 @@
 # Employee migration
 
-Status: Phase F1 corrective pass — Employee Server & Business Ownership.
+Status: Phase F2 CLOSED — Employee presentation ownership migrated.
 
 Approved F0 baseline: `ee9a60be6c077055873214a9644384caa8b43f80`
 (`docs(employee): correct F0 migration boundary`).
 
-This document retains the F0 discovery record and now records the implemented
-F1 server/business ownership. F1 is behavior-preserving: API contracts,
-permissions, transactions, concurrency rules, Thai wording, CSV behavior,
-audit behavior, Auth/Workforce behavior, Leave behavior, UI, and Prisma schema
-remain unchanged.
+This document retains the F0 discovery record and records the implemented F1
+server/business ownership and F2 presentation ownership. Both phases are
+behavior-preserving: API contracts, permissions, transactions, concurrency
+rules, Thai wording, CSV behavior, audit behavior, Auth/Workforce behavior,
+Leave behavior, UI, and Prisma schema remain unchanged.
 
 ## F1 implementation record
 
@@ -53,20 +53,16 @@ not exported.
 
 The old `lib/services/employee/**` implementation was removed because no
 production compatibility consumer remained. `lib/validations/employee.ts` is
-the remaining server-schema compatibility facade; its exact consumers are
-`components/employee/add-employee/useAddEmployee.ts` and
-`components/employee/edit-employee/useEditEmployee.ts`. It re-exports the
-client-safe schemas from the intentionally minimal `modules/employee/client.ts`
-and exits in F2/F3 when those forms migrate. No Employee presentation was moved
-in F1.
+the remaining server-schema compatibility facade used by the Employee API
+routes. It re-exports the client-safe schemas from `modules/employee/client.ts`
+for compatibility. F2 moved the active forms to the module's local schemas;
+the facade remains until the F3 consumer audit.
 
-The mixed `lib/helpers/employee-helpers.ts` remains client/presentation
-compatibility until F2, including its client-safe Employee identity formatting
-and neutral User-to-Employee fallback projection. Server routes and Auth signup
-use the Employee-owned server identity contract; client graphs do not import the
-server barrel. Attempting to route the broad legacy helper graph through the
-temporary schema client entry increased shared client bundles, so that F2
-identity cleanup is intentionally not pulled into F1.
+The mixed `lib/helpers/employee-helpers.ts` remains compatibility code after F2
+because Auth, audit, Leave, Routine, and Stock consumers still exist. The
+migrated Employee presentation uses its local client-safe formatter and the
+Employee-owned browser contracts; it does not route the broad legacy helper
+graph through the client entry.
 
 Employee lifecycle orchestration remains one serializable transaction. It
 locks the Employee, delegates linked-account locking, self-offboarding and
@@ -107,9 +103,77 @@ session.
 Employee implementation tests for schemas, queries, mutations, import, stats,
 and export are colocated under `modules/employee/**`. External route, Auth,
 signup concurrency, and Leave concurrency tests remain with their owning
-layers/features. Architecture enforcement now covers Employee route ownership,
-deep imports, self-public-barrel imports, client/server graphs, shared module
-direction, and the global Outbox Processor prohibition.
+layers/features. F2 also moved the Employee table/mobile tests and added
+client CSV/parser and route-boundary coverage. Architecture enforcement now
+covers Employee route ownership, deep imports, self-public-barrel imports,
+client/server graphs, shared module direction, and the global Outbox Processor
+prohibition.
+
+## F2 implementation record
+
+Phase F2 CLOSED — Employee presentation ownership migrated.
+
+The active Employee browser/dashboard presentation is now owned by
+`modules/employee/presentation/**`:
+
+```text
+modules/employee/presentation/
+├── dashboard/
+│   ├── EmployeeManagementSection.tsx
+│   ├── AddEmployeeSection.tsx
+│   ├── EmployeeList.tsx
+│   ├── EmployeeMobileCard.tsx
+│   ├── EmployeeModals.tsx
+│   ├── EmployeeSearchControls.tsx
+│   ├── EmployeeSkeletons.tsx
+│   ├── EmployeeStatsCards.tsx
+│   ├── EmployeeTable.tsx
+│   ├── EmployeeTablePrimitives.tsx
+│   ├── formatters.ts
+│   ├── types.ts
+│   ├── context/
+│   ├── add-employee/
+│   ├── edit-employee/
+│   └── shared/
+└── import/
+    ├── ImportEmployeeRouteContent.tsx
+    ├── ImportEmployeeCSV.tsx
+    ├── ImportHeader.tsx
+    ├── PreviewStep.tsx
+    ├── ProgressSteps.tsx
+    ├── ResultStep.tsx
+    ├── UploadStep.tsx
+    ├── csv.ts
+    ├── types.ts
+    └── useImportCSV.ts
+```
+
+The four Employee Dashboard routes compose through the browser-safe
+`@/modules/employee/client` entry. Its route-facing presentation exports are
+`EmployeeManagementSection`, `EmployeeManagementSectionSkeleton`,
+`AddEmployeeSection`, and `ImportEmployeeRouteContent`. The Employee provider,
+contexts, table/mobile components, form hooks, and import steps remain internal
+to the presentation graph. The schema exports remain only as a compatibility
+surface for `lib/validations/employee.ts` and are deferred to F3 cleanup.
+
+Employee presentation state remains feature-owned: `EmployeeProvider`, list and
+stats SWR state, filters, pagination, modal state, export state, and mutation
+refresh behavior moved with the feature. Generic Dashboard shell, navigation,
+session/access checks, loading feedback, and generic Dashboard contexts remain
+owned by the app/Dashboard composition layer. Browser traffic still uses the
+existing `/api/employees/**` and `/api/departments` endpoints.
+
+The active Employee CSV browser flow now uses the local client-safe
+`presentation/import/csv.ts` implementation. It preserves BOM handling, Thai
+and English aliases, required fields, source rows, quoted values, optional
+blanks, sample CSV content/name, Thai errors, status mapping, the 5 MB file
+limit, 1,000-row limit, preview, partial-success results, and the existing
+HTTP import endpoint. It no longer reaches the mixed Prisma/Leave
+`lib/helpers/csv-helpers.ts`; that legacy helper remains for confirmed
+compatibility consumers.
+
+F2 did not change Employee server/business ownership, lifecycle/offboarding
+composition, API URLs/contracts, permissions, database schema, or UI behavior.
 
 ## 1. Executive boundary decisions
 
@@ -166,11 +230,11 @@ LEGACY` rather than being silently assigned to Employee.
 | `app/api/employees/route.ts` | Authenticated Employee list (`GET`) and admin Employee create (`POST`) | `EMPLOYEE DELIVERY/HTTP` | Thin route adapter over the Employee server/application API in F1 |
 | `app/api/employees/[id]/route.ts` | Admin profile/status update (`PATCH`) and soft-delete/offboard (`DELETE`) | `EMPLOYEE DELIVERY/HTTP` | Thin route adapter in F1 |
 | `app/api/employees/stats/route.ts` | Authenticated aggregate Employee counts | `EMPLOYEE DELIVERY/HTTP` | Thin route adapter in F1 |
-| `app/api/employees/import/route.ts` | Admin JSON import submission and 1,000-row guard | `EMPLOYEE DELIVERY/HTTP` | Thin route adapter in F1; browser file parsing remains a presentation concern until verified |
+| `app/api/employees/import/route.ts` | Admin JSON import submission and 1,000-row guard | `EMPLOYEE DELIVERY/HTTP` | Thin route adapter in F1; browser file parsing is now owned by Employee presentation in F2 |
 | `app/api/employees/export/route.ts` | Authenticated streamed Employee CSV export | `EMPLOYEE DELIVERY/HTTP` | Thin route adapter in F1 over Employee report/export contracts |
 | `app/api/departments/route.ts` | Authenticated Department reference-data read | `SHARED / PLATFORM` for delivery, `COMPATIBILITY / LEGACY` for the capability | Remains outside Employee in F0; revisit with a future organization/reference-data migration |
-| `lib/ssot/routes.ts` | Canonical Employee dashboard/API route constants, including detail, stats, import, export, and departments | `SHARED / PLATFORM` route SSOT with Employee-specific constants | Keep as compatibility route contract; F1 must preserve values |
-| `lib/ssot/exports.ts` | Employee export limit of 2,000 rows and batch size of 250 | `SHARED / PLATFORM` policy registry with Employee-specific entry | Employee-owned export policy should move with the feature in F1, while the registry contract remains stable |
+| `lib/ssot/routes.ts` | Canonical Employee dashboard/API route constants, including detail, stats, import, export, and departments | `SHARED / PLATFORM` route SSOT with Employee-specific constants | Compatibility route contract; F1/F2 preserve values |
+| `lib/ssot/exports.ts` | Employee export limit of 2,000 rows and batch size of 250 | `SHARED / PLATFORM` policy registry with Employee-specific entry | F2 presentation continues to consume the existing registry; any ownership cleanup remains separately scoped |
 
 There is no Employee detail `GET /api/employees/[id]` route in the current
 inventory. The `[id]` route contains `PATCH` and `DELETE` only.
@@ -179,76 +243,71 @@ inventory. The `[id]` route contains `PATCH` and `DELETE` only.
 
 | Current path | Observed responsibility | Classification | Target slice |
 | --- | --- | --- | --- |
-| `app/dashboard/employees/page.tsx` | Employee management route composition; Suspense boundary | `EMPLOYEE PRESENTATION` plus Next.js delivery | F2 route composition through `@/modules/employee/client` |
-| `app/dashboard/employees/loading.tsx` | Loading UI for Employee management | `EMPLOYEE PRESENTATION` | F2 |
-| `app/dashboard/employees/new/page.tsx` | Admin gate and Add Employee route composition | `EMPLOYEE PRESENTATION` plus delivery | F2; preserve `requireDashboardAdmin` behavior |
-| `app/dashboard/employees/new/loading.tsx` | Loading UI for Add Employee | `EMPLOYEE PRESENTATION` | F2 |
-| `app/dashboard/employees/import/page.tsx` | Admin gate and import route composition | `EMPLOYEE PRESENTATION` plus delivery | F2; preserve `requireDashboardAdmin` behavior |
-| `app/dashboard/employees/import/loading.tsx` | Loading UI for import | `EMPLOYEE PRESENTATION` | F2 |
-| `app/dashboard/employees/import/ImportEmployeeRouteContent.tsx` | Client import route content, Dashboard navigation, SWR invalidation, and `ImportEmployeeCSV` composition | `EMPLOYEE PRESENTATION` with Dashboard/platform dependency | F2 module presentation; keep Dashboard shell/navigation outside Employee |
+| `app/dashboard/employees/page.tsx` | Employee management route composition; Suspense boundary | Next.js delivery using Employee client entry | F2 complete through `@/modules/employee/client` |
+| `app/dashboard/employees/loading.tsx` | Employee management skeleton route | Next.js delivery using Employee client entry | F2 complete through `@/modules/employee/client` |
+| `app/dashboard/employees/new/page.tsx` | Admin gate and Add Employee route composition | Employee client entry plus delivery | F2 complete; preserve `requireDashboardAdmin` behavior |
+| `app/dashboard/employees/new/loading.tsx` | Loading UI for Add Employee | Generic Dashboard delivery feedback | Remains outside Employee; F2 does not move generic skeletons |
+| `app/dashboard/employees/import/page.tsx` | Admin gate and import route composition | Employee client entry plus delivery | F2 complete; preserve `requireDashboardAdmin` behavior |
+| `app/dashboard/employees/import/loading.tsx` | Loading UI for import | Generic Dashboard delivery feedback | Remains outside Employee; F2 does not move generic skeletons |
+| `modules/employee/presentation/import/ImportEmployeeRouteContent.tsx` | Client import route content, Dashboard navigation, SWR invalidation, and `ImportEmployeeCSV` composition | Employee presentation with Dashboard/platform dependency | F2 complete; keep Dashboard shell/navigation outside Employee |
 
 The route URLs are canonical App Router paths and are not to be changed by the
 migration.
 
 ### 3.3 Employee feature components and context
 
-The following files are Employee-specific presentation, even though some are
-currently under `components/dashboard/`:
+The following files are the active Employee-specific presentation after F2:
 
 ```text
-components/dashboard/sections/EmployeeManagementSection.tsx
-components/dashboard/sections/AddEmployeeSection.tsx
+modules/employee/presentation/dashboard/EmployeeManagementSection.tsx
+modules/employee/presentation/dashboard/AddEmployeeSection.tsx
 
-components/dashboard/context/employee/EmployeeContext.tsx
-components/dashboard/context/employee/EmployeeProvider.tsx
-components/dashboard/context/employee/types.ts
-components/dashboard/context/employee/index.ts
-components/dashboard/context/index.ts
+modules/employee/presentation/dashboard/context/EmployeeContext.tsx
+modules/employee/presentation/dashboard/context/EmployeeProvider.tsx
+modules/employee/presentation/dashboard/context/types.ts
 
-components/employee/index.ts
-components/employee/EmployeeList.tsx
-components/employee/EmployeeTable.tsx
-components/employee/EmployeeTablePrimitives.tsx
-components/employee/EmployeeMobileCard.tsx
-components/employee/EmployeeSearchControls.tsx
-components/employee/EmployeeModals.tsx
-components/employee/EmployeeStatsCards.tsx
-components/employee/EmployeeSkeletons.tsx
+modules/employee/presentation/dashboard/EmployeeList.tsx
+modules/employee/presentation/dashboard/EmployeeTable.tsx
+modules/employee/presentation/dashboard/EmployeeTablePrimitives.tsx
+modules/employee/presentation/dashboard/EmployeeMobileCard.tsx
+modules/employee/presentation/dashboard/EmployeeSearchControls.tsx
+modules/employee/presentation/dashboard/EmployeeModals.tsx
+modules/employee/presentation/dashboard/EmployeeStatsCards.tsx
+modules/employee/presentation/dashboard/EmployeeSkeletons.tsx
+modules/employee/presentation/dashboard/formatters.ts
+modules/employee/presentation/dashboard/types.ts
 components/employee/EditStatusModal.tsx
 
-components/employee/add-employee/AddEmployeeForm.tsx
-components/employee/add-employee/useAddEmployee.ts
-components/employee/add-employee/index.ts
+modules/employee/presentation/dashboard/add-employee/AddEmployeeForm.tsx
+modules/employee/presentation/dashboard/add-employee/useAddEmployee.ts
 
-components/employee/edit-employee/EditEmployeeForm.tsx
-components/employee/edit-employee/useEditEmployee.ts
-components/employee/edit-employee/index.ts
+modules/employee/presentation/dashboard/edit-employee/EditEmployeeForm.tsx
+modules/employee/presentation/dashboard/edit-employee/useEditEmployee.ts
 
-components/employee/import-csv/ImportEmployeeCSV.tsx
-components/employee/import-csv/ImportHeader.tsx
-components/employee/import-csv/ProgressSteps.tsx
-components/employee/import-csv/UploadStep.tsx
-components/employee/import-csv/PreviewStep.tsx
-components/employee/import-csv/ResultStep.tsx
-components/employee/import-csv/useImportCSV.ts
-components/employee/import-csv/types.ts
-components/employee/import-csv/index.ts
+modules/employee/presentation/import/ImportEmployeeCSV.tsx
+modules/employee/presentation/import/ImportHeader.tsx
+modules/employee/presentation/import/ProgressSteps.tsx
+modules/employee/presentation/import/UploadStep.tsx
+modules/employee/presentation/import/PreviewStep.tsx
+modules/employee/presentation/import/ResultStep.tsx
+modules/employee/presentation/import/useImportCSV.ts
+modules/employee/presentation/import/csv.ts
+modules/employee/presentation/import/types.ts
 
-components/employee/shared/EmployeeFormFields.tsx
-components/employee/shared/types.ts
-components/employee/shared/index.ts
+modules/employee/presentation/dashboard/shared/EmployeeFormFields.tsx
+modules/employee/presentation/dashboard/shared/types.ts
 ```
 
 `EmployeeProvider` is a feature application/presentation state provider, not a
 generic Dashboard workforce provider. It owns Employee list/stats SWR state,
 search/filter/page state, edit-modal state, export state, refresh/revalidation,
-and Employee mutation toasts. It should move with Employee in F2. The
-Dashboard UI/data contexts used by the provider remain Dashboard/platform
-composition dependencies.
+and Employee mutation toasts. It now lives under
+`modules/employee/presentation/dashboard/context/`. The Dashboard UI/data
+contexts used by the provider remain Dashboard/platform dependencies.
 
-`EditStatusModal.tsx` has no production consumer in the current search and is
-not part of the active composition. It is retained as a legacy/orphaned
-Employee presentation artifact until F2/F3 confirms it can be removed.
+`components/employee/EditStatusModal.tsx` has no production consumer in the
+current search and is not part of the active composition. It is retained as a
+legacy/orphaned Employee presentation artifact for F3 confirmation/removal.
 
 ### 3.4 Legacy server/service, validation, and helper inventory
 
@@ -290,12 +349,12 @@ Classification and target ownership:
 | `lib/services/employee/import.ts` | `EMPLOYEE APPLICATION` plus persistence | Employee import use case with a technical CSV/persistence adapter |
 | `lib/services/employee/types.ts` | Mixed service DTO, actor, persistence-derived type, and result contracts | Split into domain/reference types, application commands/results, and route DTOs; do not create a mega type file |
 | `lib/services/employee/constants.ts` | Employee query/import policy | Employee module policy/constants |
-| `lib/validations/employee.ts` | Employee route/form schemas | Employee `schemas/` or route-facing presentation schemas in F1 |
+| `lib/validations/employee.ts` | Employee route schemas and compatibility re-export | `modules/employee/schemas/employee.ts`; facade remains until F3 consumer audit |
 | `lib/validations/index.ts` | Legacy re-export of Employee create/update schemas and inferred types | Compatibility facade; remove its Employee exports once all consumers use the module contract |
-| `lib/helpers/employee-helpers.ts` | Mixed Employee semantics, identity projection, presentation formatting, and User fallback | Split by ownership; detailed per-export decision appears below |
-| `lib/helpers/csv-helpers.ts` | Mixed Employee CSV and Leave CSV implementation; runtime Prisma enum import | Split Employee CSV behavior from Leave CSV behavior during F1/F3; no whole-file move |
+| `lib/helpers/employee-helpers.ts` | Mixed Employee semantics, identity projection, presentation formatting, and User fallback | Migrated Employee presentation uses local formatters; confirmed cross-feature consumers remain for F3; detailed per-export decision appears below |
+| `lib/helpers/csv-helpers.ts` | Mixed Employee CSV and Leave CSV implementation; runtime Prisma enum import | Active Employee browser parser moved to `modules/employee/presentation/import/csv.ts`; no whole-file move; final split remains F3 |
 | `lib/helpers/file-validation.ts` | Generic file validation with current CSV-specific implementation | Shared/platform primitive if it remains generic; Employee import owns which file policy it applies |
-| `types/employees.ts` | Legacy combined domain/API/UI/CSV types | Compatibility facade during F1; split types by layer and remove in F3 after consumer audit |
+| `types/employees.ts` | Legacy combined domain/API/UI/CSV types | Migrated Employee presentation uses local types; compatibility source remains for non-migrated consumers and F3 audit |
 | `types/api.ts` | Legacy API types; `GetEmployeesResponse` does not match the current paginated response | Compatibility/legacy; do not make it the new module contract |
 | `constants/employees.ts` | Employee status values, labels, colors, icons, descriptions | Employee domain/presentation policy; client-safe exports may be exposed through `client.ts` only when there is a real consumer |
 | `constants/ui.ts` | Generic UI constants with Employee CSV/status/pagination entries; some entries are stale | Compatibility/legacy; do not move the whole file into Employee |
@@ -303,7 +362,7 @@ Classification and target ownership:
 | `constants/audit.ts` | Shared audit labels/entity labels for Employee events and `EmployeeApprover` | Audit/platform registry; Employee event meaning remains Employee/Leave respectively |
 | `constants/dashboard.ts` | Dashboard menu/tab entries and route composition for Employee screens | Dashboard delivery/platform; keep route visibility separate from authorization |
 | `app/globals.css` | Global Employee dashboard/action/nickname design tokens | Shared global styling; keep tokens global unless a later design-system change explicitly scopes them |
-| `components/dashboard/context/index.ts` | Legacy Dashboard context barrel re-exporting Employee provider/hooks/types | Compatibility facade; F2 should remove Employee exports after route consumers use the module client boundary |
+| `components/dashboard/context/index.ts` | Generic Dashboard context barrel; Employee re-exports removed in F2 | Dashboard-only compatibility barrel; Employee provider/context are module-owned |
 | `lib/ssot/messages.ts` | Shared HTTP messages including Employee IDs/profile/update/delete messages | Compatibility message SSOT; preserve values during F1 and move only Employee-specific ownership deliberately |
 | `lib/audit-log/contracts.ts` | Generic audit details plus Employee/EmployeeApprover detail shapes | Audit platform contract with feature-specific detail variants; do not move generic audit infrastructure into Employee |
 | `lib/audit-log/display.ts` | Client-reachable audit formatting, Employee diff/name formatting, and Leave/Routine labels | Audit presentation/platform; must use client-safe structural Employee formatting after F2 |
@@ -339,8 +398,8 @@ projection, or feature serializer.
 | Consumer family | Runtime side | Direct Employee dependency | Transitive dependency | Database/Auth/feature/platform edges | Tests/evidence |
 | --- | --- | --- | --- | --- | --- |
 | `app/api/employees/**` | Server delivery | Legacy Employee service, schemas, Employee helper, route constants, Prisma/export helpers | Audit event and shared HTTP/CSV response | Employee/User/Department Prisma; API/Admin auth; audit platform | `__tests__/api/employees-routes.test.ts` |
-| `app/dashboard/employees/**` | Server route + client content | Employee sections/provider/import content and generic API/SWR adapters | Employee components, forms, helpers, Department endpoint, Dashboard context | Dashboard auth/navigation; Employee API; browser-only state | Employee component tests and dashboard route tests |
-| `components/employee/**` and Employee Dashboard context | Client | Employee types/constants/helpers, schemas, CSV/file helpers, API adapters | Provider → list/table/forms/import steps → Employee API | Dashboard UI/data context; no direct Prisma in component tree | `__tests__/components/EmployeeTable*.test.*`, helper/validation tests |
+| `app/dashboard/employees/**` | Server route + client content | `@/modules/employee/client` plus generic API/SWR adapters | Module-owned Employee components, forms, import flow, Department endpoint, Dashboard context | Dashboard auth/navigation; Employee API; browser-only state | Module presentation tests and architecture route tests |
+| `modules/employee/presentation/**` | Client | Local Employee types/formatters/schemas, API adapters, client CSV parser | Provider → list/table/forms/import steps → Employee API | Dashboard UI/data context; no direct Prisma in client graph | `modules/employee/presentation/**` tests |
 | `lib/auth/**`, `app/api/auth/**` | Server | User queries inspect Employee status/deleted/link/name; signup locks Employee | API session, LIFF identity, hybrid auth, Workforce gate | Auth owns credentials/session; Employee/User/Department DB; Leave public capability API | Auth, signup, hybrid, workforce, LIFF, token-version tests |
 | `modules/leave/**` | Server + client | Leave-owned persistence queries select Employee; legacy display helper imports | Requester/approver display, report rows, notification payloads, session capability projection | Leave owns approval/exception rules; Employee supplies identity/status/hierarchy data | Leave unit/API/integration suites and concurrency tests |
 | `modules/routine/**` | Server + client | Routine queries/mutations/import/recipients select Employee or linked User data | Assignee display, active/readiness projection, owner mapping, notifications | Routine owns assignee/import/recipient rules; Employee supplies reference data | Routine API/application/integration suites |
@@ -473,7 +532,7 @@ Current compatibility behavior:
   import behavior belongs to Routine and must not be copied into Employee by
   assumption.
 - The active client at
-  `components/employee/import-csv/useImportCSV.ts` previews up to the first 100
+  `modules/employee/presentation/import/useImportCSV.ts` previews up to the first 100
   parsed rows and rejects more than 1,000 parsed rows before posting.
 - `app/api/employees/import/route.ts` independently rejects more than 1,000
   submitted rows.
@@ -487,9 +546,10 @@ Current compatibility behavior:
 
 ### Columns and parsing
 
-`lib/helpers/csv-helpers.ts` maps Thai and English aliases for first name, last
-name, email, phone, position, department, affiliation, nickname, and status.
-Required columns are first name, last name, position, and department. The parser
+`modules/employee/presentation/import/csv.ts` maps Thai and English aliases for
+first name, last name, email, phone, position, department, affiliation,
+nickname, and status. Required columns are first name, last name, position, and
+department. The parser
 strips a UTF-8 BOM, ignores blank lines, records the source row, and handles
 basic quoted commas. It does not implement multiline quoted CSV records.
 
@@ -633,46 +693,43 @@ call or an N+1 sequence.
   client-side Employee schemas; their hooks fetch departments and call generic
   API adapters. They revalidate or close UI state after success.
 - Import presentation is a step flow: file validation, parse, preview,
-  submit, and result/error display. It uses Employee CSV helpers and generic
-  download/toast/SWR facilities.
+  submit, and result/error display. It uses the Employee-owned client-safe CSV
+  parser plus generic download/toast/SWR facilities.
 - Employee dashboard pages use `requireDashboardAdmin` for new/import routes,
   while the main page is composed under the existing Dashboard session/layout.
 
 ### Context ownership decision
 
-`components/dashboard/context/employee/EmployeeContext.tsx` and
+`modules/employee/presentation/dashboard/context/EmployeeContext.tsx` and
 `EmployeeProvider.tsx` represent Employee feature state, not global workforce
-identity or session state. They should move to something like
-`modules/employee/presentation/dashboard/context/` in F2. Generic Dashboard
-navigation, UI messaging, and session contexts stay outside Employee.
+identity or session state. Generic Dashboard navigation, UI messaging, and
+session contexts stay outside Employee. The old dashboard Employee context
+path is no longer used by production Employee routes.
 
 ### Browser adapters found
 
-The current feature does not have a dedicated Employee API adapter module. It
-uses generic `apiGet`/`apiPost`/`apiPatch`, route SSOT constants, SWR, toast,
-download, and debounce helpers directly from legacy presentation code. F2
-should centralize only Employee-facing browser adapters that have real reuse;
-it should not expose the server application API to the browser.
+The feature continues to use the shared browser `apiGet`/`apiPost`/`apiPatch`,
+route SSOT constants, SWR, toast, download, debounce, and file-validation
+primitives from its module-owned presentation code. No Employee server
+application API is exposed to the browser.
 
-### Proposed presentation target
+### Implemented presentation ownership
 
 ```text
 modules/employee/presentation/dashboard/
   EmployeeManagementSection
   AddEmployeeSection
-  context/
-  components/
-  hooks/
-  api.ts
+  EmployeeList, table/mobile/modals/search/stats/skeletons
+  context/, add-employee/, edit-employee/, shared/
 modules/employee/presentation/import/
   ImportEmployeeRouteContent
-  ImportEmployeeCSV and step components
+  ImportEmployeeCSV, step components, csv.ts, useImportCSV.ts
 ```
 
-The exact subfolders are proportional guidance. The important boundary is that
-feature UI, feature hooks, feature context, and browser API adapters move
-together, while `app/dashboard/employees/**` remains route composition and URL
-compatibility.
+The important boundary is now implemented: feature UI, feature hooks, feature
+context, client-safe types/formatters, and browser import parsing move together,
+while `app/dashboard/employees/**` remains route composition and URL
+compatibility through `@/modules/employee/client`.
 
 ## 9. Type, schema, and Prisma leakage audit
 
@@ -682,11 +739,13 @@ compatibility.
 | --- | --- | --- |
 | `lib/services/employee/types.ts` | Filters, create/update commands, import rows/errors/results, Employee-with-relations and pagination result, service actor | Split between Employee domain/application/reference contracts and server DTOs |
 | `lib/validations/employee.ts` | Create/update/filter Zod schemas and inferred input types | `modules/employee/schemas/` for route/application input; derive input types from schemas |
-| `types/employees.ts` | Employee/Department/User shapes, form data, CSV data, import results, table/modal props, update data | Persistence-independent domain/reference types, route DTOs, and presentation-local types; legacy facade only temporarily |
+| `modules/employee/presentation/dashboard/types.ts` | Employee/Department/User browser DTOs, form data, list/form props | Employee presentation-local client-safe contracts |
+| `modules/employee/presentation/import/types.ts` | CSV data, import results, step/file/preview/result UI state | Employee presentation/import-local client-safe contracts |
+| `types/employees.ts` | Legacy Employee/Department/User shapes, form data, CSV data, import results, table/modal props | Compatibility source retained for non-migrated consumers; F3 audit |
 | `types/api.ts` | Legacy `GetEmployeesResponse` and Department response | Compatibility type only; current paginated API DTO must become authoritative in Employee server/presentation contracts |
-| `components/dashboard/context/employee/types.ts` | Provider/UI state and context values | Employee presentation-local types |
-| `components/employee/import-csv/types.ts` | Import step/file/preview/result UI state | Employee presentation/import-local types |
-| `components/employee/shared/types.ts` | Form field/presentation props | Employee presentation-local types |
+| `modules/employee/presentation/dashboard/context/types.ts` | Provider/UI state and context values | Employee presentation-local types |
+| `modules/employee/presentation/import/types.ts` | Import step/file/preview/result UI state | Employee presentation/import-local types |
+| `modules/employee/presentation/dashboard/shared/types.ts` | Form field/presentation props | Employee presentation-local types |
 | `@prisma/client` Employee/Department/User payloads | Persistence models and enum values | Infrastructure-only; map to Employee domain/reference/API types before public export |
 
 ### Prisma leakage
@@ -696,10 +755,11 @@ compatibility.
 - `lib/services/employee/types.ts` imports Prisma Employee/Department/status
   types for server-side service contracts. These are type-level persistence
   leaks and should be replaced with module-owned types during F1.
-- `lib/helpers/csv-helpers.ts` imports `EmployeeStatus` as a runtime Prisma
-  enum. The same file is reachable from the browser import UI and also contains
-  Leave CSV helpers. This is the most important Employee client/server leakage
-  risk to split before F2 client-entry enforcement.
+- `lib/helpers/csv-helpers.ts` still imports `EmployeeStatus` as a runtime
+  Prisma enum and also contains Leave CSV helpers. The active Employee browser
+  flow no longer reaches this mixed file; its client-safe parser is now owned by
+  `modules/employee/presentation/import/csv.ts`. The legacy mixed helper remains
+  only for compatibility consumers pending F3.
 - Validation and UI constants currently use string status values independently
   of Prisma, so a future module must have one domain status representation and
   explicit adapters rather than exporting a Prisma enum.
@@ -727,7 +787,7 @@ The helper file is mixed responsibility. It must not be moved wholesale to
 | `formatEmployeePhone` | Employee phone display formatting | Employee presentation/export contract | Employee UI |
 | `getEmployeeDepartmentLabel` | Current Employee/Department display mapping (`ADMIN`/`บริหาร` vs fallback) | Keep with Employee/Department presentation until a reference-data module exists; do not classify as generic shared formatting | Employee UI and import/export-adjacent paths |
 | `getEmployeeDepartmentBadgeClass` | Current Employee/Department UI styling | Employee presentation-local | Employee UI |
-| `getEmployeeBackedUserDisplayName` | Composite User → Employee/name/email fallback identity projection | Do not make generic platform code import the Employee server entry. Either extract a structural Auth/workforce display helper or provide a deliberately client-safe identity contract; final extraction belongs in F1/F2 design | Auth server/LIFF, audit display, Leave, Routine, Stock, notifications/reports |
+| `getEmployeeBackedUserDisplayName` | Composite User → Employee/name/email fallback identity projection | Do not make generic platform code import the Employee server entry. F2 leaves this cross-feature compatibility helper in place; any structural extraction belongs in F3 or a separate scoped change | Auth server/LIFF, audit display, Leave, Routine, Stock, notifications/reports |
 
 The last export is not merely an Employee formatter: it decides fallback order
 between a linked Employee, `User.name`, `User.email`, and a Thai fallback. Its
@@ -1082,10 +1142,11 @@ display formatting and Leave client-safe formatters. The completed Leave
 migration demonstrated that a generic client-reachable helper importing a
 server module entry can pull server-only code into the client graph.
 
-Before F2, Employee display exports must therefore be split explicitly:
+F2 applies the required Employee display split explicitly:
 
 ```text
-client-safe pure Employee formatter -> @/modules/employee/client
+client-safe pure Employee formatter -> modules/employee/presentation/dashboard/formatters.ts
+route-facing Employee presentation -> @/modules/employee/client
 server/application Employee use case -> @/modules/employee
 ```
 
@@ -1095,30 +1156,29 @@ explicit decision because it composes User and Employee identity.
 
 ### Other client-reachable risks
 
-- Employee import presentation reaches `lib/helpers/csv-helpers.ts`, whose
-  runtime Prisma enum import and mixed Leave code must be split before a strict
-  Employee client entry is enforced.
+- The active Employee import presentation no longer reaches
+  `lib/helpers/csv-helpers.ts`, whose runtime Prisma enum and mixed Leave code
+  remain a legacy compatibility risk for F3.
 - Generic audit display, Stock/Routine/Leave client components, and shared
-  table/form helpers currently import the legacy Employee helper. F2 must
-  audit every runtime edge, not just direct imports.
+  table/form helpers still have legacy Employee-helper consumers. F2 verified
+  the migrated Employee graph without rewriting those cross-feature paths;
+  their cleanup belongs in F3 or a separate scoped change.
 - Type-only Prisma imports may be erased safely, but runtime Prisma imports,
   filesystem/workbook/database adapters, and server application use cases must
   never be exported from `client.ts`.
 
 ### Guardrail timing
 
-F0 adds no Employee checker rule because `modules/employee/` does not exist.
-Once F1 creates the real module, the architecture checker should add the same
-public-entry/client-entry rules used by migrated modules, including rejection
-of deep Employee imports and client-reachable server dependencies. Existing
-legacy Employee paths must remain allowed as compatibility paths until their
-respective F1/F2/F3 slice closes.
+F2 extends the architecture checker with Employee Dashboard route composition,
+deep presentation import, presentation self-barrel, and browser-safe client
+graph rules. Existing legacy Employee paths remain allowed only for the
+confirmed compatibility/orphan candidates deferred to F3.
 
-## 18. Proposed future module shape
+## 18. Employee module shape
 
 Employee is large enough to justify proportional domain, application,
-infrastructure, presentation, and schema boundaries. The following is a
-target, not a request to create empty folders in F0:
+infrastructure, presentation, and schema boundaries. F1/F2 now implement the
+following proportional shape:
 
 ```text
 modules/employee/
@@ -1155,8 +1215,8 @@ Layer decision:
   `schemas/` have distinct real responsibilities and are warranted.
 - `server/` is conditional rather than ceremonial. Employee has streamed
   export, import body handling, and route serialization, so a thin server
-  adapter is likely useful; F1 must create it only with concrete contracts,
-  not an empty placeholder.
+  adapter is created only when a concrete route/serialization contract needs
+  it; no empty placeholder layer is required.
 - `index.ts` is server/application-oriented. `client.ts` is client-safe only.
 - Prisma payloads, repositories, import internals, session/token mechanics,
   and generic Dashboard contexts are not public module contracts.
@@ -1223,24 +1283,24 @@ Those capabilities should be injected or called through narrow platform
 interfaces where needed. Employee must not export or call the global outbox
 processor, own LINE session tokens, or reimplement authentication.
 
-## 20. Proposed client public API
+## 20. Employee client public API
 
-`modules/employee/client.ts` should expose only real route-facing and
-client-safe presentation contracts:
+`modules/employee/client.ts` exposes only the route-facing and client-safe
+presentation contracts required by production routes:
 
-| Proposed export | Real consumer | Why it is public |
+| Export | Real consumer | Why it is public |
 | --- | --- | --- |
 | `EmployeeManagementSection` and its loading/skeleton contract | `app/dashboard/employees/page.tsx` | Feature dashboard route composition |
 | `AddEmployeeSection` | `app/dashboard/employees/new/page.tsx` | Feature add route composition |
 | `ImportEmployeeRouteContent` or a route-facing import composition contract | `app/dashboard/employees/import/page.tsx` | Feature import route composition and Dashboard shell integration |
-| `formatEmployeeDisplayName` / client-safe Employee identity formatter | Employee presentation and any audited client consumer that genuinely needs Employee-specific display | Pure, browser-safe identity formatting without server/database imports |
-| Conditional: client-safe Employee status/identity value types or formatters | Current Employee forms/table are internal consumers; export only if an app route or another module demonstrably crosses the client seam | Prevent Prisma enum leakage; keep styling/components internal unless a real external consumer exists |
+| `createEmployeeSchema`, `updateEmployeeSchema` and inferred types | `lib/validations/employee.ts` compatibility facade and Employee API route imports | Existing compatibility contract; retained until the F3 consumer audit |
 
 The client entry must not expose server use cases, Prisma types, repositories,
 database/session/secret code, import persistence internals, workbook/stream
-generators, or schemas exported merely for tests. Employee hooks, provider,
-table primitives, and import steps should remain internal to the client entry
-unless an app route or another feature has a demonstrated production need.
+generators, or schemas exported merely for tests. Employee identity/status
+formatters, hooks, provider, table primitives, presentation-local DTOs, and
+import steps remain internal because no external production consumer requires
+them.
 
 ## 21. Compatibility and deprecation plan
 
@@ -1253,8 +1313,9 @@ unless an app route or another feature has a demonstrated production need.
   contracts. Do not keep two business implementations alive.
 - Keep `lib/services/employee/**`, `lib/validations/employee.ts`, legacy
   Employee types, and helper exports as compatibility facades only while
-  production consumers are moved. Mark ownership and intended removal in the
-  eventual F1/F2 diff, not by changing behavior in F0.
+  production consumers are moved. F2 records the migrated consumers and leaves
+  the remaining compatibility/orphan candidates for F3 without changing
+  behavior.
 - Preserve the Employee service's User synchronization, row locks,
   serializable transactions, lifecycle guards, and refresh-token revocation.
 - Preserve the effective import maximum: the active client rejects more than
@@ -1270,14 +1331,15 @@ unless an app route or another feature has a demonstrated production need.
 
 ### F2 compatibility
 
-- Move the feature provider/context, feature components, forms, import flow,
-  and browser adapters behind `modules/employee/client.ts` while retaining
-  existing route/page URLs.
+- The feature provider/context, feature components, forms, import flow, local
+  client-safe contracts, and browser adapters now live under
+  `modules/employee/presentation/**`, with the four Employee Dashboard routes
+  consuming `modules/employee/client.ts` while retaining existing URLs.
 - Keep generic Dashboard context/navigation outside Employee.
-- Split `lib/helpers/csv-helpers.ts` before the client entry can reach runtime
-  Prisma or Leave-specific code.
-- Replace direct legacy helper imports in client-reachable paths with either
-  the client-safe Employee formatter or a neutral platform formatter.
+- The active Employee CSV parser/sample flow is local to the Employee module;
+  the client entry cannot reach the mixed Prisma/Leave CSV helper.
+- Replace only the migrated Employee presentation's direct legacy helper
+  imports; confirmed cross-feature consumers of legacy helpers remain for F3.
 
 ### F3 cleanup and deprecation exit
 
@@ -1289,15 +1351,17 @@ lib/services/employee/**
 lib/validations/employee.ts
 legacy Employee type facades in types/employees.ts and types/api.ts
 Employee-specific constants/helpers left in global locations
-components/employee/** and dashboard Employee context paths
+remaining legacy Employee presentation paths, including
+components/employee/EditStatusModal.tsx, and dashboard Employee context paths
 hooks/useCSVImport.ts if its orphan status is confirmed
 EditStatusModal.tsx if its orphan status is confirmed
 mixed Employee/Leave portions of lib/helpers/csv-helpers.ts
 ```
 
-F3 must add the Employee public-entry/deep-import/client-graph checker rules,
-then re-audit Auth/Workforce, Leave, Routine, Stock, audit, LINE, Dashboard,
-and all tests. Removal is not authorized merely because a new module exists.
+F3 must retain and re-audit the Employee public-entry/deep-import/client-graph
+checker rules alongside Auth/Workforce, Leave, Routine, Stock, audit, LINE,
+Dashboard, and all tests. Removal is not authorized merely because a new
+module exists.
 
 ## 22. Proposed migration slices
 
@@ -1331,8 +1395,9 @@ Exclude:
 - Department module creation;
 - API/schema/database behavior changes.
 
-F1 should introduce the real `modules/employee/index.ts` and only then add
-hard Employee architecture enforcement incrementally.
+F1 introduced the real `modules/employee/index.ts` and initial Employee
+architecture enforcement; F2 extends that enforcement for presentation route
+composition and the browser-safe client graph.
 
 F1 acceptance requires that the Employee deactivation implementation does not
 copy the direct `LeaveRequest` status query into `modules/employee` and does
@@ -1386,8 +1451,8 @@ separate request and compatibility plan.
 
 ```text
 __tests__/api/employees-routes.test.ts
-__tests__/components/EmployeeTable.test.tsx
-__tests__/components/EmployeeTablePrimitives.test.ts
+modules/employee/presentation/dashboard/EmployeeTable.test.tsx
+modules/employee/presentation/dashboard/EmployeeTablePrimitives.test.ts
 __tests__/helpers/employee-helpers.test.ts
 __tests__/services/employee/import.test.ts
 __tests__/services/employee/mutations.test.ts
@@ -1396,8 +1461,16 @@ __tests__/validations/employee.test.ts
 __tests__/integration/signup-employee-concurrency.integration.test.ts
 ```
 
-`__tests__/helpers/csv-helpers.test.ts` is mixed Employee/Leave CSV coverage
-and must be split by ownership during F1/F3 rather than moved wholesale.
+`modules/employee/presentation/import/csv.test.ts` now characterizes the
+Employee-owned browser parser and sample behavior. The mixed Leave/legacy CSV
+coverage remains in its original compatibility helper/test boundary for F3.
+
+Additional F2 presentation coverage is colocated under the module:
+
+```text
+modules/employee/presentation/import/useImportCSV.test.tsx
+__tests__/architecture/check-architecture.test.ts
+```
 
 ### Auth/workforce and cross-feature tests that protect Employee behavior
 
@@ -1455,9 +1528,10 @@ These are concrete implementation questions, not unknown ownership:
    a neutral Auth/platform helper or a deliberately safe Employee identity
    contract. This decision controls audit/Stock/Routine/Leave client graph
    imports.
-5. **Mixed CSV helper:** Employee import and Leave report CSV helpers share one
-   legacy file, and the runtime Prisma enum makes it unsafe as a generic client
-   dependency. Split before F2 enforcement.
+5. **Mixed CSV helper:** Employee import and Leave report CSV helpers still
+   share one legacy file, and the runtime Prisma enum makes it unsafe as a
+   generic client dependency. F2 removed the active Employee browser path from
+   that helper; final helper split/cleanup remains F3.
 6. **List/stats inconsistency:** List/export exclude soft-deleted/bootstrap
    records, while stats counts do not. The UI also renders fewer stats than the
    API returns. Preserve first; decide any correction separately.
@@ -1492,12 +1566,14 @@ These are concrete implementation questions, not unknown ownership:
 ## 25. Phase status
 
 F0 remains the historical discovery record above. F1 implements the server and
-business ownership described in the F1 implementation record. F2 presentation
-migration and F3 compatibility cleanup remain future work; neither is folded
-into this phase.
+business ownership described in the F1 implementation record. F2 implements
+the presentation ownership described in the F2 implementation record. F3
+compatibility cleanup and final re-audit remain separate future work.
 
 Phase F1 CLOSED after the corrective pass — Employee server/business ownership
-migrated; Employee presentation migration has not started. The Employee ↔
-Leave runtime cycle is removed: Leave may consume the Employee hierarchy
-contract, while Employee lifecycle receives Leave responsibility data only
-through its injected port at composition time.
+migrated. The Employee ↔ Leave runtime cycle remains removed: Leave may consume
+the Employee hierarchy contract, while Employee lifecycle receives Leave
+responsibility data only through its injected port at composition time.
+
+Phase F2 CLOSED — Employee presentation ownership migrated.
+Phase F3 compatibility cleanup/final re-audit remains.

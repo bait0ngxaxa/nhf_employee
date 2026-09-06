@@ -182,6 +182,64 @@ describe("architecture checker module boundaries", () => {
         expect(result.violations[0]).toContain("server entry");
     });
 
+    it.each([
+        "app/dashboard/employees/page.tsx",
+        "app/dashboard/employees/loading.tsx",
+        "app/dashboard/employees/new/page.tsx",
+        "app/dashboard/employees/import/page.tsx",
+    ])("allows %s to compose Employee presentation through the client entry", async (routePath) => {
+        const result = await checkFixture(
+            routePath,
+            'import { EmployeeManagementSection } from "@/modules/employee/client";',
+        );
+
+        expect(result.violations).toEqual([]);
+    });
+
+    it.each([
+        "@/components/employee/EmployeeList",
+        "@/components/dashboard/context/employee/EmployeeContext",
+        "@/components/dashboard/sections/EmployeeManagementSection",
+        "@/components/dashboard/sections/AddEmployeeSection",
+    ])("rejects Employee dashboard routes importing legacy presentation %s", async (specifier) => {
+        const result = await checkFixture(
+            "app/dashboard/employees/page.tsx",
+            `import { x } from "${specifier}";`,
+        );
+
+        expect(result.violations).toHaveLength(1);
+        expect(result.violations[0]).toContain(
+            "Employee Dashboard routes must use @/modules/employee/client",
+        );
+    });
+
+    it.each([
+        "@/modules/employee",
+        "@/modules/employee/presentation/dashboard/EmployeeList",
+    ])("rejects Employee dashboard routes importing the wrong Employee entry %s", async (specifier) => {
+        const result = await checkFixture(
+            "app/dashboard/employees/page.tsx",
+            `import { x } from "${specifier}";`,
+        );
+
+        expect(result.violations).toHaveLength(1);
+        expect(result.violations[0]).toContain(
+            "Employee Dashboard routes must use @/modules/employee/client",
+        );
+    });
+
+    it("rejects an Employee dashboard route that does not import the client entry", async () => {
+        const result = await checkFixture(
+            "app/dashboard/employees/page.tsx",
+            'import { x } from "@/components/ui/button";',
+        );
+
+        expect(result.violations).toHaveLength(1);
+        expect(result.violations[0]).toContain(
+            'must consume Employee presentation through "@/modules/employee/client"',
+        );
+    });
+
     it("rejects server-only runtime dependencies from the Leave client graph", async () => {
         const rootPath = await createFixture({
             ...fixtureFiles,
@@ -273,6 +331,37 @@ describe("architecture checker module boundaries", () => {
         expect(result.violations).toHaveLength(1);
         expect(result.violations[0]).toContain("@/modules/employee/client");
     });
+
+    it("rejects a transitive Prisma runtime dependency from the Employee client graph", async () => {
+        const rootPath = await createFixture({
+            ...fixtureFiles,
+            "modules/employee/client.ts": 'export { x } from "./presentation/example";\n',
+            "modules/employee/presentation/example.ts": [
+                'import { PrismaClient } from "@prisma/client";',
+                "export const x = PrismaClient;",
+            ].join("\n"),
+        });
+        const result = checkArchitecture({ repositoryRoot: rootPath });
+
+        expect(result.violations).toHaveLength(1);
+        expect(result.violations[0]).toContain("@prisma/client");
+        expect(result.violations[0]).toContain("Server-only runtime dependency");
+    });
+
+    it.each(["@/modules/employee", "@/modules/employee/client"])(
+        "rejects Employee presentation internals importing their own public barrel %s",
+        async (specifier) => {
+            const result = await checkFixture(
+                "modules/employee/presentation/dashboard/Example.tsx",
+                `import { x } from "${specifier}";`,
+            );
+
+            expect(result.violations).toHaveLength(1);
+            expect(result.violations[0]).toContain(
+                "Employee presentation internals must use local contracts",
+            );
+        },
+    );
 
     it("allows an external consumer to use a module public API", async () => {
         const result = await checkFixture(

@@ -1,8 +1,10 @@
 import { Suspense } from "react";
 import type { Metadata } from "next";
 
-import { EmployeeManagementSection } from "@/components/dashboard/sections/EmployeeManagementSection";
-import { EmployeeManagementSectionSkeleton } from "@/components/employee/EmployeeSkeletons";
+import {
+    EmployeeManagementSection,
+    EmployeeManagementSectionSkeleton,
+} from "@/modules/employee/client";
 
 export const metadata: Metadata = {
     title: "Employee Management | NHFapp",

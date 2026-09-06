@@ -1,8 +1,8 @@
 # Module boundaries
 
-Status: Phase F1 policy. Stock, Routine, and Leave are migrated examples.
-Employee server/business ownership is migrated; Employee presentation remains
-legacy until F2.
+Status: Phase F2 CLOSED — Employee presentation ownership migrated. Stock,
+Routine, and Leave are migrated examples; Employee server/business and active
+presentation ownership are now migrated as well.
 
 ## What is a module
 
@@ -50,10 +50,15 @@ LIFF route composition use the explicit client-safe entry point
 `@/modules/leave/client`; migrated module presentation internals use local
 relative contracts.
 
-Employee server/application consumers use `@/modules/employee`. The temporary
-`@/modules/employee/client` interface exposes only client-safe schemas required
-by the two legacy Employee forms; presentation contracts are not migrated or
-exported until F2.
+Employee server/application consumers use `@/modules/employee`. Employee
+Dashboard route composition uses `@/modules/employee/client`, whose route-facing
+presentation exports are `EmployeeManagementSection`,
+`EmployeeManagementSectionSkeleton`, `AddEmployeeSection`, and
+`ImportEmployeeRouteContent`. The active feature presentation, provider/context,
+forms, local types/formatters, and CSV browser flow live under
+`modules/employee/presentation/**`; internals use relative/local contracts.
+Schema exports remain only for the `lib/validations/employee.ts` compatibility
+facade until the F3 consumer audit.
 
 Employee and Leave have one deliberate server dependency direction. Leave may
 consume the public Employee hierarchy contract to mutate the Employee-owned
@@ -66,6 +71,12 @@ serializable lifecycle operation.
 
 The root barrel remains server/application-oriented. The client entry point
 must export only client-safe presentation contracts.
+
+The Employee client entry is browser-safe: its runtime graph contains no
+Prisma runtime, database/session/secret implementation, server-only Next.js
+modules, or Employee application/infrastructure code. Employee browser API
+traffic continues through `/api/employees/**` and `/api/departments`; the
+architecture checker walks this graph and guards the route/client boundary.
 
 Files below the module root are internal implementation. Consumers must not
 turn paths such as the following into an accidental public API:
@@ -183,9 +194,12 @@ requires API routes to use `@/modules/leave`, requires Dashboard/LIFF routes to
 use `@/modules/leave/client`, and walks production Client Component graphs so a
 generic helper cannot transitively import the Leave server entry.
 
-Employee F1 is a server/business ownership migration. Employee API routes use
-the module root, Auth signup uses its transaction-aware Employee lookup/recheck
-interface, and Leave uses its hierarchy mutation interface. Employee lifecycle
-composition binds the Leave offboarding blocker provider at the route boundary;
-there is no Employee → Leave runtime dependency. The remaining legacy Employee
-validation path is a client-safe facade for the two F2 forms.
+Employee F1 is a server/business ownership migration and F2 is the active
+presentation ownership migration. Employee API routes use the module root, Auth
+signup uses its transaction-aware Employee lookup/recheck interface, and Leave
+uses its hierarchy mutation interface. Employee lifecycle composition binds the
+Leave offboarding blocker provider at the route boundary; there is no Employee
+→ Leave runtime dependency. Generic Dashboard shell/context/navigation remain
+outside Employee. The remaining legacy Employee validation path is a
+client-safe compatibility facade for API consumers, and mixed/orphan legacy
+presentation candidates remain deferred to F3.

@@ -28,6 +28,8 @@ const DOM_TESTS = [
     "modules/routine/presentation/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts}",
     "modules/leave/presentation/**/*.{test,spec}.{jsx,mjsx,cjsx,tsx,mtsx,ctsx}",
     "modules/leave/presentation/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts}",
+    "modules/employee/presentation/**/*.{test,spec}.{jsx,mjsx,cjsx,tsx,mtsx,ctsx}",
+    "modules/employee/presentation/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts}",
 ];
 
 export default defineConfig({

@@ -3,10 +3,13 @@
 `modules/` is the ownership boundary for business capabilities in the NHF
 Employee application.
 
-Stock, Routine, and Leave are migrated feature modules. Employee F1 now owns
-Employee server/business behavior in `modules/employee/`; its presentation
-remains in legacy locations until F2. Other legacy locations remain valid until
-their feature is deliberately migrated.
+Stock, Routine, and Leave are migrated feature modules. Employee F1 owns
+Employee server/business behavior and F2 now owns the active Employee
+presentation in `modules/employee/presentation/`. Employee Dashboard routes
+consume the minimal browser-safe `@/modules/employee/client` entry. Generic
+Dashboard shell/context/navigation and route access remain outside Employee.
+Other legacy locations remain valid until their feature is deliberately
+migrated; Employee compatibility/orphan cleanup remains F3 work.
 
 Rules for new work:
 
@@ -31,3 +34,12 @@ write, while Employee lifecycle code depends only on its structural
 binds Leave's blocker implementation and passes the same transaction client
 used by the Employee serializable lifecycle operation. Employee must not
 runtime-import `@/modules/leave` or Leave internals.
+
+The Employee presentation keeps using the existing `/api/employees/**` and
+`/api/departments` browser endpoints. Its CSV upload/preview/result flow uses
+the module-owned client-safe parser and does not depend on the mixed
+Prisma/Leave `lib/helpers/csv-helpers.ts` implementation. Employee presentation
+internals use local contracts and must not import either Employee public barrel.
+
+Phase F2 CLOSED — Employee presentation ownership migrated.
+Phase F3 compatibility cleanup/final re-audit remains.

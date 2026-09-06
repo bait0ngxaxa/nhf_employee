@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 
 import { ImportSectionSkeleton } from "@/components/dashboard/feedback/SectionSkeleton";
 import { requireDashboardAdmin } from "@/app/dashboard/_lib/route-access";
-import { ImportEmployeeRouteContent } from "./ImportEmployeeRouteContent";
+import { ImportEmployeeRouteContent } from "@/modules/employee/client";
 
 export const metadata: Metadata = {
     title: "Import Employee CSV | NHFapp",
