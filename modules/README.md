@@ -74,16 +74,24 @@ ledger in
 [organization-department-migration.md](../docs/architecture/organization-department-migration.md)
 for the historical G0 record and final G1-G3 implementation ledger.
 
-Phase H0 Notification discovery is complete. The future
-`modules/notification/` capability is intentionally not created yet. It will
-own the user-facing in-app Notification/Inbox persistence, queries, read
-commands, generic create-to-explicit-user mechanics, and Notification-specific
-presentation. Leave, Stock, Routine, and the deferred Email Request/IT
-capability continue to own event meaning, recipients, titles/messages,
-action/reference values, channel choices, and event-specific dedupe or
-supersede rules.
+Phase H1 Notification server/application ownership is complete.
+`modules/notification/` owns the user-facing in-app Notification/Inbox
+persistence, queries, read commands, generic create-to-explicit-user mechanics,
+and Notification dedupe behavior. Its `index.ts` is the only supported server
+entry. The four `app/api/notifications/**` routes remain HTTP/auth adapters and
+delegate through that entry; their full Prisma-serialized row responses and
+current timestamp-cursor behavior remain compatible. H1 is server-only: no
+`client.ts` or presentation migration exists yet.
 
-`NotificationOutbox` is not part of the future Notification module. The shared
+`createInAppNotificationOnce` is now a thin compatibility adapter over the
+Notification public create command. `createAdminInAppNotificationsOnce` remains
+transitional and keeps its active-admin audience lookup outside Notification.
+Leave, Stock, Routine, and the deferred Email Request/IT capability continue to
+own event meaning, recipients, titles/messages, action/reference values,
+channel choices, and event-specific dedupe or supersede rules. Their direct
+Notification producer writes remain intentionally deferred to H3.
+
+`NotificationOutbox` is not part of the Notification module. The shared
 platform outbox owns reliable asynchronous delivery, claim/retry/dead-letter/
 supersede lifecycle, scheduling/wakeup, and provider dispatch composition.
 Business modules may enqueue outbox rows transactionally but must not import
@@ -102,4 +110,5 @@ boundary is ready. See
 for the H0 evidence, exhaustive ledger, invariants, and H1-H3 slices.
 
 Phase H0 CLOSED — Notification discovery and boundary definition complete.
-H1-H3 are not started.
+Phase H1 CLOSED — Notification server/application ownership complete.
+H2-H3 are not started.

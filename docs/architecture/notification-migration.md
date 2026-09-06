@@ -1,18 +1,19 @@
 # Notification migration record
 
-Status: **Phase H0 CLOSED — Notification discovery and boundary definition
-complete.**
+Status: **Phase H1 CLOSED — Notification server/application ownership complete.**
+Phase H0 discovery and boundary definition remains closed.
 
-This record is the source of truth for the Notification boundary before any
-Notification implementation migration. It records the repository behavior
-observed at the G3 closure baseline and separates the in-app Inbox capability
-from business notification semantics, reliable asynchronous delivery, and
-provider/channel integrations.
+This record is the source of truth for the Notification boundary and its
+incremental implementation. It records the repository behavior observed at the
+G3 closure baseline and separates the in-app Inbox capability from business
+notification semantics, reliable asynchronous delivery, and provider/channel
+integrations.
 
 Baseline audited: `b839e84bc2bc67ece29a224874b340d1af00fdae`
 (`docs(architecture): close G3 Department migration audit`). The working tree
-was clean and this baseline is the current `HEAD` at H0 start. No
-`modules/notification/` directory exists at this phase.
+was clean and this baseline was the current `HEAD` at H0 start; the H0 baseline
+had no `modules/notification/` directory. H1 now establishes that server-side
+module without changing the physical Prisma schema.
 
 ## H0 scope and evidence
 
@@ -44,11 +45,11 @@ H0.
 
 ### What the Notification capability is
 
-The future Notification capability is the user-facing **in-app Notification /
-Inbox** capability. It owns durable per-user inbox entries and the queries and
-commands that let the current user view, filter, paginate, and mark those
-entries read. It also owns Notification-specific server contracts and
-Notification-specific presentation once H1/H2 establish those entries.
+The Notification capability is the user-facing **in-app Notification / Inbox**
+capability. It owns durable per-user inbox entries and the queries and commands
+that let the current user view, filter, paginate, and mark those entries read.
+H1 has established its server/application contracts and persistence boundary;
+Notification-specific presentation remains an H2 concern.
 
 Notification does not own the business event that caused an entry, the
 recipient policy, a domain-specific message, or the choice of delivery
@@ -58,7 +59,7 @@ channels.
 
 | Concern | Owner at target | Boundary decision |
 | --- | --- | --- |
-| In-app Notification / Inbox | `modules/notification/` | Owns the `Notification` persistence boundary, generic durable create-to-user mechanics, inbox queries, unread/read commands, and Notification presentation/client contracts. |
+| In-app Notification / Inbox | `modules/notification/` | Owns the `Notification` persistence boundary, generic durable create-to-user mechanics, inbox queries, unread/read commands, and the H1 server/application contract; Notification presentation/client contracts remain H2 work. |
 | Business-owned notification semantics | Leave, Stock, Routine, Email Request while deferred, and future IT/business modules | Owns why an event is noteworthy, who receives it, its semantic type, title, message, action URL, reference ID, channel selection, and event-specific dedupe/supersede rules. |
 | Reliable asynchronous delivery / NotificationOutbox | Shared/platform outbox infrastructure | Owns `NotificationOutbox` lifecycle, claim/retry/dead-letter/supersede behavior, scheduling/wakeup, and processor composition. Business modules may enqueue rows transactionally but must not import the processor. |
 | Provider/channel integrations | Shared/platform transports plus business-owned payload composers | Email and LINE transports remain generic platform infrastructure. Leave, Stock, Routine, and the deferred Email Request capability continue to own channel-specific event payload and message meaning. |
@@ -111,9 +112,10 @@ of Notification persistence or business meaning.
    producing business module, which may then invoke Notification to persist an
    entry. A direct Outbox-to-Notification path is reserved for a future truly
    Notification-owned generic event with a fully resolved command payload.
-3. **`Notification` Prisma model:** the future Notification capability owns
+3. **`Notification` Prisma model:** the Notification capability owns
    its repository and application persistence boundary. The physical Prisma
-   schema remains the repository's shared schema until H1 migrates ownership.
+   schema remains the repository's shared physical schema; H1 changes code
+   ownership only.
 4. **`NotificationOutbox`:** shared/platform reliable asynchronous delivery
    infrastructure owns the model's lifecycle and processor composition.
 5. **Retry/scheduling/processor behavior:** shared/platform outbox code owns
@@ -154,15 +156,16 @@ of Notification persistence or business meaning.
 12. **Email Request:** it remains a transitional/deferred consumer. It is not
     migrated or redesigned with Notification; its future ownership is intended
     to be decided with the future IT capability boundary.
-13. **Transitional paths:** the legacy `app/api/notifications/**` routes,
-    `components/dashboard/notifications/**`,
-    `lib/services/notifications/in-app.ts`, direct producer writes, and the
-    public business dispatch contracts consumed by the global processor continue
-    to run unchanged until their named phases.
-14. **Next phases:** H1 establishes server/application ownership and route
+13. **Transitional paths:** H1 now routes the legacy
+    `app/api/notifications/**` HTTP adapters and generic
+    `lib/services/notifications/in-app.ts` writes through the Notification
+    public server entry. `components/dashboard/notifications/**`, direct
+    producer writes, and the public business dispatch contracts consumed by the
+    global processor remain transitional until their named phases.
+14. **Next phases:** H1 established server/application ownership and route
     delegation; H2 establishes Notification presentation/client ownership; H3
     integrates producers, resolves mixed helpers, adds guardrails, and performs
-    the final compatibility audit. None is complete in H0.
+    the final compatibility audit. H1 is now closed; H2 and H3 remain open.
 
 ## Current `Notification` persistence model
 
@@ -352,8 +355,9 @@ Leave's transaction-coupled outbox sites are:
 `modules/leave/application/approvals/current-action-recipient.ts` is the
 important cross-boundary example. The global processor claims a Leave outbox
 row, the Leave application revalidates the current action inside a transaction,
-creates the Leave in-app entry there, and enqueues the Leave LINE child. The
-processor later sends email after the transaction. After Leave's revalidation
+creates the Leave in-app entry there, and enqueues the Leave LINE child. After
+the transaction commits, the Leave dispatch contract sends the Leave action
+email through Leave-owned notification behavior. After Leave's revalidation
 and semantic composition, the Leave dispatch contract is the future caller of
 the public Notification command; this does not transfer the processor or Leave
 semantics to Notification.
@@ -456,21 +460,21 @@ module, recreate ticket behavior, delete enum values, or reinterpret old rows.
 
 ## Shared in-app helper audit
 
-`lib/services/notifications/in-app.ts` currently combines a useful generic
-persistence operation with one business audience policy:
+`lib/services/notifications/in-app.ts` remains a transitional compatibility
+surface that combines the Notification adapter with one business audience
+policy:
 
 | Symbol | Current responsibility | H0 boundary finding |
 | --- | --- | --- |
-| `InAppNotificationClient` | Narrows a Prisma transaction/client to `notification` and `user`, allowing the helper to run against `prisma` or a transaction client. | This transaction-aware persistence seam is evidence for the future Notification command; preserve atomicity. |
-| `createInAppNotificationOnce` | Skips a missing user ID, creates one `Notification` row with the supplied type/title/message/action/reference/dedupe values, and treats `P2002` as a duplicate no-op. | Generic durable persistence and uniqueness handling belong in Notification. |
+| `InAppNotificationClient` | Narrows a Prisma transaction/client to `notification` and `user`, allowing the helper to run against `prisma` or a transaction client. | H1 passes its `notification` portion to the public Notification command and preserves atomicity. |
+| `createInAppNotificationOnce` | Skips a missing user ID, creates one `Notification` row with the supplied type/title/message/action/reference/dedupe values, and treats `P2002` as a duplicate no-op. | H1 makes this a thin adapter over `@/modules/notification`; durable persistence and uniqueness handling belong in Notification. |
 | `createAdminInAppNotificationsOnce` | Looks up active, non-deleted `Role.ADMIN` users, then calls the generic helper with an admin/user-specific dedupe key. | The lookup and “all admins” audience policy do not belong in generic Notification persistence. |
 
 The helper does not own business reasons, but the admin helper does own a
-recipient-selection policy. H0 therefore records a future split rather than
-implementing one: business modules should resolve recipients and call a
-narrow Notification create-to-user contract; H3 can remove or adapt the
-mixed helper after every consumer is migrated. Do not automatically create a
-generic Notification “notify all admins” API.
+recipient-selection policy. H1 keeps that lookup outside Notification while
+business modules continue to migrate toward explicit recipients; H3 can remove
+or adapt the mixed helper after every consumer is migrated. Do not automatically
+create a generic Notification “notify all admins” API.
 
 ## NotificationOutbox audit
 
@@ -620,23 +624,25 @@ The target ownership map is:
 | Dashboard navbar, menu, route mounting, generic labels | App/Dashboard composition |
 | Authentication/session and generic HTTP/security primitives | Existing auth/shared platform |
 
-H1 should derive the smallest public Notification server contract from the
+H1 established the smallest public Notification server contract from the
 observed consumers. The evidence supports these operations, without requiring
 a new business abstraction:
 
 ```text
 listLatestForUser(userId) -> notifications + unreadCount
-listHistoryForUser(userId, filter, cursor) -> notifications + pagination/count
-markReadForUser(userId, notificationId)
+listHistoryForUser({ userId, filter?, cursor? }) -> notifications + pagination/count
+markReadForUser(notificationId, userId)
 markAllReadForUser(userId)
-createForUserOnce(input, transaction-bound client?)
+createForUserOnce(input, persistenceContext?)
 ```
 
-These names are H1 design candidates, not APIs created in H0. The create input
-must carry explicit `userId`, semantic `type`, title, message, optional
-action/reference values, and the producer's dedupe key. It must not carry an
-implicit audience query such as “all Stock admins”. Query/read commands must
-enforce user scope in the server/application layer regardless of caller UI.
+These are the H1 public APIs from `@/modules/notification`. The create input
+carries explicit `userId`, semantic `type`, title, message, optional
+action/reference values, and the producer's dedupe key. It does not carry an
+implicit audience query such as “all Stock admins”. Query/read commands enforce
+user scope in the server/application layer regardless of caller UI. Query
+results intentionally preserve the complete Prisma `Notification` row shape
+currently serialized by the HTTP APIs.
 
 For a business-owned outbox-dispatched in-app event, the global processor
 continues to dispatch through the producing business module's public contract.
@@ -649,7 +655,7 @@ input directly to Notification.
 
 ## Behavioral invariants for future phases
 
-Future H1-H3 work must preserve these observed invariants unless a separately
+Future H2-H3 work must preserve these observed invariants unless a separately
 approved behavior change explicitly supersedes them:
 
 - a signed-in user can only list, count, read, or mark-read their own Inbox;
@@ -713,14 +719,14 @@ symbol in that responsibility; grouping does not imply ownership transfer.
 
 | Current path / symbol | Current responsibility | Current owner | Target owner | Migration action | Target phase | Notes / compatibility constraint |
 | --- | --- | --- | --- | --- | --- | --- |
-| `prisma/schema.prisma :: Notification` | Durable per-user inbox row, fields, relation, indexes, nullable global dedupe uniqueness | Shared Prisma schema consumed by legacy routes/helpers/producers | Notification repository/application boundary over the shared schema | Establish repository ownership and preserve schema behavior before any schema change | H1 | No schema/index/migration change in H0; retain `referenceId` as opaque. |
+| `prisma/schema.prisma :: Notification` | Durable per-user inbox row, fields, relation, indexes, nullable global dedupe uniqueness | Shared Prisma schema consumed by legacy routes/helpers/producers | Notification repository/application boundary over the shared schema | H1 established repository ownership without changing the physical schema | H1 | No schema/index/migration change; retain `referenceId` as opaque. |
 | `prisma/schema.prisma :: NotificationType` | Current active semantic values plus historical IT values | Shared Prisma schema; semantic values supplied by producers | Notification stores the contract; business modules own meaning | Keep enum/storage compatibility and document active vs historical values | H1/H3 | Do not remove `TICKET_CREATED`, `NEW_COMMENT`, or `TICKET_UPDATED`. Preserve `@map` values. |
 | `prisma/schema.prisma :: NotificationOutbox`, `NotificationOutboxType`, `NotificationOutboxStatus` | Reliable event row, event identity, payload, lifecycle status, retry timestamps | Global platform outbox infrastructure | Global platform outbox infrastructure | Keep outside Notification; migrate only callers/contracts as approved | H3 audit only | First ten TICKET outbox values are storage-only compatibility; runtime whitelist is narrower. |
-| `app/api/notifications/route.ts` `GET` | Latest ten rows plus complete unread count | App route + legacy Prisma access | App HTTP adapter delegating to Notification application | Replace direct Prisma calls with public Notification queries while preserving response | H1 | Preserve session, user scope, order, take 10, response shape, and sanitized 500. |
-| `app/api/notifications/all/route.ts` `GET` | 20-row all/unread history with timestamp cursor and total count | App route + legacy Prisma access | App HTTP adapter delegating to Notification application | Migrate route query behavior behind Notification contract | H1 | Preserve filter fallback, cursor shape, `hasMore`, `nextCursor`, `totalCount`; do not fix cursor in H0. |
-| `app/api/notifications/[id]/read/route.ts` `PATCH` | User-scoped single mark-read | App route + direct Prisma | Notification application command via app adapter | Move persistence call behind public command | H1 | Preserve current 500 behavior for missing/non-owned rows unless separately approved. |
-| `app/api/notifications/mark-all-read/route.ts` `POST` | User-scoped mark-all-read and count | App route + direct Prisma | Notification application command via app adapter | Move update behind public command | H1 | Preserve idempotent zero count and response. |
-| `__tests__/api/notifications.test.ts` | Auth, latest query/count, single-read scope, mark-all response tests | API compatibility suite | Notification API/application contract suite with app adapter coverage | Keep and extend only when H1 changes ownership | Existing tests are compatibility evidence; they do not prove all cursor/error edges. |
+| `app/api/notifications/route.ts` `GET` | Latest ten rows plus complete unread count | App HTTP adapter | App HTTP adapter delegating through `@/modules/notification` | H1 migrated direct Prisma calls to the public Notification query | H1 | Preserve session, user scope, order, take 10, response shape, and sanitized 500. |
+| `app/api/notifications/all/route.ts` `GET` | 20-row all/unread history with timestamp cursor and total count | App HTTP adapter | App HTTP adapter delegating through `@/modules/notification` | H1 migrated route query behavior behind the public contract | H1 | Preserve filter fallback, cursor shape, `hasMore`, `nextCursor`, `totalCount`; timestamp ties remain unresolved by design. |
+| `app/api/notifications/[id]/read/route.ts` `PATCH` | User-scoped single mark-read | App HTTP adapter | Notification application command via app adapter | H1 moved persistence behind the public command | H1 | Preserve current 500 behavior for missing/non-owned rows unless separately approved. |
+| `app/api/notifications/mark-all-read/route.ts` `POST` | User-scoped mark-all-read and count | App HTTP adapter | Notification application command via app adapter | H1 moved update behind the public command | H1 | Preserve idempotent zero count and response. |
+| `__tests__/api/notifications.test.ts`; `modules/notification/application/*.test.ts`; `modules/notification/infrastructure/persistence/repository.test.ts` | Auth, public app contract, query semantics, read commands, create-once dedupe/context tests | API/module compatibility suites | Notification API/application/persistence contract suites | H1 added focused boundary coverage while preserving existing route contracts | H1 | Full cursor tie correctness remains a later approved change. |
 | `components/dashboard/notifications/NotificationShared.tsx` | Browser-safe item/list types, fetcher, states, action URL normalization, badge, icon mapping | Legacy Dashboard Notification presentation | Notification client/presentation | Move behind `modules/notification/client.ts` or a narrow client adapter | H2 | Preserve legacy Stock tab alias, disabled-tab fallback, unknown icon fallback, and client-safe graph. |
 | `components/dashboard/notifications/NotificationPageParts.tsx` | History header, filters, rows, unread visual semantics | Legacy Dashboard Notification presentation | Notification client/presentation | Move with minimal behavior-preserving component contract | H2 | Preserve all/unread labels, mark-all affordance, relative time, and row navigation. |
 | `components/dashboard/notifications/NotificationDropdown.tsx` | Navbar SWR polling and mutations | Legacy Dashboard Notification presentation | Notification client/presentation; mounted by Dashboard | Move implementation/client contract; keep mount in navbar | H2 | Preserve 60s polling, no focus revalidation/retry, 30s dedupe, toast/navigation behavior. |
@@ -728,14 +734,14 @@ symbol in that responsibility; grouping does not imply ownership transfer.
 | `app/dashboard/notifications/page.tsx`, `loading.tsx` | App Router metadata, Suspense, route composition, skeleton | App/Dashboard delivery | App/Dashboard composition + Notification client entry | Change imports only after H2 client contract exists | H2 | Do not make generic routing/shell a Notification internal. |
 | `components/dashboard/layout/DashboardNavbar.tsx` | Generic navbar/user-menu composition and dropdown mount | Dashboard shell | Dashboard shell | Update mount import to Notification client entry | H2 | Keep shell ownership and navbar tests outside Notification. |
 | `lib/ssot/routes.ts` and `constants/dashboard.ts` | API URLs, dashboard path/tab/menu metadata, generic labels | App/shared route/menu SSOT | App/shared route/menu SSOT | Keep constants stable; only add a public module adapter if needed | H1/H2 | `API_ROUTES.notifications` and `APP_DASHBOARD_TABS.notifications` are compatibility contracts, not persistence ownership. |
-| `lib/services/notifications/in-app.ts :: createInAppNotificationOnce` | Generic create, optional Prisma transaction client, P2002 idempotent no-op | Shared legacy helper | Notification application/infrastructure | Extract/adapt behind Notification public command; migrate callers incrementally | H1/H3 | Preserve explicit user ID, supplied semantic fields, dedupe, and transaction client support. |
+| `lib/services/notifications/in-app.ts :: createInAppNotificationOnce` | Generic create, optional Prisma transaction client, P2002 idempotent no-op | Transitional compatibility adapter | Notification application/infrastructure, with adapter retained for current callers | H1 converted it to a thin adapter over `@/modules/notification`; migrate callers incrementally in H3 | H1/H3 | Preserve explicit user ID, supplied semantic fields, dedupe, and transaction client support. |
 | `lib/services/notifications/in-app.ts :: createAdminInAppNotificationsOnce` | Admin lookup plus repeated generic create | Mixed shared helper: persistence + audience policy | Recipient resolution in business producer; generic write in Notification | Split after consumers have explicit recipient resolution | H3 | Do not create a generic “all admins” Notification API. |
 | `modules/leave/application/notifications/notifications.ts` | Leave titles/messages/types/actions/references/dedupe; in-app plus email orchestration | Leave | Leave for semantics; Notification for durable write | Replace local persistence seam with Notification public command when safe | H3 | Keep Leave payload parsing, recipient/action policy, `createInApp:false`, and email meaning. |
 | `modules/leave/application/approvals/decision.ts` | Mark current Leave request notification read and enqueue result event in same tx | Leave approval workflow | Leave workflow + Notification command for persistence | Adapt read command and preserve transaction coupling | H3 | Do not move Leave state/read-supersede rules to Notification. |
 | `modules/leave/application/cancellation/cancellation.ts` | Mark obsolete rows; create cancellation/rejection rows; enqueue cancellation outbox events | Leave cancellation workflow | Leave workflow + Notification command | Adapt persistence/read commands after H1 seam exists | H3 | Preserve state-specific type, recipient, action, dedupe, and atomic rollback behavior. |
 | `modules/leave/application/not-taken.ts` | Create employee confirmation; mark approver row read; enqueue not-taken events | Leave not-taken workflow | Leave workflow + Notification command | Adapt persistence/read commands | H3 | Preserve request/confirm semantics and event keys. |
 | `modules/leave/application/requests/create-request.ts` (`LEAVE_ACTION`), `modules/leave/application/approvals/decision.ts` (`LEAVE_RESULT`), `modules/leave/application/cancellation/cancellation.ts` (`LEAVE_CANCELLED`, `LEAVE_CANCELLATION_REQUESTED`, `LEAVE_CANCELLED_AFTER_APPROVAL`), `modules/leave/application/not-taken.ts` (`LEAVE_NOT_TAKEN_REQUESTED`, `LEAVE_NOT_TAKEN_CONFIRMED`), and `modules/leave/infrastructure/notifications/line.ts` (seven Leave `*_LINE` child types) | Transactional Leave event and channel-row enqueueing | Leave use cases + global outbox infrastructure | Leave + global outbox infrastructure | Keep transactional enqueue; only change the in-app dispatch seam | H3 | Preserve each event key, payload, child retry key, and Leave-owned meaning; the processor remains global. |
-| `modules/leave/application/approvals/current-action-recipient.ts` | Claims/revalidates a Leave action during global dispatch, writes the in-app entry in the transaction, enqueues the LINE child, and lets the processor send email after commit | Leave application + global processor composition | Leave application + Notification command + global outbox | Keep the public Leave dispatch contract; after Leave revalidation and semantic composition, call Notification through its public command | H3 | This is the canonical Outbox → Leave → Notification flow; stale/current-action supersede remains Leave-owned. |
+| `modules/leave/application/approvals/current-action-recipient.ts` | Claims/revalidates a Leave action during global dispatch, writes the in-app entry in the transaction, enqueues the LINE child, and sends the Leave action email through Leave-owned notification behavior after commit | Leave application + global processor composition | Leave application + Notification command + global outbox | Keep the public Leave dispatch contract; after Leave revalidation and semantic composition, call Notification through its public command | H3 | This is the canonical Outbox → Leave → Notification flow; stale/current-action supersede remains Leave-owned. |
 | `modules/leave/infrastructure/notifications/line.ts` | Leave LINE child rows, payload validation, retry key, stale/current-action supersede | Leave channel composition | Leave channel composition + global outbox lifecycle | No wholesale move; keep the public Leave channel dispatch contract | H3 audit | LINE is not Notification inbox ownership. |
 | `modules/leave/index.ts`, `modules/stock/index.ts`, `modules/routine/index.ts` | Public business dispatch contracts consumed by the global processor | Respective business modules | Respective business modules + global processor composition | Keep explicit public business dispatch contracts; do not expose Notification internals through them | H3 audit | Cross-boundary calls use module public entries; no business module imports the processor. |
 | `modules/stock/infrastructure/notifications/notifications.ts` | Stock requester/admin/low-stock in-app semantics; result email/LINE and low-stock/new-request outbox enqueue | Stock | Stock for semantics/recipients; Notification for generic write; global outbox for delivery | Resolve explicit recipients, then adapt generic writes | H3 | Preserve no-dedupe paths, admin filtering differences, request refs, URLs, and transaction boundaries. |
@@ -760,8 +766,8 @@ symbol in that responsibility; grouping does not imply ownership transfer.
 | `__tests__/api/notification-outbox-cron.test.ts`; `__tests__/services/outbox/processor.test.ts`, `routine-processor.test.ts`, `app-line-processor.test.ts`, `provider-key.test.ts` | Cron secret boundary, global claim/retry/dead, producer dispatch ordering, child delivery, provider keys | Global outbox/provider tests | Global outbox/provider tests | Keep outside Notification; add contract tests only when seam changes | H3 | Tests prove wakeup security, in-app-before-failed-channel, and at-least-once behavior. |
 | `modules/leave/application/notifications/notifications.test.ts`, `modules/leave/infrastructure/notifications/line.test.ts`, `modules/stock/__tests__/notifications.test.ts`, `modules/stock/__tests__/mutations.test.ts`, `modules/stock/__tests__/line-notifications.test.ts`, `modules/routine/application/reminders.test.ts`, `contract-reminders.test.ts`, `scheduler.test.ts`, `delete.test.ts` | Business recipient, payload, transaction, dedupe, supersede, and channel behavior | Respective feature test suites | Respective feature suites plus Notification contract tests | Preserve behavior; extend for public seam during H3 | H3 | Do not move business tests into a god Notification suite. |
 | `__tests__/api/leave-request.test.ts`, `leave-decision.test.ts`, `leave-cancel.test.ts`, `leave-not-taken.test.ts`, `stock-requests-routes.test.ts`, `line-stock-routes.test.ts`, `line-leave-routes.test.ts`, `email-request.test.ts`, and `__tests__/integration/email-request-idempotency.integration.test.ts` | API transaction/wakeup/idempotency evidence around notification-producing use cases | App/feature compatibility suites | Same feature/API suites | Preserve and extend only for an approved public seam | H3 | These tests prove producer behavior; they are not grounds for moving producer semantics into Notification. |
-| `__tests__/architecture/check-architecture.test.ts`, `modules/README.md`, `docs/architecture/*.md` | Import/dependency and ownership rules | Architecture documentation/checker | Architecture rules + Notification record | Add narrow Notification/outbox rules after H1/H3 code exists | H0/H3 | H0 documents the rule; no checker/runtime change was needed. |
-| Absent `modules/notification/` | No Notification feature module currently exists | N/A | Future Notification capability | Create only when H1 starts; no placeholder in H0 | H1 | Avoid an empty module that implies an unimplemented boundary. |
+| `__tests__/architecture/check-architecture.test.ts`, `scripts/check-architecture.mjs`, `modules/README.md`, `docs/architecture/*.md` | Import/dependency and ownership rules | Architecture documentation/checker | Architecture rules + Notification record | H1 added narrow route public-entry, route persistence, and Notification self-barrel rules | H1 | Full `prisma.notification` exclusivity remains deferred until H3 producer migration. |
+| `modules/notification/index.ts`, `application/**`, `infrastructure/persistence/**` | Server/application Notification contract and durable Inbox persistence | H1 Notification module | Notification capability | H1 established public queries/commands, repository ownership, timestamp pagination, and transaction-aware create-once persistence | H1 | No `client.ts`; presentation remains H2, business producer integration remains H3. |
 
 ## Explicit H0 non-goals
 
@@ -784,19 +790,37 @@ H0 does not:
 
 ## Subsequent implementation slices
 
-### H1 — Notification Server/Application Ownership
+### H1 — Notification Server/Application Ownership (CLOSED)
 
-Establish `modules/notification/` with the smallest evidence-backed server
-contract. Give it repository/application ownership for `Notification`, the
-inbox query/read commands, a transaction-aware generic create-to-user command,
-and route delegation for the four existing HTTP routes. Preserve the exact
-auth, user scope, response, pagination, and error behavior. Do not perform
-broad producer cleanup or migrate Email Request.
+H1 established `modules/notification/` with the smallest evidence-backed
+server boundary:
 
-For outbox-originated writes, H1 must preserve the canonical
+- `index.ts` is the only supported server/application entry and exposes the
+  latest/history queries, mark-one/mark-all commands, and generic
+  `createForUserOnce` command;
+- `application/**` owns the query/command semantics while
+  `infrastructure/persistence/**` owns the Prisma `Notification` operations;
+- all four `app/api/notifications/**` routes remain HTTP/auth adapters and now
+  delegate through `@/modules/notification`;
+- `createInAppNotificationOnce` is a compatibility adapter over the public
+  create command, while `createAdminInAppNotificationsOnce` retains its
+  transitional admin audience lookup outside Notification; and
+- the public create command preserves the narrow transaction-bound persistence
+  context and treats existing `P2002` dedupe conflicts as idempotent no-ops.
+
+H1 preserved the full Prisma-serialized response rows, current filter and
+timestamp-cursor behavior, user scoping, error compatibility, and zero-count
+mark-all behavior. It did not change the Prisma schema, business producer
+writes, NotificationOutbox, global processor, Email/LINE behavior, or
+Notification presentation. The timestamp-only cursor tie risk remains
+intentionally unresolved. Email Request/IT remains deferred; H2 owns future
+presentation migration and H3 owns producer integration and compatibility
+cleanup.
+
+For outbox-originated writes, H1 preserves the canonical
 Outbox → business dispatch contract → business/application semantics →
-Notification command flow. H1 must not make the global processor a direct
-Notification caller.
+Notification command flow. The global processor remains unchanged and is not a
+direct Notification caller in current or H1 code.
 
 ### H2 — Notification Presentation Ownership
 
@@ -828,4 +852,6 @@ Processor.
 
 **Phase H0 CLOSED — Notification discovery and boundary definition complete.**
 
-H1, H2, and H3 remain not started.
+**Phase H1 CLOSED — Notification server/application ownership complete.**
+
+H2 and H3 remain not started.

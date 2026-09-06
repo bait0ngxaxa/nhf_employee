@@ -1,7 +1,8 @@
 # Module boundaries
 
-Status: Phase H0 CLOSED — Notification discovery and boundary definition
-complete. Phase G3 Department migration remains complete.
+Status: Phase H1 CLOSED — Notification server/application ownership complete.
+Phase H0 Notification discovery and boundary definition remains closed. Phase G3
+Department migration remains complete.
 Stock, Routine, Leave, and Employee are migrated examples; Employee
 server/business and active presentation ownership are migrated as well.
 
@@ -81,13 +82,14 @@ server-side application and Prisma persistence; G2 confirms that it is
 intentionally server-only and has no `client.ts` or Department-owned
 presentation.
 
-## Notification boundary (H0)
+## Notification boundary (H0/H1)
 
-The future `modules/notification/` module is the owner of the user-facing
-in-app Notification/Inbox capability. It owns the `Notification` repository
-and persistence boundary, generic create-to-explicit-user mechanics, dedupe
+The `modules/notification/` module now owns the user-facing in-app
+Notification/Inbox capability. It owns the `Notification` repository and
+persistence boundary, generic create-to-explicit-user mechanics, dedupe
 handling, latest/history/unread queries, mark-one/mark-all-read commands, and
-Notification-specific server/client contracts and presentation.
+the public server/application contract. Notification-specific client contracts
+and presentation remain H2 work; H1 intentionally creates no `client.ts`.
 
 The module must receive explicit recipients and semantic payloads. Leave,
 Stock, Routine, and the deferred Email Request/IT capability retain ownership
@@ -112,8 +114,9 @@ Notification-owned event with a fully resolved command payload, not current
 Leave, Stock, Routine, or deferred Email Request events.
 
 The four existing `app/api/notifications/**` routes remain app HTTP delivery
-composition while their query/read behavior is delegated to Notification in
-H1. Notification-specific Dashboard components are H2 candidates; the generic
+composition and now delegate their query/read behavior through
+`@/modules/notification`. Notification-specific Dashboard components are H2
+candidates; the generic
 Dashboard navbar, route/page composition, menu constants, and session/auth
 infrastructure remain outside the module. The complete H0 evidence and ledger
 are in [notification-migration.md](./notification-migration.md).

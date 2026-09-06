@@ -1,20 +1,19 @@
-import { Prisma, Role, type NotificationType } from "@prisma/client";
+import { Role, type Prisma } from "@prisma/client";
 
 import { prisma } from "@/lib/db/prisma";
+import {
+    createForUserOnce,
+    type NotificationCreateInput,
+    type NotificationPersistenceContext,
+} from "@/modules/notification";
 
-type InAppNotificationClient = Pick<
+type InAppNotificationClient = NotificationPersistenceContext & Pick<
     Prisma.TransactionClient,
-    "notification" | "user"
+    "user"
 >;
 
-export type InAppNotificationInput = {
+export type InAppNotificationInput = Omit<NotificationCreateInput, "userId"> & {
     userId: number | null | undefined;
-    type: NotificationType;
-    title: string;
-    message: string;
-    actionUrl: string | null;
-    referenceId: string | null;
-    dedupeKey?: string | null;
 };
 
 type AdminNotificationInput = Omit<
@@ -24,39 +23,16 @@ type AdminNotificationInput = Omit<
     dedupeKeyPrefix: string;
 };
 
-function isUniqueConstraintError(error: unknown): boolean {
-    return (
-        error instanceof Prisma.PrismaClientKnownRequestError &&
-        error.code === "P2002"
-    );
-}
-
 export async function createInAppNotificationOnce(
     input: InAppNotificationInput,
     client: InAppNotificationClient = prisma,
 ): Promise<void> {
-    if (!input.userId) {
+    const { userId, ...notificationInput } = input;
+    if (!userId) {
         return;
     }
 
-    try {
-        await client.notification.create({
-            data: {
-                userId: input.userId,
-                type: input.type,
-                title: input.title,
-                message: input.message,
-                actionUrl: input.actionUrl,
-                referenceId: input.referenceId,
-                dedupeKey: input.dedupeKey ?? null,
-            },
-        });
-    } catch (error) {
-        if (isUniqueConstraintError(error)) {
-            return;
-        }
-        throw error;
-    }
+    await createForUserOnce({ ...notificationInput, userId }, client);
 }
 
 export async function createAdminInAppNotificationsOnce(

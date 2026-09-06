@@ -170,6 +170,12 @@ const employeeDashboardFeatureRouteFiles = [
     "app/dashboard/employees/new/page.tsx",
     "app/dashboard/employees/import/page.tsx",
 ];
+const notificationApiRouteFiles = [
+    "app/api/notifications/route.ts",
+    "app/api/notifications/all/route.ts",
+    "app/api/notifications/[id]/read/route.ts",
+    "app/api/notifications/mark-all-read/route.ts",
+];
 const legacyEmployeeServerPrefixes = [
     "@/lib/services/employee",
     "@/lib/validations/employee",
@@ -595,6 +601,99 @@ function getDepartmentPersistenceViolation(filePath, rootPath) {
     return `${relativeFilePath(filePath, rootPath)}:${line} direct Department Prisma access must be owned by modules/department/infrastructure/.`;
 }
 
+function isNotificationApiRoute(filePath, rootPath) {
+    return notificationApiRouteFiles.some((routePath) =>
+        filePath === resolve(rootPath, routePath),
+    );
+}
+
+function getNotificationRouteDependencyViolation(filePath, rootPath, moduleSpecifier) {
+    if (!isNotificationApiRoute(filePath, rootPath)) return null;
+
+    const resolvedImport = moduleSpecifier.startsWith("@/")
+        ? resolve(rootPath, moduleSpecifier.slice(2))
+        : getImportSourcePath(moduleSpecifier, filePath, rootPath);
+    const normalizedSpecifier = resolvedImport === null
+        ? moduleSpecifier
+        : `@/${relativeFilePath(resolvedImport, rootPath).replace(/\.[cm]?[jt]sx?$/, "")}`;
+
+    if (hasImportPrefix(normalizedSpecifier, "@/modules/notification")
+        && normalizedSpecifier !== "@/modules/notification") {
+        return "Notification API routes must use the server entry @/modules/notification.";
+    }
+
+    return null;
+}
+
+function getNotificationRouteCompositionViolations(rootPath, sourceFiles) {
+    const publicEntry = "@/modules/notification";
+    const violations = [];
+
+    for (const routePath of notificationApiRouteFiles) {
+        const filePath = resolve(rootPath, routePath);
+        if (!sourceFiles.includes(filePath)) continue;
+
+        const normalizedSpecifiers = getImports(filePath).map((record) => {
+            const resolvedImport = record.moduleSpecifier.startsWith("@/")
+                ? resolve(rootPath, record.moduleSpecifier.slice(2))
+                : getImportSourcePath(record.moduleSpecifier, filePath, rootPath);
+            return resolvedImport === null
+                ? record.moduleSpecifier
+                : `@/${relativeFilePath(resolvedImport, rootPath).replace(/\.[cm]?[jt]sx?$/, "")}`;
+        });
+
+        if (normalizedSpecifiers.includes(publicEntry)
+            || normalizedSpecifiers.some((specifier) =>
+                hasImportPrefix(specifier, publicEntry),
+            )) {
+            continue;
+        }
+
+        violations.push(
+            `${relativeFilePath(filePath, rootPath)} must consume Notification through "${publicEntry}".`,
+        );
+    }
+
+    return violations;
+}
+
+function getNotificationPersistenceViolation(filePath, rootPath) {
+    if (!isNotificationApiRoute(filePath, rootPath)) return null;
+
+    const contents = readFileSync(filePath, "utf8");
+    const accessMatch = /\bprisma\s*\.\s*notification\b/.exec(contents);
+    if (accessMatch === null || accessMatch.index === undefined) return null;
+
+    const line = contents.slice(0, accessMatch.index).split(/\r?\n/).length;
+    return `${relativeFilePath(filePath, rootPath)}:${line} Notification API routes must delegate Notification persistence through @/modules/notification.`;
+}
+
+function getNotificationDependencyViolation(filePath, rootPath, moduleSpecifier) {
+    const notificationModuleRoot = resolve(rootPath, "modules/notification");
+    if (!pathIsWithin(filePath, notificationModuleRoot)
+        || filePath === resolve(notificationModuleRoot, "index.ts")) {
+        return null;
+    }
+
+    const resolvedImport = moduleSpecifier.startsWith("@/")
+        ? resolve(rootPath, moduleSpecifier.slice(2))
+        : getImportSourcePath(moduleSpecifier, filePath, rootPath);
+    const normalizedSpecifier = resolvedImport === null
+        ? moduleSpecifier
+        : `@/${relativeFilePath(resolvedImport, rootPath).replace(/\.[cm]?[jt]sx?$/, "")}`;
+    const publicEntries = new Set([
+        "@/modules/notification",
+        "@/modules/notification/index",
+        "@/modules/notification/client",
+    ]);
+
+    if (publicEntries.has(normalizedSpecifier)) {
+        return "Notification module internals must use local contracts instead of their own public barrel.";
+    }
+
+    return null;
+}
+
 function getClientReachableServerEntryViolations(
     rootPath,
     sourceFiles,
@@ -790,6 +889,14 @@ function checkArchitecture(options = {}) {
             violations.push(departmentPersistenceViolation);
         }
 
+        const notificationPersistenceViolation = getNotificationPersistenceViolation(
+            filePath,
+            rootPath,
+        );
+        if (notificationPersistenceViolation !== null) {
+            violations.push(notificationPersistenceViolation);
+        }
+
         const owner = getOwner(filePath, modulesRoot, sharedRoot);
 
         for (const importRecord of getImports(filePath)) {
@@ -885,6 +992,37 @@ function checkArchitecture(options = {}) {
                 continue;
             }
 
+            const notificationRouteDependencyViolation =
+                getNotificationRouteDependencyViolation(
+                    filePath,
+                    rootPath,
+                    importRecord.moduleSpecifier,
+                );
+            if (notificationRouteDependencyViolation !== null) {
+                violations.push(describeViolation(
+                    filePath,
+                    rootPath,
+                    importRecord,
+                    notificationRouteDependencyViolation,
+                ));
+                continue;
+            }
+
+            const notificationDependencyViolation = getNotificationDependencyViolation(
+                filePath,
+                rootPath,
+                importRecord.moduleSpecifier,
+            );
+            if (notificationDependencyViolation !== null) {
+                violations.push(describeViolation(
+                    filePath,
+                    rootPath,
+                    importRecord,
+                    notificationDependencyViolation,
+                ));
+                continue;
+            }
+
             const moduleDependencyViolation = getModuleDependencyViolation(
                 owner,
                 importRecord.moduleSpecifier,
@@ -923,6 +1061,7 @@ function checkArchitecture(options = {}) {
     }
 
     violations.push(...getEmployeeDashboardRouteCompositionViolations(rootPath, sourceFiles));
+    violations.push(...getNotificationRouteCompositionViolations(rootPath, sourceFiles));
     violations.push(...getLeaveClientGraphViolations(rootPath));
     violations.push(...getEmployeeClientGraphViolations(rootPath));
     violations.push(...getClientReachableServerEntryViolations(rootPath, sourceFiles, "leave"));

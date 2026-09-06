@@ -1,8 +1,8 @@
 import { type NextRequest, NextResponse } from "next/server";
 
 import { requireApiSession } from "@/lib/auth/api";
-import { prisma } from "@/lib/db/prisma";
 import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
+import { listLatestForUser } from "@/modules/notification";
 
 export async function GET(_req: NextRequest): Promise<NextResponse> {
     try {
@@ -14,16 +14,7 @@ export async function GET(_req: NextRequest): Promise<NextResponse> {
             return NextResponse.json({ error: COMMON_API_MESSAGES.invalidUserSession }, { status: 400 });
         }
 
-        const [notifications, unreadCount] = await Promise.all([
-            prisma.notification.findMany({
-                where: { userId },
-                orderBy: { createdAt: "desc" },
-                take: 10,
-            }),
-            prisma.notification.count({
-                where: { userId, isRead: false },
-            }),
-        ]);
+        const { notifications, unreadCount } = await listLatestForUser(userId);
 
         return NextResponse.json({ notifications, unreadCount });
     } catch (error) {

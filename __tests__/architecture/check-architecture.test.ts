@@ -20,6 +20,9 @@ const fixtureFiles: FixtureFiles = {
     "modules/department/index.ts": "export const x = 1;\n",
     "modules/department/application/example.ts": "export const x = 1;\n",
     "modules/department/infrastructure/persistence/repository.ts": "export const x = 1;\n",
+    "modules/notification/index.ts": "export const x = 1;\n",
+    "modules/notification/application/example.ts": "export const x = 1;\n",
+    "modules/notification/infrastructure/persistence/repository.ts": "export const x = 1;\n",
     "modules/future/index.ts": "export const x = 1;\n",
     "shared/index.ts": "export const x = 1;\n",
 };
@@ -511,6 +514,84 @@ describe("architecture checker module boundaries", () => {
         expect(result.violations[0]).toContain(
             'external consumers must use the target module public API "@/modules/stock"',
         );
+    });
+
+    it.each([
+        "app/api/notifications/route.ts",
+        "app/api/notifications/all/route.ts",
+        "app/api/notifications/[id]/read/route.ts",
+        "app/api/notifications/mark-all-read/route.ts",
+    ])("allows %s to use the Notification public server entry", async (routePath) => {
+        const result = await checkFixture(
+            routePath,
+            'import { listLatestForUser } from "@/modules/notification";\n',
+        );
+
+        expect(result.violations).toEqual([]);
+    });
+
+    it("rejects a Notification API route deep-importing Notification internals", async () => {
+        const result = await checkFixture(
+            "app/api/notifications/route.ts",
+            'import { findLatestNotifications } from "@/modules/notification/infrastructure/persistence/repository";\n',
+        );
+
+        expect(result.violations).toHaveLength(1);
+        expect(result.violations[0]).toContain(
+            "Notification API routes must use the server entry @/modules/notification",
+        );
+    });
+
+    it("rejects a Notification API route without the public server entry", async () => {
+        const result = await checkFixture(
+            "app/api/notifications/route.ts",
+            'import { requireApiSession } from "@/lib/auth/api";\n',
+        );
+
+        expect(result.violations).toHaveLength(1);
+        expect(result.violations[0]).toContain(
+            'must consume Notification through "@/modules/notification"',
+        );
+    });
+
+    it("rejects direct Notification Prisma access from an API route", async () => {
+        const result = await checkFixture(
+            "app/api/notifications/route.ts",
+            [
+                'import { listLatestForUser } from "@/modules/notification";',
+                'import { prisma } from "@/lib/db/prisma";',
+                "const notifications = await prisma.notification.findMany();",
+            ].join("\n"),
+        );
+
+        expect(result.violations).toHaveLength(1);
+        expect(result.violations[0]).toContain(
+            "Notification API routes must delegate Notification persistence",
+        );
+    });
+
+    it("rejects Notification internals importing their own public barrel", async () => {
+        const result = await checkFixture(
+            "modules/notification/application/example.ts",
+            'import { listLatestForUser } from "@/modules/notification";\n',
+        );
+
+        expect(result.violations).toHaveLength(1);
+        expect(result.violations[0]).toContain(
+            "Notification module internals must use local contracts",
+        );
+    });
+
+    it("allows Notification infrastructure to use the Prisma singleton", async () => {
+        const result = await checkFixture(
+            "modules/notification/infrastructure/persistence/repository.ts",
+            [
+                'import { prisma } from "@/lib/db/prisma";',
+                "const notifications = await prisma.notification.findMany();",
+            ].join("\n"),
+        );
+
+        expect(result.violations).toEqual([]);
     });
 
     it("rejects Department API routes deep-importing Department internals", async () => {

@@ -1,7 +1,8 @@
 # NHF Employee modular monolith
 
-Status: Phase H0 CLOSED — Notification discovery and boundary definition
-complete. Phase G3 Department migration remains complete.
+Status: Phase H1 CLOSED — Notification server/application ownership complete.
+Phase H0 Notification discovery and boundary definition remains closed. Phase G3
+Department migration remains complete.
 
 This document separates the repository's observed current state from the
 target architecture. Stock server/business ownership is now migrated into
@@ -36,9 +37,9 @@ capability a stable server/application/persistence owner in
 `modules/department/`; Employee still owns its required Department association
 and Employee-specific mapping and presentation behavior.
 
-Phase H0 has now defined the Notification boundary. The future
-`modules/notification/` capability is the in-app Notification/Inbox owner; it
-does not absorb business notification semantics, the global
+Phase H1 has established the server/application Notification boundary in
+`modules/notification/`. It is the in-app Notification/Inbox owner; it does not
+absorb business notification semantics, the global
 `NotificationOutbox`, or Email/LINE delivery infrastructure. Leave, Stock, and
 Routine retain event and recipient policy, while Email Request remains a
 transitional/deferred consumer pending the future IT capability boundary. See
@@ -88,12 +89,13 @@ historical
 `/dashboard?tab=...` links remain inbound-compatible through the dashboard home
 route boundary.
 
-Notification is currently still a legacy `app/`/`components/`/`lib/` surface:
-the four Notification routes, Dashboard Notification presentation, and shared
-in-app helper have not moved. The current global outbox already treats in-app
-delivery as one possible channel, including Routine reminders, but the outbox
-processor and provider composition remain shared/platform infrastructure. H1
-will establish the Notification server seam before H2 moves its presentation.
+Notification server/application ownership now lives in `modules/notification/`:
+the four Notification routes delegate through its public server entry, and the
+shared generic in-app helper is a compatibility adapter over that entry. The
+Dashboard Notification presentation remains a legacy `components/` surface for
+H2. The current global outbox already treats in-app delivery as one possible
+channel, including Routine reminders, while the outbox processor and provider
+composition remain shared/platform infrastructure.
 
 ## Target architecture
 
@@ -181,13 +183,14 @@ Employee import seam preserve their existing contracts; Employee browser code
 continues to use HTTP. No obsolete Department runtime artifact remained, so no
 runtime cleanup was required.
 
-### Notification boundary definition (H0)
+### Notification boundary and server ownership (H0/H1)
 
 The Notification capability is deliberately narrower than the word
 "notification" in the repository. It owns durable per-user in-app Inbox
 entries, latest/history/unread queries, mark-read commands, generic
-deduplicated persistence, and Notification-specific presentation. A business
-module supplies the explicit recipient and owns the event's meaning, semantic
+deduplicated persistence, and its server/application contract. H2 will own
+Notification-specific presentation. A business module supplies the explicit
+recipient and owns the event's meaning, semantic
 type, title/message, action URL, reference ID, channel choice, and
 event-specific dedupe/supersede behavior.
 
@@ -208,8 +211,9 @@ resolved command payload, not current business-owned events.
 
 Dashboard navbar/page/menu composition remains app/Dashboard-owned. Email
 Request is documented as a transitional/deferred consumer and legacy IT enum
-values remain storage-compatible history only. H0 changes documentation only;
-H1-H3 are not complete.
+values remain storage-compatible history only. H1 changes server/application
+ownership only; H2 presentation and H3 producer integration/compatibility
+cleanup are not complete.
 
 ## Ownership principle
 

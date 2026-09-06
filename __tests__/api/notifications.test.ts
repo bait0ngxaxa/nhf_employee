@@ -1,27 +1,31 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { GET as getNotifications } from "@/app/api/notifications/route";
+import { NextRequest } from "next/server";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+import { GET as getAllNotifications } from "@/app/api/notifications/all/route";
 import { PATCH as markAsRead } from "@/app/api/notifications/[id]/read/route";
 import { POST as markAllAsRead } from "@/app/api/notifications/mark-all-read/route";
+import { GET as getNotifications } from "@/app/api/notifications/route";
 import { getApiAuthSession } from "@/lib/auth/server";
-import { prisma } from "@/lib/db/prisma";
-import { NextRequest } from "next/server";
+import {
+    listHistoryForUser,
+    listLatestForUser,
+    markAllReadForUser,
+    markReadForUser,
+} from "@/modules/notification";
 
-// Mock auth resolver
+const notificationMocks = vi.hoisted(() => ({
+    createForUserOnce: vi.fn(),
+    listHistoryForUser: vi.fn(),
+    listLatestForUser: vi.fn(),
+    markAllReadForUser: vi.fn(),
+    markReadForUser: vi.fn(),
+}));
+
 vi.mock("@/lib/auth/server", () => ({
     getApiAuthSession: vi.fn(),
 }));
 
-// Mock prisma
-vi.mock("@/lib/db/prisma", () => ({
-    prisma: {
-        notification: {
-            findMany: vi.fn(),
-            count: vi.fn(),
-            update: vi.fn(),
-            updateMany: vi.fn(),
-        },
-    },
-}));
+vi.mock("@/modules/notification", () => notificationMocks);
 
 describe("Notification API Routes", () => {
     const mockUser = {
@@ -31,111 +35,200 @@ describe("Notification API Routes", () => {
         role: "USER",
     };
     const mockGetApiAuthSession = vi.mocked(getApiAuthSession);
-    const mockFindMany = vi.mocked(prisma.notification.findMany);
-    const mockCount = vi.mocked(prisma.notification.count);
-    const mockUpdate = vi.mocked(prisma.notification.update);
-    const mockUpdateMany = vi.mocked(prisma.notification.updateMany);
+    const mockListLatestForUser = vi.mocked(listLatestForUser);
+    const mockListHistoryForUser = vi.mocked(listHistoryForUser);
+    const mockMarkReadForUser = vi.mocked(markReadForUser);
+    const mockMarkAllReadForUser = vi.mocked(markAllReadForUser);
 
     beforeEach(() => {
         vi.clearAllMocks();
+        mockListLatestForUser.mockResolvedValue({ notifications: [], unreadCount: 0 });
+        mockListHistoryForUser.mockResolvedValue({
+            notifications: [],
+            nextCursor: null,
+            hasMore: false,
+            totalCount: 0,
+        });
+        mockMarkReadForUser.mockResolvedValue({} as never);
+        mockMarkAllReadForUser.mockResolvedValue(0);
     });
 
     describe("GET /api/notifications", () => {
-        it("should return unauthorized if no session exists", async () => {
+        it("returns unauthorized if no session exists", async () => {
             mockGetApiAuthSession.mockResolvedValue(null);
             const req = new NextRequest("http://localhost/api/notifications");
+
             const res = await getNotifications(req);
-            
+
             expect(res.status).toBe(401);
             const data = await res.json();
             expect(data.error).toBe("Unauthorized");
         });
 
-        it("should return notifications and unread count for authenticated user", async () => {
-            mockGetApiAuthSession.mockResolvedValue({ user: mockUser });
-            
-            const mockNotifications = [
-                { id: "1", title: "Test 1", message: "Msg 1", isRead: false, createdAt: new Date() },
-                { id: "2", title: "Test 2", message: "Msg 2", isRead: true, createdAt: new Date() },
+        it("returns a bad-request response for an invalid numeric user session", async () => {
+            mockGetApiAuthSession.mockResolvedValue({
+                user: { ...mockUser, id: "not-a-number" },
+            } as never);
+            const req = new NextRequest("http://localhost/api/notifications");
+
+            const res = await getNotifications(req);
+
+            expect(res.status).toBe(400);
+            expect(mockListLatestForUser).not.toHaveBeenCalled();
+        });
+
+        it("returns notifications and unread count for the authenticated user", async () => {
+            mockGetApiAuthSession.mockResolvedValue({ user: mockUser } as never);
+            const notifications = [
+                { id: "1", title: "Test 1", message: "Msg 1", isRead: false },
+                { id: "2", title: "Test 2", message: "Msg 2", isRead: true },
             ];
-            
-            mockFindMany.mockResolvedValue(mockNotifications as never);
-            mockCount.mockResolvedValue(1);
+            mockListLatestForUser.mockResolvedValue({ notifications, unreadCount: 1 } as never);
 
             const req = new NextRequest("http://localhost/api/notifications");
             const res = await getNotifications(req);
-            
+
             expect(res.status).toBe(200);
             const data = await res.json();
-            expect(data.notifications).toHaveLength(2);
+            expect(data.notifications).toEqual(notifications);
             expect(data.unreadCount).toBe(1);
-            
-            expect(prisma.notification.findMany).toHaveBeenCalledWith(expect.objectContaining({
-                where: { userId: 1 },
-                orderBy: { createdAt: "desc" },
-                take: 10
-            }));
+            expect(mockListLatestForUser).toHaveBeenCalledWith(1);
+        });
+
+        it("keeps the sanitized error response when the Notification query fails", async () => {
+            mockGetApiAuthSession.mockResolvedValue({ user: mockUser } as never);
+            mockListLatestForUser.mockRejectedValue(new Error("database details"));
+            const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+            try {
+                const req = new NextRequest("http://localhost/api/notifications");
+                const res = await getNotifications(req);
+
+                expect(res.status).toBe(500);
+                const data = await res.json();
+                expect(data.error).toBeDefined();
+            } finally {
+                errorSpy.mockRestore();
+            }
+        });
+    });
+
+    describe("GET /api/notifications/all", () => {
+        it("delegates the current filter and timestamp cursor to the public query", async () => {
+            mockGetApiAuthSession.mockResolvedValue({ user: mockUser } as never);
+            const result = {
+                notifications: [{ id: "notification-1" }],
+                nextCursor: "2026-08-01T00:00:00.000Z",
+                hasMore: true,
+                totalCount: 21,
+            };
+            mockListHistoryForUser.mockResolvedValue(result as never);
+
+            const req = new NextRequest(
+                "http://localhost/api/notifications/all?filter=unread&cursor=2026-09-01T00:00:00.000Z",
+            );
+            const res = await getAllNotifications(req);
+
+            expect(res.status).toBe(200);
+            expect(await res.json()).toEqual(result);
+            expect(mockListHistoryForUser).toHaveBeenCalledWith({
+                userId: 1,
+                filter: "unread",
+                cursor: "2026-09-01T00:00:00.000Z",
+            });
         });
     });
 
     describe("PATCH /api/notifications/[id]/read", () => {
-        it("should mark a single notification as read", async () => {
-            mockGetApiAuthSession.mockResolvedValue({ user: mockUser });
-            
-            const mockNotificationId = "notif-123";
-            const params = Promise.resolve({ id: mockNotificationId });
-
-            mockUpdate.mockResolvedValue({
-                id: mockNotificationId,
-                isRead: true,
-            } as never);
-
-            const req = new NextRequest(`http://localhost/api/notifications/${mockNotificationId}/read`, {
-                method: "PATCH"
+        it("marks a single notification as read for the authenticated user", async () => {
+            mockGetApiAuthSession.mockResolvedValue({ user: mockUser } as never);
+            const notification = { id: "notif-123", isRead: true };
+            mockMarkReadForUser.mockResolvedValue(notification as never);
+            const params = Promise.resolve({ id: "notif-123" });
+            const req = new NextRequest("http://localhost/api/notifications/notif-123/read", {
+                method: "PATCH",
             });
-            
+
             const res = await markAsRead(req, { params });
-            
+
             expect(res.status).toBe(200);
-            const data = await res.json();
-            expect(data.success).toBe(true);
-            
-            expect(prisma.notification.update).toHaveBeenCalledWith({
-                where: { id: mockNotificationId, userId: 1 },
-                data: { isRead: true }
-            });
+            expect(await res.json()).toEqual({ success: true, notification });
+            expect(mockMarkReadForUser).toHaveBeenCalledWith("notif-123", 1);
         });
 
-        it("should return unauthorized for patch without session", async () => {
+        it("returns unauthorized for patch without a session", async () => {
             mockGetApiAuthSession.mockResolvedValue(null);
             const params = Promise.resolve({ id: "123" });
-            const req = new NextRequest("http://localhost/api/notifications/123/read", { method: "PATCH" });
-            
+            const req = new NextRequest("http://localhost/api/notifications/123/read", {
+                method: "PATCH",
+            });
+
             const res = await markAsRead(req, { params });
+
             expect(res.status).toBe(401);
+        });
+
+        it("keeps the generic mark-read error response for persistence failures", async () => {
+            mockGetApiAuthSession.mockResolvedValue({ user: mockUser } as never);
+            mockMarkReadForUser.mockRejectedValue(new Error("database details"));
+            const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+            try {
+                const req = new NextRequest("http://localhost/api/notifications/123/read", {
+                    method: "PATCH",
+                });
+                const res = await markAsRead(req, { params: Promise.resolve({ id: "123" }) });
+
+                expect(res.status).toBe(500);
+            } finally {
+                errorSpy.mockRestore();
+            }
         });
     });
 
     describe("POST /api/notifications/mark-all-read", () => {
-        it("should mark all user's notifications as read", async () => {
-            mockGetApiAuthSession.mockResolvedValue({ user: mockUser });
-            mockUpdateMany.mockResolvedValue({ count: 5 } as never);
-
+        it("returns the count from the user-scoped mark-all command", async () => {
+            mockGetApiAuthSession.mockResolvedValue({ user: mockUser } as never);
+            mockMarkAllReadForUser.mockResolvedValue(5);
             const req = new NextRequest("http://localhost/api/notifications/mark-all-read", {
-                method: "POST"
+                method: "POST",
             });
-            
+
             const res = await markAllAsRead(req);
-            
+
             expect(res.status).toBe(200);
-            const data = await res.json();
-            expect(data.success).toBe(true);
-            expect(data.updatedCount).toBe(5);
-            
-            expect(prisma.notification.updateMany).toHaveBeenCalledWith({
-                where: { userId: 1, isRead: false },
-                data: { isRead: true }
+            expect(await res.json()).toEqual({ success: true, updatedCount: 5 });
+            expect(mockMarkAllReadForUser).toHaveBeenCalledWith(1);
+        });
+
+        it("keeps zero unread rows as a successful result", async () => {
+            mockGetApiAuthSession.mockResolvedValue({ user: mockUser } as never);
+            mockMarkAllReadForUser.mockResolvedValue(0);
+            const req = new NextRequest("http://localhost/api/notifications/mark-all-read", {
+                method: "POST",
             });
+
+            const res = await markAllAsRead(req);
+
+            expect(res.status).toBe(200);
+            expect(await res.json()).toEqual({ success: true, updatedCount: 0 });
+        });
+
+        it("keeps the generic mark-all error response for persistence failures", async () => {
+            mockGetApiAuthSession.mockResolvedValue({ user: mockUser } as never);
+            mockMarkAllReadForUser.mockRejectedValue(new Error("database details"));
+            const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+            try {
+                const req = new NextRequest("http://localhost/api/notifications/mark-all-read", {
+                    method: "POST",
+                });
+                const res = await markAllAsRead(req);
+
+                expect(res.status).toBe(500);
+            } finally {
+                errorSpy.mockRestore();
+            }
         });
     });
 });

@@ -1,9 +1,9 @@
 import { type NextRequest, NextResponse } from "next/server";
 
 import { requireApiSession } from "@/lib/auth/api";
-import { prisma } from "@/lib/db/prisma";
 import { jsonError } from "@/lib/ssot/http";
 import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
+import { markReadForUser } from "@/modules/notification";
 
 export async function PATCH(
     _req: NextRequest,
@@ -21,15 +21,7 @@ export async function PATCH(
         const resolvedParams = await params;
         const notificationId = resolvedParams.id;
 
-        const notification = await prisma.notification.update({
-            where: {
-                id: notificationId,
-                userId,
-            },
-            data: {
-                isRead: true,
-            },
-        });
+        const notification = await markReadForUser(notificationId, userId);
 
         return NextResponse.json({ success: true, notification });
     } catch (error) {
