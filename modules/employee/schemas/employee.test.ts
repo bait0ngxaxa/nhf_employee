@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
     createEmployeeSchema,
     updateEmployeeSchema,
-} from "@/lib/validations/employee";
+} from "./employee";
 
 describe("Employee Validation", () => {
     describe("createEmployeeSchema", () => {

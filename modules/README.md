@@ -3,9 +3,10 @@
 `modules/` is the ownership boundary for business capabilities in the NHF
 Employee application.
 
-Phase A creates this boundary without moving any existing Stock, Routine,
-Leave, Employee, or other feature implementation. Legacy locations remain
-valid until a feature is deliberately migrated.
+Stock, Routine, and Leave are migrated feature modules. Employee F1 now owns
+Employee server/business behavior in `modules/employee/`; its presentation
+remains in legacy locations until F2. Other legacy locations remain valid until
+their feature is deliberately migrated.
 
 Rules for new work:
 

@@ -10,17 +10,18 @@ import {
 } from "@/lib/auth/rate-limit";
 import {
     AUTH_SIGNUP_MESSAGES,
-    hasEligibleEmployeeLifecycle,
 } from "@/lib/auth/ssot";
 import { withTrustedMutation } from "@/lib/auth/csrf";
 import { getClientMetadata } from "@/lib/auth/hybrid/session";
 import { prisma } from "@/lib/db/prisma";
-import { lockEmployeeRows } from "@/lib/db/row-locks";
 import { runSerializableTransaction } from "@/lib/db/transaction";
 import {
+    findSignupEmployee,
     getEmployeeDisplayName,
     getEmployeeFullName,
-} from "@/lib/helpers/employee-helpers";
+    hasEligibleEmployeeLifecycle,
+    lockAndRecheckSignupEmployee,
+} from "@/modules/employee";
 import { isBootstrapAdminEmail } from "@/lib/ssot/admin-bootstrap";
 import { signupSchema } from "@/lib/validations/auth";
 
@@ -29,17 +30,6 @@ const SIGNUP_RATE_LIMIT_POLICY = {
     maxAttemptsPerIdentity: 5,
     maxAttemptsPerIp: 25,
 } as const;
-
-const SIGNUP_EMPLOYEE_SELECT = {
-    id: true,
-    firstName: true,
-    lastName: true,
-    nickname: true,
-    email: true,
-    status: true,
-    deletedAt: true,
-    user: { select: { id: true } },
-} as const satisfies Prisma.EmployeeSelect;
 
 class SignupEligibilityError extends Error {
     constructor(message: string) {
@@ -100,10 +90,7 @@ export const POST = withTrustedMutation(
                 );
             }
 
-            const matchedEmployee = await prisma.employee.findUnique({
-                where: { email },
-                select: SIGNUP_EMPLOYEE_SELECT,
-            });
+            const matchedEmployee = await findSignupEmployee(email);
 
             if (
                 !matchedEmployee
@@ -124,17 +111,14 @@ export const POST = withTrustedMutation(
 
             const hashedPassword = await bcrypt.hash(password, 12);
             const { user, assignedRole, employeeDisplayName } = await runSerializableTransaction(async (tx) => {
-                await lockEmployeeRows(tx, [matchedEmployee.id]);
-
-                const lockedEmployee = await tx.employee.findUnique({
-                    where: { id: matchedEmployee.id },
-                    select: SIGNUP_EMPLOYEE_SELECT,
-                });
+                const lockedEmployee = await lockAndRecheckSignupEmployee(
+                    tx,
+                    matchedEmployee.id,
+                    email,
+                );
 
                 if (
                     !lockedEmployee
-                    || lockedEmployee.email !== email
-                    || !hasEligibleEmployeeLifecycle(lockedEmployee)
                 ) {
                     throw new SignupEligibilityError(
                         AUTH_SIGNUP_MESSAGES.employeeNotFoundThai,

@@ -2,8 +2,10 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { mockDeep, mockReset } from "vitest-mock-extended";
 import type { PrismaClient } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
-import { importEmployeesFromCSV } from "@/lib/services/employee/import";
-import type { CSVImportEmployee } from "@/lib/services/employee/types";
+import {
+    importEmployeesFromCsvRows,
+} from "./import-employees";
+import type { CsvImportEmployee } from "./types";
 
 vi.mock("@/lib/db/prisma", () => ({
     prisma: mockDeep<PrismaClient>(),
@@ -31,7 +33,7 @@ describe("Employee Import", () => {
                 user: null,
             }) as never);
 
-        const csvData: Partial<CSVImportEmployee>[] = [
+        const csvData: Partial<CsvImportEmployee>[] = [
             {
                 firstName: "John",
                 lastName: "Doe",
@@ -42,7 +44,7 @@ describe("Employee Import", () => {
         ];
 
         // Act
-        const result = await importEmployeesFromCSV(csvData);
+        const result = await importEmployeesFromCsvRows(csvData);
 
         // Assert
         expect(result.success).toHaveLength(1);
@@ -54,11 +56,11 @@ describe("Employee Import", () => {
         prismaMock.department.findMany.mockResolvedValue([]);
         prismaMock.employee.findMany.mockResolvedValue([]);
 
-        const csvData: Partial<CSVImportEmployee>[] = [
+        const csvData: Partial<CsvImportEmployee>[] = [
             { firstName: "", lastName: "Doe" }, // Missing fields
         ];
 
-        const result = await importEmployeesFromCSV(csvData);
+        const result = await importEmployeesFromCsvRows(csvData);
 
         expect(result.errors).toHaveLength(1);
         expect(result.errors[0].error).toContain("เป็นข้อมูลที่จำเป็น");
@@ -97,7 +99,7 @@ describe("Employee Import", () => {
             user: null,
         } as never);
 
-        const result = await importEmployeesFromCSV(csvData);
+        const result = await importEmployeesFromCsvRows(csvData);
 
         expect(result.errors).toHaveLength(1); // duplicate
         expect(result.success).toHaveLength(1); // unique
@@ -126,7 +128,7 @@ describe("Employee Import", () => {
             },
         ];
 
-        const result = await importEmployeesFromCSV(csvData);
+        const result = await importEmployeesFromCsvRows(csvData);
 
         expect(result.errors).toHaveLength(1); // duplicate name
         expect(result.success).toHaveLength(0);
@@ -144,7 +146,7 @@ describe("Employee Import", () => {
                 dept: { name: "ADMIN" },
             }) as never);
 
-        const validRows: Partial<CSVImportEmployee>[] = Array.from(
+        const validRows: Partial<CsvImportEmployee>[] = Array.from(
             { length: 8 },
             (_, index) => ({
                 firstName: `Valid${index}`,
@@ -154,7 +156,7 @@ describe("Employee Import", () => {
                 email: `valid${index}@thainhf.org`,
             }),
         );
-        const rows: Partial<CSVImportEmployee>[] = [
+        const rows: Partial<CsvImportEmployee>[] = [
             ...validRows,
             {
                 firstName: "Missing",
@@ -170,7 +172,7 @@ describe("Employee Import", () => {
             },
         ];
 
-        const result = await importEmployeesFromCSV(rows);
+        const result = await importEmployeesFromCsvRows(rows);
 
         expect(result.success).toHaveLength(8);
         expect(result.errors).toHaveLength(2);
@@ -183,7 +185,7 @@ describe("Employee Import", () => {
         ] as never);
         prismaMock.employee.findMany.mockResolvedValue([]);
 
-        const result = await importEmployeesFromCSV([{
+        const result = await importEmployeesFromCsvRows([{
             firstName: "External",
             lastName: "Email",
             position: "Developer",
@@ -207,7 +209,7 @@ describe("Employee Import", () => {
                 dept: { name: "ADMIN" },
             }) as never);
 
-        const result = await importEmployeesFromCSV([{
+        const result = await importEmployeesFromCsvRows([{
             firstName: "Uppercase",
             lastName: "Email",
             position: "Developer",
@@ -236,7 +238,7 @@ describe("Employee Import", () => {
                     dept: { name: "ADMIN" },
                 }) as never);
 
-            const result = await importEmployeesFromCSV([{
+            const result = await importEmployeesFromCsvRows([{
                 firstName: "No",
                 lastName: `Email${email || "Blank"}`,
                 position: "Developer",
@@ -261,7 +263,7 @@ describe("Employee Import", () => {
         ] as never);
         prismaMock.employee.findMany.mockResolvedValue([]);
 
-        const result = await importEmployeesFromCSV([{
+        const result = await importEmployeesFromCsvRows([{
             firstName: "Unknown",
             lastName: "Status",
             position: "Developer",
@@ -291,7 +293,7 @@ describe("Employee Import", () => {
                 dept: { name: "ADMIN" },
             }) as never);
 
-        const result = await importEmployeesFromCSV([{
+        const result = await importEmployeesFromCsvRows([{
             firstName: "Status",
             lastName: "Mapping",
             position: "Developer",
@@ -318,7 +320,7 @@ describe("Employee Import", () => {
                 dept: { name: "ADMIN" },
             }) as never);
 
-        const result = await importEmployeesFromCSV([
+        const result = await importEmployeesFromCsvRows([
             {
                 firstName: "First",
                 lastName: "Employee",
@@ -338,5 +340,19 @@ describe("Employee Import", () => {
         expect(result.success).toHaveLength(1);
         expect(result.errors).toHaveLength(1);
         expect(result.errors[0]?.error).toContain("อีเมลนี้ถูกใช้งานแล้ว");
+    });
+
+    it("retains the historical application behavior without a 1000-row guard", async () => {
+        prismaMock.department.findMany.mockResolvedValue([]);
+        prismaMock.employee.findMany.mockResolvedValue([]);
+        const rows = Array.from({ length: 1001 }, () => ({
+            firstName: "Missing",
+            lastName: "Position",
+        }));
+
+        const result = await importEmployeesFromCsvRows(rows);
+
+        expect(result.errors).toHaveLength(1001);
+        expect(prismaMock.employee.create).not.toHaveBeenCalled();
     });
 });

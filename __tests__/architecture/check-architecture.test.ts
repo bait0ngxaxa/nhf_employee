@@ -14,6 +14,9 @@ const fixtureFiles: FixtureFiles = {
     "modules/stock/domain/inventory.ts": "export const x = 1;\n",
     "modules/routine/index.ts": "export const x = 1;\n",
     "modules/routine/application/example.ts": "export const x = 1;\n",
+    "modules/employee/index.ts": "export const x = 1;\n",
+    "modules/employee/client.ts": '"use client"; export const x = 1;\n',
+    "modules/employee/application/example.ts": "export const x = 1;\n",
     "modules/future/index.ts": "export const x = 1;\n",
     "shared/index.ts": "export const x = 1;\n",
 };
@@ -124,6 +127,33 @@ describe("architecture checker module boundaries", () => {
         expect(result.violations[0]).toContain("own public barrel");
     });
 
+    it("rejects Employee implementation importing its own public barrel", async () => {
+        const result = await checkFixture(
+            "modules/employee/domain/example.ts",
+            'import { x } from "@/modules/employee";',
+        );
+        expect(result.violations).toHaveLength(1);
+        expect(result.violations[0]).toContain("own public barrel");
+    });
+
+    it("rejects Employee API routes importing legacy Employee ownership", async () => {
+        const result = await checkFixture(
+            "app/api/employees/example.ts",
+            'import { x } from "@/lib/services/employee";',
+        );
+        expect(result.violations).toHaveLength(1);
+        expect(result.violations[0]).toContain("Employee API routes must use");
+    });
+
+    it("rejects Employee API routes importing the client entry", async () => {
+        const result = await checkFixture(
+            "app/api/employees/example.ts",
+            'import { x } from "@/modules/employee/client";',
+        );
+        expect(result.violations).toHaveLength(1);
+        expect(result.violations[0]).toContain("server entry");
+    });
+
     it("rejects server-only runtime dependencies from the Leave client graph", async () => {
         const rootPath = await createFixture({
             ...fixtureFiles,
@@ -187,6 +217,33 @@ describe("architecture checker module boundaries", () => {
         const result = checkArchitecture({ repositoryRoot: rootPath });
 
         expect(result.violations).toEqual([]);
+    });
+
+    it("rejects a transitive client-reachable import of the Employee server entry", async () => {
+        const rootPath = await createFixture({
+            ...fixtureFiles,
+            "components/EmployeeClient.tsx": [
+                '"use client";',
+                'import { x } from "@/modules/employee";',
+                "export const EmployeeClient = () => x;",
+            ].join("\n"),
+        });
+        const result = checkArchitecture({ repositoryRoot: rootPath });
+
+        expect(result.violations).toHaveLength(1);
+        expect(result.violations[0]).toContain("Employee server entry");
+    });
+
+    it("rejects server-only runtime dependencies from the Employee client graph", async () => {
+        const rootPath = await createFixture({
+            ...fixtureFiles,
+            "modules/employee/client.ts": 'import { x } from "@/lib/server/employee"; export { x };\n',
+            "lib/server/employee.ts": "export const x = 1;\n",
+        });
+        const result = checkArchitecture({ repositoryRoot: rootPath });
+
+        expect(result.violations).toHaveLength(1);
+        expect(result.violations[0]).toContain("@/modules/employee/client");
     });
 
     it("allows an external consumer to use a module public API", async () => {

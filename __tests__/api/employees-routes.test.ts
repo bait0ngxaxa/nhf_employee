@@ -7,7 +7,12 @@ import { POST as createEmployeeRoute } from "@/app/api/employees/route";
 import { POST as importEmployeesRoute } from "@/app/api/employees/import/route";
 import { requireAdminSession } from "@/lib/auth/api";
 import { logEmployeeEvent } from "@/lib/server/audit";
-import { employeeService } from "@/lib/services/employee";
+import {
+    createEmployee,
+    deleteEmployee,
+    importEmployeesFromCsvRows,
+    updateEmployee,
+} from "@/modules/employee";
 
 vi.mock("next/server", async (importOriginal) => {
     const actual = await importOriginal<typeof NextServerModule>();
@@ -18,12 +23,19 @@ vi.mock("@/lib/auth/api", () => ({
     requireApiSession: vi.fn(),
 }));
 vi.mock("@/lib/server/audit", () => ({ logEmployeeEvent: vi.fn() }));
-vi.mock("@/lib/services/employee", () => ({
-    employeeService: {
-        createEmployee: vi.fn(),
-        updateEmployee: vi.fn(),
-        deleteEmployee: vi.fn(),
-        importEmployeesFromCSV: vi.fn(),
+vi.mock("@/modules/employee", () => ({
+    EMPLOYEE_IMPORT_MAX_ROWS: 1000,
+    createEmployee: vi.fn(),
+    deleteEmployee: vi.fn(),
+    employeeFiltersSchema: { safeParse: vi.fn() },
+    getEmployeeDisplayName: vi.fn(() => "Test Employee"),
+    importEmployeesFromCsvRows: vi.fn(),
+    updateEmployee: vi.fn(),
+    updateEmployeeSchema: {
+        safeParse: vi.fn((value) => ({ success: true, data: value })),
+    },
+    createEmployeeSchema: {
+        safeParse: vi.fn((value) => ({ success: true, data: value })),
     },
 }));
 
@@ -66,7 +78,7 @@ describe("Employee mutation routes", () => {
         ), employeeParams(id));
 
         expect(response.status).toBe(400);
-        expect(employeeService.updateEmployee).not.toHaveBeenCalled();
+        expect(updateEmployee).not.toHaveBeenCalled();
     });
 
     it.each([
@@ -86,11 +98,11 @@ describe("Employee mutation routes", () => {
         ), employeeParams(id));
 
         expect(response.status).toBe(400);
-        expect(employeeService.deleteEmployee).not.toHaveBeenCalled();
+        expect(deleteEmployee).not.toHaveBeenCalled();
     });
 
     it("PATCH returns the committed linked-user identity from the service", async () => {
-        vi.mocked(employeeService.updateEmployee).mockResolvedValue({
+        vi.mocked(updateEmployee).mockResolvedValue({
             success: true,
             employee: {
                 id: 12,
@@ -134,12 +146,12 @@ describe("Employee mutation routes", () => {
 
         expect(response.status).toBe(403);
         expect(json).not.toHaveBeenCalled();
-        expect(employeeService.createEmployee).not.toHaveBeenCalled();
-        expect(employeeService.importEmployeesFromCSV).not.toHaveBeenCalled();
+        expect(createEmployee).not.toHaveBeenCalled();
+        expect(importEmployeesFromCsvRows).not.toHaveBeenCalled();
     });
 
     it("accepts 1000 import rows for processing", async () => {
-        vi.mocked(employeeService.importEmployeesFromCSV).mockResolvedValue({
+        vi.mocked(importEmployeesFromCsvRows).mockResolvedValue({
             success: [],
             errors: [],
         });
@@ -151,7 +163,7 @@ describe("Employee mutation routes", () => {
         ));
 
         expect(response.status).toBe(200);
-        expect(employeeService.importEmployeesFromCSV).toHaveBeenCalledWith(employees);
+        expect(importEmployeesFromCsvRows).toHaveBeenCalledWith(employees);
     });
 
     it("rejects 1001 import rows before entering the import service", async () => {
@@ -163,6 +175,6 @@ describe("Employee mutation routes", () => {
         ));
 
         expect(response.status).toBe(400);
-        expect(employeeService.importEmployeesFromCSV).not.toHaveBeenCalled();
+        expect(importEmployeesFromCsvRows).not.toHaveBeenCalled();
     });
 });

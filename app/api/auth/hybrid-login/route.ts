@@ -5,8 +5,8 @@ import { z } from "zod";
 import {
     AUTH_ERROR_MESSAGES,
     authLoginUserSelect,
-    hasEligibleEmployeeLifecycle,
 } from "@/lib/auth/ssot";
+import { hasEligibleEmployeeLifecycle } from "@/modules/employee";
 import { withTrustedMutation } from "@/lib/auth/csrf";
 import { isAuthRateLimited, recordAuthAttempt } from "@/lib/auth/rate-limit";
 import { logAuthEvent } from "@/lib/server/audit";

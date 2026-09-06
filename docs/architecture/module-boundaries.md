@@ -1,8 +1,8 @@
 # Module boundaries
 
-Status: Phase E3 policy. Stock and Routine are migrated examples, and the Leave
-server/business, Dashboard/LIFF presentation, compatibility cleanup, and
-production boundary re-audit are complete.
+Status: Phase F1 policy. Stock, Routine, and Leave are migrated examples.
+Employee server/business ownership is migrated; Employee presentation remains
+legacy until F2.
 
 ## What is a module
 
@@ -49,6 +49,11 @@ Leave server/application consumers use `@/modules/leave`. Leave Dashboard and
 LIFF route composition use the explicit client-safe entry point
 `@/modules/leave/client`; migrated module presentation internals use local
 relative contracts.
+
+Employee server/application consumers use `@/modules/employee`. The temporary
+`@/modules/employee/client` interface exposes only client-safe schemas required
+by the two legacy Employee forms; presentation contracts are not migrated or
+exported until F2.
 
 The root barrel remains server/application-oriented. The client entry point
 must export only client-safe presentation contracts.
@@ -168,3 +173,8 @@ facades remain. The architecture checker rejects deleted Leave ownership paths,
 requires API routes to use `@/modules/leave`, requires Dashboard/LIFF routes to
 use `@/modules/leave/client`, and walks production Client Component graphs so a
 generic helper cannot transitively import the Leave server entry.
+
+Employee F1 is a server/business ownership migration. Employee API routes use
+the module root, Auth signup uses its transaction-aware Employee lookup/recheck
+interface, and Leave uses its hierarchy mutation interface. The remaining
+legacy Employee validation path is a client-safe facade for the two F2 forms.

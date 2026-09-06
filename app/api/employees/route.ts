@@ -1,12 +1,14 @@
 import { after, type NextRequest, NextResponse } from "next/server";
 import { requireAdminSession, requireApiSession } from "@/lib/auth/api";
 import {
+    createEmployee,
     createEmployeeSchema,
     employeeFiltersSchema,
-} from "@/lib/validations/employee";
+    getEmployeeDisplayName,
+    listEmployees,
+    type EmployeeFilters,
+} from "@/modules/employee";
 import { logEmployeeEvent } from "@/lib/server/audit";
-import { employeeService, type EmployeeFilters } from "@/lib/services/employee";
-import { getEmployeeDisplayName } from "@/lib/helpers/employee-helpers";
 import { operationFailed } from "@/lib/ssot/http";
 import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
 
@@ -49,7 +51,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
             return parsedFilters.response;
         }
 
-        const result = await employeeService.getEmployees(parsedFilters.data);
+        const result = await listEmployees(parsedFilters.data);
 
         return NextResponse.json({
             success: true,
@@ -77,7 +79,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
             return operationFailed(400, { details: errors.fieldErrors });
         }
 
-        const createResult = await employeeService.createEmployee(result.data);
+        const createResult = await createEmployee(result.data);
 
         if (!createResult.success) {
             return NextResponse.json(

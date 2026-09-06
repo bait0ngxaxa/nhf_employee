@@ -1,15 +1,107 @@
 # Employee migration
 
-Status: Phase F0 — Discovery & Boundary Definition.
+Status: Phase F1 — Employee Server & Business Ownership.
 
-Discovery baseline: `1c023304fce881d17d13b47f479cf0ac317b02dc`
-(`refactor(leave): complete E3 boundary cleanup`).
+Approved F0 baseline: `ee9a60be6c077055873214a9644384caa8b43f80`
+(`docs(employee): correct F0 migration boundary`).
 
-This document is the Employee F0 discovery record. It defines ownership,
-consumer contracts, and the proposed migration slices. It does not migrate
-Employee implementation, change runtime behavior, change API contracts, alter
-authentication or authorization, redesign the UI, or change the Prisma schema.
-There is intentionally no `modules/employee/` directory yet.
+This document retains the F0 discovery record and now records the implemented
+F1 server/business ownership. F1 is behavior-preserving: API contracts,
+permissions, transactions, concurrency rules, Thai wording, CSV behavior,
+audit behavior, Auth/Workforce behavior, Leave behavior, UI, and Prisma schema
+remain unchanged.
+
+## F1 implementation record
+
+Authoritative Employee server/business ownership is now:
+
+```text
+modules/employee/
+├── application/
+│   ├── constants.ts
+│   ├── hierarchy.ts
+│   ├── import-employees.ts
+│   ├── mutations.ts
+│   ├── signup-employee.ts
+│   └── types.ts
+├── domain/
+│   ├── identity.ts
+│   ├── import-status.ts
+│   └── lifecycle.ts
+├── infrastructure/
+│   ├── export/employee-export.ts
+│   └── persistence/
+│       ├── employee-import.ts
+│       └── employee-queries.ts
+├── schemas/employee.ts
+├── client.ts
+└── index.ts
+```
+
+`index.ts` is the deliberate server/application interface. Route consumers use
+the Employee schemas, list/create/update/delete/stats/import/export contracts,
+the import row limit, and Employee display identity. Auth consumers use the
+Employee-only lifecycle predicate plus the signup lookup and transaction-aware
+lock/re-read contract. Leave uses only the transaction-aware Employee hierarchy
+mutation contract. `getEmployeeById` was not migrated because it has no
+production consumer and is not exported.
+
+The old `lib/services/employee/**` implementation was removed because no
+production compatibility consumer remained. `lib/validations/employee.ts` is
+the remaining server-schema compatibility facade; its exact consumers are
+`components/employee/add-employee/useAddEmployee.ts` and
+`components/employee/edit-employee/useEditEmployee.ts`. It re-exports the
+client-safe schemas from the intentionally minimal `modules/employee/client.ts`
+and exits in F2/F3 when those forms migrate. No Employee presentation was moved
+in F1.
+
+The mixed `lib/helpers/employee-helpers.ts` remains client/presentation
+compatibility until F2, including its client-safe Employee identity formatting
+and neutral User-to-Employee fallback projection. Server routes and Auth signup
+use the Employee-owned server identity contract; client graphs do not import the
+server barrel. Attempting to route the broad legacy helper graph through the
+temporary schema client entry increased shared client bundles, so that F2
+identity cleanup is intentionally not pulled into F1.
+
+Employee lifecycle orchestration remains one serializable transaction. It
+locks the Employee, delegates linked-account locking, self-offboarding and
+last-active-ADMIN safety, User activation/deactivation, token-version changes,
+identity synchronization, and refresh-token revocation to
+`lib/auth/employee-account-lifecycle.ts`, then commits Employee state and audit
+in the same transaction. Auth credential, password, cookie, token issuance,
+rate-limit, and login behavior remain outside Employee.
+
+Leave owns the semantic blocker query through
+`getEmployeeLeaveOffboardingBlockers` on `@/modules/leave`. Employee passes the
+current Prisma transaction into that semantic interface, so the blocker read
+remains inside the same serializable transaction and no check/commit TOCTOU gap
+is introduced. Leave approver assignment retains its Leave-specific rules,
+locks, audit meaning, and serializable transaction; only the final `managerId`
+write crosses the public Employee hierarchy interface using that same
+transaction.
+
+Signup remains Auth-owned. It now uses Employee-owned exact-email lookup and
+transaction-aware Employee lock/re-read eligibility. User creation, role
+assignment, password hashing, unique-race mapping, audit, and session behavior
+remain in Auth; the existing serializable transaction and row lock are
+preserved.
+
+Employee import row semantics and partial-success orchestration are module
+owned, with each successful row still independently committed. The HTTP route
+and active browser continue to reject more than 1,000 rows; the application
+use case intentionally retains the legacy service's lack of an additional
+row-count guard. Employee export owns filters, the 2,000-row limit, 250-row
+batches, ordering, Thai headings/status labels, temporary-email rendering, and
+filename construction; generic CSV streaming and HTTP audit scheduling remain
+platform/delivery concerns. Export remains available to any authenticated API
+session.
+
+Employee implementation tests for schemas, queries, mutations, import, stats,
+and export are colocated under `modules/employee/**`. External route, Auth,
+signup concurrency, and Leave concurrency tests remain with their owning
+layers/features. Architecture enforcement now covers Employee route ownership,
+deep imports, self-public-barrel imports, client/server graphs, shared module
+direction, and the global Outbox Processor prohibition.
 
 ## 1. Executive boundary decisions
 
@@ -1378,14 +1470,11 @@ These are concrete implementation questions, not unknown ownership:
     atomicity and does not introduce a TOCTOU window across Leave request
     creation, approver reassignment, Leave action changes, or hierarchy changes.
 
-## 25. F0 conclusion
+## 25. Phase status
 
-F0 changes documentation only. No Employee implementation was moved, no
-`modules/employee/` placeholder was created, and no runtime behavior, API
-contract, authorization, signup/session/workforce rule, UI/UX, Leave/Routine/
-Stock behavior, Prisma schema, migration, or database semantics were changed.
+F0 remains the historical discovery record above. F1 implements the server and
+business ownership described in the F1 implementation record. F2 presentation
+migration and F3 compatibility cleanup remain future work; neither is folded
+into this phase.
 
-The next authorized implementation step is F1, using this document as the
-behavior-preservation and public-boundary contract.
-
-Phase F0 CLOSED — Employee boundary defined and corrected; implementation has not started.
+Phase F1 CLOSED — Employee server/business ownership migrated; presentation migration has not started.

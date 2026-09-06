@@ -1,6 +1,6 @@
 # Dependency rules and enforcement
 
-Status: Phase E3 guardrails extend the Phase A baseline. These rules govern new
+Status: Phase F1 guardrails extend the Phase A baseline. These rules govern new
 architecture code while unrelated legacy features remain compatible during
 incremental migration.
 
@@ -135,6 +135,12 @@ upload orchestration, Leave email templates, LINE composition, Leave links,
 constants, types, components, and hooks. All Leave module internals must use
 local contracts instead of importing either public barrel.
 
+For Employee F1, Employee API routes must consume `@/modules/employee` and may
+not use legacy Employee server ownership paths or deep imports. Employee
+internals may not self-import the root or client public interface. Production
+Client Component graphs may not reach the Employee server interface, and the
+temporary Employee client schema graph may not reach server-only dependencies.
+
 ## Automated enforcement
 
 Phase A limits automation by import target rather than by importer location.
@@ -150,6 +156,7 @@ the module boundary from a legacy directory, while imports unrelated to
 | Leave presentation ownership | `app/dashboard/leave/**`, `app/liff/leave/**`, `modules/leave/**` | Requires route composition through `@/modules/leave/client`, rejects deleted legacy presentation paths, and rejects Leave internals importing either public barrel |
 | Client/server policy | Production `"use client"` dependency graphs and migrated module client entries | Walks runtime imports transitively, rejects client-reachable use of the Leave server entry, and separately rejects server-only runtime dependencies reachable from `@/modules/leave/client`; type-only imports are erased before graph traversal |
 | Route-level Prisma policy | Legacy and new code | Documentation-led in Phase A for the existing route exceptions; new module infrastructure remains the intended boundary |
+| Employee F1 ownership | `app/api/employees/**`, `modules/employee/**`, production Client Component graphs | Requires the Employee server interface for API routes; rejects legacy server paths, deep/self-barrel imports, client-to-server reachability, and server-only dependencies from the Employee client graph |
 
 The check is fast and is included at the start of `npm run check`. Scanning
 legacy feature directories does not migrate them: the checker only evaluates
@@ -169,3 +176,8 @@ behavior-preserving.
 The closed Leave migration record is maintained in
 [leave-migration.md](./leave-migration.md). No Leave compatibility facade or
 deep-import exception remains.
+
+Employee's F1 server compatibility ledger contains
+`lib/validations/employee.ts`, used by the existing add/edit Employee forms and
+delegating to the client-safe schema interface. Mixed presentation helpers and
+types remain legacy F2 ownership and do not import the Employee server entry.

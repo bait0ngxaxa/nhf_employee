@@ -2,11 +2,14 @@ import { after, type NextRequest, NextResponse } from "next/server";
 
 import { requireAdminSession } from "@/lib/auth/api";
 import { logEmployeeEvent } from "@/lib/server/audit";
-import { employeeService } from "@/lib/services/employee";
-import { getEmployeeDisplayName } from "@/lib/helpers/employee-helpers";
+import {
+    deleteEmployee,
+    getEmployeeDisplayName,
+    updateEmployee,
+    updateEmployeeSchema,
+} from "@/modules/employee";
 import { jsonError } from "@/lib/ssot/http";
 import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
-import { updateEmployeeSchema } from "@/lib/validations/employee";
 
 async function parseEmployeeId(
     params: Promise<{ id: string }>,
@@ -54,7 +57,7 @@ export async function PATCH(
         const auth = await requireAdminSession();
         if (!auth.ok) return auth.response;
 
-        const result = await employeeService.updateEmployee(
+        const result = await updateEmployee(
             employeeId,
             validationResult.data,
             { userId: auth.user.id, email: auth.user.email },
@@ -108,7 +111,7 @@ export async function DELETE(
             return jsonError(COMMON_API_MESSAGES.invalidEmployeeId, 400);
         }
 
-        const result = await employeeService.deleteEmployee(
+        const result = await deleteEmployee(
             employeeId,
             { userId: auth.user.id, email: auth.user.email },
         );

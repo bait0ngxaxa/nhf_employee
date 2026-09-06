@@ -143,8 +143,9 @@ Dashboard modules use canonical App Router paths; do not add new
 presentation must use an explicit `/client` public entry point instead of a
 server-oriented module barrel.
 
-* สถานะปัจจุบัน: โค้ด Stock และ Routine อยู่ใน feature modules แล้ว ส่วน Leave,
-  Employee และ business module เดิมยังอยู่ที่เดิมและต้องทำงานเหมือนเดิม
+* สถานะปัจจุบัน: Stock, Routine และ Leave อยู่ใน feature modules แล้ว; Employee
+  server/business อยู่ใน `modules/employee/` ส่วน Employee presentation ยังอยู่
+  ที่เดิมจนถึง Phase F2 และต้องทำงานเหมือนเดิม
 * งาน business feature ใหม่ที่มีสาระสำคัญให้เริ่มที่ `modules/<feature>/`
   และเปิดเผย contract ที่ตั้งใจรองรับผ่าน `modules/<feature>/index.ts`
 * ใช้ dependency direction `app/** -> modules/** -> shared/**` โดย `app/**`

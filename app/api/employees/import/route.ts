@@ -1,8 +1,10 @@
 import { type NextRequest, NextResponse } from "next/server";
 
 import { requireAdminSession } from "@/lib/auth/api";
-import { employeeService } from "@/lib/services/employee";
-import { EMPLOYEE_IMPORT_MAX_ROWS } from "@/lib/services/employee/constants";
+import {
+    EMPLOYEE_IMPORT_MAX_ROWS,
+    importEmployeesFromCsvRows,
+} from "@/modules/employee";
 import { jsonError, operationFailed } from "@/lib/ssot/http";
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
@@ -25,7 +27,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
             );
         }
 
-        const result = await employeeService.importEmployeesFromCSV(employees);
+        const result = await importEmployeesFromCsvRows(employees);
 
         return NextResponse.json(
             {

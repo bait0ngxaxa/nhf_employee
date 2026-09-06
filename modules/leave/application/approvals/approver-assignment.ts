@@ -9,6 +9,7 @@ import {
 import { runSerializableTransaction } from "@/lib/db/transaction";
 import { lockEmployeeRows } from "@/modules/leave/infrastructure/persistence/transaction";
 import { getEmployeeDisplayName } from "@/lib/helpers/employee-helpers";
+import { applyEmployeeManagerChangesInTransaction } from "@/modules/employee";
 
 export type ApproverAssignment = {
     employeeId: number;
@@ -245,10 +246,7 @@ export async function assignLeaveApprovers(
         }
 
         for (const { assignment, employee } of changes) {
-            await tx.employee.update({
-                where: { id: assignment.employeeId },
-                data: { managerId: assignment.managerId },
-            });
+            await applyEmployeeManagerChangesInTransaction(tx, [assignment]);
             await writeAudit(
                 tx,
                 assignment,

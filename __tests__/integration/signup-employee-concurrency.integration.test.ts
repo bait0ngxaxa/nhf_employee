@@ -4,7 +4,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { POST as signupRoute } from "@/app/api/auth/signup/route";
 import { resetAuthRateLimit } from "@/lib/auth/rate-limit";
 import { prisma } from "@/lib/db/prisma";
-import { updateEmployee } from "@/lib/services/employee/mutations";
+import { updateEmployee } from "@/modules/employee";
 
 const DEPARTMENT_NAME = "Signup Employee Concurrency Integration";
 const DEPARTMENT_CODE = "SIGNUP-EMPLOYEE-RACE";

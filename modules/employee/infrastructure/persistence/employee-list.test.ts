@@ -2,11 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { mockDeep, mockReset } from "vitest-mock-extended";
 import { prisma } from "@/lib/db/prisma";
 import type { PrismaClient } from "@prisma/client";
-import {
-    getEmployees,
-    getEmployeeById,
-    emailExists,
-} from "@/lib/services/employee/queries";
+import { listEmployees } from "./employee-queries";
 
 // Mock prisma module
 vi.mock("@/lib/db/prisma", () => ({
@@ -35,7 +31,7 @@ describe("Employee Queries", () => {
             );
 
             // Act
-            const result = await getEmployees({ page: 1, limit: 10 });
+            const result = await listEmployees({ page: 1, limit: 10 });
 
             // Assert
             expect(prismaMock.employee.findMany).toHaveBeenCalledWith(
@@ -55,7 +51,7 @@ describe("Employee Queries", () => {
             prismaMock.employee.findMany.mockResolvedValue([]);
 
             // Act
-            await getEmployees({ page: 1, limit: 10, search: "ชาย" });
+            await listEmployees({ page: 1, limit: 10, search: "ชาย" });
 
             // Assert
             expect(prismaMock.employee.count).toHaveBeenCalledWith(
@@ -77,7 +73,7 @@ describe("Employee Queries", () => {
 
         it("should apply status filter correctly", async () => {
             // Act
-            await getEmployees({ page: 1, limit: 10, status: "ACTIVE" });
+            await listEmployees({ page: 1, limit: 10, status: "ACTIVE" });
 
             // Assert
             expect(prismaMock.employee.count).toHaveBeenCalledWith(
@@ -90,61 +86,4 @@ describe("Employee Queries", () => {
         });
     });
 
-    describe("getEmployeeById", () => {
-        it("should return employee if found", async () => {
-            const mockEmployee = { id: 1, firstName: "John" };
-            prismaMock.employee.findFirst.mockResolvedValue(
-                mockEmployee as never,
-            );
-
-            const result = await getEmployeeById(1);
-
-            expect(result).toEqual(mockEmployee);
-            expect(prismaMock.employee.findFirst).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    where: { id: 1, deletedAt: null },
-                }),
-            );
-        });
-
-        it("should return null if not found", async () => {
-            prismaMock.employee.findFirst.mockResolvedValue(null);
-
-            const result = await getEmployeeById(999);
-
-            expect(result).toBeNull();
-        });
-    });
-
-    describe("emailExists", () => {
-        it("should return true if email exists", async () => {
-            prismaMock.employee.findFirst.mockResolvedValue({
-                id: 1,
-                email: "test@test.com",
-            } as never);
-
-            const result = await emailExists("test@test.com");
-
-            expect(result).toBe(true);
-        });
-
-        it("should return false if email does not exist", async () => {
-            prismaMock.employee.findFirst.mockResolvedValue(null);
-
-            const result = await emailExists("new@test.com");
-
-            expect(result).toBe(false);
-        });
-
-        it("should return false if email exists but belongs to excludeEmployeeId", async () => {
-            prismaMock.employee.findFirst.mockResolvedValue({
-                id: 1,
-                email: "test@test.com",
-            } as never);
-
-            const result = await emailExists("test@test.com", 1);
-
-            expect(result).toBe(false);
-        });
-    });
 });

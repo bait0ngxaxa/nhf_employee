@@ -28,6 +28,9 @@ export {
 } from "./application/approvals/approver-assignment";
 export { getLeaveApproverEmployees } from "./application/approvals/approver-queries";
 export {
+    getEmployeeLeaveOffboardingBlockers,
+} from "./application/approvals/offboarding-responsibilities";
+export {
     dispatchCurrentLeaveAction,
 } from "./application/approvals/current-action-recipient";
 export {

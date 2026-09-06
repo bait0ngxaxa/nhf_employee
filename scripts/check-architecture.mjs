@@ -161,6 +161,12 @@ const leavePresentationRouteDirectories = [
     "app/liff/leave",
 ];
 
+const employeeApiRouteDirectory = "app/api/employees";
+const legacyEmployeeServerPrefixes = [
+    "@/lib/services/employee",
+    "@/lib/validations/employee",
+];
+
 const legacyLeavePresentationPrefixes = [
     "@/components/dashboard/leave",
     "@/components/dashboard/sections/LeaveManagementSection",
@@ -244,6 +250,35 @@ function getLeaveRouteDependencyViolation(filePath, rootPath, moduleSpecifier) {
         return "Leave API routes must use the server entry @/modules/leave.";
     }
 
+    return null;
+}
+
+function getEmployeeDependencyViolation(filePath, rootPath, moduleSpecifier) {
+    const resolvedImport = moduleSpecifier.startsWith("@/")
+        ? resolve(rootPath, moduleSpecifier.slice(2))
+        : getImportSourcePath(moduleSpecifier, filePath, rootPath);
+    const normalizedSpecifier = resolvedImport === null
+        ? moduleSpecifier
+        : `@/${relativeFilePath(resolvedImport, rootPath).replace(/\.[cm]?[jt]sx?$/, "")}`;
+    const employeeModuleRoot = resolve(rootPath, "modules/employee");
+    const isEmployeeInternal = pathIsWithin(filePath, employeeModuleRoot)
+        && ![
+            resolve(employeeModuleRoot, "index.ts"),
+            resolve(employeeModuleRoot, "client.ts"),
+        ].includes(filePath);
+    if (isEmployeeInternal
+        && ["@/modules/employee", "@/modules/employee/client"].includes(normalizedSpecifier)) {
+        return "Employee module internals must use local contracts instead of their own public barrel.";
+    }
+
+    if (!pathIsWithin(filePath, resolve(rootPath, employeeApiRouteDirectory))) return null;
+    if (legacyEmployeeServerPrefixes.some((prefix) => hasImportPrefix(normalizedSpecifier, prefix))) {
+        return "Employee API routes must use the Employee module public API \"@/modules/employee\".";
+    }
+    if (hasImportPrefix(normalizedSpecifier, "@/modules/employee")
+        && normalizedSpecifier !== "@/modules/employee") {
+        return "Employee API routes must use the server entry @/modules/employee.";
+    }
     return null;
 }
 
@@ -377,8 +412,9 @@ function isTestSource(filePath, rootPath) {
         || /\.(?:test|spec)\.[cm]?[jt]sx?$/.test(repositoryPath);
 }
 
-function getClientReachableLeaveServerEntryViolations(rootPath, sourceFiles) {
-    const leaveServerEntry = resolve(rootPath, "modules/leave");
+function getClientReachableServerEntryViolations(rootPath, sourceFiles, moduleName) {
+    const serverEntry = resolve(rootPath, `modules/${moduleName}`);
+    const displayName = moduleName[0].toUpperCase() + moduleName.slice(1);
     const pending = sourceFiles.filter((filePath) => (
         !isTestSource(filePath, rootPath) && hasUseClientDirective(filePath)
     ));
@@ -396,17 +432,17 @@ function getClientReachableLeaveServerEntryViolations(rootPath, sourceFiles) {
                 filePath,
                 rootPath,
             );
-            const importsLeaveServerEntry = importTarget === leaveServerEntry
+            const importsServerEntry = importTarget === serverEntry
                 || (sourcePath !== null
-                    && pathIsWithin(sourcePath, leaveServerEntry)
-                    && /^index\.[cm]?[jt]sx?$/.test(relative(leaveServerEntry, sourcePath)));
+                    && pathIsWithin(sourcePath, serverEntry)
+                    && /^index\.[cm]?[jt]sx?$/.test(relative(serverEntry, sourcePath)));
 
-            if (importsLeaveServerEntry) {
+            if (importsServerEntry) {
                 violations.push(describeViolation(
                     filePath,
                     rootPath,
                     record,
-                    "Client-reachable runtime code must not import the Leave server entry; use @/modules/leave/client.",
+                    `Client-reachable runtime code must not import the ${displayName} server entry; use @/modules/${moduleName}/client.`,
                 ));
                 continue;
             }
@@ -415,6 +451,48 @@ function getClientReachableLeaveServerEntryViolations(rootPath, sourceFiles) {
         }
     }
 
+    return violations;
+}
+
+function getEmployeeClientGraphViolations(rootPath) {
+    const entryPath = resolve(rootPath, "modules/employee/client.ts");
+    if (!existsSync(entryPath)) return [];
+    const pending = [entryPath];
+    const visited = new Set();
+    const violations = [];
+    const serverPackages = [
+        "@prisma/client", "nodemailer", "@line/bot-sdk", "server-only",
+        "next/server", "next/headers", "next/cache",
+    ];
+    const serverDirectories = [
+        "lib/db", "lib/server", "lib/email", "lib/line",
+        "modules/employee/server", "modules/employee/infrastructure",
+    ];
+    while (pending.length > 0) {
+        const filePath = pending.pop();
+        if (visited.has(filePath)) continue;
+        visited.add(filePath);
+        for (const record of getImports(filePath, true)) {
+            const { importTarget, sourcePath } = getRuntimeImportTarget(
+                record.moduleSpecifier,
+                filePath,
+                rootPath,
+            );
+            if (isBuiltin(record.moduleSpecifier)
+                || serverPackages.some((name) => hasImportPrefix(record.moduleSpecifier, name))
+                || (importTarget !== null && serverDirectories.some((directory) =>
+                    pathIsWithin(importTarget, resolve(rootPath, directory))))) {
+                violations.push(describeViolation(
+                    filePath,
+                    rootPath,
+                    record,
+                    "Server-only runtime dependency is reachable from @/modules/employee/client.",
+                ));
+                continue;
+            }
+            if (sourcePath !== null) pending.push(sourcePath);
+        }
+    }
     return violations;
 }
 
@@ -531,6 +609,21 @@ function checkArchitecture(options = {}) {
                 continue;
             }
 
+            const employeeDependencyViolation = getEmployeeDependencyViolation(
+                filePath,
+                rootPath,
+                importRecord.moduleSpecifier,
+            );
+            if (employeeDependencyViolation !== null) {
+                violations.push(describeViolation(
+                    filePath,
+                    rootPath,
+                    importRecord,
+                    employeeDependencyViolation,
+                ));
+                continue;
+            }
+
             const moduleDependencyViolation = getModuleDependencyViolation(
                 owner,
                 importRecord.moduleSpecifier,
@@ -569,7 +662,9 @@ function checkArchitecture(options = {}) {
     }
 
     violations.push(...getLeaveClientGraphViolations(rootPath));
-    violations.push(...getClientReachableLeaveServerEntryViolations(rootPath, sourceFiles));
+    violations.push(...getEmployeeClientGraphViolations(rootPath));
+    violations.push(...getClientReachableServerEntryViolations(rootPath, sourceFiles, "leave"));
+    violations.push(...getClientReachableServerEntryViolations(rootPath, sourceFiles, "employee"));
     return { sourceFiles, violations };
 }
 

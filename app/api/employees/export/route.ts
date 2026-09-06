@@ -2,19 +2,13 @@ import { after, type NextRequest, NextResponse } from "next/server";
 
 import { requireApiSession } from "@/lib/auth/api";
 import { logDataExport } from "@/lib/server/audit";
-import { generateFilename } from "@/lib/helpers/date-helpers";
 import {
-    getEmployeeEmailStatus,
-    getEmployeeStatusLabel,
-} from "@/lib/helpers/employee-helpers";
-import { prisma } from "@/lib/db/prisma";
-import { createCsvDownloadResponse, encodeCsvRow } from "@/lib/server/csv";
-import { createEmployeeWhereClause } from "@/lib/services/employee/queries";
-import type { EmployeeFilters } from "@/lib/services/employee/types";
-import { EXPORT_LIMITS } from "@/lib/ssot/exports";
+    createEmployeeExport,
+    employeeFiltersSchema,
+    type EmployeeFilters,
+} from "@/modules/employee";
 import { jsonError } from "@/lib/ssot/http";
 import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
-import { employeeFiltersSchema } from "@/lib/validations/employee";
 
 function parseExportFilters(
     url: string,
@@ -38,24 +32,6 @@ function parseExportFilters(
     return { success: true, data: parsed.data };
 }
 
-function sanitizeFilenamePart(value: string): string {
-    return value.replace(/[\\/:*?"<>|]+/g, "-").trim();
-}
-
-function buildEmployeeExportFilename(filters: EmployeeFilters): string {
-    const searchSuffix = filters.search
-        ? `_ค้นหา-${sanitizeFilenamePart(filters.search)}`
-        : "";
-    const statusSuffix =
-        filters.status && filters.status !== "all"
-            ? `_สถานะ-${sanitizeFilenamePart(
-                  getEmployeeStatusLabel(filters.status),
-              )}`
-            : "";
-
-    return generateFilename(`รายชื่อพนักงาน${searchSuffix}${statusSuffix}`, "csv");
-}
-
 export async function GET(request: NextRequest): Promise<Response> {
     try {
         const auth = await requireApiSession();
@@ -75,16 +51,15 @@ export async function GET(request: NextRequest): Promise<Response> {
         }
 
         const filters = parsedFilters.data;
-        const where = createEmployeeWhereClause(filters);
-        const recordCount = await prisma.employee.count({ where });
+        const exportPreparation = await createEmployeeExport(filters);
 
-        if (recordCount > EXPORT_LIMITS.employee.maxRows) {
+        if (exportPreparation.status === "limit-exceeded") {
             return jsonError(
-                `ส่งออกข้อมูลพนักงานได้ไม่เกิน ${EXPORT_LIMITS.employee.maxRows} รายการต่อครั้ง กรุณากรองข้อมูลเพิ่มเติม`,
+                `ส่งออกข้อมูลพนักงานได้ไม่เกิน ${exportPreparation.maxRows} รายการต่อครั้ง กรุณากรองข้อมูลเพิ่มเติม`,
                 400,
                 {
-                    maxRows: EXPORT_LIMITS.employee.maxRows,
-                    recordCount,
+                    maxRows: exportPreparation.maxRows,
+                    recordCount: exportPreparation.recordCount,
                 },
             );
         }
@@ -94,14 +69,8 @@ export async function GET(request: NextRequest): Promise<Response> {
                 await logDataExport("Employee", userId, auth.user.email, {
                     metadata: {
                         entityType: "Employee",
-                        recordCount,
-                        filters: {
-                            search: filters.search || null,
-                            status:
-                                filters.status && filters.status !== "all"
-                                    ? filters.status
-                                    : null,
-                        },
+                        recordCount: exportPreparation.recordCount,
+                        filters: exportPreparation.auditFilters,
                         exportedAt: new Date().toISOString(),
                     },
                 });
@@ -110,71 +79,7 @@ export async function GET(request: NextRequest): Promise<Response> {
             }
         });
 
-        const filename = buildEmployeeExportFilename(filters);
-
-        return createCsvDownloadResponse(filename, async (controller) => {
-            controller.enqueue(
-                encodeCsvRow([
-                    "ลำดับ",
-                    "ชื่อ",
-                    "นามสกุล",
-                    "ชื่อเล่น",
-                    "ตำแหน่ง",
-                    "สังกัด",
-                    "แผนก",
-                    "อีเมล",
-                    "เบอร์โทร",
-                    "สถานะ",
-                ]),
-            );
-
-            for (
-                let offset = 0;
-                offset < recordCount;
-                offset += EXPORT_LIMITS.employee.batchSize
-            ) {
-                const employees = await prisma.employee.findMany({
-                    where,
-                    select: {
-                        firstName: true,
-                        lastName: true,
-                        nickname: true,
-                        position: true,
-                        affiliation: true,
-                        email: true,
-                        phone: true,
-                        status: true,
-                        dept: {
-                            select: {
-                                name: true,
-                            },
-                        },
-                    },
-                    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-                    skip: offset,
-                    take: EXPORT_LIMITS.employee.batchSize,
-                });
-
-                for (const [index, employee] of employees.entries()) {
-                    controller.enqueue(
-                        encodeCsvRow([
-                            offset + index + 1,
-                            employee.firstName,
-                            employee.lastName,
-                            employee.nickname || "-",
-                            employee.position,
-                            employee.affiliation || "-",
-                            employee.dept?.name || "-",
-                            getEmployeeEmailStatus(employee.email) === "temp"
-                                ? "-"
-                                : employee.email,
-                            employee.phone || "-",
-                            getEmployeeStatusLabel(employee.status),
-                        ]),
-                    );
-                }
-            }
-        });
+        return exportPreparation.response;
     } catch (error) {
         console.error("Employee export error:", error);
         return jsonError("ไม่สามารถส่งออกข้อมูลพนักงานได้", 500);

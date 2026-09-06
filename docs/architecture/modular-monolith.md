@@ -1,6 +1,6 @@
 # NHF Employee modular monolith
 
-Status: Phase F0 — Employee Discovery & Boundary Definition.
+Status: Phase F1 — Employee Server & Business Ownership.
 
 This document separates the repository's observed current state from the
 target architecture. Stock server/business ownership is now migrated into
@@ -19,10 +19,11 @@ migrated into `modules/leave/`; Leave E1/E2/E3 are complete. See
 [leave-migration.md](./leave-migration.md) for the ownership boundary, public
 server and client APIs, attachment boundary, and compatibility ledger.
 
-Employee is the next planned capability migration. Phase F0 defines its
-ownership boundary and migration contract only; Employee implementation remains
-in its current legacy locations. See
-[employee-migration.md](./employee-migration.md) for the discovery record.
+Employee server/business ownership now lives in `modules/employee/`; Employee
+API routes consume its server interface. Employee Dashboard presentation stays
+in legacy locations until F2. See
+[employee-migration.md](./employee-migration.md) for the F0 discovery record
+and F1 implementation ledger.
 
 ## Why a modular monolith
 
@@ -53,11 +54,10 @@ distributed across locations such as:
 - `prisma/` for the single schema and its migrations; and
 - `__tests__/` for the existing unit, integration, API, and component tests.
 
-At the Phase E3 baseline, `modules/stock/`, `modules/routine/`, and
-`modules/leave/` own their server/business and client-facing presentation code
-behind separate public entry points. Employee feature code remains in its
-current legacy locations while F0 defines the next boundary; no
-`modules/employee/` implementation exists yet.
+`modules/stock/`, `modules/routine/`, and `modules/leave/` own their
+server/business and client-facing presentation code behind separate public
+entry points. `modules/employee/` now owns Employee server/business behavior;
+its presentation remains in the current legacy locations for F2.
 The Dashboard uses route-per-module App Router pages;
 historical
 `/dashboard?tab=...` links remain inbound-compatible through the dashboard home
@@ -112,9 +112,8 @@ Future migrations should be vertical and behavior-preserving:
 
 Legacy and migrated modules may coexist during this process. Migration is
 explicit and feature-by-feature; Stock was the Phase B pilot, Routine is the
-Phase D migration, and Leave E1/E2/E3 is complete. Employee F0 is the next
-planning phase; Employee server/business migration is reserved for F1 and its
-presentation for F2.
+Phase D migration, Leave E1/E2/E3 is complete, and Employee F1 establishes its
+server/business interface. Employee presentation remains reserved for F2.
 
 ## Invariants for this phase
 

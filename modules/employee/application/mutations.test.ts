@@ -6,20 +6,11 @@ import {
     createEmployee,
     updateEmployee,
     deleteEmployee,
-    offboardEmployee,
-    reactivateEmployee,
-    suspendEmployee,
-} from "@/lib/services/employee/mutations";
+} from "./mutations";
 
 vi.mock("@/lib/db/prisma", () => ({
     prisma: mockDeep<PrismaClient>(),
 }));
-vi.mock("@/lib/services/employee/queries", () => ({
-    emailExists: vi.fn(),
-}));
-
-import { emailExists } from "@/lib/services/employee/queries";
-
 const prismaMock = prisma as unknown as ReturnType<
     typeof mockDeep<PrismaClient>
 >;
@@ -58,7 +49,7 @@ function buildLinkedEmployee(
 describe("Employee Mutations", () => {
     beforeEach(() => {
         mockReset(prismaMock);
-        vi.mocked(emailExists).mockReset();
+        prismaMock.employee.findFirst.mockResolvedValue(null);
         prismaMock.$queryRaw.mockResolvedValue([] as never);
         prismaMock.$transaction.mockImplementation(async (callback) => {
             if (typeof callback === "function") {
@@ -87,7 +78,7 @@ describe("Employee Mutations", () => {
         };
 
         it("should fail if email exists", async () => {
-            vi.mocked(emailExists).mockResolvedValue(true);
+            prismaMock.employee.findFirst.mockResolvedValue({ id: 1 } as never);
 
             const result = await createEmployee(mockData);
 
@@ -108,7 +99,7 @@ describe("Employee Mutations", () => {
         });
 
         it("should create employee if valid", async () => {
-            vi.mocked(emailExists).mockResolvedValue(false);
+            prismaMock.employee.findFirst.mockResolvedValue(null);
             prismaMock.employee.create.mockResolvedValue({
                 id: 1,
                 ...mockData,
@@ -161,7 +152,6 @@ describe("Employee Mutations", () => {
                 firstName: "New",
                 email: "new@thainhf.org",
             } as never);
-            vi.mocked(emailExists).mockResolvedValue(false);
 
             const result = await updateEmployee(1, {
                 firstName: "New",
@@ -269,7 +259,6 @@ describe("Employee Mutations", () => {
                 .mockResolvedValueOnce(employee as never)
                 .mockResolvedValueOnce(null);
             prismaMock.user.findFirst.mockResolvedValue(null);
-            vi.mocked(emailExists).mockResolvedValue(false);
 
             const result = await updateEmployee(1, {
                 email: "NEW@THAINHF.ORG",
@@ -380,7 +369,6 @@ describe("Employee Mutations", () => {
                     ? { id: 2 }
                     : employee
             ) as never);
-            vi.mocked(emailExists).mockResolvedValue(true);
 
             const result = await updateEmployee(1, {
                 email: "taken@thainhf.org",
@@ -396,7 +384,6 @@ describe("Employee Mutations", () => {
             prismaMock.employee.findFirst.mockResolvedValue(employee as never);
             prismaMock.employee.findUnique.mockResolvedValue(employee as never);
             prismaMock.user.findUnique.mockResolvedValue({ id: 99 } as never);
-            vi.mocked(emailExists).mockResolvedValue(false);
 
             const result = await updateEmployee(1, {
                 email: "taken@thainhf.org",
@@ -602,7 +589,7 @@ describe("Employee Mutations", () => {
             });
             prismaMock.employee.findUnique.mockResolvedValue(employee as never);
 
-            const result = await offboardEmployee(1, ACTOR);
+            const result = await deleteEmployee(1, ACTOR);
 
             expect(result).toMatchObject({
                 success: false,
@@ -625,7 +612,7 @@ describe("Employee Mutations", () => {
             prismaMock.employee.findUnique.mockResolvedValue(employee as never);
             prismaMock.user.findMany.mockResolvedValue([{ id: 10 }] as never);
 
-            const result = await offboardEmployee(1, ACTOR);
+            const result = await deleteEmployee(1, ACTOR);
 
             expect(result).toMatchObject({
                 success: false,
@@ -652,7 +639,7 @@ describe("Employee Mutations", () => {
                 lastName: "Report",
             }] as never);
 
-            const result = await offboardEmployee(1, ACTOR);
+            const result = await deleteEmployee(1, ACTOR);
 
             expect(result).toMatchObject({
                 success: false,
@@ -683,7 +670,7 @@ describe("Employee Mutations", () => {
                 },
             }] as never);
 
-            const result = await offboardEmployee(1, ACTOR);
+            const result = await deleteEmployee(1, ACTOR);
 
             expect(result).toMatchObject({
                 success: false,
@@ -720,7 +707,7 @@ describe("Employee Mutations", () => {
                 employee: { id: 2, firstName: "Leave", lastName: "Requester" },
             }] as never);
 
-            const result = await offboardEmployee(1, ACTOR);
+            const result = await deleteEmployee(1, ACTOR);
 
             expect(result).toMatchObject({
                 success: false,
@@ -775,7 +762,7 @@ describe("Employee Mutations", () => {
                 deletedAt: null,
             } as never);
 
-            const result = await reactivateEmployee(1, ACTOR);
+            const result = await updateEmployee(1, { status: "ACTIVE" }, ACTOR);
 
             expect(result.success).toBe(true);
             expect(prismaMock.employee.update).toHaveBeenCalledWith(expect.objectContaining({
@@ -807,7 +794,7 @@ describe("Employee Mutations", () => {
                 status: "SUSPENDED",
             } as never);
 
-            const result = await suspendEmployee(1, ACTOR);
+            const result = await updateEmployee(1, { status: "SUSPENDED" }, ACTOR);
 
             expect(result.success).toBe(true);
             expect(prismaMock.employee.update).toHaveBeenCalledWith(expect.objectContaining({
@@ -861,7 +848,7 @@ describe("Employee Mutations", () => {
                 }
             });
 
-            await expect(offboardEmployee(1, ACTOR)).rejects.toThrow("audit failed");
+            await expect(deleteEmployee(1, ACTOR)).rejects.toThrow("audit failed");
             expect(state).toEqual({
                 employeeStatus: "ACTIVE",
                 employeeDeletedAt: null,
