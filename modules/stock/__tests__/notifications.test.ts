@@ -5,7 +5,10 @@ import { prisma } from "@/lib/db/prisma";
 import {
     enqueueLineLowStockReached,
     enqueueLineNewStockRequest,
+    notifyAdminsNewStockRequest,
+    notifyAdminsStockRequestCancelledByRequester,
     notifyAdminsLowStockInApp,
+    notifyStockRequestResult,
 } from "../infrastructure/notifications/notifications";
 
 vi.mock("@/lib/db/prisma", () => ({
@@ -13,6 +16,14 @@ vi.mock("@/lib/db/prisma", () => ({
 }));
 
 const prismaMock = prisma as unknown as ReturnType<typeof mockDeep<PrismaClient>>;
+
+const notificationMocks = vi.hoisted(() => ({
+    createForUser: vi.fn(),
+    createForUserOnce: vi.fn(),
+    createForUsers: vi.fn(),
+}));
+
+vi.mock("@/modules/notification", () => notificationMocks);
 
 function asNever<T>(value: T): never {
     return value as unknown as never;
@@ -33,6 +44,10 @@ describe("Stock Notifications", () => {
                 updatedAt: new Date(),
             }),
         );
+        vi.clearAllMocks();
+        notificationMocks.createForUser.mockResolvedValue(undefined);
+        notificationMocks.createForUserOnce.mockResolvedValue(undefined);
+        notificationMocks.createForUsers.mockResolvedValue(0);
     });
 
     it("should enqueue stock request line payload with projectCode and variant label", async () => {
@@ -156,7 +171,6 @@ describe("Stock Notifications", () => {
 
     it("should include variant identity in the in-app low stock message", async () => {
         prismaMock.user.findMany.mockResolvedValue(asNever([{ id: 7 }]));
-        prismaMock.notification.create.mockResolvedValue(asNever({ id: "notice-1" }));
 
         await notifyAdminsLowStockInApp({
             alertedAt: "2026-07-22T03:00:00.000Z",
@@ -173,11 +187,88 @@ describe("Stock Notifications", () => {
             }],
         });
 
-        expect(prismaMock.notification.create).toHaveBeenCalledWith({
-            data: expect.objectContaining({
+        expect(prismaMock.user.findMany).toHaveBeenCalledWith({
+            where: {
+                role: "ADMIN",
+                isActive: true,
+                deletedAt: null,
+            },
+            select: { id: true },
+        });
+        expect(notificationMocks.createForUserOnce).toHaveBeenCalledWith(
+            expect.objectContaining({
+                userId: 7,
                 message: "วัสดุ 1 รายการถึงหรือต่ำกว่าจุดแจ้งเตือน: หมึกพิมพ์ (สี: ดำ) (1/5 ตลับ)",
                 referenceId: "INK-BLACK",
             }),
+            prismaMock,
+        );
+    });
+
+    it("keeps new-request admin eligibility and user-specific dedupe keys in Stock", async () => {
+        prismaMock.user.findMany.mockResolvedValue(asNever([{ id: 7 }, { id: 8 }]));
+
+        await notifyAdminsNewStockRequest(42, "สมชาย", "PRJ-42", prismaMock);
+
+        expect(prismaMock.user.findMany).toHaveBeenCalledWith({
+            where: {
+                role: "ADMIN",
+                isActive: true,
+                deletedAt: null,
+            },
+            select: { id: true },
         });
+        expect(notificationMocks.createForUserOnce).toHaveBeenNthCalledWith(
+            1,
+            expect.objectContaining({
+                userId: 7,
+                dedupeKey: "stock:42:STOCK_REQUEST_NEW:7",
+            }),
+            prismaMock,
+        );
+        expect(notificationMocks.createForUserOnce).toHaveBeenNthCalledWith(
+            2,
+            expect.objectContaining({
+                userId: 8,
+                dedupeKey: "stock:42:STOCK_REQUEST_NEW:8",
+            }),
+            prismaMock,
+        );
+    });
+
+    it("keeps requester-cancellation admin eligibility and strict batch semantics", async () => {
+        prismaMock.user.findMany.mockResolvedValue(asNever([{ id: 7 }, { id: 8 }]));
+
+        await notifyAdminsStockRequestCancelledByRequester(42, "สมชาย", prismaMock);
+
+        expect(prismaMock.user.findMany).toHaveBeenCalledWith({
+            where: { role: "ADMIN" },
+            select: { id: true },
+        });
+        expect(notificationMocks.createForUsers).toHaveBeenCalledWith(
+            [
+                expect.objectContaining({ userId: 7, type: "STOCK_CANCELLED" }),
+                expect.objectContaining({ userId: 8, type: "STOCK_CANCELLED" }),
+            ],
+            prismaMock,
+        );
+        const inputs = notificationMocks.createForUsers.mock.calls[0]?.[0] as Array<Record<string, unknown>>;
+        expect(inputs.every((input) => !Object.prototype.hasOwnProperty.call(input, "dedupeKey"))).toBe(true);
+    });
+
+    it("keeps requester result notifications strict and without a dedupe key", async () => {
+        await notifyStockRequestResult(42, 7, false, "ผู้เบิกไม่มารับ", prismaMock);
+
+        expect(notificationMocks.createForUser).toHaveBeenCalledWith(
+            {
+                userId: 7,
+                type: "STOCK_CANCELLED",
+                title: "คำขอเบิกวัสดุถูกยกเลิก",
+                message: "คำขอเบิก #42 ถูกยกเลิก: ผู้เบิกไม่มารับ",
+                actionUrl: "/dashboard/stock?stockTab=my-requests",
+                referenceId: "42",
+            },
+            prismaMock,
+        );
     });
 });

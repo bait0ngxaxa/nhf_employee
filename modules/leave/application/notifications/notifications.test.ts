@@ -1,8 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { Prisma, type PrismaClient } from "@prisma/client";
+import type { PrismaClient } from "@prisma/client";
 import { mockDeep, mockReset } from "vitest-mock-extended";
 
 import { prisma } from "@/lib/db/prisma";
+const notificationMocks = vi.hoisted(() => ({
+    createForUserOnce: vi.fn(),
+}));
+
+vi.mock("@/modules/notification", () => notificationMocks);
 import {
     sendLeaveActionNotifications,
     sendLeaveCancelledAfterApprovalNotifications,
@@ -116,6 +121,7 @@ describe("leave notification delivery", () => {
     beforeEach(() => {
         mockReset(prismaMock);
         vi.clearAllMocks();
+        notificationMocks.createForUserOnce.mockResolvedValue(undefined);
         leaveEmailMocks.sendLeaveActionNotification.mockResolvedValue(true);
         leaveEmailMocks.sendLeaveResultNotification.mockResolvedValue(true);
         leaveEmailMocks.sendLeaveCancelledAfterApprovalNotification.mockResolvedValue(true);
@@ -160,63 +166,58 @@ describe("leave notification delivery", () => {
         await expect(sendLeaveActionNotifications(payload)).rejects.toThrow(
             "LEAVE_ACTION email notification failed",
         );
-        expect(prismaMock.notification.create).toHaveBeenCalledWith({
-            data: expect.objectContaining({
+        expect(notificationMocks.createForUserOnce).toHaveBeenCalledWith(
+            expect.objectContaining({
                 type: "LEAVE_REQUESTED",
                 referenceId: "leave-1",
                 userId: 2,
                 message: expect.stringContaining("ลาย้อนหลัง"),
             }),
-        });
+            prismaMock,
+        );
     });
 
-    it("creates result notification once and treats duplicate as success", async () => {
-        const duplicateError = new Prisma.PrismaClientKnownRequestError(
-            "Unique constraint failed",
-            {
-                code: "P2002",
-                clientVersion: "test",
-            },
-        );
-        prismaMock.notification.create.mockRejectedValue(duplicateError);
-
+    it("composes result notification-once semantics through Notification", async () => {
         await expect(
             sendLeaveResultNotifications(buildResultPayload()),
         ).resolves.toBeUndefined();
-        expect(prismaMock.notification.create).toHaveBeenCalledWith({
-            data: expect.objectContaining({
+        expect(notificationMocks.createForUserOnce).toHaveBeenCalledWith(
+            expect.objectContaining({
                 type: "LEAVE_APPROVED",
                 referenceId: "leave-1",
                 userId: 1,
                 dedupeKey: "leave:1:LEAVE_APPROVED:leave-1",
             }),
-        });
+            prismaMock,
+        );
     });
 
     it("shows the admin as the decision actor for cancellation recovery", async () => {
         await sendLeaveCancelledAfterApprovalNotifications(buildDecisionPayload());
 
-        expect(prismaMock.notification.create).toHaveBeenCalledWith({
-            data: expect.objectContaining({
+        expect(notificationMocks.createForUserOnce).toHaveBeenCalledWith(
+            expect.objectContaining({
                 type: "LEAVE_CANCELLED_AFTER_APPROVAL",
                 message: expect.stringContaining(
                     "ผู้ดูแลระบบ Admin User ยืนยันการยกเลิก",
                 ),
             }),
-        });
+            prismaMock,
+        );
     });
 
     it("shows the admin as the decision actor for not-taken recovery", async () => {
         await sendLeaveNotTakenConfirmedNotifications(buildNotTakenDecisionPayload());
 
-        expect(prismaMock.notification.create).toHaveBeenCalledWith({
-            data: expect.objectContaining({
+        expect(notificationMocks.createForUserOnce).toHaveBeenCalledWith(
+            expect.objectContaining({
                 type: "LEAVE_NOT_TAKEN_CONFIRMED",
                 message: expect.stringContaining(
                     "ผู้ดูแลระบบ Admin User ยืนยันไม่ได้ใช้วันลา",
                 ),
             }),
-        });
+            prismaMock,
+        );
     });
 
     it("does not label an assigned admin decision as a recovery override", async () => {
@@ -225,16 +226,18 @@ describe("leave notification delivery", () => {
             recoveryOverride: false,
         });
 
-        expect(prismaMock.notification.create).toHaveBeenCalledWith({
-            data: expect.objectContaining({
+        expect(notificationMocks.createForUserOnce).toHaveBeenCalledWith(
+            expect.objectContaining({
                 type: "LEAVE_NOT_TAKEN_CONFIRMED",
                 message: expect.stringContaining("Admin User ยืนยันไม่ได้ใช้วันลา"),
             }),
-        });
-        expect(prismaMock.notification.create).not.toHaveBeenCalledWith({
-            data: expect.objectContaining({
+            prismaMock,
+        );
+        expect(notificationMocks.createForUserOnce).not.toHaveBeenCalledWith(
+            expect.objectContaining({
                 message: expect.stringContaining("ผู้ดูแลระบบ Admin User"),
             }),
-        });
+            prismaMock,
+        );
     });
 });

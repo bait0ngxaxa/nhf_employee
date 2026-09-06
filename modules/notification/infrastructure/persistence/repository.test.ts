@@ -7,9 +7,11 @@ import {
     countHistoryNotifications,
     countUnreadNotifications,
     createNotification,
+    createNotifications,
     findHistoryNotifications,
     findLatestNotifications,
     updateAllNotificationsReadState,
+    updateUnreadNotificationsByReference,
     updateNotificationReadState,
 } from "./repository";
 
@@ -27,6 +29,7 @@ describe("Notification persistence repository", () => {
         persistenceContext.notification.update.mockResolvedValue(asNever({}));
         persistenceContext.notification.updateMany.mockResolvedValue({ count: 0 });
         persistenceContext.notification.create.mockResolvedValue(asNever({}));
+        persistenceContext.notification.createMany.mockResolvedValue({ count: 0 });
     });
 
     it("queries the latest ten rows for one user in descending creation order", async () => {
@@ -110,6 +113,27 @@ describe("Notification persistence repository", () => {
         });
     });
 
+    it("updates only matching unread rows for a business reference transition", async () => {
+        persistenceContext.notification.updateMany.mockResolvedValue({ count: 3 });
+
+        await expect(
+            updateUnreadNotificationsByReference({
+                userId: 17,
+                type: "LEAVE_REQUESTED",
+                referenceId: "leave-17",
+            }, persistenceContext),
+        ).resolves.toEqual({ count: 3 });
+        expect(persistenceContext.notification.updateMany).toHaveBeenCalledWith({
+            where: {
+                userId: 17,
+                type: "LEAVE_REQUESTED",
+                referenceId: "leave-17",
+                isRead: false,
+            },
+            data: { isRead: true },
+        });
+    });
+
     it("creates all supplied Inbox fields through the supplied transaction context", async () => {
         const input: NotificationCreateInput = {
             userId: 17,
@@ -141,5 +165,71 @@ describe("Notification persistence repository", () => {
         expect(persistenceContext.notification.create).toHaveBeenCalledWith({
             data: expect.objectContaining({ dedupeKey: null }),
         });
+    });
+
+    it("creates every explicit user in a strict batch without skipDuplicates", async () => {
+        await expect(
+            createNotifications([
+                {
+                    userId: 17,
+                    type: "SYSTEM_ALERT",
+                    title: "แจ้งเตือน",
+                    message: "รายละเอียด 1",
+                    actionUrl: null,
+                    referenceId: "reference-17",
+                },
+                {
+                    userId: 18,
+                    type: "SYSTEM_ALERT",
+                    title: "แจ้งเตือน",
+                    message: "รายละเอียด 2",
+                    actionUrl: "/dashboard",
+                    referenceId: "reference-18",
+                    dedupeKey: "reference-18",
+                },
+            ], persistenceContext),
+        ).resolves.toEqual({ count: 0 });
+
+        expect(persistenceContext.notification.createMany).toHaveBeenCalledWith({
+            data: [
+                {
+                    userId: 17,
+                    type: "SYSTEM_ALERT",
+                    title: "แจ้งเตือน",
+                    message: "รายละเอียด 1",
+                    actionUrl: null,
+                    referenceId: "reference-17",
+                    dedupeKey: null,
+                },
+                {
+                    userId: 18,
+                    type: "SYSTEM_ALERT",
+                    title: "แจ้งเตือน",
+                    message: "รายละเอียด 2",
+                    actionUrl: "/dashboard",
+                    referenceId: "reference-18",
+                    dedupeKey: "reference-18",
+                },
+            ],
+        });
+        expect(persistenceContext.notification.createMany.mock.calls[0]?.[0]).not.toHaveProperty(
+            "skipDuplicates",
+        );
+    });
+
+    it("propagates strict batch database failures", async () => {
+        const databaseError = new Error("batch database failure");
+        persistenceContext.notification.createMany.mockRejectedValue(databaseError);
+
+        await expect(
+            createNotifications([{
+                userId: 17,
+                type: "SYSTEM_ALERT",
+                title: "แจ้งเตือน",
+                message: "รายละเอียด",
+                actionUrl: null,
+                referenceId: null,
+            }], persistenceContext),
+        ).rejects.toBe(databaseError);
     });
 });

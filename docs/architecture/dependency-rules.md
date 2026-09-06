@@ -1,6 +1,6 @@
 # Dependency rules and enforcement
 
-Status: Phase H2 CLOSED — Notification presentation ownership complete.
+Status: Phase H3 CLOSED — Notification producer integration and final migration audit complete.
 Phase H1 server/application ownership and Phase H0 Notification discovery remain
 closed. Phase G3 Department migration remains complete. These rules govern new architecture code
 while unrelated legacy features remain compatible during incremental migration.
@@ -83,7 +83,7 @@ for client/presentation usage. Arbitrary subpaths remain forbidden. A
 server-only module intentionally has no client entry, and a client entry must
 not expose server-only implementation, database adapters, or secrets.
 
-## Notification and outbox boundary (H0/H1/H2)
+## Notification and outbox boundary (H0/H1/H2/H3)
 
 The Notification capability is consumed through `@/modules/notification`;
 server consumers must not deep-import its repository, Prisma, or presentation
@@ -112,13 +112,26 @@ Notification. A direct processor-to-Notification dispatch is reserved for a
 future truly Notification-owned generic event whose payload is already a fully
 resolved Notification command; no current production event uses that shape.
 
-The current `lib/services/notifications/in-app.ts` helper is transitional. Its
-generic create-once operation now adapts to the Notification public persistence
-seam, while its admin lookup remains recipient policy that must be split during
-H3.
-Do not introduce a generic Notification audience query or migrate Email Request
-until the future IT capability boundary is approved. Legacy IT notification and
-outbox enum values remain storage-compatible history only.
+The current `lib/services/notifications/in-app.ts` helper is now a minimal
+explicit-user compatibility adapter used only by deferred Email Request. It
+contains no audience lookup. `createAdminInAppNotificationsOnce` was removed;
+Stock owns its active-admin and requester-cancellation admin policies locally.
+Do not introduce a generic Notification audience query or migrate Email
+Request until the future IT capability boundary is approved. Legacy IT
+notification and outbox enum values remain storage-compatible history only.
+
+Notification application commands distinguish strict `createForUser` and
+`createForUsers` persistence from idempotent `createForUserOnce`: strict
+commands propagate `P2002`, while create-once catches only `P2002`. The
+business-driven `markUnreadByReferenceForUser` command accepts only explicit
+user/type/reference fields and a transaction context; the business module
+still owns when and why a row becomes obsolete.
+
+All production physical `Notification` delegate operations must be owned by
+`modules/notification/infrastructure/**`. Tests, integration fixtures, and
+Prisma support/schema/seed code remain allowed where appropriate. This rule is
+enforced by `scripts/check-architecture.mjs`; `notificationOutbox` is a
+separate delegate and is intentionally not matched.
 
 H2 keeps `app/dashboard/notifications/page.tsx` and `loading.tsx` as App Router
 composition and requires them to use `@/modules/notification/client`.
@@ -127,7 +140,9 @@ shell ownership and mounts `NotificationDropdown` through that client entry.
 The deleted `components/dashboard/notifications/**` path must not be
 reintroduced. Notification browser code remains HTTP-based through
 `API_ROUTES.notifications.*`; H1 server/application, Prisma, Outbox, Email,
-LINE, and business producer ownership remain unchanged for H3.
+LINE, and business producer ownership remain unchanged after H3. Leave, Stock,
+and Routine now consume only `@/modules/notification` for Inbox persistence;
+Email Request remains the documented compatibility exception.
 
 ## Client/server boundary
 
@@ -260,7 +275,7 @@ the module boundary from a legacy directory, while imports unrelated to
 | Employee/Leave offboarding seam | `modules/employee/**` plus Employee route composition | Employee exposes only a structural blocker-provider port; the outer composition binds Leave's implementation and must preserve the same Employee lifecycle transaction client |
 | Department G1 ownership | `app/api/departments/**`, `modules/department/**`, Employee import, production source | Department API delivery uses `@/modules/department`; Department Prisma access stays in Department infrastructure; Employee uses the Department public query; Department does not depend on Employee |
 | Department G2 presentation boundary | Production Client Component runtime graphs and Employee Department presentation | Rejects direct/transitive client imports of the server-only `@/modules/department` entry; preserves the `/api/departments` browser contract and does not require a Department client entry |
-| Notification H1/H2 ownership | `app/api/notifications/**`, `app/dashboard/notifications/**`, `components/dashboard/layout/DashboardNavbar.tsx`, `modules/notification/**`, production client graphs | Requires Notification API routes to consume `@/modules/notification`; requires Notification Dashboard routes and DashboardNavbar to consume `@/modules/notification/client`; rejects deleted legacy presentation paths, deep/self-barrel imports, server-only dependencies in the Notification client graph, and production client reachability of the Notification server entry. Direct `prisma.notification` exclusivity remains deferred until H3 producer migration |
+| Notification H1-H3 ownership | `app/api/notifications/**`, `app/dashboard/notifications/**`, `components/dashboard/layout/DashboardNavbar.tsx`, `modules/notification/**`, production client graphs, production source | Requires Notification API routes to consume `@/modules/notification`; requires Notification Dashboard routes and DashboardNavbar to consume `@/modules/notification/client`; rejects deleted legacy presentation paths, deep/self-barrel imports, server-only dependencies in the Notification client graph, production client reachability of the Notification server entry, business-module legacy adapter imports, and physical Notification delegate access outside `modules/notification/infrastructure/**`; allows tests/fixtures/support code and does not match `notificationOutbox` |
 
 ## Department final closure (G3)
 

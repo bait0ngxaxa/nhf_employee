@@ -1,6 +1,6 @@
 # Module boundaries
 
-Status: Phase H2 CLOSED — Notification presentation ownership complete.
+Status: Phase H3 CLOSED — Notification producer integration and final migration audit complete.
 Phase H1 server/application ownership and Phase H0 Notification discovery remain
 closed. Phase G3
 Department migration remains complete.
@@ -83,13 +83,15 @@ server-side application and Prisma persistence; G2 confirms that it is
 intentionally server-only and has no `client.ts` or Department-owned
 presentation.
 
-## Notification boundary (H0/H1/H2)
+## Notification boundary (H0/H1/H2/H3)
 
 The `modules/notification/` module now owns the user-facing in-app
 Notification/Inbox capability. It owns the `Notification` repository and
-persistence boundary, generic create-to-explicit-user mechanics, dedupe
-handling, latest/history/unread queries, mark-one/mark-all-read commands, and
-the public server/application contract. Notification-specific Dashboard
+persistence boundary, strict and idempotent explicit-user create mechanics,
+strict explicit-user batch create, business-driven unread reference
+transitions, dedupe handling, latest/history/unread queries,
+mark-one/mark-all-read commands, and the public server/application contract.
+Notification-specific Dashboard
 presentation is now owned under
 `modules/notification/presentation/dashboard/**` and is exposed only through
 the browser-safe `@/modules/notification/client` entry.
@@ -99,7 +101,13 @@ Stock, Routine, and the deferred Email Request/IT capability retain ownership
 of the triggering event, recipient policy, notification type, title/message,
 action URL, reference ID, channel choice, and event-specific dedupe or
 supersede semantics. Notification must not grow audience APIs such as “notify
-all Stock admins” or become a workflow owner for another module.
+all Stock admins” or become a workflow owner for another module. Leave, Stock,
+and Routine use only `@/modules/notification` for Inbox persistence; physical
+Prisma `Notification` delegate operations are owned exclusively by
+`modules/notification/infrastructure/**` in production. Stock's active/
+non-deleted admin policy and separate requester-cancellation `role = ADMIN`
+policy remain Stock-owned and intentionally distinct. The legacy generic
+adapter remains solely for deferred Email Request.
 
 `NotificationOutbox` is a separate shared/platform boundary. The global
 outbox owns reliable asynchronous delivery, event claim and status lifecycle,

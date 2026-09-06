@@ -9,6 +9,14 @@ vi.mock("@/lib/db/prisma", () => ({
     prisma: mockDeep<PrismaClient>(),
 }));
 
+const notificationMocks = vi.hoisted(() => ({
+    createForUser: vi.fn(),
+    createForUserOnce: vi.fn(),
+    createForUsers: vi.fn(),
+}));
+
+vi.mock("@/modules/notification", () => notificationMocks);
+
 const prismaMock = prisma as unknown as ReturnType<typeof mockDeep<PrismaClient>>;
 
 function asNever<T>(value: T): never {
@@ -125,6 +133,10 @@ describe("Stock Service Mutations", () => {
         prismaMock.stockRequest.findUniqueOrThrow.mockResolvedValue(
             asNever({ id: 55, requestedBy: 3 }),
         );
+        vi.clearAllMocks();
+        notificationMocks.createForUser.mockResolvedValue(undefined);
+        notificationMocks.createForUserOnce.mockResolvedValue(undefined);
+        notificationMocks.createForUsers.mockResolvedValue(0);
     });
 
     describe("audit entity routing", () => {
@@ -736,13 +748,12 @@ describe("Stock Service Mutations", () => {
                 entityId: 99,
                 details: auditDetails,
             }).summary).toBe("จ่ายคำขอเบิก #99 โครงการ PRJ-ISSUE จำนวน 2 รายการ");
-            expect(prismaMock.notification.create).toHaveBeenCalledWith(
+            expect(notificationMocks.createForUser).toHaveBeenCalledWith(
                 expect.objectContaining({
-                    data: expect.objectContaining({
-                        userId: 3,
-                        type: "STOCK_ISSUED",
-                    }),
+                    userId: 3,
+                    type: "STOCK_ISSUED",
                 }),
+                prismaMock,
             );
             expect(prismaMock.notificationOutbox.create).toHaveBeenCalledWith(
                 expect.objectContaining({
@@ -1316,7 +1327,9 @@ describe("Stock Service Mutations", () => {
             });
             expect(prismaMock.stockRequest.create).not.toHaveBeenCalled();
             expect(prismaMock.auditLog.create).not.toHaveBeenCalled();
-            expect(prismaMock.notification.create).not.toHaveBeenCalled();
+            expect(notificationMocks.createForUser).not.toHaveBeenCalled();
+            expect(notificationMocks.createForUserOnce).not.toHaveBeenCalled();
+            expect(notificationMocks.createForUsers).not.toHaveBeenCalled();
             expect(prismaMock.notificationOutbox.create).not.toHaveBeenCalled();
         });
 
@@ -1494,14 +1507,14 @@ describe("Stock Service Mutations", () => {
                 entityId: 1,
                 details: auditDetails,
             }).summary).toBe("สร้างคำขอเบิก #1 โครงการ PRJ-MATCH จำนวน 1 รายการ");
-            expect(prismaMock.notification.create).toHaveBeenCalledWith(
+            expect(notificationMocks.createForUserOnce).toHaveBeenCalledWith(
                 expect.objectContaining({
-                    data: expect.objectContaining({
-                        userId: 1,
-                        type: "STOCK_REQUEST_NEW",
-                        message: "สมชาย ใจดี (ชาย) ส่งคำขอเบิกวัสดุ #1 (PRJ-MATCH)",
-                    }),
+                    userId: 1,
+                    type: "STOCK_REQUEST_NEW",
+                    message: "สมชาย ใจดี (ชาย) ส่งคำขอเบิกวัสดุ #1 (PRJ-MATCH)",
+                    dedupeKey: "stock:1:STOCK_REQUEST_NEW:1",
                 }),
+                prismaMock,
             );
             expect(prismaMock.notificationOutbox.create).toHaveBeenCalledWith(
                 expect.objectContaining({
@@ -1833,13 +1846,12 @@ describe("Stock Service Mutations", () => {
                 entityId: 55,
                 details: auditDetails,
             }).summary).toBe("ยกเลิกคำขอเบิก #55: ผู้เบิกไม่มารับ");
-            expect(prismaMock.notification.create).toHaveBeenCalledWith(
+            expect(notificationMocks.createForUser).toHaveBeenCalledWith(
                 expect.objectContaining({
-                    data: expect.objectContaining({
-                        userId: 3,
-                        type: "STOCK_CANCELLED",
-                    }),
+                    userId: 3,
+                    type: "STOCK_CANCELLED",
                 }),
+                prismaMock,
             );
             expect(prismaMock.notificationOutbox.createMany).toHaveBeenCalledWith({
                 data: [{

@@ -41,6 +41,10 @@ import {
     APP_DASHBOARD_TABS,
     toDashboardMenuPath,
 } from "@/lib/ssot/routes";
+import {
+    createForUser,
+    markUnreadByReferenceForUser,
+} from "@/modules/notification";
 
 export const LEAVE_CANCELLATION_MESSAGES = {
     notFound: "ไม่พบคำขอลาที่ยกเลิกได้",
@@ -351,15 +355,11 @@ export async function confirmLeaveCancellation(
 
         const exceptionApproverUserId = getExceptionApproverUserId(leaveRequest);
         if (exceptionApproverUserId) {
-            await tx.notification.updateMany({
-                where: {
-                    userId: exceptionApproverUserId,
-                    type: "LEAVE_CANCELLATION_REQUESTED",
-                    referenceId: leaveId,
-                    isRead: false,
-                },
-                data: { isRead: true },
-            });
+            await markUnreadByReferenceForUser({
+                userId: exceptionApproverUserId,
+                type: "LEAVE_CANCELLATION_REQUESTED",
+                referenceId: leaveId,
+            }, tx);
         }
 
         const payload: LeaveCancelledAfterApprovalPayload = {
@@ -605,15 +605,11 @@ async function markPendingApprovalNotificationsRead(
     const approverUserId = leaveRequest.approver?.user?.id;
     if (!approverUserId) return;
 
-    await tx.notification.updateMany({
-        where: {
-            userId: approverUserId,
-            type: "LEAVE_REQUESTED",
-            referenceId: leaveRequest.id,
-            isRead: false,
-        },
-        data: { isRead: true },
-    });
+    await markUnreadByReferenceForUser({
+        userId: approverUserId,
+        type: "LEAVE_REQUESTED",
+        referenceId: leaveRequest.id,
+    }, tx);
 }
 
 async function markApprovedNotificationsRead(
@@ -621,15 +617,11 @@ async function markApprovedNotificationsRead(
     employeeUserId: number,
     leaveRequest: LeaveCancellationRequest,
 ): Promise<void> {
-    await tx.notification.updateMany({
-        where: {
-            userId: employeeUserId,
-            type: "LEAVE_APPROVED",
-            referenceId: leaveRequest.id,
-            isRead: false,
-        },
-        data: { isRead: true },
-    });
+    await markUnreadByReferenceForUser({
+        userId: employeeUserId,
+        type: "LEAVE_APPROVED",
+        referenceId: leaveRequest.id,
+    }, tx);
 
     await markPendingApprovalNotificationsRead(tx, leaveRequest);
 }
@@ -641,15 +633,11 @@ async function markCancellationNotificationsRead(
     const approverUserId = getExceptionApproverUserId(leaveRequest);
     if (!approverUserId) return;
 
-    await tx.notification.updateMany({
-        where: {
-            userId: approverUserId,
-            type: "LEAVE_CANCELLATION_REQUESTED",
-            referenceId: leaveRequest.id,
-            isRead: false,
-        },
-        data: { isRead: true },
-    });
+    await markUnreadByReferenceForUser({
+        userId: approverUserId,
+        type: "LEAVE_CANCELLATION_REQUESTED",
+        referenceId: leaveRequest.id,
+    }, tx);
 }
 
 async function createSelfCancelledNotification(
@@ -657,22 +645,20 @@ async function createSelfCancelledNotification(
     userId: number,
     leaveRequest: LeaveCancellationRequest,
 ): Promise<void> {
-    await tx.notification.create({
-        data: {
-            userId,
-            type: "LEAVE_CANCELLED",
-            title: "คำขอลาถูกยกเลิกแล้ว",
-            message: `ยกเลิกคำขอ${getLeaveTypeLabel(leaveRequest.leaveType)} ${formatLeaveSummary({
-                startDate: leaveRequest.startDate.toISOString(),
-                endDate: leaveRequest.endDate.toISOString(),
-                period: leaveRequest.period,
-                durationDays: halfDaysToDays(leaveRequest.durationHalfDays),
-            })} แล้ว`,
-            actionUrl: toDashboardMenuPath(APP_DASHBOARD_TABS.leaveHistory),
-            referenceId: leaveRequest.id,
-            dedupeKey: `leave:${userId}:LEAVE_CANCELLED:${leaveRequest.id}`,
-        },
-    });
+    await createForUser({
+        userId,
+        type: "LEAVE_CANCELLED",
+        title: "คำขอลาถูกยกเลิกแล้ว",
+        message: `ยกเลิกคำขอ${getLeaveTypeLabel(leaveRequest.leaveType)} ${formatLeaveSummary({
+            startDate: leaveRequest.startDate.toISOString(),
+            endDate: leaveRequest.endDate.toISOString(),
+            period: leaveRequest.period,
+            durationDays: halfDaysToDays(leaveRequest.durationHalfDays),
+        })} แล้ว`,
+        actionUrl: toDashboardMenuPath(APP_DASHBOARD_TABS.leaveHistory),
+        referenceId: leaveRequest.id,
+        dedupeKey: `leave:${userId}:LEAVE_CANCELLED:${leaveRequest.id}`,
+    }, tx);
 }
 
 async function createCancellationRequestedNotification(
@@ -680,17 +666,15 @@ async function createCancellationRequestedNotification(
     userId: number,
     leaveRequest: LeaveCancellationRequest,
 ): Promise<void> {
-    await tx.notification.create({
-        data: {
-            userId,
-            type: "LEAVE_CANCELLATION_REQUESTED",
-            title: "ส่งคำขอยกเลิกวันลาแล้ว",
-            message: `ส่งคำขอยกเลิก${getLeaveTypeLabel(leaveRequest.leaveType)}แล้ว รอผู้อนุมัติยืนยัน`,
-            actionUrl: toDashboardMenuPath(APP_DASHBOARD_TABS.leaveHistory),
-            referenceId: leaveRequest.id,
-            dedupeKey: `leave:${userId}:LEAVE_CANCELLATION_REQUESTED:${leaveRequest.id}`,
-        },
-    });
+    await createForUser({
+        userId,
+        type: "LEAVE_CANCELLATION_REQUESTED",
+        title: "ส่งคำขอยกเลิกวันลาแล้ว",
+        message: `ส่งคำขอยกเลิก${getLeaveTypeLabel(leaveRequest.leaveType)}แล้ว รอผู้อนุมัติยืนยัน`,
+        actionUrl: toDashboardMenuPath(APP_DASHBOARD_TABS.leaveHistory),
+        referenceId: leaveRequest.id,
+        dedupeKey: `leave:${userId}:LEAVE_CANCELLATION_REQUESTED:${leaveRequest.id}`,
+    }, tx);
 }
 
 async function createCancellationRejectedNotification(
@@ -700,22 +684,20 @@ async function createCancellationRejectedNotification(
     const employeeUserId = leaveRequest.employee.user?.id;
     if (!employeeUserId) return;
 
-    await tx.notification.create({
-        data: {
-            userId: employeeUserId,
-            type: "SYSTEM_ALERT",
-            title: "คำขอยกเลิกวันลาไม่ได้รับการอนุมัติ",
-            message: `คำขอลา${getLeaveTypeLabel(leaveRequest.leaveType)} ${formatLeaveSummary({
-                startDate: leaveRequest.startDate.toISOString(),
-                endDate: leaveRequest.endDate.toISOString(),
-                period: leaveRequest.period,
-                durationDays: halfDaysToDays(leaveRequest.durationHalfDays),
-            })} ยังคงมีสถานะอนุมัติ`,
-            actionUrl: toDashboardMenuPath(APP_DASHBOARD_TABS.leaveHistory),
-            referenceId: leaveRequest.id,
-            dedupeKey: `leave:${employeeUserId}:LEAVE_CANCELLATION_REJECTED:${leaveRequest.id}`,
-        },
-    });
+    await createForUser({
+        userId: employeeUserId,
+        type: "SYSTEM_ALERT",
+        title: "คำขอยกเลิกวันลาไม่ได้รับการอนุมัติ",
+        message: `คำขอลา${getLeaveTypeLabel(leaveRequest.leaveType)} ${formatLeaveSummary({
+            startDate: leaveRequest.startDate.toISOString(),
+            endDate: leaveRequest.endDate.toISOString(),
+            period: leaveRequest.period,
+            durationDays: halfDaysToDays(leaveRequest.durationHalfDays),
+        })} ยังคงมีสถานะอนุมัติ`,
+        actionUrl: toDashboardMenuPath(APP_DASHBOARD_TABS.leaveHistory),
+        referenceId: leaveRequest.id,
+        dedupeKey: `leave:${employeeUserId}:LEAVE_CANCELLATION_REJECTED:${leaveRequest.id}`,
+    }, tx);
 }
 
 function withCancellationInclude(

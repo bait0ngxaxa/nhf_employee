@@ -33,6 +33,10 @@ import { runSerializableTransaction } from "@/lib/db/transaction";
 import { getEmployeeDisplayName } from "@/modules/employee";
 import { isAdminRole } from "@/lib/ssot/permissions";
 import { APP_DASHBOARD_TABS, toDashboardMenuPath } from "@/lib/ssot/routes";
+import {
+    createForUser,
+    markUnreadByReferenceForUser,
+} from "@/modules/notification";
 
 const NOT_TAKEN_MESSAGES = {
     requestNotFound: "ไม่พบคำขอลาที่แจ้งไม่ได้ใช้วันลาได้",
@@ -178,16 +182,14 @@ export async function requestLeaveNotTaken(
                 payload: JSON.stringify(payload),
             },
         });
-        await tx.notification.create({
-            data: {
-                userId,
-                type: "LEAVE_NOT_TAKEN_REQUESTED",
-                title: "แจ้งไม่ได้ใช้วันลาแล้ว",
-                message: `แจ้งไม่ได้ใช้วันลาแล้ว: ${getLeaveTypeLabel(leaveRequest.leaveType)} ${formatLeaveSummary(leaveSummary)}`,
-                actionUrl: toDashboardMenuPath(APP_DASHBOARD_TABS.leaveHistory),
-                referenceId: leaveRequest.id,
-            },
-        });
+        await createForUser({
+            userId,
+            type: "LEAVE_NOT_TAKEN_REQUESTED",
+            title: "แจ้งไม่ได้ใช้วันลาแล้ว",
+            message: `แจ้งไม่ได้ใช้วันลาแล้ว: ${getLeaveTypeLabel(leaveRequest.leaveType)} ${formatLeaveSummary(leaveSummary)}`,
+            actionUrl: toDashboardMenuPath(APP_DASHBOARD_TABS.leaveHistory),
+            referenceId: leaveRequest.id,
+        }, tx);
         await createLeaveAuditInTransaction(
             tx,
             "LEAVE_REQUEST_NOT_TAKEN_REQUEST",
@@ -352,15 +354,11 @@ export async function confirmLeaveNotTaken(
         const currentApprover = getEffectiveLeaveApprover(leaveRequest);
         const effectiveApproverUserId = currentApprover?.user?.id;
         if (effectiveApproverUserId) {
-            await tx.notification.updateMany({
-                where: {
-                    userId: effectiveApproverUserId,
-                    type: "LEAVE_NOT_TAKEN_REQUESTED",
-                    referenceId: leaveRequest.id,
-                    isRead: false,
-                },
-                data: { isRead: true },
-            });
+            await markUnreadByReferenceForUser({
+                userId: effectiveApproverUserId,
+                type: "LEAVE_NOT_TAKEN_REQUESTED",
+                referenceId: leaveRequest.id,
+            }, tx);
         }
 
         const payload: LeaveNotTakenConfirmedPayload = {

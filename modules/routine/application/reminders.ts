@@ -11,9 +11,7 @@ import {
 } from "./links";
 import { runSerializableTransaction } from "@/lib/db/transaction";
 import { createLineRetryKey } from "@/lib/services/outbox/provider-key";
-import {
-    createInAppNotificationOnce,
-} from "@/lib/services/notifications/in-app";
+import { createForUserOnce } from "@/modules/notification";
 import { toDashboardRoutineTaskPath } from "@/lib/ssot/routes";
 import {
     getRoutineReminderScheduledFor,
@@ -656,7 +654,7 @@ export async function dispatchRoutineReminderOutbox(
             rule.daysBefore,
         );
         for (const recipient of activeRecipients) {
-            await createInAppNotificationOnce(
+            await createForUserOnce(
                 {
                     userId: recipient.userId,
                     type: "ROUTINE_REMINDER",

@@ -1,4 +1,4 @@
-import { Prisma, type NotificationType } from "@prisma/client";
+import type { NotificationType, Prisma } from "@prisma/client";
 
 import {
     sendLeaveActionNotification,
@@ -31,6 +31,10 @@ import type {
     LeaveResultPayload,
 } from "@/modules/leave/application/notifications/notification-payloads";
 import { getPublicOrigin } from "@/lib/network/public-url";
+import {
+    createForUserOnce,
+    type NotificationPersistenceContext,
+} from "@/modules/notification";
 
 type LeaveNotificationInput = {
     userId: number | null;
@@ -41,14 +45,7 @@ type LeaveNotificationInput = {
     referenceId: string;
 };
 
-type NotificationClient = Pick<Prisma.TransactionClient, "notification">;
-
-function isUniqueConstraintError(error: unknown): boolean {
-    return (
-        error instanceof Prisma.PrismaClientKnownRequestError &&
-        error.code === "P2002"
-    );
-}
+type NotificationClient = NotificationPersistenceContext;
 
 async function assertEmailSent(
     isSent: boolean,
@@ -72,16 +69,11 @@ async function createNotificationOnceWithClient(
     }
 
     const { userId, ...data } = input;
-    try {
-        await client.notification.create({
-            data: { ...data, userId, dedupeKey: buildDedupeKey(input) },
-        });
-    } catch (error) {
-        if (isUniqueConstraintError(error)) {
-            return;
-        }
-        throw error;
-    }
+    await createForUserOnce({
+        ...data,
+        userId,
+        dedupeKey: buildDedupeKey(input),
+    }, client);
 }
 
 async function createNotificationOnce(input: LeaveNotificationInput): Promise<void> {

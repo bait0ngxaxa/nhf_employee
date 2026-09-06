@@ -6,7 +6,10 @@ export {
 export {
     markReadForUser,
     markAllReadForUser,
+    markUnreadByReferenceForUser,
+    createForUser,
     createForUserOnce,
+    createForUsers,
 } from "./application/commands";
 export type {
     NotificationCreateInput,
@@ -14,4 +17,5 @@ export type {
     NotificationHistoryResult,
     NotificationLatestResult,
     NotificationPersistenceContext,
+    NotificationReadTransitionInput,
 } from "./application/types";

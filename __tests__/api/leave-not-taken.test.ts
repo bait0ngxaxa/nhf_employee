@@ -93,6 +93,7 @@ describe("/api/leave/not-taken", () => {
         }] as never);
         vi.mocked(prisma.$queryRaw).mockResolvedValue([] as never);
         vi.mocked(prisma.leaveQuota.findMany).mockResolvedValue([]);
+        vi.mocked(prisma.notification.updateMany).mockResolvedValue({ count: 0 });
         vi.mocked(processOutbox).mockResolvedValue({ processed: 0, failed: 0 });
         vi.mocked(prisma.$transaction).mockImplementation(async (callback) => {
             if (typeof callback === "function") {

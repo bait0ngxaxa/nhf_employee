@@ -74,12 +74,14 @@ ledger in
 [organization-department-migration.md](../docs/architecture/organization-department-migration.md)
 for the historical G0 record and final G1-G3 implementation ledger.
 
-Phase H2 Notification presentation ownership is complete; Phase H1
-server/application ownership remains complete.
+Phase H3 Notification producer integration and final migration audit are
+complete; Phase H1 server/application and H2 presentation ownership remain
+complete.
 `modules/notification/` owns the user-facing in-app Notification/Inbox
-persistence, queries, read commands, generic create-to-explicit-user mechanics,
-and Notification dedupe behavior. Its `index.ts` is the only supported server
-entry. The four `app/api/notifications/**` routes remain HTTP/auth adapters and
+persistence, queries, read commands, strict/idempotent explicit-user create
+commands, strict explicit-user batch create, business-driven unread reference
+transitions, and Notification dedupe behavior. Its `index.ts` is the only
+supported server entry. The four `app/api/notifications/**` routes remain HTTP/auth adapters and
 delegate through that entry; their full Prisma-serialized row responses and
 current timestamp-cursor behavior remain compatible. Its browser-facing
 `client.ts` exposes only `NotificationDropdown`, `NotificationsSection`, and
@@ -95,13 +97,20 @@ implementation. The deleted `components/dashboard/notifications/**` path has
 no compatibility facade. The Notification-specific history skeleton moved to
 the module; generic Dashboard skeleton primitives remain shared.
 
-`createInAppNotificationOnce` is now a thin compatibility adapter over the
-Notification public create command. `createAdminInAppNotificationsOnce` remains
-transitional and keeps its active-admin audience lookup outside Notification.
+`createForUser` and `createForUsers` are strict public persistence commands;
+`createForUserOnce` is the idempotent command that catches only `P2002`.
+`markUnreadByReferenceForUser` persists business-driven unread transitions
+without interpreting business state. The former
+`createAdminInAppNotificationsOnce` helper was removed. The generic
+`createInAppNotificationOnce` adapter remains only for deferred Email Request
+and has no audience lookup.
 Leave, Stock, Routine, and the deferred Email Request/IT capability continue to
 own event meaning, recipients, titles/messages, action/reference values,
-channel choices, and event-specific dedupe or supersede rules. Their direct
-Notification producer writes remain intentionally deferred to H3.
+channel choices, and event-specific dedupe or supersede rules. Leave, Stock,
+and Routine now use `@/modules/notification` for Inbox writes. Physical
+Notification persistence is owned only by
+`modules/notification/infrastructure/**`; Stock's two intentionally different
+admin eligibility policies remain Stock-owned.
 
 `NotificationOutbox` is not part of the Notification module. The shared
 platform outbox owns reliable asynchronous delivery, claim/retry/dead-letter/
@@ -120,9 +129,13 @@ Email Request remains explicitly deferred until the future IT capability
 boundary is ready. See
 [notification-migration.md](../docs/architecture/notification-migration.md)
 for the H0 evidence, exhaustive ledger, invariants, and H1-H3 slices. H3
-producer integration and compatibility cleanup remain open/not started.
+producer integration and compatibility cleanup are complete. NotificationOutbox
+and the global processor remain outside Notification; timestamp-only history
+cursor ambiguity and legacy `TICKET_*` storage compatibility are unchanged.
 
 Phase H0 CLOSED — Notification discovery and boundary definition complete.
 Phase H1 CLOSED — Notification server/application ownership complete.
 Phase H2 CLOSED — Notification presentation ownership complete.
-H3 remains open/not started.
+Phase H3 CLOSED — Notification producer integration and final migration audit complete.
+
+Notification H0-H3 migration complete. Email Request/IT remains deferred.

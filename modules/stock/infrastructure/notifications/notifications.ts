@@ -2,7 +2,13 @@ import { type Prisma, Role } from "@prisma/client";
 
 import { prisma } from "@/lib/db/prisma";
 import { getUserDisplayName } from "@/shared/identity/display";
-import { createAdminInAppNotificationsOnce } from "@/lib/services/notifications/in-app";
+import {
+    createForUser,
+    createForUserOnce,
+    createForUsers,
+    type NotificationCreateInput,
+    type NotificationPersistenceContext,
+} from "@/modules/notification";
 import {
     sendStockLowNotification,
     sendStockRequestNotification,
@@ -22,8 +28,8 @@ import type { LowStockAlertCandidate } from "../../domain/types";
 
 type StockNotificationClient = Pick<
     Prisma.TransactionClient,
-    "notification" | "notificationOutbox" | "user"
->;
+    "notificationOutbox" | "user"
+> & NotificationPersistenceContext;
 
 type StockRequestLineSource = {
     id: number;
@@ -69,20 +75,43 @@ export async function notifyStockRequestResult(
     cancelReason?: string | null,
     client: StockNotificationClient = prisma,
 ): Promise<void> {
-    await client.notification.create({
-        data: {
-            userId: requestedByUserId,
-            type: isIssued ? "STOCK_ISSUED" : "STOCK_CANCELLED",
-            title: isIssued
-                ? "คำขอเบิกวัสดุถูกจ่ายแล้ว"
-                : "คำขอเบิกวัสดุถูกยกเลิก",
-            message: isIssued
-                ? `คำขอเบิก #${requestId} ถูกจ่ายเรียบร้อยแล้ว`
-                : `คำขอเบิก #${requestId} ถูกยกเลิก${cancelReason ? `: ${cancelReason}` : ""}`,
-            actionUrl: toDashboardStockTabPath(STOCK_DASHBOARD_TABS.myRequests),
-            referenceId: String(requestId),
+    await createForUser({
+        userId: requestedByUserId,
+        type: isIssued ? "STOCK_ISSUED" : "STOCK_CANCELLED",
+        title: isIssued
+            ? "คำขอเบิกวัสดุถูกจ่ายแล้ว"
+            : "คำขอเบิกวัสดุถูกยกเลิก",
+        message: isIssued
+            ? `คำขอเบิก #${requestId} ถูกจ่ายเรียบร้อยแล้ว`
+            : `คำขอเบิก #${requestId} ถูกยกเลิก${cancelReason ? `: ${cancelReason}` : ""}`,
+        actionUrl: toDashboardStockTabPath(STOCK_DASHBOARD_TABS.myRequests),
+        referenceId: String(requestId),
+    }, client);
+}
+
+async function createForActiveAdmins(
+    input: Omit<NotificationCreateInput, "userId" | "dedupeKey">,
+    dedupeKeyPrefix: string,
+    client: StockNotificationClient,
+): Promise<void> {
+    const admins = await client.user.findMany({
+        where: {
+            role: Role.ADMIN,
+            isActive: true,
+            deletedAt: null,
         },
+        select: { id: true },
     });
+
+    await Promise.all(
+        admins.map((admin) =>
+            createForUserOnce({
+                ...input,
+                userId: admin.id,
+                dedupeKey: `${dedupeKeyPrefix}:${admin.id}`,
+            }, client),
+        ),
+    );
 }
 
 export async function enqueueStockRequestResultEmail(
@@ -131,14 +160,13 @@ export async function notifyAdminsNewStockRequest(
     projectCode: string,
     client: StockNotificationClient = prisma,
 ): Promise<void> {
-    await createAdminInAppNotificationsOnce({
+    await createForActiveAdmins({
         type: "STOCK_REQUEST_NEW",
         title: "คำขอเบิกวัสดุใหม่",
         message: `${requesterName} ส่งคำขอเบิกวัสดุ #${requestId} (${projectCode})`,
         actionUrl: toDashboardStockTabPath(STOCK_DASHBOARD_TABS.adminRequests),
         referenceId: String(requestId),
-        dedupeKeyPrefix: `stock:${requestId}:STOCK_REQUEST_NEW`,
-    }, client);
+    }, `stock:${requestId}:STOCK_REQUEST_NEW`, client);
 }
 
 export { buildVariantLabel } from "./notification-payloads";
@@ -244,14 +272,13 @@ export async function notifyAdminsStockRequestLineInApp(
     payload: StockRequestLineData,
     client: StockNotificationClient = prisma,
 ): Promise<void> {
-    await createAdminInAppNotificationsOnce({
+    await createForActiveAdmins({
         type: "STOCK_REQUEST_NEW",
         title: "คำขอเบิกวัสดุใหม่",
         message: `${payload.requesterName} ส่งคำขอเบิกวัสดุ #${payload.requestId} (${payload.projectCode})`,
         actionUrl: toDashboardStockTabPath(STOCK_DASHBOARD_TABS.adminRequests),
         referenceId: String(payload.requestId),
-        dedupeKeyPrefix: `stock:${payload.requestId}:STOCK_REQUEST_NEW`,
-    }, client);
+    }, `stock:${payload.requestId}:STOCK_REQUEST_NEW`, client);
 }
 
 function buildLowStockMessage(payload: StockLowLineData): string {
@@ -272,7 +299,7 @@ export async function notifyAdminsLowStockInApp(
     payload: StockLowLineData,
     client: StockNotificationClient = prisma,
 ): Promise<void> {
-    await createAdminInAppNotificationsOnce({
+    await createForActiveAdmins({
         type: "SYSTEM_ALERT",
         title: "วัสดุใกล้หมดสต็อก",
         message: buildLowStockMessage(payload),
@@ -282,8 +309,7 @@ export async function notifyAdminsLowStockInApp(
                 ? payload.items[0].variantSku
                 : payload.items[0].sku)
             : payload.alertedAt,
-        dedupeKeyPrefix: `stock-low:${payload.alertedAt}`,
-    }, client);
+    }, `stock-low:${payload.alertedAt}`, client);
 }
 
 export async function persistLowStockNotifications(
@@ -315,14 +341,14 @@ export async function notifyAdminsStockRequestCancelledByRequester(
 
     if (admins.length === 0) return;
 
-    await client.notification.createMany({
-        data: admins.map((admin) => ({
+    const inputs: NotificationCreateInput[] = admins.map((admin) => ({
             userId: admin.id,
             type: "STOCK_CANCELLED",
             title: "คำขอเบิกถูกผู้ใช้ยกเลิก",
             message: `${requesterName} ยกเลิกคำขอเบิก #${requestId} แล้ว`,
             actionUrl: toDashboardStockTabPath(STOCK_DASHBOARD_TABS.adminRequests),
             referenceId: String(requestId),
-        })),
-    });
+        }));
+
+    await createForUsers(inputs, client);
 }

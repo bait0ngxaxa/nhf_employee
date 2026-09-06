@@ -15,6 +15,12 @@ export type NotificationCreateInput = {
     dedupeKey?: string | null;
 };
 
+export type NotificationReadTransitionInput = {
+    userId: number;
+    type: NotificationType;
+    referenceId: string;
+};
+
 export type NotificationHistoryQuery = {
     userId: number;
     filter?: string | null;

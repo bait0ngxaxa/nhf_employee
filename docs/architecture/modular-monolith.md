@@ -1,6 +1,6 @@
 # NHF Employee modular monolith
 
-Status: Phase H2 CLOSED — Notification presentation ownership complete.
+Status: Phase H3 CLOSED — Notification producer integration and final migration audit complete.
 Phase H1 server/application ownership and Phase H0 Notification discovery remain
 closed. Phase G3
 Department migration remains complete.
@@ -39,7 +39,7 @@ capability a stable server/application/persistence owner in
 and Employee-specific mapping and presentation behavior.
 
 Phase H1 established the server/application Notification boundary in
-`modules/notification/`, and H2 now owns its active Dashboard presentation in
+`modules/notification/`, H2 owns its active Dashboard presentation in
 `modules/notification/presentation/dashboard/**` behind
 `@/modules/notification/client`. It is the in-app Notification/Inbox owner; it
 does not absorb business notification semantics, the global
@@ -96,7 +96,10 @@ route boundary.
 
 Notification server/application ownership now lives in `modules/notification/`:
 the four Notification routes delegate through its public server entry, and the
-shared generic in-app helper is a compatibility adapter over that entry. The
+shared generic in-app helper is a minimal explicit-user compatibility adapter
+used only by deferred Email Request. Leave, Stock, and Routine Inbox writes
+consume the Notification public entry; physical Notification Prisma
+persistence is owned only by `modules/notification/infrastructure/**`.
 Dashboard Notification presentation is module-owned behind its browser-safe
 client entry; the deleted `components/dashboard/notifications/**` path is not a
 supported ownership path. The current global outbox already treats in-app
@@ -190,12 +193,14 @@ Employee import seam preserve their existing contracts; Employee browser code
 continues to use HTTP. No obsolete Department runtime artifact remained, so no
 runtime cleanup was required.
 
-### Notification boundary and presentation ownership (H0/H1/H2)
+### Notification boundary and presentation ownership (H0/H1/H2/H3)
 
 The Notification capability is deliberately narrower than the word
 "notification" in the repository. It owns durable per-user in-app Inbox
-entries, latest/history/unread queries, mark-read commands, generic
-deduplicated persistence, and its server/application contract. H2 owns
+entries, latest/history/unread queries, mark-read commands, strict and
+idempotent explicit-user creates, strict explicit-user batch create, the
+business-driven unread reference transition, and its server/application
+contract. H2 owns
 Notification-specific Dashboard presentation under
 `modules/notification/presentation/dashboard/**` and exposes only the active
 composition contract through `modules/notification/client.ts`. A business module
@@ -221,10 +226,9 @@ resolved command payload, not current business-owned events.
 
 Dashboard navbar/page/menu composition remains app/Dashboard-owned. Email
 Request is documented as a transitional/deferred consumer and legacy IT enum
-values remain storage-compatible history only. H1 server/application ownership
-and H2 presentation ownership are complete; H3 producer integration and
-compatibility cleanup are not started. The timestamp-only history cursor risk
-remains unresolved.
+values remain storage-compatible history only. H1 server/application, H2
+presentation, and H3 producer integration/compatibility cleanup are complete.
+The timestamp-only history cursor risk remains unresolved.
 
 ## Ownership principle
 

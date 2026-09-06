@@ -2,12 +2,15 @@ import { Prisma, type Notification } from "@prisma/client";
 
 import {
     createNotification,
+    createNotifications,
     updateAllNotificationsReadState,
+    updateUnreadNotificationsByReference,
     updateNotificationReadState,
 } from "../infrastructure/persistence/repository";
 import type {
     NotificationCreateInput,
     NotificationPersistenceContext,
+    NotificationReadTransitionInput,
 } from "./types";
 
 function isUniqueConstraintError(error: unknown): boolean {
@@ -29,19 +32,53 @@ export async function markAllReadForUser(userId: number): Promise<number> {
     return result.count;
 }
 
+export async function markUnreadByReferenceForUser(
+    input: NotificationReadTransitionInput,
+    persistenceContext?: NotificationPersistenceContext,
+): Promise<number> {
+    const result = await updateUnreadNotificationsByReference(
+        input,
+        persistenceContext,
+    );
+    return result.count;
+}
+
+export async function createForUser(
+    input: NotificationCreateInput,
+    persistenceContext?: NotificationPersistenceContext,
+): Promise<void> {
+    await createNotification({
+        ...input,
+        dedupeKey: input.dedupeKey ?? null,
+    }, persistenceContext);
+}
+
 export async function createForUserOnce(
     input: NotificationCreateInput,
     persistenceContext?: NotificationPersistenceContext,
 ): Promise<void> {
     try {
-        await createNotification({
-            ...input,
-            dedupeKey: input.dedupeKey ?? null,
-        }, persistenceContext);
+        await createForUser(input, persistenceContext);
     } catch (error) {
         if (isUniqueConstraintError(error)) {
             return;
         }
         throw error;
     }
+}
+
+export async function createForUsers(
+    inputs: readonly NotificationCreateInput[],
+    persistenceContext?: NotificationPersistenceContext,
+): Promise<number> {
+    if (inputs.length === 0) return 0;
+
+    const result = await createNotifications(
+        inputs.map((input) => ({
+            ...input,
+            dedupeKey: input.dedupeKey ?? null,
+        })),
+        persistenceContext,
+    );
+    return result.count;
 }

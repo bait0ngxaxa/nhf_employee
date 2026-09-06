@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db/prisma";
 import type {
     NotificationCreateInput,
     NotificationPersistenceContext,
+    NotificationReadTransitionInput,
 } from "../../application/types";
 
 type HistoryQueryOptions = {
@@ -101,6 +102,23 @@ export function updateAllNotificationsReadState(
     });
 }
 
+export function updateUnreadNotificationsByReference(
+    input: NotificationReadTransitionInput,
+    persistenceContext: NotificationPersistenceContext = prisma,
+): Promise<Prisma.BatchPayload> {
+    return persistenceContext.notification.updateMany({
+        where: {
+            userId: input.userId,
+            type: input.type,
+            referenceId: input.referenceId,
+            isRead: false,
+        },
+        data: {
+            isRead: true,
+        },
+    });
+}
+
 export function createNotification(
     input: NotificationCreateInput,
     persistenceContext: NotificationPersistenceContext = prisma,
@@ -115,5 +133,22 @@ export function createNotification(
             referenceId: input.referenceId,
             dedupeKey: input.dedupeKey ?? null,
         },
+    });
+}
+
+export function createNotifications(
+    inputs: readonly NotificationCreateInput[],
+    persistenceContext: NotificationPersistenceContext = prisma,
+): Promise<Prisma.BatchPayload> {
+    return persistenceContext.notification.createMany({
+        data: inputs.map((input) => ({
+            userId: input.userId,
+            type: input.type,
+            title: input.title,
+            message: input.message,
+            actionUrl: input.actionUrl,
+            referenceId: input.referenceId,
+            dedupeKey: input.dedupeKey ?? null,
+        })),
     });
 }

@@ -19,7 +19,7 @@ import {
     toBangkokCalendarDate,
     type CalendarDate,
 } from "../domain/schedule";
-import { createInAppNotificationOnce } from "@/lib/services/notifications/in-app";
+import { createForUserOnce } from "@/modules/notification";
 import { toDashboardRoutineTaskPath } from "@/lib/ssot/routes";
 import {
     routineContractExpiryEmailOutboxPayloadSchema,
@@ -597,7 +597,7 @@ export async function dispatchRoutineContractExpiryOutbox(
         }
 
         for (const recipient of activeRecipients) {
-            await createInAppNotificationOnce(
+            await createForUserOnce(
                 {
                     userId: recipient.userId,
                     type: "ROUTINE_CONTRACT_EXPIRY",

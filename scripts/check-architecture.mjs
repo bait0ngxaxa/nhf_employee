@@ -608,6 +608,54 @@ function isTestSource(filePath, rootPath) {
         || /\.(?:test|spec)\.[cm]?[jt]sx?$/.test(repositoryPath);
 }
 
+const notificationDelegateOperations = new Set([
+    "create",
+    "createMany",
+    "update",
+    "updateMany",
+    "findMany",
+    "findFirst",
+    "findUnique",
+    "count",
+    "delete",
+    "deleteMany",
+    "upsert",
+]);
+
+function getNotificationDelegateAccess(filePath) {
+    const contents = readFileSync(filePath, "utf8");
+    const sourceFile = ts.createSourceFile(
+        filePath,
+        contents,
+        ts.ScriptTarget.Latest,
+        true,
+        getScriptKind(filePath),
+    );
+    let accessNode = null;
+
+    function visit(node) {
+        if (accessNode !== null) return;
+
+        if (ts.isCallExpression(node)
+            && ts.isPropertyAccessExpression(node.expression)
+            && notificationDelegateOperations.has(node.expression.name.text)
+        ) {
+            const delegate = node.expression.expression;
+            if (ts.isPropertyAccessExpression(delegate)
+                && delegate.name.text === "notification"
+            ) {
+                accessNode = node.expression;
+                return;
+            }
+        }
+
+        ts.forEachChild(node, visit);
+    }
+
+    visit(sourceFile);
+    return accessNode;
+}
+
 function getDepartmentPersistenceViolation(filePath, rootPath) {
     const departmentInfrastructureRoot = resolve(rootPath, "modules/department/infrastructure");
     const prismaRoot = resolve(rootPath, "prisma");
@@ -800,14 +848,48 @@ function getNotificationRouteCompositionViolations(rootPath, sourceFiles) {
 }
 
 function getNotificationPersistenceViolation(filePath, rootPath) {
-    if (!isNotificationApiRoute(filePath, rootPath)) return null;
+    const notificationInfrastructureRoot = resolve(
+        rootPath,
+        "modules/notification/infrastructure",
+    );
+    const prismaRoot = resolve(rootPath, "prisma");
+    if (pathIsWithin(filePath, notificationInfrastructureRoot)
+        || pathIsWithin(filePath, prismaRoot)
+        || isTestSource(filePath, rootPath)
+    ) {
+        return null;
+    }
 
-    const contents = readFileSync(filePath, "utf8");
-    const accessMatch = /\bprisma\s*\.\s*notification\b/.exec(contents);
-    if (accessMatch === null || accessMatch.index === undefined) return null;
+    const accessNode = getNotificationDelegateAccess(filePath);
+    if (accessNode === null) return null;
 
-    const line = contents.slice(0, accessMatch.index).split(/\r?\n/).length;
-    return `${relativeFilePath(filePath, rootPath)}:${line} Notification API routes must delegate Notification persistence through @/modules/notification.`;
+    const line = accessNode.getSourceFile().getLineAndCharacterOfPosition(
+        accessNode.getStart(accessNode.getSourceFile()),
+    ).line + 1;
+    if (isNotificationApiRoute(filePath, rootPath)) {
+        return `${relativeFilePath(filePath, rootPath)}:${line} Notification API routes must delegate Notification persistence through @/modules/notification.`;
+    }
+
+    return `${relativeFilePath(filePath, rootPath)}:${line} direct Notification Prisma delegate access must be owned by modules/notification/infrastructure/.`;
+}
+
+function getLegacyNotificationCompatibilityViolation(filePath, rootPath, moduleSpecifier) {
+    if (isTestSource(filePath, rootPath)) return null;
+
+    const modulesRoot = resolve(rootPath, "modules");
+    if (!pathIsWithin(filePath, modulesRoot)) return null;
+
+    const resolvedImport = moduleSpecifier.startsWith("@/")
+        ? resolve(rootPath, moduleSpecifier.slice(2))
+        : getImportSourcePath(moduleSpecifier, filePath, rootPath);
+    const normalizedSpecifier = resolvedImport === null
+        ? moduleSpecifier
+        : `@/${relativeFilePath(resolvedImport, rootPath).replace(/\.[cm]?[jt]sx?$/, "")}`;
+    if (normalizedSpecifier !== "@/lib/services/notifications/in-app") {
+        return null;
+    }
+
+    return "Business modules must use @/modules/notification instead of the deferred in-app compatibility adapter.";
 }
 
 function getNotificationDependencyViolation(filePath, rootPath, moduleSpecifier) {
@@ -1189,6 +1271,22 @@ function checkArchitecture(options = {}) {
                     rootPath,
                     importRecord,
                     deletedNotificationPresentationViolation,
+                ));
+                continue;
+            }
+
+            const legacyNotificationCompatibilityViolation =
+                getLegacyNotificationCompatibilityViolation(
+                    filePath,
+                    rootPath,
+                    importRecord.moduleSpecifier,
+                );
+            if (legacyNotificationCompatibilityViolation !== null) {
+                violations.push(describeViolation(
+                    filePath,
+                    rootPath,
+                    importRecord,
+                    legacyNotificationCompatibilityViolation,
                 ));
                 continue;
             }

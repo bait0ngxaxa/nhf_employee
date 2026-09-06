@@ -10,6 +10,10 @@ const leaveEmailMocks = vi.hoisted(() => ({
     sendLeaveActionNotification: vi.fn(),
 }));
 
+const notificationMocks = vi.hoisted(() => ({
+    createForUserOnce: vi.fn(),
+}));
+
 vi.mock("@/lib/db/prisma", () => ({
     prisma: {
         $transaction: vi.fn(),
@@ -19,6 +23,8 @@ vi.mock("@/lib/db/prisma", () => ({
 vi.mock("../../infrastructure/notifications/email", () => ({
     sendLeaveActionNotification: leaveEmailMocks.sendLeaveActionNotification,
 }));
+
+vi.mock("@/modules/notification", () => notificationMocks);
 
 type Deferred = { promise: Promise<void>; resolve: () => void };
 type Notification = { type: string; isRead: boolean };
@@ -213,6 +219,14 @@ describe("LEAVE_ACTION worker and cancellation serialization", () => {
     beforeEach(() => {
         vi.clearAllMocks();
         leaveEmailMocks.sendLeaveActionNotification.mockResolvedValue(true);
+        notificationMocks.createForUserOnce.mockImplementation(async (
+            _input: unknown,
+            context?: { notification: TestTransaction["notification"] },
+        ): Promise<void> => {
+            if (context) {
+                await context.notification.create({ data: _input });
+            }
+        });
     });
 
     it("lets the worker create the notification, then cancellation reads it and marks it read", async () => {

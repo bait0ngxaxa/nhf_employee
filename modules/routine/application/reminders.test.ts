@@ -25,8 +25,8 @@ vi.mock("@/lib/db/transaction", () => ({
     ) => callback(prisma as unknown as Prisma.TransactionClient)),
 }));
 
-vi.mock("@/lib/services/notifications/in-app", () => ({
-    createInAppNotificationOnce: createInAppNotificationOnceMock,
+vi.mock("@/modules/notification", () => ({
+    createForUserOnce: createInAppNotificationOnceMock,
 }));
 
 vi.mock("./notifications/email", () => ({

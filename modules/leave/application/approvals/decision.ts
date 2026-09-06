@@ -20,6 +20,7 @@ import {
 import { getLeaveYearFromDateValue } from "@/modules/leave/domain/quota-year";
 import { createLeaveAuditInTransaction } from "@/modules/leave/infrastructure/persistence/transaction";
 import type { LeaveActionValues } from "@/modules/leave/schemas/leave";
+import { markUnreadByReferenceForUser } from "@/modules/notification";
 
 const LEAVE_APPROVAL_MESSAGES = {
     requestNotFound: "ไม่พบคำขอลา",
@@ -136,15 +137,11 @@ export async function decideLeaveRequest(
         const updatedRequest = await tx.leaveRequest.findUniqueOrThrow({
             where: { id: input.leaveId },
         });
-        await tx.notification.updateMany({
-            where: {
-                userId: actor.userId,
-                type: "LEAVE_REQUESTED",
-                referenceId: input.leaveId,
-                isRead: false,
-            },
-            data: { isRead: true },
-        });
+        await markUnreadByReferenceForUser({
+            userId: actor.userId,
+            type: "LEAVE_REQUESTED",
+            referenceId: input.leaveId,
+        }, tx);
 
         const payload: LeaveResultPayload = {
             leaveId: input.leaveId,

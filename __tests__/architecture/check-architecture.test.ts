@@ -781,6 +781,81 @@ describe("architecture checker module boundaries", () => {
         expect(result.violations).toEqual([]);
     });
 
+    it("rejects direct Inbox create access from Leave production code", async () => {
+        const result = await checkFixture(
+            "modules/leave/application/example.ts",
+            "await tx.notification.create({ data: {} });",
+        );
+
+        expect(result.violations).toHaveLength(1);
+        expect(result.violations[0]).toContain(
+            "direct Notification Prisma delegate access must be owned by modules/notification/infrastructure/",
+        );
+    });
+
+    it("rejects direct Inbox batch access from Stock production code", async () => {
+        const result = await checkFixture(
+            "modules/stock/application/example.ts",
+            "await client.notification.createMany({ data: [] });",
+        );
+
+        expect(result.violations).toHaveLength(1);
+        expect(result.violations[0]).toContain(
+            "direct Notification Prisma delegate access must be owned by modules/notification/infrastructure/",
+        );
+    });
+
+    it("allows Notification table access in test fixtures", async () => {
+        const result = await checkFixture(
+            "modules/stock/__tests__/notification-fixture.test.ts",
+            "await prisma.notification.create({ data: {} });",
+        );
+
+        expect(result.violations).toEqual([]);
+    });
+
+    it("does not confuse NotificationOutbox persistence with Inbox persistence", async () => {
+        const result = await checkFixture(
+            "modules/routine/application/example.ts",
+            "await tx.notificationOutbox.create({ data: {} });",
+        );
+
+        expect(result.violations).toEqual([]);
+    });
+
+    it("rejects business modules importing the legacy in-app compatibility adapter", async () => {
+        const result = await checkFixture(
+            "modules/routine/application/example.ts",
+            'import { createInAppNotificationOnce } from "@/lib/services/notifications/in-app";\n',
+        );
+
+        expect(result.violations).toHaveLength(1);
+        expect(result.violations[0]).toContain(
+            "deferred in-app compatibility adapter",
+        );
+    });
+
+    it("allows business modules to consume the Notification public server entry", async () => {
+        const result = await checkFixture(
+            "modules/leave/application/example.ts",
+            'import { createForUser } from "@/modules/notification";\n',
+        );
+
+        expect(result.violations).toEqual([]);
+    });
+
+    it("rejects business modules deep-importing Notification internals", async () => {
+        const result = await checkFixture(
+            "modules/leave/application/example.ts",
+            'import { createNotification } from "@/modules/notification/infrastructure/persistence/repository";\n',
+        );
+
+        expect(result.violations).toHaveLength(1);
+        expect(result.violations[0]).toContain(
+            'cross-module dependencies must use the target module public entry point "@/modules/notification"',
+        );
+    });
+
     it("rejects Department API routes deep-importing Department internals", async () => {
         const result = await checkFixture(
             "app/api/departments/route.ts",

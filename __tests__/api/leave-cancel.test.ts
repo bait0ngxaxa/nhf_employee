@@ -108,6 +108,7 @@ describe("POST /api/leave/cancel", () => {
         vi.mocked(prisma.employee.findMany).mockResolvedValue([] as never);
         vi.mocked(prisma.$queryRaw).mockResolvedValue([] as never);
         vi.mocked(prisma.leaveQuota.findMany).mockResolvedValue([]);
+        vi.mocked(prisma.notification.updateMany).mockResolvedValue({ count: 0 });
         vi.mocked(prisma.auditLog.create).mockResolvedValue({ id: 1 } as never);
         vi.mocked(processOutbox).mockResolvedValue({ processed: 0, failed: 0 });
         vi.mocked(prisma.$transaction).mockImplementation(async (callback) => {
