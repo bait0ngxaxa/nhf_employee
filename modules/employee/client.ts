@@ -11,13 +11,3 @@ export { AddEmployeeSection } from "./presentation/dashboard/AddEmployeeSection"
 export {
     ImportEmployeeRouteContent,
 } from "./presentation/import/ImportEmployeeRouteContent";
-
-// Compatibility exports retained for the F1 validation facade until F3.
-export {
-    createEmployeeSchema,
-    updateEmployeeSchema,
-} from "./schemas/employee";
-export type {
-    CreateEmployeeInput,
-    UpdateEmployeeInput,
-} from "./schemas/employee";

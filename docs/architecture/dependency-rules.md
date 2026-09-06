@@ -192,10 +192,14 @@ The closed Leave migration record is maintained in
 [leave-migration.md](./leave-migration.md). No Leave compatibility facade or
 deep-import exception remains.
 
-Employee's F1/F2 compatibility ledger contains
-`lib/validations/employee.ts`, which continues to serve Employee API route
-consumers and delegates to the module schemas. Migrated presentation types and
-formatters are now local to Employee; mixed helpers/types, the mixed CSV helper,
-`hooks/useCSVImport.ts`, and `components/employee/EditStatusModal.tsx` remain
-legacy/orphan candidates intentionally deferred to F3. The active Employee
-browser graph does not import those mixed Employee/Leave presentation helpers.
+The Employee validation facade `lib/validations/employee.ts` was removed after
+a repository-wide search confirmed that no runtime/production consumer
+remained. Employee API routes consume the schemas exported by
+`@/modules/employee`; the browser client entry does not expose server schemas.
+The architecture checker still rejects the deleted legacy import path on
+Employee API routes to prevent its reintroduction. Migrated presentation types
+and formatters are now local to Employee; mixed helpers/types, the mixed CSV
+helper, `hooks/useCSVImport.ts`, and `components/employee/EditStatusModal.tsx`
+remain legacy/orphan candidates intentionally deferred to F3. The active
+Employee browser graph does not import those mixed Employee/Leave presentation
+helpers.

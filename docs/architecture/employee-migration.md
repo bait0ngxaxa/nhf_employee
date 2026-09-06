@@ -52,11 +52,12 @@ only the transaction-aware Employee hierarchy mutation contract.
 not exported.
 
 The old `lib/services/employee/**` implementation was removed because no
-production compatibility consumer remained. `lib/validations/employee.ts` is
-the remaining server-schema compatibility facade used by the Employee API
-routes. It re-exports the client-safe schemas from `modules/employee/client.ts`
-for compatibility. F2 moved the active forms to the module's local schemas;
-the facade remains until the F3 consumer audit.
+production compatibility consumer remained. The former
+`lib/validations/employee.ts` server-schema facade was also removed after a
+repository-wide search confirmed that no runtime/production consumer remained.
+Employee API routes now import their schemas from `@/modules/employee`; the
+browser client entry does not expose server schemas. F2 moved the active forms
+to the module's local schemas.
 
 The mixed `lib/helpers/employee-helpers.ts` remains compatibility code after F2
 because Auth, audit, Leave, Routine, and Stock consumers still exist. The
@@ -153,8 +154,9 @@ The four Employee Dashboard routes compose through the browser-safe
 `EmployeeManagementSection`, `EmployeeManagementSectionSkeleton`,
 `AddEmployeeSection`, and `ImportEmployeeRouteContent`. The Employee provider,
 contexts, table/mobile components, form hooks, and import steps remain internal
-to the presentation graph. The schema exports remain only as a compatibility
-surface for `lib/validations/employee.ts` and are deferred to F3 cleanup.
+to the presentation graph. Server schemas are exported only from
+`modules/employee/index.ts` for API/application consumers and are intentionally
+absent from `modules/employee/client.ts`.
 
 Employee presentation state remains feature-owned: `EmployeeProvider`, list and
 stats SWR state, filters, pagination, modal state, export state, and mutation
@@ -319,8 +321,6 @@ lib/services/employee/mutations.ts
 lib/services/employee/queries.ts
 lib/services/employee/types.ts
 
-lib/validations/employee.ts
-lib/validations/index.ts
 lib/helpers/employee-helpers.ts
 lib/helpers/csv-helpers.ts
 lib/helpers/file-validation.ts
@@ -349,8 +349,7 @@ Classification and target ownership:
 | `lib/services/employee/import.ts` | `EMPLOYEE APPLICATION` plus persistence | Employee import use case with a technical CSV/persistence adapter |
 | `lib/services/employee/types.ts` | Mixed service DTO, actor, persistence-derived type, and result contracts | Split into domain/reference types, application commands/results, and route DTOs; do not create a mega type file |
 | `lib/services/employee/constants.ts` | Employee query/import policy | Employee module policy/constants |
-| `lib/validations/employee.ts` | Employee route schemas and compatibility re-export | `modules/employee/schemas/employee.ts`; facade remains until F3 consumer audit |
-| `lib/validations/index.ts` | Legacy re-export of Employee create/update schemas and inferred types | Compatibility facade; remove its Employee exports once all consumers use the module contract |
+| `modules/employee/schemas/employee.ts` | Employee route schemas and inferred input types | Employee-owned server schema source, exported through `modules/employee/index.ts` only |
 | `lib/helpers/employee-helpers.ts` | Mixed Employee semantics, identity projection, presentation formatting, and User fallback | Migrated Employee presentation uses local formatters; confirmed cross-feature consumers remain for F3; detailed per-export decision appears below |
 | `lib/helpers/csv-helpers.ts` | Mixed Employee CSV and Leave CSV implementation; runtime Prisma enum import | Active Employee browser parser moved to `modules/employee/presentation/import/csv.ts`; no whole-file move; final split remains F3 |
 | `lib/helpers/file-validation.ts` | Generic file validation with current CSV-specific implementation | Shared/platform primitive if it remains generic; Employee import owns which file policy it applies |
@@ -508,7 +507,7 @@ records when the transition did not change state.
 
 | Rule | Current location(s) | F0 finding |
 | --- | --- | --- |
-| Required names/position/department ID | `lib/validations/employee.ts`, UI forms | Route and client schema behavior must be preserved; import has a separate required-field path |
+| Required names/position/department ID | `modules/employee/schemas/employee.ts`, UI forms | Route and client schema behavior must be preserved; import has a separate required-field path |
 | Email syntax and organization domain | Zod route schema, Employee service, import service | Domain enforcement is duplicated and differs between create schema/service/import; document before consolidating in F1 |
 | Employee email uniqueness | Service query, serializable update transaction, Prisma unique constraint | Keep both application feedback and DB race protection |
 | User email uniqueness/synchronization | Profile update transaction, signup transaction, Prisma unique constraint | Cross-aggregate behavior requires an explicit Auth/platform integration seam |
@@ -738,7 +737,7 @@ compatibility through `@/modules/employee/client`.
 | Current type source | Current contents | Future owner |
 | --- | --- | --- |
 | `lib/services/employee/types.ts` | Filters, create/update commands, import rows/errors/results, Employee-with-relations and pagination result, service actor | Split between Employee domain/application/reference contracts and server DTOs |
-| `lib/validations/employee.ts` | Create/update/filter Zod schemas and inferred input types | `modules/employee/schemas/` for route/application input; derive input types from schemas |
+| `modules/employee/schemas/employee.ts` | Create/update/filter Zod schemas and inferred input types | Employee server/application schema source; derive input types from schemas |
 | `modules/employee/presentation/dashboard/types.ts` | Employee/Department/User browser DTOs, form data, list/form props | Employee presentation-local client-safe contracts |
 | `modules/employee/presentation/import/types.ts` | CSV data, import results, step/file/preview/result UI state | Employee presentation/import-local client-safe contracts |
 | `types/employees.ts` | Legacy Employee/Department/User shapes, form data, CSV data, import results, table/modal props | Compatibility source retained for non-migrated consumers; F3 audit |
@@ -1293,14 +1292,14 @@ presentation contracts required by production routes:
 | `EmployeeManagementSection` and its loading/skeleton contract | `app/dashboard/employees/page.tsx` | Feature dashboard route composition |
 | `AddEmployeeSection` | `app/dashboard/employees/new/page.tsx` | Feature add route composition |
 | `ImportEmployeeRouteContent` or a route-facing import composition contract | `app/dashboard/employees/import/page.tsx` | Feature import route composition and Dashboard shell integration |
-| `createEmployeeSchema`, `updateEmployeeSchema` and inferred types | `lib/validations/employee.ts` compatibility facade and Employee API route imports | Existing compatibility contract; retained until the F3 consumer audit |
 
 The client entry must not expose server use cases, Prisma types, repositories,
 database/session/secret code, import persistence internals, workbook/stream
 generators, or schemas exported merely for tests. Employee identity/status
 formatters, hooks, provider, table primitives, presentation-local DTOs, and
 import steps remain internal because no external production consumer requires
-them.
+them. Employee API route schemas remain available through the server root
+`@/modules/employee` and are not part of the client public surface.
 
 ## 21. Compatibility and deprecation plan
 
@@ -1311,8 +1310,8 @@ them.
   auth requirements, and database semantics unchanged.
 - Make the existing route handlers thin adapters over the new Employee server
   contracts. Do not keep two business implementations alive.
-- Keep `lib/services/employee/**`, `lib/validations/employee.ts`, legacy
-  Employee types, and helper exports as compatibility facades only while
+- Keep `lib/services/employee/**`, legacy Employee types, and helper exports as
+  compatibility facades only while
   production consumers are moved. F2 records the migrated consumers and leaves
   the remaining compatibility/orphan candidates for F3 without changing
   behavior.
@@ -1340,6 +1339,9 @@ them.
   the client entry cannot reach the mixed Prisma/Leave CSV helper.
 - Replace only the migrated Employee presentation's direct legacy helper
   imports; confirmed cross-feature consumers of legacy helpers remain for F3.
+- The former `lib/validations/employee.ts` facade was removed after the
+  repository-wide production-consumer audit; API routes use the Employee
+  module root schemas.
 
 ### F3 cleanup and deprecation exit
 
@@ -1348,7 +1350,6 @@ graph checks show no production consumers:
 
 ```text
 lib/services/employee/**
-lib/validations/employee.ts
 legacy Employee type facades in types/employees.ts and types/api.ts
 Employee-specific constants/helpers left in global locations
 remaining legacy Employee presentation paths, including

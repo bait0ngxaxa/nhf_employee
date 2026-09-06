@@ -57,8 +57,10 @@ presentation exports are `EmployeeManagementSection`,
 `ImportEmployeeRouteContent`. The active feature presentation, provider/context,
 forms, local types/formatters, and CSV browser flow live under
 `modules/employee/presentation/**`; internals use relative/local contracts.
-Schema exports remain only for the `lib/validations/employee.ts` compatibility
-facade until the F3 consumer audit.
+Server schema exports remain in `modules/employee/index.ts` for Employee API
+routes; `modules/employee/client.ts` does not expose server schemas. The
+former `lib/validations/employee.ts` compatibility facade was removed after
+its production consumers were audited.
 
 Employee and Leave have one deliberate server dependency direction. Leave may
 consume the public Employee hierarchy contract to mutate the Employee-owned
@@ -200,6 +202,7 @@ signup uses its transaction-aware Employee lookup/recheck interface, and Leave
 uses its hierarchy mutation interface. Employee lifecycle composition binds the
 Leave offboarding blocker provider at the route boundary; there is no Employee
 → Leave runtime dependency. Generic Dashboard shell/context/navigation remain
-outside Employee. The remaining legacy Employee validation path is a
-client-safe compatibility facade for API consumers, and mixed/orphan legacy
-presentation candidates remain deferred to F3.
+outside Employee. The former legacy Employee validation facade was removed
+after its production consumers were audited; Employee API routes use the
+module root. Mixed/orphan legacy presentation candidates remain deferred to
+F3.
