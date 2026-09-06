@@ -261,11 +261,15 @@ function getEmployeeDependencyViolation(filePath, rootPath, moduleSpecifier) {
         ? moduleSpecifier
         : `@/${relativeFilePath(resolvedImport, rootPath).replace(/\.[cm]?[jt]sx?$/, "")}`;
     const employeeModuleRoot = resolve(rootPath, "modules/employee");
+    const isEmployeeModule = pathIsWithin(filePath, employeeModuleRoot);
     const isEmployeeInternal = pathIsWithin(filePath, employeeModuleRoot)
         && ![
             resolve(employeeModuleRoot, "index.ts"),
             resolve(employeeModuleRoot, "client.ts"),
         ].includes(filePath);
+    if (isEmployeeModule && hasImportPrefix(normalizedSpecifier, "@/modules/leave")) {
+        return "Employee module must not depend on Leave; inject the Employee offboarding-responsibility port at the composition boundary.";
+    }
     if (isEmployeeInternal
         && ["@/modules/employee", "@/modules/employee/client"].includes(normalizedSpecifier)) {
         return "Employee module internals must use local contracts instead of their own public barrel.";

@@ -11,7 +11,11 @@ export { createEmployeeExport } from "./infrastructure/export/employee-export";
 export {
     EMPLOYEE_IMPORT_MAX_ROWS,
 } from "./application/constants";
-export type { EmployeeFilters } from "./application/types";
+export type {
+    EmployeeFilters,
+    EmployeeOffboardingDependency,
+    EmployeeOffboardingDependencyProvider,
+} from "./application/types";
 
 // Auth/workforce and signup contracts.
 export { hasEligibleEmployeeLifecycle } from "./domain/lifecycle";

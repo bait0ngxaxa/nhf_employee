@@ -136,6 +136,34 @@ describe("architecture checker module boundaries", () => {
         expect(result.violations[0]).toContain("own public barrel");
     });
 
+    it.each([
+        "@/modules/leave",
+        "@/modules/leave/application/approvals/offboarding-responsibilities",
+    ])("rejects Employee implementation importing Leave %s", async (specifier) => {
+        const result = await checkFixture(
+            "modules/employee/application/example.ts",
+            `import { x } from "${specifier}";`,
+        );
+
+        expect(result.violations).toHaveLength(1);
+        expect(result.violations[0]).toContain(
+            "Employee module must not depend on Leave",
+        );
+    });
+
+    it("allows an Employee route composition boundary to use both public module APIs", async () => {
+        const result = await checkFixture(
+            "app/api/employees/example.ts",
+            [
+                'import { updateEmployee } from "@/modules/employee";',
+                'import { getEmployeeLeaveOffboardingBlockers } from "@/modules/leave";',
+                "export { updateEmployee, getEmployeeLeaveOffboardingBlockers };",
+            ].join("\n"),
+        );
+
+        expect(result.violations).toEqual([]);
+    });
+
     it("rejects Employee API routes importing legacy Employee ownership", async () => {
         const result = await checkFixture(
             "app/api/employees/example.ts",

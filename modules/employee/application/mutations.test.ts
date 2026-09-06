@@ -7,6 +7,10 @@ import {
     updateEmployee,
     deleteEmployee,
 } from "./mutations";
+import type {
+    EmployeeOffboardingDependency,
+    EmployeeOffboardingDependencyProvider,
+} from "./types";
 
 vi.mock("@/lib/db/prisma", () => ({
     prisma: mockDeep<PrismaClient>(),
@@ -16,6 +20,13 @@ const prismaMock = prisma as unknown as ReturnType<
 >;
 
 const ACTOR = { userId: 999, email: "admin@thainhf.org" };
+const NO_OFFBOARDING_DEPENDENCIES: EmployeeOffboardingDependencyProvider = async () => [];
+
+function createOffboardingDependencyProvider(
+    dependencies: readonly EmployeeOffboardingDependency[],
+): EmployeeOffboardingDependencyProvider {
+    return async () => dependencies;
+}
 
 function buildEmployee(overrides: Record<string, unknown> = {}): Record<string, unknown> {
     return {
@@ -58,7 +69,6 @@ describe("Employee Mutations", () => {
             return callback as never;
         });
         prismaMock.employee.findMany.mockResolvedValue([] as never);
-        prismaMock.leaveRequest.findMany.mockResolvedValue([] as never);
         prismaMock.user.findMany.mockResolvedValue([] as never);
         prismaMock.user.update.mockResolvedValue({ id: 10 } as never);
         prismaMock.authRefreshToken.updateMany.mockResolvedValue({ count: 1 });
@@ -312,7 +322,7 @@ describe("Employee Mutations", () => {
             const result = await updateEmployee(1, {
                 email: "SUSPENDED@THAINHF.ORG",
                 status: "SUSPENDED",
-            }, ACTOR);
+            }, ACTOR, NO_OFFBOARDING_DEPENDENCIES);
 
             expect(result.employee).toMatchObject({
                 email: "suspended@thainhf.org",
@@ -350,7 +360,7 @@ describe("Employee Mutations", () => {
             const result = await updateEmployee(1, {
                 email: "ACTIVE@THAINHF.ORG",
                 status: "ACTIVE",
-            }, ACTOR);
+            }, ACTOR, NO_OFFBOARDING_DEPENDENCIES);
 
             expect(result.employee).toMatchObject({
                 email: "active@thainhf.org",
@@ -513,7 +523,12 @@ describe("Employee Mutations", () => {
                 deletedAt: new Date(),
             } as never);
 
-            const result = await updateEmployee(1, { status: "INACTIVE" }, ACTOR);
+            const result = await updateEmployee(
+                1,
+                { status: "INACTIVE" },
+                ACTOR,
+                NO_OFFBOARDING_DEPENDENCIES,
+            );
 
             expect(result.success).toBe(true);
             expect(result.lifecycle).toBe("OFFBOARD");
@@ -521,13 +536,47 @@ describe("Employee Mutations", () => {
                 data: expect.objectContaining({ isActive: false }),
             }));
         });
+
+        it.each(["INACTIVE", "SUSPENDED"] as const)(
+            "blocks a %s status transition when Leave responsibilities remain",
+            async (status) => {
+                const employee = buildLinkedEmployee();
+                prismaMock.employee.findUnique.mockResolvedValue(employee as never);
+                const offboardingDependencyProvider = createOffboardingDependencyProvider([{
+                    id: `leave-${status.toLowerCase()}`,
+                    employee: {
+                        id: 2,
+                        firstName: "Leave",
+                        lastName: "Requester",
+                        nickname: null,
+                    },
+                }]);
+
+                const result = await updateEmployee(
+                    1,
+                    { status },
+                    ACTOR,
+                    offboardingDependencyProvider,
+                );
+
+                expect(result).toMatchObject({
+                    success: false,
+                    status: 409,
+                    error: expect.stringContaining("ต้องจัดการก่อนปิดใช้งาน"),
+                });
+                expect(prismaMock.employee.update).not.toHaveBeenCalled();
+                expect(prismaMock.user.update).not.toHaveBeenCalled();
+                expect(prismaMock.authRefreshToken.updateMany).not.toHaveBeenCalled();
+                expect(prismaMock.auditLog.create).not.toHaveBeenCalled();
+            },
+        );
     });
 
     describe("deleteEmployee", () => {
         it("should fail if not found", async () => {
             prismaMock.employee.findUnique.mockResolvedValue(null);
 
-            const result = await deleteEmployee(999, ACTOR);
+            const result = await deleteEmployee(999, ACTOR, NO_OFFBOARDING_DEPENDENCIES);
 
             expect(result.success).toBe(false);
             expect(result.status).toBe(404);
@@ -552,7 +601,7 @@ describe("Employee Mutations", () => {
                 deletedAt: new Date(),
             } as never);
 
-            const result = await deleteEmployee(1, ACTOR);
+            const result = await deleteEmployee(1, ACTOR, NO_OFFBOARDING_DEPENDENCIES);
 
             expect(result.success).toBe(true);
             expect(result.auditRecorded).toBe(true);
@@ -577,6 +626,27 @@ describe("Employee Mutations", () => {
             });
         });
 
+        it("passes the lifecycle transaction client to the offboarding provider", async () => {
+            const employee = buildEmployee();
+            prismaMock.employee.findUnique.mockResolvedValue(employee as never);
+            prismaMock.employee.update.mockResolvedValue({
+                ...employee,
+                status: "INACTIVE",
+                deletedAt: new Date(),
+            } as never);
+            const transactionClient = prismaMock as unknown as Prisma.TransactionClient;
+            let providerTransaction: Prisma.TransactionClient | undefined;
+            const offboardingDependencyProvider: EmployeeOffboardingDependencyProvider = async (tx) => {
+                providerTransaction = tx;
+                return [];
+            };
+
+            const result = await deleteEmployee(1, ACTOR, offboardingDependencyProvider);
+
+            expect(result.success).toBe(true);
+            expect(providerTransaction).toBe(transactionClient);
+        });
+
         it("blocks self-offboarding", async () => {
             const employee = buildEmployee({
                 user: {
@@ -589,7 +659,7 @@ describe("Employee Mutations", () => {
             });
             prismaMock.employee.findUnique.mockResolvedValue(employee as never);
 
-            const result = await deleteEmployee(1, ACTOR);
+            const result = await deleteEmployee(1, ACTOR, NO_OFFBOARDING_DEPENDENCIES);
 
             expect(result).toMatchObject({
                 success: false,
@@ -612,7 +682,7 @@ describe("Employee Mutations", () => {
             prismaMock.employee.findUnique.mockResolvedValue(employee as never);
             prismaMock.user.findMany.mockResolvedValue([{ id: 10 }] as never);
 
-            const result = await deleteEmployee(1, ACTOR);
+            const result = await deleteEmployee(1, ACTOR, NO_OFFBOARDING_DEPENDENCIES);
 
             expect(result).toMatchObject({
                 success: false,
@@ -639,7 +709,7 @@ describe("Employee Mutations", () => {
                 lastName: "Report",
             }] as never);
 
-            const result = await deleteEmployee(1, ACTOR);
+            const result = await deleteEmployee(1, ACTOR, NO_OFFBOARDING_DEPENDENCIES);
 
             expect(result).toMatchObject({
                 success: false,
@@ -660,7 +730,7 @@ describe("Employee Mutations", () => {
                 },
             });
             prismaMock.employee.findUnique.mockResolvedValue(employee as never);
-            prismaMock.leaveRequest.findMany.mockResolvedValue([{
+            const offboardingDependencyProvider = createOffboardingDependencyProvider([{
                 id: "leave-1",
                 employee: {
                     id: 2,
@@ -668,9 +738,9 @@ describe("Employee Mutations", () => {
                     lastName: "Requester",
                     nickname: null,
                 },
-            }] as never);
+            }]);
 
-            const result = await deleteEmployee(1, ACTOR);
+            const result = await deleteEmployee(1, ACTOR, offboardingDependencyProvider);
 
             expect(result).toMatchObject({
                 success: false,
@@ -678,6 +748,9 @@ describe("Employee Mutations", () => {
                 error: expect.stringContaining("leave-1 (Leave Requester)"),
             });
             expect(prismaMock.employee.update).not.toHaveBeenCalled();
+            expect(prismaMock.user.update).not.toHaveBeenCalled();
+            expect(prismaMock.authRefreshToken.updateMany).not.toHaveBeenCalled();
+            expect(prismaMock.auditLog.create).not.toHaveBeenCalled();
         });
 
         it.each([
@@ -702,45 +775,27 @@ describe("Employee Mutations", () => {
                 },
             });
             prismaMock.employee.findUnique.mockResolvedValue(employee as never);
-            prismaMock.leaveRequest.findMany.mockResolvedValue([{
+            const offboardingDependencyProvider = createOffboardingDependencyProvider([{
                 id: `leave-${status.toLowerCase()}`,
-                employee: { id: 2, firstName: "Leave", lastName: "Requester" },
-            }] as never);
+                employee: {
+                    id: 2,
+                    firstName: "Leave",
+                    lastName: "Requester",
+                    nickname: null,
+                },
+            }]);
 
-            const result = await deleteEmployee(1, ACTOR);
+            const result = await deleteEmployee(1, ACTOR, offboardingDependencyProvider);
 
             expect(result).toMatchObject({
                 success: false,
                 status: 409,
                 error: expect.stringContaining("ต้องจัดการก่อนปิดใช้งาน"),
             });
-            expect(prismaMock.leaveRequest.findMany).toHaveBeenCalledWith({
-                where: {
-                    OR: [
-                        { approverId: 1 },
-                        { exceptionApproverId: 1 },
-                    ],
-                    AND: [{
-                        OR: [
-                            { status: "PENDING" },
-                            { status: "CANCELLATION_REQUESTED" },
-                            { status: "APPROVED", notTakenRequestedAt: { not: null } },
-                        ],
-                    }],
-                },
-                select: {
-                    id: true,
-                    employee: {
-                        select: {
-                            id: true,
-                            firstName: true,
-                            lastName: true,
-                            nickname: true,
-                        },
-                    },
-                },
-                orderBy: { id: "asc" },
-            });
+            expect(prismaMock.employee.update).not.toHaveBeenCalled();
+            expect(prismaMock.user.update).not.toHaveBeenCalled();
+            expect(prismaMock.authRefreshToken.updateMany).not.toHaveBeenCalled();
+            expect(prismaMock.auditLog.create).not.toHaveBeenCalled();
         });
 
         it("reactivates the user only through an explicit lifecycle action", async () => {
@@ -762,7 +817,12 @@ describe("Employee Mutations", () => {
                 deletedAt: null,
             } as never);
 
-            const result = await updateEmployee(1, { status: "ACTIVE" }, ACTOR);
+            const result = await updateEmployee(
+                1,
+                { status: "ACTIVE" },
+                ACTOR,
+                NO_OFFBOARDING_DEPENDENCIES,
+            );
 
             expect(result.success).toBe(true);
             expect(prismaMock.employee.update).toHaveBeenCalledWith(expect.objectContaining({
@@ -794,7 +854,12 @@ describe("Employee Mutations", () => {
                 status: "SUSPENDED",
             } as never);
 
-            const result = await updateEmployee(1, { status: "SUSPENDED" }, ACTOR);
+            const result = await updateEmployee(
+                1,
+                { status: "SUSPENDED" },
+                ACTOR,
+                NO_OFFBOARDING_DEPENDENCIES,
+            );
 
             expect(result.success).toBe(true);
             expect(prismaMock.employee.update).toHaveBeenCalledWith(expect.objectContaining({
@@ -848,7 +913,11 @@ describe("Employee Mutations", () => {
                 }
             });
 
-            await expect(deleteEmployee(1, ACTOR)).rejects.toThrow("audit failed");
+            await expect(deleteEmployee(
+                1,
+                ACTOR,
+                NO_OFFBOARDING_DEPENDENCIES,
+            )).rejects.toThrow("audit failed");
             expect(state).toEqual({
                 employeeStatus: "ACTIVE",
                 employeeDeletedAt: null,

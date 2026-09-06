@@ -11,7 +11,6 @@ import {
 import { lockEmployeeRows } from "@/lib/db/row-locks";
 import { hasPrismaErrorCode, runSerializableTransaction } from "@/lib/db/transaction";
 import { prisma } from "@/lib/db/prisma";
-import { getEmployeeLeaveOffboardingBlockers } from "@/modules/leave";
 import {
     employeeLifecycleNeedsWrite,
     isEmployeeDeactivation,
@@ -25,6 +24,8 @@ import type {
     EmployeeLifecycleActor,
     EmployeeMutationResult,
     EmployeeRecord,
+    EmployeeOffboardingDependency,
+    EmployeeOffboardingDependencyProvider,
     UpdateEmployeeData,
 } from "./types";
 
@@ -82,8 +83,8 @@ const LIFECYCLE_EMPLOYEE_SELECT = {
 } as const satisfies Prisma.EmployeeSelect;
 
 function managerDependenciesMessage(
-    subordinates: EmployeeSummary[],
-    leaveDependencies: Awaited<ReturnType<typeof getEmployeeLeaveOffboardingBlockers>>,
+    subordinates: readonly EmployeeSummary[],
+    leaveDependencies: readonly EmployeeOffboardingDependency[],
 ): string {
     const details: string[] = [];
     if (subordinates.length > 0) {
@@ -156,6 +157,7 @@ async function assertCanDeactivateEmployee(
     employee: LifecycleEmployee,
     account: LockedEmployeeAccount | null,
     actor: EmployeeLifecycleActor,
+    offboardingDependencyProvider: EmployeeOffboardingDependencyProvider,
 ): Promise<void> {
     if (account) await assertEmployeeAccountCanDeactivate(tx, account, actor.userId);
     const [subordinates, leaveDependencies] = await Promise.all([
@@ -164,7 +166,7 @@ async function assertCanDeactivateEmployee(
             select: { id: true, firstName: true, lastName: true, nickname: true },
             orderBy: { id: "asc" },
         }),
-        getEmployeeLeaveOffboardingBlockers(tx, employee.id),
+        offboardingDependencyProvider(tx, employee.id),
     ]);
     if (subordinates.length > 0) {
         await lockEmployeeRows(tx, subordinates.map((subordinate) => subordinate.id));
@@ -272,6 +274,7 @@ async function runEmployeeLifecycle(
     operation: EmployeeLifecycleOperation,
     actor: EmployeeLifecycleActor,
     data: UpdateEmployeeData = {},
+    offboardingDependencyProvider?: EmployeeOffboardingDependencyProvider,
 ): Promise<EmployeeMutationResult> {
     try {
         return await runSerializableTransaction(async (tx) => {
@@ -294,7 +297,19 @@ async function runEmployeeLifecycle(
                 return { success: true, employee: await findCommittedEmployee(tx, employeeId), beforeData };
             }
             if (isEmployeeDeactivation(operation)) {
-                await assertCanDeactivateEmployee(tx, employee, account, actor);
+                if (!offboardingDependencyProvider) {
+                    throw new EmployeeMutationError(
+                        "ไม่สามารถตรวจสอบความรับผิดชอบด้านการลาได้",
+                        500,
+                    );
+                }
+                await assertCanDeactivateEmployee(
+                    tx,
+                    employee,
+                    account,
+                    actor,
+                    offboardingDependencyProvider,
+                );
             }
             const now = new Date();
             const status: EmployeeStatusValue = operation === "OFFBOARD"
@@ -398,8 +413,21 @@ export async function createEmployee(data: CreateEmployeeData): Promise<Employee
 
 export async function updateEmployee(
     employeeId: number,
+    data: Omit<UpdateEmployeeData, "status"> & { status?: never },
+): Promise<EmployeeMutationResult>;
+
+export async function updateEmployee(
+    employeeId: number,
+    data: UpdateEmployeeData,
+    actor: EmployeeLifecycleActor,
+    offboardingDependencyProvider: EmployeeOffboardingDependencyProvider,
+): Promise<EmployeeMutationResult>;
+
+export async function updateEmployee(
+    employeeId: number,
     data: UpdateEmployeeData,
     actor?: EmployeeLifecycleActor,
+    offboardingDependencyProvider?: EmployeeOffboardingDependencyProvider,
 ): Promise<EmployeeMutationResult> {
     if (!data.status) return runEmployeeProfileUpdate(employeeId, data);
     if (!actor) {
@@ -408,21 +436,41 @@ export async function updateEmployee(
     const operation: EmployeeLifecycleOperation = data.status === "INACTIVE"
         ? "OFFBOARD"
         : data.status === "SUSPENDED" ? "SUSPEND" : "REACTIVATE";
-    return runEmployeeLifecycle(employeeId, operation, actor, data);
+    return runEmployeeLifecycle(
+        employeeId,
+        operation,
+        actor,
+        data,
+        offboardingDependencyProvider,
+    );
 }
 
 export async function deleteEmployee(
     employeeId: number,
     actor: EmployeeLifecycleActor,
+    offboardingDependencyProvider: EmployeeOffboardingDependencyProvider,
 ): Promise<EmployeeMutationResult> {
-    return runEmployeeLifecycle(employeeId, "OFFBOARD", actor);
+    return runEmployeeLifecycle(
+        employeeId,
+        "OFFBOARD",
+        actor,
+        {},
+        offboardingDependencyProvider,
+    );
 }
 
 export async function suspendEmployee(
     employeeId: number,
     actor: EmployeeLifecycleActor,
+    offboardingDependencyProvider: EmployeeOffboardingDependencyProvider,
 ): Promise<EmployeeMutationResult> {
-    return runEmployeeLifecycle(employeeId, "SUSPEND", actor);
+    return runEmployeeLifecycle(
+        employeeId,
+        "SUSPEND",
+        actor,
+        {},
+        offboardingDependencyProvider,
+    );
 }
 
 export async function reactivateEmployee(
@@ -435,6 +483,13 @@ export async function reactivateEmployee(
 export async function offboardEmployee(
     employeeId: number,
     actor: EmployeeLifecycleActor,
+    offboardingDependencyProvider: EmployeeOffboardingDependencyProvider,
 ): Promise<EmployeeMutationResult> {
-    return runEmployeeLifecycle(employeeId, "OFFBOARD", actor);
+    return runEmployeeLifecycle(
+        employeeId,
+        "OFFBOARD",
+        actor,
+        {},
+        offboardingDependencyProvider,
+    );
 }

@@ -55,6 +55,15 @@ Employee server/application consumers use `@/modules/employee`. The temporary
 by the two legacy Employee forms; presentation contracts are not migrated or
 exported until F2.
 
+Employee and Leave have one deliberate server dependency direction. Leave may
+consume the public Employee hierarchy contract to mutate the Employee-owned
+`managerId` inside Leave's transaction. Employee lifecycle code must not import
+`@/modules/leave` or any Leave internal. Instead, Employee defines the narrow
+structural `EmployeeOffboardingDependencyProvider` port; the outer application
+composition binds Leave's blocker implementation to that port. The provider
+must receive and use the same `Prisma.TransactionClient` as the Employee
+serializable lifecycle operation.
+
 The root barrel remains server/application-oriented. The client entry point
 must export only client-safe presentation contracts.
 
@@ -176,5 +185,7 @@ generic helper cannot transitively import the Leave server entry.
 
 Employee F1 is a server/business ownership migration. Employee API routes use
 the module root, Auth signup uses its transaction-aware Employee lookup/recheck
-interface, and Leave uses its hierarchy mutation interface. The remaining
-legacy Employee validation path is a client-safe facade for the two F2 forms.
+interface, and Leave uses its hierarchy mutation interface. Employee lifecycle
+composition binds the Leave offboarding blocker provider at the route boundary;
+there is no Employee → Leave runtime dependency. The remaining legacy Employee
+validation path is a client-safe facade for the two F2 forms.

@@ -23,3 +23,11 @@ Rules for new work:
 The intended dependency direction is documented in
 [dependency rules](../docs/architecture/dependency-rules.md). Run
 `npm run architecture:check` when changing code under this directory.
+
+Employee/Leave lifecycle composition is intentionally one-way: Leave may use
+the public Employee hierarchy contract for the Employee-owned `managerId`
+write, while Employee lifecycle code depends only on its structural
+`EmployeeOffboardingDependencyProvider` port. The outer application boundary
+binds Leave's blocker implementation and passes the same transaction client
+used by the Employee serializable lifecycle operation. Employee must not
+runtime-import `@/modules/leave` or Leave internals.

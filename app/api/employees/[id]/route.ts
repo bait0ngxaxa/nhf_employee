@@ -2,6 +2,7 @@ import { after, type NextRequest, NextResponse } from "next/server";
 
 import { requireAdminSession } from "@/lib/auth/api";
 import { logEmployeeEvent } from "@/lib/server/audit";
+import { getEmployeeLeaveOffboardingBlockers } from "@/modules/leave";
 import {
     deleteEmployee,
     getEmployeeDisplayName,
@@ -61,6 +62,7 @@ export async function PATCH(
             employeeId,
             validationResult.data,
             { userId: auth.user.id, email: auth.user.email },
+            getEmployeeLeaveOffboardingBlockers,
         );
 
         if (!result.success) {
@@ -114,6 +116,7 @@ export async function DELETE(
         const result = await deleteEmployee(
             employeeId,
             { userId: auth.user.id, email: auth.user.email },
+            getEmployeeLeaveOffboardingBlockers,
         );
 
         if (!result.success) {

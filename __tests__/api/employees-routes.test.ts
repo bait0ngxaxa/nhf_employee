@@ -13,6 +13,7 @@ import {
     importEmployeesFromCsvRows,
     updateEmployee,
 } from "@/modules/employee";
+import { getEmployeeLeaveOffboardingBlockers } from "@/modules/leave";
 
 vi.mock("next/server", async (importOriginal) => {
     const actual = await importOriginal<typeof NextServerModule>();
@@ -37,6 +38,9 @@ vi.mock("@/modules/employee", () => ({
     createEmployeeSchema: {
         safeParse: vi.fn((value) => ({ success: true, data: value })),
     },
+}));
+vi.mock("@/modules/leave", () => ({
+    getEmployeeLeaveOffboardingBlockers: vi.fn(),
 }));
 
 const ADMIN = {
@@ -129,6 +133,31 @@ describe("Employee mutation routes", () => {
                 user: { email: "new@thainhf.org" },
             },
         });
+        expect(updateEmployee).toHaveBeenCalledWith(
+            12,
+            { email: "new@thainhf.org", status: "SUSPENDED" },
+            { userId: ADMIN.id, email: ADMIN.email },
+            getEmployeeLeaveOffboardingBlockers,
+        );
+    });
+
+    it("passes the Leave blocker provider to DELETE lifecycle composition", async () => {
+        vi.mocked(deleteEmployee).mockResolvedValue({
+            success: true,
+            auditRecorded: true,
+        });
+
+        const response = await DELETE(new NextRequest(
+            "http://localhost/api/employees/12",
+            { method: "DELETE" },
+        ), employeeParams("12"));
+
+        expect(response.status).toBe(200);
+        expect(deleteEmployee).toHaveBeenCalledWith(
+            12,
+            { userId: ADMIN.id, email: ADMIN.email },
+            getEmployeeLeaveOffboardingBlockers,
+        );
     });
 
     it.each([

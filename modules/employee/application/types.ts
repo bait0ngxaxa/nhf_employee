@@ -1,3 +1,5 @@
+import type { Prisma } from "@prisma/client";
+
 import type {
     EmployeeLifecycleOperation,
     EmployeeStatusValue,
@@ -79,6 +81,21 @@ export interface EmployeeLifecycleActor {
     userId: number;
     email: string;
 }
+
+export interface EmployeeOffboardingDependency {
+    id: string;
+    employee: {
+        id: number;
+        firstName: string;
+        lastName: string;
+        nickname: string | null;
+    };
+}
+
+export type EmployeeOffboardingDependencyProvider = (
+    tx: Prisma.TransactionClient,
+    employeeId: number,
+) => Promise<readonly EmployeeOffboardingDependency[]>;
 
 export interface CsvImportEmployee {
     sourceRow?: number;

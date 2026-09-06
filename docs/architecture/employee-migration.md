@@ -1,6 +1,6 @@
 # Employee migration
 
-Status: Phase F1 — Employee Server & Business Ownership.
+Status: Phase F1 corrective pass — Employee Server & Business Ownership.
 
 Approved F0 baseline: `ee9a60be6c077055873214a9644384caa8b43f80`
 (`docs(employee): correct F0 migration boundary`).
@@ -42,9 +42,14 @@ modules/employee/
 the Employee schemas, list/create/update/delete/stats/import/export contracts,
 the import row limit, and Employee display identity. Auth consumers use the
 Employee-only lifecycle predicate plus the signup lookup and transaction-aware
-lock/re-read contract. Leave uses only the transaction-aware Employee hierarchy
-mutation contract. `getEmployeeById` was not migrated because it has no
-production consumer and is not exported.
+lock/re-read contract. Employee also exposes the structural
+`EmployeeOffboardingDependencyProvider`; it contains only the blocker fields
+needed for the existing Employee error message and does not mention Leave
+implementation types. The Employee route composition imports both public
+module APIs and binds the Leave blocker implementation to that port. Leave uses
+only the transaction-aware Employee hierarchy mutation contract.
+`getEmployeeById` was not migrated because it has no production consumer and is
+not exported.
 
 The old `lib/services/employee/**` implementation was removed because no
 production compatibility consumer remained. `lib/validations/employee.ts` is
@@ -72,13 +77,16 @@ in the same transaction. Auth credential, password, cookie, token issuance,
 rate-limit, and login behavior remain outside Employee.
 
 Leave owns the semantic blocker query through
-`getEmployeeLeaveOffboardingBlockers` on `@/modules/leave`. Employee passes the
-current Prisma transaction into that semantic interface, so the blocker read
-remains inside the same serializable transaction and no check/commit TOCTOU gap
-is introduced. Leave approver assignment retains its Leave-specific rules,
-locks, audit meaning, and serializable transaction; only the final `managerId`
-write crosses the public Employee hierarchy interface using that same
-transaction.
+`getEmployeeLeaveOffboardingBlockers`. The Employee lifecycle accepts an
+Employee-owned `EmployeeOffboardingDependencyProvider`; the
+`app/api/employees/[id]/route.ts` composition boundary passes the real Leave
+implementation for both status-changing PATCH requests and DELETE. Employee
+invokes that provider with the exact `Prisma.TransactionClient` received by its
+serializable lifecycle transaction, so the blocker read remains inside the
+same transaction and no check/commit TOCTOU gap is introduced. Leave approver
+assignment retains its Leave-specific rules, locks, audit meaning, and
+serializable transaction; only the final `managerId` write crosses the public
+Employee hierarchy interface using that same transaction.
 
 Signup remains Auth-owned. It now uses Employee-owned exact-email lookup and
 transaction-aware Employee lock/re-read eligibility. User creation, role
@@ -113,7 +121,7 @@ direction, and the global Outbox Processor prohibition.
 | Account-to-workforce eligibility | Existing Auth/Workforce boundary | `lib/auth/workforce.ts` and `workforce-transaction.ts` already combine User and Employee state. F0 does not create a new Workforce module. Employee should expose only Employee-side lifecycle/identity contracts; Auth/Workforce should compose them with User/session state. |
 | Employee hierarchy | Employee | `managerId`, the self-relation, subordinate lookup, and the meaning of who reports to whom are organizational structure. Leave may interpret that structure for approval, but does not own the underlying relationship. |
 | Leave approval and exception policy | Leave | `approverId`, `exceptionApproverId`, reassignment rules, pending-request guards, current-action resolution, and approval capabilities are Leave rules. They must not be moved into Employee. |
-| Leave offboarding dependency policy | Leave | Leave owns the semantic interpretation of which outstanding request/action states prevent an Employee from leaving Leave responsibilities. The legacy Employee lifecycle implementation directly reconstructs this policy from `LeaveRequest`; this is transitional coupling, not target Employee ownership. |
+| Leave offboarding dependency policy | Leave | Leave owns the semantic interpretation of which outstanding request/action states prevent an Employee from leaving Leave responsibilities. Its implementation is injected into the Employee lifecycle through `EmployeeOffboardingDependencyProvider`; Employee does not reconstruct the policy from `LeaveRequest`. |
 | Department reference data | Transitional separate capability; future organization/reference-data capability | `Department` has its own model and `/api/departments` route, but no independent service or module exists. Employee owns its department association and import mapping, not all Department behavior. |
 | Display identity | Split by meaning | Employee owns Employee display projection and pure Employee formatting. The fallback projection from a User to Employee/name/email is an Auth/workforce/platform composition concern and must not make generic client code import the Employee server barrel. |
 | CSV import/export | Employee | The business meaning of Employee rows, fields, normalization, status, department mapping, and report columns is Employee-owned. CSV parsing/streaming is a technical adapter and may use shared file/HTTP primitives. |
@@ -398,10 +406,10 @@ silently changing the contract.
 
 #### Status transition and offboarding
 
-The current legacy lifecycle use case accepts `OFFBOARD`, `SUSPEND`, and
-`REACTIVATE` and uses row locks plus a serializable transaction. It currently
-mixes Employee lifecycle/hierarchy checks, Auth/account-administration safety
-and effects, and Leave-specific dependency policy in one function:
+The current Employee lifecycle application accepts `OFFBOARD`, `SUSPEND`, and
+`REACTIVATE` and uses row locks plus a serializable transaction. It coordinates
+Employee lifecycle/hierarchy checks, Auth/account-administration safety and
+effects, and the injected Leave responsibility port:
 
 | Operation | Employee write | User/session write | Guards and audit |
 | --- | --- | --- | --- |
@@ -409,11 +417,12 @@ and effects, and Leave-specific dependency policy in one function:
 | Suspend | `status = SUSPENDED`, `deletedAt` remains `null` | linked User `isActive = false`; token version increments; refresh tokens are revoked | Uses the same deactivation safety checks; records status-change audit |
 | Reactivate | `status = ACTIVE`, `deletedAt = null` | linked User `isActive = true`, `deletedAt = null`; token version increments; refresh tokens are revoked | Re-enables the Employee/account pair and records status-change audit |
 
-The deactivation guard directly queries `LeaveRequest` and treats `PENDING`,
+The Leave blocker provider queries `LeaveRequest` and treats `PENDING`,
 `CANCELLATION_REQUESTED`, and `APPROVED` with non-null
 `notTakenRequestedAt`—for either `approverId` or `exceptionApproverId`—as
-blockers. Those meanings are current compatibility behavior, but their semantic
-owner is Leave. Self-account/offboarding and last-active-ADMIN protection are
+blockers. It receives the same transaction client as the Employee lifecycle.
+Those meanings are current compatibility behavior, but their semantic owner is
+Leave. Self-account/offboarding and last-active-ADMIN protection are
 Auth/account-administration concerns; active subordinate protection is an
 Employee hierarchy concern.
 
@@ -431,10 +440,10 @@ records when the transition did not change state.
   field as part of Leave-specific approver assignment, with active employee,
   active linked User, email, self-assignment, duplicate, pending-request, and
   audit/concurrency rules.
-- F1 must introduce a deliberate seam for changing the Employee-owned
-  hierarchy relation while allowing Leave to retain its Leave-specific
-  preconditions and transaction semantics. It must not move the whole Leave
-  approver assignment use case into Employee.
+- F1 provides a deliberate seam for changing the Employee-owned hierarchy
+  relation while allowing Leave to retain its Leave-specific preconditions and
+  transaction semantics. It does not move the whole Leave approver assignment
+  use case into Employee.
 
 #### Duplicate and validation locations
 
@@ -446,7 +455,7 @@ records when the transition did not change state.
 | User email uniqueness/synchronization | Profile update transaction, signup transaction, Prisma unique constraint | Cross-aggregate behavior requires an explicit Auth/platform integration seam |
 | Department validity | Prisma foreign key, Employee form lookup, import code/name mapping | Import and form semantics are not identical to a generic Department API |
 | Status values | Prisma enum, validation schema, constants, CSV parser | Future domain value must not leak Prisma runtime types to clients |
-| Manager/hierarchy safety | Leave approver assignment and Employee lifecycle guards | No generic Employee manager command exists yet; this is a required F1 design seam |
+| Manager/hierarchy safety | Leave approver assignment and Employee lifecycle guards | Employee hierarchy command is the write seam; Leave retains approver policy and Employee lifecycle consumes its blocker provider |
 
 ## 5. Import workflow audit
 
@@ -832,47 +841,50 @@ Leave owns exception approver assignment and policy; it is not an Employee
 manager relationship merely because it stores an Employee ID.
 ```
 
-The legacy Employee deactivation guard is a second transitional dependency in
-the opposite direction. It directly queries `LeaveRequest.approverId`,
+The legacy Employee deactivation guard was a second transitional dependency in
+the opposite direction: it directly queried `LeaveRequest.approverId`,
 `exceptionApproverId`, `status`, and `notTakenRequestedAt` to decide whether
-outstanding Leave responsibility blocks an Employee lifecycle transition.
-Employee must not reproduce or hard-code that Leave workflow status policy
-inside `modules/employee` merely because the legacy Employee implementation
-currently does so.
+outstanding Leave responsibility blocked an Employee lifecycle transition. The
+corrective pass removes that runtime dependency. Employee now consumes only
+the structural port, and Leave remains responsible for interpreting those
+workflow states.
 
-The F1 target dependency is:
+The corrected F1 dependency direction is:
 
 ```text
-Employee offboarding orchestration
+app/api/employees/[id]/route.ts (composition boundary)
     |
-    +--> Employee hierarchy / Employee lifecycle invariants
+    +--> @/modules/employee
+    |       |
+    |       +--> Employee lifecycle / hierarchy invariants
+    |       |       depends on EmployeeOffboardingDependencyProvider
+    |       +--> Auth/account safety + account/session side effects
     |
-    +--> Auth/account safety + account/session side-effect seam
-    |
-    +--> @/modules/leave semantic offboarding-dependency contract
+    +--> @/modules/leave
+            +--> getEmployeeLeaveOffboardingBlockers (provider adapter)
+
+@/modules/leave approver assignment
+    +--> @/modules/employee hierarchy contract
 ```
 
-F1 may add the minimum deliberate server interface to `@/modules/leave` that
-answers whether an Employee can exit outstanding Leave responsibilities. A
-conceptual shape could be `getEmployeeLeaveOffboardingBlockers(employeeId)` or
-`assertEmployeeCanExitLeaveResponsibilities(employeeId)`, but F0 does not fix
-the name or implementation. Leave owns the blocker semantics; Employee may own
-the high-level offboarding orchestration and consume that semantic result.
+The Leave public API provides `getEmployeeLeaveOffboardingBlockers` as the
+adapter for the Employee-owned `EmployeeOffboardingDependencyProvider` port.
+Employee does not import `@/modules/leave` or any Leave internal; the outer
+composition boundary supplies the adapter. Leave owns the blocker semantics,
+while Employee owns the high-level offboarding orchestration and formats the
+structural result for its existing error message.
 
 This must not become an ordinary detached query with weaker guarantees. The
-Employee ↔ Leave offboarding seam must preserve the effective transaction and
-concurrency guarantees of the current lifecycle operation. F1 must inspect
-whether the Leave blocker check must execute within the caller's transaction,
-through a transaction-aware public contract, or through another design that
-does not introduce a TOCTOU window. Relevant races include Leave request
-creation, approver reassignment, Leave action changes, and Employee hierarchy
-changes.
+provider receives the caller's `Prisma.TransactionClient` and executes before
+any Employee/User lifecycle write, preserving the effective serializable
+transaction and locking guarantees of the current lifecycle operation. Relevant
+races include Leave request creation, approver reassignment, Leave action
+changes, and Employee hierarchy changes.
 
-The current Leave approver-assignment use case writes `Employee.managerId`.
-F1 must preserve its transaction and Leave-specific policy while establishing a
-public Employee hierarchy mutation seam. Leave must not deep-import
-`modules/employee` internals, and Employee must not absorb Leave approval
-policy.
+The current Leave approver-assignment use case writes `Employee.managerId`
+through the public Employee hierarchy seam. F1 preserves its transaction and
+Leave-specific policy. Leave must not deep-import `modules/employee` internals,
+and Employee must not absorb Leave approval policy.
 
 ### Future dependency rule
 
@@ -1012,13 +1024,17 @@ Routine and Stock do not acquire manager semantics merely because they read an
 Employee ID or display a name.
 ```
 
-Current implementation is transitional because Leave's approver-assignment
-application use case mutates `Employee.managerId`. This is the one important
-cross-boundary mutation to address in F1 design. The safe migration shape is a
-generic Employee hierarchy command/transaction seam invoked by Leave, with
-Leave retaining its preconditions, assignment meaning, audit details, and
-concurrency behavior. It must not become a generic “Leave approver” API in
-Employee.
+The implemented cross-boundary mutation is a narrow Employee hierarchy command
+invoked by Leave's approver-assignment application use case. Leave retains its
+preconditions, assignment meaning, audit details, and transaction/concurrency
+behavior; Employee owns only the actual `managerId` write. It is not a generic
+“Leave approver” API in Employee.
+
+The other cross-module seam is deliberately inverted: Employee lifecycle
+orchestration depends on its structural `EmployeeOffboardingDependencyProvider`
+port, while the outer Employee route composition binds
+`getEmployeeLeaveOffboardingBlockers` from Leave. The provider must use the
+same lifecycle transaction client; Employee must not import the Leave module.
 
 `Employee.managerId` and Leave `exceptionApproverId` are not interchangeable:
 
@@ -1193,11 +1209,11 @@ The initial Employee public API should not export a generic “Leave approver,�
 their owning modules. It should also not expose `Prisma.Employee`, repository
 objects, workbook internals, or a User credential operation.
 
-The Employee offboarding use case may consume a new Leave-owned semantic
-offboarding-dependency contract through `@/modules/leave`. That is a deliberate
-addition to the completed Leave module's server public interface, not an
-Employee export; its exact shape remains conditional on the transaction design
-described in Section 12.
+Employee exports only the structural
+`EmployeeOffboardingDependencyProvider` port. The outer composition boundary
+passes the Leave public `getEmployeeLeaveOffboardingBlockers` implementation
+into Employee, so the Employee public API does not expose Leave models,
+repositories, or application internals.
 
 ### Platform contracts
 
@@ -1295,8 +1311,8 @@ Include:
   production consumer;
 - status transitions, soft offboard, manager/hierarchy seam, and Employee-owned
   safety guards;
-- the minimum deliberate `@/modules/leave` server contract needed for the
-  Employee offboarding flow to consume Leave-owned blocker semantics;
+- the Employee-owned structural offboarding-responsibility port and its outer
+  composition binding to the Leave public blocker contract;
 - Auth/account safety and account/session side-effect integration while keeping
   authentication/session implementation outside Employee;
 - Employee repository/infrastructure and transaction/locking adapters;
@@ -1318,13 +1334,15 @@ Exclude:
 F1 should introduce the real `modules/employee/index.ts` and only then add
 hard Employee architecture enforcement incrementally.
 
-F1 acceptance requires that the legacy Employee deactivation implementation is
-not migrated by copying its direct `LeaveRequest` status query into
-`modules/employee`. The Leave dependency check must become a deliberate
-Leave-owned semantic contract while preserving atomicity and concurrency
-behavior. Auth/account side effects must remain owned by Auth/platform
-mechanics. The resulting Employee lifecycle use case must preserve all current
-externally observable behavior.
+F1 acceptance requires that the Employee deactivation implementation does not
+copy the direct `LeaveRequest` status query into `modules/employee` and does
+not runtime-import Leave. The Leave dependency check is a Leave-owned semantic
+implementation of the Employee offboarding-responsibility port, bound at the
+outer composition boundary. The provider must execute with the same
+transaction client before lifecycle writes, preserving atomicity and
+concurrency behavior. Auth/account side effects must remain owned by
+Auth/platform mechanics. The resulting Employee lifecycle use case must
+preserve all current externally observable behavior.
 
 ### Phase F2 — Employee Presentation Ownership
 
@@ -1463,12 +1481,13 @@ These are concrete implementation questions, not unknown ownership:
 13. **Account consistency:** `User.employeeId` and the inverse Employee.user
     relation must remain one-to-one; signup and lifecycle mutations require
     their current locks and unique constraints.
-14. **Employee ↔ Leave offboarding transaction seam:** The Leave-owned blocker
-    policy currently runs inside the serializable Employee lifecycle
-    transaction. F1 must determine whether its public contract accepts the
-    caller's transaction or uses another design that preserves effective
-    atomicity and does not introduce a TOCTOU window across Leave request
-    creation, approver reassignment, Leave action changes, or hierarchy changes.
+14. **Employee ↔ Leave offboarding transaction seam:** Resolved in the F1
+    corrective pass. Employee owns the structural
+    `EmployeeOffboardingDependencyProvider` port; the outer composition
+    boundary binds Leave's blocker implementation, passing the exact Employee
+    lifecycle transaction client. This preserves atomicity and avoids a TOCTOU
+    window across Leave request creation, approver reassignment, Leave action
+    changes, or hierarchy changes.
 
 ## 25. Phase status
 
@@ -1477,4 +1496,8 @@ business ownership described in the F1 implementation record. F2 presentation
 migration and F3 compatibility cleanup remain future work; neither is folded
 into this phase.
 
-Phase F1 CLOSED — Employee server/business ownership migrated; presentation migration has not started.
+Phase F1 CLOSED after the corrective pass — Employee server/business ownership
+migrated; Employee presentation migration has not started. The Employee ↔
+Leave runtime cycle is removed: Leave may consume the Employee hierarchy
+contract, while Employee lifecycle receives Leave responsibility data only
+through its injected port at composition time.

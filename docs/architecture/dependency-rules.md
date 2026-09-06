@@ -25,6 +25,16 @@ Allowed dependencies:
 - Shared code may depend on other genuinely shared/platform code, but not on a
   business module.
 
+Employee/Leave is a deliberate one-way exception within the general
+cross-module rule: Leave may consume the public Employee hierarchy contract
+because Employee owns `managerId`. Employee lifecycle code must not import
+`@/modules/leave` or `@/modules/leave/**`, even through a facade. Employee
+defines `EmployeeOffboardingDependencyProvider` as a structural port instead;
+the outer application composition imports both public APIs and passes Leave's
+blocker implementation into Employee. That provider must use the exact
+`Prisma.TransactionClient` supplied by the Employee serializable lifecycle
+transaction.
+
 Preferred examples:
 
 ```ts
@@ -156,7 +166,8 @@ the module boundary from a legacy directory, while imports unrelated to
 | Leave presentation ownership | `app/dashboard/leave/**`, `app/liff/leave/**`, `modules/leave/**` | Requires route composition through `@/modules/leave/client`, rejects deleted legacy presentation paths, and rejects Leave internals importing either public barrel |
 | Client/server policy | Production `"use client"` dependency graphs and migrated module client entries | Walks runtime imports transitively, rejects client-reachable use of the Leave server entry, and separately rejects server-only runtime dependencies reachable from `@/modules/leave/client`; type-only imports are erased before graph traversal |
 | Route-level Prisma policy | Legacy and new code | Documentation-led in Phase A for the existing route exceptions; new module infrastructure remains the intended boundary |
-| Employee F1 ownership | `app/api/employees/**`, `modules/employee/**`, production Client Component graphs | Requires the Employee server interface for API routes; rejects legacy server paths, deep/self-barrel imports, client-to-server reachability, and server-only dependencies from the Employee client graph |
+| Employee F1 ownership | `app/api/employees/**`, `modules/employee/**`, production Client Component graphs | Requires the Employee server interface for API routes; rejects legacy server paths, deep/self-barrel imports, Employee → Leave imports, client-to-server reachability, and server-only dependencies from the Employee client graph |
+| Employee/Leave offboarding seam | `modules/employee/**` plus Employee route composition | Employee exposes only a structural blocker-provider port; the outer composition binds Leave's implementation and must preserve the same Employee lifecycle transaction client |
 
 The check is fast and is included at the start of `npm run check`. Scanning
 legacy feature directories does not migrate them: the checker only evaluates

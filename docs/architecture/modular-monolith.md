@@ -1,6 +1,6 @@
 # NHF Employee modular monolith
 
-Status: Phase F1 — Employee Server & Business Ownership.
+Status: Phase F1 corrective pass — Employee Server & Business Ownership.
 
 This document separates the repository's observed current state from the
 target architecture. Stock server/business ownership is now migrated into
@@ -89,6 +89,17 @@ The dependency graph describes new architecture code. It does not claim that
 the legacy `lib/`, `components/`, or route structure has already been
 reorganized.
 
+### Employee/Leave lifecycle direction
+
+The Employee ↔ Leave seam is intentionally one-way at runtime. Employee owns
+`managerId` and exposes the hierarchy mutation contract used by Leave's
+approver-assignment transaction. Employee lifecycle code exposes only the
+structural `EmployeeOffboardingDependencyProvider` port; the Employee API
+composition boundary imports the public Employee and Leave APIs and binds
+`getEmployeeLeaveOffboardingBlockers` to that port. The provider receives the
+same `Prisma.TransactionClient` as the Employee serializable lifecycle
+transaction. Employee must not import Leave directly or through a facade.
+
 ## Ownership principle
 
 Code belongs with the business capability whose rules determine its behavior.
@@ -127,6 +138,10 @@ The following remain outside the scope of the route migration:
 - cron, notifications, email, LINE, uploads, and Employee runtime behavior;
   Leave runtime behavior remains unchanged by its ownership migration. Stock
   and Routine runtime behavior remain unchanged by their ownership migrations.
+
+The lifecycle correction does not change the Employee/Leave policy or API
+behavior: Leave still owns responsibility blockers and Employee still performs
+the paired Employee/User transition atomically.
 
 Detailed boundary and import rules are in
 [module-boundaries.md](./module-boundaries.md) and
