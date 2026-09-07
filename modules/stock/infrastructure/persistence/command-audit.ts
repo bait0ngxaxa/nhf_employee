@@ -1,6 +1,6 @@
 import type { Prisma } from "@prisma/client";
 
-import type { AuditLogDetails } from "@/lib/server/audit";
+import { appendAuditInTransaction, type AuditDetails } from "@/modules/audit";
 import {
     getStockAuditEntityType,
     type StockAuditAction,
@@ -9,9 +9,9 @@ import {
 import type { StockCommandActor } from "../../domain/types";
 
 function addTraceMetadata(
-    details: AuditLogDetails | undefined,
+    details: AuditDetails | undefined,
     actor: StockCommandActor,
-): AuditLogDetails | undefined {
+): AuditDetails | undefined {
     const traceMetadata = {
         ...(actor.requestId && { requestId: actor.requestId }),
         ...(actor.correlationId && { correlationId: actor.correlationId }),
@@ -32,21 +32,19 @@ export async function createStockCommandAudit(
     action: StockAuditAction,
     entityId: number,
     actor: StockCommandActor,
-    details?: AuditLogDetails,
+    details?: AuditDetails,
     entityType: StockAuditEntityType = getStockAuditEntityType(action),
 ): Promise<void> {
     const tracedDetails = addTraceMetadata(details, actor);
-    await tx.auditLog.create({
-        data: {
-            action,
-            entityType,
-            entityId,
-            userId: actor.id,
-            userEmail: actor.email,
-            ipAddress: actor.ipAddress,
-            userAgent: actor.userAgent,
-            details: tracedDetails ? JSON.stringify(tracedDetails) : null,
-        },
+    await appendAuditInTransaction(tx, {
+        action,
+        entityType,
+        entityId,
+        userId: actor.id,
+        userEmail: actor.email,
+        ipAddress: actor.ipAddress,
+        userAgent: actor.userAgent,
+        details: tracedDetails,
     });
 }
 
@@ -55,7 +53,7 @@ export async function createStockVariantAudit(
     action: Extract<StockAuditAction, "STOCK_ITEM_CREATE" | "STOCK_ITEM_UPDATE" | "STOCK_ITEM_DELETE">,
     variantId: number,
     actor: StockCommandActor,
-    details: AuditLogDetails,
+    details: AuditDetails,
 ): Promise<void> {
     await createStockCommandAudit(
         tx,

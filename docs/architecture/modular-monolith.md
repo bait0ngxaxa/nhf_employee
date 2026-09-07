@@ -1,7 +1,8 @@
 # NHF Employee modular monolith
 
-Status: Phase I2 CLOSED — Audit presentation ownership complete. Phase I3 NOT
-STARTED. Phase H3 Notification producer integration and
+Status: Phase I3 CLOSED — Audit producer integration and physical AuditLog
+persistence exclusivity complete. Audit capability migration I0-I3 is closed;
+Auth/Session/Identity remains NOT STARTED. Phase H3 Notification producer integration and
 final migration audit remain complete. Phase G3 Department migration remains
 complete.
 
@@ -114,13 +115,16 @@ entry is `@/modules/audit`; the generic Audit API routes consume that entry,
 while `lib/server/audit.ts` remains a best-effort compatibility adapter.
 Producing capabilities retain event meaning, AuditAction, entity semantics,
 details/snapshots, actor semantics, and strict versus best-effort transaction
-behavior. Auth and Email Request remain later/deferred producer boundaries.
-Known business producer and Routine-reader direct-access seams remain
-temporary for I3. Audit Dashboard presentation is now owned under
+behavior. Employee, Leave, Stock, and Routine producers and Routine entity
+history now consume the public Audit server capability; their feature-specific
+details remain capability-owned. Auth and Email Request remain later/deferred
+producer boundaries. Audit physical persistence is exclusive to
+`modules/audit/infrastructure/**`. Audit Dashboard presentation is owned under
 `modules/audit/presentation/dashboard/**` and exposed through the separate
 browser-safe `@/modules/audit/client` entry. Its App Router routes retain
 authorization, metadata, and Suspense composition. See audit-migration.md for
-the evidence and I1-I3 plan.
+the evidence and I0-I3 closure record. No Prisma schema/migration, AuditAction,
+or presentation behavior changed in I3.
 
 ## Target architecture
 

@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { mockDeep, mockReset } from "vitest-mock-extended";
 import type { PrismaClient } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
-import { getAuditLogs } from "./queries";
+import { getAuditEntityHistory, getAuditLogs } from "./queries";
 
 vi.mock("@/lib/db/prisma", () => ({
     prisma: mockDeep<PrismaClient>(),
@@ -132,6 +132,41 @@ describe("Audit Log Queries", () => {
                     }),
                 }),
             );
+        });
+    });
+
+    describe("getAuditEntityHistory", () => {
+        it("returns raw feature-owned history rows without parsing details", async () => {
+            const createdAt = new Date("2026-08-01T00:00:00.000Z");
+            const rows = [{
+                id: 7,
+                action: "ROUTINE_OCCURRENCE_REASSIGN",
+                userId: 3,
+                userEmail: "admin@thainhf.org",
+                details: '{"after":{"employeeId":21}}',
+                createdAt,
+            }];
+            prismaMock.auditLog.findMany.mockResolvedValue(rows as never);
+
+            await expect(getAuditEntityHistory({
+                entityType: "RoutineOccurrence",
+                entityId: 91,
+                limit: 100,
+            })).resolves.toEqual(rows);
+
+            expect(prismaMock.auditLog.findMany).toHaveBeenCalledWith({
+                where: { entityType: "RoutineOccurrence", entityId: 91 },
+                select: {
+                    id: true,
+                    action: true,
+                    userId: true,
+                    userEmail: true,
+                    details: true,
+                    createdAt: true,
+                },
+                orderBy: { createdAt: "desc" },
+                take: 100,
+            });
         });
     });
 });

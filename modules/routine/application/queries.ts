@@ -1,5 +1,6 @@
 import type { Prisma } from "@prisma/client";
 
+import { getAuditEntityHistory } from "@/modules/audit";
 import { prisma } from "@/lib/db/prisma";
 import { getEmployeeDisplayName } from "@/modules/employee";
 import {
@@ -877,18 +878,10 @@ export async function getRoutineOccurrenceById(
     });
     if (!row) return null;
 
-    const auditLogs = await prisma.auditLog.findMany({
-        where: { entityType: "RoutineOccurrence", entityId: occurrenceId },
-        select: {
-            id: true,
-            action: true,
-            userId: true,
-            userEmail: true,
-            details: true,
-            createdAt: true,
-        },
-        orderBy: { createdAt: "desc" },
-        take: 100,
+    const auditLogs = await getAuditEntityHistory({
+        entityType: "RoutineOccurrence",
+        entityId: occurrenceId,
+        limit: 100,
     });
 
     return {

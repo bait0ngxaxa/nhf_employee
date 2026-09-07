@@ -9,6 +9,7 @@ import type {
 } from "@prisma/client";
 import * as XLSX from "xlsx";
 
+import { appendAuditInTransaction } from "@/modules/audit";
 import { runSerializableTransaction } from "@/lib/db/transaction";
 import { getUserDisplayName } from "@/shared/identity/display";
 import { getEmployeeDisplayName } from "@/modules/employee";
@@ -662,23 +663,21 @@ export async function createRoutineImportPreview(
             },
             include: { uploadedBy: { select: ROUTINE_IMPORT_UPLOADED_BY_SELECT } },
         });
-        await tx.auditLog.create({
-            data: {
-                action: "ROUTINE_IMPORT_UPLOAD",
-                entityType: "RoutineImportBatch",
-                entityId: batch.id,
-                userId: actor.id,
-                userEmail: actor.email,
-                ipAddress: actor.ipAddress,
-                userAgent: actor.userAgent,
-                details: JSON.stringify({
-                    batchId: batch.id,
-                    fileName: upload.fileName,
-                    fileHash: upload.hash,
-                    targetSheet: scope.targetSheet,
-                    totalRows: counts.totalRows,
-                    ignoredSheetCount: scope.ignoredSheetNames.length,
-                }),
+        await appendAuditInTransaction(tx, {
+            action: "ROUTINE_IMPORT_UPLOAD",
+            entityType: "RoutineImportBatch",
+            entityId: batch.id,
+            userId: actor.id,
+            userEmail: actor.email,
+            ipAddress: actor.ipAddress,
+            userAgent: actor.userAgent,
+            details: {
+                batchId: batch.id,
+                fileName: upload.fileName,
+                fileHash: upload.hash,
+                targetSheet: scope.targetSheet,
+                totalRows: counts.totalRows,
+                ignoredSheetCount: scope.ignoredSheetNames.length,
             },
         });
         return { id: batch.id, reusedExisting: false };
@@ -1105,21 +1104,19 @@ export async function updateRoutineImportRow(
             where: { id: batchId },
             data: recalculateBatchCounts(allRows),
         });
-        await tx.auditLog.create({
-            data: {
-                action: "ROUTINE_IMPORT_ROW_UPDATE",
-                entityType: "RoutineImportRow",
-                entityId: rowId,
-                userId: actor.id,
-                userEmail: actor.email,
-                ipAddress: actor.ipAddress,
-                userAgent: actor.userAgent,
-                details: JSON.stringify({
-                    batchId,
-                    sourceKey: row.sourceKey,
-                    selected: selectedForStorage,
-                    affectedEmployeeIds: updatedData.mappedEmployeeIds,
-                }),
+        await appendAuditInTransaction(tx, {
+            action: "ROUTINE_IMPORT_ROW_UPDATE",
+            entityType: "RoutineImportRow",
+            entityId: rowId,
+            userId: actor.id,
+            userEmail: actor.email,
+            ipAddress: actor.ipAddress,
+            userAgent: actor.userAgent,
+            details: {
+                batchId,
+                sourceKey: row.sourceKey,
+                selected: selectedForStorage,
+                affectedEmployeeIds: updatedData.mappedEmployeeIds,
             },
         });
         const saved = await tx.routineImportRow.findUniqueOrThrow({ where: { id: rowId } });
@@ -1269,24 +1266,22 @@ export async function applyRoutineImportBatch(
             },
             include: { uploadedBy: { select: ROUTINE_IMPORT_UPLOADED_BY_SELECT } },
         });
-        await tx.auditLog.create({
-            data: {
-                action: "ROUTINE_IMPORT_APPLY",
-                entityType: "RoutineImportBatch",
-                entityId: batchId,
-                userId: actor.id,
-                userEmail: actor.email,
-                ipAddress: actor.ipAddress,
-                userAgent: actor.userAgent,
-                details: JSON.stringify({
-                    batchId,
-                    targetSheet: batch.targetSheet,
-                    totalSelected: rows.length,
-                    appliedRows: completed.appliedRows,
-                    conflictRows: completed.conflictRows,
-                    taskIds: importedTaskIds,
-                    importedRowIds,
-                }),
+        await appendAuditInTransaction(tx, {
+            action: "ROUTINE_IMPORT_APPLY",
+            entityType: "RoutineImportBatch",
+            entityId: batchId,
+            userId: actor.id,
+            userEmail: actor.email,
+            ipAddress: actor.ipAddress,
+            userAgent: actor.userAgent,
+            details: {
+                batchId,
+                targetSheet: batch.targetSheet,
+                totalSelected: rows.length,
+                appliedRows: completed.appliedRows,
+                conflictRows: completed.conflictRows,
+                taskIds: importedTaskIds,
+                importedRowIds,
             },
         });
         const selectedValidRows = await countSelectedValidRows(tx, batchId);
@@ -1334,17 +1329,15 @@ export async function cancelRoutineImportBatch(
             data: { status: "CANCELLED", version: { increment: 1 } },
             include: { uploadedBy: { select: ROUTINE_IMPORT_UPLOADED_BY_SELECT } },
         });
-        await tx.auditLog.create({
-            data: {
-                action: "ROUTINE_IMPORT_CANCEL",
-                entityType: "RoutineImportBatch",
-                entityId: batchId,
-                userId: actor.id,
-                userEmail: actor.email,
-                ipAddress: actor.ipAddress,
-                userAgent: actor.userAgent,
-                details: JSON.stringify({ batchId, targetSheet: current.targetSheet }),
-            },
+        await appendAuditInTransaction(tx, {
+            action: "ROUTINE_IMPORT_CANCEL",
+            entityType: "RoutineImportBatch",
+            entityId: batchId,
+            userId: actor.id,
+            userEmail: actor.email,
+            ipAddress: actor.ipAddress,
+            userAgent: actor.userAgent,
+            details: { batchId, targetSheet: current.targetSheet },
         });
         return updated;
     });

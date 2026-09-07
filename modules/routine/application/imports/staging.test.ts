@@ -343,6 +343,23 @@ describe("routine import staging row updates", () => {
                 unresolvedOwnerRows: 1,
             }),
         }));
+        expect(prismaMock.auditLog.create).toHaveBeenCalledWith({
+            data: {
+                action: "ROUTINE_IMPORT_ROW_UPDATE",
+                entityType: "RoutineImportRow",
+                entityId: 11,
+                userId: 7,
+                userEmail: "admin@example.com",
+                ipAddress: "192.0.2.7",
+                userAgent: "routine-import-test",
+                details: JSON.stringify({
+                    batchId: 1,
+                    sourceKey: "routine.xlsx:มสช.:11",
+                    selected: true,
+                    affectedEmployeeIds: [10],
+                }),
+            },
+        });
     });
 
     it("keeps selected intent while unresolved and excludes only after a deliberate unselect", async () => {

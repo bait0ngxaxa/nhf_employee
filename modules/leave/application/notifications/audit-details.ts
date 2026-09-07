@@ -1,4 +1,4 @@
-import type { LeaveAuditContext } from "@/lib/audit-log/contracts";
+import type { LeaveAuditContext } from "@/modules/leave/domain/audit";
 import { getEmployeeDisplayName } from "@/modules/employee";
 import { halfDaysToDays } from "@/modules/leave/domain/half-days";
 

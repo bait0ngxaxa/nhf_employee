@@ -4,8 +4,11 @@ import { AuditAction, type Prisma } from "@prisma/client";
 import {
     countAuditLogs,
     findAuditLogs,
+    findAuditEntityHistory,
 } from "../infrastructure/persistence/audit-log-repository";
 import type {
+    AuditEntityHistoryQuery,
+    AuditEntityHistoryRow,
     AuditLogFilters,
     AuditLogWithUser,
     PaginatedAuditLogsResult,
@@ -124,3 +127,19 @@ export const getAuditLogs = cache(
         };
     },
 );
+
+/**
+ * Read raw audit history for a feature-owned entity response.
+ *
+ * This intentionally has no user projection, pagination semantics, or JSON
+ * parsing; the producing feature owns how the rows are presented.
+ */
+export function getAuditEntityHistory(
+    query: AuditEntityHistoryQuery,
+): Promise<AuditEntityHistoryRow[]> {
+    return findAuditEntityHistory(
+        query.entityType,
+        query.entityId,
+        query.limit,
+    );
+}

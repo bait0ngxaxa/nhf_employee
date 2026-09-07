@@ -209,6 +209,52 @@ describe("NHF Routine query authorization", () => {
         });
     });
 
+    it("returns raw occurrence audit history with an ISO createdAt", async () => {
+        const createdAt = new Date("2026-08-03T12:30:00.000Z");
+        prismaMock.routineOccurrence.findFirst.mockResolvedValue(asNever(
+            occurrenceRow(91, 71, "2026-08-03"),
+        ));
+        prismaMock.auditLog.findMany.mockResolvedValue(asNever([{
+            id: 17,
+            action: "ROUTINE_OCCURRENCE_REASSIGN",
+            userId: 99,
+            userEmail: "admin@example.com",
+            details: '{"after":{"employeeId":42}}',
+            createdAt,
+        }]));
+
+        const result = await getRoutineOccurrenceById(91, {
+            actor: {
+                id: 99,
+                email: "admin@example.com",
+                role: "ADMIN",
+            },
+            employeeId: null,
+        });
+
+        expect(result?.auditLogs).toEqual([{
+            id: 17,
+            action: "ROUTINE_OCCURRENCE_REASSIGN",
+            userId: 99,
+            userEmail: "admin@example.com",
+            details: '{"after":{"employeeId":42}}',
+            createdAt: createdAt.toISOString(),
+        }]);
+        expect(prismaMock.auditLog.findMany).toHaveBeenCalledWith({
+            where: { entityType: "RoutineOccurrence", entityId: 91 },
+            select: {
+                id: true,
+                action: true,
+                userId: true,
+                userEmail: true,
+                details: true,
+                createdAt: true,
+            },
+            orderBy: { createdAt: "desc" },
+            take: 100,
+        });
+    });
+
     it("translates a timing filter into a database due-date range", async () => {
         const today = getCurrentBangkokDate();
         await getRoutineOccurrences(

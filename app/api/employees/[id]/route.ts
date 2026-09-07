@@ -1,11 +1,12 @@
 import { after, type NextRequest, NextResponse } from "next/server";
 
 import { requireAdminSession } from "@/lib/auth/api";
-import { logEmployeeEvent } from "@/lib/server/audit";
+import { getTrustedClientIp } from "@/lib/network/trusted-client-ip";
 import { getEmployeeLeaveOffboardingBlockers } from "@/modules/leave";
 import {
+    appendEmployeeDeleteAudit,
+    appendEmployeeUpdateAudit,
     deleteEmployee,
-    getEmployeeDisplayName,
     updateEmployee,
     updateEmployeeSchema,
 } from "@/modules/employee";
@@ -69,19 +70,24 @@ export async function PATCH(
             return jsonError(result.error || COMMON_API_MESSAGES.operationFailed, result.status || 500);
         }
 
-        const actionType =
-            validationResult.data.status && result.beforeData?.status !== validationResult.data.status
-                ? ("EMPLOYEE_STATUS_CHANGE" as const)
-                : ("EMPLOYEE_UPDATE" as const);
-
         if (!result.auditRecorded) {
+            const auditActor = {
+                userId: auth.user.id,
+                email: auth.user.email,
+                ipAddress: getTrustedClientIp(request.headers),
+                userAgent: request.headers.get("user-agent") || null,
+            };
             after(async () => {
-                await logEmployeeEvent(actionType, employeeId, auth.user.id, auth.user.email, {
+                await appendEmployeeUpdateAudit({
+                    employeeId,
+                    actor: auditActor,
                     before: result.beforeData,
                     after: validationResult.data as Record<string, unknown>,
-                    metadata: result.employee
-                        ? { employeeName: getEmployeeDisplayName(result.employee) }
-                        : undefined,
+                    employee: result.employee,
+                    statusChanged: Boolean(
+                        validationResult.data.status
+                        && result.beforeData?.status !== validationResult.data.status,
+                    ),
                 });
             });
         }
@@ -100,7 +106,7 @@ export async function PATCH(
 }
 
 export async function DELETE(
-    _request: NextRequest,
+    request: NextRequest,
     { params }: { params: Promise<{ id: string }> },
 ): Promise<NextResponse> {
     try {
@@ -124,8 +130,16 @@ export async function DELETE(
         }
 
         if (!result.auditRecorded) {
+            const auditActor = {
+                userId: auth.user.id,
+                email: auth.user.email,
+                ipAddress: getTrustedClientIp(request.headers),
+                userAgent: request.headers.get("user-agent") || null,
+            };
             after(async () => {
-                await logEmployeeEvent("EMPLOYEE_DELETE", employeeId, auth.user.id, auth.user.email, {
+                await appendEmployeeDeleteAudit({
+                    employeeId,
+                    actor: auditActor,
                     before: result.beforeData,
                 });
             });

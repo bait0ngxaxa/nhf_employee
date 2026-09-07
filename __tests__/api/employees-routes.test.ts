@@ -6,8 +6,10 @@ import { PATCH, DELETE } from "@/app/api/employees/[id]/route";
 import { POST as createEmployeeRoute } from "@/app/api/employees/route";
 import { POST as importEmployeesRoute } from "@/app/api/employees/import/route";
 import { requireAdminSession } from "@/lib/auth/api";
-import { logEmployeeEvent } from "@/lib/server/audit";
 import {
+    appendEmployeeCreateAudit,
+    appendEmployeeDeleteAudit,
+    appendEmployeeUpdateAudit,
     createEmployee,
     deleteEmployee,
     importEmployeesFromCsvRows,
@@ -23,9 +25,11 @@ vi.mock("@/lib/auth/api", () => ({
     requireAdminSession: vi.fn(),
     requireApiSession: vi.fn(),
 }));
-vi.mock("@/lib/server/audit", () => ({ logEmployeeEvent: vi.fn() }));
 vi.mock("@/modules/employee", () => ({
     EMPLOYEE_IMPORT_MAX_ROWS: 1000,
+    appendEmployeeCreateAudit: vi.fn(),
+    appendEmployeeDeleteAudit: vi.fn(),
+    appendEmployeeUpdateAudit: vi.fn(),
     createEmployee: vi.fn(),
     deleteEmployee: vi.fn(),
     employeeFiltersSchema: { safeParse: vi.fn() },
@@ -62,7 +66,9 @@ describe("Employee mutation routes", () => {
             user: ADMIN,
             session: { user: { ...ADMIN, id: String(ADMIN.id) } },
         });
-        vi.mocked(logEmployeeEvent).mockResolvedValue(undefined);
+        vi.mocked(appendEmployeeCreateAudit).mockResolvedValue(undefined);
+        vi.mocked(appendEmployeeDeleteAudit).mockResolvedValue(undefined);
+        vi.mocked(appendEmployeeUpdateAudit).mockResolvedValue(undefined);
     });
 
     it.each([
@@ -123,6 +129,10 @@ describe("Employee mutation routes", () => {
                     email: "new@thainhf.org",
                     status: "SUSPENDED",
                 }),
+                headers: {
+                    "cf-connecting-ip": "203.0.113.10",
+                    "user-agent": "employee-route-test",
+                },
             },
         ), employeeParams("12"));
 
@@ -138,6 +148,68 @@ describe("Employee mutation routes", () => {
             { email: "new@thainhf.org", status: "SUSPENDED" },
             { userId: ADMIN.id, email: ADMIN.email },
             getEmployeeLeaveOffboardingBlockers,
+        );
+        expect(appendEmployeeUpdateAudit).toHaveBeenCalledWith({
+            employeeId: 12,
+            actor: {
+                userId: ADMIN.id,
+                email: ADMIN.email,
+                ipAddress: "203.0.113.10",
+                userAgent: "employee-route-test",
+            },
+            before: undefined,
+            after: { email: "new@thainhf.org", status: "SUSPENDED" },
+            employee: {
+                id: 12,
+                email: "new@thainhf.org",
+                user: { id: 20, email: "new@thainhf.org", role: "USER" },
+            },
+            statusChanged: true,
+        });
+    });
+
+    it("schedules Employee create Audit after the response path is established", async () => {
+        vi.mocked(createEmployee).mockResolvedValue({
+            success: true,
+            employee: {
+                id: 12,
+                firstName: "สมชาย",
+                lastName: "ใจดี",
+                nickname: null,
+                email: "somchai@thainhf.org",
+                position: "เจ้าหน้าที่",
+                departmentId: 4,
+            },
+        } as never);
+
+        const response = await createEmployeeRoute(new NextRequest(
+            "http://localhost/api/employees",
+            {
+                method: "POST",
+                body: JSON.stringify({
+                    firstName: "สมชาย",
+                    lastName: "ใจดี",
+                    nickname: null,
+                    email: "somchai@thainhf.org",
+                    position: "เจ้าหน้าที่",
+                    departmentId: 4,
+                }),
+                headers: {
+                    "cf-connecting-ip": "203.0.113.11",
+                    "user-agent": "employee-create-route-test",
+                },
+            },
+        ));
+
+        expect(response.status).toBe(201);
+        expect(appendEmployeeCreateAudit).toHaveBeenCalledWith(
+            expect.objectContaining({ id: 12, email: "somchai@thainhf.org" }),
+            {
+                userId: ADMIN.id,
+                email: ADMIN.email,
+                ipAddress: "203.0.113.11",
+                userAgent: "employee-create-route-test",
+            },
         );
     });
 
@@ -158,6 +230,38 @@ describe("Employee mutation routes", () => {
             { userId: ADMIN.id, email: ADMIN.email },
             getEmployeeLeaveOffboardingBlockers,
         );
+        expect(appendEmployeeDeleteAudit).not.toHaveBeenCalled();
+    });
+
+    it("keeps DELETE fallback Audit best-effort when no lifecycle event was recorded", async () => {
+        vi.mocked(deleteEmployee).mockResolvedValue({
+            success: true,
+            beforeData: { status: "ACTIVE", deletedAt: null },
+            auditRecorded: false,
+        });
+
+        const response = await DELETE(new NextRequest(
+            "http://localhost/api/employees/12",
+            {
+                method: "DELETE",
+                headers: {
+                    "cf-connecting-ip": "203.0.113.12",
+                    "user-agent": "employee-delete-route-test",
+                },
+            },
+        ), employeeParams("12"));
+
+        expect(response.status).toBe(200);
+        expect(appendEmployeeDeleteAudit).toHaveBeenCalledWith({
+            employeeId: 12,
+            actor: {
+                userId: ADMIN.id,
+                email: ADMIN.email,
+                ipAddress: "203.0.113.12",
+                userAgent: "employee-delete-route-test",
+            },
+            before: { status: "ACTIVE", deletedAt: null },
+        });
     });
 
     it.each([

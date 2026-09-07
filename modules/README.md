@@ -3,14 +3,16 @@
 `modules/` is the ownership boundary for business capabilities in the NHF
 Employee application.
 
-Stock, Routine, Leave, Employee, and Department are migrated feature modules.
-Audit Phase I2 is closed with generic server/application/persistence ownership
-and Dashboard presentation ownership in `modules/audit/`. Its public server
-entry is `@/modules/audit`; its browser-facing entry is
+Stock, Routine, Leave, Employee, Department, and Audit are migrated capability
+modules. Audit Phase I3 is closed with generic server/application/persistence,
+producer, entity-history query, and Dashboard presentation ownership in
+`modules/audit/`. Its public server entry is `@/modules/audit`; its browser-facing entry is
 `@/modules/audit/client`, with Audit presentation under
-`modules/audit/presentation/dashboard/**`. The known business producer and
-Routine-reader direct-access seams remain temporary for I3, which will migrate
-producers and close final physical AuditLog persistence exclusivity.
+`modules/audit/presentation/dashboard/**`. Production physical AuditLog
+delegates are exclusive to `modules/audit/infrastructure/**`; Employee, Leave,
+Stock, and Routine retain event meaning and consume only the public Audit
+server entry. Auth/Session/Identity and Email Request/future IT migration
+remain deferred.
 Employee F0-F3 owns its server/business behavior and active presentation in
 `modules/employee/`. Employee Dashboard routes consume the minimal
 browser-safe `@/modules/employee/client` entry, which also exposes the proven

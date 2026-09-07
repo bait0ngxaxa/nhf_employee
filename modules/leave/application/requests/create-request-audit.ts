@@ -1,7 +1,7 @@
 import {
-    defineAuditDetails,
-    type AuditDetailsFor,
-} from "@/lib/audit-log/contracts";
+    defineLeaveAuditDetails,
+    type LeaveAuditDetailsFor,
+} from "@/modules/leave/domain/audit";
 import { buildLeaveAuditContext } from "@/modules/leave/application/notifications/audit-details";
 
 interface CreatedLeaveRequestAuditInput {
@@ -20,8 +20,8 @@ interface CreatedLeaveRequestAuditInput {
 
 export function buildCreatedLeaveRequestAuditDetails(
     input: CreatedLeaveRequestAuditInput,
-): AuditDetailsFor<"LEAVE_REQUEST_CREATE"> {
-    return defineAuditDetails("LEAVE_REQUEST_CREATE", {
+): LeaveAuditDetailsFor<"LEAVE_REQUEST_CREATE"> {
+    return defineLeaveAuditDetails("LEAVE_REQUEST_CREATE", {
         after: { status: "PENDING" },
         metadata: buildLeaveAuditContext(input.request, {
             employeeName: input.employeeName,

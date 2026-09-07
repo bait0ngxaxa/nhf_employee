@@ -63,6 +63,23 @@ export interface AuditLogWithUser {
     user: AuditLogUserInfo | null;
 }
 
+/** Raw AuditLog rows for a feature-owned entity-history response. */
+export interface AuditEntityHistoryRow {
+    id: number;
+    action: AuditAction;
+    userId: number | null;
+    userEmail: string | null;
+    details: string | null;
+    createdAt: Date;
+}
+
+/** Narrow, projection-free query input for feature-owned history readers. */
+export interface AuditEntityHistoryQuery {
+    entityType: string;
+    entityId: number;
+    limit: number;
+}
+
 export interface PaginatedAuditLogsResult {
     auditLogs: AuditLogWithUser[];
     pagination: {

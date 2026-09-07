@@ -3,7 +3,7 @@ import {
     StockRequestStatus,
     type Prisma,
 } from "@prisma/client";
-import { defineAuditDetails } from "@/lib/audit-log/contracts";
+import { defineStockAuditDetails } from "../../domain/audit-details";
 import { prisma } from "@/lib/db/prisma";
 import { assertActiveWorkforceInTransaction } from "@/lib/auth/workforce-transaction";
 import {
@@ -345,7 +345,7 @@ export async function issueRequest(
             "STOCK_REQUEST_ISSUE",
             requestId,
             actor,
-            defineAuditDetails("STOCK_REQUEST_ISSUE", {
+            defineStockAuditDetails("STOCK_REQUEST_ISSUE", {
                 before: { status: StockRequestStatus.PENDING_ISSUE },
                 after: { status: StockRequestStatus.ISSUED },
                 metadata: {
@@ -476,7 +476,7 @@ export async function cancelRequest(
             "STOCK_REQUEST_CANCEL",
             requestId,
             actor,
-            defineAuditDetails("STOCK_REQUEST_CANCEL", {
+            defineStockAuditDetails("STOCK_REQUEST_CANCEL", {
                 before: { status: request.status },
                 after: { status: StockRequestStatus.CANCELLED },
                 metadata: {

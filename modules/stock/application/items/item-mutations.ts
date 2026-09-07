@@ -1,9 +1,9 @@
 import { type StockTxType } from "@prisma/client";
 import {
-    defineAuditDetails,
+    defineStockAuditDetails,
     type StockItemAuditSnapshot,
     type StockVariantAuditSnapshot,
-} from "@/lib/audit-log/contracts";
+} from "../../domain/audit-details";
 import { prisma } from "@/lib/db/prisma";
 import { runSerializableTransaction } from "@/lib/db/transaction";
 import {
@@ -204,7 +204,7 @@ async function auditChangedVariants(
             "STOCK_ITEM_UPDATE",
             variantId,
             actor,
-            defineAuditDetails("STOCK_ITEM_UPDATE", {
+            defineStockAuditDetails("STOCK_ITEM_UPDATE", {
                 ...(beforeSnapshot && { before: beforeSnapshot }),
                 ...(afterSnapshot && { after: afterSnapshot }),
                 metadata: {
@@ -496,7 +496,7 @@ export async function createItem(
             "STOCK_ITEM_CREATE",
             item.id,
             actor,
-            defineAuditDetails("STOCK_ITEM_CREATE", {
+            defineStockAuditDetails("STOCK_ITEM_CREATE", {
                 after: createItemAuditSnapshot(createdItem),
                 metadata: {
                     itemId: item.id,
@@ -510,7 +510,7 @@ export async function createItem(
                 "STOCK_ITEM_CREATE",
                 variant.id,
                 actor,
-                defineAuditDetails("STOCK_ITEM_CREATE", {
+                defineStockAuditDetails("STOCK_ITEM_CREATE", {
                     after: createVariantAuditSnapshot(variant),
                     metadata: {
                         itemId: item.id,
@@ -555,7 +555,7 @@ export async function updateItem(
             auditAction,
             id,
             actor,
-            defineAuditDetails(auditAction, {
+            defineStockAuditDetails(auditAction, {
                 before: createItemAuditSnapshot(beforeItem),
                 after: createItemAuditSnapshot(item),
                 metadata: {
@@ -628,7 +628,7 @@ export async function adjustStock(
             "STOCK_ADJUST",
             adjustment.transactionId,
             actor,
-            defineAuditDetails("STOCK_ADJUST", {
+            defineStockAuditDetails("STOCK_ADJUST", {
                 before: {
                     quantity: adjustment.previousQty,
                     minStock: adjustment.previousMinStock,

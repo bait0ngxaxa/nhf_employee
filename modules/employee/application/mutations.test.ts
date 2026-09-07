@@ -918,6 +918,31 @@ describe("Employee Mutations", () => {
                 ACTOR,
                 NO_OFFBOARDING_DEPENDENCIES,
             )).rejects.toThrow("audit failed");
+            expect(prismaMock.auditLog.create).toHaveBeenCalledWith(expect.objectContaining({
+                data: expect.objectContaining({
+                    action: "EMPLOYEE_DELETE",
+                    entityType: "Employee",
+                    entityId: 1,
+                    userId: ACTOR.userId,
+                    userEmail: ACTOR.email,
+                }),
+            }));
+            const auditDetails = JSON.parse(
+                String(prismaMock.auditLog.create.mock.calls[0]?.[0].data.details),
+            ) as Record<string, Record<string, unknown>>;
+            expect(auditDetails).toMatchObject({
+                before: {
+                    status: "ACTIVE",
+                    userId: 10,
+                    userIsActive: true,
+                },
+                after: {
+                    status: "INACTIVE",
+                    userId: 10,
+                    userIsActive: false,
+                },
+                metadata: { employeeName: "Test Employee" },
+            });
             expect(state).toEqual({
                 employeeStatus: "ACTIVE",
                 employeeDeletedAt: null,

@@ -1,7 +1,8 @@
 # Dependency rules and enforcement
 
-Status: Phase I2 CLOSED — Audit presentation ownership complete. Phase I3 NOT
-STARTED. Phase H3 Notification producer integration and
+Status: Phase I3 CLOSED — Audit producer integration and physical AuditLog
+persistence exclusivity complete. Audit capability migration I0-I3 is closed;
+Auth/Session/Identity remains NOT STARTED. Phase H3 Notification producer integration and
 final migration audit remain complete. Phase G3 Department migration remains
 complete. These rules govern new architecture code while unrelated legacy
 features remain compatible during incremental migration.
@@ -145,37 +146,36 @@ LINE, and business producer ownership remain unchanged after H3. Leave, Stock,
 and Routine now consume only `@/modules/notification` for Inbox persistence;
 Email Request remains the documented compatibility exception.
 
-## Audit boundary (I1/I2 foundation and enforcement)
+## Audit boundary (I1/I2/I3 foundation and enforcement)
 
-Phase I1 establishes `modules/audit/` as the current owner of the cohesive
-generic Audit server/application and persistence capability. `shared/` may
-continue to own neutral database, HTTP/security, and trusted network
-primitives, but physical AuditLog persistence, generic Audit queries/retention,
-and Audit presentation belong to the Audit module. Audit Dashboard routes use
-the separate browser-safe `@/modules/audit/client` entry, with implementation
-under `modules/audit/presentation/dashboard/**`.
+`modules/audit/` owns the cohesive generic Audit server/application,
+physical persistence, generic queries/retention, and Dashboard presentation.
+`shared/` may continue to own neutral database, HTTP/security, and trusted
+network primitives. Audit Dashboard routes use the separate browser-safe
+`@/modules/audit/client` entry, with implementation under
+`modules/audit/presentation/dashboard/**`.
 
 Audit producers retain event meaning, action/entity selection, snapshots,
 business metadata, actor semantics, and the choice between a strict
 transaction-bound, best-effort, or after-response write. The Audit public
 server contract accepts a transaction-bound context for strict callers. It
 must not import business module internals or expose
-feature-specific commands. Email Request remains a deferred compatibility
-consumer and Auth remains a later producer phase. See audit-migration.md.
+feature-specific commands. Employee, Leave, Stock, and Routine now consume
+only `@/modules/audit` for Audit appends and the narrow entity-history query;
+their feature-specific detail contracts remain capability-owned. Employee
+after-response producers resolve trusted request metadata at the route
+boundary. Email Request remains a deferred compatibility consumer and Auth
+remains a later producer phase. See audit-migration.md.
 
-I1 enforces that Audit query/cleanup routes use the Audit public server entry,
-keeps new Audit-owned physical delegates under
-`modules/audit/infrastructure/**`, and rejects new direct AuditLog production
-access outside that owner. The exact baseline direct-access allowlist in
-`audit-migration.md` §20 covers only the existing business-producer and
-Routine-reader seams, validates operation/count per file, and does not permit
-additional access in an allowlisted file. I3 removes those producer and
-reader exceptions and then enforces final physical AuditLog exclusivity, with
-only legitimate non-production/support exceptions. I2 additionally enforces
-Audit Dashboard route composition through the client entry, rejects deleted
-legacy Audit presentation paths and Audit self-barrel imports, and walks the
-Audit client graph for server-only dependencies and other module server
-entries.
+The architecture checker enforces that every production AuditLog delegate
+operation is under `modules/audit/infrastructure/**`; the historical I1/I2
+10-expression/7-file allowlist is removed. Tests, integration fixtures, Prisma
+schema/migrations, and narrow test-support files remain non-production
+exceptions. It also rejects migrated Employee/Leave/Stock/Routine imports of
+`@/lib/server/audit` and the deleted `@/lib/audit-log/contracts` path, while
+requiring cross-module consumers to use only the Audit public server entry.
+I2's client-entry, deleted-presentation, and server-only graph rules remain
+active. Generic admin query, retention, and cleanup behavior remains unchanged.
 
 ## Client/server boundary
 

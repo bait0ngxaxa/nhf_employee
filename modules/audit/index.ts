@@ -3,7 +3,7 @@ export {
     appendAuditBestEffort,
     appendAuditInTransaction,
 } from "./application/commands";
-export { getAuditLogs } from "./application/queries";
+export { getAuditEntityHistory, getAuditLogs } from "./application/queries";
 export {
     AUDIT_LOG_RETENTION_DAYS,
     calculateAuditLogRetentionCutoff,
@@ -11,6 +11,8 @@ export {
 } from "./application/retention";
 export type {
     AuditAppendCommand,
+    AuditEntityHistoryQuery,
+    AuditEntityHistoryRow,
     AuditDetails,
     AuditLogFilters,
     AuditLogPersistenceContext,

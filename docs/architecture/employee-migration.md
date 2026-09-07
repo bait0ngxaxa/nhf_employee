@@ -436,9 +436,9 @@ Pre-F3 classification and final outcome:
 | `app/globals.css` | Global Employee dashboard/action/nickname design tokens | Shared global styling; keep tokens global unless a later design-system change explicitly scopes them |
 | `components/dashboard/context/index.ts` | Generic Dashboard context barrel; Employee re-exports removed in F2 | Dashboard-only compatibility barrel; Employee provider/context are module-owned |
 | `lib/ssot/messages.ts` | Shared HTTP messages including Employee IDs/profile/update/delete messages | Compatibility message SSOT; preserve values during F1 and move only Employee-specific ownership deliberately |
-| `lib/audit-log/contracts.ts` | Generic audit details plus Employee/EmployeeApprover detail shapes | Audit platform contract with feature-specific detail variants; do not move generic audit infrastructure into Employee |
+| `lib/audit-log/contracts.ts` | Historical mixed Audit details contract | Removed in Audit I3; Employee and Leave now own their feature-specific Audit producer contracts |
 | `lib/audit-log/display.ts` | Client-reachable audit formatting, Employee diff/name formatting, and Leave/Routine labels | Audit presentation/platform; must use client-safe structural Employee formatting after F2 |
-| `lib/server/audit.ts` | Generic audit writes plus `logEmployeeEvent`/export logging | Shared audit infrastructure; Employee supplies event meaning and snapshots |
+| `lib/server/audit.ts` | Generic compatibility writes plus export logging | Employee producer semantics are owned by `modules/employee`; Auth, Email Request, and export compatibility remain deferred |
 
 ### 3.5 Database and schema inventory
 

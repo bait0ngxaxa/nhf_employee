@@ -18,9 +18,11 @@ legacy locations into this directory. Phase I1 establishes the cohesive Audit
 capability's physical persistence, generic query/retention, and server
 application owner as `modules/audit/`, not `shared/audit/`. Phase I2 also
 places Audit Dashboard presentation under that module's browser-safe client
-boundary. The legacy Audit adapters remain only for compatibility; known
-business producer and Routine-reader direct-access seams remain temporary
-until I3 closes final physical AuditLog persistence exclusivity.
+boundary, and I3 migrates the remaining Employee, Leave, Stock, and Routine
+producer/read seams. Production physical AuditLog persistence is now exclusive
+to Audit infrastructure. Legacy Audit adapters remain only for deferred Auth,
+Email Request, and export compatibility; Auth/Session/Identity and future IT
+ownership remain deferred.
 
 See [module boundaries](../docs/architecture/module-boundaries.md) and
 [dependency rules](../docs/architecture/dependency-rules.md) for the complete

@@ -1,11 +1,12 @@
 import type { Prisma } from "@prisma/client";
 
-import { defineAuditDetails } from "@/lib/audit-log/contracts";
+import { appendAuditInTransaction } from "@/modules/audit";
 import {
     ACTIVE_LEAVE_EMPLOYEE_QUERY_WHERE,
     ACTIVE_LEAVE_APPROVER_USER_SELECT,
     isActiveLeaveApprover,
 } from "@/modules/leave/domain/approver-eligibility";
+import { defineLeaveAuditDetails } from "@/modules/leave/domain/audit";
 import { runSerializableTransaction } from "@/lib/db/transaction";
 import { lockEmployeeRows } from "@/modules/leave/infrastructure/persistence/transaction";
 import {
@@ -106,32 +107,30 @@ async function writeAudit(
     const newApproverName = newApprover
         ? getEmployeeDisplayName(newApprover)
         : null;
-    await tx.auditLog.create({
-        data: {
-            action: "EMPLOYEE_UPDATE",
-            entityType: "EmployeeApprover",
-            entityId: assignment.employeeId,
-            userId: actor.userId,
-            userEmail: actor.email,
-            details: JSON.stringify(defineAuditDetails("EMPLOYEE_UPDATE", {
-                before: {
-                    managerId: employee.managerId,
-                    managerName: previousApproverName,
-                },
-                after: {
-                    managerId: assignment.managerId,
-                    managerName: newApproverName,
-                },
-                metadata: {
-                    employeeId: employee.id,
-                    employeeName,
-                    previousApproverId: employee.managerId,
-                    previousApproverName,
-                    newApproverId: assignment.managerId,
-                    newApproverName,
-                },
-            })),
-        },
+    await appendAuditInTransaction(tx, {
+        action: "EMPLOYEE_UPDATE",
+        entityType: "EmployeeApprover",
+        entityId: assignment.employeeId,
+        userId: actor.userId,
+        userEmail: actor.email,
+        details: defineLeaveAuditDetails("EMPLOYEE_UPDATE", {
+            before: {
+                managerId: employee.managerId,
+                managerName: previousApproverName,
+            },
+            after: {
+                managerId: assignment.managerId,
+                managerName: newApproverName,
+            },
+            metadata: {
+                employeeId: employee.id,
+                employeeName,
+                previousApproverId: employee.managerId,
+                previousApproverName,
+                newApproverId: assignment.managerId,
+                newApproverName,
+            },
+        }),
     });
 }
 

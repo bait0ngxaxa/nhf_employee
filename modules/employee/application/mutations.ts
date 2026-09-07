@@ -11,6 +11,7 @@ import {
 import { lockEmployeeRows } from "@/lib/db/row-locks";
 import { hasPrismaErrorCode, runSerializableTransaction } from "@/lib/db/transaction";
 import { prisma } from "@/lib/db/prisma";
+import { appendAuditInTransaction } from "@/modules/audit";
 import {
     employeeLifecycleNeedsWrite,
     isEmployeeDeactivation,
@@ -248,23 +249,21 @@ async function writeLifecycleAudit(
     status: EmployeeStatusValue,
     deletedAt: Date | null,
 ): Promise<void> {
-    await tx.auditLog.create({
-        data: {
-            action: operation === "OFFBOARD" ? "EMPLOYEE_DELETE" : "EMPLOYEE_STATUS_CHANGE",
-            entityType: "Employee",
-            entityId: employee.id,
-            userId: actor.userId,
-            userEmail: actor.email,
-            details: JSON.stringify({
-                before: beforeData,
-                after: {
-                    status,
-                    deletedAt,
-                    userId: account?.id ?? null,
-                    userIsActive: isEmployeeDeactivation(operation) ? false : true,
-                },
-                metadata: { employeeName: getEmployeeDisplayName(employee) },
-            }),
+    await appendAuditInTransaction(tx, {
+        action: operation === "OFFBOARD" ? "EMPLOYEE_DELETE" : "EMPLOYEE_STATUS_CHANGE",
+        entityType: "Employee",
+        entityId: employee.id,
+        userId: actor.userId,
+        userEmail: actor.email,
+        details: {
+            before: beforeData,
+            after: {
+                status,
+                deletedAt,
+                userId: account?.id ?? null,
+                userIsActive: isEmployeeDeactivation(operation) ? false : true,
+            },
+            metadata: { employeeName: getEmployeeDisplayName(employee) },
         },
     });
 }

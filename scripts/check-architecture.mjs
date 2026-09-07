@@ -184,18 +184,6 @@ const auditDashboardRouteFiles = [
     "app/dashboard/audit/page.tsx",
     "app/dashboard/audit/loading.tsx",
 ];
-const auditLogCompatibilityAccesses = new Map([
-    ["modules/employee/application/mutations.ts", ["create"]],
-    ["modules/leave/infrastructure/persistence/transaction.ts", ["create"]],
-    ["modules/leave/application/approvals/approver-assignment.ts", ["create"]],
-    ["modules/stock/infrastructure/persistence/command-audit.ts", ["create"]],
-    ["modules/routine/application/audit.ts", ["create"]],
-    [
-        "modules/routine/application/imports/staging.ts",
-        ["create", "create", "create", "create"],
-    ],
-    ["modules/routine/application/queries.ts", ["findMany"]],
-]);
 const notificationDashboardRouteFiles = [
     "app/dashboard/notifications/page.tsx",
     "app/dashboard/notifications/loading.tsx",
@@ -759,32 +747,8 @@ function getAuditLogPersistenceViolation(filePath, rootPath) {
     const accesses = getAuditLogDelegateAccesses(filePath);
     if (accesses.length === 0) return null;
 
-    const repositoryPath = relativeFilePath(filePath, rootPath);
-    const expectedAccesses = auditLogCompatibilityAccesses.get(repositoryPath);
-    if (expectedAccesses === undefined) {
-        const firstAccess = accesses[0];
-        return `${repositoryPath}:${firstAccess.line} direct AuditLog Prisma delegate access must be owned by modules/audit/infrastructure/ or match an explicitly allowed temporary producer expression.`;
-    }
-
-    const actualCounts = new Map();
-    for (const access of accesses) {
-        actualCounts.set(access.operation, (actualCounts.get(access.operation) ?? 0) + 1);
-    }
-    const expectedCounts = new Map();
-    for (const operation of expectedAccesses) {
-        expectedCounts.set(operation, (expectedCounts.get(operation) ?? 0) + 1);
-    }
-    const countsMatch = actualCounts.size === expectedCounts.size
-        && [...expectedCounts].every(([operation, count]) =>
-            actualCounts.get(operation) === count,
-        );
-    if (countsMatch) return null;
-
-    const formatCounts = (counts) => [...counts.entries()]
-        .map(([operation, count]) => `${operation} x${count}`)
-        .join(", ");
     const firstAccess = accesses[0];
-    return `${repositoryPath}:${firstAccess.line} direct AuditLog access does not match the allowed temporary compatibility shape; expected ${formatCounts(expectedCounts)}, found ${formatCounts(actualCounts)}.`;
+    return `${relativeFilePath(filePath, rootPath)}:${firstAccess.line} direct AuditLog Prisma delegate access must be owned by modules/audit/infrastructure/.`;
 }
 
 const notificationDelegateOperations = new Set([
@@ -967,6 +931,38 @@ function getDeletedAuditPresentationViolation(filePath, rootPath, moduleSpecifie
     return deletedPath === undefined
         ? null
         : `Deleted Audit presentation path "${deletedPath}" must not be imported; use @/modules/audit/client or local Audit presentation imports.`;
+}
+
+const auditProducerModuleNames = new Set([
+    "employee",
+    "leave",
+    "stock",
+    "routine",
+]);
+
+function getAuditLegacyDependencyViolation(filePath, rootPath, moduleSpecifier) {
+    if (isAuditLogSupportSource(filePath, rootPath)) return null;
+
+    const resolvedImport = moduleSpecifier.startsWith("@/")
+        ? resolve(rootPath, moduleSpecifier.slice(2))
+        : getImportSourcePath(moduleSpecifier, filePath, rootPath);
+    const normalizedSpecifier = resolvedImport === null
+        ? moduleSpecifier
+        : `@/${relativeFilePath(resolvedImport, rootPath).replace(/\.[cm]?[jt]sx?$/, "")}`;
+
+    if (normalizedSpecifier === "@/lib/audit-log/contracts") {
+        return "Deleted Audit feature contracts must be owned by their producing capability.";
+    }
+
+    const producerModule = [...auditProducerModuleNames].find((moduleName) =>
+        pathIsWithin(filePath, resolve(rootPath, `modules/${moduleName}`)),
+    );
+    if (producerModule !== undefined
+        && hasImportPrefix(normalizedSpecifier, "@/lib/server/audit")) {
+        return `${producerModule} production code must use its feature-owned Audit producer and @/modules/audit instead of @/lib/server/audit.`;
+    }
+
+    return null;
 }
 
 function getAuditDashboardRouteCompositionViolations(rootPath, sourceFiles) {
@@ -1657,6 +1653,21 @@ function checkArchitecture(options = {}) {
                     rootPath,
                     importRecord,
                     auditDependencyViolation,
+                ));
+                continue;
+            }
+
+            const auditLegacyDependencyViolation = getAuditLegacyDependencyViolation(
+                filePath,
+                rootPath,
+                importRecord.moduleSpecifier,
+            );
+            if (auditLegacyDependencyViolation !== null) {
+                violations.push(describeViolation(
+                    filePath,
+                    rootPath,
+                    importRecord,
+                    auditLegacyDependencyViolation,
                 ));
                 continue;
             }

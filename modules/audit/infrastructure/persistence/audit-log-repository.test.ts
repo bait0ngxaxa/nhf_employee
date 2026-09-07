@@ -10,6 +10,7 @@ import {
     appendAuditLog,
     countAuditLogs,
     deleteExpiredAuditLogs,
+    findAuditEntityHistory,
     findAuditLogs,
 } from "./audit-log-repository";
 
@@ -89,6 +90,29 @@ describe("AuditLog persistence repository", () => {
             orderBy: { createdAt: "desc" },
             skip: 20,
             take: 10,
+        });
+    });
+
+    it("preserves the narrow entity-history projection and raw details", async () => {
+        await findAuditEntityHistory(
+            "RoutineOccurrence",
+            91,
+            100,
+            auditContext,
+        );
+
+        expect(persistenceContext.auditLog.findMany).toHaveBeenCalledWith({
+            where: { entityType: "RoutineOccurrence", entityId: 91 },
+            select: {
+                id: true,
+                action: true,
+                userId: true,
+                userEmail: true,
+                details: true,
+                createdAt: true,
+            },
+            orderBy: { createdAt: "desc" },
+            take: 100,
         });
     });
 

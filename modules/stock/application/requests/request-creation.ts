@@ -1,6 +1,6 @@
 import { StockRequestStatus, type Prisma } from "@prisma/client";
 
-import { defineAuditDetails } from "@/lib/audit-log/contracts";
+import { defineStockAuditDetails } from "../../domain/audit-details";
 import type { CreateRequestInput } from "../../schemas/stock";
 import { createStockCommandAudit } from "../../infrastructure/persistence/command-audit";
 import {
@@ -251,7 +251,7 @@ async function persistRequest(
         "STOCK_REQUEST_CREATE",
         request.id,
         actor,
-        defineAuditDetails("STOCK_REQUEST_CREATE", {
+        defineStockAuditDetails("STOCK_REQUEST_CREATE", {
             after: {
                 status: request.status,
                 itemCount: data.items.length,

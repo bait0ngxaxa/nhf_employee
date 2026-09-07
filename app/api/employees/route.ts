@@ -1,14 +1,14 @@
 import { after, type NextRequest, NextResponse } from "next/server";
 import { requireAdminSession, requireApiSession } from "@/lib/auth/api";
+import { getTrustedClientIp } from "@/lib/network/trusted-client-ip";
 import {
+    appendEmployeeCreateAudit,
     createEmployee,
     createEmployeeSchema,
     employeeFiltersSchema,
-    getEmployeeDisplayName,
     listEmployees,
     type EmployeeFilters,
 } from "@/modules/employee";
-import { logEmployeeEvent } from "@/lib/server/audit";
 import { operationFailed } from "@/lib/ssot/http";
 import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
 
@@ -94,27 +94,15 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         }
 
         const employee = createResult.employee;
+        const auditActor = {
+            userId: auth.user.id,
+            email: auth.user.email,
+            ipAddress: getTrustedClientIp(request.headers),
+            userAgent: request.headers.get("user-agent") || null,
+        };
 
         after(async () => {
-            await logEmployeeEvent(
-                "EMPLOYEE_CREATE",
-                employee.id,
-                auth.user.id,
-                auth.user.email,
-                {
-                    after: {
-                        firstName: employee.firstName,
-                        lastName: employee.lastName,
-                        nickname: employee.nickname,
-                        email: employee.email,
-                        position: employee.position,
-                        departmentId: employee.departmentId,
-                    },
-                    metadata: {
-                        employeeName: getEmployeeDisplayName(employee),
-                    },
-                },
-            );
+            await appendEmployeeCreateAudit(employee, auditActor);
         });
 
         return NextResponse.json(

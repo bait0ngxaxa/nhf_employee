@@ -6,6 +6,17 @@ export {
 } from "./schemas/employee";
 export { listEmployees, getEmployeeStats } from "./infrastructure/persistence/employee-queries";
 export { createEmployee, deleteEmployee, updateEmployee } from "./application/mutations";
+export {
+    appendEmployeeCreateAudit,
+    appendEmployeeDeleteAudit,
+    appendEmployeeUpdateAudit,
+} from "./application/audit";
+export type {
+    EmployeeAuditActor,
+    EmployeeAuditCreateEmployee,
+    EmployeeAuditDeleteInput,
+    EmployeeAuditUpdateInput,
+} from "./application/audit";
 export { importEmployeesFromCsvRows } from "./application/import-employees";
 export { createEmployeeExport } from "./infrastructure/export/employee-export";
 export {

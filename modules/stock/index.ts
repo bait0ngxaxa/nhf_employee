@@ -166,5 +166,3 @@ export type {
     StockInventoryAuditResult,
     StockInventoryAuditSnapshot,
 } from "./domain/inventory-audit";
-
-export { logStockEvent } from "./infrastructure/persistence/audit";

@@ -1,5 +1,6 @@
 import type { AuditAction, Prisma } from "@prisma/client";
 
+import { appendAuditInTransaction } from "@/modules/audit";
 import type { RoutineCommandActor } from "./types";
 
 export async function createRoutineAuditInTransaction(
@@ -10,22 +11,20 @@ export async function createRoutineAuditInTransaction(
     actor: RoutineCommandActor,
     details: Record<string, unknown>,
 ): Promise<void> {
-    await tx.auditLog.create({
-        data: {
-            action,
-            entityType,
-            entityId,
-            userId: actor.id,
-            userEmail: actor.email,
-            ipAddress: actor.ipAddress,
-            userAgent: actor.userAgent,
-            details: JSON.stringify({
-                ...details,
-                metadata: {
-                    requestId: actor.requestId ?? null,
-                    correlationId: actor.correlationId ?? null,
-                },
-            }),
+    await appendAuditInTransaction(tx, {
+        action,
+        entityType,
+        entityId,
+        userId: actor.id,
+        userEmail: actor.email,
+        ipAddress: actor.ipAddress,
+        userAgent: actor.userAgent,
+        details: {
+            ...details,
+            metadata: {
+                requestId: actor.requestId ?? null,
+                correlationId: actor.correlationId ?? null,
+            },
         },
     });
 }

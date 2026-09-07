@@ -3,6 +3,7 @@ import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
 import type {
     AuditAppendCommand,
+    AuditEntityHistoryRow,
     AuditLogPersistenceContext,
 } from "../../application/contracts";
 
@@ -26,6 +27,15 @@ type AuditLogQueryRow = Prisma.AuditLogGetPayload<{
         };
     };
 }>;
+
+const AUDIT_ENTITY_HISTORY_SELECT = {
+    id: true,
+    action: true,
+    userId: true,
+    userEmail: true,
+    details: true,
+    createdAt: true,
+} as const;
 
 export async function appendAuditLog(
     command: AuditAppendCommand,
@@ -62,6 +72,20 @@ export function findAuditLogs(
             createdAt: "desc",
         },
         skip,
+        take,
+    });
+}
+
+export function findAuditEntityHistory(
+    entityType: string,
+    entityId: number,
+    take: number,
+    persistenceContext: AuditLogPersistenceContext = prisma,
+): Promise<AuditEntityHistoryRow[]> {
+    return persistenceContext.auditLog.findMany({
+        where: { entityType, entityId },
+        select: AUDIT_ENTITY_HISTORY_SELECT,
+        orderBy: { createdAt: "desc" },
         take,
     });
 }

@@ -1106,16 +1106,19 @@ describe("architecture checker module boundaries", () => {
         );
     });
 
-    it("allows the exact known temporary producer access shape", async () => {
+    it("rejects direct AuditLog persistence from a migrated producer", async () => {
         const result = await checkFixture(
             "modules/employee/application/mutations.ts",
             "await tx.auditLog.create({ data: {} });",
         );
 
-        expect(result.violations).toEqual([]);
+        expect(result.violations).toHaveLength(1);
+        expect(result.violations[0]).toContain(
+            "direct AuditLog Prisma delegate access must be owned by modules/audit/infrastructure/",
+        );
     });
 
-    it("recognizes an aliased AuditLog delegate in the known compatibility shape", async () => {
+    it("rejects an aliased AuditLog delegate in a migrated producer", async () => {
         const result = await checkFixture(
             "modules/employee/application/mutations.ts",
             [
@@ -1124,10 +1127,13 @@ describe("architecture checker module boundaries", () => {
             ].join("\n"),
         );
 
-        expect(result.violations).toEqual([]);
+        expect(result.violations).toHaveLength(1);
+        expect(result.violations[0]).toContain(
+            "direct AuditLog Prisma delegate access must be owned by modules/audit/infrastructure/",
+        );
     });
 
-    it("rejects an additional AuditLog delegate in an allowlisted producer file", async () => {
+    it("rejects every direct AuditLog delegate operation in a migrated producer", async () => {
         const result = await checkFixture(
             "modules/employee/application/mutations.ts",
             [
@@ -1138,7 +1144,53 @@ describe("architecture checker module boundaries", () => {
 
         expect(result.violations).toHaveLength(1);
         expect(result.violations[0]).toContain(
-            "does not match the allowed temporary compatibility shape",
+            "direct AuditLog Prisma delegate access must be owned by modules/audit/infrastructure/",
+        );
+    });
+
+    it.each([
+        "modules/employee/application/example.ts",
+        "modules/leave/application/example.ts",
+        "modules/stock/application/example.ts",
+        "modules/routine/application/example.ts",
+    ])("rejects %s importing the legacy Audit server adapter", async (importerPath) => {
+        const result = await checkFixture(
+            importerPath,
+            'import { x } from "@/lib/server/audit";\n',
+        );
+
+        expect(result.violations).toHaveLength(1);
+        expect(result.violations[0]).toContain(
+            "feature-owned Audit producer",
+        );
+    });
+
+    it.each([
+        "modules/employee/application/example.ts",
+        "modules/leave/application/example.ts",
+        "modules/stock/application/example.ts",
+        "modules/routine/application/example.ts",
+    ])("requires %s to use the Audit public server entry", async (importerPath) => {
+        const result = await checkFixture(
+            importerPath,
+            'import { appendAuditInTransaction } from "@/modules/audit/application/commands";\n',
+        );
+
+        expect(result.violations).toHaveLength(1);
+        expect(result.violations[0]).toContain(
+            'cross-module dependencies must use the target module public entry point "@/modules/audit"',
+        );
+    });
+
+    it("rejects the deleted global Audit feature-contract path", async () => {
+        const result = await checkFixture(
+            "app/example.ts",
+            'import type { x } from "@/lib/audit-log/contracts";\n',
+        );
+
+        expect(result.violations).toHaveLength(1);
+        expect(result.violations[0]).toContain(
+            "Deleted Audit feature contracts",
         );
     });
 

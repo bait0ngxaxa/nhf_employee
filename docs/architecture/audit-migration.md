@@ -1,8 +1,10 @@
 # Audit capability migration
 
-Status: **Phase I2 CLOSED — Audit presentation ownership complete.**
+Status: **Phase I3 CLOSED — Audit producer integration and physical
+persistence exclusivity complete.**
 
-Phase I3: **NOT STARTED**.
+Audit capability migration I0-I3 is closed. Auth/Session/Identity migration
+has not started.
 
 Baseline audited: `05c2327be2f46e83a843040b978093b30a1c0289`
 (`refactor(notification): migrate Leave Stock and Routine Inbox writes`).
@@ -1018,6 +1020,24 @@ and closure correction:
 - Thai/UTF-8 diff inspection — passed; no mojibake or unintended presentation
   wording changes were found.
 
+### Phase I3 verification
+
+Verification was executed after the Phase I3 producer, reader, contract, and
+architecture-checker changes:
+
+- `npm.cmd run check` — passed; architecture check inspected 959 repository
+  source files, lint:strict passed, typecheck passed, and Vitest passed with
+  244 test files and 2,001 tests.
+- `npm.cmd run architecture:check` — passed; checked 959 repository source
+  files.
+- `npm.cmd run lint` — passed.
+- `npm.cmd run typecheck` — passed.
+- `npm.cmd run test:run` — passed; 244 test files and 2,001 tests.
+- Exhaustive production AuditLog delegate search — passed; 5 expressions in
+  1 Audit infrastructure file and zero outside `modules/audit/infrastructure/**`.
+- `git diff --check` and Thai/UTF-8 diff inspection — passed; no mojibake or
+  unintended Audit presentation text changes were found.
+
 ## 22. Final I0 closure checklist (historical)
 
 - [x] Every discovered production AuditLog writer is inventoried.
@@ -1059,9 +1079,8 @@ recorded above and in the checklist below.
 
 Phase I1 CLOSED — Audit server/application/persistence foundation complete.
 Phase I2 CLOSED — Audit presentation ownership complete.
-Phase I3 NOT STARTED.
 
-## 24. Final I2 closure checklist
+## 24. Final I2 closure checklist (historical pre-I3 state)
 
 - [x] `modules/audit/client.ts` is the browser entry.
 - [x] Audit Dashboard routes consume `@/modules/audit/client`.
@@ -1083,3 +1102,118 @@ Phase I3 NOT STARTED.
 
 Phase I2 CLOSED — Audit presentation ownership complete.
 Phase I3 NOT STARTED.
+
+## 25. Phase I3 implementation result
+
+Phase I3 migrated the remaining Employee, Leave, Stock, and Routine Audit
+producer and reader seams without changing their event meaning, failure
+policy, persisted details, or request timing.
+
+### Producer migrations
+
+- Employee lifecycle `writeLifecycleAudit` now calls
+  `appendAuditInTransaction(tx, command)` through `@/modules/audit`. The
+  serializable Employee transaction still owns the same strict failure path,
+  and the Employee action/entity, before/after, actor, and employee-name
+  metadata are unchanged. The strict path still intentionally supplies no
+  request IP or User-Agent.
+- Employee route create/update/delete fallback producers now live in the
+  Employee application capability and call `appendAuditBestEffort`. Routes
+  resolve the trusted Cloudflare client IP and User-Agent before scheduling
+  the existing `after(...)` callback. `result.auditRecorded === true` still
+  suppresses the fallback, so lifecycle events are not double-logged.
+- Leave workflow writes and Leave approver assignment now call the public
+  transaction-aware append with their existing transaction client. Leave
+  request IDs remain CUIDs in `details.metadata.leaveRequestId`; the
+  `LeaveRequest` `entityId` remains omitted/null-compatible with the Int
+  schema. Approver assignment remains Leave-owned and retains its
+  `EmployeeApprover` meaning and manager snapshots.
+- Stock command audit is now a strict public Audit append. Stock owns its
+  action/entity mapping and detail builders, including the persisted
+  `STOCK_REQUEST_ISSUE`/`STOCK_REQUEST_CANCEL` mappings and exact trace
+  metadata omission/merge behavior. The unused `logStockEvent` adapter,
+  export, and file were removed after the current production search found no
+  caller.
+- Routine task/occurrence writes and all four import staging writes
+  (`ROUTINE_IMPORT_UPLOAD`, `ROUTINE_IMPORT_ROW_UPDATE`,
+  `ROUTINE_IMPORT_APPLY`, and `ROUTINE_IMPORT_CANCEL`) now use the public
+  transaction-aware append. Their actor, IP/User-Agent, details, import
+  selections/conflicts, and request/correlation metadata shapes remain
+  unchanged, including Routine's explicit null trace values.
+
+### Routine history query
+
+Audit now exposes the narrow generic server contract
+`getAuditEntityHistory({ entityType, entityId, limit })`. Its infrastructure
+projection selects only `id`, `action`, `userId`, `userEmail`, `details`, and
+`createdAt`, orders by `createdAt desc`, applies the requested limit, and
+returns raw details without user projection or JSON parsing. Routine uses it
+for occurrence history and continues converting `createdAt` to an ISO string
+at its response boundary; it does not use the generic administrative Audit
+query.
+
+### Feature-owned contracts and legacy compatibility
+
+Stock detail snapshots/building contracts now live in
+`modules/stock/domain/audit-details.ts`; Leave context, mutation, create,
+and approver-assignment contracts now live in `modules/leave/domain/audit.ts`.
+The feature-specific `lib/audit-log/contracts.ts` source was deleted after
+its consumers were migrated. Employee, Leave, and Stock feature-specific
+legacy helpers (`logEmployeeEvent`, `logLeaveEvent`, and `logStockEvent`) were
+removed after exhaustive production searches found no remaining callers.
+
+`lib/server/audit.ts` remains only as deferred generic compatibility for
+Auth (`logAuthEvent` and signup `createAuditLog`), Email Request
+(`createAuditLog`), and export (`logDataExport`) flows. Auth/Session/Identity,
+Email Request/future IT, and generic export ownership are intentionally not
+migrated in I3.
+
+### Final physical AuditLog inventory and enforcement
+
+The final production direct AuditLog delegate inventory is exclusively:
+
+| Owner | Operations | Count |
+| --- | --- | ---: |
+| `modules/audit/infrastructure/persistence/audit-log-repository.ts` | `auditLog.create` | 1 |
+| `modules/audit/infrastructure/persistence/audit-log-repository.ts` | `auditLog.findMany` | 2 |
+| `modules/audit/infrastructure/persistence/audit-log-repository.ts` | `auditLog.count` | 1 |
+| `modules/audit/infrastructure/persistence/audit-log-repository.ts` | `auditLog.deleteMany` | 1 |
+| **Production total** |  | **5 expressions in 1 file** |
+
+Tests, integration fixtures, Prisma schema/migrations, and narrowly classified
+test-support files remain separate non-production exceptions. The architecture
+checker no longer has the I1/I2 10-expression/7-file compatibility allowlist;
+every production AuditLog delegate operation outside
+`modules/audit/infrastructure/**` now fails. Cross-module producers are
+required to use only `@/modules/audit`, and Employee/Leave/Stock/Routine
+production code is rejected if it reintroduces `@/lib/server/audit`.
+
+### I3 verification
+
+The exact final source-file count, Vitest file/test counts, lint, typecheck,
+architecture, aggregate check, and Thai/UTF-8 diff results are recorded in
+the verification record below after the final checks complete.
+
+## 26. Final I3 closure checklist
+
+- [x] Employee strict lifecycle and after-response producers use Employee
+  semantics plus the public Audit capability.
+- [x] Leave workflow and approver-assignment writes preserve strict rollback
+  behavior and Leave CUID compatibility.
+- [x] Stock strict command writes preserve actor, trace, action, entity, and
+  details behavior; unused `logStockEvent` was removed.
+- [x] Routine strict task/occurrence/import writes are migrated.
+- [x] Routine occurrence history uses the narrow raw entity-history query.
+- [x] Feature-specific Stock and Leave Audit contracts are capability-owned;
+  `lib/audit-log/contracts.ts` is deleted.
+- [x] The temporary direct-access allowlist is removed.
+- [x] Production physical AuditLog access is exclusive to Audit infrastructure.
+- [x] Generic admin query, retention, cleanup, client presentation, schema,
+  and AuditAction taxonomy behavior are unchanged.
+- [x] Auth/Session/Identity migration has not started.
+- [x] Email Request/future IT migration has not started.
+
+Phase I3 CLOSED — Audit producer integration and physical persistence
+exclusivity complete.
+Audit capability migration I0-I3 CLOSED.
+Auth/Session/Identity migration NOT STARTED.
