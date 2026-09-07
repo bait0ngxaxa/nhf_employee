@@ -161,15 +161,18 @@ callers. It must not import business module internals or expose
 feature-specific commands. Email Request remains a deferred compatibility
 consumer and Auth remains a later producer phase. See audit-migration.md.
 
-The future checker rules are staged: Audit API query/cleanup routes use the
-Audit public server entry; physical production AuditLog delegates live only
-under modules/audit/infrastructure/**; business modules use only the Audit
-public contract, including its transaction-aware form; and the Audit client
-entry cannot reach server-only code. Tests, integration fixtures, Prisma
-schema/migrations, seed/support code, and a documented Routine nested-reader
-compatibility adapter remain narrow exceptions. These rules must be added
-after the corresponding I1-I3 migration slice exists; they are not enforced
-by the current checker.
+The future checker rules are staged. I1 requires Audit API query/cleanup
+routes to use the Audit public server entry, prevents new cross-module deep
+imports, keeps new Audit-owned physical delegates under
+`modules/audit/infrastructure/**`, and protects the server/client boundary.
+The exact baseline direct-access allowlist in
+`audit-migration.md` §20 temporarily covers the generic I1 transfer paths and
+the existing business-producer/Routine-reader seams; it is path-specific and
+does not allow new direct accesses. I3 removes those producer and reader
+exceptions and then enforces that all production physical AuditLog delegates
+are under `modules/audit/infrastructure/**`, with only legitimate
+non-production/support exceptions. These rules are not enforced by the
+current checker.
 
 ## Client/server boundary
 

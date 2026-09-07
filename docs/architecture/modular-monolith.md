@@ -115,6 +115,9 @@ Audit presentation. Producing capabilities retain event meaning, AuditAction,
 entity semantics, details/snapshots, actor semantics, and strict versus
 best-effort transaction behavior. Auth and Email Request remain later/deferred
 producer boundaries. See audit-migration.md for the evidence and I1-I3 plan.
+I1 establishes generic Audit ownership while known business producer and
+Routine-reader direct-access seams remain temporary; I3 performs producer
+migration and closes final physical AuditLog persistence exclusivity.
 
 ## Target architecture
 

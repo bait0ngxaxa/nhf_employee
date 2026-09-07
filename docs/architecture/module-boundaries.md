@@ -189,6 +189,13 @@ keep the same business transaction; current best-effort and after-response
 writes must not be normalized. Leave's CUID-in-details fallback and all
 historical enum/storage values remain compatibility constraints.
 
+The sequencing is explicit: I1 establishes generic Audit server/application/
+persistence and query/cleanup ownership while the known business direct-write
+and Routine nested-reader seams remain temporarily allowlisted; I2 moves
+Audit-specific presentation; I3 migrates producers and closes final physical
+AuditLog persistence exclusivity. See audit-migration.md for the exact
+allowlist and exit conditions.
+
 The full producer, reader, retention, presentation, action, identity,
 transaction, metadata, compatibility, and phased I1-I3 ledger is in
 audit-migration.md. The source record explicitly keeps Email Request

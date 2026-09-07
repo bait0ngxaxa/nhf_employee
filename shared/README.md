@@ -17,7 +17,10 @@ not move the existing implementations in `lib/`, `components/`, or other
 legacy locations into this directory. Phase I0 resolves the cohesive Audit
 capability's physical persistence, generic query/retention, and presentation
 owner as a future modules/audit/ module; existing lib/ Audit code remains a
-compatibility implementation until I1-I3.
+compatibility implementation during the transition. I1 establishes generic
+Audit ownership, while known business producer and Routine-reader direct
+access seams remain temporary until I3 closes final physical AuditLog
+persistence exclusivity.
 
 See [module boundaries](../docs/architecture/module-boundaries.md) and
 [dependency rules](../docs/architecture/dependency-rules.md) for the complete

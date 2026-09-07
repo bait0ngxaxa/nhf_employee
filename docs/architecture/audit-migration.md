@@ -4,6 +4,12 @@ Status: **Phase I0 CLOSED — Audit discovery and boundary definition complete.*
 
 Phase I1 implementation: **NOT STARTED**.
 
+Baseline audited: `05c2327be2f46e83a843040b978093b30a1c0289`
+(`refactor(notification): migrate Leave Stock and Routine Inbox writes`).
+This was the repository state immediately before the Phase I0 documentation
+commit. Historical source paths and line references below refer to that
+baseline and may move during I1-I3.
+
 This record is the source of truth for the Audit capability migration. It
 records the repository state observed during Phase I0; it does not claim that
 Audit runtime ownership has already moved.
@@ -215,8 +221,8 @@ boundary even though many other capabilities produce events. The modular
 monolith places cohesive business/platform capabilities under modules/ and
 reserves shared/ for smaller genuinely cross-domain primitives. A module
 boundary also allows the architecture checker to enforce a public server
-entry, a client/server graph boundary, and exclusive physical persistence
-ownership.
+entry, a client/server graph boundary, and, at I3 closure, exclusive physical
+persistence ownership.
 
 This does not make Audit a business-domain owner. It is a platform-oriented
 capability module whose public append contract is used by Auth, Employee,
@@ -226,7 +232,7 @@ Leave, Stock, Routine, and eventually IT.
 
 | Concern | Current location | Future owner | I0 decision |
 | --- | --- | --- | --- |
-| Physical AuditLog writes | lib/server/audit.ts and migrated module internals | modules/audit/infrastructure | Preserve current locations until I1-I3; do not move in I0 |
+| Physical AuditLog writes | lib/server/audit.ts and migrated module internals | modules/audit/infrastructure | Preserve current locations in I0; move generic paths in I1 and producer paths incrementally in I3 |
 | Generic append/serialization | lib/server/audit.ts | modules/audit/application plus infrastructure | Preserve best-effort behavior and details JSON shape |
 | Event meaning and action | Auth routes, Employee, Leave, Stock, Routine, Email Request | Producing capability | Never centralize in Audit |
 | Transaction decision | Producing use case and its transaction owner | Producing capability, using Audit transaction-aware contract | Preserve strict atomicity |
@@ -738,6 +744,15 @@ I1 should establish server/application ownership without changing behavior:
 I1 must not introduce a new action taxonomy, change entityId, or move
 feature-specific detail builders into Audit.
 
+During I1, existing direct production delegates outside the new owner are
+temporary, explicit compatibility seams; they are not evidence that business
+event semantics belong in Audit. The exact finite allowlist and each path's
+exit phase are defined in section 20. I1 must not force the Employee, Leave,
+Stock, or Routine producer paths, or the active Routine nested reader, through
+the new Audit module merely to satisfy a physical-exclusivity rule. Generic
+legacy writer/query/cleanup paths are I1 transfer seams and should be moved or
+wrapped behind the Audit owner as part of I1.
+
 ## 18. Proposed I2 presentation migration
 
 I2 should move only Audit-specific presentation behind a browser-safe
@@ -799,15 +814,37 @@ has no Audit module and still contains legacy access.
 - app/api/audit-logs/** query and cleanup routes must consume
   @/modules/audit rather than lib/services/audit-log internals;
 - any future Audit write route must consume the Audit public server contract;
-- production direct AuditLog delegate access must be under
-  modules/audit/infrastructure/** once the physical owner exists;
-- business modules may call the Audit public append contract, including a
-  transaction-aware form, but may not deep-import Audit infrastructure;
+- new Audit-owned physical AuditLog delegate access must be under
+  modules/audit/infrastructure/**;
+- the exact baseline direct-access allowlist below is temporary and finite:
+  generic legacy transfer paths are allowed only until their I1 ownership
+  transfer is complete, while the listed business producer and Routine reader
+  paths remain allowed until their I3 migration slice;
+- new direct AuditLog delegate access outside modules/audit/infrastructure/**
+  and outside that exact baseline allowlist must be rejected;
+- migrated business modules may call the Audit public append contract,
+  including a transaction-aware form, but may not deep-import Audit
+  infrastructure;
 - do not flag legitimate tests, integration fixtures, Prisma schema/migrations,
   seed/support code, or documented infrastructure support;
 - do not treat notificationOutbox or unrelated model names as AuditLog access;
-- retain a narrow, time-bounded exception for the Routine nested-reader
-  compatibility adapter until its migration exit is complete.
+
+#### I1 temporary direct-access allowlist
+
+This is the evidence-backed baseline of production files that currently
+contain direct AuditLog delegates outside the future owner. The checker may
+allow these exact files during the stated transition, but must reject a new
+file or a new delegate expression outside the owner.
+
+| Transition category | Exact baseline paths | Exit condition |
+| --- | --- | --- |
+| Generic I1 transfer seams | `lib/server/audit.ts`; `lib/services/audit-log/queries.ts`; `lib/services/audit-log/mutations.ts` | Move or wrap generic append, query, and retention persistence behind `modules/audit/infrastructure/**` during I1; remove these exceptions when that transfer is complete |
+| Business producer seams retained through I3 | `modules/employee/application/mutations.ts`; `modules/leave/infrastructure/persistence/transaction.ts`; `modules/leave/application/approvals/approver-assignment.ts`; `modules/stock/infrastructure/persistence/command-audit.ts`; `modules/routine/application/audit.ts`; `modules/routine/application/imports/staging.ts` | Migrate each producer slice to the transaction-aware or best-effort Audit public contract in I3, then remove its exception |
+| Routine feature-specific reader seam | `modules/routine/application/queries.ts` | Migrate to a narrow Audit public query contract or retain only with an explicitly approved architectural reason; it must not become a permanent accidental exception |
+
+The allowlist is path-specific and based on the 14 production delegate
+expressions across the 10 files recorded in section 12. It is not a wildcard
+for legacy code and does not permit new direct access in an existing file.
 
 ### I2 client and presentation rules
 
@@ -823,6 +860,14 @@ has no Audit module and still contains legacy access.
 
 ### I3 producer rules
 
+- At I3 closure, physical AuditLog create/read/update/delete delegates in
+  production must resolve only under
+  modules/audit/infrastructure/**. This is the final physical persistence
+  exclusivity rule, not an I1 rule.
+- Remove the I1 temporary allowlist as each Employee, Leave, Stock, and
+  Routine producer slice is migrated. The generic I1 transfer exceptions must
+  already be closed; the Routine nested reader must use a narrow Audit query
+  contract or have an explicit approved exception with a documented exit.
 - migrated business producers may use only the Audit public server entry;
 - no business module may call prisma.auditLog or tx.auditLog directly;
 - event-specific details remain in the producer module;
