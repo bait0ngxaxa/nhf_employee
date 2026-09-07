@@ -1,9 +1,10 @@
 # Dependency rules and enforcement
 
-Status: Phase H3 CLOSED — Notification producer integration and final migration audit complete.
-Phase H1 server/application ownership and Phase H0 Notification discovery remain
-closed. Phase G3 Department migration remains complete. These rules govern new architecture code
-while unrelated legacy features remain compatible during incremental migration.
+Status: Phase I0 CLOSED — Audit discovery and boundary definition complete.
+Phase I1 implementation is NOT STARTED. Phase H3 Notification producer
+integration and final migration audit remain complete. Phase G3 Department
+migration remains complete. These rules govern new architecture code while
+unrelated legacy features remain compatible during incremental migration.
 
 ## Direction
 
@@ -143,6 +144,32 @@ reintroduced. Notification browser code remains HTTP-based through
 LINE, and business producer ownership remain unchanged after H3. Leave, Stock,
 and Routine now consume only `@/modules/notification` for Inbox persistence;
 Email Request remains the documented compatibility exception.
+
+## Audit boundary (I0 discovery; enforcement deferred)
+
+Phase I0 selected modules/audit/ as the future owner of the cohesive Audit
+capability. It does not create that module or change current runtime access.
+shared/ may continue to own neutral database, HTTP/security, and trusted
+network primitives, but physical AuditLog persistence, generic Audit
+queries/retention, and Audit presentation belong to the future Audit module.
+
+Audit producers retain event meaning, action/entity selection, snapshots,
+business metadata, actor semantics, and the choice between a strict
+transaction-bound, best-effort, or after-response write. A future Audit
+public server contract must accept a transaction-bound context for strict
+callers. It must not import business module internals or expose
+feature-specific commands. Email Request remains a deferred compatibility
+consumer and Auth remains a later producer phase. See audit-migration.md.
+
+The future checker rules are staged: Audit API query/cleanup routes use the
+Audit public server entry; physical production AuditLog delegates live only
+under modules/audit/infrastructure/**; business modules use only the Audit
+public contract, including its transaction-aware form; and the Audit client
+entry cannot reach server-only code. Tests, integration fixtures, Prisma
+schema/migrations, seed/support code, and a documented Routine nested-reader
+compatibility adapter remain narrow exceptions. These rules must be added
+after the corresponding I1-I3 migration slice exists; they are not enforced
+by the current checker.
 
 ## Client/server boundary
 

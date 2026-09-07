@@ -1,0 +1,906 @@
+# Audit capability migration
+
+Status: **Phase I0 CLOSED — Audit discovery and boundary definition complete.**
+
+Phase I1 implementation: **NOT STARTED**.
+
+This record is the source of truth for the Audit capability migration. It
+records the repository state observed during Phase I0; it does not claim that
+Audit runtime ownership has already moved.
+
+## 1. Scope
+
+Phase I0 covered the complete production repository, including application
+routes, migrated modules, legacy services, presentation code, Prisma schema,
+architecture rules, and the tests needed to establish behavior. The discovery
+searched for:
+
+- auditLog, AuditLog, AuditAction, createAuditLog, logAuthEvent,
+  logEmployeeEvent, logLeaveEvent, logDataExport;
+- AuditLogDetails, AuditDetails, defineAuditDetails, audit-log, and audit.ts;
+- direct Prisma delegate access through prisma.auditLog, tx.auditLog,
+  client.auditLog, and equivalent resolved production calls;
+- request metadata collection through next/headers, getTrustedClientIp,
+  user-agent, and trusted proxy headers.
+
+Tests and fixtures were not counted as production producers, but were inspected
+where they establish rollback, query, cleanup, serialization, or presentation
+semantics. The relevant evidence includes:
+
+- Prisma schema: prisma/schema.prisma:180-266;
+- generic writer and compatibility helpers: lib/server/audit.ts:1-198;
+- shared details contracts: lib/audit-log/contracts.ts:1-214;
+- query and cleanup services:
+  lib/services/audit-log/queries.ts:1-164 and
+  lib/services/audit-log/mutations.ts:1-34;
+- HTTP delivery:
+  app/api/audit-logs/route.ts,
+  app/api/audit-logs/cleanup/route.ts, and
+  app/api/audit-logs/export/route.ts;
+- active Dashboard presentation:
+  app/dashboard/audit/**, components/audit/**,
+  components/dashboard/context/audit-logs/**, and
+  components/dashboard/sections/AuditLogsSection.tsx;
+- semantic tests:
+  __tests__/services/audit-log/queries.test.ts,
+  __tests__/services/audit-log/mutations.test.ts,
+  __tests__/api/audit-log-cleanup-route.test.ts,
+  __tests__/audit-log-display.test.ts,
+  modules/employee/application/mutations.test.ts, and
+  modules/leave/application/approvals/approver-assignment.test.ts;
+- retention decision: docs/adr/0003-audit-log-retention-cleanup.md;
+- current architecture enforcement:
+  scripts/check-architecture.mjs:659-1118 and 1150-1419.
+
+No runtime source, Prisma schema, migration, component, route contract, or
+business behavior was changed in Phase I0. In particular, modules/audit/ and
+shared/audit/ do not exist as a result of this phase.
+
+## 2. Current architecture
+
+### 2.1 Persistence model
+
+AuditLog is a physical Prisma model mapped to audit_logs. Its fields are:
+
+- id: Int primary key;
+- action: AuditAction;
+- entityType: String;
+- entityId: Int?;
+- userId: Int? with User relation and onDelete SetNull;
+- userEmail: String? actor snapshot;
+- ipAddress: String?;
+- userAgent: String? text;
+- details: String? text containing serialized JSON;
+- createdAt: DateTime with a now() default.
+
+Indexes currently cover userId, action, entityType/entityId, and createdAt.
+There is no foreign key from entityType/entityId to the affected business
+record.
+
+The AuditAction enum contains 50 values. The exhaustive classification is in
+section 9. Prisma enum values STOCK_REQUEST_ISSUE and STOCK_REQUEST_CANCEL use
+database mappings STOCK_REQUEST_APPROVE and STOCK_REQUEST_REJECT respectively;
+these storage mappings are compatibility contracts.
+
+### 2.2 Generic writer and compatibility helpers
+
+lib/server/audit.ts is the current generic writer. createAuditLog:
+
+1. resolves the request IP through next/headers and
+   lib/network/trusted-client-ip.ts;
+2. resolves the user-agent through next/headers;
+3. serializes details with JSON.stringify;
+4. calls prisma.auditLog.create;
+5. catches every failure and console.error logs it without rethrowing.
+
+Therefore createAuditLog is best-effort. A caller using it cannot fail its
+primary operation because the audit insert failed.
+
+The same file also contains logAuthEvent, logEmployeeEvent, logDataExport, and
+logLeaveEvent. The first three are active compatibility APIs. logLeaveEvent
+has no active production caller in the discovered repository; it remains a
+legacy compatibility surface because its CUID workaround is still part of the
+current implementation history.
+
+lib/audit-log/contracts.ts currently mixes a generic AuditDetails shape with
+feature-owned detail contracts:
+
+- Stock snapshots and mutation/request details;
+- Leave context and Leave mutation details;
+- EmployeeApproverAuditDetails, which describes Leave-owned approver
+  assignment;
+- Routine actions represented by the generic shape.
+
+This is a boundary leak, not evidence that Audit should own Stock, Leave,
+Employee, or Routine event meaning. The contracts remain in place for I0.
+Later phases should move event-specific builders and types to their producing
+modules while retaining a generic persisted-details contract in Audit.
+
+### 2.3 Query and maintenance services
+
+lib/services/audit-log/queries.ts is the generic reader. It directly calls
+prisma.auditLog.findMany and count, includes a selected User and Employee
+projection, parses details JSON, clamps page to at least 1 and limit to
+1..100, and orders by createdAt descending. It uses offset pagination and does
+not add an id tie-breaker.
+
+lib/services/audit-log/mutations.ts owns the current cleanup operation. It
+deletes rows with createdAt strictly less than a cutoff computed as now minus
+90 days.
+
+lib/services/audit-log/index.ts is a legacy service barrel exposing both
+operations. It is not yet an Audit module public entry.
+
+### 2.4 Current delivery and presentation
+
+app/api/audit-logs/route.ts is an admin-only GET adapter. It parses action,
+entityType, search, userId, startDate, endDate, page, and limit, then returns
+the query service result unchanged.
+
+app/api/audit-logs/cleanup/route.ts is a secret-protected POST maintenance
+adapter. app/api/audit-logs/export/route.ts records a DATA_EXPORT event after
+the response path is scheduled; it is not the implementation of the export
+itself.
+
+The Dashboard path is currently legacy/shared presentation:
+
+- app/dashboard/audit/page.tsx performs Dashboard-admin access and composes
+  AuditLogsSection;
+- app/dashboard/audit/loading.tsx composes the loading skeleton;
+- components/dashboard/sections/AuditLogsSection.tsx owns the current
+  Dashboard wrapper and mounts AuditLogsProvider;
+- components/dashboard/context/audit-logs/** owns browser state and SWR
+  fetching;
+- components/audit/AuditLogViewer.tsx owns filters, table/card rendering,
+  loading/error/empty states, and pagination;
+- components/audit/AuditLogSkeletons.tsx and AuditActionBadge.tsx own
+  Audit-specific visual pieces;
+- lib/audit-log/display.ts owns action/entity summaries, before/after
+  rendering, sensitive-field suppression, and feature-specific display
+  projections;
+- constants/audit.ts owns the current action labels, badge metadata, entity
+  labels, and filter options.
+
+The current browser request is GET /api/audit-logs?page=...&limit=... with
+server-side filters. The Dashboard uses limit=15, while the API defaults to
+20 and accepts at most 100.
+
+## 3. Audit capability definition
+
+The future Audit capability is a generic record-and-read capability, not a
+business workflow owner.
+
+Audit infrastructure should own:
+
+- physical AuditLog persistence and its repository/adapter;
+- generic append/write mechanics;
+- persisted details serialization and tolerant parsing;
+- generic AuditLog query, filtering, pagination, and User/Employee projection;
+- retention cutoff and deletion mechanics;
+- generic audit persistence contracts;
+- Audit-specific viewer/presentation and its browser-safe entry;
+- accepting already-resolved neutral request metadata.
+
+The producing business or platform capability must continue to own:
+
+- when an event deserves an audit record;
+- AuditAction selection;
+- entity meaning and entity/reference identifiers;
+- before and after snapshots;
+- event-specific details and metadata;
+- actor semantics;
+- business trace/context values;
+- whether an audit write is transaction-bound, best-effort, or deferred.
+
+The future API must be generic in shape. A suitable conceptual boundary is an
+append command containing action, entityType, entityId when representable,
+actor fields, already-resolved request metadata, and details, with an
+explicit transaction-bound persistence context for strict callers. This is a
+contract decision only; no such API is implemented in I0. Audit must not grow
+methods such as logStockRequestIssued, logLeaveApproved, or
+logEmployeeOffboarded.
+
+## 4. Ownership decision
+
+### 4.1 Future owner: modules/audit/
+
+The future owner is a first-class modules/audit/ capability module, with a
+server entry and, if the presentation migration confirms the existing
+Dashboard contract, a separate browser-safe client entry.
+
+This is preferred over shared/audit/ because Audit is a cohesive capability
+with its own persistence model, query use case, retention operation, HTTP
+compatibility contracts, and feature presentation. It has a stable capability
+boundary even though many other capabilities produce events. The modular
+monolith places cohesive business/platform capabilities under modules/ and
+reserves shared/ for smaller genuinely cross-domain primitives. A module
+boundary also allows the architecture checker to enforce a public server
+entry, a client/server graph boundary, and exclusive physical persistence
+ownership.
+
+This does not make Audit a business-domain owner. It is a platform-oriented
+capability module whose public append contract is used by Auth, Employee,
+Leave, Stock, Routine, and eventually IT.
+
+### 4.2 Ownership matrix
+
+| Concern | Current location | Future owner | I0 decision |
+| --- | --- | --- | --- |
+| Physical AuditLog writes | lib/server/audit.ts and migrated module internals | modules/audit/infrastructure | Preserve current locations until I1-I3; do not move in I0 |
+| Generic append/serialization | lib/server/audit.ts | modules/audit/application plus infrastructure | Preserve best-effort behavior and details JSON shape |
+| Event meaning and action | Auth routes, Employee, Leave, Stock, Routine, Email Request | Producing capability | Never centralize in Audit |
+| Transaction decision | Producing use case and its transaction owner | Producing capability, using Audit transaction-aware contract | Preserve strict atomicity |
+| Generic query/pagination | lib/services/audit-log/queries.ts | modules/audit/application/infrastructure | Preserve response and filter behavior |
+| Retention deletion | lib/services/audit-log/mutations.ts | modules/audit/application/infrastructure | Preserve 90-day and secret-route contract |
+| Labels and generic viewer | constants/audit.ts, lib/audit-log/display.ts, components/audit/** | Audit presentation | Keep feature display adapters narrow and browser-safe |
+| Trusted client IP primitive | lib/network/trusted-client-ip.ts | shared platform | Keep independent of Audit |
+| Request/header composition | routes and actor builders | app/API or shared platform composition | Do not couple Audit core to Next.js headers |
+| Auth audit production | app/api/auth/** | Auth/Identity later phase | Audit only receives a generic append command |
+| Email Request audit production | app/api/email-request/route.ts | Deferred IT capability | Keep compatibility seam until IT migration |
+
+### 4.3 What remains outside Audit
+
+Notification, NotificationOutbox, email, LINE delivery, Outbox processing,
+Auth/session implementation, Employee lifecycle policy, Leave workflow policy,
+Stock inventory policy, Routine import/task policy, and future IT business
+semantics remain outside Audit. Audit records those events; it does not
+orchestrate them.
+
+## 5. Producer inventory
+
+The following inventory enumerates the discovered production producer paths.
+The persistence classification is repeated in the ledger in section 11.
+
+### 5.1 Generic best-effort and compatibility producers
+
+| File and function/use case | Action | Entity and identifier | Actor/details/metadata | Timing and failure semantics | Eventual owner |
+| --- | --- | --- | --- | --- | --- |
+| lib/server/audit.ts:createAuditLog | Any AuditAction supplied by caller | entityType string; optional Int entityId | userId, userEmail, serialized details; IP and User-Agent read from current Next headers | Synchronous best-effort; every failure is logged and swallowed | Audit generic append adapter |
+| app/api/auth/hybrid-login/route.ts POST | LOGIN_FAILED and LOGIN_SUCCESS | User; failed id may be absent, success uses user.id | Auth result details; generic helper captures IP/User-Agent | Best-effort; helper does not fail login response | Auth remains producer |
+| app/api/auth/refresh/route.ts:logRefreshSecurityEvent | LOGIN_FAILED for reuse, expired, inactive, and race/conflict failures | User; input userId | Auth-flow reason/family metadata and request IP/User-Agent in details; generic helper also captures headers | Best-effort; refresh failure is already determined by security logic | Auth remains producer |
+| app/api/auth/logout/route.ts POST | LOGOUT | User; revoked.userId | Revocation details; generic helper captures request metadata | Best-effort after token revocation | Auth remains producer |
+| app/api/auth/logout-all/route.ts POST | LOGOUT | User; current userId | Logout-all details | Best-effort after updateMany | Auth remains producer |
+| app/api/auth/sessions/revoke/route.ts POST | LOGOUT | User; revoked session userId | Session-revocation details | Best-effort after session revocation | Auth remains producer |
+| app/api/auth/reset-password/route.ts POST | PASSWORD_RESET | User; user.id | Reset details; called after the serializable password/session transaction | Best-effort and outside the reset transaction | Auth remains producer |
+| app/api/auth/signup/route.ts POST | USER_CREATE | User; created user.id | after snapshot of user/name/email/role and signup/bootstrap metadata | Synchronous best-effort after the user transaction and before response; audit failure does not fail signup | Auth remains producer |
+| app/api/email-request/route.ts POST | EMAIL_REQUEST | EmailRequest; integer request id | Selected request fields and authenticated actor | Synchronous best-effort; skipped for replayed/idempotent result | Deferred IT producer |
+| app/api/employees/route.ts POST | EMPLOYEE_CREATE | Employee; created employee id | Employee result and actor fields | Scheduled with next/after; best-effort after response, and not part of employee creation transaction | Employee producer until I3 |
+| app/api/employees/[id]/route.ts PATCH fallback | EMPLOYEE_STATUS_CHANGE when status changed, otherwise EMPLOYEE_UPDATE | Employee; route id | Before/result and requested update; generic helper captures headers | next/after best-effort fallback only when result.auditRecorded is false | Employee producer until I3 |
+| app/api/employees/[id]/route.ts DELETE fallback | EMPLOYEE_DELETE | Employee; route id | Deleted employee and actor details | next/after best-effort fallback when no strict lifecycle audit was recorded | Employee producer until I3 |
+| app/api/employees/export/route.ts POST | DATA_EXPORT | Employee; no entityId | entity type, count, filters, exportedAt | next/after best-effort | Exporting route supplies meaning |
+| app/api/leave/export/route.ts POST | DATA_EXPORT | LeaveRequest; no entityId | entity type, count, employee count, filters, exportedAt | next/after best-effort | Leave/export route supplies meaning |
+| app/api/audit-logs/export/route.ts POST | DATA_EXPORT | Request-provided entityType; no entityId | request count and filters, exportedAt | next/after best-effort; route currently accepts this body as an audit callback contract | Audit delivery compatibility path |
+| modules/stock/infrastructure/persistence/audit.ts:logStockEvent | StockAuditAction, legacy generic wrapper | Mapped Stock entity type and integer id | Stock details; delegates to createAuditLog | Best-effort legacy adapter; no active production caller found | Stock compatibility seam until I3 |
+| lib/server/audit.ts:logLeaveEvent | Eight Leave actions | LeaveRequest; entityId intentionally omitted | Copies the CUID into details.metadata.leaveRequestId | Best-effort legacy adapter; no active production caller found | Leave compatibility seam until I3 |
+
+The active generic helper producers therefore include authentication,
+signup, Email Request, Employee fallback/create, and three export callbacks.
+No PASSWORD_CHANGE audit producer, successful refresh audit producer, or
+forgot-password request audit producer was found.
+
+### 5.2 Transaction-bound strict producers
+
+| File and function/use case | Action(s) | Entity and identifier | Details and actor fields | Transaction evidence and eventual owner |
+| --- | --- | --- | --- | --- |
+| modules/employee/application/mutations.ts:writeLifecycleAudit, called by runEmployeeLifecycle | EMPLOYEE_STATUS_CHANGE or EMPLOYEE_DELETE | Employee; employee.id | before/after status, deletedAt, userId/userIsActive, employee name; userId/userEmail; no request IP/User-Agent in this helper | tx.auditLog.create is awaited inside runSerializableTransaction. Audit failure rejects the Employee lifecycle transaction and rolls back paired Employee/User changes. Employee supplies event meaning; Audit later supplies the append adapter |
+| modules/leave/infrastructure/persistence/transaction.ts:createLeaveAuditInTransaction, called from createLeaveRequest | LEAVE_REQUEST_CREATE | LeaveRequest; entityId null | Leave context, snapshots, event metadata; CUID in details.metadata.leaveRequestId; userId/userEmail; no entityId because schema is Int | Receives the same Prisma.TransactionClient as the Leave serializable transaction. Failure rejects request creation and rolls back request/outbox/idempotency writes |
+| modules/leave/application/approvals/decision.ts:decideLeaveRequest | LEAVE_REQUEST_APPROVE or LEAVE_REQUEST_REJECT | LeaveRequest; entityId null; CUID in metadata | Leave-specific before/after/context and decision reason | Uses the Leave transaction helper inside runSerializableTransaction; audit failure rolls back status/quota/notification/outbox work |
+| modules/leave/application/cancellation/cancellation.ts:cancelLeaveRequest | LEAVE_REQUEST_CANCELLATION_REQUEST | LeaveRequest; entityId null; CUID in metadata | Leave cancellation context and requested decision | Same strict transaction; audit failure rolls back cancellation state |
+| modules/leave/application/cancellation/cancellation.ts:confirmLeaveCancellation and rejectLeaveCancellation | LEAVE_REQUEST_CANCELLATION_CONFIRM | LeaveRequest; entityId null; CUID in metadata | Confirmation/rejection decision and Leave context | Same strict transaction; audit failure rolls back the confirmation/rejection |
+| modules/leave/application/not-taken.ts:requestLeaveNotTaken | LEAVE_REQUEST_NOT_TAKEN_REQUEST | LeaveRequest; entityId null; CUID in metadata | Leave not-taken request context | Same strict transaction; audit failure rolls back request state |
+| modules/leave/application/not-taken.ts:confirmLeaveNotTaken | LEAVE_REQUEST_NOT_TAKEN_CONFIRM | LeaveRequest; entityId null; CUID in metadata | Leave not-taken confirmation context | Same strict transaction; audit failure rolls back confirmation state |
+| modules/leave/application/approvals/approver-assignment.ts:writeAudit, called by assignLeaveApprovers | EMPLOYEE_UPDATE | EmployeeApprover; employeeId | before/after approver ids/names and employee metadata; actor user fields | tx.auditLog.create is awaited inside the same Employee manager update transaction. A later failure restores manager changes and audit rows. The semantic producer remains Leave; Employee owns the manager field |
+| modules/stock/application/items/item-mutations.ts:createCategory/deleteCategory | STOCK_CATEGORY_CREATE / STOCK_CATEGORY_DELETE | StockCategory; category id | Stock-specific snapshots and actor/trace metadata | createStockCommandAudit receives tx and is awaited in the transaction; failure rolls back category mutation |
+| modules/stock/application/items/item-mutations.ts:createItem/updateItem | STOCK_ITEM_CREATE / STOCK_ITEM_UPDATE / STOCK_ITEM_DELETE | StockItem and StockVariant; integer ids | Stock snapshots, changed variants, actor IP/User-Agent, requestId/correlationId | Same transaction-bound command audit; failure rejects the stock mutation |
+| modules/stock/application/items/item-mutations.ts:adjustStock | STOCK_ADJUST | StockAdjustment; adjustment id | Adjustment and stock snapshots, actor/trace metadata | Same serializable transaction; failure rolls back inventory adjustment |
+| modules/stock/application/requests/request-creation.ts:createNewStockRequest | STOCK_REQUEST_CREATE | StockRequest; request id | Request/line snapshots, actor/trace metadata | createStockCommandAudit is awaited in the request transaction before notifications; failure rolls back request creation |
+| modules/stock/application/requests/request-mutations.ts:issueRequest | STOCK_REQUEST_ISSUE | StockRequest; request id | Issue, inventory, line, and trace details | Same serializable transaction; failure rolls back issue and inventory changes |
+| modules/stock/application/requests/request-mutations.ts:cancelRequest | STOCK_REQUEST_CANCEL | StockRequest; request id | Cancellation and trace details | Same serializable transaction; failure rolls back cancellation |
+| modules/routine/application/audit.ts:createRoutineAuditInTransaction, called by routine mutations | ROUTINE_TASK_CREATE, ROUTINE_TASK_UPDATE, ROUTINE_TASK_DEACTIVATE, ROUTINE_TASK_DELETE, ROUTINE_OCCURRENCE_REASSIGN, ROUTINE_OCCURRENCE_DUE_DATE_CHANGE | RoutineTask or RoutineOccurrence; integer id | Routine snapshots and actor userId/userEmail/IP/User-Agent plus requestId/correlationId metadata | The helper receives tx and is awaited inside each routine mutation transaction; failure rejects the mutation |
+| modules/routine/application/imports/staging.ts:createRoutineImportPreview | ROUTINE_IMPORT_UPLOAD | RoutineImportBatch; batch id | File/batch/hash/sheet/row counts and actor/trace metadata | Direct tx.auditLog.create inside runSerializableTransaction; failure rolls back import preview/batch work |
+| modules/routine/application/imports/staging.ts:updateRoutineImportRow | ROUTINE_IMPORT_ROW_UPDATE | RoutineImportRow; row id | Batch/source/selection/affected employees | Same strict transaction; failure rolls back row update |
+| modules/routine/application/imports/staging.ts:applyRoutineImportBatch | ROUTINE_IMPORT_APPLY | RoutineImportBatch; batch id | Selected/applied/conflict/task/row details | Same strict transaction; failure rolls back apply |
+| modules/routine/application/imports/staging.ts:cancelRoutineImportBatch | ROUTINE_IMPORT_CANCEL | RoutineImportBatch; batch id | Batch/sheet cancellation details | Same strict transaction; failure rolls back cancellation |
+
+The strict rows are not using lib/server/audit.ts. They write through a
+transaction client and therefore have different failure semantics from the
+generic helper. This distinction is mandatory for I1-I3.
+
+## 6. Reader and query inventory
+
+### 6.1 Generic admin query
+
+app/api/audit-logs/route.ts requires an admin session. It returns 403 for
+missing/unauthorized access and calls auditLogService.getAuditLogs.
+
+The active query contract in lib/services/audit-log/queries.ts supports:
+
+- exact action;
+- exact entityType;
+- userId;
+- trimmed search across entityType, userEmail, User.name, Employee firstName,
+  lastName, and nickname;
+- a search term that exactly matches an AuditAction enum value;
+- startDate and endDate applied to createdAt;
+- page and limit, with page >= 1 and limit clamped to 1..100;
+- descending createdAt order and offset pagination;
+- selected User and nested Employee identity fields;
+- details JSON parsing, where invalid JSON becomes null.
+
+The response shape is:
+
+auditLogs: rows with the User/Employee projection and parsed details, plus
+pagination: page, limit, total, pages.
+
+The route parser in app/api/audit-logs/route.ts is manual rather than
+schema-backed: invalid integer/date query values can reach the service. I0
+records this behavior as a compatibility observation and does not alter it.
+
+There is no HTTP cache contract. React cache() is used for request-level
+deduplication in the query service. No secondary ordering by id exists.
+
+### 6.2 Routine nested audit reader
+
+modules/routine/application/queries.ts:getRoutineOccurrenceById directly reads
+up to 100 AuditLog rows for entityType RoutineOccurrence and the occurrence
+entity id. It selects id, action, userId, userEmail, details, and createdAt,
+orders by createdAt descending, and returns raw details strings in the routine
+occurrence response.
+
+The route app/api/routines/occurrences/[id]/route.ts authenticates and scopes
+the occurrence before invoking the query. This is an active feature-specific
+reader and a compatibility exception. It must not be silently replaced by
+the generic admin query in a later phase; I1-I3 should provide an equivalent
+narrow Audit query or preserve an explicit compatibility adapter.
+
+### 6.3 Browser reader and display adapter
+
+components/dashboard/context/audit-logs/AuditLogsProvider.tsx fetches the
+generic HTTP endpoint through SWR, keeps previous data during revalidation,
+resets page on filter/search changes, and exposes errors, refresh, pagination,
+and the current rows to AuditLogViewer.
+
+lib/audit-log/display.ts:formatAuditLogDisplay is a pure presentation adapter.
+It maps action/entity/details to labels, references, summaries, and changed
+fields; suppresses password/token/session/cookie/secret values and sensitive
+nested fields; and contains explicit Stock, Leave, EmployeeApprover, Routine,
+and DATA_EXPORT summaries. Its behavior is covered by
+__tests__/audit-log-display.test.ts and is a presentation compatibility
+contract, not a reason to move business workflows into Audit.
+
+## 7. Maintenance and retention inventory
+
+The current retention policy is 90 days:
+
+- lib/services/audit-log/mutations.ts:calculateAuditLogRetentionCutoff
+  computes now minus 90 x 24 hours;
+- cleanupExpiredAuditLogs calls prisma.auditLog.deleteMany with
+  createdAt < cutoff;
+- app/api/audit-logs/cleanup/route.ts requires POST header
+  x-cleanup-secret matching the trimmed AUDIT_LOG_CLEANUP_SECRET environment
+  value;
+- a missing secret returns 503 cleanupNotConfigured;
+- an incorrect secret returns 403;
+- success returns success, deletedCount, and cutoff as an ISO string;
+- failures return the route's sanitized server error;
+- cleanup does not create an audit record;
+- docs/adr/0003-audit-log-retention-cleanup.md specifies an external cron and
+  no in-app scheduler. Deployment controls cadence.
+
+lib/ssot/routes.ts registers the cleanup URL. No additional scheduler or
+production caller was found in the repository. Retention duration, cutoff
+comparison, secret name, route method, response shape, and no-self-audit
+behavior are compatibility constraints.
+
+## 8. Presentation inventory and proposed I2 ownership
+
+### 8.1 Current ownership classification
+
+| Current path | Classification | Future treatment |
+| --- | --- | --- |
+| app/dashboard/audit/page.tsx | App Router delivery, admin access, metadata, Suspense composition | Remains app-owned route composition; imports Audit client entry after I2 |
+| app/dashboard/audit/loading.tsx | App Router loading composition | Remains app-owned route composition; uses Audit client-safe skeleton |
+| components/dashboard/sections/AuditLogsSection.tsx | Audit-specific Dashboard composition wrapped in generic Dashboard conventions | Move behind Audit client entry |
+| components/dashboard/context/audit-logs/** | Audit-specific browser state, HTTP fetching, types | Move to Audit presentation/client-safe graph |
+| components/audit/AuditLogViewer.tsx | Audit-specific viewer, filters, states, pagination | Move to Audit presentation |
+| components/audit/AuditLogSkeletons.tsx | Audit-specific loading presentation | Move to Audit presentation |
+| components/audit/AuditActionBadge.tsx | Audit-specific action presentation | Move to Audit presentation |
+| lib/audit-log/display.ts | Audit display mapping with feature-specific projections | Move or wrap in Audit presentation; preserve pure behavior |
+| constants/audit.ts | Audit action/entity registry and labels | Move or split with Audit as owner; retain feature metadata without moving business policy |
+| components/dashboard/context/index.ts | Generic Dashboard context barrel that currently re-exports Audit context/types | Remove the Audit-specific re-export or retain a short-lived compatibility export during I2 |
+| constants/dashboard.ts, lib/ssot/routes.ts, DashboardHomeSection | Generic Dashboard/menu/route registries and navigation composition | Remain Dashboard/SSOT-owned; Audit only supplies the destination and presentation contract |
+| components/ui/**, generic pagination, generic Dashboard shell | Generic UI/platform | Remain outside Audit |
+| components/dashboard/layout/DashboardNavbar.tsx and generic Dashboard context | Dashboard shell/navigation | Remain Dashboard-owned; no Audit-specific coupling is required today |
+
+### 8.2 I2 compatibility requirements
+
+I2 must preserve:
+
+- /dashboard/audit access control and URL;
+- GET /api/audit-logs and its response/filter/pagination contract;
+- limit=15 Dashboard behavior;
+- search/action/entity/date/user filters;
+- loading, error, empty, refresh, responsive table/card, and pagination UX;
+- Thai labels and existing display suppression;
+- Employee/Leave display integration without reaching server-only module
+  entries from the client graph.
+
+The existing display adapter imports browser-safe Employee and Leave client
+helpers. I2 may retain those narrow client contracts or move the required
+structural formatting into an Audit-safe presentation adapter. It must not
+import Employee/Leave server barrels, Prisma, Next server APIs, or business
+application code into the browser graph.
+
+## 9. AuditAction inventory
+
+The following table classifies every value in prisma/schema.prisma:200-263.
+The status means current production emission, not whether historical rows may
+contain the value.
+
+| AuditAction | Producer/capability | Entity type | Status and notes |
+| --- | --- | --- | --- |
+| LOGIN_SUCCESS | Auth hybrid login | User | Active |
+| LOGIN_FAILED | Auth hybrid login and refresh security failures | User | Active; multiple failure paths |
+| LOGOUT | Auth logout, logout-all, session revoke | User | Active |
+| PASSWORD_CHANGE | Auth | User | No current producer found; keep enum/metadata |
+| PASSWORD_RESET | Auth reset-password | User | Active |
+| EMPLOYEE_CREATE | Employee API create | Employee | Active, best-effort after response |
+| EMPLOYEE_UPDATE | Employee profile fallback; Leave approver assignment | Employee or EmployeeApprover | Active and reused across two semantic producers |
+| EMPLOYEE_DELETE | Employee lifecycle and delete fallback | Employee | Active; strict lifecycle plus legacy fallback |
+| EMPLOYEE_STATUS_CHANGE | Employee lifecycle and status fallback | Employee | Active; strict lifecycle plus legacy fallback |
+| EMPLOYEE_IMPORT | Employee | Employee | No current producer found; prior migration explicitly leaves import audit absent |
+| TICKET_CREATE | Deferred/legacy IT | Historical IT entity | Historical/storage compatibility only |
+| TICKET_UPDATE | Deferred/legacy IT | Historical IT entity | Historical/storage compatibility only |
+| TICKET_STATUS_CHANGE | Deferred/legacy IT | Historical IT entity | Historical/storage compatibility only |
+| TICKET_ASSIGN | Deferred/legacy IT | Historical IT entity | Historical/storage compatibility only |
+| TICKET_COMMENT | Deferred/legacy IT | Historical IT entity | Historical/storage compatibility only |
+| TICKET_DELETE | Deferred/legacy IT | Historical IT entity | Historical/storage compatibility only |
+| LEAVE_REQUEST_CREATE | Leave create request | LeaveRequest | Active; strict, CUID fallback |
+| LEAVE_REQUEST_APPROVE | Leave decision | LeaveRequest | Active; strict, CUID fallback |
+| LEAVE_REQUEST_REJECT | Leave decision | LeaveRequest | Active; strict, CUID fallback |
+| LEAVE_REQUEST_CANCEL | Leave cancellation | LeaveRequest | Active; strict, CUID fallback |
+| LEAVE_REQUEST_CANCELLATION_REQUEST | Leave cancellation request | LeaveRequest | Active; strict, CUID fallback |
+| LEAVE_REQUEST_CANCELLATION_CONFIRM | Leave cancellation confirm/reject | LeaveRequest | Active; strict, CUID fallback |
+| LEAVE_REQUEST_NOT_TAKEN_REQUEST | Leave not-taken request | LeaveRequest | Active; strict, CUID fallback |
+| LEAVE_REQUEST_NOT_TAKEN_CONFIRM | Leave not-taken confirm | LeaveRequest | Active; strict, CUID fallback |
+| USER_CREATE | Auth signup | User | Active; best-effort after user transaction |
+| USER_UPDATE | Admin/User capability | User | No current producer found |
+| USER_DELETE | Admin/User capability | User | No current producer found |
+| USER_ROLE_CHANGE | Admin/User capability | User | No current producer found |
+| STOCK_ITEM_CREATE | Stock item creation | StockItem and StockVariant | Active; strict |
+| STOCK_ITEM_UPDATE | Stock item update | StockItem and StockVariant | Active; strict |
+| STOCK_ITEM_DELETE | Stock item deletion path | StockItem and StockVariant | Active; strict |
+| STOCK_ADJUST | Stock adjustment | StockAdjustment | Active; strict |
+| STOCK_REQUEST_CREATE | Stock request creation | StockRequest | Active; strict |
+| STOCK_REQUEST_ISSUE | Stock request issue | StockRequest | Active; Prisma database mapping is STOCK_REQUEST_APPROVE |
+| STOCK_REQUEST_CANCEL | Stock request cancel | StockRequest | Active; Prisma database mapping is STOCK_REQUEST_REJECT |
+| STOCK_CATEGORY_CREATE | Stock category creation | StockCategory | Active; strict |
+| STOCK_CATEGORY_DELETE | Stock category deletion | StockCategory | Active; strict |
+| SETTINGS_UPDATE | System/admin | Settings | No current producer found |
+| DATA_EXPORT | Generic export callbacks | Employee, LeaveRequest, or request-provided entityType | Active; generic/platform action, producer supplies export context |
+| EMAIL_REQUEST | Deferred Email Request | EmailRequest | Active; deferred compatibility producer |
+| ROUTINE_TASK_CREATE | Routine task mutation | RoutineTask | Active; strict |
+| ROUTINE_TASK_UPDATE | Routine task mutation | RoutineTask | Active; strict |
+| ROUTINE_TASK_DEACTIVATE | Routine task mutation | RoutineTask | Active; strict |
+| ROUTINE_TASK_DELETE | Routine task mutation | RoutineTask | Active; strict |
+| ROUTINE_OCCURRENCE_REASSIGN | Routine occurrence mutation | RoutineOccurrence | Active; strict |
+| ROUTINE_OCCURRENCE_DUE_DATE_CHANGE | Routine occurrence mutation | RoutineOccurrence | Active; strict |
+| ROUTINE_IMPORT_UPLOAD | Routine import preview | RoutineImportBatch | Active; strict |
+| ROUTINE_IMPORT_ROW_UPDATE | Routine import row update | RoutineImportRow | Active; strict |
+| ROUTINE_IMPORT_APPLY | Routine import apply | RoutineImportBatch | Active; strict |
+| ROUTINE_IMPORT_CANCEL | Routine import cancel | RoutineImportBatch | Active; strict |
+
+There are 38 distinct enum values emitted by current production paths. The
+remaining 12 are six historical TICKET values and six currently unused values:
+PASSWORD_CHANGE, EMPLOYEE_IMPORT, USER_UPDATE, USER_DELETE,
+USER_ROLE_CHANGE, and SETTINGS_UPDATE. None may be renamed or removed in I0.
+constants/audit.ts supplies labels and badge metadata for active values and
+intentionally omits the six legacy TICKET values; its registry test allows
+that historical exception.
+
+## 10. Entity identity and entityId compatibility
+
+AuditLog.entityId is Int? (prisma/schema.prisma:184). It is not a polymorphic
+foreign key. Current integer entity identities include User, Employee,
+EmployeeApprover employee ids, Stock records, Routine records, and EmailRequest
+ids.
+
+LeaveRequest.id is a String CUID. The active Leave transaction writer in
+modules/leave/infrastructure/persistence/transaction.ts therefore leaves
+AuditLog.entityId null and writes the real Leave request id to
+details.metadata.leaveRequestId. The legacy logLeaveEvent helper documents and
+uses the same fallback. This is not an accidental omission: it is the current
+compatibility solution.
+
+Consequences:
+
+- generic entityType/entityId filtering cannot identify a Leave request by its
+  real CUID;
+- generic query rows for Leave have a null entityId;
+- lib/audit-log/display.ts and its tests use Leave metadata to build a readable
+  reference and summary;
+- a future string identifier or alternate typed key would be a separate
+  compatibility/schema decision, not an I0 redesign;
+- I1-I3 must preserve the null entityId plus metadata fallback unless an
+  explicitly approved schema/API phase changes it.
+
+No polymorphic foreign-key architecture is proposed. Historical rows and
+existing display/query behavior must remain readable.
+
+## 11. Transaction and failure-semantics ledger
+
+| Producer group | Classification | Transaction owner/client | Does Audit failure roll back business work? | Current evidence and migration invariant |
+| --- | --- | --- | --- | --- |
+| Employee lifecycle: writeLifecycleAudit | TRANSACTIONAL_STRICT | Employee runEmployeeLifecycle; Prisma.TransactionClient from runSerializableTransaction | Yes | Awaited tx.auditLog.create at modules/employee/application/mutations.ts:251; mutation tests simulate audit rejection and restore state |
+| Leave create/decision/cancellation/not-taken | TRANSACTIONAL_STRICT | Leave application use case and the same Prisma.TransactionClient passed to createLeaveAuditInTransaction | Yes | Direct tx write at modules/leave/infrastructure/persistence/transaction.ts:36; all listed workflows use runSerializableTransaction |
+| Leave approver assignment | TRANSACTIONAL_STRICT | Leave assignLeaveApprovers transaction, including Employee manager update | Yes | Direct tx write at modules/leave/application/approvals/approver-assignment.ts:109; rollback test covers later transaction failure |
+| Stock item/category/adjust/request operations | TRANSACTIONAL_STRICT | Stock application transaction and createStockCommandAudit(tx, ...) | Yes | Direct tx write at modules/stock/infrastructure/persistence/command-audit.ts:39; calls are awaited inside serializable/transaction callbacks |
+| Routine task/occurrence operations | TRANSACTIONAL_STRICT | Routine application transaction and createRoutineAuditInTransaction(tx, ...) | Yes | Direct tx write at modules/routine/application/audit.ts:13; helper is called inside transaction callbacks |
+| Routine import upload/row/apply/cancel | TRANSACTIONAL_STRICT | Each staging use case runSerializableTransaction callback | Yes | Four awaited direct writes at modules/routine/application/imports/staging.ts:665, 1108, 1272, 1337 |
+| Auth login/refresh/logout/reset, signup, Email Request | BEST_EFFORT | Route/application operation; generic helper uses global prisma, outside the business transaction | No | lib/server/audit.ts catches and logs all failures; primary operation remains successful or retains its already-determined auth result |
+| Employee create and non-lifecycle fallback writes | AFTER_RESPONSE / DEFERRED (best-effort) | Route next/after callback; global generic helper | No | app/api/employees/route.ts:98 and app/api/employees/[id]/route.ts:78,127 use after; helper swallows failures |
+| Employee, Leave, and Audit export callbacks | AFTER_RESPONSE / DEFERRED (best-effort) | Export route next/after callback | No | app/api/employees/export/route.ts:67, app/api/leave/export/route.ts:69, app/api/audit-logs/export/route.ts:17 |
+| Legacy logStockEvent/logLeaveEvent | BEST_EFFORT compatibility | Global generic helper; no active callers found | No | Keep only as compatibility seams until their producer migrations establish replacements |
+| Routine occurrence nested reader | Not a writer | Direct global prisma read | Not applicable | Compatibility reader at modules/routine/application/queries.ts:880 |
+
+No active producer remains UNKNOWN. The most important invariant is that a
+future generic append API must accept a transaction-bound persistence context
+or equivalent port for strict callers. It must not turn tx.auditLog.create into
+a post-commit best-effort call. Conversely, replacing a current best-effort
+helper with a throwing strict call would also change business behavior and is
+not allowed without an explicit decision.
+
+## 12. Direct Prisma AuditLog access inventory
+
+The production repository contains 14 direct delegate expressions across 10
+production files:
+
+| File and lines | Delegate operations | Current classification | Future handling |
+| --- | --- | --- | --- |
+| lib/server/audit.ts:80 | prisma.auditLog.create | Generic best-effort writer | Move physical persistence behind Audit infrastructure; retain a compatibility adapter during I3 |
+| lib/services/audit-log/queries.ts:128,141 | prisma.auditLog.findMany and count | Generic query reader | Audit query infrastructure in I1 |
+| lib/services/audit-log/mutations.ts:20 | prisma.auditLog.deleteMany | Retention cleanup | Audit maintenance infrastructure in I1 |
+| modules/employee/application/mutations.ts:251 | tx.auditLog.create | Strict lifecycle write | Replace only with a transaction-aware Audit command; preserve Employee transaction |
+| modules/leave/infrastructure/persistence/transaction.ts:36 | tx.auditLog.create | Strict Leave write | Replace only with transaction-aware Audit command |
+| modules/leave/application/approvals/approver-assignment.ts:109 | tx.auditLog.create | Strict cross-capability Leave/Employee write | Leave supplies meaning; Audit supplies persistence |
+| modules/routine/application/audit.ts:13 | tx.auditLog.create | Strict routine write helper | Replace with transaction-aware Audit command |
+| modules/routine/application/imports/staging.ts:665,1108,1272,1337 | tx.auditLog.create | Four strict import writes | Replace with transaction-aware Audit command; keep import details in Routine |
+| modules/routine/application/queries.ts:880 | prisma.auditLog.findMany | Routine nested reader | Preserve as an explicit query compatibility seam or consume a narrow Audit query |
+| modules/stock/infrastructure/persistence/command-audit.ts:39 | tx.auditLog.create | Strict Stock write helper | Replace with transaction-aware Audit command; keep Stock details/meaning in Stock |
+
+The production count excludes test mocks and fixtures. The known fixture
+access is modules/stock/__tests__/integration/stock-fixtures.ts:32,
+client.auditLog.deleteMany, used for test cleanup. Future direct-access
+enforcement must also allow tests, integration fixtures, Prisma schema and
+migrations, seed/support code, and narrowly documented infrastructure support
+where no runtime production ownership is implied.
+
+## 13. Request metadata ownership
+
+The current metadata paths are intentionally not uniform:
+
+- lib/server/audit.ts obtains headers through next/headers and resolves
+  cf-connecting-ip through lib/network/trusted-client-ip.ts;
+- lib/network/trusted-client-ip.ts validates only the trusted
+  cf-connecting-ip value with Node isIP; it does not blindly trust
+  X-Forwarded-For or X-Real-IP;
+- auth hybrid session composition reads request user-agent and trusted IP in
+  lib/auth/hybrid/session.ts;
+- Stock creates a request actor in
+  modules/stock/presentation/stock-command-actor.ts with IP, User-Agent,
+  requestId, and correlationId;
+- Routine does the same in modules/routine/server/command-actor.ts;
+- strict Stock and Routine audit details carry the trace values.
+
+The recommended boundary is:
+
+1. app/API composition or a feature command actor reads request headers;
+2. the shared network primitive resolves trusted client IP;
+3. the producer passes neutral optional ipAddress, userAgent, requestId, and
+   correlationId values to Audit;
+4. the Audit application/domain contract has no dependency on Next.js
+   headers, cookies, or route objects.
+
+The legacy generic adapter may temporarily retain next/headers for unchanged
+callers. I0 does not refactor it. Request metadata is infrastructure input,
+not business event meaning, but the decision to capture it and any
+feature-specific trace values remains visible in the producer contract.
+
+## 14. Cross-module dependency analysis
+
+Current dependencies are classified as follows:
+
+- lib/audit-log/display.ts imports @/modules/employee/client and
+  @/modules/leave/client for browser-safe pure display helpers. This is a
+  client presentation dependency, not a server or persistence dependency. I2
+  must preserve the safe shape or replace it with an equally narrow adapter.
+- modules/leave/application/notifications/audit-details.ts imports the
+  Employee public server entry to resolve Employee data while building
+  Leave-owned audit details. Leave owns the context and event meaning; this is
+  not an Audit-to-Employee dependency.
+- Leave approver assignment consumes the public Employee hierarchy contract
+  while sharing its transaction client. This is the existing deliberate
+  Leave-to-Employee direction documented in the architecture rules.
+- Stock, Leave, Routine, and Employee currently write AuditLog directly or
+  through legacy helpers because Audit has not yet migrated. These are staged
+  compatibility dependencies, not the target dependency direction.
+- lib/audit-log/contracts.ts is shared by generic infrastructure and
+  feature-specific types. Its Stock/Leave/EmployeeApprover leakage is an I3
+  extraction task, not evidence for a larger generic Audit domain.
+- no current Audit module exists. Therefore no current Audit client/server
+  graph can be claimed safe or enforced as migrated.
+
+The future Audit implementation must not depend on business module internals.
+Business producers may depend on the Audit public server contract; the Audit
+module must receive already-resolved generic payloads and must not import
+Stock, Leave, Employee, Routine, Auth, or IT application internals merely to
+interpret them.
+
+## 15. Deferred compatibility consumers
+
+### Email Request / future IT
+
+app/api/email-request/route.ts creates EMAIL_REQUEST through
+lib/server/audit.ts only for a newly persisted, non-replayed EmailRequest. The
+event meaning, selected fields, and IT workflow remain Email Request concerns.
+Email Request is explicitly deferred:
+
+Email Request -> legacy generic Audit adapter -> future Audit capability
+
+The future IT capability will eventually own the producer semantics. I0 does
+not create modules/it/, change the route, or remove the generic helper.
+
+### Auth/session/identity
+
+Auth remains a later producer migration. LOGIN_SUCCESS, LOGIN_FAILED, LOGOUT,
+PASSWORD_RESET, and USER_CREATE must continue to work through a compatibility
+surface until the Auth phase establishes its own public producer boundary.
+No Auth module is created in I0.
+
+### Other compatibility paths
+
+- TICKET_* enum values are historical IT storage compatibility and must remain.
+- logLeaveEvent and logStockEvent have no active callers found but remain
+  legacy APIs until producer migration confirms their removal is safe.
+- Routine's nested AuditLog reader is an active feature response contract.
+- Existing Dashboard Audit paths remain until I2.
+- Generic service/query/cleanup paths remain until I1 establishes an Audit
+  public server entry.
+
+## 16. Invariants future phases must preserve
+
+### Business ownership
+
+Business and platform producers retain event meaning, action choice, entity
+meaning, before/after snapshots, business metadata, actor semantics, trace
+semantics, and the decision that an event must be recorded.
+
+### Audit infrastructure ownership
+
+Future Audit infrastructure owns generic physical AuditLog persistence,
+serialization/parsing, query/filter/pagination, retention mechanics, generic
+contracts, and Audit presentation. It does not own business workflows.
+
+### Transaction integrity
+
+Every current tx.auditLog.create path remains in the same business
+transaction. A future transaction-aware append must write through the supplied
+transaction-bound context and propagate failure so the enclosing transaction
+rolls back.
+
+### Failure semantics
+
+Current best-effort helpers remain non-throwing from the primary operation.
+Current after-response callbacks remain after-response/deferred. Strict and
+best-effort behavior must not be normalized.
+
+### HTTP and presentation compatibility
+
+Active Audit API URLs, response shape, filters, pagination, ordering,
+details parsing, cleanup secret behavior, and export callback behavior remain
+unchanged. Dashboard UX, loading/error/empty states, labels, search,
+pagination, and sensitive-field suppression remain unchanged through I2.
+
+### Historical data compatibility
+
+Do not rename/remove AuditAction enum values, change Prisma storage mappings,
+or reinterpret historical TICKET rows. Preserve Leave's CUID metadata
+fallback and current details serialization/parsing behavior.
+
+### Scope boundaries
+
+Do not migrate Auth, Email Request, Outbox, Notification, or other unrelated
+capabilities as part of Audit migration. Do not introduce an event bus,
+CQRS, event sourcing, or speculative polymorphic identity design.
+
+## 17. Proposed I1 architecture
+
+I1 should establish server/application ownership without changing behavior:
+
+1. Create modules/audit/ with a server public entry and proportional
+   application/infrastructure layers.
+2. Put physical AuditLog repository access, generic JSON serialization/parsing,
+   generic query/pagination, and retention cleanup behind the module.
+3. Add a generic append contract that can receive a transaction-bound
+   persistence context for strict callers and neutral request metadata.
+4. Preserve the current best-effort compatibility adapter for callers that
+   intentionally use it; do not make it throw.
+5. Move or wrap lib/services/audit-log query/cleanup behavior behind the public
+   entry while preserving exact route responses and limits.
+6. Migrate app/api/audit-logs/route.ts and cleanup route composition to the
+   Audit server entry, retaining auth and secret checks in the delivery layer
+   unless the established module pattern assigns them elsewhere.
+7. Keep business producers, Auth, Email Request, and presentation in their
+   current locations until their own slices.
+8. Add tests for strict transaction context versus best-effort failure
+   behavior before changing any producer call site.
+
+I1 must not introduce a new action taxonomy, change entityId, or move
+feature-specific detail builders into Audit.
+
+## 18. Proposed I2 presentation migration
+
+I2 should move only Audit-specific presentation behind a browser-safe
+modules/audit/client.ts entry:
+
+- AuditLogsSection and its provider/context/types;
+- AuditLogViewer, skeletons, and action badge;
+- the pure display adapter and Audit action/entity registry, or explicit
+  presentation-local wrappers;
+- the narrow browser contract needed to consume /api/audit-logs.
+
+app/dashboard/audit/page.tsx and loading.tsx remain route composition and
+continue to own Dashboard-admin access/Suspense. Generic Dashboard shell,
+navigation, generic UI primitives, and generic identity helpers remain outside
+Audit. The page may consume only the Audit client entry for Audit presentation.
+
+I2 must keep the HTTP/browser contract and not pull the Audit server entry,
+Prisma, Next server APIs, secrets, or business application/infrastructure into
+the client graph. It must preserve the current Employee/Leave display
+formatter behavior through browser-safe contracts.
+
+## 19. Proposed I3 producer migration
+
+I3 should migrate producers vertically and one capability at a time:
+
+1. Employee lifecycle and fallback/create paths;
+2. Leave request/approval/cancellation/not-taken and approver assignment;
+3. Stock command audit paths;
+4. Routine task/occurrence/import paths;
+5. Auth/session producers in the later Auth phase;
+6. Email Request only when the future IT capability is approved.
+
+For each slice:
+
+- the producing module chooses action, entity, identifier, snapshots, details,
+  actor semantics, and strict/best-effort policy;
+- strict callers pass the exact transaction-bound context;
+- best-effort and after-response callers retain their non-throwing behavior;
+- feature-specific detail contracts/builders move out of
+  lib/audit-log/contracts.ts to the producing capability;
+- Audit receives only a generic append command;
+- request metadata and trace values remain available where they are today;
+- tests prove rollback or non-failure behavior as appropriate before the
+  legacy direct access is removed.
+
+Only after all consumers are migrated should the old direct delegates,
+generic feature-specific helper methods, and obsolete presentation paths be
+removed. The migration must preserve Email Request and Auth compatibility
+seams until their own phases.
+
+## 20. Future architecture checker rules
+
+I0 defines the following staged rules; it does not add them to
+scripts/check-architecture.mjs because the current repository intentionally
+has no Audit module and still contains legacy access.
+
+### I1 server and persistence rules
+
+- app/api/audit-logs/** query and cleanup routes must consume
+  @/modules/audit rather than lib/services/audit-log internals;
+- any future Audit write route must consume the Audit public server contract;
+- production direct AuditLog delegate access must be under
+  modules/audit/infrastructure/** once the physical owner exists;
+- business modules may call the Audit public append contract, including a
+  transaction-aware form, but may not deep-import Audit infrastructure;
+- do not flag legitimate tests, integration fixtures, Prisma schema/migrations,
+  seed/support code, or documented infrastructure support;
+- do not treat notificationOutbox or unrelated model names as AuditLog access;
+- retain a narrow, time-bounded exception for the Routine nested-reader
+  compatibility adapter until its migration exit is complete.
+
+### I2 client and presentation rules
+
+- app/dashboard/audit/page.tsx and loading.tsx must consume
+  @/modules/audit/client for Audit presentation;
+- Audit client entry and all reachable runtime code must not reach Prisma,
+  lib/db, lib/server, Next server-only APIs, secrets, Email/LINE, Outbox, or
+  the Audit server/application/infrastructure entry;
+- Audit presentation internals must use local contracts and must not self-import
+  the server/client public barrels;
+- legacy components/audit and dashboard Audit paths should be rejected only
+  after their replacement is present and the compatibility audit is closed.
+
+### I3 producer rules
+
+- migrated business producers may use only the Audit public server entry;
+- no business module may call prisma.auditLog or tx.auditLog directly;
+- event-specific details remain in the producer module;
+- generic Audit code must not import business module internals;
+- the checker should distinguish a transaction-bound public append call from
+  forbidden physical delegate access.
+
+These rules follow the existing checker style: public module entries,
+client/server graph checks, owner-exclusive physical persistence, explicit
+compatibility exceptions, and phased enforcement. They should be implemented
+incrementally in I1-I3 rather than as a broad I0 rule that would make the
+current legacy repository fail.
+
+## 21. Open risks and unresolved questions
+
+1. Leave CUID identity remains the largest compatibility risk. The current
+   null entityId plus details.metadata.leaveRequestId behavior must be
+   preserved until a separate identity/schema decision is approved.
+2. The generic writer couples request metadata to Next headers and swallows
+   all errors. Moving it without an explicit failure-policy boundary could
+   silently change behavior.
+3. EMPLOYEE_UPDATE is reused for Employee profile updates and
+   EmployeeApprover assignment. Action/entity pairing and detail semantics must
+   remain distinguishable.
+4. The query uses offset pagination and createdAt-only ordering. These are
+   current contracts, although equal timestamps can make page boundaries
+   unstable.
+5. Details parsing treats invalid JSON as null. A stricter parser would be a
+   compatibility change.
+6. The Audit export callback accepts request-provided entityType/count/filter
+   data without a domain export implementation in this route. This is not
+   changed in I0; validation and authorization should be reviewed separately.
+7. The generic action/entity registry includes display compatibility values
+   such as Stock and Leave that were not found as current direct producer
+   entity types. Removing them could break historical/display behavior.
+8. The Routine occurrence nested reader bypasses the generic query service and
+   returns raw details. Its response must be treated as a separate contract.
+9. After-response execution is best-effort by design in the current routes.
+   I3 must not make those writes synchronous or transaction-bound without an
+   explicit product decision.
+10. Auth and Email Request remain producers during the staged migration. Their
+    compatibility adapters must not be deleted when the main business modules
+    move.
+
+## Verification record
+
+Verification was executed after the documentation changes:
+
+- npm.cmd run architecture:check — passed; checked 946 repository source files.
+- npm.cmd run lint — passed.
+- npm.cmd run typecheck — passed.
+- npm.cmd run test:run — passed; 238 test files and 1,940 tests passed.
+
+The repository's plain npm run form was also attempted, but this Windows
+environment blocks npm.ps1 through PowerShell execution policy. The npm.cmd
+commands above executed the same package scripts successfully. The final
+edits after the test run were documentation-only evidence refinements; no
+source/runtime file changed.
+
+## 22. Final I0 closure checklist
+
+- [x] Every discovered production AuditLog writer is inventoried.
+- [x] Every direct production AuditLog Prisma access is classified.
+- [x] Generic and Routine-specific readers are inventoried.
+- [x] Retention and cleanup route behavior is documented.
+- [x] Dashboard and display ownership is documented with an I2 map.
+- [x] Every AuditAction enum value is classified.
+- [x] Transaction-bound, best-effort, and after-response semantics are explicit.
+- [x] AuditLog.entityId and Leave CUID compatibility are documented.
+- [x] Auth producers are documented.
+- [x] Email Request is explicitly deferred.
+- [x] Future owner location is justified.
+- [x] I1, I2, and I3 boundaries are defined.
+- [x] Future architecture checker rules and legitimate exceptions are defined.
+- [x] No runtime business behavior was changed in I0.
+- [x] Verification was run after the documentation changes; results are recorded
+  in the Phase I0 handoff.
+- [x] Phase I0 is closed; Phase I1 has not started.
+
+The source-of-truth handoff is complete. No Phase I1 implementation is
+included in this change.

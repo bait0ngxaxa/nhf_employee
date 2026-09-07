@@ -1,9 +1,9 @@
 # Module boundaries
 
-Status: Phase H3 CLOSED — Notification producer integration and final migration audit complete.
-Phase H1 server/application ownership and Phase H0 Notification discovery remain
-closed. Phase G3
-Department migration remains complete.
+Status: Phase I0 CLOSED — Audit discovery and boundary definition complete.
+Phase I1 implementation is NOT STARTED. Phase H3 Notification producer
+integration and final migration audit remain complete. Phase G3 Department
+migration remains complete.
 Stock, Routine, Leave, and Employee are migrated examples; Employee
 server/business and active presentation ownership are migrated as well.
 
@@ -169,6 +169,31 @@ barrel files; small explicit entry points are easier to evolve and keep
 dependency direction visible. Only the module root and, when present, its
 `client.ts` entry are public; arbitrary subpaths remain private.
 
+## Audit boundary (I0)
+
+Phase I0 is closed as discovery and boundary definition only. The future
+owner is a first-class modules/audit/ capability module, not shared/audit/.
+No Audit module, runtime migration, direct Prisma move, or presentation move
+exists yet; Phase I1 is not started. The decision follows the ownership
+principle: Audit has a cohesive persistence, generic query/pagination,
+retention, serialization, and viewer capability, while the events it records
+remain owned by their producing capabilities.
+
+Future Audit infrastructure owns generic AuditLog persistence, append
+mechanics, parsing/serialization, generic reads, pagination, retention, and
+Audit-specific presentation. Auth, Employee, Leave, Stock, Routine, and the
+deferred IT capability continue to own event meaning, AuditAction,
+entity meaning/identifiers, snapshots, event metadata, actor semantics, and
+the decision and failure policy for each write. Transaction-bound writes must
+keep the same business transaction; current best-effort and after-response
+writes must not be normalized. Leave's CUID-in-details fallback and all
+historical enum/storage values remain compatibility constraints.
+
+The full producer, reader, retention, presentation, action, identity,
+transaction, metadata, compatibility, and phased I1-I3 ledger is in
+audit-migration.md. The source record explicitly keeps Email Request
+deferred and does not claim that I1 implementation exists.
+
 ## Larger feature shape
 
 A feature with substantial domain rules, workflows, persistence, or external
@@ -280,10 +305,12 @@ import, selector, and display compatibility behavior.
 ## Shared/platform ownership
 
 Appropriate future `shared/` responsibilities may include authentication and
-session infrastructure, database adapters, HTTP/security primitives, audit
-infrastructure, notification or LINE delivery, uploads, network concerns, and
-generic UI primitives. Phase A establishes ownership guidance but does not move
-the existing implementations.
+session infrastructure, database adapters, HTTP/security primitives, trusted
+network/request metadata primitives, notification or LINE delivery, uploads,
+and generic UI primitives. Phase I0 resolves the cohesive Audit capability's
+physical persistence, generic query/retention, and presentation owner as a
+future modules/audit/ module; existing lib/ Audit code remains a compatibility
+implementation until I1-I3.
 
 Feature-specific validation, policies, calculations, status semantics,
 workflow orchestration, and feature UI remain feature-owned. For example, code

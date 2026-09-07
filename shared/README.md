@@ -2,8 +2,9 @@
 
 `shared/` is reserved for capabilities that are genuinely cross-domain or
 platform-level. Examples include authentication infrastructure, database
-adapters, HTTP/security primitives, audit infrastructure, notification or
-LINE delivery, uploads, network concerns, and generic UI primitives.
+adapters, HTTP/security primitives, trusted network/request metadata
+primitives, notification or LINE delivery, uploads, and generic UI
+primitives.
 
 The core ownership test is:
 
@@ -13,7 +14,10 @@ The core ownership test is:
 Shared code must not depend on `modules/`. It may not become a dumping ground
 for feature-specific types, validation, policies, or workflows. Phase A does
 not move the existing implementations in `lib/`, `components/`, or other
-legacy locations into this directory.
+legacy locations into this directory. Phase I0 resolves the cohesive Audit
+capability's physical persistence, generic query/retention, and presentation
+owner as a future modules/audit/ module; existing lib/ Audit code remains a
+compatibility implementation until I1-I3.
 
 See [module boundaries](../docs/architecture/module-boundaries.md) and
 [dependency rules](../docs/architecture/dependency-rules.md) for the complete

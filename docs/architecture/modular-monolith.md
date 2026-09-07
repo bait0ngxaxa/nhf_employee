@@ -1,9 +1,9 @@
 # NHF Employee modular monolith
 
-Status: Phase H3 CLOSED — Notification producer integration and final migration audit complete.
-Phase H1 server/application ownership and Phase H0 Notification discovery remain
-closed. Phase G3
-Department migration remains complete.
+Status: Phase I0 CLOSED — Audit discovery and boundary definition complete.
+Phase I1 implementation is NOT STARTED. Phase H3 Notification producer
+integration and final migration audit remain complete. Phase G3 Department
+migration remains complete.
 
 This document separates the repository's observed current state from the
 target architecture. Stock server/business ownership is now migrated into
@@ -106,6 +106,15 @@ supported ownership path. The current global outbox already treats in-app
 delivery as one possible
 channel, including Routine reminders, while the outbox processor and provider
 composition remain shared/platform infrastructure.
+
+Audit Phase I0 discovery is closed. The future cohesive Audit capability is
+targeted for modules/audit/, not shared/audit/, but no Audit module or runtime
+ownership migration exists yet and Phase I1 is not started. Audit will own
+generic AuditLog persistence, query/pagination, retention, serialization, and
+Audit presentation. Producing capabilities retain event meaning, AuditAction,
+entity semantics, details/snapshots, actor semantics, and strict versus
+best-effort transaction behavior. Auth and Email Request remain later/deferred
+producer boundaries. See audit-migration.md for the evidence and I1-I3 plan.
 
 ## Target architecture
 

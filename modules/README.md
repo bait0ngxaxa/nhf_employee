@@ -4,6 +4,9 @@
 Employee application.
 
 Stock, Routine, Leave, Employee, and Department are migrated feature modules.
+Audit Phase I0 discovery is closed and targets a future modules/audit/
+capability owner; modules/audit/ does not exist yet and Phase I1 has not
+started.
 Employee F0-F3 owns its server/business behavior and active presentation in
 `modules/employee/`. Employee Dashboard routes consume the minimal
 browser-safe `@/modules/employee/client` entry, which also exposes the proven
