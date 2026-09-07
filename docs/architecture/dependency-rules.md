@@ -1,10 +1,10 @@
 # Dependency rules and enforcement
 
-Status: Phase I0 CLOSED — Audit discovery and boundary definition complete.
-Phase I1 implementation is NOT STARTED. Phase H3 Notification producer
-integration and final migration audit remain complete. Phase G3 Department
-migration remains complete. These rules govern new architecture code while
-unrelated legacy features remain compatible during incremental migration.
+Status: Phase I1 CLOSED — Audit server/application/persistence foundation
+complete. Phase I2 NOT STARTED. Phase H3 Notification producer integration and
+final migration audit remain complete. Phase G3 Department migration remains
+complete. These rules govern new architecture code while unrelated legacy
+features remain compatible during incremental migration.
 
 ## Direction
 
@@ -145,34 +145,31 @@ LINE, and business producer ownership remain unchanged after H3. Leave, Stock,
 and Routine now consume only `@/modules/notification` for Inbox persistence;
 Email Request remains the documented compatibility exception.
 
-## Audit boundary (I0 discovery; enforcement deferred)
+## Audit boundary (I1 foundation and enforcement)
 
-Phase I0 selected modules/audit/ as the future owner of the cohesive Audit
-capability. It does not create that module or change current runtime access.
-shared/ may continue to own neutral database, HTTP/security, and trusted
-network primitives, but physical AuditLog persistence, generic Audit
-queries/retention, and Audit presentation belong to the future Audit module.
+Phase I1 establishes `modules/audit/` as the current owner of the cohesive
+generic Audit server/application and persistence capability. `shared/` may
+continue to own neutral database, HTTP/security, and trusted network
+primitives, but physical AuditLog persistence, generic Audit queries/retention,
+and future Audit presentation belong to the Audit module.
 
 Audit producers retain event meaning, action/entity selection, snapshots,
 business metadata, actor semantics, and the choice between a strict
-transaction-bound, best-effort, or after-response write. A future Audit
-public server contract must accept a transaction-bound context for strict
-callers. It must not import business module internals or expose
+transaction-bound, best-effort, or after-response write. The Audit public
+server contract accepts a transaction-bound context for strict callers. It
+must not import business module internals or expose
 feature-specific commands. Email Request remains a deferred compatibility
 consumer and Auth remains a later producer phase. See audit-migration.md.
 
-The future checker rules are staged. I1 requires Audit API query/cleanup
-routes to use the Audit public server entry, prevents new cross-module deep
-imports, keeps new Audit-owned physical delegates under
-`modules/audit/infrastructure/**`, and protects the server/client boundary.
-The exact baseline direct-access allowlist in
-`audit-migration.md` §20 temporarily covers the generic I1 transfer paths and
-the existing business-producer/Routine-reader seams; it is path-specific and
-does not allow new direct accesses. I3 removes those producer and reader
-exceptions and then enforces that all production physical AuditLog delegates
-are under `modules/audit/infrastructure/**`, with only legitimate
-non-production/support exceptions. These rules are not enforced by the
-current checker.
+I1 enforces that Audit query/cleanup routes use the Audit public server entry,
+keeps new Audit-owned physical delegates under
+`modules/audit/infrastructure/**`, and rejects new direct AuditLog production
+access outside that owner. The exact baseline direct-access allowlist in
+`audit-migration.md` §20 covers only the existing business-producer and
+Routine-reader seams, validates operation/count per file, and does not permit
+additional access in an allowlisted file. I3 removes those producer and
+reader exceptions and then enforces final physical AuditLog exclusivity, with
+only legitimate non-production/support exceptions.
 
 ## Client/server boundary
 

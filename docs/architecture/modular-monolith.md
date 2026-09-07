@@ -1,9 +1,9 @@
 # NHF Employee modular monolith
 
-Status: Phase I0 CLOSED — Audit discovery and boundary definition complete.
-Phase I1 implementation is NOT STARTED. Phase H3 Notification producer
-integration and final migration audit remain complete. Phase G3 Department
-migration remains complete.
+Status: Phase I1 CLOSED — Audit server/application/persistence foundation
+complete. Phase I2 NOT STARTED. Phase H3 Notification producer integration and
+final migration audit remain complete. Phase G3 Department migration remains
+complete.
 
 This document separates the repository's observed current state from the
 target architecture. Stock server/business ownership is now migrated into
@@ -107,17 +107,17 @@ delivery as one possible
 channel, including Routine reminders, while the outbox processor and provider
 composition remain shared/platform infrastructure.
 
-Audit Phase I0 discovery is closed. The future cohesive Audit capability is
-targeted for modules/audit/, not shared/audit/, but no Audit module or runtime
-ownership migration exists yet and Phase I1 is not started. Audit will own
-generic AuditLog persistence, query/pagination, retention, serialization, and
-Audit presentation. Producing capabilities retain event meaning, AuditAction,
-entity semantics, details/snapshots, actor semantics, and strict versus
-best-effort transaction behavior. Auth and Email Request remain later/deferred
-producer boundaries. See audit-migration.md for the evidence and I1-I3 plan.
-I1 establishes generic Audit ownership while known business producer and
-Routine-reader direct-access seams remain temporary; I3 performs producer
-migration and closes final physical AuditLog persistence exclusivity.
+Audit Phase I0 discovery remains the historical boundary record. Phase I1 now
+owns generic AuditLog persistence, query/pagination, retention, and
+serialization in `modules/audit/`, not `shared/audit/`. Its public server
+entry is `@/modules/audit`; the generic Audit API routes consume that entry,
+while `lib/server/audit.ts` remains a best-effort compatibility adapter.
+Producing capabilities retain event meaning, AuditAction, entity semantics,
+details/snapshots, actor semantics, and strict versus best-effort transaction
+behavior. Auth and Email Request remain later/deferred producer boundaries.
+Known business producer and Routine-reader direct-access seams remain
+temporary for I3. Audit presentation remains in its pre-I2 locations. See
+audit-migration.md for the evidence and I1-I3 plan.
 
 ## Target architecture
 

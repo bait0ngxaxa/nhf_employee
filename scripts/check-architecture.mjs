@@ -176,6 +176,22 @@ const notificationApiRouteFiles = [
     "app/api/notifications/[id]/read/route.ts",
     "app/api/notifications/mark-all-read/route.ts",
 ];
+const auditApiRouteFiles = [
+    "app/api/audit-logs/route.ts",
+    "app/api/audit-logs/cleanup/route.ts",
+];
+const auditLogCompatibilityAccesses = new Map([
+    ["modules/employee/application/mutations.ts", ["create"]],
+    ["modules/leave/infrastructure/persistence/transaction.ts", ["create"]],
+    ["modules/leave/application/approvals/approver-assignment.ts", ["create"]],
+    ["modules/stock/infrastructure/persistence/command-audit.ts", ["create"]],
+    ["modules/routine/application/audit.ts", ["create"]],
+    [
+        "modules/routine/application/imports/staging.ts",
+        ["create", "create", "create", "create"],
+    ],
+    ["modules/routine/application/queries.ts", ["findMany"]],
+]);
 const notificationDashboardRouteFiles = [
     "app/dashboard/notifications/page.tsx",
     "app/dashboard/notifications/loading.tsx",
@@ -608,6 +624,158 @@ function isTestSource(filePath, rootPath) {
         || /\.(?:test|spec)\.[cm]?[jt]sx?$/.test(repositoryPath);
 }
 
+function getStaticPropertyName(node) {
+    if (ts.isPropertyAccessExpression(node)) return node.name.text;
+    if (ts.isElementAccessExpression(node)
+        && node.argumentExpression !== undefined
+        && ts.isStringLiteralLike(node.argumentExpression)) {
+        return node.argumentExpression.text;
+    }
+    return null;
+}
+
+function getStaticBindingPropertyName(node) {
+    return getStaticPropertyName(node)
+        ?? (ts.isIdentifier(node) ? node.text : null);
+}
+
+function getAuditLogAliases(sourceFile) {
+    const declarations = [];
+    const aliases = new Set();
+
+    function collectDeclarations(node) {
+        if (ts.isVariableDeclaration(node)) declarations.push(node);
+        ts.forEachChild(node, collectDeclarations);
+    }
+
+    collectDeclarations(sourceFile);
+
+    let changed = true;
+    while (changed) {
+        changed = false;
+        for (const declaration of declarations) {
+            const initializer = declaration.initializer;
+            if (initializer === undefined) continue;
+
+            if (ts.isIdentifier(declaration.name)
+                && (
+                    getStaticPropertyName(initializer) === "auditLog"
+                    || (ts.isIdentifier(initializer) && aliases.has(initializer.text))
+                )
+                && !aliases.has(declaration.name.text)) {
+                aliases.add(declaration.name.text);
+                changed = true;
+            }
+
+            if (!ts.isObjectBindingPattern(declaration.name)) continue;
+            for (const element of declaration.name.elements) {
+                if (!ts.isBindingElement(element)) continue;
+                const propertyName = element.propertyName ?? element.name;
+                if (getStaticBindingPropertyName(propertyName) !== "auditLog"
+                    || !ts.isIdentifier(element.name)
+                    || aliases.has(element.name.text)) {
+                    continue;
+                }
+                aliases.add(element.name.text);
+                changed = true;
+            }
+        }
+    }
+
+    return aliases;
+}
+
+function getAuditLogDelegateAccesses(filePath) {
+    const contents = readFileSync(filePath, "utf8");
+    const sourceFile = ts.createSourceFile(
+        filePath,
+        contents,
+        ts.ScriptTarget.Latest,
+        true,
+        getScriptKind(filePath),
+    );
+    const aliases = getAuditLogAliases(sourceFile);
+    const accesses = [];
+
+    function visit(node) {
+        if (ts.isCallExpression(node)
+            && (ts.isPropertyAccessExpression(node.expression)
+                || ts.isElementAccessExpression(node.expression))) {
+            const operation = getStaticPropertyName(node.expression);
+            const delegate = node.expression.expression;
+            const isAuditLogDelegate = getStaticPropertyName(delegate) === "auditLog"
+                || (ts.isIdentifier(delegate) && aliases.has(delegate.text));
+            if (operation !== null && isAuditLogDelegate) {
+                accesses.push({
+                    line: sourceFile.getLineAndCharacterOfPosition(
+                        node.expression.getStart(sourceFile),
+                    ).line + 1,
+                    operation,
+                });
+            }
+        }
+
+        ts.forEachChild(node, visit);
+    }
+
+    visit(sourceFile);
+    return accesses;
+}
+
+function isAuditLogSupportSource(filePath, rootPath) {
+    if (isTestSource(filePath, rootPath)) return true;
+    if (pathIsWithin(filePath, resolve(rootPath, "prisma"))) return true;
+
+    const segments = relativeFilePath(filePath, rootPath)
+        .split("/")
+        .map((segment) => segment.toLowerCase());
+    return segments.some((segment) => [
+        "fixture",
+        "fixtures",
+        "__fixtures__",
+        "test-support",
+        "test-utils",
+    ].includes(segment));
+}
+
+function getAuditLogPersistenceViolation(filePath, rootPath) {
+    const auditInfrastructureRoot = resolve(rootPath, "modules/audit/infrastructure");
+    if (pathIsWithin(filePath, auditInfrastructureRoot)
+        || isAuditLogSupportSource(filePath, rootPath)) {
+        return null;
+    }
+
+    const accesses = getAuditLogDelegateAccesses(filePath);
+    if (accesses.length === 0) return null;
+
+    const repositoryPath = relativeFilePath(filePath, rootPath);
+    const expectedAccesses = auditLogCompatibilityAccesses.get(repositoryPath);
+    if (expectedAccesses === undefined) {
+        const firstAccess = accesses[0];
+        return `${repositoryPath}:${firstAccess.line} direct AuditLog Prisma delegate access must be owned by modules/audit/infrastructure/ or match an explicitly allowed temporary producer expression.`;
+    }
+
+    const actualCounts = new Map();
+    for (const access of accesses) {
+        actualCounts.set(access.operation, (actualCounts.get(access.operation) ?? 0) + 1);
+    }
+    const expectedCounts = new Map();
+    for (const operation of expectedAccesses) {
+        expectedCounts.set(operation, (expectedCounts.get(operation) ?? 0) + 1);
+    }
+    const countsMatch = actualCounts.size === expectedCounts.size
+        && [...expectedCounts].every(([operation, count]) =>
+            actualCounts.get(operation) === count,
+        );
+    if (countsMatch) return null;
+
+    const formatCounts = (counts) => [...counts.entries()]
+        .map(([operation, count]) => `${operation} x${count}`)
+        .join(", ");
+    const firstAccess = accesses[0];
+    return `${repositoryPath}:${firstAccess.line} direct AuditLog access does not match the allowed temporary compatibility shape; expected ${formatCounts(expectedCounts)}, found ${formatCounts(actualCounts)}.`;
+}
+
 const notificationDelegateOperations = new Set([
     "create",
     "createMany",
@@ -695,6 +863,83 @@ function getNotificationRouteDependencyViolation(filePath, rootPath, moduleSpeci
     }
 
     return null;
+}
+
+function isAuditApiRoute(filePath, rootPath) {
+    return auditApiRouteFiles.some((routePath) =>
+        filePath === resolve(rootPath, routePath),
+    );
+}
+
+function getAuditApiRouteDependencyViolation(filePath, rootPath, moduleSpecifier) {
+    if (!isAuditApiRoute(filePath, rootPath)) return null;
+
+    const resolvedImport = moduleSpecifier.startsWith("@/")
+        ? resolve(rootPath, moduleSpecifier.slice(2))
+        : getImportSourcePath(moduleSpecifier, filePath, rootPath);
+    const normalizedSpecifier = resolvedImport === null
+        ? moduleSpecifier
+        : `@/${relativeFilePath(resolvedImport, rootPath).replace(/\.[cm]?[jt]sx?$/, "")}`;
+
+    if (hasImportPrefix(normalizedSpecifier, "@/modules/audit")
+        && normalizedSpecifier !== "@/modules/audit") {
+        return "Audit API routes must use the server entry @/modules/audit.";
+    }
+
+    return null;
+}
+
+function getAuditDependencyViolation(filePath, rootPath, moduleSpecifier) {
+    const auditModuleRoot = resolve(rootPath, "modules/audit");
+    if (!pathIsWithin(filePath, auditModuleRoot)
+        || filePath === resolve(auditModuleRoot, "index.ts")) {
+        return null;
+    }
+
+    const resolvedImport = moduleSpecifier.startsWith("@/")
+        ? resolve(rootPath, moduleSpecifier.slice(2))
+        : getImportSourcePath(moduleSpecifier, filePath, rootPath);
+    const normalizedSpecifier = resolvedImport === null
+        ? moduleSpecifier
+        : `@/${relativeFilePath(resolvedImport, rootPath).replace(/\.[cm]?[jt]sx?$/, "")}`;
+
+    if (["@/modules/audit", "@/modules/audit/index"].includes(normalizedSpecifier)) {
+        return "Audit module internals must use local contracts instead of their own public barrel.";
+    }
+
+    return null;
+}
+
+function getAuditApiRouteCompositionViolations(rootPath, sourceFiles) {
+    const publicEntry = "@/modules/audit";
+    const violations = [];
+
+    for (const routePath of auditApiRouteFiles) {
+        const filePath = resolve(rootPath, routePath);
+        if (!sourceFiles.includes(filePath)) continue;
+
+        const normalizedSpecifiers = getImports(filePath).map((record) => {
+            const resolvedImport = record.moduleSpecifier.startsWith("@/")
+                ? resolve(rootPath, record.moduleSpecifier.slice(2))
+                : getImportSourcePath(record.moduleSpecifier, filePath, rootPath);
+            return resolvedImport === null
+                ? record.moduleSpecifier
+                : `@/${relativeFilePath(resolvedImport, rootPath).replace(/\.[cm]?[jt]sx?$/, "")}`;
+        });
+
+        if (normalizedSpecifiers.includes(publicEntry)) continue;
+
+        const hasAuditDependency = normalizedSpecifiers.some((specifier) =>
+            hasImportPrefix(specifier, publicEntry),
+        );
+        if (hasAuditDependency) continue;
+
+        violations.push(
+            `${relativeFilePath(filePath, rootPath)} must consume Audit through "${publicEntry}".`,
+        );
+    }
+
+    return violations;
 }
 
 function getNotificationDashboardRouteDependencyViolation(filePath, rootPath, moduleSpecifier) {
@@ -1178,9 +1423,47 @@ function checkArchitecture(options = {}) {
             violations.push(notificationPersistenceViolation);
         }
 
+        const auditLogPersistenceViolation = getAuditLogPersistenceViolation(
+            filePath,
+            rootPath,
+        );
+        if (auditLogPersistenceViolation !== null) {
+            violations.push(auditLogPersistenceViolation);
+        }
+
         const owner = getOwner(filePath, modulesRoot, sharedRoot);
 
         for (const importRecord of getImports(filePath)) {
+            const auditApiRouteDependencyViolation = getAuditApiRouteDependencyViolation(
+                filePath,
+                rootPath,
+                importRecord.moduleSpecifier,
+            );
+            if (auditApiRouteDependencyViolation !== null) {
+                violations.push(describeViolation(
+                    filePath,
+                    rootPath,
+                    importRecord,
+                    auditApiRouteDependencyViolation,
+                ));
+                continue;
+            }
+
+            const auditDependencyViolation = getAuditDependencyViolation(
+                filePath,
+                rootPath,
+                importRecord.moduleSpecifier,
+            );
+            if (auditDependencyViolation !== null) {
+                violations.push(describeViolation(
+                    filePath,
+                    rootPath,
+                    importRecord,
+                    auditDependencyViolation,
+                ));
+                continue;
+            }
+
             const notificationDashboardRouteDependencyViolation =
                 getNotificationDashboardRouteDependencyViolation(
                     filePath,
@@ -1406,6 +1689,7 @@ function checkArchitecture(options = {}) {
     }
 
     violations.push(...getEmployeeDashboardRouteCompositionViolations(rootPath, sourceFiles));
+    violations.push(...getAuditApiRouteCompositionViolations(rootPath, sourceFiles));
     violations.push(...getNotificationDashboardRouteCompositionViolations(rootPath, sourceFiles));
     violations.push(...getNotificationNavbarCompositionViolations(rootPath, sourceFiles));
     violations.push(...getNotificationRouteCompositionViolations(rootPath, sourceFiles));

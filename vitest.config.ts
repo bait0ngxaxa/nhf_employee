@@ -15,6 +15,7 @@ const NODE_TESTS = [
     "__tests__/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts}",
     "modules/employee/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts}",
     "modules/department/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts}",
+    "modules/audit/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts}",
     "modules/notification/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts}",
     "modules/stock/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts}",
     "modules/routine/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts}",

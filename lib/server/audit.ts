@@ -1,6 +1,6 @@
-import { prisma } from "@/lib/db/prisma";
-import type { AuditDetails } from "@/lib/audit-log/contracts";
 import { getTrustedClientIp } from "@/lib/network/trusted-client-ip";
+import { appendAuditBestEffort } from "@/modules/audit";
+import type { AuditDetails } from "@/modules/audit";
 import { type AuditAction } from "@prisma/client";
 import { headers } from "next/headers";
 
@@ -77,17 +77,15 @@ export async function createAuditLog(
             getUserAgent(),
         ]);
 
-        await prisma.auditLog.create({
-            data: {
-                action,
-                entityType,
-                entityId,
-                userId,
-                userEmail,
-                ipAddress,
-                userAgent,
-                details: details ? JSON.stringify(details) : null,
-            },
+        await appendAuditBestEffort({
+            action,
+            entityType,
+            entityId,
+            userId,
+            userEmail,
+            ipAddress,
+            userAgent,
+            details,
         });
     } catch (error) {
         // Log error but don't throw - audit logging should not break the main flow

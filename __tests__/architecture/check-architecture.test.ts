@@ -20,6 +20,9 @@ const fixtureFiles: FixtureFiles = {
     "modules/department/index.ts": "export const x = 1;\n",
     "modules/department/application/example.ts": "export const x = 1;\n",
     "modules/department/infrastructure/persistence/repository.ts": "export const x = 1;\n",
+    "modules/audit/index.ts": "export const x = 1;\n",
+    "modules/audit/application/example.ts": "export const x = 1;\n",
+    "modules/audit/infrastructure/persistence/repository.ts": "export const x = 1;\n",
     "modules/notification/index.ts": "export const x = 1;\n",
     "modules/notification/client.ts": '"use client"; export const x = 1;\n',
     "modules/notification/application/example.ts": "export const x = 1;\n",
@@ -1076,6 +1079,87 @@ describe("architecture checker module boundaries", () => {
         expect(result.violations[0]).toContain(
             'imports "../../stock/domain/inventory"',
         );
+    });
+
+    it("allows Audit infrastructure to own direct AuditLog persistence", async () => {
+        const result = await checkFixture(
+            "modules/audit/infrastructure/persistence/repository.ts",
+            [
+                "await prisma.auditLog.create({ data: {} });",
+                "await tx.auditLog.findMany();",
+            ].join("\n"),
+        );
+
+        expect(result.violations).toEqual([]);
+    });
+
+    it("rejects direct AuditLog persistence from a new production file", async () => {
+        const result = await checkFixture(
+            "app/api/new-audit-producer.ts",
+            "await prisma.auditLog.create({ data: {} });",
+        );
+
+        expect(result.violations).toHaveLength(1);
+        expect(result.violations[0]).toContain(
+            "direct AuditLog Prisma delegate access must be owned by modules/audit/infrastructure/",
+        );
+    });
+
+    it("allows the exact known temporary producer access shape", async () => {
+        const result = await checkFixture(
+            "modules/employee/application/mutations.ts",
+            "await tx.auditLog.create({ data: {} });",
+        );
+
+        expect(result.violations).toEqual([]);
+    });
+
+    it("recognizes an aliased AuditLog delegate in the known compatibility shape", async () => {
+        const result = await checkFixture(
+            "modules/employee/application/mutations.ts",
+            [
+                "const auditLog = tx.auditLog;",
+                "await auditLog.create({ data: {} });",
+            ].join("\n"),
+        );
+
+        expect(result.violations).toEqual([]);
+    });
+
+    it("rejects an additional AuditLog delegate in an allowlisted producer file", async () => {
+        const result = await checkFixture(
+            "modules/employee/application/mutations.ts",
+            [
+                "await tx.auditLog.create({ data: {} });",
+                "await tx.auditLog.create({ data: {} });",
+            ].join("\n"),
+        );
+
+        expect(result.violations).toHaveLength(1);
+        expect(result.violations[0]).toContain(
+            "does not match the allowed temporary compatibility shape",
+        );
+    });
+
+    it("rejects Audit API routes that deep-import Audit internals", async () => {
+        const result = await checkFixture(
+            "app/api/audit-logs/route.ts",
+            'import { getAuditLogs } from "@/modules/audit/application/queries";\n',
+        );
+
+        expect(result.violations).toHaveLength(1);
+        expect(result.violations[0]).toContain(
+            "Audit API routes must use the server entry @/modules/audit",
+        );
+    });
+
+    it("allows legitimate AuditLog access in test fixtures", async () => {
+        const result = await checkFixture(
+            "modules/stock/__tests__/integration/stock-fixtures.ts",
+            "await client.auditLog.deleteMany();",
+        );
+
+        expect(result.violations).toEqual([]);
     });
 
     it.each(["stock", "routine", "future"])(

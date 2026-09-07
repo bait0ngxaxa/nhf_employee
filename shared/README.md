@@ -14,13 +14,12 @@ The core ownership test is:
 Shared code must not depend on `modules/`. It may not become a dumping ground
 for feature-specific types, validation, policies, or workflows. Phase A does
 not move the existing implementations in `lib/`, `components/`, or other
-legacy locations into this directory. Phase I0 resolves the cohesive Audit
-capability's physical persistence, generic query/retention, and presentation
-owner as a future modules/audit/ module; existing lib/ Audit code remains a
-compatibility implementation during the transition. I1 establishes generic
-Audit ownership, while known business producer and Routine-reader direct
-access seams remain temporary until I3 closes final physical AuditLog
-persistence exclusivity.
+legacy locations into this directory. Phase I1 establishes the cohesive Audit
+capability's physical persistence, generic query/retention, and server
+application owner as `modules/audit/`, not `shared/audit/`. The legacy Audit
+adapters remain only for compatibility; known business producer and
+Routine-reader direct-access seams remain temporary until I3 closes final
+physical AuditLog persistence exclusivity.
 
 See [module boundaries](../docs/architecture/module-boundaries.md) and
 [dependency rules](../docs/architecture/dependency-rules.md) for the complete

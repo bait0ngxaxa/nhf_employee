@@ -6,10 +6,8 @@ const { cleanupExpiredAuditLogsMock } = vi.hoisted(() => ({
     cleanupExpiredAuditLogsMock: vi.fn(),
 }));
 
-vi.mock("@/lib/services/audit-log", () => ({
-    auditLogService: {
-        cleanupExpiredAuditLogs: cleanupExpiredAuditLogsMock,
-    },
+vi.mock("@/modules/audit", () => ({
+    cleanupExpiredAuditLogs: cleanupExpiredAuditLogsMock,
 }));
 
 import { POST as cleanupAuditLogsRoute } from "@/app/api/audit-logs/cleanup/route";

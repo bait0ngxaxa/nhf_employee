@@ -7,7 +7,7 @@ import {
     AUDIT_LOG_RETENTION_DAYS,
     calculateAuditLogRetentionCutoff,
     cleanupExpiredAuditLogs,
-} from "@/lib/services/audit-log/mutations";
+} from "./retention";
 
 vi.mock("@/lib/db/prisma", () => ({
     prisma: mockDeep<PrismaClient>(),

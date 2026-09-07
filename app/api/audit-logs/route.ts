@@ -1,10 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { requireAdminSession } from "@/lib/auth/api";
 import { operationFailed } from "@/lib/ssot/http";
-import {
-    auditLogService,
-    type AuditLogFilters,
-} from "@/lib/services/audit-log";
+import { getAuditLogs, type AuditLogFilters } from "@/modules/audit";
 
 /**
  * Parse query parameters into AuditLogFilters
@@ -41,7 +38,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         if (!auth.ok) return auth.response;
 
         const filters = parseQueryParams(request.url);
-        const result = await auditLogService.getAuditLogs(filters);
+        const result = await getAuditLogs(filters);
 
         return NextResponse.json(result, { status: 200 });
     } catch (error) {

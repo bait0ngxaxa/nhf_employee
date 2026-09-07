@@ -6,9 +6,12 @@ export type {
     PaginatedAuditLogsResult,
 } from "./types";
 
-// Import service functions
-import { cleanupExpiredAuditLogs } from "./mutations";
-import { getAuditLogs } from "./queries";
+import {
+    cleanupExpiredAuditLogs,
+    getAuditLogs,
+} from "@/modules/audit";
+
+export type { CleanupAuditLogsResult } from "@/modules/audit";
 
 /**
  * Audit Log Service Object
@@ -18,11 +21,8 @@ export const auditLogService = {
     getAuditLogs,
 };
 
-// Also export individual functions
 export {
     AUDIT_LOG_RETENTION_DAYS,
     calculateAuditLogRetentionCutoff,
-    cleanupExpiredAuditLogs,
-    type CleanupAuditLogsResult,
-} from "./mutations";
-export { getAuditLogs };
+} from "@/modules/audit";
+export { cleanupExpiredAuditLogs, getAuditLogs };

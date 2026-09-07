@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { mockDeep, mockReset } from "vitest-mock-extended";
 import type { PrismaClient } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
-import { getAuditLogs } from "@/lib/services/audit-log/queries";
+import { getAuditLogs } from "./queries";
 
 vi.mock("@/lib/db/prisma", () => ({
     prisma: mockDeep<PrismaClient>(),
@@ -98,6 +98,40 @@ describe("Audit Log Queries", () => {
             const result = await getAuditLogs({ page: 1, limit: 10 });
 
             expect(result.auditLogs[0].details).toBeNull();
+        });
+
+        it("preserves page normalization and the one-to-one query limit clamp", async () => {
+            prismaMock.auditLog.count.mockResolvedValue(0);
+            prismaMock.auditLog.findMany.mockResolvedValue([]);
+
+            const result = await getAuditLogs({ page: 0, limit: 500 });
+
+            expect(prismaMock.auditLog.findMany).toHaveBeenCalledWith(
+                expect.objectContaining({ skip: 0, take: 100 }),
+            );
+            expect(result.pagination).toEqual({
+                page: 1,
+                limit: 100,
+                total: 0,
+                pages: 0,
+            });
+        });
+
+        it("matches an exact AuditAction value when searching", async () => {
+            prismaMock.auditLog.count.mockResolvedValue(0);
+            prismaMock.auditLog.findMany.mockResolvedValue([]);
+
+            await getAuditLogs({ page: 1, limit: 10, search: "login_success" });
+
+            expect(prismaMock.auditLog.findMany).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    where: expect.objectContaining({
+                        OR: expect.arrayContaining([
+                            { action: { equals: "LOGIN_SUCCESS" } },
+                        ]),
+                    }),
+                }),
+            );
         });
     });
 });

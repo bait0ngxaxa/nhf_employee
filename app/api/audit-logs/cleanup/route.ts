@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 
-import { auditLogService } from "@/lib/services/audit-log";
 import { forbidden, jsonError, serverError } from "@/lib/ssot/http";
 import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
+import { cleanupExpiredAuditLogs } from "@/modules/audit";
 
 const CLEANUP_SECRET_HEADER = "x-cleanup-secret";
 
@@ -23,7 +23,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     }
 
     try {
-        const result = await auditLogService.cleanupExpiredAuditLogs();
+        const result = await cleanupExpiredAuditLogs();
 
         return NextResponse.json({
             success: true,

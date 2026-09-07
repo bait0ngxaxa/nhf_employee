@@ -1,8 +1,8 @@
 # Audit capability migration
 
-Status: **Phase I0 CLOSED — Audit discovery and boundary definition complete.**
+Status: **Phase I1 CLOSED — Audit server/application/persistence foundation complete.**
 
-Phase I1 implementation: **NOT STARTED**.
+Phase I2: **NOT STARTED**.
 
 Baseline audited: `05c2327be2f46e83a843040b978093b30a1c0289`
 (`refactor(notification): migrate Leave Stock and Routine Inbox writes`).
@@ -10,9 +10,9 @@ This was the repository state immediately before the Phase I0 documentation
 commit. Historical source paths and line references below refer to that
 baseline and may move during I1-I3.
 
-This record is the source of truth for the Audit capability migration. It
-records the repository state observed during Phase I0; it does not claim that
-Audit runtime ownership has already moved.
+This record is the source of truth for the Audit capability migration. Its
+baseline sections record the repository state observed during Phase I0, while
+the I1 implementation sections record the current ownership result.
 
 ## 1. Scope
 
@@ -48,8 +48,8 @@ semantics. The relevant evidence includes:
   components/dashboard/context/audit-logs/**, and
   components/dashboard/sections/AuditLogsSection.tsx;
 - semantic tests:
-  __tests__/services/audit-log/queries.test.ts,
-  __tests__/services/audit-log/mutations.test.ts,
+  modules/audit/application/queries.test.ts,
+  modules/audit/application/retention.test.ts,
   __tests__/api/audit-log-cleanup-route.test.ts,
   __tests__/audit-log-display.test.ts,
   modules/employee/application/mutations.test.ts, and
@@ -59,10 +59,11 @@ semantics. The relevant evidence includes:
   scripts/check-architecture.mjs:659-1118 and 1150-1419.
 
 No runtime source, Prisma schema, migration, component, route contract, or
-business behavior was changed in Phase I0. In particular, modules/audit/ and
-shared/audit/ do not exist as a result of this phase.
+business behavior was changed in Phase I0. At the I0 handoff, modules/audit/
+and shared/audit/ did not exist; the I1 implementation below records the
+subsequent runtime ownership transfer.
 
-## 2. Current architecture
+## 2. Current architecture at the I0 baseline
 
 ### 2.1 Persistence model
 
@@ -171,6 +172,42 @@ The current browser request is GET /api/audit-logs?page=...&limit=... with
 server-side filters. The Dashboard uses limit=15, while the API defaults to
 20 and accepts at most 100.
 
+### 2.5 I1 implementation result
+
+Phase I1 establishes `modules/audit/` as the current server/application and
+generic persistence owner. Its supported server entry is
+`modules/audit/index.ts`, which exposes only the generic append, query, and
+retention capabilities needed by current consumers:
+
+- `appendAuditInTransaction(persistenceContext, command)` for strict writes;
+- `appendAuditBestEffort(command)` for non-throwing compatibility writes;
+- `getAuditLogs(filters)` for the existing generic administrative query;
+- `cleanupExpiredAuditLogs(now?)`, `calculateAuditLogRetentionCutoff()`, and
+  `AUDIT_LOG_RETENTION_DAYS` for retention maintenance; and
+- neutral generic append/query/result contracts.
+
+The physical Prisma adapter is
+`modules/audit/infrastructure/persistence/audit-log-repository.ts`. It owns
+AuditLog create, findMany, count, and deleteMany calls. The application layer
+owns command semantics, persisted JSON serialization, tolerant details parsing,
+query filters/pagination, and the 90-day cutoff. The application contract
+accepts already-resolved IP address and User-Agent values and has no Next.js
+request dependency.
+
+`lib/server/audit.ts` remains a compatibility adapter. It retains its current
+Next header/trusted-IP composition and delegates to the best-effort public
+command. `lib/services/audit-log/queries.ts` and `mutations.ts` are thin
+compatibility re-exports. The Audit GET and cleanup routes consume
+`@/modules/audit`; authentication, cleanup-secret validation, response
+composition, and export-route behavior remain in their delivery boundaries.
+
+The current producer direct-write seams remain intentionally unchanged for
+I3, and Audit presentation remains in its pre-I2 locations. After the generic
+transfer, the remaining production compatibility inventory is 10 direct
+AuditLog expressions across 7 allowlisted files: nine strict `create`
+expressions and one Routine `findMany` reader. No generic legacy transfer file
+contains a direct AuditLog delegate.
+
 ## 3. Audit capability definition
 
 The future Audit capability is a generic record-and-read capability, not a
@@ -210,8 +247,8 @@ logEmployeeOffboarded.
 
 ### 4.1 Future owner: modules/audit/
 
-The future owner is a first-class modules/audit/ capability module, with a
-server entry and, if the presentation migration confirms the existing
+The I0 ownership decision selected a first-class modules/audit/ capability
+module, with a server entry and, if the presentation migration confirms the existing
 Dashboard contract, a separate browser-safe client entry.
 
 This is preferred over shared/audit/ because Audit is a cohesive capability
@@ -719,39 +756,34 @@ Do not migrate Auth, Email Request, Outbox, Notification, or other unrelated
 capabilities as part of Audit migration. Do not introduce an event bus,
 CQRS, event sourcing, or speculative polymorphic identity design.
 
-## 17. Proposed I1 architecture
+## 17. I1 implementation result
 
-I1 should establish server/application ownership without changing behavior:
+I1 is closed with the following behavior-preserving implementation:
 
-1. Create modules/audit/ with a server public entry and proportional
+1. `modules/audit/` now provides the server public entry and proportional
    application/infrastructure layers.
-2. Put physical AuditLog repository access, generic JSON serialization/parsing,
-   generic query/pagination, and retention cleanup behind the module.
-3. Add a generic append contract that can receive a transaction-bound
-   persistence context for strict callers and neutral request metadata.
-4. Preserve the current best-effort compatibility adapter for callers that
-   intentionally use it; do not make it throw.
-5. Move or wrap lib/services/audit-log query/cleanup behavior behind the public
-   entry while preserving exact route responses and limits.
-6. Migrate app/api/audit-logs/route.ts and cleanup route composition to the
-   Audit server entry, retaining auth and secret checks in the delivery layer
-   unless the established module pattern assigns them elsewhere.
-7. Keep business producers, Auth, Email Request, and presentation in their
-   current locations until their own slices.
-8. Add tests for strict transaction context versus best-effort failure
-   behavior before changing any producer call site.
+2. The Audit infrastructure repository owns all generic AuditLog create,
+   findMany, count, and deleteMany calls.
+3. The generic append contract accepts resolved actor/request metadata and
+   persisted details. `appendAuditInTransaction` writes through the supplied
+   transaction context and propagates failures; `appendAuditBestEffort`
+   catches and logs failures.
+4. `lib/server/audit.ts` retains its signatures, trusted IP/User-Agent
+   collection, details shape, and compatibility helpers while delegating
+   persistence through the public Audit entry.
+5. The legacy query and retention service paths are thin re-exports, while
+   their application behavior is owned by Audit.
+6. The Audit query and cleanup routes consume `@/modules/audit`; admin auth,
+   cleanup-secret validation, status codes, response shapes, and sanitized
+   errors remain at the HTTP boundary.
+7. Employee, Leave, Stock, Routine, Auth, Email Request, export semantics,
+   Routine's nested reader, and all Audit presentation remain outside this
+   phase as documented compatibility/deferred work.
 
-I1 must not introduce a new action taxonomy, change entityId, or move
-feature-specific detail builders into Audit.
-
-During I1, existing direct production delegates outside the new owner are
-temporary, explicit compatibility seams; they are not evidence that business
-event semantics belong in Audit. The exact finite allowlist and each path's
-exit phase are defined in section 20. I1 must not force the Employee, Leave,
-Stock, or Routine producer paths, or the active Routine nested reader, through
-the new Audit module merely to satisfy a physical-exclusivity rule. Generic
-legacy writer/query/cleanup paths are I1 transfer seams and should be moved or
-wrapped behind the Audit owner as part of I1.
+I1 does not introduce an action taxonomy change, alter `AuditLog.entityId`,
+change the Prisma schema or migrations, or move feature-specific detail
+builders into Audit. The exact remaining direct-access compatibility shape is
+enforced in section 20.
 
 ## 18. Proposed I2 presentation migration
 
@@ -803,11 +835,13 @@ generic feature-specific helper methods, and obsolete presentation paths be
 removed. The migration must preserve Email Request and Auth compatibility
 seams until their own phases.
 
-## 20. Future architecture checker rules
+## 20. I1 architecture checker enforcement
 
-I0 defines the following staged rules; it does not add them to
-scripts/check-architecture.mjs because the current repository intentionally
-has no Audit module and still contains legacy access.
+I1 adds the server-boundary and staged persistence rules to
+`scripts/check-architecture.mjs`. The checker uses TypeScript AST inspection
+for direct and simple aliased AuditLog delegates, then validates the exact
+operation/count shape of each temporary producer path. A path-only exception is
+not sufficient to pass.
 
 ### I1 server and persistence rules
 
@@ -816,9 +850,9 @@ has no Audit module and still contains legacy access.
 - any future Audit write route must consume the Audit public server contract;
 - new Audit-owned physical AuditLog delegate access must be under
   modules/audit/infrastructure/**;
-- the exact baseline direct-access allowlist below is temporary and finite:
-  generic legacy transfer paths are allowed only until their I1 ownership
-  transfer is complete, while the listed business producer and Routine reader
+- the exact baseline direct-access allowlist below is temporary and finite;
+  generic legacy transfer paths have exited the allowlist after their I1
+  ownership transfer, while the listed business producer and Routine reader
   paths remain allowed until their I3 migration slice;
 - new direct AuditLog delegate access outside modules/audit/infrastructure/**
   and outside that exact baseline allowlist must be rejected;
@@ -831,20 +865,25 @@ has no Audit module and still contains legacy access.
 
 #### I1 temporary direct-access allowlist
 
-This is the evidence-backed baseline of production files that currently
-contain direct AuditLog delegates outside the future owner. The checker may
-allow these exact files during the stated transition, but must reject a new
-file or a new delegate expression outside the owner.
+This is the evidence-backed baseline of production files that still contain
+direct AuditLog delegates outside the current owner. The checker allows only
+the exact operations and counts in these files; a new file or an additional or
+different delegate expression fails the architecture check.
 
 | Transition category | Exact baseline paths | Exit condition |
 | --- | --- | --- |
-| Generic I1 transfer seams | `lib/server/audit.ts`; `lib/services/audit-log/queries.ts`; `lib/services/audit-log/mutations.ts` | Move or wrap generic append, query, and retention persistence behind `modules/audit/infrastructure/**` during I1; remove these exceptions when that transfer is complete |
+| Generic I1 transfer seams | `lib/server/audit.ts`; `lib/services/audit-log/queries.ts`; `lib/services/audit-log/mutations.ts` | Closed in I1; these files now delegate through `@/modules/audit` and contain no direct AuditLog delegate |
 | Business producer seams retained through I3 | `modules/employee/application/mutations.ts`; `modules/leave/infrastructure/persistence/transaction.ts`; `modules/leave/application/approvals/approver-assignment.ts`; `modules/stock/infrastructure/persistence/command-audit.ts`; `modules/routine/application/audit.ts`; `modules/routine/application/imports/staging.ts` | Migrate each producer slice to the transaction-aware or best-effort Audit public contract in I3, then remove its exception |
 | Routine feature-specific reader seam | `modules/routine/application/queries.ts` | Migrate to a narrow Audit public query contract or retain only with an explicitly approved architectural reason; it must not become a permanent accidental exception |
 
-The allowlist is path-specific and based on the 14 production delegate
-expressions across the 10 files recorded in section 12. It is not a wildcard
-for legacy code and does not permit new direct access in an existing file.
+The active allowlist is path-specific and contains 10 production delegate
+expressions across 7 files: `auditLog.create` x1 in each of Employee,
+Leave transaction, Leave approver assignment, Stock command audit, and Routine
+audit; `auditLog.create` x4 in Routine import staging; and
+`auditLog.findMany` x1 in the Routine nested reader. The three generic I1
+transfer files from the 14-expression I0 inventory are no longer exceptions.
+The allowlist is not a wildcard for legacy code and does not permit new direct
+access in an existing file.
 
 ### I2 client and presentation rules
 
@@ -877,9 +916,8 @@ for legacy code and does not permit new direct access in an existing file.
 
 These rules follow the existing checker style: public module entries,
 client/server graph checks, owner-exclusive physical persistence, explicit
-compatibility exceptions, and phased enforcement. They should be implemented
-incrementally in I1-I3 rather than as a broad I0 rule that would make the
-current legacy repository fail.
+compatibility exceptions, and phased enforcement. I2 presentation rules and
+I3 producer exclusivity remain staged and are not enabled by this phase.
 
 ## 21. Open risks and unresolved questions
 
@@ -914,20 +952,23 @@ current legacy repository fail.
 
 ## Verification record
 
-Verification was executed after the documentation changes:
+The I0 verification below is retained as historical handoff evidence. The
+Phase I1 implementation was verified after the runtime and test ownership
+changes:
 
-- npm.cmd run architecture:check — passed; checked 946 repository source files.
-- npm.cmd run lint — passed.
-- npm.cmd run typecheck — passed.
-- npm.cmd run test:run — passed; 238 test files and 1,940 tests passed.
+- `npm.cmd run check` — passed; architecture check inspected 954 repository
+  source files, lint:strict passed, typecheck passed, and Vitest passed with
+  240 test files and 1,955 tests.
+- `npm.cmd run architecture:check` — passed.
+- `npm.cmd run lint` — passed.
+- `npm.cmd run typecheck` — passed.
+- `npm.cmd run test:run` — passed.
 
-The repository's plain npm run form was also attempted, but this Windows
-environment blocks npm.ps1 through PowerShell execution policy. The npm.cmd
-commands above executed the same package scripts successfully. The final
-edits after the test run were documentation-only evidence refinements; no
-source/runtime file changed.
+The repository's plain `npm run` form is not used for the final commands in
+this Windows environment because PowerShell execution policy blocks
+`npm.ps1`; the `npm.cmd` commands execute the same package scripts.
 
-## 22. Final I0 closure checklist
+## 22. Final I0 closure checklist (historical)
 
 - [x] Every discovered production AuditLog writer is inventoried.
 - [x] Every direct production AuditLog Prisma access is classified.
@@ -945,7 +986,26 @@ source/runtime file changed.
 - [x] No runtime business behavior was changed in I0.
 - [x] Verification was run after the documentation changes; results are recorded
   in the Phase I0 handoff.
-- [x] Phase I0 is closed; Phase I1 has not started.
+- [x] Phase I0 was closed at the handoff; Phase I1 had not started at that time.
 
-The source-of-truth handoff is complete. No Phase I1 implementation is
-included in this change.
+The source-of-truth I0 handoff remains complete. The current I1 closure is
+recorded above and in the checklist below.
+
+## 23. Final I1 closure checklist
+
+- [x] `modules/audit/` exists with a supported server entry.
+- [x] Generic append, query, and retention persistence is owned by Audit
+  infrastructure/application code.
+- [x] Strict transaction-bound and best-effort append semantics are distinct
+  and tested.
+- [x] Audit query and cleanup routes consume `@/modules/audit`.
+- [x] Generic legacy AuditLog persistence paths are compatibility wrappers.
+- [x] The exact 10-expression, 7-file producer/reader compatibility shape is
+  architecture-checked.
+- [x] Employee, Leave, Stock, Routine producers, Auth, Email Request, and
+  Routine nested-reader semantics remain deferred as specified.
+- [x] Audit presentation remains deferred to Phase I2.
+- [x] Prisma schema and migrations remain unchanged.
+
+Phase I1 CLOSED — Audit server/application/persistence foundation complete.
+Phase I2 NOT STARTED.

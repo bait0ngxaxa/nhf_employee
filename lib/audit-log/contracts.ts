@@ -1,10 +1,8 @@
 import type { AuditAction } from "@prisma/client";
 
-export interface AuditDetails extends Record<string, unknown> {
-    before?: Record<string, unknown>;
-    after?: Record<string, unknown>;
-    metadata?: Record<string, unknown>;
-}
+import type { AuditDetails } from "@/modules/audit";
+
+export type { AuditDetails };
 
 export interface StockAttributeAuditSnapshot extends Record<string, unknown> {
     name: string;

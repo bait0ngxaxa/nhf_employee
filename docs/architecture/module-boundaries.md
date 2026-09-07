@@ -1,9 +1,9 @@
 # Module boundaries
 
-Status: Phase I0 CLOSED — Audit discovery and boundary definition complete.
-Phase I1 implementation is NOT STARTED. Phase H3 Notification producer
-integration and final migration audit remain complete. Phase G3 Department
-migration remains complete.
+Status: Phase I1 CLOSED — Audit server/application/persistence foundation
+complete. Phase I2 NOT STARTED. Phase H3 Notification producer integration and
+final migration audit remain complete. Phase G3 Department migration remains
+complete.
 Stock, Routine, Leave, and Employee are migrated examples; Employee
 server/business and active presentation ownership are migrated as well.
 
@@ -169,17 +169,17 @@ barrel files; small explicit entry points are easier to evolve and keep
 dependency direction visible. Only the module root and, when present, its
 `client.ts` entry are public; arbitrary subpaths remain private.
 
-## Audit boundary (I0)
+## Audit boundary (I1)
 
-Phase I0 is closed as discovery and boundary definition only. The future
-owner is a first-class modules/audit/ capability module, not shared/audit/.
-No Audit module, runtime migration, direct Prisma move, or presentation move
-exists yet; Phase I1 is not started. The decision follows the ownership
-principle: Audit has a cohesive persistence, generic query/pagination,
-retention, serialization, and viewer capability, while the events it records
-remain owned by their producing capabilities.
+Phase I0 remains the historical discovery and boundary-definition record. The
+current owner is the first-class `modules/audit/` capability module, not
+`shared/audit/`. I1 establishes its server/application and generic persistence
+boundary; I2 presentation and I3 producer migration remain unstarted. The
+decision follows the ownership principle: Audit has a cohesive persistence,
+generic query/pagination, retention, and serialization capability, while the
+events it records remain owned by their producing capabilities.
 
-Future Audit infrastructure owns generic AuditLog persistence, append
+Audit infrastructure owns generic AuditLog persistence, append
 mechanics, parsing/serialization, generic reads, pagination, retention, and
 Audit-specific presentation. Auth, Employee, Leave, Stock, Routine, and the
 deferred IT capability continue to own event meaning, AuditAction,
@@ -189,17 +189,23 @@ keep the same business transaction; current best-effort and after-response
 writes must not be normalized. Leave's CUID-in-details fallback and all
 historical enum/storage values remain compatibility constraints.
 
-The sequencing is explicit: I1 establishes generic Audit server/application/
-persistence and query/cleanup ownership while the known business direct-write
-and Routine nested-reader seams remain temporarily allowlisted; I2 moves
-Audit-specific presentation; I3 migrates producers and closes final physical
-AuditLog persistence exclusivity. See audit-migration.md for the exact
-allowlist and exit conditions.
+The supported server entry is `@/modules/audit`. It exposes generic
+`appendAuditInTransaction`, `appendAuditBestEffort`, `getAuditLogs`, and
+retention cleanup capabilities plus neutral contracts. Physical AuditLog
+access is owned by
+`modules/audit/infrastructure/persistence/audit-log-repository.ts`.
+`lib/server/audit.ts` and the legacy query/retention paths are compatibility
+adapters and no longer own physical persistence. The known business
+direct-write and Routine nested-reader seams remain temporarily allowlisted;
+I2 moves Audit-specific presentation and I3 migrates producers and closes
+final physical AuditLog exclusivity. See audit-migration.md for the exact
+allowlist and operation counts.
 
 The full producer, reader, retention, presentation, action, identity,
 transaction, metadata, compatibility, and phased I1-I3 ledger is in
 audit-migration.md. The source record explicitly keeps Email Request
-deferred and does not claim that I1 implementation exists.
+deferred; I1 implementation is complete while I2 presentation and I3
+producer migration remain unstarted.
 
 ## Larger feature shape
 
@@ -314,10 +320,10 @@ import, selector, and display compatibility behavior.
 Appropriate future `shared/` responsibilities may include authentication and
 session infrastructure, database adapters, HTTP/security primitives, trusted
 network/request metadata primitives, notification or LINE delivery, uploads,
-and generic UI primitives. Phase I0 resolves the cohesive Audit capability's
-physical persistence, generic query/retention, and presentation owner as a
-future modules/audit/ module; existing lib/ Audit code remains a compatibility
-implementation until I1-I3.
+and generic UI primitives. Phase I1 resolves the cohesive Audit capability's
+physical persistence and generic query/retention owner as `modules/audit/`,
+not `shared/audit/`; existing lib/ Audit code remains only as compatibility
+adapters while producer and presentation migrations proceed.
 
 Feature-specific validation, policies, calculations, status semantics,
 workflow orchestration, and feature UI remain feature-owned. For example, code
