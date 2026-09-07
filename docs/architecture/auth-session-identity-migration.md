@@ -1,17 +1,21 @@
 # Phase J0 — Auth / Session / Identity Discovery & Boundary Definition
 
-Status: **Phase J0 CLOSED — discovery and boundary definition complete.**
-J1, J2, and J3 implementation have **not started**.
+Historical status: **Phase J0 CLOSED — discovery and boundary definition
+complete.**
+Current status: **Phase J1 CLOSED — Auth / Session server and persistence
+ownership complete.**
+J2 and J3 implementation have **not started**.
 
 Audited baseline: `6021618941206d9cb204318ff8daf0c90e83d66b`
 (`feat(audit): close I3 producer integration and persistence exclusivity`)
 
-This record is authoritative for the Auth / Session / Identity migration. It
-records the implementation that existed at the audited baseline, the ownership
-decisions supported by that evidence, the behavior that later phases must
-preserve, and the incremental J1-J3 plan. It does not create a runtime Auth
-module and does not change runtime behavior, API contracts, cookies, tokens,
-Prisma schema, UI, LINE/LIFF behavior, or Audit producers.
+This record is authoritative for the Auth / Session / Identity migration. The
+J0 sections record the implementation that existed at the audited baseline,
+the ownership decisions supported by that evidence, and the behavior that
+later phases must preserve. The J1 implementation record at the end documents
+the completed server ownership move. J1 does not change API contracts,
+cookies, token contents/TTLs, Prisma schema, UI, LINE/LIFF behavior, or Auth
+Audit producers.
 
 ## 1. J0 scope and closure
 
@@ -1431,3 +1435,172 @@ The following are complete in this record:
 J0 implementation scope ends here. Any runtime, schema, route, UI, cookie,
 token, LINE/LIFF, or Audit-producer change belongs to an explicitly approved
 later phase.
+
+## 27. J1 implementation record
+
+Status: **Phase J1 CLOSED — Auth / Session server and persistence ownership
+complete.** J2 and J3 remain **NOT STARTED**.
+
+J1 used the approved baseline
+`f60b6b5051c6c309592aab76f3ac82ea83bed4dd` (`docs(architecture): correct J0
+LIFF and path audit records`). This phase moved ownership without changing the
+documented web Auth behavior, API contracts, cookies, token claims/TTLs,
+Prisma schema, browser presentation, LINE/LIFF behavior, or Auth Audit
+producer semantics.
+
+### 27.1 Resulting module structure and public server API
+
+The new cohesive server capability is deliberately proportional:
+
+```text
+modules/auth/
+├── application/
+│   ├── authentication.ts
+│   ├── employee-account-lifecycle.ts
+│   ├── recovery.ts
+│   ├── sessions.ts
+│   ├── signup.ts
+│   └── types.ts
+├── domain/
+│   └── principal.ts
+├── infrastructure/
+│   └── persistence/
+│       ├── account-repository.ts
+│       ├── password-reset-repository.ts
+│       └── refresh-token-repository.ts
+└── index.ts
+```
+
+`@/modules/auth` is the supported production server entry. Its application
+contract covers hybrid login, the narrow authenticated principal and legacy
+User-id resolver, refresh rotation, current-family resolution, active-family
+checks, logout/logout-all, session listing/family revocation, cleanup, signup,
+password recovery/reset, and the transaction-aware Employee account-lifecycle
+provider. The existing access/refresh token primitives are re-exported only as
+the server compatibility seam for their unchanged cryptographic behavior; no
+browser/client entry was created.
+
+### 27.2 Persistence ownership
+
+Production physical persistence for `AuthRefreshToken` is now restricted to
+`modules/auth/infrastructure/persistence/refresh-token-repository.ts`.
+Production physical persistence for `PasswordResetToken` is now restricted to
+`modules/auth/infrastructure/persistence/password-reset-repository.ts`.
+User account-field persistence used by Auth is in the Auth account repository.
+Routes and legacy adapters no longer perform either Auth token delegate
+operation directly. Tests, fixtures, schema/migrations, seed/support code,
+and generated code remain legitimate exceptions.
+
+The refresh implementation preserves the existing opaque-token/SHA-256/family
+algorithm, expiry, `rotatedFromId`, unique successor constraint, conditional
+claim/update, transaction boundary, successor detection, concurrent loser
+family revocation, User prevalidation, Audit timing at the route composition
+boundary, and cookie clearing. Password recovery/reset preserves hashed
+one-hour tokens, per-email counting and unused replacement, anti-enumeration,
+one-time serializable claim, bcrypt update, `tokenVersion` increment,
+refresh-session revocation, concurrency behavior, Thai messages, and Email
+timing/failure behavior.
+
+### 27.3 Core route delegation
+
+The hybrid-login, refresh, logout, logout-all, sessions, session-revoke,
+cleanup, signup, forgot-password, and reset-password routes now compose the
+Auth application through `@/modules/auth`. They retain request parsing,
+trusted-mutation and rate-limit wrappers, request metadata, HTTP status/body
+mapping, cookie application/clearing, response serialization, and deferred
+Auth Audit calls. The route-level contracts and cookie names/options remain
+unchanged.
+
+`/api/auth/me` was intentionally not moved into generic Auth. `lib/auth/server.ts`
+continues to provide its broad account/Employee/Department/Leave projection and
+its current Employee-required eligibility behavior. This is the explicit J2
+compatibility exception; no Leave predicate or Department projection was
+introduced into `modules/auth`.
+
+### 27.4 Employee account-lifecycle composition
+
+Employee now owns the structural `EmployeeAccountLifecycleProvider` port. The
+former `lib/auth/employee-account-lifecycle.ts` implementation was removed;
+Auth provides the implementation from
+`modules/auth/application/employee-account-lifecycle.ts`. The outer Employee
+route imports both public module entries and binds that provider. Employee
+does not runtime-import Auth, so no Auth ↔ Employee runtime cycle was added.
+
+The provider receives the existing Employee serializable transaction client.
+User row locking, self-deactivation protection, last-active-ADMIN protection,
+Thai error wording, `isActive`/`deletedAt`, identity synchronization,
+token-version increment, refresh revocation, lifecycle semantics, and
+atomicity are preserved in that same transaction.
+
+### 27.5 Compatibility paths intentionally retained
+
+Active compatibility/adaptation paths remain for the broad `/me` projection,
+cookie/request adapters, generic Auth API/workforce consumers, token constants
+and edge-safe routing concerns, browser presentation, and deferred Audit
+composition. `lib/auth/hybrid/tokens.ts` remains a small token primitive seam;
+it contains no Auth token persistence, and middleware continues to use its
+edge-compatible JWT routing path without a Prisma/password/refresh dependency.
+No compatibility path retains direct production `AuthRefreshToken` or
+`PasswordResetToken` persistence.
+
+### 27.6 J2 and J3 exclusions
+
+- **J2:** browser/client presentation, `modules/auth/client.ts`,
+  `HybridAuthProvider`, AuthStatus, login/signup/recovery/session UI,
+  automatic browser refresh, RefreshSessionBridge, and separation of the
+  broad `/api/auth/me` projection remain not started.
+- **J3:** LINE/LIFF identity/link/session/recovery/messaging behavior remains
+  untouched. The post-issuance LIFF route revalidation rule remains unchanged.
+- **J3:** Auth Audit producers (`LOGIN_SUCCESS`, `LOGIN_FAILED`, `LOGOUT`,
+  `PASSWORD_RESET`, `USER_CREATE`) remain at their compatibility composition
+  boundary and were not migrated to `@/modules/audit`.
+
+### 27.7 Architecture enforcement
+
+`npm.cmd run architecture:check` now checks, in addition to existing module
+rules:
+
+- direct production `AuthRefreshToken` and `PasswordResetToken` delegate
+  operations, including Prisma/transaction aliases and destructured delegate
+  aliases, are confined to Auth persistence infrastructure;
+- external Auth consumers use `@/modules/auth`, while Auth internals cannot
+  import their own public barrel; and
+- production Client Component graphs cannot reach the server-only Auth entry.
+
+The checker retains explicit test, fixture/support, Prisma schema/migration,
+seed, and generated-code exceptions and does not impose a blanket repository-
+wide ban on `prisma.user`.
+
+### 27.8 Verification record
+
+The following checks were executed after the J1 implementation:
+
+- `npm.cmd run architecture:check` — passed; 969 repository source files
+  checked.
+- `npm.cmd run lint:strict` — passed with zero warnings.
+- `npm.cmd run typecheck` — passed.
+- Focused Auth/Employee route and lifecycle suites — passed, 8 files and 88
+  tests; the Employee route compatibility suite also passed, 26 tests.
+- `npm.cmd run test:run` — passed, 244 files and 2,001 tests.
+- `npm.cmd run test:integration:mysql` — passed against the dedicated MySQL
+  `employee_nhf_integration` database after applying the existing migrations,
+  10 files and 65 tests.
+- `git diff --check` — passed.
+
+No development server or production build was run. No schema or migration file
+was changed.
+
+### 27.9 Unchanged compatibility risks and remaining work
+
+J1 intentionally leaves the recorded differences intact: login may accept a
+User without an Employee, `resolveAuthenticatedUserId` permits that case,
+`getApiAuthSession()` requires an Employee, refresh prevalidation does not
+perform the complete `/me` Employee/deleted-state check, and middleware JWT
+verification is not authoritative for DB account/session state. The documented
+concurrent refresh loser may revoke the winning successor's family. These are
+compatibility behaviors, not J1 fixes.
+
+J2 remains responsible for the browser/client and broad identity-projection
+boundary. J3 remains responsible for LINE/LIFF integration, Auth Audit
+producer migration, and final compatibility cleanup. J1 does not claim full
+Auth migration completion.

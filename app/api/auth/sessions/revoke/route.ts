@@ -5,11 +5,15 @@ import { AUTH_ERROR_MESSAGES } from "@/lib/auth/ssot";
 import { withTrustedMutation } from "@/lib/auth/csrf";
 import { logAuthEvent } from "@/lib/server/audit";
 import {
+    HYBRID_ACCESS_COOKIE_NAME,
+    HYBRID_REFRESH_COOKIE_NAME,
+    clearHybridAuthCookies,
+} from "@/lib/auth/hybrid/session";
+import {
     resolveAuthenticatedUserId,
     resolveCurrentSessionFamilyId,
-} from "@/lib/auth/hybrid/route";
-import { clearHybridAuthCookies } from "@/lib/auth/hybrid/session";
-import { prisma } from "@/lib/db/prisma";
+    revokeAuthSessionFamily,
+} from "@/modules/auth";
 
 const revokeSessionSchema = z.object({
     sessionId: z.string().min(1).max(64),
@@ -17,7 +21,8 @@ const revokeSessionSchema = z.object({
 
 export const POST = withTrustedMutation(async (request: NextRequest): Promise<NextResponse> => {
     try {
-        const userId = await resolveAuthenticatedUserId(request);
+        const accessToken = request.cookies.get(HYBRID_ACCESS_COOKIE_NAME)?.value;
+        const userId = await resolveAuthenticatedUserId(accessToken);
         if (!userId) {
             return NextResponse.json({ error: AUTH_ERROR_MESSAGES.unauthorized }, { status: 401 });
         }
@@ -28,41 +33,26 @@ export const POST = withTrustedMutation(async (request: NextRequest): Promise<Ne
             return NextResponse.json({ error: AUTH_ERROR_MESSAGES.forbidden }, { status: 400 });
         }
 
-        const tokenRecord = await prisma.authRefreshToken.findFirst({
-            where: {
-                id: parsed.data.sessionId,
-                userId,
-                revokedAt: null,
-                expiresAt: { gt: new Date() },
-            },
-            include: {
-                user: {
-                    select: { email: true },
-                },
-            },
+        const tokenRecord = await revokeAuthSessionFamily({
+            userId,
+            sessionId: parsed.data.sessionId,
         });
-
         if (!tokenRecord) {
             return NextResponse.json({ error: AUTH_ERROR_MESSAGES.forbidden }, { status: 404 });
         }
 
-        await prisma.authRefreshToken.updateMany({
-            where: {
-                userId,
-                familyId: tokenRecord.familyId,
-                revokedAt: null,
-            },
-            data: { revokedAt: new Date() },
-        });
-
-        await logAuthEvent("LOGOUT", userId, tokenRecord.user.email, {
+        await logAuthEvent("LOGOUT", userId, tokenRecord.email, {
             metadata: {
                 method: "hybrid_logout_single_session",
                 familyId: tokenRecord.familyId,
             },
         });
 
-        const currentFamilyId = await resolveCurrentSessionFamilyId(request, userId);
+        const currentFamilyId = await resolveCurrentSessionFamilyId({
+            accessToken,
+            rawRefreshToken: request.cookies.get(HYBRID_REFRESH_COOKIE_NAME)?.value,
+            userId,
+        });
         const response = NextResponse.json({ success: true });
         if (currentFamilyId === tokenRecord.familyId) {
             clearHybridAuthCookies(response);

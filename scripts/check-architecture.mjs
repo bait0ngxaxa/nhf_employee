@@ -751,6 +751,180 @@ function getAuditLogPersistenceViolation(filePath, rootPath) {
     return `${relativeFilePath(filePath, rootPath)}:${firstAccess.line} direct AuditLog Prisma delegate access must be owned by modules/audit/infrastructure/.`;
 }
 
+const authPersistenceDelegateOperations = new Set([
+    "create",
+    "createMany",
+    "update",
+    "updateMany",
+    "findMany",
+    "findFirst",
+    "findUnique",
+    "count",
+    "delete",
+    "deleteMany",
+    "upsert",
+]);
+
+const authPersistenceDelegates = new Set([
+    "authRefreshToken",
+    "passwordResetToken",
+]);
+
+function getAuthPersistenceDelegateAccesses(filePath) {
+    const contents = readFileSync(filePath, "utf8");
+    const sourceFile = ts.createSourceFile(
+        filePath,
+        contents,
+        ts.ScriptTarget.Latest,
+        true,
+        getScriptKind(filePath),
+    );
+    const declarations = [];
+    const clientAliases = new Set([
+        "prisma",
+        "tx",
+        "client",
+        "db",
+        "transaction",
+        "transactionClient",
+    ]);
+    const delegateAliases = new Set();
+    const accesses = [];
+
+    function collectDeclarations(node) {
+        if (ts.isVariableDeclaration(node)) declarations.push(node);
+        ts.forEachChild(node, collectDeclarations);
+    }
+
+    collectDeclarations(sourceFile);
+
+    function isKnownClientExpression(node) {
+        return ts.isIdentifier(node) && clientAliases.has(node.text);
+    }
+
+    function isAuthDelegateExpression(node) {
+        if (ts.isIdentifier(node)) return delegateAliases.has(node.text);
+        if (!ts.isPropertyAccessExpression(node)
+            && !ts.isElementAccessExpression(node)) {
+            return false;
+        }
+
+        const delegateName = getStaticPropertyName(node);
+        return delegateName !== null
+            && authPersistenceDelegates.has(delegateName)
+            && isKnownClientExpression(node.expression);
+    }
+
+    let changed = true;
+    while (changed) {
+        changed = false;
+        for (const declaration of declarations) {
+            if (!ts.isIdentifier(declaration.name)
+                || declaration.initializer === undefined) {
+                continue;
+            }
+
+            const initializer = declaration.initializer;
+            if (isKnownClientExpression(initializer)
+                && !clientAliases.has(declaration.name.text)) {
+                clientAliases.add(declaration.name.text);
+                changed = true;
+            }
+            if (isAuthDelegateExpression(initializer)
+                || (ts.isIdentifier(initializer)
+                    && delegateAliases.has(initializer.text))) {
+                if (!delegateAliases.has(declaration.name.text)) {
+                    delegateAliases.add(declaration.name.text);
+                    changed = true;
+                }
+            }
+        }
+    }
+
+    function collectDestructuredAliases(node) {
+        if (!ts.isVariableDeclaration(node)
+            || !ts.isObjectBindingPattern(node.name)
+            || node.initializer === undefined
+            || !isKnownClientExpression(node.initializer)) {
+            ts.forEachChild(node, collectDestructuredAliases);
+            return;
+        }
+
+        for (const element of node.name.elements) {
+            if (!ts.isBindingElement(element) || !ts.isIdentifier(element.name)) continue;
+            const propertyName = element.propertyName ?? element.name;
+            if (getStaticBindingPropertyName(propertyName) !== null
+                && authPersistenceDelegates.has(getStaticBindingPropertyName(propertyName))) {
+                delegateAliases.add(element.name.text);
+            }
+        }
+        ts.forEachChild(node, collectDestructuredAliases);
+    }
+
+    collectDestructuredAliases(sourceFile);
+
+    function visit(node) {
+        if (ts.isCallExpression(node)
+            && (ts.isPropertyAccessExpression(node.expression)
+                || ts.isElementAccessExpression(node.expression))
+            && authPersistenceDelegateOperations.has(getStaticPropertyName(node.expression))) {
+            const delegate = node.expression.expression;
+            if (isAuthDelegateExpression(delegate)) {
+                accesses.push({
+                    line: sourceFile.getLineAndCharacterOfPosition(
+                        node.expression.getStart(sourceFile),
+                    ).line + 1,
+                });
+            }
+        }
+
+        ts.forEachChild(node, visit);
+    }
+
+    visit(sourceFile);
+    return accesses;
+}
+
+function isAuthPersistenceSupportSource(filePath, rootPath) {
+    if (isTestSource(filePath, rootPath)) return true;
+    if (pathIsWithin(filePath, resolve(rootPath, "prisma"))) return true;
+
+    const segments = relativeFilePath(filePath, rootPath)
+        .split("/")
+        .map((segment) => segment.toLowerCase());
+    return segments.some((segment) => [
+        "fixture",
+        "fixtures",
+        "__fixtures__",
+        "test-support",
+        "test-utils",
+        "seed",
+        "support",
+    ].includes(segment));
+}
+
+function isAuthApiRoute(filePath, rootPath) {
+    const relativePath = relativeFilePath(filePath, rootPath);
+    return relativePath.startsWith("app/api/auth/");
+}
+
+function getAuthPersistenceViolation(filePath, rootPath) {
+    const authInfrastructureRoot = resolve(rootPath, "modules/auth/infrastructure/persistence");
+    if (pathIsWithin(filePath, authInfrastructureRoot)
+        || isAuthPersistenceSupportSource(filePath, rootPath)) {
+        return null;
+    }
+
+    const accesses = getAuthPersistenceDelegateAccesses(filePath);
+    if (accesses.length === 0) return null;
+
+    const firstAccess = accesses[0];
+    if (isAuthApiRoute(filePath, rootPath)) {
+        return `${relativeFilePath(filePath, rootPath)}:${firstAccess.line} Auth API routes must delegate AuthRefreshToken/PasswordResetToken persistence through @/modules/auth.`;
+    }
+    return `${relativeFilePath(filePath, rootPath)}:${firstAccess.line} direct AuthRefreshToken/PasswordResetToken Prisma delegate access must be owned by modules/auth/infrastructure/persistence/.`;
+}
+
 const notificationDelegateOperations = new Set([
     "create",
     "createMany",
@@ -1253,6 +1427,27 @@ function getNotificationDependencyViolation(filePath, rootPath, moduleSpecifier)
     return null;
 }
 
+function getAuthDependencyViolation(filePath, rootPath, moduleSpecifier) {
+    const authModuleRoot = resolve(rootPath, "modules/auth");
+    if (!pathIsWithin(filePath, authModuleRoot)
+        || filePath === resolve(authModuleRoot, "index.ts")) {
+        return null;
+    }
+
+    const resolvedImport = moduleSpecifier.startsWith("@/")
+        ? resolve(rootPath, moduleSpecifier.slice(2))
+        : getImportSourcePath(moduleSpecifier, filePath, rootPath);
+    const normalizedSpecifier = resolvedImport === null
+        ? moduleSpecifier
+        : `@/${relativeFilePath(resolvedImport, rootPath).replace(/\.[cm]?[jt]sx?$/, "")}`;
+    if (normalizedSpecifier === "@/modules/auth"
+        || normalizedSpecifier === "@/modules/auth/index") {
+        return "Auth module internals must use local contracts instead of their own public barrel.";
+    }
+
+    return null;
+}
+
 function getClientReachableServerEntryViolations(
     rootPath,
     sourceFiles,
@@ -1608,6 +1803,14 @@ function checkArchitecture(options = {}) {
             violations.push(auditLogPersistenceViolation);
         }
 
+        const authPersistenceViolation = getAuthPersistenceViolation(
+            filePath,
+            rootPath,
+        );
+        if (authPersistenceViolation !== null) {
+            violations.push(authPersistenceViolation);
+        }
+
         const owner = getOwner(filePath, modulesRoot, sharedRoot);
 
         for (const importRecord of getImports(filePath)) {
@@ -1875,6 +2078,21 @@ function checkArchitecture(options = {}) {
                 continue;
             }
 
+            const authDependencyViolation = getAuthDependencyViolation(
+                filePath,
+                rootPath,
+                importRecord.moduleSpecifier,
+            );
+            if (authDependencyViolation !== null) {
+                violations.push(describeViolation(
+                    filePath,
+                    rootPath,
+                    importRecord,
+                    authDependencyViolation,
+                ));
+                continue;
+            }
+
             const moduleDependencyViolation = getModuleDependencyViolation(
                 owner,
                 importRecord.moduleSpecifier,
@@ -1926,6 +2144,7 @@ function checkArchitecture(options = {}) {
     violations.push(...getClientReachableServerEntryViolations(rootPath, sourceFiles, "employee"));
     violations.push(...getClientReachableServerEntryViolations(rootPath, sourceFiles, "department", null));
     violations.push(...getClientReachableServerEntryViolations(rootPath, sourceFiles, "notification"));
+    violations.push(...getClientReachableServerEntryViolations(rootPath, sourceFiles, "auth", null));
     return { sourceFiles, violations };
 }
 

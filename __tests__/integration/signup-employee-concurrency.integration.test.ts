@@ -4,6 +4,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { POST as signupRoute } from "@/app/api/auth/signup/route";
 import { resetAuthRateLimit } from "@/lib/auth/rate-limit";
 import { prisma } from "@/lib/db/prisma";
+import { employeeAccountLifecycle } from "@/modules/auth";
 import { updateEmployee } from "@/modules/employee";
 
 const DEPARTMENT_NAME = "Signup Employee Concurrency Integration";
@@ -114,7 +115,13 @@ describe.sequential("signup and Employee identity concurrency with real MySQL", 
 
         const [signupResponse, employeeUpdate] = await Promise.all([
             signupRoute(buildSignupRequest()),
-            updateEmployee(employee.id, { email: UPDATED_EMAIL }),
+            updateEmployee(
+                employee.id,
+                { email: UPDATED_EMAIL },
+                undefined,
+                undefined,
+                employeeAccountLifecycle,
+            ),
         ]);
 
         expect([201, 400]).toContain(signupResponse.status);

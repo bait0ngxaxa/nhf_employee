@@ -5,6 +5,7 @@ import type * as NextServerModule from "next/server";
 import { PATCH, DELETE } from "@/app/api/employees/[id]/route";
 import { POST as createEmployeeRoute } from "@/app/api/employees/route";
 import { POST as importEmployeesRoute } from "@/app/api/employees/import/route";
+import { employeeAccountLifecycle } from "@/modules/auth";
 import { requireAdminSession } from "@/lib/auth/api";
 import {
     appendEmployeeCreateAudit,
@@ -148,6 +149,7 @@ describe("Employee mutation routes", () => {
             { email: "new@thainhf.org", status: "SUSPENDED" },
             { userId: ADMIN.id, email: ADMIN.email },
             getEmployeeLeaveOffboardingBlockers,
+            employeeAccountLifecycle,
         );
         expect(appendEmployeeUpdateAudit).toHaveBeenCalledWith({
             employeeId: 12,
@@ -229,6 +231,7 @@ describe("Employee mutation routes", () => {
             12,
             { userId: ADMIN.id, email: ADMIN.email },
             getEmployeeLeaveOffboardingBlockers,
+            employeeAccountLifecycle,
         );
         expect(appendEmployeeDeleteAudit).not.toHaveBeenCalled();
     });

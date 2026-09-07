@@ -1,17 +1,15 @@
 import type { Prisma } from "@prisma/client";
 
+import type {
+    EmployeeAccountLifecycleProvider,
+    EmployeeAccountLifecycleRecord,
+} from "@/modules/employee";
 import { lockUserRows } from "@/lib/db/row-locks";
-
-export interface LockedEmployeeAccount {
-    id: number;
-    name: string;
-    email: string;
-    role: string;
-    isActive: boolean;
-    deletedAt: Date | null;
-}
-
-export type EmployeeAccountLifecycleOperation = "OFFBOARD" | "SUSPEND" | "REACTIVATE";
+import {
+    synchronizeAccountIdentity,
+    updateAccountForEmployeeLifecycle,
+} from "../infrastructure/persistence/account-repository";
+import { revokeAllRefreshTokensForUserInTransaction } from "../infrastructure/persistence/refresh-token-repository";
 
 export class EmployeeAccountLifecycleError extends Error {
     readonly statusCode: number;
@@ -32,7 +30,7 @@ export async function lockEmployeeAccountForLifecycle(
 
 export async function assertEmployeeAccountCanDeactivate(
     tx: Prisma.TransactionClient,
-    account: LockedEmployeeAccount,
+    account: EmployeeAccountLifecycleRecord,
     actorUserId: number,
 ): Promise<void> {
     if (account.id === actorUserId) {
@@ -58,29 +56,15 @@ export async function assertEmployeeAccountCanDeactivate(
 
 export async function applyEmployeeAccountLifecycle(
     tx: Prisma.TransactionClient,
-    input: {
-        accountId: number;
-        operation: EmployeeAccountLifecycleOperation;
-        identity: { name?: string; email?: string };
-        revokedAt: Date;
-    },
+    input: Parameters<EmployeeAccountLifecycleProvider["applyAccountLifecycle"]>[1],
 ): Promise<void> {
     const deactivating = input.operation === "OFFBOARD" || input.operation === "SUSPEND";
-    await tx.user.update({
-        where: { id: input.accountId },
-        data: deactivating
-            ? { ...input.identity, isActive: false, tokenVersion: { increment: 1 } }
-            : {
-                ...input.identity,
-                isActive: true,
-                deletedAt: null,
-                tokenVersion: { increment: 1 },
-            },
+    await updateAccountForEmployeeLifecycle(tx, {
+        accountId: input.accountId,
+        deactivating,
+        identity: input.identity,
     });
-    await tx.authRefreshToken.updateMany({
-        where: { userId: input.accountId, revokedAt: null },
-        data: { revokedAt: input.revokedAt },
-    });
+    await revokeAllRefreshTokensForUserInTransaction(tx, input.accountId, input.revokedAt);
 }
 
 export async function synchronizeEmployeeAccountIdentity(
@@ -88,6 +72,12 @@ export async function synchronizeEmployeeAccountIdentity(
     accountId: number,
     identity: { name?: string; email?: string },
 ): Promise<void> {
-    if (Object.keys(identity).length === 0) return;
-    await tx.user.update({ where: { id: accountId }, data: identity });
+    await synchronizeAccountIdentity(tx, accountId, identity);
 }
+
+export const employeeAccountLifecycle: EmployeeAccountLifecycleProvider = {
+    lockAccountForLifecycle: lockEmployeeAccountForLifecycle,
+    assertAccountCanDeactivate: assertEmployeeAccountCanDeactivate,
+    applyAccountLifecycle: applyEmployeeAccountLifecycle,
+    synchronizeAccountIdentity: synchronizeEmployeeAccountIdentity,
+};

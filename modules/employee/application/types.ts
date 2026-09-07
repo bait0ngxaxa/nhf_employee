@@ -82,6 +82,41 @@ export interface EmployeeLifecycleActor {
     email: string;
 }
 
+export interface EmployeeAccountLifecycleRecord {
+    id: number;
+    name: string;
+    email: string;
+    role: string;
+    isActive: boolean;
+    deletedAt: Date | null;
+}
+
+export interface EmployeeAccountLifecycleProvider {
+    lockAccountForLifecycle(
+        tx: Prisma.TransactionClient,
+        userId: number,
+    ): Promise<void>;
+    assertAccountCanDeactivate(
+        tx: Prisma.TransactionClient,
+        account: EmployeeAccountLifecycleRecord,
+        actorUserId: number,
+    ): Promise<void>;
+    applyAccountLifecycle(
+        tx: Prisma.TransactionClient,
+        input: {
+            accountId: number;
+            operation: EmployeeLifecycleOperation;
+            identity: { name?: string; email?: string };
+            revokedAt: Date;
+        },
+    ): Promise<void>;
+    synchronizeAccountIdentity(
+        tx: Prisma.TransactionClient,
+        accountId: number,
+        identity: { name?: string; email?: string },
+    ): Promise<void>;
+}
+
 export interface EmployeeOffboardingDependency {
     id: string;
     employee: {

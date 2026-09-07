@@ -26,6 +26,8 @@ export type {
     EmployeeFilters,
     EmployeeOffboardingDependency,
     EmployeeOffboardingDependencyProvider,
+    EmployeeAccountLifecycleProvider,
+    EmployeeAccountLifecycleRecord,
 } from "./application/types";
 
 // Auth/workforce and signup contracts.

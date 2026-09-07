@@ -1,13 +1,5 @@
 import type { Prisma } from "@prisma/client";
 
-import {
-    applyEmployeeAccountLifecycle,
-    assertEmployeeAccountCanDeactivate,
-    EmployeeAccountLifecycleError,
-    lockEmployeeAccountForLifecycle,
-    synchronizeEmployeeAccountIdentity,
-    type LockedEmployeeAccount,
-} from "@/lib/auth/employee-account-lifecycle";
 import { lockEmployeeRows } from "@/lib/db/row-locks";
 import { hasPrismaErrorCode, runSerializableTransaction } from "@/lib/db/transaction";
 import { prisma } from "@/lib/db/prisma";
@@ -25,6 +17,8 @@ import type {
     EmployeeLifecycleActor,
     EmployeeMutationResult,
     EmployeeRecord,
+    EmployeeAccountLifecycleProvider,
+    EmployeeAccountLifecycleRecord,
     EmployeeOffboardingDependency,
     EmployeeOffboardingDependencyProvider,
     UpdateEmployeeData,
@@ -38,7 +32,7 @@ type LifecycleEmployee = {
     email: string;
     status: EmployeeStatusValue;
     deletedAt: Date | null;
-    user: LockedEmployeeAccount | null;
+    user: EmployeeAccountLifecycleRecord | null;
 };
 
 type EmployeeSummary = Pick<LifecycleEmployee, "id" | "firstName" | "lastName" | "nickname">;
@@ -52,6 +46,14 @@ class EmployeeMutationError extends Error {
         this.name = "EmployeeMutationError";
         this.statusCode = statusCode;
     }
+}
+
+function isAccountLifecycleError(
+    error: unknown,
+): error is Error & { statusCode: number } {
+    return error instanceof Error
+        && "statusCode" in error
+        && typeof error.statusCode === "number";
 }
 
 const MESSAGES = {
@@ -101,7 +103,7 @@ function managerDependenciesMessage(
 
 function buildBeforeData(
     employee: LifecycleEmployee,
-    account: LockedEmployeeAccount | null,
+    account: EmployeeAccountLifecycleRecord | null,
 ): Record<string, unknown> {
     return {
         firstName: employee.firstName,
@@ -139,13 +141,22 @@ async function lockEmployeeForMutation(
     tx: Prisma.TransactionClient,
     employeeId: number,
     allowDeleted: boolean,
-): Promise<{ employee: LifecycleEmployee; account: LockedEmployeeAccount | null }> {
+    accountLifecycleProvider?: EmployeeAccountLifecycleProvider,
+): Promise<{ employee: LifecycleEmployee; account: EmployeeAccountLifecycleRecord | null }> {
     await lockEmployeeRows(tx, [employeeId]);
     const employee = await findLifecycleEmployee(tx, employeeId);
     if (!employee || (!allowDeleted && employee.deletedAt !== null)) {
         throw new EmployeeMutationError(MESSAGES.employeeNotFound, 404);
     }
-    if (employee.user) await lockEmployeeAccountForLifecycle(tx, employee.user.id);
+    if (employee.user) {
+        if (!accountLifecycleProvider) {
+            throw new EmployeeMutationError(
+                "ไม่สามารถประสานการเปลี่ยนแปลงบัญชีผู้ใช้ได้",
+                500,
+            );
+        }
+        await accountLifecycleProvider.lockAccountForLifecycle(tx, employee.user.id);
+    }
     const lockedEmployee = await findLifecycleEmployee(tx, employeeId);
     if (!lockedEmployee || (!allowDeleted && lockedEmployee.deletedAt !== null)) {
         throw new EmployeeMutationError(MESSAGES.employeeNotFound, 404);
@@ -156,11 +167,20 @@ async function lockEmployeeForMutation(
 async function assertCanDeactivateEmployee(
     tx: Prisma.TransactionClient,
     employee: LifecycleEmployee,
-    account: LockedEmployeeAccount | null,
+    account: EmployeeAccountLifecycleRecord | null,
     actor: EmployeeLifecycleActor,
     offboardingDependencyProvider: EmployeeOffboardingDependencyProvider,
+    accountLifecycleProvider?: EmployeeAccountLifecycleProvider,
 ): Promise<void> {
-    if (account) await assertEmployeeAccountCanDeactivate(tx, account, actor.userId);
+    if (account) {
+        if (!accountLifecycleProvider) {
+            throw new EmployeeMutationError(
+                "ไม่สามารถประสานการเปลี่ยนแปลงบัญชีผู้ใช้ได้",
+                500,
+            );
+        }
+        await accountLifecycleProvider.assertAccountCanDeactivate(tx, account, actor.userId);
+    }
     const [subordinates, leaveDependencies] = await Promise.all([
         tx.employee.findMany({
             where: { managerId: employee.id, deletedAt: null },
@@ -199,7 +219,7 @@ function buildEmployeeUpdateData(data: UpdateEmployeeData): Prisma.EmployeeUnche
 async function prepareEmployeeUpdate(
     tx: Prisma.TransactionClient,
     employee: LifecycleEmployee,
-    account: LockedEmployeeAccount | null,
+    account: EmployeeAccountLifecycleRecord | null,
     data: UpdateEmployeeData,
 ): Promise<{ employeeData: Prisma.EmployeeUncheckedUpdateInput; identity: IdentityUpdate }> {
     const employeeData = buildEmployeeUpdateData(data);
@@ -242,7 +262,7 @@ async function prepareEmployeeUpdate(
 async function writeLifecycleAudit(
     tx: Prisma.TransactionClient,
     employee: LifecycleEmployee,
-    account: LockedEmployeeAccount | null,
+    account: EmployeeAccountLifecycleRecord | null,
     operation: EmployeeLifecycleOperation,
     actor: EmployeeLifecycleActor,
     beforeData: Record<string, unknown>,
@@ -274,6 +294,7 @@ async function runEmployeeLifecycle(
     actor: EmployeeLifecycleActor,
     data: UpdateEmployeeData = {},
     offboardingDependencyProvider?: EmployeeOffboardingDependencyProvider,
+    accountLifecycleProvider?: EmployeeAccountLifecycleProvider,
 ): Promise<EmployeeMutationResult> {
     try {
         return await runSerializableTransaction(async (tx) => {
@@ -281,6 +302,7 @@ async function runEmployeeLifecycle(
                 tx,
                 employeeId,
                 !isEmployeeDeactivation(operation),
+                accountLifecycleProvider,
             );
             const { employeeData, identity } = await prepareEmployeeUpdate(tx, employee, account, data);
             const beforeData = buildBeforeData(employee, account);
@@ -292,7 +314,15 @@ async function runEmployeeLifecycle(
                         include: EMPLOYEE_WITH_RELATIONS_INCLUDE,
                     });
                 }
-                if (account) await synchronizeEmployeeAccountIdentity(tx, account.id, identity);
+                if (account) {
+                    if (!accountLifecycleProvider) {
+                        throw new EmployeeMutationError(
+                            "ไม่สามารถประสานการเปลี่ยนแปลงบัญชีผู้ใช้ได้",
+                            500,
+                        );
+                    }
+                    await accountLifecycleProvider.synchronizeAccountIdentity(tx, account.id, identity);
+                }
                 return { success: true, employee: await findCommittedEmployee(tx, employeeId), beforeData };
             }
             if (isEmployeeDeactivation(operation)) {
@@ -308,6 +338,7 @@ async function runEmployeeLifecycle(
                     account,
                     actor,
                     offboardingDependencyProvider,
+                    accountLifecycleProvider,
                 );
             }
             const now = new Date();
@@ -320,7 +351,13 @@ async function runEmployeeLifecycle(
                 include: EMPLOYEE_WITH_RELATIONS_INCLUDE,
             });
             if (account) {
-                await applyEmployeeAccountLifecycle(tx, {
+                if (!accountLifecycleProvider) {
+                    throw new EmployeeMutationError(
+                        "ไม่สามารถประสานการเปลี่ยนแปลงบัญชีผู้ใช้ได้",
+                        500,
+                    );
+                }
+                await accountLifecycleProvider.applyAccountLifecycle(tx, {
                     accountId: account.id,
                     operation,
                     identity,
@@ -346,7 +383,7 @@ async function runEmployeeLifecycle(
             };
         });
     } catch (error) {
-        if (error instanceof EmployeeMutationError || error instanceof EmployeeAccountLifecycleError) {
+        if (error instanceof EmployeeMutationError || isAccountLifecycleError(error)) {
             return { success: false, error: error.message, status: error.statusCode };
         }
         if (hasPrismaErrorCode(error, "P2002")) {
@@ -359,17 +396,31 @@ async function runEmployeeLifecycle(
 async function runEmployeeProfileUpdate(
     employeeId: number,
     data: UpdateEmployeeData,
+    accountLifecycleProvider?: EmployeeAccountLifecycleProvider,
 ): Promise<EmployeeMutationResult> {
     try {
         return await runSerializableTransaction(async (tx) => {
-            const { employee, account } = await lockEmployeeForMutation(tx, employeeId, false);
+            const { employee, account } = await lockEmployeeForMutation(
+                tx,
+                employeeId,
+                false,
+                accountLifecycleProvider,
+            );
             const { employeeData, identity } = await prepareEmployeeUpdate(tx, employee, account, data);
             await tx.employee.update({
                 where: { id: employeeId },
                 data: employeeData,
                 include: EMPLOYEE_WITH_RELATIONS_INCLUDE,
             });
-            if (account) await synchronizeEmployeeAccountIdentity(tx, account.id, identity);
+            if (account) {
+                if (!accountLifecycleProvider) {
+                    throw new EmployeeMutationError(
+                        "ไม่สามารถประสานการเปลี่ยนแปลงบัญชีผู้ใช้ได้",
+                        500,
+                    );
+                }
+                await accountLifecycleProvider.synchronizeAccountIdentity(tx, account.id, identity);
+            }
             return {
                 success: true,
                 employee: await findCommittedEmployee(tx, employeeId),
@@ -377,7 +428,7 @@ async function runEmployeeProfileUpdate(
             };
         });
     } catch (error) {
-        if (error instanceof EmployeeMutationError) {
+        if (error instanceof EmployeeMutationError || isAccountLifecycleError(error)) {
             return { success: false, error: error.message, status: error.statusCode };
         }
         if (hasPrismaErrorCode(error, "P2002")) {
@@ -418,8 +469,17 @@ export async function updateEmployee(
 export async function updateEmployee(
     employeeId: number,
     data: UpdateEmployeeData,
+    actor: undefined,
+    offboardingDependencyProvider: undefined,
+    accountLifecycleProvider: EmployeeAccountLifecycleProvider,
+): Promise<EmployeeMutationResult>;
+
+export async function updateEmployee(
+    employeeId: number,
+    data: UpdateEmployeeData,
     actor: EmployeeLifecycleActor,
     offboardingDependencyProvider: EmployeeOffboardingDependencyProvider,
+    accountLifecycleProvider?: EmployeeAccountLifecycleProvider,
 ): Promise<EmployeeMutationResult>;
 
 export async function updateEmployee(
@@ -427,8 +487,9 @@ export async function updateEmployee(
     data: UpdateEmployeeData,
     actor?: EmployeeLifecycleActor,
     offboardingDependencyProvider?: EmployeeOffboardingDependencyProvider,
+    accountLifecycleProvider?: EmployeeAccountLifecycleProvider,
 ): Promise<EmployeeMutationResult> {
-    if (!data.status) return runEmployeeProfileUpdate(employeeId, data);
+    if (!data.status) return runEmployeeProfileUpdate(employeeId, data, accountLifecycleProvider);
     if (!actor) {
         return { success: false, error: MESSAGES.lifecycleActorRequired, status: 403 };
     }
@@ -441,6 +502,7 @@ export async function updateEmployee(
         actor,
         data,
         offboardingDependencyProvider,
+        accountLifecycleProvider,
     );
 }
 
@@ -448,6 +510,7 @@ export async function deleteEmployee(
     employeeId: number,
     actor: EmployeeLifecycleActor,
     offboardingDependencyProvider: EmployeeOffboardingDependencyProvider,
+    accountLifecycleProvider?: EmployeeAccountLifecycleProvider,
 ): Promise<EmployeeMutationResult> {
     return runEmployeeLifecycle(
         employeeId,
@@ -455,6 +518,7 @@ export async function deleteEmployee(
         actor,
         {},
         offboardingDependencyProvider,
+        accountLifecycleProvider,
     );
 }
 
@@ -462,6 +526,7 @@ export async function suspendEmployee(
     employeeId: number,
     actor: EmployeeLifecycleActor,
     offboardingDependencyProvider: EmployeeOffboardingDependencyProvider,
+    accountLifecycleProvider?: EmployeeAccountLifecycleProvider,
 ): Promise<EmployeeMutationResult> {
     return runEmployeeLifecycle(
         employeeId,
@@ -469,20 +534,23 @@ export async function suspendEmployee(
         actor,
         {},
         offboardingDependencyProvider,
+        accountLifecycleProvider,
     );
 }
 
 export async function reactivateEmployee(
     employeeId: number,
     actor: EmployeeLifecycleActor,
+    accountLifecycleProvider?: EmployeeAccountLifecycleProvider,
 ): Promise<EmployeeMutationResult> {
-    return runEmployeeLifecycle(employeeId, "REACTIVATE", actor);
+    return runEmployeeLifecycle(employeeId, "REACTIVATE", actor, {}, undefined, accountLifecycleProvider);
 }
 
 export async function offboardEmployee(
     employeeId: number,
     actor: EmployeeLifecycleActor,
     offboardingDependencyProvider: EmployeeOffboardingDependencyProvider,
+    accountLifecycleProvider?: EmployeeAccountLifecycleProvider,
 ): Promise<EmployeeMutationResult> {
     return runEmployeeLifecycle(
         employeeId,
@@ -490,5 +558,6 @@ export async function offboardEmployee(
         actor,
         {},
         offboardingDependencyProvider,
+        accountLifecycleProvider,
     );
 }

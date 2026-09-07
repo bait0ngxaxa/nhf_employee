@@ -4,7 +4,7 @@ import type { HybridAuthSession } from "@/lib/auth/types";
 import { HYBRID_ACCESS_COOKIE_NAME } from "@/lib/auth/hybrid/constants";
 import { parseUserId } from "@/lib/auth/hybrid/session";
 import { hasActiveSessionFamily } from "@/lib/auth/hybrid/session-store";
-import { verifyAccessToken } from "@/lib/auth/hybrid/tokens";
+import { verifyAccessToken } from "@/modules/auth";
 import { hasEligibleEmployeeLifecycle } from "@/modules/employee";
 import { prisma } from "@/lib/db/prisma";
 import { getUserDisplayName } from "@/shared/identity/display";

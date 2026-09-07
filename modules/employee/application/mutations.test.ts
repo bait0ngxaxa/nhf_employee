@@ -4,13 +4,18 @@ import { prisma } from "@/lib/db/prisma";
 import type { Prisma, PrismaClient } from "@prisma/client";
 import {
     createEmployee,
-    updateEmployee,
-    deleteEmployee,
+    updateEmployee as updateEmployeeUseCase,
+    deleteEmployee as deleteEmployeeUseCase,
 } from "./mutations";
 import type {
+    EmployeeAccountLifecycleProvider,
+    EmployeeLifecycleActor,
+    EmployeeMutationResult,
     EmployeeOffboardingDependency,
     EmployeeOffboardingDependencyProvider,
+    UpdateEmployeeData,
 } from "./types";
+import { employeeAccountLifecycle } from "@/modules/auth";
 
 vi.mock("@/lib/db/prisma", () => ({
     prisma: mockDeep<PrismaClient>(),
@@ -21,6 +26,43 @@ const prismaMock = prisma as unknown as ReturnType<
 
 const ACTOR = { userId: 999, email: "admin@thainhf.org" };
 const NO_OFFBOARDING_DEPENDENCIES: EmployeeOffboardingDependencyProvider = async () => [];
+
+function updateEmployee(
+    employeeId: number,
+    data: UpdateEmployeeData,
+    actor?: EmployeeLifecycleActor,
+    offboardingDependencyProvider?: EmployeeOffboardingDependencyProvider,
+): Promise<EmployeeMutationResult> {
+    if (!actor) {
+        return updateEmployeeUseCase(
+            employeeId,
+            data,
+            undefined,
+            undefined,
+            employeeAccountLifecycle as EmployeeAccountLifecycleProvider,
+        );
+    }
+    return updateEmployeeUseCase(
+        employeeId,
+        data,
+        actor,
+        offboardingDependencyProvider ?? NO_OFFBOARDING_DEPENDENCIES,
+        employeeAccountLifecycle,
+    );
+}
+
+function deleteEmployee(
+    employeeId: number,
+    actor: EmployeeLifecycleActor,
+    offboardingDependencyProvider: EmployeeOffboardingDependencyProvider,
+): Promise<EmployeeMutationResult> {
+    return deleteEmployeeUseCase(
+        employeeId,
+        actor,
+        offboardingDependencyProvider,
+        employeeAccountLifecycle,
+    );
+}
 
 function createOffboardingDependencyProvider(
     dependencies: readonly EmployeeOffboardingDependency[],

@@ -7,36 +7,13 @@ import {
     HYBRID_REFRESH_COOKIE_NAME,
     clearHybridAuthCookies,
 } from "@/lib/auth/hybrid/session";
-import { hashRefreshToken } from "@/lib/auth/hybrid/tokens";
-import { prisma } from "@/lib/db/prisma";
-
-async function revokeCurrentRefreshToken(tokenHash: string): Promise<{ userId: number; email: string } | null> {
-    const tokenRecord = await prisma.authRefreshToken.findUnique({
-        where: { tokenHash },
-        include: {
-            user: {
-                select: { id: true, email: true },
-            },
-        },
-    });
-
-    if (!tokenRecord || tokenRecord.revokedAt) {
-        return null;
-    }
-
-    await prisma.authRefreshToken.update({
-        where: { id: tokenRecord.id },
-        data: { revokedAt: new Date(), lastUsedAt: new Date() },
-    });
-
-    return { userId: tokenRecord.user.id, email: tokenRecord.user.email };
-}
+import { logoutCurrentRefreshSession } from "@/modules/auth";
 
 export const POST = withTrustedMutation(async (request: NextRequest): Promise<NextResponse> => {
     try {
         const refreshToken = request.cookies.get(HYBRID_REFRESH_COOKIE_NAME)?.value;
         if (refreshToken) {
-            const revoked = await revokeCurrentRefreshToken(hashRefreshToken(refreshToken));
+            const revoked = await logoutCurrentRefreshSession(refreshToken);
             if (revoked) {
                 await logAuthEvent("LOGOUT", revoked.userId, revoked.email, {
                     metadata: { method: "hybrid_logout" },

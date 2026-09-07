@@ -3,22 +3,44 @@
 `modules/` is the ownership boundary for business capabilities in the NHF
 Employee application.
 
-Stock, Routine, Leave, Employee, Department, and Audit are migrated capability
-modules. Audit Phase I3 is closed with generic server/application/persistence,
+Stock, Routine, Leave, Employee, Department, Audit, and Auth/Session are
+migrated capability modules. Audit Phase I3 is closed with generic
+server/application/persistence,
 producer, entity-history query, and Dashboard presentation ownership in
 `modules/audit/`. Its public server entry is `@/modules/audit`; its browser-facing entry is
 `@/modules/audit/client`, with Audit presentation under
 `modules/audit/presentation/dashboard/**`. Production physical AuditLog
 delegates are exclusive to `modules/audit/infrastructure/**`; Employee, Leave,
 Stock, and Routine retain event meaning and consume only the public Audit
-server entry. Auth/Session/Identity and Email Request/future IT migration
-remain deferred for implementation. Phase J0 Auth / Session / Identity
-discovery and boundary definition is now closed; the authoritative record is
+server entry. Email Request/future IT migration remains deferred. Phase J0
+Auth / Session / Identity discovery and boundary definition is closed, and
+Phase J1 Auth / Session server and persistence ownership is closed; the
+authoritative record is
 [`docs/architecture/auth-session-identity-migration.md`](../docs/architecture/auth-session-identity-migration.md).
-J1-J3 have not started and no runtime Auth module has been created. The J0
-decision keeps a cohesive Auth / Session / Account Identity server boundary,
-field-level User ownership, Employee/workforce ownership outside Auth, and a
-separate LINE/LIFF identity/account-link integration seam.
+J2 and J3 have not started. The J1 runtime capability is `modules/auth/`, with
+`@/modules/auth` as its server-only public entry and no Auth client entry. It
+owns the Auth field slice of User, credentials, web token/session families,
+recovery/reset, signup, and Auth refresh/reset-token persistence.
+Employee/workforce ownership remains outside Auth, and the separate LINE/LIFF
+identity/account-link integration seam remains deferred.
+
+The J1 Auth structure is:
+
+```text
+modules/auth/
+├── application/
+├── domain/
+├── infrastructure/persistence/
+└── index.ts
+```
+
+Core Auth routes delegate business and Auth-token persistence through this
+entry while retaining HTTP/security/cookie adaptation and deferred Auth Audit
+composition. Employee binds Auth's transaction-aware account-lifecycle
+provider through its own structural port, preserving the same serializable
+transaction and avoiding an Auth/Employee runtime cycle. The broad
+`/api/auth/me` projection remains a J2 compatibility exception; LINE/LIFF and
+Auth Audit producer migration remain J3 exceptions.
 Employee F0-F3 owns its server/business behavior and active presentation in
 `modules/employee/`. Employee Dashboard routes consume the minimal
 browser-safe `@/modules/employee/client` entry, which also exposes the proven

@@ -1,23 +1,25 @@
 # Module boundaries
 
-Status: Phase J0 CLOSED — Auth / Session / Identity discovery and boundary
-definition complete; J1-J3 implementation has not started. Phase I3 Audit
+Status: Phase J1 CLOSED — Auth / Session server and persistence ownership
+complete; J2-J3 implementation has not started. Phase I3 Audit
 producer integration and physical AuditLog persistence exclusivity remains
 closed. Phase H3 Notification producer integration and final migration audit
 remain complete. Phase G3 Department migration remains complete.
 Stock, Routine, Leave, and Employee are migrated examples; Employee
 server/business and active presentation ownership are migrated as well.
 
-The authoritative J0 boundary record is
+The authoritative Auth boundary record is
 [auth-session-identity-migration.md](./auth-session-identity-migration.md).
-Auth/Session/Account Identity is planned as one cohesive server capability for
+Auth/Session/Account Identity is one cohesive server capability for
 credentials, account fields, web token/session families, recovery, and generic
 role checks. It must not own Employee lifecycle, Leave capability predicates,
-Department data, Dashboard composition, or LINE Messaging transport. The
-future Auth client entry, if introduced in J2, is HTTP-only and must not reach
-Prisma, secrets, JWT/password implementation, or session persistence. Until
-J1, current `lib/auth/**` and route locations remain operational compatibility
-paths.
+Department data, Dashboard composition, or LINE Messaging transport. The J1
+server capability now lives under `modules/auth/` with `@/modules/auth` as its
+only supported production server entry. It has no client entry in J1; the
+production client graph must not reach Prisma, secrets, JWT/password
+implementation, or session persistence. Remaining `lib/auth/**` and route
+locations are operational compatibility/adaptation paths where active
+consumers still require them.
 
 ## What is a module
 
@@ -341,6 +343,41 @@ Department migration G0-G3 is complete. Department remains a server-only
 reference-data owner with the minimal public server API
 `listDepartments()`/`listDepartmentReferences()`; Employee owns association,
 import, selector, and display compatibility behavior.
+
+## Auth / Session / Account Identity server boundary (J1)
+
+`modules/auth/` owns the Auth field slice of `User`, credential authentication,
+access-token issue/verification semantics, refresh-token family lifecycle,
+refresh-session persistence, logout/session management/cleanup, signup,
+password recovery/reset, and the transaction-aware account lifecycle provider
+used by Employee. The structure is intentionally proportional:
+
+```text
+modules/auth/
+├── application/
+├── domain/
+├── infrastructure/persistence/
+└── index.ts
+```
+
+The root exports the server application contracts for login, refresh, principal
+resolution, logout/session operations, signup, recovery/reset, cleanup, and the
+Employee account-lifecycle provider. Routes retain HTTP/security/cookie/response
+adaptation and deferred Auth Audit composition. Auth infrastructure is the
+exclusive production owner of physical `AuthRefreshToken` and
+`PasswordResetToken` delegate access.
+
+Employee does not runtime-import Auth. It owns a structural account-lifecycle
+port; the outer Employee route binds the implementation from `@/modules/auth`
+and passes the existing serializable transaction client through it. Employee
+continues to own workforce identity/profile rules, while Auth owns the account
+field persistence operation.
+
+The `/api/auth/me` broad account/Employee/Department/Leave projection remains
+the J2 compatibility exception. No Leave predicates or Department projection
+were pulled into generic Auth. LINE/LIFF remains excluded for J3, Auth Audit
+producer migration remains excluded for J3, and no `modules/auth/client.ts`
+exists in J1.
 
 ## Shared/platform ownership
 

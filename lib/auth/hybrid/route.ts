@@ -5,52 +5,14 @@ import {
     HYBRID_REFRESH_COOKIE_NAME,
     parseUserId,
 } from "@/lib/auth/hybrid/session";
-import { hasActiveSessionFamily } from "@/lib/auth/hybrid/session-store";
-import { hashRefreshToken, verifyAccessToken } from "@/lib/auth/hybrid/tokens";
-import { prisma } from "@/lib/db/prisma";
+import {
+    resolveAuthenticatedUserId as resolveAuthUserId,
+    resolveCurrentSessionFamilyId as resolveAuthSessionFamilyId,
+} from "@/modules/auth";
 
 export async function resolveAuthenticatedUserId(request: NextRequest): Promise<number | null> {
     const accessToken = request.cookies.get(HYBRID_ACCESS_COOKIE_NAME)?.value;
-    if (!accessToken) {
-        return null;
-    }
-
-    try {
-        const claims = await verifyAccessToken(accessToken);
-        const userId = parseUserId(claims.sub);
-        if (!userId) {
-            return null;
-        }
-
-        const hasActiveSession = await hasActiveSessionFamily(userId, claims.sessionId);
-        if (!hasActiveSession) {
-            return null;
-        }
-
-        const user = await prisma.user.findUnique({
-            where: { id: userId },
-            select: {
-                isActive: true,
-                deletedAt: true,
-                tokenVersion: true,
-                employee: {
-                    select: { status: true, deletedAt: true },
-                },
-            },
-        });
-
-        const hasActiveEmployee = !user?.employee
-            || (user.employee.status === "ACTIVE" && user.employee.deletedAt === null);
-
-        return user?.isActive === true
-            && user.deletedAt === null
-            && user.tokenVersion === claims.tokenVersion
-            && hasActiveEmployee
-            ? userId
-            : null;
-    } catch {
-        return null;
-    }
+    return resolveAuthUserId(accessToken);
 }
 
 export async function resolveCurrentSessionFamilyId(
@@ -58,30 +20,12 @@ export async function resolveCurrentSessionFamilyId(
     userId: number,
 ): Promise<string | null> {
     const accessToken = request.cookies.get(HYBRID_ACCESS_COOKIE_NAME)?.value;
-    if (accessToken) {
-        try {
-            const claims = await verifyAccessToken(accessToken);
-            if (parseUserId(claims.sub) === userId) {
-                return claims.sessionId;
-            }
-        } catch {
-            // Fall through to refresh-token lookup.
-        }
-    }
-
     const refreshToken = request.cookies.get(HYBRID_REFRESH_COOKIE_NAME)?.value;
-    if (!refreshToken) {
-        return null;
-    }
-
-    const record = await prisma.authRefreshToken.findUnique({
-        where: { tokenHash: hashRefreshToken(refreshToken) },
-        select: { userId: true, familyId: true },
+    return resolveAuthSessionFamilyId({
+        accessToken,
+        rawRefreshToken: refreshToken,
+        userId,
     });
-
-    if (!record || record.userId !== userId) {
-        return null;
-    }
-
-    return record.familyId;
 }
+
+export { parseUserId };

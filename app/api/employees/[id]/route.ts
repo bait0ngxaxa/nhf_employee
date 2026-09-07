@@ -3,6 +3,7 @@ import { after, type NextRequest, NextResponse } from "next/server";
 import { requireAdminSession } from "@/lib/auth/api";
 import { getTrustedClientIp } from "@/lib/network/trusted-client-ip";
 import { getEmployeeLeaveOffboardingBlockers } from "@/modules/leave";
+import { employeeAccountLifecycle } from "@/modules/auth";
 import {
     appendEmployeeDeleteAudit,
     appendEmployeeUpdateAudit,
@@ -64,6 +65,7 @@ export async function PATCH(
             validationResult.data,
             { userId: auth.user.id, email: auth.user.email },
             getEmployeeLeaveOffboardingBlockers,
+            employeeAccountLifecycle,
         );
 
         if (!result.success) {
@@ -123,6 +125,7 @@ export async function DELETE(
             employeeId,
             { userId: auth.user.id, email: auth.user.email },
             getEmployeeLeaveOffboardingBlockers,
+            employeeAccountLifecycle,
         );
 
         if (!result.success) {

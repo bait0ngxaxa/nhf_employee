@@ -2,53 +2,30 @@ import { type NextRequest, NextResponse } from "next/server";
 
 import { AUTH_ERROR_MESSAGES } from "@/lib/auth/ssot";
 import {
+    HYBRID_ACCESS_COOKIE_NAME,
+    HYBRID_REFRESH_COOKIE_NAME,
+} from "@/lib/auth/hybrid/session";
+import {
+    listAuthSessions,
     resolveAuthenticatedUserId,
     resolveCurrentSessionFamilyId,
-} from "@/lib/auth/hybrid/route";
-import { prisma } from "@/lib/db/prisma";
-
-interface SessionItemResponse {
-    id: string;
-    familyId: string;
-    createdAt: Date;
-    lastUsedAt: Date | null;
-    expiresAt: Date;
-    userAgent: string | null;
-    ipAddress: string | null;
-    isCurrent: boolean;
-}
+} from "@/modules/auth";
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
     try {
-        const userId = await resolveAuthenticatedUserId(request);
+        const accessToken = request.cookies.get(HYBRID_ACCESS_COOKIE_NAME)?.value;
+        const refreshToken = request.cookies.get(HYBRID_REFRESH_COOKIE_NAME)?.value;
+        const userId = await resolveAuthenticatedUserId(accessToken);
         if (!userId) {
             return NextResponse.json({ error: AUTH_ERROR_MESSAGES.unauthorized }, { status: 401 });
         }
 
-        const currentFamilyId = await resolveCurrentSessionFamilyId(request, userId);
-        const now = new Date();
-        const sessions = await prisma.authRefreshToken.findMany({
-            where: {
-                userId,
-                revokedAt: null,
-                expiresAt: { gt: now },
-            },
-            orderBy: [{ lastUsedAt: "desc" }, { createdAt: "desc" }],
-            select: {
-                id: true,
-                familyId: true,
-                createdAt: true,
-                lastUsedAt: true,
-                expiresAt: true,
-                userAgent: true,
-                ipAddress: true,
-            },
+        const currentFamilyId = await resolveCurrentSessionFamilyId({
+            accessToken,
+            rawRefreshToken: refreshToken,
+            userId,
         });
-
-        const items: SessionItemResponse[] = sessions.map((session) => ({
-            ...session,
-            isCurrent: currentFamilyId === session.familyId,
-        }));
+        const items = await listAuthSessions({ userId, currentFamilyId });
 
         return NextResponse.json({ sessions: items });
     } catch {

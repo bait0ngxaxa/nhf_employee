@@ -1,18 +1,8 @@
-import { prisma } from "@/lib/db/prisma";
+import { hasActiveAuthSessionFamily } from "@/modules/auth";
 
 export async function hasActiveSessionFamily(
     userId: number,
     familyId: string,
 ): Promise<boolean> {
-    const session = await prisma.authRefreshToken.findFirst({
-        where: {
-            userId,
-            familyId,
-            revokedAt: null,
-            expiresAt: { gt: new Date() },
-        },
-        select: { id: true },
-    });
-
-    return session !== null;
+    return hasActiveAuthSessionFamily(userId, familyId);
 }

@@ -262,6 +262,31 @@ values remain storage-compatible history only. H1 server/application, H2
 presentation, and H3 producer integration/compatibility cleanup are complete.
 The timestamp-only history cursor risk remains unresolved.
 
+### Auth / Session / Account Identity (J1)
+
+Phase J1 is closed. `modules/auth/` is the cohesive server capability for
+credential authentication, Auth-owned User account fields, web access-token
+issue/verification, refresh-token families and persistence, session lifecycle,
+signup, password recovery/reset, and the transaction-aware account lifecycle
+provider consumed by Employee. Its only supported production server entry is
+`@/modules/auth`; it has no client entry in J1.
+
+The core Auth routes remain HTTP adapters for parsing, trusted-mutation checks,
+status/response serialization, cookies, request limits, and deferred Auth
+Audit composition. Their Auth business and AuthRefreshToken/
+PasswordResetToken persistence delegates are owned by the Auth application and
+infrastructure. Employee owns a structural account-lifecycle port, and the
+Employee route composes `@/modules/employee` with `@/modules/auth` so the same
+serializable Employee transaction, row locks, identity synchronization,
+token-version increment, and refresh revocation are preserved without a
+runtime module cycle.
+
+The broad `/api/auth/me` projection remains a compatibility composition with
+Employee, Department, and Leave data and is explicitly deferred to J2. LINE/
+LIFF behavior and Auth Audit producers remain deferred to J3. No Prisma schema,
+browser presentation, cookie/token contract, or documented compatibility
+behavior was changed by J1.
+
 ## Ownership principle
 
 Code belongs with the business capability whose rules determine its behavior.

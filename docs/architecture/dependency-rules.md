@@ -1,7 +1,7 @@
 # Dependency rules and enforcement
 
-Status: Phase J0 CLOSED — Auth / Session / Identity discovery and boundary
-definition complete; J1-J3 implementation has not started. Phase I3 Audit
+Status: Phase J1 CLOSED — Auth / Session server and persistence ownership
+complete; J2-J3 implementation has not started. Phase I3 Audit
 producer integration and physical AuditLog persistence exclusivity remains
 closed. Phase H3 Notification producer integration and final migration audit
 remain complete. Phase G3 Department migration remains complete. These rules
@@ -10,13 +10,13 @@ during incremental migration.
 
 The authoritative Auth boundary is recorded in
 [auth-session-identity-migration.md](./auth-session-identity-migration.md).
-Future Auth code may own credentials, account fields, web token/session-family
+`modules/auth/` owns credentials, account fields, web token/session-family
 lifecycle, password recovery, and generic account-role checks. It must not own
 Employee lifecycle, Leave capability predicates, Department data, Dashboard
-composition, or LINE Messaging transport. A future Auth client entry is
-HTTP-only and server-only persistence/secrets/JWT/password implementation must
-not enter the client graph. Current `lib/auth/**` remains an operational
-compatibility path until J1.
+composition, or LINE Messaging transport. J1 has no Auth client entry:
+server-only persistence/secrets/JWT/password implementation must not enter a
+production Client Component graph. Remaining `lib/auth/**` is an operational
+compatibility/adaptation path only where active consumers require it.
 
 ## Direction
 
@@ -48,6 +48,23 @@ the outer application composition imports both public APIs and passes Leave's
 blocker implementation into Employee. That provider must use the exact
 `Prisma.TransactionClient` supplied by the Employee serializable lifecycle
 transaction.
+
+Auth/Employee is another deliberate one-way composition seam. Auth may consume
+the public Employee lookup/eligibility contracts for login and signup, but
+Employee application code must not runtime-import `@/modules/auth` or any Auth
+internal. Employee owns a structural account-lifecycle port; the outer route
+composition binds the Auth implementation and supplies the same serializable
+`Prisma.TransactionClient`. This preserves User row locking, self/last-admin
+checks, identity synchronization, token-version increment, and refresh
+revocation without a runtime module cycle.
+
+Auth physical persistence is infrastructure-owned. Production
+`AuthRefreshToken` and `PasswordResetToken` delegate operations may occur only
+under `modules/auth/infrastructure/persistence/**`; routes, legacy adapters,
+and other production modules must call `@/modules/auth`. Tests, fixtures,
+Prisma schema/migrations, seed/support code, and generated code remain valid
+exceptions. Auth internals must not import their own `@/modules/auth` public
+barrel, and no production Client Component graph may reach that server entry.
 
 Preferred examples:
 
@@ -321,6 +338,7 @@ the module boundary from a legacy directory, while imports unrelated to
 | Department G2 presentation boundary | Production Client Component runtime graphs and Employee Department presentation | Rejects direct/transitive client imports of the server-only `@/modules/department` entry; preserves the `/api/departments` browser contract and does not require a Department client entry |
 | Notification H1-H3 ownership | `app/api/notifications/**`, `app/dashboard/notifications/**`, `components/dashboard/layout/DashboardNavbar.tsx`, `modules/notification/**`, production client graphs, production source | Requires Notification API routes to consume `@/modules/notification`; requires Notification Dashboard routes and DashboardNavbar to consume `@/modules/notification/client`; rejects deleted legacy presentation paths, deep/self-barrel imports, server-only dependencies in the Notification client graph, production client reachability of the Notification server entry, business-module legacy adapter imports, and physical Notification delegate access outside `modules/notification/infrastructure/**`; allows tests/fixtures/support code and does not match `notificationOutbox` |
 | Audit I1-I2 ownership | `app/api/audit-logs/**`, `app/dashboard/audit/**`, `modules/audit/**`, production client graphs, production source | Requires Audit API routes to consume `@/modules/audit` and Audit Dashboard routes to consume `@/modules/audit/client`; rejects deleted Audit presentation paths, deep/self-barrel imports, server-only dependencies and other module server entries in the Audit client graph, while preserving the I1 direct-access allowlist |
+| Auth J1 ownership | `app/api/auth/**`, `modules/auth/**`, Employee lifecycle composition, production source/client graphs | Restricts production `AuthRefreshToken` and `PasswordResetToken` delegate access to Auth persistence infrastructure; requires external Auth consumers to use `@/modules/auth`; rejects Auth internals importing their own barrel and production Client Component reachability of the server entry; preserves tests, fixtures, schema/migrations, seed/support, and generated-code exceptions |
 
 ## Department final closure (G3)
 
