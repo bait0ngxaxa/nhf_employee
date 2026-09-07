@@ -141,7 +141,7 @@ async function lockEmployeeForMutation(
     tx: Prisma.TransactionClient,
     employeeId: number,
     allowDeleted: boolean,
-    accountLifecycleProvider?: EmployeeAccountLifecycleProvider,
+    accountLifecycleProvider: EmployeeAccountLifecycleProvider,
 ): Promise<{ employee: LifecycleEmployee; account: EmployeeAccountLifecycleRecord | null }> {
     await lockEmployeeRows(tx, [employeeId]);
     const employee = await findLifecycleEmployee(tx, employeeId);
@@ -149,12 +149,6 @@ async function lockEmployeeForMutation(
         throw new EmployeeMutationError(MESSAGES.employeeNotFound, 404);
     }
     if (employee.user) {
-        if (!accountLifecycleProvider) {
-            throw new EmployeeMutationError(
-                "ไม่สามารถประสานการเปลี่ยนแปลงบัญชีผู้ใช้ได้",
-                500,
-            );
-        }
         await accountLifecycleProvider.lockAccountForLifecycle(tx, employee.user.id);
     }
     const lockedEmployee = await findLifecycleEmployee(tx, employeeId);
@@ -170,15 +164,9 @@ async function assertCanDeactivateEmployee(
     account: EmployeeAccountLifecycleRecord | null,
     actor: EmployeeLifecycleActor,
     offboardingDependencyProvider: EmployeeOffboardingDependencyProvider,
-    accountLifecycleProvider?: EmployeeAccountLifecycleProvider,
+    accountLifecycleProvider: EmployeeAccountLifecycleProvider,
 ): Promise<void> {
     if (account) {
-        if (!accountLifecycleProvider) {
-            throw new EmployeeMutationError(
-                "ไม่สามารถประสานการเปลี่ยนแปลงบัญชีผู้ใช้ได้",
-                500,
-            );
-        }
         await accountLifecycleProvider.assertAccountCanDeactivate(tx, account, actor.userId);
     }
     const [subordinates, leaveDependencies] = await Promise.all([
@@ -292,9 +280,9 @@ async function runEmployeeLifecycle(
     employeeId: number,
     operation: EmployeeLifecycleOperation,
     actor: EmployeeLifecycleActor,
-    data: UpdateEmployeeData = {},
-    offboardingDependencyProvider?: EmployeeOffboardingDependencyProvider,
-    accountLifecycleProvider?: EmployeeAccountLifecycleProvider,
+    data: UpdateEmployeeData,
+    offboardingDependencyProvider: EmployeeOffboardingDependencyProvider | undefined,
+    accountLifecycleProvider: EmployeeAccountLifecycleProvider,
 ): Promise<EmployeeMutationResult> {
     try {
         return await runSerializableTransaction(async (tx) => {
@@ -315,12 +303,6 @@ async function runEmployeeLifecycle(
                     });
                 }
                 if (account) {
-                    if (!accountLifecycleProvider) {
-                        throw new EmployeeMutationError(
-                            "ไม่สามารถประสานการเปลี่ยนแปลงบัญชีผู้ใช้ได้",
-                            500,
-                        );
-                    }
                     await accountLifecycleProvider.synchronizeAccountIdentity(tx, account.id, identity);
                 }
                 return { success: true, employee: await findCommittedEmployee(tx, employeeId), beforeData };
@@ -351,12 +333,6 @@ async function runEmployeeLifecycle(
                 include: EMPLOYEE_WITH_RELATIONS_INCLUDE,
             });
             if (account) {
-                if (!accountLifecycleProvider) {
-                    throw new EmployeeMutationError(
-                        "ไม่สามารถประสานการเปลี่ยนแปลงบัญชีผู้ใช้ได้",
-                        500,
-                    );
-                }
                 await accountLifecycleProvider.applyAccountLifecycle(tx, {
                     accountId: account.id,
                     operation,
@@ -396,7 +372,7 @@ async function runEmployeeLifecycle(
 async function runEmployeeProfileUpdate(
     employeeId: number,
     data: UpdateEmployeeData,
-    accountLifecycleProvider?: EmployeeAccountLifecycleProvider,
+    accountLifecycleProvider: EmployeeAccountLifecycleProvider,
 ): Promise<EmployeeMutationResult> {
     try {
         return await runSerializableTransaction(async (tx) => {
@@ -413,12 +389,6 @@ async function runEmployeeProfileUpdate(
                 include: EMPLOYEE_WITH_RELATIONS_INCLUDE,
             });
             if (account) {
-                if (!accountLifecycleProvider) {
-                    throw new EmployeeMutationError(
-                        "ไม่สามารถประสานการเปลี่ยนแปลงบัญชีผู้ใช้ได้",
-                        500,
-                    );
-                }
                 await accountLifecycleProvider.synchronizeAccountIdentity(tx, account.id, identity);
             }
             return {
@@ -463,31 +433,10 @@ export async function createEmployee(data: CreateEmployeeData): Promise<Employee
 
 export async function updateEmployee(
     employeeId: number,
-    data: Omit<UpdateEmployeeData, "status"> & { status?: never },
-): Promise<EmployeeMutationResult>;
-
-export async function updateEmployee(
-    employeeId: number,
     data: UpdateEmployeeData,
-    actor: undefined,
-    offboardingDependencyProvider: undefined,
+    actor: EmployeeLifecycleActor | undefined,
+    offboardingDependencyProvider: EmployeeOffboardingDependencyProvider | undefined,
     accountLifecycleProvider: EmployeeAccountLifecycleProvider,
-): Promise<EmployeeMutationResult>;
-
-export async function updateEmployee(
-    employeeId: number,
-    data: UpdateEmployeeData,
-    actor: EmployeeLifecycleActor,
-    offboardingDependencyProvider: EmployeeOffboardingDependencyProvider,
-    accountLifecycleProvider?: EmployeeAccountLifecycleProvider,
-): Promise<EmployeeMutationResult>;
-
-export async function updateEmployee(
-    employeeId: number,
-    data: UpdateEmployeeData,
-    actor?: EmployeeLifecycleActor,
-    offboardingDependencyProvider?: EmployeeOffboardingDependencyProvider,
-    accountLifecycleProvider?: EmployeeAccountLifecycleProvider,
 ): Promise<EmployeeMutationResult> {
     if (!data.status) return runEmployeeProfileUpdate(employeeId, data, accountLifecycleProvider);
     if (!actor) {
@@ -510,7 +459,7 @@ export async function deleteEmployee(
     employeeId: number,
     actor: EmployeeLifecycleActor,
     offboardingDependencyProvider: EmployeeOffboardingDependencyProvider,
-    accountLifecycleProvider?: EmployeeAccountLifecycleProvider,
+    accountLifecycleProvider: EmployeeAccountLifecycleProvider,
 ): Promise<EmployeeMutationResult> {
     return runEmployeeLifecycle(
         employeeId,
@@ -526,7 +475,7 @@ export async function suspendEmployee(
     employeeId: number,
     actor: EmployeeLifecycleActor,
     offboardingDependencyProvider: EmployeeOffboardingDependencyProvider,
-    accountLifecycleProvider?: EmployeeAccountLifecycleProvider,
+    accountLifecycleProvider: EmployeeAccountLifecycleProvider,
 ): Promise<EmployeeMutationResult> {
     return runEmployeeLifecycle(
         employeeId,
@@ -541,7 +490,7 @@ export async function suspendEmployee(
 export async function reactivateEmployee(
     employeeId: number,
     actor: EmployeeLifecycleActor,
-    accountLifecycleProvider?: EmployeeAccountLifecycleProvider,
+    accountLifecycleProvider: EmployeeAccountLifecycleProvider,
 ): Promise<EmployeeMutationResult> {
     return runEmployeeLifecycle(employeeId, "REACTIVATE", actor, {}, undefined, accountLifecycleProvider);
 }
@@ -550,7 +499,7 @@ export async function offboardEmployee(
     employeeId: number,
     actor: EmployeeLifecycleActor,
     offboardingDependencyProvider: EmployeeOffboardingDependencyProvider,
-    accountLifecycleProvider?: EmployeeAccountLifecycleProvider,
+    accountLifecycleProvider: EmployeeAccountLifecycleProvider,
 ): Promise<EmployeeMutationResult> {
     return runEmployeeLifecycle(
         employeeId,

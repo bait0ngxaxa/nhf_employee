@@ -1399,6 +1399,109 @@ describe("architecture checker module boundaries", () => {
         expect(result.violations).toEqual([]);
     });
 
+    it.each([
+        ["direct Prisma access", "await prisma.authRefreshToken.findUnique();"],
+        ["transaction delegate access", "await tx.authRefreshToken.updateMany();"],
+        ["PasswordResetToken access", "await prisma.passwordResetToken.findUnique();"],
+        [
+            "aliased delegate access",
+            [
+                "const tokens = prisma.authRefreshToken;",
+                "await tokens.findMany();",
+            ].join("\n"),
+        ],
+        [
+            "destructured delegate access",
+            [
+                "const { authRefreshToken } = prisma;",
+                "await authRefreshToken.findMany();",
+            ].join("\n"),
+        ],
+    ])("rejects production Auth persistence %s", async (_label, source) => {
+        const result = await checkFixture("app/api/example.ts", source);
+
+        expect(result.violations).toHaveLength(1);
+        expect(result.violations[0]).toContain(
+            "direct AuthRefreshToken/PasswordResetToken Prisma delegate access must be owned by modules/auth/infrastructure/persistence/",
+        );
+    });
+
+    it("allows Auth persistence infrastructure to use both owned delegates", async () => {
+        const rootPath = await createFixture({
+            ...fixtureFiles,
+            "modules/auth/infrastructure/persistence/repository.ts": [
+                "await prisma.authRefreshToken.findUnique();",
+                "await tx.passwordResetToken.updateMany();",
+            ].join("\n"),
+        });
+        const result = checkArchitecture({ repositoryRoot: rootPath });
+
+        expect(result.violations).toEqual([]);
+    });
+
+    it.each([
+        "__tests__/auth/persistence.test.ts",
+        "prisma/seed.ts",
+        "prisma/migrations/20260907/auth-fixture.ts",
+        "test-support/auth-fixtures.ts",
+    ])("allows intentional Auth persistence support source %s", async (filePath) => {
+        const result = await checkFixture(
+            filePath,
+            "await prisma.passwordResetToken.deleteMany();",
+        );
+
+        expect(result.violations).toEqual([]);
+    });
+
+    it("allows normal server consumers to use the Auth public entry", async () => {
+        const result = await checkFixture(
+            "app/api/auth/example.ts",
+            'import { resolveAuthenticatedUserId } from "@/modules/auth";\n',
+        );
+
+        expect(result.violations).toEqual([]);
+    });
+
+    it("rejects external consumers deep-importing Auth internals", async () => {
+        const result = await checkFixture(
+            "app/api/example.ts",
+            'import { resolveAuthenticatedPrincipal } from "@/modules/auth/application/sessions";\n',
+        );
+
+        expect(result.violations).toHaveLength(1);
+        expect(result.violations[0]).toContain(
+            'external consumers must use the target module public API "@/modules/auth"',
+        );
+    });
+
+    it("rejects Auth internals importing their own public barrel", async () => {
+        const result = await checkFixture(
+            "modules/auth/application/example.ts",
+            'import { resolveAuthenticatedUserId } from "@/modules/auth";\n',
+        );
+
+        expect(result.violations).toHaveLength(1);
+        expect(result.violations[0]).toContain(
+            "Auth module internals must use local contracts instead of their own public barrel",
+        );
+    });
+
+    it("rejects Client Component runtime reachability to the Auth server entry", async () => {
+        const result = await checkFixture(
+            "app/dashboard/auth-client.tsx",
+            [
+                '"use client";',
+                'import { resolveAuthenticatedUserId } from "@/modules/auth";',
+                "export { resolveAuthenticatedUserId };",
+            ].join("\n"),
+        );
+
+        expect(result.violations).toHaveLength(1);
+        expect(result.violations[0]).toContain(
+            "Client-reachable runtime code must not import the Auth server entry",
+        );
+    });
+
     it.each(["stock", "routine", "future"])(
         "rejects %s importing the global Outbox Processor",
         async (moduleName) => {

@@ -1476,7 +1476,10 @@ contract covers hybrid login, the narrow authenticated principal and legacy
 User-id resolver, refresh rotation, current-family resolution, active-family
 checks, logout/logout-all, session listing/family revocation, cleanup, signup,
 password recovery/reset, and the transaction-aware Employee account-lifecycle
-provider. The existing access/refresh token primitives are re-exported only as
+provider. The authenticated principal uses the current User-row role from the
+same account-resolution projection; the signed JWT role claim remains unchanged
+for token compatibility and is not used as current account authority. The
+existing access/refresh token primitives are re-exported only as
 the server compatibility seam for their unchanged cryptographic behavior; no
 browser/client entry was created.
 
@@ -1530,7 +1533,10 @@ The provider receives the existing Employee serializable transaction client.
 User row locking, self-deactivation protection, last-active-ADMIN protection,
 Thai error wording, `isActive`/`deletedAt`, identity synchronization,
 token-version increment, refresh revocation, lifecycle semantics, and
-atomicity are preserved in that same transaction.
+atomicity are preserved in that same transaction. The provider is now required
+at every public Employee mutation/use-case boundary that can encounter or
+synchronize a linked User; no public overload can omit it and defer failure to
+linked-user runtime state.
 
 ### 27.5 Compatibility paths intentionally retained
 
@@ -1569,19 +1575,25 @@ rules:
 
 The checker retains explicit test, fixture/support, Prisma schema/migration,
 seed, and generated-code exceptions and does not impose a blanket repository-
-wide ban on `prisma.user`.
+
+Fixture-based regression tests cover direct and transaction delegate access,
+aliased and destructured delegates, deep imports, Auth internal barrel imports,
+Client Component reachability, and each intentional persistence/public-entry
+allowlist.
 
 ### 27.8 Verification record
 
 The following checks were executed after the J1 implementation:
 
 - `npm.cmd run architecture:check` — passed; 969 repository source files
-  checked.
+  checked before the review-correction test was added; the final check passed
+  with 970 repository source files checked.
 - `npm.cmd run lint:strict` — passed with zero warnings.
 - `npm.cmd run typecheck` — passed.
-- Focused Auth/Employee route and lifecycle suites — passed, 8 files and 88
-  tests; the Employee route compatibility suite also passed, 26 tests.
-- `npm.cmd run test:run` — passed, 244 files and 2,001 tests.
+- Focused Auth principal and Employee route/lifecycle suites — passed, 3 files
+  and 66 tests.
+- Focused architecture-checker suite — passed, 1 file and 174 tests.
+- `npm.cmd run test:run` — passed, 245 files and 2,017 tests.
 - `npm.cmd run test:integration:mysql` — passed against the dedicated MySQL
   `employee_nhf_integration` database after applying the existing migrations,
   10 files and 65 tests.

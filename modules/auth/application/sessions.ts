@@ -146,7 +146,7 @@ export async function resolveAuthenticatedPrincipal(
 
         return {
             userId,
-            role: claims.role,
+            role: user.role,
             sessionFamilyId: claims.sessionId,
             tokenVersion: claims.tokenVersion,
         };
