@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { useAuth } from "@/components/auth/HybridAuthProvider";
+import { useAuth } from "@/modules/auth/client";
 import {
     useStockCategoriesQuery,
     useStockItemsQuery,
@@ -20,7 +20,7 @@ const navigationMocks = vi.hoisted(() => ({
     searchParams: new URLSearchParams(),
 }));
 
-vi.mock("@/components/auth/HybridAuthProvider", () => ({
+vi.mock("@/modules/auth/client", () => ({
     useAuth: vi.fn(),
 }));
 

@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
-import { HybridAuthProvider } from "../components/auth/HybridAuthProvider";
+import { HybridAuthProvider } from "@/modules/auth/client";
 import { SWRProvider } from "../components/providers/SWRProvider";
 import { ThemeColorSync } from "../components/providers/ThemeColorSync";
 import { ThemeProvider } from "../components/providers/ThemeProvider";

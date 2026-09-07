@@ -3,11 +3,50 @@ import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
 import { getBootstrapAdminEmails } from "@/lib/ssot/admin-bootstrap";
 import { EMPLOYEE_PAGINATION_DEFAULTS } from "../../application/constants";
+import { hasEligibleEmployeeLifecycle } from "../../domain/lifecycle";
 import type {
+    CurrentEmployeeProjection,
     EmployeeFilters,
     EmployeeRecord,
     PaginatedEmployeesResult,
 } from "../../application/types";
+
+export async function findCurrentEmployeeProjection(
+    userId: number,
+): Promise<CurrentEmployeeProjection | null> {
+    const employee = await prisma.employee.findFirst({
+        where: {
+            user: {
+                id: userId,
+                isActive: true,
+                deletedAt: null,
+            },
+        },
+        select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            nickname: true,
+            status: true,
+            deletedAt: true,
+            dept: { select: { name: true } },
+            subordinates: { select: { id: true }, take: 1 },
+        },
+    });
+
+    if (!employee || !hasEligibleEmployeeLifecycle(employee)) {
+        return null;
+    }
+
+    return {
+        id: employee.id,
+        firstName: employee.firstName,
+        lastName: employee.lastName,
+        nickname: employee.nickname,
+        departmentName: employee.dept?.name ?? null,
+        isManager: employee.subordinates.length > 0,
+    };
+}
 
 export const EMPLOYEE_WITH_RELATIONS_INCLUDE = {
     dept: true,

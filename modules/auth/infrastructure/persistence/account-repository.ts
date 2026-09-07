@@ -20,6 +20,8 @@ const AUTH_LOGIN_USER_SELECT = {
 } as const satisfies Prisma.UserSelect;
 
 const AUTH_RESOLUTION_USER_SELECT = {
+    email: true,
+    name: true,
     role: true,
     isActive: true,
     deletedAt: true,

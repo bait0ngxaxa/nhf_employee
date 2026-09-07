@@ -28,6 +28,9 @@ const fixtureFiles: FixtureFiles = {
     "modules/notification/client.ts": '"use client"; export const x = 1;\n',
     "modules/notification/application/example.ts": "export const x = 1;\n",
     "modules/notification/infrastructure/persistence/repository.ts": "export const x = 1;\n",
+    "modules/auth/index.ts": "export const x = 1;\n",
+    "modules/auth/client.ts": '"use client"; export const x = 1;\n',
+    "modules/auth/presentation/example.ts": '"use client"; export const x = 1;\n',
     "modules/future/index.ts": "export const x = 1;\n",
     "shared/index.ts": "export const x = 1;\n",
 };
@@ -1500,6 +1503,108 @@ describe("architecture checker module boundaries", () => {
         expect(result.violations[0]).toContain(
             "Client-reachable runtime code must not import the Auth server entry",
         );
+    });
+
+    it("allows production consumers to use the Auth browser entry", async () => {
+        const result = await checkFixture(
+            "app/login/page.tsx",
+            'import { LoginForm } from "@/modules/auth/client";\n',
+        );
+
+        expect(result.violations).toEqual([]);
+    });
+
+    it.each([
+        "@/components/auth",
+        "@/components/auth/HybridAuthProvider",
+        "@/lib/auth/client",
+    ])("rejects deleted Auth browser path %s", async (specifier) => {
+        const result = await checkFixture(
+            "app/login/page.tsx",
+            `import { x } from "${specifier}";`,
+        );
+
+        expect(result.violations).toHaveLength(1);
+        expect(result.violations[0]).toContain("Deleted Auth browser path");
+    });
+
+    it("rejects external consumers deep-importing Auth presentation", async () => {
+        const result = await checkFixture(
+            "app/login/page.tsx",
+            'import { x } from "@/modules/auth/presentation/example";\n',
+        );
+
+        expect(result.violations).toHaveLength(1);
+        expect(result.violations[0]).toContain(
+            'external consumers must use the target module public API "@/modules/auth"',
+        );
+    });
+
+    it("rejects a transitive Prisma runtime dependency from the Auth client graph", async () => {
+        const rootPath = await createFixture({
+            ...fixtureFiles,
+            "modules/auth/client.ts": '"use client"; export { x } from "./presentation/example";\n',
+            "modules/auth/presentation/example.ts": [
+                'import { PrismaClient } from "@prisma/client";',
+                "export const x = PrismaClient;",
+            ].join("\n"),
+        });
+        const result = checkArchitecture({ repositoryRoot: rootPath });
+
+        expect(result.violations).toHaveLength(1);
+        expect(result.violations[0]).toContain("@prisma/client");
+        expect(result.violations[0]).toContain(
+            "Server-only runtime dependency is reachable from @/modules/auth/client",
+        );
+    });
+
+    it("rejects a transitive next/headers dependency from the Auth client graph", async () => {
+        const rootPath = await createFixture({
+            ...fixtureFiles,
+            "modules/auth/client.ts": '"use client"; export { x } from "./presentation/example";\n',
+            "modules/auth/presentation/example.ts": [
+                'import { headers } from "next/headers";',
+                "export const x = headers;",
+            ].join("\n"),
+        });
+        const result = checkArchitecture({ repositoryRoot: rootPath });
+
+        expect(result.violations).toHaveLength(1);
+        expect(result.violations[0]).toContain("next/headers");
+        expect(result.violations[0]).toContain(
+            "Server-only runtime dependency is reachable from @/modules/auth/client",
+        );
+    });
+
+    it("rejects a transitive Auth server index from the Auth client graph", async () => {
+        const rootPath = await createFixture({
+            ...fixtureFiles,
+            "modules/auth/client.ts": '"use client"; export { x } from "./presentation/example";\n',
+            "modules/auth/presentation/example.ts": [
+                'import { x } from "@/modules/auth";',
+                "export { x };",
+            ].join("\n"),
+        });
+        const result = checkArchitecture({ repositoryRoot: rootPath });
+
+        expect(result.violations.some((message) =>
+            message.includes("Auth browser graph must not reach the @/modules/auth server entry"),
+        )).toBe(true);
+    });
+
+    it("allows a browser-safe Auth client graph", async () => {
+        const rootPath = await createFixture({
+            ...fixtureFiles,
+            "modules/auth/client.ts": '"use client"; export { x } from "./presentation/example";\n',
+            "modules/auth/presentation/example.ts": [
+                'import { x } from "@/components/ui/button";',
+                "export { x };",
+            ].join("\n"),
+            "components/ui/button.tsx": 'export const x = 1;\n',
+        });
+        const result = checkArchitecture({ repositoryRoot: rootPath });
+
+        expect(result.violations).toEqual([]);
     });
 
     it.each(["stock", "routine", "future"])(

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { fetchWithRefresh } from "@/lib/auth/client";
+import { fetchWithRefresh } from "@/modules/auth/client";
 import { apiPost } from "@/lib/client/api-client";
 import {
     fetchLeaveAttachmentImage,
@@ -15,7 +15,7 @@ vi.mock("@/lib/client/api-client", () => ({
     apiPut: vi.fn(),
 }));
 
-vi.mock("@/lib/auth/client", () => ({
+vi.mock("@/modules/auth/client", () => ({
     fetchWithRefresh: vi.fn(),
 }));
 

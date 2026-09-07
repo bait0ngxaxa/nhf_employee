@@ -1,17 +1,17 @@
 import { redirect } from "next/navigation";
 
-import { getApiAuthSession } from "@/lib/auth/server";
+import { getCurrentUserProjection } from "@/app/_lib/auth/current-user";
 import { isAdminRole } from "@/lib/ssot/permissions";
 import { APP_ROUTES } from "@/lib/ssot/routes";
 
 export async function requireDashboardAdmin(): Promise<void> {
-    const session = await getApiAuthSession();
+    const user = await getCurrentUserProjection();
 
-    if (!session) {
+    if (!user) {
         redirect(APP_ROUTES.login);
     }
 
-    if (!isAdminRole(session.user.role)) {
+    if (!isAdminRole(user.role)) {
         redirect(APP_ROUTES.accessDenied);
     }
 }

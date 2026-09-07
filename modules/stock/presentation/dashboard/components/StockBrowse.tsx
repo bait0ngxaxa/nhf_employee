@@ -4,7 +4,7 @@ import { useState } from "react";
 import dynamic from "next/dynamic";
 import { Package } from "lucide-react";
 import { Pagination } from "@/components/Pagination";
-import { useAuth } from "@/components/auth/HybridAuthProvider";
+import { useAuth } from "@/modules/auth/client";
 import { cn } from "@/lib/ui/utils";
 import { useStockDataContext, useStockUIContext } from "../context";
 import { STOCK_BROWSE_LIMIT as ITEMS_PER_PAGE } from "../context/provider.shared";

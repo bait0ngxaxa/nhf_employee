@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
     HybridAuthProvider,
     useAuth,
-} from "@/components/auth/HybridAuthProvider";
+} from "@/modules/auth/client";
 import { APP_ROUTES, API_ROUTES } from "@/lib/ssot/routes";
 
 const { usePathnameMock } = vi.hoisted(() => ({

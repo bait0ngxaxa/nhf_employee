@@ -8,6 +8,7 @@ export {
 } from "./application/authentication";
 export {
     refreshHybridSession,
+    resolveAuthenticatedAccount,
     resolveAuthenticatedPrincipal,
     resolveAuthenticatedUserId,
     resolveCurrentSessionFamilyId,
@@ -32,6 +33,7 @@ export {
 } from "./application/employee-account-lifecycle";
 export type {
     AuthClientMetadata,
+    AuthenticatedAccount,
     AuthenticatedPrincipal,
     AuthSessionItem,
     HybridLoginFailure,

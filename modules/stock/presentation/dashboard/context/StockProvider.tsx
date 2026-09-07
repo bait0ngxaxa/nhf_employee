@@ -41,7 +41,7 @@ import type {
     StockDataContextValue,
     StockUIContextValue,
 } from "./types";
-import { useAuth } from "@/components/auth/HybridAuthProvider";
+import { useAuth } from "@/modules/auth/client";
 
 interface StockProviderProps {
     children: ReactNode;

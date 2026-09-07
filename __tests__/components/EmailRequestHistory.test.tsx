@@ -1,11 +1,11 @@
 import { render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { useAuth } from "@/components/auth/HybridAuthProvider";
+import { useAuth } from "@/modules/auth/client";
 import { EmailRequestHistory } from "@/components/email/EmailRequestHistory";
 import { useEmailRequestHistory } from "@/hooks/useEmailRequestHistory";
 
-vi.mock("@/components/auth/HybridAuthProvider", () => ({
+vi.mock("@/modules/auth/client", () => ({
     useAuth: vi.fn(),
 }));
 

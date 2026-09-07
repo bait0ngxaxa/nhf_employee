@@ -6,7 +6,7 @@ import { User, LogOut } from "lucide-react";
 import Link from "next/link";
 import { isValidSessionUser } from "@/lib/auth/ssot";
 import { APP_ROUTES } from "@/lib/ssot/routes";
-import { useAuth } from "@/components/auth/HybridAuthProvider";
+import { useAuth } from "./HybridAuthProvider";
 
 export function AuthStatus() {
     const { user, status, signOut } = useAuth();

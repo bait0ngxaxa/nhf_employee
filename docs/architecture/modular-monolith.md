@@ -1,7 +1,7 @@
 # NHF Employee modular monolith
 
-Status: Phase J0 CLOSED — Auth / Session / Identity discovery and boundary
-definition complete; J1-J3 implementation has not started. Phase I3 Audit
+Status: Phase J2 CLOSED — Auth identity projection and browser presentation
+ownership complete; J3 remains NOT STARTED. Phase I3 Audit
 producer integration and physical AuditLog persistence exclusivity remains
 closed. Phase H3 Notification producer integration and final migration audit
 remain complete. Phase G3 Department migration remains complete.
@@ -16,8 +16,8 @@ workforce lifecycle and canonical workforce identity. Leave capability fields
 and Employee/Department display fields in the existing current-user response
 are application-composed compatibility projections, not generic Auth rules.
 LINE/LIFF identity and account linking remain a separate integration boundary;
-LINE Messaging transport remains platform infrastructure. No runtime Auth
-module exists yet.
+LINE Messaging transport remains platform infrastructure. Auth runtime and
+browser ownership now live under `modules/auth/`.
 
 This document separates the repository's observed current state from the
 target architecture. Stock server/business ownership is now migrated into
@@ -262,14 +262,14 @@ values remain storage-compatible history only. H1 server/application, H2
 presentation, and H3 producer integration/compatibility cleanup are complete.
 The timestamp-only history cursor risk remains unresolved.
 
-### Auth / Session / Account Identity (J1)
+### Auth / Session / Account Identity (J1/J2)
 
 Phase J1 is closed. `modules/auth/` is the cohesive server capability for
 credential authentication, Auth-owned User account fields, web access-token
 issue/verification, refresh-token families and persistence, session lifecycle,
 signup, password recovery/reset, and the transaction-aware account lifecycle
 provider consumed by Employee. Its only supported production server entry is
-`@/modules/auth`; it has no client entry in J1.
+`@/modules/auth`; J2 adds the browser-safe `@/modules/auth/client` entry.
 
 The core Auth routes remain HTTP adapters for parsing, trusted-mutation checks,
 status/response serialization, cookies, request limits, and deferred Auth
@@ -281,11 +281,12 @@ serializable Employee transaction, row locks, identity synchronization,
 token-version increment, and refresh revocation are preserved without a
 runtime module cycle.
 
-The broad `/api/auth/me` projection remains a compatibility composition with
-Employee, Department, and Leave data and is explicitly deferred to J2. LINE/
-LIFF behavior and Auth Audit producers remain deferred to J3. No Prisma schema,
-browser presentation, cookie/token contract, or documented compatibility
-behavior was changed by J1.
+The broad `/api/auth/me` projection is now composed at the delivery seam from
+Auth, Employee, and Leave public contracts. Generic Auth remains narrow;
+Employee owns workforce identity/hierarchy and Leave owns capability rules.
+LINE/LIFF behavior and Auth Audit producers remain deferred to J3. No Prisma
+schema, browser presentation behavior, cookie/token contract, or documented
+compatibility behavior was changed by J2.
 
 ## Ownership principle
 

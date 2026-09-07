@@ -6,6 +6,7 @@ import { prisma } from "@/lib/db/prisma";
 import { forbidden, jsonError, operationFailed } from "@/lib/ssot/http";
 import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
 import { isAdminRole } from "@/lib/ssot/permissions";
+import { getEmployeeDisplayName } from "@/modules/employee";
 
 type ResponseFactory = () => NextResponse;
 type ApiAuthSuccess = Extract<ApiAuthResult, { ok: true }>;
@@ -28,6 +29,9 @@ type WorkforceLookupSuccess = {
     auth: ApiAuthSuccess;
     employee: {
         id: number;
+        firstName: string;
+        lastName: string;
+        nickname: string | null;
         status: EmployeeStatus;
         deletedAt: Date | null;
     } | null;
@@ -54,7 +58,14 @@ async function lookupWorkforceSession(): Promise<WorkforceLookupResult> {
             isActive: true,
             deletedAt: true,
             employee: {
-                select: { id: true, status: true, deletedAt: true },
+                select: {
+                    id: true,
+                    firstName: true,
+                    lastName: true,
+                    nickname: true,
+                    status: true,
+                    deletedAt: true,
+                },
             },
         },
     });
@@ -70,6 +81,27 @@ function isActiveEmployee(
     employee: WorkforceLookupSuccess["employee"],
 ): employee is NonNullable<WorkforceLookupSuccess["employee"]> {
     return employee?.status === "ACTIVE" && employee.deletedAt === null;
+}
+
+function applyEmployeeIdentity(
+    auth: ApiAuthSuccess,
+    employee: WorkforceLookupSuccess["employee"],
+): ApiAuthSuccess {
+    if (
+        !employee
+        || typeof employee.firstName !== "string"
+        || typeof employee.lastName !== "string"
+    ) {
+        return auth;
+    }
+
+    return {
+        ...auth,
+        user: {
+            ...auth.user,
+            name: getEmployeeDisplayName(employee),
+        },
+    };
 }
 
 export async function requireActiveWorkforceSession(
@@ -91,7 +123,10 @@ export async function requireActiveWorkforceSession(
         return { ok: false, response: forbidden() };
     }
 
-    return { ...lookup.auth, employeeId: lookup.employee.id };
+    return {
+        ...applyEmployeeIdentity(lookup.auth, lookup.employee),
+        employeeId: lookup.employee.id,
+    };
 }
 
 export async function requireActiveWorkforceOrAdminSession(): Promise<
@@ -103,11 +138,14 @@ export async function requireActiveWorkforceOrAdminSession(): Promise<
     }
 
     if (isAdminRole(lookup.auth.user.role)) {
-        return lookup.auth;
+        return applyEmployeeIdentity(lookup.auth, lookup.employee);
     }
     if (!isActiveEmployee(lookup.employee)) {
         return { ok: false, response: forbidden() };
     }
 
-    return { ...lookup.auth, employeeId: lookup.employee.id };
+    return {
+        ...applyEmployeeIdentity(lookup.auth, lookup.employee),
+        employeeId: lookup.employee.id,
+    };
 }

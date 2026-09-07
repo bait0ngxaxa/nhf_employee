@@ -16,8 +16,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { KeyRound, Eye, EyeOff, CheckCircle2, XCircle, Loader2 } from "lucide-react";
 import Link from "next/link";
-import { apiPost } from "@/lib/client/api-client";
 import { API_ROUTES, APP_ROUTES } from "@/lib/ssot/routes";
+import { authApiPost } from "./browser-api";
 
 interface PasswordRequirement {
     label: string;
@@ -69,7 +69,7 @@ export function ResetPasswordForm({
         setIsLoading(true);
 
         try {
-            const result = await apiPost(API_ROUTES.auth.resetPassword, {
+            const result = await authApiPost(API_ROUTES.auth.resetPassword, {
                 token,
                 password,
                 confirmPassword,

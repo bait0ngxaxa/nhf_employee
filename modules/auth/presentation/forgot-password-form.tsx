@@ -14,8 +14,8 @@ import { Label } from "@/components/ui/label";
 import { useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, Mail, CheckCircle2, Loader2 } from "lucide-react";
-import { apiPost } from "@/lib/client/api-client";
 import { API_ROUTES, APP_ROUTES } from "@/lib/ssot/routes";
+import { authApiPost } from "./browser-api";
 
 export function ForgotPasswordForm({
     className,
@@ -32,7 +32,7 @@ export function ForgotPasswordForm({
         setIsLoading(true);
 
         try {
-            const result = await apiPost(API_ROUTES.auth.forgotPassword, { email });
+            const result = await authApiPost(API_ROUTES.auth.forgotPassword, { email });
 
             if (!result.success) {
                 setError(result.error);

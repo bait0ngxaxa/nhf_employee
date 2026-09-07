@@ -1,5 +1,6 @@
 import type { LeaveStatus, Prisma } from "@prisma/client";
 
+import { prisma } from "@/lib/db/prisma";
 import { ACTIVE_LEAVE_APPROVER_QUERY_WHERE } from "@/modules/leave/domain/approver-eligibility";
 
 export const LEAVE_APPROVALS_PAGE_SIZE = 10;
@@ -41,6 +42,47 @@ export function getApproverHistoryReportWhere(
     return {
         approverId: employeeId,
         status: { in: LEAVE_REPORT_STATUSES },
+    };
+}
+
+export interface CurrentEmployeeLeaveProjection {
+    canApproveLeave: boolean;
+    canViewLeaveReports: boolean;
+}
+
+export async function getCurrentEmployeeLeaveProjection(
+    employeeId: number,
+    isManager: boolean,
+): Promise<CurrentEmployeeLeaveProjection> {
+    const actionableWhere = getActionableLeaveApprovalWhere();
+    const [originalApproval, exceptionApproval, approvalHistory] = await Promise.all([
+        prisma.leaveRequest.findFirst({
+            where: {
+                approverId: employeeId,
+                exceptionApproverId: null,
+                ...actionableWhere,
+            },
+            select: { id: true },
+        }),
+        prisma.leaveRequest.findFirst({
+            where: {
+                exceptionApproverId: employeeId,
+                ...actionableWhere,
+            },
+            select: { id: true },
+        }),
+        prisma.leaveRequest.findFirst({
+            where: getApproverHistoryReportWhere(employeeId),
+            select: { id: true },
+        }),
+    ]);
+
+    const hasActionableApproval = originalApproval !== null
+        || exceptionApproval !== null;
+
+    return {
+        canApproveLeave: isManager || hasActionableApproval,
+        canViewLeaveReports: isManager || approvalHistory !== null,
     };
 }
 

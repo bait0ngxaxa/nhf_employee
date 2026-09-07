@@ -4,8 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Loader2 } from "lucide-react";
 
-import { refreshHybridSession } from "@/lib/auth/client";
 import { APP_ROUTES } from "@/lib/ssot/routes";
+import { refreshHybridSession } from "./browser-transport";
 
 function isSafeInternalPath(value: string | null): value is string {
     if (!value || !value.startsWith("/") || value.startsWith("//")) {

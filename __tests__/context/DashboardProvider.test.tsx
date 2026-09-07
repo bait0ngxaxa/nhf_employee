@@ -21,7 +21,7 @@ vi.mock("@/modules/stock/client", () => ({
     clearStockBrowseCart: vi.fn(),
 }));
 
-vi.mock("@/components/auth/HybridAuthProvider", () => ({
+vi.mock("@/modules/auth/client", () => ({
     useAuth: () => ({
         user: {
             id: "employee-1",

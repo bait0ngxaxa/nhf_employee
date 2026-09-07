@@ -17,9 +17,9 @@ import { useRouter } from "next/navigation";
 import { useTitle } from "@/hooks/useTitle";
 import Link from "next/link";
 import { Loader2 } from "lucide-react";
-import { apiPost } from "@/lib/client/api-client";
 import { API_ROUTES, APP_ROUTES } from "@/lib/ssot/routes";
-import { useAuth } from "@/components/auth/HybridAuthProvider";
+import { authApiPost } from "./browser-api";
+import { useAuth } from "./HybridAuthProvider";
 
 // Type definitions for API response
 interface User {
@@ -72,7 +72,7 @@ export function SignupForm({
         setIsLoading(true);
 
         try {
-            const result = await apiPost<SignupSuccessResponse>(
+            const result = await authApiPost<SignupSuccessResponse>(
                 API_ROUTES.auth.signup,
                 {
                     email: formData.email,
@@ -84,7 +84,7 @@ export function SignupForm({
             if (result.success) {
                 const data = result.data;
 
-                const loginResult = await apiPost(API_ROUTES.auth.hybridLogin, {
+                const loginResult = await authApiPost(API_ROUTES.auth.hybridLogin, {
                     email: formData.email.trim().toLowerCase(),
                     password: formData.password,
                 });

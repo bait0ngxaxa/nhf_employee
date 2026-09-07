@@ -3,7 +3,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { mockDeep, mockReset } from "vitest-mock-extended";
 
 import { prisma } from "@/lib/db/prisma";
-import { createEmployeeWhereClause, getEmployeeStats } from "./employee-queries";
+import {
+    createEmployeeWhereClause,
+    findCurrentEmployeeProjection,
+    getEmployeeStats,
+} from "./employee-queries";
 
 vi.mock("@/lib/db/prisma", () => ({ prisma: mockDeep<PrismaClient>() }));
 
@@ -39,5 +43,47 @@ describe("Employee query compatibility", () => {
         expect(prismaMock.employee.count).toHaveBeenNthCalledWith(1);
         expect(prismaMock.employee.count).toHaveBeenNthCalledWith(2, { where: { status: "ACTIVE" } });
         expect(prismaMock.employee.count).toHaveBeenNthCalledWith(5, { where: { dept: { code: "ADMIN" } } });
+    });
+
+    it("returns the Employee-owned current identity, department, and hierarchy projection", async () => {
+        prismaMock.employee.findFirst.mockResolvedValue({
+            id: 101,
+            firstName: "สมชาย",
+            lastName: "ใจดี",
+            nickname: "ชาย",
+            status: "ACTIVE",
+            deletedAt: null,
+            dept: { name: "วิชาการ" },
+            subordinates: [{ id: 202 }],
+        } as never);
+
+        await expect(findCurrentEmployeeProjection(41)).resolves.toEqual({
+            id: 101,
+            firstName: "สมชาย",
+            lastName: "ใจดี",
+            nickname: "ชาย",
+            departmentName: "วิชาการ",
+            isManager: true,
+        });
+        expect(prismaMock.employee.findFirst).toHaveBeenCalledWith(expect.objectContaining({
+            where: {
+                user: { id: 41, isActive: true, deletedAt: null },
+            },
+        }));
+    });
+
+    it("does not project an inactive or deleted Employee", async () => {
+        prismaMock.employee.findFirst.mockResolvedValue({
+            id: 101,
+            firstName: "สมชาย",
+            lastName: "ใจดี",
+            nickname: null,
+            status: "SUSPENDED",
+            deletedAt: null,
+            dept: { name: "วิชาการ" },
+            subordinates: [],
+        } as never);
+
+        await expect(findCurrentEmployeeProjection(41)).resolves.toBeNull();
     });
 });

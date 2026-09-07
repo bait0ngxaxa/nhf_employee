@@ -16,10 +16,10 @@ import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Loader2 } from "lucide-react";
-import { apiPost } from "@/lib/client/api-client";
 import { resolveSafeInternalPath } from "@/lib/auth/return-path";
 import { API_ROUTES, APP_ROUTES } from "@/lib/ssot/routes";
-import { useAuth } from "@/components/auth/HybridAuthProvider";
+import { authApiPost } from "./browser-api";
+import { useAuth } from "./HybridAuthProvider";
 
 // Type definitions for login
 interface LoginFormData {
@@ -66,7 +66,7 @@ export function LoginForm({
         setIsLoading(true);
 
         try {
-            const result = await apiPost(API_ROUTES.auth.hybridLogin, {
+            const result = await authApiPost(API_ROUTES.auth.hybridLogin, {
                 email: formData.email.trim().toLowerCase(),
                 password: formData.password,
             });

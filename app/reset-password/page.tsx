@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 import { type Metadata } from "next";
-import { ResetPasswordForm } from "@/components/auth/reset-password-form";
+import { ResetPasswordForm } from "@/modules/auth/client";
 
 export const metadata: Metadata = {
     title: "ตั้งรหัสผ่านใหม่ | NHFapp",

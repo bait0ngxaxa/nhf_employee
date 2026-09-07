@@ -18,9 +18,11 @@ export {
 export {
     getActionableLeaveApprovalWhere,
     getApproverHistoryReportWhere,
+    getCurrentEmployeeLeaveProjection,
     getAssignedLeaveApproverWhere,
     parseLeaveApprovalPage,
 } from "./application/approvals/approval-queries";
+export type { CurrentEmployeeLeaveProjection } from "./application/approvals/approval-queries";
 export { getLeaveApprovalList } from "./application/approvals/approval-list";
 export {
     ApproverAssignmentError,

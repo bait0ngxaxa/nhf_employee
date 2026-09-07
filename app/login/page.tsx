@@ -1,8 +1,8 @@
-import { LoginForm } from "@/components/auth";
+import { LoginForm } from "@/modules/auth/client";
 import { Suspense } from "react";
 import { type Metadata } from "next";
 import { redirect } from "next/navigation";
-import { getApiAuthSession } from "@/lib/auth/server";
+import { getCurrentUserProjection } from "@/app/_lib/auth/current-user";
 import { resolveSafeInternalPath } from "@/lib/auth/return-path";
 import { APP_ROUTES } from "@/lib/ssot/routes";
 
@@ -25,8 +25,8 @@ export default async function Page({
 }: {
     searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-    const session = await getApiAuthSession();
-    if (session) {
+    const user = await getCurrentUserProjection();
+    if (user) {
         const params = await searchParams;
         const returnTo = typeof params.returnTo === "string"
             ? params.returnTo

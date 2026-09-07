@@ -4,7 +4,11 @@ export {
     employeeFiltersSchema,
     updateEmployeeSchema,
 } from "./schemas/employee";
-export { listEmployees, getEmployeeStats } from "./infrastructure/persistence/employee-queries";
+export {
+    findCurrentEmployeeProjection,
+    listEmployees,
+    getEmployeeStats,
+} from "./infrastructure/persistence/employee-queries";
 export { createEmployee, deleteEmployee, updateEmployee } from "./application/mutations";
 export {
     appendEmployeeCreateAudit,
@@ -28,6 +32,7 @@ export type {
     EmployeeOffboardingDependencyProvider,
     EmployeeAccountLifecycleProvider,
     EmployeeAccountLifecycleRecord,
+    CurrentEmployeeProjection,
 } from "./application/types";
 
 // Auth/workforce and signup contracts.

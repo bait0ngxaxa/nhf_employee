@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { DashboardProvider } from "@/components/dashboard/context";
 import { DashboardLayoutClient } from "@/components/dashboard/layout/DashboardLayoutClient";
-import { getApiAuthSession } from "@/lib/auth/server";
+import { getCurrentUserProjection } from "@/app/_lib/auth/current-user";
 import { APP_ROUTES } from "@/lib/ssot/routes";
 
 export default async function DashboardLayout({
@@ -10,15 +10,15 @@ export default async function DashboardLayout({
 }: {
     children: React.ReactNode;
 }) {
-    const session = await getApiAuthSession();
+    const user = await getCurrentUserProjection();
 
-    if (!session) {
+    if (!user) {
         redirect(APP_ROUTES.login);
     }
 
     return (
         <Suspense>
-            <DashboardProvider initialUser={session.user}>
+            <DashboardProvider initialUser={user}>
                 <DashboardLayoutClient>{children}</DashboardLayoutClient>
             </DashboardProvider>
         </Suspense>

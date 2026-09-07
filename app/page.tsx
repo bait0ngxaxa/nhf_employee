@@ -8,7 +8,7 @@ import {
 import { redirect } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { AppLogo } from "@/components/brand/AppLogo";
-import { getApiAuthSession } from "@/lib/auth/server";
+import { getCurrentUserProjection } from "@/app/_lib/auth/current-user";
 import { APP_ROUTES } from "@/lib/ssot/routes";
 
 export const metadata: Metadata = {
@@ -135,9 +135,9 @@ function AccessPanel() {
 }
 
 export default async function Home() {
-    const session = await getApiAuthSession();
+    const user = await getCurrentUserProjection();
 
-    if (session) {
+    if (user) {
         redirect(APP_ROUTES.dashboard);
     }
 

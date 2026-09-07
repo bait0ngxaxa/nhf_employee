@@ -1,7 +1,7 @@
 # Module boundaries
 
-Status: Phase J1 CLOSED — Auth / Session server and persistence ownership
-complete; J2-J3 implementation has not started. Phase I3 Audit
+Status: Phase J2 CLOSED — Auth identity projection and browser presentation
+ownership complete; J3 remains NOT STARTED. Phase I3 Audit
 producer integration and physical AuditLog persistence exclusivity remains
 closed. Phase H3 Notification producer integration and final migration audit
 remain complete. Phase G3 Department migration remains complete.
@@ -13,10 +13,10 @@ The authoritative Auth boundary record is
 Auth/Session/Account Identity is one cohesive server capability for
 credentials, account fields, web token/session families, recovery, and generic
 role checks. It must not own Employee lifecycle, Leave capability predicates,
-Department data, Dashboard composition, or LINE Messaging transport. The J1
+Department data, Dashboard composition, or LINE Messaging transport. The
 server capability now lives under `modules/auth/` with `@/modules/auth` as its
-only supported production server entry. It has no client entry in J1; the
-production client graph must not reach Prisma, secrets, JWT/password
+server entry and `@/modules/auth/client` as its browser entry. The production
+client graph must not reach Prisma, secrets, JWT/password
 implementation, or session persistence. Remaining `lib/auth/**` and route
 locations are operational compatibility/adaptation paths where active
 consumers still require them.
@@ -373,11 +373,12 @@ and passes the existing serializable transaction client through it. Employee
 continues to own workforce identity/profile rules, while Auth owns the account
 field persistence operation.
 
-The `/api/auth/me` broad account/Employee/Department/Leave projection remains
-the J2 compatibility exception. No Leave predicates or Department projection
-were pulled into generic Auth. LINE/LIFF remains excluded for J3, Auth Audit
-producer migration remains excluded for J3, and no `modules/auth/client.ts`
-exists in J1.
+The `/api/auth/me` broad account/Employee/Department/Leave projection is now
+composed at `app/_lib/auth/current-user.ts`. No Leave predicates or Department
+projection were pulled into generic Auth. Auth presentation is under
+`modules/auth/presentation/**` and external browser consumers use only
+`@/modules/auth/client`. LINE/LIFF and Auth Audit producer migration remain
+excluded for J3.
 
 ## Shared/platform ownership
 

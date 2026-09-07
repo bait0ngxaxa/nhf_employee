@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
 
-import { RefreshSessionBridge } from "@/components/auth/RefreshSessionBridge";
+import { RefreshSessionBridge } from "@/modules/auth/client";
 
 export const metadata: Metadata = {
     title: "ตรวจสอบสิทธิ์ | NHFapp",

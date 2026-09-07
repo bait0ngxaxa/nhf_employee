@@ -8,7 +8,3 @@ export interface AuthenticatedUser {
     canApproveLeave?: boolean;
     canViewLeaveReports?: boolean;
 }
-
-export interface HybridAuthSession {
-    user: AuthenticatedUser;
-}

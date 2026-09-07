@@ -2,9 +2,9 @@
 
 Historical status: **Phase J0 CLOSED — discovery and boundary definition
 complete.**
-Current status: **Phase J1 CLOSED — Auth / Session server and persistence
-ownership complete.**
-J2 and J3 implementation have **not started**.
+Current status: **Phase J2 CLOSED — Auth identity projection and browser
+presentation ownership complete.**
+J3 remains **NOT STARTED**.
 
 Audited baseline: `6021618941206d9cb204318ff8daf0c90e83d66b`
 (`feat(audit): close I3 producer integration and persistence exclusivity`)
@@ -1575,6 +1575,7 @@ rules:
 
 The checker retains explicit test, fixture/support, Prisma schema/migration,
 seed, and generated-code exceptions and does not impose a blanket repository-
+wide ban on `prisma.user` access.
 
 Fixture-based regression tests cover direct and transaction delegate access,
 aliased and destructured delegates, deep imports, Auth internal barrel imports,
@@ -1616,3 +1617,118 @@ J2 remains responsible for the browser/client and broad identity-projection
 boundary. J3 remains responsible for LINE/LIFF integration, Auth Audit
 producer migration, and final compatibility cleanup. J1 does not claim full
 Auth migration completion.
+
+## 28. J2 implementation record — Identity Projection & Presentation Boundary
+
+Phase J2 is closed against baseline
+`c027131344983e701718713246d794944eb02977`.
+
+### 28.1 Final Auth boundaries
+
+The final proportional structure is:
+
+```text
+modules/auth/
+├── application/
+├── domain/
+├── infrastructure/
+├── presentation/
+├── client.ts
+└── index.ts
+```
+
+`@/modules/auth` remains the server public entry. It now exposes the
+DB-authoritative `resolveAuthenticatedAccount()` contract in addition to the
+J1 principal/session/use-case contracts. The account contract contains only
+account identity, current database role, session family, and token version.
+It does not query Department or Leave and does not contain Employee hierarchy
+or feature-capability fields.
+
+`@/modules/auth/client` is the explicit browser public entry. It exposes
+`HybridAuthProvider`, `useAuth`, `AuthenticatedUser`, Auth presentation
+components, `RefreshSessionBridge`, and the browser refresh/logout transport
+primitives. It does not re-export the server barrel.
+
+### 28.2 Current-user projection ownership
+
+`app/_lib/auth/current-user.ts` is the delivery/application composition seam
+for the broad current-user projection. It resolves the narrow Auth account,
+then composes the public Employee current-identity/department/hierarchy
+contract and the public Leave capability projection. Employee owns canonical
+display name, eligibility, department association, and manager hierarchy.
+Leave owns actionable original-approver work, exception-approver work, and
+historical report access. `shared/` remains independent of business modules.
+
+`/api/auth/me` still returns exactly the existing `id`, `role`, `email`,
+`name`, `department`, `isManager`, `canApproveLeave`, and
+`canViewLeaveReports` fields with the existing response and unauthorized
+behavior. An otherwise-valid Auth account may resolve without an Employee,
+but the broad projection still requires an eligible active Employee; missing,
+inactive, suspended, or deleted Employee state remains unauthorized.
+
+### 28.3 Server authorization and SSR
+
+`lib/auth/server.ts` is now a thin generic account-session compatibility
+adapter. `lib/auth/api.ts` and `lib/auth/context.ts` remain thin response and
+numeric-context adapters for their existing route consumers; they no longer
+own the broad projection. `lib/auth/workforce.ts` keeps the explicit active
+Employee requirement and preserves canonical Employee display names for
+workforce routes. Generic admin authorization remains server-side and uses the
+current DB role from the Auth principal, not browser state or the JWT role
+claim.
+
+Home, login, dashboard layout, and dashboard admin route access now consume
+the composed projection directly. Dashboard SSR redirects and admin gating
+remain server-side with no protected-content client flash. DashboardProvider
+still owns Dashboard UI state and consumes Auth only for identity/session
+state and sign-out.
+
+### 28.4 Browser presentation and refresh behavior
+
+Auth presentation moved from `components/auth/**` to
+`modules/auth/presentation/**`; production consumers use only
+`@/modules/auth/client`. `components/auth/**`, `lib/auth/client.ts`, and the
+unused `lib/auth/types.ts` were removed. The provider retains the same SWR
+`/api/auth/me` bootstrap, public and LIFF skips, status values, 12-minute
+refresh interval, 10-minute visibility threshold, credential inclusion,
+single-flight refresh, one retry after 401, internal refresh/logout/logout-all
+recursion guards, sign-out clearing, redirects, and cancellation behavior.
+
+Login, signup, forgot-password, reset-password, AuthStatus, and
+RefreshSessionBridge retain their existing wording, validation, loading,
+redirect, return-path, accessibility, and styling behavior. No LINE/LIFF
+browser behavior was moved into the Auth client entry.
+
+### 28.5 Architecture enforcement and verification
+
+The architecture checker now rejects production client reachability of the
+Auth server entry, Auth presentation deep imports, deleted legacy browser
+paths, and direct/transitive Auth client graph dependencies on Prisma,
+server-only packages, Node built-ins, server Auth infrastructure, or the Auth
+server index. Fixture tests cover rejected Client Component imports,
+transitive Prisma/`next/headers`/server-entry reachability, deep imports, the
+allowed browser entry/graph, and the legacy path guard.
+
+Verification completed for J2:
+
+- `npm.cmd run architecture:check` — passed; 977 repository source files
+  checked.
+- `npm.cmd run lint:strict` — passed with zero warnings.
+- `npm.cmd run typecheck` — passed.
+- Focused Auth, projection, browser transport, Employee/Leave query,
+  workforce, Dashboard, Stock, Email Request, and architecture suites —
+  passed, including 183 architecture tests and the new projection/transport
+  coverage.
+- `npm.cmd run test:run` — passed; 249 files and 2,037 tests.
+- `npm.cmd run test:integration:mysql` — passed; migrations were current and
+  10 integration files/65 tests passed.
+- `git diff --check` — passed.
+
+No development server or production build was run. No schema, cookie, JWT,
+refresh algorithm, Audit producer, or LINE/LIFF implementation was changed.
+
+### 28.6 J3 exclusions
+
+J3 remains **NOT STARTED**. J2 did not migrate or redesign LineAccountLink,
+LINE ID-token verification, LIFF session issuance/verification/recovery,
+`lib/auth/liff.ts`, `/api/line/**`, LINE Messaging, or Auth Audit producers.

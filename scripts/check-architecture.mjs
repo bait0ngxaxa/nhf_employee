@@ -246,6 +246,10 @@ const legacyAuditPresentationPrefixes = [
     "@/lib/audit-log/display",
     "@/constants/audit",
 ];
+const legacyAuthBrowserPrefixes = [
+    "@/components/auth",
+    "@/lib/auth/client",
+];
 
 function hasImportPrefix(moduleSpecifier, prefix) {
     return moduleSpecifier === prefix || moduleSpecifier.startsWith(`${prefix}/`);
@@ -749,6 +753,24 @@ function getAuditLogPersistenceViolation(filePath, rootPath) {
 
     const firstAccess = accesses[0];
     return `${relativeFilePath(filePath, rootPath)}:${firstAccess.line} direct AuditLog Prisma delegate access must be owned by modules/audit/infrastructure/.`;
+}
+
+function getDeletedAuthBrowserDependencyViolation(filePath, rootPath, moduleSpecifier) {
+    if (isTestSource(filePath, rootPath)) return null;
+
+    const resolvedImport = moduleSpecifier.startsWith("@/")
+        ? resolve(rootPath, moduleSpecifier.slice(2))
+        : getImportSourcePath(moduleSpecifier, filePath, rootPath);
+    const normalizedSpecifier = resolvedImport === null
+        ? moduleSpecifier
+        : `@/${relativeFilePath(resolvedImport, rootPath).replace(/\.[cm]?[jt]sx?$/, "")}`;
+    const deletedPath = legacyAuthBrowserPrefixes.find((prefix) =>
+        hasImportPrefix(normalizedSpecifier, prefix),
+    );
+
+    return deletedPath === undefined
+        ? null
+        : `Deleted Auth browser path "${deletedPath}" must not be imported; use @/modules/auth/client.`;
 }
 
 const authPersistenceDelegateOperations = new Set([
@@ -1441,7 +1463,8 @@ function getAuthDependencyViolation(filePath, rootPath, moduleSpecifier) {
         ? moduleSpecifier
         : `@/${relativeFilePath(resolvedImport, rootPath).replace(/\.[cm]?[jt]sx?$/, "")}`;
     if (normalizedSpecifier === "@/modules/auth"
-        || normalizedSpecifier === "@/modules/auth/index") {
+        || normalizedSpecifier === "@/modules/auth/index"
+        || normalizedSpecifier === "@/modules/auth/client") {
         return "Auth module internals must use local contracts instead of their own public barrel.";
     }
 
@@ -1717,6 +1740,89 @@ function getAuditClientGraphViolations(rootPath) {
                     rootPath,
                     record,
                     `Audit client graph must not reach the ${serverModuleName} server entry.`,
+                ));
+                continue;
+            }
+
+            if (sourcePath !== null) pending.push(sourcePath);
+        }
+    }
+
+    return violations;
+}
+
+function getAuthClientGraphViolations(rootPath) {
+    const entryPath = resolve(rootPath, "modules/auth/client.ts");
+    if (!existsSync(entryPath)) return [];
+
+    const authServerEntry = resolve(rootPath, "modules/auth");
+    const pending = [entryPath];
+    const visited = new Set();
+    const violations = [];
+    const serverPackages = [
+        "@prisma/client",
+        "bcrypt",
+        "nodemailer",
+        "@line/bot-sdk",
+        "server-only",
+        "next/server",
+        "next/headers",
+        "next/cache",
+    ];
+    const serverDirectories = [
+        "lib/db",
+        "lib/server",
+        "lib/email",
+        "lib/line",
+        "lib/services/audit-log",
+        "lib/services/outbox",
+        "lib/auth/api",
+        "lib/auth/context",
+        "lib/auth/hybrid",
+        "lib/auth/server",
+        "lib/auth/workforce",
+        "modules/auth/application",
+        "modules/auth/infrastructure",
+    ];
+
+    while (pending.length > 0) {
+        const filePath = pending.pop();
+        if (filePath === undefined || visited.has(filePath)) continue;
+        visited.add(filePath);
+
+        for (const record of getImports(filePath, true)) {
+            const specifier = record.moduleSpecifier;
+            const { importTarget, sourcePath } = getRuntimeImportTarget(
+                specifier,
+                filePath,
+                rootPath,
+            );
+            const reachesAuthServerEntry = importTarget === authServerEntry
+                || sourcePath === resolve(authServerEntry, "index.ts");
+            const reachesServerDirectory = [importTarget, sourcePath].some((target) =>
+                target !== null && serverDirectories.some((directory) =>
+                    pathIsWithin(target, resolve(rootPath, directory)),
+                ),
+            );
+
+            if (isBuiltin(specifier)
+                || serverPackages.some((name) => hasImportPrefix(specifier, name))
+                || reachesServerDirectory) {
+                violations.push(describeViolation(
+                    filePath,
+                    rootPath,
+                    record,
+                    "Server-only runtime dependency is reachable from @/modules/auth/client.",
+                ));
+                continue;
+            }
+
+            if (reachesAuthServerEntry) {
+                violations.push(describeViolation(
+                    filePath,
+                    rootPath,
+                    record,
+                    "The Auth browser graph must not reach the @/modules/auth server entry.",
                 ));
                 continue;
             }
@@ -2078,6 +2184,22 @@ function checkArchitecture(options = {}) {
                 continue;
             }
 
+            const deletedAuthBrowserDependencyViolation =
+                getDeletedAuthBrowserDependencyViolation(
+                    filePath,
+                    rootPath,
+                    importRecord.moduleSpecifier,
+                );
+            if (deletedAuthBrowserDependencyViolation !== null) {
+                violations.push(describeViolation(
+                    filePath,
+                    rootPath,
+                    importRecord,
+                    deletedAuthBrowserDependencyViolation,
+                ));
+                continue;
+            }
+
             const authDependencyViolation = getAuthDependencyViolation(
                 filePath,
                 rootPath,
@@ -2140,11 +2262,17 @@ function checkArchitecture(options = {}) {
     violations.push(...getEmployeeClientGraphViolations(rootPath));
     violations.push(...getNotificationClientGraphViolations(rootPath));
     violations.push(...getAuditClientGraphViolations(rootPath));
+    violations.push(...getAuthClientGraphViolations(rootPath));
     violations.push(...getClientReachableServerEntryViolations(rootPath, sourceFiles, "leave"));
     violations.push(...getClientReachableServerEntryViolations(rootPath, sourceFiles, "employee"));
     violations.push(...getClientReachableServerEntryViolations(rootPath, sourceFiles, "department", null));
     violations.push(...getClientReachableServerEntryViolations(rootPath, sourceFiles, "notification"));
-    violations.push(...getClientReachableServerEntryViolations(rootPath, sourceFiles, "auth", null));
+    violations.push(...getClientReachableServerEntryViolations(
+        rootPath,
+        sourceFiles,
+        "auth",
+        "@/modules/auth/client",
+    ));
     return { sourceFiles, violations };
 }
 

@@ -1,7 +1,7 @@
 # Dependency rules and enforcement
 
-Status: Phase J1 CLOSED — Auth / Session server and persistence ownership
-complete; J2-J3 implementation has not started. Phase I3 Audit
+Status: Phase J2 CLOSED — Auth identity projection and browser presentation
+ownership complete; J3 remains NOT STARTED. Phase I3 Audit
 producer integration and physical AuditLog persistence exclusivity remains
 closed. Phase H3 Notification producer integration and final migration audit
 remain complete. Phase G3 Department migration remains complete. These rules
@@ -13,9 +13,10 @@ The authoritative Auth boundary is recorded in
 `modules/auth/` owns credentials, account fields, web token/session-family
 lifecycle, password recovery, and generic account-role checks. It must not own
 Employee lifecycle, Leave capability predicates, Department data, Dashboard
-composition, or LINE Messaging transport. J1 has no Auth client entry:
-server-only persistence/secrets/JWT/password implementation must not enter a
-production Client Component graph. Remaining `lib/auth/**` is an operational
+composition, or LINE Messaging transport. `@/modules/auth` is the server
+entry and `@/modules/auth/client` is the browser entry: server-only
+persistence/secrets/JWT/password implementation must not enter a production
+Client Component graph. Remaining `lib/auth/**` is an operational
 compatibility/adaptation path only where active consumers require it.
 
 ## Direction
@@ -338,7 +339,30 @@ the module boundary from a legacy directory, while imports unrelated to
 | Department G2 presentation boundary | Production Client Component runtime graphs and Employee Department presentation | Rejects direct/transitive client imports of the server-only `@/modules/department` entry; preserves the `/api/departments` browser contract and does not require a Department client entry |
 | Notification H1-H3 ownership | `app/api/notifications/**`, `app/dashboard/notifications/**`, `components/dashboard/layout/DashboardNavbar.tsx`, `modules/notification/**`, production client graphs, production source | Requires Notification API routes to consume `@/modules/notification`; requires Notification Dashboard routes and DashboardNavbar to consume `@/modules/notification/client`; rejects deleted legacy presentation paths, deep/self-barrel imports, server-only dependencies in the Notification client graph, production client reachability of the Notification server entry, business-module legacy adapter imports, and physical Notification delegate access outside `modules/notification/infrastructure/**`; allows tests/fixtures/support code and does not match `notificationOutbox` |
 | Audit I1-I2 ownership | `app/api/audit-logs/**`, `app/dashboard/audit/**`, `modules/audit/**`, production client graphs, production source | Requires Audit API routes to consume `@/modules/audit` and Audit Dashboard routes to consume `@/modules/audit/client`; rejects deleted Audit presentation paths, deep/self-barrel imports, server-only dependencies and other module server entries in the Audit client graph, while preserving the I1 direct-access allowlist |
-| Auth J1 ownership | `app/api/auth/**`, `modules/auth/**`, Employee lifecycle composition, production source/client graphs | Restricts production `AuthRefreshToken` and `PasswordResetToken` delegate access to Auth persistence infrastructure; requires external Auth consumers to use `@/modules/auth`; rejects Auth internals importing their own barrel and production Client Component reachability of the server entry; preserves tests, fixtures, schema/migrations, seed/support, and generated-code exceptions |
+| Auth J1/J2 ownership | `app/api/auth/**`, `modules/auth/**`, Employee lifecycle composition, production source/client graphs | Restricts production `AuthRefreshToken` and `PasswordResetToken` delegate access to Auth persistence infrastructure; requires server consumers to use `@/modules/auth` and browser consumers to use `@/modules/auth/client`; rejects Auth presentation deep imports, deleted legacy browser seams, Auth internals importing their own barrel, client reachability of the server entry, and server-only runtime dependencies from the Auth client graph; preserves tests, fixtures, schema/migrations, seed/support, and generated-code exceptions |
+
+## Auth J2 browser and projection boundary
+
+The Auth server entry exposes only generic account/session authority. The
+delivery composition at `app/_lib/auth/current-user.ts` is the only owner of
+the broad `/api/auth/me` projection and may compose `@/modules/auth`,
+`@/modules/employee`, and `@/modules/leave`. It must not be moved into Auth
+infrastructure/domain or into `shared/`.
+
+The explicit `@/modules/auth/client` entry is the only supported production
+browser Auth import. Production Client Component graphs may not import the
+Auth server entry or Auth application/infrastructure internals, and external
+consumers may not deep-import `modules/auth/presentation/**`. The checker
+walks the Auth client entry transitively and rejects Node built-ins, Prisma,
+`next/headers`, `next/server`, `server-only`, persistence, server Auth
+directories, and the Auth server index. Type-only imports are erased before
+this graph check.
+
+The removed `components/auth/**`, `lib/auth/client.ts`, and
+`lib/auth/types.ts` paths are guarded against reintroduction. The retained
+`lib/auth/server.ts`, `lib/auth/api.ts`, and `lib/auth/context.ts` files are
+thin server compatibility adapters; they must not regain broad Employee,
+Department, or Leave projection logic.
 
 ## Department final closure (G3)
 

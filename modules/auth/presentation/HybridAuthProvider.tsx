@@ -12,10 +12,13 @@ import {
 import { usePathname } from "next/navigation";
 import useSWR from "swr";
 
-import type { AuthenticatedUser } from "@/lib/auth/types";
-import { apiGet } from "@/lib/client/api-client";
-import { logoutHybridSession, refreshHybridSession } from "@/lib/auth/client";
+import { isValidSessionUser } from "@/lib/auth/ssot";
 import { API_ROUTES, APP_ROUTES, isLiffAppPath } from "@/lib/ssot/routes";
+import { authApiGet } from "./browser-api";
+import { logoutHybridSession, refreshHybridSession } from "./browser-transport";
+import type { AuthenticatedUser } from "./types";
+
+export type { AuthenticatedUser } from "./types";
 
 export type HybridAuthStatus = "loading" | "authenticated" | "unauthenticated";
 
@@ -23,7 +26,7 @@ interface AuthMeResponse {
     user: AuthenticatedUser | null;
 }
 
-interface HybridAuthContextValue {
+export interface HybridAuthContextValue {
     user: AuthenticatedUser | null;
     status: HybridAuthStatus;
     refreshUser: () => Promise<void>;
@@ -55,10 +58,10 @@ function shouldBootstrapAuth(pathname: string | null): boolean {
 async function fetchCurrentUser(
     refreshOnUnauthorized: boolean,
 ): Promise<AuthenticatedUser | null> {
-    const result = await apiGet<AuthMeResponse>(API_ROUTES.auth.me, {
+    const result = await authApiGet<AuthMeResponse>(API_ROUTES.auth.me, {
         skipAuthRefresh: !refreshOnUnauthorized,
     });
-    if (!result.success) {
+    if (!result.success || !isValidSessionUser(result.data.user)) {
         return null;
     }
     return result.data.user;

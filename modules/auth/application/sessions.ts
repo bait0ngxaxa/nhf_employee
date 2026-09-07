@@ -23,6 +23,7 @@ import {
 import { parseAuthenticatedUserId } from "../domain/principal";
 import type {
     AuthClientMetadata,
+    AuthenticatedAccount,
     AuthenticatedPrincipal,
     AuthSessionItem,
     RefreshResult,
@@ -121,6 +122,20 @@ export async function refreshHybridSession(input: {
 export async function resolveAuthenticatedPrincipal(
     accessToken?: string,
 ): Promise<AuthenticatedPrincipal | null> {
+    const account = await resolveAuthenticatedAccount(accessToken);
+    if (!account) return null;
+
+    return {
+        userId: account.userId,
+        role: account.role,
+        sessionFamilyId: account.sessionFamilyId,
+        tokenVersion: account.tokenVersion,
+    };
+}
+
+export async function resolveAuthenticatedAccount(
+    accessToken?: string,
+): Promise<AuthenticatedAccount | null> {
     if (!accessToken) return null;
 
     try {
@@ -149,6 +164,8 @@ export async function resolveAuthenticatedPrincipal(
             role: user.role,
             sessionFamilyId: claims.sessionId,
             tokenVersion: claims.tokenVersion,
+            email: user.email,
+            name: user.name,
         };
     } catch {
         return null;

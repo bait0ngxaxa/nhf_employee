@@ -10,6 +10,11 @@ export interface AuthenticatedPrincipal {
     tokenVersion: number;
 }
 
+export interface AuthenticatedAccount extends AuthenticatedPrincipal {
+    email: string;
+    name: string;
+}
+
 export interface HybridLoginSuccess {
     status: "success";
     user: {

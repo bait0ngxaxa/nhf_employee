@@ -24,7 +24,7 @@ import {
 } from "@/lib/ssot/routes";
 import { isDashboardTabEnabled } from "@/lib/ssot/features";
 import { isAdminRole, USER_ROLES } from "@/lib/ssot/permissions";
-import { useAuth } from "@/components/auth/HybridAuthProvider";
+import { useAuth } from "@/modules/auth/client";
 import { clearStockBrowseCart } from "@/modules/stock/client";
 
 interface DashboardProviderProps {

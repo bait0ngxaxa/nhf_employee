@@ -6,7 +6,7 @@
  */
 
 import { AUTH_MUTATION_HEADERS } from "@/lib/auth/mutation-headers";
-import { fetchWithRefresh } from "@/lib/auth/client";
+import { fetchWithRefresh } from "@/modules/auth/client";
 
 export type ApiErrorCode =
     | "UNAUTHORIZED"

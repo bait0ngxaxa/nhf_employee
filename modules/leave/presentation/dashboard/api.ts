@@ -1,5 +1,5 @@
 import { apiGet, apiPost, apiPut, type ApiResponse } from "@/lib/client/api-client";
-import { fetchWithRefresh } from "@/lib/auth/client";
+import { fetchWithRefresh } from "@/modules/auth/client";
 import { createIdempotencyKey } from "@/lib/client/idempotency-key";
 import { triggerDownload } from "@/lib/helpers/download";
 import { API_ROUTES } from "@/lib/ssot/routes";

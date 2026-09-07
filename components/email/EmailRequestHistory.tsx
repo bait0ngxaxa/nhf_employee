@@ -22,7 +22,7 @@ import {
 } from "lucide-react";
 import { useEmailRequestHistory } from "@/hooks/useEmailRequestHistory";
 import { formatThaiDateTime } from "@/lib/helpers/date-helpers";
-import { useAuth } from "@/components/auth/HybridAuthProvider";
+import { useAuth } from "@/modules/auth/client";
 
 function formatSharedDriveAccess(
     sharedDriveAccess: readonly string[] | null | undefined,

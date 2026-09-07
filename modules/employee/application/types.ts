@@ -62,6 +62,15 @@ export interface EmployeeRecord {
     user?: EmployeeUserReference | null;
 }
 
+export interface CurrentEmployeeProjection {
+    id: number;
+    firstName: string;
+    lastName: string;
+    nickname: string | null;
+    departmentName: string | null;
+    isManager: boolean;
+}
+
 export interface PaginatedEmployeesResult {
     employees: EmployeeRecord[];
     pagination: { page: number; limit: number; total: number; totalPages: number };

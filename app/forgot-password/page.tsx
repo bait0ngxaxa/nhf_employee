@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 import { type Metadata } from "next";
-import { ForgotPasswordForm } from "@/components/auth/forgot-password-form";
+import { ForgotPasswordForm } from "@/modules/auth/client";
 
 export const metadata: Metadata = {
     title: "ลืมรหัสผ่าน | NHFapp",
