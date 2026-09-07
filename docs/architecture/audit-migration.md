@@ -210,19 +210,22 @@ legacy transfer file contains a direct AuditLog delegate.
 
 ## 3. Audit capability definition
 
-The future Audit capability is a generic record-and-read capability, not a
-business workflow owner.
+The cohesive `modules/audit/` capability is a generic record-and-read
+capability, not a business workflow owner. It owns generic Audit application
+behavior, generic query/retention behavior, physical AuditLog persistence, and
+Audit-specific Dashboard/browser presentation.
 
-Audit infrastructure should own:
+Layer-specific ownership is:
 
-- physical AuditLog persistence and its repository/adapter;
-- generic append/write mechanics;
-- persisted details serialization and tolerant parsing;
-- generic AuditLog query, filtering, pagination, and User/Employee projection;
-- retention cutoff and deletion mechanics;
-- generic audit persistence contracts;
-- Audit-specific viewer/presentation and its browser-safe entry;
-- accepting already-resolved neutral request metadata.
+- `modules/audit/application/**`: generic Audit use cases, orchestration,
+  serialization/parsing, query/pagination/retention behavior, and neutral
+  contracts;
+- `modules/audit/infrastructure/**`: physical AuditLog persistence and its
+  repository/adapter only;
+- `modules/audit/presentation/**`: Audit-specific browser/UI presentation and
+  its browser-safe entry.
+
+The Audit capability also accepts already-resolved neutral request metadata.
 
 The producing business or platform capability must continue to own:
 
@@ -722,11 +725,20 @@ Business and platform producers retain event meaning, action choice, entity
 meaning, before/after snapshots, business metadata, actor semantics, trace
 semantics, and the decision that an event must be recorded.
 
-### Audit infrastructure ownership
+### Audit capability and layer ownership
 
-Future Audit infrastructure owns generic physical AuditLog persistence,
-serialization/parsing, query/filter/pagination, retention mechanics, generic
-contracts, and Audit presentation. It does not own business workflows.
+The cohesive `modules/audit/` capability owns generic Audit application
+behavior, generic query/retention behavior, physical AuditLog persistence, and
+Audit-specific Dashboard/browser presentation. It does not own business
+workflows.
+
+Layer-specific ownership remains explicit:
+
+- `modules/audit/application/**` owns generic Audit use cases, orchestration,
+  serialization/parsing, query/pagination/retention behavior, and neutral
+  contracts;
+- `modules/audit/infrastructure/**` owns physical AuditLog persistence only;
+- `modules/audit/presentation/**` owns Audit-specific browser/UI presentation.
 
 ### Transaction integrity
 
@@ -990,6 +1002,22 @@ The repository's plain `npm run` form is not used for the final commands in
 this Windows environment because PowerShell execution policy blocks
 `npm.ps1`; the `npm.cmd` commands execute the same package scripts.
 
+### Phase I2 verification
+
+Verification was executed after the Phase I2 presentation ownership migration
+and closure correction:
+
+- `npm.cmd run check` — passed; architecture check inspected 955 repository
+  source files, lint:strict passed, typecheck passed, and Vitest passed with
+  241 test files and 1,977 tests.
+- `npm.cmd run architecture:check` — passed; checked 955 repository source
+  files.
+- `npm.cmd run lint` — passed.
+- `npm.cmd run typecheck` — passed.
+- `npm.cmd run test:run` — passed; 241 test files and 1,977 tests.
+- Thai/UTF-8 diff inspection — passed; no mojibake or unintended presentation
+  wording changes were found.
+
 ## 22. Final I0 closure checklist (historical)
 
 - [x] Every discovered production AuditLog writer is inventoried.
@@ -1030,5 +1058,28 @@ recorded above and in the checklist below.
 - [x] Prisma schema and migrations remain unchanged.
 
 Phase I1 CLOSED — Audit server/application/persistence foundation complete.
+Phase I2 CLOSED — Audit presentation ownership complete.
+Phase I3 NOT STARTED.
+
+## 24. Final I2 closure checklist
+
+- [x] `modules/audit/client.ts` is the browser entry.
+- [x] Audit Dashboard routes consume `@/modules/audit/client`.
+- [x] Audit presentation lives under `modules/audit/presentation/**`.
+- [x] The Audit client graph is server-safe.
+- [x] Audit presentation does not reach Prisma or a server entry.
+- [x] Legacy Audit presentation paths are removed.
+- [x] Dashboard Audit context is no longer owned by generic Dashboard context.
+- [x] Formatter and action/entity registry behavior is preserved.
+- [x] Thai wording is preserved.
+- [x] I1 persistence invariants remain intact.
+- [x] The remaining I3 direct-access inventory is 10 expressions across 7
+  files.
+- [x] No producer migration occurred.
+- [x] No Prisma schema or migration changed.
+- [x] Auth remains deferred.
+- [x] Email Request/IT remains deferred.
+- [x] I2 verification passed and is recorded above.
+
 Phase I2 CLOSED — Audit presentation ownership complete.
 Phase I3 NOT STARTED.

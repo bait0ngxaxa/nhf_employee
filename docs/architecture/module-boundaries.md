@@ -180,10 +180,18 @@ decision follows the ownership principle: Audit has a cohesive persistence,
 generic query/pagination, retention, and serialization capability, while the
 events it records remain owned by their producing capabilities.
 
-Audit infrastructure owns generic AuditLog persistence, append
-mechanics, parsing/serialization, generic reads, pagination, retention, and
-Audit-specific presentation. Auth, Employee, Leave, Stock, Routine, and the
-deferred IT capability continue to own event meaning, AuditAction,
+The cohesive `modules/audit/` capability owns generic Audit application
+behavior, generic query/retention behavior, physical AuditLog persistence, and
+Audit-specific Dashboard/browser presentation. Its layer ownership is:
+
+- `modules/audit/application/**` for generic Audit use cases, orchestration,
+  serialization/parsing, query/pagination/retention behavior, and neutral
+  contracts;
+- `modules/audit/infrastructure/**` for physical AuditLog persistence only;
+- `modules/audit/presentation/**` for Audit-specific browser/UI presentation.
+
+Auth, Employee, Leave, Stock, Routine, and the deferred IT capability continue
+to own event meaning, AuditAction,
 entity meaning/identifiers, snapshots, event metadata, actor semantics, and
 the decision and failure policy for each write. Transaction-bound writes must
 keep the same business transaction; current best-effort and after-response
