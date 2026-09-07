@@ -1,11 +1,22 @@
 # Dependency rules and enforcement
 
-Status: Phase I3 CLOSED — Audit producer integration and physical AuditLog
-persistence exclusivity complete. Audit capability migration I0-I3 is closed;
-Auth/Session/Identity remains NOT STARTED. Phase H3 Notification producer integration and
-final migration audit remain complete. Phase G3 Department migration remains
-complete. These rules govern new architecture code while unrelated legacy
-features remain compatible during incremental migration.
+Status: Phase J0 CLOSED — Auth / Session / Identity discovery and boundary
+definition complete; J1-J3 implementation has not started. Phase I3 Audit
+producer integration and physical AuditLog persistence exclusivity remains
+closed. Phase H3 Notification producer integration and final migration audit
+remain complete. Phase G3 Department migration remains complete. These rules
+govern new architecture code while unrelated legacy features remain compatible
+during incremental migration.
+
+The authoritative Auth boundary is recorded in
+[auth-session-identity-migration.md](./auth-session-identity-migration.md).
+Future Auth code may own credentials, account fields, web token/session-family
+lifecycle, password recovery, and generic account-role checks. It must not own
+Employee lifecycle, Leave capability predicates, Department data, Dashboard
+composition, or LINE Messaging transport. A future Auth client entry is
+HTTP-only and server-only persistence/secrets/JWT/password implementation must
+not enter the client graph. Current `lib/auth/**` remains an operational
+compatibility path until J1.
 
 ## Direction
 

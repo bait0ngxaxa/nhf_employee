@@ -12,7 +12,13 @@ producer, entity-history query, and Dashboard presentation ownership in
 delegates are exclusive to `modules/audit/infrastructure/**`; Employee, Leave,
 Stock, and Routine retain event meaning and consume only the public Audit
 server entry. Auth/Session/Identity and Email Request/future IT migration
-remain deferred.
+remain deferred for implementation. Phase J0 Auth / Session / Identity
+discovery and boundary definition is now closed; the authoritative record is
+[`docs/architecture/auth-session-identity-migration.md`](../docs/architecture/auth-session-identity-migration.md).
+J1-J3 have not started and no runtime Auth module has been created. The J0
+decision keeps a cohesive Auth / Session / Account Identity server boundary,
+field-level User ownership, Employee/workforce ownership outside Auth, and a
+separate LINE/LIFF identity/account-link integration seam.
 Employee F0-F3 owns its server/business behavior and active presentation in
 `modules/employee/`. Employee Dashboard routes consume the minimal
 browser-safe `@/modules/employee/client` entry, which also exposes the proven

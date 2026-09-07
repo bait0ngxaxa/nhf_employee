@@ -1,10 +1,23 @@
 # NHF Employee modular monolith
 
-Status: Phase I3 CLOSED — Audit producer integration and physical AuditLog
-persistence exclusivity complete. Audit capability migration I0-I3 is closed;
-Auth/Session/Identity remains NOT STARTED. Phase H3 Notification producer integration and
-final migration audit remain complete. Phase G3 Department migration remains
-complete.
+Status: Phase J0 CLOSED — Auth / Session / Identity discovery and boundary
+definition complete; J1-J3 implementation has not started. Phase I3 Audit
+producer integration and physical AuditLog persistence exclusivity remains
+closed. Phase H3 Notification producer integration and final migration audit
+remain complete. Phase G3 Department migration remains complete.
+
+The authoritative J0 decision is recorded in
+[auth-session-identity-migration.md](./auth-session-identity-migration.md).
+The target is one cohesive Auth / Session / Account Identity server capability
+for credentials, account state, web token/session lifecycle, password recovery,
+and generic account-role checks, with field-level ownership of `User` rather
+than ownership of the whole shared model. Employee remains the owner of
+workforce lifecycle and canonical workforce identity. Leave capability fields
+and Employee/Department display fields in the existing current-user response
+are application-composed compatibility projections, not generic Auth rules.
+LINE/LIFF identity and account linking remain a separate integration boundary;
+LINE Messaging transport remains platform infrastructure. No runtime Auth
+module exists yet.
 
 This document separates the repository's observed current state from the
 target architecture. Stock server/business ownership is now migrated into

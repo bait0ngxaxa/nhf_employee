@@ -1,12 +1,23 @@
 # Module boundaries
 
-Status: Phase I3 CLOSED — Audit producer integration and physical AuditLog
-persistence exclusivity complete. Audit capability migration I0-I3 is closed;
-Auth/Session/Identity remains NOT STARTED. Phase H3 Notification producer integration and
-final migration audit remain complete. Phase G3 Department migration remains
-complete.
+Status: Phase J0 CLOSED — Auth / Session / Identity discovery and boundary
+definition complete; J1-J3 implementation has not started. Phase I3 Audit
+producer integration and physical AuditLog persistence exclusivity remains
+closed. Phase H3 Notification producer integration and final migration audit
+remain complete. Phase G3 Department migration remains complete.
 Stock, Routine, Leave, and Employee are migrated examples; Employee
 server/business and active presentation ownership are migrated as well.
+
+The authoritative J0 boundary record is
+[auth-session-identity-migration.md](./auth-session-identity-migration.md).
+Auth/Session/Account Identity is planned as one cohesive server capability for
+credentials, account fields, web token/session families, recovery, and generic
+role checks. It must not own Employee lifecycle, Leave capability predicates,
+Department data, Dashboard composition, or LINE Messaging transport. The
+future Auth client entry, if introduced in J2, is HTTP-only and must not reach
+Prisma, secrets, JWT/password implementation, or session persistence. Until
+J1, current `lib/auth/**` and route locations remain operational compatibility
+paths.
 
 ## What is a module
 
