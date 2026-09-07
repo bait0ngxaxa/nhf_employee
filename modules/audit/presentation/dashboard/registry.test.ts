@@ -5,7 +5,7 @@ import {
     AUDIT_ACTION_FILTER_OPTIONS,
     AUDIT_ACTION_META,
     AUDIT_ENTITY_LABELS,
-} from "@/constants/audit";
+} from "./registry";
 
 describe("audit registry", () => {
     it("registers metadata and a filter option for every active AuditAction", () => {

@@ -29,6 +29,8 @@ const DOM_TESTS = [
     "modules/stock/presentation/dashboard/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts}",
     "modules/routine/presentation/**/*.{test,spec}.{jsx,mjsx,cjsx,tsx,mtsx,ctsx}",
     "modules/routine/presentation/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts}",
+    "modules/audit/presentation/**/*.{test,spec}.{jsx,mjsx,cjsx,tsx,mtsx,ctsx}",
+    "modules/audit/presentation/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts}",
     "modules/leave/presentation/**/*.{test,spec}.{jsx,mjsx,cjsx,tsx,mtsx,ctsx}",
     "modules/leave/presentation/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts}",
     "modules/employee/presentation/**/*.{test,spec}.{jsx,mjsx,cjsx,tsx,mtsx,ctsx}",

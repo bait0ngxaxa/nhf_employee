@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { formatAuditLogDisplay } from "@/lib/audit-log/display";
+import { formatAuditLogDisplay } from "@/modules/audit/client";
 import { buildCreatedLeaveRequestAuditDetails } from "./create-request-audit";
 
 describe("Leave creation audit details", () => {

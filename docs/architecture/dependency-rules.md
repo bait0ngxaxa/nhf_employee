@@ -1,7 +1,7 @@
 # Dependency rules and enforcement
 
-Status: Phase I1 CLOSED — Audit server/application/persistence foundation
-complete. Phase I2 NOT STARTED. Phase H3 Notification producer integration and
+Status: Phase I2 CLOSED — Audit presentation ownership complete. Phase I3 NOT
+STARTED. Phase H3 Notification producer integration and
 final migration audit remain complete. Phase G3 Department migration remains
 complete. These rules govern new architecture code while unrelated legacy
 features remain compatible during incremental migration.
@@ -145,13 +145,15 @@ LINE, and business producer ownership remain unchanged after H3. Leave, Stock,
 and Routine now consume only `@/modules/notification` for Inbox persistence;
 Email Request remains the documented compatibility exception.
 
-## Audit boundary (I1 foundation and enforcement)
+## Audit boundary (I1/I2 foundation and enforcement)
 
 Phase I1 establishes `modules/audit/` as the current owner of the cohesive
 generic Audit server/application and persistence capability. `shared/` may
 continue to own neutral database, HTTP/security, and trusted network
 primitives, but physical AuditLog persistence, generic Audit queries/retention,
-and future Audit presentation belong to the Audit module.
+and Audit presentation belong to the Audit module. Audit Dashboard routes use
+the separate browser-safe `@/modules/audit/client` entry, with implementation
+under `modules/audit/presentation/dashboard/**`.
 
 Audit producers retain event meaning, action/entity selection, snapshots,
 business metadata, actor semantics, and the choice between a strict
@@ -169,7 +171,11 @@ access outside that owner. The exact baseline direct-access allowlist in
 Routine-reader seams, validates operation/count per file, and does not permit
 additional access in an allowlisted file. I3 removes those producer and
 reader exceptions and then enforces final physical AuditLog exclusivity, with
-only legitimate non-production/support exceptions.
+only legitimate non-production/support exceptions. I2 additionally enforces
+Audit Dashboard route composition through the client entry, rejects deleted
+legacy Audit presentation paths and Audit self-barrel imports, and walks the
+Audit client graph for server-only dependencies and other module server
+entries.
 
 ## Client/server boundary
 
@@ -296,13 +302,14 @@ the module boundary from a legacy directory, while imports unrelated to
 | `npm run architecture:check` | Repository source files, excluding dependency, build, coverage, and generated directories | Uses the installed TypeScript parser to inspect imports, re-exports, type imports, dynamic imports, and `require()` calls; allows `@/modules/<feature>` and, when present, `@/modules/<feature>/client` as module public entries; rejects `shared -> modules`, external consumers deep-importing module internals, cross-module deep imports, including relative paths, and any business module importing the global Outbox Processor |
 | Leave route ownership | `app/api/leave/**`, `app/api/line/leave/**` | Requires the server entry `@/modules/leave` and rejects legacy paths, the client entry, and deep implementation imports |
 | Leave presentation ownership | `app/dashboard/leave/**`, `app/liff/leave/**`, `modules/leave/**` | Requires route composition through `@/modules/leave/client`, rejects deleted legacy presentation paths, and rejects Leave internals importing either public barrel |
-| Client/server policy | Production `"use client"` dependency graphs and migrated module client entries | Walks runtime imports transitively, rejects client-reachable use of the Leave, Employee, Department, and Notification server entries, and separately rejects server-only runtime dependencies reachable from `@/modules/leave/client`, `@/modules/employee/client`, and `@/modules/notification/client`; type-only imports are erased before graph traversal |
+| Client/server policy | Production `"use client"` dependency graphs and migrated module client entries | Walks runtime imports transitively, rejects client-reachable use of the Leave, Employee, Department, and Notification server entries, and separately rejects server-only runtime dependencies reachable from `@/modules/leave/client`, `@/modules/employee/client`, `@/modules/notification/client`, and `@/modules/audit/client`; type-only imports are erased before graph traversal |
 | Route-level Prisma policy | Legacy and new code | Documentation-led for unrelated legacy routes; G1 enforces Department ownership in `modules/department/infrastructure/**` |
 | Employee F3 ownership | `app/api/employees/**`, `app/dashboard/employees/**`, `modules/employee/**`, production Client Component graphs | Requires `@/modules/employee` for API routes and `@/modules/employee/client` for the four Employee Dashboard routes; rejects deleted legacy compatibility paths and deep presentation paths, including relative forms, deep/self-barrel imports, Employee → Leave imports, client-to-server reachability, and server-only dependencies from the Employee client graph |
 | Employee/Leave offboarding seam | `modules/employee/**` plus Employee route composition | Employee exposes only a structural blocker-provider port; the outer composition binds Leave's implementation and must preserve the same Employee lifecycle transaction client |
 | Department G1 ownership | `app/api/departments/**`, `modules/department/**`, Employee import, production source | Department API delivery uses `@/modules/department`; Department Prisma access stays in Department infrastructure; Employee uses the Department public query; Department does not depend on Employee |
 | Department G2 presentation boundary | Production Client Component runtime graphs and Employee Department presentation | Rejects direct/transitive client imports of the server-only `@/modules/department` entry; preserves the `/api/departments` browser contract and does not require a Department client entry |
 | Notification H1-H3 ownership | `app/api/notifications/**`, `app/dashboard/notifications/**`, `components/dashboard/layout/DashboardNavbar.tsx`, `modules/notification/**`, production client graphs, production source | Requires Notification API routes to consume `@/modules/notification`; requires Notification Dashboard routes and DashboardNavbar to consume `@/modules/notification/client`; rejects deleted legacy presentation paths, deep/self-barrel imports, server-only dependencies in the Notification client graph, production client reachability of the Notification server entry, business-module legacy adapter imports, and physical Notification delegate access outside `modules/notification/infrastructure/**`; allows tests/fixtures/support code and does not match `notificationOutbox` |
+| Audit I1-I2 ownership | `app/api/audit-logs/**`, `app/dashboard/audit/**`, `modules/audit/**`, production client graphs, production source | Requires Audit API routes to consume `@/modules/audit` and Audit Dashboard routes to consume `@/modules/audit/client`; rejects deleted Audit presentation paths, deep/self-barrel imports, server-only dependencies and other module server entries in the Audit client graph, while preserving the I1 direct-access allowlist |
 
 ## Department final closure (G3)
 

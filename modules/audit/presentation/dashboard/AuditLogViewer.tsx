@@ -20,16 +20,16 @@ import {
 } from "@/components/ui/card";
 import { Search, RefreshCw } from "lucide-react";
 import { Pagination } from "@/components/Pagination";
-import { useAuditLogsContext } from "@/components/dashboard/context/audit-logs/AuditLogsContext";
-import type { AuditLog } from "@/components/dashboard/context/audit-logs/types";
+import { useAuditLogsContext } from "./AuditLogsContext";
+import type { AuditLog } from "./types";
 import {
     AUDIT_ACTION_FILTER_OPTIONS,
     AUDIT_ENTITY_TYPE_OPTIONS,
-} from "@/constants/audit";
+} from "./registry";
 import {
     formatAuditLogDisplay,
     type AuditLogDisplay,
-} from "@/lib/audit-log/display";
+} from "./display";
 import { formatThaiDateTime } from "@/lib/helpers/date-helpers";
 import { getUserDisplayName } from "@/shared/identity/display";
 import { AuditActionBadge } from "./AuditActionBadge";

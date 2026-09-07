@@ -1,7 +1,7 @@
 import {
     AUDIT_ENTITY_LABELS,
     getAuditActionLabel,
-} from "@/constants/audit";
+} from "./registry";
 import { formatThaiDate } from "@/lib/helpers/date-helpers";
 import { getEmployeeDisplayName } from "@/modules/employee/client";
 import {

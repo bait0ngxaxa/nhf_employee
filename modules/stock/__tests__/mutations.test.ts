@@ -3,7 +3,7 @@ import { Prisma, type PrismaClient } from "@prisma/client";
 import { mockDeep, mockReset } from "vitest-mock-extended";
 import { prisma } from "@/lib/db/prisma";
 import { stockService } from "@/modules/stock";
-import { formatAuditLogDisplay } from "@/lib/audit-log/display";
+import { formatAuditLogDisplay } from "@/modules/audit/client";
 
 vi.mock("@/lib/db/prisma", () => ({
     prisma: mockDeep<PrismaClient>(),

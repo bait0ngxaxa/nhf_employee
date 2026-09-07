@@ -10,7 +10,11 @@ import {
 import useSWR from "swr";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { AuditLogsContext } from "./AuditLogsContext";
-import { type AuditLog, type AuditLogsContextValue } from "./types";
+import {
+    type AuditLog,
+    type AuditLogsContextValue,
+    type AuditLogsResponse,
+} from "./types";
 
 interface AuditLogsProviderProps {
     children: ReactNode;
@@ -40,9 +44,10 @@ export function AuditLogsProvider({ children }: AuditLogsProviderProps) {
 
     const swrKey = `/api/audit-logs?${params.toString()}`;
 
-    const { data, mutate, isLoading, error: swrError } = useSWR(swrKey, {
-        keepPreviousData: true,
-    });
+    const { data, mutate, isLoading, error: swrError } = useSWR<AuditLogsResponse>(
+        swrKey,
+        { keepPreviousData: true },
+    );
 
     const auditLogs: AuditLog[] = useMemo(
         () => data?.auditLogs || [],

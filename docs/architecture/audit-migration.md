@@ -1,8 +1,8 @@
 # Audit capability migration
 
-Status: **Phase I1 CLOSED — Audit server/application/persistence foundation complete.**
+Status: **Phase I2 CLOSED — Audit presentation ownership complete.**
 
-Phase I2: **NOT STARTED**.
+Phase I3: **NOT STARTED**.
 
 Baseline audited: `05c2327be2f46e83a843040b978093b30a1c0289`
 (`refactor(notification): migrate Leave Stock and Routine Inbox writes`).
@@ -12,7 +12,7 @@ baseline and may move during I1-I3.
 
 This record is the source of truth for the Audit capability migration. Its
 baseline sections record the repository state observed during Phase I0, while
-the I1 implementation sections record the current ownership result.
+the I1 and I2 implementation sections record the current ownership result.
 
 ## 1. Scope
 
@@ -201,12 +201,12 @@ compatibility re-exports. The Audit GET and cleanup routes consume
 `@/modules/audit`; authentication, cleanup-secret validation, response
 composition, and export-route behavior remain in their delivery boundaries.
 
-The current producer direct-write seams remain intentionally unchanged for
-I3, and Audit presentation remains in its pre-I2 locations. After the generic
-transfer, the remaining production compatibility inventory is 10 direct
-AuditLog expressions across 7 allowlisted files: nine strict `create`
-expressions and one Routine `findMany` reader. No generic legacy transfer file
-contains a direct AuditLog delegate.
+At the I1 closure, the current producer direct-write seams remained
+intentionally unchanged for I3, and Audit presentation remained in its pre-I2
+locations. After the generic transfer, the remaining production compatibility
+inventory is 10 direct AuditLog expressions across 7 allowlisted files: nine
+strict `create` expressions and one Routine `findMany` reader. No generic
+legacy transfer file contains a direct AuditLog delegate.
 
 ## 3. Audit capability definition
 
@@ -649,7 +649,9 @@ callers. I0 does not refactor it. Request metadata is infrastructure input,
 not business event meaning, but the decision to capture it and any
 feature-specific trace values remains visible in the producer contract.
 
-## 14. Cross-module dependency analysis
+## 14. Cross-module dependency analysis (I0 baseline)
+
+This section preserves the audited pre-I1/I2 dependency baseline.
 
 Current dependencies are classified as follows:
 
@@ -679,7 +681,9 @@ module must receive already-resolved generic payloads and must not import
 Stock, Leave, Employee, Routine, Auth, or IT application internals merely to
 interpret them.
 
-## 15. Deferred compatibility consumers
+## 15. Deferred compatibility consumers (I0/I1 baseline)
+
+This section preserves the deferred-consumer decisions recorded before I2.
 
 ### Email Request / future IT
 
@@ -785,26 +789,41 @@ change the Prisma schema or migrations, or move feature-specific detail
 builders into Audit. The exact remaining direct-access compatibility shape is
 enforced in section 20.
 
-## 18. Proposed I2 presentation migration
+## 18. I2 implementation result
 
-I2 should move only Audit-specific presentation behind a browser-safe
-modules/audit/client.ts entry:
+I2 is closed with the following behavior-preserving presentation ownership:
 
-- AuditLogsSection and its provider/context/types;
-- AuditLogViewer, skeletons, and action badge;
-- the pure display adapter and Audit action/entity registry, or explicit
-  presentation-local wrappers;
-- the narrow browser contract needed to consume /api/audit-logs.
+1. `modules/audit/presentation/dashboard/**` owns the Audit Dashboard section,
+   provider/context, browser response types, viewer, skeletons, action badge,
+   display formatter, and action/entity registry.
+2. `modules/audit/client.ts` is the browser-safe public entry. It exposes
+   `AuditLogsSection`, `AuditLogsSectionSkeleton`, and the existing pure
+   `formatAuditLogDisplay` contract required by cross-capability presentation
+   tests.
+3. `app/dashboard/audit/page.tsx` and `loading.tsx` remain App Router
+   composition. The page still owns `requireDashboardAdmin()`, metadata, and
+   Suspense; both route files consume Audit presentation only through
+   `@/modules/audit/client`.
+4. The provider still requests `GET /api/audit-logs` with `limit=15`, keeps
+   previous SWR data, debounces search, serializes the same non-default
+   filters, resets/clamps pagination in the same cases, and refreshes through
+   SWR mutate.
+5. The viewer's heading, Thai wording, display summaries, sensitive-field
+   suppression, date formatting, responsive mobile/table presentation, and
+   loading/error/empty/pagination behavior remain unchanged.
+6. `components/dashboard/context/index.ts` no longer re-exports Audit-specific
+   context. The obsolete Audit presentation paths under `components/`, `lib/`,
+   and `constants/` were removed after repository-wide consumer inspection.
+7. Audit presentation retains only browser-safe Employee and Leave contracts;
+   its runtime graph does not reach the Audit server entry, Prisma, server-only
+   dependencies, or other module server entries.
 
-app/dashboard/audit/page.tsx and loading.tsx remain route composition and
-continue to own Dashboard-admin access/Suspense. Generic Dashboard shell,
-navigation, generic UI primitives, and generic identity helpers remain outside
-Audit. The page may consume only the Audit client entry for Audit presentation.
-
-I2 must keep the HTTP/browser contract and not pull the Audit server entry,
-Prisma, Next server APIs, secrets, or business application/infrastructure into
-the client graph. It must preserve the current Employee/Leave display
-formatter behavior through browser-safe contracts.
+The I2 client and presentation rules are enforced in
+`scripts/check-architecture.mjs`, including route composition, deleted-path,
+self-barrel, and transitive client-graph checks. I1 server/application/
+persistence behavior and the exact 10-expression/7-file producer-reader
+compatibility shape remain unchanged. Phase I3 producer migration has not
+started.
 
 ## 19. Proposed I3 producer migration
 
@@ -835,7 +854,7 @@ generic feature-specific helper methods, and obsolete presentation paths be
 removed. The migration must preserve Email Request and Auth compatibility
 seams until their own phases.
 
-## 20. I1 architecture checker enforcement
+## 20. I1 and I2 architecture checker enforcement
 
 I1 adds the server-boundary and staged persistence rules to
 `scripts/check-architecture.mjs`. The checker uses TypeScript AST inspection
@@ -891,11 +910,13 @@ access in an existing file.
   @/modules/audit/client for Audit presentation;
 - Audit client entry and all reachable runtime code must not reach Prisma,
   lib/db, lib/server, Next server-only APIs, secrets, Email/LINE, Outbox, or
-  the Audit server/application/infrastructure entry;
+  the Audit server/application/infrastructure entry or another module's server
+  entry;
 - Audit presentation internals must use local contracts and must not self-import
   the server/client public barrels;
-- legacy components/audit and dashboard Audit paths should be rejected only
-  after their replacement is present and the compatibility audit is closed.
+- deleted components/audit, Dashboard Audit context/section, display, and
+  registry paths are rejected after their replacement and consumer migration
+  are complete.
 
 ### I3 producer rules
 
@@ -916,8 +937,9 @@ access in an existing file.
 
 These rules follow the existing checker style: public module entries,
 client/server graph checks, owner-exclusive physical persistence, explicit
-compatibility exceptions, and phased enforcement. I2 presentation rules and
-I3 producer exclusivity remain staged and are not enabled by this phase.
+compatibility exceptions, and phased enforcement. I2 presentation rules are
+now active; I3 producer exclusivity remains staged and is not enabled by this
+phase.
 
 ## 21. Open risks and unresolved questions
 
@@ -1004,8 +1026,9 @@ recorded above and in the checklist below.
   architecture-checked.
 - [x] Employee, Leave, Stock, Routine producers, Auth, Email Request, and
   Routine nested-reader semantics remain deferred as specified.
-- [x] Audit presentation remains deferred to Phase I2.
+- [x] At I1 closure, Audit presentation was deferred to Phase I2.
 - [x] Prisma schema and migrations remain unchanged.
 
 Phase I1 CLOSED — Audit server/application/persistence foundation complete.
-Phase I2 NOT STARTED.
+Phase I2 CLOSED — Audit presentation ownership complete.
+Phase I3 NOT STARTED.

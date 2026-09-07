@@ -180,6 +180,10 @@ const auditApiRouteFiles = [
     "app/api/audit-logs/route.ts",
     "app/api/audit-logs/cleanup/route.ts",
 ];
+const auditDashboardRouteFiles = [
+    "app/dashboard/audit/page.tsx",
+    "app/dashboard/audit/loading.tsx",
+];
 const auditLogCompatibilityAccesses = new Map([
     ["modules/employee/application/mutations.ts", ["create"]],
     ["modules/leave/infrastructure/persistence/transaction.ts", ["create"]],
@@ -246,6 +250,13 @@ const legacyLeaveImportPrefixes = [
 ];
 const legacyNotificationPresentationPrefixes = [
     "@/components/dashboard/notifications",
+];
+const legacyAuditPresentationPrefixes = [
+    "@/components/audit",
+    "@/components/dashboard/context/audit-logs",
+    "@/components/dashboard/sections/AuditLogsSection",
+    "@/lib/audit-log/display",
+    "@/constants/audit",
 ];
 
 function hasImportPrefix(moduleSpecifier, prefix) {
@@ -903,11 +914,94 @@ function getAuditDependencyViolation(filePath, rootPath, moduleSpecifier) {
         ? moduleSpecifier
         : `@/${relativeFilePath(resolvedImport, rootPath).replace(/\.[cm]?[jt]sx?$/, "")}`;
 
-    if (["@/modules/audit", "@/modules/audit/index"].includes(normalizedSpecifier)) {
+    if ([
+        "@/modules/audit",
+        "@/modules/audit/index",
+        "@/modules/audit/client",
+    ].includes(normalizedSpecifier)) {
         return "Audit module internals must use local contracts instead of their own public barrel.";
     }
 
     return null;
+}
+
+function getAuditDashboardRouteDependencyViolation(filePath, rootPath, moduleSpecifier) {
+    if (!auditDashboardRouteFiles.some((routePath) =>
+        filePath === resolve(rootPath, routePath),
+    )) {
+        return null;
+    }
+
+    const resolvedImport = moduleSpecifier.startsWith("@/")
+        ? resolve(rootPath, moduleSpecifier.slice(2))
+        : getImportSourcePath(moduleSpecifier, filePath, rootPath);
+    const normalizedSpecifier = resolvedImport === null
+        ? moduleSpecifier
+        : `@/${relativeFilePath(resolvedImport, rootPath).replace(/\.[cm]?[jt]sx?$/, "")}`;
+
+    if (legacyAuditPresentationPrefixes.some((prefix) =>
+        hasImportPrefix(normalizedSpecifier, prefix),
+    )) {
+        return "Audit Dashboard routes must use @/modules/audit/client instead of legacy Audit presentation paths.";
+    }
+
+    if (hasImportPrefix(normalizedSpecifier, "@/modules/audit")
+        && normalizedSpecifier !== "@/modules/audit/client") {
+        return "Audit Dashboard routes must use @/modules/audit/client.";
+    }
+
+    return null;
+}
+
+function getDeletedAuditPresentationViolation(filePath, rootPath, moduleSpecifier) {
+    const resolvedImport = moduleSpecifier.startsWith("@/")
+        ? resolve(rootPath, moduleSpecifier.slice(2))
+        : getImportSourcePath(moduleSpecifier, filePath, rootPath);
+    const normalizedSpecifier = resolvedImport === null
+        ? moduleSpecifier
+        : `@/${relativeFilePath(resolvedImport, rootPath).replace(/\.[cm]?[jt]sx?$/, "")}`;
+    const deletedPath = legacyAuditPresentationPrefixes.find((prefix) =>
+        hasImportPrefix(normalizedSpecifier, prefix),
+    );
+
+    return deletedPath === undefined
+        ? null
+        : `Deleted Audit presentation path "${deletedPath}" must not be imported; use @/modules/audit/client or local Audit presentation imports.`;
+}
+
+function getAuditDashboardRouteCompositionViolations(rootPath, sourceFiles) {
+    const clientEntry = "@/modules/audit/client";
+    const violations = [];
+
+    for (const routePath of auditDashboardRouteFiles) {
+        const filePath = resolve(rootPath, routePath);
+        if (!sourceFiles.includes(filePath)) continue;
+
+        const normalizedSpecifiers = getImports(filePath).map((record) => {
+            const resolvedImport = record.moduleSpecifier.startsWith("@/")
+                ? resolve(rootPath, record.moduleSpecifier.slice(2))
+                : getImportSourcePath(record.moduleSpecifier, filePath, rootPath);
+            return resolvedImport === null
+                ? record.moduleSpecifier
+                : `@/${relativeFilePath(resolvedImport, rootPath).replace(/\.[cm]?[jt]sx?$/, "")}`;
+        });
+
+        if (normalizedSpecifiers.includes(clientEntry)) continue;
+
+        const hasAuditPresentationImport = normalizedSpecifiers.some((specifier) =>
+            hasImportPrefix(specifier, "@/modules/audit")
+            || legacyAuditPresentationPrefixes.some((prefix) =>
+                hasImportPrefix(specifier, prefix),
+            ),
+        );
+        if (hasAuditPresentationImport) continue;
+
+        violations.push(
+            `${relativeFilePath(filePath, rootPath)} must consume Audit presentation through "${clientEntry}".`,
+        );
+    }
+
+    return violations;
 }
 
 function getAuditApiRouteCompositionViolations(rootPath, sourceFiles) {
@@ -1356,6 +1450,93 @@ function getNotificationClientGraphViolations(rootPath) {
     return violations;
 }
 
+function getAuditClientGraphViolations(rootPath) {
+    const entryPath = resolve(rootPath, "modules/audit/client.ts");
+    if (!existsSync(entryPath)) return [];
+
+    const pending = [entryPath];
+    const visited = new Set();
+    const violations = [];
+    const serverPackages = [
+        "@prisma/client",
+        "nodemailer",
+        "@line/bot-sdk",
+        "server-only",
+        "next/server",
+        "next/headers",
+        "next/cache",
+    ];
+    const serverDirectories = [
+        "lib/db",
+        "lib/server",
+        "lib/email",
+        "lib/line",
+        "lib/services/audit-log",
+        "lib/services/outbox",
+        "modules/audit/application",
+        "modules/audit/infrastructure",
+    ];
+    const serverModuleNames = [
+        "audit",
+        "employee",
+        "leave",
+        "stock",
+        "routine",
+        "notification",
+    ];
+
+    while (pending.length > 0) {
+        const filePath = pending.pop();
+        if (filePath === undefined || visited.has(filePath)) continue;
+        visited.add(filePath);
+
+        for (const record of getImports(filePath, true)) {
+            const specifier = record.moduleSpecifier;
+            const { importTarget, sourcePath } = getRuntimeImportTarget(
+                specifier,
+                filePath,
+                rootPath,
+            );
+            const reachesServerDirectory = [importTarget, sourcePath].some((target) =>
+                target !== null && serverDirectories.some((directory) =>
+                    pathIsWithin(target, resolve(rootPath, directory)),
+                ),
+            );
+            const serverModuleName = serverModuleNames.find((moduleName) => {
+                const moduleRoot = resolve(rootPath, `modules/${moduleName}`);
+                return importTarget === moduleRoot
+                    || sourcePath === resolve(moduleRoot, "index.ts");
+            });
+
+            if (isBuiltin(specifier)
+                || serverPackages.some((name) => hasImportPrefix(specifier, name))
+                || reachesServerDirectory) {
+                violations.push(describeViolation(
+                    filePath,
+                    rootPath,
+                    record,
+                    "Server-only runtime dependency is reachable from @/modules/audit/client.",
+                ));
+                continue;
+            }
+
+            if (serverModuleName !== undefined) {
+                violations.push(describeViolation(
+                    filePath,
+                    rootPath,
+                    record,
+                    `Audit client graph must not reach the ${serverModuleName} server entry.`,
+                ));
+                continue;
+            }
+
+            if (sourcePath !== null) pending.push(sourcePath);
+        }
+    }
+
+    return violations;
+}
+
 function relativeFilePath(filePath, rootPath) {
     return relative(rootPath, filePath).split(sep).join("/");
 }
@@ -1445,6 +1626,22 @@ function checkArchitecture(options = {}) {
                     rootPath,
                     importRecord,
                     auditApiRouteDependencyViolation,
+                ));
+                continue;
+            }
+
+            const auditDashboardRouteDependencyViolation =
+                getAuditDashboardRouteDependencyViolation(
+                    filePath,
+                    rootPath,
+                    importRecord.moduleSpecifier,
+                );
+            if (auditDashboardRouteDependencyViolation !== null) {
+                violations.push(describeViolation(
+                    filePath,
+                    rootPath,
+                    importRecord,
+                    auditDashboardRouteDependencyViolation,
                 ));
                 continue;
             }
@@ -1554,6 +1751,22 @@ function checkArchitecture(options = {}) {
                     rootPath,
                     importRecord,
                     deletedNotificationPresentationViolation,
+                ));
+                continue;
+            }
+
+            const deletedAuditPresentationViolation =
+                getDeletedAuditPresentationViolation(
+                    filePath,
+                    rootPath,
+                    importRecord.moduleSpecifier,
+                );
+            if (deletedAuditPresentationViolation !== null) {
+                violations.push(describeViolation(
+                    filePath,
+                    rootPath,
+                    importRecord,
+                    deletedAuditPresentationViolation,
                 ));
                 continue;
             }
@@ -1690,12 +1903,14 @@ function checkArchitecture(options = {}) {
 
     violations.push(...getEmployeeDashboardRouteCompositionViolations(rootPath, sourceFiles));
     violations.push(...getAuditApiRouteCompositionViolations(rootPath, sourceFiles));
+    violations.push(...getAuditDashboardRouteCompositionViolations(rootPath, sourceFiles));
     violations.push(...getNotificationDashboardRouteCompositionViolations(rootPath, sourceFiles));
     violations.push(...getNotificationNavbarCompositionViolations(rootPath, sourceFiles));
     violations.push(...getNotificationRouteCompositionViolations(rootPath, sourceFiles));
     violations.push(...getLeaveClientGraphViolations(rootPath));
     violations.push(...getEmployeeClientGraphViolations(rootPath));
     violations.push(...getNotificationClientGraphViolations(rootPath));
+    violations.push(...getAuditClientGraphViolations(rootPath));
     violations.push(...getClientReachableServerEntryViolations(rootPath, sourceFiles, "leave"));
     violations.push(...getClientReachableServerEntryViolations(rootPath, sourceFiles, "employee"));
     violations.push(...getClientReachableServerEntryViolations(rootPath, sourceFiles, "department", null));

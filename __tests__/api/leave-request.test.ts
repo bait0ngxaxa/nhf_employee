@@ -9,7 +9,7 @@ import { resetMutationRateLimit } from "@/lib/security/mutation-rate-limit";
 import { NextRequest } from "next/server";
 import type * as NextServerModule from "next/server";
 import type * as LeaveModule from "@/modules/leave";
-import { formatAuditLogDisplay } from "@/lib/audit-log/display";
+import { formatAuditLogDisplay } from "@/modules/audit/client";
 
 const uploadMocks = vi.hoisted(() => ({
     save: vi.fn(),

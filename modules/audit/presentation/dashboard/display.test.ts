@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatAuditLogDisplay } from "@/lib/audit-log/display";
+import { formatAuditLogDisplay } from "./display";
 
 describe("formatAuditLogDisplay", () => {
     it("summarizes legacy before and after values in Thai", () => {

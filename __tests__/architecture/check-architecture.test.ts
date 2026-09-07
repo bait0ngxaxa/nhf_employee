@@ -21,6 +21,7 @@ const fixtureFiles: FixtureFiles = {
     "modules/department/application/example.ts": "export const x = 1;\n",
     "modules/department/infrastructure/persistence/repository.ts": "export const x = 1;\n",
     "modules/audit/index.ts": "export const x = 1;\n",
+    "modules/audit/client.ts": '"use client"; export const x = 1;\n',
     "modules/audit/application/example.ts": "export const x = 1;\n",
     "modules/audit/infrastructure/persistence/repository.ts": "export const x = 1;\n",
     "modules/notification/index.ts": "export const x = 1;\n",
@@ -1151,6 +1152,190 @@ describe("architecture checker module boundaries", () => {
         expect(result.violations[0]).toContain(
             "Audit API routes must use the server entry @/modules/audit",
         );
+    });
+
+    it.each([
+        "app/dashboard/audit/page.tsx",
+        "app/dashboard/audit/loading.tsx",
+    ])("allows %s to compose Audit presentation through the client entry", async (routePath) => {
+        const result = await checkFixture(
+            routePath,
+            'import { AuditLogsSection } from "@/modules/audit/client";\n',
+        );
+
+        expect(result.violations).toEqual([]);
+    });
+
+    it.each([
+        "@/modules/audit",
+        "@/modules/audit/presentation/dashboard/AuditLogsSection",
+        "@/components/audit/AuditLogViewer",
+        "@/components/dashboard/context/audit-logs/AuditLogsProvider",
+    ])("rejects Audit dashboard routes importing %s", async (specifier) => {
+        const result = await checkFixture(
+            "app/dashboard/audit/page.tsx",
+            `import { x } from "${specifier}";`,
+        );
+
+        expect(result.violations).toHaveLength(1);
+        expect(result.violations[0]).toContain(
+            "Audit Dashboard routes must use @/modules/audit/client",
+        );
+    });
+
+    it("rejects an Audit dashboard route that does not import the client entry", async () => {
+        const result = await checkFixture(
+            "app/dashboard/audit/page.tsx",
+            'import { x } from "@/components/ui/button";',
+        );
+
+        expect(result.violations).toHaveLength(1);
+        expect(result.violations[0]).toContain(
+            'must consume Audit presentation through "@/modules/audit/client"',
+        );
+    });
+
+    it.each([
+        "@/components/audit/AuditLogViewer",
+        "@/components/dashboard/context/audit-logs/AuditLogsProvider",
+        "@/components/dashboard/sections/AuditLogsSection",
+        "@/lib/audit-log/display",
+        "@/constants/audit",
+    ])("rejects deleted Audit presentation dependency %s", async (specifier) => {
+        const result = await checkFixture(
+            "app/example.ts",
+            `import { x } from "${specifier}";`,
+        );
+
+        expect(result.violations).toHaveLength(1);
+        expect(result.violations[0]).toContain(
+            "Deleted Audit presentation path",
+        );
+    });
+
+    it("rejects a relative import of a deleted Audit presentation path", async () => {
+        const result = await checkFixture(
+            "app/dashboard/audit/example.tsx",
+            'import { x } from "../../../components/audit/AuditLogViewer";',
+        );
+
+        expect(result.violations).toHaveLength(1);
+        expect(result.violations[0]).toContain(
+            "Deleted Audit presentation path",
+        );
+    });
+
+    it.each(["@/modules/audit", "@/modules/audit/client"])(
+        "rejects Audit presentation internals importing their own public barrel %s",
+        async (specifier) => {
+            const result = await checkFixture(
+                "modules/audit/presentation/dashboard/Example.tsx",
+                `import { x } from "${specifier}";`,
+            );
+
+            expect(result.violations).toHaveLength(1);
+            expect(result.violations[0]).toContain(
+                "Audit module internals must use local contracts",
+            );
+        },
+    );
+
+    it("rejects server-only runtime dependencies from the Audit client graph", async () => {
+        const rootPath = await createFixture({
+            ...fixtureFiles,
+            "modules/audit/client.ts": '"use client"; export { x } from "./presentation/example";\n',
+            "modules/audit/presentation/example.ts": [
+                'import { x } from "@/lib/server/audit";',
+                "export { x };",
+            ].join("\n"),
+            "lib/server/audit.ts": "export const x = 1;\n",
+        });
+        const result = checkArchitecture({ repositoryRoot: rootPath });
+
+        expect(result.violations).toHaveLength(1);
+        expect(result.violations[0]).toContain(
+            "Server-only runtime dependency is reachable from @/modules/audit/client",
+        );
+    });
+
+    it("rejects a transitive Prisma runtime dependency from the Audit client graph", async () => {
+        const rootPath = await createFixture({
+            ...fixtureFiles,
+            "modules/audit/client.ts": '"use client"; export { x } from "./presentation/example";\n',
+            "modules/audit/presentation/example.ts": [
+                'import { PrismaClient } from "@prisma/client";',
+                "export const x = PrismaClient;",
+            ].join("\n"),
+        });
+        const result = checkArchitecture({ repositoryRoot: rootPath });
+
+        expect(result.violations).toHaveLength(1);
+        expect(result.violations[0]).toContain("@prisma/client");
+        expect(result.violations[0]).toContain(
+            "Server-only runtime dependency is reachable from @/modules/audit/client",
+        );
+    });
+
+    it("does not treat type-only Prisma contracts as Audit client runtime dependencies", async () => {
+        const rootPath = await createFixture({
+            ...fixtureFiles,
+            "modules/audit/client.ts": [
+                '"use client";',
+                'import type { Prisma } from "@prisma/client";',
+                "export type Select = Prisma.UserSelect;",
+            ].join("\n"),
+        });
+        const result = checkArchitecture({ repositoryRoot: rootPath });
+
+        expect(result.violations).toEqual([]);
+    });
+
+    it("rejects a transitive Audit application dependency from the Audit client graph", async () => {
+        const rootPath = await createFixture({
+            ...fixtureFiles,
+            "modules/audit/client.ts": '"use client"; export { x } from "./presentation/example";\n',
+            "modules/audit/presentation/example.ts": [
+                'import { x } from "@/modules/audit/application/example";',
+                "export { x };",
+            ].join("\n"),
+        });
+        const result = checkArchitecture({ repositoryRoot: rootPath });
+
+        expect(result.violations).toHaveLength(1);
+        expect(result.violations[0]).toContain(
+            "Server-only runtime dependency is reachable from @/modules/audit/client",
+        );
+    });
+
+    it("rejects a transitive Stock server entry from the Audit client graph", async () => {
+        const rootPath = await createFixture({
+            ...fixtureFiles,
+            "modules/audit/client.ts": '"use client"; export { x } from "./presentation/example";\n',
+            "modules/audit/presentation/example.ts": [
+                'import { x } from "@/modules/stock";',
+                "export { x };",
+            ].join("\n"),
+        });
+        const result = checkArchitecture({ repositoryRoot: rootPath });
+
+        expect(result.violations).toHaveLength(1);
+        expect(result.violations[0]).toContain(
+            "Audit client graph must not reach the stock server entry",
+        );
+    });
+
+    it("allows the Audit client graph to consume the Employee client entry", async () => {
+        const rootPath = await createFixture({
+            ...fixtureFiles,
+            "modules/audit/client.ts": '"use client"; export { x } from "./presentation/example";\n',
+            "modules/audit/presentation/example.ts": [
+                'import { x } from "@/modules/employee/client";',
+                "export { x };",
+            ].join("\n"),
+        });
+        const result = checkArchitecture({ repositoryRoot: rootPath });
+
+        expect(result.violations).toEqual([]);
     });
 
     it("allows legitimate AuditLog access in test fixtures", async () => {

@@ -1,7 +1,7 @@
 # NHF Employee modular monolith
 
-Status: Phase I1 CLOSED — Audit server/application/persistence foundation
-complete. Phase I2 NOT STARTED. Phase H3 Notification producer integration and
+Status: Phase I2 CLOSED — Audit presentation ownership complete. Phase I3 NOT
+STARTED. Phase H3 Notification producer integration and
 final migration audit remain complete. Phase G3 Department migration remains
 complete.
 
@@ -116,8 +116,11 @@ Producing capabilities retain event meaning, AuditAction, entity semantics,
 details/snapshots, actor semantics, and strict versus best-effort transaction
 behavior. Auth and Email Request remain later/deferred producer boundaries.
 Known business producer and Routine-reader direct-access seams remain
-temporary for I3. Audit presentation remains in its pre-I2 locations. See
-audit-migration.md for the evidence and I1-I3 plan.
+temporary for I3. Audit Dashboard presentation is now owned under
+`modules/audit/presentation/dashboard/**` and exposed through the separate
+browser-safe `@/modules/audit/client` entry. Its App Router routes retain
+authorization, metadata, and Suspense composition. See audit-migration.md for
+the evidence and I1-I3 plan.
 
 ## Target architecture
 

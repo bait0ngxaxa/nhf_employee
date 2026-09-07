@@ -1,6 +1,6 @@
 import type { ReactElement } from "react";
 
-import { AuditLogsSectionSkeleton } from "@/components/audit/AuditLogSkeletons";
+import { AuditLogsSectionSkeleton } from "@/modules/audit/client";
 
 export default function AuditLoading(): ReactElement {
     return <AuditLogsSectionSkeleton />;

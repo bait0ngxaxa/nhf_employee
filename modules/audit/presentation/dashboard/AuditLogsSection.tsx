@@ -1,7 +1,7 @@
 "use client";
 
-import { AuditLogViewer } from "@/components/audit/AuditLogViewer";
-import { AuditLogsProvider } from "@/components/dashboard/context/audit-logs/AuditLogsProvider";
+import { AuditLogViewer } from "./AuditLogViewer";
+import { AuditLogsProvider } from "./AuditLogsProvider";
 
 export function AuditLogsSection() {
     return (

@@ -3,7 +3,7 @@ import { type Prisma, type PrismaClient } from "@prisma/client";
 import { mockDeep, mockReset } from "vitest-mock-extended";
 
 import { prisma } from "@/lib/db/prisma";
-import { formatAuditLogDisplay } from "@/lib/audit-log/display";
+import { formatAuditLogDisplay } from "@/modules/audit/client";
 import {
     createRoutineTaskInTransaction,
     deleteRoutineTask,

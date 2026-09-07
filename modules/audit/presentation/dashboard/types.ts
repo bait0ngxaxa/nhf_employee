@@ -21,6 +21,16 @@ export interface AuditLog {
     } | null;
 }
 
+export interface AuditLogsResponse {
+    auditLogs: AuditLog[];
+    pagination: {
+        page: number;
+        limit: number;
+        total: number;
+        pages: number;
+    };
+}
+
 export interface AuditLogsContextValue {
     // Data
     auditLogs: AuditLog[];

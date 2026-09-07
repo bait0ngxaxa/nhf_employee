@@ -1,8 +1,10 @@
 import { Suspense } from "react";
 import type { Metadata } from "next";
 
-import { AuditLogsSection } from "@/components/dashboard/sections/AuditLogsSection";
-import { AuditLogsSectionSkeleton } from "@/components/audit/AuditLogSkeletons";
+import {
+    AuditLogsSection,
+    AuditLogsSectionSkeleton,
+} from "@/modules/audit/client";
 import { requireDashboardAdmin } from "@/app/dashboard/_lib/route-access";
 
 export const metadata: Metadata = {

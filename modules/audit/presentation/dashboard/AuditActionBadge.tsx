@@ -3,7 +3,7 @@ import { cn } from "@/lib/ui/utils";
 import {
     getAuditActionBadgeClassName,
     getAuditActionLabel,
-} from "@/constants/audit";
+} from "./registry";
 
 interface AuditActionBadgeProps {
     action: string;

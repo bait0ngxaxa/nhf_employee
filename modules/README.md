@@ -4,10 +4,12 @@
 Employee application.
 
 Stock, Routine, Leave, Employee, and Department are migrated feature modules.
-Audit Phase I1 is closed with generic server/application/persistence ownership
-in `modules/audit/`. Its public server entry is `@/modules/audit`, while the
-known business producer and Routine-reader direct-access seams remain
-temporary for I3. Audit presentation remains deferred to I2; I3 will migrate
+Audit Phase I2 is closed with generic server/application/persistence ownership
+and Dashboard presentation ownership in `modules/audit/`. Its public server
+entry is `@/modules/audit`; its browser-facing entry is
+`@/modules/audit/client`, with Audit presentation under
+`modules/audit/presentation/dashboard/**`. The known business producer and
+Routine-reader direct-access seams remain temporary for I3, which will migrate
 producers and close final physical AuditLog persistence exclusivity.
 Employee F0-F3 owns its server/business behavior and active presentation in
 `modules/employee/`. Employee Dashboard routes consume the minimal

@@ -1,7 +1,7 @@
 # Module boundaries
 
-Status: Phase I1 CLOSED — Audit server/application/persistence foundation
-complete. Phase I2 NOT STARTED. Phase H3 Notification producer integration and
+Status: Phase I2 CLOSED — Audit presentation ownership complete. Phase I3 NOT
+STARTED. Phase H3 Notification producer integration and
 final migration audit remain complete. Phase G3 Department migration remains
 complete.
 Stock, Routine, Leave, and Employee are migrated examples; Employee
@@ -169,12 +169,13 @@ barrel files; small explicit entry points are easier to evolve and keep
 dependency direction visible. Only the module root and, when present, its
 `client.ts` entry are public; arbitrary subpaths remain private.
 
-## Audit boundary (I1)
+## Audit boundary (I1/I2)
 
 Phase I0 remains the historical discovery and boundary-definition record. The
 current owner is the first-class `modules/audit/` capability module, not
 `shared/audit/`. I1 establishes its server/application and generic persistence
-boundary; I2 presentation and I3 producer migration remain unstarted. The
+boundary, and I2 now owns its Dashboard presentation. I3 producer migration
+remains unstarted. The
 decision follows the ownership principle: Audit has a cohesive persistence,
 generic query/pagination, retention, and serialization capability, while the
 events it records remain owned by their producing capabilities.
@@ -197,15 +198,18 @@ access is owned by
 `lib/server/audit.ts` and the legacy query/retention paths are compatibility
 adapters and no longer own physical persistence. The known business
 direct-write and Routine nested-reader seams remain temporarily allowlisted;
-I2 moves Audit-specific presentation and I3 migrates producers and closes
-final physical AuditLog exclusivity. See audit-migration.md for the exact
-allowlist and operation counts.
+I3 will migrate producers and close final physical AuditLog exclusivity. The
+browser-safe `@/modules/audit/client` entry exposes the Audit Dashboard section
+and loading skeleton; its implementation is under
+`modules/audit/presentation/dashboard/**`. The routes retain App Router
+composition and use only that client entry for Audit presentation. See
+audit-migration.md for the exact allowlist and operation counts.
 
 The full producer, reader, retention, presentation, action, identity,
 transaction, metadata, compatibility, and phased I1-I3 ledger is in
 audit-migration.md. The source record explicitly keeps Email Request
-deferred; I1 implementation is complete while I2 presentation and I3
-producer migration remain unstarted.
+deferred; I1 implementation and I2 presentation ownership are complete while
+I3 producer migration remains unstarted.
 
 ## Larger feature shape
 

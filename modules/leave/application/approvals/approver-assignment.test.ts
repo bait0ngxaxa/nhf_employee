@@ -4,7 +4,7 @@ import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
 import { assignLeaveApprovers } from "./approver-assignment";
 import { ACTIVE_LEAVE_EMPLOYEE_QUERY_WHERE } from "../../domain/approver-eligibility";
-import { formatAuditLogDisplay } from "@/lib/audit-log/display";
+import { formatAuditLogDisplay } from "@/modules/audit/client";
 
 vi.mock("@/lib/db/prisma", () => ({
     prisma: {
