@@ -693,8 +693,40 @@ purpose `nhf-liff`, issuer `nhf_employee`, audience `nhf-liff`, User id as
 subject, Employee id, `iat`, and `exp`. Default lifetime is one hour and the
 configured maximum is 24 hours. It is stored in HttpOnly cookie
 `nhf_liff_session`, SameSite=Lax, root path, Secure only in production.
-Every LIFF route re-resolves active User/Employee/link consistency from the
-database; the Employee claim is not trusted by itself.
+
+LIFF session bootstrap/recovery follows this sequence:
+
+```text
+LINE ID token
+    -> LineAccountLink lookup
+    -> active User/Employee validation
+    -> issue LIFF session
+```
+
+`POST /api/line/liff/session` performs the `LineAccountLink` lookup, then
+`findActiveLiffWorkforceIdentity()` validates User existence, `User.isActive`,
+`User.deletedAt`, linked Employee existence, Employee status, Employee
+`deletedAt`, and User.employeeId-to-Employee.id consistency before issuing the
+LIFF session.
+
+Subsequent LIFF API authorization follows a different sequence:
+
+```text
+LIFF session cookie
+    -> verify LIFF JWT
+    -> revalidate User + Employee + employeeId consistency
+    -> authorize the request
+```
+
+`requireLiffWorkforceSession()` calls `findActiveLiffWorkforceIdentity()` with
+the User and Employee ids from the verified LIFF claims. The helper rechecks
+the User and Employee conditions above and confirms that the session
+Employee id still matches the current Employee id. It does **not** query or
+revalidate `LineAccountLink`. Therefore normal LIFF feature routes do not
+reread `LineAccountLink` after a valid LIFF session has been issued. The
+Employee claim is not trusted by itself, but the absence of per-request link
+revalidation is a current compatibility/security characteristic and must not
+be changed implicitly by J3.
 
 `LiffBootstrap` uses `@line/liff` to initialize/login and obtain a fresh ID
 token. It does not use the web hybrid refresh token. On a LIFF 401, safe GET/
@@ -1010,8 +1042,18 @@ The following are migration invariants, not implementation suggestions:
 - One User maps to at most one LINE identity and one LINE identity maps to at
   most one User; exact duplicate linking remains idempotent and conflicts stay
   409.
-- LIFF unlinked, invalid, expired, inactive, deleted, and inconsistent
-  User/Employee cases preserve current response and cookie-clearing behavior.
+- LIFF bootstrap/recovery performs the current `LineAccountLink` lookup and
+  preserves the current ID-token error mapping, unlinked response/cookie
+  clearing, and inactive/deleted/inconsistent User/Employee response and
+  cookie-clearing behavior.
+- Invalid or expired LIFF session cookies preserve the current subsequent-route
+  response behavior.
+- Subsequent LIFF authorization revalidates User existence/account state,
+  Employee existence/state, User-to-Employee linkage, and the LIFF
+  Employee-id claim against the current Employee id, but does not reread
+  `LineAccountLink`. This per-request link-revalidation absence is a current
+  compatibility/security characteristic; adding it requires a separate,
+  explicit compatibility/security decision and is not implied by J3.
 - LIFF session purpose/audience/issuer, claims, TTL, cookie attributes, and
   fresh-ID-token recovery behavior remain unchanged.
 - Safe LIFF reads may replay after recovery; mutations must not be replayed
@@ -1075,6 +1117,12 @@ These are recorded risks, not J0 fixes:
 15. Duplicate `UserContext`/identity types and compatibility imports exist in
     legacy services. They should be consolidated only after the public seams
     are proven.
+16. After LIFF session issuance, `requireLiffWorkforceSession()` revalidates
+    User/Employee state and id consistency but does not reread `LineAccountLink`.
+    The repository has no normal production unlink/update flow that would
+    otherwise define the expected per-request behavior. Any future link
+    revalidation decision must be explicit and compatibility/security reviewed;
+    J3 does not automatically add it.
 
 ## 22. Capability-shape and ownership decisions
 
@@ -1341,10 +1389,14 @@ The documentation-only closure was verified as follows:
   passed: `Architecture check passed: checked 959 repository source file(s)
   for module boundaries.`
 - `git diff --check` passed.
-- A changed-path audit found only `CONTEXT.md`, `modules/README.md`, the two
-  status architecture documents, and this migration record. No runtime source,
-  Prisma schema/migration, generated file, package manifest, or lockfile
-  changed.
+- A changed-path audit against the audited I3 baseline found exactly these seven
+  files: `CONTEXT.md`, `docs/architecture/audit-migration.md`,
+  `docs/architecture/auth-session-identity-migration.md`,
+  `docs/architecture/dependency-rules.md`,
+  `docs/architecture/modular-monolith.md`,
+  `docs/architecture/module-boundaries.md`, and `modules/README.md`. No
+  runtime source, Prisma schema/migration, generated file, package manifest,
+  or lockfile changed.
 - All changed text files are UTF-8 without BOM. Existing edited documentation
   files retain CRLF line endings; the new migration record is UTF-8 without
   BOM with LF line endings. No replacement-character/mojibake marker was
