@@ -58,11 +58,14 @@ describe("GET /api/routines/summary", () => {
         expect(mocks.getSummary).toHaveBeenNthCalledWith(2, expect.objectContaining({ scope: "all" }));
     });
 
-    it("rejects a regular user's request for the all scope before querying", async () => {
+    it("allows a regular user's request for the all scope", async () => {
         const response = await GET(new NextRequest("http://localhost/api/routines/summary?scope=all"));
 
-        expect(response.status).toBe(403);
-        expect(mocks.getSummary).not.toHaveBeenCalled();
+        expect(response.status).toBe(200);
+        expect(mocks.getSummary).toHaveBeenCalledWith(expect.objectContaining({
+            scope: "all",
+            employeeId: 21,
+        }));
     });
 
     it("rejects an invalid scope", async () => {

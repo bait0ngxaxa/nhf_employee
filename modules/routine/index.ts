@@ -10,7 +10,10 @@ export {
     getRoutineReminderScheduledFor,
     toBangkokCalendarDate,
 } from "./domain/schedule";
-export type { RoutineTaskDetailResult } from "./application/queries";
+export type {
+    RoutineTaskDetailResult,
+    SerializedRoutineTaskWorkItem,
+} from "./application/queries";
 export type { RoutineSchedulerResult } from "./application/scheduler";
 
 export {
@@ -60,6 +63,12 @@ export {
     getRoutineTaskById,
     getRoutineTasks,
 } from "./application/queries";
+export {
+    prepareRoutineTaskExport,
+} from "./infrastructure/reports/routine-export";
+export type {
+    RoutineExportPreparation,
+} from "./infrastructure/reports/routine-export";
 export {
     createRoutineTask,
     createRoutineTaskInTransaction,

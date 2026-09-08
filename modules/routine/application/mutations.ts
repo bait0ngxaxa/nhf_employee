@@ -643,6 +643,11 @@ export async function updateRoutineTask(
 
         const canChangeLifecycle =
             authorization.isAdmin || current.createdById === actor.id;
+        const authorizationSource = authorization.isAdmin
+            ? "ADMIN"
+            : current.createdById === actor.id
+                ? "CREATOR"
+                : "ASSIGNEE";
         const normalizedInput = normalizeRoutineTaskUpdateInput(
             input,
             authorization,
@@ -791,6 +796,7 @@ export async function updateRoutineTask(
                     (assignee) => assignee.employeeId,
                 ) ?? current.assignees.map((assignee) => assignee.employeeId),
                 ownershipMode: authorization.isAdmin ? "ADMIN" : "SELF_SERVICE",
+                authorizationSource,
                 createdById: current.createdById,
                 assigneesChanged,
                 reminderRulesChanged,

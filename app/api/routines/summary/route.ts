@@ -25,12 +25,6 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
                 { status: 400 },
             );
         }
-        if (parsed.data.scope === "all" && auth.user.role !== "ADMIN") {
-            return NextResponse.json(
-                { error: "คุณไม่มีสิทธิ์ดูสรุป Routine ทั้งหมด" },
-                { status: 403 },
-            );
-        }
         const actor = createRoutineCommandActor(
             {
                 id: auth.user.id,

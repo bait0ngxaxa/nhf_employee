@@ -68,6 +68,33 @@ describe("DELETE /api/routines/tasks/:id", () => {
         );
     });
 
+    it("allows an active workforce user to fetch an unrelated task for reference", async () => {
+        mocks.requireActiveWorkforceOrAdminSession.mockResolvedValue({
+            ok: true,
+            user: { id: 6, email: "other@example.com", role: "USER" },
+            employeeId: 42,
+        });
+        mocks.getTask.mockResolvedValue({
+            id: 71,
+            canEdit: false,
+            canDelete: false,
+        });
+
+        const response = await GET(
+            new NextRequest("http://localhost/api/routines/tasks/71"),
+            { params: Promise.resolve({ id: "71" }) },
+        );
+
+        expect(response.status).toBe(200);
+        expect(mocks.getTask).toHaveBeenCalledWith(
+            71,
+            expect.objectContaining({
+                actor: expect.objectContaining({ id: 6, role: "USER" }),
+                employeeId: 42,
+            }),
+        );
+    });
+
     it("passes an authorized assignee PATCH to the service with the authenticated actor", async () => {
         mocks.requireActiveWorkforceOrAdminSession.mockResolvedValue({
             ok: true,

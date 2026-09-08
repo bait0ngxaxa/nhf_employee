@@ -331,6 +331,25 @@ describe("formatAuditLogDisplay", () => {
         expect(result.summary).not.toContain("version");
     });
 
+    it("formats Routine task exports with a human-readable count", () => {
+        const result = formatAuditLogDisplay({
+            action: "DATA_EXPORT",
+            entityType: "RoutineTask",
+            entityId: null,
+            details: {
+                metadata: {
+                    entityType: "RoutineTask",
+                    recordCount: 125,
+                    filters: { scope: "all", format: "xlsx" },
+                },
+            },
+        });
+
+        expect(result.entityReference).toBe("แม่แบบงานประจำ");
+        expect(result.summary).toBe("ส่งออกรายการงานประจำ 125 รายการ");
+        expect(result.summary).not.toContain("recordCount");
+    });
+
     it("does not expose sensitive values nested in unsupported structures", () => {
         const result = formatAuditLogDisplay({
             action: "USER_UPDATE",

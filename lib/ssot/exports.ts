@@ -11,4 +11,8 @@ export const EXPORT_LIMITS = {
         maxRows: 5000,
         batchSize: 250,
     },
+    routine: {
+        maxRows: 2000,
+        batchSize: 100,
+    },
 } as const;

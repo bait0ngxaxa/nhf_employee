@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useId, useMemo, useRef, useState } from "react";
-import { X } from "lucide-react";
+import { Download, X } from "lucide-react";
 import { toast } from "sonner";
 import { useSearchParams } from "next/navigation";
 import useSWR from "swr";
@@ -15,6 +15,7 @@ import { Input } from "@/components/ui/input";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { API_ROUTES } from "@/lib/ssot/routes";
 import { isAdminRole } from "@/lib/ssot/permissions";
+import { triggerDownload } from "@/lib/helpers/download";
 import type { RoutineTaskStatusFilter } from "../../schemas/routine";
 
 import { RoutineKpiGrid } from "./RoutineKpiGrid";
@@ -47,11 +48,13 @@ async function fetchRoutine<T>(url: string): Promise<T> {
 
 function RoutineOccurrencePanel({
     isAdmin,
+    scope,
     taskId,
     occurrenceId,
     onTaskSaved,
 }: {
     isAdmin: boolean;
+    scope: "mine" | "all";
     taskId: number | null;
     occurrenceId: number | null;
     onTaskSaved: () => void;
@@ -68,7 +71,6 @@ function RoutineOccurrencePanel({
     const categoryFilterId = useId();
     const timingFilterId = useId();
     const referenceErrorId = useId();
-    const scope = isAdmin ? "all" : "mine";
     const key = useMemo(() => {
         const params = new URLSearchParams({
             scope,
@@ -434,14 +436,18 @@ export function RoutineSection() {
     const [activeTab, setActiveTab] = useState("mine");
     const [summaryScope, setSummaryScope] = useState<"mine" | "all">("mine");
     const safeTab = isAdmin
-        ? activeTab
-        : activeTab === "manage"
-            ? "manage"
+        ? activeTab === "mine"
+            || activeTab === "all"
+            || activeTab === "settings"
+            || activeTab === "import"
+            ? activeTab
+            : "mine"
+        : activeTab === "mine" || activeTab === "all" || activeTab === "manage"
+            ? activeTab
             : "mine";
     useEffect(() => {
-        if (safeTab === "mine") setSummaryScope("mine");
-        if (safeTab === "all" && isAdmin) setSummaryScope("all");
-    }, [isAdmin, safeTab]);
+        setSummaryScope(safeTab === "all" ? "all" : "mine");
+    }, [safeTab]);
     const summaryKey = `${API_ROUTES.routines.summary}?scope=${summaryScope}`;
     const {
         data: summaryData,
@@ -453,15 +459,16 @@ export function RoutineSection() {
     });
 
     useEffect(() => {
-        if (isAdmin && (taskId !== null || occurrenceId !== null)) setActiveTab("all");
-    }, [isAdmin, occurrenceId, taskId]);
+        if (taskId !== null || occurrenceId !== null) setActiveTab("all");
+    }, [occurrenceId, taskId]);
 
     useEffect(() => {
         const requestedTab = searchParams.get("routineTab");
         if (
             requestedTab === "mine"
+            || requestedTab === "all"
             || (!isAdmin && requestedTab === "manage")
-            || (isAdmin && (requestedTab === "all" || requestedTab === "settings" || requestedTab === "import"))
+            || (isAdmin && (requestedTab === "settings" || requestedTab === "import"))
         ) {
             setActiveTab(requestedTab);
         }
@@ -471,13 +478,12 @@ export function RoutineSection() {
         {
             value: "mine",
             label: "รายการของฉัน",
-            content: <RoutineOccurrencePanel isAdmin={false} taskId={taskId} occurrenceId={occurrenceId} onTaskSaved={() => undefined} />,
+            content: <RoutineOccurrencePanel scope="mine" isAdmin={isAdmin} taskId={taskId} occurrenceId={occurrenceId} onTaskSaved={() => void mutateSummary()} />,
         },
         {
             value: "all",
-            label: "รายการทั้งหมด (Admin)",
-            visible: isAdmin,
-            content: <RoutineOccurrencePanel isAdmin taskId={taskId} occurrenceId={occurrenceId} onTaskSaved={() => void mutateSummary()} />,
+            label: "รายการทั้งหมด",
+            content: <RoutineOccurrencePanel scope="all" isAdmin={isAdmin} taskId={taskId} occurrenceId={occurrenceId} onTaskSaved={() => void mutateSummary()} />,
         },
         {
             value: "manage",
@@ -504,6 +510,20 @@ export function RoutineSection() {
             <SectionHeader
                 title="NHF Routine"
                 subtitle="รวมรายการ Routine ตามกำหนดเวลา ผู้รับผิดชอบ และการแจ้งเตือนที่เกี่ยวข้อง"
+                extra={(
+                    <Button
+                        type="button"
+                        variant="outline"
+                        className="border-brand-border text-brand-strong hover:bg-brand-surface-strong hover:text-brand-strong"
+                        onClick={() => triggerDownload(`${API_ROUTES.routines.export}?format=xlsx`)}
+                        aria-label="ส่งออก Excel รายการทั้งหมด"
+                        title="ส่งออกรายการทั้งหมด"
+                    >
+                        <Download aria-hidden="true" />
+                        ส่งออก Excel
+                        <span className="text-xs font-normal text-content-muted">รายการทั้งหมด</span>
+                    </Button>
+                )}
             />
             <RoutineKpiGrid
                 summary={summaryData?.summary}

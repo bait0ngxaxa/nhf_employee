@@ -397,6 +397,7 @@ export const API_ROUTES = {
     routines: {
         summary: "/api/routines/summary",
         occurrences: "/api/routines/occurrences",
+        export: "/api/routines/export",
         occurrenceById: (id: number | string): string =>
             `/api/routines/occurrences/${id}`,
         occurrenceDueDateById: (id: number | string): string =>

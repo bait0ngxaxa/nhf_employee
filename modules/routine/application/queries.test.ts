@@ -30,9 +30,17 @@ function asNever<T>(value: T): never {
     return value as unknown as never;
 }
 
-function taskRow(id: number, employeeId = 21): Record<string, unknown> {
+function taskRow(
+    id: number,
+    employeeId = 21,
+    createdById = 99,
+): Record<string, unknown> {
     return {
         id,
+        createdById,
+        sourceFileName: null,
+        sourceSheet: null,
+        sourceRow: null,
         title: `งาน ${id}`,
         description: null,
         scheduleType: "MONTHLY_DAY",
@@ -427,6 +435,25 @@ describe("NHF Routine query authorization", () => {
         );
     });
 
+    it("allows a regular user to summarize the all-task scope", async () => {
+        await getRoutineSummary({
+            actor: {
+                id: 5,
+                email: "user@example.com",
+                role: "USER",
+            },
+            employeeId: 21,
+            scope: "all",
+        });
+
+        expect(prismaMock.routineTask.findMany).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: { isActive: true },
+                select: { id: true },
+            }),
+        );
+    });
+
     it("returns one task row and the nearest relevant occurrence", async () => {
         const today = getCurrentBangkokDate();
         prismaMock.routineTask.findMany.mockResolvedValue(asNever([
@@ -477,6 +504,30 @@ describe("NHF Routine query authorization", () => {
                 }),
             }),
         );
+    });
+
+    it("returns all active tasks for a regular user's all-task scope with per-task capabilities", async () => {
+        prismaMock.routineTask.findMany.mockResolvedValue(asNever([
+            taskRow(71, 42, 5),
+            taskRow(72, 21, 99),
+            taskRow(73, 42, 99),
+        ]));
+        prismaMock.routineTask.count.mockResolvedValue(3);
+        prismaMock.routineOccurrence.findMany.mockResolvedValue(asNever([]));
+
+        const result = await getRoutineTaskWorkItems(
+            { scope: "all", page: 1, limit: 20 },
+            { actor: { id: 5, email: "user@example.com", role: "USER" }, employeeId: 21 },
+        );
+
+        expect(prismaMock.routineTask.findMany).toHaveBeenCalledWith(
+            expect.objectContaining({ where: { isActive: true } }),
+        );
+        expect(result.tasks.map((task) => ({ id: task.id, canEdit: task.canEdit }))).toEqual([
+            { id: 71, canEdit: true },
+            { id: 72, canEdit: true },
+            { id: 73, canEdit: false },
+        ]);
     });
 
     it("keeps a MANUAL task with no occurrence in the operational list", async () => {
@@ -677,7 +728,7 @@ describe("NHF Routine query authorization", () => {
         );
     });
 
-    it("denies focused access when the occurrence assignee is inactive", async () => {
+    it("denies focused mine access when the occurrence assignee is inactive", async () => {
         prismaMock.routineOccurrence.findUnique.mockResolvedValue(asNever({
             taskId: 71,
             task: { isActive: true },
@@ -686,7 +737,7 @@ describe("NHF Routine query authorization", () => {
 
         const result = await getRoutineTaskWorkItems(
             {
-                scope: "all",
+                scope: "mine",
                 taskId: 71,
                 occurrenceId: 99,
                 page: 1,
@@ -817,12 +868,12 @@ describe("NHF Routine query authorization", () => {
         expect(prismaMock.routineTask.findMany).not.toHaveBeenCalled();
     });
 
-    it("combines unit and category filters with the regular user's Task scope", async () => {
+    it("combines unit and category filters with the regular user's mine Task scope", async () => {
         prismaMock.routineTask.findMany.mockResolvedValue(asNever([taskRow(71)]));
         prismaMock.routineTask.count.mockResolvedValue(1);
 
         await getRoutineTaskWorkItems(
-            { scope: "all", unitId: 3, categoryId: 5, page: 1, limit: 20 },
+            { scope: "mine", unitId: 3, categoryId: 5, page: 1, limit: 20 },
             { actor: { id: 5, email: "user@example.com", role: "USER" }, employeeId: 21 },
         );
 
@@ -994,32 +1045,38 @@ describe("NHF Routine query authorization", () => {
         );
     });
 
-    it("returns 404-compatible detail queries for an unrelated user's task", async () => {
-        prismaMock.routineTask.findFirst.mockResolvedValue(null);
+    it("allows an active workforce user to read an unrelated task without edit access", async () => {
+        prismaMock.routineTask.findFirst.mockResolvedValue(asNever({
+            ...taskRow(71, 42, 99),
+            unitId: 1,
+            categoryId: 1,
+            version: 2,
+            updatedById: 99,
+            createdAt: new Date("2026-08-01T00:00:00.000Z"),
+            updatedAt: new Date("2026-08-01T00:00:00.000Z"),
+            sourceFileName: "internal-import.xlsx",
+            sourceSheet: "งานประจำ",
+            sourceRow: 12,
+            occurrences: [],
+        }));
 
-        await expect(
-            getRoutineTaskById(71, {
-                actor: { id: 5, email: "user@example.com", role: "USER" },
-                employeeId: 21,
-            }),
-        ).rejects.toMatchObject({ statusCode: 404, code: "NOT_FOUND" });
+        const result = await getRoutineTaskById(71, {
+            actor: { id: 5, email: "user@example.com", role: "USER" },
+            employeeId: 21,
+        });
+
+        expect(result).toMatchObject({
+            id: 71,
+            canEdit: false,
+            canDelete: false,
+            sourceFileName: null,
+            sourceSheet: null,
+            sourceRow: null,
+        });
 
         expect(prismaMock.routineTask.findFirst).toHaveBeenCalledWith(
             expect.objectContaining({
-                where: {
-                    id: 71,
-                    OR: [
-                        { createdById: 5 },
-                        {
-                            assignees: {
-                                some: {
-                                    employeeId: 21,
-                                    employee: expect.any(Object),
-                                },
-                            },
-                        },
-                    ],
-                },
+                where: { id: 71 },
             }),
         );
     });

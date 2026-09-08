@@ -27,7 +27,7 @@ import type {
     RoutineTaskFilters,
 } from "../schemas/routine";
 
-import { RoutineForbiddenError, RoutineNotFoundError } from "./errors";
+import { RoutineNotFoundError } from "./errors";
 import { isRoutineAdminActor } from "./authorization";
 import { resolveRelevantRoutineOccurrences } from "./relevant-occurrence";
 import type { RoutineQueryActor } from "./types";
@@ -365,9 +365,8 @@ function buildWorkOccurrenceWhere(
 function buildTaskAssigneeWhere(
     filters: RoutineOccurrenceFilters,
     employeeId: number | null,
-    isAdmin: boolean,
 ): Prisma.RoutineTaskWhereInput {
-    const shouldScopeToMine = !isAdmin || filters.scope === "mine";
+    const shouldScopeToMine = filters.scope !== "all";
     const assigneeId = shouldScopeToMine
         ? employeeId
         : filters.assigneeId ?? null;
@@ -385,11 +384,10 @@ function buildTaskAssigneeWhere(
 function buildTaskWhere(
     filters: RoutineOccurrenceFilters,
     employeeId: number | null,
-    isAdmin: boolean,
 ): Prisma.RoutineTaskWhereInput {
     return {
         ...buildTaskMetadataWhere(filters),
-        ...buildTaskAssigneeWhere(filters, employeeId, isAdmin),
+        ...buildTaskAssigneeWhere(filters, employeeId),
     };
 }
 
@@ -454,6 +452,23 @@ function getRoutineTaskCapabilities(
     });
 }
 
+function redactRoutineSourceMetadata<T extends {
+    sourceFileName: string | null;
+    sourceSheet: string | null;
+    sourceRow: number | null;
+}>(task: T, queryActor: RoutineQueryActor): T {
+    if (isRoutineAdminActor(queryActor.actor.role, queryActor.actor.mode)) {
+        return task;
+    }
+
+    return {
+        ...task,
+        sourceFileName: null,
+        sourceSheet: null,
+        sourceRow: null,
+    };
+}
+
 function activeEmployeeWhere(): Prisma.EmployeeWhereInput {
     return {
         status: "ACTIVE",
@@ -476,7 +491,6 @@ type RoutineFocusResolution =
 async function resolveRoutineFocus(
     filters: RoutineOccurrenceFilters,
     employeeId: number | null,
-    isAdmin: boolean,
 ): Promise<RoutineFocusResolution> {
     if (filters.occurrenceId === undefined) return { kind: "NONE" };
     if (filters.taskId === undefined) return { kind: "DENIED" };
@@ -490,7 +504,7 @@ async function resolveRoutineFocus(
     });
     if (!occurrence) {
         const fallbackTask = await prisma.routineTask.findFirst({
-            where: buildTaskWhere(filters, employeeId, isAdmin),
+            where: buildTaskWhere(filters, employeeId),
             select: { id: true },
         });
         return fallbackTask
@@ -500,7 +514,7 @@ async function resolveRoutineFocus(
     if (!occurrence.task.isActive || occurrence.taskId !== filters.taskId) {
         return { kind: "DENIED" };
     }
-    if (isAdmin && filters.scope !== "mine") {
+    if (filters.scope === "all") {
         return { kind: "AUTHORIZED_OCCURRENCE", taskId: occurrence.taskId };
     }
     if (employeeId === null) return { kind: "DENIED" };
@@ -682,16 +696,11 @@ export async function getRoutineTaskWorkItems(
     tasks: SerializedRoutineTaskWorkItem[];
     pagination: RoutinePagination;
 }> {
-    const isAdmin = isRoutineAdminActor(
-        queryActor.actor.role,
-        queryActor.actor.mode,
-    );
     const employeeId = await resolveActorEmployeeId(queryActor);
     const today = getCurrentBangkokDate();
     const focus = await resolveRoutineFocus(
         filters,
         employeeId,
-        isAdmin,
     );
     if (focus.kind === "DENIED") {
         return {
@@ -708,7 +717,7 @@ export async function getRoutineTaskWorkItems(
     const taskWhere: Prisma.RoutineTaskWhereInput = {
         ...(hasAuthorizedFocus
             ? buildTaskMetadataWhere(filters)
-            : buildTaskWhere(filters, employeeId, isAdmin)),
+            : buildTaskWhere(filters, employeeId)),
         ...(focus.kind !== "NONE" ? { id: focus.taskId } : {}),
     };
     const hasValidFocus =
@@ -808,7 +817,7 @@ export async function getRoutineTaskWorkItems(
         )
     ) {
         const fallbackTask = await prisma.routineTask.findFirst({
-            where: buildTaskWhere(filters, employeeId, isAdmin),
+            where: buildTaskWhere(filters, employeeId),
             select: { id: true },
         });
         if (!fallbackTask) {
@@ -907,9 +916,6 @@ export async function getRoutineSummary(
     );
     const employeeId = await resolveActorEmployeeId(queryActor);
     const scope = queryActor.scope ?? (isAdmin ? "all" : "mine");
-    if (!isAdmin && scope === "all") {
-        throw new RoutineForbiddenError("คุณไม่มีสิทธิ์ดูสรุป Routine ทั้งหมด");
-    }
     const today = getCurrentBangkokDate();
     const nextThirtyDays = addCalendarDays(today, 30);
 
@@ -920,7 +926,6 @@ export async function getRoutineSummary(
             limit: 1,
         },
         employeeId,
-        isAdmin,
     );
     const taskRows = await prisma.routineTask.findMany({
         where: taskWhere,
@@ -1012,7 +1017,7 @@ export async function getRoutineTasks(
 
     return {
         tasks: tasks.map((task) => ({
-            ...task,
+            ...redactRoutineSourceMetadata(task, queryActor),
             ...getRoutineTaskCapabilities(task, queryActor),
         })),
         pagination: {
@@ -1060,12 +1065,10 @@ export async function getRoutineTaskById(
     taskId: number,
     queryActor: RoutineQueryActor,
 ): Promise<RoutineTaskDetailResult> {
-    const task = await findRoutineTaskDetail(taskId, {
-        id: taskId,
-        ...buildRoutineTaskAccessWhere(queryActor),
-    });
+    const task = await findRoutineTaskDetail(taskId, { id: taskId });
+    const visibleTask = redactRoutineSourceMetadata(task, queryActor);
     return {
-        ...task,
+        ...visibleTask,
         ...getRoutineTaskCapabilities(task, queryActor),
     };
 }

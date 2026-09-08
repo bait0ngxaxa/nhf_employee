@@ -694,6 +694,7 @@ describe("NHF Routine mutations", () => {
             before: { unitName: "มสช.", categoryName: "อื่น ๆ" },
             after: { unitName: "มสช.", categoryName: "อื่น ๆ" },
             reminderRulesChanged: true,
+            authorizationSource: "ADMIN",
         });
         expect(display.summary).toContain("เปลี่ยนการแจ้งเตือน");
     });
@@ -922,6 +923,7 @@ describe("NHF Routine mutations", () => {
         expect(auditData).toMatchObject({ userId: 3, entityId: 71 });
         expect(JSON.parse(String(auditData?.details))).toMatchObject({
             createdById: 99,
+            authorizationSource: "ASSIGNEE",
         });
     });
 
@@ -986,6 +988,7 @@ describe("NHF Routine mutations", () => {
         const auditData = prismaMock.auditLog.create.mock.calls[0]?.[0]?.data;
         expect(JSON.parse(String(auditData?.details))).toMatchObject({
             isActiveChanged: false,
+            authorizationSource: "ASSIGNEE",
         });
     });
 
@@ -1035,6 +1038,10 @@ describe("NHF Routine mutations", () => {
             where: { taskId: 71 },
             data: { reminderVersion: { increment: 1 } },
         });
+        const auditData = prismaMock.auditLog.create.mock.calls[0]?.[0]?.data;
+        expect(JSON.parse(String(auditData?.details))).toMatchObject({
+            authorizationSource: "CREATOR",
+        });
     });
 
     it("allows a non-admin creator to reactivate their task", async () => {
@@ -1075,6 +1082,10 @@ describe("NHF Routine mutations", () => {
         expect(
             prismaMock.routineTask.updateMany.mock.calls[0]?.[0]?.data,
         ).toMatchObject({ isActive: false });
+        const auditData = prismaMock.auditLog.create.mock.calls[0]?.[0]?.data;
+        expect(JSON.parse(String(auditData?.details))).toMatchObject({
+            authorizationSource: "ADMIN",
+        });
     });
 
     it("returns a conflict when an assigned employee submits a stale task version", async () => {

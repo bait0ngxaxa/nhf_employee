@@ -676,6 +676,9 @@ function formatDataExportSummary(
         const yearText = year === null ? "" : ` ปี ${year.toLocaleString("th-TH", { useGrouping: false })}`;
         return `ส่งออกรายงานเบิกวัสดุ${yearText}${countText}`;
     }
+    if (entityType === "RoutineTask") {
+        return `ส่งออกรายการงานประจำ${countText}`;
+    }
 
     return null;
 }
