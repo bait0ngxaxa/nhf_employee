@@ -1719,11 +1719,12 @@ Auth server entry, Auth presentation deep imports, deleted legacy browser
 paths, and direct/transitive Auth client graph dependencies on Prisma,
 server-only packages (including the repository's actual `bcryptjs` package),
 Node built-ins, server Auth infrastructure, or the Auth server index. Auth
-presentation deep-import violations direct external consumers to
+presentation deep-import violations direct consumers outside the Auth module to
 `@/modules/auth/client`, while server Auth deep imports continue to direct
 consumers to `@/modules/auth`. Fixture tests cover rejected Client Component
 imports, transitive Prisma/`next/headers`/`bcryptjs`/server-entry reachability,
-deep imports, the allowed browser entry/graph, and the legacy path guard.
+deep imports (including cross-module presentation consumers), the allowed browser
+entry/graph, and the legacy path guard.
 
 Verification completed for J2:
 
@@ -1731,11 +1732,11 @@ Verification completed for J2:
   checked.
 - `npm.cmd run lint:strict` — passed with zero warnings.
 - `npm.cmd run typecheck` — passed.
-- Focused J2 review-correction suites — passed; 9 files and 227 tests covering
+- Focused J2 review-correction suites — passed; 9 files and 228 tests covering
   generic account resolution, legacy API/admin compatibility, `/api/auth/me`,
   current-user composition, Auth browser transport/provider, Employee/Leave
   projections, and the architecture checker.
-- `npm.cmd run test:run` — passed; 249 files and 2,045 tests.
+- `npm.cmd run test:run` — passed; 249 files and 2,046 tests.
 - `npm.cmd run test:integration:mysql` — passed; migrations were current and
   10 integration files/65 tests passed.
 - `git diff --check` — passed.

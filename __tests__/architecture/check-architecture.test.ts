@@ -1540,6 +1540,18 @@ describe("architecture checker module boundaries", () => {
         );
     });
 
+    it("rejects cross-module consumers deep-importing Auth presentation", async () => {
+        const result = await checkFixture(
+            "modules/stock/presentation/example.tsx",
+            'import { useAuth } from "@/modules/auth/presentation/HybridAuthProvider";\n',
+        );
+
+        expect(result.violations).toHaveLength(1);
+        expect(result.violations[0]).toContain(
+            "Auth presentation consumers must use @/modules/auth/client",
+        );
+    });
+
     it("keeps external Auth server deep imports on the server entry", async () => {
         const result = await checkFixture(
             "app/api/example.ts",

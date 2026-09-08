@@ -1855,7 +1855,10 @@ function getBoundaryViolation(owner, target) {
 
     const publicApi = `@/modules/${target.moduleName}`;
 
-    if (owner.kind === "external"
+    const isAuthPresentationConsumer = owner.kind === "external"
+        || (owner.kind === "module" && owner.name !== "auth");
+
+    if (isAuthPresentationConsumer
         && target.moduleName === "auth"
         && target.pathSegments[0] === "presentation") {
         return "Auth presentation consumers must use @/modules/auth/client.";
