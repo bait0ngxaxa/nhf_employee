@@ -7,6 +7,7 @@ import {
     createEmployeeWhereClause,
     findCurrentEmployeeProjection,
     getEmployeeStats,
+    hasEligibleCurrentEmployeeForUser,
 } from "./employee-queries";
 
 vi.mock("@/lib/db/prisma", () => ({ prisma: mockDeep<PrismaClient>() }));
@@ -15,6 +16,24 @@ const prismaMock = prisma as unknown as ReturnType<typeof mockDeep<PrismaClient>
 
 describe("Employee query compatibility", () => {
     beforeEach(() => mockReset(prismaMock));
+
+    it("checks legacy API eligibility with only the linked active Employee", async () => {
+        prismaMock.employee.findFirst.mockResolvedValueOnce({ id: 101 } as never);
+
+        await expect(hasEligibleCurrentEmployeeForUser(41)).resolves.toBe(true);
+        expect(prismaMock.employee.findFirst).toHaveBeenCalledWith({
+            where: {
+                user: { id: 41 },
+                status: "ACTIVE",
+                deletedAt: null,
+            },
+            select: { id: true },
+        });
+
+        prismaMock.employee.findFirst.mockResolvedValueOnce(null);
+
+        await expect(hasEligibleCurrentEmployeeForUser(41)).resolves.toBe(false);
+    });
 
     it("excludes soft-deleted and bootstrap-admin Employees from list queries", () => {
         expect(createEmployeeWhereClause({ page: 1, limit: 10 })).toMatchObject({

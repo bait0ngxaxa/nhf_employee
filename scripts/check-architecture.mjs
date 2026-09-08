@@ -124,6 +124,7 @@ function getArchitectureTarget(specifier, importerPath, rootPath, modulesRoot, s
         return {
             kind: "modules",
             moduleName: moduleSegments[0],
+            pathSegments: moduleSegments.slice(1),
             isPublicEntryPoint: moduleSegments.length === 1
                 || (moduleSegments.length === 2 && moduleSegments[1] === "client"),
         };
@@ -1762,6 +1763,7 @@ function getAuthClientGraphViolations(rootPath) {
     const serverPackages = [
         "@prisma/client",
         "bcrypt",
+        "bcryptjs",
         "nodemailer",
         "@line/bot-sdk",
         "server-only",
@@ -1852,6 +1854,12 @@ function getBoundaryViolation(owner, target) {
     }
 
     const publicApi = `@/modules/${target.moduleName}`;
+
+    if (owner.kind === "external"
+        && target.moduleName === "auth"
+        && target.pathSegments[0] === "presentation") {
+        return "Auth presentation consumers must use @/modules/auth/client.";
+    }
 
     if (target.isPublicEntryPoint) {
         return null;

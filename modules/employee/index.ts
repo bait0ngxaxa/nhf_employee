@@ -5,6 +5,7 @@ export {
     updateEmployeeSchema,
 } from "./schemas/employee";
 export {
+    hasEligibleCurrentEmployeeForUser,
     findCurrentEmployeeProjection,
     listEmployees,
     getEmployeeStats,

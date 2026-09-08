@@ -1536,6 +1536,18 @@ describe("architecture checker module boundaries", () => {
 
         expect(result.violations).toHaveLength(1);
         expect(result.violations[0]).toContain(
+            "Auth presentation consumers must use @/modules/auth/client",
+        );
+    });
+
+    it("keeps external Auth server deep imports on the server entry", async () => {
+        const result = await checkFixture(
+            "app/api/example.ts",
+            'import { x } from "@/modules/auth/infrastructure/persistence/account-repository";\n',
+        );
+
+        expect(result.violations).toHaveLength(1);
+        expect(result.violations[0]).toContain(
             'external consumers must use the target module public API "@/modules/auth"',
         );
     });
@@ -1553,6 +1565,24 @@ describe("architecture checker module boundaries", () => {
 
         expect(result.violations).toHaveLength(1);
         expect(result.violations[0]).toContain("@prisma/client");
+        expect(result.violations[0]).toContain(
+            "Server-only runtime dependency is reachable from @/modules/auth/client",
+        );
+    });
+
+    it("rejects a transitive bcryptjs runtime dependency from the Auth client graph", async () => {
+        const rootPath = await createFixture({
+            ...fixtureFiles,
+            "modules/auth/client.ts": '"use client"; export { x } from "./presentation/example";\n',
+            "modules/auth/presentation/example.ts": [
+                'import bcrypt from "bcryptjs";',
+                "export const x = bcrypt;",
+            ].join("\n"),
+        });
+        const result = checkArchitecture({ repositoryRoot: rootPath });
+
+        expect(result.violations).toHaveLength(1);
+        expect(result.violations[0]).toContain("bcryptjs");
         expect(result.violations[0]).toContain(
             "Server-only runtime dependency is reachable from @/modules/auth/client",
         );

@@ -1668,14 +1668,27 @@ inactive, suspended, or deleted Employee state remains unauthorized.
 
 ### 28.3 Server authorization and SSR
 
-`lib/auth/server.ts` is now a thin generic account-session compatibility
-adapter. `lib/auth/api.ts` and `lib/auth/context.ts` remain thin response and
-numeric-context adapters for their existing route consumers; they no longer
+`lib/auth/server.ts` is the legacy API-session compatibility adapter. It first
+resolves the generic Auth account and then applies the Employee-owned
+`hasEligibleCurrentEmployeeForUser()` contract. Therefore generic
+`resolveAuthenticatedAccount()` may accept a valid active User without an
+Employee, while `getApiAuthSession()`, `requireApiSession()`, and
+`requireAdminSession()` preserve their pre-J2 requirement for an eligible
+active, non-deleted Employee until each consumer is explicitly audited and
+migrated. The compatibility query checks only Employee eligibility; it does
+not pull Department or Leave data. No J2 authorization widening was
+introduced. `lib/auth/api.ts` and `lib/auth/context.ts` remain thin response
+and numeric-context adapters for their existing route consumers; they no longer
 own the broad projection. `lib/auth/workforce.ts` keeps the explicit active
 Employee requirement and preserves canonical Employee display names for
-workforce routes. Generic admin authorization remains server-side and uses the
-current DB role from the Auth principal, not browser state or the JWT role
-claim.
+workforce routes. Generic admin authorization remains server-side, checks the
+current DB role only after the legacy eligible session is established, and
+never relies on browser state or the JWT role claim.
+
+A repository-wide production audit found that all current
+`getApiAuthSession()`, `requireApiSession()`, and `requireAdminSession()` uses
+remain behind this compatibility seam; no consumer was explicitly migrated to
+a narrower Auth or workforce contract during J2.
 
 Home, login, dashboard layout, and dashboard admin route access now consume
 the composed projection directly. Dashboard SSR redirects and admin gating
@@ -1704,10 +1717,13 @@ browser behavior was moved into the Auth client entry.
 The architecture checker now rejects production client reachability of the
 Auth server entry, Auth presentation deep imports, deleted legacy browser
 paths, and direct/transitive Auth client graph dependencies on Prisma,
-server-only packages, Node built-ins, server Auth infrastructure, or the Auth
-server index. Fixture tests cover rejected Client Component imports,
-transitive Prisma/`next/headers`/server-entry reachability, deep imports, the
-allowed browser entry/graph, and the legacy path guard.
+server-only packages (including the repository's actual `bcryptjs` package),
+Node built-ins, server Auth infrastructure, or the Auth server index. Auth
+presentation deep-import violations direct external consumers to
+`@/modules/auth/client`, while server Auth deep imports continue to direct
+consumers to `@/modules/auth`. Fixture tests cover rejected Client Component
+imports, transitive Prisma/`next/headers`/`bcryptjs`/server-entry reachability,
+deep imports, the allowed browser entry/graph, and the legacy path guard.
 
 Verification completed for J2:
 
@@ -1715,11 +1731,11 @@ Verification completed for J2:
   checked.
 - `npm.cmd run lint:strict` — passed with zero warnings.
 - `npm.cmd run typecheck` — passed.
-- Focused Auth, projection, browser transport, Employee/Leave query,
-  workforce, Dashboard, Stock, Email Request, and architecture suites —
-  passed, including 183 architecture tests and the new projection/transport
-  coverage.
-- `npm.cmd run test:run` — passed; 249 files and 2,037 tests.
+- Focused J2 review-correction suites — passed; 9 files and 227 tests covering
+  generic account resolution, legacy API/admin compatibility, `/api/auth/me`,
+  current-user composition, Auth browser transport/provider, Employee/Leave
+  projections, and the architecture checker.
+- `npm.cmd run test:run` — passed; 249 files and 2,045 tests.
 - `npm.cmd run test:integration:mysql` — passed; migrations were current and
   10 integration files/65 tests passed.
 - `git diff --check` — passed.

@@ -11,6 +11,21 @@ import type {
     PaginatedEmployeesResult,
 } from "../../application/types";
 
+export async function hasEligibleCurrentEmployeeForUser(
+    userId: number,
+): Promise<boolean> {
+    const employee = await prisma.employee.findFirst({
+        where: {
+            user: { id: userId },
+            status: "ACTIVE",
+            deletedAt: null,
+        },
+        select: { id: true },
+    });
+
+    return employee !== null;
+}
+
 export async function findCurrentEmployeeProjection(
     userId: number,
 ): Promise<CurrentEmployeeProjection | null> {
