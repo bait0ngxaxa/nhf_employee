@@ -1045,13 +1045,50 @@ describe("NHF Routine query authorization", () => {
         );
     });
 
-    it("allows an active workforce user to read an unrelated task without edit access", async () => {
+    it("denies an active workforce user from full detail for an unrelated task", async () => {
+        prismaMock.routineTask.findFirst.mockResolvedValue(null);
+
+        await expect(getRoutineTaskById(71, {
+            actor: { id: 5, email: "user@example.com", role: "USER" },
+            employeeId: 21,
+        })).rejects.toMatchObject({ statusCode: 404, code: "NOT_FOUND" });
+
+        expect(prismaMock.routineTask.findFirst).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: {
+                    id: 71,
+                    OR: [
+                        { createdById: 5 },
+                        {
+                            assignees: {
+                                some: {
+                                    employeeId: 21,
+                                    employee: {
+                                        status: "ACTIVE",
+                                        deletedAt: null,
+                                        user: {
+                                            is: {
+                                                isActive: true,
+                                                deletedAt: null,
+                                            },
+                                        },
+                                    },
+                                },
+                            },
+                        },
+                    ],
+                },
+            }),
+        );
+    });
+
+    it("allows the task creator to fetch full detail while redacting source metadata", async () => {
         prismaMock.routineTask.findFirst.mockResolvedValue(asNever({
-            ...taskRow(71, 42, 99),
+            ...taskRow(71, 42, 5),
             unitId: 1,
             categoryId: 1,
             version: 2,
-            updatedById: 99,
+            updatedById: 5,
             createdAt: new Date("2026-08-01T00:00:00.000Z"),
             updatedAt: new Date("2026-08-01T00:00:00.000Z"),
             sourceFileName: "internal-import.xlsx",
@@ -1062,21 +1099,20 @@ describe("NHF Routine query authorization", () => {
 
         const result = await getRoutineTaskById(71, {
             actor: { id: 5, email: "user@example.com", role: "USER" },
-            employeeId: 21,
+            employeeId: null,
         });
 
         expect(result).toMatchObject({
             id: 71,
-            canEdit: false,
-            canDelete: false,
+            canEdit: true,
+            canDelete: true,
             sourceFileName: null,
             sourceSheet: null,
             sourceRow: null,
         });
-
         expect(prismaMock.routineTask.findFirst).toHaveBeenCalledWith(
             expect.objectContaining({
-                where: { id: 71 },
+                where: { id: 71, OR: [{ createdById: 5 }] },
             }),
         );
     });
@@ -1091,6 +1127,9 @@ describe("NHF Routine query authorization", () => {
             updatedById: 99,
             createdAt: new Date("2026-08-01T00:00:00.000Z"),
             updatedAt: new Date("2026-08-01T00:00:00.000Z"),
+            sourceFileName: "internal-import.xlsx",
+            sourceSheet: "งานประจำ",
+            sourceRow: 12,
             occurrences: [],
         };
         prismaMock.routineTask.findFirst.mockResolvedValue(asNever(task));
@@ -1105,7 +1144,70 @@ describe("NHF Routine query authorization", () => {
             createdById: 99,
             canEdit: true,
             canDelete: false,
+            sourceFileName: null,
+            sourceSheet: null,
+            sourceRow: null,
         });
+        expect(prismaMock.routineTask.findFirst).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: {
+                    id: 71,
+                    OR: [
+                        { createdById: 5 },
+                        {
+                            assignees: {
+                                some: {
+                                    employeeId: 21,
+                                    employee: {
+                                        status: "ACTIVE",
+                                        deletedAt: null,
+                                        user: {
+                                            is: {
+                                                isActive: true,
+                                                deletedAt: null,
+                                            },
+                                        },
+                                    },
+                                },
+                            },
+                        },
+                    ],
+                },
+            }),
+        );
+    });
+
+    it("allows an admin to fetch full detail and source metadata", async () => {
+        prismaMock.routineTask.findFirst.mockResolvedValue(asNever({
+            ...taskRow(71, 21, 5),
+            unitId: 1,
+            categoryId: 1,
+            version: 2,
+            updatedById: 99,
+            createdAt: new Date("2026-08-01T00:00:00.000Z"),
+            updatedAt: new Date("2026-08-01T00:00:00.000Z"),
+            sourceFileName: "internal-import.xlsx",
+            sourceSheet: "งานประจำ",
+            sourceRow: 12,
+            occurrences: [],
+        }));
+
+        const result = await getRoutineTaskById(71, {
+            actor: { id: 99, email: "admin@example.com", role: "ADMIN" },
+            employeeId: null,
+        });
+
+        expect(result).toMatchObject({
+            id: 71,
+            canEdit: true,
+            canDelete: true,
+            sourceFileName: "internal-import.xlsx",
+            sourceSheet: "งานประจำ",
+            sourceRow: 12,
+        });
+        expect(prismaMock.routineTask.findFirst).toHaveBeenCalledWith(
+            expect.objectContaining({ where: { id: 71 } }),
+        );
     });
 
     it("allows an active master assignee to view and edit without granting delete", async () => {

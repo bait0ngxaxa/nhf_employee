@@ -68,24 +68,20 @@ describe("DELETE /api/routines/tasks/:id", () => {
         );
     });
 
-    it("allows an active workforce user to fetch an unrelated task for reference", async () => {
+    it("returns not found when an active workforce user fetches an unrelated task detail", async () => {
         mocks.requireActiveWorkforceOrAdminSession.mockResolvedValue({
             ok: true,
             user: { id: 6, email: "other@example.com", role: "USER" },
             employeeId: 42,
         });
-        mocks.getTask.mockResolvedValue({
-            id: 71,
-            canEdit: false,
-            canDelete: false,
-        });
+        mocks.getTask.mockRejectedValueOnce(new RoutineNotFoundError("ไม่พบงานประจำ"));
 
         const response = await GET(
             new NextRequest("http://localhost/api/routines/tasks/71"),
             { params: Promise.resolve({ id: "71" }) },
         );
 
-        expect(response.status).toBe(200);
+        expect(response.status).toBe(404);
         expect(mocks.getTask).toHaveBeenCalledWith(
             71,
             expect.objectContaining({

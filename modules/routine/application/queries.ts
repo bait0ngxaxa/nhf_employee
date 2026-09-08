@@ -1065,7 +1065,10 @@ export async function getRoutineTaskById(
     taskId: number,
     queryActor: RoutineQueryActor,
 ): Promise<RoutineTaskDetailResult> {
-    const task = await findRoutineTaskDetail(taskId, { id: taskId });
+    const task = await findRoutineTaskDetail(taskId, {
+        id: taskId,
+        ...buildRoutineTaskAccessWhere(queryActor),
+    });
     const visibleTask = redactRoutineSourceMetadata(task, queryActor);
     return {
         ...visibleTask,

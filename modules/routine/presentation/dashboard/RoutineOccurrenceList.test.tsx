@@ -161,6 +161,8 @@ describe("RoutineOccurrenceList", () => {
     });
 
     it("opens a read-only detail dialog with complete business information", () => {
+        const fetchMock = vi.fn();
+        vi.stubGlobal("fetch", fetchMock);
         renderList();
 
         fireEvent.click(screen.getByRole("button", { name: "ดูรายละเอียด" }));
@@ -173,6 +175,7 @@ describe("RoutineOccurrenceList", () => {
         expect(dialog).toHaveTextContent("รอบ 2026-08");
         expect(dialog).toHaveTextContent("สมหญิง ใจงาม");
         expect(dialog).not.toHaveTextContent("ข้อมูลนำเข้า (ผู้ดูแลระบบ)");
+        expect(fetchMock).not.toHaveBeenCalled();
     });
 
     it("renders the neutral no-current-round state without inventing completion", () => {
