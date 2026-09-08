@@ -213,3 +213,21 @@ Phase H2 CLOSED — Notification presentation ownership complete.
 Phase H3 CLOSED — Notification producer integration and final migration audit complete.
 
 Notification H0-H3 migration complete. Email Request/IT remains deferred.
+
+## Stock K1 ownership closure
+
+Stock is the single owner of Stock server/business behavior, Dashboard and
+LIFF presentation, browser contracts/helpers, and Stock notification meaning.
+Stock email subjects/templates/Message-ID and LINE Flex/message composition live
+under `modules/stock/**` and call the generic platform transports through
+narrow contracts.
+
+`STOCK_REQUEST_RESULT_LINE` remains personal LINE_APP delivery through
+`LineAccountLink`/`sendAppLineNotification`. `STOCK_REQUEST_LINE` and
+`STOCK_LOW_LINE` remain operational broadcasts through the legacy Stock
+Messaging channel and `LINE_STOCK_CHANNEL_ACCESS_TOKEN`.
+
+The shared Outbox Processor remains platform-owned and delegates Stock event
+interpretation through `@/modules/stock`; it continues to own claim, retry,
+stale-processing, dead-letter, and supersede lifecycle. Email Request and the
+future IT capability remain deferred.

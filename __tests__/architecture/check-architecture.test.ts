@@ -75,6 +75,122 @@ afterEach(async () => {
 });
 
 describe("architecture checker module boundaries", () => {
+    it.each([
+        "@/components/liff/stock/LiffStockApp",
+        "@/lib/client/liff-stock",
+        "@/lib/types/stock-liff",
+    ])("rejects deleted Stock compatibility path %s", async (specifier) => {
+        const result = await checkFixture(
+            "app/example.ts",
+            `import { x } from "${specifier}";`,
+        );
+
+        expect(result.violations).toHaveLength(1);
+        expect(result.violations[0]).toContain("Deleted Stock compatibility path");
+    });
+
+    it.each([
+        "@/modules/stock",
+        "@/modules/stock/presentation/liff/components/LiffStockApp",
+    ])("rejects the wrong Stock LIFF route entry %s", async (specifier) => {
+        const result = await checkFixture(
+            "app/liff/stock/page.tsx",
+            `import { x } from "${specifier}";`,
+        );
+
+        expect(result.violations).toHaveLength(1);
+        expect(result.violations[0]).toContain("Stock LIFF routes must use");
+    });
+
+    it("requires the Stock LIFF route to compose through the client entry", async () => {
+        const result = await checkFixture(
+            "app/liff/stock/page.tsx",
+            "export const x = 1;\n",
+        );
+
+        expect(result.violations).toHaveLength(1);
+        expect(result.violations[0]).toContain(
+            "must consume Stock LIFF presentation through",
+        );
+    });
+
+    it("allows the supported Stock LIFF route entry", async () => {
+        const result = await checkFixture(
+            "app/liff/stock/page.tsx",
+            'import { x } from "@/modules/stock/client";\n',
+        );
+
+        expect(result.violations).toEqual([]);
+    });
+
+    it("rejects Stock LIFF presentation importing its own public barrel", async () => {
+        const result = await checkFixture(
+            "modules/stock/presentation/liff/api.ts",
+            'import { x } from "@/modules/stock/client";\n',
+        );
+
+        expect(result.violations).toHaveLength(1);
+        expect(result.violations[0]).toContain(
+            "Stock LIFF presentation internals must use local contracts",
+        );
+    });
+
+    it("rejects Stock client runtime access to Stock server infrastructure", async () => {
+        const result = await checkFixture(
+            "modules/stock/client.ts",
+            '"use client"; export { x } from "@/modules/stock/application/create-item";\n',
+        );
+
+        expect(result.violations.some((message) =>
+            message.includes("@/modules/stock/client"),
+        )).toBe(true);
+    });
+
+    it("allows type-only Prisma contracts in the Stock client graph", async () => {
+        const result = await checkFixture(
+            "modules/stock/client.ts",
+            '"use client"; import type { StockRequestStatus } from "@prisma/client";\n',
+        );
+
+        expect(result.violations).toEqual([]);
+    });
+
+    it("rejects generic providers importing Stock business composition", async () => {
+        const result = await checkFixture(
+            "lib/email/index.ts",
+            'import { x } from "@/modules/stock/infrastructure/notifications/email";\n',
+        );
+
+        expect(result.violations.some((message) =>
+            message.includes("Generic Email/LINE provider code"),
+        )).toBe(true);
+    });
+
+    it("rejects deep Stock imports from the global Outbox Processor", async () => {
+        const result = await checkFixture(
+            "lib/services/outbox/processor.ts",
+            'import { x } from "@/modules/stock/infrastructure/notifications/outbox";\n',
+        );
+
+        expect(result.violations.some((message) =>
+            message.includes("global Outbox Processor must consume Stock dispatch"),
+        )).toBe(true);
+    });
+
+    it("rejects Stock workflow mappings from the shared status renderer", async () => {
+        const rootPath = await createFixture({
+            ...fixtureFiles,
+            "components/dashboard/shared/RequestStatusBadge.tsx":
+                "const REQUEST_STATUS_META = { PENDING_ISSUE: {} };\n",
+        });
+        const result = await checkArchitecture({ repositoryRoot: rootPath });
+
+        expect(result.violations).toHaveLength(1);
+        expect(result.violations[0]).toContain(
+            "Shared RequestStatusBadge must remain a neutral renderer",
+        );
+    });
+
     const leavePresentationImporters = [
         "app/dashboard/leave/page.tsx",
         "app/dashboard/leave/loading.tsx",

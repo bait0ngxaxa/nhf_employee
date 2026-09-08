@@ -1,8 +1,6 @@
-import {
-    type LineFlexMessage,
-    type StockLowLineData,
-} from "@/types/api";
-import { formatDate } from "../helpers";
+import type { LineFlexMessage } from "@/types/api";
+import type { StockLowLineData } from "../../../contracts/notifications";
+import { formatDate } from "@/lib/line/helpers";
 import {
     STOCK_DASHBOARD_TABS,
     toDashboardStockTabPath,

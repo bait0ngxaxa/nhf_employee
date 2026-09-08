@@ -24,6 +24,7 @@ import {
     getLeavePeriodLabel,
     getLeaveTypeLabel,
 } from "./leave-format";
+import { getLeaveRequestStatusMeta } from "../status-meta";
 
 interface LiffLeaveHistoryProps {
     profile: LiffLeaveProfileResponse;
@@ -164,7 +165,7 @@ function HistoryCard({
                         {getLeavePeriodLabel(request.period)} · {formatLeaveDays(request.durationDays)} วัน
                     </p>
                 </div>
-                <RequestStatusBadge status={request.status} />
+                <RequestStatusBadge meta={getLeaveRequestStatusMeta(request.status)} />
             </div>
             <p className="mt-3 line-clamp-2 break-words text-sm leading-6 text-content-body">
                 {request.reason}

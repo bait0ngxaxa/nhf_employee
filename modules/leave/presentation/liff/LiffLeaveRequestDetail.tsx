@@ -4,6 +4,7 @@ import { AlertTriangle, Check, RotateCcw, X } from "lucide-react";
 import type { ReactElement } from "react";
 
 import { RequestStatusBadge } from "@/components/dashboard/shared/RequestStatusBadge";
+import { getLeaveRequestStatusMeta } from "../status-meta";
 import { Button } from "@/components/ui/button";
 import {
     Sheet,
@@ -60,7 +61,7 @@ export function LiffLeaveRequestDetail({
                                 <SheetTitle className="text-xl font-bold tracking-tight text-content-heading">
                                     {getLeaveTypeLabel(detail.leaveType)}
                                 </SheetTitle>
-                                <RequestStatusBadge status={detail.status} />
+                                <RequestStatusBadge meta={getLeaveRequestStatusMeta(detail.status)} />
                             </div>
                             <SheetDescription className="leading-6 text-content-secondary">
                                 {formatLeaveDateRange(detail.startDate, detail.endDate)} · {getLeavePeriodLabel(detail.period)} · {formatLeaveDays(detail.durationDays)} วัน

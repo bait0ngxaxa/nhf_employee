@@ -5,6 +5,7 @@ import { ClipboardList, Search, X } from "lucide-react";
 import { type StockRequestStatus } from "@prisma/client";
 import { Pagination } from "@/components/Pagination";
 import { RequestStatusBadge } from "@/components/dashboard/shared/RequestStatusBadge";
+import { getStockRequestStatusMeta } from "../../status-meta";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -274,7 +275,7 @@ function RequestRow(props: {
                 </div>
             </TableCell>
             <TableCell className="border-r border-border-subtle py-4">
-                <RequestStatusBadge status={request.status} />
+                <RequestStatusBadge meta={getStockRequestStatusMeta(request.status)} />
             </TableCell>
             <TableCell className={`py-4${showActionColumn ? " border-r border-border-subtle" : ""}`}>
                 <StockRequestNote request={request} />

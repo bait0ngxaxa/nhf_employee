@@ -263,6 +263,17 @@ const deletedLineCompatibilityPaths = [
     "@/lib/line/liff-types",
     "@/lib/line/verify-id-token",
 ];
+const deletedStockCompatibilityPaths = [
+    "@/components/liff/stock",
+    "@/lib/client/liff-stock",
+    "@/lib/types/stock-liff",
+];
+const deletedStockProviderPaths = [
+    "@/lib/email/templates/stock-request-result",
+    "@/lib/line/flex-messages/stock",
+    "@/lib/line/flex-messages/stock-low",
+    "@/lib/line/flex-messages/stock-request-result",
+];
 
 function hasImportPrefix(moduleSpecifier, prefix) {
     return moduleSpecifier === prefix || moduleSpecifier.startsWith(`${prefix}/`);
@@ -316,6 +327,118 @@ function getLeaveRouteDependencyViolation(filePath, rootPath, moduleSpecifier) {
     if (hasImportPrefix(normalizedSpecifier, "@/modules/leave")
         && normalizedSpecifier !== "@/modules/leave") {
         return "Leave API routes must use the server entry @/modules/leave.";
+    }
+
+    return null;
+}
+
+function getStockRouteDependencyViolation(filePath, rootPath, moduleSpecifier) {
+    const resolvedImport = moduleSpecifier.startsWith("@/")
+        ? resolve(rootPath, moduleSpecifier.slice(2))
+        : getImportSourcePath(moduleSpecifier, filePath, rootPath);
+    const normalizedSpecifier = resolvedImport === null
+        ? moduleSpecifier
+        : `@/${relativeFilePath(resolvedImport, rootPath).replace(/\.[cm]?[jt]sx?$/, "")}`;
+    const isStockLiffRoute = pathIsWithin(
+        filePath,
+        resolve(rootPath, "app/liff/stock"),
+    );
+    const isStockLiffPresentation = pathIsWithin(
+        filePath,
+        resolve(rootPath, "modules/stock/presentation/liff"),
+    );
+
+    if (isStockLiffRoute
+        && hasImportPrefix(normalizedSpecifier, "@/modules/stock")
+        && normalizedSpecifier !== "@/modules/stock/client") {
+        return "Stock LIFF routes must use @/modules/stock/client.";
+    }
+
+    if (isStockLiffPresentation
+        && ["@/modules/stock", "@/modules/stock/client"].includes(normalizedSpecifier)) {
+        return "Stock LIFF presentation internals must use local contracts instead of their own public barrel.";
+    }
+
+    return null;
+}
+
+function getStockLiffRouteCompositionViolations(rootPath, sourceFiles) {
+    const routePath = resolve(rootPath, "app/liff/stock/page.tsx");
+    if (!sourceFiles.includes(routePath)) return [];
+
+    const imports = getImports(routePath);
+    const normalizedSpecifiers = imports.map((record) => {
+        const resolvedImport = record.moduleSpecifier.startsWith("@/")
+            ? resolve(rootPath, record.moduleSpecifier.slice(2))
+            : getImportSourcePath(record.moduleSpecifier, routePath, rootPath);
+        return resolvedImport === null
+            ? record.moduleSpecifier
+            : `@/${relativeFilePath(resolvedImport, rootPath).replace(/\.[cm]?[jt]sx?$/, "")}`;
+    });
+
+    if (normalizedSpecifiers.includes("@/modules/stock/client")) return [];
+    if (normalizedSpecifiers.some((specifier) =>
+        hasImportPrefix(specifier, "@/modules/stock")
+        || deletedStockCompatibilityPaths.some((prefix) =>
+            hasImportPrefix(specifier, prefix),
+        ),
+    )) {
+        return [];
+    }
+
+    return [`app/liff/stock/page.tsx must consume Stock LIFF presentation through "@/modules/stock/client".`];
+}
+
+function getDeletedStockCompatibilityViolation(filePath, rootPath, moduleSpecifier) {
+    const resolvedImport = moduleSpecifier.startsWith("@/")
+        ? resolve(rootPath, moduleSpecifier.slice(2))
+        : getImportSourcePath(moduleSpecifier, filePath, rootPath);
+    const normalizedSpecifier = resolvedImport === null
+        ? moduleSpecifier
+        : `@/${relativeFilePath(resolvedImport, rootPath).replace(/\.[cm]?[jt]sx?$/, "")}`;
+    const deletedPath = deletedStockCompatibilityPaths.find((prefix) =>
+        hasImportPrefix(normalizedSpecifier, prefix),
+    );
+
+    return deletedPath === undefined
+        ? null
+        : `Deleted Stock compatibility path "${deletedPath}" must not be imported; use @/modules/stock/client or Stock-owned contracts.`;
+}
+
+function getDeletedStockProviderViolation(filePath, rootPath, moduleSpecifier) {
+    const resolvedImport = moduleSpecifier.startsWith("@/")
+        ? resolve(rootPath, moduleSpecifier.slice(2))
+        : getImportSourcePath(moduleSpecifier, filePath, rootPath);
+    const normalizedSpecifier = resolvedImport === null
+        ? moduleSpecifier
+        : `@/${relativeFilePath(resolvedImport, rootPath).replace(/\.[cm]?[jt]sx?$/, "")}`;
+    const deletedPath = deletedStockProviderPaths.find((prefix) =>
+        hasImportPrefix(normalizedSpecifier, prefix),
+    );
+
+    return deletedPath === undefined
+        ? null
+        : `Deleted Stock provider composition path "${deletedPath}" must not be imported; use Stock-owned notification composition.`;
+}
+
+function getStockProviderDependencyViolation(filePath, rootPath, moduleSpecifier) {
+    const providerRoots = [
+        resolve(rootPath, "lib/email"),
+        resolve(rootPath, "lib/line"),
+    ];
+    if (!providerRoots.some((providerRoot) => pathIsWithin(filePath, providerRoot))) {
+        return null;
+    }
+
+    const resolvedImport = moduleSpecifier.startsWith("@/")
+        ? resolve(rootPath, moduleSpecifier.slice(2))
+        : getImportSourcePath(moduleSpecifier, filePath, rootPath);
+    const normalizedSpecifier = resolvedImport === null
+        ? moduleSpecifier
+        : `@/${relativeFilePath(resolvedImport, rootPath).replace(/\.[cm]?[jt]sx?$/, "")}`;
+
+    if (hasImportPrefix(normalizedSpecifier, "@/modules/stock")) {
+        return "Generic Email/LINE provider code must not import Stock business composition or payload contracts; Stock owns message meaning.";
     }
 
     return null;
@@ -1688,6 +1811,76 @@ function getLineDependencyViolation(filePath, rootPath, moduleSpecifier) {
     return null;
 }
 
+function getStockDependencyViolation(filePath, rootPath, moduleSpecifier) {
+    const stockModuleRoot = resolve(rootPath, "modules/stock");
+    const stockLiffPresentationRoot = resolve(
+        rootPath,
+        "modules/stock/presentation/liff",
+    );
+    if (!pathIsWithin(filePath, stockLiffPresentationRoot)
+        || isTestSource(filePath, rootPath)
+        || filePath === resolve(stockModuleRoot, "index.ts")
+        || filePath === resolve(stockModuleRoot, "client.ts")) {
+        return null;
+    }
+
+    const resolvedImport = moduleSpecifier.startsWith("@/")
+        ? resolve(rootPath, moduleSpecifier.slice(2))
+        : getImportSourcePath(moduleSpecifier, filePath, rootPath);
+    const normalizedSpecifier = resolvedImport === null
+        ? moduleSpecifier
+        : `@/${relativeFilePath(resolvedImport, rootPath).replace(/\.[cm]?[jt]sx?$/, "")}`;
+    if (normalizedSpecifier === "@/modules/stock"
+        || normalizedSpecifier === "@/modules/stock/index"
+        || normalizedSpecifier === "@/modules/stock/client") {
+        return "Stock module internals must use local contracts instead of their own public barrel.";
+    }
+
+    return null;
+}
+
+function getOutboxProcessorStockDependencyViolation(filePath, rootPath, moduleSpecifier) {
+    if (relativeFilePath(filePath, rootPath) !== "lib/services/outbox/processor.ts") {
+        return null;
+    }
+
+    const resolvedImport = moduleSpecifier.startsWith("@/")
+        ? resolve(rootPath, moduleSpecifier.slice(2))
+        : getImportSourcePath(moduleSpecifier, filePath, rootPath);
+    const normalizedSpecifier = resolvedImport === null
+        ? moduleSpecifier
+        : `@/${relativeFilePath(resolvedImport, rootPath).replace(/\.[cm]?[jt]sx?$/, "")}`;
+    if (hasImportPrefix(normalizedSpecifier, "@/modules/stock")
+        && normalizedSpecifier !== "@/modules/stock"
+        && normalizedSpecifier !== "@/modules/stock/index") {
+        return "The global Outbox Processor must consume Stock dispatch through @/modules/stock, not a deep Stock import.";
+    }
+
+    return null;
+}
+
+function getSharedStatusPresentationViolation(rootPath) {
+    const filePath = resolve(
+        rootPath,
+        "components/dashboard/shared/RequestStatusBadge.tsx",
+    );
+    if (!existsSync(filePath)) return null;
+
+    const contents = readFileSync(filePath, "utf8");
+    const featureStatusTokens = [
+        "REQUEST_STATUS_META",
+        "CANCELLATION_REQUESTED",
+        "CANCELLED_AFTER_APPROVAL",
+        "PENDING_ISSUE",
+        "REJECTED_LEGACY",
+    ];
+    if (!featureStatusTokens.some((token) => contents.includes(token))) {
+        return null;
+    }
+
+    return "Shared RequestStatusBadge must remain a neutral renderer; Leave and Stock status metadata belongs to their feature modules.";
+}
+
 function getClientReachableServerEntryViolations(
     rootPath,
     sourceFiles,
@@ -2123,6 +2316,71 @@ function getLineClientGraphViolations(rootPath) {
     return violations;
 }
 
+function getStockClientGraphViolations(rootPath) {
+    const entryPath = resolve(rootPath, "modules/stock/client.ts");
+    if (!existsSync(entryPath)) return [];
+
+    const pending = [entryPath];
+    const visited = new Set();
+    const violations = [];
+    const stockServerRoot = resolve(rootPath, "modules/stock");
+    const serverPackages = [
+        "@prisma/client",
+        "nodemailer",
+        "@line/bot-sdk",
+        "server-only",
+        "next/server",
+        "next/headers",
+        "next/cache",
+    ];
+    const serverDirectories = [
+        "lib/db",
+        "lib/server",
+        "lib/email",
+        "lib/line",
+        "lib/services/outbox",
+        "modules/stock/application",
+        "modules/stock/domain",
+        "modules/stock/infrastructure",
+        "modules/stock/schemas",
+    ];
+
+    while (pending.length > 0) {
+        const filePath = pending.pop();
+        if (filePath === undefined || visited.has(filePath)) continue;
+        visited.add(filePath);
+
+        for (const record of getImports(filePath, true)) {
+            const specifier = record.moduleSpecifier;
+            const { importTarget, sourcePath } = getRuntimeImportTarget(
+                specifier,
+                filePath,
+                rootPath,
+            );
+            const importsStockServerEntry = importTarget === stockServerRoot
+                || (sourcePath !== null
+                    && pathIsWithin(sourcePath, stockServerRoot)
+                    && /^index\.[cm]?[jt]sx?$/.test(relative(stockServerRoot, sourcePath)));
+            if (isBuiltin(specifier)
+                || serverPackages.some((name) => hasImportPrefix(specifier, name))
+                || importsStockServerEntry
+                || (importTarget !== null && serverDirectories.some((directory) =>
+                    pathIsWithin(importTarget, resolve(rootPath, directory))))) {
+                violations.push(describeViolation(
+                    filePath,
+                    rootPath,
+                    record,
+                    "Server-only runtime dependency is reachable from @/modules/stock/client.",
+                ));
+                continue;
+            }
+            if (sourcePath !== null) pending.push(sourcePath);
+        }
+    }
+
+    return violations;
+}
+
 function relativeFilePath(filePath, rootPath) {
     return relative(rootPath, filePath).split(sep).join("/");
 }
@@ -2372,6 +2630,37 @@ function checkArchitecture(options = {}) {
                 continue;
             }
 
+            const deletedStockCompatibilityViolation =
+                getDeletedStockCompatibilityViolation(
+                    filePath,
+                    rootPath,
+                    importRecord.moduleSpecifier,
+                );
+            if (deletedStockCompatibilityViolation !== null) {
+                violations.push(describeViolation(
+                    filePath,
+                    rootPath,
+                    importRecord,
+                    deletedStockCompatibilityViolation,
+                ));
+                continue;
+            }
+
+            const deletedStockProviderViolation = getDeletedStockProviderViolation(
+                filePath,
+                rootPath,
+                importRecord.moduleSpecifier,
+            );
+            if (deletedStockProviderViolation !== null) {
+                violations.push(describeViolation(
+                    filePath,
+                    rootPath,
+                    importRecord,
+                    deletedStockProviderViolation,
+                ));
+                continue;
+            }
+
             const deletedNotificationPresentationViolation =
                 getDeletedNotificationPresentationViolation(
                     filePath,
@@ -2431,6 +2720,21 @@ function checkArchitecture(options = {}) {
                     rootPath,
                     importRecord,
                     leaveRouteDependencyViolation,
+                ));
+                continue;
+            }
+
+            const stockRouteDependencyViolation = getStockRouteDependencyViolation(
+                filePath,
+                rootPath,
+                importRecord.moduleSpecifier,
+            );
+            if (stockRouteDependencyViolation !== null) {
+                violations.push(describeViolation(
+                    filePath,
+                    rootPath,
+                    importRecord,
+                    stockRouteDependencyViolation,
                 ));
                 continue;
             }
@@ -2529,6 +2833,21 @@ function checkArchitecture(options = {}) {
                 continue;
             }
 
+            const stockProviderDependencyViolation = getStockProviderDependencyViolation(
+                filePath,
+                rootPath,
+                importRecord.moduleSpecifier,
+            );
+            if (stockProviderDependencyViolation !== null) {
+                violations.push(describeViolation(
+                    filePath,
+                    rootPath,
+                    importRecord,
+                    stockProviderDependencyViolation,
+                ));
+                continue;
+            }
+
             const authDependencyViolation = getAuthDependencyViolation(
                 filePath,
                 rootPath,
@@ -2555,6 +2874,37 @@ function checkArchitecture(options = {}) {
                     rootPath,
                     importRecord,
                     lineDependencyViolation,
+                ));
+                continue;
+            }
+
+            const stockDependencyViolation = getStockDependencyViolation(
+                filePath,
+                rootPath,
+                importRecord.moduleSpecifier,
+            );
+            if (stockDependencyViolation !== null) {
+                violations.push(describeViolation(
+                    filePath,
+                    rootPath,
+                    importRecord,
+                    stockDependencyViolation,
+                ));
+                continue;
+            }
+
+            const outboxProcessorStockDependencyViolation =
+                getOutboxProcessorStockDependencyViolation(
+                    filePath,
+                    rootPath,
+                    importRecord.moduleSpecifier,
+                );
+            if (outboxProcessorStockDependencyViolation !== null) {
+                violations.push(describeViolation(
+                    filePath,
+                    rootPath,
+                    importRecord,
+                    outboxProcessorStockDependencyViolation,
                 ));
                 continue;
             }
@@ -2602,12 +2952,18 @@ function checkArchitecture(options = {}) {
     violations.push(...getNotificationDashboardRouteCompositionViolations(rootPath, sourceFiles));
     violations.push(...getNotificationNavbarCompositionViolations(rootPath, sourceFiles));
     violations.push(...getNotificationRouteCompositionViolations(rootPath, sourceFiles));
+    violations.push(...getStockLiffRouteCompositionViolations(rootPath, sourceFiles));
+    const sharedStatusPresentationViolation = getSharedStatusPresentationViolation(rootPath);
+    if (sharedStatusPresentationViolation !== null) {
+        violations.push(sharedStatusPresentationViolation);
+    }
     violations.push(...getLeaveClientGraphViolations(rootPath));
     violations.push(...getEmployeeClientGraphViolations(rootPath));
     violations.push(...getNotificationClientGraphViolations(rootPath));
     violations.push(...getAuditClientGraphViolations(rootPath));
     violations.push(...getAuthClientGraphViolations(rootPath));
     violations.push(...getLineClientGraphViolations(rootPath));
+    violations.push(...getStockClientGraphViolations(rootPath));
     violations.push(...getClientReachableServerEntryViolations(rootPath, sourceFiles, "leave"));
     violations.push(...getClientReachableServerEntryViolations(rootPath, sourceFiles, "employee"));
     violations.push(...getClientReachableServerEntryViolations(rootPath, sourceFiles, "department", null));

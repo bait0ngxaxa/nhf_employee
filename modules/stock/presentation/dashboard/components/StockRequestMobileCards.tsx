@@ -2,6 +2,7 @@
 
 import type { ReactNode } from "react";
 import { RequestStatusBadge } from "@/components/dashboard/shared/RequestStatusBadge";
+import { getStockRequestStatusMeta } from "../../status-meta";
 import type { StockRequest } from "../context/types";
 import {
     formatStockRequestDate,
@@ -37,7 +38,7 @@ export function StockRequestMobileCards({
                                 {formatStockRequestDate(request.createdAt)}
                             </div>
                         </div>
-                        <RequestStatusBadge status={request.status} />
+                        <RequestStatusBadge meta={getStockRequestStatusMeta(request.status)} />
                     </div>
 
                     <div className="mt-3 grid gap-2 text-sm">

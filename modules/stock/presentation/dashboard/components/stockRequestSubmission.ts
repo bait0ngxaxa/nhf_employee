@@ -1,5 +1,5 @@
 import { useCallback, useRef } from "react";
-import type { CreateRequestInput } from "@/lib/validations/stock";
+import type { CreateRequestInput } from "../../../schemas/stock";
 import type { BrowseCartItem } from "./stockVariant.shared";
 import { normalizeStockProjectCode } from "./stockBrowseCart.shared";
 

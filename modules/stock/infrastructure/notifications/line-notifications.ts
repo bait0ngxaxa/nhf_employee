@@ -2,8 +2,16 @@ import type { NotificationOutbox } from "@prisma/client";
 
 import { runSerializableTransaction } from "@/lib/db/transaction";
 import { sendAppLineNotification } from "@/lib/line/app-notification";
-import { generateStockRequestResultFlexMessage } from "@/lib/line/flex-messages/stock-request-result";
+import { sendStockLineBroadcast } from "@/lib/line";
+import { getPublicOrigin } from "@/lib/network/public-url";
 import { buildStockLiffRequestUrl } from "../../presentation/liff-links";
+import { generateStockRequestFlexMessage } from "./line-messages/stock";
+import { generateStockLowFlexMessage } from "./line-messages/stock-low";
+import { generateStockRequestResultFlexMessage } from "./line-messages/stock-request-result";
+import type {
+    StockLowLineData,
+    StockRequestLineData,
+} from "../../contracts/notifications";
 import {
     parseStockRequestResultLinePayload,
     type StockRequestResultLinePayload,
@@ -11,6 +19,22 @@ import {
 
 export const STOCK_REQUEST_RESULT_LINE_OUTBOX_TYPE =
     "STOCK_REQUEST_RESULT_LINE" as const;
+
+export async function sendStockRequestNotification(
+    payload: StockRequestLineData,
+): Promise<boolean> {
+    return sendStockLineBroadcast(
+        generateStockRequestFlexMessage(payload, getPublicOrigin()),
+    );
+}
+
+export async function sendStockLowNotification(
+    payload: StockLowLineData,
+): Promise<boolean> {
+    return sendStockLineBroadcast(
+        generateStockLowFlexMessage(payload, getPublicOrigin()),
+    );
+}
 
 export function buildStockRequestResultLineEventKey(
     requestId: number,

@@ -6,8 +6,3 @@ export interface EmailData {
     messageId?: string;
     fromName?: string;
 }
-
-export type {
-    StockRequestResultEmailPayload,
-    StockRequestResultStatus,
-} from "@/modules/stock";

@@ -16,7 +16,7 @@ import { Textarea } from "@/components/ui/textarea";
 import type {
     LiffStockRequestAction,
     LiffStockRequestSummary,
-} from "@/lib/types/stock-liff";
+} from "../../../contracts/liff";
 
 export interface LiffStockDecisionIntent {
     action: LiffStockRequestAction;

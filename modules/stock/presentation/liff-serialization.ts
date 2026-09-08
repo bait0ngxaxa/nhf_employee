@@ -7,7 +7,7 @@ import type {
     LiffStockRequestsResponse,
     LiffStockRequestSummary,
     LiffStockViewerRole,
-} from "@/lib/types/stock-liff";
+} from "../contracts/liff";
 
 import { getStockRequestActions } from "../domain/action-availability";
 import { buildVariantLabel } from "../infrastructure/notifications/notification-payloads";

@@ -3,11 +3,11 @@
 import { Loader2, Minus, Plus, ShoppingCart, Trash2 } from "lucide-react";
 import type { ReactElement } from "react";
 
-import type { BrowseCartItem } from "@/modules/stock/client";
+import type { BrowseCartItem } from "../../dashboard/components/stockVariant.shared";
 import {
     getVariantAttributeSummary,
-    STOCK_PROJECT_CODE_MAX_LENGTH,
-} from "@/modules/stock/client";
+} from "../../dashboard/components/stockVariant.shared";
+import { STOCK_PROJECT_CODE_MAX_LENGTH } from "../../dashboard/components/stockBrowseCart.shared";
 import { Button } from "@/components/ui/button";
 import {
     Dialog,

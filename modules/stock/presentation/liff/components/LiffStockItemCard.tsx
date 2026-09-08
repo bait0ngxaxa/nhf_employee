@@ -10,8 +10,8 @@ import {
     getPreferredVariant,
     getVariantAttributeSummary,
     hasSelectableVariants,
-} from "@/modules/stock/client";
-import type { LiffStockCatalogItem } from "@/lib/types/stock-liff";
+} from "../../dashboard/components/stockVariant.shared";
+import type { LiffStockCatalogItem } from "../../../contracts/liff";
 
 interface LiffStockItemCardProps {
     item: LiffStockCatalogItem;

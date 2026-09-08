@@ -11,11 +11,11 @@ import {
     DialogScrollArea,
     DialogTitle,
 } from "@/components/ui/dialog";
-import { getVariantAttributeSummary } from "@/modules/stock/client";
+import { getVariantAttributeSummary } from "../../dashboard/components/stockVariant.shared";
 import type {
     LiffStockCatalogItem,
     LiffStockCatalogVariant,
-} from "@/lib/types/stock-liff";
+} from "../../../contracts/liff";
 
 interface LiffStockVariantPickerProps {
     item: LiffStockCatalogItem | null;

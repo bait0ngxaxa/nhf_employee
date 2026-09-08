@@ -1,13 +1,9 @@
 import {
     type EmailRequestData,
     type LineFlexMessage,
-    type StockLowLineData,
-    type StockRequestLineData,
 } from "@/types/api";
 import { type LineWebhookData } from "./types";
 import { generateEmailRequestFlexMessage } from "./flex-messages/email-request";
-import { generateStockLowFlexMessage } from "./flex-messages/stock-low";
-import { generateStockRequestFlexMessage } from "./flex-messages/stock";
 import { getPublicOrigin } from "@/lib/network/public-url";
 import {
     sendLineApiRequest,
@@ -117,27 +113,6 @@ export async function sendEmailRequestNotification(
     return await sendToITTeamOrBroadcast(flexMessage);
 }
 
-export async function sendStockRequestNotification(
-    stockRequestData: StockRequestLineData
-): Promise<boolean> {
-    const { baseUrl } = getConfig();
-    const flexMessage = generateStockRequestFlexMessage(
-        stockRequestData,
-        baseUrl
-    );
-
-    return await sendStockLineBroadcast(flexMessage);
-}
-
-export async function sendStockLowNotification(
-    stockLowData: StockLowLineData
-): Promise<boolean> {
-    const { baseUrl } = getConfig();
-    const flexMessage = generateStockLowFlexMessage(stockLowData, baseUrl);
-
-    return await sendStockLineBroadcast(flexMessage);
-}
-
 // Export as object for backward compatibility
 export const lineNotificationService = {
     sendLineMessage,
@@ -145,8 +120,6 @@ export const lineNotificationService = {
     sendStockLineBroadcast,
     sendLineWebhook,
     sendEmailRequestNotification,
-    sendStockLowNotification,
-    sendStockRequestNotification,
 };
 
 export { sendLineAppMessage, sendLinePushMessage };

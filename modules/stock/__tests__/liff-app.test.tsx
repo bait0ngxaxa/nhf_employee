@@ -10,7 +10,7 @@ import type {
     LiffStockRequestSummary,
     LiffStockRequestsResponse,
     LiffStockVariantAvailability,
-} from "@/lib/types/stock-liff";
+} from "../contracts/liff";
 
 const mocks = vi.hoisted(() => {
     class MockLiffApiError extends Error {
@@ -69,7 +69,7 @@ vi.mock("@/modules/line/client", () => ({
     fetchLiffHome: mocks.fetchHome,
 }));
 
-vi.mock("@/lib/client/liff-stock", () => ({
+vi.mock("../presentation/liff/api", () => ({
     fetchLiffStockItems: mocks.fetchItems,
     fetchLiffStockCategories: mocks.fetchCategories,
     fetchLiffStockMyRequests: mocks.fetchMyRequests,
@@ -89,7 +89,7 @@ vi.mock("sonner", () => ({
     },
 }));
 
-import { LiffStockApp } from "@/components/liff/stock/LiffStockApp";
+import { LiffStockApp } from "../presentation/liff/components/LiffStockApp";
 
 const EMPTY_REQUESTS = {
     requests: [],

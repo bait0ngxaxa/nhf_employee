@@ -371,3 +371,24 @@ the paired Employee/User transition atomically.
 Detailed boundary and import rules are in
 [module-boundaries.md](./module-boundaries.md) and
 [dependency-rules.md](./dependency-rules.md).
+
+## Stock K1 closure — current state
+
+Stock now owns its active browser boundary under `modules/stock/**`.
+`app/liff/stock/page.tsx` composes the browser-safe
+`@/modules/stock/client` entry, while Stock LIFF presentation, browser API
+helpers, and neutral LIFF contracts remain internal to Stock. The Stock client
+graph is guarded against runtime reachability to Stock server infrastructure,
+Prisma, Node-only APIs, secrets, and the global Outbox Processor.
+
+Stock also owns Stock-specific notification payload validation, email wording
+and templates, deterministic Message-ID construction, and LINE Flex/message
+composition. Generic SMTP and LINE provider/channel transport remains
+platform-owned. Operational Stock broadcasts continue using
+`LINE_STOCK_CHANNEL_ACCESS_TOKEN`; personal request-result delivery continues
+through the LINE_APP/`LineAccountLink` path.
+
+The global Outbox Processor retains claim/retry/dead-letter orchestration and
+routes Stock events through the public `@/modules/stock` dispatch contract.
+Stock does not import the processor. Shared status UI is neutral; Leave and
+Stock each own their workflow status presentation metadata.

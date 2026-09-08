@@ -9,7 +9,7 @@ import type {
     LiffStockCatalogItem,
     LiffStockCatalogResponse,
     LiffStockCategory,
-} from "@/lib/types/stock-liff";
+} from "../../../contracts/liff";
 
 import { LiffStockFilters } from "./LiffStockFilters";
 import { LiffStockItemCard } from "./LiffStockItemCard";

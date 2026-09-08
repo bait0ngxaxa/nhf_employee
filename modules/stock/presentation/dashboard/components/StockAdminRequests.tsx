@@ -5,6 +5,7 @@ import { type StockRequestStatus } from "@prisma/client";
 import { CheckCircle, ClipboardList, Loader2, Search, X, XCircle } from "lucide-react";
 import { Pagination } from "@/components/Pagination";
 import { RequestStatusBadge } from "@/components/dashboard/shared/RequestStatusBadge";
+import { getStockRequestStatusMeta } from "../../status-meta";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -254,7 +255,7 @@ export function StockAdminRequests() {
                                                 </div>
                                             </TableCell>
                                             <TableCell className="border-r border-border-subtle py-4">
-                                                <RequestStatusBadge status={req.status} />
+                                                <RequestStatusBadge meta={getStockRequestStatusMeta(req.status)} />
                                             </TableCell>
                                             <TableCell className="py-4">
                                                 {isPendingIssue ? (

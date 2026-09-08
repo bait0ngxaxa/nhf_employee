@@ -13,8 +13,8 @@ import type {
     LiffStockRequestsResponse,
     LiffStockVariantAvailability,
     LiffStockVariantAvailabilityResponse,
-} from "@/lib/types/stock-liff";
-import type { CreateRequestInput } from "@/lib/validations/stock";
+} from "../../contracts/liff";
+import type { CreateRequestInput } from "../../schemas/stock";
 
 const LIFF_STOCK_API_REQUEST_OPTIONS = {
     ...LIFF_API_REQUEST_OPTIONS,
@@ -192,4 +192,4 @@ export type {
     LiffStockRequestSummary,
     LiffStockVariantAvailability,
     LiffStockVariantAvailabilityResponse,
-} from "@/lib/types/stock-liff";
+} from "../../contracts/liff";

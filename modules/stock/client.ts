@@ -1,5 +1,6 @@
 "use client";
 
+export { LiffStockApp } from "./presentation/liff/components/LiffStockApp";
 export { StockSection } from "./presentation/dashboard/StockSection";
 export { StockSectionSkeleton } from "./presentation/dashboard/components/StockSkeletons";
 export { clearStockBrowseCart, useStockBrowseCart } from "./presentation/dashboard/components/useStockBrowseCart";

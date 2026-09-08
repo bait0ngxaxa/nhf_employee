@@ -17,7 +17,7 @@ import {
     issueLiffStockRequest,
     submitLiffStockRequest,
     fetchLiffStockVariantAvailability,
-} from "@/lib/client/liff-stock";
+} from "../presentation/liff/api";
 import { LIFF_API_REQUEST_OPTIONS } from "@/modules/line/client";
 import { API_ROUTES } from "@/lib/ssot/routes";
 

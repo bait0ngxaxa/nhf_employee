@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { NotificationOutbox, PrismaClient } from "@prisma/client";
 import { mockDeep, mockReset } from "vitest-mock-extended";
 
-import { sendStockRequestResultNotification } from "@/lib/email";
+import { sendEmail } from "@/lib/email/transport";
 import { prisma } from "@/lib/db/prisma";
 import { processOutbox } from "@/lib/services/outbox/processor";
 import { buildStockRequestResultLineEventKey } from "@/modules/stock";
@@ -19,8 +19,8 @@ vi.mock("@/lib/line/app-notification", () => ({
     sendAppLineNotification: sendAppLineNotificationMock,
 }));
 
-vi.mock("@/lib/email", () => ({
-    sendStockRequestResultNotification: vi.fn(),
+vi.mock("@/lib/email/transport", () => ({
+    sendEmail: vi.fn(),
 }));
 
 const prismaMock = prisma as unknown as ReturnType<typeof mockDeep<PrismaClient>>;
@@ -98,7 +98,7 @@ describe("personal LINE outbox processor isolation", () => {
         const result = await processOutbox();
 
         expect(result).toEqual({ processed: 0, failed: 1 });
-        expect(sendStockRequestResultNotification).not.toHaveBeenCalled();
+        expect(sendEmail).not.toHaveBeenCalled();
         expect(sendAppLineNotificationMock).toHaveBeenCalledWith(
             expect.objectContaining({
                 userId: 3,

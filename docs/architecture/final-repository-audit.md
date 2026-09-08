@@ -442,3 +442,34 @@ product-driven future IT migration as the only evidence-backed roadmap items.
 No production code, API, UI behavior, authorization behavior, persistence
 behavior, Prisma schema, migration, or runtime integration was changed by this
 audit.
+
+## K1 closure — current state after the K0 audit
+
+Phase K1 is closed against the three evidence-backed K0 Medium findings:
+
+- K0 F-1 CLOSED by K1: Stock LIFF presentation, browser transport, and neutral
+  LIFF contracts are under `modules/stock/**`; the App Router route consumes
+  only `@/modules/stock/client`.
+- K0 F-2 CLOSED by K1: Stock email and LINE message meaning is under Stock;
+  generic SMTP/LINE transports remain platform-owned. The Stock operational
+  channel still uses `LINE_STOCK_CHANNEL_ACCESS_TOKEN`, while personal result
+  LINE still uses `LineAccountLink` and the LINE_APP path.
+- K0 F-3 CLOSED by K1: `RequestStatusBadge` is a neutral renderer. Leave and
+  Stock own their separate status metadata sources with the existing labels,
+  icons, classes, and colors.
+
+The global Outbox Processor remains shared/platform infrastructure and now
+dispatches all four Stock event types through `@/modules/stock`. Stock owns
+payload validation, business/channel interpretation, in-app-before-channel
+ordering, Stock composition, and Stock supersede behavior; the processor still
+owns generic claim/retry/backoff/stale/dead-letter lifecycle and final state
+transitions.
+
+K1 removed the obsolete Stock LIFF/provider compatibility paths and the
+zero-consumer `lib/validations/stock.ts` facade. No Email Request/IT migration,
+Prisma schema change, database migration, API URL change, or UI redesign is
+part of K1.
+
+Stock modular-monolith ownership boundary COMPLETE.
+No additional K2 modular-boundary phase is currently justified.
+Future IT / Email Request remains deferred.

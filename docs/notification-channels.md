@@ -193,3 +193,17 @@ cron/worker และ provider logs ด้วยข้อมูลที่ไ�
 5. ยืนยันแล้วว่าไม่ต้องใช้ `LINE_STOCK_CHANNEL_ACCESS_TOKEN` กับ integration อื่น
 
 Phase นี้ intentionally ไม่ migrate operational broadcast และไม่ retire legacy token
+
+## Stock K1 implementation boundary
+
+หลัง K1, Stock-specific subject/template และ Flex/message composition อยู่ใต้
+`modules/stock/infrastructure/notifications/**` ส่วน `lib/email/**` และ
+`lib/line/**` เหลือบทบาทเป็น generic transport/channel mechanics ตามเดิม
+
+ความแตกต่างของ delivery context ต้องคงไว้เสมอ:
+
+- `STOCK_REQUEST_RESULT_LINE` ใช้ LINE_APP และ `LineAccountLink` ผ่าน
+  `sendAppLineNotification(...)`
+- `STOCK_REQUEST_LINE` และ `STOCK_LOW_LINE` ใช้ operational Stock Messaging
+  channel ผ่าน `LINE_STOCK_CHANNEL_ACCESS_TOKEN` และ
+  `sendStockLineBroadcast(...)`

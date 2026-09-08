@@ -1,10 +1,10 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import { LiffStockCart } from "@/components/liff/stock/LiffStockCart";
-import { LiffStockItemCard } from "@/components/liff/stock/LiffStockItemCard";
-import { LiffStockRequestCard } from "@/components/liff/stock/LiffStockRequestCard";
-import { LiffStockVariantPicker } from "@/components/liff/stock/LiffStockVariantPicker";
+import { LiffStockCart } from "../presentation/liff/components/LiffStockCart";
+import { LiffStockItemCard } from "../presentation/liff/components/LiffStockItemCard";
+import { LiffStockRequestCard } from "../presentation/liff/components/LiffStockRequestCard";
+import { LiffStockVariantPicker } from "../presentation/liff/components/LiffStockVariantPicker";
 
 const MULTI_VARIANT_ITEM = {
     id: 10,

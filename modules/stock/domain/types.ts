@@ -1,5 +1,5 @@
 import type { CreateItemInput } from "../schemas/stock";
-import type { StockLowLineItemData } from "@/types/api";
+import type { StockLowLineItemData } from "../contracts/notifications";
 
 export type CreateStockItemInput = Omit<CreateItemInput, "sku" | "categoryId"> & {
     sku?: string;

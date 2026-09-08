@@ -15,7 +15,7 @@ import {
     useStockBrowseCart,
     type StockCartAvailabilityReconciliation,
     type StockCartVariantAvailability,
-} from "@/modules/stock/client";
+} from "../../dashboard/components/useStockBrowseCart";
 import {
     isRecoveredLiffMutation,
     LIFF_SESSION_RECOVERED_MUTATION_MESSAGE,
@@ -34,7 +34,7 @@ import {
     fetchLiffStockVariantAvailability,
     issueLiffStockRequest,
     submitLiffStockRequest,
-} from "@/lib/client/liff-stock";
+} from "../api";
 import type {
     LiffStockCatalogItem,
     LiffStockCatalogResponse,
@@ -43,7 +43,7 @@ import type {
     LiffStockRequestDetail,
     LiffStockRequestsResponse,
     LiffStockRequestSummary,
-} from "@/lib/types/stock-liff";
+} from "../../../contracts/liff";
 
 import { LiffStockBrowse } from "./LiffStockBrowse";
 import { LiffStockCart } from "./LiffStockCart";

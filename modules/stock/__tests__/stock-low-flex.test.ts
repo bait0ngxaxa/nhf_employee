@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { generateStockLowFlexMessage } from "@/lib/line/flex-messages/stock-low";
+import { generateStockLowFlexMessage } from "../infrastructure/notifications/line-messages/stock-low";
 
 describe("Stock low LINE Flex message", () => {
     it("should render variant label and SKU", () => {

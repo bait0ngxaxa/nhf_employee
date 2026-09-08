@@ -12,11 +12,11 @@ import {
 import {
     sendStockLowNotification,
     sendStockRequestNotification,
-} from "@/lib/line";
+} from "./line-notifications";
 import type {
     StockLowLineData,
     StockRequestLineData,
-} from "@/types/api";
+} from "../../contracts/notifications";
 import { toDashboardStockTabPath, STOCK_DASHBOARD_TABS } from "@/lib/ssot/routes";
 import { createLineRetryKey } from "@/lib/services/outbox/provider-key";
 import {

@@ -6,8 +6,8 @@ import type {
     PrismaClient,
 } from "@prisma/client";
 import { mockDeep, mockReset } from "vitest-mock-extended";
-import { sendStockRequestResultNotification } from "@/lib/email";
-import { lineNotificationService } from "@/lib/line";
+import { sendEmail } from "@/lib/email/transport";
+import { lineNotificationService, sendStockLineBroadcast } from "@/lib/line";
 import { prisma } from "@/lib/db/prisma";
 import { processOutbox } from "@/lib/services/outbox/processor";
 import { EMAIL_REQUEST_INAPP_RECIPIENTS_ENV } from "@/lib/services/email-request/notifications";
@@ -36,8 +36,11 @@ vi.mock("@/lib/db/prisma", () => ({
     prisma: mockDeep<PrismaClient>(),
 }));
 
-vi.mock("@/lib/email", () => ({
-    sendStockRequestResultNotification: vi.fn(),
+const sendEmailMock = vi.hoisted(() => vi.fn());
+const sendStockLineBroadcastMock = vi.hoisted(() => vi.fn());
+
+vi.mock("@/lib/email/transport", () => ({
+    sendEmail: sendEmailMock,
 }));
 
 vi.mock("@/modules/leave", async (importOriginal) => {
@@ -51,9 +54,8 @@ vi.mock("@/modules/leave", async (importOriginal) => {
 vi.mock("@/lib/line", () => ({
     lineNotificationService: {
         sendEmailRequestNotification: vi.fn(),
-        sendStockRequestNotification: vi.fn(),
-        sendStockLowNotification: vi.fn(),
     },
+    sendStockLineBroadcast: sendStockLineBroadcastMock,
 }));
 
 const prismaMock = prisma as unknown as ReturnType<
@@ -538,9 +540,7 @@ describe("processOutbox", () => {
     });
 
     it("processes STOCK_REQUEST_LINE successfully", async () => {
-        vi.mocked(
-            lineNotificationService.sendStockRequestNotification,
-        ).mockResolvedValue(true);
+        vi.mocked(sendStockLineBroadcast).mockResolvedValue(true);
         prismaMock.notificationOutbox.findMany.mockResolvedValue(
             asNever([
                 buildNotification(
@@ -568,20 +568,16 @@ describe("processOutbox", () => {
         const result = await processOutbox();
 
         expect(result).toEqual({ processed: 1, failed: 0 });
-        expect(
-            lineNotificationService.sendStockRequestNotification,
-        ).toHaveBeenCalledWith(
+        expect(sendStockLineBroadcast).toHaveBeenCalledWith(
             expect.objectContaining({
-                projectCode: "PRJ-2569/01",
-                requesterName: "สมชาย",
+                type: "flex",
+                altText: "มีคำขอเบิกวัสดุใหม่ #77",
             }),
         );
     });
 
     it("creates stock request in-app notification before failed LINE delivery", async () => {
-        vi.mocked(
-            lineNotificationService.sendStockRequestNotification,
-        ).mockResolvedValue(false);
+        vi.mocked(sendStockLineBroadcast).mockResolvedValue(false);
         prismaMock.user.findMany.mockResolvedValue(asNever([{ id: 1 }]));
         prismaMock.notification.create.mockResolvedValue(asNever({ id: "n-1" }));
         prismaMock.notificationOutbox.findMany.mockResolvedValue(
@@ -621,16 +617,12 @@ describe("processOutbox", () => {
         });
 
         const inAppOrder = prismaMock.notification.create.mock.invocationCallOrder[0];
-        const lineOrder =
-            vi.mocked(lineNotificationService.sendStockRequestNotification).mock
-                .invocationCallOrder[0];
+        const lineOrder = vi.mocked(sendStockLineBroadcast).mock.invocationCallOrder[0];
         expect(inAppOrder).toBeLessThan(lineOrder);
     });
 
     it("processes STOCK_LOW_LINE successfully", async () => {
-        vi.mocked(lineNotificationService.sendStockLowNotification).mockResolvedValue(
-            true,
-        );
+        vi.mocked(sendStockLineBroadcast).mockResolvedValue(true);
         prismaMock.notificationOutbox.findMany.mockResolvedValue(
             asNever([
                 buildNotification(
@@ -657,22 +649,16 @@ describe("processOutbox", () => {
         const result = await processOutbox();
 
         expect(result).toEqual({ processed: 1, failed: 0 });
-        expect(lineNotificationService.sendStockLowNotification).toHaveBeenCalledWith(
+        expect(sendStockLineBroadcast).toHaveBeenCalledWith(
             expect.objectContaining({
-                itemCount: 1,
-                items: [
-                    expect.objectContaining({
-                        sku: "PEN-001",
-                    }),
-                ],
+                type: "flex",
+                altText: "สต็อกต่ำถึงจุดสั่งซื้อ: ปากกา",
             }),
         );
     });
 
     it("processes variant STOCK_LOW_LINE payload successfully", async () => {
-        vi.mocked(lineNotificationService.sendStockLowNotification).mockResolvedValue(
-            true,
-        );
+        vi.mocked(sendStockLineBroadcast).mockResolvedValue(true);
         prismaMock.notificationOutbox.findMany.mockResolvedValue(
             asNever([
                 buildNotification(
@@ -699,20 +685,16 @@ describe("processOutbox", () => {
         const result = await processOutbox();
 
         expect(result).toEqual({ processed: 1, failed: 0 });
-        expect(lineNotificationService.sendStockLowNotification).toHaveBeenCalledWith(
+        expect(sendStockLineBroadcast).toHaveBeenCalledWith(
             expect.objectContaining({
-                items: [expect.objectContaining({
-                    variantId: 101,
-                    variantSku: "INK-BLACK",
-                })],
+                type: "flex",
+                altText: "สต็อกต่ำถึงจุดสั่งซื้อ: หมึกพิมพ์",
             }),
         );
     });
 
     it("creates low stock in-app notification before failed LINE delivery", async () => {
-        vi.mocked(lineNotificationService.sendStockLowNotification).mockResolvedValue(
-            false,
-        );
+        vi.mocked(sendStockLineBroadcast).mockResolvedValue(false);
         prismaMock.user.findMany.mockResolvedValue(asNever([{ id: 1 }]));
         prismaMock.notification.create.mockResolvedValue(asNever({ id: "n-1" }));
         prismaMock.notificationOutbox.findMany.mockResolvedValue(
@@ -751,14 +733,12 @@ describe("processOutbox", () => {
         });
 
         const inAppOrder = prismaMock.notification.create.mock.invocationCallOrder[0];
-        const lineOrder =
-            vi.mocked(lineNotificationService.sendStockLowNotification).mock
-                .invocationCallOrder[0];
+        const lineOrder = vi.mocked(sendStockLineBroadcast).mock.invocationCallOrder[0];
         expect(inAppOrder).toBeLessThan(lineOrder);
     });
 
     it("processes a valid issued stock request result email", async () => {
-        vi.mocked(sendStockRequestResultNotification).mockResolvedValue(true);
+        vi.mocked(sendEmail).mockResolvedValue(true);
         const payload = buildStockRequestResultPayload("ISSUED");
         prismaMock.notificationOutbox.findMany.mockResolvedValue(
             asNever([
@@ -774,7 +754,9 @@ describe("processOutbox", () => {
         const result = await processOutbox();
 
         expect(result).toEqual({ processed: 1, failed: 0 });
-        expect(sendStockRequestResultNotification).toHaveBeenCalledWith(payload);
+        expect(sendEmail).toHaveBeenCalledWith(expect.objectContaining({
+            messageId: "<nhf-stock-request-77-issued@notifications.thainhf.org>",
+        }));
         expect(prismaMock.notification.create).not.toHaveBeenCalled();
         expect(prismaMock.notificationOutbox.updateMany).toHaveBeenCalledWith(
             expect.objectContaining({
@@ -785,7 +767,7 @@ describe("processOutbox", () => {
     });
 
     it("processes a valid cancelled stock request result email", async () => {
-        vi.mocked(sendStockRequestResultNotification).mockResolvedValue(true);
+        vi.mocked(sendEmail).mockResolvedValue(true);
         const payload = buildStockRequestResultPayload("CANCELLED");
         prismaMock.notificationOutbox.findMany.mockResolvedValue(
             asNever([
@@ -801,12 +783,14 @@ describe("processOutbox", () => {
         const result = await processOutbox();
 
         expect(result).toEqual({ processed: 1, failed: 0 });
-        expect(sendStockRequestResultNotification).toHaveBeenCalledWith(payload);
+        expect(sendEmail).toHaveBeenCalledWith(expect.objectContaining({
+            messageId: "<nhf-stock-request-77-cancelled@notifications.thainhf.org>",
+        }));
         expect(prismaMock.notification.create).not.toHaveBeenCalled();
     });
 
     it("retries a stock request result email when the email service returns false", async () => {
-        vi.mocked(sendStockRequestResultNotification).mockResolvedValue(false);
+        vi.mocked(sendEmail).mockResolvedValue(false);
         const payload = buildStockRequestResultPayload("ISSUED");
         prismaMock.notificationOutbox.findMany.mockResolvedValue(
             asNever([
@@ -850,7 +834,7 @@ describe("processOutbox", () => {
         const result = await processOutbox();
 
         expect(result).toEqual({ processed: 0, failed: 1 });
-        expect(sendStockRequestResultNotification).not.toHaveBeenCalled();
+        expect(sendEmail).not.toHaveBeenCalled();
         expect(prismaMock.notificationOutbox.updateMany).toHaveBeenCalledWith(
             expect.objectContaining({
                 where: { id: 123, status: "PROCESSING" },
@@ -876,7 +860,7 @@ describe("processOutbox", () => {
         const result = await processOutbox();
 
         expect(result).toEqual({ processed: 0, failed: 1 });
-        expect(sendStockRequestResultNotification).not.toHaveBeenCalled();
+        expect(sendEmail).not.toHaveBeenCalled();
         expect(prismaMock.notificationOutbox.updateMany).toHaveBeenCalledWith(
             expect.objectContaining({
                 where: { id: 124, status: "PROCESSING" },
@@ -889,7 +873,7 @@ describe("processOutbox", () => {
     });
 
     it("moves a failed stock request result email to dead letter after retries", async () => {
-        vi.mocked(sendStockRequestResultNotification).mockResolvedValue(false);
+        vi.mocked(sendEmail).mockResolvedValue(false);
         const payload = buildStockRequestResultPayload("CANCELLED");
         prismaMock.notificationOutbox.findMany.mockResolvedValue(
             asNever([{

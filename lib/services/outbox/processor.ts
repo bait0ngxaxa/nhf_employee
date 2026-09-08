@@ -1,19 +1,9 @@
 import type { NotificationOutbox } from "@prisma/client";
-import { sendStockRequestResultNotification } from "@/lib/email";
 import { lineNotificationService } from "@/lib/line";
 import { prisma } from "@/lib/db/prisma";
-import type {
-    EmailRequestData,
-    StockLowLineData,
-    StockRequestLineData,
-} from "@/types/api";
+import type { EmailRequestData } from "@/types/api";
 import { createEmailRequestInAppNotification } from "@/lib/services/email-request/notifications";
-import {
-    dispatchStockRequestResultLineOutbox,
-    notifyAdminsLowStockInApp,
-    notifyAdminsStockRequestLineInApp,
-    parseStockRequestResultEmailPayload,
-} from "@/modules/stock";
+import { dispatchStockOutbox } from "@/modules/stock";
 import {
     parseLeaveActionPayload,
     parseLeaveCancellationRequestedPayload,
@@ -60,9 +50,6 @@ type OutboxProcessResult = {
 };
 
 type DispatchOutcome = "SENT" | "SUPERSEDED" | "DEFERRED";
-
-type StockRequestLinePayload = StockRequestLineData;
-type StockLowLinePayload = StockLowLineData;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
     return typeof value === "object" && value !== null;
@@ -129,135 +116,12 @@ function parseEmailRequestPayload(payload: unknown): EmailRequestData {
     };
 }
 
-function parseStockRequestItems(
-    items: unknown[],
-): StockRequestLinePayload["items"] {
-    return items.map((item, index) => {
-        if (
-            !isRecord(item) ||
-            typeof item.name !== "string" ||
-            typeof item.quantity !== "number" ||
-            typeof item.unit !== "string"
-        ) {
-            throw new Error(`Invalid STOCK_REQUEST_LINE payload item at index ${index}`);
-        }
-
-        return {
-            name: item.name,
-            quantity: item.quantity,
-            unit: item.unit,
-            variantLabel:
-                typeof item.variantLabel === "string" ? item.variantLabel : undefined,
-        };
-    });
-}
-
-function parseStockLowItems(items: unknown[]): StockLowLinePayload["items"] {
-    return items.map((item, index) => {
-        if (
-            !isRecord(item) ||
-            typeof item.itemId !== "number" ||
-            typeof item.quantity !== "number" ||
-            typeof item.minStock !== "number" ||
-            typeof item.unit !== "string"
-        ) {
-            throw new Error(`Invalid STOCK_LOW_LINE payload item at index ${index}`);
-        }
-
-        if ("variantId" in item) {
-            if (
-                typeof item.variantId !== "number" ||
-                typeof item.itemName !== "string" ||
-                typeof item.variantSku !== "string" ||
-                typeof item.variantLabel !== "string"
-            ) {
-                throw new Error(`Invalid STOCK_LOW_LINE variant item at index ${index}`);
-            }
-
-            return {
-                itemId: item.itemId,
-                variantId: item.variantId,
-                itemName: item.itemName,
-                variantSku: item.variantSku,
-                variantLabel: item.variantLabel,
-                quantity: item.quantity,
-                minStock: item.minStock,
-                unit: item.unit,
-            };
-        }
-
-        if (typeof item.name !== "string" || typeof item.sku !== "string") {
-            throw new Error(`Invalid STOCK_LOW_LINE aggregate item at index ${index}`);
-        }
-
-        return {
-            itemId: item.itemId,
-            name: item.name,
-            sku: item.sku,
-            quantity: item.quantity,
-            minStock: item.minStock,
-            unit: item.unit,
-        };
-    });
-}
-
-function parseStockRequestLinePayload(
-    payload: unknown,
-): StockRequestLinePayload {
-    if (
-        !isRecord(payload) ||
-        typeof payload.requestId !== "number" ||
-        typeof payload.projectCode !== "string" ||
-        typeof payload.requesterName !== "string" ||
-        typeof payload.requestedAt !== "string" ||
-        typeof payload.itemCount !== "number" ||
-        typeof payload.totalQuantity !== "number" ||
-        !Array.isArray(payload.items)
-    ) {
-        throw new Error("Invalid STOCK_REQUEST_LINE payload");
-    }
-
-    return {
-        requestId: payload.requestId,
-        projectCode: payload.projectCode,
-        requesterName: payload.requesterName,
-        note: typeof payload.note === "string" ? payload.note : null,
-        requestedAt: payload.requestedAt,
-        itemCount: payload.itemCount,
-        totalQuantity: payload.totalQuantity,
-        items: parseStockRequestItems(payload.items),
-    };
-}
-
-function parseStockLowLinePayload(payload: unknown): StockLowLinePayload {
-    if (
-        !isRecord(payload) ||
-        typeof payload.alertedAt !== "string" ||
-        typeof payload.itemCount !== "number" ||
-        !Array.isArray(payload.items)
-    ) {
-        throw new Error("Invalid STOCK_LOW_LINE payload");
-    }
-
-    return {
-        alertedAt: payload.alertedAt,
-        itemCount: payload.itemCount,
-        items: parseStockLowItems(payload.items),
-    };
-}
-
 async function assertLineSent(
     isSent: boolean,
     label: string,
 ): Promise<void> {
     if (!isSent) {
         throw new Error(`${label} failed`);
-    }
-}
-
-async function assertEmailSent(isSent: boolean): Promise<void> {
-    if (!isSent) {
-        throw new Error("STOCK_REQUEST_RESULT_EMAIL failed");
     }
 }
 
@@ -328,6 +192,9 @@ async function dispatchNotification(
         throw new Error(`Unknown notification type: ${notification.type}`);
     }
 
+    const stockOutcome = await dispatchStockOutbox(notification);
+    if (stockOutcome) return stockOutcome;
+
     let payload: unknown;
     try {
         payload = parsePayload(notification.payload);
@@ -347,11 +214,6 @@ async function dispatchNotification(
             null,
         );
         if (leaveLineOutcome) return leaveLineOutcome;
-        const stockResultLineOutcome = await dispatchStockRequestResultLineOutbox(
-            notification,
-            null,
-        );
-        if (stockResultLineOutcome) return stockResultLineOutcome;
         throw error;
     }
     const routineOutcome = await dispatchRoutineReminderOutbox(
@@ -371,12 +233,6 @@ async function dispatchNotification(
         payload,
     );
     if (leaveLineOutcome) return leaveLineOutcome;
-
-    const stockResultLineOutcome = await dispatchStockRequestResultLineOutbox(
-        notification,
-        payload,
-    );
-    if (stockResultLineOutcome) return stockResultLineOutcome;
 
     switch (notification.type) {
         case "EMAIL_REQUEST": {
@@ -446,35 +302,6 @@ async function dispatchNotification(
                 payload: parsedConfirmed,
             });
             await sendLeaveNotTakenConfirmedNotifications(parsedConfirmed);
-            return "SENT";
-        }
-        case "STOCK_REQUEST_LINE": {
-            const parsedPayload = parseStockRequestLinePayload(payload);
-            await notifyAdminsStockRequestLineInApp(parsedPayload);
-            await assertLineSent(
-                await lineNotificationService.sendStockRequestNotification(
-                    parsedPayload,
-                ),
-                "LINE stock request notification",
-            );
-            return "SENT";
-        }
-        case "STOCK_LOW_LINE": {
-            const parsedPayload = parseStockLowLinePayload(payload);
-            await notifyAdminsLowStockInApp(parsedPayload);
-            await assertLineSent(
-                await lineNotificationService.sendStockLowNotification(
-                    parsedPayload,
-                ),
-                "LINE low stock notification",
-            );
-            return "SENT";
-        }
-        case "STOCK_REQUEST_RESULT_EMAIL": {
-            const parsedPayload = parseStockRequestResultEmailPayload(payload);
-            await assertEmailSent(
-                await sendStockRequestResultNotification(parsedPayload),
-            );
             return "SENT";
         }
         default:

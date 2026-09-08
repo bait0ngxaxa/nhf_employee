@@ -18,7 +18,7 @@ import {
 import { ALL_LEAVE_TYPES } from "../../../domain/constants";
 import { LEAVE_HISTORY_QUERY_MAX_LENGTH } from "../../../application/queries/history-filters";
 import { getLeaveTypeLabel } from "../../../application/notifications/notification-format";
-import { getRequestStatusMeta } from "@/components/dashboard/shared/RequestStatusBadge";
+import { getLeaveRequestStatusMeta } from "../../status-meta";
 
 const ALL_FILTER_VALUE = "__ALL__";
 
@@ -150,7 +150,7 @@ export function LeaveHistoryFilters({
                             <SelectItem value={ALL_FILTER_VALUE}>ทุกสถานะ</SelectItem>
                             {statusOptions.map((statusOption) => (
                                 <SelectItem key={statusOption} value={statusOption}>
-                                    {getRequestStatusMeta(statusOption).label}
+                                    {getLeaveRequestStatusMeta(statusOption).label}
                                 </SelectItem>
                             ))}
                         </SelectContent>

@@ -457,3 +457,20 @@ legacy Employee paths to prevent their reintroduction, including relative and
 non-static import forms supported by the checker parser. Generic User/Employee
 fallback display is owned by the structural browser-safe helper at
 `shared/identity/display.ts`; Leave report labels remain Leave-owned.
+
+## Stock K1 invariants — current
+
+- `app/liff/stock/page.tsx` must compose Stock presentation only through
+  `@/modules/stock/client`; Stock LIFF internals must not import that public
+  barrel or the Stock server entry.
+- The Stock client graph must remain browser-safe: no runtime Prisma, Node,
+  server-only, persistence, secrets, provider-server, or Outbox imports.
+- Removed Stock compatibility paths and removed generic Stock template/Flex
+  paths must not return as active imports.
+- Generic `lib/email/**` and `lib/line/**` may own transport/channel mechanics,
+  including the legacy Stock channel primitive, but not Stock business
+  payloads, wording, templates, or Flex/message composition.
+- The global Outbox Processor may route Stock only through the root
+  `@/modules/stock` contract; Stock must not import the processor.
+- `RequestStatusBadge` must remain a neutral presentation primitive. Leave and
+  Stock status meaning belongs to their respective presentation modules.

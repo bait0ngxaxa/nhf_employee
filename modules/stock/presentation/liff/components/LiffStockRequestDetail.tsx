@@ -4,7 +4,8 @@ import { Ban, Loader2, PackageCheck } from "lucide-react";
 import type { ReactElement } from "react";
 
 import { RequestStatusBadge } from "@/components/dashboard/shared/RequestStatusBadge";
-import { formatStockRequestDate } from "@/modules/stock/client";
+import { getStockRequestStatusMeta } from "../../status-meta";
+import { formatStockRequestDate } from "../../dashboard/components/stockRequest.shared";
 import { Button } from "@/components/ui/button";
 import {
     Dialog,
@@ -16,7 +17,7 @@ import {
 import type {
     LiffStockRequestAction,
     LiffStockRequestDetail as LiffStockRequestDetailData,
-} from "@/lib/types/stock-liff";
+} from "../../../contracts/liff";
 
 interface LiffStockRequestDetailProps {
     open: boolean;
@@ -85,7 +86,7 @@ export function LiffStockRequestDetail({
                                         {formatStockRequestDate(detail.createdAt)}
                                     </p>
                                 </div>
-                                <RequestStatusBadge status={detail.status} />
+                                <RequestStatusBadge meta={getStockRequestStatusMeta(detail.status)} />
                             </div>
 
                             <dl className="grid gap-2 rounded-2xl bg-surface-subtle p-3 text-sm">

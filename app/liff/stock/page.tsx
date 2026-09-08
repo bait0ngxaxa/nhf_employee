@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import type { ReactElement } from "react";
 
-import { LiffStockApp } from "@/components/liff/stock/LiffStockApp";
+import { LiffStockApp } from "@/modules/stock/client";
 
 export const metadata: Metadata = {
     title: "Stock ผ่าน LINE | NHFapp",

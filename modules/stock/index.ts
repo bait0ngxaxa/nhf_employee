@@ -130,7 +130,13 @@ export { StockInvariantViolationError } from "./infrastructure/persistence/share
 export {
     buildStockRequestResultLineEventKey,
     dispatchStockRequestResultLineOutbox,
+    sendStockLowNotification,
+    sendStockRequestNotification,
 } from "./infrastructure/notifications/line-notifications";
+export { dispatchStockOutbox } from "./infrastructure/notifications/outbox";
+export {
+    sendStockRequestResultNotification,
+} from "./infrastructure/notifications/email";
 export {
     notifyAdminsLowStockInApp,
     notifyAdminsStockRequestLineInApp,

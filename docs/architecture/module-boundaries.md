@@ -494,3 +494,19 @@ presentation boundary or the other module projections. G2 re-audited the
 presentation boundary and confirmed that no Department client entry is needed.
 Department internals remain private; the Department root is the only supported
 server entry.
+
+## Stock K1 boundary — current
+
+`modules/stock/` owns Stock server/business behavior, Dashboard and LIFF
+presentation, browser transport, Stock contracts, and Stock notification
+semantics. The only supported App Router composition entry for Stock LIFF is
+`@/modules/stock/client`; the route remains delivery-owned.
+
+Stock owns Stock payload parsing, email subjects/templates/Message-ID and
+LINE Flex/message meaning. Generic SMTP and LINE HTTP/channel transport remain
+platform-owned. The global Outbox Processor keeps lifecycle orchestration and
+delegates Stock event interpretation through `@/modules/stock`.
+
+The shared request status badge is a neutral renderer. Leave status metadata is
+Leave-owned and Stock status metadata is Stock-owned; the shared UI does not
+import either capability or contain their workflow taxonomy.

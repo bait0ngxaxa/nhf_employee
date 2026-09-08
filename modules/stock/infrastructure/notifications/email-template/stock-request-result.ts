@@ -1,6 +1,6 @@
-import type { StockRequestResultEmailPayload } from "@/modules/stock";
+import type { StockRequestResultEmailPayload } from "../notification-payloads";
 import { formatThaiDateTime } from "@/lib/helpers/date-helpers";
-import { escapeHtml } from "./html";
+import { escapeHtml } from "@/lib/email/templates/html";
 
 function getStatusText(status: StockRequestResultEmailPayload["status"]): string {
     return status === "ISSUED"

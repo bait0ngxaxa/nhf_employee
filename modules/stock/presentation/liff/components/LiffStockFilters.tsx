@@ -13,7 +13,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
-import type { LiffStockCategory } from "@/lib/types/stock-liff";
+import type { LiffStockCategory } from "../../../contracts/liff";
 
 const REQUEST_STATUSES = [
     { value: "all", label: "ทุกสถานะ" },

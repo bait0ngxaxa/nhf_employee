@@ -3,7 +3,7 @@ import { StockRequestStatus } from "@prisma/client";
 import type {
     LiffStockRequestAction,
     LiffStockViewerRole,
-} from "@/lib/types/stock-liff";
+} from "../contracts/liff";
 
 export function getStockRequestActions(
     status: StockRequestStatus,
