@@ -21,6 +21,9 @@ Phase J3 closes LINE/LIFF identity integration plus Auth Audit producer
 migration; the Auth / Session / Identity migration is complete. The
 authoritative record is
 [`docs/architecture/auth-session-identity-migration.md`](../docs/architecture/auth-session-identity-migration.md).
+The authoritative repository-wide K0 ownership map and deferred-boundary
+inventory is
+[`docs/architecture/final-repository-audit.md`](../docs/architecture/final-repository-audit.md).
 The runtime Auth capability is `modules/auth/`, with
 `@/modules/auth` as its server public entry and `@/modules/auth/client` as its
 browser public entry. It
@@ -97,7 +100,7 @@ Rules for new work:
 The intended dependency direction is documented in
 [dependency rules](../docs/architecture/dependency-rules.md). Run
 
-pm run architecture:check` when changing code under this directory.
+`npm run architecture:check` when changing code under this directory.
 
 Employee/Leave lifecycle composition is intentionally one-way: Leave may use
 the public Employee hierarchy contract for the Employee-owned `managerId`

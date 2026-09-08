@@ -9,6 +9,10 @@ complete. These rules
 govern new architecture code while unrelated legacy features remain compatible
 during incremental migration.
 
+The authoritative K0 repository-wide checker re-audit is
+[final-repository-audit.md](./final-repository-audit.md). It records current
+coverage gaps without broadening the checker speculatively.
+
 The authoritative Auth boundary is recorded in
 [auth-session-identity-migration.md](./auth-session-identity-migration.md).
 `modules/auth/` owns credentials, account fields, web token/session-family
@@ -344,6 +348,14 @@ the module boundary from a legacy directory, while imports unrelated to
 | LINE J3 ownership | `app/api/line/**`, `modules/line/**`, production source/client graphs, production `LineAccountLink` access | Requires server consumers to use `@/modules/line` and browser consumers to use `@/modules/line/client`; rejects LINE deep imports, LINE internal self-barrel imports, deleted LIFF compatibility paths, client reachability of the server entry, server/secret/Node dependencies from the LINE client graph, and direct/aliased/destructured `LineAccountLink` delegates outside `modules/line/infrastructure/**`; preserves tests, fixtures, Prisma support, and provider infrastructure exceptions |
 | Auth J3 Audit producer ownership | `app/api/auth/**` | Requires Auth producers to use `@/modules/audit` directly; rejects Auth API imports of `@/lib/server/audit` without banning legitimate non-Auth compatibility consumers |
 
+K0 checker coverage note: the current client/server graph guard explicitly
+walks Leave, Employee, Department, Notification, Audit, Auth, and LINE
+boundaries. Stock and Routine client graphs are not yet explicit checker
+scopes, and exact ownership of compatibility adapters and provider-specific
+payload composition is not mechanically allowlisted. The K0 audit records
+these as narrow future guard candidates tied to concrete correction slices;
+K0 does not add speculative rules.
+
 ## Auth J2 browser and projection boundary
 
 The Auth server entry exposes only generic account/session authority. The
@@ -419,6 +431,10 @@ imports remain compatible, and migrated module code is covered by the same
 owner-aware rules.
 
 ## Legacy compatibility
+
+The repository-wide current-state ownership map, compatibility seam ledger,
+deferred-boundary inventory, and checker coverage review are maintained in
+[final-repository-audit.md](./final-repository-audit.md).
 
 Legacy paths such as `lib/services/*`, `lib/server/*`, `lib/validations/*`,
 `components/dashboard/*`, and `app/api/*` may coexist with `modules/` and

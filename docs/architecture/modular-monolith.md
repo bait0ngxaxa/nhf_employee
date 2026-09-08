@@ -7,6 +7,11 @@ exclusivity remains closed. Phase H3 Notification producer integration and
 final migration audit remain complete. Phase G3 Department migration remains
 complete.
 
+The authoritative K0 repository-wide audit and deferred-boundary inventory is
+[final-repository-audit.md](./final-repository-audit.md). It records the
+current ownership map, the remaining Stock boundary findings, and the
+intentional future IT boundary without changing production behavior.
+
 The authoritative J0 decision is recorded in
 [auth-session-identity-migration.md](./auth-session-identity-migration.md).
 The target is one cohesive Auth / Session / Account Identity server capability
@@ -25,7 +30,9 @@ target architecture. Stock server/business ownership is now migrated into
 `modules/stock/`; its Dashboard and client presentation now live in the same
 module behind separate server and client public entry points. See
 [stock-migration.md](./stock-migration.md) for the migration status and
-transitional dependencies.
+transitional dependencies. The K0 audit records that the active Stock LIFF
+presentation remains outside this Phase C Dashboard boundary and is a future
+Stock correction slice.
 
 Routine server/business and Dashboard/LIFF presentation ownership is now also
 migrated into `modules/routine/`. See
@@ -89,9 +96,8 @@ distributed across locations such as:
 
 - `app/` for routes, pages, and other Next.js delivery concerns;
 - `components/`, `hooks/`, and `types/` for UI and client-facing artifacts;
-- `lib/` for shared/platform infrastructure and legacy feature implementation
-  for capabilities not yet migrated, plus authentication, notification, and
-  upload code;
+- `lib/` for shared/platform infrastructure, compatibility adapters, deferred
+  Email Request/IT surfaces, and remaining audited legacy feature surfaces;
 - `prisma/` for the single schema and its migrations; and
 - `__tests__/` for the existing unit, integration, API, and component tests.
 
@@ -131,8 +137,9 @@ Producing capabilities retain event meaning, AuditAction, entity semantics,
 details/snapshots, actor semantics, and strict versus best-effort transaction
 behavior. Employee, Leave, Stock, and Routine producers and Routine entity
 history now consume the public Audit server capability; their feature-specific
-details remain capability-owned. Auth and Email Request remain later/deferred
-producer boundaries. Audit physical persistence is exclusive to
+details remain capability-owned. Auth producers now consume the public Audit
+server capability directly; Email Request remains a deferred producer boundary.
+Audit physical persistence is exclusive to
 `modules/audit/infrastructure/**`. Audit Dashboard presentation is owned under
 `modules/audit/presentation/dashboard/**` and exposed through the separate
 browser-safe `@/modules/audit/client` entry. Its App Router routes retain
@@ -167,7 +174,9 @@ module may intentionally have no client entry.
 The dependency graph describes new architecture code. It does not claim that
 the legacy `lib/`, `components/`, or unrelated route structure has already been
 reorganized. Employee F0-F3 is complete; unrelated legacy feature locations
-remain outside the scope of this migration.
+remain outside the scope of the completed capability migrations. The current
+repository-wide disposition of those surfaces is recorded in
+[final-repository-audit.md](./final-repository-audit.md).
 
 ### Employee/Leave lifecycle direction
 

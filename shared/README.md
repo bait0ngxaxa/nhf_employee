@@ -20,9 +20,11 @@ application owner as `modules/audit/`, not `shared/audit/`. Phase I2 also
 places Audit Dashboard presentation under that module's browser-safe client
 boundary, and I3 migrates the remaining Employee, Leave, Stock, and Routine
 producer/read seams. Production physical AuditLog persistence is now exclusive
-to Audit infrastructure. Legacy Audit adapters remain only for deferred Auth,
-Email Request, and export compatibility; Auth/Session/Identity and future IT
-ownership remain deferred.
+to Audit infrastructure. Legacy Audit adapters remain only for
+Email Request and export compatibility; Auth/Session/Identity ownership is
+complete, and future IT remains intentionally deferred.
+The authoritative repository-wide K0 ownership map and deferred-boundary
+inventory is [final-repository-audit.md](../docs/architecture/final-repository-audit.md).
 
 See [module boundaries](../docs/architecture/module-boundaries.md) and
 [dependency rules](../docs/architecture/dependency-rules.md) for the complete

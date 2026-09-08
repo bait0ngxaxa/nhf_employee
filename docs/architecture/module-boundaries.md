@@ -9,6 +9,11 @@ complete.
 Stock, Routine, Leave, and Employee are migrated examples; Employee
 server/business and active presentation ownership are migrated as well.
 
+The authoritative K0 repository-wide ownership and deferred-boundary audit is
+[final-repository-audit.md](./final-repository-audit.md). It records the
+remaining Stock presentation/provider findings and confirms the intentional
+future modules/it boundary.
+
 The authoritative Auth boundary record is
 [auth-session-identity-migration.md](./auth-session-identity-migration.md).
 Auth/Session/Account Identity is one cohesive server capability for
@@ -436,7 +441,8 @@ network/request metadata primitives, notification or LINE delivery, uploads,
 and generic UI primitives. Phase I1 resolves the cohesive Audit capability's
 physical persistence and generic query/retention owner as `modules/audit/`,
 not `shared/audit/`; existing lib/ Audit code remains only as compatibility
-adapters while producer and presentation migrations proceed.
+adapters for deferred Email Request and export consumers. Audit producer and
+presentation migrations are complete.
 
 Feature-specific validation, policies, calculations, status semantics,
 workflow orchestration, and feature UI remain feature-owned. For example, code
@@ -461,6 +467,11 @@ structure remains operational for features that have not migrated. Existing
 imports are not rewritten merely to make the target diagram look complete. A
 migration must preserve behavior unless a separate change explicitly requests
 a behavior change.
+
+The Stock server and Dashboard boundary is migrated, but the active Stock LIFF
+presentation still uses `components/liff/stock/**`, `lib/client/liff-stock.ts`,
+and `lib/types/stock-liff.ts`. This is an identified future Stock correction
+slice, not a reason to create a second Stock module or a new capability.
 
 Leave is a completed incremental migration: `modules/leave/` owns server,
 Dashboard presentation, and LIFF presentation behavior. No Leave compatibility
