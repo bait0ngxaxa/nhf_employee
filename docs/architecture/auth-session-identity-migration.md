@@ -2,9 +2,9 @@
 
 Historical status: **Phase J0 CLOSED — discovery and boundary definition
 complete.**
-Current status: **Phase J2 CLOSED — Auth identity projection and browser
-presentation ownership complete.**
-J3 remains **NOT STARTED**.
+Current status: **Phase J3 CLOSED — LINE/LIFF identity integration and Auth
+Audit producer migration complete. The Auth / Session / Identity migration is
+COMPLETE.**
 
 Audited baseline: `6021618941206d9cb204318ff8daf0c90e83d66b`
 (`feat(audit): close I3 producer integration and persistence exclusivity`)
@@ -1744,8 +1744,190 @@ Verification completed for J2:
 No development server or production build was run. No schema, cookie, JWT,
 refresh algorithm, Audit producer, or LINE/LIFF implementation was changed.
 
-### 28.6 J3 exclusions
+### 28.6 J3 exclusions at J2 closure
 
-J3 remains **NOT STARTED**. J2 did not migrate or redesign LineAccountLink,
+J3 was **NOT STARTED at J2 closure**. J2 did not migrate or redesign LineAccountLink,
 LINE ID-token verification, LIFF session issuance/verification/recovery,
 `lib/auth/liff.ts`, `/api/line/**`, LINE Messaging, or Auth Audit producers.
+
+## 29. J3 implementation record — LINE/LIFF Integration, Auth Audit Producers, and Final Cleanup
+
+Phase J3 is closed against baseline
+`a1d8a2bb928629f3a93fb8303d7ef365170715f9`
+(`fix(architecture): guide cross-module Auth presentation consumers`). This
+record is additive to the historical J0-J2 records above; it does not rewrite
+their preserved compatibility behavior.
+
+### 29.1 Final LINE/LIFF boundaries
+
+The first-class LINE integration capability is:
+
+```text
+modules/line/
+├── application/
+│   ├── home.ts
+│   ├── liff.ts
+│   └── types.ts
+├── infrastructure/
+│   ├── persistence/account-link.ts
+│   ├── session/liff-session.ts
+│   └── verification/verify-id-token.ts
+├── presentation/
+│   ├── LiffBootstrap.tsx
+│   ├── client-config.ts
+│   ├── http.ts
+│   ├── liff-client.ts
+│   └── liff-home-client.ts
+├── client.ts
+└── index.ts
+```
+
+`@/modules/line` is the server public entry. It exposes the LIFF workforce
+session boundary, workforce resolution, home capability composition, account
+link/read contracts, frozen LINE ID-token verification, frozen LIFF session
+primitives, and the request parsing primitives used by the LINE auth routes.
+`@/modules/line/client` is the browser public entry. It exposes only the LIFF
+browser recovery/session transport, browser DTOs, `LiffBootstrap`, and the
+LIFF home transport. It does not export or transitively reach the server
+entry.
+
+LINE owns account-link identity, `LineAccountLink` persistence, verified LINE
+Login identity, LIFF session issuance/verification, workforce-session
+composition, bootstrap/recovery integration contracts, and LINE-specific
+DTOs. It does not own Auth passwords/web sessions, Employee lifecycle, Leave,
+Stock, Routine, Messaging meaning, or notification event semantics. The
+feature application shell remains outside the integration module;
+`components/liff/LiffAppShell.tsx` is retained because it composes the
+application/navigation shell rather than LINE identity, while
+`LiffBootstrap` is LINE-owned.
+
+### 29.2 Auth/Employee/Leave composition
+
+Auth now exposes the narrow server lookup
+`findAccountIdentityById()` through `@/modules/auth`. It returns only the
+current account identity/role, email/display name, and active/deleted state;
+it does not require a web session family and does not evaluate Employee or
+Leave lifecycle.
+
+Employee exposes `findLiffEmployeeByUserId()` through `@/modules/employee`.
+Employee owns existence, `ACTIVE` status, deleted state, User linkage, optional
+expected Employee ID validation, and the identity fields required for the
+canonical display name. LINE composes Auth and Employee to preserve the
+existing `user.id`, `user.role`, `user.email`, `user.name`, and `employeeId`
+result.
+
+Leave exposes `getLiffLeaveCapabilities()` through `@/modules/leave`. Leave
+keeps the exact LIFF actionable assigned-approver query, including its status
+predicates and approver precedence. Auth no longer owns the LIFF Leave
+capability query, and LINE does not duplicate Leave policy. Stock role hints
+and feature flags remain presentation hints; feature routes remain
+authoritative.
+
+### 29.3 Frozen LIFF and LINE behavior
+
+The LINE ID-token verifier now lives under LINE verification infrastructure and
+preserves the existing endpoint, POST form encoding, configured Login Channel
+ID, `sub`/`aud`/`exp`, issuer acceptance, empty/invalid/upstream/malformed
+response handling, error codes, and route status mapping. The token is never
+persisted and is never treated as a web Auth session.
+
+`LineAccountLink` authoritative persistence now lives only in
+`modules/line/infrastructure/persistence/account-link.ts`. One-to-one
+uniqueness, exact duplicate idempotency, conflict behavior, P2002 race
+handling/post-race reread, no reassignment, and no unlink flow are unchanged.
+Routine recipient resolution and reminder delivery use the narrow LINE read
+contract and pass the existing transaction-bound persistence context; Routine
+still owns recipient eligibility and notification meaning. The generic LINE
+provider adapter in `lib/line/app-notification.ts` also uses that public read
+contract. Messaging transport, channel credentials, delivery/retry behavior,
+outbox behavior, and feature message semantics remain in their existing
+provider/platform or feature owners under `lib/line` and the producing
+capabilities.
+
+LIFF JWT signing/verification remains HS256 with the same subject, claims,
+purpose, issuer, audience, timestamps, TTL, validation, and secret behavior.
+The `nhf_liff_session` cookie and its HttpOnly/Secure/SameSite/path/max-age
+options are unchanged and remain separate from web Auth cookies.
+
+`requireLiffWorkforceSession()` is now owned by `@/modules/line`. It still
+maps missing/invalid/expired cookies to 401, configuration failure to 500,
+and an invalid current workforce identity or Employee-ID mismatch to 403.
+It rereads current User and Employee state on every protected request but
+intentionally does **not** reread `LineAccountLink` after issuance. Bootstrap,
+account linking, and fresh ID-token recovery still reread the link. This
+no-link-rerevalidation rule remains an explicit compatibility/security-policy
+debt and was not changed in J3.
+
+The browser recovery contract remains separate from web refresh: recovery is
+single-flight, bootstraps once with a fresh LINE ID token, replays only GET and
+HEAD, never automatically replays mutations, preserves recovered-mutation
+messaging/metadata, disables web Auth refresh for LIFF establishment, and
+preserves all existing `LiffBootstrap` states, Thai wording, redirects,
+provider-query cleanup, safe return-path rules, styling, safe-area, and loading
+behavior.
+
+### 29.4 Auth Audit producer migration
+
+The seven Auth producer surfaces now call `appendAuditBestEffort()` directly
+from `@/modules/audit`: hybrid login (`LOGIN_FAILED` and `LOGIN_SUCCESS`),
+refresh security failure (`LOGIN_FAILED`), current logout (`LOGOUT`),
+logout-all (`LOGOUT`), selected session-family revoke (`LOGOUT`), successful
+password reset (`PASSWORD_RESET`), and successful signup (`USER_CREATE`).
+The routes retain event action/entity/actor/email/details choices, timing after
+the relevant Auth persistence result, trusted IP/User-Agent top-level request
+metadata, family-ID compatibility metadata, and non-fatal best-effort
+behavior. Generic Audit does not interpret Auth semantics.
+
+`lib/server/audit.ts` remains a thin compatibility adapter for legitimate
+non-Auth consumers: Email Request, Employee export, Leave export, and Audit
+Log export. Auth routes no longer import it. The deleted
+`lib/auth/liff.ts` implementation and the moved `lib/client/liff.ts`,
+`lib/client/liff-home.ts`, `components/liff/LiffBootstrap.tsx`,
+`lib/line/account-link.ts`, `lib/line/api.ts`, `lib/line/liff-home.ts`,
+`lib/line/liff-session.ts`, `lib/line/liff-types.ts`, and
+`lib/line/verify-id-token.ts` paths are no longer authoritative and are
+guarded against reintroduction. Feature-specific `lib/client/liff-stock.ts`
+and retained LINE provider files are compatibility/platform code, not duplicate
+LIFF identity ownership.
+
+Stable Auth delivery/composition helpers remain intentionally retained where
+they still serve non-LIFF production contracts: `lib/auth/api.ts` and
+`lib/auth/workforce.ts` remain route authorization adapters, while
+`lib/auth/hybrid/**`, `lib/auth/context.ts`, and `lib/auth/server.ts` remain
+web-session delivery primitives and compatibility projections. They are not
+the authoritative implementation of LINE/LIFF identity or Auth Audit
+production.
+
+### 29.5 Enforcement and completion status
+
+The architecture checker now enforces the LINE server/client public entries,
+LINE internal self-barrel protection, browser transitive server/secret/Node
+dependency protection, direct/aliased/destructured `LineAccountLink`
+persistence ownership, deleted LINE compatibility paths, and Auth API route
+direct use of `@/modules/audit`. Fixture regression coverage covers the
+required allowed/rejected cases, while all J1/J2 rules remain active.
+
+Phase J3 is **CLOSED — LINE/LIFF identity integration and Auth Audit producer
+migration complete.** The Auth / Session / Identity migration is
+**COMPLETE**. This closure does not claim that unrelated repository debt is
+gone. Explicitly retained debts are generic web mutation replay after
+refresh, refresh family-race behavior, process-local Auth rate limits, the
+no-post-issuance `LineAccountLink` reread policy, and refresh Audit family-ID
+metadata.
+
+### 29.6 Verification record
+
+The J3 verification record is:
+
+- `npm.cmd run architecture:check` — passed; 981 source files checked.
+- `npm.cmd run lint:strict` — passed with zero warnings.
+- `npm.cmd run typecheck` — passed.
+- `npm.cmd run test:run` — passed; 249 files and 2,066 tests.
+- `npm.cmd run test:integration:mysql` — passed; 10 files and 65 tests, with
+  current migrations and no pending migrations.
+- `git diff --check` — passed.
+
+Focused J3 coverage also passed: 19 LIFF/feature files with 224 tests, four
+Auth Audit producer files with 35 tests, and the architecture fixture suite
+with 205 tests. No development server or production build was run. No Prisma
+schema or migration change was required.

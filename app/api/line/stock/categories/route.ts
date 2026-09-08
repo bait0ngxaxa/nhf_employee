@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { requireLiffWorkforceSession } from "@/lib/auth/liff";
+import { requireLiffWorkforceSession } from "@/modules/line";
 import { stockService, toLiffStockCategory } from "@/modules/stock";
 import { serverError } from "@/lib/ssot/http";
 

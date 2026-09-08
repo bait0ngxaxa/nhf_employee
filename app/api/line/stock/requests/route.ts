@@ -1,6 +1,6 @@
 import { after, type NextRequest, NextResponse } from "next/server";
 
-import { requireLiffWorkforceSession } from "@/lib/auth/liff";
+import { requireLiffWorkforceSession } from "@/modules/line";
 import { WorkforceAuthorizationError } from "@/lib/auth/workforce-transaction";
 import { createStockCommandActor } from "@/modules/stock";
 import {

@@ -10,7 +10,7 @@ import {
     LIFF_API_REQUEST_OPTIONS,
     LIFF_SESSION_RECOVERED_MUTATION_MESSAGE,
     unwrapLiffResponse,
-} from "@/lib/client/liff";
+} from "@/modules/line/client";
 import type {
     LiffRoutineReferenceData,
     LiffRoutineSummary,

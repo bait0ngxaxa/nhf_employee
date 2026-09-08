@@ -1,6 +1,6 @@
 import { after, NextResponse, type NextRequest } from "next/server";
 
-import { requireLiffWorkforceSession } from "@/lib/auth/liff";
+import { requireLiffWorkforceSession } from "@/modules/line";
 import {
     enforceLeaveJsonBodySize,
     readLeaveJsonBody,

@@ -4,7 +4,7 @@ import { apiGet, apiPost, apiRequest } from "@/lib/client/api-client";
 import {
     LIFF_API_REQUEST_OPTIONS,
     registerLiffSessionRecovery,
-} from "@/lib/client/liff";
+} from "@/modules/line/client";
 
 function jsonResponse(body: unknown, status = 200): Response {
     return new Response(JSON.stringify(body), {

@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { toast } from "sonner";
 import { useLeaveRequestFormModel } from "./useLeaveRequestFormModel";
 import { submitLeaveRequest } from "../api";
-import { LiffApiError } from "@/lib/client/liff";
+import { LiffApiError } from "@/modules/line/client";
 import { LEAVE_ATTACHMENT_MAX_BYTES, LEAVE_ATTACHMENT_MAX_FILES } from "../../../infrastructure/attachments/constants";
 
 vi.mock("../api", () => ({

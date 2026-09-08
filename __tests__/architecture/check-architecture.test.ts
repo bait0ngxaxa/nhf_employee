@@ -24,6 +24,11 @@ const fixtureFiles: FixtureFiles = {
     "modules/audit/client.ts": '"use client"; export const x = 1;\n',
     "modules/audit/application/example.ts": "export const x = 1;\n",
     "modules/audit/infrastructure/persistence/repository.ts": "export const x = 1;\n",
+    "modules/line/index.ts": "export const x = 1;\n",
+    "modules/line/client.ts": '"use client"; export const x = 1;\n',
+    "modules/line/application/example.ts": "export const x = 1;\n",
+    "modules/line/presentation/example.ts": "export const x = 1;\n",
+    "modules/line/infrastructure/persistence/repository.ts": "export const x = 1;\n",
     "modules/notification/index.ts": "export const x = 1;\n",
     "modules/notification/client.ts": '"use client"; export const x = 1;\n',
     "modules/notification/application/example.ts": "export const x = 1;\n",
@@ -121,7 +126,7 @@ describe("architecture checker module boundaries", () => {
         const result = await checkFixture("app/dashboard/leave/page.tsx", [
             'import { x } from "@/modules/leave/client";',
             'import { y } from "@/components/ui/button";',
-            'import { z } from "@/lib/client/liff";',
+            'import { z } from "@/modules/line/client";',
         ].join("\n"));
         expect(result.violations).toEqual([]);
     });
@@ -1647,6 +1652,197 @@ describe("architecture checker module boundaries", () => {
         const result = checkArchitecture({ repositoryRoot: rootPath });
 
         expect(result.violations).toEqual([]);
+    });
+
+    it("rejects external consumers deep-importing LINE internals", async () => {
+        const result = await checkFixture(
+            "app/api/line/example.ts",
+            'import { x } from "@/modules/line/application/example";\n',
+        );
+
+        expect(result.violations).toHaveLength(1);
+        expect(result.violations[0]).toContain(
+            'external consumers must use the target module public API "@/modules/line"',
+        );
+    });
+
+    it("rejects browser consumers importing the LINE server entry", async () => {
+        const result = await checkFixture(
+            "app/liff/line-client.tsx",
+            [
+                '"use client";',
+                'import { x } from "@/modules/line";',
+                "export { x };",
+            ].join("\n"),
+        );
+
+        expect(result.violations).toHaveLength(1);
+        expect(result.violations[0]).toContain(
+            "Client-reachable runtime code must not import the Line server entry",
+        );
+    });
+
+    it("rejects cross-module consumers deep-importing LINE presentation", async () => {
+        const result = await checkFixture(
+            "modules/stock/presentation/example.tsx",
+            'import { x } from "@/modules/line/presentation/example";\n',
+        );
+
+        expect(result.violations).toHaveLength(1);
+        expect(result.violations[0]).toContain(
+            'cross-module dependencies must use the target module public entry point "@/modules/line"',
+        );
+    });
+
+    it("allows consumers to use the LINE browser entry", async () => {
+        const result = await checkFixture(
+            "app/liff/layout.tsx",
+            'import { LiffBootstrap } from "@/modules/line/client";\n',
+        );
+
+        expect(result.violations).toEqual([]);
+    });
+
+    it("rejects a transitive Prisma runtime dependency from the LINE client graph", async () => {
+        const rootPath = await createFixture({
+            ...fixtureFiles,
+            "modules/line/client.ts": '"use client"; export { x } from "./presentation/example";\n',
+            "modules/line/presentation/example.ts": [
+                'import { PrismaClient } from "@prisma/client";',
+                "export const x = PrismaClient;",
+            ].join("\n"),
+        });
+        const result = checkArchitecture({ repositoryRoot: rootPath });
+
+        expect(result.violations).toHaveLength(1);
+        expect(result.violations[0]).toContain("@prisma/client");
+        expect(result.violations[0]).toContain(
+            "Server-only runtime dependency is reachable from @/modules/line/client",
+        );
+    });
+
+    it("rejects a transitive next/headers dependency from the LINE client graph", async () => {
+        const rootPath = await createFixture({
+            ...fixtureFiles,
+            "modules/line/client.ts": '"use client"; export { x } from "./presentation/example";\n',
+            "modules/line/presentation/example.ts": [
+                'import { headers } from "next/headers";',
+                "export const x = headers;",
+            ].join("\n"),
+        });
+        const result = checkArchitecture({ repositoryRoot: rootPath });
+
+        expect(result.violations).toHaveLength(1);
+        expect(result.violations[0]).toContain("next/headers");
+        expect(result.violations[0]).toContain(
+            "Server-only runtime dependency is reachable from @/modules/line/client",
+        );
+    });
+
+    it("rejects a transitive private LINE configuration dependency from the LINE client graph", async () => {
+        const rootPath = await createFixture({
+            ...fixtureFiles,
+            "modules/line/client.ts": '"use client"; export { x } from "./presentation/example";\n',
+            "modules/line/presentation/example.ts": [
+                'import { getLineLiffId } from "@/lib/line/config";',
+                "export const x = getLineLiffId;",
+            ].join("\n"),
+            "lib/line/config.ts": "export const getLineLiffId = () => \"secret\";\n",
+        });
+        const result = checkArchitecture({ repositoryRoot: rootPath });
+
+        expect(result.violations).toHaveLength(1);
+        expect(result.violations[0]).toContain("@/lib/line/config");
+        expect(result.violations[0]).toContain(
+            "Server-only runtime dependency is reachable from @/modules/line/client",
+        );
+    });
+
+    it("rejects a transitive LINE server entry from the LINE client graph", async () => {
+        const rootPath = await createFixture({
+            ...fixtureFiles,
+            "modules/line/client.ts": '"use client"; export { x } from "@/modules/line";\n',
+        });
+        const result = checkArchitecture({ repositoryRoot: rootPath });
+
+        expect(result.violations).toHaveLength(1);
+        expect(result.violations[0]).toContain(
+            "Client-reachable runtime code must not import the Line server entry",
+        );
+    });
+
+    it.each([
+        ["direct Prisma access", "await prisma.lineAccountLink.findUnique();"],
+        ["transaction delegate access", "await tx.lineAccountLink.findMany();"],
+        [
+            "aliased delegate access",
+            [
+                "const links = prisma.lineAccountLink;",
+                "await links.findMany();",
+            ].join("\n"),
+        ],
+        [
+            "destructured delegate access",
+            [
+                "const { lineAccountLink } = prisma;",
+                "await lineAccountLink.findMany();",
+            ].join("\n"),
+        ],
+    ])("rejects production LineAccountLink persistence %s", async (_label, source) => {
+        const result = await checkFixture("app/api/example.ts", source);
+
+        expect(result.violations).toHaveLength(1);
+        expect(result.violations[0]).toContain(
+            "direct LineAccountLink Prisma delegate access must be owned by modules/line/infrastructure/",
+        );
+    });
+
+    it("allows LINE infrastructure to own direct LineAccountLink persistence", async () => {
+        const result = await checkFixture(
+            "modules/line/infrastructure/persistence/repository.ts",
+            [
+                "await prisma.lineAccountLink.findUnique();",
+                "await tx.lineAccountLink.create({ data: {} });",
+            ].join("\n"),
+        );
+
+        expect(result.violations).toEqual([]);
+    });
+
+    it("rejects Auth API routes importing the legacy Audit adapter", async () => {
+        const result = await checkFixture(
+            "app/api/auth/example.ts",
+            'import { x } from "@/lib/server/audit";\n',
+        );
+
+        expect(result.violations).toHaveLength(1);
+        expect(result.violations[0]).toContain(
+            "Auth API routes must use @/modules/audit directly",
+        );
+    });
+
+    it("allows Auth API routes to import the Audit public entry", async () => {
+        const result = await checkFixture(
+            "app/api/auth/example.ts",
+            'import { appendAuditBestEffort } from "@/modules/audit";\n',
+        );
+
+        expect(result.violations).toEqual([]);
+    });
+
+    it.each([
+        "@/lib/auth/liff",
+        "@/lib/client/liff",
+        "@/components/liff/LiffBootstrap",
+        "@/lib/line/account-link",
+    ])("rejects deleted LINE compatibility path %s", async (specifier) => {
+        const result = await checkFixture(
+            "app/liff/page.tsx",
+            `import { x } from "${specifier}";`,
+        );
+
+        expect(result.violations).toHaveLength(1);
+        expect(result.violations[0]).toContain("Deleted LINE compatibility path");
     });
 
     it.each(["stock", "routine", "future"])(

@@ -12,12 +12,9 @@ const {
     getLiffHomeModulesMock: vi.fn(),
 }));
 
-vi.mock("@/lib/auth/liff", () => ({
+vi.mock("@/modules/line", () => ({
     requireLiffWorkforceSession: requireLiffWorkforceSessionMock,
     getLiffCapabilities: getLiffCapabilitiesMock,
-}));
-
-vi.mock("@/lib/line/liff-home", () => ({
     getLiffHomeModules: getLiffHomeModulesMock,
 }));
 

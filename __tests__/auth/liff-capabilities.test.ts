@@ -13,8 +13,8 @@ vi.mock("@/lib/db/prisma", () => ({
     },
 }));
 
-import { getLiffCapabilities } from "@/lib/auth/liff";
-import type { LiffWorkforceSession } from "@/lib/auth/liff";
+import { getLiffCapabilities } from "@/modules/line";
+import type { LiffWorkforceSession } from "@/modules/line";
 import {
     getActionableLeaveApprovalWhere,
     getAssignedLeaveApproverWhere,

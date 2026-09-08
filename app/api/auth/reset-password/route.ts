@@ -1,8 +1,8 @@
 import { type NextRequest, NextResponse } from "next/server";
 
 import { AUTH_ERROR_MESSAGES } from "@/lib/auth/ssot";
-import { logAuthEvent } from "@/lib/server/audit";
-import { clearHybridAuthCookies } from "@/lib/auth/hybrid/session";
+import { clearHybridAuthCookies, getClientMetadata } from "@/lib/auth/hybrid/session";
+import { appendAuditBestEffort } from "@/modules/audit";
 import { resetPassword } from "@/modules/auth";
 import { resetPasswordSchema } from "@/lib/validations/auth";
 
@@ -48,8 +48,18 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
             );
         }
 
-        await logAuthEvent("PASSWORD_RESET", resetResult.userId, resetResult.email, {
-            metadata: { method: "email_token", forceLogoutAllSessions: true },
+        const metadata = getClientMetadata(request);
+        await appendAuditBestEffort({
+            action: "PASSWORD_RESET",
+            entityType: "User",
+            entityId: resetResult.userId,
+            userId: resetResult.userId,
+            userEmail: resetResult.email,
+            ipAddress: metadata.ipAddress,
+            userAgent: metadata.userAgent,
+            details: {
+                metadata: { method: "email_token", forceLogoutAllSessions: true },
+            },
         });
 
         const response = NextResponse.json({

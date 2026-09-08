@@ -30,7 +30,7 @@ import {
     isRecoveredLiffMutation,
     LIFF_SESSION_RECOVERED_MUTATION_MESSAGE,
     LiffApiError,
-} from "@/lib/client/liff";
+} from "@/modules/line/client";
 import {
     createLiffRoutineTask,
     updateLiffRoutineTask,

@@ -8,7 +8,7 @@ import {
     LIFF_SESSION_PURPOSE,
     setLiffSessionCookie,
     verifyLiffSession,
-} from "@/lib/line/liff-session";
+} from "@/modules/line";
 import { getLineLiffSessionConfig } from "@/lib/line/config";
 
 const SESSION_SECRET = "line-liff-test-secret-0123456789abcdef";

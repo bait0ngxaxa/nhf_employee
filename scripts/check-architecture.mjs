@@ -251,6 +251,18 @@ const legacyAuthBrowserPrefixes = [
     "@/components/auth",
     "@/lib/auth/client",
 ];
+const deletedLineCompatibilityPaths = [
+    "@/lib/auth/liff",
+    "@/lib/client/liff",
+    "@/lib/client/liff-home",
+    "@/components/liff/LiffBootstrap",
+    "@/lib/line/account-link",
+    "@/lib/line/api",
+    "@/lib/line/liff-home",
+    "@/lib/line/liff-session",
+    "@/lib/line/liff-types",
+    "@/lib/line/verify-id-token",
+];
 
 function hasImportPrefix(moduleSpecifier, prefix) {
     return moduleSpecifier === prefix || moduleSpecifier.startsWith(`${prefix}/`);
@@ -756,6 +768,164 @@ function getAuditLogPersistenceViolation(filePath, rootPath) {
     return `${relativeFilePath(filePath, rootPath)}:${firstAccess.line} direct AuditLog Prisma delegate access must be owned by modules/audit/infrastructure/.`;
 }
 
+const lineAccountLinkDelegateOperations = new Set([
+    "create",
+    "createMany",
+    "update",
+    "updateMany",
+    "findMany",
+    "findFirst",
+    "findUnique",
+    "count",
+    "delete",
+    "deleteMany",
+    "upsert",
+]);
+
+function getLineAccountLinkDelegateAccesses(filePath) {
+    const contents = readFileSync(filePath, "utf8");
+    const sourceFile = ts.createSourceFile(
+        filePath,
+        contents,
+        ts.ScriptTarget.Latest,
+        true,
+        getScriptKind(filePath),
+    );
+    const declarations = [];
+    const clientAliases = new Set([
+        "prisma",
+        "tx",
+        "client",
+        "db",
+        "transaction",
+        "transactionClient",
+    ]);
+    const delegateAliases = new Set();
+    const accesses = [];
+
+    function collectDeclarations(node) {
+        if (ts.isVariableDeclaration(node)) declarations.push(node);
+        ts.forEachChild(node, collectDeclarations);
+    }
+
+    collectDeclarations(sourceFile);
+
+    function isKnownClientExpression(node) {
+        return ts.isIdentifier(node) && clientAliases.has(node.text);
+    }
+
+    function isLineAccountLinkDelegateExpression(node) {
+        if (ts.isIdentifier(node)) return delegateAliases.has(node.text);
+        if (!ts.isPropertyAccessExpression(node)
+            && !ts.isElementAccessExpression(node)) {
+            return false;
+        }
+
+        return getStaticPropertyName(node) === "lineAccountLink"
+            && isKnownClientExpression(node.expression);
+    }
+
+    let changed = true;
+    while (changed) {
+        changed = false;
+        for (const declaration of declarations) {
+            if (!ts.isIdentifier(declaration.name)
+                || declaration.initializer === undefined) {
+                continue;
+            }
+
+            const initializer = declaration.initializer;
+            if (isKnownClientExpression(initializer)
+                && !clientAliases.has(declaration.name.text)) {
+                clientAliases.add(declaration.name.text);
+                changed = true;
+            }
+            if (isLineAccountLinkDelegateExpression(initializer)
+                || (ts.isIdentifier(initializer)
+                    && delegateAliases.has(initializer.text))) {
+                if (!delegateAliases.has(declaration.name.text)) {
+                    delegateAliases.add(declaration.name.text);
+                    changed = true;
+                }
+            }
+        }
+    }
+
+    function collectDestructuredAliases(node) {
+        if (!ts.isVariableDeclaration(node)
+            || !ts.isObjectBindingPattern(node.name)
+            || node.initializer === undefined
+            || !isKnownClientExpression(node.initializer)) {
+            ts.forEachChild(node, collectDestructuredAliases);
+            return;
+        }
+
+        for (const element of node.name.elements) {
+            if (!ts.isBindingElement(element) || !ts.isIdentifier(element.name)) continue;
+            const propertyName = element.propertyName ?? element.name;
+            if (getStaticBindingPropertyName(propertyName) === "lineAccountLink") {
+                delegateAliases.add(element.name.text);
+            }
+        }
+        ts.forEachChild(node, collectDestructuredAliases);
+    }
+
+    collectDestructuredAliases(sourceFile);
+
+    function visit(node) {
+        if (ts.isCallExpression(node)
+            && (ts.isPropertyAccessExpression(node.expression)
+                || ts.isElementAccessExpression(node.expression))
+            && lineAccountLinkDelegateOperations.has(getStaticPropertyName(node.expression))) {
+            const delegate = node.expression.expression;
+            if (isLineAccountLinkDelegateExpression(delegate)) {
+                accesses.push({
+                    line: sourceFile.getLineAndCharacterOfPosition(
+                        node.expression.getStart(sourceFile),
+                    ).line + 1,
+                });
+            }
+        }
+
+        ts.forEachChild(node, visit);
+    }
+
+    visit(sourceFile);
+    return accesses;
+}
+
+function isLinePersistenceSupportSource(filePath, rootPath) {
+    if (isTestSource(filePath, rootPath)) return true;
+    if (pathIsWithin(filePath, resolve(rootPath, "prisma"))) return true;
+
+    const segments = relativeFilePath(filePath, rootPath)
+        .split("/")
+        .map((segment) => segment.toLowerCase());
+    return segments.some((segment) => [
+        "fixture",
+        "fixtures",
+        "__fixtures__",
+        "test-support",
+        "test-utils",
+        "seed",
+        "support",
+    ].includes(segment));
+}
+
+function getLineAccountLinkPersistenceViolation(filePath, rootPath) {
+    const lineInfrastructureRoot = resolve(rootPath, "modules/line/infrastructure");
+    if (pathIsWithin(filePath, lineInfrastructureRoot)
+        || isLinePersistenceSupportSource(filePath, rootPath)) {
+        return null;
+    }
+
+    const accesses = getLineAccountLinkDelegateAccesses(filePath);
+    if (accesses.length === 0) return null;
+
+    const firstAccess = accesses[0];
+    return `${relativeFilePath(filePath, rootPath)}:${firstAccess.line} direct LineAccountLink Prisma delegate access must be owned by modules/line/infrastructure/.`;
+}
+
 function getDeletedAuthBrowserDependencyViolation(filePath, rootPath, moduleSpecifier) {
     if (isTestSource(filePath, rootPath)) return null;
 
@@ -772,6 +942,24 @@ function getDeletedAuthBrowserDependencyViolation(filePath, rootPath, moduleSpec
     return deletedPath === undefined
         ? null
         : `Deleted Auth browser path "${deletedPath}" must not be imported; use @/modules/auth/client.`;
+}
+
+function getDeletedLineCompatibilityViolation(filePath, rootPath, moduleSpecifier) {
+    if (isTestSource(filePath, rootPath)) return null;
+
+    const resolvedImport = moduleSpecifier.startsWith("@/")
+        ? resolve(rootPath, moduleSpecifier.slice(2))
+        : getImportSourcePath(moduleSpecifier, filePath, rootPath);
+    const normalizedSpecifier = resolvedImport === null
+        ? moduleSpecifier
+        : `@/${relativeFilePath(resolvedImport, rootPath).replace(/\.[cm]?[jt]sx?$/, "")}`;
+    const deletedPath = deletedLineCompatibilityPaths.find((prefix) =>
+        normalizedSpecifier === prefix || normalizedSpecifier.startsWith(`${prefix}/`),
+    );
+
+    return deletedPath === undefined
+        ? null
+        : `Deleted LINE compatibility path "${deletedPath}" must not be imported; use @/modules/line or @/modules/line/client.`;
 }
 
 const authPersistenceDelegateOperations = new Set([
@@ -1151,6 +1339,11 @@ function getAuditLegacyDependencyViolation(filePath, rootPath, moduleSpecifier) 
         return "Deleted Audit feature contracts must be owned by their producing capability.";
     }
 
+    if (isAuthApiRoute(filePath, rootPath)
+        && hasImportPrefix(normalizedSpecifier, "@/lib/server/audit")) {
+        return "Auth API routes must use @/modules/audit directly instead of @/lib/server/audit.";
+    }
+
     const producerModule = [...auditProducerModuleNames].find((moduleName) =>
         pathIsWithin(filePath, resolve(rootPath, `modules/${moduleName}`)),
     );
@@ -1467,6 +1660,29 @@ function getAuthDependencyViolation(filePath, rootPath, moduleSpecifier) {
         || normalizedSpecifier === "@/modules/auth/index"
         || normalizedSpecifier === "@/modules/auth/client") {
         return "Auth module internals must use local contracts instead of their own public barrel.";
+    }
+
+    return null;
+}
+
+function getLineDependencyViolation(filePath, rootPath, moduleSpecifier) {
+    const lineModuleRoot = resolve(rootPath, "modules/line");
+    if (!pathIsWithin(filePath, lineModuleRoot)
+        || filePath === resolve(lineModuleRoot, "index.ts")
+        || filePath === resolve(lineModuleRoot, "client.ts")) {
+        return null;
+    }
+
+    const resolvedImport = moduleSpecifier.startsWith("@/")
+        ? resolve(rootPath, moduleSpecifier.slice(2))
+        : getImportSourcePath(moduleSpecifier, filePath, rootPath);
+    const normalizedSpecifier = resolvedImport === null
+        ? moduleSpecifier
+        : `@/${relativeFilePath(resolvedImport, rootPath).replace(/\.[cm]?[jt]sx?$/, "")}`;
+    if (normalizedSpecifier === "@/modules/line"
+        || normalizedSpecifier === "@/modules/line/index"
+        || normalizedSpecifier === "@/modules/line/client") {
+        return "LINE module internals must use local contracts instead of their own public barrel.";
     }
 
     return null;
@@ -1836,6 +2052,77 @@ function getAuthClientGraphViolations(rootPath) {
     return violations;
 }
 
+function getLineClientGraphViolations(rootPath) {
+    const entryPath = resolve(rootPath, "modules/line/client.ts");
+    if (!existsSync(entryPath)) return [];
+
+    const pending = [entryPath];
+    const visited = new Set();
+    const violations = [];
+    const serverPackages = [
+        "@prisma/client",
+        "bcrypt",
+        "bcryptjs",
+        "nodemailer",
+        "@line/bot-sdk",
+        "server-only",
+        "next/server",
+        "next/headers",
+        "next/cache",
+    ];
+    const serverDirectories = [
+        "lib/db",
+        "lib/server",
+        "lib/email",
+        "lib/line",
+        "lib/services/outbox",
+        "modules/auth/application",
+        "modules/auth/infrastructure",
+        "modules/employee/application",
+        "modules/employee/infrastructure",
+        "modules/leave/application",
+        "modules/leave/infrastructure",
+        "modules/line/application",
+        "modules/line/infrastructure",
+    ];
+
+    while (pending.length > 0) {
+        const filePath = pending.pop();
+        if (filePath === undefined || visited.has(filePath)) continue;
+        visited.add(filePath);
+
+        for (const record of getImports(filePath, true)) {
+            const specifier = record.moduleSpecifier;
+            const { importTarget, sourcePath } = getRuntimeImportTarget(
+                specifier,
+                filePath,
+                rootPath,
+            );
+            const reachesServerDirectory = [importTarget, sourcePath].some((target) =>
+                target !== null && serverDirectories.some((directory) =>
+                    pathIsWithin(target, resolve(rootPath, directory)),
+                ),
+            );
+
+            if (isBuiltin(specifier)
+                || serverPackages.some((name) => hasImportPrefix(specifier, name))
+                || reachesServerDirectory) {
+                violations.push(describeViolation(
+                    filePath,
+                    rootPath,
+                    record,
+                    "Server-only runtime dependency is reachable from @/modules/line/client.",
+                ));
+                continue;
+            }
+
+            if (sourcePath !== null) pending.push(sourcePath);
+        }
+    }
+
+    return violations;
+}
+
 function relativeFilePath(filePath, rootPath) {
     return relative(rootPath, filePath).split(sep).join("/");
 }
@@ -1918,6 +2205,12 @@ function checkArchitecture(options = {}) {
         );
         if (auditLogPersistenceViolation !== null) {
             violations.push(auditLogPersistenceViolation);
+        }
+
+        const lineAccountLinkPersistenceViolation =
+            getLineAccountLinkPersistenceViolation(filePath, rootPath);
+        if (lineAccountLinkPersistenceViolation !== null) {
+            violations.push(lineAccountLinkPersistenceViolation);
         }
 
         const authPersistenceViolation = getAuthPersistenceViolation(
@@ -2211,6 +2504,22 @@ function checkArchitecture(options = {}) {
                 continue;
             }
 
+            const deletedLineCompatibilityViolation =
+                getDeletedLineCompatibilityViolation(
+                    filePath,
+                    rootPath,
+                    importRecord.moduleSpecifier,
+                );
+            if (deletedLineCompatibilityViolation !== null) {
+                violations.push(describeViolation(
+                    filePath,
+                    rootPath,
+                    importRecord,
+                    deletedLineCompatibilityViolation,
+                ));
+                continue;
+            }
+
             const authDependencyViolation = getAuthDependencyViolation(
                 filePath,
                 rootPath,
@@ -2222,6 +2531,21 @@ function checkArchitecture(options = {}) {
                     rootPath,
                     importRecord,
                     authDependencyViolation,
+                ));
+                continue;
+            }
+
+            const lineDependencyViolation = getLineDependencyViolation(
+                filePath,
+                rootPath,
+                importRecord.moduleSpecifier,
+            );
+            if (lineDependencyViolation !== null) {
+                violations.push(describeViolation(
+                    filePath,
+                    rootPath,
+                    importRecord,
+                    lineDependencyViolation,
                 ));
                 continue;
             }
@@ -2274,6 +2598,7 @@ function checkArchitecture(options = {}) {
     violations.push(...getNotificationClientGraphViolations(rootPath));
     violations.push(...getAuditClientGraphViolations(rootPath));
     violations.push(...getAuthClientGraphViolations(rootPath));
+    violations.push(...getLineClientGraphViolations(rootPath));
     violations.push(...getClientReachableServerEntryViolations(rootPath, sourceFiles, "leave"));
     violations.push(...getClientReachableServerEntryViolations(rootPath, sourceFiles, "employee"));
     violations.push(...getClientReachableServerEntryViolations(rootPath, sourceFiles, "department", null));
@@ -2283,6 +2608,12 @@ function checkArchitecture(options = {}) {
         sourceFiles,
         "auth",
         "@/modules/auth/client",
+    ));
+    violations.push(...getClientReachableServerEntryViolations(
+        rootPath,
+        sourceFiles,
+        "line",
+        "@/modules/line/client",
     ));
     return { sourceFiles, violations };
 }

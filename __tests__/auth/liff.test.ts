@@ -1,44 +1,60 @@
+// @vitest-environment node
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { cookiesMock, verifyLiffSessionMock, userFindUniqueMock } = vi.hoisted(() => ({
+const {
+    cookiesMock,
+    findAccountIdentityByIdMock,
+    findLiffEmployeeByUserIdMock,
+    lineAccountLinkFindManyMock,
+    lineAccountLinkFindUniqueMock,
+} = vi.hoisted(() => ({
     cookiesMock: vi.fn(),
-    verifyLiffSessionMock: vi.fn(),
-    userFindUniqueMock: vi.fn(),
+    findAccountIdentityByIdMock: vi.fn(),
+    findLiffEmployeeByUserIdMock: vi.fn(),
+    lineAccountLinkFindManyMock: vi.fn(),
+    lineAccountLinkFindUniqueMock: vi.fn(),
 }));
 
 vi.mock("next/headers", () => ({
     cookies: cookiesMock,
 }));
 
-vi.mock("@/lib/line/liff-session", () => ({
-    LIFF_SESSION_COOKIE_NAME: "nhf_liff_session",
-    verifyLiffSession: verifyLiffSessionMock,
+vi.mock("@/modules/auth", () => ({
+    findAccountIdentityById: findAccountIdentityByIdMock,
+}));
+
+vi.mock("@/modules/employee", () => ({
+    findLiffEmployeeByUserId: findLiffEmployeeByUserIdMock,
 }));
 
 vi.mock("@/lib/db/prisma", () => ({
     prisma: {
-        user: {
-            findUnique: userFindUniqueMock,
+        lineAccountLink: {
+            findMany: lineAccountLinkFindManyMock,
+            findUnique: lineAccountLinkFindUniqueMock,
         },
     },
 }));
 
-import { requireLiffWorkforceSession } from "@/lib/auth/liff";
-import { LineIdentityVerificationError } from "@/lib/line/errors";
+import {
+    issueLiffSession,
+    requireLiffWorkforceSession,
+} from "@/modules/line";
 
-const ACTIVE_USER = {
+const ACTIVE_ACCOUNT = {
     id: 10,
     role: "USER",
     email: "employee@example.com",
-    name: "Employee",
+    name: "บัญชีทดสอบ",
     isActive: true,
     deletedAt: null,
-    employeeId: 20,
-    employee: {
-        id: 20,
-        status: "ACTIVE",
-        deletedAt: null,
-    },
+};
+
+const ACTIVE_EMPLOYEE = {
+    id: 20,
+    firstName: "พนักงาน",
+    lastName: "ทดสอบ",
+    nickname: null,
 };
 
 function setCookieValue(value: string | undefined): void {
@@ -48,14 +64,13 @@ function setCookieValue(value: string | undefined): void {
 }
 
 describe("requireLiffWorkforceSession", () => {
-    beforeEach(() => {
+    beforeEach(async () => {
         vi.clearAllMocks();
-        setCookieValue("liff-session");
-        verifyLiffSessionMock.mockResolvedValue({
-            userId: 10,
-            employeeId: 20,
-        });
-        userFindUniqueMock.mockResolvedValue(ACTIVE_USER);
+        vi.stubEnv("LINE_LIFF_SESSION_SECRET", "test-liff-session-secret");
+        vi.stubEnv("LINE_LIFF_SESSION_TTL_SECONDS", "3600");
+        findAccountIdentityByIdMock.mockResolvedValue(ACTIVE_ACCOUNT);
+        findLiffEmployeeByUserIdMock.mockResolvedValue(ACTIVE_EMPLOYEE);
+        setCookieValue(await issueLiffSession({ userId: 10, employeeId: 20 }));
     });
 
     it("returns the current trusted user and employee identity", async () => {
@@ -65,10 +80,12 @@ describe("requireLiffWorkforceSession", () => {
                 id: 10,
                 role: "USER",
                 email: "employee@example.com",
-                name: "Employee",
+                name: "พนักงาน ทดสอบ",
             },
             employeeId: 20,
         });
+        expect(findAccountIdentityByIdMock).toHaveBeenCalledWith(10);
+        expect(findLiffEmployeeByUserIdMock).toHaveBeenCalledWith(10, 20);
     });
 
     it("rejects a missing cookie with 401", async () => {
@@ -78,16 +95,15 @@ describe("requireLiffWorkforceSession", () => {
 
         expect(result.ok).toBe(false);
         if (!result.ok) expect(result.response.status).toBe(401);
-        expect(verifyLiffSessionMock).not.toHaveBeenCalled();
+        expect(findAccountIdentityByIdMock).not.toHaveBeenCalled();
     });
 
     it.each([
-        ["malformed token", new Error("Invalid LIFF session")],
-        ["invalid signature", new Error("signature failed")],
-        ["expired token", new Error("expired")],
-        ["wrong session purpose", new Error("purpose mismatch")],
-    ])("rejects an %s with 401", async (_label, error) => {
-        verifyLiffSessionMock.mockRejectedValueOnce(error);
+        "malformed token",
+        "invalid signature",
+        "wrong session purpose",
+    ])("rejects an %s with 401", async () => {
+        setCookieValue("not-a-valid-liff-session");
 
         const result = await requireLiffWorkforceSession();
 
@@ -95,13 +111,26 @@ describe("requireLiffWorkforceSession", () => {
         if (!result.ok) expect(result.response.status).toBe(401);
     });
 
+    it("rejects an expired token with 401", async () => {
+        vi.useFakeTimers();
+        try {
+            vi.setSystemTime(new Date("2026-09-08T00:00:00.000Z"));
+            vi.stubEnv("LINE_LIFF_SESSION_TTL_SECONDS", "1");
+            const token = await issueLiffSession({ userId: 10, employeeId: 20 });
+            vi.setSystemTime(new Date("2026-09-08T00:00:02.000Z"));
+            setCookieValue(token);
+
+            const result = await requireLiffWorkforceSession();
+
+            expect(result.ok).toBe(false);
+            if (!result.ok) expect(result.response.status).toBe(401);
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
     it("maps session configuration failure to 500", async () => {
-        verifyLiffSessionMock.mockRejectedValueOnce(
-            new LineIdentityVerificationError(
-                "MISCONFIGURED",
-                "internal configuration",
-            ),
-        );
+        vi.stubEnv("LINE_LIFF_SESSION_SECRET", "");
 
         const result = await requireLiffWorkforceSession();
 
@@ -110,19 +139,16 @@ describe("requireLiffWorkforceSession", () => {
     });
 
     it.each([
-        ["inactive user", { ...ACTIVE_USER, isActive: false }],
-        ["deleted user", { ...ACTIVE_USER, deletedAt: new Date() }],
-        [
-            "inactive employee",
-            { ...ACTIVE_USER, employee: { ...ACTIVE_USER.employee, status: "INACTIVE" } },
-        ],
-        [
-            "deleted employee",
-            { ...ACTIVE_USER, employee: { ...ACTIVE_USER.employee, deletedAt: new Date() } },
-        ],
-        ["changed employee relationship", { ...ACTIVE_USER, employeeId: 99 }],
-    ])("rejects an %s with 403", async (_label, user) => {
-        userFindUniqueMock.mockResolvedValueOnce(user);
+        ["inactive user", { ...ACTIVE_ACCOUNT, isActive: false }, ACTIVE_EMPLOYEE],
+        ["deleted user", { ...ACTIVE_ACCOUNT, deletedAt: new Date() }, ACTIVE_EMPLOYEE],
+        ["inactive employee", ACTIVE_ACCOUNT, null],
+        ["deleted employee", ACTIVE_ACCOUNT, null],
+        ["changed employee relationship", ACTIVE_ACCOUNT, null],
+    ])("rejects an %s with 403", async (_label, account, employee) => {
+        findAccountIdentityByIdMock.mockReset();
+        findAccountIdentityByIdMock.mockResolvedValue(account);
+        findLiffEmployeeByUserIdMock.mockReset();
+        findLiffEmployeeByUserIdMock.mockResolvedValue(employee);
 
         const result = await requireLiffWorkforceSession();
 
@@ -131,14 +157,23 @@ describe("requireLiffWorkforceSession", () => {
     });
 
     it("does not trust an employee ID that differs from the current employee", async () => {
-        verifyLiffSessionMock.mockResolvedValueOnce({
-            userId: 10,
-            employeeId: 99,
-        });
+        setCookieValue(await issueLiffSession({ userId: 10, employeeId: 99 }));
+        findLiffEmployeeByUserIdMock.mockResolvedValueOnce(null);
 
         const result = await requireLiffWorkforceSession();
 
         expect(result.ok).toBe(false);
         if (!result.ok) expect(result.response.status).toBe(403);
+        expect(findLiffEmployeeByUserIdMock).toHaveBeenCalledWith(10, 99);
+    });
+
+    it("does not reread LineAccountLink during normal post-issuance authorization", async () => {
+        await expect(requireLiffWorkforceSession()).resolves.toMatchObject({
+            ok: true,
+            employeeId: 20,
+        });
+
+        expect(lineAccountLinkFindUniqueMock).not.toHaveBeenCalled();
+        expect(lineAccountLinkFindManyMock).not.toHaveBeenCalled();
     });
 });

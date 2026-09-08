@@ -4,9 +4,9 @@ import { z } from "zod";
 import { AUTH_ERROR_MESSAGES } from "@/lib/auth/ssot";
 import { withTrustedMutation } from "@/lib/auth/csrf";
 import { isAuthRateLimited, recordAuthAttempt } from "@/lib/auth/rate-limit";
-import { logAuthEvent } from "@/lib/server/audit";
 import { setHybridAuthCookies, getClientMetadata } from "@/lib/auth/hybrid/session";
 import { enforcePreAuthIpRateLimit } from "@/lib/security/mutation-rate-limit";
+import { appendAuditBestEffort } from "@/modules/audit";
 import { authenticateHybridLogin } from "@/modules/auth";
 
 const hybridLoginSchema = z.object({
@@ -55,14 +55,33 @@ export const POST = withTrustedMutation(async (request: NextRequest): Promise<Ne
 
         if (result.status === "invalidCredentials") {
             recordAuthAttempt(rateLimitInput, LOGIN_RATE_LIMIT_POLICY);
-            await logAuthEvent("LOGIN_FAILED", result.userId, normalizedEmail, {
-                metadata: { method: "hybrid_login", reason: "invalid_credentials_or_inactive" },
+            await appendAuditBestEffort({
+                action: "LOGIN_FAILED",
+                entityType: "User",
+                entityId: result.userId,
+                userId: result.userId,
+                userEmail: normalizedEmail,
+                ipAddress: metadata.ipAddress,
+                userAgent: metadata.userAgent,
+                details: {
+                    metadata: {
+                        method: "hybrid_login",
+                        reason: "invalid_credentials_or_inactive",
+                    },
+                },
             });
             return NextResponse.json({ error: AUTH_ERROR_MESSAGES.invalidEmailOrPassword }, { status: 401 });
         }
 
-        await logAuthEvent("LOGIN_SUCCESS", result.user.id, result.user.email, {
-            metadata: { method: "hybrid_login" },
+        await appendAuditBestEffort({
+            action: "LOGIN_SUCCESS",
+            entityType: "User",
+            entityId: result.user.id,
+            userId: result.user.id,
+            userEmail: result.user.email,
+            ipAddress: metadata.ipAddress,
+            userAgent: metadata.userAgent,
+            details: { metadata: { method: "hybrid_login" } },
         });
 
         const response = NextResponse.json({

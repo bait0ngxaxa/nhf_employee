@@ -4,8 +4,7 @@ import path from "node:path";
 import sharp from "sharp";
 
 import { isFeatureEnabled, FEATURE_KEYS } from "@/lib/ssot/features";
-import { getLiffHomeModules } from "@/lib/line/liff-home";
-import type { LiffHomeModules } from "@/lib/line/liff-types";
+import { getLiffHomeModules, type LiffHomeModules } from "@/modules/line";
 import { APP_ROUTES } from "@/lib/ssot/routes";
 
 import {

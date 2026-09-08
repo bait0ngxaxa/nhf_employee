@@ -1,4 +1,4 @@
-import { requireLiffWorkforceSession } from "@/lib/auth/liff";
+import { requireLiffWorkforceSession } from "@/modules/line";
 import { forbidden } from "@/lib/ssot/http";
 import { isAdminRole } from "@/lib/ssot/permissions";
 

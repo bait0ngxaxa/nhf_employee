@@ -31,6 +31,15 @@ const AUTH_RESOLUTION_USER_SELECT = {
     },
 } as const satisfies Prisma.UserSelect;
 
+const AUTH_IDENTITY_USER_SELECT = {
+    id: true,
+    email: true,
+    name: true,
+    role: true,
+    isActive: true,
+    deletedAt: true,
+} as const satisfies Prisma.UserSelect;
+
 const AUTH_RESET_USER_SELECT = {
     id: true,
     email: true,
@@ -56,6 +65,10 @@ export type AuthResolutionAccount = Prisma.UserGetPayload<{
     select: typeof AUTH_RESOLUTION_USER_SELECT;
 }>;
 
+export type AuthAccountIdentity = Prisma.UserGetPayload<{
+    select: typeof AUTH_IDENTITY_USER_SELECT;
+}>;
+
 export type AuthResetAccount = Prisma.UserGetPayload<{
     select: typeof AUTH_RESET_USER_SELECT;
 }>;
@@ -79,6 +92,15 @@ export async function findAccountForResolution(userId: number): Promise<AuthReso
     return prisma.user.findUnique({
         where: { id: userId },
         select: AUTH_RESOLUTION_USER_SELECT,
+    });
+}
+
+export async function findAccountIdentityById(
+    userId: number,
+): Promise<AuthAccountIdentity | null> {
+    return prisma.user.findUnique({
+        where: { id: userId },
+        select: AUTH_IDENTITY_USER_SELECT,
     });
 }
 

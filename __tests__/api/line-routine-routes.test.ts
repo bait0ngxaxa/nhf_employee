@@ -12,7 +12,7 @@ const {
     getRoutineSummaryMock: vi.fn(),
 }));
 
-vi.mock("@/lib/auth/liff", () => ({
+vi.mock("@/modules/line", () => ({
     requireLiffWorkforceSession: requireLiffWorkforceSessionMock,
 }));
 

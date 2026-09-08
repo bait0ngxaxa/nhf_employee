@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { requireLiffWorkforceSession } from "@/lib/auth/liff";
+import { requireLiffWorkforceSession } from "@/modules/line";
 import {
     getEmployeeLeaveActions,
     getEmployeeLeaveProfile,

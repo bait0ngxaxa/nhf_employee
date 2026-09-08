@@ -1,10 +1,11 @@
 # NHF Employee modular monolith
 
-Status: Phase J2 CLOSED — Auth identity projection and browser presentation
-ownership complete; J3 remains NOT STARTED. Phase I3 Audit
-producer integration and physical AuditLog persistence exclusivity remains
-closed. Phase H3 Notification producer integration and final migration audit
-remain complete. Phase G3 Department migration remains complete.
+Status: Phase J3 CLOSED — LINE/LIFF identity integration and Auth Audit
+producer migration complete; Auth / Session / Identity migration COMPLETE.
+Phase I3 Audit producer integration and physical AuditLog persistence
+exclusivity remains closed. Phase H3 Notification producer integration and
+final migration audit remain complete. Phase G3 Department migration remains
+complete.
 
 The authoritative J0 decision is recorded in
 [auth-session-identity-migration.md](./auth-session-identity-migration.md).
@@ -272,8 +273,8 @@ provider consumed by Employee. Its only supported production server entry is
 `@/modules/auth`; J2 adds the browser-safe `@/modules/auth/client` entry.
 
 The core Auth routes remain HTTP adapters for parsing, trusted-mutation checks,
-status/response serialization, cookies, request limits, and deferred Auth
-Audit composition. Their Auth business and AuthRefreshToken/
+status/response serialization, cookies, request limits, and direct best-effort
+Audit composition through `@/modules/audit`. Their Auth business and AuthRefreshToken/
 PasswordResetToken persistence delegates are owned by the Auth application and
 infrastructure. Employee owns a structural account-lifecycle port, and the
 Employee route composes `@/modules/employee` with `@/modules/auth` so the same
@@ -284,9 +285,35 @@ runtime module cycle.
 The broad `/api/auth/me` projection is now composed at the delivery seam from
 Auth, Employee, and Leave public contracts. Generic Auth remains narrow;
 Employee owns workforce identity/hierarchy and Leave owns capability rules.
-LINE/LIFF behavior and Auth Audit producers remain deferred to J3. No Prisma
-schema, browser presentation behavior, cookie/token contract, or documented
-compatibility behavior was changed by J2.
+J3 completes the separate LINE/LIFF integration boundary under
+`modules/line/`, and Auth routes now append Audit events directly through
+`@/modules/audit`. No Prisma schema, browser presentation behavior,
+cookie/token contract, or documented compatibility behavior was changed.
+
+### Auth / Session / Account Identity (J3 final boundary)
+
+`modules/line/` owns LINE account-link identity and persistence, verified LINE
+Login identity, LIFF session issuance/verification, LIFF workforce composition,
+and LINE browser recovery. Its server entry is `@/modules/line`; its browser
+entry is `@/modules/line/client`. Auth exposes only a narrow account lookup,
+Employee exposes the LIFF workforce lookup and lifecycle predicates, and Leave
+exposes the exact actionable LIFF approval capability. LINE composes these
+contracts without owning Employee, Leave, Stock, Routine, or notification
+meaning.
+
+`LineAccountLink` persistence is exclusive to LINE infrastructure. Routine and
+provider recipient resolution use a narrow LINE read contract and preserve
+transaction-bound reads. Existing LINE Messaging/provider infrastructure and
+feature-owned notification semantics remain outside the identity boundary.
+The LIFF JWT/cookie contract and the no-post-issuance `LineAccountLink`
+reread invariant remain unchanged.
+
+The seven Auth Audit producer surfaces call `appendAuditBestEffort()` from
+`@/modules/audit` directly. `lib/server/audit.ts` remains only for legitimate
+non-Auth compatibility consumers (Email Request, Employee export, Leave export,
+and Audit Log export). The architecture checker protects both LINE entries,
+the browser graph, LineAccountLink persistence ownership, deleted migration
+paths, and the Auth→Audit producer boundary.
 
 ## Ownership principle
 

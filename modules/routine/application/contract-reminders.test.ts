@@ -274,6 +274,9 @@ describe("Routine contract expiry dispatch", () => {
             asNever(buildTask()),
         );
         prismaMock.lineAccountLink.findMany.mockResolvedValue(asNever([]));
+        prismaMock.lineAccountLink.findUnique.mockResolvedValue(asNever({
+            lineUserId: "U-contract-owner",
+        }));
         sendRoutineContractExpiryNotificationMock.mockResolvedValue(true);
         sendLineAppMessageMock.mockResolvedValue(true);
     });

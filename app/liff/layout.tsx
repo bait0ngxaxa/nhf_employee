@@ -1,7 +1,7 @@
 import type { ReactElement, ReactNode } from "react";
 import { Suspense } from "react";
 
-import { LiffBootstrap } from "@/components/liff/LiffBootstrap";
+import { LiffBootstrap } from "@/modules/line/client";
 import { LiffAppShell } from "@/components/liff/LiffAppShell";
 
 export default function LiffLayout({

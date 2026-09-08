@@ -4,19 +4,15 @@ import { requireActiveWorkforceSession } from "@/lib/auth/workforce";
 import { withTrustedMutation } from "@/lib/auth/csrf";
 import { hasPrismaErrorCode } from "@/lib/db/transaction";
 import {
+    LineAccountLinkConflictError,
     lineRequestSizeGuard,
     readLineIdToken,
-} from "@/lib/line/api";
-import {
-    LineAccountLinkConflictError,
     linkLineAccount,
-} from "@/lib/line/account-link";
-import { LineIdentityVerificationError } from "@/lib/line/errors";
-import {
     issueLiffSession,
     setLiffSessionCookie,
-} from "@/lib/line/liff-session";
-import { verifyLineIdToken } from "@/lib/line/verify-id-token";
+    verifyLineIdToken,
+    LineIdentityVerificationError,
+} from "@/modules/line";
 import { jsonError, operationFailed, serverError, unauthorized } from "@/lib/ssot/http";
 
 function lineVerificationErrorResponse(

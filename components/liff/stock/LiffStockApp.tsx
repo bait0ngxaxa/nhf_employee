@@ -16,14 +16,14 @@ import {
     type StockCartAvailabilityReconciliation,
     type StockCartVariantAvailability,
 } from "@/modules/stock/client";
-import { useLiffWorkforce } from "@/components/liff/LiffBootstrap";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
     isRecoveredLiffMutation,
     LIFF_SESSION_RECOVERED_MUTATION_MESSAGE,
     LiffApiError,
-} from "@/lib/client/liff";
-import { fetchLiffHome } from "@/lib/client/liff-home";
+    useLiffWorkforce,
+} from "@/modules/line/client";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { fetchLiffHome } from "@/modules/line/client";
 import {
     cancelLiffStockRequest,
     fetchLiffStockCategories,

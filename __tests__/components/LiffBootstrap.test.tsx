@@ -3,16 +3,6 @@ import type { ReactElement } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => {
-    class MockLiffApiError extends Error {
-        readonly status: number | undefined;
-
-        constructor(message: string, status?: number) {
-            super(message);
-            this.name = "LiffApiError";
-            this.status = status;
-        }
-    }
-
     return {
         liff: {
             init: vi.fn(),
@@ -21,10 +11,9 @@ const mocks = vi.hoisted(() => {
             getIDToken: vi.fn(),
         },
         usePathname: vi.fn(),
+        apiPost: vi.fn(),
         establishLiffSession: vi.fn(),
         linkLiffAccount: vi.fn(),
-        registerLiffSessionRecovery: vi.fn(),
-        MockLiffApiError,
     };
 });
 
@@ -34,18 +23,22 @@ vi.mock("next/navigation", () => ({
     usePathname: mocks.usePathname,
 }));
 
-vi.mock("@/lib/client/liff", () => ({
-    establishLiffSession: mocks.establishLiffSession,
-    linkLiffAccount: mocks.linkLiffAccount,
-    registerLiffSessionRecovery: mocks.registerLiffSessionRecovery,
-    LiffApiError: mocks.MockLiffApiError,
+vi.mock("@/lib/client/api-client", () => ({
+    apiGet: vi.fn(),
+    apiPost: mocks.apiPost,
+    apiPut: vi.fn(),
+    apiPatch: vi.fn(),
+    apiDelete: vi.fn(),
 }));
 
 import {
     buildLiffNhfLoginUrl,
     LiffBootstrap,
+    LiffApiError,
+    recoverLiffSession,
     useLiffWorkforce,
-} from "@/components/liff/LiffBootstrap";
+} from "@/modules/line/client";
+import { API_ROUTES } from "@/lib/ssot/routes";
 
 const WORKFORCE = {
     userId: 10,
@@ -76,7 +69,17 @@ describe("LiffBootstrap", () => {
             linked: true,
             workforce: WORKFORCE,
         });
-        mocks.registerLiffSessionRecovery.mockReturnValue(vi.fn());
+        mocks.apiPost.mockImplementation(async (endpoint: string, data: unknown) => {
+            const idToken = (
+                data && typeof data === "object" && "idToken" in data
+                    ? data.idToken
+                    : undefined
+            );
+            const result = endpoint === API_ROUTES.line.accountLink
+                ? await mocks.linkLiffAccount(idToken)
+                : await mocks.establishLiffSession(idToken);
+            return { success: true, data: result, status: 200, requestId: "test" };
+        });
     });
 
     afterEach(() => {
@@ -193,26 +196,17 @@ describe("LiffBootstrap", () => {
     });
 
     it("re-establishes the shared session through the registered recovery handler", async () => {
-        let recover: (() => Promise<boolean>) | undefined;
-        mocks.registerLiffSessionRecovery.mockImplementationOnce(
-            (handler: () => Promise<boolean>) => {
-                recover = handler;
-                return vi.fn();
-            },
-        );
-
         render(<LiffBootstrap><WorkforceProbe /></LiffBootstrap>);
         expect(
             await screen.findByText("พร้อมใช้งานสำหรับ พนักงาน ทดสอบ"),
         ).toBeInTheDocument();
 
-        if (!recover) throw new Error("Expected a LIFF recovery handler");
         mocks.establishLiffSession.mockResolvedValueOnce({
             linked: true,
             workforce: { ...WORKFORCE, name: "พนักงานหลังต่ออายุ" },
         });
 
-        await expect(recover()).resolves.toBe(true);
+        await expect(recoverLiffSession()).resolves.toBe(true);
         expect(
             await screen.findByText("พร้อมใช้งานสำหรับ พนักงานหลังต่ออายุ"),
         ).toBeInTheDocument();
@@ -292,9 +286,7 @@ describe("LiffBootstrap", () => {
             "",
             "/liff/routine?link=1&loginReturn=1",
         );
-        mocks.linkLiffAccount.mockRejectedValueOnce(
-            new mocks.MockLiffApiError("หมดอายุ", 401),
-        );
+        mocks.linkLiffAccount.mockRejectedValueOnce(new LiffApiError("หมดอายุ", 401));
 
         render(<LiffBootstrap><div>Routine</div></LiffBootstrap>);
 

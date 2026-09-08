@@ -4,10 +4,10 @@ import {
     type UnauthorizedRecoveryMetadata,
     type UnauthorizedRecoveryHandler,
 } from "@/lib/client/api-client";
-import type { LiffSessionResponse } from "@/lib/line/liff-types";
+import type { LiffSessionResponse } from "../application/types";
 import { API_ROUTES } from "@/lib/ssot/routes";
 
-export type { LiffSessionResponse, LiffWorkforceIdentity } from "@/lib/line/liff-types";
+export type { LiffSessionResponse, LiffWorkforceIdentity } from "../application/types";
 
 export const LIFF_SESSION_RECOVERED_MUTATION_MESSAGE =
     "เชื่อมต่อกับ LINE ใหม่เรียบร้อยแล้ว กรุณาตรวจสอบสถานะล่าสุดก่อนลองดำเนินการอีกครั้ง";

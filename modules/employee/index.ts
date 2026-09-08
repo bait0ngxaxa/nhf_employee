@@ -7,6 +7,7 @@ export {
 export {
     hasEligibleCurrentEmployeeForUser,
     findCurrentEmployeeProjection,
+    findLiffEmployeeByUserId,
     listEmployees,
     getEmployeeStats,
 } from "./infrastructure/persistence/employee-queries";
@@ -34,6 +35,7 @@ export type {
     EmployeeAccountLifecycleProvider,
     EmployeeAccountLifecycleRecord,
     CurrentEmployeeProjection,
+    LiffEmployeeIdentity,
 } from "./application/types";
 
 // Auth/workforce and signup contracts.

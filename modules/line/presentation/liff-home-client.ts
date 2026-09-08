@@ -2,8 +2,8 @@ import { apiGet, type ApiResponse } from "@/lib/client/api-client";
 import {
     LIFF_API_REQUEST_OPTIONS,
     unwrapLiffResponse,
-} from "@/lib/client/liff";
-import type { LiffHomeResponse } from "@/lib/line/liff-types";
+} from "./liff-client";
+import type { LiffHomeResponse } from "../application/types";
 import { API_ROUTES } from "@/lib/ssot/routes";
 
 function getLiffHomeApiErrorMessage(

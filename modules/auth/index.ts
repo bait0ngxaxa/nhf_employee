@@ -19,6 +19,7 @@ export {
     revokeAuthSessionFamily,
     cleanupAuthRefreshSessions,
 } from "./application/sessions";
+export { findAccountIdentityById } from "./application/account-identity";
 export {
     requestPasswordReset,
     resetPassword,
@@ -48,6 +49,7 @@ export type {
     ResetPasswordResult,
     SignupResult,
 } from "./application/types";
+export type { AuthAccountIdentity } from "./infrastructure/persistence/account-repository";
 
 // These token primitives remain a compatibility seam for middleware and the
 // existing hybrid-token tests. They contain no persistence and are not a

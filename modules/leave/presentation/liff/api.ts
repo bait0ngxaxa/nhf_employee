@@ -11,7 +11,7 @@ import {
     LIFF_SESSION_RECOVERED_MUTATION_MESSAGE,
     LiffApiError,
     unwrapLiffResponse,
-} from "@/lib/client/liff";
+} from "@/modules/line/client";
 import type { LeaveHistoryFilters } from "../../application/queries/history-filters";
 import { API_ROUTES } from "@/lib/ssot/routes";
 import type { LiffLeaveApprovalsResponse, LiffLeaveProfileResponse, LiffLeaveRequestDetail } from "../types";

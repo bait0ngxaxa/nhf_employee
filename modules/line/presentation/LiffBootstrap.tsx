@@ -20,9 +20,9 @@ import {
     linkLiffAccount,
     registerLiffSessionRecovery,
     type LiffWorkforceIdentity,
-} from "@/lib/client/liff";
+} from "./liff-client";
 import { isSafeInternalPath } from "@/lib/auth/return-path";
-import { getLineLiffId } from "@/lib/line/config";
+import { getLineLiffId } from "./client-config";
 import { APP_ROUTES, isLiffAppPath } from "@/lib/ssot/routes";
 
 type LiffBootstrapState =

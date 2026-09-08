@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { getLiffHomeModules } from "@/lib/line/liff-home";
+import { getLiffHomeModules } from "@/modules/line";
 
 describe("LIFF home module availability", () => {
     afterEach(() => {

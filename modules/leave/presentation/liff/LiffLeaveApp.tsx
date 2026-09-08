@@ -22,12 +22,12 @@ import {
     requestLiffLeaveNotTaken,
     submitLiffLeaveDecision,
 } from "./api";
-import { fetchLiffHome } from "@/lib/client/liff-home";
+import { fetchLiffHome } from "@/modules/line/client";
 import {
     isRecoveredLiffMutation,
     LIFF_SESSION_RECOVERED_MUTATION_MESSAGE,
     LiffApiError,
-} from "@/lib/client/liff";
+} from "@/modules/line/client";
 import type { LeaveHistoryFilters } from "../../application/queries/history-filters";
 import type { ApproverLeaveAction, EmployeeLeaveAction, LiffEmployeeLeaveRequest, LiffLeaveApprovalItem, LiffLeaveApprovalsResponse, LiffLeaveProfileResponse, LiffLeaveRequestDetail as LiffLeaveRequestDetailData } from "../types";
 

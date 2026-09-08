@@ -4,6 +4,7 @@ import { Role } from "@prisma/client";
 import { sendRoutineReminderNotification } from "./notifications/email";
 import type { RoutineReminderEmailData } from "./notifications/notification-types";
 import { sendAppLineNotification } from "@/lib/line/app-notification";
+import { findLineUserIdByUserId } from "@/modules/line";
 import { generateRoutineReminderFlexMessage } from "./notifications/routine-reminder-flex";
 import {
     buildRoutineDashboardTaskUrl,
@@ -433,12 +434,11 @@ async function dispatchRoutineReminderLineOutbox(
                         deletedAt: true,
                     },
                 },
-                lineAccountLink: {
-                    select: { lineUserId: true },
-                },
             },
         });
-        const lineUserId = recipient?.lineAccountLink?.lineUserId.trim();
+        const lineUserId = recipient
+            ? (await findLineUserIdByUserId(payload.userId, tx))?.trim()
+            : null;
         if (
             !recipient
             || !lineUserId

@@ -26,8 +26,8 @@ vi.mock("bcryptjs", () => ({
 
 vi.mock("@/lib/db/prisma", () => ({ prisma: prismaMock }));
 
-vi.mock("@/lib/server/audit", () => ({
-    logAuthEvent: vi.fn(),
+vi.mock("@/modules/audit", () => ({
+    appendAuditBestEffort: vi.fn(),
 }));
 
 vi.mock("@/lib/auth/hybrid/tokens", () => ({

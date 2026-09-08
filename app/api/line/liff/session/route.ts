@@ -1,21 +1,17 @@
 import { type NextRequest, NextResponse } from "next/server";
 
-import { findActiveLiffWorkforceIdentity } from "@/lib/auth/liff";
 import { withTrustedMutation } from "@/lib/auth/csrf";
 import {
     findLineAccountLinkByLineUserId,
-} from "@/lib/line/account-link";
-import {
     lineRequestSizeGuard,
     readLineIdToken,
-} from "@/lib/line/api";
-import { LineIdentityVerificationError } from "@/lib/line/errors";
-import {
     clearLiffSessionCookie,
+    findActiveLiffWorkforceIdentity,
     issueLiffSession,
     setLiffSessionCookie,
-} from "@/lib/line/liff-session";
-import { verifyLineIdToken } from "@/lib/line/verify-id-token";
+    verifyLineIdToken,
+    LineIdentityVerificationError,
+} from "@/modules/line";
 import { forbidden, operationFailed, serverError, unauthorized } from "@/lib/ssot/http";
 
 function lineVerificationErrorResponse(

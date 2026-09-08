@@ -1,7 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 
-import { createAuditLog } from "@/lib/server/audit";
 import {
     clearAuthIdentityRateLimit,
     isAuthRateLimited,
@@ -11,6 +10,7 @@ import { AUTH_SIGNUP_MESSAGES } from "@/lib/auth/ssot";
 import { withTrustedMutation } from "@/lib/auth/csrf";
 import { getClientMetadata } from "@/lib/auth/hybrid/session";
 import { signupSchema } from "@/lib/validations/auth";
+import { appendAuditBestEffort } from "@/modules/audit";
 import { signupAccount, SignupEligibilityError } from "@/modules/auth";
 
 const SIGNUP_RATE_LIMIT_POLICY = {
@@ -66,12 +66,14 @@ export const POST = withTrustedMutation(
             });
             clearAuthIdentityRateLimit(rateLimitInput);
 
-            await createAuditLog({
+            await appendAuditBestEffort({
                 action: "USER_CREATE",
                 entityType: "User",
                 entityId: result.user.id,
                 userId: result.user.id,
                 userEmail: result.user.email,
+                ipAddress: metadata.ipAddress,
+                userAgent: metadata.userAgent,
                 details: {
                     after: {
                         name: result.user.name,

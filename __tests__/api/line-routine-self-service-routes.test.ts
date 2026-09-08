@@ -12,7 +12,7 @@ const mocks = vi.hoisted(() => ({
         enforceAuthenticatedMutationRateLimit: vi.fn(),
 }));
 
-vi.mock("@/lib/auth/liff", () => ({
+vi.mock("@/modules/line", () => ({
     requireLiffWorkforceSession: mocks.requireLiffWorkforceSession,
 }));
 

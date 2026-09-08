@@ -4,7 +4,7 @@ import {
     LIFF_SESSION_RECOVERED_MUTATION_MESSAGE,
     LIFF_API_REQUEST_OPTIONS,
     unwrapLiffResponse,
-} from "@/lib/client/liff";
+} from "@/modules/line/client";
 import { API_ROUTES } from "@/lib/ssot/routes";
 import type {
     LiffStockCatalogResponse,

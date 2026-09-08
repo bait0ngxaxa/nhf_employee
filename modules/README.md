@@ -3,7 +3,8 @@
 `modules/` is the ownership boundary for business capabilities in the NHF
 Employee application.
 
-Stock, Routine, Leave, Employee, Department, Audit, and Auth/Session are
+Stock, Routine, Leave, Employee, Department, Audit, Auth/Session, and
+LINE/LIFF integration are
 migrated capability modules. Audit Phase I3 is closed with generic
 server/application/persistence,
 producer, entity-history query, and Dashboard presentation ownership in
@@ -15,16 +16,19 @@ Stock, and Routine retain event meaning and consume only the public Audit
 server entry. Email Request/future IT migration remains deferred. Phase J0
 Auth / Session / Identity discovery and boundary definition is closed, Phase
 J1 Auth / Session server and persistence ownership is closed, and Phase J2
-Auth identity projection and browser presentation ownership is closed; the
+Auth identity projection and browser presentation ownership is closed, and
+Phase J3 closes LINE/LIFF identity integration plus Auth Audit producer
+migration; the Auth / Session / Identity migration is complete. The
 authoritative record is
 [`docs/architecture/auth-session-identity-migration.md`](../docs/architecture/auth-session-identity-migration.md).
-J3 remains NOT STARTED. The runtime capability is `modules/auth/`, with
+The runtime Auth capability is `modules/auth/`, with
 `@/modules/auth` as its server public entry and `@/modules/auth/client` as its
 browser public entry. It
 owns the Auth field slice of User, credentials, web token/session families,
 recovery/reset, signup, and Auth refresh/reset-token persistence.
-Employee/workforce ownership remains outside Auth, and the separate LINE/LIFF
-identity/account-link integration seam remains deferred.
+Employee/workforce ownership remains outside Auth. The LINE/LIFF integration
+capability is `modules/line/`, with `@/modules/line` as its server entry and
+`@/modules/line/client` as its browser entry.
 
 The J2 Auth structure is:
 
@@ -39,13 +43,37 @@ modules/auth/
 ```
 
 Core Auth routes delegate business and Auth-token persistence through the server
-entry while retaining HTTP/security/cookie adaptation and deferred Auth Audit
-composition. Employee binds Auth's transaction-aware account-lifecycle
+entry while retaining HTTP/security/cookie adaptation. Auth Audit producers
+call `@/modules/audit` directly. Employee binds Auth's transaction-aware account-lifecycle
 provider through its own structural port, preserving the same serializable
 transaction and avoiding an Auth/Employee runtime cycle. The broad
 `/api/auth/me` projection is composed outside generic Auth from Auth, Employee,
-and Leave public contracts. LINE/LIFF and Auth Audit producer migration remain
-J3 exceptions.
+and Leave public contracts.
+
+The J3 LINE structure is:
+
+```text
+modules/line/
+├── application/
+├── infrastructure/
+├── presentation/
+├── client.ts
+└── index.ts
+```
+
+The server entry owns LINE account linking, verified identity, LIFF sessions,
+LIFF workforce composition, and recovery contracts. Auth supplies the narrow
+account lookup, Employee supplies the active workforce lookup, and Leave
+supplies the exact actionable LIFF approval capability. `LineAccountLink`
+persistence is exclusive to LINE infrastructure; Routine retains recipient
+meaning and uses the public LINE read contract. The browser entry contains only
+browser-safe LIFF transport, DTOs, SDK bootstrap, and recovery, and cannot
+reach server secrets or the LINE server entry.
+
+The LIFF JWT/cookie contract and the rule that normal post-issuance workforce
+authorization does not reread `LineAccountLink` remain unchanged. Provider
+Messaging/outbox infrastructure remains under its existing platform/provider
+owners, and feature modules retain notification meaning.
 Employee F0-F3 owns its server/business behavior and active presentation in
 `modules/employee/`. Employee Dashboard routes consume the minimal
 browser-safe `@/modules/employee/client` entry, which also exposes the proven
@@ -68,7 +96,8 @@ Rules for new work:
 
 The intended dependency direction is documented in
 [dependency rules](../docs/architecture/dependency-rules.md). Run
-`npm run architecture:check` when changing code under this directory.
+
+pm run architecture:check` when changing code under this directory.
 
 Employee/Leave lifecycle composition is intentionally one-way: Leave may use
 the public Employee hierarchy contract for the Employee-owned `managerId`

@@ -50,6 +50,26 @@ export interface CurrentEmployeeLeaveProjection {
     canViewLeaveReports: boolean;
 }
 
+export interface LiffLeaveCapabilities {
+    canApproveLeave: boolean;
+}
+
+export async function getLiffLeaveCapabilities(
+    employeeId: number,
+): Promise<LiffLeaveCapabilities> {
+    const actionableApproval = await prisma.leaveRequest.findFirst({
+        where: {
+            AND: [
+                getAssignedLeaveApproverWhere(employeeId),
+                getActionableLeaveApprovalWhere(),
+            ],
+        },
+        select: { id: true },
+    });
+
+    return { canApproveLeave: actionableApproval !== null };
+}
+
 export async function getCurrentEmployeeLeaveProjection(
     employeeId: number,
     isManager: boolean,

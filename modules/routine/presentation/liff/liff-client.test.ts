@@ -14,7 +14,7 @@ import {
     establishLiffSession,
     LiffApiError,
     linkLiffAccount,
-} from "@/lib/client/liff";
+} from "@/modules/line/client";
 import { fetchLiffRoutineSummary } from "./api";
 import { API_ROUTES } from "@/lib/ssot/routes";
 

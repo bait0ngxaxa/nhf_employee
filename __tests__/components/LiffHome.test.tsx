@@ -15,15 +15,9 @@ const mocks = vi.hoisted(() => ({
     },
 }));
 
-vi.mock("@/lib/client/liff-home", () => ({
+vi.mock("@/modules/line/client", () => ({
     fetchLiffHome: mocks.fetchLiffHome,
-}));
-
-vi.mock("@/lib/client/liff", () => ({
     LiffApiError: mocks.MockLiffApiError,
-}));
-
-vi.mock("@/components/liff/LiffBootstrap", () => ({
     useLiffWorkforce: mocks.useLiffWorkforce,
 }));
 

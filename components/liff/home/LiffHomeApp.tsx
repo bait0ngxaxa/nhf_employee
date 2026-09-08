@@ -16,14 +16,13 @@ import {
     type ReactElement,
 } from "react";
 
-import { useLiffWorkforce } from "@/components/liff/LiffBootstrap";
+import { LiffApiError, useLiffWorkforce } from "@/modules/line/client";
 import { ErrorState, LoadingState } from "@/components/ui/state";
-import { fetchLiffHome } from "@/lib/client/liff-home";
-import { LiffApiError } from "@/lib/client/liff";
+import { fetchLiffHome } from "@/modules/line/client";
 import type {
     LiffHomeModule,
     LiffHomeResponse,
-} from "@/lib/line/liff-types";
+} from "@/modules/line/client";
 import { APP_ROUTES } from "@/lib/ssot/routes";
 import { cn } from "@/lib/ui/utils";
 

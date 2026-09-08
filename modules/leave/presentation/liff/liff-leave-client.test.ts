@@ -18,7 +18,7 @@ import {
     submitLiffLeaveDecision,
     submitLiffLeaveRequest,
 } from "./api";
-import { LIFF_API_REQUEST_OPTIONS } from "@/lib/client/liff";
+import { LIFF_API_REQUEST_OPTIONS } from "@/modules/line/client";
 import { API_ROUTES } from "@/lib/ssot/routes";
 
 const SUCCESS = {

@@ -30,7 +30,7 @@ vi.mock("next/server", async (importOriginal) => {
     };
 });
 
-vi.mock("@/lib/auth/liff", () => ({
+vi.mock("@/modules/line", () => ({
     requireLiffWorkforceSession: mocks.requireLiffWorkforceSession,
 }));
 

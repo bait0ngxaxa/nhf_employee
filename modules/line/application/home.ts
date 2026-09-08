@@ -1,5 +1,5 @@
 import { FEATURE_KEYS, isFeatureEnabled } from "@/lib/ssot/features";
-import type { LiffHomeResponse } from "./liff-types";
+import type { LiffHomeResponse } from "./types";
 
 export function getLiffHomeModules(): LiffHomeResponse["modules"] {
     const leaveEnabled = isFeatureEnabled(FEATURE_KEYS.leave);

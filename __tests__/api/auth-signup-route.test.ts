@@ -7,7 +7,8 @@ import type * as HybridAuthTokensModule from "@/lib/auth/hybrid/tokens";
 import { POST as signupRoute } from "@/app/api/auth/signup/route";
 import { resetAuthRateLimit } from "@/lib/auth/rate-limit";
 
-const { prismaMock } = vi.hoisted(() => ({
+const { appendAuditBestEffortMock, prismaMock } = vi.hoisted(() => ({
+    appendAuditBestEffortMock: vi.fn(),
     prismaMock: {
         user: {
             findUnique: vi.fn(),
@@ -18,9 +19,6 @@ const { prismaMock } = vi.hoisted(() => ({
         },
         employee: {
             findUnique: vi.fn(),
-        },
-        auditLog: {
-            create: vi.fn(),
         },
         $queryRaw: vi.fn(),
         $transaction: vi.fn(),
@@ -35,6 +33,10 @@ vi.mock("bcryptjs", () => ({
 
 vi.mock("@/lib/db/prisma", () => ({
     prisma: prismaMock,
+}));
+
+vi.mock("@/modules/audit", () => ({
+    appendAuditBestEffort: appendAuditBestEffortMock,
 }));
 
 vi.mock("@/lib/auth/hybrid/tokens", async () => {
@@ -83,9 +85,9 @@ describe("Auth signup route", () => {
         prismaMock.user.findUnique.mockReset();
         prismaMock.user.create.mockReset();
         prismaMock.employee.findUnique.mockReset();
-        prismaMock.auditLog.create.mockReset();
         prismaMock.$queryRaw.mockReset();
         prismaMock.$transaction.mockReset();
+        appendAuditBestEffortMock.mockReset();
         prismaMock.$queryRaw.mockResolvedValue([]);
         prismaMock.$transaction.mockImplementation(async (operation) => {
             if (typeof operation === "function") {
@@ -142,8 +144,6 @@ describe("Auth signup route", () => {
             role: "USER",
             tokenVersion: 1,
         });
-        prismaMock.auditLog.create.mockResolvedValue({ id: 1 });
-
         const response = await signupRoute(
             buildRequest({
                 email: "user@thainhf.org",
@@ -167,6 +167,25 @@ describe("Auth signup route", () => {
             select: expect.objectContaining({ email: true }),
         });
         expect(prismaMock.authRefreshToken.create).not.toHaveBeenCalled();
+        expect(appendAuditBestEffortMock).toHaveBeenCalledWith(expect.objectContaining({
+            action: "USER_CREATE",
+            entityType: "User",
+            entityId: 7,
+            userId: 7,
+            userEmail: "user@thainhf.org",
+            details: {
+                after: {
+                    name: "สมชาย ใจดี",
+                    email: "user@thainhf.org",
+                    role: "USER",
+                },
+                metadata: {
+                    source: "signup",
+                    bootstrapAdmin: false,
+                    employeeName: "สมชาย ใจดี",
+                },
+            },
+        }));
         expect(response.headers.get("set-cookie")).toBeNull();
     });
 
@@ -188,8 +207,6 @@ describe("Auth signup route", () => {
             role: "ADMIN",
             tokenVersion: 1,
         });
-        prismaMock.auditLog.create.mockResolvedValue({ id: 2 });
-
         const response = await signupRoute(
             buildRequest({
                 email: "admin@thainhf.org",

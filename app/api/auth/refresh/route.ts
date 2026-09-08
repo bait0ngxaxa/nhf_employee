@@ -2,7 +2,6 @@ import { type NextRequest, NextResponse } from "next/server";
 
 import { AUTH_ERROR_MESSAGES } from "@/lib/auth/ssot";
 import { withTrustedMutation } from "@/lib/auth/csrf";
-import { logAuthEvent } from "@/lib/server/audit";
 import {
     HYBRID_REFRESH_COOKIE_NAME,
     clearHybridAuthCookies,
@@ -10,6 +9,7 @@ import {
     setHybridAuthCookies,
 } from "@/lib/auth/hybrid/session";
 import { enforcePreAuthIpRateLimit } from "@/lib/security/mutation-rate-limit";
+import { appendAuditBestEffort } from "@/modules/audit";
 import { refreshHybridSession } from "@/modules/auth";
 
 function unauthorizedResponse(): NextResponse {
@@ -29,13 +29,22 @@ async function logRefreshSecurityEvent(input: {
     ipAddress?: string;
     userAgent?: string;
 }): Promise<void> {
-    await logAuthEvent("LOGIN_FAILED", input.userId, input.email, {
-        metadata: {
-            authFlow: "hybrid_refresh",
-            reason: input.reason,
-            familyId: input.familyId,
-            ipAddress: input.ipAddress,
-            userAgent: input.userAgent,
+    await appendAuditBestEffort({
+        action: "LOGIN_FAILED",
+        entityType: "User",
+        entityId: input.userId,
+        userId: input.userId,
+        userEmail: input.email,
+        ipAddress: input.ipAddress,
+        userAgent: input.userAgent,
+        details: {
+            metadata: {
+                authFlow: "hybrid_refresh",
+                reason: input.reason,
+                familyId: input.familyId,
+                ipAddress: input.ipAddress,
+                userAgent: input.userAgent,
+            },
         },
     });
 }

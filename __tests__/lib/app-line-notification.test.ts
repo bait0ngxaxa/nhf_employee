@@ -44,6 +44,9 @@ describe("sendAppLineNotification", () => {
     beforeEach(() => {
         mockReset(prismaMock);
         vi.clearAllMocks();
+        prismaMock.lineAccountLink.findUnique.mockResolvedValue(asNever({
+            lineUserId: "U-linked",
+        }));
         sendLineAppMessageMock.mockResolvedValue(true);
     });
 
@@ -68,6 +71,7 @@ describe("sendAppLineNotification", () => {
         prismaMock.user.findUnique.mockResolvedValue(asNever(
             buildRecipient({ lineAccountLink: null }),
         ));
+        prismaMock.lineAccountLink.findUnique.mockResolvedValue(null);
 
         await expect(sendAppLineNotification({
             userId: 10,

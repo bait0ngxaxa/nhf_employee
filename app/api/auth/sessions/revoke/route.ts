@@ -3,17 +3,18 @@ import { z } from "zod";
 
 import { AUTH_ERROR_MESSAGES } from "@/lib/auth/ssot";
 import { withTrustedMutation } from "@/lib/auth/csrf";
-import { logAuthEvent } from "@/lib/server/audit";
 import {
     HYBRID_ACCESS_COOKIE_NAME,
     HYBRID_REFRESH_COOKIE_NAME,
     clearHybridAuthCookies,
+    getClientMetadata,
 } from "@/lib/auth/hybrid/session";
 import {
     resolveAuthenticatedUserId,
     resolveCurrentSessionFamilyId,
     revokeAuthSessionFamily,
 } from "@/modules/auth";
+import { appendAuditBestEffort } from "@/modules/audit";
 
 const revokeSessionSchema = z.object({
     sessionId: z.string().min(1).max(64),
@@ -41,10 +42,20 @@ export const POST = withTrustedMutation(async (request: NextRequest): Promise<Ne
             return NextResponse.json({ error: AUTH_ERROR_MESSAGES.forbidden }, { status: 404 });
         }
 
-        await logAuthEvent("LOGOUT", userId, tokenRecord.email, {
-            metadata: {
-                method: "hybrid_logout_single_session",
-                familyId: tokenRecord.familyId,
+        const metadata = getClientMetadata(request);
+        await appendAuditBestEffort({
+            action: "LOGOUT",
+            entityType: "User",
+            entityId: userId,
+            userId,
+            userEmail: tokenRecord.email,
+            ipAddress: metadata.ipAddress,
+            userAgent: metadata.userAgent,
+            details: {
+                metadata: {
+                    method: "hybrid_logout_single_session",
+                    familyId: tokenRecord.familyId,
+                },
             },
         });
 

@@ -44,7 +44,7 @@ vi.mock("next/navigation", () => ({
     useSearchParams: mocks.useSearchParams,
 }));
 
-vi.mock("@/lib/client/liff", () => ({
+vi.mock("@/modules/line/client", () => ({
     LiffApiError: mocks.MockLiffApiError,
     isRecoveredLiffMutation: mocks.isRecoveredLiffMutation,
     LIFF_SESSION_RECOVERED_MUTATION_MESSAGE:

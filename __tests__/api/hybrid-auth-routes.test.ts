@@ -26,8 +26,8 @@ const { prismaMock } = vi.hoisted(() => ({
     },
 }));
 
-vi.mock("@/lib/server/audit", () => ({
-    logAuthEvent: vi.fn(),
+vi.mock("@/modules/audit", () => ({
+    appendAuditBestEffort: vi.fn(),
 }));
 
 vi.mock("@/lib/auth/hybrid/tokens", () => ({

@@ -1,3 +1,5 @@
+import type { Prisma } from "@prisma/client";
+
 import { hasPrismaErrorCode } from "@/lib/db/transaction";
 import { prisma } from "@/lib/db/prisma";
 
@@ -17,6 +19,11 @@ const lineAccountLinkSelect = {
     userId: true,
     lineUserId: true,
 } as const;
+
+export type LineAccountLinkReadClient = Pick<
+    Prisma.TransactionClient,
+    "lineAccountLink"
+>;
 
 function isSameLink(
     link: LineAccountLinkRecord | null,
@@ -38,8 +45,9 @@ function assertLinkInput(userId: number, lineUserId: string): void {
 
 async function findLinkByUserId(
     userId: number,
+    client: LineAccountLinkReadClient = prisma,
 ): Promise<LineAccountLinkRecord | null> {
-    return prisma.lineAccountLink.findUnique({
+    return client.lineAccountLink.findUnique({
         where: { userId },
         select: lineAccountLinkSelect,
     });
@@ -47,8 +55,9 @@ async function findLinkByUserId(
 
 async function findLinkByLineUserId(
     lineUserId: string,
+    client: LineAccountLinkReadClient = prisma,
 ): Promise<LineAccountLinkRecord | null> {
-    return prisma.lineAccountLink.findUnique({
+    return client.lineAccountLink.findUnique({
         where: { lineUserId },
         select: lineAccountLinkSelect,
     });
@@ -62,6 +71,30 @@ export async function findLineAccountLinkByLineUserId(
         select: { userId: true },
     });
     return link;
+}
+
+export async function findLineUserIdByUserId(
+    userId: number,
+    client: LineAccountLinkReadClient = prisma,
+): Promise<string | null> {
+    const link = await client.lineAccountLink.findUnique({
+        where: { userId },
+        select: { lineUserId: true },
+    });
+    return link?.lineUserId ?? null;
+}
+
+export async function findLinkedUserIdsByUserIds(
+    userIds: readonly number[],
+    client: LineAccountLinkReadClient = prisma,
+): Promise<number[]> {
+    if (userIds.length === 0) return [];
+
+    const links = await client.lineAccountLink.findMany({
+        where: { userId: { in: [...userIds] } },
+        select: { userId: true },
+    }) ?? [];
+    return links.map((link) => link.userId);
 }
 
 export async function linkLineAccount(

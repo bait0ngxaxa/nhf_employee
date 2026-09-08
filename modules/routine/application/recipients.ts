@@ -4,6 +4,10 @@ import { z } from "zod";
 import {
     type EmployeeDisplayNameSource,
 } from "@/modules/employee";
+import {
+    findLinkedUserIdsByUserIds,
+    type LineAccountLinkReadClient,
+} from "@/modules/line";
 import { getUserDisplayName } from "@/shared/identity/display";
 
 export type RoutineNotificationRecipient = {
@@ -158,15 +162,16 @@ export async function resolveRoutineNotificationRecipients(
 }
 
 export async function resolveLinkedRoutineLineRecipients(
-    tx: Pick<Prisma.TransactionClient, "lineAccountLink">,
+    tx: LineAccountLinkReadClient,
     recipients: readonly RoutineNotificationRecipient[],
 ): Promise<RoutineNotificationRecipient[]> {
     if (recipients.length === 0) return [];
 
-    const links = (await tx.lineAccountLink.findMany({
-        where: { userId: { in: recipients.map((recipient) => recipient.userId) } },
-        select: { userId: true },
-    })) ?? [];
-    const linkedUserIds = new Set(links.map((link) => link.userId));
+    const linkedUserIds = new Set(
+        await findLinkedUserIdsByUserIds(
+            recipients.map((recipient) => recipient.userId),
+            tx,
+        ),
+    );
     return recipients.filter((recipient) => linkedUserIds.has(recipient.userId));
 }

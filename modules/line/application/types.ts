@@ -4,6 +4,22 @@ export interface LiffWorkforceIdentity {
     name: string | null;
 }
 
+export interface LiffWorkforceUser {
+    id: number;
+    role: string;
+    email: string;
+    name: string | null;
+}
+
+export interface VerifiedLineIdentity {
+    lineUserId: string;
+}
+
+export interface LiffWorkforceSession {
+    user: LiffWorkforceUser;
+    employeeId: number;
+}
+
 export type LiffSessionResponse =
     | { linked: false }
     | { linked: true; workforce: LiffWorkforceIdentity };

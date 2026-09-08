@@ -2,7 +2,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { toast } from "sonner";
 
-import { LiffApiError } from "@/lib/client/liff";
+import { LiffApiError } from "@/modules/line/client";
 import type {
     LiffStockCatalogResponse,
     LiffStockRequestAction,
@@ -12,7 +12,27 @@ import type {
     LiffStockVariantAvailability,
 } from "@/lib/types/stock-liff";
 
-const mocks = vi.hoisted(() => ({
+const mocks = vi.hoisted(() => {
+    class MockLiffApiError extends Error {
+        readonly status: number | undefined;
+        readonly sessionRecovered: boolean;
+        readonly unauthorizedRecovery: { recovered: boolean; replayed: boolean } | undefined;
+
+        constructor(
+            message: string,
+            status?: number,
+            _details?: unknown,
+            unauthorizedRecovery?: { recovered: boolean; replayed: boolean },
+        ) {
+            super(message);
+            this.name = "LiffApiError";
+            this.status = status;
+            this.sessionRecovered = unauthorizedRecovery?.recovered === true;
+            this.unauthorizedRecovery = unauthorizedRecovery;
+        }
+    }
+
+    return {
     search: "",
     fetchHome: vi.fn(),
     fetchItems: vi.fn(),
@@ -23,19 +43,29 @@ const mocks = vi.hoisted(() => ({
     fetchAvailability: vi.fn(),
     submitRequest: vi.fn(),
     cancelRequest: vi.fn(),
-    issueRequest: vi.fn(),
-    useLiffWorkforce: vi.fn(),
-}));
+        issueRequest: vi.fn(),
+        useLiffWorkforce: vi.fn(),
+        MockLiffApiError,
+        isRecoveredLiffMutation: (error: unknown): boolean =>
+            error instanceof MockLiffApiError
+            && error.status === 401
+            && error.sessionRecovered
+            && error.unauthorizedRecovery?.replayed === false,
+        LIFF_SESSION_RECOVERED_MUTATION_MESSAGE:
+            "เชื่อมต่อกับ LINE ใหม่เรียบร้อยแล้ว กรุณาตรวจสอบสถานะล่าสุดก่อนลองดำเนินการอีกครั้ง",
+    };
+});
 
 vi.mock("next/navigation", () => ({
     useSearchParams: () => new URLSearchParams(mocks.search),
 }));
 
-vi.mock("@/components/liff/LiffBootstrap", () => ({
+vi.mock("@/modules/line/client", () => ({
+    LiffApiError: mocks.MockLiffApiError,
+    isRecoveredLiffMutation: mocks.isRecoveredLiffMutation,
+    LIFF_SESSION_RECOVERED_MUTATION_MESSAGE:
+        mocks.LIFF_SESSION_RECOVERED_MUTATION_MESSAGE,
     useLiffWorkforce: mocks.useLiffWorkforce,
-}));
-
-vi.mock("@/lib/client/liff-home", () => ({
     fetchLiffHome: mocks.fetchHome,
 }));
 

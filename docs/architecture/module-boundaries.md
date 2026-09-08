@@ -1,10 +1,11 @@
 # Module boundaries
 
-Status: Phase J2 CLOSED — Auth identity projection and browser presentation
-ownership complete; J3 remains NOT STARTED. Phase I3 Audit
-producer integration and physical AuditLog persistence exclusivity remains
-closed. Phase H3 Notification producer integration and final migration audit
-remain complete. Phase G3 Department migration remains complete.
+Status: Phase J3 CLOSED — LINE/LIFF identity integration and Auth Audit
+producer migration complete; Auth / Session / Identity migration COMPLETE.
+Phase I3 Audit producer integration and physical AuditLog persistence
+exclusivity remains closed. Phase H3 Notification producer integration and
+final migration audit remain complete. Phase G3 Department migration remains
+complete.
 Stock, Routine, Leave, and Employee are migrated examples; Employee
 server/business and active presentation ownership are migrated as well.
 
@@ -363,7 +364,8 @@ modules/auth/
 The root exports the server application contracts for login, refresh, principal
 resolution, logout/session operations, signup, recovery/reset, cleanup, and the
 Employee account-lifecycle provider. Routes retain HTTP/security/cookie/response
-adaptation and deferred Auth Audit composition. Auth infrastructure is the
+adaptation, while Auth producers append through the public Audit capability.
+Auth infrastructure is the
 exclusive production owner of physical `AuthRefreshToken` and
 `PasswordResetToken` delegate access.
 
@@ -377,8 +379,54 @@ The `/api/auth/me` broad account/Employee/Department/Leave projection is now
 composed at `app/_lib/auth/current-user.ts`. No Leave predicates or Department
 projection were pulled into generic Auth. Auth presentation is under
 `modules/auth/presentation/**` and external browser consumers use only
-`@/modules/auth/client`. LINE/LIFF and Auth Audit producer migration remain
-excluded for J3.
+`@/modules/auth/client`. The final LINE/LIFF and Auth Audit boundary is
+recorded below.
+
+## LINE / LIFF integration boundary (J3)
+
+`modules/line/` is the cohesive integration capability for LINE account-link
+identity, `LineAccountLink` persistence, verified LINE Login identity, LIFF
+session issuance/verification, LIFF workforce-session composition, bootstrap
+and recovery contracts, and LINE-specific DTOs. Its proportional structure is:
+
+```text
+modules/line/
+├── application/
+├── infrastructure/
+├── presentation/
+├── client.ts
+└── index.ts
+```
+
+`@/modules/line` is the server entry and `@/modules/line/client` is the
+browser-safe entry. The browser entry contains only LIFF SDK/browser HTTP
+transport, DTO types, and `LiffBootstrap`; it cannot reach Prisma, Next
+server APIs, Node built-ins, server secrets, mixed LINE configuration,
+verification, signing, or the server barrel. External consumers cannot deep
+import LINE internals, and LINE internals cannot import their own public
+barrels.
+
+Auth exposes the narrow account identity lookup required by LIFF. Employee
+owns the active/non-deleted Employee and User-link predicates and the
+expected-Employee-ID check. Leave owns the exact actionable assigned-approver
+capability query used by the LIFF home projection. LINE composes these
+contracts; it does not own Employee lifecycle, Leave/Stock/Routine policy,
+notification meaning, or Messaging transport.
+
+LINE infrastructure exclusively owns production `LineAccountLink` delegate
+access. Routine recipient/reminder code and the provider recipient adapter use
+the narrow LINE read contract and preserve existing transaction contexts.
+One-to-one/idempotent/conflict/race behavior, no reassignment/unlink policy,
+LINE ID-token verification, LIFF JWT/cookie semantics, and provider/outbox
+delivery semantics remain unchanged. Protected LIFF requests reread current
+User/Employee state but intentionally do not reread `LineAccountLink` after
+issuance; bootstrap and fresh ID-token recovery still do.
+
+Auth producer routes now call `appendAuditBestEffort()` directly from
+`@/modules/audit` for all seven existing Auth event surfaces. The generic
+Audit capability does not interpret Auth meaning. `lib/server/audit.ts` remains
+only for Email Request, Employee export, Leave export, and Audit Log export
+compatibility consumers.
 
 ## Shared/platform ownership
 

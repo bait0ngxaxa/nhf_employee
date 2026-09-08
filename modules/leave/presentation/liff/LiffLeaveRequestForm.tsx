@@ -18,7 +18,7 @@ import {
 import { useLeaveRequestFormModel } from "../dashboard/hooks/useLeaveRequestFormModel";
 import {
     isRecoveredLiffMutation,
-} from "@/lib/client/liff";
+} from "@/modules/line/client";
 import { submitLiffLeaveRequest } from "./api";
 import type { LiffLeaveQuotaSummary } from "../types";
 

@@ -2,6 +2,10 @@ import type { Prisma } from "@prisma/client";
 
 import { prisma } from "@/lib/db/prisma";
 import { lineRetryKeySchema } from "@/lib/validations/line";
+import {
+    findLineUserIdByUserId,
+    type LineAccountLinkReadClient,
+} from "@/modules/line";
 import type { LineFlexMessage } from "@/types/api";
 import { sendLineAppMessage } from "./messaging";
 
@@ -15,14 +19,10 @@ const appLineRecipientSelect = {
             deletedAt: true,
         },
     },
-    lineAccountLink: {
-        select: {
-            lineUserId: true,
-        },
-    },
 } as const satisfies Prisma.UserSelect;
 
-type AppLineNotificationClient = Pick<Prisma.TransactionClient, "user">;
+type AppLineNotificationClient = Pick<Prisma.TransactionClient, "user">
+    & LineAccountLinkReadClient;
 
 export type AppLineNotificationResult =
     | { status: "SENT" }
@@ -55,13 +55,9 @@ function isEligibleUser(recipient: {
         );
 }
 
-function getLineUserId(
-    recipient: {
-        lineAccountLink: { lineUserId: string } | null;
-    },
-): string | null {
-    const lineUserId = recipient.lineAccountLink?.lineUserId.trim();
-    return lineUserId || null;
+function getLineUserId(lineUserId: string | null): string | null {
+    const normalizedLineUserId = lineUserId?.trim();
+    return normalizedLineUserId || null;
 }
 
 export async function sendAppLineNotification(
@@ -81,7 +77,9 @@ export async function sendAppLineNotification(
         return { status: "SKIPPED", reason: "INELIGIBLE" };
     }
 
-    const lineUserId = getLineUserId(recipient);
+    const lineUserId = getLineUserId(
+        await findLineUserIdByUserId(input.userId, client),
+    );
     if (!lineUserId) {
         return { status: "SKIPPED", reason: "UNLINKED" };
     }

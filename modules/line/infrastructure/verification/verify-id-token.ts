@@ -1,6 +1,7 @@
-import { getLineConfig } from "./config";
-import { LineIdentityVerificationError } from "./errors";
-import type { VerifiedLineIdentity } from "./types";
+import { getLineConfig } from "@/lib/line/config";
+import { LineIdentityVerificationError } from "@/lib/line/errors";
+
+import type { VerifiedLineIdentity } from "../../application/types";
 
 const LINE_ID_TOKEN_VERIFICATION_URL =
     "https://api.line.me/oauth2/v2.1/verify";
@@ -102,4 +103,4 @@ export async function verifyLineIdToken(
     };
 }
 
-export { LineIdentityVerificationError } from "./errors";
+export { LineIdentityVerificationError } from "@/lib/line/errors";

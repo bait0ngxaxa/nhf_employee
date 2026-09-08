@@ -2,10 +2,10 @@ import { NextResponse } from "next/server";
 
 import {
     getLiffCapabilities,
+    getLiffHomeModules,
     requireLiffWorkforceSession,
-} from "@/lib/auth/liff";
-import { getLiffHomeModules } from "@/lib/line/liff-home";
-import type { LiffHomeResponse } from "@/lib/line/liff-types";
+} from "@/modules/line";
+import type { LiffHomeResponse } from "@/modules/line";
 import { serverError } from "@/lib/ssot/http";
 
 export async function GET(): Promise<NextResponse> {

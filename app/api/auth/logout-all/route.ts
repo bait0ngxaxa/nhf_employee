@@ -2,15 +2,16 @@ import { type NextRequest, NextResponse } from "next/server";
 
 import { AUTH_ERROR_MESSAGES } from "@/lib/auth/ssot";
 import { withTrustedMutation } from "@/lib/auth/csrf";
-import { logAuthEvent } from "@/lib/server/audit";
 import {
     clearHybridAuthCookies,
+    getClientMetadata,
 } from "@/lib/auth/hybrid/session";
 import { HYBRID_ACCESS_COOKIE_NAME } from "@/lib/auth/hybrid/constants";
 import {
     logoutAllRefreshSessions,
     resolveAuthenticatedUserId,
 } from "@/modules/auth";
+import { appendAuditBestEffort } from "@/modules/audit";
 
 export const POST = withTrustedMutation(async (request: NextRequest): Promise<NextResponse> => {
     try {
@@ -30,8 +31,16 @@ export const POST = withTrustedMutation(async (request: NextRequest): Promise<Ne
             return unauthorized;
         }
 
-        await logAuthEvent("LOGOUT", userId, user.email, {
-            metadata: { method: "hybrid_logout_all" },
+        const metadata = getClientMetadata(request);
+        await appendAuditBestEffort({
+            action: "LOGOUT",
+            entityType: "User",
+            entityId: userId,
+            userId,
+            userEmail: user.email,
+            ipAddress: metadata.ipAddress,
+            userAgent: metadata.userAgent,
+            details: { metadata: { method: "hybrid_logout_all" } },
         });
 
         const response = NextResponse.json({ success: true });

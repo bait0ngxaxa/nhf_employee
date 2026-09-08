@@ -99,29 +99,6 @@ export async function createAuditLog(
 }
 
 /**
- * Create audit log for authentication events
- */
-export async function logAuthEvent(
-    action:
-        | "LOGIN_SUCCESS"
-        | "LOGIN_FAILED"
-        | "LOGOUT"
-        | "PASSWORD_CHANGE"
-        | "PASSWORD_RESET",
-    userId?: number,
-    userEmail?: string,
-    details?: AuditLogDetails,
-): Promise<void> {
-    await createAuditLog({
-        action,
-        entityType: "User",
-        entityId: userId,
-        userId,
-        userEmail,
-        details,
-    });
-}
-/**
  * Create audit log for data export events
  */
 export async function logDataExport(

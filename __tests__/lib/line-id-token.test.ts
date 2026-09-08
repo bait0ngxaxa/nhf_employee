@@ -10,7 +10,7 @@ import { getLineConfig } from "@/lib/line/config";
 import {
     LineIdentityVerificationError,
     verifyLineIdToken,
-} from "@/lib/line/verify-id-token";
+} from "@/modules/line";
 
 const fetchMock = vi.fn<typeof fetch>();
 

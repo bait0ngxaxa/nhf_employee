@@ -1,8 +1,8 @@
 import { jwtVerify, SignJWT, type JWTPayload } from "jose";
 import type { NextResponse } from "next/server";
 
-import { getLineLiffSessionConfig } from "./config";
-import { LineIdentityVerificationError } from "./errors";
+import { getLineLiffSessionConfig } from "@/lib/line/config";
+import { LineIdentityVerificationError } from "@/lib/line/errors";
 
 export const LIFF_SESSION_COOKIE_NAME = "nhf_liff_session";
 export const LIFF_SESSION_PURPOSE = "nhf-liff";

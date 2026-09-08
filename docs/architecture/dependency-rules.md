@@ -1,10 +1,11 @@
 # Dependency rules and enforcement
 
-Status: Phase J2 CLOSED — Auth identity projection and browser presentation
-ownership complete; J3 remains NOT STARTED. Phase I3 Audit
-producer integration and physical AuditLog persistence exclusivity remains
-closed. Phase H3 Notification producer integration and final migration audit
-remain complete. Phase G3 Department migration remains complete. These rules
+Status: Phase J3 CLOSED — LINE/LIFF identity integration and Auth Audit
+producer migration complete; Auth / Session / Identity migration COMPLETE.
+Phase I3 Audit producer integration and physical AuditLog persistence
+exclusivity remains closed. Phase H3 Notification producer integration and
+final migration audit remain complete. Phase G3 Department migration remains
+complete. These rules
 govern new architecture code while unrelated legacy features remain compatible
 during incremental migration.
 
@@ -340,6 +341,8 @@ the module boundary from a legacy directory, while imports unrelated to
 | Notification H1-H3 ownership | `app/api/notifications/**`, `app/dashboard/notifications/**`, `components/dashboard/layout/DashboardNavbar.tsx`, `modules/notification/**`, production client graphs, production source | Requires Notification API routes to consume `@/modules/notification`; requires Notification Dashboard routes and DashboardNavbar to consume `@/modules/notification/client`; rejects deleted legacy presentation paths, deep/self-barrel imports, server-only dependencies in the Notification client graph, production client reachability of the Notification server entry, business-module legacy adapter imports, and physical Notification delegate access outside `modules/notification/infrastructure/**`; allows tests/fixtures/support code and does not match `notificationOutbox` |
 | Audit I1-I2 ownership | `app/api/audit-logs/**`, `app/dashboard/audit/**`, `modules/audit/**`, production client graphs, production source | Requires Audit API routes to consume `@/modules/audit` and Audit Dashboard routes to consume `@/modules/audit/client`; rejects deleted Audit presentation paths, deep/self-barrel imports, server-only dependencies and other module server entries in the Audit client graph, while preserving the I1 direct-access allowlist |
 | Auth J1/J2 ownership | `app/api/auth/**`, `modules/auth/**`, Employee lifecycle composition, production source/client graphs | Restricts production `AuthRefreshToken` and `PasswordResetToken` delegate access to Auth persistence infrastructure; requires server consumers to use `@/modules/auth` and browser consumers to use `@/modules/auth/client`; rejects Auth presentation deep imports, deleted legacy browser seams, Auth internals importing their own barrel, client reachability of the server entry, and server-only runtime dependencies from the Auth client graph; preserves tests, fixtures, schema/migrations, seed/support, and generated-code exceptions |
+| LINE J3 ownership | `app/api/line/**`, `modules/line/**`, production source/client graphs, production `LineAccountLink` access | Requires server consumers to use `@/modules/line` and browser consumers to use `@/modules/line/client`; rejects LINE deep imports, LINE internal self-barrel imports, deleted LIFF compatibility paths, client reachability of the server entry, server/secret/Node dependencies from the LINE client graph, and direct/aliased/destructured `LineAccountLink` delegates outside `modules/line/infrastructure/**`; preserves tests, fixtures, Prisma support, and provider infrastructure exceptions |
+| Auth J3 Audit producer ownership | `app/api/auth/**` | Requires Auth producers to use `@/modules/audit` directly; rejects Auth API imports of `@/lib/server/audit` without banning legitimate non-Auth compatibility consumers |
 
 ## Auth J2 browser and projection boundary
 
@@ -363,6 +366,31 @@ The removed `components/auth/**`, `lib/auth/client.ts`, and
 `lib/auth/server.ts`, `lib/auth/api.ts`, and `lib/auth/context.ts` files are
 thin server compatibility adapters; they must not regain broad Employee,
 Department, or Leave projection logic.
+
+## LINE / LIFF and Auth Audit final boundary (J3)
+
+`@/modules/line` is the server integration entry and `@/modules/line/client`
+is the browser-safe entry. LINE owns account-link identity, verification,
+LIFF sessions, workforce composition, and browser recovery; Auth owns the
+narrow account identity lookup, Employee owns active/non-deleted workforce
+lookup and linkage, and Leave owns the actionable LIFF approval capability.
+LINE does not absorb feature policy or Messaging meaning.
+
+Production `LineAccountLink` delegate access is exclusive to
+`modules/line/infrastructure/**`. Routine and provider recipient resolution
+use the narrow public read contract and preserve transaction-bound contexts.
+The checker recognizes direct Prisma/transaction access, delegate aliases, and
+destructured aliases, while allowing tests, fixtures, Prisma support, and the
+LINE infrastructure owner.
+
+The LINE client graph rejects Prisma, Next server APIs, Node built-ins,
+server-only modules, mixed/private LINE configuration, credentials, signing or
+verification infrastructure, and the LINE server entry. The checker also
+guards deleted `lib/auth/liff.ts`, `lib/client/liff.ts`, moved Bootstrap and
+LINE implementation paths. Auth API routes are separately required to call
+`appendAuditBestEffort()` from `@/modules/audit`; `lib/server/audit.ts` remains
+an explicit compatibility adapter only for Email Request, Employee export,
+Leave export, and Audit Log export.
 
 ## Department final closure (G3)
 

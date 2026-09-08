@@ -3,7 +3,28 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { LeaveHistoryFilters } from "../../application/queries/history-filters";
 import type { ApproverLeaveAction, LiffLeaveRequestDetail as LiffLeaveRequestDetailData } from "../types";
 
-const mocks = vi.hoisted(() => ({
+const mocks = vi.hoisted(() => {
+    class MockLiffApiError extends Error {
+        readonly status: number | undefined;
+        readonly sessionRecovered: boolean;
+        readonly unauthorizedRecovery:
+            { recovered: boolean; replayed: boolean } | undefined;
+
+        constructor(
+            message: string,
+            status?: number,
+            _details?: unknown,
+            unauthorizedRecovery?: { recovered: boolean; replayed: boolean },
+        ) {
+            super(message);
+            this.name = "LiffApiError";
+            this.status = status;
+            this.sessionRecovered = unauthorizedRecovery?.recovered === true;
+            this.unauthorizedRecovery = unauthorizedRecovery;
+        }
+    }
+
+    return {
     search: "",
     fetchHome: vi.fn(),
     fetchProfile: vi.fn(),
@@ -13,8 +34,17 @@ const mocks = vi.hoisted(() => ({
     confirmNotTaken: vi.fn(),
     decideCancellation: vi.fn(),
     requestNotTaken: vi.fn(),
-    submitDecision: vi.fn(),
-}));
+        submitDecision: vi.fn(),
+        MockLiffApiError,
+        isRecoveredLiffMutation: (error: unknown): boolean =>
+            error instanceof MockLiffApiError
+            && error.status === 401
+            && error.sessionRecovered
+            && error.unauthorizedRecovery?.replayed === false,
+        LIFF_SESSION_RECOVERED_MUTATION_MESSAGE:
+            "เชื่อมต่อกับ LINE ใหม่เรียบร้อยแล้ว กรุณาตรวจสอบสถานะล่าสุดก่อนลองดำเนินการอีกครั้ง",
+    };
+});
 
 vi.mock("next/navigation", () => ({
     useSearchParams: () => new URLSearchParams(mocks.search),
@@ -31,8 +61,12 @@ vi.mock("./api", () => ({
     submitLiffLeaveDecision: mocks.submitDecision,
 }));
 
-vi.mock("@/lib/client/liff-home", () => ({
+vi.mock("@/modules/line/client", () => ({
     fetchLiffHome: mocks.fetchHome,
+    LiffApiError: mocks.MockLiffApiError,
+    isRecoveredLiffMutation: mocks.isRecoveredLiffMutation,
+    LIFF_SESSION_RECOVERED_MUTATION_MESSAGE:
+        mocks.LIFF_SESSION_RECOVERED_MUTATION_MESSAGE,
 }));
 
 vi.mock("./LiffLeaveOverview", () => ({
@@ -204,7 +238,7 @@ vi.mock("./LiffLeaveDecisionSheet", () => ({
 }));
 
 import { LiffLeaveApp } from "./LiffLeaveApp";
-import { LiffApiError } from "@/lib/client/liff";
+import { LiffApiError } from "@/modules/line/client";
 
 const PROFILE = {
     quotas: [],

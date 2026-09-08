@@ -1,6 +1,7 @@
 // @vitest-environment node
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest, NextResponse } from "next/server";
+import type * as LineModule from "@/modules/line";
 
 const {
     requireActiveWorkforceSessionMock,
@@ -26,31 +27,27 @@ vi.mock("@/lib/auth/workforce", () => ({
     requireActiveWorkforceSession: requireActiveWorkforceSessionMock,
 }));
 
-vi.mock("@/lib/auth/liff", () => ({
-    findActiveLiffWorkforceIdentity: findActiveLiffWorkforceIdentityMock,
-}));
-
-vi.mock("@/lib/line/verify-id-token", () => ({
-    verifyLineIdToken: verifyLineIdTokenMock,
-}));
-
-vi.mock("@/lib/line/account-link", () => ({
-    LineAccountLinkConflictError: class LineAccountLinkConflictError extends Error {},
-    linkLineAccount: linkLineAccountMock,
-    findLineAccountLinkByLineUserId: findLineAccountLinkByLineUserIdMock,
-}));
-
-vi.mock("@/lib/line/liff-session", () => ({
-    issueLiffSession: issueLiffSessionMock,
-    setLiffSessionCookie: setLiffSessionCookieMock,
-    clearLiffSessionCookie: clearLiffSessionCookieMock,
-}));
+vi.mock("@/modules/line", async (importOriginal) => {
+    const actual = await importOriginal<typeof LineModule>();
+    return {
+        ...actual,
+        findActiveLiffWorkforceIdentity: findActiveLiffWorkforceIdentityMock,
+        verifyLineIdToken: verifyLineIdTokenMock,
+        linkLineAccount: linkLineAccountMock,
+        findLineAccountLinkByLineUserId: findLineAccountLinkByLineUserIdMock,
+        issueLiffSession: issueLiffSessionMock,
+        setLiffSessionCookie: setLiffSessionCookieMock,
+        clearLiffSessionCookie: clearLiffSessionCookieMock,
+    };
+});
 
 import { POST as accountLinkRoute } from "@/app/api/line/account-link/route";
 import { POST as liffSessionRoute } from "@/app/api/line/liff/session/route";
-import { LineAccountLinkConflictError } from "@/lib/line/account-link";
-import { LINE_AUTH_MAX_REQUEST_BYTES } from "@/lib/line/api";
-import { LineIdentityVerificationError } from "@/lib/line/errors";
+import {
+    LineAccountLinkConflictError,
+    LINE_AUTH_MAX_REQUEST_BYTES,
+    LineIdentityVerificationError,
+} from "@/modules/line";
 
 const ACTIVE_AUTH = {
     ok: true as const,

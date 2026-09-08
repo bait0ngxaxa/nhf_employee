@@ -8,6 +8,7 @@ import type {
     CurrentEmployeeProjection,
     EmployeeFilters,
     EmployeeRecord,
+    LiffEmployeeIdentity,
     PaginatedEmployeesResult,
 } from "../../application/types";
 
@@ -61,6 +62,33 @@ export async function findCurrentEmployeeProjection(
         departmentName: employee.dept?.name ?? null,
         isManager: employee.subordinates.length > 0,
     };
+}
+
+export async function findLiffEmployeeByUserId(
+    userId: number,
+    expectedEmployeeId?: number,
+): Promise<LiffEmployeeIdentity | null> {
+    const employee = await prisma.employee.findFirst({
+        where: {
+            ...(expectedEmployeeId === undefined ? {} : { id: expectedEmployeeId }),
+            status: "ACTIVE",
+            deletedAt: null,
+            user: {
+                id: userId,
+                ...(expectedEmployeeId === undefined
+                    ? {}
+                    : { employeeId: expectedEmployeeId }),
+            },
+        },
+        select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            nickname: true,
+        },
+    });
+
+    return employee;
 }
 
 export const EMPLOYEE_WITH_RELATIONS_INCLUDE = {

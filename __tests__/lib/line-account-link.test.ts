@@ -16,7 +16,7 @@ vi.mock("@/lib/db/prisma", () => ({
 import {
     LineAccountLinkConflictError,
     linkLineAccount,
-} from "@/lib/line/account-link";
+} from "@/modules/line";
 
 describe("LINE account link persistence", () => {
     beforeEach(() => {

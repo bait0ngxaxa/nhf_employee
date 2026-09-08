@@ -248,6 +248,12 @@ describe("Routine reminder dispatch", () => {
         prismaMock.notificationOutbox.updateMany.mockResolvedValue(
             asNever({ count: 1 }),
         );
+        prismaMock.lineAccountLink.findMany.mockResolvedValue(asNever([]));
+        prismaMock.lineAccountLink.findUnique.mockImplementation(
+            ({ where }) => asNever({
+                lineUserId: where.userId === 99 ? "U-admin" : "U-assignee",
+            }),
+        );
         sendRoutineReminderNotificationMock.mockResolvedValue(true);
         sendLineAppMessageMock.mockResolvedValue(true);
     });
@@ -1044,6 +1050,9 @@ describe("Routine reminder dispatch", () => {
                 lineAccountLink: { lineUserId: "U-assignee" },
             }),
         );
+        prismaMock.lineAccountLink.findUnique.mockResolvedValue(asNever({
+            lineUserId: "U-assignee",
+        }));
 
         const payload = buildLinePayload();
         const notification = buildLineNotification(payload);
@@ -1091,6 +1100,9 @@ describe("Routine reminder dispatch", () => {
                 lineAccountLink: { lineUserId: "U-admin" },
             }),
         );
+        prismaMock.lineAccountLink.findUnique.mockResolvedValue(asNever({
+            lineUserId: "U-admin",
+        }));
 
         const payload = buildLinePayload({ userId: 99, isAssignee: false });
         const result = await dispatchRoutineReminderOutbox(
@@ -1122,6 +1134,7 @@ describe("Routine reminder dispatch", () => {
                 lineAccountLink: null,
             }),
         );
+        prismaMock.lineAccountLink.findUnique.mockResolvedValue(null);
 
         const payload = buildLinePayload();
         const result = await dispatchRoutineReminderOutbox(
@@ -1182,6 +1195,9 @@ describe("Routine reminder dispatch", () => {
                 lineAccountLink: { lineUserId: "U-assignee" },
             }),
         );
+        prismaMock.lineAccountLink.findUnique.mockResolvedValue(asNever({
+            lineUserId: "U-assignee",
+        }));
         sendLineAppMessageMock.mockResolvedValueOnce(false);
 
         const payload = buildLinePayload();

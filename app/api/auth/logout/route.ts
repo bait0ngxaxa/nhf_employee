@@ -2,11 +2,12 @@ import { type NextRequest, NextResponse } from "next/server";
 
 import { AUTH_ERROR_MESSAGES } from "@/lib/auth/ssot";
 import { withTrustedMutation } from "@/lib/auth/csrf";
-import { logAuthEvent } from "@/lib/server/audit";
 import {
     HYBRID_REFRESH_COOKIE_NAME,
     clearHybridAuthCookies,
+    getClientMetadata,
 } from "@/lib/auth/hybrid/session";
+import { appendAuditBestEffort } from "@/modules/audit";
 import { logoutCurrentRefreshSession } from "@/modules/auth";
 
 export const POST = withTrustedMutation(async (request: NextRequest): Promise<NextResponse> => {
@@ -15,8 +16,16 @@ export const POST = withTrustedMutation(async (request: NextRequest): Promise<Ne
         if (refreshToken) {
             const revoked = await logoutCurrentRefreshSession(refreshToken);
             if (revoked) {
-                await logAuthEvent("LOGOUT", revoked.userId, revoked.email, {
-                    metadata: { method: "hybrid_logout" },
+                const metadata = getClientMetadata(request);
+                await appendAuditBestEffort({
+                    action: "LOGOUT",
+                    entityType: "User",
+                    entityId: revoked.userId,
+                    userId: revoked.userId,
+                    userEmail: revoked.email,
+                    ipAddress: metadata.ipAddress,
+                    userAgent: metadata.userAgent,
+                    details: { metadata: { method: "hybrid_logout" } },
                 });
             }
         }

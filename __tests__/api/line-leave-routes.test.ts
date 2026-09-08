@@ -26,7 +26,7 @@ vi.mock("next/server", async (importOriginal) => {
     return { ...actual, after: vi.fn((callback: () => void) => callback()) };
 });
 
-vi.mock("@/lib/auth/liff", () => ({
+vi.mock("@/modules/line", () => ({
     requireLiffWorkforceSession: mocks.requireLiffWorkforceSession,
 }));
 vi.mock("@/modules/leave", async (importOriginal) => {

@@ -71,6 +71,13 @@ export interface CurrentEmployeeProjection {
     isManager: boolean;
 }
 
+export interface LiffEmployeeIdentity {
+    id: number;
+    firstName: string;
+    lastName: string;
+    nickname: string | null;
+}
+
 export interface PaginatedEmployeesResult {
     employees: EmployeeRecord[];
     pagination: { page: number; limit: number; total: number; totalPages: number };
