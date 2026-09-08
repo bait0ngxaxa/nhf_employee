@@ -72,6 +72,9 @@ function buildRequest(
             origin: "http://localhost",
             "x-requested-with": "XMLHttpRequest",
             "content-type": "application/json",
+            "cf-connecting-ip": "203.0.113.40",
+            "x-forwarded-for": "198.51.100.40",
+            "user-agent": "signup-test-agent",
             ...headers,
         },
         body: JSON.stringify(body),
@@ -88,6 +91,7 @@ describe("Auth signup route", () => {
         prismaMock.$queryRaw.mockReset();
         prismaMock.$transaction.mockReset();
         appendAuditBestEffortMock.mockReset();
+        appendAuditBestEffortMock.mockResolvedValue(undefined);
         prismaMock.$queryRaw.mockResolvedValue([]);
         prismaMock.$transaction.mockImplementation(async (operation) => {
             if (typeof operation === "function") {
@@ -111,6 +115,7 @@ describe("Auth signup route", () => {
         const response = await signupRoute(request);
 
         expect(response.status).toBe(403);
+        expect(appendAuditBestEffortMock).not.toHaveBeenCalled();
     });
 
     it("returns 400 when signup payload is invalid", async () => {
@@ -124,6 +129,7 @@ describe("Auth signup route", () => {
 
         expect(response.status).toBe(400);
         expect(prismaMock.user.findUnique).not.toHaveBeenCalled();
+        expect(appendAuditBestEffortMock).not.toHaveBeenCalled();
     });
 
     it("creates user when signup payload is valid", async () => {
@@ -167,12 +173,14 @@ describe("Auth signup route", () => {
             select: expect.objectContaining({ email: true }),
         });
         expect(prismaMock.authRefreshToken.create).not.toHaveBeenCalled();
-        expect(appendAuditBestEffortMock).toHaveBeenCalledWith(expect.objectContaining({
+        expect(appendAuditBestEffortMock).toHaveBeenCalledWith({
             action: "USER_CREATE",
             entityType: "User",
             entityId: 7,
             userId: 7,
             userEmail: "user@thainhf.org",
+            ipAddress: "203.0.113.40",
+            userAgent: "signup-test-agent",
             details: {
                 after: {
                     name: "สมชาย ใจดี",
@@ -185,7 +193,9 @@ describe("Auth signup route", () => {
                     employeeName: "สมชาย ใจดี",
                 },
             },
-        }));
+        });
+        expect(prismaMock.user.create.mock.invocationCallOrder[0])
+            .toBeLessThan(appendAuditBestEffortMock.mock.invocationCallOrder[0]);
         expect(response.headers.get("set-cookie")).toBeNull();
     });
 
@@ -257,6 +267,7 @@ describe("Auth signup route", () => {
         await expect(response.json()).resolves.toEqual({
             error: "บัญชีนี้ถูกลงทะเบียนแล้ว",
         });
+        expect(appendAuditBestEffortMock).not.toHaveBeenCalled();
     });
 
     it.each([
@@ -289,6 +300,7 @@ describe("Auth signup route", () => {
 
         expect(response.status).toBe(400);
         expect(prismaMock.user.create).not.toHaveBeenCalled();
+        expect(appendAuditBestEffortMock).not.toHaveBeenCalled();
     });
 
     it("does not let the bootstrap admin email bypass employee lifecycle", async () => {
@@ -313,6 +325,7 @@ describe("Auth signup route", () => {
 
         expect(response.status).toBe(400);
         expect(prismaMock.user.create).not.toHaveBeenCalled();
+        expect(appendAuditBestEffortMock).not.toHaveBeenCalled();
     });
 
     it.each([
@@ -355,6 +368,7 @@ describe("Auth signup route", () => {
             expect(response.status).toBe(400);
             expect(prismaMock.$queryRaw).toHaveBeenCalledTimes(1);
             expect(prismaMock.user.create).not.toHaveBeenCalled();
+            expect(appendAuditBestEffortMock).not.toHaveBeenCalled();
         },
     );
 
@@ -386,6 +400,7 @@ describe("Auth signup route", () => {
 
         expect(response.status).toBe(400);
         expect(prismaMock.user.create).not.toHaveBeenCalled();
+        expect(appendAuditBestEffortMock).not.toHaveBeenCalled();
     });
 
     it("rejects when the employee is linked by the time of the locked reload", async () => {
@@ -416,6 +431,7 @@ describe("Auth signup route", () => {
 
         expect(response.status).toBe(400);
         expect(prismaMock.user.create).not.toHaveBeenCalled();
+        expect(appendAuditBestEffortMock).not.toHaveBeenCalled();
     });
 
     it("does not let bootstrap admin eligibility become stale before creation", async () => {
@@ -446,6 +462,7 @@ describe("Auth signup route", () => {
 
         expect(response.status).toBe(400);
         expect(prismaMock.user.create).not.toHaveBeenCalled();
+        expect(appendAuditBestEffortMock).not.toHaveBeenCalled();
     });
 
     it("returns 429 when signup attempts exceed limit", async () => {
@@ -468,5 +485,6 @@ describe("Auth signup route", () => {
         const rateLimitedResponse = await signupRoute(buildRequest(requestBody));
 
         expect(rateLimitedResponse.status).toBe(429);
+        expect(appendAuditBestEffortMock).not.toHaveBeenCalled();
     });
 });

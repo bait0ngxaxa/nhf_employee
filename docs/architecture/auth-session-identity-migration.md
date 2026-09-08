@@ -1903,9 +1903,12 @@ production.
 The architecture checker now enforces the LINE server/client public entries,
 LINE internal self-barrel protection, browser transitive server/secret/Node
 dependency protection, direct/aliased/destructured `LineAccountLink`
-persistence ownership, deleted LINE compatibility paths, and Auth API route
-direct use of `@/modules/audit`. Fixture regression coverage covers the
-required allowed/rejected cases, while all J1/J2 rules remain active.
+persistence ownership, deleted LINE compatibility paths, LINE presentation
+remediation through `@/modules/line/client`, and Auth API route direct use of
+`@/modules/audit`. Fixture regression coverage covers the required
+allowed/rejected cases, including external and cross-module LINE presentation
+consumers and server-side LINE deep imports, while all J1/J2 rules remain
+active.
 
 Phase J3 is **CLOSED — LINE/LIFF identity integration and Auth Audit producer
 migration complete.** The Auth / Session / Identity migration is
@@ -1919,15 +1922,24 @@ metadata.
 
 The J3 verification record is:
 
-- `npm.cmd run architecture:check` — passed; 981 source files checked.
+- `npm.cmd run architecture:check` — passed; 982 source files checked.
 - `npm.cmd run lint:strict` — passed with zero warnings.
 - `npm.cmd run typecheck` — passed.
-- `npm.cmd run test:run` — passed; 249 files and 2,066 tests.
-- `npm.cmd run test:integration:mysql` — passed; 10 files and 65 tests, with
-  current migrations and no pending migrations.
+- `npm.cmd run test:run` — passed; 250 files and 2,074 tests.
+- `npm.cmd run test:integration:mysql` — not rerun for this tests/checker/docs-only
+  correction; the prior J3 integration record remains valid because no runtime,
+  schema, or migration file changed.
 - `git diff --check` — passed.
 
-Focused J3 coverage also passed: 19 LIFF/feature files with 224 tests, four
-Auth Audit producer files with 35 tests, and the architecture fixture suite
-with 205 tests. No development server or production build was run. No Prisma
-schema or migration change was required.
+Focused J3 correction coverage also passed. The Auth producer route suites now
+assert all eight event scenarios (hybrid-login failure and success, refresh
+security failure, current logout, logout-all, selected session-family revoke,
+password reset, and signup) with exact action/entity/actor/email/details
+contracts, trusted Cloudflare client IP and User-Agent metadata, persistence
+ordering, and required no-event cases. The best-effort regression exercises
+the real `appendAuditBestEffort()` implementation with failing Audit
+persistence and verifies representative Auth success and failure results are
+unchanged. The architecture fixture suite also covers the corrected LINE
+presentation remediation and preserved LINE server-entry remediation. No
+development server or production build was run. No Prisma schema or migration
+change was required.

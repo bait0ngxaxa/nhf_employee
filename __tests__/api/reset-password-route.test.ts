@@ -4,7 +4,8 @@ import { NextRequest } from "next/server";
 
 import { POST as resetPasswordRoute } from "@/app/api/auth/reset-password/route";
 
-const { hashPasswordMock, prismaMock } = vi.hoisted(() => ({
+const { appendAuditBestEffortMock, hashPasswordMock, prismaMock } = vi.hoisted(() => ({
+    appendAuditBestEffortMock: vi.fn(),
     hashPasswordMock: vi.fn(),
     prismaMock: {
         passwordResetToken: {
@@ -30,13 +31,18 @@ vi.mock("bcryptjs", () => ({
 vi.mock("@/lib/db/prisma", () => ({ prisma: prismaMock }));
 
 vi.mock("@/modules/audit", () => ({
-    appendAuditBestEffort: vi.fn(),
+    appendAuditBestEffort: appendAuditBestEffortMock,
 }));
 
 function buildRequest(password = "StrongPass1"): NextRequest {
     return new NextRequest("http://localhost/api/auth/reset-password", {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: {
+            "content-type": "application/json",
+            "cf-connecting-ip": "203.0.113.30",
+            "x-forwarded-for": "198.51.100.30",
+            "user-agent": "reset-password-test-agent",
+        },
         body: JSON.stringify({
             token: "raw-reset-token",
             password,
@@ -60,6 +66,7 @@ function buildToken(overrides: Record<string, unknown> = {}) {
 describe("Reset password route", () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        appendAuditBestEffortMock.mockResolvedValue(undefined);
         hashPasswordMock.mockResolvedValue("hashed-password");
         prismaMock.passwordResetToken.findUnique.mockResolvedValue(buildToken());
         prismaMock.passwordResetToken.update.mockResolvedValue(buildToken({ used: true }));
@@ -102,6 +109,30 @@ describe("Reset password route", () => {
             },
         });
         expect(prismaMock.authRefreshToken.updateMany).toHaveBeenCalledTimes(1);
+        expect(appendAuditBestEffortMock).toHaveBeenCalledWith({
+            action: "PASSWORD_RESET",
+            entityType: "User",
+            entityId: 7,
+            userId: 7,
+            userEmail: "user@thainhf.org",
+            ipAddress: "203.0.113.30",
+            userAgent: "reset-password-test-agent",
+            details: {
+                metadata: {
+                    method: "email_token",
+                    forceLogoutAllSessions: true,
+                },
+            },
+        });
+        const lastInvalidationCall = Math.max(
+            ...[
+                ...prismaMock.passwordResetToken.updateMany.mock.invocationCallOrder,
+                ...prismaMock.user.update.mock.invocationCallOrder,
+                ...prismaMock.authRefreshToken.updateMany.mock.invocationCallOrder,
+            ],
+        );
+        expect(lastInvalidationCall)
+            .toBeLessThan(appendAuditBestEffortMock.mock.invocationCallOrder[0]);
     });
 
     it("rejects an already-used token", async () => {
@@ -114,6 +145,7 @@ describe("Reset password route", () => {
         expect(response.status).toBe(400);
         expect(prismaMock.$transaction).not.toHaveBeenCalled();
         expect(prismaMock.user.update).not.toHaveBeenCalled();
+        expect(appendAuditBestEffortMock).not.toHaveBeenCalled();
     });
 
     it("rejects an expired token", async () => {
@@ -126,6 +158,7 @@ describe("Reset password route", () => {
         expect(response.status).toBe(400);
         expect(prismaMock.$transaction).not.toHaveBeenCalled();
         expect(prismaMock.user.update).not.toHaveBeenCalled();
+        expect(appendAuditBestEffortMock).not.toHaveBeenCalled();
     });
 
     it("does not change the password or sessions when the atomic claim loses a race", async () => {
@@ -137,6 +170,7 @@ describe("Reset password route", () => {
         expect(prismaMock.user.update).not.toHaveBeenCalled();
         expect(prismaMock.authRefreshToken.updateMany).not.toHaveBeenCalled();
         expect(response.headers.get("set-cookie")).toBeNull();
+        expect(appendAuditBestEffortMock).not.toHaveBeenCalled();
     });
 
     it("rejects a token that expires after precheck but before the atomic claim", async () => {
@@ -164,6 +198,7 @@ describe("Reset password route", () => {
         expect(prismaMock.user.update).not.toHaveBeenCalled();
         expect(prismaMock.authRefreshToken.updateMany).not.toHaveBeenCalled();
         expect(response.headers.get("set-cookie")).toBeNull();
+        expect(appendAuditBestEffortMock).not.toHaveBeenCalled();
     });
 
     it("reevaluates expiration time for each serializable transaction attempt", async () => {
@@ -201,5 +236,18 @@ describe("Reset password route", () => {
         );
         expect(prismaMock.user.update).not.toHaveBeenCalled();
         expect(prismaMock.authRefreshToken.updateMany).not.toHaveBeenCalled();
+        expect(appendAuditBestEffortMock).not.toHaveBeenCalled();
+    });
+
+    it("does not audit a reset token whose user no longer exists", async () => {
+        prismaMock.user.findUnique.mockResolvedValue(null);
+
+        const response = await resetPasswordRoute(buildRequest());
+
+        expect(response.status).toBe(400);
+        expect(prismaMock.$transaction).not.toHaveBeenCalled();
+        expect(prismaMock.user.update).not.toHaveBeenCalled();
+        expect(prismaMock.authRefreshToken.updateMany).not.toHaveBeenCalled();
+        expect(appendAuditBestEffortMock).not.toHaveBeenCalled();
     });
 });

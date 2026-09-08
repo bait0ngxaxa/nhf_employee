@@ -2151,6 +2151,15 @@ function getBoundaryViolation(owner, target) {
         return "Auth presentation consumers must use @/modules/auth/client.";
     }
 
+    const isLinePresentationConsumer = owner.kind === "external"
+        || (owner.kind === "module" && owner.name !== "line");
+
+    if (isLinePresentationConsumer
+        && target.moduleName === "line"
+        && target.pathSegments[0] === "presentation") {
+        return "LINE presentation consumers must use @/modules/line/client.";
+    }
+
     if (target.isPublicEntryPoint) {
         return null;
     }

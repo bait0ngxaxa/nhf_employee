@@ -1690,7 +1690,31 @@ describe("architecture checker module boundaries", () => {
 
         expect(result.violations).toHaveLength(1);
         expect(result.violations[0]).toContain(
-            'cross-module dependencies must use the target module public entry point "@/modules/line"',
+            "LINE presentation consumers must use @/modules/line/client",
+        );
+    });
+
+    it("rejects external consumers deep-importing LINE presentation", async () => {
+        const result = await checkFixture(
+            "app/liff/example.tsx",
+            'import { LiffBootstrap } from "@/modules/line/presentation/LiffBootstrap";\n',
+        );
+
+        expect(result.violations).toHaveLength(1);
+        expect(result.violations[0]).toContain(
+            "LINE presentation consumers must use @/modules/line/client",
+        );
+    });
+
+    it("keeps external LINE server deep imports on the server entry", async () => {
+        const result = await checkFixture(
+            "app/api/line/example.ts",
+            'import { x } from "@/modules/line/infrastructure/persistence/repository";\n',
+        );
+
+        expect(result.violations).toHaveLength(1);
+        expect(result.violations[0]).toContain(
+            'external consumers must use the target module public API "@/modules/line"',
         );
     });
 

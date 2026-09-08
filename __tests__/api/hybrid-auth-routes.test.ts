@@ -5,12 +5,14 @@ import { NextRequest } from "next/server";
 import { POST as refreshRoute } from "@/app/api/auth/refresh/route";
 import { POST as logoutRoute } from "@/app/api/auth/logout/route";
 import { POST as logoutAllRoute } from "@/app/api/auth/logout-all/route";
+import { POST as revokeSessionRoute } from "@/app/api/auth/sessions/revoke/route";
 import {
     HYBRID_ACCESS_COOKIE_NAME,
     HYBRID_REFRESH_COOKIE_NAME,
 } from "@/lib/auth/hybrid/constants";
 
-const { prismaMock } = vi.hoisted(() => ({
+const { appendAuditBestEffortMock, prismaMock } = vi.hoisted(() => ({
+    appendAuditBestEffortMock: vi.fn(),
     prismaMock: {
         authRefreshToken: {
             findUnique: vi.fn(),
@@ -27,7 +29,7 @@ const { prismaMock } = vi.hoisted(() => ({
 }));
 
 vi.mock("@/modules/audit", () => ({
-    appendAuditBestEffort: vi.fn(),
+    appendAuditBestEffort: appendAuditBestEffortMock,
 }));
 
 vi.mock("@/lib/auth/hybrid/tokens", () => ({
@@ -61,6 +63,7 @@ vi.mock("@/lib/db/prisma", () => ({
 describe("Hybrid auth routes", () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        appendAuditBestEffortMock.mockResolvedValue(undefined);
         prismaMock.$transaction.mockImplementation(
             async (callback: (client: typeof prismaMock) => Promise<unknown>) =>
                 callback(prismaMock),
@@ -68,6 +71,34 @@ describe("Hybrid auth routes", () => {
         prismaMock.authRefreshToken.findFirst.mockResolvedValue({ id: "active-session" });
         prismaMock.authRefreshToken.updateMany.mockResolvedValue({ count: 1 });
     });
+
+    function expectRefreshSecurityAudit(
+        reason: "refresh_token_reuse_or_expired" | "inactive_user_refresh_attempt",
+    ): void {
+        expect(appendAuditBestEffortMock).toHaveBeenCalledTimes(1);
+        expect(appendAuditBestEffortMock).toHaveBeenCalledWith({
+            action: "LOGIN_FAILED",
+            entityType: "User",
+            entityId: 1,
+            userId: 1,
+            userEmail: "u@test.com",
+            ipAddress: "203.0.113.20",
+            userAgent: "hybrid-auth-test-agent",
+            details: {
+                metadata: {
+                    authFlow: "hybrid_refresh",
+                    reason,
+                    familyId: "family-1",
+                    ipAddress: "203.0.113.20",
+                    userAgent: "hybrid-auth-test-agent",
+                },
+            },
+        });
+        const lastPersistenceCall = prismaMock.authRefreshToken.updateMany
+            .mock.invocationCallOrder.at(-1) ?? Number.POSITIVE_INFINITY;
+        expect(lastPersistenceCall)
+            .toBeLessThan(appendAuditBestEffortMock.mock.invocationCallOrder[0]);
+    }
 
     it("refresh rotates token and returns success", async () => {
         prismaMock.authRefreshToken.findUnique.mockResolvedValue({
@@ -93,6 +124,7 @@ describe("Hybrid auth routes", () => {
             data: { revokedAt: expect.any(Date), lastUsedAt: expect.any(Date) },
         });
         expect(prismaMock.authRefreshToken.create).toHaveBeenCalledTimes(1);
+        expect(appendAuditBestEffortMock).not.toHaveBeenCalled();
         expect(setCookie).toContain(`${HYBRID_ACCESS_COOKIE_NAME}=`);
         expect(setCookie).toContain(`${HYBRID_REFRESH_COOKIE_NAME}=`);
         expect(setCookie).toContain("Path=/");
@@ -129,6 +161,7 @@ describe("Hybrid auth routes", () => {
             where: { familyId: "family-1", revokedAt: null },
             data: { revokedAt: expect.any(Date) },
         });
+        expectRefreshSecurityAudit("refresh_token_reuse_or_expired");
         expect(setCookie).toContain(`${HYBRID_ACCESS_COOKIE_NAME}=; Path=/; Max-Age=0`);
     });
 
@@ -159,6 +192,7 @@ describe("Hybrid auth routes", () => {
             where: { familyId: "family-1", revokedAt: null },
             data: { revokedAt: expect.any(Date) },
         });
+        expectRefreshSecurityAudit("refresh_token_reuse_or_expired");
         expect(setCookie).toContain(`${HYBRID_ACCESS_COOKIE_NAME}=; Path=/; Max-Age=0`);
     });
 
@@ -185,6 +219,7 @@ describe("Hybrid auth routes", () => {
             where: { familyId: "family-1", revokedAt: null },
             data: { revokedAt: expect.any(Date) },
         });
+        expectRefreshSecurityAudit("refresh_token_reuse_or_expired");
     });
 
     it("refresh revokes the family when a recently rotated token is reused", async () => {
@@ -211,8 +246,29 @@ describe("Hybrid auth routes", () => {
             where: { familyId: "family-1", revokedAt: null },
             data: { revokedAt: expect.any(Date) },
         });
+        expectRefreshSecurityAudit("refresh_token_reuse_or_expired");
         expect(prismaMock.authRefreshToken.create).not.toHaveBeenCalled();
         expect(response.headers.get("set-cookie")).toContain(`${HYBRID_ACCESS_COOKIE_NAME}=; Path=/; Max-Age=0`);
+    });
+
+    it("records an inactive-user refresh security event after family revocation", async () => {
+        prismaMock.authRefreshToken.findUnique.mockResolvedValue({
+            id: "rt1",
+            userId: 1,
+            familyId: "family-1",
+            revokedAt: null,
+            expiresAt: new Date("2030-01-01T00:00:00.000Z"),
+            user: { id: 1, email: "u@test.com", role: "ADMIN", isActive: false },
+        });
+
+        const request = new NextRequest("http://localhost/api/auth/refresh", {
+            method: "POST",
+            headers: { ...csrfHeaders, cookie: `${HYBRID_REFRESH_COOKIE_NAME}=old-refresh-token` },
+        });
+        const response = await refreshRoute(request);
+
+        expect(response.status).toBe(401);
+        expectRefreshSecurityAudit("inactive_user_refresh_attempt");
     });
 
     it("logout revokes current refresh token", async () => {
@@ -230,6 +286,18 @@ describe("Hybrid auth routes", () => {
 
         expect(response.status).toBe(200);
         expect(prismaMock.authRefreshToken.update).toHaveBeenCalledTimes(1);
+        expect(appendAuditBestEffortMock).toHaveBeenCalledWith({
+            action: "LOGOUT",
+            entityType: "User",
+            entityId: 1,
+            userId: 1,
+            userEmail: "u@test.com",
+            ipAddress: "203.0.113.20",
+            userAgent: "hybrid-auth-test-agent",
+            details: { metadata: { method: "hybrid_logout" } },
+        });
+        expect(prismaMock.authRefreshToken.update.mock.invocationCallOrder[0])
+            .toBeLessThan(appendAuditBestEffortMock.mock.invocationCallOrder[0]);
         expect(response.headers.get("set-cookie")).toContain(`${HYBRID_REFRESH_COOKIE_NAME}=`);
     });
 
@@ -254,6 +322,18 @@ describe("Hybrid auth routes", () => {
             where: { userId: 1, revokedAt: null },
             data: { revokedAt: expect.any(Date) },
         });
+        expect(appendAuditBestEffortMock).toHaveBeenCalledWith({
+            action: "LOGOUT",
+            entityType: "User",
+            entityId: 1,
+            userId: 1,
+            userEmail: "u@test.com",
+            ipAddress: "203.0.113.20",
+            userAgent: "hybrid-auth-test-agent",
+            details: { metadata: { method: "hybrid_logout_all" } },
+        });
+        expect(prismaMock.authRefreshToken.updateMany.mock.invocationCallOrder[0])
+            .toBeLessThan(appendAuditBestEffortMock.mock.invocationCallOrder[0]);
     });
 
     it("logout-all rejects an access JWT from a revoked session family", async () => {
@@ -268,9 +348,68 @@ describe("Hybrid auth routes", () => {
         expect(response.status).toBe(401);
         expect(prismaMock.user.findUnique).not.toHaveBeenCalled();
         expect(prismaMock.authRefreshToken.updateMany).not.toHaveBeenCalled();
+        expect(appendAuditBestEffortMock).not.toHaveBeenCalled();
+    });
+
+    it("audits selected session-family revocation after revoking the current family", async () => {
+        prismaMock.user.findUnique.mockResolvedValue({
+            email: "u@test.com",
+            isActive: true,
+            deletedAt: null,
+            tokenVersion: 1,
+            employee: null,
+        });
+        prismaMock.authRefreshToken.findFirst
+            .mockResolvedValueOnce({ id: "active-session" })
+            .mockResolvedValueOnce({
+                familyId: "family-1",
+                user: { email: "u@test.com" },
+            });
+
+        const request = new NextRequest("http://localhost/api/auth/sessions/revoke", {
+            method: "POST",
+            headers: {
+                ...csrfHeaders,
+                cookie: [
+                    `${HYBRID_ACCESS_COOKIE_NAME}=access-token`,
+                    `${HYBRID_REFRESH_COOKIE_NAME}=old-refresh-token`,
+                ].join("; "),
+            },
+            body: JSON.stringify({ sessionId: "family-1" }),
+        });
+        const response = await revokeSessionRoute(request);
+
+        expect(response.status).toBe(200);
+        expect(prismaMock.authRefreshToken.updateMany).toHaveBeenCalledWith({
+            where: { familyId: "family-1", revokedAt: null },
+            data: { revokedAt: expect.any(Date) },
+        });
+        expect(appendAuditBestEffortMock).toHaveBeenCalledWith({
+            action: "LOGOUT",
+            entityType: "User",
+            entityId: 1,
+            userId: 1,
+            userEmail: "u@test.com",
+            ipAddress: "203.0.113.20",
+            userAgent: "hybrid-auth-test-agent",
+            details: {
+                metadata: {
+                    method: "hybrid_logout_single_session",
+                    familyId: "family-1",
+                },
+            },
+        });
+        expect(prismaMock.authRefreshToken.updateMany.mock.invocationCallOrder[0])
+            .toBeLessThan(appendAuditBestEffortMock.mock.invocationCallOrder[0]);
+        expect(response.headers.get("set-cookie")).toContain(
+            `${HYBRID_ACCESS_COOKIE_NAME}=; Path=/; Max-Age=0`,
+        );
     });
 });
     const csrfHeaders = {
         origin: "http://localhost",
         "x-requested-with": "XMLHttpRequest",
+        "cf-connecting-ip": "203.0.113.20",
+        "x-forwarded-for": "198.51.100.20",
+        "user-agent": "hybrid-auth-test-agent",
     };
