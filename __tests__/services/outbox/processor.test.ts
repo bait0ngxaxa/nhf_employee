@@ -615,6 +615,18 @@ describe("processOutbox", () => {
                 referenceId: "77",
             }),
         });
+        expect(prismaMock.notificationOutbox.updateMany).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: expect.objectContaining({
+                    id: 113,
+                    status: "PROCESSING",
+                }),
+                data: expect.objectContaining({
+                    status: "FAILED",
+                    lastError: "LINE stock request notification failed",
+                }),
+            }),
+        );
 
         const inAppOrder = prismaMock.notification.create.mock.invocationCallOrder[0];
         const lineOrder = vi.mocked(sendStockLineBroadcast).mock.invocationCallOrder[0];

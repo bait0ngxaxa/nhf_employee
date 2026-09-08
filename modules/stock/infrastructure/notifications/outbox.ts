@@ -61,7 +61,7 @@ export async function dispatchStockOutbox(
             const parsedPayload = parseStockRequestLinePayload(payload);
             await notifyAdminsStockRequestLineInApp(parsedPayload);
             if (!(await sendStockRequestNotification(parsedPayload))) {
-                throw new Error("LINE stock notification failed");
+                throw new Error("LINE stock request notification failed");
             }
             return "SENT";
         }
